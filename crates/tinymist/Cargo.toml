@@ -1,0 +1,56 @@
+[package]
+name = "tinymist-cli"
+description = "CLI for tinymist."
+categories = ["compilers", "command-line-utilities"]
+keywords = ["cli", "language", "typst"]
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "tinymist"
+path = "src/main.rs"
+test = false
+doctest = false
+bench = false
+doc = false
+
+[dependencies]
+
+once_cell.workspace = true
+anyhow.workspace = true
+comemo.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+futures.workspace = true
+regex.workspace = true
+itertools.workspace = true
+lazy_static.workspace = true
+strum.workspace = true
+async-trait.workspace = true
+env_logger.workspace = true
+log.workspace = true
+percent-encoding.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+parking_lot.workspace = true
+
+typst.workspace = true
+typst-ide.workspace = true
+typst-pdf.workspace = true
+typst-assets = { workspace = true, features = ["fonts"] }
+
+typst-ts-core = { version = "0.4.2-rc6", default-features = false, features = [
+    "flat-vector",
+    "vector-bbox",
+] }
+typst-ts-compiler.workspace = true
+typst-preview.workspace = true
+
+tower-lsp.workspace = true
+
+# [lints]
+# workspace = true

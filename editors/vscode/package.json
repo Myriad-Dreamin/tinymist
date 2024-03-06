@@ -1,0 +1,349 @@
+{
+    "name": "tinymist",
+    "description": "A language server for Typst",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Myriad-Dreamin/tinymist"
+    },
+    "displayName": "Tinymist Typst LSP",
+    "author": "Myriad-Dreamin",
+    "contributors": [
+        "Myriad-Dreamin",
+        "Nathan Varner"
+    ],
+    "publisher": "Myriad-Dreamin",
+    "license": "Apache-2.0 OR MIT",
+    "version": "0.12.0",
+    "engines": {
+        "vscode": "^1.71.0"
+    },
+    "main": "./out/extension.js",
+    "contributes": {
+        "configuration": {
+            "type": "object",
+            "title": "Typst LSP",
+            "properties": {
+                "tinymist.exportPdf": {
+                    "title": "Export PDF",
+                    "description": "The extension can export PDFs of your Typst files. This setting controls whether this feature is enabled and how often it runs.",
+                    "type": "string",
+                    "default": "onSave",
+                    "enum": [
+                        "never",
+                        "onSave",
+                        "onType"
+                    ],
+                    "enumDescriptions": [
+                        "Never export PDFs, you will manually run typst.",
+                        "Export PDFs when you save a file.",
+                        "Export PDFs as you type in a file."
+                    ]
+                },
+                "tinymist.rootPath": {
+                    "title": "Root path",
+                    "description": "Configure the root for absolute paths in typst",
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "tinymist.semanticTokens": {
+                    "title": "Semantic tokens mode",
+                    "description": "Enable or disable semantic tokens (LSP syntax highlighting)",
+                    "type": "string",
+                    "default": "enable",
+                    "enum": [
+                        "enable",
+                        "disable"
+                    ],
+                    "enumDescriptions": [
+                        "Use semantic tokens for syntax highlighting",
+                        "Do not use semantic tokens for syntax highlighting"
+                    ]
+                },
+                "tinymist.serverPath": {
+                    "title": "Path to server executable",
+                    "description": "The extension can use a local tinymist executable instead of the one bundled with the extension. This setting controls the path to the executable.",
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "tinymist.trace.server": {
+                    "scope": "window",
+                    "type": "string",
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
+                    "default": "off",
+                    "description": "Traces the communication between VS Code and the language server."
+                },
+                "tinymist.experimentalFormatterMode": {
+                    "title": "Enable Experimental Formatter",
+                    "description": "The extension can format Typst files using typstfmt (experimental).",
+                    "type": "string",
+                    "default": "off",
+                    "enum": [
+                        "off",
+                        "on"
+                    ],
+                    "enumDescriptions": [
+                        "Formatter is not activated.",
+                        "Experimental formatter is activated."
+                    ]
+                }
+            }
+        },
+        "configurationDefaults": {
+            "[typst]": {
+                "editor.wordWrap": "on",
+                "editor.semanticHighlighting.enabled": true,
+                "editor.tabSize": 2
+            }
+        },
+        "languages": [
+            {
+                "id": "typst",
+                "configuration": "./language-configuration.json",
+                "extensions": [
+                    ".typ"
+                ],
+                "aliases": [
+                    "Typst"
+                ],
+                "icon": {
+                    "light": "./icons/typst-small.png",
+                    "dark": "./icons/typst-small.png"
+                }
+            }
+        ],
+        "semanticTokenTypes": [
+            {
+                "id": "bool",
+                "description": "A boolean literal"
+            },
+            {
+                "id": "punct",
+                "description": "Punctuation in code"
+            },
+            {
+                "id": "escape",
+                "description": "Escape sequence"
+            },
+            {
+                "id": "link",
+                "description": "Hyperlink"
+            },
+            {
+                "id": "raw",
+                "description": "Raw text"
+            },
+            {
+                "id": "label",
+                "description": "Label"
+            },
+            {
+                "id": "ref",
+                "description": "Reference to a label"
+            },
+            {
+                "id": "heading",
+                "description": "Heading"
+            },
+            {
+                "id": "marker",
+                "description": "List, enum, or term list marker"
+            },
+            {
+                "id": "term",
+                "description": "Term in a term list"
+            },
+            {
+                "id": "delim",
+                "description": "Delimiter of a different type of markup"
+            },
+            {
+                "id": "pol",
+                "description": "Interpolated variable"
+            },
+            {
+                "id": "error",
+                "description": "Syntax error"
+            },
+            {
+                "id": "text",
+                "description": "Text"
+            }
+        ],
+        "semanticTokenModifiers": [
+            {
+                "id": "math",
+                "description": "Math mode markup"
+            },
+            {
+                "id": "strong",
+                "description": "Strong (usually bolded) text"
+            },
+            {
+                "id": "emph",
+                "description": "Emphasized (usually italicized) text"
+            }
+        ],
+        "semanticTokenScopes": [
+            {
+                "language": "typst",
+                "scopes": {
+                    "*.strong.emph": [
+                        "markup.bold.typst markup.italic.typst"
+                    ],
+                    "*.strong": [
+                        "markup.bold.typst"
+                    ],
+                    "*.emph": [
+                        "markup.italic.typst"
+                    ],
+                    "*.math": [
+                        "markup.math.typst"
+                    ],
+                    "bool": [
+                        "constant.language.boolean.typst"
+                    ],
+                    "punct": [
+                        "punctuation.typst",
+                        "punctuation.definition.typst"
+                    ],
+                    "escape": [
+                        "constant.character.escape.typst",
+                        "keyword.operator.typst",
+                        "punctuation.definition.typst"
+                    ],
+                    "link": [
+                        "markup.underline.link.typst"
+                    ],
+                    "raw": [
+                        "markup.inline.raw.typst",
+                        "markup.raw.inline.typst"
+                    ],
+                    "delim.math": [
+                        "punctuation.definition.math.typst",
+                        "punctuation.definition.string.end.math.typst",
+                        "string.quoted.other.typst"
+                    ],
+                    "operator.math": [
+                        "keyword.operator.math.typst"
+                    ],
+                    "heading": [
+                        "markup.heading.typst"
+                    ],
+                    "marker": [
+                        "markup.list.typst punctuation.definition.list.begin.typst",
+                        "markup.list.typst",
+                        "punctuation.definition.list.begin.typst"
+                    ],
+                    "term": [
+                        "markup.list.term.typst",
+                        "markup.bold.term.typst"
+                    ],
+                    "label": [
+                        "string.other.link.title.typst",
+                        "entity.name.label.typst",
+                        "meta.link.inline.typst",
+                        "markup.underline.link.typst"
+                    ],
+                    "ref": [
+                        "string.other.link.typst",
+                        "markup.other.reference.typst",
+                        "entity.name.label.typst",
+                        "meta.link.inline.typst",
+                        "markup.underline.link.typst"
+                    ],
+                    "pol": [
+                        "meta.interpolation.typst",
+                        "variable.typst"
+                    ],
+                    "error": [
+                        "invalid.typst"
+                    ]
+                }
+            }
+        ],
+        "commands": [
+            {
+                "command": "tinymist.exportCurrentPdf",
+                "title": "Export the currently open file as PDF",
+                "category": "Typst"
+            },
+            {
+                "command": "tinymist.showPdf",
+                "title": "Show the compiled PDF of the currently opened typst file",
+                "category": "Typst",
+                "icon": "$(open-preview)"
+            },
+            {
+                "command": "tinymist.clearCache",
+                "title": "Clear all cached resources",
+                "category": "Typst"
+            }
+        ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "tinymist.exportCurrentPdf",
+                    "when": "editorLangId == typst"
+                },
+                {
+                    "command": "tinymist.clearCache",
+                    "when": "editorLangId == typst"
+                }
+            ],
+            "editor/title": [
+                {
+                    "command": "tinymist.showPdf",
+                    "group": "navigation",
+                    "when": "editorLangId == typst"
+                }
+            ]
+        }
+    },
+    "activationEvents": [
+        "onLanguage:typst",
+        "onCommand:tinymist.exportCurrentPdf",
+        "onCommand:tinymist.clearCache"
+    ],
+    "scripts": {
+        "build-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node16",
+        "vscode:prepublish": "npm run build-base -- --minify",
+        "package": "vsce package",
+        "compile": "npm run build-base -- --sourcemap",
+        "watch": "npm run build-base -- --sourcemap --watch",
+        "check": "tsc --noEmit",
+        "lint": "eslint ./src --ext .ts",
+        "lint-fix": "eslint ./src --ext .ts --fix",
+        "format-check": "prettier --check .",
+        "format": "prettier --write .",
+        "test": ""
+    },
+    "dependencies": {
+        "vscode-languageclient": "^9.0.1"
+    },
+    "devDependencies": {
+        "@types/node": "^20.8.10",
+        "@types/vscode": "~1.71.0",
+        "@typescript-eslint/eslint-plugin": "^6.9.1",
+        "@typescript-eslint/parser": "^6.9.1",
+        "@vscode/vsce": "^2.22.0",
+        "esbuild": "^0.19.5",
+        "eslint": "^8.52.0",
+        "eslint-config-prettier": "^9.0.0",
+        "eslint-plugin-import": "^2.29.0",
+        "eslint-plugin-n": "^16.2.0",
+        "eslint-plugin-promise": "^6.1.1",
+        "ovsx": "^0.8.3",
+        "prettier": "^3.0.3",
+        "typescript": "^5.2.2"
+    }
+}

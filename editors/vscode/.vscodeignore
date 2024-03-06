@@ -1,0 +1,11 @@
+**
+!language-configuration.json
+!typst.tmLanguage.json
+!out/extension.js
+!out/tinymist
+!out/tinymist.exe
+!package.json
+!package-lock.json
+!icons/**
+!README.md
+!LICENSE.md

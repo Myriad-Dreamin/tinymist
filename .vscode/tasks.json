@@ -1,0 +1,75 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "VS Code Extension Prelaunch",
+			"dependsOn": [
+				"Compile VS Code Extension",
+				"Build Debug LSP Binary",
+				"Copy Debug LSP Binary to VS Code Extension"
+			],
+			"dependsOrder": "sequence",
+		},
+		{
+			"label": "VS Code Extension Prelaunch [Jaeger]",
+			"dependsOn": [
+				"Compile VS Code Extension",
+				"Build Debug LSP Binary [Jaeger]",
+				"Copy Debug LSP Binary to VS Code Extension"
+			],
+			"dependsOrder": "sequence"
+		},
+		{
+			"label": "Compile VS Code Extension",
+			"type": "npm",
+			"script": "compile",
+			"path": "editors/vscode",
+			"group": "build",
+		},
+		{
+			"label": "Build Debug LSP Binary",
+			"type": "cargo",
+			"command": "build",
+			"args": [ "--bin", "tinymist" ],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build Debug LSP Binary [Jaeger]",
+			"type": "cargo",
+			"command": "build",
+			"args": [ "--bin", "tinymist", "--features", "jaeger" ],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Copy Debug LSP Binary to VS Code Extension",
+			"type": "shell",
+			"windows": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}\\target\\debug\\tinymist.exe",
+					"${workspaceFolder}\\editors\\vscode\\out\\"
+				]
+			},
+			"linux": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}/target/debug/tinymist",
+					"${workspaceFolder}/editors/vscode/out/"
+				]
+			},
+			"osx": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}/target/debug/tinymist",
+					"${workspaceFolder}/editors/vscode/out/"
+				]
+			}
+		}
+	]
+}

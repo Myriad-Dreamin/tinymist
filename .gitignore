@@ -1,0 +1,8 @@
+/target/
+/editors/lapce/target/
+result*
+.direnv
+.envrc
+node_modules/
+/editors/vscode/out/
+/editors/lapce/out/

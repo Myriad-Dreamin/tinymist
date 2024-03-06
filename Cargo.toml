@@ -1,0 +1,94 @@
+[workspace.package]
+description = "Fast lsp implementation for typst."
+authors = ["Myriad-Dreamin <camiyoru@gmail.com>"]
+version = "0.1.0"
+edition = "2021"
+readme = "README.md"
+license = "Apache-2.0"
+homepage = "https://github.com/_/tinymist"
+repository = "https://github.com/_/tinymist"
+rust-version = "1.74"
+
+[workspace]
+resolver = "2"
+members = ["crates/*", "external/typst-preview"]
+
+[workspace.dependencies]
+
+once_cell = "1"
+anyhow = "1"
+
+fxhash = "0.2.1"
+ecow = "0.2.0"
+comemo = "0.3"
+ena = "0.14.2"
+futures = "0.3"
+regex = "1.8.1"
+itertools = "0.12.0"
+lazy_static = "1.4.0"
+env_logger = "0.11.1"
+log = "0.4.17"
+percent-encoding = "2.3.0"
+strum = { version = "0.25.0", features = ["derive"] }
+async-trait = "0.1.73"
+parking_lot = "0.12.1"
+thiserror = "1.0.44"
+
+typst = "0.10.0"
+typst-ide = "0.10.0"
+typst-pdf = "0.10.0"
+typst-assets = { git = "https://github.com/typst/typst-assets", rev = "79e1c84" }
+typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "98e3d3a42877b195f87223060882d55fd5aaa04a", package = "typst-ts-core" }
+typst-ts-compiler = { version = "0.4.2-rc6" }
+typst-preview = { path = "external/typst-preview" }
+
+tower-lsp = "0.20.0"
+
+clap = { version = "4.4", features = ["derive", "env", "unicode", "wrap_help"] }
+clap_builder = { version = "4", features = ["string"] }
+clap_complete = "4.4"
+clap_complete_fig = "4.4"
+clap_mangen = { version = "0.2.15" }
+vergen = { version = "8.2.5", features = [
+    "build",
+    "cargo",
+    "git",
+    "gitcl",
+    "rustc",
+] }
+tokio = { version = "1.34.0", features = [
+    "macros",
+    "rt-multi-thread",
+    "io-std",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+divan = "0.1.7"
+insta = "1.34"
+
+[profile.release]
+lto = true        # Enable link-time optimization
+strip = true      # Strip symbols from binary*
+opt-level = 3     # Optimize for speed
+codegen-units = 1 # Reduce number of codegen units to increase optimizations
+panic = 'abort'   # Abort on panic
+
+[workspace.lints.rust]
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+uninlined_format_args = "warn"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+missing_safety_doc = "warn"
+undocumented_unsafe_blocks = "warn"
+
+[patch.crates-io]
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.10.0-half" }
+typst-ide = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.10.0-half" }
+typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.10.0-half" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.10.0-half" }
+typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "98e3d3a42877b195f87223060882d55fd5aaa04a", package = "typst-ts-svg-exporter" }
+typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "98e3d3a42877b195f87223060882d55fd5aaa04a", package = "typst-ts-core" }
+typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "98e3d3a42877b195f87223060882d55fd5aaa04a", package = "typst-ts-compiler" }
