@@ -5,22 +5,9 @@ use futures::future::BoxFuture;
 use itertools::Itertools;
 use serde::Deserialize;
 use serde_json::{Map, Value};
-use tower_lsp::lsp_types::{
-    self, ConfigurationItem, InitializeParams, PositionEncodingKind, Registration,
-};
+use tower_lsp::lsp_types::{self, ConfigurationItem, InitializeParams, PositionEncodingKind};
 
 use crate::ext::InitializeParamsExt;
-
-const CONFIG_REGISTRATION_ID: &str = "config";
-const CONFIG_METHOD_ID: &str = "workspace/didChangeConfiguration";
-
-pub fn get_config_registration() -> Registration {
-    Registration {
-        id: CONFIG_REGISTRATION_ID.to_owned(),
-        method: CONFIG_METHOD_ID.to_owned(),
-        register_options: None,
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]

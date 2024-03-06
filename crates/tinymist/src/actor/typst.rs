@@ -1,92 +1,56 @@
-use std::collections::HashMap;
-use std::path::Path;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex as SyncMutex};
+use std::{
+    collections::HashMap,
+    iter,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex as SyncMutex},
+};
 
 use anyhow::anyhow;
 use futures::future::join_all;
-use itertools::Itertools;
-use log::error;
-use log::trace;
-use log::warn;
-use tokio::sync::broadcast;
-use tokio::sync::mpsc;
-use tokio::sync::watch;
-use tokio::sync::Mutex;
-use tokio::sync::RwLock;
-
-use tower_lsp::lsp_types::SelectionRange;
+use itertools::{Format, Itertools};
+use log::{error, trace, warn};
+use tokio::sync::{broadcast, mpsc, watch, Mutex, RwLock};
 use tower_lsp::lsp_types::{
-    CompletionResponse, DocumentSymbolResponse, Documentation, Hover, Location as LspLocation,
-    MarkupContent, MarkupKind, Position as LspPosition, SemanticTokens, SemanticTokensDelta,
-    SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp, SignatureInformation,
-    SymbolInformation, SymbolKind, TextDocumentContentChangeEvent, Url,
+    CompletionResponse, DiagnosticRelatedInformation, DocumentSymbolResponse, Documentation, Hover,
+    Location as LspLocation, MarkupContent, MarkupKind, Position as LspPosition, SelectionRange,
+    SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult,
+    SignatureHelp, SignatureInformation, SymbolInformation, SymbolKind,
+    TextDocumentContentChangeEvent, Url,
 };
-use typst::diag::SourceDiagnostic;
-use typst_ts_core::typst::prelude::EcoVec;
-
-use typst::diag::FileError;
-use typst::diag::FileResult;
-use typst::diag::SourceResult;
-use typst::foundations::Func;
-use typst::foundations::ParamInfo;
-use typst::foundations::Value;
+use typst::diag::{EcoString, FileError, FileResult, SourceDiagnostic, SourceResult, Tracepoint};
+use typst::foundations::{Func, ParamInfo, Value};
 use typst::layout::Position;
 use typst::model::Document;
-use typst::syntax::ast;
-use typst::syntax::ast::AstNode;
-use typst::syntax::LinkedNode;
-use typst::syntax::Source;
-use typst::syntax::Span;
-use typst::syntax::SyntaxKind;
-use typst::syntax::VirtualPath;
+use typst::syntax::{
+    ast::{self, AstNode},
+    FileId, LinkedNode, Source, Span, Spanned, SyntaxKind, VirtualPath,
+};
 use typst::World;
 use typst_preview::CompilationHandleImpl;
-use typst_ts_compiler::service::WorkspaceProvider;
-use typst_ts_compiler::service::{
-    CompileActor, CompileClient as TsCompileClient, CompileExporter, Compiler, WorldExporter,
-};
-use typst_ts_compiler::service::{CompileDriver as CompileDriverInner, CompileMiddleware};
-use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
-use typst_ts_compiler::NotifyApi;
-use typst_ts_compiler::Time;
-use typst_ts_compiler::TypstSystemWorld;
-use typst_ts_core::config::CompileOpts;
-use typst_ts_core::debug_loc::SourceSpanOffset;
-use typst_ts_core::error::prelude::*;
-use typst_ts_core::Bytes;
-use typst_ts_core::DynExporter;
-use typst_ts_core::Error;
-
 use typst_preview::{CompilationHandle, CompileStatus};
 use typst_preview::{CompileHost, EditorServer, MemoryFiles, MemoryFilesShort, SourceFileServer};
 use typst_preview::{DocToSrcJumpInfo, Location};
-use typst_ts_core::ImmutPath;
-use typst_ts_core::TypstDocument;
-use typst_ts_core::TypstFileId;
+use typst_ts_compiler::service::{
+    CompileActor, CompileClient as TsCompileClient, CompileDriver as CompileDriverInner,
+    CompileExporter, CompileMiddleware, Compiler, WorkspaceProvider, WorldExporter,
+};
+use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
+use typst_ts_compiler::{NotifyApi, Time, TypstSystemWorld};
+use typst_ts_core::{
+    config::CompileOpts, debug_loc::SourceSpanOffset, error::prelude::*, typst::prelude::EcoVec,
+    Bytes, DynExporter, Error, ImmutPath, TypstDocument, TypstFileId,
+};
 
-use itertools::Format;
-use std::iter;
-use tower_lsp::lsp_types::DiagnosticRelatedInformation;
-use typst::diag::{EcoString, Tracepoint};
-use typst::syntax::{FileId, Spanned};
-
+use crate::actor::render::PdfExportActor;
+use crate::actor::render::RenderActorRequest;
 use crate::analysis::analyze::analyze_expr;
 use crate::config::PositionEncoding;
-use crate::lsp_typst_boundary::lsp_to_typst;
-use crate::lsp_typst_boundary::typst_to_lsp;
-use crate::lsp_typst_boundary::LspDiagnostic;
-use crate::lsp_typst_boundary::LspRange;
-use crate::lsp_typst_boundary::LspRawRange;
-use crate::lsp_typst_boundary::LspSeverity;
-use crate::lsp_typst_boundary::TypstDiagnostic;
-use crate::lsp_typst_boundary::TypstSeverity;
-use crate::lsp_typst_boundary::TypstSpan;
+use crate::lsp::LspHost;
+use crate::lsp_typst_boundary::{
+    lsp_to_typst, typst_to_lsp, LspDiagnostic, LspRange, LspRawRange, LspSeverity, TypstDiagnostic,
+    TypstSeverity, TypstSpan,
+};
 use crate::semantic_tokens::SemanticTokenCache;
-use crate::server::LspHost;
-
-use super::render::PdfExportActor;
-use super::render::RenderActorRequest;
 
 type CompileService<H> = CompileActor<Reporter<CompileExporter<CompileDriver>, H>>;
 type CompileClient<H> = TsCompileClient<CompileService<H>>;

@@ -1,34 +1,68 @@
+pub use tower_lsp::Client as LspHost;
+
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use anyhow::Context;
 use async_trait::async_trait;
 use futures::FutureExt;
 use log::{error, info, trace};
+use once_cell::sync::OnceCell;
 use serde_json::Value as JsonValue;
+use tokio::sync::{Mutex, RwLock};
 use tower_lsp::lsp_types::*;
 use tower_lsp::{jsonrpc, LanguageServer};
+use typst::model::Document;
 use typst_ts_core::config::CompileOpts;
 
 use crate::actor;
+use crate::actor::typst::CompileCluster;
 use crate::actor::typst::{
     CompilerQueryResponse, CompletionRequest, DocumentSymbolRequest, HoverRequest,
     OnSaveExportRequest, SelectionRangeRequest, SemanticTokensDeltaRequest,
     SemanticTokensFullRequest, SignatureHelpRequest, SymbolRequest,
 };
 use crate::config::{
-    get_config_registration, Config, ConstConfig, ExperimentalFormatterMode, ExportPdfMode,
-    SemanticTokensMode,
+    Config, ConstConfig, ExperimentalFormatterMode, ExportPdfMode, SemanticTokensMode,
 };
 use crate::ext::InitializeParamsExt;
-// use crate::server::formatting::{get_formatting_registration,
-// get_formatting_unregistration};
-// use crate::workspace::Workspace;
 
 use super::semantic_tokens::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
     get_semantic_tokens_unregistration,
 };
-use super::TypstServer;
+
+pub struct TypstServer {
+    pub client: LspHost,
+    pub document: Mutex<Arc<Document>>,
+    // typst_thread: TypstThread,
+    pub universe: OnceCell<CompileCluster>,
+    pub config: Arc<RwLock<Config>>,
+    pub const_config: OnceCell<ConstConfig>,
+}
+
+impl TypstServer {
+    pub fn new(client: LspHost) -> Self {
+        Self {
+            // typst_thread: Default::default(),
+            universe: Default::default(),
+            config: Default::default(),
+            const_config: Default::default(),
+            client,
+            document: Default::default(),
+        }
+    }
+
+    pub fn const_config(&self) -> &ConstConfig {
+        self.const_config
+            .get()
+            .expect("const config should be initialized")
+    }
+
+    pub fn universe(&self) -> &CompileCluster {
+        self.universe.get().expect("universe should be initialized")
+    }
+}
 
 macro_rules! run_query {
     ($self: expr, $query: ident, $req: expr) => {{
@@ -208,67 +242,25 @@ impl LanguageServer for TypstServer {
             }));
         }
 
-        // if const_config.supports_document_formatting_dynamic_registration {
-        //     trace!("setting up to dynamically register document formatting support");
-
-        //     let client = self.client.clone();
-        //     let register = move || {
-        //         trace!("dynamically registering document formatting");
-        //         let client = client.clone();
-        //         async move {
-        //             client
-        //                 .register_capability(vec![get_formatting_registration()])
-        //                 .await
-        //                 .context("could not register document formatting")
-        //         }
-        //     };
-
-        //     let client = self.client.clone();
-        //     let unregister = move || {
-        //         trace!("unregistering document formatting");
-        //         let client = client.clone();
-        //         async move {
-        //             client
-        //                 .unregister_capability(vec![get_formatting_unregistration()])
-        //                 .await
-        //                 .context("could not unregister document formatting")
-        //         }
-        //     };
-
-        //     if config.formatter == ExperimentalFormatterMode::On {
-        //         if let Some(err) = register().await.err() {
-        //             error!("could not dynamically register document formatting:
-        // {err}");         }
-        //     }
-
-        //     config.listen_formatting(Box::new(move |formatter| match formatter {
-        //         ExperimentalFormatterMode::On => register().boxed(),
-        //         ExperimentalFormatterMode::Off => unregister().boxed(),
-        //     }));
-        // }
-
         if const_config.supports_config_change_registration {
             trace!("setting up to request config change notifications");
 
+            const CONFIG_REGISTRATION_ID: &str = "config";
+            const CONFIG_METHOD_ID: &str = "workspace/didChangeConfiguration";
+
             let err = self
                 .client
-                .register_capability(vec![get_config_registration()])
+                .register_capability(vec![Registration {
+                    id: CONFIG_REGISTRATION_ID.to_owned(),
+                    method: CONFIG_METHOD_ID.to_owned(),
+                    register_options: None,
+                }])
                 .await
                 .err();
             if let Some(err) = err {
                 error!("could not register to watch config changes: {err}");
             }
         }
-
-        // trace!("setting up to watch Typst files");
-        // let watch_files_error = self
-        //     .client
-        //     .register_capability(vec![self.get_watcher_registration()])
-        //     .await
-        //     .err();
-        // if let Some(err) = watch_files_error {
-        //     error!("could not register to watch Typst files: {err}");
-        // }
 
         info!("server initialized");
     }
@@ -314,26 +306,6 @@ impl LanguageServer for TypstServer {
             let _ = run_query!(self, OnSaveExport, OnSaveExportRequest { path });
         }
     }
-
-    // async fn did_change_watched_files(&self, params: DidChangeWatchedFilesParams)
-    // {     let changes = params.changes;
-
-    //     let mut workspace = self.workspace().write().await;
-
-    //     for change in changes {
-    //         self.handle_file_change_event(&mut workspace, change);
-    //     }
-    // }
-
-    // async fn did_change_workspace_folders(&self, params:
-    // DidChangeWorkspaceFoldersParams) {     let event = params.event;
-
-    //     let mut workspace = self.workspace().write().await;
-
-    //     if let Err(err) = workspace.handle_workspace_folders_change_event(&event)
-    // {         error!("error when changing workspace folders: {err}");
-    //     }
-    // }
 
     async fn execute_command(
         &self,
@@ -543,29 +515,6 @@ impl LanguageServer for TypstServer {
             }
         }
     }
-
-    // async fn formatting(
-    //     &self,
-    //     params: DocumentFormattingParams,
-    // ) -> jsonrpc::Result<Option<Vec<TextEdit>>> {
-    //     let uri = params.text_document.uri;
-
-    //     let edits = self
-    //         .scope_with_source(&uri)
-    //         .await
-    //         .map_err(|err| {
-    //             error!("error getting document to format: {err} {uri}");
-    //             jsonrpc::Error::internal_error()
-    //         })?
-    //         .run2(|source, project| self.format_document(project, source))
-    //         .await
-    //         .map_err(|err| {
-    //             error!("error formatting document: {err} {uri}");
-    //             jsonrpc::Error::internal_error()
-    //         })?;
-
-    //     Ok(Some(edits))
-    // }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LspCommand {

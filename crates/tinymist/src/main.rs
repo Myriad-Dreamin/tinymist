@@ -3,7 +3,6 @@
 mod config;
 mod ext;
 mod lsp_typst_boundary;
-mod server;
 
 // pub mod formatting;
 pub mod actor;
@@ -11,9 +10,9 @@ pub mod analysis;
 pub mod lsp;
 pub mod semantic_tokens;
 
-use server::TypstServer;
-
 use tower_lsp::{LspService, Server};
+
+use lsp::TypstServer;
 
 // #[derive(Debug, Clone)]
 // struct Args {}
@@ -47,10 +46,6 @@ async fn main() {
         .filter_module("typst_ts_compiler::service::watch", log::LevelFilter::Debug)
         .try_init();
 
-    run().await;
-}
-
-async fn run() {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
