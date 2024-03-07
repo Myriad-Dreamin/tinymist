@@ -36,7 +36,7 @@ use typst_ts_core::{
 
 use crate::actor::render::PdfExportActor;
 use crate::actor::render::RenderActorRequest;
-use crate::lsp::LspHost;
+use crate::LspHost;
 
 type CompileService<H> = CompileActor<Reporter<CompileExporter<CompileDriver>, H>>;
 type CompileClient<H> = TsCompileClient<CompileService<H>>;

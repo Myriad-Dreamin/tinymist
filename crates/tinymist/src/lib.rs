@@ -1,3 +1,6 @@
+// pub mod formatting;
+pub mod actor;
+
 pub use tower_lsp::Client as LspHost;
 
 use std::borrow::Cow;
@@ -29,7 +32,6 @@ use tower_lsp::{jsonrpc, lsp_types::*, LanguageServer};
 use typst::model::Document;
 use typst_ts_core::config::CompileOpts;
 
-use crate::actor;
 use crate::actor::typst::CompileCluster;
 use crate::actor::typst::{CompilerQueryResponse, OnSaveExportRequest};
 
