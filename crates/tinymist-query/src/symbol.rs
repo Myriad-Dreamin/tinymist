@@ -1,7 +1,9 @@
 use typst_ts_compiler::NotifyApi;
 
-use crate::document_symbol::get_lexical_hierarchy;
-use crate::{prelude::*, LexicalHierarchy, LexicalKind, LexicalScopeGranularity};
+use crate::{
+    analysis::{get_lexical_hierarchy, LexicalHierarchy, LexicalScopeKind},
+    prelude::*,
+};
 
 #[derive(Debug, Clone)]
 pub struct SymbolRequest {
@@ -23,12 +25,13 @@ impl SymbolRequest {
                 return;
             };
             let uri = Url::from_file_path(path).unwrap();
-            let res = get_lexical_hierarchy(source.clone(), LexicalScopeGranularity::None)
-                .and_then(|symbols| {
+            let res = get_lexical_hierarchy(source.clone(), LexicalScopeKind::Symbol).and_then(
+                |symbols| {
                     self.pattern.as_ref().map(|pattern| {
                         filter_document_symbols(&symbols, pattern, &source, &uri, position_encoding)
                     })
-                });
+                },
+            );
 
             if let Some(mut res) = res {
                 symbols.append(&mut res)
@@ -60,13 +63,7 @@ fn filter_document_symbols(
 
             SymbolInformation {
                 name: e.info.name.clone(),
-                kind: match e.info.kind {
-                    LexicalKind::Namespace(..) => SymbolKind::NAMESPACE,
-                    LexicalKind::Variable => SymbolKind::VARIABLE,
-                    LexicalKind::Function => SymbolKind::FUNCTION,
-                    LexicalKind::Constant => SymbolKind::CONSTANT,
-                    LexicalKind::Block => unreachable!(),
-                },
+                kind: e.info.kind.try_into().unwrap(),
                 tags: None,
                 deprecated: None,
                 location: LspLocation {

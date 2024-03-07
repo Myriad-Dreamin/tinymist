@@ -193,6 +193,7 @@ pub struct ConstConfig {
     pub supports_semantic_tokens_dynamic_registration: bool,
     pub supports_document_formatting_dynamic_registration: bool,
     pub supports_config_change_registration: bool,
+    pub line_folding_only: bool,
 }
 
 pub struct TypstServer {
@@ -348,6 +349,7 @@ impl LanguageServer for TypstServer {
                 document_symbol_provider: Some(OneOf::Left(true)),
                 workspace_symbol_provider: Some(OneOf::Left(true)),
                 selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
+                folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 workspace: Some(WorkspaceServerCapabilities {
                     workspace_folders: Some(WorkspaceFoldersServerCapabilities {
                         supported: Some(true),
@@ -562,8 +564,16 @@ impl LanguageServer for TypstServer {
     ) -> jsonrpc::Result<Option<Vec<FoldingRange>>> {
         let uri = params.text_document.uri;
         let path = uri.to_file_path().unwrap();
+        let line_folding_only = self.const_config().line_folding_only;
 
-        run_query!(self, FoldingRange, FoldingRangeRequest { path })
+        run_query!(
+            self,
+            FoldingRange,
+            FoldingRangeRequest {
+                path,
+                line_folding_only
+            }
+        )
     }
 
     async fn selection_range(
@@ -727,6 +737,7 @@ impl From<&InitializeParams> for ConstConfig {
             supports_document_formatting_dynamic_registration: params
                 .supports_document_formatting_dynamic_registration(),
             supports_config_change_registration: params.supports_config_change_registration(),
+            line_folding_only: params.line_folding_only(),
         }
     }
 }
@@ -738,6 +749,7 @@ pub trait InitializeParamsExt {
     fn document_formatting_capabilities(&self) -> Option<&DocumentFormattingClientCapabilities>;
     fn supports_semantic_tokens_dynamic_registration(&self) -> bool;
     fn supports_document_formatting_dynamic_registration(&self) -> bool;
+    fn line_folding_only(&self) -> bool;
     fn root_paths(&self) -> Vec<PathBuf>;
 }
 
@@ -758,6 +770,15 @@ impl InitializeParamsExt for InitializeParams {
             .workspace
             .as_ref()
             .and_then(|workspace| workspace.configuration)
+            .unwrap_or(false)
+    }
+
+    fn line_folding_only(&self) -> bool {
+        self.capabilities
+            .text_document
+            .as_ref()
+            .and_then(|workspace| workspace.folding_range.as_ref())
+            .and_then(|folding| folding.line_folding_only)
             .unwrap_or(false)
     }
 

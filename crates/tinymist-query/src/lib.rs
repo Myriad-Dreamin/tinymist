@@ -40,8 +40,10 @@ mod tests {
     use serde::Serialize;
     use serde_json::{ser::PrettyFormatter, Serializer, Value};
     use typst_ts_compiler::ShadowApiExt;
-    pub use typst_ts_compiler::TypstSystemWorld;
     use typst_ts_core::{config::CompileOpts, Bytes};
+
+    pub use insta::assert_snapshot;
+    pub use typst_ts_compiler::TypstSystemWorld;
 
     pub fn run_with_source<T>(
         source: &str,
@@ -73,6 +75,11 @@ mod tests {
     pub struct JsonRepr(Value);
 
     impl JsonRepr {
+        pub fn new_pure(v: impl serde::Serialize) -> Self {
+            let s = serde_json::to_value(v).unwrap();
+            Self(s)
+        }
+
         // pub fn new(v: impl serde::Serialize) -> Self {
         //     let s = serde_json::to_value(v).unwrap();
         //     Self(REDACT_URI.redact(s))
