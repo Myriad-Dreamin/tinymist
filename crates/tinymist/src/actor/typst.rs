@@ -1,30 +1,23 @@
 use std::{
     collections::HashMap,
-    iter,
     path::{Path, PathBuf},
     sync::{Arc, Mutex as SyncMutex},
 };
 
 use anyhow::anyhow;
 use futures::future::join_all;
-use itertools::{Format, Itertools};
 use log::{error, trace, warn};
+use tinymist_query::{LspDiagnostic, LspRange, PositionEncoding, SemanticTokenCache};
 use tokio::sync::{broadcast, mpsc, watch, Mutex, RwLock};
 use tower_lsp::lsp_types::{
-    CompletionResponse, DiagnosticRelatedInformation, DocumentSymbolResponse, Documentation, Hover,
-    Location as LspLocation, MarkupContent, MarkupKind, Position as LspPosition, SelectionRange,
-    SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult,
-    SignatureHelp, SignatureInformation, SymbolInformation, SymbolKind,
+    CompletionResponse, DocumentSymbolResponse, Hover, SelectionRange,
+    SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp, SymbolInformation,
     TextDocumentContentChangeEvent, Url,
 };
-use typst::diag::{EcoString, FileError, FileResult, SourceDiagnostic, SourceResult, Tracepoint};
-use typst::foundations::{Func, ParamInfo, Value};
+use typst::diag::{FileResult, SourceDiagnostic, SourceResult};
 use typst::layout::Position;
 use typst::model::Document;
-use typst::syntax::{
-    ast::{self, AstNode},
-    FileId, LinkedNode, Source, Span, Spanned, SyntaxKind, VirtualPath,
-};
+use typst::syntax::{Source, Span};
 use typst::World;
 use typst_preview::CompilationHandleImpl;
 use typst_preview::{CompilationHandle, CompileStatus};
@@ -35,34 +28,25 @@ use typst_ts_compiler::service::{
     CompileExporter, CompileMiddleware, Compiler, WorkspaceProvider, WorldExporter,
 };
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
-use typst_ts_compiler::{NotifyApi, Time, TypstSystemWorld};
+use typst_ts_compiler::{Time, TypstSystemWorld};
 use typst_ts_core::{
     config::CompileOpts, debug_loc::SourceSpanOffset, error::prelude::*, typst::prelude::EcoVec,
-    Bytes, DynExporter, Error, ImmutPath, TypstDocument, TypstFileId,
+    Bytes, DynExporter, Error, ImmutPath, TypstDocument,
 };
 
 use crate::actor::render::PdfExportActor;
 use crate::actor::render::RenderActorRequest;
-use crate::analysis::analyze::analyze_expr;
-use crate::config::PositionEncoding;
 use crate::lsp::LspHost;
-use crate::lsp_typst_boundary::{
-    lsp_to_typst, typst_to_lsp, LspDiagnostic, LspRange, LspRawRange, LspSeverity, TypstDiagnostic,
-    TypstSeverity, TypstSpan,
-};
-use crate::semantic_tokens::SemanticTokenCache;
 
 type CompileService<H> = CompileActor<Reporter<CompileExporter<CompileDriver>, H>>;
 type CompileClient<H> = TsCompileClient<CompileService<H>>;
 
 type DiagnosticsSender = mpsc::UnboundedSender<(String, DiagnosticsMap)>;
-
 type DiagnosticsMap = HashMap<Url, Vec<LspDiagnostic>>;
 
-pub type Client = TypstClient<CompileHandler>;
+type Client = TypstClient<CompileHandler>;
 
 pub fn create_cluster(host: LspHost, roots: Vec<PathBuf>, opts: CompileOpts) -> CompileCluster {
-    //
     let (diag_tx, diag_rx) = mpsc::unbounded_channel();
 
     let primary = create_server(
@@ -74,7 +58,7 @@ pub fn create_cluster(host: LspHost, roots: Vec<PathBuf>, opts: CompileOpts) -> 
     CompileCluster {
         memory_changes: RwLock::new(HashMap::new()),
         primary,
-        semantic_tokens_delta_cache: Default::default(),
+        tokens_cache: Default::default(),
         actor: Some(CompileClusterActor {
             host,
             diag_rx,
@@ -130,7 +114,7 @@ pub struct CompileClusterActor {
 pub struct CompileCluster {
     memory_changes: RwLock<HashMap<Arc<Path>, MemoryFileMeta>>,
     primary: CompileNode,
-    pub semantic_tokens_delta_cache: Arc<parking_lot::RwLock<SemanticTokenCache>>,
+    pub tokens_cache: SemanticTokenCache,
     actor: Option<CompileClusterActor>,
 }
 
@@ -305,70 +289,16 @@ pub struct OnSaveExportRequest {
 }
 
 #[derive(Debug, Clone)]
-pub struct HoverRequest {
-    pub path: PathBuf,
-    pub position: LspPosition,
-    pub position_encoding: PositionEncoding,
-}
-
-#[derive(Debug, Clone)]
-pub struct CompletionRequest {
-    pub path: PathBuf,
-    pub position: LspPosition,
-    pub position_encoding: PositionEncoding,
-    pub explicit: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct SignatureHelpRequest {
-    pub path: PathBuf,
-    pub position: LspPosition,
-    pub position_encoding: PositionEncoding,
-}
-
-#[derive(Debug, Clone)]
-pub struct DocumentSymbolRequest {
-    pub path: PathBuf,
-    pub position_encoding: PositionEncoding,
-}
-
-#[derive(Debug, Clone)]
-pub struct SymbolRequest {
-    pub pattern: Option<String>,
-    pub position_encoding: PositionEncoding,
-}
-
-#[derive(Debug, Clone)]
-pub struct SelectionRangeRequest {
-    pub path: PathBuf,
-    pub positions: Vec<LspPosition>,
-    pub position_encoding: PositionEncoding,
-}
-
-#[derive(Debug, Clone)]
-pub struct SemanticTokensFullRequest {
-    pub path: PathBuf,
-    pub position_encoding: PositionEncoding,
-}
-
-#[derive(Debug, Clone)]
-pub struct SemanticTokensDeltaRequest {
-    pub path: PathBuf,
-    pub previous_result_id: String,
-    pub position_encoding: PositionEncoding,
-}
-
-#[derive(Debug, Clone)]
 pub enum CompilerQueryRequest {
     OnSaveExport(OnSaveExportRequest),
-    Hover(HoverRequest),
-    Completion(CompletionRequest),
-    SignatureHelp(SignatureHelpRequest),
-    DocumentSymbol(DocumentSymbolRequest),
-    Symbol(SymbolRequest),
-    SemanticTokensFull(SemanticTokensFullRequest),
-    SemanticTokensDelta(SemanticTokensDeltaRequest),
-    SelectionRange(SelectionRangeRequest),
+    Hover(tinymist_query::HoverRequest),
+    Completion(tinymist_query::CompletionRequest),
+    SignatureHelp(tinymist_query::SignatureHelpRequest),
+    DocumentSymbol(tinymist_query::DocumentSymbolRequest),
+    Symbol(tinymist_query::SymbolRequest),
+    SemanticTokensFull(tinymist_query::SemanticTokensFullRequest),
+    SemanticTokensDelta(tinymist_query::SemanticTokensDeltaRequest),
+    SelectionRange(tinymist_query::SelectionRangeRequest),
 }
 
 #[derive(Debug, Clone)]
@@ -384,97 +314,48 @@ pub enum CompilerQueryResponse {
     SelectionRange(Option<Vec<SelectionRange>>),
 }
 
+macro_rules! query_state {
+    ($self:ident, $method:ident, $query:expr, $req:expr) => {{
+        let doc = $self.handler.result.lock().unwrap().clone().ok();
+        let res = $self.steal_world(|w| $query(w, doc, $req)).await;
+        res.map(CompilerQueryResponse::$method)
+    }};
+}
+
+macro_rules! query_world {
+    ($self:ident, $method:ident, $query:expr, $req:expr) => {{
+        let res = $self.steal_world(|w| $query(w, $req)).await;
+        res.map(CompilerQueryResponse::$method)
+    }};
+}
+
+macro_rules! query_tokens_cache {
+    ($self:ident, $method:ident, $query:expr, $req:expr) => {{
+        let path: ImmutPath = $req.path.clone().into();
+        let vfs = $self.memory_changes.read().await;
+        let snapshot = vfs.get(&path).ok_or_else(|| anyhow!("file missing"))?;
+        let res = $query(&$self.tokens_cache, snapshot.content.clone(), $req);
+        Ok(CompilerQueryResponse::$method(res))
+    }};
+}
+
 impl CompileCluster {
     pub async fn query(
         &self,
         query: CompilerQueryRequest,
     ) -> anyhow::Result<CompilerQueryResponse> {
+        use tinymist_query::*;
+        use CompilerQueryRequest::*;
+
         match query {
-            CompilerQueryRequest::SemanticTokensFull(SemanticTokensFullRequest {
-                path,
-                position_encoding,
-            }) => self
-                .semantic_tokens_full(path, position_encoding)
-                .await
-                .map(CompilerQueryResponse::SemanticTokensFull),
-            CompilerQueryRequest::SemanticTokensDelta(SemanticTokensDeltaRequest {
-                path,
-                previous_result_id,
-                position_encoding,
-            }) => self
-                .semantic_tokens_delta(path, previous_result_id, position_encoding)
-                .await
-                .map(CompilerQueryResponse::SemanticTokensDelta),
+            SemanticTokensFull(req) => {
+                query_tokens_cache!(self, SemanticTokensFull, semantic_tokens_full, req)
+            }
+            SemanticTokensDelta(req) => {
+                query_tokens_cache!(self, SemanticTokensDelta, semantic_tokens_delta, req)
+            }
             _ => self.primary.query(query).await,
         }
-    }
-
-    async fn semantic_tokens_full(
-        &self,
-        path: PathBuf,
-        position_encoding: PositionEncoding,
-    ) -> anyhow::Result<Option<SemanticTokensResult>> {
-        let path: ImmutPath = path.into();
-
-        let source = self
-            .memory_changes
-            .read()
-            .await
-            .get(&path)
-            .ok_or_else(|| anyhow!("file missing"))?
-            .content
-            .clone();
-
-        let (tokens, result_id) = self.get_semantic_tokens_full(&source, position_encoding);
-
-        Ok(Some(
-            SemanticTokens {
-                result_id: Some(result_id),
-                data: tokens,
-            }
-            .into(),
-        ))
-    }
-
-    async fn semantic_tokens_delta(
-        &self,
-        path: PathBuf,
-        previous_result_id: String,
-        position_encoding: PositionEncoding,
-    ) -> anyhow::Result<Option<SemanticTokensFullDeltaResult>> {
-        let path: ImmutPath = path.into();
-
-        let source = self
-            .memory_changes
-            .read()
-            .await
-            .get(&path)
-            .ok_or_else(|| anyhow!("file missing"))?
-            .content
-            .clone();
-
-        let (tokens, result_id) = self.try_semantic_tokens_delta_from_result_id(
-            &source,
-            &previous_result_id,
-            position_encoding,
-        );
-
-        Ok(match tokens {
-            Ok(edits) => Some(
-                SemanticTokensDelta {
-                    result_id: Some(result_id),
-                    edits,
-                }
-                .into(),
-            ),
-            Err(tokens) => Some(
-                SemanticTokens {
-                    result_id: Some(result_id),
-                    data: tokens,
-                }
-                .into(),
-            ),
-        })
     }
 }
 
@@ -565,6 +446,43 @@ pub struct CompileServer<H: CompilationHandle> {
     client: TypstClient<H>,
 }
 
+impl<H: CompilationHandle> CompileServer<H> {
+    pub fn new(
+        diag_group: String,
+        compiler_driver: CompileDriver,
+        cb: H,
+        diag_tx: DiagnosticsSender,
+        exporter: DynExporter<TypstDocument>,
+    ) -> Self {
+        let root = compiler_driver.inner.world.root.clone();
+        let driver = CompileExporter::new(compiler_driver).with_exporter(exporter);
+        let driver = Reporter {
+            diag_group,
+            diag_tx,
+            inner: driver,
+            cb,
+        };
+        let inner = CompileActor::new(driver, root.as_ref().to_owned()).with_watch(true);
+
+        Self {
+            inner,
+            client: TypstClient {
+                entry: Arc::new(SyncMutex::new(None)),
+                inner: once_cell::sync::OnceCell::new(),
+            },
+        }
+    }
+
+    pub fn spawn(self) -> Result<TypstClient<H>, Error> {
+        let (server, client) = self.inner.split();
+        tokio::spawn(server.spawn());
+
+        self.client.inner.set(client).ok().unwrap();
+
+        Ok(self.client)
+    }
+}
+
 pub struct Reporter<C, H> {
     diag_group: String,
     diag_tx: DiagnosticsSender,
@@ -615,198 +533,19 @@ impl<C: Compiler + WorldExporter, H> WorldExporter for Reporter<C, H> {
 
 impl<C: Compiler<World = TypstSystemWorld>, H> Reporter<C, H> {
     fn push_diagnostics(&mut self, diagnostics: EcoVec<SourceDiagnostic>) {
-        fn convert_diagnostics<'a>(
-            project: &TypstSystemWorld,
-            errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
-            position_encoding: PositionEncoding,
-        ) -> DiagnosticsMap {
-            errors
-                .into_iter()
-                .flat_map(|error| {
-                    convert_diagnostic(project, error, position_encoding)
-                        .map_err(move |conversion_err| {
-                            error!("could not convert Typst error to diagnostic: {conversion_err:?} error to convert: {error:?}");
-                        })
-                })
-                .collect::<Vec<_>>()
-                .into_iter()
-                .into_group_map()
-        }
-
-        fn convert_diagnostic(
-            project: &TypstSystemWorld,
-            typst_diagnostic: &TypstDiagnostic,
-            position_encoding: PositionEncoding,
-        ) -> anyhow::Result<(Url, LspDiagnostic)> {
-            let uri;
-            let lsp_range;
-            if let Some((id, span)) = diagnostic_span_id(typst_diagnostic) {
-                uri = Url::from_file_path(project.path_for_id(id)?).unwrap();
-                let source = project.source(id)?;
-                lsp_range = diagnostic_range(&source, span, position_encoding).raw_range;
-            } else {
-                uri = Url::from_file_path(project.root.clone()).unwrap();
-                lsp_range = LspRawRange::default();
-            };
-
-            let lsp_severity = diagnostic_severity(typst_diagnostic.severity);
-
-            let typst_message = &typst_diagnostic.message;
-            let typst_hints = &typst_diagnostic.hints;
-            let lsp_message = format!("{typst_message}{}", diagnostic_hints(typst_hints));
-
-            let tracepoints =
-                diagnostic_related_information(project, typst_diagnostic, position_encoding)?;
-
-            let diagnostic = LspDiagnostic {
-                range: lsp_range,
-                severity: Some(lsp_severity),
-                message: lsp_message,
-                source: Some("typst".to_owned()),
-                related_information: Some(tracepoints),
-                ..Default::default()
-            };
-
-            Ok((uri, diagnostic))
-        }
-
-        fn tracepoint_to_relatedinformation(
-            project: &TypstSystemWorld,
-            tracepoint: &Spanned<Tracepoint>,
-            position_encoding: PositionEncoding,
-        ) -> anyhow::Result<Option<DiagnosticRelatedInformation>> {
-            if let Some(id) = tracepoint.span.id() {
-                let uri = Url::from_file_path(project.path_for_id(id)?).unwrap();
-                let source = project.source(id)?;
-
-                if let Some(typst_range) = source.range(tracepoint.span) {
-                    let lsp_range = typst_to_lsp::range(typst_range, &source, position_encoding);
-
-                    return Ok(Some(DiagnosticRelatedInformation {
-                        location: LspLocation {
-                            uri,
-                            range: lsp_range.raw_range,
-                        },
-                        message: tracepoint.v.to_string(),
-                    }));
-                }
-            }
-
-            Ok(None)
-        }
-
-        fn diagnostic_related_information(
-            project: &TypstSystemWorld,
-            typst_diagnostic: &TypstDiagnostic,
-            position_encoding: PositionEncoding,
-        ) -> anyhow::Result<Vec<DiagnosticRelatedInformation>> {
-            let mut tracepoints = vec![];
-
-            for tracepoint in &typst_diagnostic.trace {
-                if let Some(info) =
-                    tracepoint_to_relatedinformation(project, tracepoint, position_encoding)?
-                {
-                    tracepoints.push(info);
-                }
-            }
-
-            Ok(tracepoints)
-        }
-
-        fn diagnostic_span_id(typst_diagnostic: &TypstDiagnostic) -> Option<(FileId, TypstSpan)> {
-            iter::once(typst_diagnostic.span)
-                .chain(typst_diagnostic.trace.iter().map(|trace| trace.span))
-                .find_map(|span| Some((span.id()?, span)))
-        }
-
-        fn diagnostic_range(
-            source: &Source,
-            typst_span: TypstSpan,
-            position_encoding: PositionEncoding,
-        ) -> LspRange {
-            // Due to #241 and maybe typst/typst#2035, we sometimes fail to find the span.
-            // In that case, we use a default span as a better alternative to
-            // panicking.
-            //
-            // This may have been fixed after Typst 0.7.0, but it's still nice to avoid
-            // panics in case something similar reappears.
-            match source.find(typst_span) {
-                Some(node) => {
-                    let typst_range = node.range();
-                    typst_to_lsp::range(typst_range, source, position_encoding)
-                }
-                None => LspRange::new(
-                    LspRawRange::new(LspPosition::new(0, 0), LspPosition::new(0, 0)),
-                    position_encoding,
-                ),
-            }
-        }
-
-        fn diagnostic_severity(typst_severity: TypstSeverity) -> LspSeverity {
-            match typst_severity {
-                TypstSeverity::Error => LspSeverity::ERROR,
-                TypstSeverity::Warning => LspSeverity::WARNING,
-            }
-        }
-
-        fn diagnostic_hints(
-            typst_hints: &[EcoString],
-        ) -> Format<impl Iterator<Item = EcoString> + '_> {
-            iter::repeat(EcoString::from("\n\nHint: "))
-                .take(typst_hints.len())
-                .interleave(typst_hints.iter().cloned())
-                .format("")
-        }
+        trace!("send diagnostics: {:#?}", diagnostics);
 
         // todo encoding
-        let diagnostics = convert_diagnostics(
+        let diagnostics = tinymist_query::convert_diagnostics(
             self.inner.world(),
             diagnostics.as_ref(),
             PositionEncoding::Utf16,
         );
 
-        trace!("send diagnostics: {:#?}", diagnostics);
         let err = self.diag_tx.send((self.diag_group.clone(), diagnostics));
         if let Err(err) = err {
             error!("failed to send diagnostics: {:#}", err);
         }
-    }
-}
-
-impl<H: CompilationHandle> CompileServer<H> {
-    pub fn new(
-        diag_group: String,
-        compiler_driver: CompileDriver,
-        cb: H,
-        diag_tx: DiagnosticsSender,
-        exporter: DynExporter<TypstDocument>,
-    ) -> Self {
-        let root = compiler_driver.inner.world.root.clone();
-        let driver = CompileExporter::new(compiler_driver).with_exporter(exporter);
-        let driver = Reporter {
-            diag_group,
-            diag_tx,
-            inner: driver,
-            cb,
-        };
-        let inner = CompileActor::new(driver, root.as_ref().to_owned()).with_watch(true);
-
-        Self {
-            inner,
-            client: TypstClient {
-                entry: Arc::new(SyncMutex::new(None)),
-                inner: once_cell::sync::OnceCell::new(),
-            },
-        }
-    }
-
-    pub fn spawn(self) -> Result<TypstClient<H>, Error> {
-        let (server, client) = self.inner.split();
-        tokio::spawn(server.spawn());
-
-        self.client.inner.set(client).ok().unwrap();
-
-        Ok(self.client)
     }
 }
 
@@ -965,58 +704,20 @@ impl CompileNode {
         &self,
         query: CompilerQueryRequest,
     ) -> anyhow::Result<CompilerQueryResponse> {
+        use tinymist_query::*;
+        use CompilerQueryRequest::*;
+
         match query {
             CompilerQueryRequest::OnSaveExport(OnSaveExportRequest { path }) => {
                 self.on_save_export(path).await?;
                 Ok(CompilerQueryResponse::OnSaveExport(()))
             }
-            CompilerQueryRequest::Hover(HoverRequest {
-                path,
-                position,
-                position_encoding,
-            }) => self
-                .hover(path, position, position_encoding)
-                .await
-                .map(CompilerQueryResponse::Hover),
-            CompilerQueryRequest::Completion(CompletionRequest {
-                path,
-                position,
-                position_encoding,
-                explicit,
-            }) => self
-                .completion(path, position, position_encoding, explicit)
-                .await
-                .map(CompilerQueryResponse::Completion),
-            CompilerQueryRequest::SignatureHelp(SignatureHelpRequest {
-                path,
-                position,
-                position_encoding,
-            }) => self
-                .signature_help(path, position, position_encoding)
-                .await
-                .map(CompilerQueryResponse::SignatureHelp),
-            CompilerQueryRequest::DocumentSymbol(DocumentSymbolRequest {
-                path,
-                position_encoding,
-            }) => self
-                .document_symbol(path, position_encoding)
-                .await
-                .map(CompilerQueryResponse::DocumentSymbol),
-            CompilerQueryRequest::Symbol(SymbolRequest {
-                pattern,
-                position_encoding,
-            }) => self
-                .symbol(pattern, position_encoding)
-                .await
-                .map(CompilerQueryResponse::Symbol),
-            CompilerQueryRequest::SelectionRange(SelectionRangeRequest {
-                path,
-                positions,
-                position_encoding,
-            }) => self
-                .selection_range(path, positions, position_encoding)
-                .await
-                .map(CompilerQueryResponse::SelectionRange),
+            Hover(req) => query_state!(self, Hover, hover, req),
+            Completion(req) => query_state!(self, Completion, completion, req),
+            SignatureHelp(req) => query_world!(self, SignatureHelp, signature_help, req),
+            DocumentSymbol(req) => query_world!(self, DocumentSymbol, document_symbol, req),
+            Symbol(req) => query_world!(self, Symbol, symbol, req),
+            SelectionRange(req) => query_world!(self, SelectionRange, selection_range, req),
             CompilerQueryRequest::SemanticTokensDelta(..)
             | CompilerQueryRequest::SemanticTokensFull(..) => unreachable!(),
         }
@@ -1026,491 +727,13 @@ impl CompileNode {
         Ok(())
     }
 
-    async fn hover(
+    async fn steal_world<T: Send + Sync + 'static>(
         &self,
-        path: PathBuf,
-        position: LspPosition,
-        position_encoding: PositionEncoding,
-    ) -> anyhow::Result<Option<Hover>> {
-        let doc = self.handler.result.lock().unwrap().clone().ok();
-
+        f: impl FnOnce(&TypstSystemWorld) -> T + Send + Sync + 'static,
+    ) -> anyhow::Result<T> {
         let mut client = self.inner.lock().await;
-        let fut = client.steal_async(move |compiler, _| {
-            let world = compiler.compiler.world();
-
-            let source = get_suitable_source_in_workspace(world, &path).ok()?;
-            let typst_offset =
-                lsp_to_typst::position_to_offset(position, position_encoding, &source);
-
-            let typst_tooltip = typst_ide::tooltip(world, doc.as_deref(), &source, typst_offset)?;
-
-            let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset)?;
-            let range = typst_to_lsp::range(ast_node.range(), &source, position_encoding);
-
-            Some(Hover {
-                contents: typst_to_lsp::tooltip(&typst_tooltip),
-                range: Some(range.raw_range),
-            })
-        });
+        let fut = client.steal_async(move |compiler, _| f(compiler.compiler.world()));
 
         Ok(fut.await?)
     }
-
-    async fn completion(
-        &self,
-        path: PathBuf,
-        position: LspPosition,
-        position_encoding: PositionEncoding,
-        explicit: bool,
-    ) -> anyhow::Result<Option<CompletionResponse>> {
-        let doc = self.handler.result.lock().unwrap().clone().ok();
-
-        let mut client = self.inner.lock().await;
-        let fut = client.steal_async(move |compiler, _| {
-            let world = compiler.compiler.world();
-
-            let source = get_suitable_source_in_workspace(world, &path).ok()?;
-            let typst_offset =
-                lsp_to_typst::position_to_offset(position, position_encoding, &source);
-
-            let (typst_start_offset, completions) =
-                typst_ide::autocomplete(world, doc.as_deref(), &source, typst_offset, explicit)?;
-
-            let lsp_start_position =
-                typst_to_lsp::offset_to_position(typst_start_offset, position_encoding, &source);
-            let replace_range = LspRawRange::new(lsp_start_position, position);
-            Some(typst_to_lsp::completions(&completions, replace_range).into())
-        });
-
-        Ok(fut.await?)
-    }
-
-    async fn signature_help(
-        &self,
-        path: PathBuf,
-        position: LspPosition,
-        position_encoding: PositionEncoding,
-    ) -> anyhow::Result<Option<SignatureHelp>> {
-        fn surrounding_function_syntax<'b>(
-            leaf: &'b LinkedNode,
-        ) -> Option<(ast::Expr<'b>, LinkedNode<'b>, ast::Args<'b>)> {
-            let parent = leaf.parent()?;
-            let parent = match parent.kind() {
-                SyntaxKind::Named => parent.parent()?,
-                _ => parent,
-            };
-            let args = parent.cast::<ast::Args>()?;
-            let grand = parent.parent()?;
-            let expr = grand.cast::<ast::Expr>()?;
-            let callee = match expr {
-                ast::Expr::FuncCall(call) => call.callee(),
-                ast::Expr::Set(set) => set.target(),
-                _ => return None,
-            };
-            Some((callee, grand.find(callee.span())?, args))
-        }
-
-        fn param_index_at_leaf(
-            leaf: &LinkedNode,
-            function: &Func,
-            args: ast::Args,
-        ) -> Option<usize> {
-            let deciding = deciding_syntax(leaf);
-            let params = function.params()?;
-            let param_index = find_param_index(&deciding, params, args)?;
-            trace!("got param index {param_index}");
-            Some(param_index)
-        }
-
-        /// Find the piece of syntax that decides what we're completing.
-        fn deciding_syntax<'b>(leaf: &'b LinkedNode) -> LinkedNode<'b> {
-            let mut deciding = leaf.clone();
-            while !matches!(
-                deciding.kind(),
-                SyntaxKind::LeftParen | SyntaxKind::Comma | SyntaxKind::Colon
-            ) {
-                let Some(prev) = deciding.prev_leaf() else {
-                    break;
-                };
-                deciding = prev;
-            }
-            deciding
-        }
-
-        fn find_param_index(
-            deciding: &LinkedNode,
-            params: &[ParamInfo],
-            args: ast::Args,
-        ) -> Option<usize> {
-            match deciding.kind() {
-                // After colon: "func(param:|)", "func(param: |)".
-                SyntaxKind::Colon => {
-                    let prev = deciding.prev_leaf()?;
-                    let param_ident = prev.cast::<ast::Ident>()?;
-                    params
-                        .iter()
-                        .position(|param| param.name == param_ident.as_str())
-                }
-                // Before: "func(|)", "func(hi|)", "func(12,|)".
-                SyntaxKind::Comma | SyntaxKind::LeftParen => {
-                    let next = deciding.next_leaf();
-                    let following_param = next.as_ref().and_then(|next| next.cast::<ast::Ident>());
-                    match following_param {
-                        Some(next) => params
-                            .iter()
-                            .position(|param| param.named && param.name.starts_with(next.as_str())),
-                        None => {
-                            let positional_args_so_far = args
-                                .items()
-                                .filter(|arg| matches!(arg, ast::Arg::Pos(_)))
-                                .count();
-                            params
-                                .iter()
-                                .enumerate()
-                                .filter(|(_, param)| param.positional)
-                                .map(|(i, _)| i)
-                                .nth(positional_args_so_far)
-                        }
-                    }
-                }
-                _ => None,
-            }
-        }
-
-        fn markdown_docs(docs: &str) -> Documentation {
-            Documentation::MarkupContent(MarkupContent {
-                kind: MarkupKind::Markdown,
-                value: docs.to_owned(),
-            })
-        }
-
-        let mut client = self.inner.lock().await;
-        let fut = client.steal_async(move |compiler, _| {
-            let world = compiler.compiler.world();
-
-            let source = get_suitable_source_in_workspace(world, &path).ok()?;
-            let typst_offset =
-                lsp_to_typst::position_to_offset(position, position_encoding, &source);
-
-            let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset)?;
-            let (callee, callee_node, args) = surrounding_function_syntax(&ast_node)?;
-
-            let mut ancestor = &ast_node;
-            while !ancestor.is::<ast::Expr>() {
-                ancestor = ancestor.parent()?;
-            }
-
-            if !callee.hash() && !matches!(callee, ast::Expr::MathIdent(_)) {
-                return None;
-            }
-
-            let values = analyze_expr(world, &callee_node);
-
-            let function = values.into_iter().find_map(|v| match v {
-                Value::Func(f) => Some(f),
-                _ => None,
-            })?;
-            trace!("got function {function:?}");
-
-            let param_index = param_index_at_leaf(&ast_node, &function, args);
-
-            let label = format!(
-                "{}({}){}",
-                function.name().unwrap_or("<anonymous closure>"),
-                match function.params() {
-                    Some(params) => params
-                        .iter()
-                        .map(typst_to_lsp::param_info_to_label)
-                        .join(", "),
-                    None => "".to_owned(),
-                },
-                match function.returns() {
-                    Some(returns) => format!("-> {}", typst_to_lsp::cast_info_to_label(returns)),
-                    None => "".to_owned(),
-                }
-            );
-            let params = function
-                .params()
-                .unwrap_or_default()
-                .iter()
-                .map(typst_to_lsp::param_info)
-                .collect();
-            trace!("got signature info {label} {params:?}");
-
-            let documentation = function.docs().map(markdown_docs);
-
-            let active_parameter = param_index.map(|i| i as u32);
-
-            Some(SignatureInformation {
-                label,
-                documentation,
-                parameters: Some(params),
-                active_parameter,
-            })
-        });
-
-        let signature = fut.await?;
-
-        Ok(signature.map(|signature| SignatureHelp {
-            signatures: vec![signature],
-            active_signature: Some(0),
-            active_parameter: None,
-        }))
-    }
-
-    async fn document_symbol(
-        &self,
-        path: PathBuf,
-        position_encoding: PositionEncoding,
-    ) -> anyhow::Result<Option<DocumentSymbolResponse>> {
-        let mut client = self.inner.lock().await;
-        let fut = client.steal_async(move |compiler, _| {
-            let world = compiler.compiler.world();
-
-            let source = get_suitable_source_in_workspace(world, &path).ok()?;
-
-            let uri = Url::from_file_path(path).unwrap();
-            let symbols = get_document_symbols(source, uri, position_encoding);
-
-            symbols.map(DocumentSymbolResponse::Flat)
-        });
-
-        Ok(fut.await?)
-    }
-
-    async fn symbol(
-        &self,
-        pattern: Option<String>,
-        position_encoding: PositionEncoding,
-    ) -> anyhow::Result<Option<Vec<SymbolInformation>>> {
-        let mut client = self.inner.lock().await;
-        let fut = client.steal_async(move |compiler, _| {
-            let world = compiler.compiler.world();
-
-            // todo: expose source
-
-            let mut symbols = vec![];
-
-            world.iter_dependencies(&mut |path, _| {
-                let Ok(source) = get_suitable_source_in_workspace(world, path) else {
-                    return;
-                };
-                let uri = Url::from_file_path(path).unwrap();
-                let res =
-                    get_document_symbols(source, uri, position_encoding).and_then(|symbols| {
-                        pattern
-                            .as_ref()
-                            .map(|pattern| filter_document_symbols(symbols, pattern))
-                    });
-
-                if let Some(mut res) = res {
-                    symbols.append(&mut res)
-                }
-            });
-
-            Some(symbols)
-        });
-
-        Ok(fut.await?)
-    }
-
-    async fn selection_range(
-        &self,
-        path: PathBuf,
-        positions: Vec<LspPosition>,
-        position_encoding: PositionEncoding,
-    ) -> anyhow::Result<Option<Vec<SelectionRange>>> {
-        fn range_for_node(
-            source: &Source,
-            position_encoding: PositionEncoding,
-            node: &LinkedNode,
-        ) -> SelectionRange {
-            let range = typst_to_lsp::range(node.range(), source, position_encoding);
-            SelectionRange {
-                range: range.raw_range,
-                parent: node
-                    .parent()
-                    .map(|node| Box::new(range_for_node(source, position_encoding, node))),
-            }
-        }
-
-        let mut client = self.inner.lock().await;
-        let fut = client.steal_async(move |compiler, _| {
-            let world = compiler.compiler.world();
-
-            let source = get_suitable_source_in_workspace(world, &path).ok()?;
-
-            let mut ranges = Vec::new();
-            for position in positions {
-                let typst_offset =
-                    lsp_to_typst::position_to_offset(position, position_encoding, &source);
-                let tree = LinkedNode::new(source.root());
-                let leaf = tree.leaf_at(typst_offset)?;
-                ranges.push(range_for_node(&source, position_encoding, &leaf));
-            }
-
-            Some(ranges)
-        });
-
-        Ok(fut.await?)
-    }
-}
-
-fn get_suitable_source_in_workspace(w: &TypstSystemWorld, p: &Path) -> FileResult<Source> {
-    // todo: source in packages
-    let relative_path = p
-        .strip_prefix(&w.workspace_root())
-        .map_err(|_| FileError::NotFound(p.to_owned()))?;
-    w.source(TypstFileId::new(None, VirtualPath::new(relative_path)))
-}
-
-fn filter_document_symbols(
-    symbols: Vec<SymbolInformation>,
-    query_string: &str,
-) -> Vec<SymbolInformation> {
-    symbols
-        .into_iter()
-        .filter(|e| e.name.contains(query_string))
-        .collect()
-}
-
-#[comemo::memoize]
-fn get_document_symbols(
-    source: Source,
-    uri: Url,
-    position_encoding: PositionEncoding,
-) -> Option<Vec<SymbolInformation>> {
-    struct DocumentSymbolWorker {
-        symbols: Vec<SymbolInformation>,
-    }
-
-    impl DocumentSymbolWorker {
-        /// Get all symbols for a node recursively.
-        pub fn get_symbols<'a>(
-            &mut self,
-            node: LinkedNode<'a>,
-            source: &'a Source,
-            uri: &'a Url,
-            position_encoding: PositionEncoding,
-        ) -> anyhow::Result<()> {
-            let own_symbol = get_ident(&node, source, uri, position_encoding)?;
-
-            for child in node.children() {
-                self.get_symbols(child, source, uri, position_encoding)?;
-            }
-
-            if let Some(symbol) = own_symbol {
-                self.symbols.push(symbol);
-            }
-
-            Ok(())
-        }
-    }
-
-    /// Get symbol for a leaf node of a valid type, or `None` if the node is an
-    /// invalid type.
-    #[allow(deprecated)]
-    fn get_ident(
-        node: &LinkedNode,
-        source: &Source,
-        uri: &Url,
-        position_encoding: PositionEncoding,
-    ) -> anyhow::Result<Option<SymbolInformation>> {
-        match node.kind() {
-            SyntaxKind::Label => {
-                let ast_node = node
-                    .cast::<ast::Label>()
-                    .ok_or_else(|| anyhow!("cast to ast node failed: {:?}", node))?;
-                let name = ast_node.get().to_string();
-                let symbol = SymbolInformation {
-                    name,
-                    kind: SymbolKind::CONSTANT,
-                    tags: None,
-                    deprecated: None, // do not use, deprecated, use `tags` instead
-                    location: LspLocation {
-                        uri: uri.clone(),
-                        range: typst_to_lsp::range(node.range(), source, position_encoding)
-                            .raw_range,
-                    },
-                    container_name: None,
-                };
-                Ok(Some(symbol))
-            }
-            SyntaxKind::Ident => {
-                let ast_node = node
-                    .cast::<ast::Ident>()
-                    .ok_or_else(|| anyhow!("cast to ast node failed: {:?}", node))?;
-                let name = ast_node.get().to_string();
-                let Some(parent) = node.parent() else {
-                    return Ok(None);
-                };
-                let kind = match parent.kind() {
-                    // for variable definitions, the Let binding holds an Ident
-                    SyntaxKind::LetBinding => SymbolKind::VARIABLE,
-                    // for function definitions, the Let binding holds a Closure which holds the
-                    // Ident
-                    SyntaxKind::Closure => {
-                        let Some(grand_parent) = parent.parent() else {
-                            return Ok(None);
-                        };
-                        match grand_parent.kind() {
-                            SyntaxKind::LetBinding => SymbolKind::FUNCTION,
-                            _ => return Ok(None),
-                        }
-                    }
-                    _ => return Ok(None),
-                };
-                let symbol = SymbolInformation {
-                    name,
-                    kind,
-                    tags: None,
-                    deprecated: None, // do not use, deprecated, use `tags` instead
-                    location: LspLocation {
-                        uri: uri.clone(),
-                        range: typst_to_lsp::range(node.range(), source, position_encoding)
-                            .raw_range,
-                    },
-                    container_name: None,
-                };
-                Ok(Some(symbol))
-            }
-            SyntaxKind::Markup => {
-                let name = node.get().to_owned().into_text().to_string();
-                if name.is_empty() {
-                    return Ok(None);
-                }
-                let Some(parent) = node.parent() else {
-                    return Ok(None);
-                };
-                let kind = match parent.kind() {
-                    SyntaxKind::Heading => SymbolKind::NAMESPACE,
-                    _ => return Ok(None),
-                };
-                let symbol = SymbolInformation {
-                    name,
-                    kind,
-                    tags: None,
-                    deprecated: None, // do not use, deprecated, use `tags` instead
-                    location: LspLocation {
-                        uri: uri.clone(),
-                        range: typst_to_lsp::range(node.range(), source, position_encoding)
-                            .raw_range,
-                    },
-                    container_name: None,
-                };
-                Ok(Some(symbol))
-            }
-            _ => Ok(None),
-        }
-    }
-
-    let root = LinkedNode::new(source.root());
-
-    let mut worker = DocumentSymbolWorker { symbols: vec![] };
-
-    let res = worker
-        .get_symbols(root, &source, &uri, position_encoding)
-        .ok();
-
-    res.map(|_| worker.symbols)
 }

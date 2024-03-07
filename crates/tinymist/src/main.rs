@@ -1,18 +1,10 @@
 //! # tinymist LSP Server
 
-mod config;
-mod ext;
-mod lsp_typst_boundary;
-
 // pub mod formatting;
 pub mod actor;
-pub mod analysis;
 pub mod lsp;
-pub mod semantic_tokens;
 
 use tower_lsp::{LspService, Server};
-
-use lsp::TypstServer;
 
 // #[derive(Debug, Clone)]
 // struct Args {}
@@ -49,7 +41,7 @@ async fn main() {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
-    let (service, socket) = LspService::new(TypstServer::new);
+    let (service, socket) = LspService::new(lsp::TypstServer::new);
 
     Server::new(stdin, stdout, socket).serve(service).await;
 }

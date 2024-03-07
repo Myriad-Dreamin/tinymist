@@ -1,6 +1,8 @@
 pub use tower_lsp::Client as LspHost;
 
 use std::borrow::Cow;
+use std::fmt;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -9,28 +11,187 @@ use futures::FutureExt;
 use log::{error, info, trace};
 use once_cell::sync::OnceCell;
 use serde_json::Value as JsonValue;
+use tinymist_query::{
+    get_semantic_tokens_options, get_semantic_tokens_registration,
+    get_semantic_tokens_unregistration, CompletionRequest, DocumentSymbolRequest, HoverRequest,
+    PositionEncoding, SelectionRangeRequest, SemanticTokensDeltaRequest, SemanticTokensFullRequest,
+    SignatureHelpRequest, SymbolRequest,
+};
+
+use anyhow::bail;
+use futures::future::BoxFuture;
+use itertools::Itertools;
+use serde::Deserialize;
+use serde_json::{Map, Value};
 use tokio::sync::{Mutex, RwLock};
-use tower_lsp::lsp_types::*;
-use tower_lsp::{jsonrpc, LanguageServer};
+use tower_lsp::lsp_types::ConfigurationItem;
+use tower_lsp::{jsonrpc, lsp_types::*, LanguageServer};
 use typst::model::Document;
 use typst_ts_core::config::CompileOpts;
 
 use crate::actor;
 use crate::actor::typst::CompileCluster;
-use crate::actor::typst::{
-    CompilerQueryResponse, CompletionRequest, DocumentSymbolRequest, HoverRequest,
-    OnSaveExportRequest, SelectionRangeRequest, SemanticTokensDeltaRequest,
-    SemanticTokensFullRequest, SignatureHelpRequest, SymbolRequest,
-};
-use crate::config::{
-    Config, ConstConfig, ExperimentalFormatterMode, ExportPdfMode, SemanticTokensMode,
-};
-use crate::ext::InitializeParamsExt;
+use crate::actor::typst::{CompilerQueryResponse, OnSaveExportRequest};
 
-use super::semantic_tokens::{
-    get_semantic_tokens_options, get_semantic_tokens_registration,
-    get_semantic_tokens_unregistration,
-};
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExperimentalFormatterMode {
+    #[default]
+    Off,
+    On,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportPdfMode {
+    Never,
+    #[default]
+    OnSave,
+    OnType,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SemanticTokensMode {
+    Disable,
+    #[default]
+    Enable,
+}
+
+pub type Listener<T> = Box<dyn FnMut(&T) -> BoxFuture<anyhow::Result<()>> + Send + Sync>;
+
+const CONFIG_ITEMS: &[&str] = &[
+    "exportPdf",
+    "rootPath",
+    "semanticTokens",
+    "experimentalFormatterMode",
+];
+
+#[derive(Default)]
+pub struct Config {
+    pub export_pdf: ExportPdfMode,
+    pub root_path: Option<PathBuf>,
+    pub semantic_tokens: SemanticTokensMode,
+    pub formatter: ExperimentalFormatterMode,
+    semantic_tokens_listeners: Vec<Listener<SemanticTokensMode>>,
+    formatter_listeners: Vec<Listener<ExperimentalFormatterMode>>,
+}
+
+impl Config {
+    pub fn get_items() -> Vec<ConfigurationItem> {
+        let sections = CONFIG_ITEMS
+            .iter()
+            .flat_map(|item| [format!("tinymist.{item}"), item.to_string()]);
+
+        sections
+            .map(|section| ConfigurationItem {
+                section: Some(section),
+                ..Default::default()
+            })
+            .collect()
+    }
+
+    pub fn values_to_map(values: Vec<Value>) -> Map<String, Value> {
+        let unpaired_values = values
+            .into_iter()
+            .tuples()
+            .map(|(a, b)| if !a.is_null() { a } else { b });
+
+        CONFIG_ITEMS
+            .iter()
+            .map(|item| item.to_string())
+            .zip(unpaired_values)
+            .collect()
+    }
+
+    pub fn listen_semantic_tokens(&mut self, listener: Listener<SemanticTokensMode>) {
+        self.semantic_tokens_listeners.push(listener);
+    }
+
+    // pub fn listen_formatting(&mut self, listener:
+    // Listener<ExperimentalFormatterMode>) {     self.formatter_listeners.
+    // push(listener); }
+
+    pub async fn update(&mut self, update: &Value) -> anyhow::Result<()> {
+        if let Value::Object(update) = update {
+            self.update_by_map(update).await
+        } else {
+            bail!("got invalid configuration object {update}")
+        }
+    }
+
+    pub async fn update_by_map(&mut self, update: &Map<String, Value>) -> anyhow::Result<()> {
+        let export_pdf = update
+            .get("exportPdf")
+            .map(ExportPdfMode::deserialize)
+            .and_then(Result::ok);
+        if let Some(export_pdf) = export_pdf {
+            self.export_pdf = export_pdf;
+        }
+
+        let root_path = update.get("rootPath");
+        if let Some(root_path) = root_path {
+            if root_path.is_null() {
+                self.root_path = None;
+            }
+            if let Some(root_path) = root_path.as_str().map(PathBuf::from) {
+                self.root_path = Some(root_path);
+            }
+        }
+
+        let semantic_tokens = update
+            .get("semanticTokens")
+            .map(SemanticTokensMode::deserialize)
+            .and_then(Result::ok);
+        if let Some(semantic_tokens) = semantic_tokens {
+            for listener in &mut self.semantic_tokens_listeners {
+                listener(&semantic_tokens).await?;
+            }
+            self.semantic_tokens = semantic_tokens;
+        }
+
+        let formatter = update
+            .get("experimentalFormatterMode")
+            .map(ExperimentalFormatterMode::deserialize)
+            .and_then(Result::ok);
+        if let Some(formatter) = formatter {
+            for listener in &mut self.formatter_listeners {
+                listener(&formatter).await?;
+            }
+            self.formatter = formatter;
+        }
+
+        Ok(())
+    }
+}
+
+impl fmt::Debug for Config {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Config")
+            .field("export_pdf", &self.export_pdf)
+            .field("formatter", &self.formatter)
+            .field("semantic_tokens", &self.semantic_tokens)
+            .field(
+                "semantic_tokens_listeners",
+                &format_args!("Vec[len = {}]", self.semantic_tokens_listeners.len()),
+            )
+            .field(
+                "formatter_listeners",
+                &format_args!("Vec[len = {}]", self.formatter_listeners.len()),
+            )
+            .finish()
+    }
+}
+
+/// Configuration set at initialization that won't change within a single
+/// session
+#[derive(Debug)]
+pub struct ConstConfig {
+    pub position_encoding: PositionEncoding,
+    pub supports_semantic_tokens_dynamic_registration: bool,
+    pub supports_document_formatting_dynamic_registration: bool,
+    pub supports_config_change_registration: bool,
+}
 
 pub struct TypstServer {
     pub client: LspHost,
@@ -581,5 +742,107 @@ impl TypstServer {
         // Ok(())
 
         todo!()
+    }
+}
+
+impl ConstConfig {
+    fn choose_encoding(params: &InitializeParams) -> PositionEncoding {
+        let encodings = params.position_encodings();
+        if encodings.contains(&PositionEncodingKind::UTF8) {
+            PositionEncoding::Utf8
+        } else {
+            PositionEncoding::Utf16
+        }
+    }
+}
+
+impl From<&InitializeParams> for ConstConfig {
+    fn from(params: &InitializeParams) -> Self {
+        Self {
+            position_encoding: Self::choose_encoding(params),
+            supports_semantic_tokens_dynamic_registration: params
+                .supports_semantic_tokens_dynamic_registration(),
+            supports_document_formatting_dynamic_registration: params
+                .supports_document_formatting_dynamic_registration(),
+            supports_config_change_registration: params.supports_config_change_registration(),
+        }
+    }
+}
+
+pub trait InitializeParamsExt {
+    fn position_encodings(&self) -> &[PositionEncodingKind];
+    fn supports_config_change_registration(&self) -> bool;
+    fn semantic_tokens_capabilities(&self) -> Option<&SemanticTokensClientCapabilities>;
+    fn document_formatting_capabilities(&self) -> Option<&DocumentFormattingClientCapabilities>;
+    fn supports_semantic_tokens_dynamic_registration(&self) -> bool;
+    fn supports_document_formatting_dynamic_registration(&self) -> bool;
+    fn root_paths(&self) -> Vec<PathBuf>;
+}
+
+static DEFAULT_ENCODING: [PositionEncodingKind; 1] = [PositionEncodingKind::UTF16];
+
+impl InitializeParamsExt for InitializeParams {
+    fn position_encodings(&self) -> &[PositionEncodingKind] {
+        self.capabilities
+            .general
+            .as_ref()
+            .and_then(|general| general.position_encodings.as_ref())
+            .map(|encodings| encodings.as_slice())
+            .unwrap_or(&DEFAULT_ENCODING)
+    }
+
+    fn supports_config_change_registration(&self) -> bool {
+        self.capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.configuration)
+            .unwrap_or(false)
+    }
+
+    fn semantic_tokens_capabilities(&self) -> Option<&SemanticTokensClientCapabilities> {
+        self.capabilities
+            .text_document
+            .as_ref()?
+            .semantic_tokens
+            .as_ref()
+    }
+
+    fn document_formatting_capabilities(&self) -> Option<&DocumentFormattingClientCapabilities> {
+        self.capabilities
+            .text_document
+            .as_ref()?
+            .formatting
+            .as_ref()
+    }
+
+    fn supports_semantic_tokens_dynamic_registration(&self) -> bool {
+        self.semantic_tokens_capabilities()
+            .and_then(|semantic_tokens| semantic_tokens.dynamic_registration)
+            .unwrap_or(false)
+    }
+
+    fn supports_document_formatting_dynamic_registration(&self) -> bool {
+        self.document_formatting_capabilities()
+            .and_then(|document_format| document_format.dynamic_registration)
+            .unwrap_or(false)
+    }
+
+    #[allow(deprecated)] // `self.root_path` is marked as deprecated
+    fn root_paths(&self) -> Vec<PathBuf> {
+        match self.workspace_folders.as_ref() {
+            Some(roots) => roots
+                .iter()
+                .map(|root| &root.uri)
+                .map(Url::to_file_path)
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap(),
+            None => self
+                .root_uri
+                .as_ref()
+                .map(|uri| uri.to_file_path().unwrap())
+                .or_else(|| self.root_path.clone().map(PathBuf::from))
+                .into_iter()
+                .collect(),
+        }
     }
 }

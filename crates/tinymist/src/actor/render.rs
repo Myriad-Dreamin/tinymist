@@ -11,7 +11,7 @@ use tokio::sync::{
 };
 use typst_ts_core::TypstDocument;
 
-use crate::config::ExportPdfMode;
+use crate::lsp::ExportPdfMode;
 
 #[derive(Debug, Clone)]
 pub enum RenderActorRequest {

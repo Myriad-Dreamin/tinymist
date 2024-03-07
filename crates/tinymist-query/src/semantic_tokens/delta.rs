@@ -7,12 +7,12 @@ struct CachedTokens {
 }
 
 #[derive(Default, Debug)]
-pub struct Cache {
+pub struct CacheInner {
     last_sent: Option<CachedTokens>,
     next_id: u64,
 }
 
-impl Cache {
+impl CacheInner {
     pub fn try_take_result(&mut self, id: &str) -> Option<Vec<SemanticToken>> {
         let id = id.parse::<u64>().ok()?;
         match self.last_sent.take() {

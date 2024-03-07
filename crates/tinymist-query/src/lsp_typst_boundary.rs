@@ -7,7 +7,7 @@ pub type LspPosition = lsp_types::Position;
 /// The interpretation of an `LspCharacterOffset` depends on the
 /// `LspPositionEncoding`
 pub type LspCharacterOffset = u32;
-pub type LspPositionEncoding = crate::config::PositionEncoding;
+pub type LspPositionEncoding = PositionEncoding;
 /// Byte offset (i.e. UTF-8 bytes) in Typst files, either from the start of the
 /// line or the file
 pub type TypstOffset = usize;
@@ -29,6 +29,33 @@ pub type TypstSeverity = typst::diag::Severity;
 
 pub type LspParamInfo = lsp_types::ParameterInformation;
 pub type TypstParamInfo = typst::foundations::ParamInfo;
+
+/// What counts as "1 character" for string indexing. We should always prefer
+/// UTF-8, but support UTF-16 as long as it is standard. For more background on
+/// encodings and LSP, try ["The bottom emoji breaks rust-analyzer"](https://fasterthanli.me/articles/the-bottom-emoji-breaks-rust-analyzer),
+/// a well-written article on the topic.
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Default)]
+pub enum PositionEncoding {
+    /// "1 character" means "1 UTF-16 code unit"
+    ///
+    /// This is the only required encoding for LSPs to support, but it's not a
+    /// natural one (unless you're working in JS). Prefer UTF-8, and refer
+    /// to the article linked in the `PositionEncoding` docs for more
+    /// background.
+    #[default]
+    Utf16,
+    /// "1 character" means "1 byte"
+    Utf8,
+}
+
+impl From<PositionEncoding> for lsp_types::PositionEncodingKind {
+    fn from(position_encoding: PositionEncoding) -> Self {
+        match position_encoding {
+            PositionEncoding::Utf16 => Self::UTF16,
+            PositionEncoding::Utf8 => Self::UTF8,
+        }
+    }
+}
 
 /// An LSP range with its associated encoding.
 pub struct LspRange {
@@ -289,8 +316,7 @@ pub mod typst_to_lsp {
 mod test {
     use typst::syntax::Source;
 
-    use crate::config::PositionEncoding;
-    use crate::lsp_typst_boundary::lsp_to_typst;
+    use crate::{lsp_to_typst, PositionEncoding};
 
     use super::*;
 

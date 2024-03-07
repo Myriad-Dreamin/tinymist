@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use parking_lot::RwLock;
 use strum::IntoEnumIterator;
 use tower_lsp::lsp_types::{
     Registration, SemanticToken, SemanticTokensEdit, SemanticTokensFullOptions,
@@ -7,15 +8,14 @@ use tower_lsp::lsp_types::{
 use typst::diag::EcoString;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 
-use crate::actor::typst::CompileCluster;
-use crate::config::PositionEncoding;
+use crate::PositionEncoding;
 
 use self::delta::token_delta;
 use self::modifier_set::ModifierSet;
 use self::token_encode::encode_tokens;
 use self::typst_tokens::{Modifier, TokenType};
 
-pub use self::delta::Cache as SemanticTokenCache;
+pub use self::delta::CacheInner as TokenCacheInner;
 
 mod delta;
 mod modifier_set;
@@ -58,7 +58,10 @@ pub fn get_semantic_tokens_options() -> SemanticTokensOptions {
     }
 }
 
-impl CompileCluster {
+#[derive(Default)]
+pub struct SemanticTokenCache(RwLock<TokenCacheInner>);
+
+impl SemanticTokenCache {
     pub fn get_semantic_tokens_full(
         &self,
         source: &Source,
@@ -70,10 +73,7 @@ impl CompileCluster {
         let encoded_tokens = encode_tokens(tokens, source, encoding);
         let output_tokens = encoded_tokens.map(|(token, _)| token).collect_vec();
 
-        let result_id = self
-            .semantic_tokens_delta_cache
-            .write()
-            .cache_result(output_tokens.clone());
+        let result_id = self.0.write().cache_result(output_tokens.clone());
 
         (output_tokens, result_id)
     }
@@ -84,10 +84,7 @@ impl CompileCluster {
         result_id: &str,
         encoding: PositionEncoding,
     ) -> (Result<Vec<SemanticTokensEdit>, Vec<SemanticToken>>, String) {
-        let cached = self
-            .semantic_tokens_delta_cache
-            .write()
-            .try_take_result(result_id);
+        let cached = self.0.write().try_take_result(result_id);
 
         // this call will overwrite the cache, so need to read from cache first
         let (tokens, result_id) = self.get_semantic_tokens_full(source, encoding);
