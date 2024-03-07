@@ -16,9 +16,9 @@ use once_cell::sync::OnceCell;
 use serde_json::Value as JsonValue;
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
-    get_semantic_tokens_unregistration, CompletionRequest, DocumentSymbolRequest, HoverRequest,
-    PositionEncoding, SelectionRangeRequest, SemanticTokensDeltaRequest, SemanticTokensFullRequest,
-    SignatureHelpRequest, SymbolRequest,
+    get_semantic_tokens_unregistration, CompletionRequest, DocumentSymbolRequest,
+    FoldingRangeRequest, HoverRequest, PositionEncoding, SelectionRangeRequest,
+    SemanticTokensDeltaRequest, SemanticTokensFullRequest, SignatureHelpRequest, SymbolRequest,
 };
 
 use anyhow::bail;
@@ -554,6 +554,16 @@ impl LanguageServer for TypstServer {
         let pattern = (!params.query.is_empty()).then_some(params.query);
 
         run_query!(self, Symbol, SymbolRequest { pattern })
+    }
+
+    async fn folding_range(
+        &self,
+        params: FoldingRangeParams,
+    ) -> jsonrpc::Result<Option<Vec<FoldingRange>>> {
+        let uri = params.text_document.uri;
+        let path = uri.to_file_path().unwrap();
+
+        run_query!(self, FoldingRange, FoldingRangeRequest { path })
     }
 
     async fn selection_range(

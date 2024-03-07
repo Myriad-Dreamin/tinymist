@@ -12,7 +12,7 @@ use tinymist_query::{
 };
 use tokio::sync::{broadcast, mpsc, watch, Mutex, RwLock};
 use tower_lsp::lsp_types::{
-    CompletionResponse, DocumentSymbolResponse, Hover, SelectionRange,
+    CompletionResponse, DocumentSymbolResponse, FoldingRange, Hover, SelectionRange,
     SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp, SymbolInformation,
     TextDocumentContentChangeEvent, Url,
 };
@@ -300,6 +300,7 @@ pub enum CompilerQueryRequest {
     Symbol(tinymist_query::SymbolRequest),
     SemanticTokensFull(tinymist_query::SemanticTokensFullRequest),
     SemanticTokensDelta(tinymist_query::SemanticTokensDeltaRequest),
+    FoldingRange(tinymist_query::FoldingRangeRequest),
     SelectionRange(tinymist_query::SelectionRangeRequest),
 }
 
@@ -313,6 +314,7 @@ pub enum CompilerQueryResponse {
     Symbol(Option<Vec<SymbolInformation>>),
     SemanticTokensFull(Option<SemanticTokensResult>),
     SemanticTokensDelta(Option<SemanticTokensFullDeltaResult>),
+    FoldingRange(Option<Vec<FoldingRange>>),
     SelectionRange(Option<Vec<SelectionRange>>),
 }
 
@@ -681,6 +683,7 @@ impl<H: CompilationHandle> CompileNode<H> {
             SignatureHelp(req) => query_world!(self, SignatureHelp, req),
             DocumentSymbol(req) => query_world!(self, DocumentSymbol, req),
             Symbol(req) => query_world!(self, Symbol, req),
+            FoldingRange(req) => query_world!(self, FoldingRange, req),
             SelectionRange(req) => query_world!(self, SelectionRange, req),
             CompilerQueryRequest::SemanticTokensDelta(..)
             | CompilerQueryRequest::SemanticTokensFull(..) => unreachable!(),

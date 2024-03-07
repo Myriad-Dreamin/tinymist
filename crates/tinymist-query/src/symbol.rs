@@ -1,7 +1,7 @@
 use typst_ts_compiler::NotifyApi;
 
-use crate::document_symbol::get_document_symbols;
-use crate::prelude::*;
+use crate::document_symbol::get_lexical_hierarchy;
+use crate::{prelude::*, LexicalHierarchy, LexicalKind, LexicalScopeGranularity};
 
 #[derive(Debug, Clone)]
 pub struct SymbolRequest {
@@ -23,11 +23,12 @@ impl SymbolRequest {
                 return;
             };
             let uri = Url::from_file_path(path).unwrap();
-            let res = get_document_symbols(source, uri, position_encoding).and_then(|symbols| {
-                self.pattern
-                    .as_ref()
-                    .map(|pattern| filter_document_symbols(symbols, pattern))
-            });
+            let res = get_lexical_hierarchy(source.clone(), LexicalScopeGranularity::None)
+                .and_then(|symbols| {
+                    self.pattern.as_ref().map(|pattern| {
+                        filter_document_symbols(&symbols, pattern, &source, &uri, position_encoding)
+                    })
+                });
 
             if let Some(mut res) = res {
                 symbols.append(&mut res)
@@ -38,12 +39,42 @@ impl SymbolRequest {
     }
 }
 
+#[allow(deprecated)]
 fn filter_document_symbols(
-    symbols: Vec<SymbolInformation>,
+    symbols: &[LexicalHierarchy],
     query_string: &str,
+    source: &Source,
+    uri: &Url,
+    position_encoding: PositionEncoding,
 ) -> Vec<SymbolInformation> {
     symbols
-        .into_iter()
-        .filter(|e| e.name.contains(query_string))
+        .iter()
+        .flat_map(|e| {
+            [e].into_iter()
+                .chain(e.children.as_deref().into_iter().flatten())
+        })
+        .filter(|e| e.info.name.contains(query_string))
+        .map(|e| {
+            let rng =
+                typst_to_lsp::range(e.info.range.clone(), source, position_encoding).raw_range;
+
+            SymbolInformation {
+                name: e.info.name.clone(),
+                kind: match e.info.kind {
+                    LexicalKind::Namespace(..) => SymbolKind::NAMESPACE,
+                    LexicalKind::Variable => SymbolKind::VARIABLE,
+                    LexicalKind::Function => SymbolKind::FUNCTION,
+                    LexicalKind::Constant => SymbolKind::CONSTANT,
+                    LexicalKind::Block => unreachable!(),
+                },
+                tags: None,
+                deprecated: None,
+                location: LspLocation {
+                    uri: uri.clone(),
+                    range: rng,
+                },
+                container_name: None,
+            }
+        })
         .collect()
 }

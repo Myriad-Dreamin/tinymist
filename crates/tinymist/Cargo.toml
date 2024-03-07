@@ -34,6 +34,7 @@ typst-assets = { workspace = true, features = ["fonts"] }
 typst-ts-core = { version = "0.4.2-rc6", default-features = false, features = [
     "flat-vector",
     "vector-bbox",
+    "no-content-hint",
 ] }
 typst-ts-compiler.workspace = true
 typst-preview.workspace = true
