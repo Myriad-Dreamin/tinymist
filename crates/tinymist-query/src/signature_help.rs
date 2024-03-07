@@ -19,11 +19,6 @@ impl SignatureHelpRequest {
         let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset)?;
         let (callee, callee_node, args) = surrounding_function_syntax(&ast_node)?;
 
-        let mut ancestor = &ast_node;
-        while !ancestor.is::<ast::Expr>() {
-            ancestor = ancestor.parent()?;
-        }
-
         if !callee.hash() && !matches!(callee, ast::Expr::MathIdent(_)) {
             return None;
         }
