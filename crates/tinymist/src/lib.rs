@@ -17,8 +17,8 @@ use serde_json::Value as JsonValue;
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
     get_semantic_tokens_unregistration, CompletionRequest, DocumentSymbolRequest,
-    FoldingRangeRequest, GotoDefinitionRequest, HoverRequest, PositionEncoding,
-    SelectionRangeRequest, SemanticTokensDeltaRequest, SemanticTokensFullRequest,
+    FoldingRangeRequest, GotoDefinitionRequest, HoverRequest, OnSaveExportRequest,
+    PositionEncoding, SelectionRangeRequest, SemanticTokensDeltaRequest, SemanticTokensFullRequest,
     SignatureHelpRequest, SymbolRequest,
 };
 
@@ -34,7 +34,6 @@ use typst::model::Document;
 use typst_ts_core::config::CompileOpts;
 
 use crate::actor::typst::CompileCluster;
-use crate::actor::typst::{CompilerQueryResponse, OnSaveExportRequest};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -234,14 +233,14 @@ macro_rules! run_query {
         let req = $req;
         $self
             .universe()
-            .query(actor::typst::CompilerQueryRequest::$query(req.clone()))
+            .query(tinymist_query::CompilerQueryRequest::$query(req.clone()))
             .await
             .map_err(|err| {
                 error!("error getting $query: {err} with request {req:?}");
                 jsonrpc::Error::internal_error()
             })
             .map(|resp| {
-                let CompilerQueryResponse::$query(resp) = resp else {
+                let tinymist_query::CompilerQueryResponse::$query(resp) = resp else {
                     unreachable!()
                 };
                 resp

@@ -1,6 +1,7 @@
 pub mod analysis;
 
 pub(crate) mod diagnostics;
+
 pub use diagnostics::*;
 pub(crate) mod signature_help;
 pub use signature_help::*;
@@ -29,6 +30,48 @@ pub mod lsp_typst_boundary;
 pub use lsp_typst_boundary::*;
 
 mod prelude;
+
+mod polymorphic {
+    use super::prelude::*;
+    use super::*;
+
+    #[derive(Debug, Clone)]
+    pub struct OnSaveExportRequest {
+        pub path: PathBuf,
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum CompilerQueryRequest {
+        OnSaveExport(OnSaveExportRequest),
+        Hover(HoverRequest),
+        GotoDefinition(GotoDefinitionRequest),
+        Completion(CompletionRequest),
+        SignatureHelp(SignatureHelpRequest),
+        DocumentSymbol(DocumentSymbolRequest),
+        Symbol(SymbolRequest),
+        SemanticTokensFull(SemanticTokensFullRequest),
+        SemanticTokensDelta(SemanticTokensDeltaRequest),
+        FoldingRange(FoldingRangeRequest),
+        SelectionRange(SelectionRangeRequest),
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum CompilerQueryResponse {
+        OnSaveExport(()),
+        Hover(Option<Hover>),
+        GotoDefinition(Option<GotoDefinitionResponse>),
+        Completion(Option<CompletionResponse>),
+        SignatureHelp(Option<SignatureHelp>),
+        DocumentSymbol(Option<DocumentSymbolResponse>),
+        Symbol(Option<Vec<SymbolInformation>>),
+        SemanticTokensFull(Option<SemanticTokensResult>),
+        SemanticTokensDelta(Option<SemanticTokensFullDeltaResult>),
+        FoldingRange(Option<Vec<FoldingRange>>),
+        SelectionRange(Option<Vec<SelectionRange>>),
+    }
+}
+
+pub use polymorphic::*;
 
 #[cfg(test)]
 mod tests {

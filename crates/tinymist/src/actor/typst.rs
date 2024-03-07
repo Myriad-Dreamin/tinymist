@@ -8,14 +8,11 @@ use anyhow::anyhow;
 use futures::future::join_all;
 use log::{error, trace, warn};
 use tinymist_query::{
-    DiagnosticsMap, LspDiagnostic, LspRange, PositionEncoding, SemanticTokenCache,
+    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, LspDiagnostic, LspRange,
+    OnSaveExportRequest, PositionEncoding, SemanticTokenCache,
 };
 use tokio::sync::{broadcast, mpsc, watch, Mutex, RwLock};
-use tower_lsp::lsp_types::{
-    CompletionResponse, DocumentSymbolResponse, FoldingRange, GotoDefinitionResponse, Hover,
-    SelectionRange, SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp,
-    SymbolInformation, TextDocumentContentChangeEvent, Url,
-};
+use tower_lsp::lsp_types::{TextDocumentContentChangeEvent, Url};
 use typst::diag::{FileResult, SourceDiagnostic, SourceResult};
 use typst::layout::Position;
 use typst::model::Document;
@@ -283,41 +280,6 @@ impl CompileCluster {
 
         Ok(())
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct OnSaveExportRequest {
-    pub path: PathBuf,
-}
-
-#[derive(Debug, Clone)]
-pub enum CompilerQueryRequest {
-    OnSaveExport(OnSaveExportRequest),
-    Hover(tinymist_query::HoverRequest),
-    GotoDefinition(tinymist_query::GotoDefinitionRequest),
-    Completion(tinymist_query::CompletionRequest),
-    SignatureHelp(tinymist_query::SignatureHelpRequest),
-    DocumentSymbol(tinymist_query::DocumentSymbolRequest),
-    Symbol(tinymist_query::SymbolRequest),
-    SemanticTokensFull(tinymist_query::SemanticTokensFullRequest),
-    SemanticTokensDelta(tinymist_query::SemanticTokensDeltaRequest),
-    FoldingRange(tinymist_query::FoldingRangeRequest),
-    SelectionRange(tinymist_query::SelectionRangeRequest),
-}
-
-#[derive(Debug, Clone)]
-pub enum CompilerQueryResponse {
-    OnSaveExport(()),
-    Hover(Option<Hover>),
-    GotoDefinition(Option<GotoDefinitionResponse>),
-    Completion(Option<CompletionResponse>),
-    SignatureHelp(Option<SignatureHelp>),
-    DocumentSymbol(Option<DocumentSymbolResponse>),
-    Symbol(Option<Vec<SymbolInformation>>),
-    SemanticTokensFull(Option<SemanticTokensResult>),
-    SemanticTokensDelta(Option<SemanticTokensFullDeltaResult>),
-    FoldingRange(Option<Vec<FoldingRange>>),
-    SelectionRange(Option<Vec<SelectionRange>>),
 }
 
 macro_rules! query_state {
