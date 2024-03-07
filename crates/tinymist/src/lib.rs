@@ -17,8 +17,9 @@ use serde_json::Value as JsonValue;
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
     get_semantic_tokens_unregistration, CompletionRequest, DocumentSymbolRequest,
-    FoldingRangeRequest, HoverRequest, PositionEncoding, SelectionRangeRequest,
-    SemanticTokensDeltaRequest, SemanticTokensFullRequest, SignatureHelpRequest, SymbolRequest,
+    FoldingRangeRequest, GotoDefinitionRequest, HoverRequest, PositionEncoding,
+    SelectionRangeRequest, SemanticTokensDeltaRequest, SemanticTokensFullRequest,
+    SignatureHelpRequest, SymbolRequest,
 };
 
 use anyhow::bail;
@@ -315,6 +316,7 @@ impl LanguageServer for TypstServer {
 
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
                 signature_help_provider: Some(SignatureHelpOptions {
                     trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
                     retrigger_characters: None,
@@ -322,7 +324,7 @@ impl LanguageServer for TypstServer {
                         work_done_progress: None,
                     },
                 }),
-                hover_provider: Some(HoverProviderCapability::Simple(true)),
+                definition_provider: Some(OneOf::Left(true)),
                 completion_provider: Some(CompletionOptions {
                     trigger_characters: Some(vec![
                         String::from("#"),
@@ -503,6 +505,21 @@ impl LanguageServer for TypstServer {
         let position = params.text_document_position_params.position;
 
         run_query!(self, Hover, HoverRequest { path, position })
+    }
+
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let path = uri.to_file_path().unwrap();
+        let position = params.text_document_position_params.position;
+
+        run_query!(
+            self,
+            GotoDefinition,
+            GotoDefinitionRequest { path, position }
+        )
     }
 
     async fn completion(

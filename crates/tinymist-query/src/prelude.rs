@@ -9,10 +9,10 @@ pub use itertools::{Format, Itertools};
 pub use log::{error, trace};
 pub use tower_lsp::lsp_types::{
     CompletionResponse, DiagnosticRelatedInformation, DocumentSymbol, DocumentSymbolResponse,
-    Documentation, FoldingRange, Hover, Location as LspLocation, MarkupContent, MarkupKind,
-    Position as LspPosition, SelectionRange, SemanticTokens, SemanticTokensDelta,
-    SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp, SignatureInformation,
-    SymbolInformation, Url,
+    Documentation, FoldingRange, GotoDefinitionResponse, Hover, Location as LspLocation,
+    MarkupContent, MarkupKind, Position as LspPosition, SelectionRange, SemanticTokens,
+    SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp,
+    SignatureInformation, SymbolInformation, Url,
 };
 pub use typst::diag::{EcoString, FileError, FileResult, Tracepoint};
 pub use typst::foundations::{Func, ParamInfo, Value};

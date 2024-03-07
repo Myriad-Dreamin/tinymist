@@ -12,9 +12,9 @@ use tinymist_query::{
 };
 use tokio::sync::{broadcast, mpsc, watch, Mutex, RwLock};
 use tower_lsp::lsp_types::{
-    CompletionResponse, DocumentSymbolResponse, FoldingRange, Hover, SelectionRange,
-    SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp, SymbolInformation,
-    TextDocumentContentChangeEvent, Url,
+    CompletionResponse, DocumentSymbolResponse, FoldingRange, GotoDefinitionResponse, Hover,
+    SelectionRange, SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp,
+    SymbolInformation, TextDocumentContentChangeEvent, Url,
 };
 use typst::diag::{FileResult, SourceDiagnostic, SourceResult};
 use typst::layout::Position;
@@ -294,6 +294,7 @@ pub struct OnSaveExportRequest {
 pub enum CompilerQueryRequest {
     OnSaveExport(OnSaveExportRequest),
     Hover(tinymist_query::HoverRequest),
+    GotoDefinition(tinymist_query::GotoDefinitionRequest),
     Completion(tinymist_query::CompletionRequest),
     SignatureHelp(tinymist_query::SignatureHelpRequest),
     DocumentSymbol(tinymist_query::DocumentSymbolRequest),
@@ -308,6 +309,7 @@ pub enum CompilerQueryRequest {
 pub enum CompilerQueryResponse {
     OnSaveExport(()),
     Hover(Option<Hover>),
+    GotoDefinition(Option<GotoDefinitionResponse>),
     Completion(Option<CompletionResponse>),
     SignatureHelp(Option<SignatureHelp>),
     DocumentSymbol(Option<DocumentSymbolResponse>),
@@ -679,6 +681,7 @@ impl<H: CompilationHandle> CompileNode<H> {
                 Ok(CompilerQueryResponse::OnSaveExport(()))
             }
             Hover(req) => query_state!(self, Hover, req),
+            GotoDefinition(req) => query_world!(self, GotoDefinition, req),
             Completion(req) => query_state!(self, Completion, req),
             SignatureHelp(req) => query_world!(self, SignatureHelp, req),
             DocumentSymbol(req) => query_world!(self, DocumentSymbol, req),

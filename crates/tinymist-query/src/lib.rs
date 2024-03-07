@@ -22,6 +22,8 @@ pub(crate) mod folding_range;
 pub use folding_range::*;
 pub(crate) mod selection_range;
 pub use selection_range::*;
+pub(crate) mod goto_definition;
+pub use goto_definition::*;
 
 pub mod lsp_typst_boundary;
 pub use lsp_typst_boundary::*;
