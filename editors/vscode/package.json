@@ -12,8 +12,8 @@
         "Nathan Varner"
     ],
     "publisher": "Myriad-Dreamin",
-    "license": "Apache-2.0 OR MIT",
-    "version": "0.12.0",
+    "license": "Apache-2.0",
+    "version": "0.11.0",
     "engines": {
         "vscode": "^1.71.0"
     },
@@ -21,7 +21,7 @@
     "contributes": {
         "configuration": {
             "type": "object",
-            "title": "Typst LSP",
+            "title": "Tinymist Typst LSP",
             "properties": {
                 "tinymist.exportPdf": {
                     "title": "Export PDF",
