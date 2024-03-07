@@ -5,17 +5,19 @@ pub struct DocumentSymbolRequest {
     pub path: PathBuf,
 }
 
-pub fn document_symbol(
-    world: &TypstSystemWorld,
-    req: DocumentSymbolRequest,
-    position_encoding: PositionEncoding,
-) -> Option<DocumentSymbolResponse> {
-    let source = get_suitable_source_in_workspace(world, &req.path).ok()?;
+impl DocumentSymbolRequest {
+    pub fn request(
+        self,
+        world: &TypstSystemWorld,
+        position_encoding: PositionEncoding,
+    ) -> Option<DocumentSymbolResponse> {
+        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
 
-    let uri = Url::from_file_path(req.path).unwrap();
-    let symbols = get_document_symbols(source, uri, position_encoding);
+        let uri = Url::from_file_path(self.path).unwrap();
+        let symbols = get_document_symbols(source, uri, position_encoding);
 
-    symbols.map(DocumentSymbolResponse::Flat)
+        symbols.map(DocumentSymbolResponse::Flat)
+    }
 }
 
 #[comemo::memoize]

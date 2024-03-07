@@ -7,7 +7,9 @@ use std::{
 use anyhow::anyhow;
 use futures::future::join_all;
 use log::{error, trace, warn};
-use tinymist_query::{LspDiagnostic, LspRange, PositionEncoding, SemanticTokenCache};
+use tinymist_query::{
+    DiagnosticsMap, LspDiagnostic, LspRange, PositionEncoding, SemanticTokenCache,
+};
 use tokio::sync::{broadcast, mpsc, watch, Mutex, RwLock};
 use tower_lsp::lsp_types::{
     CompletionResponse, DocumentSymbolResponse, Hover, SelectionRange,
@@ -42,9 +44,6 @@ type CompileService<H> = CompileActor<Reporter<CompileExporter<CompileDriver>, H
 type CompileClient<H> = TsCompileClient<CompileService<H>>;
 
 type DiagnosticsSender = mpsc::UnboundedSender<(String, DiagnosticsMap)>;
-type DiagnosticsMap = HashMap<Url, Vec<LspDiagnostic>>;
-
-// type Client = TypstClient<CompileHandler>;
 
 pub struct CompileCluster {
     position_encoding: PositionEncoding,
@@ -65,7 +64,7 @@ pub fn create_cluster(
     let primary = create_server(
         "primary".to_owned(),
         cfg,
-        create_compiler(roots.clone(), opts.clone()),
+        CompileDriver::new(roots.clone(), opts.clone()),
         diag_tx,
     );
 
@@ -81,11 +80,6 @@ pub fn create_cluster(
             affect_map: HashMap::new(),
         }),
     }
-}
-
-fn create_compiler(roots: Vec<PathBuf>, opts: CompileOpts) -> CompileDriver {
-    let world = TypstSystemWorld::new(opts).expect("incorrect options");
-    CompileDriver::new(world, roots)
 }
 
 fn create_server(
@@ -323,31 +317,31 @@ pub enum CompilerQueryResponse {
 }
 
 macro_rules! query_state {
-    ($self:ident, $method:ident, $query:expr, $req:expr) => {{
+    ($self:ident, $method:ident, $req:expr) => {{
         let doc = $self.handler.result.lock().unwrap().clone().ok();
         let enc = $self.position_encoding;
-        let res = $self.steal_world(move |w| $query(w, doc, $req, enc)).await;
+        let res = $self.steal_world(move |w| $req.request(w, doc, enc)).await;
         res.map(CompilerQueryResponse::$method)
     }};
 }
 
 macro_rules! query_world {
-    ($self:ident, $method:ident, $query:expr, $req:expr) => {{
+    ($self:ident, $method:ident, $req:expr) => {{
         let enc = $self.position_encoding;
-        let res = $self.steal_world(move |w| $query(w, $req, enc)).await;
+        let res = $self.steal_world(move |w| $req.request(w, enc)).await;
         res.map(CompilerQueryResponse::$method)
     }};
 }
 
 macro_rules! query_tokens_cache {
-    ($self:ident, $method:ident, $query:expr, $req:expr) => {{
+    ($self:ident, $method:ident, $req:expr) => {{
         let path: ImmutPath = $req.path.clone().into();
         let vfs = $self.memory_changes.read().await;
         let snapshot = vfs.get(&path).ok_or_else(|| anyhow!("file missing"))?;
         let source = snapshot.content.clone();
 
         let enc = $self.position_encoding;
-        let res = $query(&$self.tokens_cache, source, $req, enc);
+        let res = $req.request(&$self.tokens_cache, source, enc);
         Ok(CompilerQueryResponse::$method(res))
     }};
 }
@@ -357,16 +351,11 @@ impl CompileCluster {
         &self,
         query: CompilerQueryRequest,
     ) -> anyhow::Result<CompilerQueryResponse> {
-        use tinymist_query::*;
         use CompilerQueryRequest::*;
 
         match query {
-            SemanticTokensFull(req) => {
-                query_tokens_cache!(self, SemanticTokensFull, semantic_tokens_full, req)
-            }
-            SemanticTokensDelta(req) => {
-                query_tokens_cache!(self, SemanticTokensDelta, semantic_tokens_delta, req)
-            }
+            SemanticTokensFull(req) => query_tokens_cache!(self, SemanticTokensFull, req),
+            SemanticTokensDelta(req) => query_tokens_cache!(self, SemanticTokensDelta, req),
             _ => self.primary.query(query).await,
         }
     }
@@ -415,7 +404,8 @@ impl CompileMiddleware for CompileDriver {
 }
 
 impl CompileDriver {
-    fn new(world: TypstSystemWorld, roots: Vec<PathBuf>) -> Self {
+    fn new(roots: Vec<PathBuf>, opts: CompileOpts) -> Self {
+        let world = TypstSystemWorld::new(opts).expect("incorrect options");
         let driver = CompileDriverInner::new(world);
 
         Self {
@@ -679,7 +669,6 @@ impl<H: CompilationHandle> CompileNode<H> {
         &self,
         query: CompilerQueryRequest,
     ) -> anyhow::Result<CompilerQueryResponse> {
-        use tinymist_query::*;
         use CompilerQueryRequest::*;
 
         match query {
@@ -687,12 +676,12 @@ impl<H: CompilationHandle> CompileNode<H> {
                 self.on_save_export(path).await?;
                 Ok(CompilerQueryResponse::OnSaveExport(()))
             }
-            Hover(req) => query_state!(self, Hover, hover, req),
-            Completion(req) => query_state!(self, Completion, completion, req),
-            SignatureHelp(req) => query_world!(self, SignatureHelp, signature_help, req),
-            DocumentSymbol(req) => query_world!(self, DocumentSymbol, document_symbol, req),
-            Symbol(req) => query_world!(self, Symbol, symbol, req),
-            SelectionRange(req) => query_world!(self, SelectionRange, selection_range, req),
+            Hover(req) => query_state!(self, Hover, req),
+            Completion(req) => query_state!(self, Completion, req),
+            SignatureHelp(req) => query_world!(self, SignatureHelp, req),
+            DocumentSymbol(req) => query_world!(self, DocumentSymbol, req),
+            Symbol(req) => query_world!(self, Symbol, req),
+            SelectionRange(req) => query_world!(self, SelectionRange, req),
             CompilerQueryRequest::SemanticTokensDelta(..)
             | CompilerQueryRequest::SemanticTokensFull(..) => unreachable!(),
         }

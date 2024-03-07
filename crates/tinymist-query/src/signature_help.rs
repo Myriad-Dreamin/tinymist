@@ -6,73 +6,76 @@ pub struct SignatureHelpRequest {
     pub position: LspPosition,
 }
 
-pub fn signature_help(
-    world: &TypstSystemWorld,
-    SignatureHelpRequest { path, position }: SignatureHelpRequest,
-    position_encoding: PositionEncoding,
-) -> Option<SignatureHelp> {
-    let source = get_suitable_source_in_workspace(world, &path).ok()?;
-    let typst_offset = lsp_to_typst::position_to_offset(position, position_encoding, &source);
+impl SignatureHelpRequest {
+    pub fn request(
+        self,
+        world: &TypstSystemWorld,
+        position_encoding: PositionEncoding,
+    ) -> Option<SignatureHelp> {
+        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
+        let typst_offset =
+            lsp_to_typst::position_to_offset(self.position, position_encoding, &source);
 
-    let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset)?;
-    let (callee, callee_node, args) = surrounding_function_syntax(&ast_node)?;
+        let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset)?;
+        let (callee, callee_node, args) = surrounding_function_syntax(&ast_node)?;
 
-    let mut ancestor = &ast_node;
-    while !ancestor.is::<ast::Expr>() {
-        ancestor = ancestor.parent()?;
-    }
-
-    if !callee.hash() && !matches!(callee, ast::Expr::MathIdent(_)) {
-        return None;
-    }
-
-    let values = analyze_expr(world, &callee_node);
-
-    let function = values.into_iter().find_map(|v| match v {
-        Value::Func(f) => Some(f),
-        _ => None,
-    })?;
-    trace!("got function {function:?}");
-
-    let param_index = param_index_at_leaf(&ast_node, &function, args);
-
-    let label = format!(
-        "{}({}){}",
-        function.name().unwrap_or("<anonymous closure>"),
-        match function.params() {
-            Some(params) => params
-                .iter()
-                .map(typst_to_lsp::param_info_to_label)
-                .join(", "),
-            None => "".to_owned(),
-        },
-        match function.returns() {
-            Some(returns) => format!("-> {}", typst_to_lsp::cast_info_to_label(returns)),
-            None => "".to_owned(),
+        let mut ancestor = &ast_node;
+        while !ancestor.is::<ast::Expr>() {
+            ancestor = ancestor.parent()?;
         }
-    );
-    let params = function
-        .params()
-        .unwrap_or_default()
-        .iter()
-        .map(typst_to_lsp::param_info)
-        .collect();
-    trace!("got signature info {label} {params:?}");
 
-    let documentation = function.docs().map(markdown_docs);
+        if !callee.hash() && !matches!(callee, ast::Expr::MathIdent(_)) {
+            return None;
+        }
 
-    let active_parameter = param_index.map(|i| i as u32);
+        let values = analyze_expr(world, &callee_node);
 
-    Some(SignatureHelp {
-        signatures: vec![SignatureInformation {
-            label,
-            documentation,
-            parameters: Some(params),
-            active_parameter,
-        }],
-        active_signature: Some(0),
-        active_parameter: None,
-    })
+        let function = values.into_iter().find_map(|v| match v {
+            Value::Func(f) => Some(f),
+            _ => None,
+        })?;
+        trace!("got function {function:?}");
+
+        let param_index = param_index_at_leaf(&ast_node, &function, args);
+
+        let label = format!(
+            "{}({}){}",
+            function.name().unwrap_or("<anonymous closure>"),
+            match function.params() {
+                Some(params) => params
+                    .iter()
+                    .map(typst_to_lsp::param_info_to_label)
+                    .join(", "),
+                None => "".to_owned(),
+            },
+            match function.returns() {
+                Some(returns) => format!("-> {}", typst_to_lsp::cast_info_to_label(returns)),
+                None => "".to_owned(),
+            }
+        );
+        let params = function
+            .params()
+            .unwrap_or_default()
+            .iter()
+            .map(typst_to_lsp::param_info)
+            .collect();
+        trace!("got signature info {label} {params:?}");
+
+        let documentation = function.docs().map(markdown_docs);
+
+        let active_parameter = param_index.map(|i| i as u32);
+
+        Some(SignatureHelp {
+            signatures: vec![SignatureInformation {
+                label,
+                documentation,
+                parameters: Some(params),
+                active_parameter,
+            }],
+            active_signature: Some(0),
+            active_parameter: None,
+        })
+    }
 }
 
 fn surrounding_function_syntax<'b>(

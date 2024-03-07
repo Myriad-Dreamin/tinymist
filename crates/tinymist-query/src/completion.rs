@@ -7,20 +7,23 @@ pub struct CompletionRequest {
     pub explicit: bool,
 }
 
-pub fn completion(
-    world: &TypstSystemWorld,
-    doc: Option<Arc<TypstDocument>>,
-    req: CompletionRequest,
-    position_encoding: PositionEncoding,
-) -> Option<CompletionResponse> {
-    let source = get_suitable_source_in_workspace(world, &req.path).ok()?;
-    let typst_offset = lsp_to_typst::position_to_offset(req.position, position_encoding, &source);
+impl CompletionRequest {
+    pub fn request(
+        self,
+        world: &TypstSystemWorld,
+        doc: Option<Arc<TypstDocument>>,
+        position_encoding: PositionEncoding,
+    ) -> Option<CompletionResponse> {
+        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
+        let typst_offset =
+            lsp_to_typst::position_to_offset(self.position, position_encoding, &source);
 
-    let (typst_start_offset, completions) =
-        typst_ide::autocomplete(world, doc.as_deref(), &source, typst_offset, req.explicit)?;
+        let (typst_start_offset, completions) =
+            typst_ide::autocomplete(world, doc.as_deref(), &source, typst_offset, self.explicit)?;
 
-    let lsp_start_position =
-        typst_to_lsp::offset_to_position(typst_start_offset, position_encoding, &source);
-    let replace_range = LspRawRange::new(lsp_start_position, req.position);
-    Some(typst_to_lsp::completions(&completions, replace_range).into())
+        let lsp_start_position =
+            typst_to_lsp::offset_to_position(typst_start_offset, position_encoding, &source);
+        let replace_range = LspRawRange::new(lsp_start_position, self.position);
+        Some(typst_to_lsp::completions(&completions, replace_range).into())
+    }
 }

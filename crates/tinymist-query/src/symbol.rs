@@ -8,32 +8,34 @@ pub struct SymbolRequest {
     pub pattern: Option<String>,
 }
 
-pub fn symbol(
-    world: &TypstSystemWorld,
-    SymbolRequest { pattern }: SymbolRequest,
-    position_encoding: PositionEncoding,
-) -> Option<Vec<SymbolInformation>> {
-    // todo: expose source
+impl SymbolRequest {
+    pub fn request(
+        self,
+        world: &TypstSystemWorld,
+        position_encoding: PositionEncoding,
+    ) -> Option<Vec<SymbolInformation>> {
+        // todo: expose source
 
-    let mut symbols = vec![];
+        let mut symbols = vec![];
 
-    world.iter_dependencies(&mut |path, _| {
-        let Ok(source) = get_suitable_source_in_workspace(world, path) else {
-            return;
-        };
-        let uri = Url::from_file_path(path).unwrap();
-        let res = get_document_symbols(source, uri, position_encoding).and_then(|symbols| {
-            pattern
-                .as_ref()
-                .map(|pattern| filter_document_symbols(symbols, pattern))
+        world.iter_dependencies(&mut |path, _| {
+            let Ok(source) = get_suitable_source_in_workspace(world, path) else {
+                return;
+            };
+            let uri = Url::from_file_path(path).unwrap();
+            let res = get_document_symbols(source, uri, position_encoding).and_then(|symbols| {
+                self.pattern
+                    .as_ref()
+                    .map(|pattern| filter_document_symbols(symbols, pattern))
+            });
+
+            if let Some(mut res) = res {
+                symbols.append(&mut res)
+            }
         });
 
-        if let Some(mut res) = res {
-            symbols.append(&mut res)
-        }
-    });
-
-    Some(symbols)
+        Some(symbols)
+    }
 }
 
 fn filter_document_symbols(

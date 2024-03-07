@@ -5,19 +5,21 @@ pub struct SemanticTokensFullRequest {
     pub path: PathBuf,
 }
 
-pub fn semantic_tokens_full(
-    cache: &SemanticTokenCache,
-    source: Source,
-    _req: SemanticTokensFullRequest,
-    position_encoding: PositionEncoding,
-) -> Option<SemanticTokensResult> {
-    let (tokens, result_id) = cache.get_semantic_tokens_full(&source, position_encoding);
+impl SemanticTokensFullRequest {
+    pub fn request(
+        self,
+        cache: &SemanticTokenCache,
+        source: Source,
+        position_encoding: PositionEncoding,
+    ) -> Option<SemanticTokensResult> {
+        let (tokens, result_id) = cache.get_semantic_tokens_full(&source, position_encoding);
 
-    Some(
-        SemanticTokens {
-            result_id: Some(result_id),
-            data: tokens,
-        }
-        .into(),
-    )
+        Some(
+            SemanticTokens {
+                result_id: Some(result_id),
+                data: tokens,
+            }
+            .into(),
+        )
+    }
 }

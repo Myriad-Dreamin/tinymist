@@ -6,22 +6,25 @@ pub struct SelectionRangeRequest {
     pub positions: Vec<LspPosition>,
 }
 
-pub fn selection_range(
-    world: &TypstSystemWorld,
-    req: SelectionRangeRequest,
-    position_encoding: PositionEncoding,
-) -> Option<Vec<SelectionRange>> {
-    let source = get_suitable_source_in_workspace(world, &req.path).ok()?;
+impl SelectionRangeRequest {
+    pub fn request(
+        self,
+        world: &TypstSystemWorld,
+        position_encoding: PositionEncoding,
+    ) -> Option<Vec<SelectionRange>> {
+        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
 
-    let mut ranges = Vec::new();
-    for position in req.positions {
-        let typst_offset = lsp_to_typst::position_to_offset(position, position_encoding, &source);
-        let tree = LinkedNode::new(source.root());
-        let leaf = tree.leaf_at(typst_offset)?;
-        ranges.push(range_for_node(&source, position_encoding, &leaf));
+        let mut ranges = Vec::new();
+        for position in self.positions {
+            let typst_offset =
+                lsp_to_typst::position_to_offset(position, position_encoding, &source);
+            let tree = LinkedNode::new(source.root());
+            let leaf = tree.leaf_at(typst_offset)?;
+            ranges.push(range_for_node(&source, position_encoding, &leaf));
+        }
+
+        Some(ranges)
     }
-
-    Some(ranges)
 }
 
 fn range_for_node(
