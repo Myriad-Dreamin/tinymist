@@ -28,7 +28,6 @@ itertools = "0.12.0"
 lazy_static = "1.4.0"
 env_logger = "0.11.1"
 log = "0.4.17"
-percent-encoding = "2.3.0"
 strum = { version = "0.25.0", features = ["derive"] }
 async-trait = "0.1.73"
 parking_lot = "0.12.1"

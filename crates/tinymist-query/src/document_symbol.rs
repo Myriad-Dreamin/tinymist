@@ -3,17 +3,17 @@ use crate::prelude::*;
 #[derive(Debug, Clone)]
 pub struct DocumentSymbolRequest {
     pub path: PathBuf,
-    pub position_encoding: PositionEncoding,
 }
 
 pub fn document_symbol(
     world: &TypstSystemWorld,
     req: DocumentSymbolRequest,
+    position_encoding: PositionEncoding,
 ) -> Option<DocumentSymbolResponse> {
     let source = get_suitable_source_in_workspace(world, &req.path).ok()?;
 
     let uri = Url::from_file_path(req.path).unwrap();
-    let symbols = get_document_symbols(source, uri, req.position_encoding);
+    let symbols = get_document_symbols(source, uri, position_encoding);
 
     symbols.map(DocumentSymbolResponse::Flat)
 }

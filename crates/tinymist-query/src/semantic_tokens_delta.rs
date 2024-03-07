@@ -4,18 +4,18 @@ use crate::{prelude::*, SemanticTokenCache};
 pub struct SemanticTokensDeltaRequest {
     pub path: PathBuf,
     pub previous_result_id: String,
-    pub position_encoding: PositionEncoding,
 }
 
 pub fn semantic_tokens_delta(
     cache: &SemanticTokenCache,
     source: Source,
     req: SemanticTokensDeltaRequest,
+    position_encoding: PositionEncoding,
 ) -> Option<SemanticTokensFullDeltaResult> {
     let (tokens, result_id) = cache.try_semantic_tokens_delta_from_result_id(
         &source,
         &req.previous_result_id,
-        req.position_encoding,
+        position_encoding,
     );
 
     match tokens {

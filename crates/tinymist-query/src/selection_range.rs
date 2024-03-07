@@ -4,22 +4,21 @@ use crate::prelude::*;
 pub struct SelectionRangeRequest {
     pub path: PathBuf,
     pub positions: Vec<LspPosition>,
-    pub position_encoding: PositionEncoding,
 }
 
 pub fn selection_range(
     world: &TypstSystemWorld,
     req: SelectionRangeRequest,
+    position_encoding: PositionEncoding,
 ) -> Option<Vec<SelectionRange>> {
     let source = get_suitable_source_in_workspace(world, &req.path).ok()?;
 
     let mut ranges = Vec::new();
     for position in req.positions {
-        let typst_offset =
-            lsp_to_typst::position_to_offset(position, req.position_encoding, &source);
+        let typst_offset = lsp_to_typst::position_to_offset(position, position_encoding, &source);
         let tree = LinkedNode::new(source.root());
         let leaf = tree.leaf_at(typst_offset)?;
-        ranges.push(range_for_node(&source, req.position_encoding, &leaf));
+        ranges.push(range_for_node(&source, position_encoding, &leaf));
     }
 
     Some(ranges)

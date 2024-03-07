@@ -15,7 +15,7 @@ use self::modifier_set::ModifierSet;
 use self::token_encode::encode_tokens;
 use self::typst_tokens::{Modifier, TokenType};
 
-pub use self::delta::CacheInner as TokenCacheInner;
+use self::delta::CacheInner as TokenCacheInner;
 
 mod delta;
 mod modifier_set;

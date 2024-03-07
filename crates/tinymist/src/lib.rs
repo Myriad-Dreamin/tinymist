@@ -252,11 +252,16 @@ impl LanguageServer for TypstServer {
     async fn initialize(&self, params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
         // self.tracing_init();
 
+        self.const_config
+            .set(ConstConfig::from(&params))
+            .expect("const config should not yet be initialized");
+
         let cluster = {
             let root_paths = params.root_paths();
             let primary_root = root_paths.first().cloned().unwrap_or_default();
             actor::typst::create_cluster(
                 self.client.clone(),
+                self.const_config.get().unwrap(),
                 root_paths,
                 CompileOpts {
                     root_dir: primary_root,
@@ -274,10 +279,6 @@ impl LanguageServer for TypstServer {
             .set(cluster)
             .map_err(|_| ())
             .expect("the cluster is already initialized");
-
-        self.const_config
-            .set(ConstConfig::from(&params))
-            .expect("const config should not yet be initialized");
 
         tokio::spawn(cluster_bg.run());
 
@@ -498,17 +499,8 @@ impl LanguageServer for TypstServer {
         let uri = &params.text_document_position_params.text_document.uri;
         let path = uri.to_file_path().unwrap();
         let position = params.text_document_position_params.position;
-        let position_encoding = self.const_config().position_encoding;
 
-        run_query!(
-            self,
-            Hover,
-            HoverRequest {
-                path,
-                position,
-                position_encoding,
-            }
-        )
+        run_query!(self, Hover, HoverRequest { path, position })
     }
 
     async fn completion(
@@ -522,7 +514,6 @@ impl LanguageServer for TypstServer {
             .context
             .map(|context| context.trigger_kind == CompletionTriggerKind::INVOKED)
             .unwrap_or(false);
-        let position_encoding = self.const_config().position_encoding;
 
         run_query!(
             self,
@@ -530,7 +521,6 @@ impl LanguageServer for TypstServer {
             CompletionRequest {
                 path,
                 position,
-                position_encoding,
                 explicit,
             }
         )
@@ -543,17 +533,8 @@ impl LanguageServer for TypstServer {
         let uri = params.text_document_position_params.text_document.uri;
         let path = uri.to_file_path().unwrap();
         let position = params.text_document_position_params.position;
-        let position_encoding = self.const_config().position_encoding;
 
-        run_query!(
-            self,
-            SignatureHelp,
-            SignatureHelpRequest {
-                path,
-                position,
-                position_encoding,
-            }
-        )
+        run_query!(self, SignatureHelp, SignatureHelpRequest { path, position })
     }
 
     async fn document_symbol(
@@ -562,16 +543,8 @@ impl LanguageServer for TypstServer {
     ) -> jsonrpc::Result<Option<DocumentSymbolResponse>> {
         let uri = params.text_document.uri;
         let path = uri.to_file_path().unwrap();
-        let position_encoding = self.const_config().position_encoding;
 
-        run_query!(
-            self,
-            DocumentSymbol,
-            DocumentSymbolRequest {
-                path,
-                position_encoding
-            }
-        )
+        run_query!(self, DocumentSymbol, DocumentSymbolRequest { path })
     }
 
     async fn symbol(
@@ -579,16 +552,8 @@ impl LanguageServer for TypstServer {
         params: WorkspaceSymbolParams,
     ) -> jsonrpc::Result<Option<Vec<SymbolInformation>>> {
         let pattern = (!params.query.is_empty()).then_some(params.query);
-        let position_encoding = self.const_config().position_encoding;
 
-        run_query!(
-            self,
-            Symbol,
-            SymbolRequest {
-                pattern,
-                position_encoding
-            }
-        )
+        run_query!(self, Symbol, SymbolRequest { pattern })
     }
 
     async fn selection_range(
@@ -598,16 +563,11 @@ impl LanguageServer for TypstServer {
         let uri = params.text_document.uri;
         let path = uri.to_file_path().unwrap();
         let positions = params.positions;
-        let position_encoding = self.const_config().position_encoding;
 
         run_query!(
             self,
             SelectionRange,
-            SelectionRangeRequest {
-                path,
-                positions,
-                position_encoding
-            }
+            SelectionRangeRequest { path, positions }
         )
     }
 
@@ -617,16 +577,8 @@ impl LanguageServer for TypstServer {
     ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
         let uri = params.text_document.uri;
         let path = uri.to_file_path().unwrap();
-        let position_encoding = self.const_config().position_encoding;
 
-        run_query!(
-            self,
-            SemanticTokensFull,
-            SemanticTokensFullRequest {
-                path,
-                position_encoding
-            }
-        )
+        run_query!(self, SemanticTokensFull, SemanticTokensFullRequest { path })
     }
 
     async fn semantic_tokens_full_delta(
@@ -636,7 +588,6 @@ impl LanguageServer for TypstServer {
         let uri = params.text_document.uri;
         let path = uri.to_file_path().unwrap();
         let previous_result_id = params.previous_result_id;
-        let position_encoding = self.const_config().position_encoding;
 
         run_query!(
             self,
@@ -644,7 +595,6 @@ impl LanguageServer for TypstServer {
             SemanticTokensDeltaRequest {
                 path,
                 previous_result_id,
-                position_encoding
             }
         )
     }

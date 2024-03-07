@@ -31,12 +31,12 @@ use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 use typst_ts_compiler::{Time, TypstSystemWorld};
 use typst_ts_core::{
     config::CompileOpts, debug_loc::SourceSpanOffset, error::prelude::*, typst::prelude::EcoVec,
-    Bytes, DynExporter, Error, ImmutPath, TypstDocument,
+    Bytes, Error, ImmutPath,
 };
 
-use crate::actor::render::PdfExportActor;
 use crate::actor::render::RenderActorRequest;
 use crate::LspHost;
+use crate::{actor::render::PdfExportActor, ConstConfig};
 
 type CompileService<H> = CompileActor<Reporter<CompileExporter<CompileDriver>, H>>;
 type CompileClient<H> = TsCompileClient<CompileService<H>>;
@@ -44,18 +44,33 @@ type CompileClient<H> = TsCompileClient<CompileService<H>>;
 type DiagnosticsSender = mpsc::UnboundedSender<(String, DiagnosticsMap)>;
 type DiagnosticsMap = HashMap<Url, Vec<LspDiagnostic>>;
 
-type Client = TypstClient<CompileHandler>;
+// type Client = TypstClient<CompileHandler>;
 
-pub fn create_cluster(host: LspHost, roots: Vec<PathBuf>, opts: CompileOpts) -> CompileCluster {
+pub struct CompileCluster {
+    position_encoding: PositionEncoding,
+    memory_changes: RwLock<HashMap<Arc<Path>, MemoryFileMeta>>,
+    primary: CompileNode<CompileHandler>,
+    pub tokens_cache: SemanticTokenCache,
+    actor: Option<CompileClusterActor>,
+}
+
+pub fn create_cluster(
+    host: LspHost,
+    cfg: &ConstConfig,
+    roots: Vec<PathBuf>,
+    opts: CompileOpts,
+) -> CompileCluster {
     let (diag_tx, diag_rx) = mpsc::unbounded_channel();
 
     let primary = create_server(
         "primary".to_owned(),
+        cfg,
         create_compiler(roots.clone(), opts.clone()),
         diag_tx,
     );
 
     CompileCluster {
+        position_encoding: cfg.position_encoding,
         memory_changes: RwLock::new(HashMap::new()),
         primary,
         tokens_cache: Default::default(),
@@ -75,32 +90,48 @@ fn create_compiler(roots: Vec<PathBuf>, opts: CompileOpts) -> CompileDriver {
 
 fn create_server(
     diag_group: String,
+    cfg: &ConstConfig,
     compiler_driver: CompileDriver,
     diag_tx: DiagnosticsSender,
-) -> CompileNode {
+) -> CompileNode<CompileHandler> {
     let (doc_sender, doc_recv) = watch::channel(None);
     let (render_tx, render_rx) = broadcast::channel(1024);
 
-    let exporter: DynExporter<TypstDocument> = Box::new(move |_w: &dyn World, doc| {
-        let _ = doc_sender.send(Some(doc)); // it is ok to ignore the error here
-                                            // todo: is it right that ignore zero broadcast receiver?
-        let _ = render_tx.send(RenderActorRequest::Render);
-
-        Ok(())
-    });
-
     tokio::spawn(PdfExportActor::new(doc_recv, render_rx).run());
 
+    let root = compiler_driver.inner.world.root.as_ref().to_owned();
     let handler: CompileHandler = compiler_driver.handler.clone();
-    let compile_server = CompileServer::new(
-        diag_group,
-        compiler_driver,
-        handler.clone(),
-        diag_tx,
-        exporter,
-    );
 
-    CompileNode::new(handler, compile_server.spawn().unwrap())
+    let driver = CompileExporter::new(compiler_driver).with_exporter(Box::new(
+        move |_w: &dyn World, doc| {
+            let _ = doc_sender.send(Some(doc));
+            // todo: is it right that ignore zero broadcast receiver?
+            let _ = render_tx.send(RenderActorRequest::Render);
+
+            Ok(())
+        },
+    ));
+    let driver = Reporter {
+        diag_group,
+        position_encoding: cfg.position_encoding,
+        diag_tx,
+        inner: driver,
+        cb: handler.clone(),
+    };
+    let driver = CompileActor::new(driver, root).with_watch(true);
+
+    let (server, client) = driver.split();
+
+    tokio::spawn(server.spawn());
+
+    CompileNode::new(cfg.position_encoding, handler, client)
+}
+
+impl CompileCluster {
+    pub fn split(mut self) -> (Self, CompileClusterActor) {
+        let actor = self.actor.take().expect("actor is poisoned");
+        (self, actor)
+    }
 }
 
 pub struct CompileClusterActor {
@@ -109,20 +140,6 @@ pub struct CompileClusterActor {
 
     diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
     affect_map: HashMap<String, Vec<Url>>,
-}
-
-pub struct CompileCluster {
-    memory_changes: RwLock<HashMap<Arc<Path>, MemoryFileMeta>>,
-    primary: CompileNode,
-    pub tokens_cache: SemanticTokenCache,
-    actor: Option<CompileClusterActor>,
-}
-
-impl CompileCluster {
-    pub fn split(mut self) -> (Self, CompileClusterActor) {
-        let actor = self.actor.take().expect("actor is poisoned");
-        (self, actor)
-    }
 }
 
 impl CompileClusterActor {
@@ -205,16 +222,13 @@ impl CompileCluster {
             },
         );
 
-        let mut primary = self.primary.inner.lock().await;
-
         let content: Bytes = content.as_bytes().into();
 
-        primary.change_entry(path.clone()).await?;
+        self.primary.change_entry(path.clone()).await?;
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_inserts(vec![(path, FileResult::Ok((now, content)).into())]);
-        primary
-            .inner()
-            .add_memory_changes(MemoryEvent::Update(files));
+        let iw = self.primary.inner.lock().await;
+        iw.add_memory_changes(MemoryEvent::Update(files));
 
         Ok(())
     }
@@ -224,14 +238,11 @@ impl CompileCluster {
 
         self.memory_changes.write().await.remove(&path);
 
-        let mut primary = self.primary.inner.lock().await;
-
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_removes(vec![path]);
         // todo: change focus
-        primary
-            .inner()
-            .add_memory_changes(MemoryEvent::Update(files));
+        let iw = self.primary.inner.lock().await;
+        iw.add_memory_changes(MemoryEvent::Update(files));
 
         Ok(())
     }
@@ -271,13 +282,10 @@ impl CompileCluster {
 
         drop(memory_changes);
 
-        let mut primary = self.primary.inner.lock().await;
-
-        primary.change_entry(path.clone()).await?;
+        self.primary.change_entry(path.clone()).await?;
         let files = FileChangeSet::new_inserts(vec![(path.clone(), snapshot)]);
-        primary
-            .inner()
-            .add_memory_changes(MemoryEvent::Update(files));
+        let iw = self.primary.inner.lock().await;
+        iw.add_memory_changes(MemoryEvent::Update(files));
 
         Ok(())
     }
@@ -317,14 +325,16 @@ pub enum CompilerQueryResponse {
 macro_rules! query_state {
     ($self:ident, $method:ident, $query:expr, $req:expr) => {{
         let doc = $self.handler.result.lock().unwrap().clone().ok();
-        let res = $self.steal_world(|w| $query(w, doc, $req)).await;
+        let enc = $self.position_encoding;
+        let res = $self.steal_world(move |w| $query(w, doc, $req, enc)).await;
         res.map(CompilerQueryResponse::$method)
     }};
 }
 
 macro_rules! query_world {
     ($self:ident, $method:ident, $query:expr, $req:expr) => {{
-        let res = $self.steal_world(|w| $query(w, $req)).await;
+        let enc = $self.position_encoding;
+        let res = $self.steal_world(move |w| $query(w, $req, enc)).await;
         res.map(CompilerQueryResponse::$method)
     }};
 }
@@ -334,7 +344,10 @@ macro_rules! query_tokens_cache {
         let path: ImmutPath = $req.path.clone().into();
         let vfs = $self.memory_changes.read().await;
         let snapshot = vfs.get(&path).ok_or_else(|| anyhow!("file missing"))?;
-        let res = $query(&$self.tokens_cache, snapshot.content.clone(), $req);
+        let source = snapshot.content.clone();
+
+        let enc = $self.position_encoding;
+        let res = $query(&$self.tokens_cache, source, $req, enc);
         Ok(CompilerQueryResponse::$method(res))
     }};
 }
@@ -441,50 +454,9 @@ impl CompileDriver {
     }
 }
 
-pub struct CompileServer<H: CompilationHandle> {
-    inner: CompileService<H>,
-    client: TypstClient<H>,
-}
-
-impl<H: CompilationHandle> CompileServer<H> {
-    pub fn new(
-        diag_group: String,
-        compiler_driver: CompileDriver,
-        cb: H,
-        diag_tx: DiagnosticsSender,
-        exporter: DynExporter<TypstDocument>,
-    ) -> Self {
-        let root = compiler_driver.inner.world.root.clone();
-        let driver = CompileExporter::new(compiler_driver).with_exporter(exporter);
-        let driver = Reporter {
-            diag_group,
-            diag_tx,
-            inner: driver,
-            cb,
-        };
-        let inner = CompileActor::new(driver, root.as_ref().to_owned()).with_watch(true);
-
-        Self {
-            inner,
-            client: TypstClient {
-                entry: Arc::new(SyncMutex::new(None)),
-                inner: once_cell::sync::OnceCell::new(),
-            },
-        }
-    }
-
-    pub fn spawn(self) -> Result<TypstClient<H>, Error> {
-        let (server, client) = self.inner.split();
-        tokio::spawn(server.spawn());
-
-        self.client.inner.set(client).ok().unwrap();
-
-        Ok(self.client)
-    }
-}
-
 pub struct Reporter<C, H> {
     diag_group: String,
+    position_encoding: PositionEncoding,
     diag_tx: DiagnosticsSender,
     inner: C,
     cb: H,
@@ -539,7 +511,7 @@ impl<C: Compiler<World = TypstSystemWorld>, H> Reporter<C, H> {
         let diagnostics = tinymist_query::convert_diagnostics(
             self.inner.world(),
             diagnostics.as_ref(),
-            PositionEncoding::Utf16,
+            self.position_encoding,
         );
 
         let err = self.diag_tx.send((self.diag_group.clone(), diagnostics));
@@ -549,29 +521,31 @@ impl<C: Compiler<World = TypstSystemWorld>, H> Reporter<C, H> {
     }
 }
 
-pub struct TypstClient<H: CompilationHandle> {
+pub struct CompileNode<H: CompilationHandle> {
+    position_encoding: PositionEncoding,
+    handler: CompileHandler,
     entry: Arc<SyncMutex<Option<ImmutPath>>>,
-    inner: once_cell::sync::OnceCell<CompileClient<H>>,
+    inner: Mutex<CompileClient<H>>,
 }
 
 // todo: remove unsafe impl send
-unsafe impl<H: CompilationHandle> Send for TypstClient<H> {}
-unsafe impl<H: CompilationHandle> Sync for TypstClient<H> {}
+unsafe impl<H: CompilationHandle> Send for CompileNode<H> {}
+unsafe impl<H: CompilationHandle> Sync for CompileNode<H> {}
 
-impl<H: CompilationHandle> TypstClient<H> {
+impl<H: CompilationHandle> CompileNode<H> {
     fn inner(&mut self) -> &mut CompileClient<H> {
-        self.inner.get_mut().unwrap()
+        self.inner.get_mut()
     }
 
     /// Steal the compiler thread and run the given function.
     pub async fn steal_async<Ret: Send + 'static>(
-        &mut self,
+        &self,
         f: impl FnOnce(&mut CompileService<H>, tokio::runtime::Handle) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
-        self.inner().steal_async(f).await
+        self.inner.lock().await.steal_async(f).await
     }
 
-    async fn change_entry(&mut self, path: ImmutPath) -> Result<(), Error> {
+    async fn change_entry(&self, path: ImmutPath) -> Result<(), Error> {
         if !path.is_absolute() {
             return Err(error_once!("entry file must be absolute", path: path.display()));
         }
@@ -602,7 +576,7 @@ impl<H: CompilationHandle> TypstClient<H> {
     }
 }
 
-impl<H: CompilationHandle> SourceFileServer for TypstClient<H> {
+impl<H: CompilationHandle> SourceFileServer for CompileNode<H> {
     async fn resolve_source_span(
         &mut self,
         loc: Location,
@@ -648,7 +622,7 @@ impl<H: CompilationHandle> SourceFileServer for TypstClient<H> {
     }
 }
 
-impl<H: CompilationHandle> EditorServer for TypstClient<H> {
+impl<H: CompilationHandle> EditorServer for CompileNode<H> {
     async fn update_memory_files(
         &mut self,
         files: MemoryFiles,
@@ -685,18 +659,19 @@ impl<H: CompilationHandle> EditorServer for TypstClient<H> {
     }
 }
 
-impl<H: CompilationHandle> CompileHost for TypstClient<H> {}
+impl<H: CompilationHandle> CompileHost for CompileNode<H> {}
 
-pub struct CompileNode {
-    handler: CompileHandler,
-    inner: Arc<Mutex<Client>>,
-}
-
-impl CompileNode {
-    fn new(handler: CompileHandler, unwrap: TypstClient<CompileHandler>) -> Self {
+impl<H: CompilationHandle> CompileNode<H> {
+    fn new(
+        position_encoding: PositionEncoding,
+        handler: CompileHandler,
+        inner: CompileClient<H>,
+    ) -> Self {
         Self {
+            position_encoding,
             handler,
-            inner: Arc::new(Mutex::new(unwrap)),
+            entry: Arc::new(SyncMutex::new(None)),
+            inner: Mutex::new(inner),
         }
     }
 

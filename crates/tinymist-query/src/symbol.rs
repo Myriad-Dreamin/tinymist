@@ -6,15 +6,12 @@ use crate::prelude::*;
 #[derive(Debug, Clone)]
 pub struct SymbolRequest {
     pub pattern: Option<String>,
-    pub position_encoding: PositionEncoding,
 }
 
 pub fn symbol(
     world: &TypstSystemWorld,
-    SymbolRequest {
-        pattern,
-        position_encoding,
-    }: SymbolRequest,
+    SymbolRequest { pattern }: SymbolRequest,
+    position_encoding: PositionEncoding,
 ) -> Option<Vec<SymbolInformation>> {
     // todo: expose source
 

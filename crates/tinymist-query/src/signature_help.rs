@@ -4,16 +4,12 @@ use crate::prelude::*;
 pub struct SignatureHelpRequest {
     pub path: PathBuf,
     pub position: LspPosition,
-    pub position_encoding: PositionEncoding,
 }
 
 pub fn signature_help(
     world: &TypstSystemWorld,
-    SignatureHelpRequest {
-        path,
-        position,
-        position_encoding,
-    }: SignatureHelpRequest,
+    SignatureHelpRequest { path, position }: SignatureHelpRequest,
+    position_encoding: PositionEncoding,
 ) -> Option<SignatureHelp> {
     let source = get_suitable_source_in_workspace(world, &path).ok()?;
     let typst_offset = lsp_to_typst::position_to_offset(position, position_encoding, &source);
