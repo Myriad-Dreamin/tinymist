@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use anyhow::anyhow;
+use log::info;
 use tower_lsp::lsp_types::SymbolKind;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 use typst_ts_core::typst::prelude::{eco_vec, EcoVec};
@@ -199,6 +200,7 @@ pub(crate) fn get_lexical_hierarchy(
         }))
     }
 
+    let b = std::time::Instant::now();
     let root = LinkedNode::new(source.root());
 
     let mut worker = LexicalHierarchyWorker {
@@ -218,5 +220,8 @@ pub(crate) fn get_lexical_hierarchy(
     while worker.stack.len() > 1 {
         worker.symbreak();
     }
+
+    let e = std::time::Instant::now();
+    info!("lexical hierarchy analysis took {:?}", e - b);
     res.map(|_| worker.stack.pop().unwrap().1)
 }

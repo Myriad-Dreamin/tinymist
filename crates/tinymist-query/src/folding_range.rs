@@ -36,7 +36,9 @@ impl FoldingRangeRequest {
             true,
             &mut results,
         );
-        trace!("FoldingRangeRequest(line_folding_only={line_folding_only}) symbols: {symbols:#?} results: {results:#?}");
+        if false {
+            trace!("FoldingRangeRequest(line_folding_only={line_folding_only}) symbols: {symbols:#?} results: {results:#?}");
+        }
 
         Some(results)
     }
