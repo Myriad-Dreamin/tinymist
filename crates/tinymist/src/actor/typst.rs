@@ -853,6 +853,8 @@ impl<H: CompilationHandle> CompileNode<H> {
             InlayHint(req) => query_world!(self, InlayHint, req),
             Completion(req) => query_state!(self, Completion, req),
             SignatureHelp(req) => query_world!(self, SignatureHelp, req),
+            Rename(req) => query_world!(self, Rename, req),
+            PrepareRename(req) => query_world!(self, PrepareRename, req),
             Symbol(req) => query_world!(self, Symbol, req),
             FoldingRange(..)
             | SelectionRange(..)

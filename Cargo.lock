@@ -3441,6 +3441,7 @@ dependencies = [
  "typst-ide",
  "typst-ts-compiler",
  "typst-ts-core",
+ "walkdir",
 ]
 
 [[package]]

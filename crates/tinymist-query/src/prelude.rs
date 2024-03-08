@@ -10,9 +10,9 @@ pub use log::{error, trace};
 pub use tower_lsp::lsp_types::{
     CompletionResponse, DiagnosticRelatedInformation, DocumentSymbol, DocumentSymbolResponse,
     Documentation, FoldingRange, GotoDefinitionResponse, Hover, InlayHint, Location as LspLocation,
-    MarkupContent, MarkupKind, Position as LspPosition, SelectionRange, SemanticTokens,
-    SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp,
-    SignatureInformation, SymbolInformation, Url,
+    MarkupContent, MarkupKind, Position as LspPosition, PrepareRenameResponse, SelectionRange,
+    SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult,
+    SignatureHelp, SignatureInformation, SymbolInformation, Url, WorkspaceEdit,
 };
 pub use typst::diag::{EcoString, FileError, FileResult, Tracepoint};
 pub use typst::foundations::{Func, ParamInfo, Value};

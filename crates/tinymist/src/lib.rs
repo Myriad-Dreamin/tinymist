@@ -174,6 +174,12 @@ impl LanguageServer for TypstServer {
                 document_symbol_provider: Some(OneOf::Left(true)),
                 workspace_symbol_provider: Some(OneOf::Left(true)),
                 selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
+                rename_provider: Some(OneOf::Right(RenameOptions {
+                    prepare_provider: Some(true),
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
+                })),
                 folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 workspace: Some(WorkspaceServerCapabilities {
                     workspace_folders: Some(WorkspaceFoldersServerCapabilities {
@@ -386,15 +392,18 @@ impl LanguageServer for TypstServer {
         run_query!(self.SignatureHelp(path, position))
     }
 
-    async fn rename(&self, _params: RenameParams) -> jsonrpc::Result<Option<WorkspaceEdit>> {
-        Ok(None)
+    async fn rename(&self, params: RenameParams) -> jsonrpc::Result<Option<WorkspaceEdit>> {
+        let (path, position) = as_path_pos(params.text_document_position);
+        let new_name = params.new_name;
+        run_query!(self.Rename(path, position, new_name))
     }
 
     async fn prepare_rename(
         &self,
-        _params: TextDocumentPositionParams,
+        params: TextDocumentPositionParams,
     ) -> jsonrpc::Result<Option<PrepareRenameResponse>> {
-        Ok(None)
+        let (path, position) = as_path_pos(params);
+        run_query!(self.PrepareRename(path, position))
     }
 
     async fn symbol(

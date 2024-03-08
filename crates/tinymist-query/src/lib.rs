@@ -27,6 +27,10 @@ pub(crate) mod goto_definition;
 pub use goto_definition::*;
 pub(crate) mod inlay_hint;
 pub use inlay_hint::*;
+pub(crate) mod prepare_rename;
+pub use prepare_rename::*;
+pub(crate) mod rename;
+pub use rename::*;
 
 pub mod lsp_typst_boundary;
 pub use lsp_typst_boundary::*;
@@ -58,6 +62,8 @@ mod polymorphic {
         InlayHint(InlayHintRequest),
         Completion(CompletionRequest),
         SignatureHelp(SignatureHelpRequest),
+        Rename(RenameRequest),
+        PrepareRename(PrepareRenameRequest),
         DocumentSymbol(DocumentSymbolRequest),
         Symbol(SymbolRequest),
         SemanticTokensFull(SemanticTokensFullRequest),
@@ -76,6 +82,8 @@ mod polymorphic {
                 CompilerQueryRequest::InlayHint(..) => Unique,
                 CompilerQueryRequest::Completion(..) => Mergable,
                 CompilerQueryRequest::SignatureHelp(..) => PinnedFirst,
+                CompilerQueryRequest::Rename(..) => Mergable,
+                CompilerQueryRequest::PrepareRename(..) => Mergable,
                 CompilerQueryRequest::DocumentSymbol(..) => ContextFreeUnique,
                 CompilerQueryRequest::Symbol(..) => Mergable,
                 CompilerQueryRequest::SemanticTokensFull(..) => ContextFreeUnique,
@@ -93,6 +101,8 @@ mod polymorphic {
                 CompilerQueryRequest::InlayHint(req) => &req.path,
                 CompilerQueryRequest::Completion(req) => &req.path,
                 CompilerQueryRequest::SignatureHelp(req) => &req.path,
+                CompilerQueryRequest::Rename(req) => &req.path,
+                CompilerQueryRequest::PrepareRename(req) => &req.path,
                 CompilerQueryRequest::DocumentSymbol(req) => &req.path,
                 CompilerQueryRequest::Symbol(..) => return None,
                 CompilerQueryRequest::SemanticTokensFull(req) => &req.path,
@@ -111,6 +121,8 @@ mod polymorphic {
         InlayHint(Option<Vec<InlayHint>>),
         Completion(Option<CompletionResponse>),
         SignatureHelp(Option<SignatureHelp>),
+        PrepareRename(Option<PrepareRenameResponse>),
+        Rename(Option<WorkspaceEdit>),
         DocumentSymbol(Option<DocumentSymbolResponse>),
         Symbol(Option<Vec<SymbolInformation>>),
         SemanticTokensFull(Option<SemanticTokensResult>),

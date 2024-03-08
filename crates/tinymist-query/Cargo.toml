@@ -22,6 +22,7 @@ log.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 parking_lot.workspace = true
+walkdir = "2"
 
 typst.workspace = true
 typst-ide.workspace = true
