@@ -12,7 +12,7 @@ use tinymist_query::{
     LspRange, OnSaveExportRequest, PositionEncoding, SemanticTokenCache,
 };
 use tokio::sync::{broadcast, mpsc, watch, Mutex, RwLock};
-use tower_lsp::lsp_types::{TextDocumentContentChangeEvent, Url};
+use tower_lsp::lsp_types::{Diagnostic, TextDocumentContentChangeEvent, Url};
 use typst::{
     diag::{FileResult, SourceDiagnostic, SourceResult},
     layout::Position,
@@ -45,7 +45,7 @@ type CompileService<H> = CompileActor<Reporter<CompileExporter<CompileDriver>, H
 type CompileClient<H> = TsCompileClient<CompileService<H>>;
 type Node = CompileNode<CompileHandler>;
 
-type DiagnosticsSender = mpsc::UnboundedSender<(String, DiagnosticsMap)>;
+type DiagnosticsSender = mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>;
 
 pub struct CompileCluster {
     roots: Vec<PathBuf>,
@@ -65,7 +65,7 @@ impl CompileCluster {
         roots: Vec<PathBuf>,
         cfg: &ConstConfig,
         primary: Node,
-        diag_rx: mpsc::UnboundedReceiver<(String, DiagnosticsMap)>,
+        diag_rx: mpsc::UnboundedReceiver<(String, Option<DiagnosticsMap>)>,
     ) -> Self {
         Self {
             roots,
@@ -80,6 +80,7 @@ impl CompileCluster {
                 diag_rx,
                 diagnostics: HashMap::new(),
                 affect_map: HashMap::new(),
+                published_primary: false,
             }),
         }
     }
@@ -167,10 +168,11 @@ pub fn create_server(
 
 pub struct CompileClusterActor {
     host: LspHost,
-    diag_rx: mpsc::UnboundedReceiver<(String, DiagnosticsMap)>,
+    diag_rx: mpsc::UnboundedReceiver<(String, Option<DiagnosticsMap>)>,
 
     diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
     affect_map: HashMap<String, Vec<Url>>,
+    published_primary: bool,
 }
 
 impl CompileClusterActor {
@@ -178,14 +180,63 @@ impl CompileClusterActor {
         loop {
             tokio::select! {
                 Some((group, diagnostics)) = self.diag_rx.recv() => {
-                    debug!("received diagnostics from {}: diag({:#?})", group, diagnostics.len());
-                    self.publish(group, diagnostics).await;
+                    debug!("received diagnostics from {}: diag({:#?})", group, diagnostics.as_ref().map(|e| e.len()));
+                    let with_primary = (self.affect_map.len() <= 1 && self.affect_map.contains_key("primary")) && group == "primary";
+                    self.publish(group, diagnostics, with_primary).await;
+                    if !with_primary {
+                        let again_with_primary = self.affect_map.len() == 1 && self.affect_map.contains_key("primary");
+                        if self.published_primary != again_with_primary {
+                            self.flush_primary_diagnostics(again_with_primary).await;
+                            self.published_primary = again_with_primary;
+                        }
+                    }
                 }
             }
         }
     }
 
-    pub async fn publish(&mut self, group: String, next_diagnostics: DiagnosticsMap) {
+    pub async fn do_publish_diagnostics(
+        host: &LspHost,
+        uri: Url,
+        diags: Vec<Diagnostic>,
+        version: Option<i32>,
+        ignored: bool,
+    ) {
+        if ignored {
+            return;
+        }
+
+        host.publish_diagnostics(uri, diags, version).await
+    }
+
+    async fn flush_primary_diagnostics(&mut self, enable: bool) {
+        let affected = self.affect_map.get("primary");
+
+        let tasks = affected.into_iter().flatten().map(|url| {
+            let path_diags = self.diagnostics.get(url);
+
+            let diags = path_diags.into_iter().flatten().filter_map(|(g, diags)| {
+                if g == "primary" {
+                    return enable.then_some(diags);
+                }
+                Some(diags)
+            });
+            let to_publish = diags.flatten().cloned().collect();
+
+            Self::do_publish_diagnostics(&self.host, url.clone(), to_publish, None, false)
+        });
+
+        join_all(tasks).await;
+    }
+
+    pub async fn publish(
+        &mut self,
+        group: String,
+        next_diagnostics: Option<DiagnosticsMap>,
+        with_primary: bool,
+    ) {
+        let is_primary = group == "primary";
+
         let affected = self.affect_map.get_mut(&group);
 
         let affected = affected.map(std::mem::take);
@@ -194,22 +245,48 @@ impl CompileClusterActor {
         // time. The LSP specifies that files will not have diagnostics
         // updated, including removed, without an explicit update, so we need
         // to send an empty `Vec` of diagnostics to these sources.
-        let clear_list = affected
+        // todo: merge
+        let clear_list = if let Some(n) = next_diagnostics.as_ref() {
+            affected
+                .into_iter()
+                .flatten()
+                .filter(|e| !n.contains_key(e))
+                .map(|e| (e, None))
+                .collect::<Vec<_>>()
+        } else {
+            affected
+                .into_iter()
+                .flatten()
+                .map(|e| (e, None))
+                .collect::<Vec<_>>()
+        };
+        let next_affected = if let Some(n) = next_diagnostics.as_ref() {
+            n.keys().cloned().collect()
+        } else {
+            Vec::new()
+        };
+        let clear_all = next_diagnostics.is_none();
+        // Gets touched updates
+        let update_list = next_diagnostics
             .into_iter()
             .flatten()
-            .filter(|e| !next_diagnostics.contains_key(e))
-            .map(|e| (e, None))
-            .collect::<Vec<_>>();
-        let next_affected = next_diagnostics.keys().cloned().collect();
-        // Gets touched updates
-        let update_list = next_diagnostics.into_iter().map(|(x, y)| (x, Some(y)));
+            .map(|(x, y)| (x, Some(y)));
 
         let tasks = clear_list.into_iter().chain(update_list);
         let tasks = tasks.map(|(url, next)| {
             let path_diags = self.diagnostics.entry(url.clone()).or_default();
             let rest_all = path_diags
                 .iter()
-                .filter_map(|(g, diags)| if g != &group { Some(diags) } else { None })
+                .filter_map(|(g, diags)| {
+                    if !with_primary && g == "primary" {
+                        return None;
+                    }
+                    if g != &group {
+                        Some(diags)
+                    } else {
+                        None
+                    }
+                })
                 .flatten()
                 .cloned();
 
@@ -225,13 +302,24 @@ impl CompileClusterActor {
                 }
             }
 
-            self.host.publish_diagnostics(url, to_publish, None)
+            Self::do_publish_diagnostics(
+                &self.host,
+                url,
+                to_publish,
+                None,
+                is_primary && !with_primary,
+            )
         });
 
         join_all(tasks).await;
 
-        // We just used the cache, and won't need it again, so we can update it now
-        self.affect_map.insert(group, next_affected);
+        if clear_all {
+            // We just used the cache, and won't need it again, so we can update it now
+            self.affect_map.remove(&group);
+        } else {
+            // We just used the cache, and won't need it again, so we can update it now
+            self.affect_map.insert(group, next_affected);
+        }
     }
 }
 
@@ -556,7 +644,9 @@ impl<C: Compiler<World = TypstSystemWorld>, H> Reporter<C, H> {
             self.position_encoding,
         );
 
-        let err = self.diag_tx.send((self.diag_group.clone(), diagnostics));
+        let err = self
+            .diag_tx
+            .send((self.diag_group.clone(), Some(diagnostics)));
         if let Err(err) = err {
             error!("failed to send diagnostics: {:#}", err);
         }

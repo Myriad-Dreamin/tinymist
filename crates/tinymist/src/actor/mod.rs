@@ -17,8 +17,8 @@ pub mod typst;
 struct Repr {
     config: ConstConfig,
 
-    diag_tx: mpsc::UnboundedSender<(String, DiagnosticsMap)>,
-    diag_rx: Option<mpsc::UnboundedReceiver<(String, DiagnosticsMap)>>,
+    diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
+    diag_rx: Option<mpsc::UnboundedReceiver<(String, Option<DiagnosticsMap>)>>,
 }
 
 impl Repr {
