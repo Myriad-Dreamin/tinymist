@@ -728,16 +728,15 @@ pub trait InitializeParamsExt {
     fn root_paths(&self) -> Vec<PathBuf>;
 }
 
-static DEFAULT_ENCODING: [PositionEncodingKind; 1] = [PositionEncodingKind::UTF16];
-
 impl InitializeParamsExt for InitializeParams {
     fn position_encodings(&self) -> &[PositionEncodingKind] {
+        const DEFAULT_ENCODING: &[PositionEncodingKind; 1] = &[PositionEncodingKind::UTF16];
         self.capabilities
             .general
             .as_ref()
             .and_then(|general| general.position_encodings.as_ref())
             .map(|encodings| encodings.as_slice())
-            .unwrap_or(&DEFAULT_ENCODING)
+            .unwrap_or(DEFAULT_ENCODING)
     }
 
     fn supports_config_change_registration(&self) -> bool {
