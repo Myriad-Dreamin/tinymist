@@ -30,8 +30,7 @@ fn filter_document_symbols(
     symbols
         .iter()
         .map(|e| {
-            let rng =
-                typst_to_lsp::range(e.info.range.clone(), source, position_encoding).raw_range;
+            let rng = typst_to_lsp::range(e.info.range.clone(), source, position_encoding);
 
             DocumentSymbol {
                 name: e.info.name.clone(),

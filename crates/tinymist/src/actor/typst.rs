@@ -8,8 +8,8 @@ use anyhow::anyhow;
 use futures::future::join_all;
 use log::{debug, error, trace, warn};
 use tinymist_query::{
-    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature, LspDiagnostic,
-    LspRange, OnSaveExportRequest, PositionEncoding, SemanticTokenCache,
+    lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
+    LspDiagnostic, OnSaveExportRequest, PositionEncoding, SemanticTokenCache,
 };
 use tokio::sync::{broadcast, mpsc, watch, Mutex, RwLock};
 use tower_lsp::lsp_types::{Diagnostic, TextDocumentContentChangeEvent, Url};
@@ -394,8 +394,8 @@ impl CompileCluster {
             let replacement = change.text;
             match change.range {
                 Some(lsp_range) => {
-                    let range =
-                        LspRange::new(lsp_range, position_encoding).into_range_on(&meta.content);
+                    let range = lsp_to_typst::range(lsp_range, position_encoding, &meta.content)
+                        .expect("invalid range");
                     meta.content.edit(range, &replacement);
                 }
                 None => {

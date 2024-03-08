@@ -16,8 +16,7 @@ impl GotoDefinitionRequest {
         position_encoding: PositionEncoding,
     ) -> Option<GotoDefinitionResponse> {
         let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-        let typst_offset =
-            lsp_to_typst::position_to_offset(self.position, position_encoding, &source);
+        let typst_offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset)?;
 
@@ -86,13 +85,13 @@ impl GotoDefinitionRequest {
         };
 
         let origin_selection_range =
-            typst_to_lsp::range(callee_link.range(), &source, position_encoding).raw_range;
+            typst_to_lsp::range(callee_link.range(), &source, position_encoding);
 
         let span_path = world.path_for_id(id).ok()?;
         let span_source = world.source(id).ok()?;
         let offset = span_source.find(span)?;
         let typst_range = offset.range();
-        let range = typst_to_lsp::range(typst_range, &span_source, position_encoding).raw_range;
+        let range = typst_to_lsp::range(typst_range, &span_source, position_encoding);
 
         let uri = Url::from_file_path(span_path).ok()?;
 

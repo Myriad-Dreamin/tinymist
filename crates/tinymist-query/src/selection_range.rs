@@ -14,8 +14,7 @@ impl SelectionRangeRequest {
     ) -> Option<Vec<SelectionRange>> {
         let mut ranges = Vec::new();
         for position in self.positions {
-            let typst_offset =
-                lsp_to_typst::position_to_offset(position, position_encoding, &source);
+            let typst_offset = lsp_to_typst::position(position, position_encoding, &source)?;
             let tree = LinkedNode::new(source.root());
             let leaf = tree.leaf_at(typst_offset)?;
             ranges.push(range_for_node(&source, position_encoding, &leaf));
@@ -32,7 +31,7 @@ fn range_for_node(
 ) -> SelectionRange {
     let range = typst_to_lsp::range(node.range(), source, position_encoding);
     SelectionRange {
-        range: range.raw_range,
+        range,
         parent: node
             .parent()
             .map(|node| Box::new(range_for_node(source, position_encoding, node))),

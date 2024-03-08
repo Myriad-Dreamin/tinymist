@@ -13,8 +13,7 @@ impl SignatureHelpRequest {
         position_encoding: PositionEncoding,
     ) -> Option<SignatureHelp> {
         let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-        let typst_offset =
-            lsp_to_typst::position_to_offset(self.position, position_encoding, &source);
+        let typst_offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset)?;
         let (callee, callee_node, args) = surrounding_function_syntax(&ast_node)?;

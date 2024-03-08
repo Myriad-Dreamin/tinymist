@@ -58,8 +58,7 @@ fn filter_document_symbols(
         })
         .filter(|e| e.info.name.contains(query_string))
         .map(|e| {
-            let rng =
-                typst_to_lsp::range(e.info.range.clone(), source, position_encoding).raw_range;
+            let rng = typst_to_lsp::range(e.info.range.clone(), source, position_encoding);
 
             SymbolInformation {
                 name: e.info.name.clone(),

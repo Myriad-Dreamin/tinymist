@@ -27,8 +27,8 @@ pub use typst_ts_core::{TypstDocument, TypstFileId};
 
 pub use crate::analysis::analyze_expr;
 pub use crate::lsp_typst_boundary::{
-    lsp_to_typst, typst_to_lsp, LspDiagnostic, LspRange, LspRawRange, LspSeverity,
-    PositionEncoding, TypstDiagnostic, TypstSeverity, TypstSpan,
+    lsp_to_typst, typst_to_lsp, LspDiagnostic, LspRange, LspSeverity, PositionEncoding,
+    TypstDiagnostic, TypstSeverity, TypstSpan,
 };
 
 pub fn get_suitable_source_in_workspace(w: &TypstSystemWorld, p: &Path) -> FileResult<Source> {

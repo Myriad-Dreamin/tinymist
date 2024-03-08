@@ -57,7 +57,7 @@ fn calc_folding_range(
     ranges: &mut Vec<FoldingRange>,
 ) {
     for (i, e) in symbols.iter().enumerate() {
-        let rng = typst_to_lsp::range(e.info.range.clone(), source, position_encoding).raw_range;
+        let rng = typst_to_lsp::range(e.info.range.clone(), source, position_encoding);
         let is_not_last_range = i + 1 < symbols.len();
         let is_not_final_last_range = !is_last_range || is_not_last_range;
 
@@ -72,8 +72,7 @@ fn calc_folding_range(
 
         let next_start = if is_not_last_range {
             let next = &symbols[i + 1];
-            let next_rng =
-                typst_to_lsp::range(next.info.range.clone(), source, position_encoding).raw_range;
+            let next_rng = typst_to_lsp::range(next.info.range.clone(), source, position_encoding);
             (next_rng.start.line, Some(next_rng.start.character))
         } else if is_not_final_last_range {
             parent_last_loc

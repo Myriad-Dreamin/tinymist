@@ -30,10 +30,10 @@ fn convert_diagnostic(
     if let Some((id, span)) = diagnostic_span_id(typst_diagnostic) {
         uri = Url::from_file_path(project.path_for_id(id)?).unwrap();
         let source = project.source(id)?;
-        lsp_range = diagnostic_range(&source, span, position_encoding).raw_range;
+        lsp_range = diagnostic_range(&source, span, position_encoding);
     } else {
         uri = Url::from_file_path(project.root.clone()).unwrap();
-        lsp_range = LspRawRange::default();
+        lsp_range = LspRange::default();
     };
 
     let lsp_severity = diagnostic_severity(typst_diagnostic.severity);
@@ -71,7 +71,7 @@ fn tracepoint_to_relatedinformation(
             return Ok(Some(DiagnosticRelatedInformation {
                 location: LspLocation {
                     uri,
-                    range: lsp_range.raw_range,
+                    range: lsp_range,
                 },
                 message: tracepoint.v.to_string(),
             }));
@@ -121,10 +121,7 @@ fn diagnostic_range(
             let typst_range = node.range();
             typst_to_lsp::range(typst_range, source, position_encoding)
         }
-        None => LspRange::new(
-            LspRawRange::new(LspPosition::new(0, 0), LspPosition::new(0, 0)),
-            position_encoding,
-        ),
+        None => LspRange::new(LspPosition::new(0, 0), LspPosition::new(0, 0)),
     }
 }
 

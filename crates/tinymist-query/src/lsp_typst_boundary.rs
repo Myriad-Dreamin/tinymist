@@ -1,7 +1,6 @@
 //! Conversions between Typst and LSP types and representations
 
 use tower_lsp::lsp_types;
-use typst::syntax::Source;
 
 pub type LspPosition = lsp_types::Position;
 /// The interpretation of an `LspCharacterOffset` depends on the
@@ -15,7 +14,7 @@ pub type TypstSpan = typst::syntax::Span;
 
 /// An LSP range. It needs its associated `LspPositionEncoding` to be used. The
 /// `LspRange` struct provides this range with that encoding.
-pub type LspRawRange = lsp_types::Range;
+pub type LspRange = lsp_types::Range;
 pub type TypstRange = std::ops::Range<usize>;
 
 pub type TypstTooltip = typst_ide::Tooltip;
@@ -57,25 +56,6 @@ impl From<PositionEncoding> for lsp_types::PositionEncodingKind {
     }
 }
 
-/// An LSP range with its associated encoding.
-pub struct LspRange {
-    pub raw_range: LspRawRange,
-    pub encoding: LspPositionEncoding,
-}
-
-impl LspRange {
-    pub fn new(raw_range: LspRawRange, encoding: LspPositionEncoding) -> Self {
-        Self {
-            raw_range,
-            encoding,
-        }
-    }
-
-    pub fn into_range_on(self, source: &Source) -> TypstRange {
-        lsp_to_typst::range(&self, source)
-    }
-}
-
 pub type LspCompletion = lsp_types::CompletionItem;
 pub type LspCompletionKind = lsp_types::CompletionItemKind;
 pub type TypstCompletion = typst_ide::Completion;
@@ -86,18 +66,16 @@ pub mod lsp_to_typst {
 
     use super::*;
 
-    pub fn position_to_offset(
+    pub fn position(
         lsp_position: LspPosition,
         lsp_position_encoding: LspPositionEncoding,
         typst_source: &Source,
-    ) -> TypstOffset {
+    ) -> Option<TypstOffset> {
         match lsp_position_encoding {
             LspPositionEncoding::Utf8 => {
                 let line_index = lsp_position.line as usize;
                 let column_index = lsp_position.character as usize;
-                typst_source
-                    .line_column_to_byte(line_index, column_index)
-                    .unwrap()
+                typst_source.line_column_to_byte(line_index, column_index)
             }
             LspPositionEncoding::Utf16 => {
                 // We have a line number and a UTF-16 offset into that line. We want a byte
@@ -121,26 +99,30 @@ pub mod lsp_to_typst {
                 let line_index = lsp_position.line as usize;
                 let utf16_offset_in_line = lsp_position.character as usize;
 
-                let byte_line_offset = typst_source.line_to_byte(line_index).unwrap();
-                let utf16_line_offset = typst_source.byte_to_utf16(byte_line_offset).unwrap();
+                let byte_line_offset = typst_source.line_to_byte(line_index)?;
+                let utf16_line_offset = typst_source.byte_to_utf16(byte_line_offset)?;
                 let utf16_offset = utf16_line_offset + utf16_offset_in_line;
 
-                typst_source.utf16_to_byte(utf16_offset).unwrap()
+                typst_source.utf16_to_byte(utf16_offset)
             }
         }
     }
 
-    pub fn range(lsp_range: &LspRange, source: &Source) -> TypstRange {
-        let lsp_start = lsp_range.raw_range.start;
-        let typst_start = position_to_offset(lsp_start, lsp_range.encoding, source);
+    pub fn range(
+        lsp_range: LspRange,
+        lsp_position_encoding: LspPositionEncoding,
+        source: &Source,
+    ) -> Option<TypstRange> {
+        let lsp_start = lsp_range.start;
+        let typst_start = position(lsp_start, lsp_position_encoding, source)?;
 
-        let lsp_end = lsp_range.raw_range.end;
-        let typst_end = position_to_offset(lsp_end, lsp_range.encoding, source);
+        let lsp_end = lsp_range.end;
+        let typst_end = position(lsp_end, lsp_position_encoding, source)?;
 
-        TypstRange {
+        Some(TypstRange {
             start: typst_start,
             end: typst_end,
-        }
+        })
     }
 }
 
@@ -202,8 +184,7 @@ pub mod typst_to_lsp {
         let typst_end = typst_range.end;
         let lsp_end = offset_to_position(typst_end, lsp_position_encoding, typst_source);
 
-        let raw_range = LspRawRange::new(lsp_start, lsp_end);
-        LspRange::new(raw_range, lsp_position_encoding)
+        LspRange::new(lsp_start, lsp_end)
     }
 
     fn completion_kind(typst_completion_kind: TypstCompletionKind) -> LspCompletionKind {
@@ -234,10 +215,7 @@ pub mod typst_to_lsp {
         result.to_string()
     }
 
-    pub fn completion(
-        typst_completion: &TypstCompletion,
-        lsp_replace: LspRawRange,
-    ) -> LspCompletion {
+    pub fn completion(typst_completion: &TypstCompletion, lsp_replace: LspRange) -> LspCompletion {
         let typst_snippet = typst_completion
             .apply
             .as_ref()
@@ -257,7 +235,7 @@ pub mod typst_to_lsp {
 
     pub fn completions(
         typst_completions: &[TypstCompletion],
-        lsp_replace: LspRawRange,
+        lsp_replace: LspRange,
     ) -> Vec<LspCompletion> {
         typst_completions
             .iter()
@@ -343,19 +321,17 @@ mod test {
             character: 12,
         };
 
-        let start_offset =
-            lsp_to_typst::position_to_offset(start, PositionEncoding::Utf16, &source);
+        let start_offset = lsp_to_typst::position(start, PositionEncoding::Utf16, &source).unwrap();
         let start_actual = 0;
 
-        let emoji_offset =
-            lsp_to_typst::position_to_offset(emoji, PositionEncoding::Utf16, &source);
+        let emoji_offset = lsp_to_typst::position(emoji, PositionEncoding::Utf16, &source).unwrap();
         let emoji_actual = 5;
 
         let post_emoji_offset =
-            lsp_to_typst::position_to_offset(post_emoji, PositionEncoding::Utf16, &source);
+            lsp_to_typst::position(post_emoji, PositionEncoding::Utf16, &source).unwrap();
         let post_emoji_actual = 9;
 
-        let end_offset = lsp_to_typst::position_to_offset(end, PositionEncoding::Utf16, &source);
+        let end_offset = lsp_to_typst::position(end, PositionEncoding::Utf16, &source).unwrap();
         let end_actual = 14;
 
         assert_eq!(start_offset, start_actual);

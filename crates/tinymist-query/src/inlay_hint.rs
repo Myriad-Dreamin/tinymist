@@ -14,7 +14,7 @@ use crate::prelude::*;
 #[derive(Debug, Clone)]
 pub struct InlayHintRequest {
     pub path: PathBuf,
-    pub range: LspRawRange,
+    pub range: LspRange,
 }
 
 impl InlayHintRequest {
@@ -24,13 +24,7 @@ impl InlayHintRequest {
         position_encoding: PositionEncoding,
     ) -> Option<Vec<InlayHint>> {
         let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-        let range = lsp_to_typst::range(
-            &LspRange {
-                raw_range: self.range,
-                encoding: position_encoding,
-            },
-            &source,
-        );
+        let range = lsp_to_typst::range(self.range, position_encoding, &source)?;
 
         let hints = inlay_hints(world, &source, range, position_encoding).ok()?;
         debug!(
