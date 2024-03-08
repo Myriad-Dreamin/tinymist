@@ -3,202 +3,31 @@ pub mod actor;
 
 pub use tower_lsp::Client as LspHost;
 
+use core::fmt;
 use std::borrow::Cow;
-use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::Context;
-use async_trait::async_trait;
-use futures::FutureExt;
+use anyhow::{bail, Context};
+use futures::{future::BoxFuture, FutureExt};
+use itertools::Itertools;
 use log::{error, info, trace};
 use once_cell::sync::OnceCell;
-use serde_json::Value as JsonValue;
+use paste::paste;
+use serde::Deserialize;
+use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
-    get_semantic_tokens_unregistration, CompletionRequest, DocumentSymbolRequest,
-    FoldingRangeRequest, GotoDefinitionRequest, HoverRequest, OnSaveExportRequest,
-    PositionEncoding, SelectionRangeRequest, SemanticTokensDeltaRequest, SemanticTokensFullRequest,
-    SignatureHelpRequest, SymbolRequest,
+    get_semantic_tokens_unregistration, PositionEncoding,
 };
-
-use anyhow::bail;
-use futures::future::BoxFuture;
-use itertools::Itertools;
-use serde::Deserialize;
-use serde_json::{Map, Value};
-use tokio::sync::{Mutex, RwLock};
-use tower_lsp::lsp_types::ConfigurationItem;
+use tokio::sync::RwLock;
 use tower_lsp::{jsonrpc, lsp_types::*, LanguageServer};
-use typst::model::Document;
 use typst_ts_core::config::CompileOpts;
 
 use crate::actor::typst::CompileCluster;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ExperimentalFormatterMode {
-    #[default]
-    Off,
-    On,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ExportPdfMode {
-    Never,
-    #[default]
-    OnSave,
-    OnType,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum SemanticTokensMode {
-    Disable,
-    #[default]
-    Enable,
-}
-
-pub type Listener<T> = Box<dyn FnMut(&T) -> BoxFuture<anyhow::Result<()>> + Send + Sync>;
-
-const CONFIG_ITEMS: &[&str] = &[
-    "exportPdf",
-    "rootPath",
-    "semanticTokens",
-    "experimentalFormatterMode",
-];
-
-#[derive(Default)]
-pub struct Config {
-    pub export_pdf: ExportPdfMode,
-    pub root_path: Option<PathBuf>,
-    pub semantic_tokens: SemanticTokensMode,
-    pub formatter: ExperimentalFormatterMode,
-    semantic_tokens_listeners: Vec<Listener<SemanticTokensMode>>,
-    formatter_listeners: Vec<Listener<ExperimentalFormatterMode>>,
-}
-
-impl Config {
-    pub fn get_items() -> Vec<ConfigurationItem> {
-        let sections = CONFIG_ITEMS
-            .iter()
-            .flat_map(|item| [format!("tinymist.{item}"), item.to_string()]);
-
-        sections
-            .map(|section| ConfigurationItem {
-                section: Some(section),
-                ..Default::default()
-            })
-            .collect()
-    }
-
-    pub fn values_to_map(values: Vec<Value>) -> Map<String, Value> {
-        let unpaired_values = values
-            .into_iter()
-            .tuples()
-            .map(|(a, b)| if !a.is_null() { a } else { b });
-
-        CONFIG_ITEMS
-            .iter()
-            .map(|item| item.to_string())
-            .zip(unpaired_values)
-            .collect()
-    }
-
-    pub fn listen_semantic_tokens(&mut self, listener: Listener<SemanticTokensMode>) {
-        self.semantic_tokens_listeners.push(listener);
-    }
-
-    // pub fn listen_formatting(&mut self, listener:
-    // Listener<ExperimentalFormatterMode>) {     self.formatter_listeners.
-    // push(listener); }
-
-    pub async fn update(&mut self, update: &Value) -> anyhow::Result<()> {
-        if let Value::Object(update) = update {
-            self.update_by_map(update).await
-        } else {
-            bail!("got invalid configuration object {update}")
-        }
-    }
-
-    pub async fn update_by_map(&mut self, update: &Map<String, Value>) -> anyhow::Result<()> {
-        let export_pdf = update
-            .get("exportPdf")
-            .map(ExportPdfMode::deserialize)
-            .and_then(Result::ok);
-        if let Some(export_pdf) = export_pdf {
-            self.export_pdf = export_pdf;
-        }
-
-        let root_path = update.get("rootPath");
-        if let Some(root_path) = root_path {
-            if root_path.is_null() {
-                self.root_path = None;
-            }
-            if let Some(root_path) = root_path.as_str().map(PathBuf::from) {
-                self.root_path = Some(root_path);
-            }
-        }
-
-        let semantic_tokens = update
-            .get("semanticTokens")
-            .map(SemanticTokensMode::deserialize)
-            .and_then(Result::ok);
-        if let Some(semantic_tokens) = semantic_tokens {
-            for listener in &mut self.semantic_tokens_listeners {
-                listener(&semantic_tokens).await?;
-            }
-            self.semantic_tokens = semantic_tokens;
-        }
-
-        let formatter = update
-            .get("experimentalFormatterMode")
-            .map(ExperimentalFormatterMode::deserialize)
-            .and_then(Result::ok);
-        if let Some(formatter) = formatter {
-            for listener in &mut self.formatter_listeners {
-                listener(&formatter).await?;
-            }
-            self.formatter = formatter;
-        }
-
-        Ok(())
-    }
-}
-
-impl fmt::Debug for Config {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Config")
-            .field("export_pdf", &self.export_pdf)
-            .field("formatter", &self.formatter)
-            .field("semantic_tokens", &self.semantic_tokens)
-            .field(
-                "semantic_tokens_listeners",
-                &format_args!("Vec[len = {}]", self.semantic_tokens_listeners.len()),
-            )
-            .field(
-                "formatter_listeners",
-                &format_args!("Vec[len = {}]", self.formatter_listeners.len()),
-            )
-            .finish()
-    }
-}
-
-/// Configuration set at initialization that won't change within a single
-/// session
-#[derive(Debug)]
-pub struct ConstConfig {
-    pub position_encoding: PositionEncoding,
-    pub supports_semantic_tokens_dynamic_registration: bool,
-    pub supports_document_formatting_dynamic_registration: bool,
-    pub supports_config_change_registration: bool,
-    pub line_folding_only: bool,
-}
-
 pub struct TypstServer {
     pub client: LspHost,
-    pub document: Mutex<Arc<Document>>,
     // typst_thread: TypstThread,
     pub universe: OnceCell<CompileCluster>,
     pub config: Arc<RwLock<Config>>,
@@ -213,7 +42,6 @@ impl TypstServer {
             config: Default::default(),
             const_config: Default::default(),
             client,
-            document: Default::default(),
         }
     }
 
@@ -229,18 +57,19 @@ impl TypstServer {
 }
 
 macro_rules! run_query {
-    ($self: expr, $query: ident, $req: expr) => {{
-        let req = $req;
+    ($self: ident.$query: ident ($($arg_key:ident),+ $(,)?)) => {{
+        use tinymist_query::*;
+        let req = paste! { [<$query Request>] { $($arg_key),+ } };
         $self
             .universe()
-            .query(tinymist_query::CompilerQueryRequest::$query(req.clone()))
+            .query(CompilerQueryRequest::$query(req.clone()))
             .await
             .map_err(|err| {
                 error!("error getting $query: {err} with request {req:?}");
                 jsonrpc::Error::internal_error()
             })
             .map(|resp| {
-                let tinymist_query::CompilerQueryResponse::$query(resp) = resp else {
+                let CompilerQueryResponse::$query(resp) = resp else {
                     unreachable!()
                 };
                 resp
@@ -248,7 +77,15 @@ macro_rules! run_query {
     }};
 }
 
-#[async_trait]
+fn as_path(inp: TextDocumentIdentifier) -> PathBuf {
+    inp.uri.to_file_path().unwrap()
+}
+
+fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
+    (as_path(inp.text_document), inp.position)
+}
+
+#[async_trait::async_trait]
 impl LanguageServer for TypstServer {
     async fn initialize(&self, params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
         // self.tracing_init();
@@ -436,6 +273,8 @@ impl LanguageServer for TypstServer {
         Ok(())
     }
 
+    // Document Synchronization
+
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let path = params.text_document.uri.to_file_path().unwrap();
         let text = params.text_document.text;
@@ -470,99 +309,105 @@ impl LanguageServer for TypstServer {
         let config = self.config.read().await;
 
         if config.export_pdf == ExportPdfMode::OnSave {
-            let _ = run_query!(self, OnSaveExport, OnSaveExportRequest { path });
+            let _ = run_query!(self.OnSaveExport(path));
         }
     }
 
-    async fn execute_command(
-        &self,
-        params: ExecuteCommandParams,
-    ) -> jsonrpc::Result<Option<JsonValue>> {
-        let ExecuteCommandParams {
-            command,
-            arguments,
-            work_done_progress_params: _,
-        } = params;
-        match LspCommand::parse(&command) {
-            Some(LspCommand::ExportPdf) => {
-                self.command_export_pdf(arguments).await?;
-            }
-            Some(LspCommand::ClearCache) => {
-                self.command_clear_cache(arguments).await?;
-            }
-            None => {
-                error!("asked to execute unknown command");
-                return Err(jsonrpc::Error::method_not_found());
-            }
-        };
-        Ok(None)
-    }
-
-    async fn hover(&self, params: HoverParams) -> jsonrpc::Result<Option<Hover>> {
-        let uri = &params.text_document_position_params.text_document.uri;
-        let path = uri.to_file_path().unwrap();
-        let position = params.text_document_position_params.position;
-
-        run_query!(self, Hover, HoverRequest { path, position })
-    }
+    // Language Features
 
     async fn goto_definition(
         &self,
         params: GotoDefinitionParams,
     ) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
-        let uri = params.text_document_position_params.text_document.uri;
-        let path = uri.to_file_path().unwrap();
-        let position = params.text_document_position_params.position;
-
-        run_query!(
-            self,
-            GotoDefinition,
-            GotoDefinitionRequest { path, position }
-        )
+        let (path, position) = as_path_pos(params.text_document_position_params);
+        run_query!(self.GotoDefinition(path, position))
     }
 
-    async fn completion(
-        &self,
-        params: CompletionParams,
-    ) -> jsonrpc::Result<Option<CompletionResponse>> {
-        let uri = params.text_document_position.text_document.uri;
-        let path = uri.to_file_path().unwrap();
-        let position = params.text_document_position.position;
-        let explicit = params
-            .context
-            .map(|context| context.trigger_kind == CompletionTriggerKind::INVOKED)
-            .unwrap_or(false);
-
-        run_query!(
-            self,
-            Completion,
-            CompletionRequest {
-                path,
-                position,
-                explicit,
-            }
-        )
+    async fn hover(&self, params: HoverParams) -> jsonrpc::Result<Option<Hover>> {
+        let (path, position) = as_path_pos(params.text_document_position_params);
+        run_query!(self.Hover(path, position))
     }
 
-    async fn signature_help(
+    async fn folding_range(
         &self,
-        params: SignatureHelpParams,
-    ) -> jsonrpc::Result<Option<SignatureHelp>> {
-        let uri = params.text_document_position_params.text_document.uri;
-        let path = uri.to_file_path().unwrap();
-        let position = params.text_document_position_params.position;
+        params: FoldingRangeParams,
+    ) -> jsonrpc::Result<Option<Vec<FoldingRange>>> {
+        let path = as_path(params.text_document);
+        let line_folding_only = self.const_config().line_folding_only;
+        run_query!(self.FoldingRange(path, line_folding_only))
+    }
 
-        run_query!(self, SignatureHelp, SignatureHelpRequest { path, position })
+    async fn selection_range(
+        &self,
+        params: SelectionRangeParams,
+    ) -> jsonrpc::Result<Option<Vec<SelectionRange>>> {
+        let path = as_path(params.text_document);
+        let positions = params.positions;
+        run_query!(self.SelectionRange(path, positions))
     }
 
     async fn document_symbol(
         &self,
         params: DocumentSymbolParams,
     ) -> jsonrpc::Result<Option<DocumentSymbolResponse>> {
-        let uri = params.text_document.uri;
-        let path = uri.to_file_path().unwrap();
+        let path = as_path(params.text_document);
+        run_query!(self.DocumentSymbol(path))
+    }
 
-        run_query!(self, DocumentSymbol, DocumentSymbolRequest { path })
+    async fn semantic_tokens_full(
+        &self,
+        params: SemanticTokensParams,
+    ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
+        let path = as_path(params.text_document);
+        run_query!(self.SemanticTokensFull(path))
+    }
+
+    async fn semantic_tokens_full_delta(
+        &self,
+        params: SemanticTokensDeltaParams,
+    ) -> jsonrpc::Result<Option<SemanticTokensFullDeltaResult>> {
+        let path = as_path(params.text_document);
+        let previous_result_id = params.previous_result_id;
+        run_query!(self.SemanticTokensDelta(path, previous_result_id))
+    }
+
+    async fn inlay_hint(
+        &self,
+        _params: InlayHintParams,
+    ) -> jsonrpc::Result<Option<Vec<InlayHint>>> {
+        Ok(None)
+    }
+
+    async fn completion(
+        &self,
+        params: CompletionParams,
+    ) -> jsonrpc::Result<Option<CompletionResponse>> {
+        let (path, position) = as_path_pos(params.text_document_position);
+        let explicit = params
+            .context
+            .map(|context| context.trigger_kind == CompletionTriggerKind::INVOKED)
+            .unwrap_or(false);
+
+        run_query!(self.Completion(path, position, explicit))
+    }
+
+    async fn signature_help(
+        &self,
+        params: SignatureHelpParams,
+    ) -> jsonrpc::Result<Option<SignatureHelp>> {
+        let (path, position) = as_path_pos(params.text_document_position_params);
+        run_query!(self.SignatureHelp(path, position))
+    }
+
+    async fn rename(&self, _params: RenameParams) -> jsonrpc::Result<Option<WorkspaceEdit>> {
+        Ok(None)
+    }
+
+    async fn prepare_rename(
+        &self,
+        _params: TextDocumentPositionParams,
+    ) -> jsonrpc::Result<Option<PrepareRenameResponse>> {
+        Ok(None)
     }
 
     async fn symbol(
@@ -570,69 +415,7 @@ impl LanguageServer for TypstServer {
         params: WorkspaceSymbolParams,
     ) -> jsonrpc::Result<Option<Vec<SymbolInformation>>> {
         let pattern = (!params.query.is_empty()).then_some(params.query);
-
-        run_query!(self, Symbol, SymbolRequest { pattern })
-    }
-
-    async fn folding_range(
-        &self,
-        params: FoldingRangeParams,
-    ) -> jsonrpc::Result<Option<Vec<FoldingRange>>> {
-        let uri = params.text_document.uri;
-        let path = uri.to_file_path().unwrap();
-        let line_folding_only = self.const_config().line_folding_only;
-
-        run_query!(
-            self,
-            FoldingRange,
-            FoldingRangeRequest {
-                path,
-                line_folding_only
-            }
-        )
-    }
-
-    async fn selection_range(
-        &self,
-        params: SelectionRangeParams,
-    ) -> jsonrpc::Result<Option<Vec<SelectionRange>>> {
-        let uri = params.text_document.uri;
-        let path = uri.to_file_path().unwrap();
-        let positions = params.positions;
-
-        run_query!(
-            self,
-            SelectionRange,
-            SelectionRangeRequest { path, positions }
-        )
-    }
-
-    async fn semantic_tokens_full(
-        &self,
-        params: SemanticTokensParams,
-    ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
-        let uri = params.text_document.uri;
-        let path = uri.to_file_path().unwrap();
-
-        run_query!(self, SemanticTokensFull, SemanticTokensFullRequest { path })
-    }
-
-    async fn semantic_tokens_full_delta(
-        &self,
-        params: SemanticTokensDeltaParams,
-    ) -> jsonrpc::Result<Option<SemanticTokensFullDeltaResult>> {
-        let uri = params.text_document.uri;
-        let path = uri.to_file_path().unwrap();
-        let previous_result_id = params.previous_result_id;
-
-        run_query!(
-            self,
-            SemanticTokensDelta,
-            SemanticTokensDeltaRequest {
-                path,
-                previous_result_id,
-            }
-        )
+        run_query!(self.Symbol(pattern))
     }
 
     async fn did_change_configuration(&self, params: DidChangeConfigurationParams) {
@@ -664,7 +447,32 @@ impl LanguageServer for TypstServer {
             }
         }
     }
+
+    async fn execute_command(
+        &self,
+        params: ExecuteCommandParams,
+    ) -> jsonrpc::Result<Option<JsonValue>> {
+        let ExecuteCommandParams {
+            command,
+            arguments,
+            work_done_progress_params: _,
+        } = params;
+        match LspCommand::parse(&command) {
+            Some(LspCommand::ExportPdf) => {
+                self.command_export_pdf(arguments).await?;
+            }
+            Some(LspCommand::ClearCache) => {
+                self.command_clear_cache(arguments).await?;
+            }
+            None => {
+                error!("asked to execute unknown command");
+                return Err(jsonrpc::Error::method_not_found());
+            }
+        };
+        Ok(None)
+    }
 }
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LspCommand {
     ExportPdf,
@@ -713,7 +521,7 @@ impl TypstServer {
             .to_file_path()
             .map_err(|_| jsonrpc::Error::invalid_params("URI is not a file URI"))?;
 
-        let _ = run_query!(self, OnSaveExport, OnSaveExportRequest { path });
+        let _ = run_query!(self.OnSaveExport(path));
 
         Ok(())
     }
@@ -731,6 +539,167 @@ impl TypstServer {
 
         todo!()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExperimentalFormatterMode {
+    #[default]
+    Off,
+    On,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportPdfMode {
+    Never,
+    #[default]
+    OnSave,
+    OnType,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SemanticTokensMode {
+    Disable,
+    #[default]
+    Enable,
+}
+
+pub type Listener<T> = Box<dyn FnMut(&T) -> BoxFuture<anyhow::Result<()>> + Send + Sync>;
+
+const CONFIG_ITEMS: &[&str] = &[
+    "exportPdf",
+    "rootPath",
+    "semanticTokens",
+    "experimentalFormatterMode",
+];
+
+#[derive(Default)]
+pub struct Config {
+    pub export_pdf: ExportPdfMode,
+    pub root_path: Option<PathBuf>,
+    pub semantic_tokens: SemanticTokensMode,
+    pub formatter: ExperimentalFormatterMode,
+    semantic_tokens_listeners: Vec<Listener<SemanticTokensMode>>,
+    formatter_listeners: Vec<Listener<ExperimentalFormatterMode>>,
+}
+
+impl Config {
+    pub fn get_items() -> Vec<ConfigurationItem> {
+        let sections = CONFIG_ITEMS
+            .iter()
+            .flat_map(|item| [format!("tinymist.{item}"), item.to_string()]);
+
+        sections
+            .map(|section| ConfigurationItem {
+                section: Some(section),
+                ..Default::default()
+            })
+            .collect()
+    }
+
+    pub fn values_to_map(values: Vec<JsonValue>) -> Map<String, JsonValue> {
+        let unpaired_values = values
+            .into_iter()
+            .tuples()
+            .map(|(a, b)| if !a.is_null() { a } else { b });
+
+        CONFIG_ITEMS
+            .iter()
+            .map(|item| item.to_string())
+            .zip(unpaired_values)
+            .collect()
+    }
+
+    pub fn listen_semantic_tokens(&mut self, listener: Listener<SemanticTokensMode>) {
+        self.semantic_tokens_listeners.push(listener);
+    }
+
+    // pub fn listen_formatting(&mut self, listener:
+    // Listener<ExperimentalFormatterMode>) {     self.formatter_listeners.
+    // push(listener); }
+
+    pub async fn update(&mut self, update: &JsonValue) -> anyhow::Result<()> {
+        if let JsonValue::Object(update) = update {
+            self.update_by_map(update).await
+        } else {
+            bail!("got invalid configuration object {update}")
+        }
+    }
+
+    pub async fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
+        let export_pdf = update
+            .get("exportPdf")
+            .map(ExportPdfMode::deserialize)
+            .and_then(Result::ok);
+        if let Some(export_pdf) = export_pdf {
+            self.export_pdf = export_pdf;
+        }
+
+        let root_path = update.get("rootPath");
+        if let Some(root_path) = root_path {
+            if root_path.is_null() {
+                self.root_path = None;
+            }
+            if let Some(root_path) = root_path.as_str().map(PathBuf::from) {
+                self.root_path = Some(root_path);
+            }
+        }
+
+        let semantic_tokens = update
+            .get("semanticTokens")
+            .map(SemanticTokensMode::deserialize)
+            .and_then(Result::ok);
+        if let Some(semantic_tokens) = semantic_tokens {
+            for listener in &mut self.semantic_tokens_listeners {
+                listener(&semantic_tokens).await?;
+            }
+            self.semantic_tokens = semantic_tokens;
+        }
+
+        let formatter = update
+            .get("experimentalFormatterMode")
+            .map(ExperimentalFormatterMode::deserialize)
+            .and_then(Result::ok);
+        if let Some(formatter) = formatter {
+            for listener in &mut self.formatter_listeners {
+                listener(&formatter).await?;
+            }
+            self.formatter = formatter;
+        }
+
+        Ok(())
+    }
+}
+
+impl fmt::Debug for Config {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Config")
+            .field("export_pdf", &self.export_pdf)
+            .field("formatter", &self.formatter)
+            .field("semantic_tokens", &self.semantic_tokens)
+            .field(
+                "semantic_tokens_listeners",
+                &format_args!("Vec[len = {}]", self.semantic_tokens_listeners.len()),
+            )
+            .field(
+                "formatter_listeners",
+                &format_args!("Vec[len = {}]", self.formatter_listeners.len()),
+            )
+            .finish()
+    }
+}
+
+/// Configuration set at initialization that won't change within a single
+/// session
+#[derive(Debug)]
+pub struct ConstConfig {
+    pub position_encoding: PositionEncoding,
+    pub supports_semantic_tokens_dynamic_registration: bool,
+    pub supports_document_formatting_dynamic_registration: bool,
+    pub supports_config_change_registration: bool,
+    pub line_folding_only: bool,
 }
 
 impl ConstConfig {

@@ -3406,6 +3406,7 @@ dependencies = [
  "log",
  "once_cell",
  "parking_lot",
+ "paste",
  "serde",
  "serde_json",
  "tinymist-query",

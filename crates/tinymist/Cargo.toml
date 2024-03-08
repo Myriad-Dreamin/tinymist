@@ -26,6 +26,7 @@ log.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 parking_lot.workspace = true
+paste = "1.0"
 
 typst.workspace = true
 typst-pdf.workspace = true
