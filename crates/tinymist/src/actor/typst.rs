@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::anyhow;
 use futures::future::join_all;
-use log::{error, trace, warn};
+use log::{debug, error, trace, warn};
 use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, LspDiagnostic, LspRange,
     OnSaveExportRequest, PositionEncoding, SemanticTokenCache,
@@ -100,7 +100,7 @@ pub fn create_server(
         },
     ));
     let driver = Reporter {
-        diag_group,
+        diag_group: diag_group.clone(),
         position_encoding: cfg.position_encoding,
         diag_tx,
         inner: driver,
@@ -112,7 +112,7 @@ pub fn create_server(
 
     tokio::spawn(server.spawn());
 
-    CompileNode::new(cfg.position_encoding, handler, client)
+    CompileNode::new(diag_group, cfg.position_encoding, handler, client)
 }
 
 pub struct CompileClusterActor {
@@ -205,7 +205,6 @@ impl CompileCluster {
 
         let content: Bytes = content.as_bytes().into();
 
-        self.primary.change_entry(path.clone()).await?;
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_inserts(vec![(path, FileResult::Ok((now, content)).into())]);
         let iw = self.primary.inner.lock().await;
@@ -263,7 +262,6 @@ impl CompileCluster {
 
         drop(memory_changes);
 
-        self.primary.change_entry(path.clone()).await?;
         let files = FileChangeSet::new_inserts(vec![(path.clone(), snapshot)]);
         let iw = self.primary.inner.lock().await;
         iw.add_memory_changes(MemoryEvent::Update(files));
@@ -312,7 +310,12 @@ impl CompileCluster {
         match query {
             SemanticTokensFull(req) => query_tokens_cache!(self, SemanticTokensFull, req),
             SemanticTokensDelta(req) => query_tokens_cache!(self, SemanticTokensDelta, req),
-            _ => self.primary.query(query).await,
+            _ => {
+                if let Some(path) = query.associated_path() {
+                    self.primary.change_entry(path.into()).await?;
+                }
+                self.primary.query(query).await
+            }
         }
     }
 }
@@ -362,7 +365,16 @@ impl CompileMiddleware for CompileDriver {
 impl CompileDriver {
     pub fn new(roots: Vec<PathBuf>, opts: CompileOpts) -> Self {
         let world = TypstSystemWorld::new(opts).expect("incorrect options");
-        let driver = CompileDriverInner::new(world);
+        let mut driver = CompileDriverInner::new(world);
+
+        driver.entry_file = "detached.typ".into();
+        // todo: suitable approach to avoid panic
+        driver.notify_fs_event(typst_ts_compiler::vfs::notify::FilesystemEvent::Update(
+            typst_ts_compiler::vfs::notify::FileChangeSet::new_inserts(vec![(
+                driver.world.root.join("detached.typ").into(),
+                Ok((Time::now(), Bytes::from("".as_bytes()))).into(),
+            )]),
+        ));
 
         Self {
             inner: driver,
@@ -468,6 +480,7 @@ impl<C: Compiler<World = TypstSystemWorld>, H> Reporter<C, H> {
 }
 
 pub struct CompileNode<H: CompilationHandle> {
+    diag_group: String,
     position_encoding: PositionEncoding,
     handler: CompileHandler,
     entry: Arc<SyncMutex<Option<ImmutPath>>>,
@@ -505,6 +518,12 @@ impl<H: CompilationHandle> CompileNode<H> {
         };
 
         if should_change {
+            debug!(
+                "the entry file of TypstActor({}) is changed to {}",
+                self.diag_group,
+                path.display()
+            );
+
             self.steal_async(move |compiler, _| {
                 let root = compiler.compiler.world().workspace_root();
                 if !path.starts_with(&root) {
@@ -516,6 +535,11 @@ impl<H: CompilationHandle> CompileNode<H> {
                 driver.set_entry_file(path.as_ref().to_owned());
             })
             .await?;
+
+            // todo: trigger recompile
+            let files = FileChangeSet::new_inserts(vec![]);
+            let inner = self.inner.lock().await;
+            inner.add_memory_changes(MemoryEvent::Update(files))
         }
 
         Ok(())
@@ -609,11 +633,13 @@ impl<H: CompilationHandle> CompileHost for CompileNode<H> {}
 
 impl<H: CompilationHandle> CompileNode<H> {
     fn new(
+        diag_group: String,
         position_encoding: PositionEncoding,
         handler: CompileHandler,
         inner: CompileClient<H>,
     ) -> Self {
         Self {
+            diag_group,
             position_encoding,
             handler,
             entry: Arc::new(SyncMutex::new(None)),

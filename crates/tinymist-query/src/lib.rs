@@ -57,6 +57,24 @@ mod polymorphic {
         FoldingRange(FoldingRangeRequest),
         SelectionRange(SelectionRangeRequest),
     }
+    impl CompilerQueryRequest {
+        pub fn associated_path(&self) -> Option<&Path> {
+            Some(match self {
+                CompilerQueryRequest::OnSaveExport(req) => &req.path,
+                CompilerQueryRequest::Hover(req) => &req.path,
+                CompilerQueryRequest::GotoDefinition(req) => &req.path,
+                CompilerQueryRequest::InlayHint(req) => &req.path,
+                CompilerQueryRequest::Completion(req) => &req.path,
+                CompilerQueryRequest::SignatureHelp(req) => &req.path,
+                CompilerQueryRequest::DocumentSymbol(req) => &req.path,
+                CompilerQueryRequest::Symbol(..) => return None,
+                CompilerQueryRequest::SemanticTokensFull(req) => &req.path,
+                CompilerQueryRequest::SemanticTokensDelta(req) => &req.path,
+                CompilerQueryRequest::FoldingRange(req) => &req.path,
+                CompilerQueryRequest::SelectionRange(req) => &req.path,
+            })
+        }
+    }
 
     #[derive(Debug, Clone)]
     pub enum CompilerQueryResponse {

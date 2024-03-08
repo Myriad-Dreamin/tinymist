@@ -1,6 +1,7 @@
 use std::{borrow::Cow, ops::Range};
 
 use comemo::Prehashed;
+use log::debug;
 use tower_lsp::lsp_types::{InlayHintKind, InlayHintLabel};
 use typst::{
     foundations::{Args, Closure},
@@ -32,7 +33,15 @@ impl InlayHintRequest {
         );
 
         let hints = inlay_hints(world, &source, range, position_encoding).ok()?;
-        trace!("got inlay hints {hints:?}");
+        debug!(
+            "got inlay hints on {source:?} => {hints:?}",
+            source = source.id(),
+            hints = hints.len()
+        );
+        if hints.is_empty() {
+            let root = LinkedNode::new(source.root());
+            debug!("debug root {root:#?}");
+        }
 
         Some(hints)
     }
