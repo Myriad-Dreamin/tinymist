@@ -13,29 +13,31 @@ use tinymist_query::{
 };
 use tokio::sync::{broadcast, mpsc, watch, Mutex, RwLock};
 use tower_lsp::lsp_types::{TextDocumentContentChangeEvent, Url};
-use typst::diag::{FileResult, SourceDiagnostic, SourceResult};
-use typst::layout::Position;
-use typst::model::Document;
-use typst::syntax::{Source, Span};
-use typst::World;
-use typst_preview::CompilationHandleImpl;
-use typst_preview::{CompilationHandle, CompileStatus};
-use typst_preview::{CompileHost, EditorServer, MemoryFiles, MemoryFilesShort, SourceFileServer};
-use typst_preview::{DocToSrcJumpInfo, Location};
-use typst_ts_compiler::service::{
-    CompileActor, CompileClient as TsCompileClient, CompileDriver as CompileDriverInner,
-    CompileExporter, CompileMiddleware, Compiler, WorkspaceProvider, WorldExporter,
+use typst::{
+    diag::{FileResult, SourceDiagnostic, SourceResult},
+    layout::Position,
+    syntax::{Source, Span},
 };
-use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
-use typst_ts_compiler::{Time, TypstSystemWorld};
+use typst_preview::{
+    CompilationHandle, CompilationHandleImpl, CompileHost, CompileStatus, DocToSrcJumpInfo,
+    EditorServer, Location, MemoryFiles, MemoryFilesShort, SourceFileServer,
+};
+use typst_ts_compiler::{
+    service::{
+        CompileActor, CompileClient as TsCompileClient, CompileDriver as CompileDriverInner,
+        CompileExporter, CompileMiddleware, Compiler, WorkspaceProvider, WorldExporter,
+    },
+    vfs::notify::{FileChangeSet, MemoryEvent},
+    Time, TypstSystemWorld,
+};
 use typst_ts_core::{
     config::CompileOpts, debug_loc::SourceSpanOffset, error::prelude::*, typst::prelude::EcoVec,
-    Bytes, Error, ImmutPath,
+    Bytes, Error, ImmutPath, TypstDocument, TypstWorld,
 };
 
 use crate::actor::render::RenderActorRequest;
+use crate::ConstConfig;
 use crate::LspHost;
-use crate::{actor::render::PdfExportActor, ConstConfig};
 
 type CompileService<H> = CompileActor<Reporter<CompileExporter<CompileDriver>, H>>;
 type CompileClient<H> = TsCompileClient<CompileService<H>>;
@@ -50,51 +52,46 @@ pub struct CompileCluster {
     actor: Option<CompileClusterActor>,
 }
 
-pub fn create_cluster(
-    host: LspHost,
-    cfg: &ConstConfig,
-    roots: Vec<PathBuf>,
-    opts: CompileOpts,
-) -> CompileCluster {
-    let (diag_tx, diag_rx) = mpsc::unbounded_channel();
+impl CompileCluster {
+    pub fn new(
+        host: LspHost,
+        cfg: &ConstConfig,
+        primary: CompileNode<CompileHandler>,
+        diag_rx: mpsc::UnboundedReceiver<(String, DiagnosticsMap)>,
+    ) -> Self {
+        Self {
+            position_encoding: cfg.position_encoding,
+            memory_changes: RwLock::new(HashMap::new()),
+            primary,
+            tokens_cache: Default::default(),
+            actor: Some(CompileClusterActor {
+                host,
+                diag_rx,
+                diagnostics: HashMap::new(),
+                affect_map: HashMap::new(),
+            }),
+        }
+    }
 
-    let primary = create_server(
-        "primary".to_owned(),
-        cfg,
-        CompileDriver::new(roots.clone(), opts.clone()),
-        diag_tx,
-    );
-
-    CompileCluster {
-        position_encoding: cfg.position_encoding,
-        memory_changes: RwLock::new(HashMap::new()),
-        primary,
-        tokens_cache: Default::default(),
-        actor: Some(CompileClusterActor {
-            host,
-            diag_rx,
-            diagnostics: HashMap::new(),
-            affect_map: HashMap::new(),
-        }),
+    pub fn split(mut self) -> (Self, CompileClusterActor) {
+        let actor = self.actor.take().expect("actor is poisoned");
+        (self, actor)
     }
 }
 
-fn create_server(
+pub fn create_server(
     diag_group: String,
     cfg: &ConstConfig,
     compiler_driver: CompileDriver,
     diag_tx: DiagnosticsSender,
+    doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
+    render_tx: broadcast::Sender<RenderActorRequest>,
 ) -> CompileNode<CompileHandler> {
-    let (doc_sender, doc_recv) = watch::channel(None);
-    let (render_tx, render_rx) = broadcast::channel(1024);
-
-    tokio::spawn(PdfExportActor::new(doc_recv, render_rx).run());
-
     let root = compiler_driver.inner.world.root.as_ref().to_owned();
     let handler: CompileHandler = compiler_driver.handler.clone();
 
     let driver = CompileExporter::new(compiler_driver).with_exporter(Box::new(
-        move |_w: &dyn World, doc| {
+        move |_w: &dyn TypstWorld, doc| {
             let _ = doc_sender.send(Some(doc));
             // todo: is it right that ignore zero broadcast receiver?
             let _ = render_tx.send(RenderActorRequest::Render);
@@ -116,13 +113,6 @@ fn create_server(
     tokio::spawn(server.spawn());
 
     CompileNode::new(cfg.position_encoding, handler, client)
-}
-
-impl CompileCluster {
-    pub fn split(mut self) -> (Self, CompileClusterActor) {
-        let actor = self.actor.take().expect("actor is poisoned");
-        (self, actor)
-    }
 }
 
 pub struct CompileClusterActor {
@@ -329,7 +319,7 @@ impl CompileCluster {
 
 #[derive(Clone)]
 pub struct CompileHandler {
-    result: Arc<SyncMutex<Result<Arc<Document>, CompileStatus>>>,
+    result: Arc<SyncMutex<Result<Arc<TypstDocument>, CompileStatus>>>,
     inner: Arc<SyncMutex<Option<CompilationHandleImpl>>>,
 }
 
@@ -341,7 +331,7 @@ impl CompilationHandle for CompileHandler {
         }
     }
 
-    fn notify_compile(&self, result: Result<Arc<Document>, CompileStatus>) {
+    fn notify_compile(&self, result: Result<Arc<TypstDocument>, CompileStatus>) {
         *self.result.lock().unwrap() = result.clone();
 
         let inner = self.inner.lock().unwrap();
@@ -370,7 +360,7 @@ impl CompileMiddleware for CompileDriver {
 }
 
 impl CompileDriver {
-    fn new(roots: Vec<PathBuf>, opts: CompileOpts) -> Self {
+    pub fn new(roots: Vec<PathBuf>, opts: CompileOpts) -> Self {
         let world = TypstSystemWorld::new(opts).expect("incorrect options");
         let driver = CompileDriverInner::new(world);
 
@@ -434,7 +424,7 @@ impl<C: Compiler<World = TypstSystemWorld>, H: CompilationHandle> CompileMiddlew
     fn wrap_compile(
         &mut self,
         env: &mut typst_ts_compiler::service::CompileEnv,
-    ) -> SourceResult<Arc<Document>> {
+    ) -> SourceResult<Arc<TypstDocument>> {
         self.cb.status(CompileStatus::Compiling);
         match self.inner_mut().compile(env) {
             Ok(doc) => {

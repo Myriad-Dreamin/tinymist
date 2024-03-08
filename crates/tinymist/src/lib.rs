@@ -4,7 +4,6 @@ pub mod actor;
 pub use tower_lsp::Client as LspHost;
 
 use core::fmt;
-use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -22,26 +21,23 @@ use tinymist_query::{
 };
 use tokio::sync::RwLock;
 use tower_lsp::{jsonrpc, lsp_types::*, LanguageServer};
-use typst_ts_core::config::CompileOpts;
 
 use crate::actor::typst::CompileCluster;
 
 pub struct TypstServer {
-    pub client: LspHost,
-    // typst_thread: TypstThread,
-    pub universe: OnceCell<CompileCluster>,
     pub config: Arc<RwLock<Config>>,
     pub const_config: OnceCell<ConstConfig>,
+    pub client: LspHost,
+    pub universe: OnceCell<CompileCluster>,
 }
 
 impl TypstServer {
     pub fn new(client: LspHost) -> Self {
         Self {
-            // typst_thread: Default::default(),
-            universe: Default::default(),
             config: Default::default(),
             const_config: Default::default(),
             client,
+            universe: Default::default(),
         }
     }
 
@@ -90,38 +86,14 @@ impl LanguageServer for TypstServer {
     async fn initialize(&self, params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
         // self.tracing_init();
 
-        self.const_config
-            .set(ConstConfig::from(&params))
-            .expect("const config should not yet be initialized");
-
-        let cluster = {
-            let root_paths = params.root_paths();
-            let primary_root = root_paths.first().cloned().unwrap_or_default();
-            actor::typst::create_cluster(
-                self.client.clone(),
-                self.const_config.get().unwrap(),
-                root_paths,
-                CompileOpts {
-                    root_dir: primary_root,
-                    // todo: font paths
-                    // font_paths: arguments.font_paths.clone(),
-                    with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
-                    ..CompileOpts::default()
-                },
-            )
-        };
-
-        let (cluster, cluster_bg) = cluster.split();
-
-        self.universe
-            .set(cluster)
-            .map_err(|_| ())
-            .expect("the cluster is already initialized");
-
-        tokio::spawn(cluster_bg.run());
+        // Initialize configurations
+        let cc = &self.const_config;
+        cc.set(ConstConfig::from(&params))
+            .expect("const config is initialized");
+        let cc = cc.get().expect("const config is not initialized").clone();
 
         if let Some(init) = &params.initialization_options {
-            let mut config = self.config.write().await;
+            let mut config: tokio::sync::RwLockWriteGuard<'_, Config> = self.config.write().await;
             config
                 .update(init)
                 .await
@@ -129,6 +101,24 @@ impl LanguageServer for TypstServer {
                 .map_err(ToString::to_string)
                 .map_err(jsonrpc::Error::invalid_params)?;
         }
+
+        // Bootstrap actors
+        let actor_factory = actor::ActorFactory::new(cc);
+
+        // Run the PDF export actor before preparing cluster to avoid loss of events
+        actor_factory.pdf_export_actor().await;
+
+        // Bootstrap the cluster
+        let cluster = actor_factory.prepare_cluster(self.client.clone(), params.root_paths());
+        let (cluster, cluster_bg) = cluster.split();
+        self.universe
+            .set(cluster)
+            .map_err(|_| ())
+            .expect("the cluster is already initialized");
+        // Run the cluster in the background after we referencing it
+        tokio::spawn(cluster_bg.run());
+
+        // Respond to the host (LSP client)
 
         let config = self.config.read().await;
 
@@ -693,7 +683,7 @@ impl fmt::Debug for Config {
 
 /// Configuration set at initialization that won't change within a single
 /// session
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstConfig {
     pub position_encoding: PositionEncoding,
     pub supports_semantic_tokens_dynamic_registration: bool,
