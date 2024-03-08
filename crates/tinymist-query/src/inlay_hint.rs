@@ -121,14 +121,18 @@ fn inlay_hints(
                             continue;
                         };
 
+                        if info.param.name.is_empty() {
+                            continue;
+                        }
+
                         let pos = arg_node.range().end;
                         let lsp_pos =
                             typst_to_lsp::offset_to_position(pos, self.encoding, self.source);
 
                         let label = InlayHintLabel::String(if info.kind == ParamKind::Rest {
-                            format!(":..{}", info.param.name)
+                            format!(": ..{}", info.param.name)
                         } else {
-                            format!(":{}", info.param.name)
+                            format!(": {}", info.param.name)
                         });
 
                         self.hints.push(InlayHint {
@@ -137,7 +141,7 @@ fn inlay_hints(
                             kind: Some(InlayHintKind::PARAMETER),
                             text_edits: None,
                             tooltip: None,
-                            padding_left: Some(true),
+                            padding_left: None,
                             padding_right: None,
                             data: None,
                         });
@@ -179,7 +183,7 @@ enum ParamKind {
 #[derive(Debug, Clone)]
 struct CallParamInfo {
     kind: ParamKind,
-    param: Arc<ParamInfo>,
+    param: Arc<ParamSpec>,
     // types: EcoVec<()>,
 }
 
@@ -345,11 +349,41 @@ fn analyze_call_no_cache(func: Func, args: ast::Args<'_>) -> Option<CallInfo> {
     Some(info)
 }
 
+/// Describes a function parameter.
+#[derive(Debug, Clone)]
+pub struct ParamSpec {
+    /// The parameter's name.
+    pub name: Cow<'static, str>,
+    /// Creates an instance of the parameter's default value.
+    pub default: Option<fn() -> Value>,
+    /// Is the parameter positional?
+    pub positional: bool,
+    /// Is the parameter named?
+    ///
+    /// Can be true even if `positional` is true if the parameter can be given
+    /// in both variants.
+    pub named: bool,
+    /// Can the parameter be given any number of times?
+    pub variadic: bool,
+}
+
+impl ParamSpec {
+    fn from_static(s: &ParamInfo) -> Arc<Self> {
+        Arc::new(Self {
+            name: Cow::Borrowed(s.name),
+            default: s.default,
+            positional: s.positional,
+            named: s.named,
+            variadic: s.variadic,
+        })
+    }
+}
+
 #[derive(Debug, Clone)]
 struct Signature {
-    pos: Vec<Arc<ParamInfo>>,
-    named: HashMap<String, Arc<ParamInfo>>,
-    rest: Option<Arc<ParamInfo>>,
+    pos: Vec<Arc<ParamSpec>>,
+    named: HashMap<Cow<'static, str>, Arc<ParamSpec>>,
+    rest: Option<Arc<ParamSpec>>,
     _broken: bool,
 }
 
@@ -359,7 +393,10 @@ fn analyze_signature(func: Func) -> Arc<Signature> {
     let params = match func.inner() {
         Repr::With(..) => unreachable!(),
         Repr::Closure(c) => analyze_closure_signature(c.clone()),
-        Repr::Element(..) | Repr::Native(..) => Cow::Borrowed(func.params().unwrap()),
+        Repr::Element(..) | Repr::Native(..) => {
+            let params = func.params().unwrap();
+            params.iter().map(ParamSpec::from_static).collect()
+        }
     };
 
     let mut pos = vec![];
@@ -367,21 +404,21 @@ fn analyze_signature(func: Func) -> Arc<Signature> {
     let mut rest = None;
     let mut broken = false;
 
-    for param in params.iter() {
+    for param in params.into_iter() {
         if param.named {
-            named.insert(param.name.to_owned(), Arc::new(param.clone()));
+            named.insert(param.name.clone(), param.clone());
         }
 
         if param.variadic {
             if rest.is_some() {
                 broken = true;
             } else {
-                rest = Some(Arc::new(param.clone()));
+                rest = Some(param.clone());
             }
         }
 
         if param.positional {
-            pos.push(Arc::new(param.clone()));
+            pos.push(param);
         }
     }
 
@@ -393,10 +430,64 @@ fn analyze_signature(func: Func) -> Arc<Signature> {
     })
 }
 
-fn analyze_closure_signature(c: Arc<Prehashed<Closure>>) -> Cow<'static, [ParamInfo]> {
-    let params = vec![];
+fn analyze_closure_signature(c: Arc<Prehashed<Closure>>) -> Vec<Arc<ParamSpec>> {
+    let mut params = vec![];
 
     trace!("closure signature for: {:?}", c.node.kind());
 
-    Cow::Owned(params)
+    let closure = &c.node;
+    let closure_ast = match closure.kind() {
+        SyntaxKind::Closure => closure.cast::<ast::Closure>().unwrap(),
+        _ => return params,
+    };
+
+    for param in closure_ast.params().children() {
+        match param {
+            ast::Param::Pos(ast::Pattern::Placeholder(..)) => {
+                params.push(Arc::new(ParamSpec {
+                    name: Cow::Borrowed("_"),
+                    default: None,
+                    positional: true,
+                    named: false,
+                    variadic: false,
+                }));
+            }
+            ast::Param::Pos(e) => {
+                // todo: destructing
+                let name = e.idents();
+                if name.len() != 1 {
+                    continue;
+                }
+                let name = name[0].as_str();
+
+                params.push(Arc::new(ParamSpec {
+                    name: Cow::Owned(name.to_owned()),
+                    default: None,
+                    positional: true,
+                    named: false,
+                    variadic: false,
+                }));
+            }
+            ast::Param::Named(n) => {
+                params.push(Arc::new(ParamSpec {
+                    name: Cow::Owned(n.name().as_str().to_owned()),
+                    default: None,
+                    positional: false,
+                    named: true,
+                    variadic: false,
+                }));
+            }
+            ast::Param::Sink(s) => {
+                params.push(Arc::new(ParamSpec {
+                    name: Cow::Owned(s.name().unwrap_or_default().as_str().to_owned()),
+                    default: None,
+                    positional: false,
+                    named: false,
+                    variadic: true,
+                }));
+            }
+        }
+    }
+
+    params
 }

@@ -23,7 +23,7 @@ use tower_lsp::{LspService, Server};
 async fn main() {
     let _ = env_logger::builder()
         // TODO: set this back to Info
-        .filter_module("tinymist", log::LevelFilter::Trace)
+        .filter_module("tinymist", log::LevelFilter::Debug)
         // .filter_module("tinymist", log::LevelFilter::Debug)
         .filter_module("typst_preview", log::LevelFilter::Debug)
         .filter_module("typst_ts", log::LevelFilter::Info)
