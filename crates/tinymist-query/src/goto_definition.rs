@@ -1,3 +1,6 @@
+use log::debug;
+use tower_lsp::lsp_types::LocationLink;
+
 use crate::prelude::*;
 
 #[derive(Debug, Clone)]
@@ -81,6 +84,10 @@ impl GotoDefinitionRequest {
         let Some(id) = span.id() else {
             return None;
         };
+
+        let origin_selection_range =
+            typst_to_lsp::range(callee_link.range(), &source, position_encoding).raw_range;
+
         let span_path = world.path_for_id(id).ok()?;
         let span_source = world.source(id).ok()?;
         let offset = span_source.find(span)?;
@@ -89,6 +96,14 @@ impl GotoDefinitionRequest {
 
         let uri = Url::from_file_path(span_path).ok()?;
 
-        Some(GotoDefinitionResponse::Scalar(LspLocation { uri, range }))
+        let res = Some(GotoDefinitionResponse::Link(vec![LocationLink {
+            origin_selection_range: Some(origin_selection_range),
+            target_uri: uri,
+            target_range: range,
+            target_selection_range: range,
+        }]));
+
+        debug!("goto_definition: {res:?}");
+        res
     }
 }
