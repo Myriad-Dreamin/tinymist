@@ -105,9 +105,6 @@ impl LanguageServer for TypstServer {
         // Bootstrap actors
         let actor_factory = actor::ActorFactory::new(cc);
 
-        // Run the PDF export actor before preparing cluster to avoid loss of events
-        actor_factory.pdf_export_actor().await;
-
         // Bootstrap the cluster
         let cluster = actor_factory.prepare_cluster(self.client.clone(), params.root_paths());
         let (cluster, cluster_bg) = cluster.split();
@@ -454,6 +451,9 @@ impl LanguageServer for TypstServer {
             Some(LspCommand::ClearCache) => {
                 self.command_clear_cache(arguments).await?;
             }
+            Some(LspCommand::PinMain) => {
+                self.command_pin_main(arguments).await?;
+            }
             None => {
                 error!("asked to execute unknown command");
                 return Err(jsonrpc::Error::method_not_found());
@@ -467,6 +467,7 @@ impl LanguageServer for TypstServer {
 pub enum LspCommand {
     ExportPdf,
     ClearCache,
+    PinMain,
 }
 
 impl From<LspCommand> for String {
@@ -474,6 +475,7 @@ impl From<LspCommand> for String {
         match command {
             LspCommand::ExportPdf => "tinymist.doPdfExport".to_string(),
             LspCommand::ClearCache => "tinymist.doClearCache".to_string(),
+            LspCommand::PinMain => "tinymist.doPinMain".to_string(),
         }
     }
 }
@@ -483,12 +485,17 @@ impl LspCommand {
         match command {
             "tinymist.doPdfExport" => Some(Self::ExportPdf),
             "tinymist.doClearCache" => Some(Self::ClearCache),
+            "tinymist.doPinMain" => Some(Self::PinMain),
             _ => None,
         }
     }
 
     pub fn all_as_string() -> Vec<String> {
-        vec![Self::ExportPdf.into(), Self::ClearCache.into()]
+        vec![
+            Self::ExportPdf.into(),
+            Self::ClearCache.into(),
+            Self::PinMain.into(),
+        ]
     }
 }
 
@@ -525,9 +532,37 @@ impl TypstServer {
 
         // self.typst(|_| comemo::evict(0)).await;
 
-        // Ok(())
+        Ok(())
+    }
 
-        todo!()
+    /// Pin main file to some path.
+    pub async fn command_pin_main(&self, arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
+        if arguments.is_empty() {
+            return Err(jsonrpc::Error::invalid_params("Missing file URI argument"));
+        }
+        let Some(file_uri) = arguments.first().and_then(|v| v.as_str()) else {
+            return Err(jsonrpc::Error::invalid_params(
+                "Missing file URI as first argument",
+            ));
+        };
+        let file_uri = if file_uri == "detached" {
+            None
+        } else {
+            Some(
+                Url::parse(file_uri)
+                    .map_err(|_| jsonrpc::Error::invalid_params("Parameter is not a valid URI"))?,
+            )
+        };
+
+        let update_result = self.universe().pin_main(file_uri.clone()).await;
+
+        update_result.map_err(|err| {
+            error!("could not set main file: {err}");
+            jsonrpc::Error::internal_error()
+        })?;
+
+        info!("main file pinned: {main_url:?}", main_url = file_uri);
+        Ok(())
     }
 }
 

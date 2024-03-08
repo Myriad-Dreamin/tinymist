@@ -52,6 +52,12 @@ async function startClient(context: ExtensionContext): Promise<void> {
     context.subscriptions.push(
         commands.registerCommand("tinymist.exportCurrentPdf", commandExportCurrentPdf)
     );
+    context.subscriptions.push(
+        commands.registerCommand("typst-lsp.pinMainToCurrent", () => commandPinMain(true))
+    );
+    context.subscriptions.push(
+        commands.registerCommand("typst-lsp.unpinMain", () => commandPinMain(false))
+    );
     context.subscriptions.push(commands.registerCommand("tinymist.showPdf", commandShowPdf));
     context.subscriptions.push(commands.registerCommand("tinymist.clearCache", commandClearCache));
 
@@ -169,6 +175,27 @@ async function commandClearCache(): Promise<void> {
 
     await client?.sendRequest("workspace/executeCommand", {
         command: "tinymist.doClearCache",
+        arguments: [uri],
+    });
+}
+
+async function commandPinMain(isPin: boolean): Promise<void> {
+    if (!isPin) {
+        await client?.sendRequest("workspace/executeCommand", {
+            command: "tinymist.doPinMain",
+            arguments: ["detached"],
+        });
+    }
+
+    const activeEditor = window.activeTextEditor;
+    if (activeEditor === undefined) {
+        return;
+    }
+
+    const uri = activeEditor.document.uri.toString();
+
+    await client?.sendRequest("workspace/executeCommand", {
+        command: "tinymist.doPinMain",
         arguments: [uri],
     });
 }

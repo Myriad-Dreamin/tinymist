@@ -39,30 +39,41 @@ use crate::actor::render::RenderActorRequest;
 use crate::ConstConfig;
 use crate::LspHost;
 
+use super::ActorFactory;
+
 type CompileService<H> = CompileActor<Reporter<CompileExporter<CompileDriver>, H>>;
 type CompileClient<H> = TsCompileClient<CompileService<H>>;
+type Node = CompileNode<CompileHandler>;
 
 type DiagnosticsSender = mpsc::UnboundedSender<(String, DiagnosticsMap)>;
 
 pub struct CompileCluster {
+    roots: Vec<PathBuf>,
+    actor_factory: ActorFactory,
     position_encoding: PositionEncoding,
     memory_changes: RwLock<HashMap<Arc<Path>, MemoryFileMeta>>,
-    primary: CompileNode<CompileHandler>,
+    primary: Node,
+    main: Mutex<Option<Node>>,
     pub tokens_cache: SemanticTokenCache,
     actor: Option<CompileClusterActor>,
 }
 
 impl CompileCluster {
     pub fn new(
+        actor_factory: ActorFactory,
         host: LspHost,
+        roots: Vec<PathBuf>,
         cfg: &ConstConfig,
-        primary: CompileNode<CompileHandler>,
+        primary: Node,
         diag_rx: mpsc::UnboundedReceiver<(String, DiagnosticsMap)>,
     ) -> Self {
         Self {
+            roots,
+            actor_factory,
             position_encoding: cfg.position_encoding,
             memory_changes: RwLock::new(HashMap::new()),
             primary,
+            main: Mutex::new(None),
             tokens_cache: Default::default(),
             actor: Some(CompileClusterActor {
                 host,
@@ -77,6 +88,45 @@ impl CompileCluster {
         let actor = self.actor.take().expect("actor is poisoned");
         (self, actor)
     }
+
+    pub async fn pin_main(&self, new_entry: Option<Url>) -> Result<(), Error> {
+        let mut m = self.main.lock().await;
+        match (new_entry, m.is_some()) {
+            (Some(new_entry), true) => {
+                let path = new_entry
+                    .to_file_path()
+                    .map_err(|_| error_once!("invalid url"))?;
+                let path = path.as_path().into();
+
+                m.as_mut().unwrap().change_entry(path).await
+            }
+            (Some(new_entry), false) => {
+                let path = new_entry
+                    .to_file_path()
+                    .map_err(|_| error_once!("invalid url"))?;
+                let path = path.as_path().into();
+
+                let main_node = self
+                    .actor_factory
+                    .server("main".to_owned(), self.roots.clone());
+                main_node.change_entry(path).await?;
+
+                // todo: disable primary watch
+
+                *m = Some(main_node);
+                Ok(())
+            }
+            (None, true) => {
+                // todo: unpin main
+                warn!("unpin main is not implemented yet");
+
+                // todo: enable primary watch
+
+                Ok(())
+            }
+            (None, false) => Ok(()),
+        }
+    }
 }
 
 pub fn create_server(
@@ -86,7 +136,7 @@ pub fn create_server(
     diag_tx: DiagnosticsSender,
     doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
     render_tx: broadcast::Sender<RenderActorRequest>,
-) -> CompileNode<CompileHandler> {
+) -> Node {
     let root = compiler_driver.inner.world.root.as_ref().to_owned();
     let handler: CompileHandler = compiler_driver.handler.clone();
 
@@ -128,6 +178,7 @@ impl CompileClusterActor {
         loop {
             tokio::select! {
                 Some((group, diagnostics)) = self.diag_rx.recv() => {
+                    debug!("received diagnostics from {}: diag({:#?})", group, diagnostics.len());
                     self.publish(group, diagnostics).await;
                 }
             }
@@ -191,6 +242,20 @@ struct MemoryFileMeta {
 }
 
 impl CompileCluster {
+    async fn update_source(&self, files: FileChangeSet) -> Result<(), Error> {
+        let primary = Some(&self.primary);
+        let main = self.main.lock().await;
+        let main = main.as_ref();
+        let clients_to_notify = (primary.iter()).chain(main.iter());
+
+        for client in clients_to_notify {
+            let iw = client.inner.lock().await;
+            iw.add_memory_changes(MemoryEvent::Update(files.clone()));
+        }
+
+        Ok(())
+    }
+
     pub async fn create_source(&self, path: PathBuf, content: String) -> Result<(), Error> {
         let now = Time::now();
         let path: ImmutPath = path.into();
@@ -207,10 +272,8 @@ impl CompileCluster {
 
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_inserts(vec![(path, FileResult::Ok((now, content)).into())]);
-        let iw = self.primary.inner.lock().await;
-        iw.add_memory_changes(MemoryEvent::Update(files));
 
-        Ok(())
+        self.update_source(files).await
     }
 
     pub async fn remove_source(&self, path: PathBuf) -> Result<(), Error> {
@@ -220,11 +283,8 @@ impl CompileCluster {
 
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_removes(vec![path]);
-        // todo: change focus
-        let iw = self.primary.inner.lock().await;
-        iw.add_memory_changes(MemoryEvent::Update(files));
 
-        Ok(())
+        self.update_source(files).await
     }
 
     pub async fn edit_source(
@@ -263,10 +323,8 @@ impl CompileCluster {
         drop(memory_changes);
 
         let files = FileChangeSet::new_inserts(vec![(path.clone(), snapshot)]);
-        let iw = self.primary.inner.lock().await;
-        iw.add_memory_changes(MemoryEvent::Update(files));
 
-        Ok(())
+        self.update_source(files).await
     }
 }
 
@@ -509,32 +567,47 @@ impl<H: CompilationHandle> CompileNode<H> {
             return Err(error_once!("entry file must be absolute", path: path.display()));
         }
 
+        // todo: more robust rollback logic
         let entry = self.entry.clone();
         let should_change = {
             let mut entry = entry.lock().unwrap();
             let should_change = entry.as_ref().map(|e| e != &path).unwrap_or(true);
+            let prev = entry.clone();
             *entry = Some(path.clone());
-            should_change
+
+            should_change.then_some(prev)
         };
 
-        if should_change {
+        if let Some(prev) = should_change {
+            let next = path.clone();
+
             debug!(
                 "the entry file of TypstActor({}) is changed to {}",
                 self.diag_group,
-                path.display()
+                next.display()
             );
 
-            self.steal_async(move |compiler, _| {
-                let root = compiler.compiler.world().workspace_root();
-                if !path.starts_with(&root) {
-                    warn!("entry file is not in workspace root {}", path.display());
-                    return;
+            let res = self
+                .steal_async(move |compiler, _| {
+                    let root = compiler.compiler.world().workspace_root();
+                    if !path.starts_with(&root) {
+                        warn!("entry file is not in workspace root {}", path.display());
+                        return;
+                    }
+
+                    let driver = &mut compiler.compiler.compiler.inner.compiler;
+                    driver.set_entry_file(path.as_ref().to_owned());
+                })
+                .await;
+
+            if res.is_err() {
+                let mut entry = entry.lock().unwrap();
+                if *entry == Some(next) {
+                    *entry = prev;
                 }
 
-                let driver = &mut compiler.compiler.compiler.inner.compiler;
-                driver.set_entry_file(path.as_ref().to_owned());
-            })
-            .await?;
+                return res;
+            }
 
             // todo: trigger recompile
             let files = FileChangeSet::new_inserts(vec![]);
