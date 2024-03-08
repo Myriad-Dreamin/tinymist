@@ -84,10 +84,16 @@ missing_safety_doc = "warn"
 undocumented_unsafe_blocks = "warn"
 
 [patch.crates-io]
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.10.0-half" }
-typst-ide = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.10.0-half" }
-typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.10.0-half" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "typst.ts-v0.10.0-half" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
+typst-ide = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
+typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
+
+# typst = { path = "../typst/crates/typst" }
+# typst-ide = { path = "../typst/crates/typst-ide" }
+# typst-pdf = { path = "../typst/crates/typst-pdf" }
+# typst-syntax = { path = "../typst/crates/typst-syntax" }
+
 typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "98e3d3a42877b195f87223060882d55fd5aaa04a", package = "typst-ts-svg-exporter" }
 typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "98e3d3a42877b195f87223060882d55fd5aaa04a", package = "typst-ts-core" }
 typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "98e3d3a42877b195f87223060882d55fd5aaa04a", package = "typst-ts-compiler" }

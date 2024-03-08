@@ -3716,7 +3716,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 [[package]]
 name = "typst"
 version = "0.10.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.10.0-half#cce5dc159ff7275573765143767b705ec2eb8616"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.0#7cea94c836af968f1b26ff50f360fe432d47c85b"
 dependencies = [
  "az",
  "bitflags 2.4.2",
@@ -3774,7 +3774,7 @@ source = "git+https://github.com/typst/typst-assets?rev=79e1c84#79e1c84788fb23f3
 [[package]]
 name = "typst-ide"
 version = "0.10.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.10.0-half#cce5dc159ff7275573765143767b705ec2eb8616"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.0#7cea94c836af968f1b26ff50f360fe432d47c85b"
 dependencies = [
  "comemo",
  "ecow",
@@ -3788,7 +3788,7 @@ dependencies = [
 [[package]]
 name = "typst-macros"
 version = "0.10.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.10.0-half#cce5dc159ff7275573765143767b705ec2eb8616"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.0#7cea94c836af968f1b26ff50f360fe432d47c85b"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -3799,7 +3799,7 @@ dependencies = [
 [[package]]
 name = "typst-pdf"
 version = "0.10.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.10.0-half#cce5dc159ff7275573765143767b705ec2eb8616"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.0#7cea94c836af968f1b26ff50f360fe432d47c85b"
 dependencies = [
  "base64",
  "bytemuck",
@@ -3854,7 +3854,7 @@ dependencies = [
 [[package]]
 name = "typst-syntax"
 version = "0.10.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=typst.ts-v0.10.0-half#cce5dc159ff7275573765143767b705ec2eb8616"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.0#7cea94c836af968f1b26ff50f360fe432d47c85b"
 dependencies = [
  "comemo",
  "ecow",

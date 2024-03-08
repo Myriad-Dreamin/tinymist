@@ -634,6 +634,7 @@ impl<H: CompilationHandle> CompileNode<H> {
             }
             Hover(req) => query_state!(self, Hover, req),
             GotoDefinition(req) => query_world!(self, GotoDefinition, req),
+            InlayHint(req) => query_world!(self, InlayHint, req),
             Completion(req) => query_state!(self, Completion, req),
             SignatureHelp(req) => query_world!(self, SignatureHelp, req),
             DocumentSymbol(req) => query_world!(self, DocumentSymbol, req),

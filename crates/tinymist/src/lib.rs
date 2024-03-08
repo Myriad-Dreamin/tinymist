@@ -186,6 +186,7 @@ impl LanguageServer for TypstServer {
                     ..Default::default()
                 }),
                 document_formatting_provider,
+                inlay_hint_provider: Some(OneOf::Left(true)),
                 ..Default::default()
             },
             ..Default::default()
@@ -361,11 +362,10 @@ impl LanguageServer for TypstServer {
         run_query!(self.SemanticTokensDelta(path, previous_result_id))
     }
 
-    async fn inlay_hint(
-        &self,
-        _params: InlayHintParams,
-    ) -> jsonrpc::Result<Option<Vec<InlayHint>>> {
-        Ok(None)
+    async fn inlay_hint(&self, params: InlayHintParams) -> jsonrpc::Result<Option<Vec<InlayHint>>> {
+        let path = as_path(params.text_document);
+        let range = params.range;
+        run_query!(self.InlayHint(path, range))
     }
 
     async fn completion(

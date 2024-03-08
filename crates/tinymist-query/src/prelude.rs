@@ -9,7 +9,7 @@ pub use itertools::{Format, Itertools};
 pub use log::{error, trace};
 pub use tower_lsp::lsp_types::{
     CompletionResponse, DiagnosticRelatedInformation, DocumentSymbol, DocumentSymbolResponse,
-    Documentation, FoldingRange, GotoDefinitionResponse, Hover, Location as LspLocation,
+    Documentation, FoldingRange, GotoDefinitionResponse, Hover, InlayHint, Location as LspLocation,
     MarkupContent, MarkupKind, Position as LspPosition, SelectionRange, SemanticTokens,
     SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp,
     SignatureInformation, SymbolInformation, Url,

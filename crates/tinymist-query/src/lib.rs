@@ -25,6 +25,8 @@ pub(crate) mod selection_range;
 pub use selection_range::*;
 pub(crate) mod goto_definition;
 pub use goto_definition::*;
+pub(crate) mod inlay_hint;
+pub use inlay_hint::*;
 
 pub mod lsp_typst_boundary;
 pub use lsp_typst_boundary::*;
@@ -45,6 +47,7 @@ mod polymorphic {
         OnSaveExport(OnSaveExportRequest),
         Hover(HoverRequest),
         GotoDefinition(GotoDefinitionRequest),
+        InlayHint(InlayHintRequest),
         Completion(CompletionRequest),
         SignatureHelp(SignatureHelpRequest),
         DocumentSymbol(DocumentSymbolRequest),
@@ -60,6 +63,7 @@ mod polymorphic {
         OnSaveExport(()),
         Hover(Option<Hover>),
         GotoDefinition(Option<GotoDefinitionResponse>),
+        InlayHint(Option<Vec<InlayHint>>),
         Completion(Option<CompletionResponse>),
         SignatureHelp(Option<SignatureHelp>),
         DocumentSymbol(Option<DocumentSymbolResponse>),
