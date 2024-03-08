@@ -42,6 +42,14 @@ mod polymorphic {
         pub path: PathBuf,
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum FoldRequestFeature {
+        PinnedFirst,
+        Unique,
+        Mergable,
+        ContextFreeUnique,
+    }
+
     #[derive(Debug, Clone)]
     pub enum CompilerQueryRequest {
         OnSaveExport(OnSaveExportRequest),
@@ -57,7 +65,26 @@ mod polymorphic {
         FoldingRange(FoldingRangeRequest),
         SelectionRange(SelectionRangeRequest),
     }
+
     impl CompilerQueryRequest {
+        pub fn fold_feature(&self) -> FoldRequestFeature {
+            use FoldRequestFeature::*;
+            match self {
+                CompilerQueryRequest::OnSaveExport(..) => Mergable,
+                CompilerQueryRequest::Hover(..) => PinnedFirst,
+                CompilerQueryRequest::GotoDefinition(..) => PinnedFirst,
+                CompilerQueryRequest::InlayHint(..) => Unique,
+                CompilerQueryRequest::Completion(..) => Mergable,
+                CompilerQueryRequest::SignatureHelp(..) => PinnedFirst,
+                CompilerQueryRequest::DocumentSymbol(..) => ContextFreeUnique,
+                CompilerQueryRequest::Symbol(..) => Mergable,
+                CompilerQueryRequest::SemanticTokensFull(..) => ContextFreeUnique,
+                CompilerQueryRequest::SemanticTokensDelta(..) => ContextFreeUnique,
+                CompilerQueryRequest::FoldingRange(..) => ContextFreeUnique,
+                CompilerQueryRequest::SelectionRange(..) => ContextFreeUnique,
+            }
+        }
+
         pub fn associated_path(&self) -> Option<&Path> {
             Some(match self {
                 CompilerQueryRequest::OnSaveExport(req) => &req.path,

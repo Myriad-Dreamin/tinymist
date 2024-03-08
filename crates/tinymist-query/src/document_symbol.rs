@@ -11,11 +11,9 @@ pub struct DocumentSymbolRequest {
 impl DocumentSymbolRequest {
     pub fn request(
         self,
-        world: &TypstSystemWorld,
+        source: Source,
         position_encoding: PositionEncoding,
     ) -> Option<DocumentSymbolResponse> {
-        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-
         let symbols = get_lexical_hierarchy(source.clone(), LexicalScopeKind::Symbol)?;
 
         let symbols = filter_document_symbols(&symbols, &source, position_encoding);
@@ -74,8 +72,11 @@ mod tests {
 }
 "#,
             |world, path| {
-                let request = DocumentSymbolRequest { path };
-                let result = request.request(world, PositionEncoding::Utf16);
+                let request = DocumentSymbolRequest { path: path.clone() };
+
+                let source = get_suitable_source_in_workspace(world, &path).unwrap();
+
+                let result = request.request(source, PositionEncoding::Utf16);
                 assert_snapshot!(JsonRepr::new_redacted(result.unwrap(), &REDACT_LOC), @r###"
                 [
                  {

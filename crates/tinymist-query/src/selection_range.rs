@@ -9,11 +9,9 @@ pub struct SelectionRangeRequest {
 impl SelectionRangeRequest {
     pub fn request(
         self,
-        world: &TypstSystemWorld,
+        source: Source,
         position_encoding: PositionEncoding,
     ) -> Option<Vec<SelectionRange>> {
-        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-
         let mut ranges = Vec::new();
         for position in self.positions {
             let typst_offset =

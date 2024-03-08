@@ -12,12 +12,10 @@ pub struct FoldingRangeRequest {
 impl FoldingRangeRequest {
     pub fn request(
         self,
-        world: &TypstSystemWorld,
+        source: Source,
         position_encoding: PositionEncoding,
     ) -> Option<Vec<FoldingRange>> {
         let line_folding_only = self.line_folding_only;
-
-        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
 
         let symbols = get_lexical_hierarchy(source.clone(), LexicalScopeKind::Block)?;
 
@@ -123,10 +121,13 @@ mod tests {
     fn test_folding_range_request() {
         run_with_source("#let a = 1;", |world, path| {
             let request = FoldingRangeRequest {
-                path,
+                path: path.clone(),
                 line_folding_only: true,
             };
-            let result = request.request(world, PositionEncoding::Utf16);
+
+            let source = get_suitable_source_in_workspace(world, &path).unwrap();
+
+            let result = request.request(source, PositionEncoding::Utf16);
             assert_snapshot!(JsonRepr::new_pure(result.unwrap()), @"[]");
         });
         let t = r#"#let a = {
@@ -136,10 +137,13 @@ mod tests {
 }"#;
         run_with_source(t, |world, path| {
             let request = FoldingRangeRequest {
-                path,
+                path: path.clone(),
                 line_folding_only: true,
             };
-            let result = request.request(world, PositionEncoding::Utf16);
+
+            let source = get_suitable_source_in_workspace(world, &path).unwrap();
+
+            let result = request.request(source, PositionEncoding::Utf16);
             assert_snapshot!(JsonRepr::new_pure(result.unwrap()), @r###"
             [
              {

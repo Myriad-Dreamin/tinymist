@@ -8,8 +8,8 @@ use anyhow::anyhow;
 use futures::future::join_all;
 use log::{debug, error, trace, warn};
 use tinymist_query::{
-    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, LspDiagnostic, LspRange,
-    OnSaveExportRequest, PositionEncoding, SemanticTokenCache,
+    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature, LspDiagnostic,
+    LspRange, OnSaveExportRequest, PositionEncoding, SemanticTokenCache,
 };
 use tokio::sync::{broadcast, mpsc, watch, Mutex, RwLock};
 use tower_lsp::lsp_types::{TextDocumentContentChangeEvent, Url};
@@ -345,6 +345,19 @@ macro_rules! query_world {
     }};
 }
 
+macro_rules! query_source {
+    ($self:ident, $method:ident, $req:expr) => {{
+        let path: ImmutPath = $req.path.clone().into();
+        let vfs = $self.memory_changes.read().await;
+        let snapshot = vfs.get(&path).ok_or_else(|| anyhow!("file missing"))?;
+        let source = snapshot.content.clone();
+
+        let enc = $self.position_encoding;
+        let res = $req.request(source, enc);
+        Ok(CompilerQueryResponse::$method(res))
+    }};
+}
+
 macro_rules! query_tokens_cache {
     ($self:ident, $method:ident, $req:expr) => {{
         let path: ImmutPath = $req.path.clone().into();
@@ -368,11 +381,24 @@ impl CompileCluster {
         match query {
             SemanticTokensFull(req) => query_tokens_cache!(self, SemanticTokensFull, req),
             SemanticTokensDelta(req) => query_tokens_cache!(self, SemanticTokensDelta, req),
+            FoldingRange(req) => query_source!(self, FoldingRange, req),
+            SelectionRange(req) => query_source!(self, SelectionRange, req),
+            DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
             _ => {
-                if let Some(path) = query.associated_path() {
-                    self.primary.change_entry(path.into()).await?;
-                }
-                self.primary.query(query).await
+                let main = self.main.lock().await;
+
+                let query_target = match main.as_ref() {
+                    Some(main) => main,
+                    None => {
+                        // todo: race condition, we need atomic primary query
+                        if let Some(path) = query.associated_path() {
+                            self.primary.change_entry(path.into()).await?;
+                        }
+                        &self.primary
+                    }
+                };
+
+                query_target.query(query).await
             }
         }
     }
@@ -725,6 +751,7 @@ impl<H: CompilationHandle> CompileNode<H> {
         query: CompilerQueryRequest,
     ) -> anyhow::Result<CompilerQueryResponse> {
         use CompilerQueryRequest::*;
+        assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
         match query {
             CompilerQueryRequest::OnSaveExport(OnSaveExportRequest { path }) => {
@@ -736,12 +763,12 @@ impl<H: CompilationHandle> CompileNode<H> {
             InlayHint(req) => query_world!(self, InlayHint, req),
             Completion(req) => query_state!(self, Completion, req),
             SignatureHelp(req) => query_world!(self, SignatureHelp, req),
-            DocumentSymbol(req) => query_world!(self, DocumentSymbol, req),
             Symbol(req) => query_world!(self, Symbol, req),
-            FoldingRange(req) => query_world!(self, FoldingRange, req),
-            SelectionRange(req) => query_world!(self, SelectionRange, req),
-            CompilerQueryRequest::SemanticTokensDelta(..)
-            | CompilerQueryRequest::SemanticTokensFull(..) => unreachable!(),
+            FoldingRange(..)
+            | SelectionRange(..)
+            | SemanticTokensDelta(..)
+            | DocumentSymbol(..)
+            | SemanticTokensFull(..) => unreachable!(),
         }
     }
 
