@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::anyhow;
 use futures::future::join_all;
-use log::{debug, error, trace, warn};
+use log::{debug, error, info, trace, warn};
 use tinymist_query::{
     lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
     LspDiagnostic, OnSaveExportRequest, PositionEncoding, SemanticTokenCache,
@@ -16,7 +16,7 @@ use tower_lsp::lsp_types::{Diagnostic, TextDocumentContentChangeEvent, Url};
 use typst::{
     diag::{FileResult, SourceDiagnostic, SourceResult},
     layout::Position,
-    syntax::{Source, Span},
+    syntax::{Source, Span, VirtualPath},
 };
 use typst_preview::{
     CompilationHandle, CompilationHandleImpl, CompileHost, CompileStatus, DocToSrcJumpInfo,
@@ -112,16 +112,12 @@ impl CompileCluster {
                     .server("main".to_owned(), self.roots.clone());
                 main_node.change_entry(path).await?;
 
-                // todo: disable primary watch
-
                 *m = Some(main_node);
                 Ok(())
             }
             (None, true) => {
                 // todo: unpin main
-                warn!("unpin main is not implemented yet");
-
-                // todo: enable primary watch
+                m.as_mut().unwrap().disable().await;
 
                 Ok(())
             }
@@ -180,7 +176,7 @@ impl CompileClusterActor {
         loop {
             tokio::select! {
                 Some((group, diagnostics)) = self.diag_rx.recv() => {
-                    debug!("received diagnostics from {}: diag({:#?})", group, diagnostics.as_ref().map(|e| e.len()));
+                    info!("received diagnostics from {}: diag({:?})", group, diagnostics.as_ref().map(|e| e.len()));
                     let with_primary = (self.affect_map.len() <= 1 && self.affect_map.contains_key("primary")) && group == "primary";
                     self.publish(group, diagnostics, with_primary).await;
                     if !with_primary {
@@ -644,9 +640,15 @@ impl<C: Compiler<World = TypstSystemWorld>, H> Reporter<C, H> {
             self.position_encoding,
         );
 
+        // todo: better way to remove diagnostics
+        // todo: check all errors in this file
+
+        let main = self.inner.world().main;
+        let valid = main.is_some_and(|e| e.vpath() != &VirtualPath::new("detached.typ"));
+
         let err = self
             .diag_tx
-            .send((self.diag_group.clone(), Some(diagnostics)));
+            .send((self.diag_group.clone(), valid.then_some(diagnostics)));
         if let Err(err) = err {
             error!("failed to send diagnostics: {:#}", err);
         }
@@ -676,6 +678,30 @@ impl<H: CompilationHandle> CompileNode<H> {
         f: impl FnOnce(&mut CompileService<H>, tokio::runtime::Handle) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
         self.inner.lock().await.steal_async(f).await
+    }
+
+    // todo: stop main
+    async fn disable(&self) {
+        let res = self
+            .steal_async(move |compiler, _| {
+                let path = Path::new("detached.typ");
+                let root = compiler.compiler.world().workspace_root();
+
+                let driver = &mut compiler.compiler.compiler.inner.compiler;
+                driver.set_entry_file(path.to_owned());
+
+                // todo: suitable approach to avoid panic
+                driver.notify_fs_event(typst_ts_compiler::vfs::notify::FilesystemEvent::Update(
+                    typst_ts_compiler::vfs::notify::FileChangeSet::new_inserts(vec![(
+                        root.join("detached.typ").into(),
+                        Ok((Time::now(), Bytes::from("".as_bytes()))).into(),
+                    )]),
+                ));
+            })
+            .await;
+        if let Err(err) = res {
+            error!("failed to disable main: {:#}", err);
+        }
     }
 
     async fn change_entry(&self, path: ImmutPath) -> Result<(), Error> {
