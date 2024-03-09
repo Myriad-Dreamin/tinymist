@@ -1,11 +1,11 @@
 {
     "name": "tinymist",
-    "description": "A language server for Typst",
+    "description": "An integrated language service for Typst",
     "repository": {
         "type": "git",
         "url": "https://github.com/Myriad-Dreamin/tinymist"
     },
-    "displayName": "Tinymist Typst LSP",
+    "displayName": "Tinymist Typst",
     "author": "Myriad-Dreamin",
     "contributors": [
         "Myriad-Dreamin",

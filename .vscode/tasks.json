@@ -11,18 +11,26 @@
 			"dependsOrder": "sequence",
 		},
 		{
-			"label": "VS Code Extension Prelaunch [Jaeger]",
+			"label": "Build VS Code Extension Bundle",
 			"dependsOn": [
 				"Compile VS Code Extension",
-				"Build Debug LSP Binary [Jaeger]",
-				"Copy Debug LSP Binary to VS Code Extension"
+				"Build Release LSP Binary",
+				"Copy Release LSP Binary to VS Code Extension",
+				"Generate VS Code Extension Bundle"
 			],
-			"dependsOrder": "sequence"
+			"dependsOrder": "sequence",
 		},
 		{
 			"label": "Compile VS Code Extension",
 			"type": "npm",
 			"script": "compile",
+			"path": "editors/vscode",
+			"group": "build",
+		},
+		{
+			"label": "Generate VS Code Extension Bundle",
+			"type": "npm",
+			"script": "package",
 			"path": "editors/vscode",
 			"group": "build",
 		},
@@ -37,10 +45,10 @@
 			"group": "build"
 		},
 		{
-			"label": "Build Debug LSP Binary [Jaeger]",
+			"label": "Build Release LSP Binary",
 			"type": "cargo",
 			"command": "build",
-			"args": [ "--bin", "tinymist", "--features", "jaeger" ],
+			"args": [ "--release", "--bin", "tinymist" ],
 			"problemMatcher": [
 				"$rustc"
 			],
@@ -67,6 +75,31 @@
 				"command": "cp",
 				"args": [
 					"${workspaceFolder}/target/debug/tinymist",
+					"${workspaceFolder}/editors/vscode/out/"
+				]
+			}
+		},
+		{
+			"label": "Copy Release LSP Binary to VS Code Extension",
+			"type": "shell",
+			"windows": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}\\target\\release\\tinymist.exe",
+					"${workspaceFolder}\\editors\\vscode\\out\\"
+				]
+			},
+			"linux": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}/target/release/tinymist",
+					"${workspaceFolder}/editors/vscode/out/"
+				]
+			},
+			"osx": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}/target/release/tinymist",
 					"${workspaceFolder}/editors/vscode/out/"
 				]
 			}
