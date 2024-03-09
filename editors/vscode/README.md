@@ -4,9 +4,7 @@ A VS Code extension for Typst.
 
 ## Features
 
-- Syntax highlighting, error reporting, code completion, and function signature
-  help
-- Compiles to PDF on save (configurable to as-you-type, or can be disabled)
+See [Tinymist features](../../README.md#features) for a list of features.
 
 ## Usage Tips
 
@@ -25,5 +23,5 @@ A VS Code extension for Typst.
 
 ## Technical
 
-The extension uses [Typst LSP](https://github.com/Myriad-Dreamin/tinymist) on the
+The extension uses [Tinymist](https://github.com/Myriad-Dreamin/tinymist) on the
 backend.
