@@ -193,6 +193,7 @@ async function commandPinMain(isPin: boolean): Promise<void> {
             command: "tinymist.doPinMain",
             arguments: ["detached"],
         });
+        return;
     }
 
     const activeEditor = window.activeTextEditor;
