@@ -3411,6 +3411,7 @@ dependencies = [
  "serde_json",
  "tinymist-query",
  "tokio",
+ "tower",
  "tower-lsp",
  "typst",
  "typst-assets",

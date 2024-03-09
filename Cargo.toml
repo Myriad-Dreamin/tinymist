@@ -41,6 +41,7 @@ typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "98e
 typst-ts-compiler = { version = "0.4.2-rc6" }
 typst-preview = { path = "external/typst-preview" }
 
+tower = { version = "0.4", default-features = false, features = ["util"] }
 tower-lsp = "0.20.0"
 
 clap = { version = "4.4", features = ["derive", "env", "unicode", "wrap_help"] }
