@@ -4,6 +4,39 @@ use log::debug;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind, VirtualPath};
 use typst_ts_core::{typst::prelude::EcoVec, TypstFileId};
 
+use crate::prelude::*;
+
+pub fn find_source_by_import(
+    world: Tracked<'_, dyn World>,
+    current: TypstFileId,
+    import_node: ast::ModuleImport,
+) -> Option<Source> {
+    // todo: this could be vaild: import("path.typ"), where v is parenthesized
+    let v = import_node.source();
+    match v {
+        ast::Expr::Str(s) => {
+            let s = s.get();
+
+            if s.starts_with('@') {
+                // todo: import from package
+                return None;
+            }
+
+            let path = Path::new(s.as_str());
+            let vpath = if path.is_relative() {
+                current.vpath().join(path)
+            } else {
+                VirtualPath::new(path)
+            };
+
+            let id = TypstFileId::new(current.package().cloned(), vpath);
+            world.source(id).ok()
+        }
+        _ => None,
+    }
+}
+
+// todo: bad peformance
 pub fn find_imports(
     source: &Source,
     def_id: Option<TypstFileId>,

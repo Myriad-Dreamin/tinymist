@@ -5,7 +5,7 @@ pub use std::{
     sync::Arc,
 };
 
-pub use comemo::Track;
+pub use comemo::{Track, Tracked};
 pub use itertools::{Format, Itertools};
 pub use log::{error, trace};
 pub use tower_lsp::lsp_types::{
