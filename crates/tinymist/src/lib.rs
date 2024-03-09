@@ -1,5 +1,34 @@
+//! # tinymist
+//!
+//! This crate provides an integrated service for [Typst](https://typst.app/) [taɪpst]. It provides:
+//! + A language server following the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
+//!
+//! ## Architecture
+//!
+//! Tinymist binary has multiple modes, and it may runs multiple actors in
+//! background. The actors could run as an async task, in a single thread, or in
+//! an isolated process.
+//!
+//! The main process of tinymist runs the program as a language server, through
+//! stdin and stdout. A main process will fork:
+//! - rendering actors to provide PDF export with watching.
+//! - compiler actors to provide language APIs.
+//!
+//! ## Debugging with input mirroring
+//!
+//! You can record the input during running the editors with Tinymist. You can
+//! then replay the input to debug the language server.
+//!
+//! ```sh
+//! # Record the input
+//! tinymist --mirror input.txt
+//! # Replay the input
+//! tinymist --replay input.txt
+//! ```
+
 // pub mod formatting;
-pub mod actor;
+mod actor;
+pub mod logging;
 
 pub use tower_lsp::Client as LspHost;
 
@@ -27,7 +56,7 @@ use crate::actor::typst::CompileCluster;
 
 type LspFuture<'a, Resp> = BoxFuture<'a, jsonrpc::Result<Resp>>;
 type LspMethod<Resp> =
-    for<'a> fn(srv: &'a TypstServer, args: Vec<JsonValue>) -> LspFuture<'a, Resp>;
+    for<'a> fn(srv: &'a TypstLanguageServer, args: Vec<JsonValue>) -> LspFuture<'a, Resp>;
 type MethodMap = HashMap<&'static str, LspMethod<()>>;
 
 macro_rules! const_async_fn {
@@ -39,15 +68,22 @@ macro_rules! const_async_fn {
     }};
 }
 
-pub struct TypstServer {
-    pub config: Arc<RwLock<Config>>,
-    pub const_config: OnceCell<ConstConfig>,
-    pub client: LspHost,
-    pub universe: OnceCell<CompileCluster>,
+/// The object providing the language server functionality.
+pub struct TypstLanguageServer {
+    client: LspHost,
+    /// Extra commands provided with `textDocument/executeCommand`.
     pub commands: MethodMap,
+    /// User configuration from the editor.
+    pub config: Arc<RwLock<Config>>,
+    /// Const configuration initialized at the start of the session.
+    /// For example, the position encoding.
+    pub const_config: OnceCell<ConstConfig>,
+    /// The compiler cluster.
+    pub universe: OnceCell<CompileCluster>,
 }
 
-impl TypstServer {
+impl TypstLanguageServer {
+    /// Create a new language server.
     pub fn new(client: LspHost) -> Self {
         Self {
             config: Default::default(),
@@ -58,17 +94,25 @@ impl TypstServer {
         }
     }
 
+    /// Get the const configuration.
+    ///
+    /// # Panics
+    /// Panics if the const configuration is not initialized.
     pub fn const_config(&self) -> &ConstConfig {
         self.const_config
             .get()
             .expect("const config should be initialized")
     }
 
+    /// Get the compiler cluster.
+    ///
+    /// # Panics
+    /// Panics if the universe is not initialized.
     pub fn universe(&self) -> &CompileCluster {
         self.universe.get().expect("universe should be initialized")
     }
 
-    pub fn get_commands() -> MethodMap {
+    fn get_commands() -> MethodMap {
         macro_rules! redirected_command {
             ($key: expr, Self::$method: ident) => {
                 ($key, const_async_fn!(LspMethod<()>, Self::$method, inputs))
@@ -114,7 +158,7 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 }
 
 #[async_trait::async_trait]
-impl LanguageServer for TypstServer {
+impl LanguageServer for TypstLanguageServer {
     async fn initialize(&self, params: InitializeParams) -> jsonrpc::Result<InitializeResult> {
         // self.tracing_init();
 
@@ -161,7 +205,7 @@ impl LanguageServer for TypstServer {
         };
 
         let document_formatting_provider = match config.formatter {
-            ExperimentalFormatterMode::On
+            ExperimentalFormatterMode::Enable
                 if !params.supports_document_formatting_dynamic_registration() =>
             {
                 Some(OneOf::Left(true))
@@ -496,9 +540,12 @@ impl LanguageServer for TypstServer {
 }
 
 /// Here are implemented the handlers for each command.
-impl TypstServer {
+impl TypstLanguageServer {
     /// Export the current document as a PDF file. The client is responsible for
     /// passing the correct file URI.
+    ///
+    /// # Errors
+    /// Errors if a provided file URI is not a valid file URI.
     pub async fn export_pdf(&self, arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
         if arguments.is_empty() {
             return Err(jsonrpc::Error::invalid_params("Missing file URI argument"));
@@ -520,21 +567,25 @@ impl TypstServer {
     }
 
     /// Clear all cached resources.
+    ///
+    /// # Errors
+    /// Errors if the cache could not be cleared.
     pub async fn clear_cache(&self, _arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
         comemo::evict(0);
         Ok(())
     }
 
     /// Pin main file to some path.
+    ///
+    /// # Errors
+    /// Errors if a provided file URI is not a valid file URI.
     pub async fn pin_main(&self, arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
-        if arguments.is_empty() {
-            return Err(jsonrpc::Error::invalid_params("Missing file URI argument"));
-        }
         let Some(file_uri) = arguments.first().and_then(|v| v.as_str()) else {
             return Err(jsonrpc::Error::invalid_params(
-                "Missing file URI as first argument",
+                "Missing file path as the first argument",
             ));
         };
+
         let file_uri = if file_uri == "detached" {
             None
         } else {
@@ -556,16 +607,20 @@ impl TypstServer {
     }
 
     /// Change the actived document.
+    ///
+    /// # Errors
+    /// Errors if a provided file URI is not a valid path string.
+    /// Errors if the document could not be activated.
     pub async fn activate_doc(&self, arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
-        if arguments.is_empty() {
-            return Err(jsonrpc::Error::invalid_params("Missing file URI argument"));
-        }
-        let path = match arguments.first().unwrap() {
+        let Some(path) = arguments.first() else {
+            return Err(jsonrpc::Error::invalid_params("Missing path argument"));
+        };
+        let path = match path {
             JsonValue::String(s) => Some(Path::new(s).into()),
             JsonValue::Null => None,
             _ => {
                 return Err(jsonrpc::Error::invalid_params(
-                    "URI Parameter is not a string or null",
+                    "Path Parameter is not a string or null",
                 ))
             }
         };
@@ -582,32 +637,43 @@ impl TypstServer {
     }
 }
 
+/// The mode of the experimental formatter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ExperimentalFormatterMode {
+    /// Disable the experimental formatter.
     #[default]
-    Off,
-    On,
+    Disable,
+    /// Enable the experimental formatter.
+    Enable,
 }
 
+/// The mode of PDF export.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ExportPdfMode {
+    /// Don't export PDF automatically.
     Never,
+    /// Export PDF on saving the document, i.e. on `textDocument/didSave`
+    /// events.
     #[default]
     OnSave,
+    /// Export PDF on typing, i.e. on `textDocument/didChange` events.
     OnType,
 }
 
+/// The mode of semantic tokens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SemanticTokensMode {
+    /// Disable the semantic tokens.
     Disable,
+    /// Enable the semantic tokens.
     #[default]
     Enable,
 }
 
-pub type Listener<T> = Box<dyn FnMut(&T) -> BoxFuture<anyhow::Result<()>> + Send + Sync>;
+type Listener<T> = Box<dyn FnMut(&T) -> BoxFuture<anyhow::Result<()>> + Send + Sync>;
 
 const CONFIG_ITEMS: &[&str] = &[
     "exportPdf",
@@ -616,17 +682,23 @@ const CONFIG_ITEMS: &[&str] = &[
     "experimentalFormatterMode",
 ];
 
+/// The user configuration read from the editor.
 #[derive(Default)]
 pub struct Config {
+    /// The mode of PDF export.
     pub export_pdf: ExportPdfMode,
+    /// Specifies the root path of the project manually.
     pub root_path: Option<PathBuf>,
+    /// Dynamic configuration for semantic tokens.
     pub semantic_tokens: SemanticTokensMode,
+    /// Dynamic configuration for the experimental formatter.
     pub formatter: ExperimentalFormatterMode,
     semantic_tokens_listeners: Vec<Listener<SemanticTokensMode>>,
     formatter_listeners: Vec<Listener<ExperimentalFormatterMode>>,
 }
 
 impl Config {
+    /// Gets items for serialization.
     pub fn get_items() -> Vec<ConfigurationItem> {
         let sections = CONFIG_ITEMS
             .iter()
@@ -640,6 +712,7 @@ impl Config {
             .collect()
     }
 
+    /// Converts values to a map.
     pub fn values_to_map(values: Vec<JsonValue>) -> Map<String, JsonValue> {
         let unpaired_values = values
             .into_iter()
@@ -653,14 +726,10 @@ impl Config {
             .collect()
     }
 
-    pub fn listen_semantic_tokens(&mut self, listener: Listener<SemanticTokensMode>) {
-        self.semantic_tokens_listeners.push(listener);
-    }
-
-    // pub fn listen_formatting(&mut self, listener:
-    // Listener<ExperimentalFormatterMode>) {     self.formatter_listeners.
-    // push(listener); }
-
+    /// Updates the configuration with a JSON object.
+    ///
+    /// # Errors
+    /// Errors if the update is invalid.
     pub async fn update(&mut self, update: &JsonValue) -> anyhow::Result<()> {
         if let JsonValue::Object(update) = update {
             self.update_by_map(update).await
@@ -669,6 +738,10 @@ impl Config {
         }
     }
 
+    /// Updates the configuration with a map.
+    ///
+    /// # Errors
+    /// Errors if the update is invalid.
     pub async fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
         let export_pdf = update
             .get("exportPdf")
@@ -712,6 +785,14 @@ impl Config {
 
         Ok(())
     }
+
+    fn listen_semantic_tokens(&mut self, listener: Listener<SemanticTokensMode>) {
+        self.semantic_tokens_listeners.push(listener);
+    }
+
+    // pub fn listen_formatting(&mut self, listener:
+    // Listener<ExperimentalFormatterMode>) {     self.formatter_listeners.
+    // push(listener); }
 }
 
 impl fmt::Debug for Config {
@@ -736,10 +817,17 @@ impl fmt::Debug for Config {
 /// session
 #[derive(Debug, Clone)]
 pub struct ConstConfig {
+    /// The position encoding, either UTF-8 or UTF-16.
+    /// Defaults to UTF-16 if not specified.
     pub position_encoding: PositionEncoding,
+    /// Whether the client supports dynamic registration of semantic tokens.
     pub supports_semantic_tokens_dynamic_registration: bool,
+    /// Whether the client supports dynamic registration of document formatting.
     pub supports_document_formatting_dynamic_registration: bool,
+    /// Whether the client supports dynamic registration of configuration
+    /// changes.
     pub supports_config_change_registration: bool,
+    /// Whether the client only supports line folding.
     pub line_folding_only: bool,
 }
 
@@ -768,7 +856,7 @@ impl From<&InitializeParams> for ConstConfig {
     }
 }
 
-pub trait InitializeParamsExt {
+trait InitializeParamsExt {
     fn position_encodings(&self) -> &[PositionEncodingKind];
     fn supports_config_change_registration(&self) -> bool;
     fn semantic_tokens_capabilities(&self) -> Option<&SemanticTokensClientCapabilities>;

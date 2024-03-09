@@ -1,3 +1,5 @@
+//! Generates project metadata.
+
 use anyhow::Result;
 use vergen::EmitBuilder;
 

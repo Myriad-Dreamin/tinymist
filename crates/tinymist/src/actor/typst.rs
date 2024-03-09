@@ -1,3 +1,5 @@
+//! The typst actors running compilations.
+
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -729,7 +731,13 @@ pub struct CompileNode<H: CompilationHandle> {
 }
 
 // todo: remove unsafe impl send
+/// SAFETY:
+/// This is safe because the not send types are only used in compiler time
+/// hints.
 unsafe impl<H: CompilationHandle> Send for CompileNode<H> {}
+/// SAFETY:
+/// This is safe because the not sync types are only used in compiler time
+/// hints.
 unsafe impl<H: CompilationHandle> Sync for CompileNode<H> {}
 
 impl<H: CompilationHandle> CompileNode<H> {

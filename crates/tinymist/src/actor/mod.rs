@@ -1,3 +1,5 @@
+//! Bootstrap actors for Tinymist.
+
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
 
 use ::typst::util::Deferred;

@@ -1,3 +1,5 @@
+//! The (PDF) render actor
+
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -16,7 +18,7 @@ use crate::ExportPdfMode;
 #[derive(Debug, Clone)]
 pub enum RenderActorRequest {
     Render,
-    ChangeConfig(PdfExportConfig),
+    // ChangeConfig(PdfExportConfig),
 }
 
 #[derive(Debug, Clone)]
@@ -75,9 +77,9 @@ impl PdfExportActor {
                                 }
                             }
                         }
-                        RenderActorRequest::ChangeConfig(config) => {
-                            self.config = Some(config);
-                        }
+                        // RenderActorRequest::ChangeConfig(config) => {
+                        //     self.config = Some(config);
+                        // }
                     }
                 }
             }
