@@ -7,6 +7,7 @@ import {
     Uri,
     WorkspaceConfiguration,
     TextEditor,
+    ExtensionMode,
 } from "vscode";
 import * as path from "path";
 import * as child_process from "child_process";
@@ -31,6 +32,12 @@ async function startClient(context: ExtensionContext): Promise<void> {
     const serverCommand = getServer(config);
     const run = {
         command: serverCommand,
+        args: [
+            /// The `--mirror` flag is only used in development/test mode for testing
+            ...(context.extensionMode != ExtensionMode.Production
+                ? ["--mirror", "tinymist-lsp.log"]
+                : []),
+        ],
         options: { env: Object.assign({}, process.env, { RUST_BACKTRACE: "1" }) },
     };
     const serverOptions: ServerOptions = {

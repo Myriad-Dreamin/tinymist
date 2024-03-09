@@ -2,30 +2,23 @@
 
 use core::fmt;
 use core::task::{Context, Poll};
+use std::io::Write;
 use std::time::Instant;
 
+use clap::Parser;
 use futures::future::BoxFuture;
+use log::info;
 use tinymist::TypstServer;
+use tokio::io::AsyncRead;
+use tokio_util::io::InspectReader;
 use tower_lsp::{
     jsonrpc::{Request, Response},
     LspService, Server,
 };
 
-// #[derive(Debug, Clone)]
-// struct Args {}
+use crate::args::CliArguments;
 
-// fn arg_parser() -> OptionParser<Args> {
-//     construct!(Args {}).to_options().version(
-//         format!(
-//             "{}, commit {} (Typst version {TYPST_VERSION})",
-//             env!("CARGO_PKG_VERSION"),
-//             env!("GIT_COMMIT")
-//         )
-//         .as_str(),
-//     )
-// }
-
-// pub const TYPST_VERSION: &str = env!("TYPST_VERSION");
+mod args;
 
 #[tokio::main]
 async fn main() {
@@ -41,7 +34,20 @@ async fn main() {
         .filter_module("typst_ts_compiler::service::watch", log::LevelFilter::Debug)
         .try_init();
 
-    let stdin = tokio::io::stdin();
+    let args = CliArguments::parse();
+    info!("Arguments: {:#?}", args);
+
+    let stdin: Box<dyn AsyncRead + Unpin> = if !args.mirror_input.is_empty() {
+        let file = tokio::fs::File::open(&args.mirror_input).await.unwrap();
+        Box::new(file)
+    } else if args.mirror.is_empty() {
+        Box::new(tokio::io::stdin())
+    } else {
+        let mut file = std::fs::File::create(&args.mirror).unwrap();
+        Box::new(InspectReader::new(tokio::io::stdin(), move |bytes| {
+            file.write_all(bytes).unwrap();
+        }))
+    };
     let stdout = tokio::io::stdout();
 
     let (inner, socket) = LspService::new(TypstServer::new);

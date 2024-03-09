@@ -4,5 +4,6 @@ result*
 .direnv
 .envrc
 node_modules/
+/local/
 /editors/vscode/out/
 /editors/lapce/out/

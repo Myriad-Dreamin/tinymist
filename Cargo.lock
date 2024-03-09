@@ -471,6 +471,9 @@ dependencies = [
  "anstyle",
  "clap_lex",
  "strsim 0.11.0",
+ "terminal_size",
+ "unicase",
+ "unicode-width",
 ]
 
 [[package]]
@@ -480,6 +483,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "885e4d7d5af40bfb99ae6f9433e292feac98d452dcb3ec3d25dfe7552b77da8c"
 dependencies = [
  "clap",
+]
+
+[[package]]
+name = "clap_complete_fig"
+version = "4.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54b3e65f91fabdd23cac3d57d39d5d938b4daabd070c335c006dccb866a61110"
+dependencies = [
+ "clap",
+ "clap_complete",
 ]
 
 [[package]]
@@ -3315,6 +3328,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "terminal_size"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21bebf2b7c9e0a515f6e0f8c51dc0f8e4696391e6f1ff30379559f8365fb0df7"
+dependencies = [
+ "rustix",
+ "windows-sys 0.48.0",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3399,6 +3422,12 @@ version = "0.11.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "cargo_metadata",
+ "clap",
+ "clap_builder",
+ "clap_complete",
+ "clap_complete_fig",
+ "clap_mangen",
  "comemo",
  "env_logger",
  "futures",
@@ -3411,6 +3440,7 @@ dependencies = [
  "serde_json",
  "tinymist-query",
  "tokio",
+ "tokio-util",
  "tower",
  "tower-lsp",
  "typst",
@@ -3419,6 +3449,7 @@ dependencies = [
  "typst-preview",
  "typst-ts-compiler",
  "typst-ts-core",
+ "vergen",
 ]
 
 [[package]]
