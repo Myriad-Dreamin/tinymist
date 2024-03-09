@@ -75,9 +75,9 @@ impl TypstServer {
         }
 
         MethodMap::from_iter([
-            redirected_command!("tinymist.doPdfExport", Self::command_export_pdf),
-            redirected_command!("tinymist.doClearCache", Self::command_clear_cache),
-            redirected_command!("tinymist.doPinMain", Self::command_pin_main),
+            redirected_command!("tinymist.doPdfExport", Self::export_pdf),
+            redirected_command!("tinymist.doClearCache", Self::clear_cache),
+            redirected_command!("tinymist.doPinMain", Self::pin_main),
         ])
     }
 }
@@ -497,7 +497,7 @@ impl LanguageServer for TypstServer {
 impl TypstServer {
     /// Export the current document as a PDF file. The client is responsible for
     /// passing the correct file URI.
-    pub async fn command_export_pdf(&self, arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
+    pub async fn export_pdf(&self, arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
         if arguments.is_empty() {
             return Err(jsonrpc::Error::invalid_params("Missing file URI argument"));
         }
@@ -518,7 +518,7 @@ impl TypstServer {
     }
 
     /// Clear all cached resources.
-    pub async fn command_clear_cache(&self, _arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
+    pub async fn clear_cache(&self, _arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
         // self.workspace().write().await.clear().map_err(|err| {
         //     error!("could not clear cache: {err}");
         //     jsonrpc::Error::internal_error()
@@ -530,7 +530,7 @@ impl TypstServer {
     }
 
     /// Pin main file to some path.
-    pub async fn command_pin_main(&self, arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
+    pub async fn pin_main(&self, arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
         if arguments.is_empty() {
             return Err(jsonrpc::Error::invalid_params("Missing file URI argument"));
         }
