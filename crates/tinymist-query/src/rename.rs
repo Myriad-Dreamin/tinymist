@@ -69,7 +69,7 @@ impl RenameRequest {
         );
 
         let def_func = def_node.cast::<ast::LetBinding>()?;
-        let def_names = def_func.kind().idents();
+        let def_names = def_func.kind().bindings();
         if def_names.len() != 1 {
             return None;
         }

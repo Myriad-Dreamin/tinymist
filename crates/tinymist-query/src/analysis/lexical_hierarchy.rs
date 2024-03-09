@@ -183,7 +183,7 @@ pub(crate) fn get_lexical_hierarchy(
                 };
                 let kind = match parent.kind() {
                     SyntaxKind::Heading => LexicalKind::Namespace(
-                        parent.cast::<ast::Heading>().unwrap().level().get() as i16,
+                        parent.cast::<ast::Heading>().unwrap().depth().get() as i16,
                     ),
                     _ => return Ok(None),
                 };

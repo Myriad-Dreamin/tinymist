@@ -24,7 +24,7 @@ impl SignatureHelpRequest {
 
         let values = analyze_expr(world, &callee_node);
 
-        let function = values.into_iter().find_map(|v| match v {
+        let function = values.into_iter().find_map(|v| match v.0 {
             Value::Func(f) => Some(f),
             _ => None,
         })?;

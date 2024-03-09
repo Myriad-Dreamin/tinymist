@@ -43,7 +43,7 @@ impl<'a> Worker<'a> {
         match node.kind() {
             SyntaxKind::LetBinding => {
                 let lb = node.cast::<ast::LetBinding>().unwrap();
-                let name = lb.kind().idents();
+                let name = lb.kind().bindings();
                 for n in name {
                     if n.get() == self.target {
                         return None;

@@ -89,7 +89,7 @@ fn advance_prev_adjacent(node: LinkedNode) -> Option<LinkedNode> {
     }
 }
 
-#[comemo::memoize]
+// #[comemo::memoize]
 fn find_definition_in_module<'a>(
     world: Tracked<'a, dyn World>,
     current: TypstFileId,
@@ -239,7 +239,7 @@ fn find_syntax_definition<'a>(
                             if name.get() == self.name {
                                 let values =
                                     analyze_expr(self.world.deref(), &node.find(name.span())?);
-                                let func = values.into_iter().find_map(|v| match v {
+                                let func = values.into_iter().find_map(|v| match v.0 {
                                     Value::Func(f) => Some(f),
                                     _ => None,
                                 });
@@ -261,6 +261,13 @@ fn find_syntax_definition<'a>(
                         ))) => {
                             return self.resolve_as_var(node.clone(), name);
                         }
+                        ast::LetBindingKind::Normal(ast::Pattern::Parenthesized(e)) => {
+                            let e = deref_lvalue(node.find(e.span())?)?;
+                            if let Some(name) = e.cast::<ast::Ident>() {
+                                return self.resolve_as_var(e.clone(), name);
+                            }
+                            None
+                        }
                         ast::LetBindingKind::Normal(ast::Pattern::Normal(e)) => {
                             let e = deref_lvalue(node.find(e.span())?)?;
                             if let Some(name) = e.cast::<ast::Ident>() {
@@ -269,7 +276,7 @@ fn find_syntax_definition<'a>(
                             None
                         }
                         ast::LetBindingKind::Normal(ast::Pattern::Destructuring(n)) => {
-                            for i in n.idents() {
+                            for i in n.bindings() {
                                 if i.get() == self.name {
                                     return self.resolve_as_var(node.clone(), i);
                                 }
@@ -395,8 +402,8 @@ pub(crate) fn find_definition<'a>(
 
     let values = analyze_expr(world.deref(), &use_site);
 
-    let func = values.into_iter().find_map(|v| match &v {
-        Value::Func(..) => Some(v),
+    let func = values.into_iter().find_map(|v| match &v.0 {
+        Value::Func(..) => Some(v.0),
         _ => None,
     });
 

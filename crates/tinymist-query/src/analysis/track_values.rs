@@ -1,36 +1,34 @@
 use comemo::Track;
-use typst::diag::EcoString;
 use typst::engine::{Engine, Route};
 use typst::eval::{Tracer, Vm};
-use typst::foundations::{Label, Scopes, Value};
+use typst::foundations::{Context, Label, Scopes, Styles, Value};
 use typst::introspection::{Introspector, Locator};
 use typst::model::{BibliographyElem, Document};
 use typst::syntax::{ast, LinkedNode, Span, SyntaxKind};
 use typst::World;
-use typst_ts_core::typst::prelude::{eco_vec, EcoVec};
+use typst_ts_core::typst::prelude::*;
 
 /// Try to determine a set of possible values for an expression.
-pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<Value> {
-    match node.cast::<ast::Expr>() {
-        Some(ast::Expr::None(_)) => eco_vec![Value::None],
-        Some(ast::Expr::Auto(_)) => eco_vec![Value::Auto],
-        Some(ast::Expr::Bool(v)) => eco_vec![Value::Bool(v.get())],
-        Some(ast::Expr::Int(v)) => eco_vec![Value::Int(v.get())],
-        Some(ast::Expr::Float(v)) => eco_vec![Value::Float(v.get())],
-        Some(ast::Expr::Numeric(v)) => eco_vec![Value::numeric(v.get())],
-        Some(ast::Expr::Str(v)) => eco_vec![Value::Str(v.get().into())],
+pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
+    let Some(expr) = node.cast::<ast::Expr>() else {
+        return eco_vec![];
+    };
 
-        Some(ast::Expr::FieldAccess(access)) => {
-            let Some(child) = node.children().next() else {
-                return eco_vec![];
-            };
-            analyze_expr(world, &child)
-                .into_iter()
-                .filter_map(|target| target.field(&access.field()).ok())
-                .collect()
-        }
+    let val = match expr {
+        ast::Expr::None(_) => Value::None,
+        ast::Expr::Auto(_) => Value::Auto,
+        ast::Expr::Bool(v) => Value::Bool(v.get()),
+        ast::Expr::Int(v) => Value::Int(v.get()),
+        ast::Expr::Float(v) => Value::Float(v.get()),
+        ast::Expr::Numeric(v) => Value::numeric(v.get()),
+        ast::Expr::Str(v) => Value::Str(v.get().into()),
+        _ => {
+            if node.kind() == SyntaxKind::Contextual {
+                if let Some(child) = node.children().last() {
+                    return analyze_expr(world, &child);
+                }
+            }
 
-        Some(_) => {
             if let Some(parent) = node.parent() {
                 if parent.kind() == SyntaxKind::FieldAccess && node.index() > 0 {
                     return analyze_expr(world, parent);
@@ -40,16 +38,16 @@ pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<Value> {
             let mut tracer = Tracer::new();
             tracer.inspect(node.span());
             typst::compile(world, &mut tracer).ok();
-            tracer.values()
+            return tracer.values();
         }
+    };
 
-        _ => eco_vec![],
-    }
+    eco_vec![(val, None)]
 }
 
 /// Try to load a module from the current source file.
 pub fn analyze_import(world: &dyn World, source: &LinkedNode) -> Option<Value> {
-    let source = analyze_expr(world, source).into_iter().next()?;
+    let (source, _) = analyze_expr(world, source).into_iter().next()?;
     if source.scope().is_some() {
         return Some(source);
     }
@@ -65,7 +63,13 @@ pub fn analyze_import(world: &dyn World, source: &LinkedNode) -> Option<Value> {
         tracer: tracer.track_mut(),
     };
 
-    let mut vm = Vm::new(engine, Scopes::new(Some(world.library())), Span::detached());
+    let context = Context::none();
+    let mut vm = Vm::new(
+        engine,
+        &context,
+        Scopes::new(Some(world.library())),
+        Span::detached(),
+    );
     typst::eval::import(&mut vm, source, Span::detached(), true)
         .ok()
         .map(Value::Module)

@@ -11,6 +11,7 @@ use tokio::sync::{
     broadcast::{self, error::RecvError},
     watch,
 };
+use typst::foundations::Smart;
 use typst_ts_core::TypstDocument;
 
 use crate::ExportPdfMode;
@@ -91,7 +92,7 @@ impl PdfExportActor {
         // todo: timestamp world.now()
         info!("exporting PDF {path}", path = path.display());
 
-        let data = typst_pdf::pdf(doc, None, None);
+        let data = typst_pdf::pdf(doc, Smart::Auto, None);
 
         std::fs::write(path, data).context("failed to export PDF")?;
 

@@ -1,11 +1,11 @@
 use std::{borrow::Cow, ops::Range};
 
-use comemo::Prehashed;
 use log::debug;
 use tower_lsp::lsp_types::{InlayHintKind, InlayHintLabel};
 use typst::{
     foundations::{Args, Closure},
     syntax::SyntaxNode,
+    util::LazyHash,
 };
 use typst_ts_core::typst::prelude::eco_vec;
 
@@ -106,7 +106,7 @@ fn inlay_hints(
 
                     // todo: reduce many such patterns
                     let values = analyze_expr(self.world, &callee_node);
-                    let func = values.into_iter().find_map(|v| match v {
+                    let func = values.into_iter().find_map(|v| match v.0 {
                         Value::Func(f) => Some(f),
                         _ => None,
                     })?;
@@ -433,7 +433,7 @@ fn analyze_signature(func: Func) -> Arc<Signature> {
     })
 }
 
-fn analyze_closure_signature(c: Arc<Prehashed<Closure>>) -> Vec<Arc<ParamSpec>> {
+fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
     let mut params = vec![];
 
     trace!("closure signature for: {:?}", c.node.kind());
@@ -457,7 +457,7 @@ fn analyze_closure_signature(c: Arc<Prehashed<Closure>>) -> Vec<Arc<ParamSpec>> 
             }
             ast::Param::Pos(e) => {
                 // todo: destructing
-                let name = e.idents();
+                let name = e.bindings();
                 if name.len() != 1 {
                     continue;
                 }
@@ -480,13 +480,14 @@ fn analyze_closure_signature(c: Arc<Prehashed<Closure>>) -> Vec<Arc<ParamSpec>> 
                     variadic: false,
                 }));
             }
-            ast::Param::Sink(s) => {
+            ast::Param::Spread(n) => {
+                let ident = n.sink_ident().map(|e| e.as_str());
                 params.push(Arc::new(ParamSpec {
-                    name: Cow::Owned(s.name().unwrap_or_default().as_str().to_owned()),
+                    name: Cow::Owned(ident.unwrap_or_default().to_owned()),
                     default: None,
                     positional: false,
-                    named: false,
-                    variadic: true,
+                    named: true,
+                    variadic: false,
                 }));
             }
         }

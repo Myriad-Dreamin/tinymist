@@ -232,7 +232,10 @@ impl CompileClusterActor {
     pub async fn run(mut self) {
         loop {
             tokio::select! {
-                Some((group, diagnostics)) = self.diag_rx.recv() => {
+                e = self.diag_rx.recv() => {
+                    let Some((group, diagnostics)) = e else {
+                        break;
+                    };
                     info!("received diagnostics from {}: diag({:?})", group, diagnostics.as_ref().map(|e| e.len()));
                     let with_primary = (self.affect_map.len() <= 1 && self.affect_map.contains_key("primary")) && group == "primary";
                     self.publish(group, diagnostics, with_primary).await;
@@ -245,6 +248,7 @@ impl CompileClusterActor {
                     }
                 }
             }
+            info!("compile cluster actor is stopped");
         }
     }
 
@@ -386,17 +390,15 @@ impl CompileCluster {
     async fn update_source(&self, files: FileChangeSet) -> Result<(), Error> {
         let primary = self.primary.clone();
         let main = self.main.clone();
-        tokio::spawn(async move {
-            let primary = Some(&primary);
-            let main = main.lock().await;
-            let main = main.as_ref();
-            let clients_to_notify = (primary.iter()).chain(main.iter());
+        let primary = Some(&primary);
+        let main = main.lock().await;
+        let main = main.as_ref();
+        let clients_to_notify = (primary.iter()).chain(main.iter());
 
-            for client in clients_to_notify {
-                let iw = client.wait().inner.lock().await;
-                iw.add_memory_changes(MemoryEvent::Update(files.clone()));
-            }
-        });
+        for client in clients_to_notify {
+            let iw = client.wait().inner.lock().await;
+            iw.add_memory_changes(MemoryEvent::Update(files.clone()));
+        }
 
         Ok(())
     }
@@ -414,6 +416,7 @@ impl CompileCluster {
         );
 
         let content: Bytes = content.as_bytes().into();
+        log::info!("create source: {:?}", path);
 
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_inserts(vec![(path, FileResult::Ok((now, content)).into())]);
@@ -425,6 +428,7 @@ impl CompileCluster {
         let path: ImmutPath = path.into();
 
         self.memory_changes.write().await.remove(&path);
+        log::info!("remove source: {:?}", path);
 
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_removes(vec![path]);
@@ -494,7 +498,9 @@ macro_rules! query_source {
     ($self:ident, $method:ident, $req:expr) => {{
         let path: ImmutPath = $req.path.clone().into();
         let vfs = $self.memory_changes.read().await;
-        let snapshot = vfs.get(&path).ok_or_else(|| anyhow!("file missing"))?;
+        let snapshot = vfs
+            .get(&path)
+            .ok_or_else(|| anyhow!("file missing {:?}", $self.memory_changes))?;
         let source = snapshot.content.clone();
 
         let enc = $self.position_encoding;
