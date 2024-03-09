@@ -58,3 +58,25 @@ impl GotoDefinitionRequest {
         res
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        // goto_definition
+        snapshot_testing("goto_definition", &|world, path| {
+            let source = get_suitable_source_in_workspace(world, &path).unwrap();
+
+            let request = GotoDefinitionRequest {
+                path: path.clone(),
+                position: find_test_position(&source),
+            };
+
+            let result = request.request(world, PositionEncoding::Utf16);
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
+}

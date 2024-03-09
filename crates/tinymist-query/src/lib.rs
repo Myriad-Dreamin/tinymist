@@ -145,13 +145,30 @@ mod tests {
     use once_cell::sync::Lazy;
     use serde::Serialize;
     use serde_json::{ser::PrettyFormatter, Serializer, Value};
-    use typst_ts_compiler::ShadowApiExt;
-    use typst_ts_core::{config::CompileOpts, Bytes};
+    use typst::syntax::{LinkedNode, Source, VirtualPath};
+    use typst_ts_compiler::{service::WorkspaceProvider, ShadowApi};
+    use typst_ts_core::{config::CompileOpts, Bytes, TypstFileId};
 
     pub use insta::assert_snapshot;
     pub use typst_ts_compiler::TypstSystemWorld;
 
-    pub fn run_with_source<T>(
+    use crate::{typst_to_lsp, LspPosition, PositionEncoding};
+
+    pub fn snapshot_testing(name: &str, f: &impl Fn(&mut TypstSystemWorld, PathBuf)) {
+        let mut settings = insta::Settings::new();
+        settings.set_prepend_module_to_snapshot(false);
+        settings.set_snapshot_path(format!("fixtures/{name}"));
+        settings.bind(|| {
+            let glob_path = format!("fixtures/{name}/*.typ");
+            insta::glob!(&glob_path, |path| {
+                let contents = std::fs::read_to_string(path).unwrap();
+
+                run_with_sources(&contents, f);
+            });
+        });
+    }
+
+    pub fn run_with_sources<T>(
         source: &str,
         f: impl FnOnce(&mut TypstSystemWorld, PathBuf) -> T,
     ) -> T {
@@ -165,18 +182,70 @@ mod tests {
             ..Default::default()
         })
         .unwrap();
-        let pw = &root.join(Path::new("/main.typ"));
-        world
-            .with_shadow_file(pw, Bytes::from(source.as_bytes()), move |e| {
-                Ok(f(e, pw.to_owned()))
-            })
-            .unwrap()
+        let sources = source.split("-----");
+
+        let mut last_pw = None;
+        for (i, source) in sources.enumerate() {
+            // find prelude
+            let mut source = source.trim();
+            let path = if source.starts_with("//") {
+                let first_line = source.lines().next().unwrap();
+                source = source.strip_prefix(first_line).unwrap().trim();
+
+                let content = first_line.strip_prefix("//").unwrap().trim();
+                content.strip_prefix("path:").unwrap().trim().to_owned()
+            } else {
+                format!("/source{i}.typ")
+            };
+
+            let pw = root.join(Path::new(&path));
+            world
+                .map_shadow(&pw, Bytes::from(source.as_bytes()))
+                .unwrap();
+            last_pw = Some(pw);
+        }
+
+        let pw = last_pw.unwrap();
+        world.set_main_id(TypstFileId::new(
+            None,
+            VirtualPath::new(pw.strip_prefix(root).unwrap()),
+        ));
+        f(&mut world, pw)
+    }
+
+    pub fn find_test_position(s: &Source) -> LspPosition {
+        let re = s.text().find("/* position */").map(|e| (e, true));
+        let re = re.or_else(|| s.text().find("/* position after */").zip(Some(false)));
+        let (re, prev) = re.unwrap();
+
+        let n = LinkedNode::new(s.root());
+        let mut n = n.leaf_at(re + 1).unwrap();
+
+        while n.kind().is_trivia() {
+            let m = if prev {
+                n.prev_sibling()
+            } else {
+                n.next_sibling()
+            };
+            n = m.or_else(|| n.parent().cloned()).unwrap();
+        }
+
+        typst_to_lsp::offset_to_position(n.offset() + 1, PositionEncoding::Utf16, s)
     }
 
     // pub static REDACT_URI: Lazy<RedactFields> = Lazy::new(||
     // RedactFields::from_iter(["uri"]));
-    pub static REDACT_LOC: Lazy<RedactFields> =
-        Lazy::new(|| RedactFields::from_iter(["location", "range", "selectionRange"]));
+    pub static REDACT_LOC: Lazy<RedactFields> = Lazy::new(|| {
+        RedactFields::from_iter([
+            "location",
+            "range",
+            "selectionRange",
+            "targetRange",
+            "targetSelectionRange",
+            "originSelectionRange",
+            "targetUri",
+        ])
+    });
 
     pub struct JsonRepr(Value);
 
@@ -219,6 +288,10 @@ mod tests {
         }
     }
 
+    fn pos(v: &Value) -> String {
+        format!("{}:{}", v["line"], v["character"])
+    }
+
     impl Redact for RedactFields {
         fn redact(&self, v: Value) -> Value {
             match v {
@@ -226,8 +299,24 @@ mod tests {
                     for (_, v) in m.iter_mut() {
                         *v = self.redact(v.clone());
                     }
-                    for k in self.0.iter() {
-                        m.remove(*k);
+                    for k in self.0.iter().copied() {
+                        let Some(t) = m.remove(k) else {
+                            continue;
+                        };
+
+                        match k {
+                            "range"
+                            | "selectionRange"
+                            | "originSelectionRange"
+                            | "targetRange"
+                            | "targetSelectionRange" => {
+                                m.insert(
+                                    k.to_owned(),
+                                    format!("{}:{}", pos(&t["start"]), pos(&t["end"])).into(),
+                                );
+                            }
+                            _ => {}
+                        }
                     }
                     Value::Object(m)
                 }

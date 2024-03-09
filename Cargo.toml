@@ -66,7 +66,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 divan = "0.1.7"
-insta = "1.34"
+insta = { vesrion = "1.34", features = ["glob"] }
+
+[profile.dev.package.insta]
+opt-level = 3
+
+[profile.dev.package.similar]
+opt-level = 3
 
 [profile.release]
 lto = true        # Enable link-time optimization
