@@ -110,9 +110,9 @@ fn diagnostic_range(
     typst_span: TypstSpan,
     position_encoding: PositionEncoding,
 ) -> LspRange {
-    // Due to #241 and maybe typst/typst#2035, we sometimes fail to find the span.
-    // In that case, we use a default span as a better alternative to
-    // panicking.
+    // Due to nvaner/typst-lsp#241 and maybe typst/typst#2035, we sometimes fail to
+    // find the span. In that case, we use a default span as a better
+    // alternative to panicking.
     //
     // This may have been fixed after Typst 0.7.0, but it's still nice to avoid
     // panics in case something similar reappears.
