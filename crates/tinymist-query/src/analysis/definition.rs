@@ -90,11 +90,12 @@ fn advance_prev_adjacent(node: LinkedNode) -> Option<LinkedNode> {
     }
 }
 
-fn find_source_by_import(
+pub fn find_source_by_import(
     world: Tracked<'_, dyn World>,
     current: TypstFileId,
     import_node: ast::ModuleImport,
 ) -> Option<Source> {
+    // todo: this could be vaild: import("path.typ"), where v is parenthesized
     let v = import_node.source();
     match v {
         ast::Expr::Str(s) => {
@@ -394,6 +395,22 @@ pub(crate) fn find_definition<'a>(
         ast::Expr::Ident(..) | ast::Expr::MathIdent(..) | ast::Expr::FieldAccess(..) => {
             is_ident_only = true;
             may_ident
+        }
+        ast::Expr::Str(..) => {
+            if let Some(parent) = ancestor.parent() {
+                let e = parent.cast::<ast::ModuleImport>()?;
+                let source = find_source_by_import(world, current, e)?;
+                let src = ancestor.find(e.source().span())?;
+                return Some(Definition::Module(ModuleDefinition {
+                    module: source.id(),
+                    use_site: src,
+                    span: source.root().span(),
+                }));
+            }
+            return None;
+        }
+        ast::Expr::Import(..) => {
+            return None;
         }
         _ => {
             debug!("unsupported kind {kind:?}", kind = ancestor.kind());
