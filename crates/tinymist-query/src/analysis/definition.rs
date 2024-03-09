@@ -409,22 +409,17 @@ pub(crate) fn find_definition<'a>(
 
     let values = analyze_expr(world.deref(), &use_site);
 
-    let func_or_module = values.into_iter().find_map(|v| match &v {
-        Value::Func(..) | Value::Module(..) => Some(v),
+    let func = values.into_iter().find_map(|v| match &v {
+        Value::Func(..) => Some(v),
         _ => None,
     });
 
-    Some(match func_or_module {
+    Some(match func {
         Some(Value::Func(f)) => Definition::Func(FuncDefinition {
             value: f.clone(),
             span: f.span(),
             use_site,
         }),
-        Some(Value::Module(m)) => {
-            trace!("find module. {m:?}");
-            // todo
-            return None;
-        }
         _ => {
             return match may_ident {
                 ast::Expr::Ident(e) => find_syntax_definition(world, current, use_site, e.get()),
