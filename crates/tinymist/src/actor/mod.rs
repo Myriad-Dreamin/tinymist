@@ -1,5 +1,6 @@
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
 
+use ::typst::util::Deferred;
 use parking_lot::Mutex;
 use tinymist_query::DiagnosticsMap;
 use tokio::sync::{broadcast, mpsc, watch};
@@ -7,7 +8,7 @@ use typst_ts_core::config::CompileOpts;
 
 use self::{
     render::PdfExportActor,
-    typst::{create_server, CompileCluster, CompileDriver, CompileHandler, CompileNode},
+    typst::{create_server, CompileCluster, CompileHandler, CompileNode},
 };
 use crate::{ConstConfig, LspHost};
 
@@ -22,7 +23,12 @@ struct Repr {
 }
 
 impl Repr {
-    fn server(&mut self, name: String, roots: Vec<PathBuf>) -> CompileNode<CompileHandler> {
+    fn server(
+        &mut self,
+        name: String,
+        roots: Vec<PathBuf>,
+        entry: Option<PathBuf>,
+    ) -> Deferred<CompileNode<CompileHandler>> {
         let (doc_tx, doc_rx) = watch::channel(None);
         let (render_tx, _) = broadcast::channel(10);
 
@@ -39,7 +45,9 @@ impl Repr {
         create_server(
             name,
             &self.config,
-            CompileDriver::new(roots.clone(), opts),
+            roots.clone(),
+            opts,
+            entry,
             self.diag_tx.clone(),
             doc_tx,
             render_tx,
@@ -54,7 +62,7 @@ impl Repr {
     ) -> CompileCluster {
         let diag_rx = self.diag_rx.take().expect("diag_rx is poisoned");
 
-        let primary = self.server("primary".to_owned(), roots.clone());
+        let primary = self.server("primary".to_owned(), roots.clone(), None);
         CompileCluster::new(fac, host, roots, &self.config, primary, diag_rx)
     }
 }
@@ -73,8 +81,13 @@ impl ActorFactory {
         })))
     }
 
-    fn server(&self, name: String, roots: Vec<PathBuf>) -> CompileNode<CompileHandler> {
-        self.0.lock().server(name, roots)
+    fn server(
+        &self,
+        name: String,
+        roots: Vec<PathBuf>,
+        entry: Option<PathBuf>,
+    ) -> Deferred<CompileNode<CompileHandler>> {
+        self.0.lock().server(name, roots, entry)
     }
 
     pub fn prepare_cluster(&self, host: LspHost, roots: Vec<PathBuf>) -> CompileCluster {
