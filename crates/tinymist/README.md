@@ -1,5 +1,5 @@
 
-# Tinymist
+# tinymist
 
 This crate provides an integrated service for [Typst](https://typst.app/) [taɪpst]. It provides:
 + A language server following the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
