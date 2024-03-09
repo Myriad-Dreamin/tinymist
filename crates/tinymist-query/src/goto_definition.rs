@@ -19,19 +19,16 @@ impl GotoDefinitionRequest {
         let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
         let typst_offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
 
-        let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset + 1)?;
-
-        let t: &dyn World = world;
-
-        let def = find_definition(t.track(), source.id(), ast_node)?;
-        // todo: handle other definitions
-        let span = def.span();
-        let use_site = def.use_site();
+        let def = {
+            let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset + 1)?;
+            let t: &dyn World = world;
+            find_definition(t.track(), source.id(), ast_node)?
+        };
+        let (span, use_site) = (def.span(), def.use_site());
 
         if span.is_detached() {
             return None;
         }
-
         let Some(id) = span.id() else {
             return None;
         };
@@ -41,8 +38,8 @@ impl GotoDefinitionRequest {
 
         let span_path = world.path_for_id(id).ok()?;
         let span_source = world.source(id).ok()?;
-        let offset = span_source.find(span)?;
-        let typst_range = offset.range();
+        let def_node = span_source.find(span)?;
+        let typst_range = def_node.range();
         let range = typst_to_lsp::range(typst_range, &span_source, position_encoding);
 
         let uri = Url::from_file_path(span_path).ok()?;
