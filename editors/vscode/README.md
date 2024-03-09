@@ -1,4 +1,4 @@
-# tinymist Typst LSP VS Code Extension
+# Tinymist Typst VS Code Extension
 
 A VS Code extension for Typst.
 

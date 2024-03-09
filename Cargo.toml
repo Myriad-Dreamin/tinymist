@@ -1,6 +1,6 @@
 [workspace.package]
-description = "Fast lsp implementation for typst."
-authors = ["Myriad-Dreamin <camiyoru@gmail.com>"]
+description = "An integrated language service for Typst."
+authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
 version = "0.11.0"
 edition = "2021"
 readme = "README.md"
@@ -70,7 +70,7 @@ insta = "1.34"
 
 [profile.release]
 lto = true        # Enable link-time optimization
-strip = true      # Strip symbols from binary*
+debug = true
 opt-level = 3     # Optimize for speed
 codegen-units = 1 # Reduce number of codegen units to increase optimizations
 panic = 'abort'   # Abort on panic
