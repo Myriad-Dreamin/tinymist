@@ -18,7 +18,7 @@ impl HoverRequest {
 
         let typst_tooltip = typst_ide::tooltip(world, doc.as_deref(), &source, typst_offset)?;
 
-        let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset)?;
+        let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset + 1)?;
         let range = typst_to_lsp::range(ast_node.range(), &source, position_encoding);
 
         Some(Hover {

@@ -15,7 +15,7 @@ impl SignatureHelpRequest {
         let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
         let typst_offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
 
-        let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset)?;
+        let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset + 1)?;
         let (callee, callee_node, args) = surrounding_function_syntax(&ast_node)?;
 
         if !callee.hash() && !matches!(callee, ast::Expr::MathIdent(_)) {

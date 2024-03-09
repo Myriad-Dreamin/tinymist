@@ -16,7 +16,7 @@ impl SelectionRangeRequest {
         for position in self.positions {
             let typst_offset = lsp_to_typst::position(position, position_encoding, &source)?;
             let tree = LinkedNode::new(source.root());
-            let leaf = tree.leaf_at(typst_offset)?;
+            let leaf = tree.leaf_at(typst_offset + 1)?;
             ranges.push(range_for_node(&source, position_encoding, &leaf));
         }
 
