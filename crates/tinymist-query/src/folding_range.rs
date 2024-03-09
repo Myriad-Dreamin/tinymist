@@ -117,8 +117,8 @@ mod tests {
     use crate::tests::*;
 
     #[test]
-    fn test_folding_range_request() {
-        run_with_source("#let a = 1;", |world, path| {
+    fn test() {
+        snapshot_testing("folding_range", &|world, path| {
             let request = FoldingRangeRequest {
                 path: path.clone(),
                 line_folding_only: true,
@@ -127,38 +127,7 @@ mod tests {
             let source = get_suitable_source_in_workspace(world, &path).unwrap();
 
             let result = request.request(source, PositionEncoding::Utf16);
-            assert_snapshot!(JsonRepr::new_pure(result.unwrap()), @"[]");
-        });
-        let t = r#"#let a = {
-  let b = {
-  
-  }
-}"#;
-        run_with_source(t, |world, path| {
-            let request = FoldingRangeRequest {
-                path: path.clone(),
-                line_folding_only: true,
-            };
-
-            let source = get_suitable_source_in_workspace(world, &path).unwrap();
-
-            let result = request.request(source, PositionEncoding::Utf16);
-            assert_snapshot!(JsonRepr::new_pure(result.unwrap()), @r###"
-            [
-             {
-              "collapsedText": "",
-              "endLine": 0,
-              "startCharacter": 9,
-              "startLine": 0
-             },
-             {
-              "collapsedText": "",
-              "endLine": 3,
-              "startCharacter": 10,
-              "startLine": 1
-             }
-            ]
-            "###);
+            assert_snapshot!(JsonRepr::new_pure(result.unwrap()));
         });
     }
 }

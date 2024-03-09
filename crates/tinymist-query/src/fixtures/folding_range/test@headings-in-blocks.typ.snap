@@ -1,0 +1,35 @@
+---
+source: crates/tinymist-query/src/folding_range.rs
+expression: "JsonRepr::new_pure(result.unwrap())"
+input_file: crates/tinymist-query/src/fixtures/folding_range/headings-in-blocks.typ
+---
+[
+ {
+  "collapsedText": "Heading 2",
+  "endCharacter": 16,
+  "endLine": 8,
+  "startCharacter": 7,
+  "startLine": 5
+ },
+ {
+  "collapsedText": "",
+  "endCharacter": 3,
+  "endLine": 7,
+  "startCharacter": 11,
+  "startLine": 3
+ },
+ {
+  "collapsedText": "Heading 1",
+  "endCharacter": 14,
+  "endLine": 8,
+  "startCharacter": 5,
+  "startLine": 1
+ },
+ {
+  "collapsedText": "",
+  "endCharacter": 1,
+  "endLine": 8,
+  "startCharacter": 9,
+  "startLine": 0
+ }
+]
