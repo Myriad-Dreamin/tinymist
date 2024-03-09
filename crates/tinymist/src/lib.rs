@@ -4,8 +4,8 @@ pub mod actor;
 pub use tower_lsp::Client as LspHost;
 
 use core::fmt;
-use std::path::PathBuf;
 use std::sync::Arc;
+use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{bail, Context};
 use futures::{future::BoxFuture, FutureExt};
@@ -24,11 +24,26 @@ use tower_lsp::{jsonrpc, lsp_types::*, LanguageServer};
 
 use crate::actor::typst::CompileCluster;
 
+type LspFuture<'a, Resp> = BoxFuture<'a, jsonrpc::Result<Resp>>;
+type LspMethod<Resp> =
+    for<'a> fn(srv: &'a TypstServer, args: Vec<JsonValue>) -> LspFuture<'a, Resp>;
+type MethodMap = HashMap<&'static str, LspMethod<()>>;
+
+macro_rules! const_async_fn {
+    ($ty: ty, Self::$method: ident, $($arg_key:ident),+ $(,)?) => {{
+        const E: $ty = |this, $($arg_key),+| Box::pin(
+            this.$method($($arg_key),+)
+        );
+        E
+    }};
+}
+
 pub struct TypstServer {
     pub config: Arc<RwLock<Config>>,
     pub const_config: OnceCell<ConstConfig>,
     pub client: LspHost,
     pub universe: OnceCell<CompileCluster>,
+    pub commands: MethodMap,
 }
 
 impl TypstServer {
@@ -38,6 +53,7 @@ impl TypstServer {
             const_config: Default::default(),
             client,
             universe: Default::default(),
+            commands: Self::get_commands(),
         }
     }
 
@@ -49,6 +65,20 @@ impl TypstServer {
 
     pub fn universe(&self) -> &CompileCluster {
         self.universe.get().expect("universe should be initialized")
+    }
+
+    pub fn get_commands() -> MethodMap {
+        macro_rules! redirected_command {
+            ($key: expr, Self::$method: ident) => {
+                ($key, const_async_fn!(LspMethod<()>, Self::$method, inputs))
+            };
+        }
+
+        MethodMap::from_iter([
+            redirected_command!("tinymist.doPdfExport", Self::command_export_pdf),
+            redirected_command!("tinymist.doClearCache", Self::command_clear_cache),
+            redirected_command!("tinymist.doPinMain", Self::command_pin_main),
+        ])
     }
 }
 
@@ -166,7 +196,7 @@ impl LanguageServer for TypstServer {
                 )),
                 semantic_tokens_provider,
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: LspCommand::all_as_string(),
+                    commands: self.commands.keys().map(ToString::to_string).collect(),
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: None,
                     },
@@ -453,58 +483,13 @@ impl LanguageServer for TypstServer {
             arguments,
             work_done_progress_params: _,
         } = params;
-        match LspCommand::parse(&command) {
-            Some(LspCommand::ExportPdf) => {
-                self.command_export_pdf(arguments).await?;
-            }
-            Some(LspCommand::ClearCache) => {
-                self.command_clear_cache(arguments).await?;
-            }
-            Some(LspCommand::PinMain) => {
-                self.command_pin_main(arguments).await?;
-            }
-            None => {
-                error!("asked to execute unknown command");
-                return Err(jsonrpc::Error::method_not_found());
-            }
+        let Some(handler) = self.commands.get(command.as_str()) else {
+            error!("asked to execute unknown command");
+            return Err(jsonrpc::Error::method_not_found());
         };
-        Ok(None)
-    }
-}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LspCommand {
-    ExportPdf,
-    ClearCache,
-    PinMain,
-}
-
-impl From<LspCommand> for String {
-    fn from(command: LspCommand) -> Self {
-        match command {
-            LspCommand::ExportPdf => "tinymist.doPdfExport".to_string(),
-            LspCommand::ClearCache => "tinymist.doClearCache".to_string(),
-            LspCommand::PinMain => "tinymist.doPinMain".to_string(),
-        }
-    }
-}
-
-impl LspCommand {
-    pub fn parse(command: &str) -> Option<Self> {
-        match command {
-            "tinymist.doPdfExport" => Some(Self::ExportPdf),
-            "tinymist.doClearCache" => Some(Self::ClearCache),
-            "tinymist.doPinMain" => Some(Self::PinMain),
-            _ => None,
-        }
-    }
-
-    pub fn all_as_string() -> Vec<String> {
-        vec![
-            Self::ExportPdf.into(),
-            Self::ClearCache.into(),
-            Self::PinMain.into(),
-        ]
+        handler(self, arguments).await?;
+        Ok(Some(JsonValue::Null))
     }
 }
 
