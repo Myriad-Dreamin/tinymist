@@ -20,10 +20,10 @@ Language service (LSP) features:
   - Also known as "document outline" or "table of contents" **in Typst**.
 - [Folding ranges](https://burkeholland.gitbook.io/vs-code-can-do-that/exercise-3-navigation-and-refactoring/folding-sections)
   - You can collapse code/content blocks and headings.
-- [Goto definition](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-definitions-of-a-symbol)
+- [Goto definitions](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-definitions-of-a-symbol)
   - Right-click on a symbol and select "Go to Definition".
   - Or ctrl+click on a symbol.
-- [Goto declaration](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#find-all-references-to-a-symbol)
+- [Goto declarations](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#find-all-references-to-a-symbol)
   - Also known as "find all references".
 - [Hover tips](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-hovers)
   - Also known as "hovering tooltip".
