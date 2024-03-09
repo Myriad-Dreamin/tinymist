@@ -519,13 +519,7 @@ impl TypstServer {
 
     /// Clear all cached resources.
     pub async fn clear_cache(&self, _arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
-        // self.workspace().write().await.clear().map_err(|err| {
-        //     error!("could not clear cache: {err}");
-        //     jsonrpc::Error::internal_error()
-        // })?;
-
-        // self.typst(|_| comemo::evict(0)).await;
-
+        comemo::evict(0);
         Ok(())
     }
 
