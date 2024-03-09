@@ -17,10 +17,11 @@ impl GotoDefinitionRequest {
         position_encoding: PositionEncoding,
     ) -> Option<GotoDefinitionResponse> {
         let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-        let typst_offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
+        let offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
+        let cursor = offset + 1;
 
         let def = {
-            let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset + 1)?;
+            let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
             let t: &dyn World = world;
             find_definition(t.track(), source.id(), ast_node)?
         };
