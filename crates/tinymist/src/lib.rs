@@ -4,6 +4,7 @@ pub mod actor;
 pub use tower_lsp::Client as LspHost;
 
 use core::fmt;
+use std::path::Path;
 use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -78,6 +79,7 @@ impl TypstServer {
             redirected_command!("tinymist.doPdfExport", Self::export_pdf),
             redirected_command!("tinymist.doClearCache", Self::clear_cache),
             redirected_command!("tinymist.doPinMain", Self::pin_main),
+            redirected_command!("tinymist.doActivateDoc", Self::activate_doc),
         ])
     }
 }
@@ -550,6 +552,32 @@ impl TypstServer {
         })?;
 
         info!("main file pinned: {main_url:?}", main_url = file_uri);
+        Ok(())
+    }
+
+    /// Change the actived document.
+    pub async fn activate_doc(&self, arguments: Vec<JsonValue>) -> jsonrpc::Result<()> {
+        if arguments.is_empty() {
+            return Err(jsonrpc::Error::invalid_params("Missing file URI argument"));
+        }
+        let path = match arguments.first().unwrap() {
+            JsonValue::String(s) => Some(Path::new(s).into()),
+            JsonValue::Null => None,
+            _ => {
+                return Err(jsonrpc::Error::invalid_params(
+                    "URI Parameter is not a string or null",
+                ))
+            }
+        };
+
+        let update_result = self.universe().activate_doc(path.clone()).await;
+
+        update_result.map_err(|err| {
+            error!("could not set active document: {err}");
+            jsonrpc::Error::internal_error()
+        })?;
+
+        info!("active document set: {path:?}", path = path);
         Ok(())
     }
 }

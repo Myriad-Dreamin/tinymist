@@ -6,6 +6,7 @@ import {
     ViewColumn,
     Uri,
     WorkspaceConfiguration,
+    TextEditor,
 } from "vscode";
 import * as path from "path";
 import * as child_process from "child_process";
@@ -48,6 +49,13 @@ async function startClient(context: ExtensionContext): Promise<void> {
         serverOptions,
         clientOptions
     );
+
+    window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
+        if (editor?.document.languageId !== "typst") {
+            return;
+        }
+        return commandActivateDoc(editor);
+    });
 
     context.subscriptions.push(
         commands.registerCommand("tinymist.exportCurrentPdf", commandExportCurrentPdf)
@@ -197,5 +205,12 @@ async function commandPinMain(isPin: boolean): Promise<void> {
     await client?.sendRequest("workspace/executeCommand", {
         command: "tinymist.doPinMain",
         arguments: [uri],
+    });
+}
+
+async function commandActivateDoc(editor: TextEditor | undefined): Promise<void> {
+    await client?.sendRequest("workspace/executeCommand", {
+        command: "tinymist.doActivateDoc",
+        arguments: [editor?.document.uri.fsPath],
     });
 }

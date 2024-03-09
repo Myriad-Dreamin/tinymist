@@ -90,6 +90,17 @@ impl CompileCluster {
         (self, actor)
     }
 
+    pub async fn activate_doc(&self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+        match new_entry {
+            Some(new_entry) => self.primary.change_entry(new_entry).await?,
+            None => {
+                self.primary.disable().await;
+            }
+        }
+
+        Ok(())
+    }
+
     pub async fn pin_main(&self, new_entry: Option<Url>) -> Result<(), Error> {
         let mut m = self.main.lock().await;
         match (new_entry, m.is_some()) {
