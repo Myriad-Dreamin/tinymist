@@ -1,9 +1,8 @@
-use log::debug;
-
 use crate::{
     analysis::{find_definition, Definition},
     prelude::*,
 };
+use log::debug;
 
 #[derive(Debug, Clone)]
 pub struct PrepareRenameRequest {
@@ -25,9 +24,13 @@ impl PrepareRenameRequest {
         let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
         let typst_offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
 
-        let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset)?;
+        let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset + 1)?;
 
-        let Definition::Func(func) = find_definition(world, ast_node)?;
+        let t: &dyn World = world;
+        let Definition::Func(func) = find_definition(t.track(), source.id(), ast_node)? else {
+            // todo: handle other definitions
+            return None;
+        };
 
         use typst::foundations::func::Repr;
         let mut f = func.value.clone();

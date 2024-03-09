@@ -1,10 +1,8 @@
+use comemo::Track;
 use log::debug;
 use tower_lsp::lsp_types::LocationLink;
 
-use crate::{
-    analysis::{find_definition, Definition},
-    prelude::*,
-};
+use crate::{analysis::find_definition, prelude::*};
 
 #[derive(Debug, Clone)]
 pub struct GotoDefinitionRequest {
@@ -21,12 +19,14 @@ impl GotoDefinitionRequest {
         let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
         let typst_offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
 
-        let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset)?;
+        let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset + 1)?;
 
-        let Definition::Func(func) = find_definition(world, ast_node)?;
+        let t: &dyn World = world;
 
-        let span = func.span;
-        let callee_link = func.use_site;
+        let def = find_definition(t.track(), source.id(), ast_node)?;
+        // todo: handle other definitions
+        let span = def.span();
+        let use_site = def.use_site();
 
         if span.is_detached() {
             return None;
@@ -37,7 +37,7 @@ impl GotoDefinitionRequest {
         };
 
         let origin_selection_range =
-            typst_to_lsp::range(callee_link.range(), &source, position_encoding);
+            typst_to_lsp::range(use_site.range(), &source, position_encoding);
 
         let span_path = world.path_for_id(id).ok()?;
         let span_source = world.source(id).ok()?;
