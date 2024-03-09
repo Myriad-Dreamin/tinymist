@@ -56,69 +56,14 @@ mod tests {
     use crate::tests::*;
 
     #[test]
-    fn test_get_document_symbols() {
-        run_with_source(
-            r#"
-= Heading 1
-#let a = 1;
-== Heading 2
-#let b = 1;
-= Heading 3
-#let c = 1;
-#let d = {
-  #let e = 1;
-  0
-}
-"#,
-            |world, path| {
-                let request = DocumentSymbolRequest { path: path.clone() };
+    fn test() {
+        snapshot_testing("document_symbols", &|world, path| {
+            let request = DocumentSymbolRequest { path: path.clone() };
 
-                let source = get_suitable_source_in_workspace(world, &path).unwrap();
+            let source = get_suitable_source_in_workspace(world, &path).unwrap();
 
-                let result = request.request(source, PositionEncoding::Utf16);
-                assert_snapshot!(JsonRepr::new_redacted(result.unwrap(), &REDACT_LOC), @r###"
-                [
-                 {
-                  "children": [
-                   {
-                    "kind": 13,
-                    "name": "a"
-                   },
-                   {
-                    "children": [
-                     {
-                      "kind": 13,
-                      "name": "b"
-                     }
-                    ],
-                    "kind": 3,
-                    "name": "Heading 2"
-                   }
-                  ],
-                  "kind": 3,
-                  "name": "Heading 1"
-                 },
-                 {
-                  "children": [
-                   {
-                    "kind": 13,
-                    "name": "c"
-                   },
-                   {
-                    "kind": 13,
-                    "name": "d"
-                   },
-                   {
-                    "kind": 13,
-                    "name": "e"
-                   }
-                  ],
-                  "kind": 3,
-                  "name": "Heading 3"
-                 }
-                ]
-                "###);
-            },
-        );
+            let result = request.request(source, PositionEncoding::Utf16);
+            assert_snapshot!(JsonRepr::new_redacted(result.unwrap(), &REDACT_LOC));
+        });
     }
 }

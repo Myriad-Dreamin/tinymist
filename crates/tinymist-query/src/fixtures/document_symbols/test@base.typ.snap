@@ -1,0 +1,61 @@
+---
+source: crates/tinymist-query/src/document_symbol.rs
+expression: "JsonRepr::new_redacted(result.unwrap(), &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/document_symbols/base.typ
+---
+[
+ {
+  "children": [
+   {
+    "kind": 13,
+    "name": "a",
+    "range": "1:5:1:6",
+    "selectionRange": "1:5:1:6"
+   },
+   {
+    "children": [
+     {
+      "kind": 13,
+      "name": "b",
+      "range": "3:5:3:6",
+      "selectionRange": "3:5:3:6"
+     }
+    ],
+    "kind": 3,
+    "name": "Heading 2",
+    "range": "2:3:2:12",
+    "selectionRange": "2:3:2:12"
+   }
+  ],
+  "kind": 3,
+  "name": "Heading 1",
+  "range": "0:2:0:11",
+  "selectionRange": "0:2:0:11"
+ },
+ {
+  "children": [
+   {
+    "kind": 13,
+    "name": "c",
+    "range": "5:5:5:6",
+    "selectionRange": "5:5:5:6"
+   },
+   {
+    "kind": 13,
+    "name": "d",
+    "range": "6:5:6:6",
+    "selectionRange": "6:5:6:6"
+   },
+   {
+    "kind": 13,
+    "name": "e",
+    "range": "7:6:7:7",
+    "selectionRange": "7:6:7:7"
+   }
+  ],
+  "kind": 3,
+  "name": "Heading 3",
+  "range": "4:2:4:11",
+  "selectionRange": "4:2:4:11"
+ }
+]

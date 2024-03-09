@@ -1,0 +1,49 @@
+---
+source: crates/tinymist-query/src/document_symbol.rs
+expression: "JsonRepr::new_redacted(result.unwrap(), &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/document_symbols/nested-blocks.typ
+---
+[
+ {
+  "kind": 13,
+  "name": "a",
+  "range": "0:5:0:6",
+  "selectionRange": "0:5:0:6"
+ },
+ {
+  "kind": 13,
+  "name": "b",
+  "range": "1:6:1:7",
+  "selectionRange": "1:6:1:7"
+ },
+ {
+  "kind": 13,
+  "name": "c",
+  "range": "2:8:2:9",
+  "selectionRange": "2:8:2:9"
+ },
+ {
+  "kind": 13,
+  "name": "b",
+  "range": "6:6:6:7",
+  "selectionRange": "6:6:6:7"
+ },
+ {
+  "kind": 13,
+  "name": "b",
+  "range": "9:6:9:7",
+  "selectionRange": "9:6:9:7"
+ },
+ {
+  "kind": 13,
+  "name": "c",
+  "range": "10:8:10:9",
+  "selectionRange": "10:8:10:9"
+ },
+ {
+  "kind": 13,
+  "name": "b",
+  "range": "16:6:16:7",
+  "selectionRange": "16:6:16:7"
+ }
+]

@@ -1,0 +1,33 @@
+---
+source: crates/tinymist-query/src/document_symbol.rs
+expression: "JsonRepr::new_redacted(result.unwrap(), &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/document_symbols/headings-in-blocks.typ
+---
+[
+ {
+  "kind": 13,
+  "name": "a",
+  "range": "0:5:0:6",
+  "selectionRange": "0:5:0:6"
+ },
+ {
+  "children": [
+   {
+    "kind": 13,
+    "name": "b",
+    "range": "3:7:3:8",
+    "selectionRange": "3:7:3:8"
+   }
+  ],
+  "kind": 3,
+  "name": "Heading 1",
+  "range": "1:5:1:14",
+  "selectionRange": "1:5:1:14"
+ },
+ {
+  "kind": 3,
+  "name": "Heading 2",
+  "range": "5:7:5:16",
+  "selectionRange": "5:7:5:16"
+ }
+]
