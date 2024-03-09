@@ -37,8 +37,8 @@ async fn main() {
     let args = CliArguments::parse();
     info!("Arguments: {:#?}", args);
 
-    let stdin: Box<dyn AsyncRead + Unpin> = if !args.mirror_input.is_empty() {
-        let file = tokio::fs::File::open(&args.mirror_input).await.unwrap();
+    let stdin: Box<dyn AsyncRead + Unpin> = if !args.replay.is_empty() {
+        let file = tokio::fs::File::open(&args.replay).await.unwrap();
         Box::new(file)
     } else if args.mirror.is_empty() {
         Box::new(tokio::io::stdin())
