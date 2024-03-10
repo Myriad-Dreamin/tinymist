@@ -492,10 +492,14 @@ impl<Ctx> CompileClient<Ctx> {
         f: impl FnOnce(&mut Ctx) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
         // get current async handle
-        if tokio::runtime::Handle::try_current().is_ok() {
+        if let Ok(e) = tokio::runtime::Handle::try_current() {
             let fut = self.steal_inner(f)?;
             // todo: remove blocking
-            return pollster::block_on(fut).map_err(map_string_err("failed to steal"));
+            return std::thread::spawn(move || {
+                e.block_on(fut).map_err(map_string_err("failed to steal"))
+            })
+            .join()
+            .unwrap();
         }
 
         self.steal_inner(f)?
