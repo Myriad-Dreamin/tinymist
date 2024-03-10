@@ -1,4 +1,4 @@
-use std::{collections::HashSet, os::windows::fs::FileTypeExt};
+use std::collections::HashSet;
 
 use log::{debug, warn};
 use lsp_types::TextEdit;
@@ -173,7 +173,7 @@ fn search_in_workspace(
         let Ok(de) = path else {
             continue;
         };
-        if !de.file_type().is_file() && !de.file_type().is_symlink_file() {
+        if !de.file_type().is_file() {
             continue;
         }
         if !de

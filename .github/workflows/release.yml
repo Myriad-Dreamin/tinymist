@@ -77,12 +77,33 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - uses: actions/checkout@v4
+        with:
+          repository: Enter-tainer/typst-preview
+          path: external/typst-preview
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.4
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 16
+      - name: Hack typst-preview
+        run: |
+          mv src/main.rs src/main.rsx
+        working-directory: ./external/typst-preview
+      - name: Build typst-dom
+        run: |
+          yarn
+          yarn build
+        working-directory: ./external/typst-preview/addons/typst-dom
+      - name: Build frontend
+        run: yarn
+        working-directory: ./external/typst-preview/addons/frontend
+      - name: Build typst-preview
+        run: |
+          yarn
+          yarn run compile
+        working-directory: ./external/typst-preview/addons/vscode
       - name: Build vscode extension
         run: |
           yarn
@@ -186,6 +207,27 @@ jobs:
           submodules: recursive
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.4
+      - uses: actions/checkout@v4
+        with:
+          repository: Enter-tainer/typst-preview
+          path: external/typst-preview
+      - name: Hack typst-preview
+        run: |
+          mv src/main.rs src/main.rsx
+        working-directory: ./external/typst-preview
+      - name: Build typst-dom
+        run: |
+          yarn
+          yarn build
+        working-directory: ./external/typst-preview/addons/typst-dom
+      - name: Build frontend
+        run: yarn
+        working-directory: ./external/typst-preview/addons/frontend
+      - name: Build typst-preview
+        run: |
+          yarn
+          yarn run compile
+        working-directory: ./external/typst-preview/addons/vscode
       - name: Build vscode extension
         run: |
           yarn
