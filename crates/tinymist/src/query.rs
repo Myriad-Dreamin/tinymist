@@ -29,8 +29,10 @@ impl TypstLanguageServer {
         let clients_to_notify = (primary.iter()).chain(main.iter());
 
         for client in clients_to_notify {
-            let iw = client.wait().inner.lock();
-            iw.add_memory_changes(MemoryEvent::Update(files.clone()));
+            client
+                .wait()
+                .inner
+                .add_memory_changes(MemoryEvent::Update(files.clone()));
         }
 
         Ok(())
@@ -110,6 +112,26 @@ impl TypstLanguageServer {
     }
 }
 
+#[macro_export]
+macro_rules! run_query {
+    ($self: ident.$query: ident ($($arg_key:ident),+ $(,)?)) => {{
+        use tinymist_query::*;
+        let req = paste! { [<$query Request>] { $($arg_key),+ } };
+        $self
+            .query(CompilerQueryRequest::$query(req.clone()))
+            .map_err(|err| {
+                error!("error getting $query: {err} with request {req:?}");
+                internal_error("Internal error")
+            })
+            .map(|resp| {
+                let CompilerQueryResponse::$query(resp) = resp else {
+                    unreachable!()
+                };
+                resp
+            })
+    }};
+}
+
 macro_rules! query_source {
     ($self:ident, $method:ident, $req:expr) => {{
         let path: ImmutPath = $req.path.clone().into();
@@ -119,7 +141,7 @@ macro_rules! query_source {
             .ok_or_else(|| anyhow!("file missing {:?}", $self.memory_changes))?;
         let source = snapshot.content.clone();
 
-        let enc = $self.position_encoding;
+        let enc = $self.const_config.position_encoding;
         let res = $req.request(source, enc);
         Ok(CompilerQueryResponse::$method(res))
     }};
@@ -132,7 +154,7 @@ macro_rules! query_tokens_cache {
         let snapshot = vfs.get(&path).ok_or_else(|| anyhow!("file missing"))?;
         let source = snapshot.content.clone();
 
-        let enc = $self.position_encoding;
+        let enc = $self.const_config.position_encoding;
         let res = $req.request(&$self.tokens_cache, source, enc);
         Ok(CompilerQueryResponse::$method(res))
     }};

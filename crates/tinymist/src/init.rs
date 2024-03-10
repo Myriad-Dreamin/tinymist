@@ -351,8 +351,7 @@ impl Init {
         // Bootstrap server
         let (diag_tx, diag_rx) = mpsc::unbounded_channel();
 
-        let service =
-            TypstLanguageServer::new(self.host.clone(), params.root_paths(), &cc, diag_tx);
+        let service = TypstLanguageServer::new(self.host.clone(), params.root_paths(), cc, diag_tx);
 
         if let Some(init) = &params.initialization_options {
             if let Err(err) = config

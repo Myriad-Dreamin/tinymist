@@ -27,14 +27,14 @@ pub fn io_transport<I: BufRead, O: Write>(
     out: impl FnOnce() -> O + Send + Sync + 'static,
 ) -> (Sender<Message>, Receiver<Message>, IoThreads) {
     // todo: set cap back to 0
-    let (writer_sender, writer_receiver) = bounded::<Message>(1024);
+    let (writer_sender, writer_receiver) = bounded::<Message>(0);
     let writer = thread::spawn(move || {
         let mut out = out();
         writer_receiver
             .into_iter()
             .try_for_each(|it| it.write(&mut out))
     });
-    let (reader_sender, reader_receiver) = bounded::<Message>(1024);
+    let (reader_sender, reader_receiver) = bounded::<Message>(0);
     let reader = thread::spawn(move || {
         let mut inp = inp();
         while let Some(msg) = Message::read(&mut inp)? {
@@ -67,14 +67,14 @@ impl IoThreads {
         match self.reader.join() {
             Ok(r) => r?,
             Err(err) => {
-                println!("reader panicked!");
+                eprintln!("reader panicked!");
                 std::panic::panic_any(err)
             }
         }
         match self.writer.join() {
             Ok(r) => r,
             Err(err) => {
-                println!("writer panicked!");
+                eprintln!("writer panicked!");
                 std::panic::panic_any(err);
             }
         }

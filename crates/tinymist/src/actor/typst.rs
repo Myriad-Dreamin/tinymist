@@ -6,7 +6,6 @@ use std::{
 };
 
 use log::{debug, error, trace, warn};
-use parking_lot::Mutex;
 use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
     OnSaveExportRequest, PositionEncoding,
@@ -24,7 +23,6 @@ use typst_preview::{
 };
 use typst_ts_compiler::{
     service::{
-        CompileActor as CompileActorInner, CompileClient as TsCompileClient,
         CompileDriver as CompileDriverInner, CompileExporter, CompileMiddleware, Compiler,
         WorkspaceProvider, WorldExporter,
     },
@@ -36,6 +34,8 @@ use typst_ts_core::{
     Bytes, Error, ImmutPath, TypstDocument, TypstWorld,
 };
 
+use super::compile::CompileActor as CompileActorInner;
+use super::compile::CompileClient as TsCompileClient;
 use crate::actor::render::RenderActorRequest;
 use crate::ConstConfig;
 
@@ -290,7 +290,7 @@ pub struct CompileActor {
     position_encoding: PositionEncoding,
     handler: CompileHandler,
     entry: Arc<SyncMutex<Option<ImmutPath>>>,
-    pub inner: Mutex<CompileClient<CompileHandler>>,
+    pub inner: CompileClient<CompileHandler>,
 }
 
 // todo: remove unsafe impl send
@@ -304,8 +304,8 @@ unsafe impl Send for CompileActor {}
 unsafe impl Sync for CompileActor {}
 
 impl CompileActor {
-    fn inner(&mut self) -> &mut CompileClient<CompileHandler> {
-        self.inner.get_mut()
+    fn inner(&self) -> &CompileClient<CompileHandler> {
+        &self.inner
     }
 
     /// Steal the compiler thread and run the given function.
@@ -313,7 +313,17 @@ impl CompileActor {
         &self,
         f: impl FnOnce(&mut CompileService<CompileHandler>) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
-        self.inner.lock().steal(f)
+        self.inner.steal(f)
+    }
+
+    /// Steal the compiler thread and run the given function.
+    pub async fn steal_async<Ret: Send + 'static>(
+        &self,
+        f: impl FnOnce(&mut CompileService<CompileHandler>, tokio::runtime::Handle) -> Ret
+            + Send
+            + 'static,
+    ) -> ZResult<Ret> {
+        self.inner.steal_async(f).await
     }
 
     // todo: stop main
@@ -363,6 +373,7 @@ impl CompileActor {
                 next.display()
             );
 
+            // todo
             let res = self.steal(move |compiler| {
                 let root = compiler.compiler.world().workspace_root();
                 if !path.starts_with(&root) {
@@ -385,8 +396,7 @@ impl CompileActor {
 
             // todo: trigger recompile
             let files = FileChangeSet::new_inserts(vec![]);
-            let inner = self.inner.lock();
-            inner.add_memory_changes(MemoryEvent::Update(files))
+            self.inner.add_memory_changes(MemoryEvent::Update(files))
         }
 
         Ok(())
@@ -490,7 +500,7 @@ impl CompileActor {
             position_encoding,
             handler,
             entry: Arc::new(SyncMutex::new(None)),
-            inner: Mutex::new(inner),
+            inner,
         }
     }
 
@@ -527,8 +537,7 @@ impl CompileActor {
         &self,
         f: impl FnOnce(&TypstSystemWorld) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
-        let mut client = self.inner.lock();
-        let fut = client.steal(move |compiler| f(compiler.compiler.world()));
+        let fut = self.steal(move |compiler| f(compiler.compiler.world()));
 
         Ok(fut?)
     }

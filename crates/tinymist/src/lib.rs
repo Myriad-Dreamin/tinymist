@@ -42,6 +42,7 @@ use actor::typst::CompileActor;
 use anyhow::Context;
 use crossbeam_channel::select;
 use crossbeam_channel::Receiver;
+use futures::future::BoxFuture;
 use log::{debug, error, info, trace, warn};
 use lsp_server::{ErrorCode, Message, Notification, Request, ResponseError};
 use lsp_types::notification::{Notification as NotificationTrait, PublishDiagnostics};
@@ -54,10 +55,12 @@ use query::MemoryFileMeta;
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
-    get_semantic_tokens_unregistration, DiagnosticsMap, PositionEncoding, SemanticTokenCache,
+    get_semantic_tokens_unregistration, DiagnosticsMap, SemanticTokenCache,
 };
 use tokio::sync::mpsc;
 use typst::util::Deferred;
+
+pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
 
 use crate::init::*;
 
@@ -244,25 +247,6 @@ macro_rules! notify_fn {
     };
 }
 
-macro_rules! run_query {
-    ($self: ident.$query: ident ($($arg_key:ident),+ $(,)?)) => {{
-        use tinymist_query::*;
-        let req = paste! { [<$query Request>] { $($arg_key),+ } };
-        $self
-            .query(CompilerQueryRequest::$query(req.clone()))
-            .map_err(|err| {
-                error!("error getting $query: {err} with request {req:?}");
-                internal_error("Internal error")
-            })
-            .map(|resp| {
-                let CompilerQueryResponse::$query(resp) = resp else {
-                    unreachable!()
-                };
-                resp
-            })
-    }};
-}
-
 fn as_path(inp: TextDocumentIdentifier) -> PathBuf {
     inp.uri.to_file_path().unwrap()
 }
@@ -287,11 +271,10 @@ pub struct TypstLanguageServer {
     pub config: Config,
     /// Const configuration initialized at the start of the session.
     /// For example, the position encoding.
-    pub const_config: OnceCell<ConstConfig>,
+    pub const_config: ConstConfig,
 
     diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
     roots: Vec<PathBuf>,
-    position_encoding: PositionEncoding,
     memory_changes: RwLock<HashMap<Arc<Path>, MemoryFileMeta>>,
     primary: OnceCell<Deferred<CompileActor>>,
     main: Arc<Mutex<Option<Deferred<CompileActor>>>>,
@@ -304,21 +287,20 @@ impl TypstLanguageServer {
     pub fn new(
         client: LspHost,
         roots: Vec<PathBuf>,
-        cfg: &ConstConfig,
+        const_config: ConstConfig,
         diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
     ) -> Self {
         Self {
             client: client.clone(),
             shutdown_requested: false,
             config: Default::default(),
-            const_config: Default::default(),
+            const_config,
             exec_cmds: Self::get_exec_commands(),
             regular_cmds: Self::get_regular_cmds(),
             notify_cmds: Self::get_notify_cmds(),
 
             diag_tx,
             roots,
-            position_encoding: cfg.position_encoding,
             memory_changes: RwLock::new(HashMap::new()),
             primary: OnceCell::new(),
             main: Arc::new(Mutex::new(None)),
@@ -331,9 +313,7 @@ impl TypstLanguageServer {
     /// # Panics
     /// Panics if the const configuration is not initialized.
     pub fn const_config(&self) -> &ConstConfig {
-        self.const_config
-            .get()
-            .expect("const config should be initialized")
+        &self.const_config
     }
 
     fn primary_deferred(&self) -> &Deferred<CompileActor> {

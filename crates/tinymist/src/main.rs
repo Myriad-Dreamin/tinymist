@@ -42,12 +42,23 @@ async fn main() -> anyhow::Result<()> {
             .try_init()
     };
 
-    // Note that  we must have our logging only write out to stderr.
-    eprintln!("starting generic LSP server");
-
     // Parse command line arguments
     let args = CliArguments::parse();
     info!("Arguments: {:#?}", args);
+
+    match args.mode.as_str() {
+        "server" => {}
+        "probe" => return Ok(()),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "unknown mode: {mode}, expected one of: server or probe",
+                mode = args.mode,
+            ));
+        }
+    }
+
+    // Note that  we must have our logging only write out to stderr.
+    info!("starting generic LSP server");
 
     // Set up input and output
     let mirror = args.mirror.clone();
@@ -75,30 +86,38 @@ async fn main() -> anyhow::Result<()> {
     let (sender, receiver, io_threads) = io_transport(i, o);
     let connection = Connection { sender, receiver };
 
+    // todo: ugly code
     let (initialize_id, initialize_params) = match connection.initialize_start() {
         Ok(it) => it,
         Err(e) => {
+            log::error!("failed to initialize: {e}");
             if e.channel_is_disconnected() {
                 io_threads.join()?;
             }
             return Err(e.into());
         }
     };
+    let request_received = std::time::Instant::now();
     trace!("InitializeParams: {initialize_params}");
+    let host = LspHost::new(connection.sender);
+
+    let req = lsp_server::Request::new(initialize_id, "initialize".to_owned(), initialize_params);
+    host.register_request(&req, request_received);
+    let lsp_server::Request {
+        id: initialize_id,
+        params: initialize_params,
+        ..
+    } = req;
+
     let initialize_params = from_json::<InitializeParams>("InitializeParams", &initialize_params)?;
 
-    let host = LspHost::new(connection.sender);
     let (mut service, initialize_result) =
         Init { host: host.clone() }.initialize(initialize_params.clone());
 
-    // todo: better send
-    host.complete_request(
-        &mut service,
-        match initialize_result {
-            Ok(cap) => Response::new_ok(initialize_id, Some(cap)),
-            Err(err) => Response::new_err(initialize_id, err.code, err.message),
-        },
-    );
+    host.respond(match initialize_result {
+        Ok(cap) => Response::new_ok(initialize_id, Some(cap)),
+        Err(err) => Response::new_err(initialize_id, err.code, err.message),
+    });
 
     #[derive(Debug, Clone, PartialEq)]
     pub struct ProtocolError(String, bool);
@@ -118,6 +137,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    info!("waiting for initialized notification");
     let initialized_ack = match &connection.receiver.recv() {
         Ok(Message::Notification(n)) if n.method == "initialized" => Ok(()),
         Ok(msg) => Err(ProtocolError::new(format!(

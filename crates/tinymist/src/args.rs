@@ -4,6 +4,12 @@ use once_cell::sync::Lazy;
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 #[cfg_attr(feature = "clap", clap(name = "tinymist", author, version, about, long_version(LONG_VERSION.as_str())))]
 pub struct CliArguments {
+    /// Mode of the binary
+    #[cfg_attr(
+        feature = "clap",
+        clap(long, default_value = "server", value_name = "FILE")
+    )]
+    pub mode: String,
     /// Mirror the stdin to the file
     #[cfg_attr(feature = "clap", clap(long, default_value = "", value_name = "FILE"))]
     pub mirror: String,

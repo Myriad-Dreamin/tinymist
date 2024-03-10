@@ -15,7 +15,7 @@ use typst::{
     World,
 };
 
-use crate::{
+use typst_ts_compiler::{
     service::features::WITH_COMPILING_STATUS_FEATURE,
     vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage},
     world::{CompilerFeat, CompilerWorld},
@@ -27,15 +27,31 @@ use typst_ts_core::{
     TypstDocument, TypstFileId,
 };
 
-use super::{
+use typst_ts_compiler::service::{
     features::FeatureSet, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter,
     WorkspaceProvider, WorldExporter,
 };
+
+#[derive(Debug, Clone)]
+pub struct VersionedDocument {
+    pub version: usize,
+    pub document: Arc<TypstDocument>,
+}
 
 /// A task that can be sent to the context (compiler thread)
 ///
 /// The internal function will be dereferenced and called on the context.
 type BorrowTask<Ctx> = Box<dyn FnOnce(&mut Ctx) + Send + 'static>;
+
+/// Interrupts for external sources
+enum ExternalInterrupt<Ctx> {
+    /// Interrupted by task.
+    ///
+    /// See [`CompileClient<Ctx>::steal`] for more information.
+    Task(BorrowTask<Ctx>),
+    /// Interrupted by memory file changes.
+    Memory(MemoryEvent),
+}
 
 /// Interrupts for the compiler thread.
 enum CompilerInterrupt<Ctx> {
@@ -90,12 +106,8 @@ pub struct CompileActor<C: Compiler> {
     watch_feature_set: Arc<FeatureSet>,
 
     /// Internal channel for stealing the compiler thread.
-    steal_send: mpsc::UnboundedSender<BorrowTask<Self>>,
-    steal_recv: mpsc::UnboundedReceiver<BorrowTask<Self>>,
-
-    /// Internal channel for memory events.
-    memory_send: mpsc::UnboundedSender<MemoryEvent>,
-    memory_recv: mpsc::UnboundedReceiver<MemoryEvent>,
+    steal_send: mpsc::UnboundedSender<ExternalInterrupt<Self>>,
+    steal_recv: mpsc::UnboundedReceiver<ExternalInterrupt<Self>>,
 }
 
 impl<C: Compiler + ShadowApi + WorldExporter + Send + 'static> CompileActor<C>
@@ -104,7 +116,6 @@ where
 {
     pub fn new_with_features(compiler: C, root: PathBuf, feature_set: FeatureSet) -> Self {
         let (steal_send, steal_recv) = mpsc::unbounded_channel();
-        let (memory_send, memory_recv) = mpsc::unbounded_channel();
 
         let watch_feature_set = Arc::new(
             feature_set
@@ -128,15 +139,19 @@ where
 
             steal_send,
             steal_recv,
-
-            memory_send,
-            memory_recv,
         }
     }
 
     /// Create a new compiler thread.
     pub fn new(compiler: C, root: PathBuf) -> Self {
         Self::new_with_features(compiler, root, FeatureSet::default())
+    }
+
+    pub fn doc(&self) -> Option<VersionedDocument> {
+        self.latest_doc.clone().map(|doc| VersionedDocument {
+            version: self.logical_tick,
+            document: doc,
+        })
     }
 
     fn make_env(&self, feature_set: Arc<FeatureSet>) -> CompileEnv {
@@ -193,9 +208,13 @@ where
         };
 
         // Spawn file system watcher.
-        tokio::spawn(super::watch_deps(dep_rx, move |event| {
-            log_send_error("fs_event", fs_tx.send(event));
-        }));
+        // todo: don't compile if no entry
+        tokio::spawn(typst_ts_compiler::service::watch_deps(
+            dep_rx,
+            move |event| {
+                log_send_error("fs_event", fs_tx.send(event));
+            },
+        ));
 
         // Spawn compiler thread.
         let compile_thread = ensure_single_thread("typst-compiler", async move {
@@ -204,33 +223,49 @@ where
             // Wait for first events.
             while let Some(event) = tokio::select! {
                 Some(it) = fs_rx.recv() => Some(CompilerInterrupt::Fs(it)),
-                Some(it) = self.memory_recv.recv() => Some(CompilerInterrupt::Memory(it)),
-                Some(it) = self.steal_recv.recv() => Some(CompilerInterrupt::Task(it)),
+                Some(it) = self.steal_recv.recv() => match it {
+                    ExternalInterrupt::Task(task) => Some(CompilerInterrupt::Task(task)),
+                    ExternalInterrupt::Memory(task) => Some(CompilerInterrupt::Memory(task)),
+                },
             } {
                 // Small step to warp the logical clock.
                 self.logical_tick += 1;
 
                 // Accumulate events.
-                let mut need_recompile = false;
-                need_recompile = self.process(event, &compiler_ack) || need_recompile;
-                while let Some(event) = fs_rx
-                    .try_recv()
-                    .ok()
-                    .map(CompilerInterrupt::Fs)
-                    .or_else(|| {
-                        self.memory_recv
-                            .try_recv()
-                            .ok()
-                            .map(CompilerInterrupt::Memory)
-                    })
-                    .or_else(|| self.steal_recv.try_recv().ok().map(CompilerInterrupt::Task))
-                {
-                    need_recompile = self.process(event, &compiler_ack) || need_recompile;
-                }
+                let mut need_recompile = self.process(event, &compiler_ack);
+                let task_event = {
+                    let mut task_event = None;
+                    while let Ok(event) = self.steal_recv.try_recv() {
+                        match event {
+                            ExternalInterrupt::Task(task) => {
+                                task_event = Some(CompilerInterrupt::Task(task));
+                                break;
+                            }
+                            ExternalInterrupt::Memory(event) => {
+                                need_recompile = self
+                                    .process(CompilerInterrupt::Memory(event), &compiler_ack)
+                                    || need_recompile;
+                            }
+                        };
+                    }
+                    while let Ok(event) = fs_rx.try_recv() {
+                        need_recompile = self.process(CompilerInterrupt::Fs(event), &compiler_ack)
+                            || need_recompile;
+                    }
+                    task_event
+                };
 
                 // Compile if needed.
                 if need_recompile {
                     self.compile(&compiler_ack);
+                }
+
+                // If there is a task event, execute it.
+                if let Some(event) = task_event {
+                    let need_recompile = self.process(event, &compiler_ack);
+                    if need_recompile {
+                        self.compile(&compiler_ack);
+                    }
                 }
             }
 
@@ -315,7 +350,7 @@ where
                 // Also, record the logical tick when shadow is dirty.
                 self.dirty_shadow_logical_tick = self.logical_tick;
                 send(Notify(NotifyMessage::UpstreamUpdate(
-                    crate::vfs::notify::UpstreamUpdateEvent {
+                    typst_ts_compiler::vfs::notify::UpstreamUpdateEvent {
                         invalidates: files.into_iter().collect(),
                         opaque: Box::new(TaggedMemoryEvent {
                             logical_tick: self.logical_tick,
@@ -407,13 +442,11 @@ impl<C: Compiler> CompileActor<C> {
 
     pub fn split(self) -> (Self, CompileClient<Self>) {
         let steal_send = self.steal_send.clone();
-        let memory_send = self.memory_send.clone();
         (
             self,
             CompileClient {
                 steal_send,
-                memory_send,
-                _ctx: std::marker::PhantomData,
+                _ctx: typst_ts_core::PhantomParamData::default(),
             },
         )
     }
@@ -422,17 +455,20 @@ impl<C: Compiler> CompileActor<C> {
         self.latest_doc.clone()
     }
 }
+
 #[derive(Debug, Clone)]
 pub struct CompileClient<Ctx> {
-    steal_send: mpsc::UnboundedSender<BorrowTask<Ctx>>,
-    memory_send: mpsc::UnboundedSender<MemoryEvent>,
+    steal_send: mpsc::UnboundedSender<ExternalInterrupt<Ctx>>,
 
-    _ctx: std::marker::PhantomData<Ctx>,
+    _ctx: typst_ts_core::PhantomParamData<Ctx>,
 }
+
+unsafe impl<Ctx> Send for CompileClient<Ctx> {}
+unsafe impl<Ctx> Sync for CompileClient<Ctx> {}
 
 impl<Ctx> CompileClient<Ctx> {
     fn steal_inner<Ret: Send + 'static>(
-        &mut self,
+        &self,
         f: impl FnOnce(&mut Ctx) -> Ret + Send + 'static,
     ) -> ZResult<oneshot::Receiver<Ret>> {
         let (tx, rx) = oneshot::channel();
@@ -446,15 +482,22 @@ impl<Ctx> CompileClient<Ctx> {
         });
 
         self.steal_send
-            .send(task)
+            .send(ExternalInterrupt::Task(task))
             .map_err(map_string_err("failed to send to steal"))?;
         Ok(rx)
     }
 
     pub fn steal<Ret: Send + 'static>(
-        &mut self,
+        &self,
         f: impl FnOnce(&mut Ctx) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
+        // get current async handle
+        if tokio::runtime::Handle::try_current().is_ok() {
+            let fut = self.steal_inner(f)?;
+            // todo: remove blocking
+            return pollster::block_on(fut).map_err(map_string_err("failed to steal"));
+        }
+
         self.steal_inner(f)?
             .blocking_recv()
             .map_err(map_string_err("failed to recv from steal"))
@@ -462,7 +505,7 @@ impl<Ctx> CompileClient<Ctx> {
 
     /// Steal the compiler thread and run the given function.
     pub async fn steal_async<Ret: Send + 'static>(
-        &mut self,
+        &self,
         f: impl FnOnce(&mut Ctx, tokio::runtime::Handle) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
         // get current async handle
@@ -473,7 +516,10 @@ impl<Ctx> CompileClient<Ctx> {
     }
 
     pub fn add_memory_changes(&self, event: MemoryEvent) {
-        log_send_error("mem_event", self.memory_send.send(event));
+        log_send_error(
+            "mem_event",
+            self.steal_send.send(ExternalInterrupt::Memory(event)),
+        );
     }
 }
 
@@ -492,7 +538,7 @@ where
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
     pub async fn resolve_src_to_doc_jump(
-        &mut self,
+        &self,
         filepath: PathBuf,
         line: usize,
         character: usize,
@@ -518,7 +564,7 @@ where
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
     pub async fn resolve_src_location(
-        &mut self,
+        &self,
         loc: SourceLocation,
     ) -> ZResult<Option<SourceSpanOffset>> {
         self.steal_async(move |this, _| {
@@ -546,12 +592,12 @@ where
         .await
     }
 
-    pub async fn resolve_span(&mut self, span: Span) -> ZResult<Option<DocToSrcJumpInfo>> {
+    pub async fn resolve_span(&self, span: Span) -> ZResult<Option<DocToSrcJumpInfo>> {
         self.resolve_span_and_offset(span, None).await
     }
 
     pub async fn resolve_span_and_offset(
-        &mut self,
+        &self,
         span: Span,
         offset: Option<usize>,
     ) -> ZResult<Option<DocToSrcJumpInfo>> {

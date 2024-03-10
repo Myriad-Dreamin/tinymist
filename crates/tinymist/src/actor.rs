@@ -1,6 +1,7 @@
 //! Bootstrap actors for Tinymist.
 
 pub mod cluster;
+pub mod compile;
 pub mod render;
 pub mod typst;
 
