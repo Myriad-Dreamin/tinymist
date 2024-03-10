@@ -74,7 +74,6 @@ async fn main() -> anyhow::Result<()> {
             let stdin = std::io::stdin().lock();
             Box::new(stdin)
         } else {
-            // todo: mirror
             let file = std::fs::File::create(&mirror).unwrap();
             let stdin = std::io::stdin().lock();
             Box::new(MirrorWriter(stdin, file, std::sync::Once::new()))
@@ -178,19 +177,21 @@ struct MirrorWriter<R: Read, W: Write>(R, W, std::sync::Once);
 
 impl<R: Read, W: Write> Read for MirrorWriter<R, W> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.0.read(buf)
+        let res = self.0.read(buf)?;
+
+        if let Err(err) = self.1.write_all(&buf[..res]) {
+            self.2.call_once(|| {
+                warn!("failed to write to mirror: {err}");
+            });
+        }
+
+        Ok(res)
     }
 }
 
 impl<R: Read + BufRead, W: Write> BufRead for MirrorWriter<R, W> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        let buf = self.0.fill_buf()?;
-        if let Err(err) = self.1.write_all(buf) {
-            self.2.call_once(|| {
-                warn!("failed to write to mirror: {err}");
-            });
-        }
-        Ok(buf)
+        self.0.fill_buf()
     }
 
     fn consume(&mut self, amt: usize) {

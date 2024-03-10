@@ -69,8 +69,6 @@ impl CompileClusterActor {
                 }
                 Some(diags)
             });
-            // todo: .flatten() removed
-            // let to_publish = diags.flatten().cloned().collect();
             let to_publish = diags.flatten().cloned().collect();
 
             Self::do_publish_diagnostics(&self.host, url.clone(), to_publish, None, false)

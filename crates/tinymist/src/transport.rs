@@ -26,7 +26,6 @@ pub fn io_transport<I: BufRead, O: Write>(
     inp: impl FnOnce() -> I + Send + Sync + 'static,
     out: impl FnOnce() -> O + Send + Sync + 'static,
 ) -> (Sender<Message>, Receiver<Message>, IoThreads) {
-    // todo: set cap back to 0
     let (writer_sender, writer_receiver) = bounded::<Message>(0);
     let writer = thread::spawn(move || {
         let mut out = out();

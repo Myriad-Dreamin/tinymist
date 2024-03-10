@@ -293,7 +293,6 @@ impl Config {
             self.export_pdf = ExportPdfMode::default();
         }
 
-        // todo: it doesn't respect the root path
         let root_path = update.get("rootPath");
         if let Some(root_path) = root_path {
             if root_path.is_null() {
