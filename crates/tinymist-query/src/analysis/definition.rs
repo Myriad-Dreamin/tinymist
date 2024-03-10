@@ -1,7 +1,9 @@
+use std::collections::HashSet;
 use std::ops::Deref;
 use std::path::Path;
 
 use log::{debug, trace};
+use parking_lot::Mutex;
 use typst::syntax::ast::Ident;
 use typst::World;
 use typst::{
@@ -79,6 +81,10 @@ fn deref_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
 }
 
 fn advance_prev_adjacent(node: LinkedNode) -> Option<LinkedNode> {
+    // this is aworkaround for a bug in the parser
+    if node.len() == 0 {
+        return None;
+    }
     match node.prev_sibling() {
         Some(prev) => Some(prev),
         None => {
@@ -91,12 +97,17 @@ fn advance_prev_adjacent(node: LinkedNode) -> Option<LinkedNode> {
 
 // #[comemo::memoize]
 fn find_definition_in_module<'a>(
-    world: Tracked<'a, dyn World>,
-    current: TypstFileId,
+    search_ctx: &'a SearchCtx<'a>,
     source: Source,
-    name: &'a str,
+    name: &str,
 ) -> Option<Span> {
-    // todo: cyclic import
+    {
+        let mut s = search_ctx.searched.lock();
+        if s.contains(&source.id()) {
+            return None;
+        }
+        s.insert(source.id());
+    }
     let root = source.root();
     let node = LinkedNode::new(root);
     let last_expr = if let Some(m) = root.cast::<ast::Markup>() {
@@ -106,7 +117,7 @@ fn find_definition_in_module<'a>(
         return None;
     };
     let last = node.find(last_expr.span())?;
-    let e = find_syntax_definition(world, current, last, name)?;
+    let e = find_syntax_definition(search_ctx, last, name)?;
     Some(e.span())
 }
 
@@ -127,9 +138,8 @@ enum ImportRef<'a> {
     ExternalResolved(Span),
 }
 
-fn find_ref_in_import<'a>(
-    world: Tracked<'_, dyn World>,
-    current: TypstFileId,
+fn find_ref_in_import<'b, 'a>(
+    ctx: &'b SearchCtx<'b>,
     import_node: ast::ModuleImport<'a>,
     name: &str,
 ) -> Option<ImportRef<'a>> {
@@ -161,8 +171,8 @@ fn find_ref_in_import<'a>(
 
     match imports {
         ast::Imports::Wildcard => {
-            let dep = find_source_by_import(world, current, import_node)?;
-            let res = find_definition_in_module(world, current, dep, name)?;
+            let dep = find_source_by_import(ctx.world, ctx.current, import_node)?;
+            let res = find_definition_in_module(ctx, dep, name)?;
             return Some(ImportRef::ExternalResolved(res));
         }
         ast::Imports::Items(items) => {
@@ -187,21 +197,19 @@ fn find_ref_in_import<'a>(
     None
 }
 
-fn find_syntax_definition<'a>(
-    world: Tracked<'a, dyn World>,
-    current: TypstFileId,
+fn find_syntax_definition<'b, 'a>(
+    search_ctx: &'b SearchCtx<'b>,
     node: LinkedNode<'a>,
     name: &str,
 ) -> Option<Definition<'a>> {
-    struct SyntaxDefinitionWorker<'a, 'b> {
-        world: Tracked<'a, dyn World>,
-        current: TypstFileId,
+    struct SyntaxDefinitionWorker<'a, 'b, 'c> {
+        ctx: &'c SearchCtx<'c>,
         name: &'b str,
         use_site: LinkedNode<'a>,
     }
 
-    impl<'a, 'b> SyntaxDefinitionWorker<'a, 'b> {
-        fn find(&self, mut node: LinkedNode<'a>) -> Option<Definition<'a>> {
+    impl<'a, 'b, 'c> SyntaxDefinitionWorker<'a, 'b, 'c> {
+        fn find(&mut self, mut node: LinkedNode<'a>) -> Option<Definition<'a>> {
             loop {
                 if let Some(def) = self.check(node.clone()) {
                     return Some(def);
@@ -229,7 +237,7 @@ fn find_syntax_definition<'a>(
             }))
         }
 
-        fn check(&self, node: LinkedNode<'a>) -> Option<Definition<'a>> {
+        fn check(&mut self, node: LinkedNode<'a>) -> Option<Definition<'a>> {
             let node = deref_lvalue(node)?;
             match node.kind() {
                 SyntaxKind::LetBinding => {
@@ -238,7 +246,7 @@ fn find_syntax_definition<'a>(
                         ast::LetBindingKind::Closure(name) => {
                             if name.get() == self.name {
                                 let values =
-                                    analyze_expr(self.world.deref(), &node.find(name.span())?);
+                                    analyze_expr(self.ctx.world.deref(), &node.find(name.span())?);
                                 let func = values.into_iter().find_map(|v| match v.0 {
                                     Value::Func(f) => Some(f),
                                     _ => None,
@@ -289,9 +297,13 @@ fn find_syntax_definition<'a>(
                 SyntaxKind::ModuleImport => {
                     let import_node = node.cast::<ast::ModuleImport>()?;
 
-                    match find_ref_in_import(self.world, self.current, import_node, self.name)? {
+                    match find_ref_in_import(self.ctx, import_node, self.name)? {
                         ImportRef::ModuleAs(ident) => {
-                            let m = find_source_by_import(self.world, self.current, import_node)?;
+                            let m = find_source_by_import(
+                                self.ctx.world,
+                                self.ctx.current,
+                                import_node,
+                            )?;
                             return Some(Definition::Module(ModuleDefinition {
                                 module: m.id(),
                                 use_site: self.use_site.clone(),
@@ -299,7 +311,11 @@ fn find_syntax_definition<'a>(
                             }));
                         }
                         ImportRef::Path(s) => {
-                            let m = find_source_by_import(self.world, self.current, import_node)?;
+                            let m = find_source_by_import(
+                                self.ctx.world,
+                                self.ctx.current,
+                                import_node,
+                            )?;
                             return Some(Definition::Module(ModuleDefinition {
                                 module: m.id(),
                                 use_site: self.use_site.clone(),
@@ -334,13 +350,18 @@ fn find_syntax_definition<'a>(
         }
     }
 
-    let worker = SyntaxDefinitionWorker {
-        world,
-        current,
+    let mut worker = SyntaxDefinitionWorker {
+        ctx: search_ctx,
         name,
         use_site: node.clone(),
     };
     worker.find(node)
+}
+
+struct SearchCtx<'a> {
+    world: Tracked<'a, dyn World>,
+    current: TypstFileId,
+    searched: Mutex<HashSet<TypstFileId>>,
 }
 
 // todo: field definition
@@ -349,6 +370,14 @@ pub(crate) fn find_definition<'a>(
     current: TypstFileId,
     node: LinkedNode<'a>,
 ) -> Option<Definition<'a>> {
+    let mut search_ctx = SearchCtx {
+        world,
+        current,
+        searched: Mutex::new(HashSet::new()),
+    };
+    let search_ctx = &mut search_ctx;
+    search_ctx.searched.lock().insert(current);
+
     let mut ancestor = node;
     while !ancestor.is::<ast::Expr>() {
         ancestor = ancestor.parent()?.clone();
@@ -415,10 +444,8 @@ pub(crate) fn find_definition<'a>(
         }),
         _ => {
             return match may_ident {
-                ast::Expr::Ident(e) => find_syntax_definition(world, current, use_site, e.get()),
-                ast::Expr::MathIdent(e) => {
-                    find_syntax_definition(world, current, use_site, e.get())
-                }
+                ast::Expr::Ident(e) => find_syntax_definition(search_ctx, use_site, e.get()),
+                ast::Expr::MathIdent(e) => find_syntax_definition(search_ctx, use_site, e.get()),
                 ast::Expr::FieldAccess(..) => {
                     debug!("find field access");
                     None
