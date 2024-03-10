@@ -3,6 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::bail;
 use itertools::Itertools;
+use log::info;
 use lsp_types::*;
 use serde::Deserialize;
 use serde_json::{Map, Value as JsonValue};
@@ -114,14 +115,18 @@ pub enum ExperimentalFormatterMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ExportPdfMode {
-    /// Don't export PDF automatically.
+    #[default]
+    Auto,
+    /// Select best solution automatically. (Recommended)
     Never,
     /// Export PDF on saving the document, i.e. on `textDocument/didSave`
     /// events.
-    #[default]
     OnSave,
     /// Export PDF on typing, i.e. on `textDocument/didChange` events.
     OnType,
+    /// Export PDFs when a document has a title, which is useful to filter out
+    /// template files.
+    OnDocumentHasTitle,
 }
 
 /// The mode of semantic tokens.
@@ -346,6 +351,11 @@ impl Init {
 
         // Initialize configurations
         let cc = ConstConfig::from(&params);
+        info!(
+            "initialized with const_config {const_config:?}",
+            const_config = cc
+        );
+
         let mut config = Config::default();
 
         // Bootstrap server
@@ -363,6 +373,8 @@ impl Init {
                 return (service, Err(err));
             }
         }
+
+        info!("initialized with config {config:?}", config = config);
 
         let cluster_actor = CompileClusterActor {
             host: self.host.clone(),

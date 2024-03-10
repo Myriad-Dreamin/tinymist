@@ -788,16 +788,25 @@ impl TypstLanguageServer {
         let uri = params.text_document.uri;
         let path = uri.to_file_path().unwrap();
 
-        if self.config.export_pdf == ExportPdfMode::OnSave {
-            let _ = run_query!(self.OnSaveExport(path));
-        }
+        let _ = run_query!(self.OnSaveExport(path));
         Ok(())
     }
 
     fn on_changed_configuration(&mut self, values: Map<String, JsonValue>) -> LspResult<()> {
+        let export_pdf = self.config.export_pdf;
         match self.config.update_by_map(&values) {
             Ok(()) => {
                 info!("new settings applied");
+
+                if export_pdf != self.config.export_pdf {
+                    self.primary().change_export_pdf(self.config.export_pdf);
+                    {
+                        let m = self.main.lock();
+                        if let Some(main) = m.as_ref() {
+                            main.wait().change_export_pdf(self.config.export_pdf);
+                        }
+                    }
+                }
             }
             Err(err) => {
                 error!("error applying new settings: {err}");
@@ -829,8 +838,8 @@ impl TypstLanguageServer {
                             return;
                         };
 
-                        let resp = serde_json::from_value(result).unwrap();
-                        let _ = this.on_changed_configuration(resp);
+                        let resp: Vec<JsonValue> = serde_json::from_value(result).unwrap();
+                        let _ = this.on_changed_configuration(Config::values_to_map(resp));
                     },
                 );
             }

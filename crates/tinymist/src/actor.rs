@@ -12,7 +12,7 @@ use tokio::sync::{broadcast, watch};
 use typst_ts_core::config::CompileOpts;
 
 use self::{
-    render::PdfExportActor,
+    render::{PdfExportActor, PdfExportConfig},
     typst::{create_server, CompileActor},
 };
 use crate::TypstLanguageServer;
@@ -23,7 +23,19 @@ impl TypstLanguageServer {
         let (render_tx, _) = broadcast::channel(10);
 
         // Run the PDF export actor before preparing cluster to avoid loss of events
-        tokio::spawn(PdfExportActor::new(doc_rx.clone(), render_tx.subscribe()).run());
+        tokio::spawn(
+            PdfExportActor::new(
+                doc_rx.clone(),
+                render_tx.subscribe(),
+                Some(PdfExportConfig {
+                    path: entry
+                        .as_ref()
+                        .map(|e| e.clone().with_extension("pdf").into()),
+                    mode: self.config.export_pdf,
+                }),
+            )
+            .run(),
+        );
 
         let roots = self.roots.clone();
         let opts = CompileOpts {

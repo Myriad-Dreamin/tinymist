@@ -27,16 +27,20 @@
                     "title": "Export PDF",
                     "description": "The extension can export PDFs of your Typst files. This setting controls whether this feature is enabled and how often it runs.",
                     "type": "string",
-                    "default": "onSave",
+                    "default": "auto",
                     "enum": [
+                        "auto",
                         "never",
                         "onSave",
-                        "onType"
+                        "onType",
+                        "onDocumentHasTitle"
                     ],
                     "enumDescriptions": [
+                        "Select best solution automatically. (Recommended)",
                         "Never export PDFs, you will manually run typst.",
                         "Export PDFs when you save a file.",
-                        "Export PDFs as you type in a file."
+                        "Export PDFs as you type in a file.",
+                        "Export PDFs when a document has a title (and save a file), which is useful to filter out template files."
                     ]
                 },
                 "tinymist.rootPath": {
@@ -86,10 +90,10 @@
                     "title": "Enable Experimental Formatter",
                     "description": "The extension can format Typst files using typstfmt (experimental).",
                     "type": "string",
-                    "default": "off",
+                    "default": "disable",
                     "enum": [
-                        "off",
-                        "on"
+                        "disable",
+                        "enable"
                     ],
                     "enumDescriptions": [
                         "Formatter is not activated.",

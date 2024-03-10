@@ -5,7 +5,8 @@ use std::{
     sync::{Arc, Mutex as SyncMutex},
 };
 
-use log::{debug, error, trace, warn};
+use log::{debug, error, info, trace, warn};
+use parking_lot::Mutex;
 use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
     OnSaveExportRequest, PositionEncoding,
@@ -34,8 +35,8 @@ use typst_ts_core::{
     Bytes, Error, ImmutPath, TypstDocument, TypstWorld,
 };
 
-use super::compile::CompileActor as CompileActorInner;
 use super::compile::CompileClient as TsCompileClient;
+use super::{compile::CompileActor as CompileActorInner, render::PdfExportConfig};
 use crate::actor::render::RenderActorRequest;
 use crate::ConstConfig;
 
@@ -62,11 +63,12 @@ pub fn create_server(
         let root = compiler_driver.inner.world.root.as_ref().to_owned();
         let handler: CompileHandler = compiler_driver.handler.clone();
 
+        let ontyped_render_tx = render_tx.clone();
         let driver = CompileExporter::new(compiler_driver).with_exporter(Box::new(
             move |_w: &dyn TypstWorld, doc| {
                 let _ = doc_sender.send(Some(doc));
                 // todo: is it right that ignore zero broadcast receiver?
-                let _ = render_tx.send(RenderActorRequest::Render);
+                let _ = ontyped_render_tx.send(RenderActorRequest::OnTyped);
 
                 Ok(())
             },
@@ -84,11 +86,17 @@ pub fn create_server(
 
         current_runtime.spawn(server.spawn());
 
-        let this = CompileActor::new(diag_group, cfg.position_encoding, handler, client);
+        let this = CompileActor::new(
+            diag_group,
+            cfg.position_encoding,
+            handler,
+            client,
+            render_tx,
+        );
 
         // todo: less bug-prone code
         if let Some(entry) = entry {
-            this.entry.lock().unwrap().replace(entry.into());
+            this.entry.lock().replace(entry.into());
         }
 
         this
@@ -289,8 +297,9 @@ pub struct CompileActor {
     diag_group: String,
     position_encoding: PositionEncoding,
     handler: CompileHandler,
-    entry: Arc<SyncMutex<Option<ImmutPath>>>,
+    entry: Arc<Mutex<Option<ImmutPath>>>,
     pub inner: CompileClient<CompileHandler>,
+    render_tx: broadcast::Sender<RenderActorRequest>,
 }
 
 // todo: remove unsafe impl send
@@ -356,7 +365,7 @@ impl CompileActor {
         // todo: more robust rollback logic
         let entry = self.entry.clone();
         let should_change = {
-            let mut entry = entry.lock().unwrap();
+            let mut entry = entry.lock();
             let should_change = entry.as_ref().map(|e| e != &path).unwrap_or(true);
             let prev = entry.clone();
             *entry = Some(path.clone());
@@ -373,6 +382,12 @@ impl CompileActor {
                 next.display()
             );
 
+            self.render_tx
+                .send(RenderActorRequest::ChangeExportPath(Some(
+                    next.with_extension("pdf").into(),
+                )))
+                .unwrap();
+
             // todo
             let res = self.steal(move |compiler| {
                 let root = compiler.compiler.world().workspace_root();
@@ -386,7 +401,13 @@ impl CompileActor {
             });
 
             if res.is_err() {
-                let mut entry = entry.lock().unwrap();
+                self.render_tx
+                    .send(RenderActorRequest::ChangeExportPath(
+                        prev.clone().map(|e| e.with_extension("pdf").into()),
+                    ))
+                    .unwrap();
+
+                let mut entry = entry.lock();
                 if *entry == Some(next) {
                     *entry = prev;
                 }
@@ -396,10 +417,24 @@ impl CompileActor {
 
             // todo: trigger recompile
             let files = FileChangeSet::new_inserts(vec![]);
-            self.inner.add_memory_changes(MemoryEvent::Update(files))
+            self.inner.add_memory_changes(MemoryEvent::Update(files));
         }
 
         Ok(())
+    }
+
+    pub(crate) fn change_export_pdf(&self, export_pdf: crate::ExportPdfMode) {
+        let entry = self.entry.lock();
+        let path = entry
+            .as_ref()
+            .map(|e| e.clone().with_extension("pdf").into());
+        let _ = self
+            .render_tx
+            .send(RenderActorRequest::ChangeConfig(PdfExportConfig {
+                path,
+                mode: export_pdf,
+            }))
+            .unwrap();
     }
 }
 
@@ -494,13 +529,15 @@ impl CompileActor {
         position_encoding: PositionEncoding,
         handler: CompileHandler,
         inner: CompileClient<CompileHandler>,
+        render_tx: broadcast::Sender<RenderActorRequest>,
     ) -> Self {
         Self {
             diag_group,
             position_encoding,
             handler,
-            entry: Arc::new(SyncMutex::new(None)),
+            entry: Arc::new(Mutex::new(None)),
             inner,
+            render_tx,
         }
     }
 
@@ -529,7 +566,10 @@ impl CompileActor {
         }
     }
 
-    fn on_save_export(&self, _path: PathBuf) -> anyhow::Result<()> {
+    fn on_save_export(&self, path: PathBuf) -> anyhow::Result<()> {
+        info!("CompileActor: on save export: {}", path.display());
+        let _ = self.render_tx.send(RenderActorRequest::OnSaved(path));
+
         Ok(())
     }
 
