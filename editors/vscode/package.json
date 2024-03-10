@@ -73,7 +73,7 @@
                     ]
                 },
                 "tinymist.noSystemFonts": {
-                    "title": "whether to load system fonts for Typst compiler",
+                    "title": "Whether to load system fonts for Typst compiler",
                     "description": "A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler.",
                     "type": [
                         "boolean",
@@ -83,12 +83,22 @@
                 },
                 "tinymist.fontPaths": {
                     "title": "Font paths for Typst compiler",
-                    "description": "Font paths, which doesn't allow for dynamic configuration",
+                    "description": "Font paths, which doesn't allow for dynamic configuration. Note: you can use vscode variables in the path, e.g. `${workspaceFolder}/fonts`.",
                     "type": [
                         "array",
                         "null"
                     ],
                     "default": null
+                },
+                "tinymist.typstExtraArgs": {
+                    "title": "Specifies the arguments for Typst as same as typst-cli",
+                    "description": "You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`.",
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "title": "arguments in order"
+                    },
+                    "default": []
                 },
                 "tinymist.serverPath": {
                     "title": "Path to server executable",

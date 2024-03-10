@@ -22,9 +22,17 @@ impl TypstLanguageServer {
         let (doc_tx, doc_rx) = watch::channel(None);
         let (render_tx, _) = broadcast::channel(10);
 
+        // todo: don't ignore entry from typst_extra_args
+        // entry: command.input,
         let roots = self.roots.clone();
         let root_dir = self.config.root_path.clone();
-        let root_dir = root_dir.unwrap_or_else(|| roots.first().cloned().unwrap_or_default());
+        let root_dir = root_dir.or_else(|| {
+            self.config
+                .typst_extra_args
+                .as_ref()
+                .and_then(|x| x.root_dir.clone())
+        });
+        let root_dir = root_dir.unwrap_or_else(|| roots.first().cloned().unwrap());
         // Run the PDF export actor before preparing cluster to avoid loss of events
         tokio::spawn(
             PdfExportActor::new(
@@ -40,12 +48,26 @@ impl TypstLanguageServer {
             .run(),
         );
 
-        let opts = CompileOpts {
+        let mut opts = CompileOpts {
             root_dir,
             // todo: additional inputs
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
             ..self.compile_opts.clone()
         };
+
+        if let Some(extras) = &self.config.typst_extra_args {
+            if let Some(inputs) = extras.inputs.as_ref() {
+                if opts.inputs.is_empty() {
+                    opts.inputs = inputs.clone();
+                }
+            }
+            if !extras.font_paths.is_empty() && opts.font_paths.is_empty() {
+                opts.font_paths = extras.font_paths.clone();
+            }
+        }
+
+        // ..self.config.typst_extra_args.clone()
+
         create_server(
             name,
             self.const_config(),

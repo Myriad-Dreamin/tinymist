@@ -2,14 +2,18 @@ use core::fmt;
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::bail;
+use clap::builder::ValueParser;
+use clap::{ArgAction, Parser};
 use itertools::Itertools;
-use log::info;
+use log::{error, info};
 use lsp_types::*;
 use serde::Deserialize;
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
+use typst::foundations::IntoValue;
 use typst_ts_core::config::CompileOpts;
+use typst_ts_core::TypstDict;
 
 use crate::actor::cluster::CompileClusterActor;
 use crate::{invalid_params, LspHost, LspResult, TypstLanguageServer, TypstLanguageServerArgs};
@@ -141,6 +145,21 @@ pub enum SemanticTokensMode {
     Enable,
 }
 
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct CompileExtraOpts {
+    /// The root directory for compilation routine.
+    pub root_dir: Option<PathBuf>,
+
+    /// Path to entry
+    pub entry: Option<PathBuf>,
+
+    /// Additional input arguments to compile the entry file.
+    pub inputs: Option<TypstDict>,
+
+    /// will remove later
+    pub font_paths: Vec<PathBuf>,
+}
+
 type Listener<T> = Box<dyn FnMut(&T) -> anyhow::Result<()>>;
 
 const CONFIG_ITEMS: &[&str] = &[
@@ -149,6 +168,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "rootPath",
     "semanticTokens",
     "experimentalFormatterMode",
+    "typstExtraArgs",
 ];
 
 /// The user configuration read from the editor.
@@ -164,8 +184,51 @@ pub struct Config {
     pub semantic_tokens: SemanticTokensMode,
     /// Dynamic configuration for the experimental formatter.
     pub formatter: ExperimentalFormatterMode,
+    /// Typst extra arguments.
+    pub typst_extra_args: Option<CompileExtraOpts>,
     semantic_tokens_listeners: Vec<Listener<SemanticTokensMode>>,
     formatter_listeners: Vec<Listener<ExperimentalFormatterMode>>,
+}
+
+/// Common arguments of compile, watch, and query.
+#[derive(Debug, Clone, Parser)]
+pub struct TypstArgs {
+    /// Path to input Typst file, use `-` to read input from stdin
+    #[clap(value_name = "INPUT")]
+    pub input: Option<PathBuf>,
+
+    /// Configures the project root (for absolute paths)
+    #[clap(long = "root", value_name = "DIR")]
+    pub root: Option<PathBuf>,
+
+    /// Add a string key-value pair visible through `sys.inputs`
+    #[clap(
+            long = "input",
+            value_name = "key=value",
+            action = ArgAction::Append,
+            value_parser = ValueParser::new(parse_input_pair),
+        )]
+    pub inputs: Vec<(String, String)>,
+
+    /// Adds additional directories to search for fonts
+    #[clap(long = "font-path", value_name = "DIR")]
+    pub font_paths: Vec<PathBuf>,
+}
+
+/// Parses key/value pairs split by the first equal sign.
+///
+/// This function will return an error if the argument contains no equals sign
+/// or contains the key (before the equals sign) is empty.
+fn parse_input_pair(raw: &str) -> Result<(String, String), String> {
+    let (key, val) = raw
+        .split_once('=')
+        .ok_or("input must be a key and a value separated by an equal sign")?;
+    let key = key.trim().to_owned();
+    if key.is_empty() {
+        return Err("the key was missing or empty".to_owned());
+    }
+    let val = val.trim().to_owned();
+    Ok((key, val))
 }
 
 impl Config {
@@ -226,6 +289,8 @@ impl Config {
             .and_then(Result::ok);
         if let Some(export_pdf) = export_pdf {
             self.export_pdf = export_pdf;
+        } else {
+            self.export_pdf = ExportPdfMode::default();
         }
 
         // todo: it doesn't respect the root path
@@ -237,6 +302,8 @@ impl Config {
             if let Some(root_path) = root_path.as_str().map(PathBuf::from) {
                 self.root_path = Some(root_path);
             }
+        } else {
+            self.root_path = None;
         }
 
         let semantic_tokens = update
@@ -261,6 +328,43 @@ impl Config {
             self.formatter = formatter;
         }
 
+        'parse_extra_args: {
+            if let Some(typst_extra_args) = update.get("typstExtraArgs") {
+                let typst_args: Vec<String> = match serde_json::from_value(typst_extra_args.clone())
+                {
+                    Ok(e) => e,
+                    Err(e) => {
+                        error!("failed to parse typstExtraArgs: {e}");
+                        return Ok(());
+                    }
+                };
+
+                let command = match TypstArgs::try_parse_from(
+                    Some("typst-cli".to_owned()).into_iter().chain(typst_args),
+                ) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        error!("failed to parse typstExtraArgs: {e}");
+                        break 'parse_extra_args;
+                    }
+                };
+
+                // Convert the input pairs to a dictionary.
+                let inputs: TypstDict = command
+                    .inputs
+                    .iter()
+                    .map(|(k, v)| (k.as_str().into(), v.as_str().into_value()))
+                    .collect();
+
+                self.typst_extra_args = Some(CompileExtraOpts {
+                    entry: command.input,
+                    root_dir: command.root,
+                    inputs: Some(inputs),
+                    font_paths: command.font_paths,
+                });
+            }
+        }
+
         Ok(())
     }
 
@@ -279,6 +383,7 @@ impl fmt::Debug for Config {
             .field("export_pdf", &self.export_pdf)
             .field("formatter", &self.formatter)
             .field("semantic_tokens", &self.semantic_tokens)
+            .field("typst_extra_args", &self.typst_extra_args)
             .field(
                 "semantic_tokens_listeners",
                 &format_args!("Vec[len = {}]", self.semantic_tokens_listeners.len()),
