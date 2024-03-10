@@ -143,6 +143,7 @@ pub enum SemanticTokensMode {
 type Listener<T> = Box<dyn FnMut(&T) -> anyhow::Result<()>>;
 
 const CONFIG_ITEMS: &[&str] = &[
+    "outputPath",
     "exportPdf",
     "rootPath",
     "semanticTokens",
@@ -152,6 +153,8 @@ const CONFIG_ITEMS: &[&str] = &[
 /// The user configuration read from the editor.
 #[derive(Default)]
 pub struct Config {
+    /// The output directory for PDF export.
+    pub output_path: String,
     /// The mode of PDF export.
     pub export_pdf: ExportPdfMode,
     /// Specifies the root path of the project manually.
@@ -210,6 +213,12 @@ impl Config {
     /// # Errors
     /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
+        if let Some(JsonValue::String(output_path)) = update.get("outputPath") {
+            self.output_path = output_path.to_owned();
+        } else {
+            self.output_path = String::new();
+        }
+
         let export_pdf = update
             .get("exportPdf")
             .map(ExportPdfMode::deserialize)
@@ -218,6 +227,7 @@ impl Config {
             self.export_pdf = export_pdf;
         }
 
+        // todo: it doesn't respect the root path
         let root_path = update.get("rootPath");
         if let Some(root_path) = root_path {
             if root_path.is_null() {

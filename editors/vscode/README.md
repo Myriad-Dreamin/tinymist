@@ -12,14 +12,23 @@ See [Tinymist features](../../README.md#features) for a list of features.
   the output as you work, install a PDF viewer extension, such as
   `vscode-pdf`.
 - To configure when PDFs are compiled:
-  1. Open settings
+  1. Open settings.
     - File -> Preferences -> Settings (Linux, Windows)
     - Code -> Preferences -> Settings (Mac)
-  2. Search for "Typst Export PDF"
-  3. Change the Export PDF setting
-    - `onSave` makes a PDF after saving the Typst file
-    - `onType` makes PDF files live, as you type
-    - `never` disables PDF compilation
+  2. Search for "Tinymist Export PDF".
+  3. Change the Export PDF setting.
+    - `onSave` makes a PDF after saving the Typst file.
+    - `onType` makes PDF files live, as you type.
+    - `never` disables PDF compilation.
+    - "onDocumentHasTitle" makes a PDF when the document has a title and, as you save.
+- To configure where PDFs are saved:
+  1. Open settings.
+  2. Search for "Tinymist Output Path".
+  3. Change the Export PDF setting. This is the path pattern to store artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration
+    - e.g. `$root/$dir/$name` (default) for `$root/path/to/main.pdf`.
+    - e.g. `$root/target/$dir/$name` for `$root/target/path/to/main.pdf`.
+    - e.g. `$root/foo` for `$root/foo.pdf`.
+  4. Note: the output path should be substituted as an absolute path.
 
 ## Technical
 

@@ -22,24 +22,25 @@ impl TypstLanguageServer {
         let (doc_tx, doc_rx) = watch::channel(None);
         let (render_tx, _) = broadcast::channel(10);
 
+        let roots = self.roots.clone();
+        let root_dir = roots.first().cloned().unwrap_or_default();
         // Run the PDF export actor before preparing cluster to avoid loss of events
         tokio::spawn(
             PdfExportActor::new(
                 doc_rx.clone(),
                 render_tx.subscribe(),
-                Some(PdfExportConfig {
-                    path: entry
-                        .as_ref()
-                        .map(|e| e.clone().with_extension("pdf").into()),
+                PdfExportConfig {
+                    substitute_pattern: self.config.output_path.clone(),
+                    root: root_dir.clone().into(),
+                    path: entry.clone().map(From::from),
                     mode: self.config.export_pdf,
-                }),
+                },
             )
             .run(),
         );
 
-        let roots = self.roots.clone();
         let opts = CompileOpts {
-            root_dir: roots.first().cloned().unwrap_or_default(),
+            root_dir,
             // todo: font paths
             // font_paths: arguments.font_paths.clone(),
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),

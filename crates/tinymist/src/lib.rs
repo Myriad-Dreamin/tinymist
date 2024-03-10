@@ -62,6 +62,7 @@ use typst::util::Deferred;
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
 
+use crate::actor::render::PdfExportConfig;
 use crate::init::*;
 
 // Enforces drop order
@@ -793,17 +794,27 @@ impl TypstLanguageServer {
     }
 
     fn on_changed_configuration(&mut self, values: Map<String, JsonValue>) -> LspResult<()> {
+        let output_directory = self.config.output_path.clone();
         let export_pdf = self.config.export_pdf;
         match self.config.update_by_map(&values) {
             Ok(()) => {
                 info!("new settings applied");
 
-                if export_pdf != self.config.export_pdf {
-                    self.primary().change_export_pdf(self.config.export_pdf);
+                if output_directory != self.config.output_path
+                    || export_pdf != self.config.export_pdf
+                {
+                    let config = PdfExportConfig {
+                        substitute_pattern: self.config.output_path.clone(),
+                        mode: self.config.export_pdf,
+                        root: Path::new("").into(),
+                        path: None,
+                    };
+
+                    self.primary().change_export_pdf(config.clone());
                     {
                         let m = self.main.lock();
                         if let Some(main) = m.as_ref() {
-                            main.wait().change_export_pdf(self.config.export_pdf);
+                            main.wait().change_export_pdf(config);
                         }
                     }
                 }

@@ -37,7 +37,7 @@ use typst_ts_core::{
 
 use super::compile::CompileClient as TsCompileClient;
 use super::{compile::CompileActor as CompileActorInner, render::PdfExportConfig};
-use crate::actor::render::RenderActorRequest;
+use crate::actor::render::{PdfPathVars, RenderActorRequest};
 use crate::ConstConfig;
 
 type CompileService<H> = CompileActorInner<Reporter<CompileExporter<CompileDriver>, H>>;
@@ -80,7 +80,7 @@ pub fn create_server(
             inner: driver,
             cb: handler.clone(),
         };
-        let driver = CompileActorInner::new(driver, root).with_watch(true);
+        let driver = CompileActorInner::new(driver, root.clone()).with_watch(true);
 
         let (server, client) = driver.split();
 
@@ -88,6 +88,7 @@ pub fn create_server(
 
         let this = CompileActor::new(
             diag_group,
+            root.into(),
             cfg.position_encoding,
             handler,
             client,
@@ -297,6 +298,7 @@ pub struct CompileActor {
     diag_group: String,
     position_encoding: PositionEncoding,
     handler: CompileHandler,
+    root: ImmutPath,
     entry: Arc<Mutex<Option<ImmutPath>>>,
     pub inner: CompileClient<CompileHandler>,
     render_tx: broadcast::Sender<RenderActorRequest>,
@@ -383,9 +385,10 @@ impl CompileActor {
             );
 
             self.render_tx
-                .send(RenderActorRequest::ChangeExportPath(Some(
-                    next.with_extension("pdf").into(),
-                )))
+                .send(RenderActorRequest::ChangeExportPath(PdfPathVars {
+                    root: self.root.clone(),
+                    path: Some(next.clone()),
+                }))
                 .unwrap();
 
             // todo
@@ -402,9 +405,10 @@ impl CompileActor {
 
             if res.is_err() {
                 self.render_tx
-                    .send(RenderActorRequest::ChangeExportPath(
-                        prev.clone().map(|e| e.with_extension("pdf").into()),
-                    ))
+                    .send(RenderActorRequest::ChangeExportPath(PdfPathVars {
+                        root: self.root.clone(),
+                        path: prev.clone(),
+                    }))
                     .unwrap();
 
                 let mut entry = entry.lock();
@@ -423,7 +427,7 @@ impl CompileActor {
         Ok(())
     }
 
-    pub(crate) fn change_export_pdf(&self, export_pdf: crate::ExportPdfMode) {
+    pub(crate) fn change_export_pdf(&self, config: PdfExportConfig) {
         let entry = self.entry.lock();
         let path = entry
             .as_ref()
@@ -431,8 +435,10 @@ impl CompileActor {
         let _ = self
             .render_tx
             .send(RenderActorRequest::ChangeConfig(PdfExportConfig {
+                substitute_pattern: config.substitute_pattern,
+                root: self.root.clone(),
                 path,
-                mode: export_pdf,
+                mode: config.mode,
             }))
             .unwrap();
     }
@@ -526,6 +532,7 @@ impl CompileHost for CompileActor {}
 impl CompileActor {
     fn new(
         diag_group: String,
+        root: ImmutPath,
         position_encoding: PositionEncoding,
         handler: CompileHandler,
         inner: CompileClient<CompileHandler>,
@@ -533,6 +540,7 @@ impl CompileActor {
     ) -> Self {
         Self {
             diag_group,
+            root,
             position_encoding,
             handler,
             entry: Arc::new(Mutex::new(None)),
