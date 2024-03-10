@@ -1,7 +1,7 @@
 use std::{borrow::Cow, ops::Range};
 
 use log::debug;
-use tower_lsp::lsp_types::{InlayHintKind, InlayHintLabel};
+use lsp_types::{InlayHintKind, InlayHintLabel};
 use typst::{
     foundations::{Args, Closure},
     syntax::SyntaxNode,

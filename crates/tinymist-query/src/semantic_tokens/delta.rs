@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::{SemanticToken, SemanticTokensEdit};
+use lsp_types::{SemanticToken, SemanticTokensEdit};
 
 #[derive(Debug)]
 struct CachedTokens {

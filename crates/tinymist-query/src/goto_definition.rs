@@ -1,6 +1,6 @@
 use comemo::Track;
 use log::debug;
-use tower_lsp::lsp_types::LocationLink;
+use lsp_types::LocationLink;
 
 use crate::{analysis::find_definition, prelude::*};
 

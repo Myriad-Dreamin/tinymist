@@ -1,10 +1,10 @@
 use itertools::Itertools;
-use parking_lot::RwLock;
-use strum::IntoEnumIterator;
-use tower_lsp::lsp_types::{
+use lsp_types::{
     Registration, SemanticToken, SemanticTokensEdit, SemanticTokensFullOptions,
     SemanticTokensLegend, SemanticTokensOptions, Unregistration,
 };
+use parking_lot::RwLock;
+use strum::IntoEnumIterator;
 use typst::diag::EcoString;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 

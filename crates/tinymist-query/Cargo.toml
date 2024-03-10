@@ -34,7 +34,7 @@ typst-ts-core = { version = "0.4.2-rc6", default-features = false, features = [
 ] }
 typst-ts-compiler.workspace = true
 
-tower-lsp.workspace = true
+lsp-types.workspace = true
 
 [dev-dependencies]
 once_cell.workspace = true

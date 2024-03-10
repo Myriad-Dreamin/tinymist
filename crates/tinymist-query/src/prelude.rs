@@ -8,7 +8,7 @@ pub use std::{
 pub use comemo::{Track, Tracked};
 pub use itertools::{Format, Itertools};
 pub use log::{error, trace};
-pub use tower_lsp::lsp_types::{
+pub use lsp_types::{
     CompletionResponse, DiagnosticRelatedInformation, DocumentSymbol, DocumentSymbolResponse,
     Documentation, FoldingRange, GotoDefinitionResponse, Hover, InlayHint, Location as LspLocation,
     MarkupContent, MarkupKind, Position as LspPosition, PrepareRenameResponse, SelectionRange,

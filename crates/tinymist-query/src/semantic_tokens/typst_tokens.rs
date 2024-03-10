@@ -1,7 +1,7 @@
 //! Types for tokens used for Typst syntax
 
+use lsp_types::{SemanticTokenModifier, SemanticTokenType};
 use strum::EnumIter;
-use tower_lsp::lsp_types::{SemanticTokenModifier, SemanticTokenType};
 
 const BOOL: SemanticTokenType = SemanticTokenType::new("bool");
 const PUNCTUATION: SemanticTokenType = SemanticTokenType::new("punct");

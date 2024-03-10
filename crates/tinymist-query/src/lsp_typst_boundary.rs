@@ -1,6 +1,6 @@
 //! Conversions between Typst and LSP types and representations
 
-use tower_lsp::lsp_types;
+use lsp_types;
 
 pub type LspPosition = lsp_types::Position;
 /// The interpretation of an `LspCharacterOffset` depends on the
@@ -130,11 +130,11 @@ pub mod typst_to_lsp {
 
     use itertools::Itertools;
     use lazy_static::lazy_static;
-    use regex::{Captures, Regex};
-    use tower_lsp::lsp_types::{
+    use lsp_types::{
         CompletionTextEdit, Documentation, InsertTextFormat, LanguageString, MarkedString,
         MarkupContent, MarkupKind, TextEdit,
     };
+    use regex::{Captures, Regex};
     use typst::diag::EcoString;
     use typst::foundations::{CastInfo, Repr};
     use typst::syntax::Source;

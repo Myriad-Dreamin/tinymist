@@ -1,7 +1,7 @@
 use std::{collections::HashSet, os::windows::fs::FileTypeExt};
 
 use log::{debug, warn};
-use tower_lsp::lsp_types::TextEdit;
+use lsp_types::TextEdit;
 
 use crate::{
     analysis::{find_definition, find_imports, find_lexical_references_after, Definition},

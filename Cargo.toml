@@ -41,8 +41,9 @@ typst-ts-core = { version = "0.4.2-rc6" }
 typst-ts-compiler = { version = "0.4.2-rc6" }
 typst-preview = { path = "external/typst-preview" }
 
-tower = { version = "0.4", default-features = false, features = ["util"] }
-tower-lsp = "0.20.0"
+lsp-server = "0.7.3"
+lsp-types = { version = "=0.95.0", features = ["proposed"] }
+crossbeam-channel = "0.5.8"
 
 clap = { version = "4.4", features = ["derive", "env", "unicode", "wrap_help"] }
 clap_builder = { version = "4", features = ["string"] }
@@ -86,8 +87,8 @@ missing_docs = "warn"
 
 [workspace.lints.clippy]
 uninlined_format_args = "warn"
-missing_errors_doc = "warn"
-missing_panics_doc = "warn"
+# missing_errors_doc = "warn"
+# missing_panics_doc = "warn"
 missing_safety_doc = "warn"
 undocumented_unsafe_blocks = "warn"
 

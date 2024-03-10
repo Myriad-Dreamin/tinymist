@@ -1,4 +1,4 @@
-use tower_lsp::lsp_types::{Position, SemanticToken};
+use lsp_types::{Position, SemanticToken};
 use typst::diag::EcoString;
 use typst::syntax::Source;
 

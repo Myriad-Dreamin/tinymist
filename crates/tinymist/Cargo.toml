@@ -47,8 +47,9 @@ typst-ts-core = { version = "0.4.2-rc6", default-features = false, features = [
 typst-ts-compiler.workspace = true
 typst-preview.workspace = true
 
-tower.workspace = true
-tower-lsp.workspace = true
+lsp-server.workspace = true
+crossbeam-channel.workspace = true
+lsp-types.workspace = true
 
 [features]
 default = ["cli"]
@@ -59,5 +60,5 @@ anyhow.workspace = true
 vergen.workspace = true
 cargo_metadata = "0.18.0"
 
-[lints]
-workspace = true
+# [lints]
+# workspace = true

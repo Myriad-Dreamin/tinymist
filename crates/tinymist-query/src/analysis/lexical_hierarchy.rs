@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use anyhow::anyhow;
 use log::info;
-use tower_lsp::lsp_types::SymbolKind;
+use lsp_types::SymbolKind;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 use typst_ts_core::typst::prelude::{eco_vec, EcoVec};
 
