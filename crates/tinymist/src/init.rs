@@ -361,7 +361,8 @@ impl Init {
         // Bootstrap server
         let (diag_tx, diag_rx) = mpsc::unbounded_channel();
 
-        let service = TypstLanguageServer::new(self.host.clone(), params.root_paths(), cc, diag_tx);
+        let mut service =
+            TypstLanguageServer::new(self.host.clone(), params.root_paths(), cc, diag_tx);
 
         if let Some(init) = &params.initialization_options {
             if let Err(err) = config
@@ -375,6 +376,7 @@ impl Init {
         }
 
         info!("initialized with config {config:?}", config = config);
+        service.config = config;
 
         let cluster_actor = CompileClusterActor {
             host: self.host.clone(),
@@ -391,7 +393,7 @@ impl Init {
         tokio::spawn(cluster_actor.run());
 
         // Respond to the host (LSP client)
-        let semantic_tokens_provider = match config.semantic_tokens {
+        let semantic_tokens_provider = match service.config.semantic_tokens {
             SemanticTokensMode::Enable
                 if !params.supports_semantic_tokens_dynamic_registration() =>
             {
@@ -400,7 +402,7 @@ impl Init {
             _ => None,
         };
 
-        let document_formatting_provider = match config.formatter {
+        let document_formatting_provider = match service.config.formatter {
             ExperimentalFormatterMode::Enable
                 if !params.supports_document_formatting_dynamic_registration() =>
             {
