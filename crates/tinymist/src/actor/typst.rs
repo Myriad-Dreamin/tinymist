@@ -1,25 +1,21 @@
 //! The typst actors running compilations.
 
 use std::{
-    collections::HashMap,
     path::{Path, PathBuf},
     sync::{Arc, Mutex as SyncMutex},
 };
 
-use anyhow::anyhow;
-use futures::future::join_all;
-use log::{debug, error, info, trace, warn};
-use lsp_types::{Diagnostic, TextDocumentContentChangeEvent, Url};
-use parking_lot::{Mutex, RwLock};
+use log::{debug, error, trace, warn};
+use parking_lot::Mutex;
 use tinymist_query::{
-    lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
-    LspDiagnostic, OnSaveExportRequest, PositionEncoding, SemanticTokenCache,
+    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
+    OnSaveExportRequest, PositionEncoding,
 };
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::{
-    diag::{FileResult, SourceDiagnostic, SourceResult},
+    diag::{SourceDiagnostic, SourceResult},
     layout::Position,
-    syntax::{Source, Span, VirtualPath},
+    syntax::{Span, VirtualPath},
     util::Deferred,
 };
 use typst_preview::{
@@ -28,8 +24,9 @@ use typst_preview::{
 };
 use typst_ts_compiler::{
     service::{
-        CompileActor, CompileClient as TsCompileClient, CompileDriver as CompileDriverInner,
-        CompileExporter, CompileMiddleware, Compiler, WorkspaceProvider, WorldExporter,
+        CompileActor as CompileActorInner, CompileClient as TsCompileClient,
+        CompileDriver as CompileDriverInner, CompileExporter, CompileMiddleware, Compiler,
+        WorkspaceProvider, WorldExporter,
     },
     vfs::notify::{FileChangeSet, MemoryEvent},
     Time, TypstSystemWorld,
@@ -41,104 +38,11 @@ use typst_ts_core::{
 
 use crate::actor::render::RenderActorRequest;
 use crate::ConstConfig;
-use crate::LspHost;
 
-use super::ActorFactory;
-
-type CompileService<H> = CompileActor<Reporter<CompileExporter<CompileDriver>, H>>;
+type CompileService<H> = CompileActorInner<Reporter<CompileExporter<CompileDriver>, H>>;
 type CompileClient<H> = TsCompileClient<CompileService<H>>;
-type Node = CompileNode<CompileHandler>;
 
 type DiagnosticsSender = mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>;
-
-pub struct CompileCluster {
-    roots: Vec<PathBuf>,
-    actor_factory: ActorFactory,
-    position_encoding: PositionEncoding,
-    memory_changes: RwLock<HashMap<Arc<Path>, MemoryFileMeta>>,
-    primary: Deferred<Node>,
-    main: Arc<Mutex<Option<Deferred<Node>>>>,
-    pub tokens_cache: SemanticTokenCache,
-    actor: Option<CompileClusterActor>,
-}
-
-impl CompileCluster {
-    pub fn new(
-        actor_factory: ActorFactory,
-        host: LspHost,
-        roots: Vec<PathBuf>,
-        cfg: &ConstConfig,
-        primary: Deferred<Node>,
-        diag_rx: mpsc::UnboundedReceiver<(String, Option<DiagnosticsMap>)>,
-    ) -> Self {
-        Self {
-            roots,
-            actor_factory,
-            position_encoding: cfg.position_encoding,
-            memory_changes: RwLock::new(HashMap::new()),
-            primary,
-            main: Arc::new(Mutex::new(None)),
-            tokens_cache: Default::default(),
-            actor: Some(CompileClusterActor {
-                host,
-                diag_rx,
-                diagnostics: HashMap::new(),
-                affect_map: HashMap::new(),
-                published_primary: false,
-            }),
-        }
-    }
-
-    pub fn split(mut self) -> (Self, CompileClusterActor) {
-        let actor = self.actor.take().expect("actor is poisoned");
-        (self, actor)
-    }
-
-    pub fn activate_doc(&self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
-        match new_entry {
-            Some(new_entry) => self.primary.wait().change_entry(new_entry)?,
-            None => {
-                self.primary.wait().disable();
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn pin_main(&self, new_entry: Option<Url>) -> Result<(), Error> {
-        let mut m = self.main.lock();
-        match (new_entry, m.is_some()) {
-            (Some(new_entry), true) => {
-                let path = new_entry
-                    .to_file_path()
-                    .map_err(|_| error_once!("invalid url"))?;
-                let path = path.as_path().into();
-
-                m.as_mut().unwrap().wait().change_entry(path)
-            }
-            (Some(new_entry), false) => {
-                let path = new_entry
-                    .to_file_path()
-                    .map_err(|_| error_once!("invalid url"))?;
-                let path = path.as_path().into();
-
-                let main_node =
-                    self.actor_factory
-                        .server("main".to_owned(), self.roots.clone(), Some(path));
-
-                *m = Some(main_node);
-                Ok(())
-            }
-            (None, true) => {
-                // todo: unpin main
-                m.as_mut().unwrap().wait().disable();
-
-                Ok(())
-            }
-            (None, false) => Ok(()),
-        }
-    }
-}
 
 #[allow(clippy::too_many_arguments)]
 pub fn create_server(
@@ -150,7 +54,7 @@ pub fn create_server(
     diag_tx: DiagnosticsSender,
     doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
     render_tx: broadcast::Sender<RenderActorRequest>,
-) -> Deferred<Node> {
+) -> Deferred<CompileActor> {
     let cfg = cfg.clone();
     let current_runtime = tokio::runtime::Handle::current();
     Deferred::new(move || {
@@ -174,13 +78,13 @@ pub fn create_server(
             inner: driver,
             cb: handler.clone(),
         };
-        let driver = CompileActor::new(driver, root).with_watch(true);
+        let driver = CompileActorInner::new(driver, root).with_watch(true);
 
         let (server, client) = driver.split();
 
         current_runtime.spawn(server.spawn());
 
-        let this = CompileNode::new(diag_group, cfg.position_encoding, handler, client);
+        let this = CompileActor::new(diag_group, cfg.position_encoding, handler, client);
 
         // todo: less bug-prone code
         if let Some(entry) = entry {
@@ -189,266 +93,6 @@ pub fn create_server(
 
         this
     })
-}
-
-pub struct CompileClusterActor {
-    host: LspHost,
-    diag_rx: mpsc::UnboundedReceiver<(String, Option<DiagnosticsMap>)>,
-
-    diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
-    affect_map: HashMap<String, Vec<Url>>,
-    published_primary: bool,
-}
-
-impl CompileClusterActor {
-    pub async fn run(mut self) {
-        loop {
-            tokio::select! {
-                e = self.diag_rx.recv() => {
-                    let Some((group, diagnostics)) = e else {
-                        break;
-                    };
-                    info!("received diagnostics from {}: diag({:?})", group, diagnostics.as_ref().map(|e| e.len()));
-                    let with_primary = (self.affect_map.len() <= 1 && self.affect_map.contains_key("primary")) && group == "primary";
-                    self.publish(group, diagnostics, with_primary).await;
-                    if !with_primary {
-                        let again_with_primary = self.affect_map.len() == 1 && self.affect_map.contains_key("primary");
-                        if self.published_primary != again_with_primary {
-                            self.flush_primary_diagnostics(again_with_primary).await;
-                            self.published_primary = again_with_primary;
-                        }
-                    }
-                }
-            }
-            info!("compile cluster actor is stopped");
-        }
-    }
-
-    pub async fn do_publish_diagnostics(
-        host: &LspHost,
-        uri: Url,
-        diags: Vec<Diagnostic>,
-        version: Option<i32>,
-        ignored: bool,
-    ) {
-        if ignored {
-            return;
-        }
-
-        host.publish_diagnostics(uri, diags, version)
-    }
-
-    async fn flush_primary_diagnostics(&mut self, enable: bool) {
-        let affected = self.affect_map.get("primary");
-
-        let tasks = affected.into_iter().flatten().map(|url| {
-            let path_diags = self.diagnostics.get(url);
-
-            let diags = path_diags.into_iter().flatten().filter_map(|(g, diags)| {
-                if g == "primary" {
-                    return enable.then_some(diags);
-                }
-                Some(diags)
-            });
-            // todo: .flatten() removed
-            // let to_publish = diags.flatten().cloned().collect();
-            let to_publish = diags.flatten().cloned().collect();
-
-            Self::do_publish_diagnostics(&self.host, url.clone(), to_publish, None, false)
-        });
-
-        join_all(tasks).await;
-    }
-
-    pub async fn publish(
-        &mut self,
-        group: String,
-        next_diagnostics: Option<DiagnosticsMap>,
-        with_primary: bool,
-    ) {
-        let is_primary = group == "primary";
-
-        let affected = self.affect_map.get_mut(&group);
-
-        let affected = affected.map(std::mem::take);
-
-        // Gets sources which had some diagnostic published last time, but not this
-        // time. The LSP specifies that files will not have diagnostics
-        // updated, including removed, without an explicit update, so we need
-        // to send an empty `Vec` of diagnostics to these sources.
-        // todo: merge
-        let clear_list = if let Some(n) = next_diagnostics.as_ref() {
-            affected
-                .into_iter()
-                .flatten()
-                .filter(|e| !n.contains_key(e))
-                .map(|e| (e, None))
-                .collect::<Vec<_>>()
-        } else {
-            affected
-                .into_iter()
-                .flatten()
-                .map(|e| (e, None))
-                .collect::<Vec<_>>()
-        };
-        let next_affected = if let Some(n) = next_diagnostics.as_ref() {
-            n.keys().cloned().collect()
-        } else {
-            Vec::new()
-        };
-        let clear_all = next_diagnostics.is_none();
-        // Gets touched updates
-        let update_list = next_diagnostics
-            .into_iter()
-            .flatten()
-            .map(|(x, y)| (x, Some(y)));
-
-        let tasks = clear_list.into_iter().chain(update_list);
-        let tasks = tasks.map(|(url, next)| {
-            let path_diags = self.diagnostics.entry(url.clone()).or_default();
-            let rest_all = path_diags
-                .iter()
-                .filter_map(|(g, diags)| {
-                    if !with_primary && g == "primary" {
-                        return None;
-                    }
-                    if g != &group {
-                        Some(diags)
-                    } else {
-                        None
-                    }
-                })
-                .flatten()
-                .cloned();
-
-            let next_all = next.clone().into_iter().flatten();
-            let to_publish = rest_all.chain(next_all).collect();
-
-            match next {
-                Some(next) => {
-                    path_diags.insert(group.clone(), next);
-                }
-                None => {
-                    path_diags.remove(&group);
-                }
-            }
-
-            Self::do_publish_diagnostics(
-                &self.host,
-                url,
-                to_publish,
-                None,
-                is_primary && !with_primary,
-            )
-        });
-
-        join_all(tasks).await;
-
-        if clear_all {
-            // We just used the cache, and won't need it again, so we can update it now
-            self.affect_map.remove(&group);
-        } else {
-            // We just used the cache, and won't need it again, so we can update it now
-            self.affect_map.insert(group, next_affected);
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct MemoryFileMeta {
-    mt: Time,
-    content: Source,
-}
-
-impl CompileCluster {
-    fn update_source(&self, files: FileChangeSet) -> Result<(), Error> {
-        let primary = self.primary.clone();
-        let main = self.main.clone();
-        let primary = Some(&primary);
-        let main = main.lock();
-        let main = main.as_ref();
-        let clients_to_notify = (primary.iter()).chain(main.iter());
-
-        for client in clients_to_notify {
-            let iw = client.wait().inner.lock();
-            iw.add_memory_changes(MemoryEvent::Update(files.clone()));
-        }
-
-        Ok(())
-    }
-
-    pub fn create_source(&self, path: PathBuf, content: String) -> Result<(), Error> {
-        let now = Time::now();
-        let path: ImmutPath = path.into();
-
-        self.memory_changes.write().insert(
-            path.clone(),
-            MemoryFileMeta {
-                mt: now,
-                content: Source::detached(content.clone()),
-            },
-        );
-
-        let content: Bytes = content.as_bytes().into();
-        log::info!("create source: {:?}", path);
-
-        // todo: is it safe to believe that the path is normalized?
-        let files = FileChangeSet::new_inserts(vec![(path, FileResult::Ok((now, content)).into())]);
-
-        self.update_source(files)
-    }
-
-    pub fn remove_source(&self, path: PathBuf) -> Result<(), Error> {
-        let path: ImmutPath = path.into();
-
-        self.memory_changes.write().remove(&path);
-        log::info!("remove source: {:?}", path);
-
-        // todo: is it safe to believe that the path is normalized?
-        let files = FileChangeSet::new_removes(vec![path]);
-
-        self.update_source(files)
-    }
-
-    pub fn edit_source(
-        &self,
-        path: PathBuf,
-        content: Vec<TextDocumentContentChangeEvent>,
-        position_encoding: PositionEncoding,
-    ) -> Result<(), Error> {
-        let now = Time::now();
-        let path: ImmutPath = path.into();
-
-        let mut memory_changes = self.memory_changes.write();
-
-        let meta = memory_changes
-            .get_mut(&path)
-            .ok_or_else(|| error_once!("file missing", path: path.display()))?;
-
-        for change in content {
-            let replacement = change.text;
-            match change.range {
-                Some(lsp_range) => {
-                    let range = lsp_to_typst::range(lsp_range, position_encoding, &meta.content)
-                        .expect("invalid range");
-                    meta.content.edit(range, &replacement);
-                }
-                None => {
-                    meta.content.replace(&replacement);
-                }
-            }
-        }
-
-        meta.mt = now;
-
-        let snapshot = FileResult::Ok((now, meta.content.text().as_bytes().into())).into();
-
-        drop(memory_changes);
-
-        let files = FileChangeSet::new_inserts(vec![(path.clone(), snapshot)]);
-
-        self.update_source(files)
-    }
 }
 
 macro_rules! query_state {
@@ -466,64 +110,6 @@ macro_rules! query_world {
         let res = $self.steal_world(move |w| $req.request(w, enc));
         res.map(CompilerQueryResponse::$method)
     }};
-}
-
-macro_rules! query_source {
-    ($self:ident, $method:ident, $req:expr) => {{
-        let path: ImmutPath = $req.path.clone().into();
-        let vfs = $self.memory_changes.read();
-        let snapshot = vfs
-            .get(&path)
-            .ok_or_else(|| anyhow!("file missing {:?}", $self.memory_changes))?;
-        let source = snapshot.content.clone();
-
-        let enc = $self.position_encoding;
-        let res = $req.request(source, enc);
-        Ok(CompilerQueryResponse::$method(res))
-    }};
-}
-
-macro_rules! query_tokens_cache {
-    ($self:ident, $method:ident, $req:expr) => {{
-        let path: ImmutPath = $req.path.clone().into();
-        let vfs = $self.memory_changes.read();
-        let snapshot = vfs.get(&path).ok_or_else(|| anyhow!("file missing"))?;
-        let source = snapshot.content.clone();
-
-        let enc = $self.position_encoding;
-        let res = $req.request(&$self.tokens_cache, source, enc);
-        Ok(CompilerQueryResponse::$method(res))
-    }};
-}
-
-impl CompileCluster {
-    pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
-        use CompilerQueryRequest::*;
-
-        match query {
-            SemanticTokensFull(req) => query_tokens_cache!(self, SemanticTokensFull, req),
-            SemanticTokensDelta(req) => query_tokens_cache!(self, SemanticTokensDelta, req),
-            FoldingRange(req) => query_source!(self, FoldingRange, req),
-            SelectionRange(req) => query_source!(self, SelectionRange, req),
-            DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
-            _ => {
-                let main = self.main.lock();
-
-                let query_target = match main.as_ref() {
-                    Some(main) => main,
-                    None => {
-                        // todo: race condition, we need atomic primary query
-                        if let Some(path) = query.associated_path() {
-                            self.primary.wait().change_entry(path.into())?;
-                        }
-                        &self.primary
-                    }
-                };
-
-                query_target.wait().query(query)
-            }
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -699,39 +285,39 @@ impl<C: Compiler<World = TypstSystemWorld>, H> Reporter<C, H> {
     }
 }
 
-pub struct CompileNode<H: CompilationHandle> {
+pub struct CompileActor {
     diag_group: String,
     position_encoding: PositionEncoding,
     handler: CompileHandler,
     entry: Arc<SyncMutex<Option<ImmutPath>>>,
-    inner: Mutex<CompileClient<H>>,
+    pub inner: Mutex<CompileClient<CompileHandler>>,
 }
 
 // todo: remove unsafe impl send
 /// SAFETY:
 /// This is safe because the not send types are only used in compiler time
 /// hints.
-unsafe impl<H: CompilationHandle> Send for CompileNode<H> {}
+unsafe impl Send for CompileActor {}
 /// SAFETY:
 /// This is safe because the not sync types are only used in compiler time
 /// hints.
-unsafe impl<H: CompilationHandle> Sync for CompileNode<H> {}
+unsafe impl Sync for CompileActor {}
 
-impl<H: CompilationHandle> CompileNode<H> {
-    fn inner(&mut self) -> &mut CompileClient<H> {
+impl CompileActor {
+    fn inner(&mut self) -> &mut CompileClient<CompileHandler> {
         self.inner.get_mut()
     }
 
     /// Steal the compiler thread and run the given function.
     pub fn steal<Ret: Send + 'static>(
         &self,
-        f: impl FnOnce(&mut CompileService<H>) -> Ret + Send + 'static,
+        f: impl FnOnce(&mut CompileService<CompileHandler>) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
         self.inner.lock().steal(f)
     }
 
     // todo: stop main
-    fn disable(&self) {
+    pub fn disable(&self) {
         let res = self.steal(move |compiler| {
             let path = Path::new("detached.typ");
             let root = compiler.compiler.world().workspace_root();
@@ -752,7 +338,7 @@ impl<H: CompilationHandle> CompileNode<H> {
         }
     }
 
-    fn change_entry(&self, path: ImmutPath) -> Result<(), Error> {
+    pub fn change_entry(&self, path: ImmutPath) -> Result<(), Error> {
         if !path.is_absolute() {
             return Err(error_once!("entry file must be absolute", path: path.display()));
         }
@@ -807,7 +393,7 @@ impl<H: CompilationHandle> CompileNode<H> {
     }
 }
 
-impl<H: CompilationHandle> SourceFileServer for CompileNode<H> {
+impl SourceFileServer for CompileActor {
     async fn resolve_source_span(
         &mut self,
         loc: Location,
@@ -853,7 +439,7 @@ impl<H: CompilationHandle> SourceFileServer for CompileNode<H> {
     }
 }
 
-impl<H: CompilationHandle> EditorServer for CompileNode<H> {
+impl EditorServer for CompileActor {
     async fn update_memory_files(
         &mut self,
         files: MemoryFiles,
@@ -890,14 +476,14 @@ impl<H: CompilationHandle> EditorServer for CompileNode<H> {
     }
 }
 
-impl<H: CompilationHandle> CompileHost for CompileNode<H> {}
+impl CompileHost for CompileActor {}
 
-impl<H: CompilationHandle> CompileNode<H> {
+impl CompileActor {
     fn new(
         diag_group: String,
         position_encoding: PositionEncoding,
         handler: CompileHandler,
-        inner: CompileClient<H>,
+        inner: CompileClient<CompileHandler>,
     ) -> Self {
         Self {
             diag_group,

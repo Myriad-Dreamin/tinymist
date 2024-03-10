@@ -8,7 +8,7 @@ use clap::Parser;
 use log::{info, trace, warn};
 use lsp_types::{InitializeParams, InitializedParams};
 use serde::de::DeserializeOwned;
-use tinymist::{transport::io_transport, LspHost, TypstLanguageServer};
+use tinymist::{init::Init, transport::io_transport, LspHost};
 
 use crate::args::CliArguments;
 
@@ -88,9 +88,8 @@ async fn main() -> anyhow::Result<()> {
     let initialize_params = from_json::<InitializeParams>("InitializeParams", &initialize_params)?;
 
     let host = LspHost::new(connection.sender);
-    let mut service = TypstLanguageServer::new(host.clone());
-
-    let initialize_result = service.initialize(initialize_params.clone());
+    let (mut service, initialize_result) =
+        Init { host: host.clone() }.initialize(initialize_params.clone());
 
     // todo: better send
     host.complete_request(
