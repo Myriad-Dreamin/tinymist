@@ -43,7 +43,7 @@ use anyhow::Context;
 use crossbeam_channel::select;
 use crossbeam_channel::Receiver;
 use futures::future::BoxFuture;
-use log::{debug, error, info, trace, warn};
+use log::{error, info, trace, warn};
 use lsp_server::{ErrorCode, Message, Notification, Request, ResponseError};
 use lsp_types::notification::{Notification as NotificationTrait, PublishDiagnostics};
 use lsp_types::request::{RegisterCapability, UnregisterCapability, WorkspaceConfiguration};
@@ -129,7 +129,7 @@ impl LspHost {
 
     pub fn register_request(&self, request: &lsp_server::Request, request_received: Instant) {
         let mut req_queue = self.req_queue.lock();
-        debug!(
+        info!(
             "handling {} - ({}) at {:0.2?}",
             request.method, request.id, request_received
         );
@@ -148,7 +148,7 @@ impl LspHost {
             // }
 
             let duration = start.elapsed();
-            debug!(
+            info!(
                 "handled  {} - ({}) in {:0.2?}",
                 method, response.id, duration
             );
@@ -477,7 +477,7 @@ impl TypstLanguageServer {
         request_received: Instant,
         not: Notification,
     ) -> anyhow::Result<()> {
-        debug!("notifying {} - at {:0.2?}", not.method, request_received);
+        info!("notifying {} - at {:0.2?}", not.method, request_received);
 
         let Some(handler) = self.notify_cmds.get(not.method.as_str()) else {
             warn!("unhandled notification: {}", not.method);

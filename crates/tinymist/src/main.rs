@@ -34,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
     let _ = {
         use log::LevelFilter::*;
         env_logger::builder()
-            .filter_module("tinymist", Debug)
+            .filter_module("tinymist", Info)
             .filter_module("typst_preview", Debug)
             .filter_module("typst_ts", Info)
             .filter_module("typst_ts_compiler::service::compile", Info)
