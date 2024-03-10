@@ -1,5 +1,6 @@
 //! The typst actors running compilations.
 
+use core::fmt;
 use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex as SyncMutex},
@@ -59,6 +60,25 @@ pub fn create_server(
     let cfg = cfg.clone();
     let current_runtime = tokio::runtime::Handle::current();
     Deferred::new(move || {
+        struct ShowOpts<'a>(&'a CompileOpts);
+
+        impl<'a> fmt::Debug for ShowOpts<'a> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_struct("CompileOpts")
+                    .field("root_dir", &self.0.root_dir)
+                    .field("entry", &self.0.entry)
+                    .field("inputs", &self.0.inputs)
+                    .field("font_paths", &self.0.font_paths)
+                    .field("no_system_fonts", &self.0.no_system_fonts)
+                    .finish()
+            }
+        }
+
+        info!(
+            "TypstActor: creating server for {} with arguments {:#?}",
+            diag_group,
+            ShowOpts(&opts)
+        );
         let compiler_driver = CompileDriver::new(roots.clone(), opts, entry.clone());
         let root = compiler_driver.inner.world.root.as_ref().to_owned();
         let handler: CompileHandler = compiler_driver.handler.clone();
