@@ -13,7 +13,7 @@
     ],
     "publisher": "myriad-dreamin",
     "license": "Apache-2.0",
-    "version": "0.11.0",
+    "version": "0.10.0",
     "engines": {
         "vscode": "^1.71.0"
     },
@@ -71,6 +71,24 @@
                         "Use semantic tokens for syntax highlighting",
                         "Do not use semantic tokens for syntax highlighting"
                     ]
+                },
+                "tinymist.noSystemFonts": {
+                    "title": "whether to load system fonts for Typst compiler",
+                    "description": "A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "tinymist.fontPaths": {
+                    "title": "Font paths for Typst compiler",
+                    "description": "Font paths, which doesn't allow for dynamic configuration",
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "default": null
                 },
                 "tinymist.serverPath": {
                     "title": "Path to server executable",
@@ -338,7 +356,8 @@
         "test": ""
     },
     "dependencies": {
-        "vscode-languageclient": "^9.0.1"
+        "vscode-languageclient": "^9.0.1",
+        "vscode-variables": "^0.1.3"
     },
     "devDependencies": {
         "@types/node": "^20.8.10",

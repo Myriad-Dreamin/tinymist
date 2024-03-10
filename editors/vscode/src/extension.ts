@@ -9,6 +9,7 @@ import {
     TextEditor,
     ExtensionMode,
 } from "vscode";
+import * as vscode from "vscode";
 import * as path from "path";
 import * as child_process from "child_process";
 
@@ -17,6 +18,7 @@ import {
     type LanguageClientOptions,
     type ServerOptions,
 } from "vscode-languageclient/node";
+import vscodeVariables from "vscode-variables";
 
 let client: LanguageClient | undefined = undefined;
 
@@ -30,6 +32,9 @@ export function activate(context: ExtensionContext): Promise<void> {
 async function startClient(context: ExtensionContext): Promise<void> {
     const config = workspace.getConfiguration("tinymist");
     const serverCommand = getServer(config);
+    const fontPaths = vscode.workspace.getConfiguration().get<string[]>("tinymist.fontPaths");
+    const noSystemFonts =
+        vscode.workspace.getConfiguration().get<boolean | null>("tinymist.noSystemFonts") === true;
     const run = {
         command: serverCommand,
         args: [
@@ -38,6 +43,8 @@ async function startClient(context: ExtensionContext): Promise<void> {
             ...(context.extensionMode != ExtensionMode.Production
                 ? ["--mirror", "tinymist-lsp.log"]
                 : []),
+            ...(fontPaths ?? []).flatMap((fontPath) => ["--font-path", vscodeVariables(fontPath)]),
+            ...(noSystemFonts ? ["--no-system-fonts"] : []),
         ],
         options: { env: Object.assign({}, process.env, { RUST_BACKTRACE: "1" }) },
     };
@@ -166,6 +173,7 @@ async function commandShowPdf(): Promise<void> {
         return;
     }
 
+    // todo: this is wrong
     const uri = activeEditor.document.uri;
     // change the file extension to `.pdf` as we want to open the pdf file
     // and not the currently opened `.typ` file.

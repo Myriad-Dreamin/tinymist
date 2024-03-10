@@ -1,4 +1,9 @@
+use std::path::PathBuf;
+
 use once_cell::sync::Lazy;
+
+#[cfg(feature = "clap")]
+const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
@@ -16,6 +21,18 @@ pub struct CliArguments {
     /// Replay input from the file
     #[cfg_attr(feature = "clap", clap(long, default_value = "", value_name = "FILE"))]
     pub replay: String,
+    /// Font paths, which doesn't allow for dynamic configuration
+    #[cfg_attr(feature = "clap", clap(
+        long = "font-path",
+        value_name = "DIR",
+        action = clap::ArgAction::Append,
+        env = "TYPST_FONT_PATHS",
+        value_delimiter = ENV_PATH_SEP
+    ))]
+    pub font_paths: Vec<PathBuf>,
+    /// Exclude system fonts
+    #[cfg_attr(feature = "clap", clap(long, default_value = "false"))]
+    pub no_system_fonts: bool,
 }
 
 pub static LONG_VERSION: Lazy<String> = Lazy::new(|| {

@@ -9,9 +9,10 @@ use serde::Deserialize;
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
+use typst_ts_core::config::CompileOpts;
 
 use crate::actor::cluster::CompileClusterActor;
-use crate::{invalid_params, LspHost, LspResult, TypstLanguageServer};
+use crate::{invalid_params, LspHost, LspResult, TypstLanguageServer, TypstLanguageServerArgs};
 
 trait InitializeParamsExt {
     fn position_encodings(&self) -> &[PositionEncodingKind];
@@ -335,6 +336,7 @@ impl From<&InitializeParams> for ConstConfig {
 
 pub struct Init {
     pub host: LspHost,
+    pub compile_opts: CompileOpts,
 }
 
 impl Init {
@@ -371,8 +373,13 @@ impl Init {
         // Bootstrap server
         let (diag_tx, diag_rx) = mpsc::unbounded_channel();
 
-        let mut service =
-            TypstLanguageServer::new(self.host.clone(), params.root_paths(), cc, diag_tx);
+        let mut service = TypstLanguageServer::new(TypstLanguageServerArgs {
+            client: self.host.clone(),
+            compile_opts: self.compile_opts,
+            roots: params.root_paths(),
+            const_config: cc,
+            diag_tx,
+        });
 
         if let Some(init) = &params.initialization_options {
             if let Err(err) = config

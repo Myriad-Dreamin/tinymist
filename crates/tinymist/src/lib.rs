@@ -59,6 +59,7 @@ use tinymist_query::{
 };
 use tokio::sync::mpsc;
 use typst::util::Deferred;
+use typst_ts_core::config::CompileOpts;
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
 
@@ -256,6 +257,14 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
     (as_path(inp.text_document), inp.position)
 }
 
+pub struct TypstLanguageServerArgs {
+    pub client: LspHost,
+    pub compile_opts: CompileOpts,
+    pub roots: Vec<PathBuf>,
+    pub const_config: ConstConfig,
+    pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
+}
+
 /// The object providing the language server functionality.
 pub struct TypstLanguageServer {
     /// The language server client.
@@ -273,6 +282,8 @@ pub struct TypstLanguageServer {
     /// Const configuration initialized at the start of the session.
     /// For example, the position encoding.
     pub const_config: ConstConfig,
+    /// The default opts for the compiler.
+    pub compile_opts: CompileOpts,
 
     diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
     roots: Vec<PathBuf>,
@@ -285,23 +296,19 @@ pub struct TypstLanguageServer {
 /// Getters and the main loop.
 impl TypstLanguageServer {
     /// Create a new language server.
-    pub fn new(
-        client: LspHost,
-        roots: Vec<PathBuf>,
-        const_config: ConstConfig,
-        diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
-    ) -> Self {
+    pub fn new(args: TypstLanguageServerArgs) -> Self {
         Self {
-            client: client.clone(),
+            client: args.client.clone(),
             shutdown_requested: false,
             config: Default::default(),
-            const_config,
+            const_config: args.const_config,
+            compile_opts: args.compile_opts,
             exec_cmds: Self::get_exec_commands(),
             regular_cmds: Self::get_regular_cmds(),
             notify_cmds: Self::get_notify_cmds(),
 
-            diag_tx,
-            roots,
+            diag_tx: args.diag_tx,
+            roots: args.roots,
             memory_changes: RwLock::new(HashMap::new()),
             primary: OnceCell::new(),
             main: Arc::new(Mutex::new(None)),

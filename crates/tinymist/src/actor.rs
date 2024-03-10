@@ -41,10 +41,9 @@ impl TypstLanguageServer {
 
         let opts = CompileOpts {
             root_dir,
-            // todo: font paths
-            // font_paths: arguments.font_paths.clone(),
+            // todo: additional inputs
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
-            ..CompileOpts::default()
+            ..self.compile_opts.clone()
         };
         create_server(
             name,

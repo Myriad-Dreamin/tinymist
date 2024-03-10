@@ -9,6 +9,7 @@ use log::{info, trace, warn};
 use lsp_types::{InitializeParams, InitializedParams};
 use serde::de::DeserializeOwned;
 use tinymist::{init::Init, transport::io_transport, LspHost};
+use typst_ts_core::config::CompileOpts;
 
 use crate::args::CliArguments;
 
@@ -111,8 +112,15 @@ async fn main() -> anyhow::Result<()> {
 
     let initialize_params = from_json::<InitializeParams>("InitializeParams", &initialize_params)?;
 
-    let (mut service, initialize_result) =
-        Init { host: host.clone() }.initialize(initialize_params.clone());
+    let (mut service, initialize_result) = Init {
+        host: host.clone(),
+        compile_opts: CompileOpts {
+            font_paths: args.font_paths,
+            no_system_fonts: args.no_system_fonts,
+            ..Default::default()
+        },
+    }
+    .initialize(initialize_params.clone());
 
     host.respond(match initialize_result {
         Ok(cap) => Response::new_ok(initialize_id, Some(cap)),
@@ -158,16 +166,6 @@ async fn main() -> anyhow::Result<()> {
     }
 
     service.initialized(InitializedParams {});
-
-    // // Set up LSP server
-    // let (inner, socket) = LspService::new();
-    // let service = LogService {
-    //     inner,
-    //     show_time: true,
-    // };
-
-    // // Handle requests
-    // Server::new(stdin, stdout, socket).serve(service).await;
 
     service.main_loop(connection.receiver)?;
 
