@@ -23,7 +23,8 @@ impl TypstLanguageServer {
         let (render_tx, _) = broadcast::channel(10);
 
         let roots = self.roots.clone();
-        let root_dir = roots.first().cloned().unwrap_or_default();
+        let root_dir = self.config.root_path.clone();
+        let root_dir = root_dir.unwrap_or_else(|| roots.first().cloned().unwrap_or_default());
         // Run the PDF export actor before preparing cluster to avoid loss of events
         tokio::spawn(
             PdfExportActor::new(

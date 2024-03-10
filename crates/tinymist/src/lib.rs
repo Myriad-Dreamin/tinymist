@@ -804,32 +804,32 @@ impl TypstLanguageServer {
         let output_directory = self.config.output_path.clone();
         let export_pdf = self.config.export_pdf;
         match self.config.update_by_map(&values) {
-            Ok(()) => {
-                info!("new settings applied");
-
-                if output_directory != self.config.output_path
-                    || export_pdf != self.config.export_pdf
-                {
-                    let config = PdfExportConfig {
-                        substitute_pattern: self.config.output_path.clone(),
-                        mode: self.config.export_pdf,
-                        root: Path::new("").into(),
-                        path: None,
-                    };
-
-                    self.primary().change_export_pdf(config.clone());
-                    {
-                        let m = self.main.lock();
-                        if let Some(main) = m.as_ref() {
-                            main.wait().change_export_pdf(config);
-                        }
-                    }
-                }
-            }
+            Ok(()) => {}
             Err(err) => {
                 error!("error applying new settings: {err}");
+                return Err(internal_error("Internal error"));
             }
         }
+
+        info!("new settings applied");
+        if output_directory != self.config.output_path || export_pdf != self.config.export_pdf {
+            let config = PdfExportConfig {
+                substitute_pattern: self.config.output_path.clone(),
+                mode: self.config.export_pdf,
+                root: Path::new("").into(),
+                path: None,
+            };
+
+            self.primary().change_export_pdf(config.clone());
+            {
+                let m = self.main.lock();
+                if let Some(main) = m.as_ref() {
+                    main.wait().change_export_pdf(config);
+                }
+            }
+        }
+
+        // todo: watch changes of the root path
 
         Ok(())
     }
