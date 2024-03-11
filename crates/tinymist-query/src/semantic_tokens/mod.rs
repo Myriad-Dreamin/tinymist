@@ -186,7 +186,7 @@ fn token_from_node(node: &LinkedNode) -> Option<TokenType> {
         }
         Dollar => Some(TokenType::Delimiter),
         None | Auto | Let | Show | If | Else | For | In | While | Break | Continue | Return
-        | Import | Include | As | Set => Some(TokenType::Keyword),
+        | Import | Include | As | Set | Context => Some(TokenType::Keyword),
         Bool => Some(TokenType::Bool),
         Int | Float | Numeric => Some(TokenType::Number),
         Str => Some(TokenType::String),
