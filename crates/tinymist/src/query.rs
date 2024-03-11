@@ -174,8 +174,8 @@ impl TypstLanguageServer {
                 let main = self.main.lock();
 
                 let query_target = match main.as_ref() {
-                    Some(main) => main.wait(),
-                    None => {
+                    Some(main) if self.pinning => main.wait(),
+                    Some(..) | None => {
                         // todo: race condition, we need atomic primary query
                         if let Some(path) = query.associated_path() {
                             self.primary().change_entry(path.into())?;

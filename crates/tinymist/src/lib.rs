@@ -289,6 +289,7 @@ pub struct TypstLanguageServer {
     roots: Vec<PathBuf>,
     memory_changes: RwLock<HashMap<Arc<Path>, MemoryFileMeta>>,
     primary: OnceCell<Deferred<CompileActor>>,
+    pinning: bool,
     main: Arc<Mutex<Option<Deferred<CompileActor>>>>,
     tokens_cache: SemanticTokenCache,
 }
@@ -311,6 +312,7 @@ impl TypstLanguageServer {
             roots: args.roots,
             memory_changes: RwLock::new(HashMap::new()),
             primary: OnceCell::new(),
+            pinning: false,
             main: Arc::new(Mutex::new(None)),
             tokens_cache: Default::default(),
         }
@@ -690,6 +692,7 @@ impl TypstLanguageServer {
         };
 
         let new_entry = file_uri.clone();
+        self.pinning = new_entry.is_some();
         let mut m = self.main.lock();
         let update_result = match (new_entry, m.is_some()) {
             (Some(new_entry), true) => {
