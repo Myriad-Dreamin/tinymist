@@ -5,6 +5,20 @@ input_file: crates/tinymist-query/src/fixtures/folding_range/headings-in-blocks.
 ---
 [
  {
+  "collapsedText": "",
+  "endCharacter": 11,
+  "endLine": 2,
+  "startCharacter": 8,
+  "startLine": 2
+ },
+ {
+  "collapsedText": "",
+  "endCharacter": 13,
+  "endLine": 6,
+  "startCharacter": 10,
+  "startLine": 6
+ },
+ {
   "collapsedText": "Heading 2",
   "endCharacter": 16,
   "endLine": 8,

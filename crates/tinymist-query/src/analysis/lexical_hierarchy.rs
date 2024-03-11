@@ -33,7 +33,21 @@ impl TryFrom<LexicalKind> for SymbolKind {
 pub(crate) enum LexicalScopeKind {
     #[default]
     Symbol,
-    Block,
+    Braced,
+}
+
+impl LexicalScopeKind {
+    fn affect_symbol(&self) -> bool {
+        matches!(self, LexicalScopeKind::Symbol)
+    }
+
+    fn affect_block(&self) -> bool {
+        matches!(self, LexicalScopeKind::Braced)
+    }
+
+    fn affect_expr(&self) -> bool {
+        matches!(self, LexicalScopeKind::Braced)
+    }
 }
 
 #[derive(Debug, Clone, Hash)]
@@ -74,13 +88,6 @@ pub(crate) fn get_lexical_hierarchy(
         fn symbreak(&mut self) {
             let (symbol, children) = self.stack.pop().unwrap();
             let current = &mut self.stack.last_mut().unwrap().1;
-
-            // symbol.wide_range = children
-            //     .iter()
-            //     .map(|c| c.info.wide_range.clone())
-            //     .fold(symbol.range.clone(), |acc, r| {
-            //         acc.start.min(r.start)..acc.end.max(r.end)
-            //     });
 
             current.push(symbreak(symbol, children));
         }
@@ -135,7 +142,7 @@ pub(crate) fn get_lexical_hierarchy(
     #[allow(deprecated)]
     fn get_ident(node: &LinkedNode, g: LexicalScopeKind) -> anyhow::Result<Option<LexicalInfo>> {
         let (name, kind) = match node.kind() {
-            SyntaxKind::Label if LexicalScopeKind::Block != g => {
+            SyntaxKind::Label if g.affect_symbol() => {
                 let ast_node = node
                     .cast::<ast::Label>()
                     .ok_or_else(|| anyhow!("cast to ast node failed: {:?}", node))?;
@@ -143,10 +150,7 @@ pub(crate) fn get_lexical_hierarchy(
 
                 (name, LexicalKind::Constant)
             }
-            SyntaxKind::CodeBlock | SyntaxKind::ContentBlock if LexicalScopeKind::Symbol != g => {
-                (String::new(), LexicalKind::Block)
-            }
-            SyntaxKind::Ident if LexicalScopeKind::Block != g => {
+            SyntaxKind::Ident if g.affect_symbol() => {
                 let ast_node = node
                     .cast::<ast::Ident>()
                     .ok_or_else(|| anyhow!("cast to ast node failed: {:?}", node))?;
@@ -172,6 +176,24 @@ pub(crate) fn get_lexical_hierarchy(
                 };
 
                 (name, kind)
+            }
+            SyntaxKind::Equation
+            | SyntaxKind::Raw
+            | SyntaxKind::CodeBlock
+            | SyntaxKind::ContentBlock
+            | SyntaxKind::BlockComment
+                if g.affect_block() =>
+            {
+                (String::new(), LexicalKind::Block)
+            }
+            SyntaxKind::Parenthesized
+            | SyntaxKind::Destructuring
+            | SyntaxKind::Args
+            | SyntaxKind::Array
+            | SyntaxKind::Dict
+                if g.affect_expr() =>
+            {
+                (String::new(), LexicalKind::Block)
             }
             SyntaxKind::Markup => {
                 let name = node.get().to_owned().into_text().to_string();
