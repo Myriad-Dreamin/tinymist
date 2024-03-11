@@ -16,8 +16,8 @@ use crate::TypstLanguageServer;
 
 #[derive(Debug, Clone)]
 pub struct MemoryFileMeta {
-    mt: Time,
-    content: Source,
+    pub mt: Time,
+    pub content: Source,
 }
 
 impl TypstLanguageServer {

@@ -53,6 +53,7 @@ pub fn create_server(
     roots: Vec<PathBuf>,
     opts: CompileOpts,
     entry: Option<PathBuf>,
+    snapshot: FileChangeSet,
     diag_tx: DiagnosticsSender,
     doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
     render_tx: broadcast::Sender<RenderActorRequest>,
@@ -104,6 +105,7 @@ pub fn create_server(
 
         let (server, client) = driver.split();
 
+        client.add_memory_changes(MemoryEvent::Update(snapshot));
         current_runtime.spawn(server.spawn());
 
         let this = CompileActor::new(

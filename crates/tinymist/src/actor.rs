@@ -7,8 +7,9 @@ pub mod typst;
 
 use std::{borrow::Cow, path::PathBuf};
 
-use ::typst::util::Deferred;
+use ::typst::{diag::FileResult, util::Deferred};
 use tokio::sync::{broadcast, watch};
+use typst_ts_compiler::vfs::notify::FileChangeSet;
 use typst_ts_core::config::CompileOpts;
 
 use self::{
@@ -67,12 +68,27 @@ impl TypstLanguageServer {
             }
         }
 
+        let snapshot = {
+            let memory_changes = self.memory_changes.read();
+
+            FileChangeSet::new_inserts(
+                memory_changes
+                    .iter()
+                    .map(|(path, meta)| {
+                        let content = meta.content.clone().text().as_bytes().into();
+                        (path.clone(), FileResult::Ok((meta.mt, content)).into())
+                    })
+                    .collect(),
+            )
+        };
+
         create_server(
             name,
             self.const_config(),
             roots,
             opts,
             entry,
+            snapshot,
             self.diag_tx.clone(),
             doc_tx,
             render_tx,
