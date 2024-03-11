@@ -105,6 +105,9 @@ pub fn create_server(
 
         let (server, client) = driver.split();
 
+        // We do send memory changes instead of initializing compiler with them.
+        // This is because there are state recorded inside of the compiler actor, and we
+        // must update them.
         client.add_memory_changes(MemoryEvent::Update(snapshot));
         current_runtime.spawn(server.spawn());
 
