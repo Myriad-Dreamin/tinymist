@@ -28,19 +28,23 @@ impl CompileClusterActor {
                         break;
                     };
                     info!("received diagnostics from {}: diag({:?})", group, diagnostics.as_ref().map(|e| e.len()));
+
                     let with_primary = (self.affect_map.len() <= 1 && self.affect_map.contains_key("primary")) && group == "primary";
+
                     self.publish(group, diagnostics, with_primary).await;
-                    if !with_primary {
-                        let again_with_primary = self.affect_map.len() == 1 && self.affect_map.contains_key("primary");
-                        if self.published_primary != again_with_primary {
-                            self.flush_primary_diagnostics(again_with_primary).await;
-                            self.published_primary = again_with_primary;
-                        }
+
+                    // Check with primary again after publish
+                    let again_with_primary = self.affect_map.len() == 1 && self.affect_map.contains_key("primary");
+
+                    if !with_primary && self.published_primary != again_with_primary {
+                        self.flush_primary_diagnostics(again_with_primary).await;
+                        self.published_primary = again_with_primary;
                     }
                 }
             }
-            info!("compile cluster actor is stopped");
         }
+
+        info!("compile cluster actor is stopped");
     }
 
     pub async fn do_publish_diagnostics(
@@ -80,64 +84,49 @@ impl CompileClusterActor {
     pub async fn publish(
         &mut self,
         group: String,
-        next_diagnostics: Option<DiagnosticsMap>,
+        next_diag: Option<DiagnosticsMap>,
         with_primary: bool,
     ) {
         let is_primary = group == "primary";
+        let clear_all = next_diag.is_none();
+        let affect_list = next_diag.as_ref().map(|e| e.keys().cloned().collect());
+        let affect_list: Vec<_> = affect_list.unwrap_or_default();
 
-        let affected = self.affect_map.get_mut(&group);
+        // Get sources which had some diagnostic published last time, but not this time.
+        //
+        // The LSP specifies that files will not have diagnostics updated, including
+        // removed, without an explicit update, so we need to send an empty `Vec` of
+        // diagnostics to these sources.
 
-        let affected = affected.map(std::mem::take);
-
-        // Gets sources which had some diagnostic published last time, but not this
-        // time. The LSP specifies that files will not have diagnostics
-        // updated, including removed, without an explicit update, so we need
-        // to send an empty `Vec` of diagnostics to these sources.
-        // todo: merge
-        let clear_list = if let Some(n) = next_diagnostics.as_ref() {
-            affected
-                .into_iter()
-                .flatten()
-                .filter(|e| !n.contains_key(e))
-                .map(|e| (e, None))
-                .collect::<Vec<_>>()
+        // Get sources that affected by this group in last round but not this time
+        let affected = self.affect_map.get_mut(&group).map(std::mem::take);
+        let affected = affected.into_iter().flatten().map(|e| (e, None));
+        let prev_aff: Vec<_> = if let Some(n) = next_diag.as_ref() {
+            affected.filter(|e| !n.contains_key(&e.0)).collect()
         } else {
-            affected
-                .into_iter()
-                .flatten()
-                .map(|e| (e, None))
-                .collect::<Vec<_>>()
+            affected.collect()
         };
-        let next_affected = if let Some(n) = next_diagnostics.as_ref() {
-            n.keys().cloned().collect()
-        } else {
-            Vec::new()
-        };
-        let clear_all = next_diagnostics.is_none();
-        // Gets touched updates
-        let update_list = next_diagnostics
-            .into_iter()
-            .flatten()
-            .map(|(x, y)| (x, Some(y)));
 
-        let tasks = clear_list.into_iter().chain(update_list);
+        // Get touched updates
+        let next_aff = next_diag.into_iter().flatten().map(|(x, y)| (x, Some(y)));
+
+        let tasks = prev_aff.into_iter().chain(next_aff);
         let tasks = tasks.map(|(url, next)| {
+            // Get the diagnostics from other groups
             let path_diags = self.diagnostics.entry(url.clone()).or_default();
             let rest_all = path_diags
                 .iter()
                 .filter_map(|(g, diags)| {
-                    if !with_primary && g == "primary" {
+                    if (!with_primary && g == "primary") || g == &group {
                         return None;
                     }
-                    if g != &group {
-                        Some(diags)
-                    } else {
-                        None
-                    }
+
+                    Some(diags)
                 })
                 .flatten()
                 .cloned();
 
+            // Get the diagnostics from this group
             let next_all = next.clone().into_iter().flatten();
             let to_publish = rest_all.chain(next_all).collect();
 
@@ -166,7 +155,7 @@ impl CompileClusterActor {
             self.affect_map.remove(&group);
         } else {
             // We just used the cache, and won't need it again, so we can update it now
-            self.affect_map.insert(group, next_affected);
+            self.affect_map.insert(group, affect_list);
         }
     }
 }

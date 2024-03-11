@@ -33,6 +33,7 @@ impl TypstLanguageServer {
                 .and_then(|x| x.root_dir.clone())
         });
         let root_dir = root_dir.unwrap_or_else(|| roots.first().cloned().unwrap());
+
         // Run the PDF export actor before preparing cluster to avoid loss of events
         tokio::spawn(
             PdfExportActor::new(
@@ -65,8 +66,6 @@ impl TypstLanguageServer {
                 opts.font_paths = extras.font_paths.clone();
             }
         }
-
-        // ..self.config.typst_extra_args.clone()
 
         create_server(
             name,
