@@ -68,19 +68,15 @@ impl TypstLanguageServer {
             }
         }
 
-        let snapshot = {
-            let memory_changes = self.memory_changes.read();
-
-            FileChangeSet::new_inserts(
-                memory_changes
-                    .iter()
-                    .map(|(path, meta)| {
-                        let content = meta.content.clone().text().as_bytes().into();
-                        (path.clone(), FileResult::Ok((meta.mt, content)).into())
-                    })
-                    .collect(),
-            )
-        };
+        let snapshot = FileChangeSet::new_inserts(
+            self.memory_changes
+                .iter()
+                .map(|(path, meta)| {
+                    let content = meta.content.clone().text().as_bytes().into();
+                    (path.clone(), FileResult::Ok((meta.mt, content)).into())
+                })
+                .collect(),
+        );
 
         create_server(
             name,

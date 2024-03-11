@@ -37,11 +37,11 @@ impl TypstLanguageServer {
         Ok(())
     }
 
-    pub fn create_source(&self, path: PathBuf, content: String) -> Result<(), Error> {
+    pub fn create_source(&mut self, path: PathBuf, content: String) -> Result<(), Error> {
         let now = Time::now();
         let path: ImmutPath = path.into();
 
-        self.memory_changes.write().insert(
+        self.memory_changes.insert(
             path.clone(),
             MemoryFileMeta {
                 mt: now,
@@ -58,10 +58,10 @@ impl TypstLanguageServer {
         self.update_source(files)
     }
 
-    pub fn remove_source(&self, path: PathBuf) -> Result<(), Error> {
+    pub fn remove_source(&mut self, path: PathBuf) -> Result<(), Error> {
         let path: ImmutPath = path.into();
 
-        self.memory_changes.write().remove(&path);
+        self.memory_changes.remove(&path);
         log::info!("remove source: {:?}", path);
 
         // todo: is it safe to believe that the path is normalized?
@@ -71,7 +71,7 @@ impl TypstLanguageServer {
     }
 
     pub fn edit_source(
-        &self,
+        &mut self,
         path: PathBuf,
         content: Vec<TextDocumentContentChangeEvent>,
         position_encoding: PositionEncoding,
@@ -79,9 +79,8 @@ impl TypstLanguageServer {
         let now = Time::now();
         let path: ImmutPath = path.into();
 
-        let mut memory_changes = self.memory_changes.write();
-
-        let meta = memory_changes
+        let meta = self
+            .memory_changes
             .get_mut(&path)
             .ok_or_else(|| error_once!("file missing", path: path.display()))?;
 
@@ -102,8 +101,6 @@ impl TypstLanguageServer {
         meta.mt = now;
 
         let snapshot = FileResult::Ok((now, meta.content.text().as_bytes().into())).into();
-
-        drop(memory_changes);
 
         let files = FileChangeSet::new_inserts(vec![(path.clone(), snapshot)]);
 
@@ -134,10 +131,8 @@ macro_rules! run_query {
 macro_rules! query_source {
     ($self:ident, $method:ident, $req:expr) => {{
         let path: ImmutPath = $req.path.clone().into();
-        let vfs = $self.memory_changes.read();
-        let snapshot = vfs
-            .get(&path)
-            .ok_or_else(|| anyhow!("file missing {:?}", $self.memory_changes))?;
+        let snapshot = $self.memory_changes.get(&path);
+        let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {:?}", path))?;
         let source = snapshot.content.clone();
 
         let enc = $self.const_config.position_encoding;
@@ -149,8 +144,8 @@ macro_rules! query_source {
 macro_rules! query_tokens_cache {
     ($self:ident, $method:ident, $req:expr) => {{
         let path: ImmutPath = $req.path.clone().into();
-        let vfs = $self.memory_changes.read();
-        let snapshot = vfs.get(&path).ok_or_else(|| anyhow!("file missing"))?;
+        let snapshot = $self.memory_changes.get(&path);
+        let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {:?}", path))?;
         let source = snapshot.content.clone();
 
         let enc = $self.const_config.position_encoding;

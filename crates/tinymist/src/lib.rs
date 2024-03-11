@@ -49,7 +49,7 @@ use lsp_types::notification::{Notification as NotificationTrait, PublishDiagnost
 use lsp_types::request::{RegisterCapability, UnregisterCapability, WorkspaceConfiguration};
 use lsp_types::*;
 use once_cell::sync::OnceCell;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use paste::paste;
 use query::MemoryFileMeta;
 use serde_json::{Map, Value as JsonValue};
@@ -287,7 +287,7 @@ pub struct TypstLanguageServer {
 
     diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
     roots: Vec<PathBuf>,
-    memory_changes: RwLock<HashMap<Arc<Path>, MemoryFileMeta>>,
+    memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
     primary: OnceCell<Deferred<CompileActor>>,
     pinning: bool,
     main: Option<Deferred<CompileActor>>,
@@ -310,7 +310,7 @@ impl TypstLanguageServer {
 
             diag_tx: args.diag_tx,
             roots: args.roots,
-            memory_changes: RwLock::new(HashMap::new()),
+            memory_changes: HashMap::new(),
             primary: OnceCell::new(),
             pinning: false,
             main: None,
@@ -768,7 +768,7 @@ impl TypstLanguageServer {
 
 /// Document Synchronization
 impl TypstLanguageServer {
-    fn did_open(&self, params: DidOpenTextDocumentParams) -> LspResult<()> {
+    fn did_open(&mut self, params: DidOpenTextDocumentParams) -> LspResult<()> {
         let path = params.text_document.uri.to_file_path().unwrap();
         let text = params.text_document.text;
 
@@ -776,7 +776,7 @@ impl TypstLanguageServer {
         Ok(())
     }
 
-    fn did_close(&self, params: DidCloseTextDocumentParams) -> LspResult<()> {
+    fn did_close(&mut self, params: DidCloseTextDocumentParams) -> LspResult<()> {
         let path = params.text_document.uri.to_file_path().unwrap();
 
         self.remove_source(path.clone()).unwrap();
@@ -784,7 +784,7 @@ impl TypstLanguageServer {
         Ok(())
     }
 
-    fn did_change(&self, params: DidChangeTextDocumentParams) -> LspResult<()> {
+    fn did_change(&mut self, params: DidChangeTextDocumentParams) -> LspResult<()> {
         let path = params.text_document.uri.to_file_path().unwrap();
         let changes = params.content_changes;
 
