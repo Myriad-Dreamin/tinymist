@@ -1,0 +1,15 @@
+---
+source: crates/tinymist-query/src/inlay_hint.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/inlay_hints/base.typ
+---
+[
+ {
+  "kind": 2,
+  "label": ": body",
+  "position": {
+   "character": 8,
+   "line": 0
+  }
+ }
+]
