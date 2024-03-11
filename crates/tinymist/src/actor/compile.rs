@@ -32,16 +32,13 @@ use typst_ts_compiler::service::{
     WorkspaceProvider, WorldExporter,
 };
 
+use crate::task::BorrowTask;
+
 #[derive(Debug, Clone)]
 pub struct VersionedDocument {
     pub version: usize,
     pub document: Arc<TypstDocument>,
 }
-
-/// A task that can be sent to the context (compiler thread)
-///
-/// The internal function will be dereferenced and called on the context.
-type BorrowTask<Ctx> = Box<dyn FnOnce(&mut Ctx) + Send + 'static>;
 
 /// Interrupts for external sources
 enum ExternalInterrupt<Ctx> {

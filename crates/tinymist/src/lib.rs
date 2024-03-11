@@ -30,6 +30,7 @@
 mod actor;
 pub mod init;
 mod query;
+mod task;
 pub mod transport;
 
 use core::fmt;
@@ -210,7 +211,7 @@ type LspResult<Res> = Result<Res, ResponseError>;
 type LspMethod<Res> = fn(srv: &mut TypstLanguageServer, args: JsonValue) -> LspResult<Res>;
 type LspHandler<Req, Res> = fn(srv: &mut TypstLanguageServer, args: Req) -> LspResult<Res>;
 
-type ExecuteCmdMap = HashMap<&'static str, LspHandler<Vec<JsonValue>, ()>>;
+type ExecuteCmdMap = HashMap<&'static str, LspHandler<Vec<JsonValue>, JsonValue>>;
 type NotifyCmdMap = HashMap<&'static str, LspMethod<()>>;
 type RegularCmdMap = HashMap<&'static str, LspMethod<JsonValue>>;
 
@@ -344,11 +345,12 @@ impl TypstLanguageServer {
             request_fn!(SemanticTokensFullRequest, Self::semantic_tokens_full),
             request_fn!(SemanticTokensFullDeltaRequest, Self::semantic_tokens_full_delta),
             request_fn!(DocumentSymbolRequest, Self::document_symbol),
-            request_fn!(InlayHintRequest, Self::inlay_hint),
             // Sync for low latency
             request_fn!(SelectionRangeRequest, Self::selection_range),
             // latency insensitive
+            request_fn!(InlayHintRequest, Self::inlay_hint),
             request_fn!(HoverRequest, Self::hover),
+            request_fn!(CodeLensRequest, Self::code_lens),
             request_fn!(FoldingRangeRequest, Self::folding_range),
             request_fn!(SignatureHelpRequest, Self::signature_help),
             request_fn!(PrepareRenameRequest, Self::prepare_rename),
@@ -615,13 +617,13 @@ impl TypstLanguageServer {
             ($key: expr, Self::$method: ident) => {
                 (
                     $key,
-                    exec_fn!(LspHandler<Vec<JsonValue>, ()>, Self::$method, inputs),
+                    exec_fn!(LspHandler<Vec<JsonValue>, JsonValue>, Self::$method, inputs),
                 )
             };
         }
 
         ExecuteCmdMap::from_iter([
-            redirected_command!("tinymist.doPdfExport", Self::export_pdf),
+            redirected_command!("tinymist.exportPdf", Self::export_pdf),
             redirected_command!("tinymist.doClearCache", Self::clear_cache),
             redirected_command!("tinymist.doPinMain", Self::pin_main),
             redirected_command!("tinymist.doActivateDoc", Self::activate_doc),
@@ -640,8 +642,7 @@ impl TypstLanguageServer {
             return Err(method_not_found());
         };
 
-        handler(self, arguments)?;
-        Ok(Some(JsonValue::Null))
+        Ok(Some(handler(self, arguments)?))
     }
 
     /// Export the current document as a PDF file. The client is responsible for
@@ -649,7 +650,7 @@ impl TypstLanguageServer {
     ///
     /// # Errors
     /// Errors if a provided file URI is not a valid file URI.
-    pub fn export_pdf(&self, arguments: Vec<JsonValue>) -> LspResult<()> {
+    pub fn export_pdf(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         if arguments.is_empty() {
             return Err(invalid_params("Missing file URI argument"));
         }
@@ -662,25 +663,26 @@ impl TypstLanguageServer {
             .to_file_path()
             .map_err(|_| invalid_params("URI is not a file URI"))?;
 
-        let _ = run_query!(self.OnSaveExport(path));
+        let res = run_query!(self.OnExport(path))?;
+        let res = serde_json::to_value(res).map_err(|_| internal_error("Cannot serialize path"))?;
 
-        Ok(())
+        Ok(res)
     }
 
     /// Clear all cached resources.
     ///
     /// # Errors
     /// Errors if the cache could not be cleared.
-    pub fn clear_cache(&self, _arguments: Vec<JsonValue>) -> LspResult<()> {
+    pub fn clear_cache(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         comemo::evict(0);
-        Ok(())
+        Ok(JsonValue::Null)
     }
 
     /// Pin main file to some path.
     ///
     /// # Errors
     /// Errors if a provided file URI is not a valid file URI.
-    pub fn pin_main(&mut self, arguments: Vec<JsonValue>) -> LspResult<()> {
+    pub fn pin_main(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let Some(file_uri) = arguments.first().and_then(|v| v.as_str()) else {
             return Err(invalid_params("Missing file path as the first argument"));
         };
@@ -728,7 +730,7 @@ impl TypstLanguageServer {
         })?;
 
         info!("main file pinned: {main_url:?}", main_url = file_uri);
-        Ok(())
+        Ok(JsonValue::Null)
     }
 
     /// Change the actived document.
@@ -736,7 +738,7 @@ impl TypstLanguageServer {
     /// # Errors
     /// Errors if a provided file URI is not a valid path string.
     /// Errors if the document could not be activated.
-    pub fn activate_doc(&self, arguments: Vec<JsonValue>) -> LspResult<()> {
+    pub fn activate_doc(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let Some(path) = arguments.first() else {
             return Err(invalid_params("Missing path argument"));
         };
@@ -762,7 +764,7 @@ impl TypstLanguageServer {
         // })?;
 
         info!("active document set: {path:?}", path = path);
-        Ok(())
+        Ok(JsonValue::Null)
     }
 }
 
@@ -926,6 +928,11 @@ impl TypstLanguageServer {
         let path = as_path(params.text_document);
         let range = params.range;
         run_query!(self.InlayHint(path, range))
+    }
+
+    fn code_lens(&self, params: CodeLensParams) -> LspResult<Option<Vec<CodeLens>>> {
+        let path = as_path(params.text_document);
+        run_query!(self.CodeLens(path))
     }
 
     fn completion(&self, params: CompletionParams) -> LspResult<Option<CompletionResponse>> {

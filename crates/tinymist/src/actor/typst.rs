@@ -10,9 +10,9 @@ use log::{debug, error, info, trace, warn};
 use parking_lot::Mutex;
 use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
-    OnSaveExportRequest, PositionEncoding,
+    OnExportRequest, OnSaveExportRequest, PositionEncoding,
 };
-use tokio::sync::{broadcast, mpsc, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use typst::{
     diag::{SourceDiagnostic, SourceResult},
     layout::Position,
@@ -579,6 +579,9 @@ impl CompileActor {
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
         match query {
+            CompilerQueryRequest::OnExport(OnExportRequest { path }) => {
+                Ok(CompilerQueryResponse::OnExport(self.on_export(path)?))
+            }
             CompilerQueryRequest::OnSaveExport(OnSaveExportRequest { path }) => {
                 self.on_save_export(path)?;
                 Ok(CompilerQueryResponse::OnSaveExport(()))
@@ -586,6 +589,7 @@ impl CompileActor {
             Hover(req) => query_state!(self, Hover, req),
             GotoDefinition(req) => query_world!(self, GotoDefinition, req),
             InlayHint(req) => query_world!(self, InlayHint, req),
+            CodeLens(req) => query_world!(self, CodeLens, req),
             Completion(req) => query_state!(self, Completion, req),
             SignatureHelp(req) => query_world!(self, SignatureHelp, req),
             Rename(req) => query_world!(self, Rename, req),
@@ -597,6 +601,40 @@ impl CompileActor {
             | DocumentSymbol(..)
             | SemanticTokensFull(..) => unreachable!(),
         }
+    }
+
+    pub fn sync_render<Ret: Send + 'static>(&self, f: oneshot::Receiver<Ret>) -> ZResult<Ret> {
+        // get current async handle
+        if let Ok(e) = tokio::runtime::Handle::try_current() {
+            // todo: remove blocking
+            return std::thread::spawn(move || {
+                e.block_on(f)
+                    .map_err(map_string_err("failed to sync_render"))
+            })
+            .join()
+            .unwrap();
+        }
+
+        f.blocking_recv()
+            .map_err(map_string_err("failed to recv from sync_render"))
+    }
+
+    fn on_export(&self, path: PathBuf) -> anyhow::Result<Option<PathBuf>> {
+        info!("CompileActor: on export: {}", path.display());
+
+        let (tx, rx) = oneshot::channel();
+
+        let task = Arc::new(Mutex::new(Some(tx)));
+
+        self.render_tx
+            .send(RenderActorRequest::DoExport(task))
+            .map_err(map_string_err("failed to send to sync_render"))?;
+
+        let res: Option<PathBuf> = self.sync_render(rx)?;
+
+        info!("CompileActor: on export end: {path:?} as {res:?}");
+
+        Ok(res)
     }
 
     fn on_save_export(&self, path: PathBuf) -> anyhow::Result<()> {

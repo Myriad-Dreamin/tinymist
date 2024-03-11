@@ -7,9 +7,10 @@ use std::{
 
 use anyhow::Context;
 use log::{error, info};
+use parking_lot::Mutex;
 use tokio::sync::{
     broadcast::{self, error::RecvError},
-    watch,
+    oneshot, watch,
 };
 use typst::foundations::Smart;
 use typst_ts_core::{path::PathClean, ImmutPath, TypstDocument};
@@ -19,6 +20,8 @@ use crate::ExportPdfMode;
 #[derive(Debug, Clone)]
 pub enum RenderActorRequest {
     OnTyped,
+    // todo: bad arch...
+    DoExport(Arc<Mutex<Option<oneshot::Sender<Option<PathBuf>>>>>),
     OnSaved(PathBuf),
     ChangeExportPath(PdfPathVars),
     ChangeConfig(PdfExportConfig),
@@ -94,7 +97,20 @@ impl PdfExportActor {
                             self.path = cfg.path;
                         }
                         _ => {
-                            self.check_mode_and_export(req).await;
+                            let sender = match &req {
+                                RenderActorRequest::DoExport(sender) => Some(sender.clone()),
+                                _ => None,
+                            };
+                            let resp = self.check_mode_and_export(req).await;
+                            if let Some(sender) = sender {
+                                let Some(sender) = sender.lock().take() else {
+                                    error!("PdfRenderActor: sender is None");
+                                    continue;
+                                };
+                                if let Err(e) = sender.send(resp) {
+                                    error!("PdfRenderActor: failed to send response: {err:?}", err = e);
+                                }
+                            }
                         }
                     }
                 }
@@ -102,14 +118,15 @@ impl PdfExportActor {
         }
     }
 
-    async fn check_mode_and_export(&self, req: RenderActorRequest) {
+    async fn check_mode_and_export(&self, req: RenderActorRequest) -> Option<PathBuf> {
         let Some(document) = self.document.borrow().clone() else {
             info!("PdfRenderActor: document is not ready");
-            return;
+            return None;
         };
 
         let eq_mode = match req {
             RenderActorRequest::OnTyped => ExportPdfMode::OnType,
+            RenderActorRequest::DoExport(..) => ExportPdfMode::OnSave,
             RenderActorRequest::OnSaved(..) => ExportPdfMode::OnSave,
             _ => unreachable!(),
         };
@@ -119,11 +136,17 @@ impl PdfExportActor {
             self.path, self.substitute_pattern
         );
         if let Some(path) = self.path.as_ref() {
-            if (get_mode(self.mode) == eq_mode) || validate_document(&req, self.mode, &document) {
-                let Err(err) = self.export_pdf(&document, path).await else {
-                    return;
+            let should_do = matches!(req, RenderActorRequest::DoExport(..));
+            let should_do = should_do || get_mode(self.mode) == eq_mode;
+            let should_do = should_do || validate_document(&req, self.mode, &document);
+            if should_do {
+                return match self.export_pdf(&document, path).await {
+                    Ok(pdf) => Some(pdf),
+                    Err(err) => {
+                        error!("PdfRenderActor: failed to export PDF: {err}", err = err);
+                        None
+                    }
                 };
-                error!("PdfRenderActor: failed to export PDF: {err}", err = err);
             }
         }
 
@@ -150,9 +173,11 @@ impl PdfExportActor {
 
             false
         }
+
+        None
     }
 
-    async fn export_pdf(&self, doc: &TypstDocument, path: &Path) -> anyhow::Result<()> {
+    async fn export_pdf(&self, doc: &TypstDocument, path: &Path) -> anyhow::Result<PathBuf> {
         let Some(to) = substitute_path(&self.substitute_pattern, &self.root, path) else {
             return Err(anyhow::anyhow!("failed to substitute path"));
         };
@@ -176,10 +201,10 @@ impl PdfExportActor {
         // todo: timestamp world.now()
         let data = typst_pdf::pdf(doc, Smart::Auto, None);
 
-        std::fs::write(to, data).context("failed to export PDF")?;
+        std::fs::write(&to, data).context("failed to export PDF")?;
 
         info!("PDF export complete");
-        Ok(())
+        Ok(to)
     }
 }
 

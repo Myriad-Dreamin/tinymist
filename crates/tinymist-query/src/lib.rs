@@ -31,6 +31,8 @@ pub(crate) mod prepare_rename;
 pub use prepare_rename::*;
 pub(crate) mod rename;
 pub use rename::*;
+pub(crate) mod code_lens;
+pub use code_lens::*;
 
 pub mod lsp_typst_boundary;
 pub use lsp_typst_boundary::*;
@@ -40,6 +42,11 @@ mod prelude;
 mod polymorphic {
     use super::prelude::*;
     use super::*;
+
+    #[derive(Debug, Clone)]
+    pub struct OnExportRequest {
+        pub path: PathBuf,
+    }
 
     #[derive(Debug, Clone)]
     pub struct OnSaveExportRequest {
@@ -56,10 +63,12 @@ mod polymorphic {
 
     #[derive(Debug, Clone)]
     pub enum CompilerQueryRequest {
+        OnExport(OnExportRequest),
         OnSaveExport(OnSaveExportRequest),
         Hover(HoverRequest),
         GotoDefinition(GotoDefinitionRequest),
         InlayHint(InlayHintRequest),
+        CodeLens(CodeLensRequest),
         Completion(CompletionRequest),
         SignatureHelp(SignatureHelpRequest),
         Rename(RenameRequest),
@@ -76,10 +85,12 @@ mod polymorphic {
         pub fn fold_feature(&self) -> FoldRequestFeature {
             use FoldRequestFeature::*;
             match self {
+                CompilerQueryRequest::OnExport(..) => Mergable,
                 CompilerQueryRequest::OnSaveExport(..) => Mergable,
                 CompilerQueryRequest::Hover(..) => PinnedFirst,
                 CompilerQueryRequest::GotoDefinition(..) => PinnedFirst,
                 CompilerQueryRequest::InlayHint(..) => Unique,
+                CompilerQueryRequest::CodeLens(..) => Unique,
                 CompilerQueryRequest::Completion(..) => Mergable,
                 CompilerQueryRequest::SignatureHelp(..) => PinnedFirst,
                 CompilerQueryRequest::Rename(..) => Mergable,
@@ -95,10 +106,12 @@ mod polymorphic {
 
         pub fn associated_path(&self) -> Option<&Path> {
             Some(match self {
+                CompilerQueryRequest::OnExport(..) => return None,
                 CompilerQueryRequest::OnSaveExport(req) => &req.path,
                 CompilerQueryRequest::Hover(req) => &req.path,
                 CompilerQueryRequest::GotoDefinition(req) => &req.path,
                 CompilerQueryRequest::InlayHint(req) => &req.path,
+                CompilerQueryRequest::CodeLens(req) => &req.path,
                 CompilerQueryRequest::Completion(req) => &req.path,
                 CompilerQueryRequest::SignatureHelp(req) => &req.path,
                 CompilerQueryRequest::Rename(req) => &req.path,
@@ -115,10 +128,12 @@ mod polymorphic {
 
     #[derive(Debug, Clone)]
     pub enum CompilerQueryResponse {
+        OnExport(Option<PathBuf>),
         OnSaveExport(()),
         Hover(Option<Hover>),
         GotoDefinition(Option<GotoDefinitionResponse>),
         InlayHint(Option<Vec<InlayHint>>),
+        CodeLens(Option<Vec<CodeLens>>),
         Completion(Option<CompletionResponse>),
         SignatureHelp(Option<SignatureHelp>),
         PrepareRename(Option<PrepareRenameResponse>),

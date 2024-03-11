@@ -84,6 +84,9 @@ async function startClient(context: ExtensionContext): Promise<void> {
     );
     context.subscriptions.push(commands.registerCommand("tinymist.showPdf", commandShowPdf));
     context.subscriptions.push(commands.registerCommand("tinymist.clearCache", commandClearCache));
+    context.subscriptions.push(
+        commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens)
+    );
 
     return client.start();
 }
@@ -149,7 +152,7 @@ function validateServer(path: string): { valid: true } | { valid: false; message
     }
 }
 
-async function commandExportCurrentPdf(): Promise<void> {
+async function commandExportCurrentPdf(): Promise<string | undefined> {
     const activeEditor = window.activeTextEditor;
     if (activeEditor === undefined) {
         return;
@@ -157,10 +160,15 @@ async function commandExportCurrentPdf(): Promise<void> {
 
     const uri = activeEditor.document.uri.toString();
 
-    await client?.sendRequest("workspace/executeCommand", {
-        command: "tinymist.doPdfExport",
+    const res = await client?.sendRequest<string | null>("workspace/executeCommand", {
+        command: "tinymist.exportPdf",
         arguments: [uri],
     });
+    console.log("export pdf", res);
+    if (res === null) {
+        return undefined;
+    }
+    return res;
 }
 
 /**
@@ -173,22 +181,19 @@ async function commandShowPdf(): Promise<void> {
         return;
     }
 
-    // todo: this is wrong
-    const uri = activeEditor.document.uri;
-    // change the file extension to `.pdf` as we want to open the pdf file
-    // and not the currently opened `.typ` file.
-    const n = uri.toString().lastIndexOf(".");
-    const pdf_uri = Uri.parse(uri.toString().slice(0, n) + ".pdf");
+    // only create pdf if it does not exist yet
+    const pdfPath = await commandExportCurrentPdf();
 
-    try {
-        await workspace.fs.stat(pdf_uri);
-    } catch {
-        // only create pdf if it does not exist yet
-        await commandExportCurrentPdf();
-    } finally {
-        // here we can be sure that the pdf exists
-        await commands.executeCommand("vscode.open", pdf_uri, ViewColumn.Beside);
+    if (pdfPath === undefined) {
+        // show error message
+        await window.showErrorMessage("Failed to create PDF");
+        return;
     }
+
+    const pdfUri = Uri.file(pdfPath);
+
+    // here we can be sure that the pdf exists
+    await commands.executeCommand("vscode.open", pdfUri, ViewColumn.Beside);
 }
 
 async function commandClearCache(): Promise<void> {
@@ -232,4 +237,30 @@ async function commandActivateDoc(editor: TextEditor | undefined): Promise<void>
         command: "tinymist.doActivateDoc",
         arguments: [editor?.document.uri.fsPath],
     });
+}
+
+async function commandRunCodeLens(...args: string[]): Promise<void> {
+    console.log("run code lens", args);
+    if (args.length === 0) {
+        return;
+    }
+
+    switch (args[0]) {
+        case "preview": {
+            break;
+        }
+        case "preview-in": {
+            break;
+        }
+        case "export-pdf": {
+            await commandShowPdf();
+            break;
+        }
+        case "export-as": {
+            break;
+        }
+        default: {
+            console.error("unknown code lens command", args[0]);
+        }
+    }
 }

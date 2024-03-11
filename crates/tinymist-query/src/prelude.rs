@@ -9,12 +9,14 @@ pub use comemo::{Track, Tracked};
 pub use itertools::{Format, Itertools};
 pub use log::{error, trace};
 pub use lsp_types::{
-    CompletionResponse, DiagnosticRelatedInformation, DocumentSymbol, DocumentSymbolResponse,
-    Documentation, FoldingRange, GotoDefinitionResponse, Hover, InlayHint, Location as LspLocation,
-    MarkupContent, MarkupKind, Position as LspPosition, PrepareRenameResponse, SelectionRange,
-    SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult,
-    SignatureHelp, SignatureInformation, SymbolInformation, Url, WorkspaceEdit,
+    CodeLens, CompletionResponse, DiagnosticRelatedInformation, DocumentSymbol,
+    DocumentSymbolResponse, Documentation, FoldingRange, GotoDefinitionResponse, Hover, InlayHint,
+    Location as LspLocation, MarkupContent, MarkupKind, Position as LspPosition,
+    PrepareRenameResponse, SelectionRange, SemanticTokens, SemanticTokensDelta,
+    SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp, SignatureInformation,
+    SymbolInformation, Url, WorkspaceEdit,
 };
+pub use serde_json::Value as JsonValue;
 pub use typst::diag::{EcoString, FileError, FileResult, Tracepoint};
 pub use typst::foundations::{Func, ParamInfo, Value};
 pub use typst::syntax::{
