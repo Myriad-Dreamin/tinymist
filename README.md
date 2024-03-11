@@ -23,19 +23,21 @@ Language service (LSP) features:
 - [Goto definitions](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-definitions-of-a-symbol)
   - Right-click on a symbol and select "Go to Definition".
   - Or ctrl+click on a symbol.
-- [Goto declarations](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#find-all-references-to-a-symbol)
-  - Also known as "find all references".
+<!-- - [Goto declarations](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#find-all-references-to-a-symbol)
+  - Also known as "find all references". -->
 - [Hover tips](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-hovers)
   - Also known as "hovering tooltip".
 - [Inlay hints](https://www.jetbrains.com/help/idea/inlay-hints.html)
   - Inlay hints are special markers that appear in the editor and provide you with additional information about your code, like the names of the parameters that a called method expects.
+- [Code Lens](https://code.visualstudio.com/blogs/2017/02/12/code-lens-roundup)
+  - Should give contextual buttons along with code. For example, a button for exporting your document to various formats at the start of the document.
 - [Rename symbols](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#rename-symbols)
 - [Help with function and method signatures](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#help-with-function-and-method-signatures)
 - [Workspace Symbols](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-all-symbol-definitions-in-folder)
 
 Extra features:
 
-- Compiles to PDF on save (configurable to as-you-type, or can be disabled)
+- Compiles to PDF on save (configurable to as-you-type, or other options)
 
 ## Installation
 
@@ -44,4 +46,4 @@ Follow the instructions to enable tinymist in your favorite editor.
 
 ## Acknowledgements
 
-- It is developed based on [typst-lsp](https://github.com/nvarner/typst-lsp)
+- Partially code is inherited from [typst-lsp](https://github.com/nvarner/typst-lsp)
