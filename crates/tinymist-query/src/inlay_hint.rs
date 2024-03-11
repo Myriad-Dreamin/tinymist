@@ -495,3 +495,28 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
 
     params
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("inlay_hints", &|world, path| {
+            let source = get_suitable_source_in_workspace(world, &path).unwrap();
+
+            let request = InlayHintRequest {
+                path: path.clone(),
+                range: typst_to_lsp::range(
+                    0..source.text().len(),
+                    &source,
+                    PositionEncoding::Utf16,
+                ),
+            };
+
+            let result = request.request(world, PositionEncoding::Utf16);
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
+}

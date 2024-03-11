@@ -161,7 +161,10 @@ mod tests {
     use serde::Serialize;
     use serde_json::{ser::PrettyFormatter, Serializer, Value};
     use typst::syntax::{LinkedNode, Source, VirtualPath};
-    use typst_ts_compiler::{service::WorkspaceProvider, ShadowApi};
+    use typst_ts_compiler::{
+        service::{CompileDriver, Compiler, WorkspaceProvider},
+        ShadowApi,
+    };
     use typst_ts_core::{config::CompileOpts, Bytes, TypstFileId};
 
     pub use insta::assert_snapshot;
@@ -199,6 +202,9 @@ mod tests {
         .unwrap();
         let sources = source.split("-----");
 
+        let pw = root.join(Path::new("/main.typ"));
+        world.map_shadow(&pw, Bytes::from_static(b"")).unwrap();
+
         let mut last_pw = None;
         for (i, source) in sources.enumerate() {
             // find prelude
@@ -220,18 +226,24 @@ mod tests {
             last_pw = Some(pw);
         }
 
+        world.set_main_id(TypstFileId::new(None, VirtualPath::new("/main.typ")));
+        let mut driver = CompileDriver::new(world);
+        let _ = driver.compile(&mut Default::default());
+
         let pw = last_pw.unwrap();
-        world.set_main_id(TypstFileId::new(
+        driver.world_mut().set_main_id(TypstFileId::new(
             None,
             VirtualPath::new(pw.strip_prefix(root).unwrap()),
         ));
-        f(&mut world, pw)
+        f(driver.world_mut(), pw)
     }
 
     pub fn find_test_position(s: &Source) -> LspPosition {
         let re = s.text().find("/* position */").map(|e| (e, true));
         let re = re.or_else(|| s.text().find("/* position after */").zip(Some(false)));
-        let (re, prev) = re.unwrap();
+        let (re, prev) = re
+            .ok_or_else(|| panic!("No position marker found in source:\n{}", s.text()))
+            .unwrap();
 
         let n = LinkedNode::new(s.root());
         let mut n = n.leaf_at(re + 1).unwrap();
