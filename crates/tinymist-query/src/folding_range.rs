@@ -17,7 +17,7 @@ impl FoldingRangeRequest {
     ) -> Option<Vec<FoldingRange>> {
         let line_folding_only = self.line_folding_only;
 
-        let symbols = get_lexical_hierarchy(source.clone(), LexicalScopeKind::Block)?;
+        let symbols = get_lexical_hierarchy(source.clone(), LexicalScopeKind::Braced)?;
 
         let mut results = vec![];
         let LspPosition { line, character } =
