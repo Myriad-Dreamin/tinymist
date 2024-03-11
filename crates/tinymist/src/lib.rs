@@ -50,7 +50,7 @@ use lsp_types::notification::{Notification as NotificationTrait, PublishDiagnost
 use lsp_types::request::{RegisterCapability, UnregisterCapability, WorkspaceConfiguration};
 use lsp_types::*;
 use once_cell::sync::OnceCell;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use paste::paste;
 use query::MemoryFileMeta;
 use serde_json::{Map, Value as JsonValue};
@@ -79,13 +79,13 @@ type ReqQueue = lsp_server::ReqQueue<(String, Instant), ReqHandler>;
 /// The host for the language server, or known as the LSP client.
 #[derive(Debug, Clone)]
 pub struct LspHost {
-    sender: crossbeam_channel::Sender<Message>,
+    sender: Arc<RwLock<Option<crossbeam_channel::Sender<Message>>>>,
     req_queue: Arc<Mutex<ReqQueue>>,
 }
 
 impl LspHost {
     /// Creates a new language server host.
-    pub fn new(sender: crossbeam_channel::Sender<Message>) -> Self {
+    pub fn new(sender: Arc<RwLock<Option<crossbeam_channel::Sender<Message>>>>) -> Self {
         Self {
             sender,
             req_queue: Arc::new(Mutex::new(ReqQueue::default())),
@@ -98,10 +98,15 @@ impl LspHost {
         handler: ReqHandler,
     ) {
         let mut req_queue = self.req_queue.lock();
+        let sender = self.sender.read();
+        let Some(sender) = sender.as_ref() else {
+            warn!("closed connection, failed to send request");
+            return;
+        };
         let request = req_queue
             .outgoing
             .register(R::METHOD.to_owned(), params, handler);
-        let Err(res) = self.sender.send(request.into()) else {
+        let Err(res) = sender.send(request.into()) else {
             return;
         };
         warn!("failed to send request: {res:?}");
@@ -123,7 +128,13 @@ impl LspHost {
 
     pub fn send_notification<N: lsp_types::notification::Notification>(&self, params: N::Params) {
         let not = lsp_server::Notification::new(N::METHOD.to_owned(), params);
-        let Err(res) = self.sender.send(not.into()) else {
+
+        let sender = self.sender.read();
+        let Some(sender) = sender.as_ref() else {
+            warn!("closed connection, failed to send request");
+            return;
+        };
+        let Err(res) = sender.send(not.into()) else {
             return;
         };
         warn!("failed to send notification: {res:?}");
@@ -143,6 +154,12 @@ impl LspHost {
     pub fn respond(&self, response: lsp_server::Response) {
         let mut req_queue = self.req_queue.lock();
         if let Some((method, start)) = req_queue.incoming.complete(response.id.clone()) {
+            let sender = self.sender.read();
+            let Some(sender) = sender.as_ref() else {
+                warn!("closed connection, failed to send request");
+                return;
+            };
+
             // if let Some(err) = &response.error {
             //     if err.message.starts_with("server panicked") {
             //         self.poke_rust_analyzer_developer(format!("{}, check the log",
@@ -154,7 +171,7 @@ impl LspHost {
                 "handled  {} - ({}) in {:0.2?}",
                 method, response.id, duration
             );
-            let Err(res) = self.sender.send(response.into()) else {
+            let Err(res) = sender.send(response.into()) else {
                 return;
             };
             warn!("failed to send response: {res:?}");

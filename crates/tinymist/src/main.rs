@@ -2,11 +2,15 @@
 
 mod args;
 
-use std::io::{self, BufRead, Read, Write};
+use std::{
+    io::{self, BufRead, Read, Write},
+    sync::Arc,
+};
 
 use clap::Parser;
 use log::{info, trace, warn};
 use lsp_types::{InitializeParams, InitializedParams};
+use parking_lot::RwLock;
 use serde::de::DeserializeOwned;
 use tinymist::{init::Init, transport::io_transport, LspHost};
 use typst_ts_core::config::CompileOpts;
@@ -99,7 +103,8 @@ async fn main() -> anyhow::Result<()> {
     };
     let request_received = std::time::Instant::now();
     trace!("InitializeParams: {initialize_params}");
-    let host = LspHost::new(connection.sender);
+    let sender = Arc::new(RwLock::new(Some(connection.sender)));
+    let host = LspHost::new(sender.clone());
 
     let req = lsp_server::Request::new(initialize_id, "initialize".to_owned(), initialize_params);
     host.register_request(&req, request_received);
@@ -168,6 +173,10 @@ async fn main() -> anyhow::Result<()> {
 
     service.main_loop(connection.receiver)?;
 
+    // Drop it on the main thread
+    {
+        sender.write().take();
+    }
     io_threads.join()?;
     info!("server did shut down");
     Ok(())
