@@ -23,9 +23,8 @@ pub struct MemoryFileMeta {
 impl TypstLanguageServer {
     fn update_source(&self, files: FileChangeSet) -> Result<(), Error> {
         let main = self.main.clone();
-        let primary = Some(self.primary_deferred());
-        let main = main.lock();
         let main = main.as_ref();
+        let primary = Some(self.primary_deferred());
         let clients_to_notify = (primary.iter()).chain(main.iter());
 
         for client in clients_to_notify {
@@ -171,8 +170,7 @@ impl TypstLanguageServer {
             SelectionRange(req) => query_source!(self, SelectionRange, req),
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
             _ => {
-                let main = self.main.lock();
-
+                let main = &self.main;
                 let query_target = match main.as_ref() {
                     Some(main) if self.pinning => main.wait(),
                     Some(..) | None => {

@@ -290,7 +290,7 @@ pub struct TypstLanguageServer {
     memory_changes: RwLock<HashMap<Arc<Path>, MemoryFileMeta>>,
     primary: OnceCell<Deferred<CompileActor>>,
     pinning: bool,
-    main: Arc<Mutex<Option<Deferred<CompileActor>>>>,
+    main: Option<Deferred<CompileActor>>,
     tokens_cache: SemanticTokenCache,
 }
 
@@ -313,7 +313,7 @@ impl TypstLanguageServer {
             memory_changes: RwLock::new(HashMap::new()),
             primary: OnceCell::new(),
             pinning: false,
-            main: Arc::new(Mutex::new(None)),
+            main: None,
             tokens_cache: Default::default(),
         }
     }
@@ -693,15 +693,14 @@ impl TypstLanguageServer {
 
         let new_entry = file_uri.clone();
         self.pinning = new_entry.is_some();
-        let mut m = self.main.lock();
-        let update_result = match (new_entry, m.is_some()) {
+        let update_result = match (new_entry, self.main.is_some()) {
             (Some(new_entry), true) => {
                 let path = new_entry
                     .to_file_path()
                     .map_err(|_| invalid_params("invalid url"))?;
                 let path = path.as_path().into();
 
-                m.as_mut().unwrap().wait().change_entry(path)
+                self.main.as_mut().unwrap().wait().change_entry(path)
             }
             (Some(new_entry), false) => {
                 let path = new_entry
@@ -711,18 +710,17 @@ impl TypstLanguageServer {
 
                 let main_node = self.server("main".to_owned(), Some(path));
 
-                *m = Some(main_node);
+                self.main = Some(main_node);
                 Ok(())
             }
             (None, true) => {
                 // todo: unpin main
-                m.as_mut().unwrap().wait().disable();
+                self.main.as_mut().unwrap().wait().disable();
 
                 Ok(())
             }
             (None, false) => Ok(()),
         };
-        drop(m);
 
         update_result.map_err(|err| {
             error!("could not set main file: {err}");
@@ -825,8 +823,7 @@ impl TypstLanguageServer {
 
             self.primary().change_export_pdf(config.clone());
             {
-                let m = self.main.lock();
-                if let Some(main) = m.as_ref() {
+                if let Some(main) = self.main.as_ref() {
                     main.wait().change_export_pdf(config);
                 }
             }
