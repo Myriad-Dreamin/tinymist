@@ -4,7 +4,7 @@ A VS Code extension for Typst.
 
 ## Features
 
-See [Tinymist features](../../README.md#features) for a list of features.
+See [Tinymist features](https://github.com/Myriad-Dreamin/tinymist#features) for a list of features.
 
 ## Usage Tips
 
