@@ -3,7 +3,7 @@ use std::{
     thread,
 };
 
-use log::trace;
+use log::{info, trace};
 
 use crossbeam_channel::{bounded, Receiver, Sender};
 
@@ -29,9 +29,12 @@ pub fn io_transport<I: BufRead, O: Write>(
     let (writer_sender, writer_receiver) = bounded::<Message>(0);
     let writer = thread::spawn(move || {
         let mut out = out();
-        writer_receiver
+        let res = writer_receiver
             .into_iter()
-            .try_for_each(|it| it.write(&mut out))
+            .try_for_each(|it| it.write(&mut out));
+
+        info!("writer thread finished");
+        res
     });
     let (reader_sender, reader_receiver) = bounded::<Message>(0);
     let reader = thread::spawn(move || {
@@ -48,6 +51,8 @@ pub fn io_transport<I: BufRead, O: Write>(
                 break;
             }
         }
+
+        info!("reader thread finished");
         Ok(())
     });
     let threads = IoThreads { reader, writer };
