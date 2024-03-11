@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/func.typ
+---
+[
+ {
+  "kind": "Variable",
+  "name": "x",
+  "range": "5:6"
+ },
+ {
+  "kind": "Function",
+  "name": "f",
+  "range": "18:19"
+ },
+ {
+  "kind": "Variable",
+  "name": "a",
+  "range": "20:21"
+ },
+ {
+  "children": [
+   {
+    "kind": "ValRef",
+    "name": "a",
+    "range": "25:26"
+   }
+  ],
+  "kind": "Block",
+  "name": "",
+  "range": "25:26"
+ }
+]

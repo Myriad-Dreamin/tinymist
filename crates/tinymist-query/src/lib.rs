@@ -209,15 +209,17 @@ mod tests {
         for (i, source) in sources.enumerate() {
             // find prelude
             let mut source = source.trim();
-            let path = if source.starts_with("//") {
+            let mut path = None;
+
+            if source.starts_with("//") {
                 let first_line = source.lines().next().unwrap();
                 source = source.strip_prefix(first_line).unwrap().trim();
 
                 let content = first_line.strip_prefix("//").unwrap().trim();
-                content.strip_prefix("path:").unwrap().trim().to_owned()
-            } else {
-                format!("/source{i}.typ")
+                path = content.strip_prefix("path:").map(|e| e.trim().to_owned())
             };
+
+            let path = path.unwrap_or_else(|| format!("/source{i}.typ"));
 
             let pw = root.join(Path::new(&path));
             world
@@ -316,7 +318,11 @@ mod tests {
     }
 
     fn pos(v: &Value) -> String {
-        format!("{}:{}", v["line"], v["character"])
+        match v {
+            Value::Object(v) => format!("{}:{}", v["line"], v["character"]),
+            Value::Number(v) => v.to_string(),
+            _ => "<null>".to_owned(),
+        }
     }
 
     impl Redact for RedactFields {
