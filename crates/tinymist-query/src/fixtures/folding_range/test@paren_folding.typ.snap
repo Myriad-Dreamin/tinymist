@@ -3,4 +3,12 @@ source: crates/tinymist-query/src/folding_range.rs
 expression: "JsonRepr::new_pure(result.unwrap())"
 input_file: crates/tinymist-query/src/fixtures/folding_range/paren_folding.typ
 ---
-[]
+[
+ {
+  "collapsedText": "",
+  "endCharacter": 1,
+  "endLine": 2,
+  "startCharacter": 1,
+  "startLine": 0
+ }
+]

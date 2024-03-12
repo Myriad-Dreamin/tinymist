@@ -1,0 +1,13 @@
+---
+source: crates/tinymist-query/src/document_symbol.rs
+expression: "JsonRepr::new_redacted(result.unwrap(), &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/document_symbols/func.typ
+---
+[
+ {
+  "kind": 12,
+  "name": "f",
+  "range": "0:5:0:6",
+  "selectionRange": "0:5:0:6"
+ }
+]

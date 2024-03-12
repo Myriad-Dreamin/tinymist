@@ -1,0 +1,22 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/redefine.typ
+---
+[
+ {
+  "kind": "Variable",
+  "name": "x",
+  "range": "5:6"
+ },
+ {
+  "kind": "ValRef",
+  "name": "x",
+  "range": "22:23"
+ },
+ {
+  "kind": "Variable",
+  "name": "x",
+  "range": "18:19"
+ }
+]
