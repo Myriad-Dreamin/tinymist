@@ -176,7 +176,7 @@ mod tests {
     pub fn snapshot_testing(name: &str, f: &impl Fn(&mut TypstSystemWorld, PathBuf)) {
         let mut settings = insta::Settings::new();
         settings.set_prepend_module_to_snapshot(false);
-        settings.set_snapshot_path(format!("fixtures/{name}"));
+        settings.set_snapshot_path(format!("fixtures/{name}/snaps"));
         settings.bind(|| {
             let glob_path = format!("fixtures/{name}/*.typ");
             insta::glob!(&glob_path, |path| {
