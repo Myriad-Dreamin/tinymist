@@ -80,7 +80,7 @@ fn calc_folding_range(
             last_loc
         };
 
-        if matches!(e.info.kind, LexicalKind::Namespace(..)) {
+        if matches!(e.info.kind, LexicalKind::Heading(..)) {
             range.end_line = range.end_line.max(if is_not_last_range {
                 next_start.0.saturating_sub(1)
             } else {

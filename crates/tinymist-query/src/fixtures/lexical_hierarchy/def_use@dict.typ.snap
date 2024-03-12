@@ -1,0 +1,26 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/dict.typ
+---
+{
+ "x@18..19": {
+  "def": {
+   "kind": "Variable",
+   "name": "x",
+   "range": "18:19"
+  },
+  "refs": []
+ },
+ "z@5..6": {
+  "def": {
+   "kind": "Variable",
+   "name": "z",
+   "range": "5:6"
+  },
+  "refs": [
+   "z@43..44",
+   "z@30..31"
+  ]
+ }
+}
