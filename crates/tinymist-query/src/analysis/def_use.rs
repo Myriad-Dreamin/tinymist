@@ -6,7 +6,9 @@ use typst::syntax::Source;
 
 use crate::adt::snapshot_map::SnapshotMap;
 
-use super::{get_lexical_hierarchy, LexicalHierarchy, LexicalKind, LexicalScopeKind};
+use super::{
+    get_lexical_hierarchy, LexicalHierarchy, LexicalKind, LexicalScopeKind, LexicalVarKind,
+};
 
 pub use typst_ts_core::vector::ir::DefId;
 
@@ -126,17 +128,19 @@ impl DefUseCollector {
 
     fn scan(&mut self, e: &[LexicalHierarchy]) -> Option<()> {
         for e in e {
-            match e.info.kind {
+            match &e.info.kind {
                 LexicalKind::Heading(..) => unreachable!(),
-                LexicalKind::Label => self.insert(Ns::Label, e),
-                LexicalKind::LabelRef => self.insert_ref(Ns::Label, e),
-                LexicalKind::Function | LexicalKind::Variable => self.insert(Ns::Value, e),
-                LexicalKind::ValRef => self.insert_ref(Ns::Value, e),
+                LexicalKind::Var(LexicalVarKind::Label) => self.insert(Ns::Label, e),
+                LexicalKind::Var(LexicalVarKind::LabelRef) => self.insert_ref(Ns::Label, e),
+                LexicalKind::Var(LexicalVarKind::Function)
+                | LexicalKind::Var(LexicalVarKind::Variable) => self.insert(Ns::Value, e),
+                LexicalKind::Var(LexicalVarKind::ValRef) => self.insert_ref(Ns::Value, e),
                 LexicalKind::Block => {
                     if let Some(e) = &e.children {
                         self.enter(|this| this.scan(e.as_slice()))?;
                     }
                 }
+                LexicalKind::Mod(..) => {}
             }
         }
 
@@ -157,7 +161,7 @@ impl DefUseCollector {
             id_ref.clone(),
             IdentDef {
                 name: e.info.name.clone(),
-                kind: e.info.kind,
+                kind: e.info.kind.clone(),
                 range: e.info.range.clone(),
             },
         );

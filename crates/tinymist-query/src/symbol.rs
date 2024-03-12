@@ -62,7 +62,7 @@ fn filter_document_symbols(
 
             SymbolInformation {
                 name: e.info.name.clone(),
-                kind: e.info.kind.try_into().unwrap(),
+                kind: e.info.kind.clone().try_into().unwrap(),
                 tags: None,
                 deprecated: None,
                 location: LspLocation {

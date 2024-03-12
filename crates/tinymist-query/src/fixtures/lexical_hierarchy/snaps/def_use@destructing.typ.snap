@@ -6,7 +6,9 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/destructing.typ
 {
  "a@29..30": {
   "def": {
-   "kind": "Variable",
+   "kind": {
+    "Var": "Variable"
+   },
    "name": "a",
    "range": "29:30"
   },
@@ -14,7 +16,9 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/destructing.typ
  },
  "a@6..7": {
   "def": {
-   "kind": "Variable",
+   "kind": {
+    "Var": "Variable"
+   },
    "name": "a",
    "range": "6:7"
   },
@@ -24,7 +28,9 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/destructing.typ
  },
  "b@32..33": {
   "def": {
-   "kind": "Variable",
+   "kind": {
+    "Var": "Variable"
+   },
    "name": "b",
    "range": "32:33"
   },
@@ -32,7 +38,9 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/destructing.typ
  },
  "b@9..10": {
   "def": {
-   "kind": "Variable",
+   "kind": {
+    "Var": "Variable"
+   },
    "name": "b",
    "range": "9:10"
   },

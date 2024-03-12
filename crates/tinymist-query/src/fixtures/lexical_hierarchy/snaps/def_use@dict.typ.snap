@@ -6,7 +6,9 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/dict.typ
 {
  "x@18..19": {
   "def": {
-   "kind": "Variable",
+   "kind": {
+    "Var": "Variable"
+   },
    "name": "x",
    "range": "18:19"
   },
@@ -14,7 +16,9 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/dict.typ
  },
  "z@5..6": {
   "def": {
-   "kind": "Variable",
+   "kind": {
+    "Var": "Variable"
+   },
    "name": "z",
    "range": "5:6"
   },
