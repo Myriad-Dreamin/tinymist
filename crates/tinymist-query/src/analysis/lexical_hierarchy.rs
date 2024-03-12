@@ -24,7 +24,7 @@ pub(crate) fn get_lexical_hierarchy(
     worker.stack.push((
         LexicalInfo {
             name: "deadbeef".to_string(),
-            kind: LexicalKind::Namespace(-1),
+            kind: LexicalKind::Heading(-1),
             range: 0..0,
         },
         eco_vec![],
@@ -40,9 +40,9 @@ pub(crate) fn get_lexical_hierarchy(
     res.map(|_| worker.stack.pop().unwrap().1)
 }
 
-#[derive(Debug, Clone, Copy, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum LexicalKind {
-    Namespace(i16),
+    Heading(i16),
     ValRef,
     LabelRef,
     Variable,
@@ -56,7 +56,7 @@ impl TryFrom<LexicalKind> for SymbolKind {
 
     fn try_from(value: LexicalKind) -> Result<Self, Self::Error> {
         match value {
-            LexicalKind::Namespace(..) => Ok(SymbolKind::NAMESPACE),
+            LexicalKind::Heading(..) => Ok(SymbolKind::NAMESPACE),
             LexicalKind::Variable => Ok(SymbolKind::VARIABLE),
             LexicalKind::Function => Ok(SymbolKind::FUNCTION),
             LexicalKind::Label => Ok(SymbolKind::CONSTANT),
@@ -218,10 +218,10 @@ impl LexicalHierarchyWorker {
         let checkpoint = self.enter_symbol_context(&node)?;
 
         if let Some(symbol) = own_symbol {
-            if let LexicalKind::Namespace(level) = symbol.kind {
+            if let LexicalKind::Heading(level) = symbol.kind {
                 'heading_break: while let Some((w, _)) = self.stack.last() {
                     match w.kind {
-                        LexicalKind::Namespace(l) if l < level => break 'heading_break,
+                        LexicalKind::Heading(l) if l < level => break 'heading_break,
                         LexicalKind::Block => break 'heading_break,
                         _ if self.stack.len() <= 1 => break 'heading_break,
                         _ => {}
@@ -230,7 +230,7 @@ impl LexicalHierarchyWorker {
                     self.symbreak();
                 }
             }
-            let is_heading = matches!(symbol.kind, LexicalKind::Namespace(..));
+            let is_heading = matches!(symbol.kind, LexicalKind::Heading(..));
 
             self.stack.push((symbol, eco_vec![]));
             let stack_height = self.stack.len();
@@ -416,7 +416,7 @@ impl LexicalHierarchyWorker {
                     return Ok(None);
                 };
                 let kind = match parent.kind() {
-                    SyntaxKind::Heading if self.g.affect_heading() => LexicalKind::Namespace(
+                    SyntaxKind::Heading if self.g.affect_heading() => LexicalKind::Heading(
                         parent.cast::<ast::Heading>().unwrap().depth().get() as i16,
                     ),
                     _ => return Ok(None),

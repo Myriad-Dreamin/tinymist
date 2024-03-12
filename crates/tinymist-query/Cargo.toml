@@ -22,7 +22,10 @@ log.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 parking_lot.workspace = true
+ena.workspace = true
+fxhash.workspace = true
 walkdir = "2"
+indexmap = "2.1.0"
 
 typst.workspace = true
 typst-ide.workspace = true
