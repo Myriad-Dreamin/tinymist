@@ -32,6 +32,7 @@ pub mod init;
 mod query;
 mod task;
 pub mod transport;
+mod utils;
 
 use core::fmt;
 use std::path::Path;
@@ -49,7 +50,6 @@ use lsp_server::{ErrorCode, Message, Notification, Request, ResponseError};
 use lsp_types::notification::{Notification as NotificationTrait, PublishDiagnostics};
 use lsp_types::request::{RegisterCapability, UnregisterCapability, WorkspaceConfiguration};
 use lsp_types::*;
-use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
 use paste::paste;
 use query::MemoryFileMeta;
@@ -306,7 +306,7 @@ pub struct TypstLanguageServer {
     diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
     roots: Vec<PathBuf>,
     memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
-    primary: OnceCell<Deferred<CompileActor>>,
+    primary: Option<Deferred<CompileActor>>,
     pinning: bool,
     main: Option<Deferred<CompileActor>>,
     tokens_cache: SemanticTokenCache,
@@ -329,7 +329,7 @@ impl TypstLanguageServer {
             diag_tx: args.diag_tx,
             roots: args.roots,
             memory_changes: HashMap::new(),
-            primary: OnceCell::new(),
+            primary: None,
             pinning: false,
             main: None,
             tokens_cache: Default::default(),
@@ -345,7 +345,7 @@ impl TypstLanguageServer {
     }
 
     fn primary_deferred(&self) -> &Deferred<CompileActor> {
-        self.primary.get().expect("primary")
+        self.primary.as_ref().expect("primary")
     }
 
     fn primary(&self) -> &CompileActor {
@@ -719,7 +719,7 @@ impl TypstLanguageServer {
                     .map_err(|_| invalid_params("invalid url"))?;
                 let path = path.as_path().into();
 
-                self.main.as_mut().unwrap().wait().change_entry(path)
+                self.main.as_mut().unwrap().wait().change_entry(Some(path))
             }
             (Some(new_entry), false) => {
                 let path = new_entry
@@ -733,8 +733,8 @@ impl TypstLanguageServer {
                 Ok(())
             }
             (None, true) => {
-                // todo: unpin main
-                self.main.as_mut().unwrap().wait().disable();
+                let main = self.main.take().unwrap();
+                std::thread::spawn(move || main.wait().settle());
 
                 Ok(())
             }
@@ -765,15 +765,9 @@ impl TypstLanguageServer {
             _ => return Err(invalid_params("Path Parameter is not a string or null")),
         };
 
-        match path.clone() {
-            Some(new_entry) => self
-                .primary()
-                .change_entry(new_entry)
-                .map_err(|e| internal_error(e.to_string()))?,
-            None => {
-                self.primary().disable();
-            }
-        };
+        self.primary()
+            .change_entry(path.clone())
+            .map_err(|e| internal_error(e.to_string()))?;
 
         // update_result.map_err(|err| {
         //     error!("could not set active document: {err}");
