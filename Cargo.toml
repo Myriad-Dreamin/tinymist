@@ -103,9 +103,9 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "
 # typst-pdf = { path = "../typst/crates/typst-pdf" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "1f5f38895d9848c0406c62a808e4b582567c72f0", package = "typst-ts-svg-exporter" }
-typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "1f5f38895d9848c0406c62a808e4b582567c72f0", package = "typst-ts-core" }
-typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "1f5f38895d9848c0406c62a808e4b582567c72f0", package = "typst-ts-compiler" }
+typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "aabc5dd01e9d5772e80e0bdeb5a2d6fda5a093bc", package = "typst-ts-svg-exporter" }
+typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "aabc5dd01e9d5772e80e0bdeb5a2d6fda5a093bc", package = "typst-ts-core" }
+typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "aabc5dd01e9d5772e80e0bdeb5a2d6fda5a093bc", package = "typst-ts-compiler" }
 
 # typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
 # typst-ts-core = { path = "../typst.ts/core" }
