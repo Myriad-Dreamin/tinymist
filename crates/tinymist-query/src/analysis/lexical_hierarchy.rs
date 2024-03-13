@@ -14,7 +14,10 @@ use typst::{
     },
     util::LazyHash,
 };
-use typst_ts_core::typst::prelude::{eco_vec, EcoVec};
+use typst_ts_core::{
+    typst::prelude::{eco_vec, EcoVec},
+    TypstFileId,
+};
 
 pub(crate) fn get_lexical_hierarchy(
     source: Source,
@@ -59,7 +62,7 @@ pub enum ModSrc {
     Expr(Box<ImportAlias>),
     /// `import "" ...`
     ///  ^^^^^^^^^^^^^
-    Path(Box<Path>),
+    Path(Box<str>),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -81,6 +84,13 @@ pub enum LexicalModKind {
     /// `import "foo": *`
     ///                ^
     Star,
+    /// the symbol inside of `import "foo": *`
+    ///                                     ^
+    ExternResolved {
+        #[serde(skip_serializing, skip_deserializing)]
+        at: Option<TypstFileId>,
+        in_mod_kind: Box<LexicalModKind>,
+    },
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -143,11 +153,15 @@ impl LexicalKind {
         LexicalKind::Mod(LexicalModKind::Ident)
     }
 
+    const fn module_star() -> LexicalKind {
+        LexicalKind::Mod(LexicalModKind::Star)
+    }
+
     fn module_expr(path: Box<ImportAlias>) -> LexicalKind {
         LexicalKind::Mod(LexicalModKind::Module(ModSrc::Expr(path)))
     }
 
-    fn module(path: Box<Path>) -> LexicalKind {
+    fn module(path: Box<str>) -> LexicalKind {
         LexicalKind::Mod(LexicalModKind::Module(ModSrc::Path(path)))
     }
 
@@ -558,8 +572,7 @@ impl LexicalHierarchyWorker {
                 match src {
                     ast::Expr::Str(e) => {
                         let e = e.get();
-                        let e = Path::new(e.as_ref());
-                        (String::new(), LexicalKind::module(e.into()))
+                        (String::new(), LexicalKind::module(e.as_ref().into()))
                     }
                     src => {
                         let e = node
@@ -669,7 +682,7 @@ impl LexicalHierarchyWorker {
                 let v = node.find(wildcard.span()).context("no pos")?;
                 self.push_leaf(LexicalInfo {
                     name: "*".to_string(),
-                    kind: LexicalKind::module_path(),
+                    kind: LexicalKind::module_star(),
                     range: v.range(),
                 });
             }

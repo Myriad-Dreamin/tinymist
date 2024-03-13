@@ -220,7 +220,7 @@ mod tests {
                 path = content.strip_prefix("path:").map(|e| e.trim().to_owned())
             };
 
-            let path = path.unwrap_or_else(|| format!("/source{i}.typ"));
+            let path = path.unwrap_or_else(|| format!("/s{i}.typ"));
 
             let pw = root.join(Path::new(&path));
             world

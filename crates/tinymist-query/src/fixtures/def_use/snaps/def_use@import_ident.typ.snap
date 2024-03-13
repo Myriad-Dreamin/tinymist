@@ -4,7 +4,7 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/def_use/import_ident.typ
 ---
 {
- "base@8..18": {
+ "base@8..18@s0.typ": {
   "def": {
    "kind": {
     "Mod": "PathVar"
@@ -17,7 +17,7 @@ input_file: crates/tinymist-query/src/fixtures/def_use/import_ident.typ
    "base@51..55"
   ]
  },
- "x@47..48": {
+ "x@47..48@s0.typ": {
   "def": {
    "kind": {
     "Mod": "Ident"
