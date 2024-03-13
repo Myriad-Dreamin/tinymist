@@ -174,9 +174,12 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
                                     Some(source.id()).zip(get_def_use_inner(self.ctx, source))
                                 });
 
-                        if let Some((id, external_info)) = external_info {
+                        if let Some((_, external_info)) = external_info {
                             for v in &external_info.exports_refs {
-                                let (_, ext_sym) =
+                                // Use FileId in ident_defs map should lose stacked import
+                                // information, but it is currently
+                                // not a problem.
+                                let ((ext_id, _), ext_sym) =
                                     external_info.ident_defs.get_index(v.0 as usize).unwrap();
 
                                 let name = ext_sym.name.clone();
@@ -189,7 +192,7 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
                                 let (id, ..) = self
                                     .info
                                     .ident_defs
-                                    .insert_full((id, ext_ref), ext_sym.clone());
+                                    .insert_full((*ext_id, ext_ref), ext_sym.clone());
 
                                 let id = DefId(id as u64);
                                 self.id_scope.insert(name, id);
