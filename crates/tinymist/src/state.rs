@@ -21,6 +21,38 @@ pub struct MemoryFileMeta {
 }
 
 impl TypstLanguageServer {
+    /// Updates the main entry
+    pub fn update_main_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+        self.pinning = new_entry.is_some();
+        match (new_entry, self.main.is_some()) {
+            (Some(new_entry), true) => {
+                let main = self.main.as_mut().unwrap();
+                main.wait().change_entry(Some(new_entry))?;
+            }
+            (Some(new_entry), false) => {
+                let main_node = self.server("main".to_owned(), Some(new_entry.as_ref().to_owned()));
+
+                self.main = Some(main_node);
+            }
+            (None, true) => {
+                let main = self.main.take().unwrap();
+                std::thread::spawn(move || main.wait().settle());
+            }
+            (None, false) => {}
+        };
+
+        Ok(())
+    }
+
+    /// Updates the primary (focusing) entry
+    pub fn update_primary_entry(&self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+        self.primary().change_entry(new_entry.clone())?;
+
+        Ok(())
+    }
+}
+
+impl TypstLanguageServer {
     fn update_source(&self, files: FileChangeSet) -> Result<(), Error> {
         let main = self.main.clone();
         let main = main.as_ref();
