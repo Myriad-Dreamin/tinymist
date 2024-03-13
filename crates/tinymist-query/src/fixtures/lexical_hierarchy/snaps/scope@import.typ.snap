@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/import.typ
+---
+[
+ {
+  "children": [
+   {
+    "kind": {
+     "Mod": "PathVar"
+    },
+    "name": "base",
+    "range": "8:18"
+   }
+  ],
+  "kind": {
+   "Mod": {
+    "Module": {
+     "Path": "base.typ"
+    }
+   }
+  },
+  "name": "",
+  "range": "1:18"
+ },
+ {
+  "kind": {
+   "Var": "ValRef"
+  },
+  "name": "base",
+  "range": "21:25"
+ }
+]

@@ -76,8 +76,8 @@ pub enum LexicalModKind {
     ///                ^^^
     Ident,
     /// `import "foo": bar as baz`
-    ///                ^^^
-    Aliased(Box<ImportAlias>),
+    ///                ^^^^^^^^^^
+    Alias { target: Box<ImportAlias> },
     /// `import "foo": *`
     ///                ^
     Star,
@@ -152,7 +152,9 @@ impl LexicalKind {
     }
 
     fn module_import_alias(alias: ImportAlias) -> LexicalKind {
-        LexicalKind::Mod(LexicalModKind::Aliased(Box::new(alias)))
+        LexicalKind::Mod(LexicalModKind::Alias {
+            target: Box::new(alias),
+        })
     }
 }
 
@@ -518,15 +520,15 @@ impl LexicalHierarchyWorker {
                     .cast::<ast::RenamedImportItem>()
                     .ok_or_else(|| anyhow!("cast to renamed import item failed: {:?}", node))?;
 
-                let name = src.original_name().get().to_string();
+                let name = src.new_name().get().to_string();
 
-                let new_name = src.new_name();
-                let new_name_node = node.find(new_name.span()).context("no pos")?;
+                let target_name = src.original_name();
+                let target_name_node = node.find(target_name.span()).context("no pos")?;
                 (
                     name,
                     LexicalKind::module_import_alias(ImportAlias {
-                        name: new_name.get().to_string(),
-                        range: new_name_node.range(),
+                        name: target_name.get().to_string(),
+                        range: target_name_node.range(),
                     }),
                 )
             }

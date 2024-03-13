@@ -1,0 +1,32 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/def_use/import_alias.typ
+---
+{
+ "base@8..18": {
+  "def": {
+   "kind": {
+    "Mod": "PathVar"
+   },
+   "name": "base",
+   "range": "8:18"
+  },
+  "refs": [
+   "base@21..25",
+   "base@55..59"
+  ]
+ },
+ "foo@49..52": {
+  "def": {
+   "kind": {
+    "Mod": "ModuleAlias"
+   },
+   "name": "foo",
+   "range": "49:52"
+  },
+  "refs": [
+   "foo@62..65"
+  ]
+ }
+}

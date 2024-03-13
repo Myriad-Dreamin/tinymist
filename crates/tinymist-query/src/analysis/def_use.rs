@@ -23,6 +23,20 @@ pub struct IdentRef {
     range: Range<usize>,
 }
 
+impl PartialOrd for IdentRef {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for IdentRef {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.name
+            .cmp(&other.name)
+            .then_with(|| self.range.start.cmp(&other.range.start))
+    }
+}
+
 impl fmt::Display for IdentRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}@{:?}", self.name, self.range)
@@ -56,13 +70,17 @@ impl<'a> Serialize for DefUseSnapshot<'a> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap;
         // HashMap<IdentRef, DefId>
-        let references: HashMap<DefId, Vec<IdentRef>> = {
+        let mut references: HashMap<DefId, Vec<IdentRef>> = {
             let mut map = HashMap::new();
             for (k, v) in &self.0.ident_refs {
                 map.entry(*v).or_insert_with(Vec::new).push(k.clone());
             }
             map
         };
+        // sort
+        for (_, v) in references.iter_mut() {
+            v.sort();
+        }
 
         #[derive(Serialize)]
         struct DefUseEntry<'a> {
@@ -84,13 +102,15 @@ impl<'a> Serialize for DefUseSnapshot<'a> {
         }
 
         if !self.0.undefined_refs.is_empty() {
+            let mut undefined_refs = self.0.undefined_refs.clone();
+            undefined_refs.sort();
             let entry = DefUseEntry {
                 def: &IdentDef {
                     name: "<nil>".to_string(),
                     kind: LexicalKind::Block,
                     range: 0..0,
                 },
-                refs: &self.0.undefined_refs,
+                refs: &undefined_refs,
             };
             state.serialize_entry("<nil>", &entry)?;
         }
@@ -133,14 +153,26 @@ impl DefUseCollector {
                 LexicalKind::Var(LexicalVarKind::Label) => self.insert(Ns::Label, e),
                 LexicalKind::Var(LexicalVarKind::LabelRef) => self.insert_ref(Ns::Label, e),
                 LexicalKind::Var(LexicalVarKind::Function)
-                | LexicalKind::Var(LexicalVarKind::Variable) => self.insert(Ns::Value, e),
+                | LexicalKind::Var(LexicalVarKind::Variable)
+                | LexicalKind::Mod(super::LexicalModKind::PathVar)
+                | LexicalKind::Mod(super::LexicalModKind::ModuleAlias)
+                | LexicalKind::Mod(super::LexicalModKind::Ident)
+                | LexicalKind::Mod(super::LexicalModKind::Alias { .. }) => {
+                    self.insert(Ns::Value, e)
+                }
                 LexicalKind::Var(LexicalVarKind::ValRef) => self.insert_ref(Ns::Value, e),
                 LexicalKind::Block => {
                     if let Some(e) = &e.children {
                         self.enter(|this| this.scan(e.as_slice()))?;
                     }
                 }
-                LexicalKind::Mod(..) => {}
+                LexicalKind::Mod(super::LexicalModKind::Module(..)) => {
+                    // todo: process import star
+                    if let Some(e) = &e.children {
+                        self.scan(e.as_slice())?;
+                    }
+                }
+                LexicalKind::Mod(super::LexicalModKind::Star) => {}
             }
         }
 

@@ -1,0 +1,19 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/def_use/base.typ
+---
+{
+ "x@5..6": {
+  "def": {
+   "kind": {
+    "Var": "Variable"
+   },
+   "name": "x",
+   "range": "5:6"
+  },
+  "refs": [
+   "x@14..15"
+  ]
+ }
+}
