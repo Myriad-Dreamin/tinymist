@@ -171,7 +171,7 @@ impl TypstLanguageServer {
                     Some(..) | None => {
                         // todo: race condition, we need atomic primary query
                         if let Some(path) = query.associated_path() {
-                            self.primary().change_entry(path.into())?;
+                            self.primary().change_entry(Some(path.into()))?;
                         }
                         self.primary()
                     }

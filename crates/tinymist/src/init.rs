@@ -508,7 +508,10 @@ impl Init {
         };
 
         let primary = service.server("primary".to_owned(), None);
-        service.primary.get_or_init(|| primary);
+        if service.primary.is_some() {
+            panic!("primary already initialized");
+        }
+        service.primary = Some(primary);
 
         // Run the cluster in the background after we referencing it
         tokio::spawn(cluster_actor.run());

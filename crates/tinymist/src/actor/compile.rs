@@ -32,7 +32,7 @@ use typst_ts_compiler::service::{
     WorkspaceProvider, WorldExporter,
 };
 
-use crate::task::BorrowTask;
+use crate::{task::BorrowTask, utils};
 
 #[derive(Debug, Clone)]
 pub struct VersionedDocument {
@@ -42,6 +42,10 @@ pub struct VersionedDocument {
 
 /// Interrupts for external sources
 enum ExternalInterrupt<Ctx> {
+    /// Compile anyway.
+    Compile,
+    /// Interrupted by settle request.
+    Settle(oneshot::Sender<()>),
     /// Interrupted by task.
     ///
     /// See [`CompileClient<Ctx>::steal`] for more information.
@@ -52,6 +56,8 @@ enum ExternalInterrupt<Ctx> {
 
 /// Interrupts for the compiler thread.
 enum CompilerInterrupt<Ctx> {
+    /// Compile anyway.
+    Compile,
     /// Interrupted by task.
     ///
     /// See [`CompileClient<Ctx>::steal`] for more information.
@@ -77,6 +83,11 @@ struct TaggedMemoryEvent {
     logical_tick: usize,
     /// The memory event happened.
     event: MemoryEvent,
+}
+
+struct SuspendState {
+    suspended: bool,
+    dirty: bool,
 }
 
 /// The compiler thread.
@@ -105,13 +116,20 @@ pub struct CompileActor<C: Compiler> {
     /// Internal channel for stealing the compiler thread.
     steal_send: mpsc::UnboundedSender<ExternalInterrupt<Self>>,
     steal_recv: mpsc::UnboundedReceiver<ExternalInterrupt<Self>>,
+
+    suspend_state: SuspendState,
 }
 
 impl<C: Compiler + ShadowApi + WorldExporter + Send + 'static> CompileActor<C>
 where
     C::World: for<'files> codespan_reporting::files::Files<'files, FileId = TypstFileId>,
 {
-    pub fn new_with_features(compiler: C, root: PathBuf, feature_set: FeatureSet) -> Self {
+    pub fn new_with_features(
+        compiler: C,
+        root: PathBuf,
+        entry: Option<PathBuf>,
+        feature_set: FeatureSet,
+    ) -> Self {
         let (steal_send, steal_recv) = mpsc::unbounded_channel();
 
         let watch_feature_set = Arc::new(
@@ -136,12 +154,17 @@ where
 
             steal_send,
             steal_recv,
+
+            suspend_state: SuspendState {
+                suspended: entry.is_none(),
+                dirty: false,
+            },
         }
     }
 
     /// Create a new compiler thread.
-    pub fn new(compiler: C, root: PathBuf) -> Self {
-        Self::new_with_features(compiler, root, FeatureSet::default())
+    pub fn new(compiler: C, root: PathBuf, entry: Option<PathBuf>) -> Self {
+        Self::new_with_features(compiler, root, entry, FeatureSet::default())
     }
 
     pub fn doc(&self) -> Option<VersionedDocument> {
@@ -197,6 +220,14 @@ where
         let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
         let (fs_tx, mut fs_rx) = tokio::sync::mpsc::unbounded_channel();
 
+        let settle_notify_tx = dep_tx.clone();
+        let settle_notify = move || {
+            log_send_error(
+                "settle_notify",
+                settle_notify_tx.send(NotifyMessage::Settle),
+            )
+        };
+
         // Wrap sender to send compiler response.
         let compiler_ack = move |res: CompilerResponse| match res {
             CompilerResponse::Notify(msg) => {
@@ -209,7 +240,7 @@ where
         tokio::spawn(typst_ts_compiler::service::watch_deps(
             dep_rx,
             move |event| {
-                log_send_error("fs_event", fs_tx.send(event));
+                log_send_error("fs_event", fs_tx.send(Some(event)));
             },
         ));
 
@@ -218,22 +249,36 @@ where
             log::debug!("CompileActor: initialized");
 
             // Wait for first events.
-            while let Some(event) = tokio::select! {
+            'event_loop: while let Some(event) = tokio::select! {
                 Some(it) = fs_rx.recv() => Some(CompilerInterrupt::Fs(it)),
                 Some(it) = self.steal_recv.recv() => match it {
+                    ExternalInterrupt::Compile => Some(CompilerInterrupt::Compile),
                     ExternalInterrupt::Task(task) => Some(CompilerInterrupt::Task(task)),
                     ExternalInterrupt::Memory(task) => Some(CompilerInterrupt::Memory(task)),
+                    ExternalInterrupt::Settle(e) => {
+                        log::info!("CompileActor: requested stop");
+                        e.send(()).ok();
+                        break 'event_loop;
+                    }
                 },
             } {
                 // Small step to warp the logical clock.
                 self.logical_tick += 1;
 
-                // Accumulate events.
+                // Accumulate events, the order of processing which is critical.
                 let mut need_recompile = self.process(event, &compiler_ack);
                 let task_event = {
                     let mut task_event = None;
                     while let Ok(event) = self.steal_recv.try_recv() {
                         match event {
+                            ExternalInterrupt::Compile => {
+                                need_recompile = true;
+                            }
+                            ExternalInterrupt::Settle(e) => {
+                                log::info!("CompileActor: requested stop");
+                                e.send(()).ok();
+                                break 'event_loop;
+                            }
                             ExternalInterrupt::Task(task) => {
                                 task_event = Some(CompilerInterrupt::Task(task));
                                 break;
@@ -266,7 +311,8 @@ where
                 }
             }
 
-            log::debug!("CompileActor: exited");
+            settle_notify();
+            log::info!("CompileActor: exited");
         })
         .unwrap();
 
@@ -274,9 +320,26 @@ where
         Some(compile_thread)
     }
 
+    pub(crate) fn change_entry(&mut self, entry: Option<Arc<Path>>) {
+        let suspending = entry.is_none();
+        if suspending {
+            self.suspend_state.suspended = true;
+        } else {
+            self.suspend_state.suspended = false;
+            if self.suspend_state.dirty {
+                self.steal_send.send(ExternalInterrupt::Compile).ok();
+            }
+        }
+    }
+
     /// Compile the document.
     fn compile(&mut self, send: impl Fn(CompilerResponse)) {
         use CompilerResponse::*;
+
+        if self.suspend_state.suspended {
+            self.suspend_state.dirty = true;
+            return;
+        }
 
         // Compile the document.
         self.latest_doc = self
@@ -285,7 +348,12 @@ where
             .ok();
 
         // Evict compilation cache.
+        let evict_start = std::time::Instant::now();
         comemo::evict(30);
+        log::info!(
+            "CompileActor: evict compilation cache in {:?}",
+            evict_start.elapsed()
+        );
 
         // Notify the new file dependencies.
         let mut deps = vec![];
@@ -301,6 +369,11 @@ where
         self.logical_tick += 1;
 
         match event {
+            // Compile anyway.
+            CompilerInterrupt::Compile => {
+                // Will trigger compilation
+                true
+            }
             // Borrow the compiler thread and run the task.
             //
             // See [`CompileClient::steal`] for more information.
@@ -488,20 +561,14 @@ impl<Ctx> CompileClient<Ctx> {
         &self,
         f: impl FnOnce(&mut Ctx) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
-        // get current async handle
-        if let Ok(e) = tokio::runtime::Handle::try_current() {
-            let fut = self.steal_inner(f)?;
-            // todo: remove blocking
-            return std::thread::spawn(move || {
-                e.block_on(fut).map_err(map_string_err("failed to steal"))
-            })
-            .join()
-            .unwrap();
-        }
+        utils::threaded_receive(self.steal_inner(f)?)
+    }
 
-        self.steal_inner(f)?
-            .blocking_recv()
-            .map_err(map_string_err("failed to recv from steal"))
+    pub fn settle(&self) -> ZResult<()> {
+        let (tx, rx) = oneshot::channel();
+        // very weird if this is error, we unwrap it.
+        self.steal_send.send(ExternalInterrupt::Settle(tx)).unwrap();
+        utils::threaded_receive(rx)
     }
 
     /// Steal the compiler thread and run the given function.

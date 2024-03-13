@@ -29,17 +29,20 @@ use typst_ts_compiler::{
         WorkspaceProvider, WorldExporter,
     },
     vfs::notify::{FileChangeSet, MemoryEvent},
-    Time, TypstSystemWorld,
+    TypstSystemWorld,
 };
 use typst_ts_core::{
     config::CompileOpts, debug_loc::SourceSpanOffset, error::prelude::*, typst::prelude::EcoVec,
-    Bytes, Error, ImmutPath, TypstDocument, TypstWorld,
+    Error, ImmutPath, TypstDocument, TypstWorld,
 };
 
 use super::compile::CompileClient as TsCompileClient;
 use super::{compile::CompileActor as CompileActorInner, render::PdfExportConfig};
-use crate::actor::render::{PdfPathVars, RenderActorRequest};
 use crate::ConstConfig;
+use crate::{
+    actor::render::{PdfPathVars, RenderActorRequest},
+    utils,
+};
 
 type CompileService<H> = CompileActorInner<Reporter<CompileExporter<CompileDriver>, H>>;
 type CompileClient<H> = TsCompileClient<CompileService<H>>;
@@ -101,7 +104,7 @@ pub fn create_server(
             inner: driver,
             cb: handler.clone(),
         };
-        let driver = CompileActorInner::new(driver, root.clone()).with_watch(true);
+        let driver = CompileActorInner::new(driver, root.clone(), entry.clone()).with_watch(true);
 
         let (server, client) = driver.split();
 
@@ -191,16 +194,7 @@ impl CompileMiddleware for CompileDriver {
 impl CompileDriver {
     pub fn new(roots: Vec<PathBuf>, opts: CompileOpts, entry: Option<PathBuf>) -> Self {
         let world = TypstSystemWorld::new(opts).expect("incorrect options");
-        let mut driver = CompileDriverInner::new(world);
-
-        driver.entry_file = "detached.typ".into();
-        // todo: suitable approach to avoid panic
-        driver.notify_fs_event(typst_ts_compiler::vfs::notify::FilesystemEvent::Update(
-            typst_ts_compiler::vfs::notify::FileChangeSet::new_inserts(vec![(
-                driver.world.root.join("detached.typ").into(),
-                Ok((Time::now(), Bytes::from("".as_bytes()))).into(),
-            )]),
-        ));
+        let driver = CompileDriverInner::new(world);
 
         let mut this = Self {
             inner: driver,
@@ -274,13 +268,13 @@ impl<C: Compiler<World = TypstSystemWorld>, H: CompilationHandle> CompileMiddlew
             Ok(doc) => {
                 self.cb.notify_compile(Ok(doc.clone()));
 
-                self.push_diagnostics(EcoVec::new());
+                self.notify_diagnostics(EcoVec::new());
                 Ok(doc)
             }
             Err(err) => {
                 self.cb.notify_compile(Err(CompileStatus::CompileError));
 
-                self.push_diagnostics(err);
+                self.notify_diagnostics(err);
                 Err(EcoVec::new())
             }
         }
@@ -294,8 +288,15 @@ impl<C: Compiler + WorldExporter, H> WorldExporter for Reporter<C, H> {
 }
 
 impl<C: Compiler<World = TypstSystemWorld>, H> Reporter<C, H> {
-    fn push_diagnostics(&mut self, diagnostics: EcoVec<SourceDiagnostic>) {
-        trace!("send diagnostics: {:#?}", diagnostics);
+    fn push_diagnostics(&mut self, diagnostics: Option<DiagnosticsMap>) {
+        let err = self.diag_tx.send((self.diag_group.clone(), diagnostics));
+        if let Err(err) = err {
+            error!("failed to send diagnostics: {:#}", err);
+        }
+    }
+
+    fn notify_diagnostics(&mut self, diagnostics: EcoVec<SourceDiagnostic>) {
+        trace!("notify diagnostics: {:#?}", diagnostics);
 
         // todo encoding
         let diagnostics = tinymist_query::convert_diagnostics(
@@ -310,12 +311,7 @@ impl<C: Compiler<World = TypstSystemWorld>, H> Reporter<C, H> {
         let main = self.inner.world().main;
         let valid = main.is_some_and(|e| e.vpath() != &VirtualPath::new("detached.typ"));
 
-        let err = self
-            .diag_tx
-            .send((self.diag_group.clone(), valid.then_some(diagnostics)));
-        if let Err(err) = err {
-            error!("failed to send diagnostics: {:#}", err);
-        }
+        self.push_diagnostics(valid.then_some(diagnostics));
     }
 }
 
@@ -328,16 +324,6 @@ pub struct CompileActor {
     pub inner: CompileClient<CompileHandler>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
-
-// todo: remove unsafe impl send
-/// SAFETY:
-/// This is safe because the not send types are only used in compiler time
-/// hints.
-unsafe impl Send for CompileActor {}
-/// SAFETY:
-/// This is safe because the not sync types are only used in compiler time
-/// hints.
-unsafe impl Sync for CompileActor {}
 
 impl CompileActor {
     fn inner(&self) -> &CompileClient<CompileHandler> {
@@ -362,40 +348,33 @@ impl CompileActor {
         self.inner.steal_async(f).await
     }
 
-    // todo: stop main
-    pub fn disable(&self) {
-        let res = self.steal(move |compiler| {
-            let path = Path::new("detached.typ");
-            let root = compiler.compiler.world().workspace_root();
-
-            let driver = &mut compiler.compiler.compiler.inner.compiler;
-            driver.set_entry_file(path.to_owned());
-
-            // todo: suitable approach to avoid panic
-            driver.notify_fs_event(typst_ts_compiler::vfs::notify::FilesystemEvent::Update(
-                typst_ts_compiler::vfs::notify::FileChangeSet::new_inserts(vec![(
-                    root.join("detached.typ").into(),
-                    Ok((Time::now(), Bytes::from("".as_bytes()))).into(),
-                )]),
-            ));
-        });
-        if let Err(err) = res {
-            error!("failed to disable main: {:#}", err);
+    pub fn settle(&self) {
+        let _ = self.change_entry(None);
+        info!("TypstActor({}): settle requested", self.diag_group);
+        let res = self.inner.settle();
+        match res {
+            Ok(()) => info!("TypstActor({}): settled", self.diag_group),
+            Err(err) => {
+                error!(
+                    "TypstActor({}): failed to settle: {:#}",
+                    self.diag_group, err
+                );
+            }
         }
     }
 
-    pub fn change_entry(&self, path: ImmutPath) -> Result<(), Error> {
-        if !path.is_absolute() {
-            return Err(error_once!("entry file must be absolute", path: path.display()));
+    pub fn change_entry(&self, path: Option<ImmutPath>) -> Result<(), Error> {
+        if path.as_deref().is_some_and(|p| !p.is_absolute()) {
+            return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
         }
 
         // todo: more robust rollback logic
         let entry = self.entry.clone();
         let should_change = {
             let mut entry = entry.lock();
-            let should_change = entry.as_ref().map(|e| e != &path).unwrap_or(true);
+            let should_change = entry.as_deref() != path.as_deref();
             let prev = entry.clone();
-            *entry = Some(path.clone());
+            *entry = path.clone();
 
             should_change.then_some(prev)
         };
@@ -404,28 +383,36 @@ impl CompileActor {
             let next = path.clone();
 
             debug!(
-                "the entry file of TypstActor({}) is changed to {}",
+                "the entry file of TypstActor({}) is changed to {next:?}",
                 self.diag_group,
-                next.display()
             );
 
             self.render_tx
                 .send(RenderActorRequest::ChangeExportPath(PdfPathVars {
                     root: self.root.clone(),
-                    path: Some(next.clone()),
+                    path: next.clone(),
                 }))
                 .unwrap();
 
             // todo
             let res = self.steal(move |compiler| {
                 let root = compiler.compiler.world().workspace_root();
-                if !path.starts_with(&root) {
-                    warn!("entry file is not in workspace root {}", path.display());
+                if path.as_ref().is_some_and(|p| !p.starts_with(&root)) {
+                    warn!("entry file is not in workspace root {path:?}");
                     return;
                 }
 
-                let driver = &mut compiler.compiler.compiler.inner.compiler;
-                driver.set_entry_file(path.as_ref().to_owned());
+                if let Some(path) = &path {
+                    let driver = &mut compiler.compiler.compiler.inner.compiler;
+                    driver.set_entry_file(path.as_ref().to_owned());
+                }
+
+                compiler.change_entry(path.clone());
+
+                if path.is_none() {
+                    info!("TypstActor: removing diag");
+                    compiler.compiler.compiler.push_diagnostics(None);
+                }
             });
 
             if res.is_err() {
@@ -437,7 +424,8 @@ impl CompileActor {
                     .unwrap();
 
                 let mut entry = entry.lock();
-                if *entry == Some(next) {
+                // todo: the rollback is actually not atomic
+                if *entry == next {
                     *entry = prev;
                 }
 
@@ -603,22 +591,6 @@ impl CompileActor {
         }
     }
 
-    pub fn sync_render<Ret: Send + 'static>(&self, f: oneshot::Receiver<Ret>) -> ZResult<Ret> {
-        // get current async handle
-        if let Ok(e) = tokio::runtime::Handle::try_current() {
-            // todo: remove blocking
-            return std::thread::spawn(move || {
-                e.block_on(f)
-                    .map_err(map_string_err("failed to sync_render"))
-            })
-            .join()
-            .unwrap();
-        }
-
-        f.blocking_recv()
-            .map_err(map_string_err("failed to recv from sync_render"))
-    }
-
     fn on_export(&self, path: PathBuf) -> anyhow::Result<Option<PathBuf>> {
         info!("CompileActor: on export: {}", path.display());
 
@@ -630,7 +602,7 @@ impl CompileActor {
             .send(RenderActorRequest::DoExport(task))
             .map_err(map_string_err("failed to send to sync_render"))?;
 
-        let res: Option<PathBuf> = self.sync_render(rx)?;
+        let res: Option<PathBuf> = utils::threaded_receive(rx)?;
 
         info!("CompileActor: on export end: {path:?} as {res:?}");
 
