@@ -5,24 +5,32 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/func.typ
 ---
 [
  {
-  "kind": "Variable",
+  "kind": {
+   "Var": "Variable"
+  },
   "name": "x",
   "range": "5:6"
  },
  {
-  "kind": "Function",
+  "kind": {
+   "Var": "Function"
+  },
   "name": "f",
   "range": "18:19"
  },
  {
-  "kind": "Variable",
+  "kind": {
+   "Var": "Variable"
+  },
   "name": "a",
   "range": "20:21"
  },
  {
   "children": [
    {
-    "kind": "ValRef",
+    "kind": {
+     "Var": "ValRef"
+    },
     "name": "a",
     "range": "25:26"
    }

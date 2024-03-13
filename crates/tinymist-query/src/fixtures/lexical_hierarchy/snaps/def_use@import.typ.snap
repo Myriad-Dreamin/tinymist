@@ -1,19 +1,19 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
-input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/base.typ
+input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/import.typ
 ---
 {
- "x@5..6": {
+ "base@8..18": {
   "def": {
    "kind": {
-    "Var": "Variable"
+    "Mod": "PathVar"
    },
-   "name": "x",
-   "range": "5:6"
+   "name": "base",
+   "range": "8:18"
   },
   "refs": [
-   "x@14..15"
+   "base@21..25"
   ]
  }
 }

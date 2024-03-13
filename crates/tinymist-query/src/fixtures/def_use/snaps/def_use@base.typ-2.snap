@@ -1,7 +1,7 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
-input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/base.typ
+input_file: crates/tinymist-query/src/fixtures/def_use/base.typ
 ---
 {
  "x@5..6": {

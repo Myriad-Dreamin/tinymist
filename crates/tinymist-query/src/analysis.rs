@@ -13,6 +13,7 @@ pub use def_use::*;
 
 #[cfg(test)]
 mod lexical_hierarchy_tests {
+    use def_use::get_def_use;
     use def_use::DefUseSnapshot;
 
     use crate::analysis::def_use;
@@ -35,14 +36,19 @@ mod lexical_hierarchy_tests {
     }
 
     #[test]
-    fn def_use() {
-        snapshot_testing("lexical_hierarchy", &|world, path| {
-            let source = get_suitable_source_in_workspace(world, &path).unwrap();
+    fn test_def_use() {
+        fn def_use(set: &str) {
+            snapshot_testing(set, &|world, path| {
+                let source = get_suitable_source_in_workspace(world, &path).unwrap();
 
-            let result = def_use::get_def_use(source);
-            let result = result.as_ref().map(DefUseSnapshot);
+                let result = get_def_use(source);
+                let result = result.as_ref().map(DefUseSnapshot);
 
-            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
-        });
+                assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+            });
+        }
+
+        def_use("lexical_hierarchy");
+        def_use("def_use");
     }
 }

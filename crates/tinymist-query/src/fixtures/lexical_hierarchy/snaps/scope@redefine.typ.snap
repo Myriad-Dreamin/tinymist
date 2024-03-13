@@ -5,17 +5,23 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/redefine.typ
 ---
 [
  {
-  "kind": "Variable",
+  "kind": {
+   "Var": "Variable"
+  },
   "name": "x",
   "range": "5:6"
  },
  {
-  "kind": "ValRef",
+  "kind": {
+   "Var": "ValRef"
+  },
   "name": "x",
   "range": "22:23"
  },
  {
-  "kind": "Variable",
+  "kind": {
+   "Var": "Variable"
+  },
   "name": "x",
   "range": "18:19"
  }
