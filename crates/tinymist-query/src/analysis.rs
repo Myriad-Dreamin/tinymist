@@ -41,8 +41,9 @@ mod lexical_hierarchy_tests {
             snapshot_testing(set, &|world, path| {
                 let source = get_suitable_source_in_workspace(world, &path).unwrap();
 
-                let result = get_def_use(source);
-                let result = result.as_ref().map(DefUseSnapshot);
+                let world: &dyn World = world;
+                let result = get_def_use(world.track(), source);
+                let result = result.as_deref().map(DefUseSnapshot);
 
                 assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
             });

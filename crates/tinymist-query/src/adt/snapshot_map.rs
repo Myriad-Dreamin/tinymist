@@ -71,6 +71,14 @@ where
         self.undo_log.clear();
     }
 
+    pub fn entries(&self) -> impl Iterator<Item = (&K, &V)> {
+        self.map.borrow().iter()
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = &V> {
+        self.map.borrow().values()
+    }
+
     pub fn insert(&mut self, key: K, value: V) -> bool {
         match self.map.borrow_mut().insert(key.clone(), value) {
             None => {

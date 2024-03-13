@@ -4,7 +4,7 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/def_use/import_alias_both.typ
 ---
 {
- "base@8..18": {
+ "base@8..18@s0.typ": {
   "def": {
    "kind": {
     "Mod": "PathVar"
@@ -17,7 +17,7 @@ input_file: crates/tinymist-query/src/fixtures/def_use/import_alias_both.typ
    "base@65..69"
   ]
  },
- "foo@49..52": {
+ "foo@49..52@s0.typ": {
   "def": {
    "kind": {
     "Mod": "ModuleAlias"
@@ -27,7 +27,7 @@ input_file: crates/tinymist-query/src/fixtures/def_use/import_alias_both.typ
   },
   "refs": []
  },
- "foo@54..62": {
+ "foo@54..62@s0.typ": {
   "def": {
    "kind": {
     "Mod": {

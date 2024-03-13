@@ -4,7 +4,7 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/import.typ
 ---
 {
- "base@8..18": {
+ "base@8..18@s0.typ": {
   "def": {
    "kind": {
     "Mod": "PathVar"
