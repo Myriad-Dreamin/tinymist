@@ -73,7 +73,7 @@ impl Definition<'_> {
     }
 }
 
-fn deref_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
+pub(crate) fn deref_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
     while let Some(e) = node.cast::<ast::Parenthesized>() {
         node = node.find(e.expr().span())?;
     }

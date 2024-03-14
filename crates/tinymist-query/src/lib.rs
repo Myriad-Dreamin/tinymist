@@ -4,36 +4,38 @@ pub mod analysis;
 pub(crate) mod diagnostics;
 
 pub use diagnostics::*;
-pub(crate) mod signature_help;
-pub use signature_help::*;
+pub(crate) mod code_lens;
+pub use code_lens::*;
+pub(crate) mod completion;
+pub use completion::*;
 pub(crate) mod document_symbol;
 pub use document_symbol::*;
-pub(crate) mod symbol;
-pub use symbol::*;
+pub(crate) mod folding_range;
+pub use folding_range::*;
+pub(crate) mod goto_declaration;
+pub use goto_declaration::*;
+pub(crate) mod goto_definition;
+pub use goto_definition::*;
+pub(crate) mod hover;
+pub use hover::*;
+pub(crate) mod inlay_hint;
+pub use inlay_hint::*;
+pub(crate) mod rename;
+pub use rename::*;
+pub(crate) mod selection_range;
+pub use selection_range::*;
 pub(crate) mod semantic_tokens;
 pub use semantic_tokens::*;
 pub(crate) mod semantic_tokens_full;
 pub use semantic_tokens_full::*;
 pub(crate) mod semantic_tokens_delta;
 pub use semantic_tokens_delta::*;
-pub(crate) mod hover;
-pub use hover::*;
-pub(crate) mod completion;
-pub use completion::*;
-pub(crate) mod folding_range;
-pub use folding_range::*;
-pub(crate) mod selection_range;
-pub use selection_range::*;
-pub(crate) mod goto_definition;
-pub use goto_definition::*;
-pub(crate) mod inlay_hint;
-pub use inlay_hint::*;
+pub(crate) mod signature_help;
+pub use signature_help::*;
+pub(crate) mod symbol;
+pub use symbol::*;
 pub(crate) mod prepare_rename;
 pub use prepare_rename::*;
-pub(crate) mod rename;
-pub use rename::*;
-pub(crate) mod code_lens;
-pub use code_lens::*;
 
 pub mod lsp_typst_boundary;
 pub use lsp_typst_boundary::*;
@@ -68,6 +70,7 @@ mod polymorphic {
         OnSaveExport(OnSaveExportRequest),
         Hover(HoverRequest),
         GotoDefinition(GotoDefinitionRequest),
+        GotoDeclaration(GotoDeclarationRequest),
         InlayHint(InlayHintRequest),
         CodeLens(CodeLensRequest),
         Completion(CompletionRequest),
@@ -90,6 +93,7 @@ mod polymorphic {
                 CompilerQueryRequest::OnSaveExport(..) => Mergable,
                 CompilerQueryRequest::Hover(..) => PinnedFirst,
                 CompilerQueryRequest::GotoDefinition(..) => PinnedFirst,
+                CompilerQueryRequest::GotoDeclaration(..) => PinnedFirst,
                 CompilerQueryRequest::InlayHint(..) => Unique,
                 CompilerQueryRequest::CodeLens(..) => Unique,
                 CompilerQueryRequest::Completion(..) => Mergable,
@@ -111,6 +115,7 @@ mod polymorphic {
                 CompilerQueryRequest::OnSaveExport(req) => &req.path,
                 CompilerQueryRequest::Hover(req) => &req.path,
                 CompilerQueryRequest::GotoDefinition(req) => &req.path,
+                CompilerQueryRequest::GotoDeclaration(req) => &req.path,
                 CompilerQueryRequest::InlayHint(req) => &req.path,
                 CompilerQueryRequest::CodeLens(req) => &req.path,
                 CompilerQueryRequest::Completion(req) => &req.path,
@@ -133,6 +138,7 @@ mod polymorphic {
         OnSaveExport(()),
         Hover(Option<Hover>),
         GotoDefinition(Option<GotoDefinitionResponse>),
+        GotoDeclaration(Option<GotoDeclarationResponse>),
         InlayHint(Option<Vec<InlayHint>>),
         CodeLens(Option<Vec<CodeLens>>),
         Completion(Option<CompletionResponse>),
@@ -161,7 +167,10 @@ mod tests {
     use once_cell::sync::Lazy;
     use serde::Serialize;
     use serde_json::{ser::PrettyFormatter, Serializer, Value};
-    use typst::syntax::{LinkedNode, Source, VirtualPath};
+    use typst::syntax::{
+        ast::{self, AstNode},
+        LinkedNode, Source, SyntaxKind, VirtualPath,
+    };
     use typst_ts_compiler::{
         service::{CompileDriver, Compiler, WorkspaceProvider},
         ShadowApi,
@@ -242,25 +251,86 @@ mod tests {
     }
 
     pub fn find_test_position(s: &Source) -> LspPosition {
-        let re = s.text().find("/* position */").map(|e| (e, true));
-        let re = re.or_else(|| s.text().find("/* position after */").zip(Some(false)));
-        let (re, prev) = re
+        enum AstMatcher {
+            MatchAny { prev: bool },
+            MatchIdent { prev: bool },
+        }
+        use AstMatcher::*;
+
+        let re = s
+            .text()
+            .find("/* position */")
+            .map(|e| (e, MatchAny { prev: true }));
+        let re = re.or_else(|| {
+            s.text()
+                .find("/* position after */")
+                .zip(Some(MatchAny { prev: false }))
+        });
+        let re = re.or_else(|| {
+            s.text()
+                .find("/* ident */")
+                .zip(Some(MatchIdent { prev: true }))
+        });
+        let re = re.or_else(|| {
+            s.text()
+                .find("/* ident after */")
+                .zip(Some(MatchIdent { prev: false }))
+        });
+        let (re, m) = re
             .ok_or_else(|| panic!("No position marker found in source:\n{}", s.text()))
             .unwrap();
 
         let n = LinkedNode::new(s.root());
         let mut n = n.leaf_at(re + 1).unwrap();
 
-        while n.kind().is_trivia() {
-            let m = if prev {
-                n.prev_sibling()
-            } else {
-                n.next_sibling()
-            };
-            n = m.or_else(|| n.parent().cloned()).unwrap();
+        let match_prev = match &m {
+            MatchAny { prev } => *prev,
+            MatchIdent { prev } => *prev,
+        };
+        let match_ident = match m {
+            MatchAny { .. } => false,
+            MatchIdent { .. } => true,
+        };
+
+        'match_loop: loop {
+            if n.kind().is_trivia() {
+                let m = if match_prev {
+                    n.prev_sibling()
+                } else {
+                    n.next_sibling()
+                };
+                n = m.or_else(|| n.parent().cloned()).unwrap();
+                continue;
+            }
+            if match_ident {
+                match n.kind() {
+                    SyntaxKind::Closure => {
+                        let c = n.cast::<ast::Closure>().unwrap();
+                        if let Some(name) = c.name() {
+                            if let Some(m) = n.find(name.span()) {
+                                n = m;
+                                break 'match_loop;
+                            }
+                        }
+                    }
+                    SyntaxKind::LetBinding => {
+                        let c = n.cast::<ast::LetBinding>().unwrap();
+                        if let Some(name) = c.kind().bindings().first() {
+                            if let Some(m) = n.find(name.span()) {
+                                n = m;
+                                break 'match_loop;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            break;
         }
 
-        typst_to_lsp::offset_to_position(n.offset() + 1, PositionEncoding::Utf16, s)
+        // eprintln!("position: {:?} -> {:?}", n.offset(), n);
+
+        typst_to_lsp::offset_to_position(n.offset(), PositionEncoding::Utf16, s)
     }
 
     // pub static REDACT_URI: Lazy<RedactFields> = Lazy::new(||

@@ -1,0 +1,27 @@
+---
+source: crates/tinymist-query/src/goto_declaration.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/goto_declaration/redefine.typ
+---
+[
+ {
+  "originSelectionRange": "0:23:0:24",
+  "targetRange": "3:6:3:7",
+  "targetSelectionRange": "3:6:3:7"
+ },
+ {
+  "originSelectionRange": "0:23:0:24",
+  "targetRange": "6:12:6:13",
+  "targetSelectionRange": "6:12:6:13"
+ },
+ {
+  "originSelectionRange": "0:23:0:24",
+  "targetRange": "3:2:3:3",
+  "targetSelectionRange": "3:2:3:3"
+ },
+ {
+  "originSelectionRange": "0:23:0:24",
+  "targetRange": "8:9:8:10",
+  "targetSelectionRange": "8:9:8:10"
+ }
+]

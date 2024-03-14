@@ -6,6 +6,7 @@ use std::{
 };
 
 use comemo::Tracked;
+use log::info;
 use parking_lot::Mutex;
 use serde::Serialize;
 use typst::{syntax::Source, World};
@@ -26,8 +27,8 @@ enum Ns {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IdentRef {
-    name: String,
-    range: Range<usize>,
+    pub name: String,
+    pub range: Range<usize>,
 }
 
 impl PartialOrd for IdentRef {
@@ -70,6 +71,19 @@ pub struct DefUseInfo {
     ident_refs: HashMap<IdentRef, DefId>,
     undefined_refs: Vec<IdentRef>,
     exports_refs: Vec<DefId>,
+}
+
+impl DefUseInfo {
+    pub fn get_def(&self, fid: TypstFileId, ident: &IdentRef) -> Option<(DefId, &IdentDef)> {
+        let (id, _, def) = self.ident_defs.get_full(&(fid, ident.clone()))?;
+        Some((DefId(id as u64), def))
+    }
+
+    pub fn get_refs(&self, id: DefId) -> impl Iterator<Item = &IdentRef> {
+        self.ident_refs
+            .iter()
+            .filter_map(move |(k, v)| if *v == id { Some(k) } else { None })
+    }
 }
 
 pub fn get_def_use(world: Tracked<'_, dyn World>, source: Source) -> Option<Arc<DefUseInfo>> {
@@ -171,6 +185,7 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
                         let external_info =
                             find_source_by_import_path(self.ctx.world, self.current_id, path)
                                 .and_then(|source| {
+                                    info!("diving source for def use: {:?}", source.id());
                                     Some(source.id()).zip(get_def_use_inner(self.ctx, source))
                                 });
 

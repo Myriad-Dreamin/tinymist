@@ -27,6 +27,10 @@ trait InitializeParamsExt {
     fn supports_document_formatting_dynamic_registration(&self) -> bool;
     fn line_folding_only(&self) -> bool;
     fn root_paths(&self) -> Vec<PathBuf>;
+
+    // todo: svelte-language-server responds to a Goto Definition request with
+    // LocationLink[] even if the client does not report the
+    // textDocument.definition.linkSupport capability.
 }
 
 impl InitializeParamsExt for InitializeParams {
@@ -586,6 +590,7 @@ impl Init {
                     },
                 }),
                 definition_provider: Some(OneOf::Left(true)),
+                declaration_provider: Some(DeclarationCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions {
                     trigger_characters: Some(vec![
                         String::from("#"),
