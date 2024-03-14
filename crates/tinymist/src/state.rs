@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use ::typst::{diag::FileResult, syntax::Source};
 use anyhow::anyhow;
+use log::warn;
 use lsp_types::TextDocumentContentChangeEvent;
 use tinymist_query::{lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, PositionEncoding};
 use typst_ts_compiler::{
@@ -21,7 +22,46 @@ pub struct MemoryFileMeta {
 }
 
 impl TypstLanguageServer {
+    pub fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<PathBuf> {
+        if let Some(path) = &self.config.root_path {
+            return Some(path.clone());
+        }
+
+        if let Some(path) = &self
+            .config
+            .typst_extra_args
+            .as_ref()
+            .and_then(|x| x.root_dir.clone())
+        {
+            return Some(path.clone());
+        }
+
+        if let Some(entry) = entry {
+            for root in self.roots.iter() {
+                if entry.starts_with(root) {
+                    return Some(root.clone());
+                }
+            }
+        }
+
+        if !self.roots.is_empty() {
+            warn!("entry is not in any set root directory");
+        }
+
+        let entry = entry?;
+        if let Some(parent) = entry.parent() {
+            return Some(parent.into());
+        }
+
+        if !self.roots.is_empty() {
+            return Some(self.roots[0].clone());
+        }
+
+        None
+    }
+
     /// Updates the main entry
+    // todo: the changed entry may be out of root directory
     pub fn update_main_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
         self.pinning = new_entry.is_some();
         match (new_entry, self.main.is_some()) {
@@ -30,7 +70,7 @@ impl TypstLanguageServer {
                 main.wait().change_entry(Some(new_entry))?;
             }
             (Some(new_entry), false) => {
-                let main_node = self.server("main".to_owned(), Some(new_entry.as_ref().to_owned()));
+                let main_node = self.server("main".to_owned(), Some(new_entry));
 
                 self.main = Some(main_node);
             }

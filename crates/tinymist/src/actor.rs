@@ -5,12 +5,13 @@ pub mod compile;
 pub mod render;
 pub mod typst;
 
-use std::{borrow::Cow, path::PathBuf};
+use std::{borrow::Cow, env::current_dir, path::PathBuf};
 
 use ::typst::{diag::FileResult, util::Deferred};
+use log::warn;
 use tokio::sync::{broadcast, watch};
 use typst_ts_compiler::vfs::notify::FileChangeSet;
-use typst_ts_core::config::CompileOpts;
+use typst_ts_core::{config::CompileOpts, ImmutPath};
 
 use self::{
     render::{PdfExportActor, PdfExportConfig},
@@ -19,21 +20,20 @@ use self::{
 use crate::TypstLanguageServer;
 
 impl TypstLanguageServer {
-    pub fn server(&self, name: String, entry: Option<PathBuf>) -> Deferred<CompileActor> {
+    pub fn server(&self, name: String, entry: Option<ImmutPath>) -> Deferred<CompileActor> {
         let (doc_tx, doc_rx) = watch::channel(None);
         let (render_tx, _) = broadcast::channel(10);
 
         // todo: don't ignore entry from typst_extra_args
         // entry: command.input,
-        let roots = self.roots.clone();
-        let root_dir = self.config.root_path.clone();
-        let root_dir = root_dir.or_else(|| {
-            self.config
-                .typst_extra_args
-                .as_ref()
-                .and_then(|x| x.root_dir.clone())
+
+        let root_dir = self.determine_root(entry.as_ref());
+        let root_dir = root_dir.unwrap_or_else(|| {
+            current_dir().unwrap_or_else(|e| {
+                warn!("failed to determine root directory by cwd: {e}");
+                PathBuf::new()
+            })
         });
-        let root_dir = root_dir.unwrap_or_else(|| roots.first().cloned().unwrap());
 
         // Run the PDF export actor before preparing cluster to avoid loss of events
         tokio::spawn(
@@ -42,7 +42,7 @@ impl TypstLanguageServer {
                 render_tx.subscribe(),
                 PdfExportConfig {
                     substitute_pattern: self.config.output_path.clone(),
-                    root: root_dir.clone().into(),
+                    root: root_dir.as_path().into(),
                     path: entry.clone().map(From::from),
                     mode: self.config.export_pdf,
                 },
@@ -81,9 +81,8 @@ impl TypstLanguageServer {
         create_server(
             name,
             self.const_config(),
-            roots,
             opts,
-            entry,
+            entry.as_deref().map(|e| e.to_owned()),
             snapshot,
             self.diag_tx.clone(),
             doc_tx,

@@ -293,6 +293,7 @@ impl Config {
             self.export_pdf = ExportPdfMode::default();
         }
 
+        // todo: the command.root may be not absolute
         let root_path = update.get("rootPath");
         if let Some(root_path) = root_path {
             if root_path.is_null() {
@@ -355,6 +356,7 @@ impl Config {
                     .map(|(k, v)| (k.as_str().into(), v.as_str().into_value()))
                     .collect();
 
+                // todo: the command.root may be not absolute
                 self.typst_extra_args = Some(CompileExtraOpts {
                     entry: command.input,
                     root_dir: command.root,

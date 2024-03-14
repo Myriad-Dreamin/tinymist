@@ -53,7 +53,6 @@ type DiagnosticsSender = mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>
 pub fn create_server(
     diag_group: String,
     cfg: &ConstConfig,
-    roots: Vec<PathBuf>,
     opts: CompileOpts,
     entry: Option<PathBuf>,
     snapshot: FileChangeSet,
@@ -83,7 +82,7 @@ pub fn create_server(
             diag_group,
             ShowOpts(&opts)
         );
-        let compiler_driver = CompileDriver::new(roots.clone(), opts, entry.clone());
+        let compiler_driver = CompileDriver::new(opts, entry.clone());
         let root = compiler_driver.inner.world.root.as_ref().to_owned();
         let handler: CompileHandler = compiler_driver.handler.clone();
 
@@ -175,7 +174,6 @@ impl CompilationHandle for CompileHandler {
 
 pub struct CompileDriver {
     inner: CompileDriverInner,
-    roots: Vec<PathBuf>,
     handler: CompileHandler,
 }
 
@@ -192,13 +190,12 @@ impl CompileMiddleware for CompileDriver {
 }
 
 impl CompileDriver {
-    pub fn new(roots: Vec<PathBuf>, opts: CompileOpts, entry: Option<PathBuf>) -> Self {
+    pub fn new(opts: CompileOpts, entry: Option<PathBuf>) -> Self {
         let world = TypstSystemWorld::new(opts).expect("incorrect options");
         let driver = CompileDriverInner::new(world);
 
         let mut this = Self {
             inner: driver,
-            roots,
             handler: CompileHandler {
                 result: Arc::new(SyncMutex::new(Err(CompileStatus::Compiling))),
                 inner: Arc::new(SyncMutex::new(None)),
@@ -214,7 +211,6 @@ impl CompileDriver {
 
     // todo: determine root
     fn set_entry_file(&mut self, entry: PathBuf) {
-        let _ = &self.roots;
         // let candidates = self
         //     .current
         //     .iter()
