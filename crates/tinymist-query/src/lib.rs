@@ -3,6 +3,10 @@ pub mod analysis;
 
 pub(crate) mod diagnostics;
 
+use std::sync::Arc;
+
+use typst_ts_core::TypstDocument;
+
 pub use diagnostics::*;
 pub(crate) mod signature_help;
 pub use signature_help::*;
@@ -39,6 +43,12 @@ pub mod lsp_typst_boundary;
 pub use lsp_typst_boundary::*;
 
 mod prelude;
+
+#[derive(Debug, Clone)]
+pub struct VersionedDocument {
+    pub version: usize,
+    pub document: Arc<TypstDocument>,
+}
 
 mod polymorphic {
     use super::prelude::*;

@@ -11,10 +11,10 @@ impl CompletionRequest {
     pub fn request(
         self,
         world: &TypstSystemWorld,
-        doc: Option<Arc<TypstDocument>>,
+        doc: Option<VersionedDocument>,
         position_encoding: PositionEncoding,
     ) -> Option<CompletionResponse> {
-        let doc = doc.as_deref();
+        let doc = doc.as_ref().map(|doc| doc.document.as_ref());
         let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
         let cursor = lsp_to_typst::position(self.position, position_encoding, &source)?;
 

@@ -26,13 +26,14 @@ pub use typst::syntax::{
 pub use typst::World;
 use typst_ts_compiler::service::WorkspaceProvider;
 pub use typst_ts_compiler::TypstSystemWorld;
-pub use typst_ts_core::{TypstDocument, TypstFileId};
+pub use typst_ts_core::TypstFileId;
 
 pub use crate::analysis::analyze_expr;
 pub use crate::lsp_typst_boundary::{
     lsp_to_typst, typst_to_lsp, LspDiagnostic, LspRange, LspSeverity, PositionEncoding,
     TypstDiagnostic, TypstSeverity, TypstSpan,
 };
+pub use crate::VersionedDocument;
 
 pub fn get_suitable_source_in_workspace(w: &TypstSystemWorld, p: &Path) -> FileResult<Source> {
     // todo: source in packages

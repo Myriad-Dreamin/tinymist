@@ -8,6 +8,7 @@ use std::{
 };
 
 use serde::Serialize;
+use tinymist_query::VersionedDocument;
 use tokio::sync::{mpsc, oneshot};
 use typst::{
     layout::{Frame, FrameItem, Point, Position},
@@ -33,12 +34,6 @@ use typst_ts_compiler::service::{
 };
 
 use crate::{task::BorrowTask, utils};
-
-#[derive(Debug, Clone)]
-pub struct VersionedDocument {
-    pub version: usize,
-    pub document: Arc<TypstDocument>,
-}
 
 /// Interrupts for external sources
 enum ExternalInterrupt<Ctx> {
