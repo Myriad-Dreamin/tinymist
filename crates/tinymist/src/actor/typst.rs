@@ -11,7 +11,7 @@ use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
-    OnExportRequest, OnSaveExportRequest, PositionEncoding,
+    OnExportRequest, OnSaveExportRequest, PositionEncoding, VersionedDocument,
 };
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use typst::{
@@ -88,15 +88,13 @@ pub fn create_server(
 
     let (root_tx, root_rx) = oneshot::channel();
 
-    let handler = CompileHandler {
-        result: Arc::new(SyncMutex::new(Err(CompileStatus::Compiling))),
-        inner: Arc::new(SyncMutex::new(None)),
-    };
-
     let inner = Deferred::new({
         let current_runtime = tokio::runtime::Handle::current();
+        let handler = CompileHandler {
+            inner: Arc::new(SyncMutex::new(None)),
+        };
+
         let diag_group = diag_group.clone();
-        let handler = handler.clone();
         let entry = entry.clone();
         let render_tx = render_tx.clone();
 
@@ -170,7 +168,6 @@ pub fn create_server(
         root,
         entry,
         pos_encoding,
-        handler,
         inner,
         render_tx,
     )
@@ -192,9 +189,8 @@ impl<'a> fmt::Debug for ShowOpts<'a> {
 
 macro_rules! query_state {
     ($self:ident, $method:ident, $req:expr) => {{
-        let doc = $self.handler.result.lock().unwrap().clone().ok();
         let enc = $self.position_encoding;
-        let res = $self.steal_world(move |w| $req.request(w, doc, enc));
+        let res = $self.steal_state(move |w, doc| $req.request(w, doc, enc));
         res.map(CompilerQueryResponse::$method)
     }};
 }
@@ -209,7 +205,6 @@ macro_rules! query_world {
 
 #[derive(Clone)]
 pub struct CompileHandler {
-    result: Arc<SyncMutex<Result<Arc<TypstDocument>, CompileStatus>>>,
     inner: Arc<SyncMutex<Option<CompilationHandleImpl>>>,
 }
 
@@ -222,8 +217,6 @@ impl CompilationHandle for CompileHandler {
     }
 
     fn notify_compile(&self, result: Result<Arc<TypstDocument>, CompileStatus>) {
-        *self.result.lock().unwrap() = result.clone();
-
         let inner = self.inner.lock().unwrap();
         if let Some(inner) = inner.as_ref() {
             inner.notify_compile(result.clone());
@@ -370,7 +363,6 @@ impl<C: Compiler<World = TypstSystemWorld>, H> Reporter<C, H> {
 pub struct CompileActor {
     diag_group: String,
     position_encoding: PositionEncoding,
-    handler: CompileHandler,
     root_tx: Mutex<Option<oneshot::Sender<Option<ImmutPath>>>>,
     root: OnceCell<Option<ImmutPath>>,
     entry: Arc<Mutex<Option<ImmutPath>>>,
@@ -386,7 +378,6 @@ impl CompileActor {
         root: Option<ImmutPath>,
         entry: Option<ImmutPath>,
         position_encoding: PositionEncoding,
-        handler: CompileHandler,
         inner: Deferred<CompileClient<CompileHandler>>,
         render_tx: broadcast::Sender<RenderActorRequest>,
     ) -> Self {
@@ -398,7 +389,6 @@ impl CompileActor {
                 None => OnceCell::new(),
             },
             position_encoding,
-            handler,
             entry: Arc::new(Mutex::new(entry)),
             inner,
             render_tx,
@@ -727,6 +717,15 @@ impl CompileActor {
         let _ = self.render_tx.send(RenderActorRequest::OnSaved(path));
 
         Ok(())
+    }
+
+    fn steal_state<T: Send + Sync + 'static>(
+        &self,
+        f: impl FnOnce(&TypstSystemWorld, Option<VersionedDocument>) -> T + Send + Sync + 'static,
+    ) -> anyhow::Result<T> {
+        let fut = self.steal(move |compiler| f(compiler.compiler.world(), compiler.doc()));
+
+        Ok(fut?)
     }
 
     fn steal_world<T: Send + Sync + 'static>(
