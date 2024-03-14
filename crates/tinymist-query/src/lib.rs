@@ -36,6 +36,8 @@ pub(crate) mod symbol;
 pub use symbol::*;
 pub(crate) mod prepare_rename;
 pub use prepare_rename::*;
+pub(crate) mod references;
+pub use references::*;
 
 pub mod lsp_typst_boundary;
 pub use lsp_typst_boundary::*;
@@ -71,6 +73,7 @@ mod polymorphic {
         Hover(HoverRequest),
         GotoDefinition(GotoDefinitionRequest),
         GotoDeclaration(GotoDeclarationRequest),
+        References(ReferencesRequest),
         InlayHint(InlayHintRequest),
         CodeLens(CodeLensRequest),
         Completion(CompletionRequest),
@@ -94,6 +97,7 @@ mod polymorphic {
                 CompilerQueryRequest::Hover(..) => PinnedFirst,
                 CompilerQueryRequest::GotoDefinition(..) => PinnedFirst,
                 CompilerQueryRequest::GotoDeclaration(..) => PinnedFirst,
+                CompilerQueryRequest::References(..) => PinnedFirst,
                 CompilerQueryRequest::InlayHint(..) => Unique,
                 CompilerQueryRequest::CodeLens(..) => Unique,
                 CompilerQueryRequest::Completion(..) => Mergable,
@@ -116,6 +120,7 @@ mod polymorphic {
                 CompilerQueryRequest::Hover(req) => &req.path,
                 CompilerQueryRequest::GotoDefinition(req) => &req.path,
                 CompilerQueryRequest::GotoDeclaration(req) => &req.path,
+                CompilerQueryRequest::References(req) => &req.path,
                 CompilerQueryRequest::InlayHint(req) => &req.path,
                 CompilerQueryRequest::CodeLens(req) => &req.path,
                 CompilerQueryRequest::Completion(req) => &req.path,
@@ -139,6 +144,7 @@ mod polymorphic {
         Hover(Option<Hover>),
         GotoDefinition(Option<GotoDefinitionResponse>),
         GotoDeclaration(Option<GotoDeclarationResponse>),
+        References(Option<Vec<LspLocation>>),
         InlayHint(Option<Vec<InlayHint>>),
         CodeLens(Option<Vec<CodeLens>>),
         Completion(Option<CompletionResponse>),

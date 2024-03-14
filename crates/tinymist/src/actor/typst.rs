@@ -690,6 +690,7 @@ impl CompileActor {
             Hover(req) => query_state!(self, Hover, req),
             GotoDefinition(req) => query_world!(self, GotoDefinition, req),
             GotoDeclaration(req) => query_world!(self, GotoDeclaration, req),
+            References(req) => query_world!(self, References, req),
             InlayHint(req) => query_world!(self, InlayHint, req),
             CodeLens(req) => query_world!(self, CodeLens, req),
             Completion(req) => query_state!(self, Completion, req),

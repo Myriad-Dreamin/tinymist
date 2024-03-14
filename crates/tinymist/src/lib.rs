@@ -370,6 +370,7 @@ impl TypstLanguageServer {
             request_fn!(Rename, Self::rename),
             request_fn!(GotoDefinition, Self::goto_definition),
             request_fn!(GotoDeclaration, Self::goto_declaration),
+            request_fn!(References, Self::references),
             request_fn!(WorkspaceSymbolRequest, Self::symbol),
             request_fn!(ExecuteCommand, Self::execute_command),
         ])
@@ -852,6 +853,11 @@ impl TypstLanguageServer {
     ) -> LspResult<Option<GotoDeclarationResponse>> {
         let (path, position) = as_path_pos(params.text_document_position_params);
         run_query!(self.GotoDeclaration(path, position))
+    }
+
+    fn references(&self, params: ReferenceParams) -> LspResult<Option<Vec<Location>>> {
+        let (path, position) = as_path_pos(params.text_document_position);
+        run_query!(self.References(path, position))
     }
 
     fn hover(&self, params: HoverParams) -> LspResult<Option<Hover>> {
