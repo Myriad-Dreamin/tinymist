@@ -43,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
             .filter_module("typst_preview", Debug)
             .filter_module("typst_ts", Info)
             .filter_module("typst_ts_compiler::service::compile", Info)
-            .filter_module("typst_ts_compiler::service::watch", Debug)
+            .filter_module("typst_ts_compiler::service::watch", Info)
             .try_init()
     };
 

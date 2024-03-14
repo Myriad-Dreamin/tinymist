@@ -7,6 +7,7 @@ use std::{
 };
 
 use log::{debug, error, info, trace, warn};
+use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
@@ -49,87 +50,144 @@ type CompileClient<H> = TsCompileClient<CompileService<H>>;
 
 type DiagnosticsSender = mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>;
 
+pub enum OptsState {
+    Exact(CompileOpts),
+    Rootless(Box<dyn FnOnce(PathBuf) -> CompileOpts + Send + Sync>),
+}
+impl OptsState {
+    pub(crate) fn new(
+        root: Option<Arc<Path>>,
+        opts: impl FnOnce(PathBuf) -> CompileOpts + Send + Sync + 'static,
+    ) -> OptsState {
+        match root {
+            Some(root) => OptsState::Exact(opts(root.as_ref().to_owned())),
+            None => OptsState::Rootless(Box::new(opts)),
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn create_server(
     diag_group: String,
     cfg: &ConstConfig,
-    roots: Vec<PathBuf>,
-    opts: CompileOpts,
-    entry: Option<PathBuf>,
+    opts: OptsState,
+    root: Option<ImmutPath>,
+    entry: Option<ImmutPath>,
     snapshot: FileChangeSet,
     diag_tx: DiagnosticsSender,
     doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
     render_tx: broadcast::Sender<RenderActorRequest>,
-) -> Deferred<CompileActor> {
-    let cfg = cfg.clone();
-    let current_runtime = tokio::runtime::Handle::current();
-    Deferred::new(move || {
-        struct ShowOpts<'a>(&'a CompileOpts);
+) -> CompileActor {
+    let pos_encoding = cfg.position_encoding;
 
-        impl<'a> fmt::Debug for ShowOpts<'a> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_struct("CompileOpts")
-                    .field("root_dir", &self.0.root_dir)
-                    .field("entry", &self.0.entry)
-                    .field("inputs", &self.0.inputs)
-                    .field("font_paths", &self.0.font_paths)
-                    .field("no_system_fonts", &self.0.no_system_fonts)
-                    .finish()
-            }
+    info!(
+        "TypstActor: creating server for {} with opts(determined={:?})",
+        diag_group,
+        matches!(opts, OptsState::Exact(_))
+    );
+
+    let (root_tx, root_rx) = oneshot::channel();
+
+    let handler = CompileHandler {
+        result: Arc::new(SyncMutex::new(Err(CompileStatus::Compiling))),
+        inner: Arc::new(SyncMutex::new(None)),
+    };
+
+    let inner = Deferred::new({
+        let current_runtime = tokio::runtime::Handle::current();
+        let diag_group = diag_group.clone();
+        let handler = handler.clone();
+        let entry = entry.clone();
+        let render_tx = render_tx.clone();
+
+        move || {
+            let opts = match opts {
+                OptsState::Exact(opts) => opts,
+                OptsState::Rootless(opts) => {
+                    let root: ImmutPath = match utils::threaded_receive(root_rx) {
+                        Ok(Some(root)) => root,
+                        Ok(None) => {
+                            error!("TypstActor: failed to receive root path: root is none");
+                            return CompileClient::faked();
+                        }
+                        Err(err) => {
+                            error!("TypstActor: failed to receive root path: {:#}", err);
+                            return CompileClient::faked();
+                        }
+                    };
+
+                    opts(root.as_ref().into())
+                }
+            };
+
+            let root: ImmutPath = opts.root_dir.as_path().into();
+
+            info!(
+                "TypstActor: creating server for {} with arguments {:#?}",
+                diag_group,
+                ShowOpts(&opts)
+            );
+
+            // todo: entry is PathBuf, which is inefficient
+            let compiler_driver = CompileDriver::new(opts, entry.clone(), handler);
+            let handler: CompileHandler = compiler_driver.handler.clone();
+
+            let ontyped_render_tx = render_tx.clone();
+            let driver = CompileExporter::new(compiler_driver).with_exporter(Box::new(
+                move |_w: &dyn TypstWorld, doc| {
+                    let _ = doc_sender.send(Some(doc));
+                    // todo: is it right that ignore zero broadcast receiver?
+                    let _ = ontyped_render_tx.send(RenderActorRequest::OnTyped);
+
+                    Ok(())
+                },
+            ));
+            let driver = Reporter {
+                diag_group: diag_group.clone(),
+                position_encoding: pos_encoding,
+                diag_tx,
+                inner: driver,
+                cb: handler.clone(),
+            };
+            let driver =
+                CompileActorInner::new(driver, root.clone(), entry.clone()).with_watch(true);
+
+            let (server, client) = driver.split();
+
+            // We do send memory changes instead of initializing compiler with them.
+            // This is because there are state recorded inside of the compiler actor, and we
+            // must update them.
+            client.add_memory_changes(MemoryEvent::Update(snapshot));
+            current_runtime.spawn(server.spawn());
+
+            client
         }
+    });
 
-        info!(
-            "TypstActor: creating server for {} with arguments {:#?}",
-            diag_group,
-            ShowOpts(&opts)
-        );
-        let compiler_driver = CompileDriver::new(roots.clone(), opts, entry.clone());
-        let root = compiler_driver.inner.world.root.as_ref().to_owned();
-        let handler: CompileHandler = compiler_driver.handler.clone();
+    CompileActor::new(
+        diag_group,
+        root_tx,
+        root,
+        entry,
+        pos_encoding,
+        handler,
+        inner,
+        render_tx,
+    )
+}
 
-        let ontyped_render_tx = render_tx.clone();
-        let driver = CompileExporter::new(compiler_driver).with_exporter(Box::new(
-            move |_w: &dyn TypstWorld, doc| {
-                let _ = doc_sender.send(Some(doc));
-                // todo: is it right that ignore zero broadcast receiver?
-                let _ = ontyped_render_tx.send(RenderActorRequest::OnTyped);
+struct ShowOpts<'a>(&'a CompileOpts);
 
-                Ok(())
-            },
-        ));
-        let driver = Reporter {
-            diag_group: diag_group.clone(),
-            position_encoding: cfg.position_encoding,
-            diag_tx,
-            inner: driver,
-            cb: handler.clone(),
-        };
-        let driver = CompileActorInner::new(driver, root.clone(), entry.clone()).with_watch(true);
-
-        let (server, client) = driver.split();
-
-        // We do send memory changes instead of initializing compiler with them.
-        // This is because there are state recorded inside of the compiler actor, and we
-        // must update them.
-        client.add_memory_changes(MemoryEvent::Update(snapshot));
-        current_runtime.spawn(server.spawn());
-
-        let this = CompileActor::new(
-            diag_group,
-            root.into(),
-            cfg.position_encoding,
-            handler,
-            client,
-            render_tx,
-        );
-
-        // todo: less bug-prone code
-        if let Some(entry) = entry {
-            this.entry.lock().replace(entry.into());
-        }
-
-        this
-    })
+impl<'a> fmt::Debug for ShowOpts<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CompileOpts")
+            .field("root_dir", &self.0.root_dir)
+            .field("entry", &self.0.entry)
+            .field("inputs", &self.0.inputs)
+            .field("font_paths", &self.0.font_paths)
+            .field("no_system_fonts", &self.0.no_system_fonts)
+            .finish()
+    }
 }
 
 macro_rules! query_state {
@@ -175,7 +233,6 @@ impl CompilationHandle for CompileHandler {
 
 pub struct CompileDriver {
     inner: CompileDriverInner,
-    roots: Vec<PathBuf>,
     handler: CompileHandler,
 }
 
@@ -192,21 +249,17 @@ impl CompileMiddleware for CompileDriver {
 }
 
 impl CompileDriver {
-    pub fn new(roots: Vec<PathBuf>, opts: CompileOpts, entry: Option<PathBuf>) -> Self {
+    pub fn new(opts: CompileOpts, entry: Option<ImmutPath>, handler: CompileHandler) -> Self {
         let world = TypstSystemWorld::new(opts).expect("incorrect options");
         let driver = CompileDriverInner::new(world);
 
         let mut this = Self {
             inner: driver,
-            roots,
-            handler: CompileHandler {
-                result: Arc::new(SyncMutex::new(Err(CompileStatus::Compiling))),
-                inner: Arc::new(SyncMutex::new(None)),
-            },
+            handler,
         };
 
         if let Some(entry) = entry {
-            this.set_entry_file(entry);
+            this.set_entry_file(entry.as_ref().to_owned());
         }
 
         this
@@ -214,7 +267,6 @@ impl CompileDriver {
 
     // todo: determine root
     fn set_entry_file(&mut self, entry: PathBuf) {
-        let _ = &self.roots;
         // let candidates = self
         //     .current
         //     .iter()
@@ -319,15 +371,42 @@ pub struct CompileActor {
     diag_group: String,
     position_encoding: PositionEncoding,
     handler: CompileHandler,
-    root: ImmutPath,
+    root_tx: Mutex<Option<oneshot::Sender<Option<ImmutPath>>>>,
+    root: OnceCell<Option<ImmutPath>>,
     entry: Arc<Mutex<Option<ImmutPath>>>,
-    pub inner: CompileClient<CompileHandler>,
+    inner: Deferred<CompileClient<CompileHandler>>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
 
 impl CompileActor {
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        diag_group: String,
+        root_tx: oneshot::Sender<Option<ImmutPath>>,
+        root: Option<ImmutPath>,
+        entry: Option<ImmutPath>,
+        position_encoding: PositionEncoding,
+        handler: CompileHandler,
+        inner: Deferred<CompileClient<CompileHandler>>,
+        render_tx: broadcast::Sender<RenderActorRequest>,
+    ) -> Self {
+        Self {
+            diag_group,
+            root_tx: Mutex::new(root.is_none().then_some(root_tx)),
+            root: match root {
+                Some(root) => OnceCell::from(Some(root)),
+                None => OnceCell::new(),
+            },
+            position_encoding,
+            handler,
+            entry: Arc::new(Mutex::new(entry)),
+            inner,
+            render_tx,
+        }
+    }
+
     fn inner(&self) -> &CompileClient<CompileHandler> {
-        &self.inner
+        self.inner.wait()
     }
 
     /// Steal the compiler thread and run the given function.
@@ -335,7 +414,7 @@ impl CompileActor {
         &self,
         f: impl FnOnce(&mut CompileService<CompileHandler>) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
-        self.inner.steal(f)
+        self.inner().steal(f)
     }
 
     /// Steal the compiler thread and run the given function.
@@ -345,13 +424,13 @@ impl CompileActor {
             + Send
             + 'static,
     ) -> ZResult<Ret> {
-        self.inner.steal_async(f).await
+        self.inner().steal_async(f).await
     }
 
     pub fn settle(&self) {
-        let _ = self.change_entry(None);
+        let _ = self.change_entry(None, |_| None);
         info!("TypstActor({}): settle requested", self.diag_group);
-        let res = self.inner.settle();
+        let res = self.inner().settle();
         match res {
             Ok(()) => info!("TypstActor({}): settled", self.diag_group),
             Err(err) => {
@@ -363,10 +442,27 @@ impl CompileActor {
         }
     }
 
-    pub fn change_entry(&self, path: Option<ImmutPath>) -> Result<(), Error> {
+    pub fn change_entry(
+        &self,
+        path: Option<ImmutPath>,
+        resolve_root: impl FnOnce(Option<ImmutPath>) -> Option<ImmutPath>,
+    ) -> Result<(), Error> {
         if path.as_deref().is_some_and(|p| !p.is_absolute()) {
             return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
         }
+        {
+            let path = path.clone();
+            self.root.get_or_init(|| {
+                info!("TypstActor({}): delayed root resolution", self.diag_group);
+                let mut root_tx = self.root_tx.lock();
+                let root_tx = root_tx.take().unwrap();
+                let root = resolve_root(path);
+                let _ = root_tx.send(root.clone());
+
+                info!("TypstActor({}): resolved root: {root:?}", self.diag_group);
+                root
+            })
+        };
 
         // todo: more robust rollback logic
         let entry = self.entry.clone();
@@ -389,7 +485,7 @@ impl CompileActor {
 
             self.render_tx
                 .send(RenderActorRequest::ChangeExportPath(PdfPathVars {
-                    root: self.root.clone(),
+                    root: self.root.get().cloned().flatten(),
                     path: next.clone(),
                 }))
                 .unwrap();
@@ -418,7 +514,7 @@ impl CompileActor {
             if res.is_err() {
                 self.render_tx
                     .send(RenderActorRequest::ChangeExportPath(PdfPathVars {
-                        root: self.root.clone(),
+                        root: self.root.get().cloned().flatten(),
                         path: prev.clone(),
                     }))
                     .unwrap();
@@ -434,10 +530,46 @@ impl CompileActor {
 
             // todo: trigger recompile
             let files = FileChangeSet::new_inserts(vec![]);
-            self.inner.add_memory_changes(MemoryEvent::Update(files));
+            self.inner().add_memory_changes(MemoryEvent::Update(files));
         }
 
         Ok(())
+    }
+
+    pub fn add_memory_changes(
+        &self,
+        event: MemoryEvent,
+        resolve_root: impl FnOnce(Option<ImmutPath>) -> Option<ImmutPath>,
+    ) {
+        self.root.get_or_init(|| {
+            info!(
+                "TypstActor({}): delayed root resolution on memory change events",
+                self.diag_group
+            );
+
+            // determine path by event
+            let entry = {
+                let entry = self.entry.lock().clone();
+
+                entry.or_else(|| match &event {
+                    MemoryEvent::Sync(changeset) | MemoryEvent::Update(changeset) => changeset
+                        .inserts
+                        .first()
+                        .map(|e| e.0.clone())
+                        .or_else(|| changeset.removes.first().cloned()),
+                })
+            };
+
+            let mut root_tx = self.root_tx.lock();
+            let root_tx = root_tx.take().unwrap();
+            let root = resolve_root(entry);
+            let _ = root_tx.send(root.clone());
+
+            info!("TypstActor({}): resolved root: {root:?}", self.diag_group);
+            root
+        });
+
+        self.inner.wait().add_memory_changes(event);
     }
 
     pub(crate) fn change_export_pdf(&self, config: PdfExportConfig) {
@@ -449,7 +581,7 @@ impl CompileActor {
             .render_tx
             .send(RenderActorRequest::ChangeConfig(PdfExportConfig {
                 substitute_pattern: config.substitute_pattern,
-                root: self.root.clone(),
+                root: self.root.get().cloned().flatten(),
                 path,
                 mode: config.mode,
             }))
@@ -543,25 +675,6 @@ impl EditorServer for CompileActor {
 impl CompileHost for CompileActor {}
 
 impl CompileActor {
-    fn new(
-        diag_group: String,
-        root: ImmutPath,
-        position_encoding: PositionEncoding,
-        handler: CompileHandler,
-        inner: CompileClient<CompileHandler>,
-        render_tx: broadcast::Sender<RenderActorRequest>,
-    ) -> Self {
-        Self {
-            diag_group,
-            root,
-            position_encoding,
-            handler,
-            entry: Arc::new(Mutex::new(None)),
-            inner,
-            render_tx,
-        }
-    }
-
     pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
         use CompilerQueryRequest::*;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);

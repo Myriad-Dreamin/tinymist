@@ -29,7 +29,7 @@
 // pub mod formatting;
 mod actor;
 pub mod init;
-mod query;
+mod state;
 mod task;
 pub mod transport;
 mod utils;
@@ -52,15 +52,15 @@ use lsp_types::request::{RegisterCapability, UnregisterCapability, WorkspaceConf
 use lsp_types::*;
 use parking_lot::{Mutex, RwLock};
 use paste::paste;
-use query::MemoryFileMeta;
 use serde_json::{Map, Value as JsonValue};
+use state::MemoryFileMeta;
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
     get_semantic_tokens_unregistration, DiagnosticsMap, SemanticTokenCache,
 };
 use tokio::sync::mpsc;
-use typst::util::Deferred;
 use typst_ts_core::config::CompileOpts;
+use typst_ts_core::ImmutPath;
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
 
@@ -278,7 +278,6 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 pub struct TypstLanguageServerArgs {
     pub client: LspHost,
     pub compile_opts: CompileOpts,
-    pub roots: Vec<PathBuf>,
     pub const_config: ConstConfig,
     pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
 }
@@ -304,11 +303,10 @@ pub struct TypstLanguageServer {
     pub compile_opts: CompileOpts,
 
     diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
-    roots: Vec<PathBuf>,
     memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
-    primary: Option<Deferred<CompileActor>>,
+    primary: Option<CompileActor>,
     pinning: bool,
-    main: Option<Deferred<CompileActor>>,
+    main: Option<CompileActor>,
     tokens_cache: SemanticTokenCache,
 }
 
@@ -327,7 +325,6 @@ impl TypstLanguageServer {
             notify_cmds: Self::get_notify_cmds(),
 
             diag_tx: args.diag_tx,
-            roots: args.roots,
             memory_changes: HashMap::new(),
             primary: None,
             pinning: false,
@@ -344,12 +341,8 @@ impl TypstLanguageServer {
         &self.const_config
     }
 
-    fn primary_deferred(&self) -> &Deferred<CompileActor> {
-        self.primary.as_ref().expect("primary")
-    }
-
     fn primary(&self) -> &CompileActor {
-        self.primary_deferred().wait()
+        self.primary.as_ref().expect("primary")
     }
 
     #[rustfmt::skip]
@@ -642,8 +635,8 @@ impl TypstLanguageServer {
         ExecuteCmdMap::from_iter([
             redirected_command!("tinymist.exportPdf", Self::export_pdf),
             redirected_command!("tinymist.doClearCache", Self::clear_cache),
-            redirected_command!("tinymist.doPinMain", Self::pin_main),
-            redirected_command!("tinymist.doActivateDoc", Self::activate_doc),
+            redirected_command!("tinymist.pinMain", Self::pin_document),
+            redirected_command!("tinymist.focusMain", Self::focus_document),
         ])
     }
 
@@ -696,87 +689,47 @@ impl TypstLanguageServer {
     }
 
     /// Pin main file to some path.
-    ///
-    /// # Errors
-    /// Errors if a provided file URI is not a valid file URI.
-    pub fn pin_main(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
-        let Some(file_uri) = arguments.first().and_then(|v| v.as_str()) else {
-            return Err(invalid_params("Missing file path as the first argument"));
-        };
+    pub fn pin_document(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        let new_entry = parse_path_or_null(arguments.first())?;
 
-        let file_uri = if file_uri == "detached" {
-            None
-        } else {
-            Some(Url::parse(file_uri).map_err(|_| invalid_params("Parameter is not a valid URI"))?)
-        };
+        let update_result = self.update_main_entry(new_entry.clone());
+        update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
 
-        let new_entry = file_uri.clone();
-        self.pinning = new_entry.is_some();
-        let update_result = match (new_entry, self.main.is_some()) {
-            (Some(new_entry), true) => {
-                let path = new_entry
-                    .to_file_path()
-                    .map_err(|_| invalid_params("invalid url"))?;
-                let path = path.as_path().into();
-
-                self.main.as_mut().unwrap().wait().change_entry(Some(path))
-            }
-            (Some(new_entry), false) => {
-                let path = new_entry
-                    .to_file_path()
-                    .map_err(|_| invalid_params("invalid url"))?;
-                let path = path.as_path().into();
-
-                let main_node = self.server("main".to_owned(), Some(path));
-
-                self.main = Some(main_node);
-                Ok(())
-            }
-            (None, true) => {
-                let main = self.main.take().unwrap();
-                std::thread::spawn(move || main.wait().settle());
-
-                Ok(())
-            }
-            (None, false) => Ok(()),
-        };
-
-        update_result.map_err(|err| {
-            error!("could not set main file: {err}");
-            internal_error("Internal error")
-        })?;
-
-        info!("main file pinned: {main_url:?}", main_url = file_uri);
+        info!("file pinned: {entry:?}", entry = new_entry);
         Ok(JsonValue::Null)
     }
 
-    /// Change the actived document.
-    ///
-    /// # Errors
-    /// Errors if a provided file URI is not a valid path string.
-    /// Errors if the document could not be activated.
-    pub fn activate_doc(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
-        let Some(path) = arguments.first() else {
-            return Err(invalid_params("Missing path argument"));
-        };
-        let path = match path {
-            JsonValue::String(s) => Some(Path::new(s).into()),
-            JsonValue::Null => None,
-            _ => return Err(invalid_params("Path Parameter is not a string or null")),
-        };
+    /// Focus main file to some path.
+    pub fn focus_document(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        let new_entry = parse_path_or_null(arguments.first())?;
 
-        self.primary()
-            .change_entry(path.clone())
-            .map_err(|e| internal_error(e.to_string()))?;
+        let update_result = self.update_primary_entry(new_entry.clone());
+        update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
 
-        // update_result.map_err(|err| {
-        //     error!("could not set active document: {err}");
-        //     internal_error("Internal error")
-        // })?;
-
-        info!("active document set: {path:?}", path = path);
+        info!("file focused: {entry:?}", entry = new_entry);
         Ok(JsonValue::Null)
     }
+}
+
+fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
+    let new_entry = match v {
+        Some(JsonValue::String(s)) => {
+            let s = Path::new(s);
+            if !s.is_absolute() {
+                return Err(invalid_params("entry should be absolute"));
+            }
+
+            Some(s.into())
+        }
+        Some(JsonValue::Null) => None,
+        _ => {
+            return Err(invalid_params(
+                "The first parameter is not a valid path or null",
+            ))
+        }
+    };
+
+    Ok(new_entry)
 }
 
 /// Document Synchronization
@@ -830,14 +783,13 @@ impl TypstLanguageServer {
             let config = PdfExportConfig {
                 substitute_pattern: self.config.output_path.clone(),
                 mode: self.config.export_pdf,
-                root: Path::new("").into(),
-                path: None,
+                ..PdfExportConfig::default()
             };
 
             self.primary().change_export_pdf(config.clone());
             {
                 if let Some(main) = self.main.as_ref() {
-                    main.wait().change_export_pdf(config);
+                    main.change_export_pdf(config);
                 }
             }
         }

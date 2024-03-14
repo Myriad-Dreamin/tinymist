@@ -5,7 +5,7 @@ use anyhow::bail;
 use clap::builder::ValueParser;
 use clap::{ArgAction, Parser};
 use itertools::Itertools;
-use log::{error, info};
+use log::{error, info, warn};
 use lsp_types::*;
 use serde::Deserialize;
 use serde_json::{Map, Value as JsonValue};
@@ -13,7 +13,7 @@ use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
 use typst::foundations::IntoValue;
 use typst_ts_core::config::CompileOpts;
-use typst_ts_core::TypstDict;
+use typst_ts_core::{ImmutPath, TypstDict};
 
 use crate::actor::cluster::CompileClusterActor;
 use crate::{invalid_params, LspHost, LspResult, TypstLanguageServer, TypstLanguageServerArgs};
@@ -174,6 +174,8 @@ const CONFIG_ITEMS: &[&str] = &[
 /// The user configuration read from the editor.
 #[derive(Default)]
 pub struct Config {
+    /// The workspace roots from initialization.
+    pub roots: Vec<PathBuf>,
     /// The output directory for PDF export.
     pub output_path: String,
     /// The mode of PDF export.
@@ -293,6 +295,7 @@ impl Config {
             self.export_pdf = ExportPdfMode::default();
         }
 
+        // todo: the command.root may be not absolute
         let root_path = update.get("rootPath");
         if let Some(root_path) = root_path {
             if root_path.is_null() {
@@ -355,6 +358,7 @@ impl Config {
                     .map(|(k, v)| (k.as_str().into(), v.as_str().into_value()))
                     .collect();
 
+                // todo: the command.root may be not absolute
                 self.typst_extra_args = Some(CompileExtraOpts {
                     entry: command.input,
                     root_dir: command.root,
@@ -365,6 +369,42 @@ impl Config {
         }
 
         Ok(())
+    }
+
+    pub fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
+        if let Some(path) = &self.root_path {
+            return Some(path.as_path().into());
+        }
+
+        if let Some(path) = &self
+            .typst_extra_args
+            .as_ref()
+            .and_then(|x| x.root_dir.clone())
+        {
+            return Some(path.as_path().into());
+        }
+
+        if let Some(entry) = entry {
+            for root in self.roots.iter() {
+                if entry.starts_with(root) {
+                    return Some(root.as_path().into());
+                }
+            }
+
+            if !self.roots.is_empty() {
+                warn!("entry is not in any set root directory");
+            }
+
+            if let Some(parent) = entry.parent() {
+                return Some(parent.into());
+            }
+        }
+
+        if !self.roots.is_empty() {
+            return Some(self.roots[0].as_path().into());
+        }
+
+        None
     }
 
     pub(crate) fn listen_semantic_tokens(&mut self, listener: Listener<SemanticTokensMode>) {
@@ -480,11 +520,11 @@ impl Init {
         let mut service = TypstLanguageServer::new(TypstLanguageServerArgs {
             client: self.host.clone(),
             compile_opts: self.compile_opts,
-            roots: params.root_paths(),
             const_config: cc,
             diag_tx,
         });
 
+        config.roots = params.root_paths();
         if let Some(init) = &params.initialization_options {
             if let Err(err) = config
                 .update(init)

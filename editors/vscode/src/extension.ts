@@ -213,7 +213,7 @@ async function commandClearCache(): Promise<void> {
 async function commandPinMain(isPin: boolean): Promise<void> {
     if (!isPin) {
         await client?.sendRequest("workspace/executeCommand", {
-            command: "tinymist.doPinMain",
+            command: "tinymist.pinMain",
             arguments: ["detached"],
         });
         return;
@@ -224,17 +224,15 @@ async function commandPinMain(isPin: boolean): Promise<void> {
         return;
     }
 
-    const uri = activeEditor.document.uri.toString();
-
     await client?.sendRequest("workspace/executeCommand", {
-        command: "tinymist.doPinMain",
-        arguments: [uri],
+        command: "tinymist.pinMain",
+        arguments: [activeEditor.document.uri.fsPath],
     });
 }
 
 async function commandActivateDoc(editor: TextEditor | undefined): Promise<void> {
     await client?.sendRequest("workspace/executeCommand", {
-        command: "tinymist.doActivateDoc",
+        command: "tinymist.focusMain",
         arguments: [editor?.document.uri.fsPath],
     });
 }

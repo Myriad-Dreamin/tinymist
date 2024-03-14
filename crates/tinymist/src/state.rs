@@ -21,17 +21,50 @@ pub struct MemoryFileMeta {
 }
 
 impl TypstLanguageServer {
+    /// Updates the main entry
+    // todo: the changed entry may be out of root directory
+    pub fn update_main_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+        self.pinning = new_entry.is_some();
+        match (new_entry, self.main.is_some()) {
+            (Some(new_entry), true) => {
+                let main = self.main.as_mut().unwrap();
+                main.change_entry(Some(new_entry), |e| self.config.determine_root(e.as_ref()))?;
+            }
+            (Some(new_entry), false) => {
+                let main_node = self.server("main".to_owned(), Some(new_entry));
+
+                self.main = Some(main_node);
+            }
+            (None, true) => {
+                let main = self.main.take().unwrap();
+                std::thread::spawn(move || main.settle());
+            }
+            (None, false) => {}
+        };
+
+        Ok(())
+    }
+
+    /// Updates the primary (focusing) entry
+    pub fn update_primary_entry(&self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+        self.primary().change_entry(new_entry.clone(), |e| {
+            self.config.determine_root(e.as_ref())
+        })?;
+
+        Ok(())
+    }
+}
+
+impl TypstLanguageServer {
     fn update_source(&self, files: FileChangeSet) -> Result<(), Error> {
-        let main = self.main.clone();
-        let main = main.as_ref();
-        let primary = Some(self.primary_deferred());
-        let clients_to_notify = (primary.iter()).chain(main.iter());
+        let main = self.main.as_ref();
+        let primary = Some(self.primary());
+        let clients_to_notify = (primary.into_iter()).chain(main);
 
         for client in clients_to_notify {
-            client
-                .wait()
-                .inner
-                .add_memory_changes(MemoryEvent::Update(files.clone()));
+            client.add_memory_changes(MemoryEvent::Update(files.clone()), |e| {
+                self.config.determine_root(e.as_ref())
+            });
         }
 
         Ok(())
@@ -165,13 +198,14 @@ impl TypstLanguageServer {
             SelectionRange(req) => query_source!(self, SelectionRange, req),
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
             _ => {
-                let main = &self.main;
-                let query_target = match main.as_ref() {
-                    Some(main) if self.pinning => main.wait(),
+                let query_target = match self.main.as_ref() {
+                    Some(main) if self.pinning => main,
                     Some(..) | None => {
                         // todo: race condition, we need atomic primary query
                         if let Some(path) = query.associated_path() {
-                            self.primary().change_entry(Some(path.into()))?;
+                            self.primary().change_entry(Some(path.into()), |e| {
+                                self.config.determine_root(e.as_ref())
+                            })?;
                         }
                         self.primary()
                     }
