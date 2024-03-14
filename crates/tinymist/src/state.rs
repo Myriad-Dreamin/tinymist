@@ -62,10 +62,9 @@ impl TypstLanguageServer {
         let clients_to_notify = (primary.into_iter()).chain(main);
 
         for client in clients_to_notify {
-            client
-                .inner
-                .wait()
-                .add_memory_changes(MemoryEvent::Update(files.clone()));
+            client.add_memory_changes(MemoryEvent::Update(files.clone()), |e| {
+                self.config.determine_root(e.as_ref())
+            });
         }
 
         Ok(())

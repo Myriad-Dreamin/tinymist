@@ -374,7 +374,7 @@ pub struct CompileActor {
     root_tx: Mutex<Option<oneshot::Sender<Option<ImmutPath>>>>,
     root: OnceCell<Option<ImmutPath>>,
     entry: Arc<Mutex<Option<ImmutPath>>>,
-    pub inner: Deferred<CompileClient<CompileHandler>>,
+    inner: Deferred<CompileClient<CompileHandler>>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
 
@@ -534,6 +534,42 @@ impl CompileActor {
         }
 
         Ok(())
+    }
+
+    pub fn add_memory_changes(
+        &self,
+        event: MemoryEvent,
+        resolve_root: impl FnOnce(Option<ImmutPath>) -> Option<ImmutPath>,
+    ) {
+        self.root.get_or_init(|| {
+            info!(
+                "TypstActor({}): delayed root resolution on memory change events",
+                self.diag_group
+            );
+
+            // determine path by event
+            let entry = {
+                let entry = self.entry.lock().clone();
+
+                entry.or_else(|| match &event {
+                    MemoryEvent::Sync(changeset) | MemoryEvent::Update(changeset) => changeset
+                        .inserts
+                        .first()
+                        .map(|e| e.0.clone())
+                        .or_else(|| changeset.removes.first().cloned()),
+                })
+            };
+
+            let mut root_tx = self.root_tx.lock();
+            let root_tx = root_tx.take().unwrap();
+            let root = resolve_root(entry);
+            let _ = root_tx.send(root.clone());
+
+            info!("TypstActor({}): resolved root: {root:?}", self.diag_group);
+            root
+        });
+
+        self.inner.wait().add_memory_changes(event);
     }
 
     pub(crate) fn change_export_pdf(&self, config: PdfExportConfig) {
