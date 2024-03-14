@@ -278,7 +278,6 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 pub struct TypstLanguageServerArgs {
     pub client: LspHost,
     pub compile_opts: CompileOpts,
-    pub roots: Vec<PathBuf>,
     pub const_config: ConstConfig,
     pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
 }
@@ -304,7 +303,6 @@ pub struct TypstLanguageServer {
     pub compile_opts: CompileOpts,
 
     diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
-    roots: Vec<PathBuf>,
     memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
     primary: Option<CompileActor>,
     pinning: bool,
@@ -327,7 +325,6 @@ impl TypstLanguageServer {
             notify_cmds: Self::get_notify_cmds(),
 
             diag_tx: args.diag_tx,
-            roots: args.roots,
             memory_changes: HashMap::new(),
             primary: None,
             pinning: false,
@@ -786,8 +783,7 @@ impl TypstLanguageServer {
             let config = PdfExportConfig {
                 substitute_pattern: self.config.output_path.clone(),
                 mode: self.config.export_pdf,
-                root: Path::new("").into(),
-                path: None,
+                ..PdfExportConfig::default()
             };
 
             self.primary().change_export_pdf(config.clone());

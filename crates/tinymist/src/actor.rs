@@ -5,17 +5,16 @@ pub mod compile;
 pub mod render;
 pub mod typst;
 
-use std::{borrow::Cow, env::current_dir, path::PathBuf};
+use std::{borrow::Cow, path::PathBuf};
 
 use ::typst::diag::FileResult;
-use log::warn;
 use tokio::sync::{broadcast, watch};
 use typst_ts_compiler::vfs::notify::FileChangeSet;
 use typst_ts_core::{config::CompileOpts, ImmutPath};
 
 use self::{
     render::{PdfExportActor, PdfExportConfig},
-    typst::{create_server, CompileActor},
+    typst::{create_server, CompileActor, OptsState},
 };
 use crate::TypstLanguageServer;
 
@@ -26,14 +25,7 @@ impl TypstLanguageServer {
 
         // todo: don't ignore entry from typst_extra_args
         // entry: command.input,
-
-        let root_dir = self.determine_root(entry.as_ref());
-        let root_dir = root_dir.unwrap_or_else(|| {
-            current_dir().unwrap_or_else(|e| {
-                warn!("failed to determine root directory by cwd: {e}");
-                PathBuf::new()
-            })
-        });
+        let root_dir = self.config.determine_root(entry.as_ref());
 
         // Run the PDF export actor before preparing cluster to avoid loss of events
         tokio::spawn(
@@ -42,7 +34,7 @@ impl TypstLanguageServer {
                 render_tx.subscribe(),
                 PdfExportConfig {
                     substitute_pattern: self.config.output_path.clone(),
-                    root: root_dir.as_path().into(),
+                    root: root_dir.clone(),
                     path: entry.clone().map(From::from),
                     mode: self.config.export_pdf,
                 },
@@ -50,23 +42,27 @@ impl TypstLanguageServer {
             .run(),
         );
 
-        let mut opts = CompileOpts {
-            root_dir,
-            // todo: additional inputs
-            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
-            ..self.compile_opts.clone()
-        };
+        let opts = {
+            let mut opts = self.compile_opts.clone();
 
-        if let Some(extras) = &self.config.typst_extra_args {
-            if let Some(inputs) = extras.inputs.as_ref() {
-                if opts.inputs.is_empty() {
-                    opts.inputs = inputs.clone();
+            if let Some(extras) = &self.config.typst_extra_args {
+                if let Some(inputs) = extras.inputs.as_ref() {
+                    if opts.inputs.is_empty() {
+                        opts.inputs = inputs.clone();
+                    }
+                }
+                if !extras.font_paths.is_empty() && opts.font_paths.is_empty() {
+                    opts.font_paths = extras.font_paths.clone();
                 }
             }
-            if !extras.font_paths.is_empty() && opts.font_paths.is_empty() {
-                opts.font_paths = extras.font_paths.clone();
+
+            move |root_dir: PathBuf| CompileOpts {
+                root_dir,
+                // todo: additional inputs
+                with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+                ..opts
             }
-        }
+        };
 
         let snapshot = FileChangeSet::new_inserts(
             self.memory_changes
@@ -81,8 +77,9 @@ impl TypstLanguageServer {
         create_server(
             name,
             self.const_config(),
-            opts,
-            entry.as_deref().map(|e| e.to_owned()),
+            OptsState::new(root_dir.clone(), opts),
+            root_dir,
+            entry,
             snapshot,
             self.diag_tx.clone(),
             doc_tx,

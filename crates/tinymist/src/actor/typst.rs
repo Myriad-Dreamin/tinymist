@@ -7,6 +7,7 @@ use std::{
 };
 
 use log::{debug, error, info, trace, warn};
+use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
@@ -49,26 +50,43 @@ type CompileClient<H> = TsCompileClient<CompileService<H>>;
 
 type DiagnosticsSender = mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>;
 
+pub enum OptsState {
+    Exact(CompileOpts),
+    Rootless(Box<dyn FnOnce(PathBuf) -> CompileOpts + Send + Sync>),
+}
+impl OptsState {
+    pub(crate) fn new(
+        root: Option<Arc<Path>>,
+        opts: impl FnOnce(PathBuf) -> CompileOpts + Send + Sync + 'static,
+    ) -> OptsState {
+        match root {
+            Some(root) => OptsState::Exact(opts(root.as_ref().to_owned())),
+            None => OptsState::Rootless(Box::new(opts)),
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn create_server(
     diag_group: String,
     cfg: &ConstConfig,
-    opts: CompileOpts,
-    entry: Option<PathBuf>,
+    opts: OptsState,
+    root: Option<ImmutPath>,
+    entry: Option<ImmutPath>,
     snapshot: FileChangeSet,
     diag_tx: DiagnosticsSender,
     doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 ) -> CompileActor {
+    let pos_encoding = cfg.position_encoding;
+
     info!(
-        "TypstActor: creating server for {} with arguments {:#?}",
+        "TypstActor: creating server for {} with opts(determined={:?})",
         diag_group,
-        ShowOpts(&opts)
+        matches!(opts, OptsState::Exact(_))
     );
 
-    let pos_encoding = cfg.position_encoding;
-    let root: ImmutPath = opts.root_dir.as_path().into();
-    let entry = entry.as_ref().map(|e| e.as_path().into());
+    let (root_tx, root_rx) = oneshot::channel();
 
     let handler = CompileHandler {
         result: Arc::new(SyncMutex::new(Err(CompileStatus::Compiling))),
@@ -77,13 +95,39 @@ pub fn create_server(
 
     let inner = Deferred::new({
         let current_runtime = tokio::runtime::Handle::current();
-        let root = root.clone();
         let diag_group = diag_group.clone();
         let handler = handler.clone();
         let entry = entry.clone();
         let render_tx = render_tx.clone();
 
         move || {
+            let opts = match opts {
+                OptsState::Exact(opts) => opts,
+                OptsState::Rootless(opts) => {
+                    let root: ImmutPath = match utils::threaded_receive(root_rx) {
+                        Ok(Some(root)) => root,
+                        Ok(None) => {
+                            error!("TypstActor: failed to receive root path: root is none");
+                            return CompileClient::faked();
+                        }
+                        Err(err) => {
+                            error!("TypstActor: failed to receive root path: {:#}", err);
+                            return CompileClient::faked();
+                        }
+                    };
+
+                    opts(root.as_ref().into())
+                }
+            };
+
+            let root: ImmutPath = opts.root_dir.as_path().into();
+
+            info!(
+                "TypstActor: creating server for {} with arguments {:#?}",
+                diag_group,
+                ShowOpts(&opts)
+            );
+
             // todo: entry is PathBuf, which is inefficient
             let compiler_driver = CompileDriver::new(opts, entry.clone(), handler);
             let handler: CompileHandler = compiler_driver.handler.clone();
@@ -122,6 +166,7 @@ pub fn create_server(
 
     CompileActor::new(
         diag_group,
+        root_tx,
         root,
         entry,
         pos_encoding,
@@ -326,13 +371,40 @@ pub struct CompileActor {
     diag_group: String,
     position_encoding: PositionEncoding,
     handler: CompileHandler,
-    root: ImmutPath,
+    root_tx: Mutex<Option<oneshot::Sender<Option<ImmutPath>>>>,
+    root: OnceCell<Option<ImmutPath>>,
     entry: Arc<Mutex<Option<ImmutPath>>>,
     pub inner: Deferred<CompileClient<CompileHandler>>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
 
 impl CompileActor {
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        diag_group: String,
+        root_tx: oneshot::Sender<Option<ImmutPath>>,
+        root: Option<ImmutPath>,
+        entry: Option<ImmutPath>,
+        position_encoding: PositionEncoding,
+        handler: CompileHandler,
+        inner: Deferred<CompileClient<CompileHandler>>,
+        render_tx: broadcast::Sender<RenderActorRequest>,
+    ) -> Self {
+        Self {
+            diag_group,
+            root_tx: Mutex::new(root.is_none().then_some(root_tx)),
+            root: match root {
+                Some(root) => OnceCell::from(Some(root)),
+                None => OnceCell::new(),
+            },
+            position_encoding,
+            handler,
+            entry: Arc::new(Mutex::new(entry)),
+            inner,
+            render_tx,
+        }
+    }
+
     fn inner(&self) -> &CompileClient<CompileHandler> {
         self.inner.wait()
     }
@@ -356,7 +428,7 @@ impl CompileActor {
     }
 
     pub fn settle(&self) {
-        let _ = self.change_entry(None);
+        let _ = self.change_entry(None, |_| None);
         info!("TypstActor({}): settle requested", self.diag_group);
         let res = self.inner().settle();
         match res {
@@ -370,10 +442,27 @@ impl CompileActor {
         }
     }
 
-    pub fn change_entry(&self, path: Option<ImmutPath>) -> Result<(), Error> {
+    pub fn change_entry(
+        &self,
+        path: Option<ImmutPath>,
+        resolve_root: impl FnOnce(Option<ImmutPath>) -> Option<ImmutPath>,
+    ) -> Result<(), Error> {
         if path.as_deref().is_some_and(|p| !p.is_absolute()) {
             return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
         }
+        {
+            let path = path.clone();
+            self.root.get_or_init(|| {
+                info!("TypstActor({}): delayed root resolution", self.diag_group);
+                let mut root_tx = self.root_tx.lock();
+                let root_tx = root_tx.take().unwrap();
+                let root = resolve_root(path);
+                let _ = root_tx.send(root.clone());
+
+                info!("TypstActor({}): resolved root: {root:?}", self.diag_group);
+                root
+            })
+        };
 
         // todo: more robust rollback logic
         let entry = self.entry.clone();
@@ -396,7 +485,7 @@ impl CompileActor {
 
             self.render_tx
                 .send(RenderActorRequest::ChangeExportPath(PdfPathVars {
-                    root: self.root.clone(),
+                    root: self.root.get().cloned().flatten(),
                     path: next.clone(),
                 }))
                 .unwrap();
@@ -425,7 +514,7 @@ impl CompileActor {
             if res.is_err() {
                 self.render_tx
                     .send(RenderActorRequest::ChangeExportPath(PdfPathVars {
-                        root: self.root.clone(),
+                        root: self.root.get().cloned().flatten(),
                         path: prev.clone(),
                     }))
                     .unwrap();
@@ -456,7 +545,7 @@ impl CompileActor {
             .render_tx
             .send(RenderActorRequest::ChangeConfig(PdfExportConfig {
                 substitute_pattern: config.substitute_pattern,
-                root: self.root.clone(),
+                root: self.root.get().cloned().flatten(),
                 path,
                 mode: config.mode,
             }))
@@ -550,26 +639,6 @@ impl EditorServer for CompileActor {
 impl CompileHost for CompileActor {}
 
 impl CompileActor {
-    fn new(
-        diag_group: String,
-        root: ImmutPath,
-        entry: Option<ImmutPath>,
-        position_encoding: PositionEncoding,
-        handler: CompileHandler,
-        inner: Deferred<CompileClient<CompileHandler>>,
-        render_tx: broadcast::Sender<RenderActorRequest>,
-    ) -> Self {
-        Self {
-            diag_group,
-            root,
-            position_encoding,
-            handler,
-            entry: Arc::new(Mutex::new(entry)),
-            inner,
-            render_tx,
-        }
-    }
-
     pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
         use CompilerQueryRequest::*;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);

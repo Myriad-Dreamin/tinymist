@@ -29,14 +29,14 @@ pub enum RenderActorRequest {
 
 #[derive(Debug, Clone)]
 pub struct PdfPathVars {
-    pub root: ImmutPath,
+    pub root: Option<ImmutPath>,
     pub path: Option<ImmutPath>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PdfExportConfig {
     pub substitute_pattern: String,
-    pub root: ImmutPath,
+    pub root: Option<ImmutPath>,
     pub path: Option<ImmutPath>,
     pub mode: ExportPdfMode,
 }
@@ -46,7 +46,7 @@ pub struct PdfExportActor {
     document: watch::Receiver<Option<Arc<TypstDocument>>>,
 
     pub substitute_pattern: String,
-    pub root: ImmutPath,
+    pub root: Option<ImmutPath>,
     pub path: Option<ImmutPath>,
     pub mode: ExportPdfMode,
 }
@@ -136,12 +136,12 @@ impl PdfExportActor {
             "PdfRenderActor: check path {:?} with output directory {}",
             self.path, self.substitute_pattern
         );
-        if let Some(path) = self.path.as_ref() {
+        if let Some((root, path)) = self.root.as_ref().zip(self.path.as_ref()) {
             let should_do = matches!(req, RenderActorRequest::DoExport(..));
             let should_do = should_do || get_mode(self.mode) == eq_mode;
             let should_do = should_do || validate_document(&req, self.mode, &document);
             if should_do {
-                return match self.export_pdf(&document, path).await {
+                return match self.export_pdf(&document, root, path).await {
                     Ok(pdf) => Some(pdf),
                     Err(err) => {
                         error!("PdfRenderActor: failed to export PDF: {err}", err = err);
@@ -178,8 +178,13 @@ impl PdfExportActor {
         None
     }
 
-    async fn export_pdf(&self, doc: &TypstDocument, path: &Path) -> anyhow::Result<PathBuf> {
-        let Some(to) = substitute_path(&self.substitute_pattern, &self.root, path) else {
+    async fn export_pdf(
+        &self,
+        doc: &TypstDocument,
+        root: &Path,
+        path: &Path,
+    ) -> anyhow::Result<PathBuf> {
+        let Some(to) = substitute_path(&self.substitute_pattern, root, path) else {
             return Err(anyhow::anyhow!("failed to substitute path"));
         };
         if to.is_relative() {

@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use ::typst::{diag::FileResult, syntax::Source};
 use anyhow::anyhow;
-use log::warn;
 use lsp_types::TextDocumentContentChangeEvent;
 use tinymist_query::{lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, PositionEncoding};
 use typst_ts_compiler::{
@@ -22,44 +21,6 @@ pub struct MemoryFileMeta {
 }
 
 impl TypstLanguageServer {
-    pub fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<PathBuf> {
-        if let Some(path) = &self.config.root_path {
-            return Some(path.clone());
-        }
-
-        if let Some(path) = &self
-            .config
-            .typst_extra_args
-            .as_ref()
-            .and_then(|x| x.root_dir.clone())
-        {
-            return Some(path.clone());
-        }
-
-        if let Some(entry) = entry {
-            for root in self.roots.iter() {
-                if entry.starts_with(root) {
-                    return Some(root.clone());
-                }
-            }
-        }
-
-        if !self.roots.is_empty() {
-            warn!("entry is not in any set root directory");
-        }
-
-        let entry = entry?;
-        if let Some(parent) = entry.parent() {
-            return Some(parent.into());
-        }
-
-        if !self.roots.is_empty() {
-            return Some(self.roots[0].clone());
-        }
-
-        None
-    }
-
     /// Updates the main entry
     // todo: the changed entry may be out of root directory
     pub fn update_main_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
@@ -67,7 +28,7 @@ impl TypstLanguageServer {
         match (new_entry, self.main.is_some()) {
             (Some(new_entry), true) => {
                 let main = self.main.as_mut().unwrap();
-                main.change_entry(Some(new_entry))?;
+                main.change_entry(Some(new_entry), |e| self.config.determine_root(e.as_ref()))?;
             }
             (Some(new_entry), false) => {
                 let main_node = self.server("main".to_owned(), Some(new_entry));
@@ -86,7 +47,9 @@ impl TypstLanguageServer {
 
     /// Updates the primary (focusing) entry
     pub fn update_primary_entry(&self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
-        self.primary().change_entry(new_entry.clone())?;
+        self.primary().change_entry(new_entry.clone(), |e| {
+            self.config.determine_root(e.as_ref())
+        })?;
 
         Ok(())
     }
@@ -241,7 +204,9 @@ impl TypstLanguageServer {
                     Some(..) | None => {
                         // todo: race condition, we need atomic primary query
                         if let Some(path) = query.associated_path() {
-                            self.primary().change_entry(Some(path.into()))?;
+                            self.primary().change_entry(Some(path.into()), |e| {
+                                self.config.determine_root(e.as_ref())
+                            })?;
                         }
                         self.primary()
                     }

@@ -515,7 +515,7 @@ impl<C: Compiler> CompileActor<C> {
         (
             self,
             CompileClient {
-                steal_send,
+                intr_tx: steal_send,
                 _ctx: typst_ts_core::PhantomParamData::default(),
             },
         )
@@ -528,13 +528,23 @@ impl<C: Compiler> CompileActor<C> {
 
 #[derive(Debug, Clone)]
 pub struct CompileClient<Ctx> {
-    steal_send: mpsc::UnboundedSender<ExternalInterrupt<Ctx>>,
+    intr_tx: mpsc::UnboundedSender<ExternalInterrupt<Ctx>>,
 
     _ctx: typst_ts_core::PhantomParamData<Ctx>,
 }
 
 unsafe impl<Ctx> Send for CompileClient<Ctx> {}
 unsafe impl<Ctx> Sync for CompileClient<Ctx> {}
+
+impl<Ctx> CompileClient<Ctx> {
+    pub fn faked() -> Self {
+        let (intr_tx, _) = mpsc::unbounded_channel();
+        Self {
+            intr_tx,
+            _ctx: typst_ts_core::PhantomParamData::default(),
+        }
+    }
+}
 
 impl<Ctx> CompileClient<Ctx> {
     fn steal_inner<Ret: Send + 'static>(
@@ -551,9 +561,9 @@ impl<Ctx> CompileClient<Ctx> {
             }
         });
 
-        self.steal_send
+        self.intr_tx
             .send(ExternalInterrupt::Task(task))
-            .map_err(map_string_err("failed to send to steal"))?;
+            .map_err(map_string_err("failed to send steal request"))?;
         Ok(rx)
     }
 
@@ -567,7 +577,9 @@ impl<Ctx> CompileClient<Ctx> {
     pub fn settle(&self) -> ZResult<()> {
         let (tx, rx) = oneshot::channel();
         // very weird if this is error, we unwrap it.
-        self.steal_send.send(ExternalInterrupt::Settle(tx)).unwrap();
+        self.intr_tx
+            .send(ExternalInterrupt::Settle(tx))
+            .map_err(map_string_err("failed to send settle request"))?;
         utils::threaded_receive(rx)
     }
 
@@ -586,7 +598,7 @@ impl<Ctx> CompileClient<Ctx> {
     pub fn add_memory_changes(&self, event: MemoryEvent) {
         log_send_error(
             "mem_event",
-            self.steal_send.send(ExternalInterrupt::Memory(event)),
+            self.intr_tx.send(ExternalInterrupt::Memory(event)),
         );
     }
 }
