@@ -67,7 +67,7 @@ impl TypstLanguageServer {
         match (new_entry, self.main.is_some()) {
             (Some(new_entry), true) => {
                 let main = self.main.as_mut().unwrap();
-                main.wait().change_entry(Some(new_entry))?;
+                main.change_entry(Some(new_entry))?;
             }
             (Some(new_entry), false) => {
                 let main_node = self.server("main".to_owned(), Some(new_entry));
@@ -76,7 +76,7 @@ impl TypstLanguageServer {
             }
             (None, true) => {
                 let main = self.main.take().unwrap();
-                std::thread::spawn(move || main.wait().settle());
+                std::thread::spawn(move || main.settle());
             }
             (None, false) => {}
         };
@@ -94,15 +94,14 @@ impl TypstLanguageServer {
 
 impl TypstLanguageServer {
     fn update_source(&self, files: FileChangeSet) -> Result<(), Error> {
-        let main = self.main.clone();
-        let main = main.as_ref();
-        let primary = Some(self.primary_deferred());
-        let clients_to_notify = (primary.iter()).chain(main.iter());
+        let main = self.main.as_ref();
+        let primary = Some(self.primary());
+        let clients_to_notify = (primary.into_iter()).chain(main);
 
         for client in clients_to_notify {
             client
-                .wait()
                 .inner
+                .wait()
                 .add_memory_changes(MemoryEvent::Update(files.clone()));
         }
 
@@ -237,9 +236,8 @@ impl TypstLanguageServer {
             SelectionRange(req) => query_source!(self, SelectionRange, req),
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
             _ => {
-                let main = &self.main;
-                let query_target = match main.as_ref() {
-                    Some(main) if self.pinning => main.wait(),
+                let query_target = match self.main.as_ref() {
+                    Some(main) if self.pinning => main,
                     Some(..) | None => {
                         // todo: race condition, we need atomic primary query
                         if let Some(path) = query.associated_path() {

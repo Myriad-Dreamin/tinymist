@@ -24,7 +24,7 @@ use typst_ts_compiler::{
 use typst_ts_core::{
     debug_loc::{SourceLocation, SourceSpanOffset},
     error::prelude::{map_string_err, ZResult},
-    TypstDocument, TypstFileId,
+    ImmutPath, TypstDocument, TypstFileId,
 };
 
 use typst_ts_compiler::service::{
@@ -95,7 +95,7 @@ pub struct CompileActor<C: Compiler> {
     /// The underlying compiler.
     pub compiler: CompileReporter<C>,
     /// The root path of the workspace.
-    pub root: PathBuf,
+    pub root: ImmutPath,
     /// Whether to enable file system watching.
     pub enable_watch: bool,
 
@@ -126,8 +126,8 @@ where
 {
     pub fn new_with_features(
         compiler: C,
-        root: PathBuf,
-        entry: Option<PathBuf>,
+        root: ImmutPath,
+        entry: Option<ImmutPath>,
         feature_set: FeatureSet,
     ) -> Self {
         let (steal_send, steal_recv) = mpsc::unbounded_channel();
@@ -163,7 +163,7 @@ where
     }
 
     /// Create a new compiler thread.
-    pub fn new(compiler: C, root: PathBuf, entry: Option<PathBuf>) -> Self {
+    pub fn new(compiler: C, root: ImmutPath, entry: Option<ImmutPath>) -> Self {
         Self::new_with_features(compiler, root, entry, FeatureSet::default())
     }
 

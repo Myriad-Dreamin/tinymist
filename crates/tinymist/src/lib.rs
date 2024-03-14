@@ -59,7 +59,6 @@ use tinymist_query::{
     get_semantic_tokens_unregistration, DiagnosticsMap, SemanticTokenCache,
 };
 use tokio::sync::mpsc;
-use typst::util::Deferred;
 use typst_ts_core::config::CompileOpts;
 use typst_ts_core::ImmutPath;
 
@@ -307,9 +306,9 @@ pub struct TypstLanguageServer {
     diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
     roots: Vec<PathBuf>,
     memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
-    primary: Option<Deferred<CompileActor>>,
+    primary: Option<CompileActor>,
     pinning: bool,
-    main: Option<Deferred<CompileActor>>,
+    main: Option<CompileActor>,
     tokens_cache: SemanticTokenCache,
 }
 
@@ -345,12 +344,8 @@ impl TypstLanguageServer {
         &self.const_config
     }
 
-    fn primary_deferred(&self) -> &Deferred<CompileActor> {
-        self.primary.as_ref().expect("primary")
-    }
-
     fn primary(&self) -> &CompileActor {
-        self.primary_deferred().wait()
+        self.primary.as_ref().expect("primary")
     }
 
     #[rustfmt::skip]
@@ -798,7 +793,7 @@ impl TypstLanguageServer {
             self.primary().change_export_pdf(config.clone());
             {
                 if let Some(main) = self.main.as_ref() {
-                    main.wait().change_export_pdf(config);
+                    main.change_export_pdf(config);
                 }
             }
         }

@@ -116,6 +116,7 @@ impl PdfExportActor {
                 }
             }
         }
+        info!("PdfRenderActor: stopped");
     }
 
     async fn check_mode_and_export(&self, req: RenderActorRequest) -> Option<PathBuf> {

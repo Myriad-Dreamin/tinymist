@@ -7,7 +7,7 @@ pub mod typst;
 
 use std::{borrow::Cow, env::current_dir, path::PathBuf};
 
-use ::typst::{diag::FileResult, util::Deferred};
+use ::typst::diag::FileResult;
 use log::warn;
 use tokio::sync::{broadcast, watch};
 use typst_ts_compiler::vfs::notify::FileChangeSet;
@@ -20,7 +20,7 @@ use self::{
 use crate::TypstLanguageServer;
 
 impl TypstLanguageServer {
-    pub fn server(&self, name: String, entry: Option<ImmutPath>) -> Deferred<CompileActor> {
+    pub fn server(&self, name: String, entry: Option<ImmutPath>) -> CompileActor {
         let (doc_tx, doc_rx) = watch::channel(None);
         let (render_tx, _) = broadcast::channel(10);
 
