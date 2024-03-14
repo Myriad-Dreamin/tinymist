@@ -11,6 +11,34 @@ use typst_ts_core::typst::prelude::eco_vec;
 
 use crate::prelude::*;
 
+pub struct InlayHintConfig {
+    // positional arguments group
+    pub on_pos_args: bool,
+    pub off_single_pos_arg: bool,
+
+    // variadic arguments group
+    pub on_variadic_args: bool,
+    pub only_first_variadic_args: bool,
+
+    // todo
+    // The typst sugar grammar
+    pub on_content_block_args: bool,
+}
+
+impl InlayHintConfig {
+    pub const fn smart() -> Self {
+        Self {
+            on_pos_args: true,
+            off_single_pos_arg: true,
+
+            on_variadic_args: true,
+            only_first_variadic_args: true,
+
+            on_content_block_args: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct InlayHintRequest {
     pub path: PathBuf,
@@ -26,7 +54,7 @@ impl InlayHintRequest {
         let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
         let range = lsp_to_typst::range(self.range, position_encoding, &source)?;
 
-        let hints = inlay_hints(world, &source, range, position_encoding).ok()?;
+        let hints = inlay_hint(world, &source, range, position_encoding).ok()?;
         debug!(
             "got inlay hints on {source:?} => {hints:?}",
             source = source.id(),
@@ -41,12 +69,14 @@ impl InlayHintRequest {
     }
 }
 
-fn inlay_hints(
+fn inlay_hint(
     world: &TypstSystemWorld,
     source: &Source,
     range: Range<usize>,
     encoding: PositionEncoding,
 ) -> FileResult<Vec<InlayHint>> {
+    const SMART: InlayHintConfig = InlayHintConfig::smart();
+
     struct InlayHintWorker<'a> {
         world: &'a TypstSystemWorld,
         source: &'a Source,
@@ -110,10 +140,48 @@ fn inlay_hints(
                         Value::Func(f) => Some(f),
                         _ => None,
                     })?;
-                    trace!("got function {func:?}");
+                    log::info!("got function {func:?}");
 
                     let call_info = analyze_call(func, args)?;
-                    trace!("got call_info {call_info:?}");
+                    log::info!("got call_info {call_info:?}");
+
+                    let check_single_pos_arg = || {
+                        let mut pos = 0;
+                        let mut content_pos = 0;
+
+                        for arg in args.items() {
+                            let Some(arg_node) = args_node.find(arg.span()) else {
+                                continue;
+                            };
+
+                            let Some(info) = call_info.arg_mapping.get(&arg_node) else {
+                                continue;
+                            };
+
+                            if info.kind != ParamKind::Named {
+                                if info.is_content_block {
+                                    content_pos += 1;
+                                } else {
+                                    pos += 1;
+                                };
+
+                                if pos > 1 && content_pos > 1 {
+                                    break;
+                                }
+                            }
+                        }
+
+                        (pos <= 1, content_pos <= 1)
+                    };
+
+                    let (disable_by_single_pos_arg, disable_by_single_content_pos_arg) =
+                        if SMART.on_pos_args && SMART.off_single_pos_arg {
+                            check_single_pos_arg()
+                        } else {
+                            (false, false)
+                        };
+
+                    let mut is_first_variadic_arg = true;
 
                     for arg in args.items() {
                         let Some(arg_node) = args_node.find(arg.span()) else {
@@ -126,6 +194,36 @@ fn inlay_hints(
 
                         if info.param.name.is_empty() {
                             continue;
+                        }
+
+                        match info.kind {
+                            ParamKind::Named => {
+                                continue;
+                            }
+                            ParamKind::Positional
+                                if call_info.signature.has_fill_or_size_or_stroke =>
+                            {
+                                continue
+                            }
+                            ParamKind::Positional
+                                if !SMART.on_pos_args
+                                    || (info.is_content_block
+                                        && disable_by_single_content_pos_arg)
+                                    || (!info.is_content_block && disable_by_single_pos_arg) =>
+                            {
+                                continue
+                            }
+                            ParamKind::Rest
+                                if (!SMART.on_variadic_args
+                                    || (!is_first_variadic_arg
+                                        && SMART.only_first_variadic_args)) =>
+                            {
+                                continue;
+                            }
+                            ParamKind::Rest => {
+                                is_first_variadic_arg = false;
+                            }
+                            ParamKind::Positional => {}
                         }
 
                         let pos = arg_node.range().end;
@@ -186,12 +284,14 @@ enum ParamKind {
 #[derive(Debug, Clone)]
 struct CallParamInfo {
     kind: ParamKind,
+    is_content_block: bool,
     param: Arc<ParamSpec>,
     // types: EcoVec<()>,
 }
 
 #[derive(Debug, Clone)]
 struct CallInfo {
+    signature: Arc<Signature>,
     arg_mapping: HashMap<SyntaxNode, CallParamInfo>,
 }
 
@@ -201,10 +301,6 @@ fn analyze_call(func: Func, args: ast::Args<'_>) -> Option<Arc<CallInfo>> {
 }
 
 fn analyze_call_no_cache(func: Func, args: ast::Args<'_>) -> Option<CallInfo> {
-    let mut info = CallInfo {
-        arg_mapping: HashMap::new(),
-    };
-
     #[derive(Debug, Clone)]
     enum ArgValue<'a> {
         Instance(Args),
@@ -222,6 +318,11 @@ fn analyze_call_no_cache(func: Func, args: ast::Args<'_>) -> Option<CallInfo> {
 
     let signature = analyze_signature(func);
     trace!("got signature {signature:?}");
+
+    let mut info = CallInfo {
+        arg_mapping: HashMap::new(),
+        signature: signature.clone(),
+    };
 
     enum PosState {
         Init,
@@ -265,10 +366,13 @@ fn analyze_call_no_cache(func: Func, args: ast::Args<'_>) -> Option<CallInfo> {
             };
 
             if let Some(arg) = arg {
+                // todo: process desugar
+                let is_content_block = arg.kind() == SyntaxKind::ContentBlock;
                 info.arg_mapping.insert(
                     arg,
                     CallParamInfo {
                         kind,
+                        is_content_block,
                         param: param.clone(),
                         // types: eco_vec![],
                     },
@@ -296,10 +400,13 @@ fn analyze_call_no_cache(func: Func, args: ast::Args<'_>) -> Option<CallInfo> {
             };
 
             if let Some(arg) = arg {
+                // todo: process desugar
+                let is_content_block = arg.kind() == SyntaxKind::ContentBlock;
                 info.arg_mapping.insert(
                     arg,
                     CallParamInfo {
                         kind: ParamKind::Rest,
+                        is_content_block,
                         param: rest.clone(),
                         // types: eco_vec![],
                     },
@@ -333,6 +440,7 @@ fn analyze_call_no_cache(func: Func, args: ast::Args<'_>) -> Option<CallInfo> {
                                     arg_tag,
                                     CallParamInfo {
                                         kind: ParamKind::Named,
+                                        is_content_block: false,
                                         param: param.clone(),
                                         // types: eco_vec![],
                                     },
@@ -386,6 +494,7 @@ impl ParamSpec {
 struct Signature {
     pos: Vec<Arc<ParamSpec>>,
     named: HashMap<Cow<'static, str>, Arc<ParamSpec>>,
+    has_fill_or_size_or_stroke: bool,
     rest: Option<Arc<ParamSpec>>,
     _broken: bool,
 }
@@ -406,9 +515,24 @@ fn analyze_signature(func: Func) -> Arc<Signature> {
     let mut named = HashMap::new();
     let mut rest = None;
     let mut broken = false;
+    let mut has_fill = false;
+    let mut has_stroke = false;
+    let mut has_size = false;
 
     for param in params.into_iter() {
         if param.named {
+            match param.name.as_ref() {
+                "fill" => {
+                    has_fill = true;
+                }
+                "stroke" => {
+                    has_stroke = true;
+                }
+                "size" => {
+                    has_size = true;
+                }
+                _ => {}
+            }
             named.insert(param.name.clone(), param.clone());
         }
 
@@ -429,6 +553,7 @@ fn analyze_signature(func: Func) -> Arc<Signature> {
         pos,
         named,
         rest,
+        has_fill_or_size_or_stroke: has_fill || has_stroke || has_size,
         _broken: broken,
     })
 }
@@ -502,7 +627,7 @@ mod tests {
     use crate::tests::*;
 
     #[test]
-    fn test() {
+    fn smart() {
         snapshot_testing("inlay_hints", &|world, path| {
             let source = get_suitable_source_in_workspace(world, &path).unwrap();
 
