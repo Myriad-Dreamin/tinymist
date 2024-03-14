@@ -48,7 +48,10 @@ use futures::future::BoxFuture;
 use log::{error, info, trace, warn};
 use lsp_server::{ErrorCode, Message, Notification, Request, ResponseError};
 use lsp_types::notification::{Notification as NotificationTrait, PublishDiagnostics};
-use lsp_types::request::{RegisterCapability, UnregisterCapability, WorkspaceConfiguration};
+use lsp_types::request::{
+    GotoDeclarationParams, GotoDeclarationResponse, RegisterCapability, UnregisterCapability,
+    WorkspaceConfiguration,
+};
 use lsp_types::*;
 use parking_lot::{Mutex, RwLock};
 use paste::paste;
@@ -366,6 +369,8 @@ impl TypstLanguageServer {
             request_fn!(PrepareRenameRequest, Self::prepare_rename),
             request_fn!(Rename, Self::rename),
             request_fn!(GotoDefinition, Self::goto_definition),
+            request_fn!(GotoDeclaration, Self::goto_declaration),
+            request_fn!(References, Self::references),
             request_fn!(WorkspaceSymbolRequest, Self::symbol),
             request_fn!(ExecuteCommand, Self::execute_command),
         ])
@@ -840,6 +845,19 @@ impl TypstLanguageServer {
     ) -> LspResult<Option<GotoDefinitionResponse>> {
         let (path, position) = as_path_pos(params.text_document_position_params);
         run_query!(self.GotoDefinition(path, position))
+    }
+
+    fn goto_declaration(
+        &self,
+        params: GotoDeclarationParams,
+    ) -> LspResult<Option<GotoDeclarationResponse>> {
+        let (path, position) = as_path_pos(params.text_document_position_params);
+        run_query!(self.GotoDeclaration(path, position))
+    }
+
+    fn references(&self, params: ReferenceParams) -> LspResult<Option<Vec<Location>>> {
+        let (path, position) = as_path_pos(params.text_document_position);
+        run_query!(self.References(path, position))
     }
 
     fn hover(&self, params: HoverParams) -> LspResult<Option<Hover>> {

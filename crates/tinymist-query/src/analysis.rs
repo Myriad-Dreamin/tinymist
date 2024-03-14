@@ -10,6 +10,8 @@ pub mod reference;
 pub use reference::*;
 pub mod def_use;
 pub use def_use::*;
+pub mod matcher;
+pub use matcher::*;
 
 #[cfg(test)]
 mod lexical_hierarchy_tests {

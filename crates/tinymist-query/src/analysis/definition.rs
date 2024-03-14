@@ -15,7 +15,7 @@ use typst::{
 };
 use typst_ts_core::TypstFileId;
 
-use crate::analysis::find_source_by_import;
+use crate::analysis::{deref_lvalue, find_source_by_import};
 use crate::{prelude::*, TypstSpan};
 
 #[derive(Debug, Clone)]
@@ -71,13 +71,6 @@ impl Definition<'_> {
             Definition::External(s) => &s.use_site,
         }
     }
-}
-
-fn deref_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
-    while let Some(e) = node.cast::<ast::Parenthesized>() {
-        node = node.find(e.expr().span())?;
-    }
-    Some(node)
 }
 
 fn advance_prev_adjacent(node: LinkedNode) -> Option<LinkedNode> {
