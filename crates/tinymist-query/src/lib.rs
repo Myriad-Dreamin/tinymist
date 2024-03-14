@@ -344,6 +344,7 @@ mod tests {
     pub static REDACT_LOC: Lazy<RedactFields> = Lazy::new(|| {
         RedactFields::from_iter([
             "location",
+            "uri",
             "range",
             "selectionRange",
             "targetRange",
