@@ -119,6 +119,14 @@ mod tests {
             };
 
             let result = request.request(world, PositionEncoding::Utf16);
+            // sort
+            let result = result.map(|mut e| {
+                e.sort_by(|a, b| match a.range.start.cmp(&b.range.start) {
+                    std::cmp::Ordering::Equal => a.range.end.cmp(&b.range.end),
+                    e => e,
+                });
+                e
+            });
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

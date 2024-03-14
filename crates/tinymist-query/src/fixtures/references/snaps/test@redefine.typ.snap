@@ -5,9 +5,6 @@ input_file: crates/tinymist-query/src/fixtures/references/redefine.typ
 ---
 [
  {
-  "range": "8:9:8:10"
- },
- {
   "range": "3:2:3:3"
  },
  {
@@ -15,5 +12,8 @@ input_file: crates/tinymist-query/src/fixtures/references/redefine.typ
  },
  {
   "range": "6:12:6:13"
+ },
+ {
+  "range": "8:9:8:10"
  }
 ]
