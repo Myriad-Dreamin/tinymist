@@ -174,9 +174,13 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                 | LexicalKind::Mod(super::LexicalModKind::ModuleAlias) => {
                     self.insert_module(Ns::Value, e)
                 }
-                LexicalKind::Mod(super::LexicalModKind::Ident)
-                | LexicalKind::Mod(super::LexicalModKind::Alias { .. }) => {
-                    self.insert_extern(Ns::Value, e)
+                LexicalKind::Mod(super::LexicalModKind::Ident) => {
+                    self.insert(Ns::Value, e);
+                    self.insert_extern(e.info.name.clone(), e.info.range.clone());
+                }
+                LexicalKind::Mod(super::LexicalModKind::Alias { target }) => {
+                    self.insert(Ns::Value, e);
+                    self.insert_extern(target.name.clone(), target.range.clone());
                 }
                 LexicalKind::Var(LexicalVarKind::ValRef) => self.insert_ref(Ns::Value, e),
                 LexicalKind::Block => {
@@ -254,15 +258,11 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
         }
     }
 
-    fn insert_extern(&mut self, label: Ns, e: &LexicalHierarchy) {
-        self.insert(label, e);
+    fn insert_extern(&mut self, name: String, range: Range<usize>) {
         if let Some(src) = &self.ext_src {
             self.info.external_refs.insert(
-                (src.id(), Some(e.info.name.clone())),
-                vec![IdentRef {
-                    name: e.info.name.clone(),
-                    range: e.info.range.clone(),
-                }],
+                (src.id(), Some(name.clone())),
+                vec![IdentRef { name, range }],
             );
         }
     }
