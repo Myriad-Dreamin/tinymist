@@ -245,9 +245,22 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
 
     switch (args[0]) {
         case "preview": {
+            void vscode.commands.executeCommand(`typst-preview.preview`);
             break;
         }
         case "preview-in": {
+            // prompt for enum (doc, slide) with default
+            const mode = await vscode.window.showQuickPick(["doc", "slide"], {
+                title: "Preview Mode",
+            });
+            const target = await vscode.window.showQuickPick(["tab", "browser"], {
+                title: "Target to preview in",
+            });
+
+            const command =
+                (target === "tab" ? "preview" : "browser") + (mode === "slide" ? "-slide" : "");
+
+            void vscode.commands.executeCommand(`typst-preview.${command}`);
             break;
         }
         case "export-pdf": {
@@ -255,6 +268,13 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
             break;
         }
         case "export-as": {
+            const fmt = await vscode.window.showQuickPick(["pdf"], {
+                title: "Format to export as",
+            });
+
+            if (fmt === "pdf") {
+                await commandShowPdf();
+            }
             break;
         }
         default: {

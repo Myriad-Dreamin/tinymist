@@ -34,7 +34,7 @@ impl CodeLensRequest {
         res.push(doc_lens("Preview", vec!["preview".into()]));
         res.push(doc_lens("Preview in ..", vec!["preview-in".into()]));
         res.push(doc_lens("Export PDF", vec!["export-pdf".into()]));
-        res.push(doc_lens("Export ..", vec!["export-as".into()]));
+        res.push(doc_lens("Export as ..", vec!["export-as".into()]));
 
         Some(res)
     }
