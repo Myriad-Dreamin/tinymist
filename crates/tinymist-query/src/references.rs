@@ -73,7 +73,7 @@ fn find_references(
 
     // todo: if it is exported, find all the references in the workspace
     let ident_ref = IdentRef {
-        name,
+        name: name.clone(),
         range: ident.range(),
     };
     let def_fid = ident.span().id()?;
@@ -84,6 +84,7 @@ fn find_references(
     let def_path = ctx.world.path_for_id(def_fid).ok()?;
     let uri = Url::from_file_path(def_path).ok()?;
 
+    // todo: reuse uri, range to location
     let mut references = def_use
         .get_refs(id)
         .map(|r| {
@@ -103,19 +104,35 @@ fn find_references(
         while let Some(ref_fid) = ctx.worklist.pop() {
             let ref_source = ctx.ctx.source_by_id(ref_fid).ok()?;
             let def_use = get_def_use(ctx.ctx, ref_source.clone())?;
-            let (id, _) = def_use.get_def(def_fid, &ident_ref)?;
 
             let uri = ctx.ctx.world.path_for_id(ref_fid).ok()?;
             let uri = Url::from_file_path(uri).ok()?;
-            let locations = def_use.get_refs(id).map(|r| {
-                let range = typst_to_lsp::range(r.range.clone(), &ref_source, position_encoding);
 
-                LspLocation {
-                    uri: uri.clone(),
-                    range,
-                }
-            });
-            references.extend(locations);
+            if let Some((id, _def)) = def_use.get_def(def_fid, &ident_ref) {
+                references.extend(def_use.get_refs(id).map(|r| {
+                    let range =
+                        typst_to_lsp::range(r.range.clone(), &ref_source, position_encoding);
+
+                    LspLocation {
+                        uri: uri.clone(),
+                        range,
+                    }
+                }));
+            };
+
+            references.extend(
+                def_use
+                    .get_external_refs(def_fid, Some(name.clone()))
+                    .map(|r| {
+                        let range =
+                            typst_to_lsp::range(r.range.clone(), &ref_source, position_encoding);
+
+                        LspLocation {
+                            uri: uri.clone(),
+                            range,
+                        }
+                    }),
+            );
 
             if def_use.is_exported(id) {
                 ctx.push_dependents(ref_fid);

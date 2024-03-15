@@ -113,7 +113,7 @@ pub enum LexicalVarKind {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum LexicalKind {
+pub enum LexicalKind {
     Heading(i16),
     Var(LexicalVarKind),
     Mod(LexicalModKind),
