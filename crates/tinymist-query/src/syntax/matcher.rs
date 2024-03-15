@@ -28,8 +28,51 @@ impl<'a> DerefTarget<'a> {
     }
 }
 
+fn is_mark(sk: SyntaxKind) -> bool {
+    use SyntaxKind::*;
+    matches!(
+        sk,
+        MathAlignPoint
+            | Plus
+            | Minus
+            | Slash
+            | Hat
+            | Dot
+            | Eq
+            | EqEq
+            | ExclEq
+            | Lt
+            | LtEq
+            | Gt
+            | GtEq
+            | PlusEq
+            | HyphEq
+            | StarEq
+            | SlashEq
+            | Dots
+            | Arrow
+            | Not
+            | And
+            | Or
+            | LeftBrace
+            | RightBrace
+            | LeftBracket
+            | RightBracket
+            | LeftParen
+            | RightParen
+            | Comma
+            | Semicolon
+            | Colon
+            | Hash
+    )
+}
+
 pub fn get_deref_target(node: LinkedNode) -> Option<DerefTarget> {
     let mut ancestor = node;
+    if ancestor.kind().is_trivia() || is_mark(ancestor.kind()) {
+        ancestor = ancestor.prev_sibling()?;
+    }
+
     while !ancestor.is::<ast::Expr>() {
         ancestor = ancestor.parent()?.clone();
     }
