@@ -1,6 +1,5 @@
 use std::ops::Range;
 
-use comemo::Track;
 use log::debug;
 use lsp_types::LocationLink;
 
@@ -21,6 +20,7 @@ impl GotoDeclarationRequest {
         world: &TypstSystemWorld,
         position_encoding: PositionEncoding,
     ) -> Option<GotoDeclarationResponse> {
+        let mut ctx = AnalysisContext::new(world);
         let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
         let offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
         let cursor = offset + 1;
@@ -34,7 +34,7 @@ impl GotoDeclarationRequest {
         let origin_selection_range =
             typst_to_lsp::range(use_site.range(), &source, position_encoding);
 
-        let def_use = get_def_use(w.track(), source.clone())?;
+        let def_use = get_def_use(&mut ctx, source.clone())?;
         let ref_spans = find_declarations(w, def_use, deref_target)?;
 
         let mut links = vec![];

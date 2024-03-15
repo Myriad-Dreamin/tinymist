@@ -20,7 +20,7 @@ use typst_ts_core::{config::CompileOpts, Bytes, TypstFileId};
 pub use insta::assert_snapshot;
 pub use typst_ts_compiler::TypstSystemWorld;
 
-use crate::{typst_to_lsp, LspPosition, PositionEncoding};
+use crate::{prelude::AnalysisContext, typst_to_lsp, LspPosition, PositionEncoding};
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut TypstSystemWorld, PathBuf)) {
     let mut settings = insta::Settings::new();
@@ -33,6 +33,24 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut TypstSystemWorld, PathBuf))
 
             run_with_sources(&contents, f);
         });
+    });
+}
+
+pub fn snapshot_testing2(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) {
+    snapshot_testing(name, &|w, p| {
+        let paths = w
+            .shadow_paths()
+            .into_iter()
+            .map(|p| {
+                TypstFileId::new(
+                    None,
+                    VirtualPath::new(p.strip_prefix(w.workspace_root()).unwrap()),
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut ctx = AnalysisContext::new(w);
+        ctx.test_files(|| paths);
+        f(&mut ctx, p);
     });
 }
 

@@ -5,17 +5,17 @@ use std::{
     sync::Arc,
 };
 
-use comemo::Tracked;
 use log::info;
 use parking_lot::Mutex;
 use serde::Serialize;
-use typst::{syntax::Source, World};
+use typst::syntax::Source;
 use typst_ts_core::{path::unix_slash, TypstFileId};
 
 use crate::{adt::snapshot_map::SnapshotMap, analysis::find_source_by_import_path};
 
 use super::{
-    get_lexical_hierarchy, LexicalHierarchy, LexicalKind, LexicalScopeKind, LexicalVarKind, ModSrc,
+    get_lexical_hierarchy, AnalysisContext, LexicalHierarchy, LexicalKind, LexicalScopeKind,
+    LexicalVarKind, ModSrc,
 };
 
 pub use typst_ts_core::vector::ir::DefId;
@@ -86,24 +86,34 @@ impl DefUseInfo {
     }
 }
 
-pub fn get_def_use(world: Tracked<'_, dyn World>, source: Source) -> Option<Arc<DefUseInfo>> {
-    let ctx = SearchCtx {
-        world,
+pub fn get_def_use<'a>(
+    world: &'a mut AnalysisContext<'a>,
+    source: Source,
+) -> Option<Arc<DefUseInfo>> {
+    let mut ctx = SearchCtx {
+        ctx: world,
         searched: Default::default(),
     };
 
-    get_def_use_inner(&ctx, source)
+    get_def_use_inner(&mut ctx, source)
 }
 
-struct SearchCtx<'a> {
-    world: Tracked<'a, dyn World>,
+struct SearchCtx<'w> {
+    ctx: &'w mut AnalysisContext<'w>,
     searched: Mutex<HashSet<TypstFileId>>,
 }
 
-fn get_def_use_inner<'w>(ctx: &'w SearchCtx<'w>, source: Source) -> Option<Arc<DefUseInfo>> {
+fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<Arc<DefUseInfo>> {
     let current_id = source.id();
     if !ctx.searched.lock().insert(current_id) {
         return None;
+    }
+
+    ctx.ctx.get_mut(current_id);
+    let c = ctx.ctx.get(current_id).unwrap();
+
+    if let Some(info) = c.def_use() {
+        return Some(info);
     }
 
     let e = get_lexical_hierarchy(source, LexicalScopeKind::DefUse)?;
@@ -120,11 +130,16 @@ fn get_def_use_inner<'w>(ctx: &'w SearchCtx<'w>, source: Source) -> Option<Arc<D
 
     collector.scan(&e);
     collector.calc_exports();
-    Some(Arc::new(collector.info))
+    let res = Some(Arc::new(collector.info));
+
+    let c = ctx.ctx.get(current_id).unwrap();
+    // todo: cyclic import cause no any information
+    c.compute_def_use(|| res.clone());
+    res
 }
 
 struct DefUseCollector<'a, 'w> {
-    ctx: &'w SearchCtx<'w>,
+    ctx: &'a mut SearchCtx<'w>,
     info: DefUseInfo,
     label_scope: SnapshotMap<String, DefId>,
     id_scope: SnapshotMap<String, DefId>,
@@ -183,7 +198,7 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
                 LexicalKind::Mod(super::LexicalModKind::Star) => {
                     if let Some(path) = self.current_path {
                         let external_info =
-                            find_source_by_import_path(self.ctx.world, self.current_id, path)
+                            find_source_by_import_path(self.ctx.ctx.world, self.current_id, path)
                                 .and_then(|source| {
                                     info!("diving source for def use: {:?}", source.id());
                                     Some(source.id()).zip(get_def_use_inner(self.ctx, source))

@@ -1,6 +1,5 @@
 use std::ops::Range;
 
-use comemo::Track;
 use log::debug;
 
 use crate::{
@@ -17,10 +16,13 @@ pub struct ReferencesRequest {
 impl ReferencesRequest {
     pub fn request(
         self,
-        world: &TypstSystemWorld,
+        ctx: &TypstSystemWorld,
         position_encoding: PositionEncoding,
     ) -> Option<Vec<LspLocation>> {
-        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
+        let mut ctx = AnalysisContext::new(ctx);
+
+        let world = ctx.world;
+        let source = ctx.source_by_path(&self.path).ok()?;
         let offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
         let cursor = offset + 1;
 
@@ -29,7 +31,7 @@ impl ReferencesRequest {
         debug!("ast_node: {ast_node:?}", ast_node = ast_node);
         let deref_target = get_deref_target(ast_node)?;
 
-        let def_use = get_def_use(w.track(), source.clone())?;
+        let def_use = get_def_use(&mut ctx, source.clone())?;
         let ref_spans = find_declarations(w, def_use, deref_target)?;
 
         let mut locations = vec![];

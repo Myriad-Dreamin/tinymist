@@ -28,7 +28,7 @@ use typst_ts_compiler::service::WorkspaceProvider;
 pub use typst_ts_compiler::TypstSystemWorld;
 pub use typst_ts_core::TypstFileId;
 
-pub use crate::analysis::analyze_expr;
+pub use crate::analysis::{analyze_expr, AnalysisContext};
 pub use crate::lsp_typst_boundary::{
     lsp_to_typst, typst_to_lsp, LspDiagnostic, LspRange, LspSeverity, PositionEncoding,
     TypstDiagnostic, TypstSeverity, TypstSpan,
