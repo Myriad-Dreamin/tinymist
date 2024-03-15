@@ -1,12 +1,11 @@
 use core::fmt;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     ops::{Deref, Range},
     sync::Arc,
 };
 
 use log::info;
-use parking_lot::Mutex;
 use serde::Serialize;
 use typst::syntax::Source;
 use typst_ts_core::{path::unix_slash, TypstFileId};
@@ -15,7 +14,7 @@ use crate::{adt::snapshot_map::SnapshotMap, analysis::find_source_by_import_path
 
 use super::{
     get_lexical_hierarchy, AnalysisContext, LexicalHierarchy, LexicalKind, LexicalScopeKind,
-    LexicalVarKind, ModSrc,
+    LexicalVarKind, ModSrc, SearchCtx,
 };
 
 pub use typst_ts_core::vector::ir::DefId;
@@ -60,14 +59,15 @@ impl Serialize for IdentRef {
 
 #[derive(Serialize, Clone)]
 pub struct IdentDef {
-    name: String,
-    kind: LexicalKind,
-    range: Range<usize>,
+    pub name: String,
+    pub kind: LexicalKind,
+    pub range: Range<usize>,
 }
 
 #[derive(Default)]
 pub struct DefUseInfo {
     ident_defs: indexmap::IndexMap<(TypstFileId, IdentRef), IdentDef>,
+    external_refs: HashMap<(TypstFileId, Option<String>), Vec<IdentRef>>,
     ident_refs: HashMap<IdentRef, DefId>,
     undefined_refs: Vec<IdentRef>,
     exports_refs: Vec<DefId>,
@@ -84,28 +84,30 @@ impl DefUseInfo {
             .iter()
             .filter_map(move |(k, v)| if *v == id { Some(k) } else { None })
     }
+
+    pub fn get_external_refs(
+        &self,
+        ext_id: TypstFileId,
+        ext_name: Option<String>,
+    ) -> impl Iterator<Item = &IdentRef> {
+        self.external_refs
+            .get(&(ext_id, ext_name))
+            .into_iter()
+            .flatten()
+    }
+
+    pub fn is_exported(&self, id: DefId) -> bool {
+        self.exports_refs.contains(&id)
+    }
 }
 
-pub fn get_def_use<'a>(
-    world: &'a mut AnalysisContext<'a>,
-    source: Source,
-) -> Option<Arc<DefUseInfo>> {
-    let mut ctx = SearchCtx {
-        ctx: world,
-        searched: Default::default(),
-    };
-
-    get_def_use_inner(&mut ctx, source)
-}
-
-struct SearchCtx<'w> {
-    ctx: &'w mut AnalysisContext<'w>,
-    searched: Mutex<HashSet<TypstFileId>>,
+pub fn get_def_use(ctx: &mut AnalysisContext, source: Source) -> Option<Arc<DefUseInfo>> {
+    get_def_use_inner(&mut ctx.fork_for_search(), source)
 }
 
 fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<Arc<DefUseInfo>> {
     let current_id = source.id();
-    if !ctx.searched.lock().insert(current_id) {
+    if !ctx.searched.insert(current_id) {
         return None;
     }
 
@@ -125,7 +127,7 @@ fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<Arc<DefUseIn
         label_scope: SnapshotMap::default(),
 
         current_id,
-        current_path: None,
+        ext_src: None,
     };
 
     collector.scan(&e);
@@ -138,17 +140,17 @@ fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<Arc<DefUseIn
     res
 }
 
-struct DefUseCollector<'a, 'w> {
-    ctx: &'a mut SearchCtx<'w>,
+struct DefUseCollector<'a, 'b, 'w> {
+    ctx: &'a mut SearchCtx<'b, 'w>,
     info: DefUseInfo,
     label_scope: SnapshotMap<String, DefId>,
     id_scope: SnapshotMap<String, DefId>,
 
     current_id: TypstFileId,
-    current_path: Option<&'a str>,
+    ext_src: Option<Source>,
 }
 
-impl<'a, 'w> DefUseCollector<'a, 'w> {
+impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
     fn enter<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let id_snap = self.id_scope.snapshot();
         let res = f(self);
@@ -167,12 +169,18 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
                 LexicalKind::Var(LexicalVarKind::Label) => self.insert(Ns::Label, e),
                 LexicalKind::Var(LexicalVarKind::LabelRef) => self.insert_ref(Ns::Label, e),
                 LexicalKind::Var(LexicalVarKind::Function)
-                | LexicalKind::Var(LexicalVarKind::Variable)
-                | LexicalKind::Mod(super::LexicalModKind::PathVar)
-                | LexicalKind::Mod(super::LexicalModKind::ModuleAlias)
-                | LexicalKind::Mod(super::LexicalModKind::Ident)
-                | LexicalKind::Mod(super::LexicalModKind::Alias { .. }) => {
-                    self.insert(Ns::Value, e)
+                | LexicalKind::Var(LexicalVarKind::Variable) => self.insert(Ns::Value, e),
+                LexicalKind::Mod(super::LexicalModKind::PathVar)
+                | LexicalKind::Mod(super::LexicalModKind::ModuleAlias) => {
+                    self.insert_module(Ns::Value, e)
+                }
+                LexicalKind::Mod(super::LexicalModKind::Ident) => {
+                    self.insert(Ns::Value, e);
+                    self.insert_extern(e.info.name.clone(), e.info.range.clone());
+                }
+                LexicalKind::Mod(super::LexicalModKind::Alias { target }) => {
+                    self.insert(Ns::Value, e);
+                    self.insert_extern(target.name.clone(), target.range.clone());
                 }
                 LexicalKind::Var(LexicalVarKind::ValRef) => self.insert_ref(Ns::Value, e),
                 LexicalKind::Block => {
@@ -184,7 +192,12 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
                     match p {
                         ModSrc::Expr(_) => {}
                         ModSrc::Path(p) => {
-                            self.current_path = Some(p.deref());
+                            let src = find_source_by_import_path(
+                                self.ctx.ctx.world,
+                                self.current_id,
+                                p.deref(),
+                            );
+                            self.ext_src = src;
                         }
                     }
 
@@ -193,40 +206,35 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
                         self.scan(e.as_slice())?;
                     }
 
-                    self.current_path = None;
+                    self.ext_src = None;
                 }
                 LexicalKind::Mod(super::LexicalModKind::Star) => {
-                    if let Some(path) = self.current_path {
-                        let external_info =
-                            find_source_by_import_path(self.ctx.ctx.world, self.current_id, path)
-                                .and_then(|source| {
-                                    info!("diving source for def use: {:?}", source.id());
-                                    Some(source.id()).zip(get_def_use_inner(self.ctx, source))
-                                });
+                    if let Some(source) = &self.ext_src {
+                        info!("diving source for def use: {:?}", source.id());
+                        let (_, external_info) =
+                            Some(source.id()).zip(get_def_use_inner(self.ctx, source.clone()))?;
 
-                        if let Some((_, external_info)) = external_info {
-                            for v in &external_info.exports_refs {
-                                // Use FileId in ident_defs map should lose stacked import
-                                // information, but it is currently
-                                // not a problem.
-                                let ((ext_id, _), ext_sym) =
-                                    external_info.ident_defs.get_index(v.0 as usize).unwrap();
+                        for v in &external_info.exports_refs {
+                            // Use FileId in ident_defs map should lose stacked import
+                            // information, but it is currently
+                            // not a problem.
+                            let ((ext_id, _), ext_sym) =
+                                external_info.ident_defs.get_index(v.0 as usize).unwrap();
 
-                                let name = ext_sym.name.clone();
+                            let name = ext_sym.name.clone();
 
-                                let ext_ref = IdentRef {
-                                    name: name.clone(),
-                                    range: ext_sym.range.clone(),
-                                };
+                            let ext_ref = IdentRef {
+                                name: name.clone(),
+                                range: ext_sym.range.clone(),
+                            };
 
-                                let (id, ..) = self
-                                    .info
-                                    .ident_defs
-                                    .insert_full((*ext_id, ext_ref), ext_sym.clone());
+                            let (id, ..) = self
+                                .info
+                                .ident_defs
+                                .insert_full((*ext_id, ext_ref), ext_sym.clone());
 
-                                let id = DefId(id as u64);
-                                self.id_scope.insert(name, id);
-                            }
+                            let id = DefId(id as u64);
+                            self.id_scope.insert(name, id);
                         }
                     }
                 }
@@ -235,6 +243,28 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
         }
 
         Some(())
+    }
+
+    fn insert_module(&mut self, label: Ns, e: &LexicalHierarchy) {
+        self.insert(label, e);
+        if let Some(src) = &self.ext_src {
+            self.info.external_refs.insert(
+                (src.id(), None),
+                vec![IdentRef {
+                    name: e.info.name.clone(),
+                    range: e.info.range.clone(),
+                }],
+            );
+        }
+    }
+
+    fn insert_extern(&mut self, name: String, range: Range<usize>) {
+        if let Some(src) = &self.ext_src {
+            self.info.external_refs.insert(
+                (src.id(), Some(name.clone())),
+                vec![IdentRef { name, range }],
+            );
+        }
     }
 
     fn insert(&mut self, label: Ns, e: &LexicalHierarchy) {

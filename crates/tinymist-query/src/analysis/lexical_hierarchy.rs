@@ -113,7 +113,7 @@ pub enum LexicalVarKind {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum LexicalKind {
+pub enum LexicalKind {
     Heading(i16),
     Var(LexicalVarKind),
     Mod(LexicalModKind),
@@ -449,6 +449,26 @@ impl LexicalHierarchyWorker {
                         }
                     }
                 }
+                SyntaxKind::RenamedImportItem if self.g.affect_import() => {
+                    let src = node
+                        .cast::<ast::RenamedImportItem>()
+                        .ok_or_else(|| anyhow!("cast to renamed import item failed: {:?}", node))?;
+
+                    let origin_name = src.new_name();
+                    let origin_name_node = node.find(origin_name.span()).context("no pos")?;
+
+                    let target_name = src.original_name();
+                    let target_name_node = node.find(target_name.span()).context("no pos")?;
+
+                    self.push_leaf(LexicalInfo {
+                        name: origin_name.get().to_string(),
+                        kind: LexicalKind::module_import_alias(ImportAlias {
+                            name: target_name.get().to_string(),
+                            range: target_name_node.range(),
+                        }),
+                        range: origin_name_node.range(),
+                    });
+                }
                 SyntaxKind::FieldAccess => {
                     self.get_symbols_in_first_expr(node.children())?;
                 }
@@ -528,23 +548,6 @@ impl LexicalHierarchyWorker {
                 };
 
                 (name, kind)
-            }
-            SyntaxKind::RenamedImportItem if self.g.affect_import() => {
-                let src = node
-                    .cast::<ast::RenamedImportItem>()
-                    .ok_or_else(|| anyhow!("cast to renamed import item failed: {:?}", node))?;
-
-                let name = src.new_name().get().to_string();
-
-                let target_name = src.original_name();
-                let target_name_node = node.find(target_name.span()).context("no pos")?;
-                (
-                    name,
-                    LexicalKind::module_import_alias(ImportAlias {
-                        name: target_name.get().to_string(),
-                        range: target_name_node.range(),
-                    }),
-                )
             }
             SyntaxKind::Equation | SyntaxKind::Raw | SyntaxKind::BlockComment
                 if self.g.affect_markup() =>

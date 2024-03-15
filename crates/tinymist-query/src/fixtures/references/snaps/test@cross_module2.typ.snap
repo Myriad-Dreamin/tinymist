@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/references.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/references/cross_module2.typ
+---
+[
+ {
+  "range": "0:20:0:21"
+ }
+]

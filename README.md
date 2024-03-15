@@ -23,8 +23,9 @@ Language service (LSP) features:
 - [Goto definitions](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-definitions-of-a-symbol)
   - Right-click on a symbol and select "Go to Definition".
   - Or ctrl+click on a symbol.
-<!-- - [Goto declarations](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#find-all-references-to-a-symbol)
-  - Also known as "find all references". -->
+- [References](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#find-all-references-to-a-symbol)
+  - Right-click on a symbol and select "Go to References" or "Find References".
+  - Or ctrl+click on a symbol.
 - [Hover tips](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-hovers)
   - Also known as "hovering tooltip".
 - [Inlay hints](https://www.jetbrains.com/help/idea/inlay-hints.html)
