@@ -7,7 +7,7 @@ use typst_ts_core::{typst::prelude::EcoVec, TypstFileId};
 use crate::prelude::*;
 
 pub fn find_source_by_import_path(
-    world: Tracked<'_, dyn World>,
+    world: &dyn World,
     current: TypstFileId,
     import_path: &str,
 ) -> Option<Source> {
@@ -28,7 +28,7 @@ pub fn find_source_by_import_path(
 }
 
 pub fn find_source_by_import(
-    world: Tracked<'_, dyn World>,
+    world: &dyn World,
     current: TypstFileId,
     import_node: ast::ModuleImport,
 ) -> Option<Source> {
@@ -40,7 +40,6 @@ pub fn find_source_by_import(
     }
 }
 
-// todo: bad peformance
 pub fn find_imports(
     source: &Source,
     def_id: Option<TypstFileId>,
@@ -64,6 +63,7 @@ pub fn find_imports(
                     let src = i.source();
                     match src {
                         ast::Expr::Str(s) => {
+                            // todo: source in packages
                             let s = s.get();
                             let path = Path::new(s.as_str());
                             let vpath = if path.is_relative() {
@@ -105,4 +105,16 @@ pub fn find_imports(
     worker.analyze(root);
 
     worker.imports
+}
+
+#[comemo::memoize]
+pub fn find_imports2(source: &Source) -> EcoVec<TypstFileId> {
+    let res = find_imports(source, None);
+    let mut res: Vec<TypstFileId> = res
+        .into_iter()
+        .map(|(vpath, _)| TypstFileId::new(None, vpath))
+        .collect();
+    res.sort();
+    res.dedup();
+    res.into_iter().collect()
 }

@@ -164,7 +164,7 @@ fn find_ref_in_import<'b, 'a>(
 
     match imports {
         ast::Imports::Wildcard => {
-            let dep = find_source_by_import(ctx.world, ctx.current, import_node)?;
+            let dep = find_source_by_import(ctx.world.deref(), ctx.current, import_node)?;
             let res = find_definition_in_module(ctx, dep, name)?;
             return Some(ImportRef::ExternalResolved(res));
         }
@@ -293,7 +293,7 @@ fn find_syntax_definition<'b, 'a>(
                     match find_ref_in_import(self.ctx, import_node, self.name)? {
                         ImportRef::ModuleAs(ident) => {
                             let m = find_source_by_import(
-                                self.ctx.world,
+                                self.ctx.world.deref(),
                                 self.ctx.current,
                                 import_node,
                             )?;
@@ -305,7 +305,7 @@ fn find_syntax_definition<'b, 'a>(
                         }
                         ImportRef::Path(s) => {
                             let m = find_source_by_import(
-                                self.ctx.world,
+                                self.ctx.world.deref(),
                                 self.ctx.current,
                                 import_node,
                             )?;
@@ -397,7 +397,7 @@ pub(crate) fn find_definition<'a>(
         ast::Expr::Str(..) => {
             if let Some(parent) = ancestor.parent() {
                 let e = parent.cast::<ast::ModuleImport>()?;
-                let source = find_source_by_import(world, current, e)?;
+                let source = find_source_by_import(world.deref(), current, e)?;
                 let src = ancestor.find(e.source().span())?;
                 return Some(Definition::Module(ModuleDefinition {
                     module: source.id(),

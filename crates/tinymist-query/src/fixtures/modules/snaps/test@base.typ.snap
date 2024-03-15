@@ -1,0 +1,21 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_pure(dependencies)"
+input_file: crates/tinymist-query/src/fixtures/modules/base.typ
+---
+[
+ {
+  "dependencies": [],
+  "dependents": [
+   "/s1.typ"
+  ],
+  "id": "/may_import.typ"
+ },
+ {
+  "dependencies": [
+   "/may_import.typ"
+  ],
+  "dependents": [],
+  "id": "/s1.typ"
+ }
+]
