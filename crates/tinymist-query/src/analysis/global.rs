@@ -14,7 +14,11 @@ use typst_ts_compiler::{service::WorkspaceProvider, TypstSystemWorld};
 use typst_ts_core::{cow_mut::CowMut, ImmutPath, TypstFileId};
 
 use super::{get_def_use_inner, DefUseInfo};
-use crate::syntax::{construct_module_dependencies, scan_workspace_files, ModuleDependency};
+use crate::{
+    lsp_to_typst,
+    syntax::{construct_module_dependencies, scan_workspace_files, ModuleDependency},
+    typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange,
+};
 
 /// A cache for module-level analysis results of a module.
 ///
@@ -52,6 +56,8 @@ pub struct Analysis {
     /// This means that the analysis result won't be valid if the root directory
     /// changes.
     pub root: ImmutPath,
+    /// The position encoding for the workspace.
+    position_encoding: PositionEncoding,
 }
 
 /// A cache for all level of analysis results of a module.
@@ -72,11 +78,12 @@ pub struct AnalysisContext<'a> {
 
 impl<'w> AnalysisContext<'w> {
     /// Create a new analysis context.
-    pub fn new(world: &'w TypstSystemWorld) -> Self {
+    pub fn new(world: &'w TypstSystemWorld, encoding: PositionEncoding) -> Self {
         Self {
             world,
             analysis: CowMut::Owned(Analysis {
                 root: world.workspace_root(),
+                position_encoding: encoding,
             }),
             caches: AnalysisCaches {
                 modules: HashMap::new(),
@@ -156,6 +163,22 @@ impl<'w> AnalysisContext<'w> {
             searched: Default::default(),
             worklist: Default::default(),
         }
+    }
+
+    pub fn to_typst_pos(&self, position: LspPosition, src: &Source) -> Option<usize> {
+        lsp_to_typst::position(position, self.analysis.position_encoding, src)
+    }
+
+    pub fn to_typst_range(&self, position: LspRange, src: &Source) -> Option<TypstRange> {
+        lsp_to_typst::range(position, self.analysis.position_encoding, src)
+    }
+
+    pub fn to_lsp_range(&self, position: TypstRange, src: &Source) -> LspRange {
+        typst_to_lsp::range(position, src, self.analysis.position_encoding)
+    }
+
+    pub(crate) fn position_encoding(&self) -> PositionEncoding {
+        self.analysis.position_encoding
     }
 }
 

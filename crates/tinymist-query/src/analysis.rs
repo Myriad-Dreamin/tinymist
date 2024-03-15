@@ -87,10 +87,10 @@ mod lexical_hierarchy_tests {
     #[test]
     fn test_def_use() {
         fn def_use(set: &str) {
-            snapshot_testing(set, &|world, path| {
-                let source = get_suitable_source_in_workspace(world, &path).unwrap();
+            snapshot_testing2(set, &|ctx, path| {
+                let source = ctx.source_by_path(&path).unwrap();
 
-                let result = AnalysisContext::new(world).def_use(source);
+                let result = ctx.def_use(source);
                 let result = result.as_deref().map(DefUseSnapshot);
 
                 assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));

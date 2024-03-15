@@ -10,22 +10,38 @@ use crate::{
         find_source_by_import, get_deref_target, DerefTarget, IdentRef, LexicalKind,
         LexicalModKind, LexicalVarKind,
     },
+    SyntaxRequest,
 };
 
+/// The [`textDocument/definition`] request asks the server for the definition
+/// location of a symbol at a given text document position.
+///
+/// [`textDocument/definition`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_definition
+///
+/// # Compatibility
+///
+/// The [`GotoDefinitionResponse::Link`](lsp_types::GotoDefinitionResponse::Link) return value
+/// was introduced in specification version 3.14.0 and requires client-side
+/// support in order to be used. It can be returned if the client set the
+/// following field to `true` in the [`initialize`](Self::initialize) method:
+///
+/// ```text
+/// InitializeParams::capabilities::text_document::definition::link_support
+/// ```
 #[derive(Debug, Clone)]
 pub struct GotoDefinitionRequest {
+    /// The path of the document to request for.
     pub path: PathBuf,
+    /// The source code position to request for.
     pub position: LspPosition,
 }
 
-impl GotoDefinitionRequest {
-    pub fn request(
-        self,
-        ctx: &mut AnalysisContext,
-        position_encoding: PositionEncoding,
-    ) -> Option<GotoDefinitionResponse> {
+impl SyntaxRequest for GotoDefinitionRequest {
+    type Response = GotoDefinitionResponse;
+
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
+        let offset = ctx.to_typst_pos(self.position, &source)?;
         let cursor = offset + 1;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
@@ -33,8 +49,7 @@ impl GotoDefinitionRequest {
 
         let deref_target = get_deref_target(ast_node)?;
         let use_site = deref_target.node().clone();
-        let origin_selection_range =
-            typst_to_lsp::range(use_site.range(), &source, position_encoding);
+        let origin_selection_range = ctx.to_lsp_range(use_site.range(), &source);
 
         let def = find_definition(ctx, source.clone(), deref_target)?;
 
@@ -42,7 +57,7 @@ impl GotoDefinitionRequest {
         let uri = Url::from_file_path(span_path).ok()?;
 
         let span_source = ctx.source_by_id(def.fid).ok()?;
-        let range = typst_to_lsp::range(def.def_range, &span_source, position_encoding);
+        let range = ctx.to_lsp_range(def.def_range, &span_source);
 
         let res = Some(GotoDefinitionResponse::Link(vec![LocationLink {
             origin_selection_range: Some(origin_selection_range),
@@ -214,7 +229,7 @@ mod tests {
                 position: find_test_position(&source),
             };
 
-            let result = request.request(world, PositionEncoding::Utf16);
+            let result = request.request(world);
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

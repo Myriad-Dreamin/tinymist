@@ -4,22 +4,28 @@ use typst_ts_core::vector::ir::DefId;
 use crate::{
     prelude::*,
     syntax::{get_deref_target, DerefTarget, IdentRef},
+    SyntaxRequest,
 };
 
+/// The [`textDocument/references`] request is sent from the client to the
+/// server to resolve project-wide references for the symbol denoted by the
+/// given text document position.
+///
+/// [`textDocument/references`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_references
 #[derive(Debug, Clone)]
 pub struct ReferencesRequest {
+    /// The path of the document to request for.
     pub path: PathBuf,
+    /// The source code position to request for.
     pub position: LspPosition,
 }
 
-impl ReferencesRequest {
-    pub fn request(
-        self,
-        ctx: &mut AnalysisContext,
-        position_encoding: PositionEncoding,
-    ) -> Option<Vec<LspLocation>> {
+impl SyntaxRequest for ReferencesRequest {
+    type Response = Vec<LspLocation>;
+
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
+        let offset = ctx.to_typst_pos(self.position, &source)?;
         let cursor = offset + 1;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
@@ -27,7 +33,7 @@ impl ReferencesRequest {
         let deref_target = get_deref_target(ast_node)?;
 
         let def_use = ctx.def_use(source.clone())?;
-        let locations = find_references(ctx, def_use, deref_target, position_encoding)?;
+        let locations = find_references(ctx, def_use, deref_target, ctx.position_encoding())?;
 
         debug!("references: {locations:?}");
         Some(locations)
@@ -178,7 +184,7 @@ mod tests {
                 position: find_test_position(&source),
             };
 
-            let result = request.request(world, PositionEncoding::Utf16);
+            let result = request.request(world);
             // sort
             let result = result.map(|mut e| {
                 e.sort_by(|a, b| match a.range.start.cmp(&b.range.start) {

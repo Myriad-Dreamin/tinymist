@@ -20,7 +20,7 @@ impl GotoDeclarationRequest {
         world: &TypstSystemWorld,
         position_encoding: PositionEncoding,
     ) -> Option<GotoDeclarationResponse> {
-        let mut ctx = AnalysisContext::new(world);
+        let mut ctx = AnalysisContext::new(world, position_encoding);
         let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
         let offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
         let cursor = offset + 1;

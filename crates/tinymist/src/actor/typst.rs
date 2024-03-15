@@ -11,7 +11,8 @@ use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use tinymist_query::{
     analysis::AnalysisContext, CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap,
-    FoldRequestFeature, OnExportRequest, OnSaveExportRequest, PositionEncoding, VersionedDocument,
+    FoldRequestFeature, OnExportRequest, OnSaveExportRequest, PositionEncoding, SyntaxRequest,
+    VersionedDocument,
 };
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use typst::{
@@ -205,8 +206,7 @@ macro_rules! query_world {
 
 macro_rules! query_world2 {
     ($self:ident, $method:ident, $req:expr) => {{
-        let enc = $self.position_encoding;
-        let res = $self.steal_world2(move |w| $req.request(w, enc));
+        let res = $self.steal_world2(move |w| $req.request(w));
         res.map(CompilerQueryResponse::$method)
     }};
 }
@@ -751,9 +751,10 @@ impl CompileActor {
         &self,
         f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
+        let enc = self.position_encoding;
         let fut = self.steal(move |compiler| {
             // todo: record analysis
-            f(&mut AnalysisContext::new(compiler.compiler.world()))
+            f(&mut AnalysisContext::new(compiler.compiler.world(), enc))
         });
 
         Ok(fut?)
