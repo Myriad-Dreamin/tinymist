@@ -1,6 +1,6 @@
 use crate::{
-    analysis::{get_lexical_hierarchy, LexicalHierarchy, LexicalScopeKind},
     prelude::*,
+    syntax::{get_lexical_hierarchy, LexicalHierarchy, LexicalScopeKind},
 };
 
 #[derive(Debug, Clone)]

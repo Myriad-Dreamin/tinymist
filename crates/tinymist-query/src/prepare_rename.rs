@@ -1,4 +1,4 @@
-use crate::{analysis::get_deref_target, find_definition, prelude::*, DefinitionLink};
+use crate::{find_definition, prelude::*, syntax::get_deref_target, DefinitionLink};
 use log::debug;
 
 #[derive(Debug, Clone)]

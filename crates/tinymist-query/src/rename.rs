@@ -2,9 +2,7 @@ use log::debug;
 use lsp_types::TextEdit;
 
 use crate::{
-    analysis::{get_def_use, get_deref_target},
-    find_definition, find_references,
-    prelude::*,
+    find_definition, find_references, prelude::*, syntax::get_deref_target,
     validate_renaming_definition,
 };
 
@@ -35,7 +33,7 @@ impl RenameRequest {
 
         validate_renaming_definition(&lnk)?;
 
-        let def_use = get_def_use(ctx, source.clone())?;
+        let def_use = ctx.def_use(source.clone())?;
         let references = find_references(ctx, def_use, deref_target, position_encoding)?;
 
         let mut editions = HashMap::new();

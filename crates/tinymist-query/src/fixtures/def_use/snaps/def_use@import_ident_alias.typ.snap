@@ -22,10 +22,7 @@ input_file: crates/tinymist-query/src/fixtures/def_use/import_ident_alias.typ
    "kind": {
     "Mod": {
      "Alias": {
-      "target": {
-       "name": "x",
-       "range": "47:48"
-      }
+      "target": "x@47..48"
      }
     }
    },

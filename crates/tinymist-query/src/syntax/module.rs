@@ -1,8 +1,11 @@
-use std::{collections::HashMap, sync::Once};
+use std::{collections::HashMap, path::Path, sync::Once};
 
+use typst::syntax::VirtualPath;
 use typst_ts_core::{typst::prelude::EcoVec, TypstFileId};
 
-use super::{find_imports, AnalysisContext};
+use crate::prelude::AnalysisContext;
+
+use super::find_imports;
 
 pub struct ModuleDependency {
     pub dependencies: EcoVec<TypstFileId>,
@@ -50,4 +53,36 @@ pub fn construct_module_dependencies(
     }
 
     dependencies
+}
+
+pub fn scan_workspace_files(root: &Path) -> Vec<TypstFileId> {
+    let mut res = vec![];
+    for path in walkdir::WalkDir::new(root).follow_links(false).into_iter() {
+        let Ok(de) = path else {
+            continue;
+        };
+        if !de.file_type().is_file() {
+            continue;
+        }
+        if !de
+            .path()
+            .extension()
+            .is_some_and(|e| e == "typ" || e == "typc")
+        {
+            continue;
+        }
+
+        let path = de.path();
+        let relative_path = match path.strip_prefix(root) {
+            Ok(p) => p,
+            Err(err) => {
+                log::warn!("failed to strip prefix, path: {path:?}, root: {root:?}: {err}");
+                continue;
+            }
+        };
+
+        res.push(TypstFileId::new(None, VirtualPath::new(relative_path)));
+    }
+
+    res
 }

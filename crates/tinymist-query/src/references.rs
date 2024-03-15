@@ -2,8 +2,8 @@ use log::debug;
 use typst_ts_core::vector::ir::DefId;
 
 use crate::{
-    analysis::{get_def_use, get_deref_target, DerefTarget, IdentRef},
     prelude::*,
+    syntax::{get_deref_target, DerefTarget, IdentRef},
 };
 
 #[derive(Debug, Clone)]
@@ -26,7 +26,7 @@ impl ReferencesRequest {
         debug!("ast_node: {ast_node:?}", ast_node = ast_node);
         let deref_target = get_deref_target(ast_node)?;
 
-        let def_use = get_def_use(ctx, source.clone())?;
+        let def_use = ctx.def_use(source.clone())?;
         let locations = find_references(ctx, def_use, deref_target, position_encoding)?;
 
         debug!("references: {locations:?}");
@@ -88,7 +88,7 @@ pub(crate) fn find_references(
     };
 
     let def_source = ctx.source_by_id(def_fid).ok()?;
-    let root_def_use = get_def_use(ctx, def_source)?;
+    let root_def_use = ctx.def_use(def_source)?;
     let root_def_id = root_def_use.get_def(def_fid, &def_ident)?.0;
 
     find_references_root(
@@ -132,9 +132,7 @@ pub(crate) fn find_references_root(
         ctx.push_dependents(def_fid);
         while let Some(ref_fid) = ctx.worklist.pop() {
             let ref_source = ctx.ctx.source_by_id(ref_fid).ok()?;
-            let def_use = get_def_use(ctx.ctx, ref_source.clone())?;
-
-            log::info!("def_use for {ref_fid:?} => {:?}", def_use.exports_defs);
+            let def_use = ctx.ctx.def_use(ref_source.clone())?;
 
             let uri = ctx.ctx.world.path_for_id(ref_fid).ok()?;
             let uri = Url::from_file_path(uri).ok()?;

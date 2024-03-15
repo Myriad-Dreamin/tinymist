@@ -1,3 +1,5 @@
+//! Dynamic analysis of an expression or import statement.
+
 use comemo::Track;
 use typst::engine::{Engine, Route};
 use typst::eval::{Tracer, Vm};

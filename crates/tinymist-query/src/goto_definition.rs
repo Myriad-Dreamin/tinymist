@@ -1,21 +1,15 @@
 use std::ops::Range;
 
 use log::debug;
-use typst::{
-    foundations::Value,
-    syntax::{
-        ast::{self},
-        LinkedNode, Source,
-    },
-};
+use typst::foundations::Value;
 use typst_ts_core::TypstFileId;
 
 use crate::{
-    analysis::{
-        find_source_by_import, get_def_use, get_deref_target, DerefTarget, IdentRef, LexicalKind,
+    prelude::*,
+    syntax::{
+        find_source_by_import, get_deref_target, DerefTarget, IdentRef, LexicalKind,
         LexicalModKind, LexicalVarKind,
     },
-    prelude::*,
 };
 
 #[derive(Debug, Clone)]
@@ -98,7 +92,7 @@ pub(crate) fn find_definition(
     };
 
     // syntatic definition
-    let def_use = get_def_use(ctx, source)?;
+    let def_use = ctx.def_use(source)?;
     let ident_ref = match use_site.cast::<ast::Expr>()? {
         ast::Expr::Ident(e) => IdentRef {
             name: e.get().to_string(),

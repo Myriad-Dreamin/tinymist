@@ -16,6 +16,8 @@ use typst::{
 };
 use typst_ts_core::typst::prelude::{eco_vec, EcoVec};
 
+use super::IdentRef;
+
 pub(crate) fn get_lexical_hierarchy(
     source: Source,
     g: LexicalScopeKind,
@@ -47,16 +49,10 @@ pub(crate) fn get_lexical_hierarchy(
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ImportAlias {
-    pub name: String,
-    pub range: Range<usize>,
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ModSrc {
     /// `import cetz.draw ...`
     ///  ^^^^^^^^^^^^^^^^^^^^
-    Expr(Box<ImportAlias>),
+    Expr(Box<IdentRef>),
     /// `import "" ...`
     ///  ^^^^^^^^^^^^^
     Path(Box<str>),
@@ -77,7 +73,7 @@ pub enum LexicalModKind {
     Ident,
     /// `import "foo": bar as baz`
     ///                ^^^^^^^^^^
-    Alias { target: Box<ImportAlias> },
+    Alias { target: Box<IdentRef> },
     /// `import "foo": *`
     ///                ^
     Star,
@@ -147,7 +143,7 @@ impl LexicalKind {
         LexicalKind::Mod(LexicalModKind::Star)
     }
 
-    fn module_expr(path: Box<ImportAlias>) -> LexicalKind {
+    fn module_expr(path: Box<IdentRef>) -> LexicalKind {
         LexicalKind::Mod(LexicalModKind::Module(ModSrc::Expr(path)))
     }
 
@@ -155,7 +151,7 @@ impl LexicalKind {
         LexicalKind::Mod(LexicalModKind::Module(ModSrc::Path(path)))
     }
 
-    fn module_import_alias(alias: ImportAlias) -> LexicalKind {
+    fn module_import_alias(alias: IdentRef) -> LexicalKind {
         LexicalKind::Mod(LexicalModKind::Alias {
             target: Box::new(alias),
         })
@@ -455,7 +451,7 @@ impl LexicalHierarchyWorker {
 
                     self.push_leaf(LexicalInfo {
                         name: origin_name.get().to_string(),
-                        kind: LexicalKind::module_import_alias(ImportAlias {
+                        kind: LexicalKind::module_import_alias(IdentRef {
                             name: target_name.get().to_string(),
                             range: target_name_node.range(),
                         }),
@@ -574,7 +570,7 @@ impl LexicalHierarchyWorker {
                         let e = node
                             .find(src.span())
                             .ok_or_else(|| anyhow!("find expression failed: {:?}", src))?;
-                        let e = ImportAlias {
+                        let e = IdentRef {
                             name: String::new(),
                             range: e.range(),
                         };
