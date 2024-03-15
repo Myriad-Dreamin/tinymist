@@ -27,6 +27,10 @@ once_cell.workspace = true
 fxhash.workspace = true
 walkdir = "2"
 indexmap = "2.1.0"
+toml = { version = "0.8", default-features = false, features = [
+    "parse",
+    "display",
+] }
 
 typst.workspace = true
 typst-ide.workspace = true

@@ -1,20 +1,26 @@
 use std::path::Path;
 
-use log::debug;
-use typst::syntax::{ast, LinkedNode, Source, SyntaxKind, VirtualPath};
-use typst_ts_core::{typst::prelude::EcoVec, TypstFileId};
+use typst::syntax::{ast, package::PackageManifest, LinkedNode, Source, SyntaxKind, VirtualPath};
+use typst_ts_core::{package::PackageSpec, typst::prelude::EcoVec, TypstFileId};
 
 use crate::prelude::*;
 
-/// Find a source instance by its import path.
-pub fn find_source_by_import_path(
+fn resolve_id_by_path(
     world: &dyn World,
     current: TypstFileId,
     import_path: &str,
-) -> Option<Source> {
+) -> Option<TypstFileId> {
     if import_path.starts_with('@') {
-        // todo: import from package
-        return None;
+        let spec = import_path.parse::<PackageSpec>().ok()?;
+        // Evaluate the manifest.
+        let manifest_id = FileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
+        let bytes = world.file(manifest_id).ok()?;
+        let string = std::str::from_utf8(&bytes).map_err(FileError::from).ok()?;
+        let manifest: PackageManifest = toml::from_str(string).ok()?;
+        manifest.validate(&spec).ok()?;
+
+        // Evaluate the entry point.
+        return Some(manifest_id.join(&manifest.package.entrypoint));
     }
 
     let path = Path::new(import_path);
@@ -24,8 +30,18 @@ pub fn find_source_by_import_path(
         VirtualPath::new(path)
     };
 
-    let id = TypstFileId::new(current.package().cloned(), vpath);
-    world.source(id).ok()
+    Some(TypstFileId::new(current.package().cloned(), vpath))
+}
+
+/// Find a source instance by its import path.
+pub fn find_source_by_import_path(
+    world: &dyn World,
+    current: TypstFileId,
+    import_path: &str,
+) -> Option<Source> {
+    world
+        .source(resolve_id_by_path(world, current, import_path)?)
+        .ok()
 }
 
 /// Find a source instance by its import node.
@@ -43,11 +59,11 @@ pub fn find_source_by_import(
 }
 
 /// Find all static imports in a source.
-#[comemo::memoize]
-pub fn find_imports(source: &Source) -> EcoVec<TypstFileId> {
+pub fn find_imports(world: &dyn World, source: &Source) -> EcoVec<TypstFileId> {
     let root = LinkedNode::new(source.root());
 
     let mut worker = ImportWorker {
+        world,
         current: source.id(),
         imports: EcoVec::new(),
     };
@@ -55,18 +71,16 @@ pub fn find_imports(source: &Source) -> EcoVec<TypstFileId> {
     worker.analyze(root);
     let res = worker.imports;
 
-    let mut res: Vec<TypstFileId> = res
-        .into_iter()
-        .map(|(vpath, _)| TypstFileId::new(None, vpath))
-        .collect();
+    let mut res: Vec<TypstFileId> = res.into_iter().map(|(id, _)| id).collect();
     res.sort();
     res.dedup();
     res.into_iter().collect()
 }
 
 struct ImportWorker<'a> {
+    world: &'a dyn World,
     current: TypstFileId,
-    imports: EcoVec<(VirtualPath, LinkedNode<'a>)>,
+    imports: EcoVec<(FileId, LinkedNode<'a>)>,
 }
 
 impl<'a> ImportWorker<'a> {
@@ -79,15 +93,9 @@ impl<'a> ImportWorker<'a> {
                     ast::Expr::Str(s) => {
                         // todo: source in packages
                         let s = s.get();
-                        let path = Path::new(s.as_str());
-                        let vpath = if path.is_relative() {
-                            self.current.vpath().join(path)
-                        } else {
-                            VirtualPath::new(path)
-                        };
-                        debug!("found import {vpath:?}");
+                        let id = resolve_id_by_path(self.world, self.current, s.as_str())?;
 
-                        self.imports.push((vpath, node));
+                        self.imports.push((id, node));
                     }
                     // todo: handle dynamic import
                     ast::Expr::FieldAccess(..) | ast::Expr::Ident(..) => {}
