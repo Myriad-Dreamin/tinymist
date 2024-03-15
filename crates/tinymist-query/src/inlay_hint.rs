@@ -140,10 +140,10 @@ fn inlay_hint(
                         Value::Func(f) => Some(f),
                         _ => None,
                     })?;
-                    log::info!("got function {func:?}");
+                    log::debug!("got function {func:?}");
 
                     let call_info = analyze_call(func, args)?;
-                    log::info!("got call_info {call_info:?}");
+                    log::debug!("got call_info {call_info:?}");
 
                     let check_single_pos_arg = || {
                         let mut pos = 0;
