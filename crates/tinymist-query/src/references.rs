@@ -33,7 +33,7 @@ impl ReferencesRequest {
     }
 }
 
-fn find_references(
+pub(crate) fn find_references(
     ctx: &mut AnalysisContext<'_>,
     def_use: Arc<crate::analysis::DefUseInfo>,
     deref_target: DerefTarget<'_>,

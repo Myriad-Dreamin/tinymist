@@ -43,13 +43,12 @@ impl GotoDefinitionRequest {
             typst_to_lsp::range(use_site.range(), &source, position_encoding);
 
         let def = find_definition(ctx, source.clone(), deref_target)?;
-        let _ = def.value;
 
         let span_path = ctx.world.path_for_id(def.fid).ok()?;
         let uri = Url::from_file_path(span_path).ok()?;
 
         let span_source = ctx.source_by_id(def.fid).ok()?;
-        let range = typst_to_lsp::range(def.range, &span_source, position_encoding);
+        let range = typst_to_lsp::range(def.def_range, &span_source, position_encoding);
 
         let res = Some(GotoDefinitionResponse::Link(vec![LocationLink {
             origin_selection_range: Some(origin_selection_range),
@@ -64,9 +63,11 @@ impl GotoDefinitionRequest {
 }
 
 pub(crate) struct DefinitionLink {
-    value: Option<Value>,
-    fid: TypstFileId,
-    range: Range<usize>,
+    pub value: Option<Value>,
+    pub fid: TypstFileId,
+    pub name: String,
+    pub def_range: Range<usize>,
+    pub name_range: Option<Range<usize>>,
 }
 
 // todo: field definition
@@ -75,36 +76,26 @@ pub(crate) fn find_definition(
     source: Source,
     deref_target: DerefTarget<'_>,
 ) -> Option<DefinitionLink> {
+    let source_id = source.id();
+
     let use_site = match deref_target {
         // todi: field access
         DerefTarget::VarAccess(node) | DerefTarget::Callee(node) => node,
-        // todo: better support
+        // todo: better support (rename import path?)
         DerefTarget::ImportPath(path) => {
             let parent = path.parent()?;
             let def_fid = parent.span().id()?;
             let e = parent.cast::<ast::ModuleImport>()?;
             let source = find_source_by_import(ctx.world, def_fid, e)?;
             return Some(DefinitionLink {
+                name: String::new(),
                 value: None,
                 fid: source.id(),
-                range: (LinkedNode::new(source.root())).range(),
+                def_range: (LinkedNode::new(source.root())).range(),
+                name_range: None,
             });
         }
     };
-
-    let values = analyze_expr(ctx.world, &use_site);
-    for v in values {
-        if let Value::Func(f) = v.0 {
-            let span = f.span();
-            let fid = span.id()?;
-            let source = ctx.source_by_id(fid).ok()?;
-            return Some(DefinitionLink {
-                value: Some(Value::Func(f.clone())),
-                fid,
-                range: source.find(span)?.range(),
-            });
-        }
-    }
 
     // syntatic definition
     let def_use = get_def_use(ctx, source)?;
@@ -126,9 +117,38 @@ pub(crate) fn find_definition(
             return None;
         }
     };
+    let def_id = def_use.get_ref(&ident_ref);
+    let def_id = def_id.or_else(|| {
+        let (def_id, _) = def_use.get_def(source_id, &ident_ref)?;
+        Some(def_id)
+    });
+    let def_info = def_id.and_then(|def_id| def_use.get_def_by_id(def_id));
 
-    let def_id = def_use.get_ref(&ident_ref)?;
-    let (def_fid, def) = def_use.get_def_by_id(def_id)?;
+    let values = analyze_expr(ctx.world, &use_site);
+    for v in values {
+        // mostly builtin functions
+        if let Value::Func(f) = v.0 {
+            let name = f
+                .name()
+                .or_else(|| def_info.as_ref().map(|(_, r)| r.name.as_str()));
+
+            if let Some(name) = name {
+                let span = f.span();
+                let fid = span.id()?;
+                let source = ctx.source_by_id(fid).ok()?;
+
+                return Some(DefinitionLink {
+                    name: name.to_owned(),
+                    value: Some(Value::Func(f.clone())),
+                    fid,
+                    def_range: source.find(span)?.range(),
+                    name_range: def_info.map(|(_, r)| r.range.clone()),
+                });
+            }
+        }
+    }
+
+    let (def_fid, def) = def_info?;
 
     match def.kind {
         LexicalKind::Heading(..) | LexicalKind::Block => unreachable!(),
@@ -145,9 +165,11 @@ pub(crate) fn find_definition(
             | LexicalModKind::Alias { .. }
             | LexicalModKind::Ident,
         ) => Some(DefinitionLink {
+            name: def.name.clone(),
             value: None,
             fid: def_fid,
-            range: def.range.clone(),
+            def_range: def.range.clone(),
+            name_range: Some(def.range.clone()),
         }),
         LexicalKind::Var(LexicalVarKind::Function) => {
             let def_source = ctx.source_by_id(def_fid).ok()?;
@@ -164,9 +186,11 @@ pub(crate) fn find_definition(
             };
 
             Some(DefinitionLink {
+                name: def.name.clone(),
                 value: Some(Value::Func(func.clone())),
                 fid: def_fid,
-                range: def.range.clone(),
+                def_range: def.range.clone(),
+                name_range: Some(def.range.clone()),
             })
         }
         LexicalKind::Mod(LexicalModKind::Star) => {

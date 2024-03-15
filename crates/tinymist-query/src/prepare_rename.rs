@@ -1,7 +1,4 @@
-use crate::{
-    analysis::{find_definition, Definition},
-    prelude::*,
-};
+use crate::{analysis::get_deref_target, find_definition, prelude::*, DefinitionLink};
 use log::debug;
 
 #[derive(Debug, Clone)]
@@ -10,6 +7,8 @@ pub struct PrepareRenameRequest {
     pub position: LspPosition,
 }
 
+// todo: rename alias
+// todo: rename import path?
 impl PrepareRenameRequest {
     /// See <https://github.com/microsoft/vscode-go/issues/2714>.
     /// The prepareRename feature is sent before a rename request. If the user
@@ -18,54 +17,68 @@ impl PrepareRenameRequest {
     /// show the rename pop-up.
     pub fn request(
         self,
-        world: &TypstSystemWorld,
+        ctx: &mut AnalysisContext,
         position_encoding: PositionEncoding,
     ) -> Option<PrepareRenameResponse> {
-        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-        let typst_offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
+        let source = ctx.source_by_path(&self.path).ok()?;
 
-        let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset + 1)?;
+        let offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
+        let cursor = offset + 1;
 
-        let t: &dyn World = world;
-        let Definition::Func(func) = find_definition(t.track(), source.id(), ast_node)? else {
-            // todo: handle other definitions
-            return None;
-        };
+        let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
+        debug!("ast_node: {ast_node:?}", ast_node = ast_node);
 
+        let deref_target = get_deref_target(ast_node)?;
+        let use_site = deref_target.node().clone();
+        let origin_selection_range =
+            typst_to_lsp::range(use_site.range(), &source, position_encoding);
+
+        let lnk = find_definition(ctx, source.clone(), deref_target)?;
+        validate_renaming_definition(&lnk)?;
+
+        debug!("prepare_rename: {}", lnk.name);
+        Some(PrepareRenameResponse::RangeWithPlaceholder {
+            range: origin_selection_range,
+            placeholder: lnk.name,
+        })
+    }
+}
+
+pub(crate) fn validate_renaming_definition(lnk: &DefinitionLink) -> Option<()> {
+    'check_func: {
         use typst::foundations::func::Repr;
-        let mut f = func.value.clone();
+        let mut f = match &lnk.value {
+            Some(Value::Func(f)) => f,
+            Some(..) => {
+                log::info!(
+                    "prepare_rename: not a function on function definition site: {:?}",
+                    lnk.value
+                );
+                return None;
+            }
+            None => {
+                break 'check_func;
+            }
+        };
         loop {
             match f.inner() {
                 // native functions can't be renamed
                 Repr::Native(..) | Repr::Element(..) => return None,
                 // todo: rename with site
-                Repr::With(w) => f = w.0.clone(),
+                Repr::With(w) => f = &w.0,
                 Repr::Closure(..) => break,
             }
         }
-
-        // todo: unwrap parentheses
-        let ident = match func.use_site.kind() {
-            SyntaxKind::Ident | SyntaxKind::MathIdent => func.use_site.text(),
-            _ => return None,
-        };
-        debug!("prepare_rename: {ident}");
-
-        let id = func.span.id()?;
-        if id.package().is_some() {
-            debug!(
-                "prepare_rename: {ident} is in a package {pkg:?}",
-                pkg = id.package()
-            );
-            return None;
-        }
-
-        let origin_selection_range =
-            typst_to_lsp::range(func.use_site.range(), &source, position_encoding);
-
-        Some(PrepareRenameResponse::RangeWithPlaceholder {
-            range: origin_selection_range,
-            placeholder: ident.to_string(),
-        })
     }
+
+    if lnk.fid.package().is_some() {
+        debug!(
+            "prepare_rename: {name} is in a package {pkg:?}",
+            name = lnk.name,
+            pkg = lnk.fid.package()
+        );
+        return None;
+    }
+
+    Some(())
 }

@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Once};
 
 use typst_ts_core::{typst::prelude::EcoVec, TypstFileId};
 
-use super::{find_imports2, AnalysisContext};
+use super::{find_imports, AnalysisContext};
 
 pub struct ModuleDependency {
     pub dependencies: EcoVec<TypstFileId>,
@@ -28,7 +28,7 @@ pub fn construct_module_dependencies(
         };
 
         let file_id = source.id();
-        let deps = find_imports2(&source);
+        let deps = find_imports(&source);
         dependencies
             .entry(file_id)
             .or_insert_with(|| ModuleDependency {

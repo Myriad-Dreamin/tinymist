@@ -1,5 +1,3 @@
-pub mod definition;
-pub use definition::*;
 pub mod def_use;
 pub use def_use::*;
 pub mod import;
@@ -10,8 +8,6 @@ pub mod matcher;
 pub use matcher::*;
 pub mod module;
 pub use module::*;
-pub mod reference;
-pub use reference::*;
 pub mod track_values;
 pub use track_values::*;
 
