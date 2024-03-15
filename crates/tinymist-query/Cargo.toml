@@ -25,7 +25,8 @@ parking_lot.workspace = true
 ena.workspace = true
 once_cell.workspace = true
 fxhash.workspace = true
-walkdir = "2"
+toml.workspace = true
+walkdir.workspace = true
 indexmap = "2.1.0"
 toml = { version = "0.8", default-features = false, features = [
     "parse",

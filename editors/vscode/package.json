@@ -325,6 +325,11 @@
                 "command": "tinymist.clearCache",
                 "title": "Clear all cached resources",
                 "category": "Typst"
+            },
+            {
+                "command": "tinymist.initTemplate",
+                "title": "Initialize a new Typst project based on a template",
+                "category": "Typst"
             }
         ],
         "menus": {

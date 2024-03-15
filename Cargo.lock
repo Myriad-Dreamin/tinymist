@@ -3604,6 +3604,7 @@ dependencies = [
  "tinymist-query",
  "tokio",
  "tokio-util",
+ "toml",
  "typst",
  "typst-assets 0.10.0",
  "typst-pdf",
@@ -3611,6 +3612,7 @@ dependencies = [
  "typst-ts-compiler",
  "typst-ts-core",
  "vergen",
+ "walkdir",
 ]
 
 [[package]]

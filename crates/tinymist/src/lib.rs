@@ -31,6 +31,7 @@ mod actor;
 pub mod init;
 mod state;
 mod task;
+mod tools;
 pub mod transport;
 mod utils;
 
@@ -62,13 +63,18 @@ use tinymist_query::{
     get_semantic_tokens_unregistration, DiagnosticsMap, SemanticTokenCache,
 };
 use tokio::sync::mpsc;
+use typst::diag::StrResult;
+use typst::syntax::package::VersionlessPackageSpec;
+use typst_ts_compiler::service::Compiler;
 use typst_ts_core::config::CompileOpts;
-use typst_ts_core::ImmutPath;
+use typst_ts_core::package::PackageSpec;
+use typst_ts_core::{error::prelude::*, ImmutPath};
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
 
 use crate::actor::render::PdfExportConfig;
 use crate::init::*;
+use crate::tools::package::InitTask;
 
 // Enforces drop order
 pub struct Handle<H, C> {
@@ -642,6 +648,7 @@ impl TypstLanguageServer {
             redirected_command!("tinymist.doClearCache", Self::clear_cache),
             redirected_command!("tinymist.pinMain", Self::pin_document),
             redirected_command!("tinymist.focusMain", Self::focus_document),
+            redirected_command!("tinymist.doInitTemplate", Self::init_template),
         ])
     }
 
@@ -712,6 +719,61 @@ impl TypstLanguageServer {
         update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
 
         info!("file focused: {entry:?}", entry = new_entry);
+        Ok(JsonValue::Null)
+    }
+
+    /// Initialize a new template.
+    pub fn init_template(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        use crate::tools::package::{self, determine_latest_version, TemplateSource};
+
+        let from_source = arguments
+            .first()
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_owned())
+            .ok_or_else(|| invalid_params("The first parameter is not a valid source or null"))?;
+        let to_path = parse_path_or_null(arguments.get(1))?;
+        self.primary()
+            .steal(move |c| {
+                let mut from_source = from_source.as_str();
+                if from_source.starts_with("typst ") {
+                    from_source = from_source[6..].trim();
+                }
+                if from_source.starts_with("init ") {
+                    from_source = from_source[5..].trim();
+                }
+
+                // Parse the package specification. If the user didn't specify the version,
+                // we try to figure it out automatically by downloading the package index
+                // or searching the disk.
+                let spec: PackageSpec = from_source
+                    .parse()
+                    .or_else(|err| {
+                        // Try to parse without version, but prefer the error message of the
+                        // normal package spec parsing if it fails.
+                        let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
+                        let version = determine_latest_version(c.compiler.world(), &spec)?;
+                        StrResult::Ok(spec.at(version))
+                    })
+                    .map_err(map_string_err("failed to parse package spec"))?;
+
+                let from_source = TemplateSource::Package(spec);
+
+                package::init(
+                    c.compiler.world(),
+                    InitTask {
+                        tmpl: from_source.clone(),
+                        dir: to_path.clone(),
+                    },
+                )
+                .map_err(map_string_err("failed to initialize template"))?;
+
+                info!("template initialized: {from_source:?} to {to_path:?}");
+
+                ZResult::Ok(())
+            })
+            .and_then(|e| e)
+            .map_err(|e| invalid_params(format!("failed to determine template source: {e}")))?;
+
         Ok(JsonValue::Null)
     }
 }
