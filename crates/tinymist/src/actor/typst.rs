@@ -686,15 +686,15 @@ impl CompileActor {
                 Ok(CompilerQueryResponse::OnSaveExport(()))
             }
             Hover(req) => query_state!(self, Hover, req),
-            GotoDefinition(req) => query_world!(self, GotoDefinition, req),
+            GotoDefinition(req) => query_world2!(self, GotoDefinition, req),
             GotoDeclaration(req) => query_world!(self, GotoDeclaration, req),
             References(req) => query_world2!(self, References, req),
             InlayHint(req) => query_world!(self, InlayHint, req),
             CodeLens(req) => query_world!(self, CodeLens, req),
             Completion(req) => query_state!(self, Completion, req),
             SignatureHelp(req) => query_world!(self, SignatureHelp, req),
-            Rename(req) => query_world!(self, Rename, req),
-            PrepareRename(req) => query_world!(self, PrepareRename, req),
+            Rename(req) => query_world2!(self, Rename, req),
+            PrepareRename(req) => query_world2!(self, PrepareRename, req),
             Symbol(req) => query_world!(self, Symbol, req),
             FoldingRange(..)
             | SelectionRange(..)

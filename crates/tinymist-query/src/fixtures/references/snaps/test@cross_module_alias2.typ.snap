@@ -1,10 +1,8 @@
 ---
 source: crates/tinymist-query/src/references.rs
-expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+expression: "JsonRepr::new_pure(result)"
 input_file: crates/tinymist-query/src/fixtures/references/cross_module_alias2.typ
 ---
 [
- {
-  "range": "0:20:0:21"
- }
+ "/s0.typ@0:20:0:21"
 ]

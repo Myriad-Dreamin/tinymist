@@ -1,0 +1,12 @@
+---
+source: crates/tinymist-query/src/goto_definition.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/goto_definition/inside_import_alias2.typ
+---
+[
+ {
+  "originSelectionRange": "2:43:2:45",
+  "targetRange": "2:43:2:45",
+  "targetSelectionRange": "2:43:2:45"
+ }
+]

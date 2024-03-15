@@ -1,13 +1,9 @@
 ---
 source: crates/tinymist-query/src/references.rs
-expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+expression: "JsonRepr::new_pure(result)"
 input_file: crates/tinymist-query/src/fixtures/references/at_def.typ
 ---
 [
- {
-  "range": "1:2:1:3"
- },
- {
-  "range": "2:2:2:3"
- }
+ "/s0.typ@1:2:1:3",
+ "/s0.typ@2:2:2:3"
 ]

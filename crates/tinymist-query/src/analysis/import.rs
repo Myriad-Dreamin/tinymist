@@ -40,76 +40,18 @@ pub fn find_source_by_import(
     }
 }
 
-pub fn find_imports(
-    source: &Source,
-    def_id: Option<TypstFileId>,
-) -> EcoVec<(VirtualPath, LinkedNode<'_>)> {
+#[comemo::memoize]
+pub fn find_imports(source: &Source) -> EcoVec<TypstFileId> {
     let root = LinkedNode::new(source.root());
-    if let Some(def_id) = def_id.as_ref() {
-        debug!("find imports for {def_id:?}");
-    }
-
-    struct ImportWorker<'a> {
-        current: TypstFileId,
-        def_id: Option<TypstFileId>,
-        imports: EcoVec<(VirtualPath, LinkedNode<'a>)>,
-    }
-
-    impl<'a> ImportWorker<'a> {
-        fn analyze(&mut self, node: LinkedNode<'a>) -> Option<()> {
-            match node.kind() {
-                SyntaxKind::ModuleImport => {
-                    let i = node.cast::<ast::ModuleImport>().unwrap();
-                    let src = i.source();
-                    match src {
-                        ast::Expr::Str(s) => {
-                            // todo: source in packages
-                            let s = s.get();
-                            let path = Path::new(s.as_str());
-                            let vpath = if path.is_relative() {
-                                self.current.vpath().join(path)
-                            } else {
-                                VirtualPath::new(path)
-                            };
-                            debug!("found import {vpath:?}");
-
-                            if self.def_id.is_some_and(|e| e.vpath() != &vpath) {
-                                return None;
-                            }
-
-                            self.imports.push((vpath, node));
-                        }
-                        // todo: handle dynamic import
-                        ast::Expr::FieldAccess(..) | ast::Expr::Ident(..) => {}
-                        _ => {}
-                    }
-                    return None;
-                }
-                SyntaxKind::ModuleInclude => {}
-                _ => {}
-            }
-            for child in node.children() {
-                self.analyze(child);
-            }
-
-            None
-        }
-    }
 
     let mut worker = ImportWorker {
         current: source.id(),
-        def_id,
         imports: EcoVec::new(),
     };
 
     worker.analyze(root);
+    let res = worker.imports;
 
-    worker.imports
-}
-
-#[comemo::memoize]
-pub fn find_imports2(source: &Source) -> EcoVec<TypstFileId> {
-    let res = find_imports(source, None);
     let mut res: Vec<TypstFileId> = res
         .into_iter()
         .map(|(vpath, _)| TypstFileId::new(None, vpath))
@@ -117,4 +59,46 @@ pub fn find_imports2(source: &Source) -> EcoVec<TypstFileId> {
     res.sort();
     res.dedup();
     res.into_iter().collect()
+}
+
+struct ImportWorker<'a> {
+    current: TypstFileId,
+    imports: EcoVec<(VirtualPath, LinkedNode<'a>)>,
+}
+
+impl<'a> ImportWorker<'a> {
+    fn analyze(&mut self, node: LinkedNode<'a>) -> Option<()> {
+        match node.kind() {
+            SyntaxKind::ModuleImport => {
+                let i = node.cast::<ast::ModuleImport>().unwrap();
+                let src = i.source();
+                match src {
+                    ast::Expr::Str(s) => {
+                        // todo: source in packages
+                        let s = s.get();
+                        let path = Path::new(s.as_str());
+                        let vpath = if path.is_relative() {
+                            self.current.vpath().join(path)
+                        } else {
+                            VirtualPath::new(path)
+                        };
+                        debug!("found import {vpath:?}");
+
+                        self.imports.push((vpath, node));
+                    }
+                    // todo: handle dynamic import
+                    ast::Expr::FieldAccess(..) | ast::Expr::Ident(..) => {}
+                    _ => {}
+                }
+                return None;
+            }
+            SyntaxKind::ModuleInclude => {}
+            _ => {}
+        }
+        for child in node.children() {
+            self.analyze(child);
+        }
+
+        None
+    }
 }

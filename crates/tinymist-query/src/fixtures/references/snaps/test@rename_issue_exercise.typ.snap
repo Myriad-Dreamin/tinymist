@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/references.rs
+expression: "JsonRepr::new_pure(result)"
+input_file: crates/tinymist-query/src/fixtures/references/rename_issue_exercise.typ
+---
+[
+ "/basic/mod.typ@0:22:0:30",
+ "/basic/mod.typ@1:1:1:9",
+ "/basic/writing.typ@1:1:1:9"
+]

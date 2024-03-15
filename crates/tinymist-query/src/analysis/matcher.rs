@@ -11,6 +11,7 @@ pub fn deref_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
     Some(node)
 }
 
+#[derive(Debug, Clone)]
 pub enum DerefTarget<'a> {
     VarAccess(LinkedNode<'a>),
     Callee(LinkedNode<'a>),

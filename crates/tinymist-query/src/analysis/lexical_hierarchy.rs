@@ -14,10 +14,7 @@ use typst::{
     },
     util::LazyHash,
 };
-use typst_ts_core::{
-    typst::prelude::{eco_vec, EcoVec},
-    TypstFileId,
-};
+use typst_ts_core::typst::prelude::{eco_vec, EcoVec};
 
 pub(crate) fn get_lexical_hierarchy(
     source: Source,
@@ -84,13 +81,6 @@ pub enum LexicalModKind {
     /// `import "foo": *`
     ///                ^
     Star,
-    /// the symbol inside of `import "foo": *`
-    ///                                     ^
-    ExternResolved {
-        #[serde(skip_serializing, skip_deserializing)]
-        at: Option<TypstFileId>,
-        in_mod_kind: Box<LexicalModKind>,
-    },
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -421,12 +411,6 @@ impl LexicalHierarchyWorker {
                             self.get_symbols_with(n, IdentContext::Func)?;
                         }
                     }
-                    if self.g == LexicalScopeKind::DefUse {
-                        let param = node.children().find(|n| n.kind() == SyntaxKind::Params);
-                        if let Some(param) = param {
-                            self.get_symbols_with(param, IdentContext::Params)?;
-                        }
-                    }
                     let body = node
                         .children()
                         .rev()
@@ -440,6 +424,15 @@ impl LexicalHierarchyWorker {
                             };
                             self.stack.push((symbol, eco_vec![]));
                             let stack_height = self.stack.len();
+
+                            if self.g == LexicalScopeKind::DefUse {
+                                let param =
+                                    node.children().find(|n| n.kind() == SyntaxKind::Params);
+                                if let Some(param) = param {
+                                    self.get_symbols_with(param, IdentContext::Params)?;
+                                }
+                            }
+
                             self.get_symbols_with(body, IdentContext::Ref)?;
                             while stack_height <= self.stack.len() {
                                 self.symbreak();
