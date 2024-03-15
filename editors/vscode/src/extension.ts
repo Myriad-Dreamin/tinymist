@@ -68,7 +68,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
 
     window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
         if (editor?.document.languageId !== "typst") {
-            return;
+            return commandActivateDoc(undefined);
         }
         return commandActivateDoc(editor);
     });
