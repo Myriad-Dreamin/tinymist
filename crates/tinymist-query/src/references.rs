@@ -1,4 +1,5 @@
 use log::debug;
+use typst_ts_core::vector::ir::DefId;
 
 use crate::{
     analysis::{get_def_use, get_deref_target, DerefTarget, IdentRef},
@@ -76,17 +77,45 @@ pub(crate) fn find_references(
         name: name.clone(),
         range: ident.range(),
     };
-    let def_fid = ident.span().id()?;
+    let cur_fid = ident.span().id()?;
 
-    let (id, _) = def_use.get_def(def_fid, &ident_ref)?;
+    let def_id = def_use.get_ref(&ident_ref);
+    let def_id = def_id.or_else(|| Some(def_use.get_def(cur_fid, &ident_ref)?.0));
+    let (def_fid, def) = def_id.and_then(|def_id| def_use.get_def_by_id(def_id))?;
+    let def_ident = IdentRef {
+        name: def.name.clone(),
+        range: def.range.clone(),
+    };
+
     let def_source = ctx.source_by_id(def_fid).ok()?;
+    let root_def_use = get_def_use(ctx, def_source)?;
+    let root_def_id = root_def_use.get_def(def_fid, &def_ident)?.0;
 
+    find_references_root(
+        ctx,
+        root_def_use,
+        def_fid,
+        root_def_id,
+        def_ident,
+        position_encoding,
+    )
+}
+
+pub(crate) fn find_references_root(
+    ctx: &mut AnalysisContext<'_>,
+    def_use: Arc<crate::analysis::DefUseInfo>,
+    def_fid: TypstFileId,
+    def_id: DefId,
+    def_ident: IdentRef,
+    position_encoding: PositionEncoding,
+) -> Option<Vec<LspLocation>> {
+    let def_source = ctx.source_by_id(def_fid).ok()?;
     let def_path = ctx.world.path_for_id(def_fid).ok()?;
     let uri = Url::from_file_path(def_path).ok()?;
 
     // todo: reuse uri, range to location
     let mut references = def_use
-        .get_refs(id)
+        .get_refs(def_id)
         .map(|r| {
             let range = typst_to_lsp::range(r.range.clone(), &def_source, position_encoding);
 
@@ -97,7 +126,7 @@ pub(crate) fn find_references(
         })
         .collect::<Vec<_>>();
 
-    if def_use.is_exported(id) {
+    if def_use.is_exported(def_id) {
         // Find dependents
         let mut ctx = ctx.fork_for_search();
         ctx.push_dependents(def_fid);
@@ -105,10 +134,13 @@ pub(crate) fn find_references(
             let ref_source = ctx.ctx.source_by_id(ref_fid).ok()?;
             let def_use = get_def_use(ctx.ctx, ref_source.clone())?;
 
+            log::info!("def_use for {ref_fid:?} => {:?}", def_use.exports_defs);
+
             let uri = ctx.ctx.world.path_for_id(ref_fid).ok()?;
             let uri = Url::from_file_path(uri).ok()?;
 
-            if let Some((id, _def)) = def_use.get_def(def_fid, &ident_ref) {
+            let mut redefines = vec![];
+            if let Some((id, _def)) = def_use.get_def(def_fid, &def_ident) {
                 references.extend(def_use.get_refs(id).map(|r| {
                     let range =
                         typst_to_lsp::range(r.range.clone(), &ref_source, position_encoding);
@@ -118,25 +150,12 @@ pub(crate) fn find_references(
                         range,
                     }
                 }));
+                redefines.push(id);
+
+                if def_use.is_exported(id) {
+                    ctx.push_dependents(ref_fid);
+                }
             };
-
-            references.extend(
-                def_use
-                    .get_external_refs(def_fid, Some(name.clone()))
-                    .map(|r| {
-                        let range =
-                            typst_to_lsp::range(r.range.clone(), &ref_source, position_encoding);
-
-                        LspLocation {
-                            uri: uri.clone(),
-                            range,
-                        }
-                    }),
-            );
-
-            if def_use.is_exported(id) {
-                ctx.push_dependents(ref_fid);
-            }
         }
     }
 
@@ -145,6 +164,8 @@ pub(crate) fn find_references(
 
 #[cfg(test)]
 mod tests {
+    use typst_ts_core::path::unix_slash;
+
     use super::*;
     use crate::tests::*;
 
@@ -168,7 +189,24 @@ mod tests {
                 });
                 e
             });
-            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+
+            let result = result.map(|v| {
+                v.into_iter()
+                    .map(|l| {
+                        let fp = unix_slash(&l.uri.to_file_path().unwrap());
+                        let fp = fp.strip_prefix("C:").unwrap_or(&fp);
+                        format!(
+                            "{fp}@{}:{}:{}:{}",
+                            l.range.start.line,
+                            l.range.start.character,
+                            l.range.end.line,
+                            l.range.end.character
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            });
+
+            assert_snapshot!(JsonRepr::new_pure(result));
         });
     }
 }

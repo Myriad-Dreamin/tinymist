@@ -1,6 +1,8 @@
 ---
-source: crates/tinymist-query/src/goto_declaration.rs
-expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
-input_file: crates/tinymist-query/src/fixtures/goto_declaration/base.typ
+source: crates/tinymist-query/src/references.rs
+expression: "JsonRepr::new_pure(result)"
+input_file: crates/tinymist-query/src/fixtures/references/base.typ
 ---
-null
+[
+ "/s0.typ@1:23:1:24"
+]

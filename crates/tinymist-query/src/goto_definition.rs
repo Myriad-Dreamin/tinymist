@@ -57,7 +57,7 @@ impl GotoDefinitionRequest {
             target_selection_range: range,
         }]));
 
-        debug!("goto_definition: {res:?}");
+        debug!("goto_definition: {:?} {res:?}", def.fid);
         res
     }
 }
@@ -118,16 +118,20 @@ pub(crate) fn find_definition(
         }
     };
     let def_id = def_use.get_ref(&ident_ref);
-    let def_id = def_id.or_else(|| {
-        let (def_id, _) = def_use.get_def(source_id, &ident_ref)?;
-        Some(def_id)
-    });
+    let def_id = def_id.or_else(|| Some(def_use.get_def(source_id, &ident_ref)?.0));
     let def_info = def_id.and_then(|def_id| def_use.get_def_by_id(def_id));
 
     let values = analyze_expr(ctx.world, &use_site);
     for v in values {
         // mostly builtin functions
         if let Value::Func(f) = v.0 {
+            use typst::foundations::func::Repr;
+            match f.inner() {
+                // The with function should be resolved as the with position
+                Repr::Closure(..) | Repr::With(..) => continue,
+                Repr::Native(..) | Repr::Element(..) => {}
+            }
+
             let name = f
                 .name()
                 .or_else(|| def_info.as_ref().map(|(_, r)| r.name.as_str()));
@@ -175,15 +179,16 @@ pub(crate) fn find_definition(
             let def_source = ctx.source_by_id(def_fid).ok()?;
             let root = LinkedNode::new(def_source.root());
             let def_name = root.leaf_at(def.range.start + 1)?;
+            log::info!("def_name for function: {def_name:?}", def_name = def_name);
             let values = analyze_expr(ctx.world, &def_name);
-            let func = values.into_iter().find_map(|v| match v.0 {
+            let Some(func) = values.into_iter().find_map(|v| match v.0 {
                 Value::Func(f) => Some(f),
                 _ => None,
-            });
-            let Some(func) = func else {
-                debug!("no func found... {:?}", def.name);
+            }) else {
+                log::info!("no func found... {:?}", def.name);
                 return None;
             };
+            log::info!("okay for function: {func:?}");
 
             Some(DefinitionLink {
                 name: def.name.clone(),
