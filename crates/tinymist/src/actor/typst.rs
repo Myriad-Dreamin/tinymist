@@ -3,7 +3,7 @@
 use core::fmt;
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, Mutex as SyncMutex},
+    sync::Arc,
 };
 
 use log::{debug, error, info, trace, warn};
@@ -17,14 +17,11 @@ use tinymist_query::{
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use typst::{
     diag::{SourceDiagnostic, SourceResult},
-    layout::Position,
-    syntax::{Span, VirtualPath},
+    syntax::VirtualPath,
     util::Deferred,
 };
-use typst_preview::{
-    CompilationHandle, CompilationHandleImpl, CompileHost, CompileStatus, DocToSrcJumpInfo,
-    EditorServer, Location, MemoryFiles, MemoryFilesShort, SourceFileServer,
-};
+#[cfg(feature = "preview")]
+use typst_preview::{CompilationHandle, CompilationHandleImpl, CompileStatus};
 use typst_ts_compiler::{
     service::{
         CompileDriver as CompileDriverInner, CompileExporter, CompileMiddleware, Compiler,
@@ -34,8 +31,8 @@ use typst_ts_compiler::{
     TypstSystemWorld,
 };
 use typst_ts_core::{
-    config::CompileOpts, debug_loc::SourceSpanOffset, error::prelude::*, typst::prelude::EcoVec,
-    Error, ImmutPath, TypstDocument, TypstWorld,
+    config::CompileOpts, error::prelude::*, typst::prelude::EcoVec, Error, ImmutPath,
+    TypstDocument, TypstWorld,
 };
 
 use super::compile::CompileClient as TsCompileClient;
@@ -45,6 +42,21 @@ use crate::{
     actor::render::{PdfPathVars, RenderActorRequest},
     utils,
 };
+
+#[cfg(not(feature = "preview"))]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", content = "data")]
+pub enum CompileStatus {
+    Compiling,
+    CompileSuccess,
+    CompileError,
+}
+
+#[cfg(not(feature = "preview"))]
+pub trait CompilationHandle: Send + 'static {
+    fn status(&self, status: CompileStatus);
+    fn notify_compile(&self, res: Result<Arc<TypstDocument>, CompileStatus>);
+}
 
 type CompileService<H> = CompileActorInner<Reporter<CompileExporter<CompileDriver>, H>>;
 type CompileClient<H> = TsCompileClient<CompileService<H>>;
@@ -92,7 +104,8 @@ pub fn create_server(
     let inner = Deferred::new({
         let current_runtime = tokio::runtime::Handle::current();
         let handler = CompileHandler {
-            inner: Arc::new(SyncMutex::new(None)),
+            #[cfg(feature = "preview")]
+            inner: Arc::new(Mutex::new(None)),
         };
 
         let diag_group = diag_group.clone();
@@ -213,21 +226,28 @@ macro_rules! query_world2 {
 
 #[derive(Clone)]
 pub struct CompileHandler {
-    inner: Arc<SyncMutex<Option<CompilationHandleImpl>>>,
+    #[cfg(feature = "preview")]
+    inner: Arc<Mutex<Option<CompilationHandleImpl>>>,
 }
 
 impl CompilationHandle for CompileHandler {
-    fn status(&self, status: CompileStatus) {
-        let inner = self.inner.lock().unwrap();
-        if let Some(inner) = inner.as_ref() {
-            inner.status(status);
+    fn status(&self, _status: CompileStatus) {
+        #[cfg(feature = "preview")]
+        {
+            let inner = self.inner.lock();
+            if let Some(inner) = inner.as_ref() {
+                inner.status(_status);
+            }
         }
     }
 
-    fn notify_compile(&self, result: Result<Arc<TypstDocument>, CompileStatus>) {
-        let inner = self.inner.lock().unwrap();
-        if let Some(inner) = inner.as_ref() {
-            inner.notify_compile(result.clone());
+    fn notify_compile(&self, _result: Result<Arc<TypstDocument>, CompileStatus>) {
+        #[cfg(feature = "preview")]
+        {
+            let inner = self.inner.lock();
+            if let Some(inner) = inner.as_ref() {
+                inner.notify_compile(_result.clone());
+            }
         }
     }
 }
@@ -296,11 +316,13 @@ pub struct Reporter<C, H> {
     position_encoding: PositionEncoding,
     diag_tx: DiagnosticsSender,
     inner: C,
+    #[allow(unused)]
     cb: H,
 }
 
-impl<C: Compiler<World = TypstSystemWorld>, H: CompilationHandle> CompileMiddleware
-    for Reporter<C, H>
+impl<C: Compiler<World = TypstSystemWorld>, H> CompileMiddleware for Reporter<C, H>
+where
+    H: CompilationHandle,
 {
     type Compiler = C;
 
@@ -316,15 +338,18 @@ impl<C: Compiler<World = TypstSystemWorld>, H: CompilationHandle> CompileMiddlew
         &mut self,
         env: &mut typst_ts_compiler::service::CompileEnv,
     ) -> SourceResult<Arc<TypstDocument>> {
+        #[cfg(feature = "preview")]
         self.cb.status(CompileStatus::Compiling);
         match self.inner_mut().compile(env) {
             Ok(doc) => {
+                #[cfg(feature = "preview")]
                 self.cb.notify_compile(Ok(doc.clone()));
 
                 self.notify_diagnostics(EcoVec::new());
                 Ok(doc)
             }
             Err(err) => {
+                #[cfg(feature = "preview")]
                 self.cb.notify_compile(Err(CompileStatus::CompileError));
 
                 self.notify_diagnostics(err);
@@ -587,91 +612,6 @@ impl CompileActor {
     }
 }
 
-impl SourceFileServer for CompileActor {
-    async fn resolve_source_span(
-        &mut self,
-        loc: Location,
-    ) -> Result<Option<SourceSpanOffset>, Error> {
-        let Location::Src(src_loc) = loc;
-        self.inner().resolve_src_location(src_loc).await
-    }
-
-    async fn resolve_document_position(
-        &mut self,
-        loc: Location,
-    ) -> Result<Option<Position>, Error> {
-        let Location::Src(src_loc) = loc;
-
-        let path = Path::new(&src_loc.filepath).to_owned();
-        let line = src_loc.pos.line;
-        let column = src_loc.pos.column;
-
-        self.inner()
-            .resolve_src_to_doc_jump(path, line, column)
-            .await
-    }
-
-    async fn resolve_source_location(
-        &mut self,
-        s: Span,
-        offset: Option<usize>,
-    ) -> Result<Option<DocToSrcJumpInfo>, Error> {
-        Ok(self
-            .inner()
-            .resolve_span_and_offset(s, offset)
-            .await
-            .map_err(|err| {
-                error!("TypstActor: failed to resolve span and offset: {:#}", err);
-            })
-            .ok()
-            .flatten()
-            .map(|e| DocToSrcJumpInfo {
-                filepath: e.filepath,
-                start: e.start,
-                end: e.end,
-            }))
-    }
-}
-
-impl EditorServer for CompileActor {
-    async fn update_memory_files(
-        &mut self,
-        files: MemoryFiles,
-        reset_shadow: bool,
-    ) -> Result<(), Error> {
-        // todo: is it safe to believe that the path is normalized?
-        let now = std::time::SystemTime::now();
-        let files = FileChangeSet::new_inserts(
-            files
-                .files
-                .into_iter()
-                .map(|(path, content)| {
-                    let content = content.as_bytes().into();
-                    // todo: cloning PathBuf -> Arc<Path>
-                    (path.into(), Ok((now, content)).into())
-                })
-                .collect(),
-        );
-        self.inner().add_memory_changes(if reset_shadow {
-            MemoryEvent::Sync(files)
-        } else {
-            MemoryEvent::Update(files)
-        });
-
-        Ok(())
-    }
-
-    async fn remove_shadow_files(&mut self, files: MemoryFilesShort) -> Result<(), Error> {
-        // todo: is it safe to believe that the path is normalized?
-        let files = FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
-        self.inner().add_memory_changes(MemoryEvent::Update(files));
-
-        Ok(())
-    }
-}
-
-impl CompileHost for CompileActor {}
-
 impl CompileActor {
     pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
         use CompilerQueryRequest::*;
@@ -759,4 +699,111 @@ impl CompileActor {
 
         Ok(fut?)
     }
+}
+
+#[cfg(feature = "preview")]
+mod preview_exts {
+    use std::path::Path;
+
+    use typst::layout::Position;
+    use typst::syntax::Span;
+    use typst_preview::{
+        CompileHost, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
+        SourceFileServer,
+    };
+    use typst_ts_compiler::vfs::notify::FileChangeSet;
+    use typst_ts_compiler::vfs::notify::MemoryEvent;
+    use typst_ts_core::debug_loc::SourceSpanOffset;
+    use typst_ts_core::Error;
+
+    use super::CompileActor;
+
+    #[cfg(feature = "preview")]
+    impl SourceFileServer for CompileActor {
+        async fn resolve_source_span(
+            &mut self,
+            loc: Location,
+        ) -> Result<Option<SourceSpanOffset>, Error> {
+            let Location::Src(src_loc) = loc;
+            self.inner().resolve_src_location(src_loc).await
+        }
+
+        async fn resolve_document_position(
+            &mut self,
+            loc: Location,
+        ) -> Result<Option<Position>, Error> {
+            let Location::Src(src_loc) = loc;
+
+            let path = Path::new(&src_loc.filepath).to_owned();
+            let line = src_loc.pos.line;
+            let column = src_loc.pos.column;
+
+            self.inner()
+                .resolve_src_to_doc_jump(path, line, column)
+                .await
+        }
+
+        async fn resolve_source_location(
+            &mut self,
+            s: Span,
+            offset: Option<usize>,
+        ) -> Result<Option<DocToSrcJumpInfo>, Error> {
+            Ok(self
+                .inner()
+                .resolve_span_and_offset(s, offset)
+                .await
+                .map_err(|err| {
+                    log::error!("TypstActor: failed to resolve span and offset: {:#}", err);
+                })
+                .ok()
+                .flatten()
+                .map(|e| DocToSrcJumpInfo {
+                    filepath: e.filepath,
+                    start: e.start,
+                    end: e.end,
+                }))
+        }
+    }
+
+    #[cfg(feature = "preview")]
+    impl EditorServer for CompileActor {
+        async fn update_memory_files(
+            &mut self,
+            files: MemoryFiles,
+            reset_shadow: bool,
+        ) -> Result<(), Error> {
+            // todo: is it safe to believe that the path is normalized?
+            let now = std::time::SystemTime::now();
+            let files = FileChangeSet::new_inserts(
+                files
+                    .files
+                    .into_iter()
+                    .map(|(path, content)| {
+                        let content = content.as_bytes().into();
+                        // todo: cloning PathBuf -> Arc<Path>
+                        (path.into(), Ok((now, content)).into())
+                    })
+                    .collect(),
+            );
+            self.inner().add_memory_changes(if reset_shadow {
+                MemoryEvent::Sync(files)
+            } else {
+                MemoryEvent::Update(files)
+            });
+
+            Ok(())
+        }
+
+        async fn remove_shadow_files(&mut self, files: MemoryFilesShort) -> Result<(), Error> {
+            // todo: is it safe to believe that the path is normalized?
+            let files =
+                FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
+            self.inner().add_memory_changes(MemoryEvent::Update(files));
+
+            Ok(())
+        }
+    }
+
+    #[cfg(feature = "preview")]
+    impl CompileHost for CompileActor {}
 }
