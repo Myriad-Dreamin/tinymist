@@ -74,6 +74,15 @@ pub struct DefUseInfo {
 }
 
 impl DefUseInfo {
+    pub fn get_ref(&self, ident: &IdentRef) -> Option<DefId> {
+        self.ident_refs.get(ident).copied()
+    }
+
+    pub fn get_def_by_id(&self, id: DefId) -> Option<(TypstFileId, &IdentDef)> {
+        let ((fid, _), def) = self.ident_defs.get_index(id.0 as usize)?;
+        Some((*fid, def))
+    }
+
     pub fn get_def(&self, fid: TypstFileId, ident: &IdentRef) -> Option<(DefId, &IdentDef)> {
         let (id, _, def) = self.ident_defs.get_full(&(fid, ident.clone()))?;
         Some((DefId(id as u64), def))
@@ -238,7 +247,6 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                         }
                     }
                 }
-                LexicalKind::Mod(super::LexicalModKind::ExternResolved { .. }) => {}
             }
         }
 

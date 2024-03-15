@@ -686,7 +686,7 @@ impl CompileActor {
                 Ok(CompilerQueryResponse::OnSaveExport(()))
             }
             Hover(req) => query_state!(self, Hover, req),
-            GotoDefinition(req) => query_world!(self, GotoDefinition, req),
+            GotoDefinition(req) => query_world2!(self, GotoDefinition, req),
             GotoDeclaration(req) => query_world!(self, GotoDeclaration, req),
             References(req) => query_world2!(self, References, req),
             InlayHint(req) => query_world!(self, InlayHint, req),

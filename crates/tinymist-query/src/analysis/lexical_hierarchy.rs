@@ -14,10 +14,7 @@ use typst::{
     },
     util::LazyHash,
 };
-use typst_ts_core::{
-    typst::prelude::{eco_vec, EcoVec},
-    TypstFileId,
-};
+use typst_ts_core::typst::prelude::{eco_vec, EcoVec};
 
 pub(crate) fn get_lexical_hierarchy(
     source: Source,
@@ -84,13 +81,6 @@ pub enum LexicalModKind {
     /// `import "foo": *`
     ///                ^
     Star,
-    /// the symbol inside of `import "foo": *`
-    ///                                     ^
-    ExternResolved {
-        #[serde(skip_serializing, skip_deserializing)]
-        at: Option<TypstFileId>,
-        in_mod_kind: Box<LexicalModKind>,
-    },
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]

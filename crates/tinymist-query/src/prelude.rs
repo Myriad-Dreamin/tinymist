@@ -11,10 +11,10 @@ pub use log::{error, trace};
 pub use lsp_types::{
     request::GotoDeclarationResponse, CodeLens, CompletionResponse, DiagnosticRelatedInformation,
     DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange, GotoDefinitionResponse,
-    Hover, InlayHint, Location as LspLocation, MarkupContent, MarkupKind, Position as LspPosition,
-    PrepareRenameResponse, SelectionRange, SemanticTokens, SemanticTokensDelta,
-    SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp, SignatureInformation,
-    SymbolInformation, Url, WorkspaceEdit,
+    Hover, InlayHint, Location as LspLocation, LocationLink, MarkupContent, MarkupKind,
+    Position as LspPosition, PrepareRenameResponse, SelectionRange, SemanticTokens,
+    SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp,
+    SignatureInformation, SymbolInformation, Url, WorkspaceEdit,
 };
 pub use serde_json::Value as JsonValue;
 pub use typst::diag::{EcoString, FileError, FileResult, Tracepoint};
