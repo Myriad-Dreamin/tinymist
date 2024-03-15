@@ -1,4 +1,8 @@
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+    sync::Arc,
+};
 
 use once_cell::sync::OnceCell;
 use typst::{
@@ -9,7 +13,7 @@ use typst::{
 use typst_ts_compiler::{service::WorkspaceProvider, TypstSystemWorld};
 use typst_ts_core::{cow_mut::CowMut, ImmutPath, TypstFileId};
 
-use super::DefUseInfo;
+use super::{construct_module_dependencies, DefUseInfo, ModuleDependency};
 
 pub struct ModuleAnalysisCache {
     source: OnceCell<FileResult<Source>>,
@@ -42,18 +46,8 @@ pub struct Analysis {
 pub struct AnalysisCaches {
     modules: HashMap<TypstFileId, ModuleAnalysisCache>,
     root_files: OnceCell<Vec<TypstFileId>>,
+    module_deps: OnceCell<HashMap<TypstFileId, ModuleDependency>>,
 }
-
-// fn search_in_workspace(
-//     world: &TypstSystemWorld,
-//     def_id: TypstFileId,
-//     ident: &str,
-//     new_name: &str,
-//     editions: &mut HashMap<Url, Vec<TextEdit>>,
-//     wq: &mut WorkQueue,
-//     position_encoding: PositionEncoding,
-// ) -> Option<()> {
-// }
 
 pub struct AnalysisContext<'a> {
     pub world: &'a TypstSystemWorld,
@@ -61,8 +55,8 @@ pub struct AnalysisContext<'a> {
     caches: AnalysisCaches,
 }
 
-impl<'a> AnalysisContext<'a> {
-    pub fn new(world: &'a TypstSystemWorld) -> Self {
+impl<'w> AnalysisContext<'w> {
+    pub fn new(world: &'w TypstSystemWorld) -> Self {
         Self {
             world,
             analysis: CowMut::Owned(Analysis {
@@ -71,6 +65,7 @@ impl<'a> AnalysisContext<'a> {
             caches: AnalysisCaches {
                 modules: HashMap::new(),
                 root_files: OnceCell::new(),
+                module_deps: OnceCell::new(),
             },
         }
     }
@@ -82,6 +77,25 @@ impl<'a> AnalysisContext<'a> {
 
     pub fn files(&mut self) -> &Vec<TypstFileId> {
         self.caches.root_files.get_or_init(|| self.search_files())
+    }
+
+    pub fn module_dependencies(&mut self) -> &HashMap<TypstFileId, ModuleDependency> {
+        if self.caches.module_deps.get().is_some() {
+            return self.caches.module_deps.get().unwrap();
+        } else {
+            // may cause multiple times to calculate, but it is okay because we have mutable
+            // reference to self.
+            let deps = construct_module_dependencies(self);
+            self.caches.module_deps.get_or_init(|| deps)
+        }
+    }
+
+    pub fn fork_for_search<'s>(&'s mut self) -> SearchCtx<'s, 'w> {
+        SearchCtx {
+            ctx: self,
+            searched: Default::default(),
+            worklist: Default::default(),
+        }
     }
 
     pub fn get_mut(&mut self, file_id: TypstFileId) -> &ModuleAnalysisCache {
@@ -146,5 +160,30 @@ impl<'a> AnalysisContext<'a> {
         }
 
         res
+    }
+}
+
+pub struct SearchCtx<'b, 'w> {
+    pub ctx: &'b mut AnalysisContext<'w>,
+    pub searched: HashSet<TypstFileId>,
+    pub worklist: Vec<TypstFileId>,
+}
+
+impl SearchCtx<'_, '_> {
+    pub fn push(&mut self, id: TypstFileId) -> bool {
+        if self.searched.insert(id) {
+            self.worklist.push(id);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn push_dependents(&mut self, id: TypstFileId) {
+        let deps = self.ctx.module_dependencies().get(&id);
+        let dependents = deps.map(|e| e.dependents.clone()).into_iter().flatten();
+        for dep in dependents {
+            self.push(dep);
+        }
     }
 }

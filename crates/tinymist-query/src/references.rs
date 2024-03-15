@@ -1,5 +1,3 @@
-use std::ops::Range;
-
 use log::debug;
 
 use crate::{
@@ -16,47 +14,31 @@ pub struct ReferencesRequest {
 impl ReferencesRequest {
     pub fn request(
         self,
-        ctx: &TypstSystemWorld,
+        ctx: &mut AnalysisContext,
         position_encoding: PositionEncoding,
     ) -> Option<Vec<LspLocation>> {
-        let mut ctx = AnalysisContext::new(ctx);
-
-        let world = ctx.world;
         let source = ctx.source_by_path(&self.path).ok()?;
         let offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
         let cursor = offset + 1;
 
-        let w: &dyn World = world;
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
         debug!("ast_node: {ast_node:?}", ast_node = ast_node);
         let deref_target = get_deref_target(ast_node)?;
 
-        let def_use = get_def_use(&mut ctx, source.clone())?;
-        let ref_spans = find_declarations(w, def_use, deref_target)?;
-
-        let mut locations = vec![];
-        for ref_range in ref_spans {
-            let ref_id = source.id();
-            let ref_source = &source;
-
-            let span_path = world.path_for_id(ref_id).ok()?;
-            let range = typst_to_lsp::range(ref_range, ref_source, position_encoding);
-
-            let uri = Url::from_file_path(span_path).ok()?;
-
-            locations.push(LspLocation { uri, range });
-        }
+        let def_use = get_def_use(ctx, source.clone())?;
+        let locations = find_references(ctx, def_use, deref_target, position_encoding)?;
 
         debug!("references: {locations:?}");
         Some(locations)
     }
 }
 
-fn find_declarations(
-    _w: &dyn World,
+fn find_references(
+    ctx: &mut AnalysisContext<'_>,
     def_use: Arc<crate::analysis::DefUseInfo>,
     deref_target: DerefTarget<'_>,
-) -> Option<Vec<Range<usize>>> {
+    position_encoding: PositionEncoding,
+) -> Option<Vec<LspLocation>> {
     let node = match deref_target {
         DerefTarget::VarAccess(node) => node,
         DerefTarget::Callee(node) => node,
@@ -94,14 +76,54 @@ fn find_declarations(
         name,
         range: ident.range(),
     };
+    let def_fid = ident.span().id()?;
 
-    let (id, _) = def_use.get_def(ident.span().id()?, &ident_ref)?;
-    Some(
-        def_use
-            .get_refs(id)
-            .map(|r| r.range.clone())
-            .collect::<Vec<_>>(),
-    )
+    let (id, _) = def_use.get_def(def_fid, &ident_ref)?;
+    let def_source = ctx.source_by_id(def_fid).ok()?;
+
+    let def_path = ctx.world.path_for_id(def_fid).ok()?;
+    let uri = Url::from_file_path(def_path).ok()?;
+
+    let mut references = def_use
+        .get_refs(id)
+        .map(|r| {
+            let range = typst_to_lsp::range(r.range.clone(), &def_source, position_encoding);
+
+            LspLocation {
+                uri: uri.clone(),
+                range,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if def_use.is_exported(id) {
+        // Find dependents
+        let mut ctx = ctx.fork_for_search();
+        ctx.push_dependents(def_fid);
+        while let Some(ref_fid) = ctx.worklist.pop() {
+            let ref_source = ctx.ctx.source_by_id(ref_fid).ok()?;
+            let def_use = get_def_use(ctx.ctx, ref_source.clone())?;
+            let (id, _) = def_use.get_def(def_fid, &ident_ref)?;
+
+            let uri = ctx.ctx.world.path_for_id(ref_fid).ok()?;
+            let uri = Url::from_file_path(uri).ok()?;
+            let locations = def_use.get_refs(id).map(|r| {
+                let range = typst_to_lsp::range(r.range.clone(), &ref_source, position_encoding);
+
+                LspLocation {
+                    uri: uri.clone(),
+                    range,
+                }
+            });
+            references.extend(locations);
+
+            if def_use.is_exported(id) {
+                ctx.push_dependents(ref_fid);
+            }
+        }
+    }
+
+    Some(references)
 }
 
 #[cfg(test)]
@@ -112,8 +134,8 @@ mod tests {
     #[test]
     fn test() {
         // goto_definition
-        snapshot_testing("references", &|world, path| {
-            let source = get_suitable_source_in_workspace(world, &path).unwrap();
+        snapshot_testing2("references", &|world, path| {
+            let source = world.source_by_path(&path).unwrap();
 
             let request = ReferencesRequest {
                 path: path.clone(),

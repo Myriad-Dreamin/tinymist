@@ -1,12 +1,11 @@
 use core::fmt;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     ops::{Deref, Range},
     sync::Arc,
 };
 
 use log::info;
-use parking_lot::Mutex;
 use serde::Serialize;
 use typst::syntax::Source;
 use typst_ts_core::{path::unix_slash, TypstFileId};
@@ -15,7 +14,7 @@ use crate::{adt::snapshot_map::SnapshotMap, analysis::find_source_by_import_path
 
 use super::{
     get_lexical_hierarchy, AnalysisContext, LexicalHierarchy, LexicalKind, LexicalScopeKind,
-    LexicalVarKind, ModSrc,
+    LexicalVarKind, ModSrc, SearchCtx,
 };
 
 pub use typst_ts_core::vector::ir::DefId;
@@ -84,28 +83,19 @@ impl DefUseInfo {
             .iter()
             .filter_map(move |(k, v)| if *v == id { Some(k) } else { None })
     }
+
+    pub fn is_exported(&self, id: DefId) -> bool {
+        self.exports_refs.contains(&id)
+    }
 }
 
-pub fn get_def_use<'a>(
-    world: &'a mut AnalysisContext<'a>,
-    source: Source,
-) -> Option<Arc<DefUseInfo>> {
-    let mut ctx = SearchCtx {
-        ctx: world,
-        searched: Default::default(),
-    };
-
-    get_def_use_inner(&mut ctx, source)
-}
-
-struct SearchCtx<'w> {
-    ctx: &'w mut AnalysisContext<'w>,
-    searched: Mutex<HashSet<TypstFileId>>,
+pub fn get_def_use(ctx: &mut AnalysisContext, source: Source) -> Option<Arc<DefUseInfo>> {
+    get_def_use_inner(&mut ctx.fork_for_search(), source)
 }
 
 fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<Arc<DefUseInfo>> {
     let current_id = source.id();
-    if !ctx.searched.lock().insert(current_id) {
+    if !ctx.searched.insert(current_id) {
         return None;
     }
 
@@ -138,8 +128,8 @@ fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<Arc<DefUseIn
     res
 }
 
-struct DefUseCollector<'a, 'w> {
-    ctx: &'a mut SearchCtx<'w>,
+struct DefUseCollector<'a, 'b, 'w> {
+    ctx: &'a mut SearchCtx<'b, 'w>,
     info: DefUseInfo,
     label_scope: SnapshotMap<String, DefId>,
     id_scope: SnapshotMap<String, DefId>,
@@ -148,7 +138,7 @@ struct DefUseCollector<'a, 'w> {
     current_path: Option<&'a str>,
 }
 
-impl<'a, 'w> DefUseCollector<'a, 'w> {
+impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
     fn enter<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let id_snap = self.id_scope.snapshot();
         let res = f(self);

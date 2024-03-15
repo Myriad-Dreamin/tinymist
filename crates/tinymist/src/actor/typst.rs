@@ -10,8 +10,8 @@ use log::{debug, error, info, trace, warn};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use tinymist_query::{
-    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
-    OnExportRequest, OnSaveExportRequest, PositionEncoding, VersionedDocument,
+    analysis::AnalysisContext, CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap,
+    FoldRequestFeature, OnExportRequest, OnSaveExportRequest, PositionEncoding, VersionedDocument,
 };
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use typst::{
@@ -199,6 +199,14 @@ macro_rules! query_world {
     ($self:ident, $method:ident, $req:expr) => {{
         let enc = $self.position_encoding;
         let res = $self.steal_world(move |w| $req.request(w, enc));
+        res.map(CompilerQueryResponse::$method)
+    }};
+}
+
+macro_rules! query_world2 {
+    ($self:ident, $method:ident, $req:expr) => {{
+        let enc = $self.position_encoding;
+        let res = $self.steal_world2(move |w| $req.request(w, enc));
         res.map(CompilerQueryResponse::$method)
     }};
 }
@@ -680,7 +688,7 @@ impl CompileActor {
             Hover(req) => query_state!(self, Hover, req),
             GotoDefinition(req) => query_world!(self, GotoDefinition, req),
             GotoDeclaration(req) => query_world!(self, GotoDeclaration, req),
-            References(req) => query_world!(self, References, req),
+            References(req) => query_world2!(self, References, req),
             InlayHint(req) => query_world!(self, InlayHint, req),
             CodeLens(req) => query_world!(self, CodeLens, req),
             Completion(req) => query_state!(self, Completion, req),
@@ -735,6 +743,18 @@ impl CompileActor {
         f: impl FnOnce(&TypstSystemWorld) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
         let fut = self.steal(move |compiler| f(compiler.compiler.world()));
+
+        Ok(fut?)
+    }
+
+    fn steal_world2<T: Send + Sync + 'static>(
+        &self,
+        f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
+    ) -> anyhow::Result<T> {
+        let fut = self.steal(move |compiler| {
+            // todo: record analysis
+            f(&mut AnalysisContext::new(compiler.compiler.world()))
+        });
 
         Ok(fut?)
     }
