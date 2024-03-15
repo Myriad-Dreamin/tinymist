@@ -19,14 +19,14 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/func.typ
   "range": "18:19"
  },
  {
-  "kind": {
-   "Var": "Variable"
-  },
-  "name": "a",
-  "range": "20:21"
- },
- {
   "children": [
+   {
+    "kind": {
+     "Var": "Variable"
+    },
+    "name": "a",
+    "range": "20:21"
+   },
    {
     "kind": {
      "Var": "ValRef"

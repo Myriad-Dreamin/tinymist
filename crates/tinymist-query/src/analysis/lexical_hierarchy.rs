@@ -411,12 +411,6 @@ impl LexicalHierarchyWorker {
                             self.get_symbols_with(n, IdentContext::Func)?;
                         }
                     }
-                    if self.g == LexicalScopeKind::DefUse {
-                        let param = node.children().find(|n| n.kind() == SyntaxKind::Params);
-                        if let Some(param) = param {
-                            self.get_symbols_with(param, IdentContext::Params)?;
-                        }
-                    }
                     let body = node
                         .children()
                         .rev()
@@ -430,6 +424,15 @@ impl LexicalHierarchyWorker {
                             };
                             self.stack.push((symbol, eco_vec![]));
                             let stack_height = self.stack.len();
+
+                            if self.g == LexicalScopeKind::DefUse {
+                                let param =
+                                    node.children().find(|n| n.kind() == SyntaxKind::Params);
+                                if let Some(param) = param {
+                                    self.get_symbols_with(param, IdentContext::Params)?;
+                                }
+                            }
+
                             self.get_symbols_with(body, IdentContext::Ref)?;
                             while stack_height <= self.stack.len() {
                                 self.symbreak();
