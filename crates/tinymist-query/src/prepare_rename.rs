@@ -1,28 +1,38 @@
-use crate::{analysis::get_deref_target, find_definition, prelude::*, DefinitionLink};
+use crate::{find_definition, prelude::*, syntax::get_deref_target, DefinitionLink, SyntaxRequest};
 use log::debug;
 
+/// The [`textDocument/prepareRename`] request is sent from the client to the
+/// server to setup and test the validity of a rename operation at a given
+/// location.
+///
+/// [`textDocument/prepareRename`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_prepareRename
+///
+/// # Compatibility
+///
+/// This request was introduced in specification version 3.12.0.
+///
+/// See <https://github.com/microsoft/vscode-go/issues/2714>.
+/// The prepareRename feature is sent before a rename request. If the user
+/// is trying to rename a symbol that should not be renamed (inside a
+/// string or comment, on a builtin identifier, etc.), VSCode won't even
+/// show the rename pop-up.
 #[derive(Debug, Clone)]
 pub struct PrepareRenameRequest {
+    /// The path of the document to request for.
     pub path: PathBuf,
+    /// The source code position to request for.
     pub position: LspPosition,
 }
 
 // todo: rename alias
 // todo: rename import path?
-impl PrepareRenameRequest {
-    /// See <https://github.com/microsoft/vscode-go/issues/2714>.
-    /// The prepareRename feature is sent before a rename request. If the user
-    /// is trying to rename a symbol that should not be renamed (inside a
-    /// string or comment, on a builtin identifier, etc.), VSCode won't even
-    /// show the rename pop-up.
-    pub fn request(
-        self,
-        ctx: &mut AnalysisContext,
-        position_encoding: PositionEncoding,
-    ) -> Option<PrepareRenameResponse> {
+impl SyntaxRequest for PrepareRenameRequest {
+    type Response = PrepareRenameResponse;
+
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
 
-        let offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
+        let offset = ctx.to_typst_pos(self.position, &source)?;
         let cursor = offset + 1;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
@@ -30,8 +40,7 @@ impl PrepareRenameRequest {
 
         let deref_target = get_deref_target(ast_node)?;
         let use_site = deref_target.node().clone();
-        let origin_selection_range =
-            typst_to_lsp::range(use_site.range(), &source, position_encoding);
+        let origin_selection_range = ctx.to_lsp_range(use_site.range(), &source);
 
         let lnk = find_definition(ctx, source.clone(), deref_target)?;
         validate_renaming_definition(&lnk)?;

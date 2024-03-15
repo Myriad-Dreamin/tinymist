@@ -6,6 +6,7 @@ use typst_ts_core::{typst::prelude::EcoVec, TypstFileId};
 
 use crate::prelude::*;
 
+/// Find a source instance by its import path.
 pub fn find_source_by_import_path(
     world: &dyn World,
     current: TypstFileId,
@@ -27,6 +28,7 @@ pub fn find_source_by_import_path(
     world.source(id).ok()
 }
 
+/// Find a source instance by its import node.
 pub fn find_source_by_import(
     world: &dyn World,
     current: TypstFileId,
@@ -40,6 +42,7 @@ pub fn find_source_by_import(
     }
 }
 
+/// Find all static imports in a source.
 #[comemo::memoize]
 pub fn find_imports(source: &Source) -> EcoVec<TypstFileId> {
     let root = LinkedNode::new(source.root());

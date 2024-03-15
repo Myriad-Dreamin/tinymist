@@ -2,28 +2,32 @@ use log::debug;
 use lsp_types::TextEdit;
 
 use crate::{
-    analysis::{get_def_use, get_deref_target},
-    find_definition, find_references,
-    prelude::*,
-    validate_renaming_definition,
+    find_definition, find_references, prelude::*, syntax::get_deref_target,
+    validate_renaming_definition, SyntaxRequest,
 };
 
+/// The [`textDocument/rename`] request is sent from the client to the server to
+/// ask the server to compute a workspace change so that the client can perform
+/// a workspace-wide rename of a symbol.
+///
+/// [`textDocument/rename`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_rename
 #[derive(Debug, Clone)]
 pub struct RenameRequest {
+    /// The path of the document to request for.
     pub path: PathBuf,
+    /// The source code position to request for.
     pub position: LspPosition,
+    /// The new name to rename to.
     pub new_name: String,
 }
 
-impl RenameRequest {
-    pub fn request(
-        self,
-        ctx: &mut AnalysisContext,
-        position_encoding: PositionEncoding,
-    ) -> Option<WorkspaceEdit> {
+impl SyntaxRequest for RenameRequest {
+    type Response = WorkspaceEdit;
+
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
 
-        let offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
+        let offset = ctx.to_typst_pos(self.position, &source)?;
         let cursor = offset + 1;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
@@ -35,8 +39,8 @@ impl RenameRequest {
 
         validate_renaming_definition(&lnk)?;
 
-        let def_use = get_def_use(ctx, source.clone())?;
-        let references = find_references(ctx, def_use, deref_target, position_encoding)?;
+        let def_use = ctx.def_use(source.clone())?;
+        let references = find_references(ctx, def_use, deref_target, ctx.position_encoding())?;
 
         let mut editions = HashMap::new();
 
@@ -53,7 +57,7 @@ impl RenameRequest {
 
             LspLocation {
                 uri,
-                range: typst_to_lsp::range(range, &def_source, position_encoding),
+                range: ctx.to_lsp_range(range, &def_source),
             }
         };
 

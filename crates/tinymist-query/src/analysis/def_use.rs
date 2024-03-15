@@ -1,4 +1,5 @@
-use core::fmt;
+//! Static analysis for def-use relations.
+
 use std::{
     collections::HashMap,
     ops::{Deref, Range},
@@ -10,106 +11,77 @@ use serde::Serialize;
 use typst::syntax::Source;
 use typst_ts_core::{path::unix_slash, TypstFileId};
 
-use crate::{adt::snapshot_map::SnapshotMap, analysis::find_source_by_import_path};
-
-use super::{
-    get_lexical_hierarchy, AnalysisContext, LexicalHierarchy, LexicalKind, LexicalScopeKind,
-    LexicalVarKind, ModSrc, SearchCtx,
+use super::SearchCtx;
+use crate::syntax::{
+    find_source_by_import_path, get_lexical_hierarchy, IdentRef, LexicalHierarchy, LexicalKind,
+    LexicalScopeKind, LexicalVarKind, ModSrc,
 };
+use crate::{adt::snapshot_map::SnapshotMap, syntax::LexicalModKind};
 
 pub use typst_ts_core::vector::ir::DefId;
 
+/// The type namespace of def-use relations
+///
+/// The symbols from different namespaces are not visible to each other.
 enum Ns {
+    /// Def-use for labels
     Label,
+    /// Def-use for values
     Value,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct IdentRef {
-    pub name: String,
-    pub range: Range<usize>,
-}
-
-impl PartialOrd for IdentRef {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for IdentRef {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.name
-            .cmp(&other.name)
-            .then_with(|| self.range.start.cmp(&other.range.start))
-    }
-}
-
-impl fmt::Display for IdentRef {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}@{:?}", self.name, self.range)
-    }
-}
-
-impl Serialize for IdentRef {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let s = self.to_string();
-        serializer.serialize_str(&s)
-    }
-}
-
+/// A flat and transient reference to some symbol in a source file.
+///
+/// See [`IdentRef`] for definition of a "transient" reference.
 #[derive(Serialize, Clone)]
 pub struct IdentDef {
+    /// The name of the symbol.
     pub name: String,
+    /// The kind of the symbol.
     pub kind: LexicalKind,
+    /// The byte range of the symbol in the source file.
     pub range: Range<usize>,
 }
 
 type ExternalRefMap = HashMap<(TypstFileId, Option<String>), Vec<(Option<DefId>, IdentRef)>>;
 
+/// The def-use information of a source file.
 #[derive(Default)]
 pub struct DefUseInfo {
     ident_defs: indexmap::IndexMap<(TypstFileId, IdentRef), IdentDef>,
     external_refs: ExternalRefMap,
     ident_refs: HashMap<IdentRef, DefId>,
-    redefine_current: Option<TypstFileId>,
-    ident_redefines: HashMap<IdentRef, DefId>,
     undefined_refs: Vec<IdentRef>,
     exports_refs: Vec<DefId>,
-    pub exports_defs: HashMap<String, DefId>,
+    exports_defs: HashMap<String, DefId>,
 }
 
 impl DefUseInfo {
+    /// Get the definition id of a symbol by its name reference.
     pub fn get_ref(&self, ident: &IdentRef) -> Option<DefId> {
         self.ident_refs.get(ident).copied()
     }
 
+    /// Get the definition of a symbol by its unique id.
     pub fn get_def_by_id(&self, id: DefId) -> Option<(TypstFileId, &IdentDef)> {
         let ((fid, _), def) = self.ident_defs.get_index(id.0 as usize)?;
         Some((*fid, def))
     }
 
+    /// Get the definition of a symbol by its name reference.
     pub fn get_def(&self, fid: TypstFileId, ident: &IdentRef) -> Option<(DefId, &IdentDef)> {
-        let (id, _, def) = self
-            .ident_defs
-            .get_full(&(fid, ident.clone()))
-            .or_else(|| {
-                if self.redefine_current == Some(fid) {
-                    let def_id = self.ident_redefines.get(ident)?;
-                    let kv = self.ident_defs.get_index(def_id.0 as usize)?;
-                    Some((def_id.0 as usize, kv.0, kv.1))
-                } else {
-                    None
-                }
-            })?;
+        let (id, _, def) = self.ident_defs.get_full(&(fid, ident.clone()))?;
         Some((DefId(id as u64), def))
     }
 
+    /// Get the references of a symbol by its unique id.
     pub fn get_refs(&self, id: DefId) -> impl Iterator<Item = &IdentRef> {
         self.ident_refs
             .iter()
             .filter_map(move |(k, v)| if *v == id { Some(k) } else { None })
     }
 
+    /// Get external references of a symbol by its name reference.
     pub fn get_external_refs(
         &self,
         ext_id: TypstFileId,
@@ -121,16 +93,13 @@ impl DefUseInfo {
             .flatten()
     }
 
+    /// Check if a symbol is exported.
     pub fn is_exported(&self, id: DefId) -> bool {
         self.exports_refs.contains(&id)
     }
 }
 
-pub fn get_def_use(ctx: &mut AnalysisContext, source: Source) -> Option<Arc<DefUseInfo>> {
-    get_def_use_inner(&mut ctx.fork_for_search(), source)
-}
-
-fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<Arc<DefUseInfo>> {
+pub(super) fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<Arc<DefUseInfo>> {
     let current_id = source.id();
     ctx.ctx.get_mut(current_id);
     let c = ctx.ctx.get(current_id).unwrap();
@@ -155,7 +124,6 @@ fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<Arc<DefUseIn
         ext_src: None,
     };
 
-    collector.info.redefine_current = Some(current_id);
     collector.scan(&e);
     collector.calc_exports();
     let res = Some(Arc::new(collector.info));
@@ -240,27 +208,18 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                 | LexicalKind::Var(LexicalVarKind::Variable) => {
                     self.insert(Ns::Value, e);
                 }
-                LexicalKind::Mod(super::LexicalModKind::PathVar)
-                | LexicalKind::Mod(super::LexicalModKind::ModuleAlias) => {
-                    self.insert_module(Ns::Value, e)
-                }
-                LexicalKind::Mod(super::LexicalModKind::Ident) => {
-                    match self.import_name(&e.info.name) {
-                        Some(()) => {
-                            self.insert_ref(Ns::Value, e);
-                            self.insert_redef(e);
-                        }
-                        None => {
-                            let def_id = self.insert(Ns::Value, e);
-                            self.insert_extern(
-                                e.info.name.clone(),
-                                e.info.range.clone(),
-                                Some(def_id),
-                            );
-                        }
+                LexicalKind::Mod(LexicalModKind::PathVar)
+                | LexicalKind::Mod(LexicalModKind::ModuleAlias) => self.insert_module(Ns::Value, e),
+                LexicalKind::Mod(LexicalModKind::Ident) => match self.import_name(&e.info.name) {
+                    Some(()) => {
+                        self.insert_ref(Ns::Value, e);
                     }
-                }
-                LexicalKind::Mod(super::LexicalModKind::Alias { target }) => {
+                    None => {
+                        let def_id = self.insert(Ns::Value, e);
+                        self.insert_extern(e.info.name.clone(), e.info.range.clone(), Some(def_id));
+                    }
+                },
+                LexicalKind::Mod(LexicalModKind::Alias { target }) => {
                     match self.import_name(&target.name) {
                         Some(()) => {
                             self.insert_ident_ref(
@@ -288,7 +247,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                         self.enter(|this| this.scan(e.as_slice()))?;
                     }
                 }
-                LexicalKind::Mod(super::LexicalModKind::Module(p)) => {
+                LexicalKind::Mod(LexicalModKind::Module(p)) => {
                     match p {
                         ModSrc::Expr(_) => {}
                         ModSrc::Path(p) => {
@@ -308,7 +267,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
 
                     self.ext_src = None;
                 }
-                LexicalKind::Mod(super::LexicalModKind::Star) => {
+                LexicalKind::Mod(LexicalModKind::Star) => {
                     if let Some(source) = &self.ext_src {
                         info!("diving source for def use: {:?}", source.id());
                         let (_, external_info) =
@@ -399,21 +358,9 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
             },
         );
     }
-
-    fn insert_redef(&mut self, e: &LexicalHierarchy) {
-        let snap = &mut self.id_scope;
-
-        let id_ref = IdentRef {
-            name: e.info.name.clone(),
-            range: e.info.range.clone(),
-        };
-
-        if let Some(id) = snap.get(&e.info.name) {
-            self.info.ident_redefines.insert(id_ref, *id);
-        }
-    }
 }
 
+/// A snapshot of the def-use information for testing.
 pub struct DefUseSnapshot<'a>(pub &'a DefUseInfo);
 
 impl<'a> Serialize for DefUseSnapshot<'a> {

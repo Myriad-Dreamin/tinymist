@@ -2,32 +2,38 @@ use log::debug;
 use typst_ts_core::vector::ir::DefId;
 
 use crate::{
-    analysis::{get_def_use, get_deref_target, DerefTarget, IdentRef},
     prelude::*,
+    syntax::{get_deref_target, DerefTarget, IdentRef},
+    SyntaxRequest,
 };
 
+/// The [`textDocument/references`] request is sent from the client to the
+/// server to resolve project-wide references for the symbol denoted by the
+/// given text document position.
+///
+/// [`textDocument/references`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_references
 #[derive(Debug, Clone)]
 pub struct ReferencesRequest {
+    /// The path of the document to request for.
     pub path: PathBuf,
+    /// The source code position to request for.
     pub position: LspPosition,
 }
 
-impl ReferencesRequest {
-    pub fn request(
-        self,
-        ctx: &mut AnalysisContext,
-        position_encoding: PositionEncoding,
-    ) -> Option<Vec<LspLocation>> {
+impl SyntaxRequest for ReferencesRequest {
+    type Response = Vec<LspLocation>;
+
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
+        let offset = ctx.to_typst_pos(self.position, &source)?;
         let cursor = offset + 1;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
         debug!("ast_node: {ast_node:?}", ast_node = ast_node);
         let deref_target = get_deref_target(ast_node)?;
 
-        let def_use = get_def_use(ctx, source.clone())?;
-        let locations = find_references(ctx, def_use, deref_target, position_encoding)?;
+        let def_use = ctx.def_use(source.clone())?;
+        let locations = find_references(ctx, def_use, deref_target, ctx.position_encoding())?;
 
         debug!("references: {locations:?}");
         Some(locations)
@@ -88,7 +94,7 @@ pub(crate) fn find_references(
     };
 
     let def_source = ctx.source_by_id(def_fid).ok()?;
-    let root_def_use = get_def_use(ctx, def_source)?;
+    let root_def_use = ctx.def_use(def_source)?;
     let root_def_id = root_def_use.get_def(def_fid, &def_ident)?.0;
 
     find_references_root(
@@ -132,9 +138,7 @@ pub(crate) fn find_references_root(
         ctx.push_dependents(def_fid);
         while let Some(ref_fid) = ctx.worklist.pop() {
             let ref_source = ctx.ctx.source_by_id(ref_fid).ok()?;
-            let def_use = get_def_use(ctx.ctx, ref_source.clone())?;
-
-            log::info!("def_use for {ref_fid:?} => {:?}", def_use.exports_defs);
+            let def_use = ctx.ctx.def_use(ref_source.clone())?;
 
             let uri = ctx.ctx.world.path_for_id(ref_fid).ok()?;
             let uri = Url::from_file_path(uri).ok()?;
@@ -180,7 +184,7 @@ mod tests {
                 position: find_test_position(&source),
             };
 
-            let result = request.request(world, PositionEncoding::Utf16);
+            let result = request.request(world);
             // sort
             let result = result.map(|mut e| {
                 e.sort_by(|a, b| match a.range.start.cmp(&b.range.start) {

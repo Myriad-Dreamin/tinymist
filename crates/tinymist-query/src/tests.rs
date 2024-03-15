@@ -48,7 +48,7 @@ pub fn snapshot_testing2(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf))
                 )
             })
             .collect::<Vec<_>>();
-        let mut ctx = AnalysisContext::new(w);
+        let mut ctx = AnalysisContext::new(w, PositionEncoding::Utf16);
         ctx.test_files(|| paths);
         f(&mut ctx, p);
     });

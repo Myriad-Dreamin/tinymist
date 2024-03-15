@@ -1,7 +1,9 @@
 use crate::prelude::*;
 
+/// Stores diagnostics for files.
 pub type DiagnosticsMap = HashMap<Url, Vec<LspDiagnostic>>;
 
+/// Converts a list of Typst diagnostics to LSP diagnostics.
 pub fn convert_diagnostics<'a>(
     project: &TypstSystemWorld,
     errors: impl IntoIterator<Item = &'a TypstDiagnostic>,

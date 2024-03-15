@@ -1,10 +1,12 @@
 mod adt;
 pub mod analysis;
+pub mod syntax;
 
 pub(crate) mod diagnostics;
 
 use std::sync::Arc;
 
+pub use analysis::AnalysisContext;
 use typst_ts_core::TypstDocument;
 
 pub use diagnostics::*;
@@ -52,6 +54,12 @@ mod prelude;
 pub struct VersionedDocument {
     pub version: usize,
     pub document: Arc<TypstDocument>,
+}
+
+pub trait SyntaxRequest {
+    type Response;
+
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response>;
 }
 
 mod polymorphic {

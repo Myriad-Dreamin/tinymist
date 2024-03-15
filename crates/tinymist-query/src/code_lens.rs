@@ -2,8 +2,13 @@ use lsp_types::Command;
 
 use crate::prelude::*;
 
+/// The [`textDocument/codeLens`] request is sent from the client to the server
+/// to compute code lenses for a given text document.
+///
+/// [`textDocument/codeLens`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_codeLens
 #[derive(Debug, Clone)]
 pub struct CodeLensRequest {
+    /// The path of the document to request for.
     pub path: PathBuf,
 }
 
