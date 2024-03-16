@@ -31,11 +31,21 @@ export function activate(context: ExtensionContext): Promise<void> {
 }
 
 async function startClient(context: ExtensionContext): Promise<void> {
-    const config = workspace.getConfiguration("tinymist");
+    let config: Record<string, any> = workspace.getConfiguration("tinymist");
+
+    {
+        const keys = Object.keys(config);
+        let values = keys.map((key) => config.get(key));
+        values = substVscodeVarsInConfig(keys, values);
+        config = {};
+        for (let i = 0; i < keys.length; i++) {
+            config[keys[i]] = values[i];
+        }
+    }
+
     const serverCommand = getServer(config);
-    const fontPaths = vscode.workspace.getConfiguration().get<string[]>("tinymist.fontPaths");
-    const noSystemFonts =
-        vscode.workspace.getConfiguration().get<boolean | null>("tinymist.noSystemFonts") === true;
+    const fontPaths = config.fontPaths as string[] | null;
+    const noSystemFonts = config.noSystemFonts as boolean | null;
     const run = {
         command: serverCommand,
         args: [
@@ -58,6 +68,18 @@ async function startClient(context: ExtensionContext): Promise<void> {
     const clientOptions: LanguageClientOptions = {
         documentSelector: [{ scheme: "file", language: "typst" }],
         initializationOptions: config,
+        middleware: {
+            workspace: {
+                async configuration(params, token, next) {
+                    const items = params.items.map((item) => item.section);
+                    const result = await next(params, token);
+                    if (!Array.isArray(result)) {
+                        return result;
+                    }
+                    return substVscodeVarsInConfig(items, result);
+                },
+            },
+        },
     };
 
     client = new LanguageClient(
@@ -104,9 +126,9 @@ export function deactivate(): Promise<void> | undefined {
     return client?.stop();
 }
 
-function getServer(conf: WorkspaceConfiguration): string {
-    const pathInConfig = conf.get<string | null>("serverPath");
-    if (pathInConfig !== undefined && pathInConfig !== null && pathInConfig !== "") {
+function getServer(conf: Record<string, any>): string {
+    const pathInConfig = substVscodeVars(conf.serverPath);
+    if (pathInConfig) {
         const validation = validateServer(pathInConfig);
         if (!validation.valid) {
             throw new Error(
@@ -332,4 +354,42 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
             console.error("unknown code lens command", args[0]);
         }
     }
+}
+
+function substVscodeVars(str: string | null | undefined): string | undefined {
+    if (str === undefined || str === null) {
+        return undefined;
+    }
+    return vscodeVariables(str);
+}
+
+const STR_VARIABLES = [
+    "serverPath",
+    "tinymist.serverPath",
+    "rootPath",
+    "tinymist.rootPath",
+    "outputPath",
+    "tinymist.outputPath",
+];
+const STR_ARR_VARIABLES = ["fontPaths", "tinymist.fontPaths"];
+
+// todo: documentation that, typstExtraArgs won't get variable extended
+function substVscodeVarsInConfig(keys: (string | undefined)[], values: unknown[]): unknown[] {
+    return values.map((value, i) => {
+        const k = keys[i];
+        if (!k) {
+            return value;
+        }
+        if (STR_VARIABLES.includes(k)) {
+            return substVscodeVars(value as string);
+        }
+        if (STR_ARR_VARIABLES.includes(k)) {
+            const paths = value as string[];
+            if (!paths) {
+                return undefined;
+            }
+            return paths.map((path) => substVscodeVars(path));
+        }
+        return value;
+    });
 }

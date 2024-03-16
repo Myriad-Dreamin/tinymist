@@ -356,22 +356,25 @@ impl Config {
                 };
 
                 // Convert the input pairs to a dictionary.
-                let inputs: TypstDict = command
-                    .inputs
-                    .iter()
-                    .map(|(k, v)| (k.as_str().into(), v.as_str().into_value()))
-                    .collect();
+                let inputs: Option<TypstDict> = if command.inputs.is_empty() {
+                    None
+                } else {
+                    let pairs = command.inputs.iter();
+                    let pairs = pairs.map(|(k, v)| (k.as_str().into(), v.as_str().into_value()));
+                    Some(pairs.collect())
+                };
 
                 // todo: the command.root may be not absolute
                 self.typst_extra_args = Some(CompileExtraOpts {
                     entry: command.input,
                     root_dir: command.root,
-                    inputs: Some(inputs),
+                    inputs,
                     font_paths: command.font_paths,
                 });
             }
         }
 
+        self.validate()?;
         Ok(())
     }
 
@@ -413,6 +416,24 @@ impl Config {
 
     pub(crate) fn listen_semantic_tokens(&mut self, listener: Listener<SemanticTokensMode>) {
         self.semantic_tokens_listeners.push(listener);
+    }
+
+    fn validate(&self) -> anyhow::Result<()> {
+        if let Some(root) = &self.root_path {
+            if !root.is_absolute() {
+                bail!("rootPath must be an absolute path: {root:?}");
+            }
+        }
+
+        if let Some(extra_args) = &self.typst_extra_args {
+            if let Some(root) = &extra_args.root_dir {
+                if !root.is_absolute() {
+                    bail!("typstExtraArgs.root must be an absolute path: {root:?}");
+                }
+            }
+        }
+
+        Ok(())
     }
 
     // pub fn listen_formatting(&mut self, listener:
@@ -642,5 +663,74 @@ impl Init {
         };
 
         (service, Ok(res))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_config_update() {
+        let mut config = Config::default();
+
+        let root_path = if cfg!(windows) { "C:\\root" } else { "/root" };
+
+        let update = json!({
+            "outputPath": "out",
+            "exportPdf": "onSave",
+            "rootPath": root_path,
+            "semanticTokens": "enable",
+            "experimentalFormatterMode": "enable",
+            "typstExtraArgs": ["--root", root_path]
+        });
+
+        config.update(&update).unwrap();
+
+        assert_eq!(config.output_path, "out");
+        assert_eq!(config.export_pdf, ExportPdfMode::OnSave);
+        assert_eq!(config.root_path, Some(PathBuf::from(root_path)));
+        assert_eq!(config.semantic_tokens, SemanticTokensMode::Enable);
+        assert_eq!(config.formatter, ExperimentalFormatterMode::Enable);
+        assert_eq!(
+            config.typst_extra_args,
+            Some(CompileExtraOpts {
+                root_dir: Some(PathBuf::from(root_path)),
+                ..Default::default()
+            })
+        );
+    }
+
+    #[test]
+    fn test_empty_extra_args() {
+        let mut config = Config::default();
+        let update = json!({
+            "typstExtraArgs": []
+        });
+
+        config.update(&update).unwrap();
+    }
+
+    #[test]
+    fn test_reject_abnormal_root() {
+        let mut config = Config::default();
+        let update = json!({
+            "rootPath": ".",
+        });
+
+        let err = format!("{}", config.update(&update).unwrap_err());
+        assert!(err.contains("absolute path"), "unexpected error: {}", err);
+    }
+
+    #[test]
+    fn test_reject_abnormal_root2() {
+        let mut config = Config::default();
+        let update = json!({
+            "typstExtraArgs": ["--root", "."]
+        });
+
+        let err = format!("{}", config.update(&update).unwrap_err());
+        assert!(err.contains("absolute path"), "unexpected error: {}", err);
     }
 }

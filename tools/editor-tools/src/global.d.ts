@@ -1,2 +1,2 @@
 interface Window {}
-const acquireVsCodeApi: any;
+declare const acquireVsCodeApi: any;

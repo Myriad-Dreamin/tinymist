@@ -841,7 +841,9 @@ impl TypstLanguageServer {
             Ok(()) => {}
             Err(err) => {
                 error!("error applying new settings: {err}");
-                return Err(internal_error("Internal error"));
+                return Err(invalid_params(format!(
+                    "error applying new settings: {err}"
+                )));
             }
         }
 
