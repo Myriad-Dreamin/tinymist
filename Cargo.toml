@@ -46,7 +46,7 @@ typst-pdf = "0.11.0"
 typst-assets = { git = "https://github.com/typst/typst-assets", rev = "4d1211a" }
 typst-ts-core = { version = "0.4.2-rc8" }
 typst-ts-compiler = { version = "0.4.2-rc8" }
-typst-preview = { git = "https://github.com/Enter-tainer/typst-preview", rev = "b7db246d8a61a2f1caf9d3a6aa6b74ac68c3027c" }
+typst-preview = { git = "https://github.com/Enter-tainer/typst-preview", rev = "18630ebda22339109ef675a885787f4fc8731ba8" }
 
 lsp-server = "0.7.6"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
