@@ -35,7 +35,7 @@ jobs:
   build:
     strategy:
       matrix:
-        is-release: startsWith(github.ref, 'refs/tags/')
+        is-release: ${{ startsWith(github.ref, 'refs/tags/') }}
         include:
           - is-release: false
             os: windows-latest
