@@ -97,6 +97,7 @@ jobs:
             platform: darwin
             arch: arm64
     name: build (${{ matrix.platform }}-${{ matrix.arch }})
+    needs: [pre_check]
     runs-on: ${{ matrix.os }}
     env:
       target: ${{ matrix.platform }}-${{ matrix.arch }}
