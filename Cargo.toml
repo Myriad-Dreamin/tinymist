@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.10.2"
+version = "0.10.3"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
