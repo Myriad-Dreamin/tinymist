@@ -3640,7 +3640,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "strum 0.25.0",
+ "strum 0.26.2",
  "toml",
  "typst",
  "typst-ide",
