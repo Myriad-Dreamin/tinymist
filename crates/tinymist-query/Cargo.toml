@@ -27,7 +27,7 @@ once_cell.workspace = true
 fxhash.workspace = true
 toml.workspace = true
 walkdir.workspace = true
-indexmap = "2.1.0"
+indexmap.workspace = true
 
 typst.workspace = true
 typst-ide.workspace = true

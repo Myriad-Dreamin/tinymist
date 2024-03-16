@@ -13,7 +13,7 @@
     ],
     "publisher": "myriad-dreamin",
     "license": "Apache-2.0",
-    "version": "0.10.2",
+    "version": "0.10.3",
     "engines": {
         "vscode": "^1.71.0"
     },
@@ -333,7 +333,7 @@
             },
             {
                 "command": "tinymist.showTemplateGallery",
-                "title": "Show available Typst templates for picking up a template to initialize",
+                "title": "Show available Typst templates (gallery) for picking up a template to initialize",
                 "category": "Typst"
             }
         ],

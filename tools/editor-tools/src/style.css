@@ -62,38 +62,33 @@ html, body {
     margin: 24px 28px;
 }
 
-@media (prefers-color-scheme: dark) {
-    .tinymist-card {
-        background: rgba(255, 255, 255, 0.05);
-    }
-    .tinymist-category {
-        background: rgba(255, 255, 255, 0.05);
-    }
-    .tinymist-category-filter-button {
-        background: rgba(129, 60, 133, 0.6);
-    }
-    .tinymist-category-filter-button:hover {
-        background: rgba(129, 60, 133, 0.9);
-    }
-    .tinymist-category-filter-button.activated {
-        background: rgba(129, 60, 133, 0.9);
-    }
+body.typst-preview-dark .tinymist-card {
+    background: rgba(193, 108, 108, 0.05);
 }
-
-@media (prefers-color-scheme: light) {
-    .tinymist-card {
-        background: rgba(0, 0, 0, 0.05);
-    }
-    .tinymist-category {
-        background: rgba(0, 0, 0, 0.05);
-    }
-    .tinymist-category-filter-button {
-        background: rgba(186, 204, 217, 0.6);
-    }
-    .tinymist-category-filter-button:hover {
-        background: rgba(186, 204, 217, 0.9);
-    }
-    .tinymist-category-filter-button.activated {
-        background: rgba(186, 204, 217, 0.9);
-    }
+body.typst-preview-dark .tinymist-category {
+    background: rgba(255, 255, 255, 0.05);
+}
+body.typst-preview-dark .tinymist-category-filter-button {
+    background: rgba(129, 60, 133, 0.6);
+}
+body.typst-preview-dark .tinymist-category-filter-button:hover {
+    background: rgba(129, 60, 133, 0.9);
+}
+body.typst-preview-dark .tinymist-category-filter-button.activated {
+    background: rgba(129, 60, 133, 0.9);
+}
+body.typst-preview-light .tinymist-card {
+    background: rgba(0, 0, 0, 0.05);
+}
+body.typst-preview-light .tinymist-category {
+    background: rgba(0, 0, 0, 0.05);
+}
+body.typst-preview-light .tinymist-category-filter-button {
+    background: rgba(186, 204, 217, 0.6);
+}
+body.typst-preview-light .tinymist-category-filter-button:hover {
+    background: rgba(186, 204, 217, 0.9);
+}
+body.typst-preview-light .tinymist-category-filter-button.activated {
+    background: rgba(186, 204, 217, 0.9);
 }

@@ -31,11 +31,13 @@ export function activate(context: ExtensionContext): Promise<void> {
 }
 
 async function startClient(context: ExtensionContext): Promise<void> {
-    let config: Record<string, any> = workspace.getConfiguration("tinymist");
+    let config: Record<string, any> = JSON.parse(
+        JSON.stringify(workspace.getConfiguration("tinymist"))
+    );
 
     {
         const keys = Object.keys(config);
-        let values = keys.map((key) => config.get(key));
+        let values = keys.map((key) => config[key]);
         values = substVscodeVarsInConfig(keys, values);
         config = {};
         for (let i = 0; i < keys.length; i++) {
@@ -127,7 +129,7 @@ export function deactivate(): Promise<void> | undefined {
 }
 
 function getServer(conf: Record<string, any>): string {
-    const pathInConfig = substVscodeVars(conf.serverPath);
+    const pathInConfig = conf.serverPath;
     if (pathInConfig) {
         const validation = validateServer(pathInConfig);
         if (!validation.valid) {
@@ -360,7 +362,12 @@ function substVscodeVars(str: string | null | undefined): string | undefined {
     if (str === undefined || str === null) {
         return undefined;
     }
-    return vscodeVariables(str);
+    try {
+        return vscodeVariables(str);
+    } catch (e) {
+        console.error("failed to substitute vscode variables", e);
+        return str;
+    }
 }
 
 const STR_VARIABLES = [
