@@ -1,0 +1,99 @@
+html, body {
+    margin: 0;
+}
+
+.tinymist-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 0.75rem;
+}
+
+.template-card {
+    padding: 18px 24px;
+    margin: 1em 0;
+}
+
+.tinymist-search {
+    width: calc(100% - 1em);
+    margin: 0.2em;
+}
+
+.tinymist-author-container {
+    font-size: 0.8em;
+}
+
+.tinymist-template-action-container {
+    margin-top: 0.2em;
+    margin-bottom: 0.3em;
+}
+
+.tinymist-category-container {
+    margin-bottom: 0.1em;
+}
+
+.tinymist-category {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 0.4rem;
+    padding: 0.1rem 0.5rem;
+}
+
+.tinymist-category-filter {
+    display: flex;
+    margin-top: 6px;
+    gap: 0.5rem;
+}
+
+.tinymist-category-filter-button {
+    background: rgba(129, 60, 133, 0.6);
+    border: none;
+    border-radius: 0.2rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.tinymist-category-filter-button:hover {
+    background: rgba(129, 60, 133, 0.9);
+}
+
+.tinymist-category-filter-button.activated {
+    background: rgba(129, 60, 133, 0.9);
+}
+
+#tinymist-app {
+    margin: 24px 28px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .tinymist-card {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    .tinymist-category {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    .tinymist-category-filter-button {
+        background: rgba(129, 60, 133, 0.6);
+    }
+    .tinymist-category-filter-button:hover {
+        background: rgba(129, 60, 133, 0.9);
+    }
+    .tinymist-category-filter-button.activated {
+        background: rgba(129, 60, 133, 0.9);
+    }
+}
+
+@media (prefers-color-scheme: light) {
+    .tinymist-card {
+        background: rgba(0, 0, 0, 0.05);
+    }
+    .tinymist-category {
+        background: rgba(0, 0, 0, 0.05);
+    }
+    .tinymist-category-filter-button {
+        background: rgba(186, 204, 217, 0.6);
+    }
+    .tinymist-category-filter-button:hover {
+        background: rgba(186, 204, 217, 0.9);
+    }
+    .tinymist-category-filter-button.activated {
+        background: rgba(186, 204, 217, 0.9);
+    }
+}

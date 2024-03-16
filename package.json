@@ -1,0 +1,14 @@
+{
+  "name": "tinymist",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "workspaces": [
+    "editors/vscode",
+    "tools/editor-tools"
+  ],
+  "scripts": {},
+  "dependencies": {},
+  "devDependencies": {}
+}

@@ -330,6 +330,11 @@
                 "command": "tinymist.initTemplate",
                 "title": "Initialize a new Typst project based on a template",
                 "category": "Typst"
+            },
+            {
+                "command": "tinymist.showTemplateGallery",
+                "title": "Show available Typst templates for picking up a template to initialize",
+                "category": "Typst"
             }
         ],
         "menus": {
@@ -358,11 +363,12 @@
         "onCommand:tinymist.clearCache"
     ],
     "scripts": {
+        "build:frontend": "cd ../../tools/editor-tools/ && yarn run build",
         "build-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node16",
-        "vscode:prepublish": "npm run build-base -- --minify",
-        "package": "vsce package",
-        "compile": "npm run build-base -- --sourcemap",
-        "watch": "npm run build-base -- --sourcemap --watch",
+        "vscode:prepublish": "yarn run build-base -- --minify && yarn run build:frontend && node scripts/postinstall.cjs",
+        "package": "vsce package --yarn",
+        "compile": "yarn run build-base -- --sourcemap && yarn run build:frontend && node scripts/postinstall.cjs",
+        "watch": "yarn run build-base -- --sourcemap --watch",
         "check": "tsc --noEmit",
         "lint": "eslint ./src --ext .ts",
         "lint-fix": "eslint ./src --ext .ts --fix",
@@ -388,6 +394,7 @@
         "eslint-plugin-promise": "^6.1.1",
         "ovsx": "^0.8.3",
         "prettier": "^3.0.3",
+        "rimraf": "^5.0.5",
         "typescript": "^5.2.2"
     }
 }

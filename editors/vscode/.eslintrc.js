@@ -1,38 +1,89 @@
-module.exports = {
-    env: {
-        es2021: true,
-        node: true,
-    },
+const tsRule = {
+    files: ['*.ts'],
+    ignorePatterns: ['esbuild.config.mjs'],
     extends: [
-        "plugin:@typescript-eslint/recommended",
-        "plugin:@typescript-eslint/recommended-requiring-type-checking",
-        "plugin:@typescript-eslint/strict",
-        "prettier",
+      'eslint:recommended',
+      'plugin:@typescript-eslint/eslint-recommended',
+      'plugin:@typescript-eslint/recommended',
+      'plugin:@typescript-eslint/recommended-requiring-type-checking',
     ],
-    overrides: [],
+    parser: '@typescript-eslint/parser',
     parserOptions: {
-        ecmaVersion: "latest",
-        sourceType: "module",
-        project: "tsconfig.json",
+      ecmaVersion: 10,
+      project: ['./tsconfig.lib.json'],
+      sourceType: 'module',
+      ecmaFeatures: {
+        modules: true,
+      },
     },
+    plugins: [
+      '@typescript-eslint',
+      // "@angular-eslint/eslint-plugin"
+    ],
     rules: {
-        "no-unused-vars": "off",
-        "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
-        "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
-        "class-methods-use-this": "off",
-        "@typescript-eslint/explicit-function-return-type": "error",
-        "@typescript-eslint/no-explicit-any": "error",
-        "init-declarations": "off",
-        "@typescript-eslint/init-declarations": "error",
-        "no-undef-init": "off",
-        "@typescript-eslint/strict-boolean-expressions": [
-            "error",
-            {
-                allowString: false,
-                allowNumber: false,
-                allowNullableObject: false,
-                allowNullableEnum: false,
-            },
-        ],
+      '@typescript-eslint/indent': [
+        'error',
+        2,
+        {
+          SwitchCase: 1,
+        },
+      ],
+      '@typescript-eslint/member-delimiter-style': [
+        'error',
+        {
+          multiline: {
+            delimiter: 'semi',
+            requireLast: true,
+          },
+          singleline: {
+            delimiter: 'semi',
+            requireLast: false,
+          },
+        },
+      ],
+      semi: [2, 'always'],
+      '@typescript-eslint/no-inferrable-types': [
+        'error',
+        {
+          ignoreParameters: true,
+          ignoreProperties: true,
+        },
+      ],
+      '@typescript-eslint/ban-ts-comment': 0,
+      '@typescript-eslint/no-empty-function': 0,
+      '@typescript-eslint/no-var-requires': 0,
+      '@typescript-eslint/no-explicit-any': 0,
+      '@typescript-eslint/no-floating-promises': 0,
+      '@typescript-eslint/no-unsafe-assignment': 0,
+      '@typescript-eslint/no-unsafe-return': 0,
+      '@typescript-eslint/no-unsafe-call': 0,
+      '@typescript-eslint/no-unsafe-member-access': 0,
+      '@typescript-eslint/unbound-method': 0,
+      // "@angular-eslint/use-injectable-provided-in": "error",
+      // "@angular-eslint/no-attribute-decorator": "error"
     },
-};
+  };
+  
+  // noinspection SpellCheckingInspection
+  module.exports = {
+    env: {
+      browser: true,
+      node: true,
+      es6: true,
+      es2015: true,
+      es2017: true,
+    },
+    overrides: [
+      tsRule,
+      // {
+      //   "files": ["*.component.html"],
+      //   "parser": "@angular-eslint/template-parser",
+      //   "plugins": ["@angular-eslint/template"],
+      //   "rules": {
+      //       "@angular-eslint/template/banana-in-a-box": "error",
+      //       "@angular-eslint/template/no-negated-async": "error"
+      //   }
+      // },
+    ],
+  };
+  
