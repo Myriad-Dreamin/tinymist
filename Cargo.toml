@@ -32,6 +32,11 @@ strum = { version = "0.25.0", features = ["derive"] }
 async-trait = "0.1.73"
 parking_lot = "0.12.1"
 thiserror = "1.0.44"
+walkdir = "2"
+toml = { version = "0.8", default-features = false, features = [
+    "parse",
+    "display",
+] }
 
 typst = "0.10.0"
 typst-ide = "0.10.0"

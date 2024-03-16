@@ -87,6 +87,9 @@ async function startClient(context: ExtensionContext): Promise<void> {
     context.subscriptions.push(
         commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens)
     );
+    context.subscriptions.push(
+        commands.registerCommand("tinymist.initTemplate", commandInitTemplate)
+    );
 
     return client.start();
 }
@@ -228,6 +231,42 @@ async function commandPinMain(isPin: boolean): Promise<void> {
         command: "tinymist.pinMain",
         arguments: [activeEditor.document.uri.fsPath],
     });
+}
+
+async function commandInitTemplate(...args: string[]): Promise<void> {
+    const initArgs: string[] = [];
+    if (args.length === 2) {
+        initArgs.push(...args);
+    } else if (args.length > 0) {
+        await vscode.window.showErrorMessage("Invalid arguments for initTemplate");
+        return;
+    } else {
+        const mode = await vscode.window.showInputBox({
+            title: "template from url or package spec id",
+            prompt: "git or package spec with an optional version, you can also enters entire command, such as `typst init @preview/touying:0.3.2`",
+        });
+        initArgs.push(mode ?? "");
+        const path = await vscode.window.showOpenDialog({
+            canSelectFiles: false,
+            canSelectFolders: true,
+            canSelectMany: false,
+            openLabel: "Select folder to initialize",
+        });
+        if (path === undefined) {
+            return;
+        }
+        initArgs.push(path[0].fsPath);
+    }
+
+    const fsPath = initArgs[1];
+    const uri = Uri.file(fsPath);
+
+    await client?.sendRequest("workspace/executeCommand", {
+        command: "tinymist.doInitTemplate",
+        arguments: [...initArgs],
+    });
+
+    await commands.executeCommand("vscode.openFolder", uri);
 }
 
 async function commandActivateDoc(editor: TextEditor | undefined): Promise<void> {
