@@ -40,7 +40,7 @@ jobs:
     steps:
       - name: check_is_release
         id: check_is_release
-        run: echo "isa=${{ startsWith(github.ref, 'refs/tags/') }}" >> $GITHUB_OUTPUT
+        run: echo "isa=[${{ startsWith(github.ref, 'refs/tags/') }}]" >> $GITHUB_OUTPUT
   build:
     strategy:
       matrix:
