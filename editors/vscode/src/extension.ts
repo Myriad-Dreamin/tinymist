@@ -19,6 +19,7 @@ import {
     type ServerOptions,
 } from "vscode-languageclient/node";
 import vscodeVariables from "vscode-variables";
+import { activateEditorTool } from "./editor-tools";
 
 let client: LanguageClient | undefined = undefined;
 
@@ -89,6 +90,11 @@ async function startClient(context: ExtensionContext): Promise<void> {
     );
     context.subscriptions.push(
         commands.registerCommand("tinymist.initTemplate", commandInitTemplate)
+    );
+    context.subscriptions.push(
+        commands.registerCommand("tinymist.showTemplateGallery", () =>
+            commandShowTemplateGallery(context)
+        )
     );
 
     return client.start();
@@ -233,12 +239,18 @@ async function commandPinMain(isPin: boolean): Promise<void> {
     });
 }
 
+async function commandShowTemplateGallery(context: vscode.ExtensionContext): Promise<void> {
+    await activateEditorTool(context, "template-gallery");
+}
+
 async function commandInitTemplate(...args: string[]): Promise<void> {
     const initArgs: string[] = [];
     if (args.length === 2) {
         initArgs.push(...args);
     } else if (args.length > 0) {
-        await vscode.window.showErrorMessage("Invalid arguments for initTemplate");
+        await vscode.window.showErrorMessage(
+            "Invalid arguments for initTemplate, needs either all arguments or zero arguments"
+        );
         return;
     } else {
         const mode = await vscode.window.showInputBox({
