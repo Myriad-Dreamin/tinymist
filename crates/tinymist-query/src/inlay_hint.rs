@@ -34,7 +34,7 @@ impl InlayHintConfig {
             on_variadic_args: true,
             only_first_variadic_args: true,
 
-            on_content_block_args: true,
+            on_content_block_args: false,
         }
     }
 }
@@ -249,14 +249,14 @@ fn inlay_hint(
                             ParamKind::Positional => {}
                         }
 
-                        let pos = arg_node.range().end;
+                        let pos = arg_node.range().start;
                         let lsp_pos =
                             typst_to_lsp::offset_to_position(pos, self.encoding, self.source);
 
                         let label = InlayHintLabel::String(if info.kind == ParamKind::Rest {
-                            format!(": ..{}", info.param.name)
+                            format!("..{}:", info.param.name)
                         } else {
-                            format!(": {}", info.param.name)
+                            format!("{}:", info.param.name)
                         });
 
                         self.hints.push(InlayHint {
@@ -266,7 +266,7 @@ fn inlay_hint(
                             text_edits: None,
                             tooltip: None,
                             padding_left: None,
-                            padding_right: None,
+                            padding_right: Some(true),
                             data: None,
                         });
                     }
