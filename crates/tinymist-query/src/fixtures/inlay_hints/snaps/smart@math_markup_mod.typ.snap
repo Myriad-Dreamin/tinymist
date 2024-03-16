@@ -6,17 +6,19 @@ input_file: crates/tinymist-query/src/fixtures/inlay_hints/math_markup_mod.typ
 [
  {
   "kind": 2,
-  "label": ": x",
+  "label": "x:",
+  "paddingRight": true,
   "position": {
-   "character": 8,
+   "character": 7,
    "line": 1
   }
  },
  {
   "kind": 2,
-  "label": ": y",
+  "label": "y:",
+  "paddingRight": true,
   "position": {
-   "character": 11,
+   "character": 10,
    "line": 1
   }
  }
