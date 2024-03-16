@@ -36,15 +36,15 @@ jobs:
     name: pre_check
     runs-on: ubuntu-latest
     outputs:
-      is-release: ${{ steps.check_is_release.outputs.isa }}
+      tagged: ${{ steps.check_is_release.outputs.isa }}
     steps:
       - name: check_is_release
         id: check_is_release
-        run: echo "::set-output name=isa::${{ startsWith(github.ref, 'refs/tags/') }}"   
+        run: echo "isa=${{ startsWith(github.ref, 'refs/tags/') }}" >> $GITHUB_OUTPUT
   build:
     strategy:
       matrix:
-        is-release: ${{ fromJson(needs.pre_check.outputs.is-release) }}
+        is-release: ${{ fromJson(needs.pre_check.outputs.tagged) }}
         include:
           - is-release: false
             os: windows-latest
