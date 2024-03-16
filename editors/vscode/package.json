@@ -333,7 +333,7 @@
             },
             {
                 "command": "tinymist.showTemplateGallery",
-                "title": "Show available Typst templates for picking up a template to initialize",
+                "title": "Show available Typst templates (gallery) for picking up a template to initialize",
                 "category": "Typst"
             }
         ],

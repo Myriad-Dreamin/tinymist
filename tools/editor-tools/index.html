@@ -66,13 +66,24 @@
         "(prefers-color-scheme: dark)"
       ).matches;
 
+      const defaultDarkBackgroundColor = "rgb(17, 17, 17)";
+      const defaultLightBackgroundColor = "rgb(255, 255, 255)";
       const defaultBackgroundColor = serverDark
-        ? "rgb(17, 17, 17)"
-        : "rgb(255, 255, 255)";
-      var previewBackgroundColor =
+        ? defaultDarkBackgroundColor
+        : defaultLightBackgroundColor;
+      const defaultToolbarDarkFgColor = "#fff";
+      const defaultToolbarLightFgColor = "#000";
+      const defaultToolbarFgColor = serverDark
+        ? defaultToolbarDarkFgColor
+        : defaultToolbarLightFgColor;
+      const previewBackgroundColor =
         getComputedStyle(document.documentElement).getPropertyValue(
           "--vscode-sideBar-background"
         ) || defaultBackgroundColor;
+      const previewToolbarFgColor =
+        getComputedStyle(document.documentElement).getPropertyValue(
+          "--vscode-menu-foreground"
+        ) || defaultToolbarFgColor;
 
       let preferColorScheme = "dark";
       /// Perceptible distance between colors:
@@ -80,28 +91,22 @@
       /// 1~2: perceptible through close observation
       /// 2~10: perceptible at a glance
       if (deltaE(cssColorToRgba(previewBackgroundColor), [255, 255, 255]) < 5) {
-        previewBackgroundColor = defaultBackgroundColor;
-        previewForegroundColor = defaultToolbarFgColor;
+        previewBackgroundColor = defaultLightBackgroundColor;
+        previewToolbarFgColor = defaultToolbarLightFgColor;
         preferColorScheme = "light";
       }
       document.documentElement.style.colorScheme = preferColorScheme;
 
-      var defaultToolbarFgColor = "#fff";
-      var previewToolbarFgColor =
-        getComputedStyle(document.documentElement).getPropertyValue(
-          "--vscode-menu-foreground"
-        ) || defaultToolbarFgColor;
+      const previewForegroundColor = previewToolbarFgColor;
 
-      var previewForegroundColor = previewToolbarFgColor;
-
-      var defaultToolbarBorderColor = "rgba(0, 0, 0, 0)";
-      var previewToolbarBorderColor =
+      const defaultToolbarBorderColor = "rgba(0, 0, 0, 0)";
+      const previewToolbarBorderColor =
         getComputedStyle(document.documentElement).getPropertyValue(
           "--vscode-menu-border"
         ) || defaultToolbarBorderColor;
 
-      var defaultToolbarBgColor = "rgb(50, 54, 57)";
-      var previewToolbarBgColor =
+      const defaultToolbarBgColor = "rgb(50, 54, 57)";
+      const previewToolbarBgColor =
         getComputedStyle(document.documentElement).getPropertyValue(
           "--vscode-menu-background"
         ) || defaultToolbarBgColor;
@@ -111,6 +116,11 @@
         previewForegroundColor = defaultToolbarFgColor;
       }
 
+      if (preferColorScheme === "dark") {
+        document.body.classList.add("typst-preview-dark");
+      } else {
+        document.body.classList.add("typst-preview-light");
+      }
       // append css variable --typst-preview-background-color
       document.documentElement.style.setProperty(
         "--typst-preview-background-color",
@@ -145,6 +155,14 @@
       background-color: var(--typst-preview-background-color) !important;
     "
   >
+    <script>
+      const themeKind = document.body?.getAttribute("data-vscode-theme-kind");
+      if (themeKind === "vscode-dark") {
+        document.body.classList.add("typst-preview-dark");
+      } else {
+        document.body.classList.add("typst-preview-light");
+      }
+    </script>
     <div id="tinymist-app"></div>
   </body>
 </html>
