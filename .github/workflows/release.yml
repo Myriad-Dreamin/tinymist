@@ -36,18 +36,18 @@ jobs:
     name: pre_check
     runs-on: ubuntu-latest
     outputs:
-      is-release: ${{ steps.check_is_release.outputs.is-release }}
+      is-release: ${{ steps.check_is_release.outputs.isa }}
     steps:
       - name: check_is_release
         id: check_is_release
         run: |
           if ${{ startsWith(github.ref, 'refs/tags/') }}; then
-            is-release='true'
+            isa='true'
           else
-            is-release='false'
+            isa='false'
           fi
-          value=$(echo ${is-release} | jq -c)
-          echo "::set-output name=is-release::${value}"   
+          value=$(echo ${isa} | jq -c)
+          echo "::set-output name=isa::${value}"   
   build:
     strategy:
       matrix:
