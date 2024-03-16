@@ -40,14 +40,7 @@ jobs:
     steps:
       - name: check_is_release
         id: check_is_release
-        run: |
-          if ${{ startsWith(github.ref, 'refs/tags/') }}; then
-            isa='true'
-          else
-            isa='false'
-          fi
-          value=$(echo ${isa} | jq -c)
-          echo "::set-output name=isa::${value}"   
+        run: echo "::set-output name=isa::${{ startsWith(github.ref, 'refs/tags/') }}"   
   build:
     strategy:
       matrix:
