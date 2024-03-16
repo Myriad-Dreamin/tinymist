@@ -32,72 +32,42 @@ jobs:
         uses: fkirc/skip-duplicate-actions@v5
         with:
           cancel_others: "true"
-  pre_check:
-    name: pre_check
-    runs-on: ubuntu-latest
-    outputs:
-      tagged: ${{ steps.check_is_release.outputs.isa }}
-    steps:
-      - name: check_is_release
-        id: check_is_release
-        run: echo "isa=[${{ startsWith(github.ref, 'refs/tags/') }}]" >> $GITHUB_OUTPUT
   build:
     strategy:
       matrix:
-        is-release: ${{ fromJson(needs.pre_check.outputs.tagged) }}
         include:
-          - is-release: false
-            os: windows-latest
+          - os: windows-latest
             rust-target: x86_64-pc-windows-msvc
             platform: win32
             arch: x64
-          - is-release: false
-            os: ubuntu-20.04
-            rust-target: x86_64-unknown-linux-gnu
-            platform: linux
-            arch: x64
-          - is-release: false
-            os: macos-11
-            rust-target: aarch64-apple-darwin
-            platform: darwin
-            arch: arm64
-          - is-release: true
-            os: windows-latest
-            rust-target: x86_64-pc-windows-msvc
-            platform: win32
-            arch: x64
-          - is-release: true
-            os: windows-latest
+            regular_build: 'true'
+          - os: windows-latest
             rust-target: aarch64-pc-windows-msvc
             platform: win32
             arch: arm64
-          - is-release: true
-            os: ubuntu-20.04
+          - os: ubuntu-20.04
             rust-target: x86_64-unknown-linux-gnu
             platform: linux
             arch: x64
-          - is-release: true
-            os: ubuntu-20.04
+            regular_build: 'true'
+          - os: ubuntu-20.04
             rust-target: aarch64-unknown-linux-gnu
             platform: linux
             arch: arm64
-          - is-release: true
-            os: ubuntu-20.04
+          - os: ubuntu-20.04
             rust-target: arm-unknown-linux-gnueabihf
             platform: linux
             arch: armhf
-          - is-release: true
-            os: macos-11
+          - os: macos-11
             rust-target: x86_64-apple-darwin
             platform: darwin
             arch: x64
-          - is-release: true
-            os: macos-11
+          - os: macos-11
             rust-target: aarch64-apple-darwin
             platform: darwin
             arch: arm64
+            regular_build: 'true'
     name: build (${{ matrix.platform }}-${{ matrix.arch }})
-    needs: [pre_check]
     runs-on: ${{ matrix.os }}
     env:
       target: ${{ matrix.platform }}-${{ matrix.arch }}
@@ -105,46 +75,57 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - uses: actions/checkout@v4
         with:
           repository: Enter-tainer/typst-preview
           path: external/typst-preview
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.4
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 16
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Hack typst-preview
         run: |
           mv src/main.rs src/main.rsx
         working-directory: ./external/typst-preview
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Build typst-dom
         run: |
           yarn
           yarn build
         working-directory: ./external/typst-preview/addons/typst-dom
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Build frontend
         run: yarn
         working-directory: ./external/typst-preview/addons/frontend
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Build typst-preview
         run: |
           yarn
           yarn run compile
         working-directory: ./external/typst-preview/addons/vscode
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Install deps
         run: yarn install
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Build vscode extension
         run: |
           yarn
           yarn run compile
         working-directory: ./editors/vscode
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust-target }}
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Install llvm
-        if: matrix.platform == 'linux'
+        if: matrix.platform == 'linux' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
           sudo apt-get update
           sudo apt-get install llvm
@@ -153,65 +134,72 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install gcc-aarch64-linux-gnu
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Install ARM target toolchain
         if: matrix.rust-target == 'arm-unknown-linux-gnueabihf'
         run: |
           sudo apt-get update
           sudo apt-get install gcc-arm-linux-gnueabihf
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Build tinymist binary
         shell: pwsh
         run: |
           cargo build --release -p tinymist --target ${{ matrix.rust-target }}
+        if: startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true'
       - name: Rename debug symbols for windows
-        if: matrix.platform == 'win32'
+        if: matrix.platform == 'win32' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
           cd target/${{ matrix.rust-target }}/release
           cp tinymist.pdb tinymist-${{ env.target }}.pdb
       - name: Upload split debug symbols for windows
-        if: matrix.platform == 'win32'
+        if: matrix.platform == 'win32' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.pdb
           path: target/${{ matrix.rust-target }}/release/tinymist-${{ env.target }}.pdb
       - name: Split debug symbols for linux
-        if: matrix.platform == 'linux'
+        if: matrix.platform == 'linux' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
           cd target/${{ matrix.rust-target }}/release
           llvm-objcopy --compress-debug-sections --only-keep-debug "tinymist" "tinymist-${{ env.target }}.debug"
           llvm-objcopy --strip-debug --add-gnu-debuglink="tinymist-${{ env.target }}.debug" "tinymist"
       - name: Upload split debug symbols for linux
-        if: matrix.platform == 'linux'
+        if: matrix.platform == 'linux' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.debug
           path: target/${{ matrix.rust-target }}/release/tinymist-${{ env.target }}.debug
           compression-level: 0
       - name: Collect debug symbols for mac
-        if: matrix.platform == 'darwin'
+        if: matrix.platform == 'darwin' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
           dsymutil -f "target/${{ matrix.rust-target }}/release/tinymist"
           mv "target/${{ matrix.rust-target }}/release/tinymist.dwarf" "target/${{ matrix.rust-target }}/release/tinymist-${{ env.target }}.dwarf"
       - name: Upload split debug symbols for mac
-        if: matrix.platform == 'darwin'
+        if: matrix.platform == 'darwin' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.dwarf
           path: target/${{ matrix.rust-target }}/release/tinymist-${{ env.target }}.dwarf
       - name: Copy binary to output directory
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         shell: pwsh
         run: |
           cp "target/${{ matrix.rust-target }}/release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "editors/vscode/out/"
           cp "target/${{ matrix.rust-target }}/release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "tinymist-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       - name: Upload binary artifact
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}
           path: tinymist-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
       - name: Package extension
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
         working-directory: ./editors/vscode
       - name: Upload VSIX artifact
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.vsix
