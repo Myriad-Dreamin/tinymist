@@ -11,7 +11,7 @@ rust-version = "1.74"
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "external/typst-preview"]
+members = ["crates/*"]
 
 [workspace.dependencies]
 
@@ -39,7 +39,7 @@ typst-pdf = "0.10.0"
 typst-assets = { git = "https://github.com/typst/typst-assets", rev = "4d1211a" }
 typst-ts-core = { version = "0.4.2-rc7" }
 typst-ts-compiler = { version = "0.4.2-rc7" }
-typst-preview = { path = "external/typst-preview" }
+typst-preview = { git = "https://github.com/Enter-tainer/typst-preview", rev = "b7db246d8a61a2f1caf9d3a6aa6b74ac68c3027c" }
 
 lsp-server = "0.7.3"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
@@ -93,6 +93,8 @@ missing_safety_doc = "warn"
 undocumented_unsafe_blocks = "warn"
 
 [patch.crates-io]
+
+
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
 typst-ide = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
 typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
@@ -110,3 +112,7 @@ typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = 
 # typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
 # typst-ts-core = { path = "../typst.ts/core" }
 # typst-ts-compiler = { path = "../typst.ts/compiler" }
+
+# https://github.com/rust-lang/cargo/issues/8690
+[patch."https://github.com/Enter-tainer/typst-preview"]
+typst-preview = { path = "external/typst-preview" }

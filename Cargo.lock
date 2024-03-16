@@ -569,35 +569,14 @@ checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 
 [[package]]
 name = "comemo"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf5705468fa80602ee6a5f9318306e6c428bffd53e43209a78bc05e6e667c6f4"
-dependencies = [
- "comemo-macros 0.3.1",
- "siphasher 1.0.0",
-]
-
-[[package]]
-name = "comemo"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df6916408a724339aa77b18214233355f3eb04c42eb895e5f8909215bd8a7a91"
 dependencies = [
- "comemo-macros 0.4.0",
+ "comemo-macros",
  "once_cell",
  "parking_lot",
  "siphasher 1.0.0",
-]
-
-[[package]]
-name = "comemo-macros"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54af6ac68ada2d161fa9cc1ab52676228e340866d094d6542107e74b82acc095"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.52",
 ]
 
 [[package]]
@@ -2698,7 +2677,7 @@ source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=2ba02c5ff3e2ab73584
 dependencies = [
  "base64 0.22.0",
  "bitvec",
- "comemo 0.4.0",
+ "comemo",
  "dashmap",
  "ecow",
  "fxhash",
@@ -3609,7 +3588,7 @@ dependencies = [
  "clap_complete_fig",
  "clap_mangen",
  "codespan-reporting",
- "comemo 0.4.0",
+ "comemo",
  "crossbeam-channel",
  "env_logger",
  "futures",
@@ -3626,7 +3605,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "typst",
- "typst-assets",
+ "typst-assets 0.10.0",
  "typst-pdf",
  "typst-preview",
  "typst-ts-compiler",
@@ -3639,7 +3618,7 @@ name = "tinymist-query"
 version = "0.10.2"
 dependencies = [
  "anyhow",
- "comemo 0.4.0",
+ "comemo",
  "ena",
  "fxhash",
  "indexmap 2.2.5",
@@ -3897,7 +3876,7 @@ dependencies = [
  "bitflags 2.4.2",
  "chinese-number",
  "ciborium",
- "comemo 0.4.0",
+ "comemo",
  "csv",
  "ecow",
  "fontdb",
@@ -3937,7 +3916,7 @@ dependencies = [
  "ttf-parser",
  "two-face",
  "typed-arena",
- "typst-assets",
+ "typst-assets 0.10.0",
  "typst-macros",
  "typst-syntax",
  "typst-timing",
@@ -3955,11 +3934,16 @@ version = "0.10.0"
 source = "git+https://github.com/typst/typst-assets?rev=4d1211a#4d1211ab5ba8a02992a7362000e6dd422d44dd68"
 
 [[package]]
+name = "typst-assets"
+version = "0.11.0-rc1"
+source = "git+https://github.com/typst/typst-assets?tag=v0.11.0-rc1#0ef66188759fc7035be57d9608ccb1ecfd3ef796"
+
+[[package]]
 name = "typst-ide"
 version = "0.10.0"
 source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.0#e1daef5ab881af01bd86f2dd9700dd759c017387"
 dependencies = [
- "comemo 0.4.0",
+ "comemo",
  "ecow",
  "if_chain",
  "log",
@@ -3986,7 +3970,7 @@ source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.
 dependencies = [
  "base64 0.22.0",
  "bytemuck",
- "comemo 0.4.0",
+ "comemo",
  "ecow",
  "image",
  "miniz_oxide",
@@ -3996,7 +3980,7 @@ dependencies = [
  "svg2pdf",
  "ttf-parser",
  "typst",
- "typst-assets",
+ "typst-assets 0.10.0",
  "typst-macros",
  "typst-timing",
  "unicode-properties",
@@ -4006,14 +3990,14 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.10.8"
+version = "0.10.10"
 dependencies = [
  "anyhow",
  "await-tree",
  "clap",
  "clap_complete",
  "clap_mangen",
- "comemo 0.3.1",
+ "comemo",
  "elsa",
  "env_logger",
  "futures",
@@ -4030,6 +4014,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "typst",
+ "typst-assets 0.11.0-rc1",
  "typst-ts-compiler",
  "typst-ts-core",
  "typst-ts-svg-exporter",
@@ -4041,7 +4026,7 @@ name = "typst-syntax"
 version = "0.10.0"
 source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.0#e1daef5ab881af01bd86f2dd9700dd759c017387"
 dependencies = [
- "comemo 0.4.0",
+ "comemo",
  "ecow",
  "once_cell",
  "serde",
@@ -4072,7 +4057,7 @@ dependencies = [
  "base64 0.22.0",
  "chrono",
  "codespan-reporting",
- "comemo 0.4.0",
+ "comemo",
  "dirs",
  "dissimilar",
  "flate2",
@@ -4110,7 +4095,7 @@ dependencies = [
  "base64-serde",
  "bitvec",
  "byteorder",
- "comemo 0.4.0",
+ "comemo",
  "crossbeam-queue",
  "dashmap",
  "ecow",
@@ -4144,7 +4129,7 @@ version = "0.4.2-rc8"
 source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=2ba02c5ff3e2ab735849d4e96b331bec14c24a00#2ba02c5ff3e2ab735849d4e96b331bec14c24a00"
 dependencies = [
  "base64 0.22.0",
- "comemo 0.4.0",
+ "comemo",
  "log",
  "once_cell",
  "rayon",
