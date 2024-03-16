@@ -28,10 +28,6 @@ fxhash.workspace = true
 toml.workspace = true
 walkdir.workspace = true
 indexmap = "2.1.0"
-toml = { version = "0.8", default-features = false, features = [
-    "parse",
-    "display",
-] }
 
 typst.workspace = true
 typst-ide.workspace = true
