@@ -35,42 +35,49 @@ jobs:
   build:
     strategy:
       matrix:
+        is-release:
+          - ${{ startsWith(github.ref, 'refs/tags/') }}
         include:
           - os: windows-latest
             rust-target: x86_64-pc-windows-msvc
             platform: win32
             arch: x64
-            regular_build: 'true'
+            regular-build: true
           - os: windows-latest
             rust-target: aarch64-pc-windows-msvc
             platform: win32
             arch: arm64
+            regular-build: false
           - os: ubuntu-20.04
             rust-target: x86_64-unknown-linux-gnu
             platform: linux
             arch: x64
-            regular_build: 'true'
+            regular-build: true
           - os: ubuntu-20.04
             rust-target: aarch64-unknown-linux-gnu
             platform: linux
             arch: arm64
+            regular-build: false
           - os: ubuntu-20.04
             rust-target: arm-unknown-linux-gnueabihf
             platform: linux
             arch: armhf
+            regular-build: false
           - os: macos-11
             rust-target: x86_64-apple-darwin
             platform: darwin
             arch: x64
+            regular-build: false
           - os: macos-11
             rust-target: aarch64-apple-darwin
             platform: darwin
             arch: arm64
-            regular_build: 'true'
-
+            regular-build: true
+        # Run only the amd64 build in pull reqs:
+        exclude:
+          - { is-release: false, regular-build: false }
     name: build (${{ matrix.platform }}-${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
-    if: startsWith(github.ref, 'refs/tags/') || ${{ matrix.regular_build == 'true' }}
     env:
       target: ${{ matrix.platform }}-${{ matrix.arch }}
     steps:
