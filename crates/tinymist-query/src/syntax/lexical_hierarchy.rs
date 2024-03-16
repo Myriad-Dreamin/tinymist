@@ -14,7 +14,11 @@ use typst::{
     },
     util::LazyHash,
 };
-use typst_ts_core::typst::prelude::{eco_vec, EcoVec};
+use typst_ts_core::{
+    error::prelude::WithContext,
+    package::PackageSpec,
+    typst::prelude::{eco_vec, EcoVec},
+};
 
 use super::IdentRef;
 
@@ -37,7 +41,13 @@ pub(crate) fn get_lexical_hierarchy(
         },
         eco_vec![],
     ));
-    let res = worker.get_symbols(root).ok();
+    let res = match worker.get_symbols(root) {
+        Ok(()) => Some(()),
+        Err(e) => {
+            log::error!("lexical hierarchy analysis failed: {:?}", e);
+            None
+        }
+    };
 
     while worker.stack.len() > 1 {
         worker.symbreak();
@@ -641,15 +651,24 @@ impl LexicalHierarchyWorker {
             match v {
                 ast::Expr::Str(e) => {
                     let e = e.get();
-                    let e = Path::new(e.as_ref())
-                        .file_name()
-                        .context("no file name")?
-                        .to_string_lossy();
-                    let e = e.as_ref();
-                    let e = e.strip_suffix(".typ").context("no suffix")?;
+
+                    let name = if e.starts_with('@') {
+                        let spec = e
+                            .parse::<PackageSpec>()
+                            .context("parse package spec failed for name")?;
+                        spec.name.to_string()
+                    } else {
+                        let e = Path::new(e.as_ref())
+                            .file_name()
+                            .context("no file name")?
+                            .to_string_lossy();
+                        let e = e.as_ref();
+                        e.strip_suffix(".typ").context("no suffix")?.to_owned()
+                    };
+
                     // return (e == name).then_some(ImportRef::Path(v));
                     self.push_leaf(LexicalInfo {
-                        name: e.to_string(),
+                        name,
                         kind: LexicalKind::module_path(),
                         range: v_linked.range(),
                     });

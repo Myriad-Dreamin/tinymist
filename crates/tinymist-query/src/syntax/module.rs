@@ -31,7 +31,7 @@ pub fn construct_module_dependencies(
         };
 
         let file_id = source.id();
-        let deps = find_imports(&source);
+        let deps = find_imports(ctx.world, &source);
         dependencies
             .entry(file_id)
             .or_insert_with(|| ModuleDependency {
