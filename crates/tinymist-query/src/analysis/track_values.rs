@@ -68,7 +68,7 @@ pub fn analyze_import(world: &dyn World, source: &LinkedNode) -> Option<Value> {
     let context = Context::none();
     let mut vm = Vm::new(
         engine,
-        &context,
+        context.track(),
         Scopes::new(Some(world.library())),
         Span::detached(),
     );
