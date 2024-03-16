@@ -181,6 +181,28 @@ fn inlay_hint(
                             (false, false)
                         };
 
+                    let disable_by_single_line_content_block = !SMART.on_content_block_args
+                        || 'one_line: {
+                            for arg in args.items() {
+                                let Some(arg_node) = args_node.find(arg.span()) else {
+                                    continue;
+                                };
+
+                                let Some(info) = call_info.arg_mapping.get(&arg_node) else {
+                                    continue;
+                                };
+
+                                if info.kind != ParamKind::Named
+                                    && info.is_content_block
+                                    && !is_one_line(self.source, &arg_node)
+                                {
+                                    break 'one_line false;
+                                }
+                            }
+
+                            true
+                        };
+
                     let mut is_first_variadic_arg = true;
 
                     for arg in args.items() {
@@ -208,7 +230,8 @@ fn inlay_hint(
                             ParamKind::Positional
                                 if !SMART.on_pos_args
                                     || (info.is_content_block
-                                        && disable_by_single_content_pos_arg)
+                                        && (disable_by_single_content_pos_arg
+                                            || disable_by_single_line_content_block))
                                     || (!info.is_content_block && disable_by_single_pos_arg) =>
                             {
                                 continue
@@ -619,6 +642,18 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
     }
 
     params
+}
+
+fn is_one_line(src: &Source, arg_node: &LinkedNode<'_>) -> bool {
+    is_one_line_(src, arg_node).unwrap_or(true)
+}
+
+fn is_one_line_(src: &Source, arg_node: &LinkedNode<'_>) -> Option<bool> {
+    let lb = arg_node.children().next()?;
+    let rb = arg_node.children().next_back()?;
+    let ll = src.byte_to_line(lb.offset())?;
+    let rl = src.byte_to_line(rb.offset())?;
+    Some(ll == rl)
 }
 
 #[cfg(test)]
