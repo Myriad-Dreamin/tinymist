@@ -39,6 +39,9 @@ Language service (LSP) features:
 Extra features:
 
 - Compiles to PDF on save (configurable to as-you-type, or other options)
+- [Editor tools](https://github.com/Myriad-Dreamin/tinymist/tree/main/tools/editor-tools):
+  - View a list of templates in template gallery.
+  - Click a button in template gallery to initialize a new project with a template.
 
 ## Installation
 
