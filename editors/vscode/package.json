@@ -332,6 +332,11 @@
                 "category": "Typst"
             },
             {
+                "command": "tinymist.initTemplateInPlace",
+                "title": "Insert the content of template entry in place",
+                "category": "Typst"
+            },
+            {
                 "command": "tinymist.showTemplateGallery",
                 "title": "Show available Typst templates (gallery) for picking up a template to initialize",
                 "category": "Typst"

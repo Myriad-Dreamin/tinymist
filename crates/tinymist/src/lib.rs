@@ -56,6 +56,7 @@ use lsp_types::request::{
 use lsp_types::*;
 use parking_lot::{Mutex, RwLock};
 use paste::paste;
+use serde::Serialize;
 use serde_json::{Map, Value as JsonValue};
 use state::MemoryFileMeta;
 use tinymist_query::{
@@ -649,6 +650,7 @@ impl TypstLanguageServer {
             redirected_command!("tinymist.pinMain", Self::pin_document),
             redirected_command!("tinymist.focusMain", Self::focus_document),
             redirected_command!("tinymist.doInitTemplate", Self::init_template),
+            redirected_command!("tinymist.doGetTemplateEntry", Self::do_get_template_entry),
         ])
     }
 
@@ -726,22 +728,21 @@ impl TypstLanguageServer {
     pub fn init_template(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         use crate::tools::package::{self, determine_latest_version, TemplateSource};
 
+        #[derive(Debug, Serialize)]
+        struct InitResult {
+            #[serde(rename = "entryPath")]
+            entry_path: PathBuf,
+        }
+
         let from_source = arguments
             .first()
             .and_then(|v| v.as_str())
             .map(|s| s.to_owned())
             .ok_or_else(|| invalid_params("The first parameter is not a valid source or null"))?;
         let to_path = parse_path_or_null(arguments.get(1))?;
-        self.primary()
+        let res = self
+            .primary()
             .steal(move |c| {
-                let mut from_source = from_source.as_str();
-                if from_source.starts_with("typst ") {
-                    from_source = from_source[6..].trim();
-                }
-                if from_source.starts_with("init ") {
-                    from_source = from_source[5..].trim();
-                }
-
                 // Parse the package specification. If the user didn't specify the version,
                 // we try to figure it out automatically by downloading the package index
                 // or searching the disk.
@@ -758,7 +759,7 @@ impl TypstLanguageServer {
 
                 let from_source = TemplateSource::Package(spec);
 
-                package::init(
+                let entry_path = package::init(
                     c.compiler.world(),
                     InitTask {
                         tmpl: from_source.clone(),
@@ -769,12 +770,55 @@ impl TypstLanguageServer {
 
                 info!("template initialized: {from_source:?} to {to_path:?}");
 
-                ZResult::Ok(())
+                ZResult::Ok(InitResult { entry_path })
             })
             .and_then(|e| e)
             .map_err(|e| invalid_params(format!("failed to determine template source: {e}")))?;
 
-        Ok(JsonValue::Null)
+        serde_json::to_value(res).map_err(|_| internal_error("Cannot serialize path"))
+    }
+
+    /// Get the entry of a template.
+    pub fn do_get_template_entry(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        use crate::tools::package::{self, determine_latest_version, TemplateSource};
+
+        let from_source = arguments
+            .first()
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_owned())
+            .ok_or_else(|| invalid_params("The first parameter is not a valid source or null"))?;
+
+        let entry = self
+            .primary()
+            .steal(move |c| {
+                // Parse the package specification. If the user didn't specify the version,
+                // we try to figure it out automatically by downloading the package index
+                // or searching the disk.
+                let spec: PackageSpec = from_source
+                    .parse()
+                    .or_else(|err| {
+                        // Try to parse without version, but prefer the error message of the
+                        // normal package spec parsing if it fails.
+                        let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
+                        let version = determine_latest_version(c.compiler.world(), &spec)?;
+                        StrResult::Ok(spec.at(version))
+                    })
+                    .map_err(map_string_err("failed to parse package spec"))?;
+
+                let from_source = TemplateSource::Package(spec);
+
+                let entry = package::get_entry(c.compiler.world(), from_source)
+                    .map_err(map_string_err("failed to get template entry"))?;
+
+                ZResult::Ok(entry)
+            })
+            .and_then(|e| e)
+            .map_err(|e| invalid_params(format!("failed to determine template entry: {e}")))?;
+
+        let entry = String::from_utf8(entry.to_vec())
+            .map_err(|_| invalid_params("template entry is not a valid UTF-8 string"))?;
+
+        Ok(JsonValue::String(entry))
     }
 }
 

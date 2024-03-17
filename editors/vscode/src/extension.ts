@@ -114,7 +114,12 @@ async function startClient(context: ExtensionContext): Promise<void> {
     );
     context.subscriptions.push(
         commands.registerCommand("tinymist.initTemplate", (...args) =>
-            commandInitTemplate(context, ...args)
+            commandInitTemplate(context, false, ...args)
+        )
+    );
+    context.subscriptions.push(
+        commands.registerCommand("tinymist.initTemplateInPlace", (...args) =>
+            commandInitTemplate(context, true, ...args)
         )
     );
     context.subscriptions.push(
@@ -271,74 +276,119 @@ async function commandShowTemplateGallery(context: vscode.ExtensionContext): Pro
 
 async function commandInitTemplate(
     context: vscode.ExtensionContext,
+    inPlace: boolean,
     ...args: string[]
 ): Promise<void> {
     const initArgs: string[] = [];
-    if (args.length === 2) {
-        initArgs.push(...args);
-    } else if (args.length > 0) {
-        await vscode.window.showErrorMessage(
-            "Invalid arguments for initTemplate, needs either all arguments or zero arguments"
-        );
-        return;
-    } else {
-        const mode = await getTemplateSpecifier();
-        initArgs.push(mode ?? "");
-        const path = await vscode.window.showOpenDialog({
-            canSelectFiles: false,
-            canSelectFolders: true,
-            canSelectMany: false,
-            openLabel: "Select folder to initialize",
+    if (!inPlace) {
+        if (args.length === 2) {
+            initArgs.push(...args);
+        } else if (args.length > 0) {
+            await vscode.window.showErrorMessage(
+                "Invalid arguments for initTemplate, needs either all arguments or zero arguments"
+            );
+            return;
+        } else {
+            const mode = await getTemplateSpecifier();
+            initArgs.push(mode ?? "");
+            const path = await vscode.window.showOpenDialog({
+                canSelectFiles: false,
+                canSelectFolders: true,
+                canSelectMany: false,
+                openLabel: "Select folder to initialize",
+            });
+            if (path === undefined) {
+                return;
+            }
+            initArgs.push(path[0].fsPath);
+        }
+
+        const fsPath = initArgs[1];
+        const uri = Uri.file(fsPath);
+
+        interface InitResult {
+            entryPath: string;
+        }
+
+        const res: InitResult | undefined = await client?.sendRequest("workspace/executeCommand", {
+            command: "tinymist.doInitTemplate",
+            arguments: [...initArgs],
         });
-        if (path === undefined) {
+
+        const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (res && workspaceRoot && uri.fsPath.startsWith(workspaceRoot)) {
+            const entry = Uri.file(path.resolve(uri.fsPath, res.entryPath));
+            await commands.executeCommand("vscode.open", entry, ViewColumn.Active);
+        } else {
+            // focus the new folder
+            await commands.executeCommand("vscode.openFolder", uri);
+        }
+    } else {
+        if (args.length === 1) {
+            initArgs.push(...args);
+        } else if (args.length > 0) {
+            await vscode.window.showErrorMessage(
+                "Invalid arguments for initTemplateInPlace, needs either all arguments or zero arguments"
+            );
+            return;
+        } else {
+            const mode = await getTemplateSpecifier();
+            initArgs.push(mode ?? "");
+        }
+
+        const res: string | undefined = await client?.sendRequest("workspace/executeCommand", {
+            command: "tinymist.doGetTemplateEntry",
+            arguments: [...initArgs],
+        });
+
+        if (!res) {
             return;
         }
-        initArgs.push(path[0].fsPath);
 
-        function getTemplateSpecifier(): Promise<string> {
-            const data = getUserPackageData(context).data;
-            const pkgSpecifiers: string[] = [];
-            for (const ns of Object.keys(data)) {
-                for (const pkgName of Object.keys(data[ns])) {
-                    pkgSpecifiers.push(`@${ns}/${pkgName}`);
-                }
-            }
-
-            return new Promise((resolve) => {
-                const quickPick = window.createQuickPick();
-                quickPick.placeholder =
-                    "git, package spec with an optional version, or entire command, such as `typst init @preview/touying:0.3.2`";
-                quickPick.canSelectMany = false;
-                quickPick.items = pkgSpecifiers.map((label) => ({ label }));
-                quickPick.onDidAccept(() => {
-                    const selection = quickPick.activeItems[0];
-                    resolve(selection.label);
-                    quickPick.hide();
-                });
-                quickPick.onDidChangeValue(() => {
-                    // add a new code to the pick list as the first item
-                    if (!pkgSpecifiers.includes(quickPick.value)) {
-                        const newItems = [quickPick.value, ...pkgSpecifiers].map((label) => ({
-                            label,
-                        }));
-                        quickPick.items = newItems;
-                    }
-                });
-                quickPick.onDidHide(() => quickPick.dispose());
-                quickPick.show();
-            });
+        const activeEditor = window.activeTextEditor;
+        if (activeEditor === undefined) {
+            return;
         }
+
+        // insert content at the cursor
+        activeEditor.edit((editBuilder) => {
+            editBuilder.insert(activeEditor.selection.active, res);
+        });
     }
 
-    const fsPath = initArgs[1];
-    const uri = Uri.file(fsPath);
+    function getTemplateSpecifier(): Promise<string> {
+        const data = getUserPackageData(context).data;
+        const pkgSpecifiers: string[] = [];
+        for (const ns of Object.keys(data)) {
+            for (const pkgName of Object.keys(data[ns])) {
+                pkgSpecifiers.push(`@${ns}/${pkgName}`);
+            }
+        }
 
-    await client?.sendRequest("workspace/executeCommand", {
-        command: "tinymist.doInitTemplate",
-        arguments: [...initArgs],
-    });
-
-    await commands.executeCommand("vscode.openFolder", uri);
+        return new Promise((resolve) => {
+            const quickPick = window.createQuickPick();
+            quickPick.placeholder =
+                "git, package spec with an optional version, such as `@preview/touying:0.3.2`";
+            quickPick.canSelectMany = false;
+            quickPick.items = pkgSpecifiers.map((label) => ({ label }));
+            quickPick.onDidAccept(() => {
+                const selection = quickPick.activeItems[0];
+                resolve(selection.label);
+                quickPick.hide();
+            });
+            quickPick.onDidChangeValue(() => {
+                // add a new code to the pick list as the first item
+                if (!pkgSpecifiers.includes(quickPick.value)) {
+                    const newItems = [quickPick.value, ...pkgSpecifiers].map((label) => ({
+                        label,
+                    }));
+                    quickPick.items = newItems;
+                }
+            });
+            quickPick.onDidHide(() => quickPick.dispose());
+            quickPick.show();
+        });
+    }
 }
 
 async function commandActivateDoc(editor: TextEditor | undefined): Promise<void> {
