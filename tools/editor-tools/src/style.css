@@ -42,7 +42,11 @@ html, body {
     gap: 0.5rem;
 }
 
-.tinymist-category-filter-button {
+.tinymist-template-actions .tinymist-button div {
+    height: 16px;
+}
+
+.tinymist-button {
     background: rgba(129, 60, 133, 0.6);
     border: none;
     border-radius: 0.2rem;
@@ -50,11 +54,11 @@ html, body {
     transition: background 0.15s;
 }
 
-.tinymist-category-filter-button:hover {
+.tinymist-button:hover {
     background: rgba(129, 60, 133, 0.9);
 }
 
-.tinymist-category-filter-button.activated {
+.tinymist-button.activated {
     background: rgba(129, 60, 133, 0.9);
 }
 
@@ -68,13 +72,13 @@ body.typst-preview-dark .tinymist-card {
 body.typst-preview-dark .tinymist-category {
     background: rgba(255, 255, 255, 0.05);
 }
-body.typst-preview-dark .tinymist-category-filter-button {
+body.typst-preview-dark .tinymist-button {
     background: rgba(129, 60, 133, 0.6);
 }
-body.typst-preview-dark .tinymist-category-filter-button:hover {
+body.typst-preview-dark .tinymist-button:hover {
     background: rgba(129, 60, 133, 0.9);
 }
-body.typst-preview-dark .tinymist-category-filter-button.activated {
+body.typst-preview-dark .tinymist-button.activated {
     background: rgba(129, 60, 133, 0.9);
 }
 body.typst-preview-light .tinymist-card {
@@ -83,12 +87,16 @@ body.typst-preview-light .tinymist-card {
 body.typst-preview-light .tinymist-category {
     background: rgba(0, 0, 0, 0.05);
 }
-body.typst-preview-light .tinymist-category-filter-button {
+body.typst-preview-light .tinymist-button {
     background: rgba(186, 204, 217, 0.6);
 }
-body.typst-preview-light .tinymist-category-filter-button:hover {
+body.typst-preview-light .tinymist-button:hover {
     background: rgba(186, 204, 217, 0.9);
 }
-body.typst-preview-light .tinymist-category-filter-button.activated {
+body.typst-preview-light .tinymist-button.activated {
     background: rgba(186, 204, 217, 0.9);
+}
+
+.tinymist-icon path {
+    fill: WindowText;
 }

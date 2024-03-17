@@ -76,11 +76,11 @@
       const defaultToolbarFgColor = serverDark
         ? defaultToolbarDarkFgColor
         : defaultToolbarLightFgColor;
-      const previewBackgroundColor =
+      let previewBackgroundColor =
         getComputedStyle(document.documentElement).getPropertyValue(
           "--vscode-sideBar-background"
         ) || defaultBackgroundColor;
-      const previewToolbarFgColor =
+      let previewToolbarFgColor =
         getComputedStyle(document.documentElement).getPropertyValue(
           "--vscode-menu-foreground"
         ) || defaultToolbarFgColor;
@@ -97,7 +97,7 @@
       }
       document.documentElement.style.colorScheme = preferColorScheme;
 
-      const previewForegroundColor = previewToolbarFgColor;
+      let previewForegroundColor = previewToolbarFgColor;
 
       const defaultToolbarBorderColor = "rgba(0, 0, 0, 0)";
       const previewToolbarBorderColor =
@@ -114,12 +114,6 @@
       if (preferColorScheme === "dark") {
         previewBackgroundColor = defaultBackgroundColor;
         previewForegroundColor = defaultToolbarFgColor;
-      }
-
-      if (preferColorScheme === "dark") {
-        document.body.classList.add("typst-preview-dark");
-      } else {
-        document.body.classList.add("typst-preview-light");
       }
       // append css variable --typst-preview-background-color
       document.documentElement.style.setProperty(
@@ -156,11 +150,16 @@
     "
   >
     <script>
-      const themeKind = document.body?.getAttribute("data-vscode-theme-kind");
-      if (themeKind === "vscode-dark") {
-        document.body.classList.add("typst-preview-dark");
-      } else {
-        document.body.classList.add("typst-preview-light");
+      {
+        const themeKind = document.body?.getAttribute("data-vscode-theme-kind");
+        const serverDark =
+          themeKind === "vscode-dark" ||
+          window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+        if (serverDark) {
+          document.body.classList.add("typst-preview-dark");
+        } else {
+          document.body.classList.add("typst-preview-light");
+        }
       }
     </script>
     <div id="tinymist-app"></div>
