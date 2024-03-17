@@ -1,12 +1,12 @@
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use typst::diag::{bail, eco_format, FileError, FileResult, StrResult};
 use typst::syntax::package::{PackageManifest, PackageSpec, TemplateInfo};
 use typst::syntax::VirtualPath;
 use typst::World;
 use typst_ts_compiler::TypstSystemWorld;
-use typst_ts_core::{ImmutPath, TypstFileId};
+use typst_ts_core::{Bytes, ImmutPath, TypstFileId};
 
 #[derive(Debug, Clone)]
 pub enum TemplateSource {
@@ -19,7 +19,29 @@ pub struct InitTask {
 }
 
 /// Execute an initialization command.
-pub fn init(world: &TypstSystemWorld, task: InitTask) -> StrResult<()> {
+pub fn get_entry(world: &TypstSystemWorld, tmpl: TemplateSource) -> StrResult<Bytes> {
+    let TemplateSource::Package(spec) = tmpl;
+
+    let toml_id = TypstFileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
+
+    // Parse the manifest.
+    let manifest = parse_manifest(world, toml_id)?;
+    manifest.validate(&spec)?;
+
+    // Ensure that it is indeed a template.
+    let Some(tmpl_info) = &manifest.template else {
+        bail!("package {spec} is not a template");
+    };
+
+    let entry_point = toml_id
+        .join(&(tmpl_info.path.to_string() + "/main.typ"))
+        .join(&tmpl_info.entrypoint);
+
+    world.file(entry_point).map_err(|e| eco_format!("{e}"))
+}
+
+/// Execute an initialization command.
+pub fn init(world: &TypstSystemWorld, task: InitTask) -> StrResult<PathBuf> {
     let TemplateSource::Package(spec) = task.tmpl;
     let project_dir = task
         .dir
@@ -36,6 +58,8 @@ pub fn init(world: &TypstSystemWorld, task: InitTask) -> StrResult<()> {
         bail!("package {spec} is not a template");
     };
 
+    let entry_point = Path::new(template.entrypoint.as_str()).to_owned();
+
     // Determine the directory at which we will create the project.
     // let project_dir =
     // Path::new(command.dir.as_deref().unwrap_or(&manifest.package.name));
@@ -43,7 +67,7 @@ pub fn init(world: &TypstSystemWorld, task: InitTask) -> StrResult<()> {
     // Set up the project.
     scaffold_project(world, template, toml_id, &project_dir)?;
 
-    Ok(())
+    Ok(entry_point)
 }
 
 /// Parses the manifest of the package located at `package_path`.
