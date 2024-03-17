@@ -11,6 +11,12 @@ export function setupVscodeChannel() {
   }
 }
 
+export function requestSavePackageData(data: any) {
+  if (vscodeAPI?.postMessage) {
+    vscodeAPI.postMessage({ type: "savePackageData", data });
+  }
+}
+
 export function requestInitTemplate(packageSpec: string) {
   if (vscodeAPI?.postMessage) {
     vscodeAPI.postMessage({ type: "initTemplate", packageSpec });

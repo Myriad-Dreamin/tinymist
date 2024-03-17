@@ -19,7 +19,7 @@ import {
     type ServerOptions,
 } from "vscode-languageclient/node";
 import vscodeVariables from "vscode-variables";
-import { activateEditorTool } from "./editor-tools";
+import { activateEditorTool, getUserPackageData } from "./editor-tools";
 
 let client: LanguageClient | undefined = undefined;
 
@@ -113,7 +113,9 @@ async function startClient(context: ExtensionContext): Promise<void> {
         commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens)
     );
     context.subscriptions.push(
-        commands.registerCommand("tinymist.initTemplate", commandInitTemplate)
+        commands.registerCommand("tinymist.initTemplate", (...args) =>
+            commandInitTemplate(context, ...args)
+        )
     );
     context.subscriptions.push(
         commands.registerCommand("tinymist.showTemplateGallery", () =>
@@ -267,7 +269,10 @@ async function commandShowTemplateGallery(context: vscode.ExtensionContext): Pro
     await activateEditorTool(context, "template-gallery");
 }
 
-async function commandInitTemplate(...args: string[]): Promise<void> {
+async function commandInitTemplate(
+    context: vscode.ExtensionContext,
+    ...args: string[]
+): Promise<void> {
     const initArgs: string[] = [];
     if (args.length === 2) {
         initArgs.push(...args);
@@ -277,10 +282,7 @@ async function commandInitTemplate(...args: string[]): Promise<void> {
         );
         return;
     } else {
-        const mode = await vscode.window.showInputBox({
-            title: "template from url or package spec id",
-            prompt: "git or package spec with an optional version, you can also enters entire command, such as `typst init @preview/touying:0.3.2`",
-        });
+        const mode = await getTemplateSpecifier();
         initArgs.push(mode ?? "");
         const path = await vscode.window.showOpenDialog({
             canSelectFiles: false,
@@ -292,6 +294,40 @@ async function commandInitTemplate(...args: string[]): Promise<void> {
             return;
         }
         initArgs.push(path[0].fsPath);
+
+        function getTemplateSpecifier(): Promise<string> {
+            const data = getUserPackageData(context).data;
+            const pkgSpecifiers: string[] = [];
+            for (const ns of Object.keys(data)) {
+                for (const pkgName of Object.keys(data[ns])) {
+                    pkgSpecifiers.push(`@${ns}/${pkgName}`);
+                }
+            }
+
+            return new Promise((resolve) => {
+                const quickPick = window.createQuickPick();
+                quickPick.placeholder =
+                    "git, package spec with an optional version, or entire command, such as `typst init @preview/touying:0.3.2`";
+                quickPick.canSelectMany = false;
+                quickPick.items = pkgSpecifiers.map((label) => ({ label }));
+                quickPick.onDidAccept(() => {
+                    const selection = quickPick.activeItems[0];
+                    resolve(selection.label);
+                    quickPick.hide();
+                });
+                quickPick.onDidChangeValue(() => {
+                    // add a new code to the pick list as the first item
+                    if (!pkgSpecifiers.includes(quickPick.value)) {
+                        const newItems = [quickPick.value, ...pkgSpecifiers].map((label) => ({
+                            label,
+                        }));
+                        quickPick.items = newItems;
+                    }
+                });
+                quickPick.onDidHide(() => quickPick.dispose());
+                quickPick.show();
+            });
+        }
     }
 
     const fsPath = initArgs[1];
