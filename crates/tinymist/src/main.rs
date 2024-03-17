@@ -204,6 +204,14 @@ impl<R: Read + BufRead, W: Write> BufRead for MirrorWriter<R, W> {
     }
 
     fn consume(&mut self, amt: usize) {
+        let buf = self.0.fill_buf().unwrap();
+
+        if let Err(err) = self.1.write_all(&buf[..amt]) {
+            self.2.call_once(|| {
+                warn!("failed to write to mirror: {err}");
+            });
+        }
+
         self.0.consume(amt);
     }
 }
