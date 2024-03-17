@@ -22,3 +22,24 @@ tinymist --mirror input.txt
 # Replay the input
 tinymist --replay input.txt
 ```
+
+## Analyze memory usage with DHAT
+
+You can build the program with `dhat-heap` feature to collect memory usage with DHAT. The DHAT will instrument the allocator dynamically, so it will slow down the program significantly.
+
+```sh
+cargo build --release --bin tinymist --features dhat-heap
+```
+
+The instrumented program is nothing different from the normal program, so you can mine the specific memory usage with a lsp session (recorded with `--mirror`) by replaying the input.
+
+```sh
+./target/release/tinymist --replay input.txt
+...
+dhat: Total:     740,668,176 bytes in 1,646,987 blocks
+dhat: At t-gmax: 264,604,009 bytes in 317,241 blocks
+dhat: At t-end:  259,597,420 bytes in 313,588 blocks
+dhat: The data has been saved to dhat-heap.json, and is viewable with dhat/dh_view.html
+```
+
+Once you have the `dhat-heap.json`, you can visualize the memory usage with [the DHAT viewer](https://nnethercote.github.io/dh_view/dh_view.html).

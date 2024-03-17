@@ -24,6 +24,10 @@ use crate::args::CliArguments;
 
 use lsp_server::{Connection, Message, Response};
 
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 fn from_json<T: DeserializeOwned>(
     what: &'static str,
     json: &serde_json::Value,
@@ -35,6 +39,9 @@ fn from_json<T: DeserializeOwned>(
 /// The main entry point.
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::new_heap();
+
     // Start logging
     let _ = {
         use log::LevelFilter::*;
@@ -204,6 +211,14 @@ impl<R: Read + BufRead, W: Write> BufRead for MirrorWriter<R, W> {
     }
 
     fn consume(&mut self, amt: usize) {
+        let buf = self.0.fill_buf().unwrap();
+
+        if let Err(err) = self.1.write_all(&buf[..amt]) {
+            self.2.call_once(|| {
+                warn!("failed to write to mirror: {err}");
+            });
+        }
+
         self.0.consume(amt);
     }
 }

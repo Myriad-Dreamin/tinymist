@@ -52,11 +52,13 @@ typst-preview = { workspace = true, optional = true }
 lsp-server.workspace = true
 crossbeam-channel.workspace = true
 lsp-types.workspace = true
+dhat = { version = "0.3.3", optional = true }
 
 [features]
 default = ["cli", "preview"]
 cli = ["clap"]
 preview = ["typst-preview"]
+dhat-heap = ["dhat"]
 
 [build-dependencies]
 anyhow.workspace = true
