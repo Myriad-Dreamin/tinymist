@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, StatefulRequest};
 
 #[derive(Debug, Clone)]
 pub struct HoverRequest {
@@ -6,24 +6,25 @@ pub struct HoverRequest {
     pub position: LspPosition,
 }
 
-impl HoverRequest {
-    pub fn request(
+impl StatefulRequest for HoverRequest {
+    type Response = Hover;
+
+    fn request(
         self,
-        world: &TypstSystemWorld,
+        ctx: &mut AnalysisContext,
         doc: Option<VersionedDocument>,
-        position_encoding: PositionEncoding,
-    ) -> Option<Hover> {
+    ) -> Option<Self::Response> {
         let doc = doc.as_ref().map(|doc| doc.document.as_ref());
 
-        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-        let offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
+        let source = ctx.source_by_path(&self.path).ok()?;
+        let offset = ctx.to_typst_pos(self.position, &source)?;
         // the typst's cursor is 1-based, so we need to add 1 to the offset
         let cursor = offset + 1;
 
-        let typst_tooltip = typst_ide::tooltip(world, doc, &source, cursor)?;
+        let typst_tooltip = typst_ide::tooltip(ctx.world, doc, &source, cursor)?;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
-        let range = typst_to_lsp::range(ast_node.range(), &source, position_encoding);
+        let range = ctx.to_lsp_range(ast_node.range(), &source);
 
         Some(Hover {
             contents: typst_to_lsp::tooltip(&typst_tooltip),

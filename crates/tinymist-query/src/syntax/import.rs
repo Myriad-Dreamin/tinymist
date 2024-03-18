@@ -1,7 +1,11 @@
 use std::path::Path;
 
-use typst::syntax::{ast, package::PackageManifest, LinkedNode, Source, SyntaxKind, VirtualPath};
-use typst_ts_core::{package::PackageSpec, typst::prelude::EcoVec, TypstFileId};
+use ecow::EcoVec;
+use typst::syntax::{
+    ast,
+    package::{PackageManifest, PackageSpec},
+    FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath,
+};
 
 use crate::prelude::*;
 
@@ -13,7 +17,7 @@ fn resolve_id_by_path(
     if import_path.starts_with('@') {
         let spec = import_path.parse::<PackageSpec>().ok()?;
         // Evaluate the manifest.
-        let manifest_id = FileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
+        let manifest_id = TypstFileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
         let bytes = world.file(manifest_id).ok()?;
         let string = std::str::from_utf8(&bytes).map_err(FileError::from).ok()?;
         let manifest: PackageManifest = toml::from_str(string).ok()?;
@@ -80,7 +84,7 @@ pub fn find_imports(world: &dyn World, source: &Source) -> EcoVec<TypstFileId> {
 struct ImportWorker<'a> {
     world: &'a dyn World,
     current: TypstFileId,
-    imports: EcoVec<(FileId, LinkedNode<'a>)>,
+    imports: EcoVec<(TypstFileId, LinkedNode<'a>)>,
 }
 
 impl<'a> ImportWorker<'a> {

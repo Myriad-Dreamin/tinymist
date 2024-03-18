@@ -57,10 +57,10 @@ mod tests {
 
     #[test]
     fn test() {
-        snapshot_testing("document_symbols", &|world, path| {
+        snapshot_testing("document_symbols", &|ctx, path| {
             let request = DocumentSymbolRequest { path: path.clone() };
 
-            let source = get_suitable_source_in_workspace(world, &path).unwrap();
+            let source = ctx.source_by_path(&path).unwrap();
 
             let result = request.request(source, PositionEncoding::Utf16);
             assert_snapshot!(JsonRepr::new_redacted(result.unwrap(), &REDACT_LOC));

@@ -47,7 +47,7 @@ impl SyntaxRequest for RenameRequest {
         let def_loc = {
             let def_source = ctx.source_by_id(lnk.fid).ok()?;
 
-            let span_path = ctx.world.path_for_id(lnk.fid).ok()?;
+            let span_path = ctx.path_for_id(lnk.fid).ok()?;
             let uri = Url::from_file_path(span_path).ok()?;
 
             let Some(range) = lnk.name_range else {

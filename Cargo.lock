@@ -414,8 +414,10 @@ checksum = "8eaf5903dcbc0a39312feb77df2ff4c76387d591b9fc7b04a238dcf8bb62639a"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-targets 0.52.4",
 ]
 
@@ -3616,6 +3618,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cargo_metadata",
+ "chrono",
  "clap",
  "clap_builder",
  "clap_complete",
@@ -3656,6 +3659,7 @@ version = "0.11.0"
 dependencies = [
  "anyhow",
  "comemo",
+ "ecow",
  "ena",
  "fxhash",
  "indexmap 2.2.5",
@@ -3666,6 +3670,7 @@ dependencies = [
  "lsp-types",
  "once_cell",
  "parking_lot",
+ "reflexo",
  "regex",
  "serde",
  "serde_json",

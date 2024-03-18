@@ -124,7 +124,7 @@ mod tests {
                 line_folding_only: true,
             };
 
-            let source = get_suitable_source_in_workspace(world, &path).unwrap();
+            let source = world.source_by_path(&path).unwrap();
 
             let result = request.request(source, PositionEncoding::Utf16);
             assert_snapshot!(JsonRepr::new_pure(result.unwrap()));

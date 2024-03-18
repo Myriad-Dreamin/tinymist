@@ -38,7 +38,7 @@ impl SyntaxRequest for GotoDeclarationRequest {
             let ref_id = source.id();
             let ref_source = &source;
 
-            let span_path = ctx.world.path_for_id(ref_id).ok()?;
+            let span_path = ctx.path_for_id(ref_id).ok()?;
             let range = ctx.to_lsp_range(ref_range, ref_source);
 
             let uri = Url::from_file_path(span_path).ok()?;

@@ -101,7 +101,7 @@ fn diagnostic_related_information(
     Ok(tracepoints)
 }
 
-fn diagnostic_span_id(typst_diagnostic: &TypstDiagnostic) -> Option<(FileId, TypstSpan)> {
+fn diagnostic_span_id(typst_diagnostic: &TypstDiagnostic) -> Option<(TypstFileId, TypstSpan)> {
     iter::once(typst_diagnostic.span)
         .chain(typst_diagnostic.trace.iter().map(|trace| trace.span))
         .find_map(|span| Some((span.id()?, span)))

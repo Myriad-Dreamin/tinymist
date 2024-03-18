@@ -11,8 +11,9 @@ use log::{debug, error, info, trace, warn};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use tinymist_query::{
-    analysis::AnalysisContext, CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap,
-    FoldRequestFeature, OnExportRequest, OnSaveExportRequest, PositionEncoding, SyntaxRequest,
+    analysis::{Analysis, AnalysisContext},
+    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
+    OnExportRequest, OnSaveExportRequest, PositionEncoding, StatefulRequest, SyntaxRequest,
     VersionedDocument,
 };
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
@@ -204,8 +205,7 @@ impl<'a> fmt::Debug for ShowOpts<'a> {
 
 macro_rules! query_state {
     ($self:ident, $method:ident, $req:expr) => {{
-        let enc = $self.position_encoding;
-        let res = $self.steal_state(move |w, doc| $req.request(w, doc, enc));
+        let res = $self.steal_state(move |w, doc| $req.request(w, doc));
         res.map(CompilerQueryResponse::$method)
     }};
 }
@@ -664,11 +664,39 @@ impl CompileActor {
 
     fn steal_state<T: Send + Sync + 'static>(
         &self,
-        f: impl FnOnce(&TypstSystemWorld, Option<VersionedDocument>) -> T + Send + Sync + 'static,
+        f: impl FnOnce(&mut AnalysisContext, Option<VersionedDocument>) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
-        let fut = self.steal(move |compiler| f(compiler.compiler.world(), compiler.success_doc()));
+        let enc = self.position_encoding;
 
-        Ok(fut?)
+        self.steal(move |compiler| {
+            // todo: record analysis
+            let doc = compiler.success_doc();
+            let w = compiler.compiler.world_mut();
+
+            let Some(main) = w.main else {
+                log::error!("TypstActor: main file is not set");
+                return Err(anyhow!("main file is not set"));
+            };
+            w.source(main).map_err(|err| {
+                log::info!("TypstActor: failed to prepare main file: {:?}", err);
+                anyhow!("failed to get source: {err}")
+            })?;
+            w.prepare_env(&mut Default::default()).map_err(|err| {
+                log::error!("TypstActor: failed to prepare env: {:?}", err);
+                anyhow!("failed to prepare env")
+            })?;
+
+            Ok(f(
+                &mut AnalysisContext::new(
+                    w,
+                    Analysis {
+                        root: w.root.clone(),
+                        position_encoding: enc,
+                    },
+                ),
+                doc,
+            ))
+        })?
     }
 
     fn steal_world<T: Send + Sync + 'static>(
@@ -694,7 +722,13 @@ impl CompileActor {
                 anyhow!("failed to prepare env")
             })?;
 
-            Ok(f(&mut AnalysisContext::new(compiler.compiler.world(), enc)))
+            Ok(f(&mut AnalysisContext::new(
+                w,
+                Analysis {
+                    root: w.root.clone(),
+                    position_encoding: enc,
+                },
+            )))
         })?
     }
 }

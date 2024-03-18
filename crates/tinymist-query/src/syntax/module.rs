@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Path, sync::Once};
 
-use typst::syntax::VirtualPath;
-use typst_ts_core::{typst::prelude::EcoVec, TypstFileId};
+use ecow::EcoVec;
+use typst::syntax::{FileId as TypstFileId, VirtualPath};
 
 use crate::prelude::AnalysisContext;
 

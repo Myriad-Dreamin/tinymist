@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use log::debug;
 use typst::foundations::Value;
-use typst_ts_core::TypstFileId;
+use typst::syntax::FileId as TypstFileId;
 
 use crate::{
     prelude::*,
@@ -53,7 +53,7 @@ impl SyntaxRequest for GotoDefinitionRequest {
 
         let def = find_definition(ctx, source.clone(), deref_target)?;
 
-        let span_path = ctx.world.path_for_id(def.fid).ok()?;
+        let span_path = ctx.path_for_id(def.fid).ok()?;
         let uri = Url::from_file_path(span_path).ok()?;
 
         let span_source = ctx.source_by_id(def.fid).ok()?;
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn test() {
-        snapshot_testing2("goto_definition", &|world, path| {
+        snapshot_testing("goto_definition", &|world, path| {
             let source = world.source_by_path(&path).unwrap();
 
             let request = GotoDefinitionRequest {

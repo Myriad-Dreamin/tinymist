@@ -7,7 +7,7 @@ pub(crate) mod diagnostics;
 use std::sync::Arc;
 
 pub use analysis::AnalysisContext;
-use typst_ts_core::TypstDocument;
+use typst::model::Document as TypstDocument;
 
 pub use diagnostics::*;
 pub(crate) mod code_lens;
@@ -60,6 +60,16 @@ pub trait SyntaxRequest {
     type Response;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response>;
+}
+
+pub trait StatefulRequest {
+    type Response;
+
+    fn request(
+        self,
+        ctx: &mut AnalysisContext,
+        v: Option<VersionedDocument>,
+    ) -> Option<Self::Response>;
 }
 
 mod polymorphic {

@@ -20,9 +20,11 @@ use typst_ts_core::{config::CompileOpts, Bytes, TypstFileId};
 pub use insta::assert_snapshot;
 pub use typst_ts_compiler::TypstSystemWorld;
 
-use crate::{prelude::AnalysisContext, typst_to_lsp, LspPosition, PositionEncoding};
+use crate::{
+    analysis::Analysis, prelude::AnalysisContext, typst_to_lsp, LspPosition, PositionEncoding,
+};
 
-pub fn snapshot_testing(name: &str, f: &impl Fn(&mut TypstSystemWorld, PathBuf)) {
+pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) {
     let mut settings = insta::Settings::new();
     settings.set_prepend_module_to_snapshot(false);
     settings.set_snapshot_path(format!("fixtures/{name}/snaps"));
@@ -31,26 +33,28 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut TypstSystemWorld, PathBuf))
         insta::glob!(&glob_path, |path| {
             let contents = std::fs::read_to_string(path).unwrap();
 
-            run_with_sources(&contents, f);
+            run_with_sources(&contents, |w: &mut TypstSystemWorld, p| {
+                let paths = w
+                    .shadow_paths()
+                    .into_iter()
+                    .map(|p| {
+                        TypstFileId::new(
+                            None,
+                            VirtualPath::new(p.strip_prefix(w.workspace_root()).unwrap()),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                let mut ctx = AnalysisContext::new(
+                    w,
+                    Analysis {
+                        root: w.workspace_root(),
+                        position_encoding: PositionEncoding::Utf16,
+                    },
+                );
+                ctx.test_files(|| paths);
+                f(&mut ctx, p);
+            });
         });
-    });
-}
-
-pub fn snapshot_testing2(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) {
-    snapshot_testing(name, &|w, p| {
-        let paths = w
-            .shadow_paths()
-            .into_iter()
-            .map(|p| {
-                TypstFileId::new(
-                    None,
-                    VirtualPath::new(p.strip_prefix(w.workspace_root()).unwrap()),
-                )
-            })
-            .collect::<Vec<_>>();
-        let mut ctx = AnalysisContext::new(w, PositionEncoding::Utf16);
-        ctx.test_files(|| paths);
-        f(&mut ctx, p);
     });
 }
 
