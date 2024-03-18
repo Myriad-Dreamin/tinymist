@@ -1,4 +1,4 @@
-use crate::{prelude::*, SemanticTokenCache};
+use crate::{prelude::*, SemanticTokenContext};
 
 #[derive(Debug, Clone)]
 pub struct SemanticTokensDeltaRequest {
@@ -9,15 +9,11 @@ pub struct SemanticTokensDeltaRequest {
 impl SemanticTokensDeltaRequest {
     pub fn request(
         self,
-        cache: &SemanticTokenCache,
+        ctx: &SemanticTokenContext,
         source: Source,
-        position_encoding: PositionEncoding,
     ) -> Option<SemanticTokensFullDeltaResult> {
-        let (tokens, result_id) = cache.try_semantic_tokens_delta_from_result_id(
-            &source,
-            &self.previous_result_id,
-            position_encoding,
-        );
+        let (tokens, result_id) =
+            ctx.try_semantic_tokens_delta_from_result_id(&source, &self.previous_result_id);
 
         match tokens {
             Ok(edits) => Some(

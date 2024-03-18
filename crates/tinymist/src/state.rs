@@ -181,8 +181,7 @@ macro_rules! query_tokens_cache {
         let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {:?}", path))?;
         let source = snapshot.content.clone();
 
-        let enc = $self.const_config.position_encoding;
-        let res = $req.request(&$self.tokens_cache, source, enc);
+        let res = $req.request(&$self.tokens_ctx, source);
         Ok(CompilerQueryResponse::$method(res))
     }};
 }

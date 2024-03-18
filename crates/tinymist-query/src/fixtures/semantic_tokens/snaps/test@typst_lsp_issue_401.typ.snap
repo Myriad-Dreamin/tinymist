@@ -1,0 +1,6 @@
+---
+source: crates/tinymist-query/src/semantic_tokens_full.rs
+expression: "serde_json::to_string(&result).unwrap()"
+input_file: crates/tinymist-query/src/fixtures/semantic_tokens/typst_lsp_issue_401.typ
+---
+{"data":[0,0,1,1,0,0,1,7,1,0,1,0,2,1,0,1,0,6,1,0]}

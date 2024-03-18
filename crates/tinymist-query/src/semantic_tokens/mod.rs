@@ -1,30 +1,31 @@
-use itertools::Itertools;
+use std::ops::Range;
+
 use lsp_types::{
     Registration, SemanticToken, SemanticTokensEdit, SemanticTokensFullOptions,
     SemanticTokensLegend, SemanticTokensOptions, Unregistration,
 };
 use parking_lot::RwLock;
 use strum::IntoEnumIterator;
-use typst::diag::EcoString;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 
-use crate::PositionEncoding;
+use crate::{LspPosition, PositionEncoding};
 
 use self::delta::token_delta;
 use self::modifier_set::ModifierSet;
-use self::token_encode::encode_tokens;
 use self::typst_tokens::{Modifier, TokenType};
 
 use self::delta::CacheInner as TokenCacheInner;
 
 mod delta;
 mod modifier_set;
-mod token_encode;
 mod typst_tokens;
 
 pub fn get_legend() -> SemanticTokensLegend {
     SemanticTokensLegend {
-        token_types: TokenType::iter().map(Into::into).collect(),
+        token_types: TokenType::iter()
+            .filter(|e| *e != TokenType::None)
+            .map(Into::into)
+            .collect(),
         token_modifiers: Modifier::iter().map(Into::into).collect(),
     }
 }
@@ -59,35 +60,53 @@ pub fn get_semantic_tokens_options() -> SemanticTokensOptions {
 }
 
 #[derive(Default)]
-pub struct SemanticTokenCache(RwLock<TokenCacheInner>);
+pub struct SemanticTokenContext {
+    cache: RwLock<TokenCacheInner>,
+    position_encoding: PositionEncoding,
+    /// Whether to allow overlapping tokens.
+    pub allow_overlapping_token: bool,
+    /// Whether to allow multiline tokens.
+    pub allow_multiline_token: bool,
+}
 
-impl SemanticTokenCache {
-    pub fn get_semantic_tokens_full(
-        &self,
-        source: &Source,
-        encoding: PositionEncoding,
-    ) -> (Vec<SemanticToken>, String) {
+impl SemanticTokenContext {
+    pub fn new(
+        position_encoding: PositionEncoding,
+        allow_overlapping_token: bool,
+        allow_multiline_token: bool,
+    ) -> Self {
+        Self {
+            cache: RwLock::new(TokenCacheInner::default()),
+            position_encoding,
+            allow_overlapping_token,
+            allow_multiline_token,
+        }
+    }
+
+    pub fn get_semantic_tokens_full(&self, source: &Source) -> (Vec<SemanticToken>, String) {
         let root = LinkedNode::new(source.root());
 
-        let tokens = tokenize_tree(&root, ModifierSet::empty());
-        let encoded_tokens = encode_tokens(tokens, source, encoding);
-        let output_tokens = encoded_tokens.map(|(token, _)| token).collect_vec();
+        let mut tokenizer = Tokenizer::new(
+            source.clone(),
+            self.allow_multiline_token,
+            self.position_encoding,
+        );
+        tokenizer.tokenize_tree(&root, ModifierSet::empty());
+        let output = tokenizer.output;
 
-        let result_id = self.0.write().cache_result(output_tokens.clone());
-
-        (output_tokens, result_id)
+        let result_id = self.cache.write().cache_result(output.clone());
+        (output, result_id)
     }
 
     pub fn try_semantic_tokens_delta_from_result_id(
         &self,
         source: &Source,
         result_id: &str,
-        encoding: PositionEncoding,
     ) -> (Result<Vec<SemanticTokensEdit>, Vec<SemanticToken>>, String) {
-        let cached = self.0.write().try_take_result(result_id);
+        let cached = self.cache.write().try_take_result(result_id);
 
         // this call will overwrite the cache, so need to read from cache first
-        let (tokens, result_id) = self.get_semantic_tokens_full(source, encoding);
+        let (tokens, result_id) = self.get_semantic_tokens_full(source);
 
         match cached {
             Some(cached) => (Ok(token_delta(&cached, &tokens)), result_id),
@@ -96,44 +115,195 @@ impl SemanticTokenCache {
     }
 }
 
-fn tokenize_single_node(node: &LinkedNode, modifiers: ModifierSet) -> Option<Token> {
-    let is_leaf = node.children().next().is_none();
+struct Tokenizer {
+    curr_pos: LspPosition,
+    pos_offset: usize,
+    output: Vec<SemanticToken>,
+    source: Source,
+    encoding: PositionEncoding,
 
-    token_from_node(node)
-        .or_else(|| is_leaf.then_some(TokenType::Text))
-        .map(|token_type| Token::new(token_type, modifiers, node))
+    allow_multiline_token: bool,
+
+    token: Token,
 }
 
-/// Tokenize a node and its children
-fn tokenize_tree<'a>(
-    root: &LinkedNode<'a>,
-    parent_modifiers: ModifierSet,
-) -> Box<dyn Iterator<Item = Token> + 'a> {
-    let modifiers = parent_modifiers | modifiers_from_node(root);
+impl Tokenizer {
+    fn new(source: Source, allow_multiline_token: bool, encoding: PositionEncoding) -> Self {
+        Self {
+            curr_pos: LspPosition::new(0, 0),
+            pos_offset: 0,
+            output: Vec::new(),
+            source,
+            allow_multiline_token,
+            encoding,
 
-    let token = tokenize_single_node(root, modifiers).into_iter();
-    let children = root
-        .children()
-        .flat_map(move |child| tokenize_tree(&child, modifiers));
-    Box::new(token.chain(children))
+            token: Token::default(),
+        }
+    }
+
+    /// Tokenize a node and its children
+    fn tokenize_tree(&mut self, root: &LinkedNode, modifiers: ModifierSet) {
+        let is_leaf = root.get().children().len() == 0;
+        let modifiers = modifiers | modifiers_from_node(root);
+
+        let range = root.range();
+        let mut token = token_from_node(root)
+            .or_else(|| is_leaf.then_some(TokenType::Text))
+            .map(|token_type| Token::new(token_type, modifiers, range.clone()));
+
+        // Push start
+        if !self.token.range.is_empty() && self.token.range.start < range.start {
+            let end = self.token.range.end.min(range.start);
+            self.push(Token {
+                token_type: self.token.token_type,
+                modifiers: self.token.modifiers,
+                range: self.token.range.start..end,
+            });
+            self.token.range.start = end;
+        }
+
+        if !is_leaf {
+            if let Some(token) = token.as_mut() {
+                std::mem::swap(&mut self.token, token);
+            }
+
+            for child in root.children() {
+                self.tokenize_tree(&child, modifiers);
+            }
+
+            if let Some(token) = token.as_mut() {
+                std::mem::swap(&mut self.token, token);
+            }
+        }
+
+        // Push end
+        if let Some(token) = token.clone() {
+            if !token.range.is_empty() {
+                self.push(token);
+            }
+        }
+    }
+
+    fn push(&mut self, token: Token) {
+        use crate::typst_to_lsp;
+        use lsp_types::Position;
+        let utf8_start = token.range.start;
+        if self.pos_offset > utf8_start {
+            return;
+        }
+        let utf8_end = token.range.end;
+        self.pos_offset = utf8_start;
+
+        let position = typst_to_lsp::offset_to_position(utf8_start, self.encoding, &self.source);
+
+        let delta = self.curr_pos.delta(&position);
+        self.curr_pos = position;
+
+        let encode_length = |s, t| {
+            match self.encoding {
+                PositionEncoding::Utf8 => t - s,
+                PositionEncoding::Utf16 => {
+                    // todo: whether it is safe to unwrap
+                    let utf16_start = self.source.byte_to_utf16(s).unwrap();
+                    let utf16_end = self.source.byte_to_utf16(t).unwrap();
+                    utf16_end - utf16_start
+                }
+            }
+        };
+
+        if self.allow_multiline_token {
+            self.output.push(SemanticToken {
+                delta_line: delta.delta_line,
+                delta_start: delta.delta_start,
+                length: encode_length(utf8_start, utf8_end) as u32,
+                token_type: token.token_type as u32,
+                token_modifiers_bitset: token.modifiers.bitset(),
+            });
+        } else {
+            let final_line = self.source.byte_to_line(utf8_end).unwrap() as u32;
+            let next_offset = self
+                .source
+                .line_to_byte((self.curr_pos.line + 1) as usize)
+                .unwrap_or(self.source.text().len());
+            self.output.push(SemanticToken {
+                delta_line: delta.delta_line,
+                delta_start: delta.delta_start,
+                length: encode_length(utf8_start, utf8_end.min(next_offset)) as u32,
+                token_type: token.token_type as u32,
+                token_modifiers_bitset: token.modifiers.bitset(),
+            });
+            let mut utf8_cursor = next_offset;
+            if self.curr_pos.line < final_line {
+                for line in self.curr_pos.line + 1..=final_line {
+                    let next_offset = if line == final_line {
+                        utf8_end
+                    } else {
+                        self.source
+                            .line_to_byte((line + 1) as usize)
+                            .unwrap_or(self.source.text().len())
+                    };
+
+                    self.output.push(SemanticToken {
+                        delta_line: 1,
+                        delta_start: 0,
+                        length: encode_length(utf8_cursor, next_offset) as u32,
+                        token_type: token.token_type as u32,
+                        token_modifiers_bitset: token.modifiers.bitset(),
+                    });
+                    self.pos_offset = utf8_cursor;
+                    utf8_cursor = next_offset;
+                }
+                self.curr_pos.line = final_line;
+                self.curr_pos.character = 0;
+            }
+        }
+
+        pub trait PositionExt {
+            fn delta(&self, to: &Self) -> PositionDelta;
+        }
+
+        impl PositionExt for Position {
+            /// Calculates the delta from `self` to `to`. This is in the
+            /// `SemanticToken` sense, so the delta's `character` is
+            /// relative to `self`'s `character` iff `self` and `to`
+            /// are on the same line. Otherwise, it's relative to
+            /// the start of the line `to` is on.
+            fn delta(&self, to: &Self) -> PositionDelta {
+                let line_delta = to.line - self.line;
+                let char_delta = if line_delta == 0 {
+                    to.character - self.character
+                } else {
+                    to.character
+                };
+
+                PositionDelta {
+                    delta_line: line_delta,
+                    delta_start: char_delta,
+                }
+            }
+        }
+
+        #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Default)]
+        pub struct PositionDelta {
+            pub delta_line: u32,
+            pub delta_start: u32,
+        }
+    }
 }
 
+#[derive(Clone, Default)]
 pub struct Token {
     pub token_type: TokenType,
     pub modifiers: ModifierSet,
-    pub offset: usize,
-    pub source: EcoString,
+    pub range: Range<usize>,
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, modifiers: ModifierSet, node: &LinkedNode) -> Self {
-        let source = node.get().clone().into_text();
-
+    pub fn new(token_type: TokenType, modifiers: ModifierSet, range: Range<usize>) -> Self {
         Self {
             token_type,
             modifiers,
-            offset: node.offset(),
-            source,
+            range,
         }
     }
 }
