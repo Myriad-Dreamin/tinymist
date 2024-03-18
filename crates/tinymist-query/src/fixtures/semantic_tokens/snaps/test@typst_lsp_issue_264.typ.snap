@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/semantic_tokens_full.rs
-expression: "HashRepr(JsonRepr::new_pure(result))"
+expression: "serde_json::to_string(&result).unwrap()"
 input_file: crates/tinymist-query/src/fixtures/semantic_tokens/typst_lsp_issue_264.typ
 ---
-sha256:19d7513fed9953643111f80559b253a424f0d48f8ceef34cbba484685e48e4ad
+{"data":[0,0,15,0,0,3,2,4,20,0,2,0,31,11,0,0,0,3,20,0,0,3,4,20,0,0,4,2,20,0,1,0,17,20,0,0,17,2,20,0,1,0,3,20,0]}

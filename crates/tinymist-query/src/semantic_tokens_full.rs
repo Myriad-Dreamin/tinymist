@@ -45,7 +45,7 @@ mod tests {
                 tokens.result_id.take();
             }
 
-            assert_snapshot!(HashRepr(JsonRepr::new_pure(result)));
+            assert_snapshot!(serde_json::to_string(&result).unwrap());
         });
     }
 }
