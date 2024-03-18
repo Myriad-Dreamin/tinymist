@@ -77,7 +77,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 divan = "0.1.14"
-insta = { vesrion = "1.36", features = ["glob"] }
+insta = { version = "1.36", features = ["glob"] }
 
 [profile.dev.package.insta]
 opt-level = 3
