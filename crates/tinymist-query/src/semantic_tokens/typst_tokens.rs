@@ -20,7 +20,7 @@ const TEXT: SemanticTokenType = SemanticTokenType::new("text");
 
 /// Very similar to [`typst_ide::Tag`], but with convenience traits, and
 /// extensible because we want to further customize highlighting
-#[derive(Clone, Copy, EnumIter)]
+#[derive(Clone, Copy, Eq, PartialEq, EnumIter, Default)]
 #[repr(u32)]
 pub enum TokenType {
     // Standard LSP types
@@ -52,6 +52,9 @@ pub enum TokenType {
     /// apply a modifier to it. This token type is mostly for that, since
     /// text should usually not be specially styled.
     Text,
+    /// A token that is not recognized by the lexer
+    #[default]
+    None,
 }
 
 impl From<TokenType> for SemanticTokenType {
@@ -80,6 +83,7 @@ impl From<TokenType> for SemanticTokenType {
             Interpolated => INTERPOLATED,
             Error => ERROR,
             Text => TEXT,
+            None => unreachable!(),
         }
     }
 }

@@ -61,7 +61,7 @@ use serde_json::{Map, Value as JsonValue};
 use state::MemoryFileMeta;
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
-    get_semantic_tokens_unregistration, DiagnosticsMap, SemanticTokenCache,
+    get_semantic_tokens_unregistration, DiagnosticsMap, SemanticTokenContext,
 };
 use tokio::sync::mpsc;
 use typst::diag::StrResult;
@@ -317,13 +317,20 @@ pub struct TypstLanguageServer {
     primary: Option<CompileActor>,
     pinning: bool,
     main: Option<CompileActor>,
-    tokens_cache: SemanticTokenCache,
+    tokens_ctx: SemanticTokenContext,
 }
 
 /// Getters and the main loop.
 impl TypstLanguageServer {
     /// Create a new language server.
     pub fn new(args: TypstLanguageServerArgs) -> Self {
+        let tokens_ctx = SemanticTokenContext::new(
+            args.const_config.position_encoding,
+            args.const_config
+                .supports_semantic_tokens_overlapping_token_support,
+            args.const_config
+                .supports_semantic_tokens_multiline_token_support,
+        );
         Self {
             client: args.client.clone(),
             shutdown_requested: false,
@@ -339,7 +346,7 @@ impl TypstLanguageServer {
             primary: None,
             pinning: false,
             main: None,
-            tokens_cache: Default::default(),
+            tokens_ctx,
         }
     }
 

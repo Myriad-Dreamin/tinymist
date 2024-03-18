@@ -24,6 +24,8 @@ trait InitializeParamsExt {
     fn semantic_tokens_capabilities(&self) -> Option<&SemanticTokensClientCapabilities>;
     fn document_formatting_capabilities(&self) -> Option<&DocumentFormattingClientCapabilities>;
     fn supports_semantic_tokens_dynamic_registration(&self) -> bool;
+    fn supports_semantic_tokens_overlapping_token_support(&self) -> bool;
+    fn supports_semantic_tokens_multiline_token_support(&self) -> bool;
     fn supports_document_formatting_dynamic_registration(&self) -> bool;
     fn line_folding_only(&self) -> bool;
     fn root_paths(&self) -> Vec<PathBuf>;
@@ -80,6 +82,18 @@ impl InitializeParamsExt for InitializeParams {
     fn supports_semantic_tokens_dynamic_registration(&self) -> bool {
         self.semantic_tokens_capabilities()
             .and_then(|semantic_tokens| semantic_tokens.dynamic_registration)
+            .unwrap_or(false)
+    }
+
+    fn supports_semantic_tokens_overlapping_token_support(&self) -> bool {
+        self.semantic_tokens_capabilities()
+            .and_then(|semantic_tokens| semantic_tokens.overlapping_token_support)
+            .unwrap_or(false)
+    }
+
+    fn supports_semantic_tokens_multiline_token_support(&self) -> bool {
+        self.semantic_tokens_capabilities()
+            .and_then(|semantic_tokens| semantic_tokens.multiline_token_support)
             .unwrap_or(false)
     }
 
@@ -469,6 +483,10 @@ pub struct ConstConfig {
     pub position_encoding: PositionEncoding,
     /// Whether the client supports dynamic registration of semantic tokens.
     pub supports_semantic_tokens_dynamic_registration: bool,
+    /// Whether the client supports overlapping tokens.
+    pub supports_semantic_tokens_overlapping_token_support: bool,
+    /// Whether the client supports multiline tokens.
+    pub supports_semantic_tokens_multiline_token_support: bool,
     /// Whether the client supports dynamic registration of document formatting.
     pub supports_document_formatting_dynamic_registration: bool,
     /// Whether the client supports dynamic registration of configuration
@@ -495,6 +513,10 @@ impl From<&InitializeParams> for ConstConfig {
             position_encoding: Self::choose_encoding(params),
             supports_semantic_tokens_dynamic_registration: params
                 .supports_semantic_tokens_dynamic_registration(),
+            supports_semantic_tokens_overlapping_token_support: params
+                .supports_semantic_tokens_overlapping_token_support(),
+            supports_semantic_tokens_multiline_token_support: params
+                .supports_semantic_tokens_multiline_token_support(),
             supports_document_formatting_dynamic_registration: params
                 .supports_document_formatting_dynamic_registration(),
             supports_config_change_registration: params.supports_config_change_registration(),
