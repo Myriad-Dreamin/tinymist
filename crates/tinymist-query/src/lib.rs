@@ -1,6 +1,7 @@
 mod adt;
 pub mod analysis;
 pub mod syntax;
+mod upstream;
 
 pub(crate) mod diagnostics;
 

@@ -17,7 +17,7 @@ pub type TypstSpan = typst::syntax::Span;
 pub type LspRange = lsp_types::Range;
 pub type TypstRange = std::ops::Range<usize>;
 
-pub type TypstTooltip = typst_ide::Tooltip;
+pub type TypstTooltip = crate::upstream::Tooltip;
 pub type LspHoverContents = lsp_types::HoverContents;
 
 pub type LspDiagnostic = lsp_types::Diagnostic;

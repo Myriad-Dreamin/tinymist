@@ -1,4 +1,4 @@
-use crate::{prelude::*, StatefulRequest};
+use crate::{prelude::*, upstream::tooltip, StatefulRequest};
 
 #[derive(Debug, Clone)]
 pub struct HoverRequest {
@@ -21,7 +21,7 @@ impl StatefulRequest for HoverRequest {
         // the typst's cursor is 1-based, so we need to add 1 to the offset
         let cursor = offset + 1;
 
-        let typst_tooltip = typst_ide::tooltip(ctx.world, doc, &source, cursor)?;
+        let typst_tooltip = tooltip(ctx.world, doc, &source, cursor)?;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
         let range = ctx.to_lsp_range(ast_node.range(), &source);
