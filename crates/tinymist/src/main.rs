@@ -36,75 +36,14 @@ fn from_json<T: DeserializeOwned>(
         .map_err(|e| anyhow::format_err!("Failed to deserialize {what}: {e}; {json}"))
 }
 
-/// The main entry point.
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    #[cfg(feature = "dhat-heap")]
-    let _profiler = dhat::Profiler::new_heap();
-
-    // Start logging
-    let _ = {
-        use log::LevelFilter::*;
-        env_logger::builder()
-            .filter_module("tinymist", Info)
-            .filter_module("typst_preview", Debug)
-            .filter_module("typst_ts", Info)
-            .filter_module("typst_ts_compiler::service::compile", Info)
-            .filter_module("typst_ts_compiler::service::watch", Info)
-            .try_init()
-    };
-
-    // Parse command line arguments
-    let args = CliArguments::parse();
-    info!("Arguments: {:#?}", args);
-
-    match args.mode.as_str() {
-        "server" => {}
-        "probe" => return Ok(()),
-        _ => {
-            return Err(anyhow::anyhow!(
-                "unknown mode: {mode}, expected one of: server or probe",
-                mode = args.mode,
-            ));
-        }
-    }
-
-    // Note that  we must have our logging only write out to stderr.
-    info!("starting generic LSP server");
-
-    // Set up input and output
-    let mirror = args.mirror.clone();
-    let i = move || -> Box<dyn BufRead> {
-        if !args.replay.is_empty() {
-            // Get input from file
-            let file = std::fs::File::open(&args.replay).unwrap();
-            let file = std::io::BufReader::new(file);
-            Box::new(file)
-        } else if mirror.is_empty() {
-            // Get input from stdin
-            let stdin = std::io::stdin().lock();
-            Box::new(stdin)
-        } else {
-            let file = std::fs::File::create(&mirror).unwrap();
-            let stdin = std::io::stdin().lock();
-            Box::new(MirrorWriter(stdin, file, std::sync::Once::new()))
-        }
-    };
-    let o = || std::io::stdout().lock();
-
-    // Create the transport. Includes the stdio (stdin and stdout) versions but this
-    // could also be implemented to use sockets or HTTP.
-    let (sender, receiver, io_threads) = io_transport(i, o);
-    let connection = Connection { sender, receiver };
-
+fn lsp(args: CliArguments, connection: Connection, force_exit: &mut bool) -> anyhow::Result<()> {
+    *force_exit = false;
     // todo: ugly code
     let (initialize_id, initialize_params) = match connection.initialize_start() {
         Ok(it) => it,
         Err(e) => {
             log::error!("failed to initialize: {e}");
-            if e.channel_is_disconnected() {
-                io_threads.join()?;
-            }
+            *force_exit = !e.channel_is_disconnected();
             return Err(e.into());
         }
     };
@@ -112,6 +51,8 @@ async fn main() -> anyhow::Result<()> {
     trace!("InitializeParams: {initialize_params}");
     let sender = Arc::new(RwLock::new(Some(connection.sender)));
     let host = LspHost::new(sender.clone());
+
+    let _drop_connection = ForceDrop(sender);
 
     let req = lsp_server::Request::new(initialize_id, "initialize".to_owned(), initialize_params);
     host.register_request(&req, request_received);
@@ -168,9 +109,7 @@ async fn main() -> anyhow::Result<()> {
         }
     };
     if let Err(e) = initialized_ack {
-        if e.channel_is_disconnected() {
-            io_threads.join()?;
-        }
+        *force_exit = !e.channel_is_disconnected();
         return Err(anyhow::anyhow!(
             "failed to receive initialized notification: {e:?}"
         ));
@@ -178,15 +117,87 @@ async fn main() -> anyhow::Result<()> {
 
     service.initialized(InitializedParams {});
 
-    service.main_loop(connection.receiver)?;
+    service.main_loop(connection.receiver)
+}
 
-    // Drop it on the main thread
-    {
-        sender.write().take();
+/// The main entry point.
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::new_heap();
+
+    // Start logging
+    let _ = {
+        use log::LevelFilter::*;
+        env_logger::builder()
+            .filter_module("tinymist", Info)
+            .filter_module("typst_preview", Debug)
+            .filter_module("typst_ts", Info)
+            .filter_module("typst_ts_compiler::service::compile", Info)
+            .filter_module("typst_ts_compiler::service::watch", Info)
+            .try_init()
+    };
+
+    // Parse command line arguments
+    let args = CliArguments::parse();
+    info!("Arguments: {:#?}", args);
+
+    match args.mode.as_str() {
+        "server" => {}
+        "probe" => return Ok(()),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "unknown mode: {mode}, expected one of: server or probe",
+                mode = args.mode,
+            ));
+        }
     }
-    io_threads.join()?;
+
+    // Note that  we must have our logging only write out to stderr.
+    info!("starting generic LSP server");
+
+    // Set up input and output
+    let replay = args.replay.clone();
+    let mirror = args.mirror.clone();
+    let i = move || -> Box<dyn BufRead> {
+        if !replay.is_empty() {
+            // Get input from file
+            let file = std::fs::File::open(&replay).unwrap();
+            let file = std::io::BufReader::new(file);
+            Box::new(file)
+        } else if mirror.is_empty() {
+            // Get input from stdin
+            let stdin = std::io::stdin().lock();
+            Box::new(stdin)
+        } else {
+            let file = std::fs::File::create(&mirror).unwrap();
+            let stdin = std::io::stdin().lock();
+            Box::new(MirrorWriter(stdin, file, std::sync::Once::new()))
+        }
+    };
+    let o = || std::io::stdout().lock();
+
+    // Create the transport. Includes the stdio (stdin and stdout) versions but this
+    // could also be implemented to use sockets or HTTP.
+    let (sender, receiver, io_threads) = io_transport(i, o);
+    let connection = Connection { sender, receiver };
+
+    // Start the LSP server
+    let mut force_exit = false;
+    lsp(args, connection, &mut force_exit)?;
+
+    if !force_exit {
+        io_threads.join()?;
+    }
     info!("server did shut down");
     Ok(())
+}
+
+struct ForceDrop<T>(Arc<RwLock<Option<T>>>);
+impl<T> Drop for ForceDrop<T> {
+    fn drop(&mut self) {
+        self.0.write().take();
+    }
 }
 
 struct MirrorWriter<R: Read, W: Write>(R, W, std::sync::Once);
