@@ -295,3 +295,16 @@ impl Redact for RedactFields {
         }
     }
 }
+
+pub struct HashRepr<T>(pub T);
+
+// sha256
+impl fmt::Display for HashRepr<JsonRepr> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use sha2::{Digest, Sha256};
+
+        let res = self.0.to_string();
+        let hash = Sha256::digest(res).to_vec();
+        write!(f, "sha256:{}", hex::encode(hash))
+    }
+}
