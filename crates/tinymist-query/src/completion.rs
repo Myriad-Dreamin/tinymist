@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, StatefulRequest};
 
 #[derive(Debug, Clone)]
 pub struct CompletionRequest {
@@ -7,16 +7,17 @@ pub struct CompletionRequest {
     pub explicit: bool,
 }
 
-impl CompletionRequest {
-    pub fn request(
+impl StatefulRequest for CompletionRequest {
+    type Response = CompletionResponse;
+
+    fn request(
         self,
-        world: &TypstSystemWorld,
+        ctx: &mut AnalysisContext,
         doc: Option<VersionedDocument>,
-        position_encoding: PositionEncoding,
-    ) -> Option<CompletionResponse> {
+    ) -> Option<Self::Response> {
         let doc = doc.as_ref().map(|doc| doc.document.as_ref());
-        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-        let cursor = lsp_to_typst::position(self.position, position_encoding, &source)?;
+        let source = ctx.source_by_path(&self.path).ok()?;
+        let cursor = ctx.to_typst_pos(self.position, &source)?;
 
         // Please see <https://github.com/nvarner/typst-lsp/commit/2d66f26fb96ceb8e485f492e5b81e9db25c3e8ec>
         //
@@ -33,10 +34,10 @@ impl CompletionRequest {
         // assume that the completion is not explicit.
         let explicit = false;
 
-        let (offset, completions) = typst_ide::autocomplete(world, doc, &source, cursor, explicit)?;
+        let (offset, completions) =
+            typst_ide::autocomplete(ctx.world, doc, &source, cursor, explicit)?;
 
-        let lsp_start_position =
-            typst_to_lsp::offset_to_position(offset, position_encoding, &source);
+        let lsp_start_position = ctx.to_lsp_pos(offset, &source);
         let replace_range = LspRange::new(lsp_start_position, self.position);
         Some(typst_to_lsp::completions(&completions, replace_range).into())
     }

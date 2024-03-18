@@ -8,9 +8,9 @@ pub use global::*;
 
 #[cfg(test)]
 mod module_tests {
+    use ecow::EcoVec;
+    use reflexo::path::unix_slash;
     use serde_json::json;
-    use typst_ts_core::path::unix_slash;
-    use typst_ts_core::typst::prelude::EcoVec;
 
     use crate::prelude::*;
     use crate::syntax::module::*;
@@ -18,7 +18,7 @@ mod module_tests {
 
     #[test]
     fn test() {
-        snapshot_testing2("modules", &|ctx, _| {
+        snapshot_testing("modules", &|ctx, _| {
             fn ids(ids: EcoVec<TypstFileId>) -> Vec<String> {
                 let mut ids: Vec<String> = ids
                     .into_iter()
@@ -66,14 +66,14 @@ mod lexical_hierarchy_tests {
     use def_use::DefUseSnapshot;
 
     use crate::analysis::def_use;
-    use crate::prelude::*;
+    // use crate::prelude::*;
     use crate::syntax::lexical_hierarchy;
     use crate::tests::*;
 
     #[test]
     fn scope() {
-        snapshot_testing("lexical_hierarchy", &|world, path| {
-            let source = get_suitable_source_in_workspace(world, &path).unwrap();
+        snapshot_testing("lexical_hierarchy", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
 
             let result = lexical_hierarchy::get_lexical_hierarchy(
                 source,
@@ -87,7 +87,7 @@ mod lexical_hierarchy_tests {
     #[test]
     fn test_def_use() {
         fn def_use(set: &str) {
-            snapshot_testing2(set, &|ctx, path| {
+            snapshot_testing(set, &|ctx, path| {
                 let source = ctx.source_by_path(&path).unwrap();
 
                 let result = ctx.def_use(source);

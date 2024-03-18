@@ -4,20 +4,18 @@ use std::{
 };
 
 use anyhow::{anyhow, Context};
+use ecow::{eco_vec, EcoVec};
 use log::info;
 use lsp_types::SymbolKind;
+use reflexo::error::prelude::*;
 use serde::{Deserialize, Serialize};
 use typst::{
     syntax::{
         ast::{self, AstNode},
+        package::PackageSpec,
         LinkedNode, Source, SyntaxKind,
     },
     util::LazyHash,
-};
-use typst_ts_core::{
-    error::prelude::WithContext,
-    package::PackageSpec,
-    typst::prelude::{eco_vec, EcoVec},
 };
 
 use super::IdentRef;

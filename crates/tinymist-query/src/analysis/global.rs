@@ -1,17 +1,22 @@
 use std::{
     collections::{HashMap, HashSet},
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
 use once_cell::sync::OnceCell;
+use reflexo::{cow_mut::CowMut, ImmutPath};
+use typst::syntax::FileId as TypstFileId;
 use typst::{
     diag::{eco_format, FileError, FileResult},
     syntax::{Source, VirtualPath},
     World,
 };
-use typst_ts_compiler::{service::WorkspaceProvider, TypstSystemWorld};
-use typst_ts_core::{cow_mut::CowMut, ImmutPath, TypstFileId};
+use typst_ts_compiler::package::Registry;
+use typst_ts_compiler::TypstSystemWorld;
+// use typst_ts_compiler::TypstSystemWorld;
+// use typst_ts_compiler::{service::WorkspaceProvider, TypstSystemWorld};
+// use typst_ts_core::{cow_mut::CowMut, ImmutPath};
 
 use super::{get_def_use_inner, DefUseInfo};
 use crate::{
@@ -57,10 +62,11 @@ pub struct Analysis {
     /// changes.
     pub root: ImmutPath,
     /// The position encoding for the workspace.
-    position_encoding: PositionEncoding,
+    pub position_encoding: PositionEncoding,
 }
 
 /// A cache for all level of analysis results of a module.
+#[derive(Default)]
 pub struct AnalysisCaches {
     modules: HashMap<TypstFileId, ModuleAnalysisCache>,
     root_files: OnceCell<Vec<TypstFileId>>,
@@ -78,18 +84,11 @@ pub struct AnalysisContext<'a> {
 
 impl<'w> AnalysisContext<'w> {
     /// Create a new analysis context.
-    pub fn new(world: &'w TypstSystemWorld, encoding: PositionEncoding) -> Self {
+    pub fn new(world: &'w TypstSystemWorld, a: Analysis) -> Self {
         Self {
             world,
-            analysis: CowMut::Owned(Analysis {
-                root: world.workspace_root(),
-                position_encoding: encoding,
-            }),
-            caches: AnalysisCaches {
-                modules: HashMap::new(),
-                root_files: OnceCell::new(),
-                module_deps: OnceCell::new(),
-            },
+            analysis: CowMut::Owned(a),
+            caches: AnalysisCaches::default(),
         }
     }
 
@@ -115,6 +114,24 @@ impl<'w> AnalysisContext<'w> {
             let deps = construct_module_dependencies(self);
             self.caches.module_deps.get_or_init(|| deps)
         }
+    }
+
+    /// Resolve the real path for a file id.
+    pub fn path_for_id(&self, id: TypstFileId) -> Result<PathBuf, FileError> {
+        if id.vpath().as_rootless_path() == Path::new("-") {
+            return Ok(PathBuf::from("-"));
+        }
+
+        // Determine the root path relative to which the file path
+        // will be resolved.
+        let root = match id.package() {
+            Some(spec) => self.world.registry.resolve(spec)?,
+            None => self.analysis.root.clone(),
+        };
+
+        // Join the path to the root. If it tries to escape, deny
+        // access. Note: It can still escape via symlinks.
+        id.vpath().resolve(&root).ok_or(FileError::AccessDenied)
     }
 
     /// Get the source of a file by file id.
@@ -171,6 +188,10 @@ impl<'w> AnalysisContext<'w> {
 
     pub fn to_typst_range(&self, position: LspRange, src: &Source) -> Option<TypstRange> {
         lsp_to_typst::range(position, self.analysis.position_encoding, src)
+    }
+
+    pub fn to_lsp_pos(&self, typst_offset: usize, src: &Source) -> LspPosition {
+        typst_to_lsp::offset_to_position(typst_offset, self.analysis.position_encoding, src)
     }
 
     pub fn to_lsp_range(&self, position: TypstRange, src: &Source) -> LspRange {

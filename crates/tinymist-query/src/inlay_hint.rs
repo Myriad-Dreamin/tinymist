@@ -1,5 +1,6 @@
 use std::{borrow::Cow, ops::Range};
 
+use ecow::eco_vec;
 use log::debug;
 use lsp_types::{InlayHintKind, InlayHintLabel};
 use typst::{
@@ -7,7 +8,6 @@ use typst::{
     syntax::SyntaxNode,
     util::LazyHash,
 };
-use typst_ts_core::typst::prelude::eco_vec;
 
 use crate::{prelude::*, SyntaxRequest};
 
@@ -68,7 +68,7 @@ impl SyntaxRequest for InlayHintRequest {
 }
 
 fn inlay_hint(
-    world: &TypstSystemWorld,
+    world: &dyn World,
     source: &Source,
     range: Range<usize>,
     encoding: PositionEncoding,
@@ -76,7 +76,7 @@ fn inlay_hint(
     const SMART: InlayHintConfig = InlayHintConfig::smart();
 
     struct InlayHintWorker<'a> {
-        world: &'a TypstSystemWorld,
+        world: &'a dyn World,
         source: &'a Source,
         range: Range<usize>,
         encoding: PositionEncoding,
@@ -661,7 +661,7 @@ mod tests {
 
     #[test]
     fn smart() {
-        snapshot_testing2("inlay_hints", &|ctx, path| {
+        snapshot_testing("inlay_hints", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
             let request = InlayHintRequest {

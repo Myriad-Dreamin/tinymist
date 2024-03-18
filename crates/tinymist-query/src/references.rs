@@ -1,5 +1,4 @@
 use log::debug;
-use typst_ts_core::vector::ir::DefId;
 
 use crate::{
     prelude::*,
@@ -116,7 +115,7 @@ pub(crate) fn find_references_root(
     position_encoding: PositionEncoding,
 ) -> Option<Vec<LspLocation>> {
     let def_source = ctx.source_by_id(def_fid).ok()?;
-    let def_path = ctx.world.path_for_id(def_fid).ok()?;
+    let def_path = ctx.path_for_id(def_fid).ok()?;
     let uri = Url::from_file_path(def_path).ok()?;
 
     // todo: reuse uri, range to location
@@ -140,7 +139,7 @@ pub(crate) fn find_references_root(
             let ref_source = ctx.ctx.source_by_id(ref_fid).ok()?;
             let def_use = ctx.ctx.def_use(ref_source.clone())?;
 
-            let uri = ctx.ctx.world.path_for_id(ref_fid).ok()?;
+            let uri = ctx.ctx.path_for_id(ref_fid).ok()?;
             let uri = Url::from_file_path(uri).ok()?;
 
             let mut redefines = vec![];
@@ -176,7 +175,7 @@ mod tests {
     #[test]
     fn test() {
         // goto_definition
-        snapshot_testing2("references", &|world, path| {
+        snapshot_testing("references", &|world, path| {
             let source = world.source_by_path(&path).unwrap();
 
             let request = ReferencesRequest {

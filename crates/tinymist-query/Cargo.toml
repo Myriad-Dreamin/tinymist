@@ -28,16 +28,18 @@ fxhash.workspace = true
 toml.workspace = true
 walkdir.workspace = true
 indexmap.workspace = true
+ecow.workspace = true
 
 typst.workspace = true
 typst-ide.workspace = true
 
-typst-ts-core = { version = "0.4.2-rc6", default-features = false, features = [
+reflexo.workspace = true
+typst-ts-compiler.workspace = true
+typst-ts-core = { version = "0.4.2-rc8", default-features = false, features = [
     "flat-vector",
     "vector-bbox",
     "no-content-hint",
 ] }
-typst-ts-compiler.workspace = true
 
 lsp-types.workspace = true
 

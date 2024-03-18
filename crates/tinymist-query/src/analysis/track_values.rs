@@ -1,6 +1,7 @@
 //! Dynamic analysis of an expression or import statement.
 
 use comemo::Track;
+use ecow::*;
 use typst::engine::{Engine, Route};
 use typst::eval::{Tracer, Vm};
 use typst::foundations::{Context, Label, Scopes, Styles, Value};
@@ -8,7 +9,6 @@ use typst::introspection::{Introspector, Locator};
 use typst::model::{BibliographyElem, Document};
 use typst::syntax::{ast, LinkedNode, Span, SyntaxKind};
 use typst::World;
-use typst_ts_core::typst::prelude::*;
 
 /// Try to determine a set of possible values for an expression.
 pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
