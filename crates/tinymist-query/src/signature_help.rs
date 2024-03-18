@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, SyntaxRequest};
 
 #[derive(Debug, Clone)]
 pub struct SignatureHelpRequest {
@@ -6,14 +6,12 @@ pub struct SignatureHelpRequest {
     pub position: LspPosition,
 }
 
-impl SignatureHelpRequest {
-    pub fn request(
-        self,
-        world: &TypstSystemWorld,
-        position_encoding: PositionEncoding,
-    ) -> Option<SignatureHelp> {
-        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-        let typst_offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
+impl SyntaxRequest for SignatureHelpRequest {
+    type Response = SignatureHelp;
+
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+        let source = ctx.source_by_path(&self.path).ok()?;
+        let typst_offset = ctx.to_typst_pos(self.position, &source)?;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset + 1)?;
         let (callee, callee_node, args) = surrounding_function_syntax(&ast_node)?;
@@ -22,7 +20,7 @@ impl SignatureHelpRequest {
             return None;
         }
 
-        let values = analyze_expr(world, &callee_node);
+        let values = analyze_expr(ctx.world, &callee_node);
 
         let function = values.into_iter().find_map(|v| match v.0 {
             Value::Func(f) => Some(f),

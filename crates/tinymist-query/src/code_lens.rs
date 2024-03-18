@@ -1,6 +1,6 @@
 use lsp_types::Command;
 
-use crate::prelude::*;
+use crate::{prelude::*, SyntaxRequest};
 
 /// The [`textDocument/codeLens`] request is sent from the client to the server
 /// to compute code lenses for a given text document.
@@ -12,15 +12,13 @@ pub struct CodeLensRequest {
     pub path: PathBuf,
 }
 
-impl CodeLensRequest {
-    pub fn request(
-        self,
-        world: &TypstSystemWorld,
-        position_encoding: PositionEncoding,
-    ) -> Option<Vec<CodeLens>> {
-        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
+impl SyntaxRequest for CodeLensRequest {
+    type Response = Vec<CodeLens>;
 
-        let doc_start = typst_to_lsp::range(0..0, &source, position_encoding);
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+        let source = ctx.source_by_path(&self.path).ok()?;
+
+        let doc_start = ctx.to_lsp_range(0..0, &source);
 
         let mut res = vec![];
 

@@ -9,7 +9,7 @@ use typst::{
 };
 use typst_ts_core::typst::prelude::eco_vec;
 
-use crate::prelude::*;
+use crate::{prelude::*, SyntaxRequest};
 
 pub struct InlayHintConfig {
     // positional arguments group
@@ -45,16 +45,14 @@ pub struct InlayHintRequest {
     pub range: LspRange,
 }
 
-impl InlayHintRequest {
-    pub fn request(
-        self,
-        world: &TypstSystemWorld,
-        position_encoding: PositionEncoding,
-    ) -> Option<Vec<InlayHint>> {
-        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-        let range = lsp_to_typst::range(self.range, position_encoding, &source)?;
+impl SyntaxRequest for InlayHintRequest {
+    type Response = Vec<InlayHint>;
 
-        let hints = inlay_hint(world, &source, range, position_encoding).ok()?;
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+        let source = ctx.source_by_path(&self.path).ok()?;
+        let range = ctx.to_typst_range(self.range, &source)?;
+
+        let hints = inlay_hint(ctx.world, &source, range, ctx.position_encoding()).ok()?;
         debug!(
             "got inlay hints on {source:?} => {hints:?}",
             source = source.id(),
@@ -663,8 +661,8 @@ mod tests {
 
     #[test]
     fn smart() {
-        snapshot_testing("inlay_hints", &|world, path| {
-            let source = get_suitable_source_in_workspace(world, &path).unwrap();
+        snapshot_testing2("inlay_hints", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
 
             let request = InlayHintRequest {
                 path: path.clone(),
@@ -675,7 +673,7 @@ mod tests {
                 ),
             };
 
-            let result = request.request(world, PositionEncoding::Utf16);
+            let result = request.request(ctx);
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

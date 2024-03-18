@@ -6,6 +6,7 @@ use std::{
     sync::Arc,
 };
 
+use anyhow::anyhow;
 use log::{debug, error, info, trace, warn};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
@@ -25,7 +26,7 @@ use typst_preview::{CompilationHandle, CompilationHandleImpl, CompileStatus};
 use typst_ts_compiler::{
     service::{
         CompileDriver as CompileDriverInner, CompileExporter, CompileMiddleware, Compiler,
-        WorkspaceProvider, WorldExporter,
+        EnvWorld, WorkspaceProvider, WorldExporter,
     },
     vfs::notify::{FileChangeSet, MemoryEvent},
     TypstSystemWorld,
@@ -211,15 +212,7 @@ macro_rules! query_state {
 
 macro_rules! query_world {
     ($self:ident, $method:ident, $req:expr) => {{
-        let enc = $self.position_encoding;
-        let res = $self.steal_world(move |w| $req.request(w, enc));
-        res.map(CompilerQueryResponse::$method)
-    }};
-}
-
-macro_rules! query_world2 {
-    ($self:ident, $method:ident, $req:expr) => {{
-        let res = $self.steal_world2(move |w| $req.request(w));
+        let res = $self.steal_world(move |w| $req.request(w));
         res.map(CompilerQueryResponse::$method)
     }};
 }
@@ -626,15 +619,15 @@ impl CompileActor {
                 Ok(CompilerQueryResponse::OnSaveExport(()))
             }
             Hover(req) => query_state!(self, Hover, req),
-            GotoDefinition(req) => query_world2!(self, GotoDefinition, req),
+            GotoDefinition(req) => query_world!(self, GotoDefinition, req),
             GotoDeclaration(req) => query_world!(self, GotoDeclaration, req),
-            References(req) => query_world2!(self, References, req),
+            References(req) => query_world!(self, References, req),
             InlayHint(req) => query_world!(self, InlayHint, req),
             CodeLens(req) => query_world!(self, CodeLens, req),
             Completion(req) => query_state!(self, Completion, req),
             SignatureHelp(req) => query_world!(self, SignatureHelp, req),
-            Rename(req) => query_world2!(self, Rename, req),
-            PrepareRename(req) => query_world2!(self, PrepareRename, req),
+            Rename(req) => query_world!(self, Rename, req),
+            PrepareRename(req) => query_world!(self, PrepareRename, req),
             Symbol(req) => query_world!(self, Symbol, req),
             FoldingRange(..)
             | SelectionRange(..)
@@ -680,24 +673,29 @@ impl CompileActor {
 
     fn steal_world<T: Send + Sync + 'static>(
         &self,
-        f: impl FnOnce(&TypstSystemWorld) -> T + Send + Sync + 'static,
-    ) -> anyhow::Result<T> {
-        let fut = self.steal(move |compiler| f(compiler.compiler.world()));
-
-        Ok(fut?)
-    }
-
-    fn steal_world2<T: Send + Sync + 'static>(
-        &self,
         f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
         let enc = self.position_encoding;
-        let fut = self.steal(move |compiler| {
-            // todo: record analysis
-            f(&mut AnalysisContext::new(compiler.compiler.world(), enc))
-        });
 
-        Ok(fut?)
+        self.steal(move |compiler| {
+            // todo: record analysis
+            let w = compiler.compiler.world_mut();
+
+            let Some(main) = w.main else {
+                log::error!("TypstActor: main file is not set");
+                return Err(anyhow!("main file is not set"));
+            };
+            w.source(main).map_err(|err| {
+                log::info!("TypstActor: failed to prepare main file: {:?}", err);
+                anyhow!("failed to get source: {err}")
+            })?;
+            w.prepare_env(&mut Default::default()).map_err(|err| {
+                log::error!("TypstActor: failed to prepare env: {:?}", err);
+                anyhow!("failed to prepare env")
+            })?;
+
+            Ok(f(&mut AnalysisContext::new(compiler.compiler.world(), enc)))
+        })?
     }
 }
 
