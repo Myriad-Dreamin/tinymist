@@ -1,0 +1,95 @@
+>#set text(fill: red);
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst punctuation.definition.keyword.typst
+#    ^ source.typst
+#     ^^^^ source.typst entity.name.function.typst
+#         ^ source.typst meta.brace.round.typst
+#          ^^^^ source.typst entity.other.interpolated.typst
+#              ^ source.typst punctuation.separator.colon.typst
+#               ^ source.typst
+#                ^^^ source.typst entity.other.interpolated.typst
+#                   ^ source.typst meta.brace.round.typst
+#                    ^ source.typst punctuation.terminator.statement.typst
+>#set text(fill: red)
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst punctuation.definition.keyword.typst
+#    ^ source.typst
+#     ^^^^ source.typst entity.name.function.typst
+#         ^ source.typst meta.brace.round.typst
+#          ^^^^ source.typst entity.other.interpolated.typst
+#              ^ source.typst punctuation.separator.colon.typst
+#               ^ source.typst
+#                ^^^ source.typst entity.other.interpolated.typst
+#                   ^ source.typst meta.brace.round.typst
+>#set text("")
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst punctuation.definition.keyword.typst
+#    ^ source.typst
+#     ^^^^ source.typst entity.name.function.typst
+#         ^ source.typst meta.brace.round.typst
+#          ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#           ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#            ^ source.typst meta.brace.round.typst
+>#set text(red)
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst punctuation.definition.keyword.typst
+#    ^ source.typst
+#     ^^^^ source.typst entity.name.function.typst
+#         ^ source.typst meta.brace.round.typst
+#          ^^^ source.typst entity.other.interpolated.typst
+#             ^ source.typst meta.brace.round.typst
+>#set list.item(red);
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst punctuation.definition.keyword.typst
+#    ^ source.typst
+#     ^^^^ source.typst entity.other.interpolated.typst
+#         ^ source.typst
+#          ^^^^ source.typst entity.name.function.typst
+#              ^ source.typst meta.brace.round.typst
+#               ^^^ source.typst entity.other.interpolated.typst
+#                  ^ source.typst meta.brace.round.typst
+#                   ^ source.typst punctuation.terminator.statement.typst
+>#set list.item(fill: red);
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst punctuation.definition.keyword.typst
+#    ^ source.typst
+#     ^^^^ source.typst entity.other.interpolated.typst
+#         ^ source.typst
+#          ^^^^ source.typst entity.name.function.typst
+#              ^ source.typst meta.brace.round.typst
+#               ^^^^ source.typst entity.other.interpolated.typst
+#                   ^ source.typst punctuation.separator.colon.typst
+#                    ^ source.typst
+#                     ^^^ source.typst entity.other.interpolated.typst
+#                        ^ source.typst meta.brace.round.typst
+#                         ^ source.typst punctuation.terminator.statement.typst
+>#set (text(fill: red));
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst punctuation.definition.keyword.typst
+#    ^ source.typst
+#     ^ source.typst meta.brace.round.typst
+#      ^^^^ source.typst entity.name.function.typst
+#          ^ source.typst meta.brace.round.typst
+#           ^^^^ source.typst entity.other.interpolated.typst
+#               ^ source.typst punctuation.separator.colon.typst
+#                ^ source.typst
+#                 ^^^ source.typst entity.other.interpolated.typst
+#                    ^ source.typst meta.brace.round.typst
+#                     ^ source.typst meta.brace.round.typst
+#                      ^ source.typst punctuation.terminator.statement.typst
+>#set ((text(fill: red)));
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst punctuation.definition.keyword.typst
+#    ^ source.typst
+#     ^ source.typst meta.brace.round.typst
+#      ^ source.typst meta.brace.round.typst
+#       ^^^^ source.typst entity.name.function.typst
+#           ^ source.typst meta.brace.round.typst
+#            ^^^^ source.typst entity.other.interpolated.typst
+#                ^ source.typst punctuation.separator.colon.typst
+#                 ^ source.typst
+#                  ^^^ source.typst entity.other.interpolated.typst
+#                     ^ source.typst meta.brace.round.typst
+#                      ^ source.typst meta.brace.round.typst
+#                       ^ source.typst meta.brace.round.typst
+#                        ^ source.typst punctuation.terminator.statement.typst

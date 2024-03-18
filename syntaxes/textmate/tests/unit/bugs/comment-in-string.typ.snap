@@ -1,0 +1,14 @@
+>#link("https://myriad-dreamin.github.io/typst.ts/cookery/guide/compiler/ts-cli.html")[Form1]: Render to SVG and then embed it as a high-quality vectored image directly.
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst entity.name.function.typst
+#     ^ source.typst meta.brace.round.typst
+#      ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst string.quoted.double.typst
+#                                                                                   ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#                                                                                    ^ source.typst meta.brace.round.typst
+#                                                                                     ^ source.typst meta.brace.square.typ
+#                                                                                      ^^^^^ source.typst
+#                                                                                           ^ source.typst meta.brace.square.typst
+#                                                                                            ^ source.typst
+#                                                                                             ^ source.typst
+#                                                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst
