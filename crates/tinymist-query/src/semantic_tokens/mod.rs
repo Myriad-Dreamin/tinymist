@@ -86,9 +86,13 @@ impl SemanticTokenContext {
     pub fn get_semantic_tokens_full(&self, source: &Source) -> (Vec<SemanticToken>, String) {
         let root = LinkedNode::new(source.root());
 
-        let mut recv = Tokenizer::new(source.clone(), self.position_encoding);
-        recv.tokenize_tree(&root, ModifierSet::empty());
-        let output = recv.output;
+        let mut tokenizer = Tokenizer::new(
+            source.clone(),
+            self.allow_multiline_token,
+            self.position_encoding,
+        );
+        tokenizer.tokenize_tree(&root, ModifierSet::empty());
+        let output = tokenizer.output;
 
         let result_id = self.cache.write().cache_result(output.clone());
         (output, result_id)
@@ -113,19 +117,24 @@ impl SemanticTokenContext {
 
 struct Tokenizer {
     curr_pos: LspPosition,
+    pos_offset: usize,
     output: Vec<SemanticToken>,
     source: Source,
     encoding: PositionEncoding,
+
+    allow_multiline_token: bool,
 
     token: Token,
 }
 
 impl Tokenizer {
-    fn new(source: Source, encoding: PositionEncoding) -> Self {
+    fn new(source: Source, allow_multiline_token: bool, encoding: PositionEncoding) -> Self {
         Self {
             curr_pos: LspPosition::new(0, 0),
+            pos_offset: 0,
             output: Vec::new(),
             source,
+            allow_multiline_token,
             encoding,
 
             token: Token::default(),
@@ -178,33 +187,76 @@ impl Tokenizer {
     fn push(&mut self, token: Token) {
         use crate::typst_to_lsp;
         use lsp_types::Position;
-
         let utf8_start = token.range.start;
+        if self.pos_offset > utf8_start {
+            return;
+        }
         let utf8_end = token.range.end;
+        self.pos_offset = utf8_start;
 
         let position = typst_to_lsp::offset_to_position(utf8_start, self.encoding, &self.source);
-        let delta = self.curr_pos.delta(&position);
 
-        let length = match self.encoding {
-            PositionEncoding::Utf8 => utf8_end - utf8_start,
-            PositionEncoding::Utf16 => {
-                // todo: whether it is safe to unwrap
-                let utf16_start = self.source.byte_to_utf16(utf8_start).unwrap();
-                let utf16_end = self.source.byte_to_utf16(utf8_end).unwrap();
-                utf16_end - utf16_start
+        let delta = self.curr_pos.delta(&position);
+        self.curr_pos = position;
+
+        let encode_length = |s, t| {
+            match self.encoding {
+                PositionEncoding::Utf8 => t - s,
+                PositionEncoding::Utf16 => {
+                    // todo: whether it is safe to unwrap
+                    let utf16_start = self.source.byte_to_utf16(s).unwrap();
+                    let utf16_end = self.source.byte_to_utf16(t).unwrap();
+                    utf16_end - utf16_start
+                }
             }
         };
 
-        let encoded_token = SemanticToken {
-            delta_line: delta.delta_line,
-            delta_start: delta.delta_start,
-            length: length as u32,
-            token_type: token.token_type as u32,
-            token_modifiers_bitset: token.modifiers.bitset(),
-        };
+        if self.allow_multiline_token {
+            self.output.push(SemanticToken {
+                delta_line: delta.delta_line,
+                delta_start: delta.delta_start,
+                length: encode_length(utf8_start, utf8_end) as u32,
+                token_type: token.token_type as u32,
+                token_modifiers_bitset: token.modifiers.bitset(),
+            });
+        } else {
+            let final_line = self.source.byte_to_line(utf8_end).unwrap() as u32;
+            let next_offset = self
+                .source
+                .line_to_byte((self.curr_pos.line + 1) as usize)
+                .unwrap_or(self.source.text().len());
+            self.output.push(SemanticToken {
+                delta_line: delta.delta_line,
+                delta_start: delta.delta_start,
+                length: encode_length(utf8_start, utf8_end.min(next_offset)) as u32,
+                token_type: token.token_type as u32,
+                token_modifiers_bitset: token.modifiers.bitset(),
+            });
+            let mut utf8_cursor = next_offset;
+            if self.curr_pos.line < final_line {
+                for line in self.curr_pos.line + 1..=final_line {
+                    let next_offset = if line == final_line {
+                        utf8_end
+                    } else {
+                        self.source
+                            .line_to_byte((line + 1) as usize)
+                            .unwrap_or(self.source.text().len())
+                    };
 
-        self.curr_pos = position;
-        self.output.push(encoded_token);
+                    self.output.push(SemanticToken {
+                        delta_line: 1,
+                        delta_start: 0,
+                        length: encode_length(utf8_cursor, next_offset) as u32,
+                        token_type: token.token_type as u32,
+                        token_modifiers_bitset: token.modifiers.bitset(),
+                    });
+                    self.pos_offset = utf8_cursor;
+                    utf8_cursor = next_offset;
+                }
+                self.curr_pos.line = final_line;
+                self.curr_pos.character = 0;
+            }
+        }
 
         pub trait PositionExt {
             fn delta(&self, to: &Self) -> PositionDelta;
