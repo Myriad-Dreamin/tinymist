@@ -666,7 +666,7 @@ impl CompileActor {
         &self,
         f: impl FnOnce(&TypstSystemWorld, Option<VersionedDocument>) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
-        let fut = self.steal(move |compiler| f(compiler.compiler.world(), compiler.doc()));
+        let fut = self.steal(move |compiler| f(compiler.compiler.world(), compiler.success_doc()));
 
         Ok(fut?)
     }

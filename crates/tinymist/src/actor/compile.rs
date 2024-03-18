@@ -103,6 +103,8 @@ pub struct CompileActor<C: Compiler> {
     estimated_shadow_files: HashSet<Arc<Path>>,
     /// The latest compiled document.
     latest_doc: Option<Arc<TypstDocument>>,
+    /// The latest successly compiled document.
+    latest_success_doc: Option<Arc<TypstDocument>>,
     /// feature set for compile_once mode.
     once_feature_set: Arc<FeatureSet>,
     /// Shared feature set for watch mode.
@@ -144,6 +146,7 @@ where
 
             estimated_shadow_files: Default::default(),
             latest_doc: None,
+            latest_success_doc: None,
             once_feature_set: Arc::new(feature_set),
             watch_feature_set,
 
@@ -160,6 +163,15 @@ where
     /// Create a new compiler thread.
     pub fn new(compiler: C, root: ImmutPath, entry: Option<ImmutPath>) -> Self {
         Self::new_with_features(compiler, root, entry, FeatureSet::default())
+    }
+
+    pub fn success_doc(&self) -> Option<VersionedDocument> {
+        self.latest_success_doc
+            .clone()
+            .map(|doc| VersionedDocument {
+                version: self.logical_tick,
+                document: doc,
+            })
     }
 
     pub fn doc(&self) -> Option<VersionedDocument> {
@@ -325,6 +337,10 @@ where
                 self.steal_send.send(ExternalInterrupt::Compile).ok();
             }
         }
+
+        // Reset the document state.
+        self.latest_doc = None;
+        self.latest_success_doc = None;
     }
 
     /// Compile the document.
@@ -341,6 +357,9 @@ where
             .compiler
             .compile(&mut CompileEnv::default().configure_shared(self.watch_feature_set.clone()))
             .ok();
+        if self.latest_doc.is_some() {
+            self.latest_success_doc = self.latest_doc.clone();
+        }
 
         // Evict compilation cache.
         let evict_start = std::time::Instant::now();
