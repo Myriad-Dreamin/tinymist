@@ -72,6 +72,7 @@ impl SyntaxRequest for GotoDefinitionRequest {
 }
 
 pub(crate) struct DefinitionLink {
+    pub kind: LexicalKind,
     pub value: Option<Value>,
     pub fid: TypstFileId,
     pub name: String,
@@ -97,6 +98,7 @@ pub(crate) fn find_definition(
             let e = parent.cast::<ast::ModuleImport>()?;
             let source = find_source_by_import(ctx.world, def_fid, e)?;
             return Some(DefinitionLink {
+                kind: LexicalKind::Mod(LexicalModKind::PathVar),
                 name: String::new(),
                 value: None,
                 fid: source.id(),
@@ -151,6 +153,7 @@ pub(crate) fn find_definition(
                 let source = ctx.source_by_id(fid).ok()?;
 
                 return Some(DefinitionLink {
+                    kind: LexicalKind::Var(LexicalVarKind::Function),
                     name: name.to_owned(),
                     value: Some(Value::Func(f.clone())),
                     fid,
@@ -178,6 +181,7 @@ pub(crate) fn find_definition(
             | LexicalModKind::Alias { .. }
             | LexicalModKind::Ident,
         ) => Some(DefinitionLink {
+            kind: def.kind.clone(),
             name: def.name.clone(),
             value: None,
             fid: def_fid,
@@ -190,18 +194,13 @@ pub(crate) fn find_definition(
             let def_name = root.leaf_at(def.range.start + 1)?;
             log::info!("def_name for function: {def_name:?}", def_name = def_name);
             let values = analyze_expr(ctx.world, &def_name);
-            let Some(func) = values.into_iter().find_map(|v| match v.0 {
-                Value::Func(f) => Some(f),
-                _ => None,
-            }) else {
-                log::info!("no func found... {:?}", def.name);
-                return None;
-            };
+            let func = values.into_iter().find(|v| matches!(v.0, Value::Func(..)));
             log::info!("okay for function: {func:?}");
 
             Some(DefinitionLink {
+                kind: def.kind.clone(),
                 name: def.name.clone(),
-                value: Some(Value::Func(func.clone())),
+                value: func.map(|v| v.0),
                 fid: def_fid,
                 def_range: def.range.clone(),
                 name_range: Some(def.range.clone()),

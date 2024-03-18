@@ -46,7 +46,7 @@ pub enum Tooltip {
 }
 
 /// Tooltip for a hovered expression.
-fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
+pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
     let mut ancestor = leaf;
     while !ancestor.is::<ast::Expr>() {
         ancestor = ancestor.parent()?;
