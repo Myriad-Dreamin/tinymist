@@ -43,23 +43,13 @@ codespan-reporting = "0.11"
 typst = "0.11.0"
 typst-ide = "0.11.0"
 typst-pdf = "0.11.0"
-typst-assets = { git = "https://github.com/typst/typst-assets", rev = "4d1211a" }
-reflexo = { version = "0.4.2-rc8", default-features = false, features = [
+typst-assets = "0.11.0"
+reflexo = { version = "0.4.2-rc9", default-features = false, features = [
     "flat-vector",
 ] }
-typst-ts-core = { version = "0.4.2-rc8" }
-typst-ts-compiler = { version = "0.4.2-rc8" }
-typst-preview = { git = "https://github.com/Enter-tainer/typst-preview", rev = "18630ebda22339109ef675a885787f4fc8731ba8" }
-
-# [features]
-# rkyv = ["dep:rkyv", "rkyv/alloc", "rkyv/archive_le"]
-# rkyv-validation = ["dep:rkyv", "rkyv/validation"]
-# flat-vector = ["rkyv", "rkyv-validation"]
-
-# __web = ["dep:wasm-bindgen", "dep:js-sys"]
-# web = ["__web"]
-# full = ["web", "flat-vector"]
-# default = ["full"]
+typst-ts-core = { version = "0.4.2-rc9" }
+typst-ts-compiler = { version = "0.4.2-rc9" }
+typst-preview = { version = "0.11.0" }
 
 lsp-server = "0.7.6"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
@@ -125,15 +115,7 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "
 # typst-pdf = { path = "../typst/crates/typst-pdf" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "2fc877de0a4bcd7a8f057933546a97348e9621c7", package = "typst-ts-svg-exporter" }
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "2fc877de0a4bcd7a8f057933546a97348e9621c7", package = "reflexo" }
-typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "2fc877de0a4bcd7a8f057933546a97348e9621c7", package = "typst-ts-core" }
-typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts", rev = "2fc877de0a4bcd7a8f057933546a97348e9621c7", package = "typst-ts-compiler" }
-
 # typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
+# reflexo = { path = "../typst.ts/crates/reflexo/" }
 # typst-ts-core = { path = "../typst.ts/core" }
 # typst-ts-compiler = { path = "../typst.ts/compiler" }
-
-# https://github.com/rust-lang/cargo/issues/8690
-[patch."https://github.com/Enter-tainer/typst-preview"]
-typst-preview = { path = "external/typst-preview" }

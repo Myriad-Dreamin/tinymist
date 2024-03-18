@@ -2702,8 +2702,9 @@ dependencies = [
 
 [[package]]
 name = "reflexo"
-version = "0.4.2-rc8"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=2fc877de0a4bcd7a8f057933546a97348e9621c7#2fc877de0a4bcd7a8f057933546a97348e9621c7"
+version = "0.4.2-rc9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3bf3d6c80be65ec408823031e560758c1de427601d61a82fdea0d0ecb7794f4"
 dependencies = [
  "base64 0.22.0",
  "bitvec",
@@ -3644,7 +3645,7 @@ dependencies = [
  "tokio-util",
  "toml",
  "typst",
- "typst-assets 0.10.0",
+ "typst-assets",
  "typst-pdf",
  "typst-preview",
  "typst-ts-compiler",
@@ -3959,7 +3960,7 @@ dependencies = [
  "ttf-parser",
  "two-face",
  "typed-arena",
- "typst-assets 0.11.0",
+ "typst-assets",
  "typst-macros",
  "typst-syntax",
  "typst-timing",
@@ -3970,11 +3971,6 @@ dependencies = [
  "usvg",
  "wasmi",
 ]
-
-[[package]]
-name = "typst-assets"
-version = "0.10.0"
-source = "git+https://github.com/typst/typst-assets?rev=4d1211a#4d1211ab5ba8a02992a7362000e6dd422d44dd68"
 
 [[package]]
 name = "typst-assets"
@@ -4024,7 +4020,7 @@ dependencies = [
  "svg2pdf",
  "ttf-parser",
  "typst",
- "typst-assets 0.11.0",
+ "typst-assets",
  "typst-macros",
  "typst-timing",
  "unicode-properties",
@@ -4034,7 +4030,9 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.10.10"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b8eebe95602e6723ce6e3c06e4c32000ab1bde2d0e775248b74ee2373aeff87"
 dependencies = [
  "anyhow",
  "await-tree",
@@ -4058,7 +4056,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "typst",
- "typst-assets 0.11.0",
+ "typst-assets",
  "typst-ts-compiler",
  "typst-ts-core",
  "typst-ts-svg-exporter",
@@ -4094,8 +4092,9 @@ dependencies = [
 
 [[package]]
 name = "typst-ts-compiler"
-version = "0.4.2-rc8"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=2fc877de0a4bcd7a8f057933546a97348e9621c7#2fc877de0a4bcd7a8f057933546a97348e9621c7"
+version = "0.4.2-rc9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "478dbcd334466a939420fa9e9429e0ecaa8ec8c5a943e74862b2b46b364e2938"
 dependencies = [
  "append-only-vec",
  "base64 0.22.0",
@@ -4132,8 +4131,9 @@ dependencies = [
 
 [[package]]
 name = "typst-ts-core"
-version = "0.4.2-rc8"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=2fc877de0a4bcd7a8f057933546a97348e9621c7#2fc877de0a4bcd7a8f057933546a97348e9621c7"
+version = "0.4.2-rc9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d109fb49a9ffa1d9f7126b317313d29257ec0d34ae7a34c65d16ed1fea2b448"
 dependencies = [
  "base64 0.22.0",
  "base64-serde",
@@ -4169,8 +4169,9 @@ dependencies = [
 
 [[package]]
 name = "typst-ts-svg-exporter"
-version = "0.4.2-rc8"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts?rev=2fc877de0a4bcd7a8f057933546a97348e9621c7#2fc877de0a4bcd7a8f057933546a97348e9621c7"
+version = "0.4.2-rc9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f909564a69478f3e244ddc4380dc337f74edfa5d4ce7551ddfedc6f5d32f48b6"
 dependencies = [
  "base64 0.22.0",
  "comemo",
