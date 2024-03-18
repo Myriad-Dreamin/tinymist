@@ -361,7 +361,10 @@ async function commandInitTemplate(
         const pkgSpecifiers: string[] = [];
         for (const ns of Object.keys(data)) {
             for (const pkgName of Object.keys(data[ns])) {
-                pkgSpecifiers.push(`@${ns}/${pkgName}`);
+                const pkg = data[ns][pkgName];
+                if (pkg?.isFavorite) {
+                    pkgSpecifiers.push(`@${ns}/${pkgName}`);
+                }
             }
         }
 
