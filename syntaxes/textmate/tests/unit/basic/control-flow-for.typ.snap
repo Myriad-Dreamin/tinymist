@@ -1,17 +1,17 @@
 >#for i
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst keyword.control.typst
 #    ^^ source.typst
 >#for i in
-#^ source.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst keyword.control.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
 #       ^^ source.typst keyword.other.typst
 >#for i in range(1)
 #^ source.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst keyword.control.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -23,7 +23,7 @@
 #                 ^ source.typst meta.brace.round.typst
 >#for i in range(1) {}
 #^ source.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst keyword.control.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -38,7 +38,7 @@
 #                    ^ source.typst meta.brace.curly.typst
 >#for i in {}
 #^ source.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst keyword.control.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -48,7 +48,7 @@
 #           ^ source.typst meta.brace.curly.typst
 >#for i in {}; 1
 #^ source.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst keyword.control.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -60,7 +60,7 @@
 #             ^^^ source.typst
 >#for i in range(1) {}; 1
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst keyword.control.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -77,7 +77,7 @@
 #                      ^^^ source.typst
 >#for i in range(1) {}1
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst keyword.control.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -92,8 +92,8 @@
 #                    ^ source.typst meta.brace.curly.typst
 #                     ^ source.typst
 >#for i in range(1) {}a
-#^ source.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst keyword.control.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -108,8 +108,8 @@
 #                    ^ source.typst meta.brace.curly.typst
 #                     ^ source.typst
 >#for i in range(1) {} 1
-#^ source.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst keyword.control.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -124,8 +124,8 @@
 #                    ^ source.typst meta.brace.curly.typst
 #                     ^^ source.typst
 >#for i in range(1) {} a
-#^ source.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst keyword.control.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -139,3 +139,55 @@
 #                   ^ source.typst meta.brace.curly.typst
 #                    ^ source.typst meta.brace.curly.typst
 #                     ^^ source.typst
+>#for i in range(1) {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst keyword.control.typst
+#    ^ source.typst
+#     ^ source.typst variable.other.readwrite.typst
+#      ^ source.typst
+#       ^^ source.typst keyword.other.typst
+#         ^ source.typst
+#          ^^^^^ source.typst entity.name.function.typst
+#               ^ source.typst meta.brace.round.typst
+#                ^ source.typst constant.numeric.integer.typst
+#                 ^ source.typst meta.brace.round.typst
+#                  ^ source.typst
+#                   ^ source.typst meta.brace.curly.typst
+#                    ^ source.typst meta.brace.curly.typst
+>#for i in range(1) {}; {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst keyword.control.typst
+#    ^ source.typst
+#     ^ source.typst variable.other.readwrite.typst
+#      ^ source.typst
+#       ^^ source.typst keyword.other.typst
+#         ^ source.typst
+#          ^^^^^ source.typst entity.name.function.typst
+#               ^ source.typst meta.brace.round.typst
+#                ^ source.typst constant.numeric.integer.typst
+#                 ^ source.typst meta.brace.round.typst
+#                  ^ source.typst
+#                   ^ source.typst meta.brace.curly.typst
+#                    ^ source.typst meta.brace.curly.typst
+#                     ^ source.typst punctuation.terminator.statement.typst
+#                      ^^^^ source.typst
+>#for i in range(1) {} {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst keyword.control.typst
+#    ^ source.typst
+#     ^ source.typst variable.other.readwrite.typst
+#      ^ source.typst
+#       ^^ source.typst keyword.other.typst
+#         ^ source.typst
+#          ^^^^^ source.typst entity.name.function.typst
+#               ^ source.typst meta.brace.round.typst
+#                ^ source.typst constant.numeric.integer.typst
+#                 ^ source.typst meta.brace.round.typst
+#                  ^ source.typst
+#                   ^ source.typst meta.brace.curly.typst
+#                    ^ source.typst meta.brace.curly.typst
+#                     ^ source.typst
+#                      ^ source.typst meta.brace.curly.typst
+#                       ^ source.typst meta.brace.curly.typst
+>1
+#^^ source.typst

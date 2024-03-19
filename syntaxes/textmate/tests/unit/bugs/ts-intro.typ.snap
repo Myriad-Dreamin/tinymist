@@ -18,8 +18,7 @@
 #                                 ^^^^^^ source.typst string.quoted.double.typst
 #                                       ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
 #                                        ^ source.typst meta.brace.round.typst
-#                                         ^ source.typst
-#                                          ^^^^ source.typst
+#                                         ^^^^^ source.typst
 #                                              ^ source.typst punctuation.definition.hash.typst
 #                                               ^^^^ source.typst entity.name.function.typst
 #                                                   ^ source.typst meta.brace.round.typst
@@ -34,5 +33,4 @@
 #                                                                        ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
 #                                                                         ^ source.typst meta.brace.round.typst
 #                                                                          ^ source.typst
-#                                                                           ^ source.typst
-#                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst
+#                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst

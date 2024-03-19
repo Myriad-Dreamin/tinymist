@@ -9,3 +9,7 @@
 #for i in range(1) {}a
 #for i in range(1) {} 1
 #for i in range(1) {} a
+#for i in range(1) {}
+#for i in range(1) {}; {}
+#for i in range(1) {} {}
+1

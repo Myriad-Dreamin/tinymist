@@ -1,0 +1,1 @@
+#let code(it, args: any, res: none, scope: (:));

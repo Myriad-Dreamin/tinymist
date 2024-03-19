@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "compile": "js-yaml typst.tmLanguage.yaml > typst.tmLanguage.json",
+    "bundle": "node scripts/install.cjs",
     "test": "yarn compile && npx vscode-tmgrammar-snap --updateSnapshot tests/unit/**/*.typ"
   },
   "devDependencies": {

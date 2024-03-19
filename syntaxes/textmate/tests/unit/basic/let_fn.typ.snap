@@ -1,6 +1,6 @@
 >#let f() = 1;
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst storage.type.typst
 #    ^ source.typst
 #     ^ source.typst entity.name.function.typst
 #      ^ source.typst meta.brace.round.typst
@@ -12,7 +12,7 @@
 #            ^ source.typst punctuation.terminator.statement.typst
 >#let f(a) = 1;
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst storage.type.typst
 #    ^ source.typst
 #     ^ source.typst entity.name.function.typst
 #      ^ source.typst meta.brace.round.typst
@@ -25,7 +25,7 @@
 #             ^ source.typst punctuation.terminator.statement.typst
 >#let f(a, b: none) = 1;
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst storage.type.typst
 #    ^ source.typst
 #     ^ source.typst entity.name.function.typst
 #      ^ source.typst meta.brace.round.typst
@@ -44,7 +44,7 @@
 #                      ^ source.typst punctuation.terminator.statement.typst
 >#let f(a, (b, c)) = 1;
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst storage.type.typst
 #    ^ source.typst
 #     ^ source.typst entity.name.function.typst
 #      ^ source.typst meta.brace.round.typst
@@ -65,7 +65,7 @@
 #                     ^ source.typst punctuation.terminator.statement.typst
 >#let f(a, (b, c: d)) = 1;
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst storage.type.typst
 #    ^ source.typst
 #     ^ source.typst entity.name.function.typst
 #      ^ source.typst meta.brace.round.typst
@@ -89,7 +89,7 @@
 #                        ^ source.typst punctuation.terminator.statement.typst
 >#let f((a, b)) = 1;
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst storage.type.typst
 #    ^ source.typst
 #     ^ source.typst entity.name.function.typst
 #      ^ source.typst meta.brace.round.typst
@@ -107,7 +107,7 @@
 #                  ^ source.typst punctuation.terminator.statement.typst
 >#let f((a, (c: (b: e)))) = 1;
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst storage.type.typst
 #    ^ source.typst
 #     ^ source.typst entity.name.function.typst
 #      ^ source.typst meta.brace.round.typst
@@ -135,7 +135,7 @@
 #                            ^ source.typst punctuation.terminator.statement.typst
 >#let f((a, ..)) = 1;
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst storage.type.typst
 #    ^ source.typst
 #     ^ source.typst entity.name.function.typst
 #      ^ source.typst meta.brace.round.typst
@@ -153,7 +153,7 @@
 #                   ^ source.typst punctuation.terminator.statement.typst
 >#let f((.., a)) = 1;
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst punctuation.definition.keyword.typst
+# ^^^ source.typst storage.type.typst
 #    ^ source.typst
 #     ^ source.typst entity.name.function.typst
 #      ^ source.typst meta.brace.round.typst

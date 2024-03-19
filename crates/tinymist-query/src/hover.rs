@@ -61,8 +61,8 @@ fn def_tooltip(ctx: &mut AnalysisContext, source: &Source, cursor: usize) -> Opt
         crate::syntax::LexicalKind::Var(LexicalVarKind::Function) => {
             let f = lnk.value.as_ref();
             Some(Tooltip::Text(eco_format!(
-                r#"```typc
-let {}({});
+                r#"```typst-grammar
+#let {}({});
 ```{}"#,
                 lnk.name,
                 ParamTooltip(f),
@@ -80,8 +80,8 @@ let {}({});
 
             Some(Tooltip::Text(eco_format!(
                 r#"
-```typc
-let {};
+```typst-grammar
+#let {};
 ```{v}"#,
                 lnk.name
             )))

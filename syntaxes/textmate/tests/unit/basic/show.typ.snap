@@ -1,6 +1,6 @@
 >#show: it => it
 #^ source.typst punctuation.definition.hash.typst
-# ^^^^ source.typst punctuation.definition.keyword.typst
+# ^^^^ source.typst keyword.control.typst
 #     ^ source.typst punctuation.separator.colon.typst
 #      ^ source.typst
 #       ^^ source.typst entity.other.interpolated.typst
@@ -10,7 +10,7 @@
 #             ^^ source.typst entity.other.interpolated.typst
 >#show text: it => it
 #^ source.typst punctuation.definition.hash.typst
-# ^^^^ source.typst punctuation.definition.keyword.typst
+# ^^^^ source.typst keyword.control.typst
 #     ^ source.typst
 #      ^^^^ source.typst entity.other.interpolated.typst
 #          ^ source.typst punctuation.separator.colon.typst

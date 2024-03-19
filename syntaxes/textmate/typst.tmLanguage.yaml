@@ -128,7 +128,8 @@ repository:
           '2':
             name: punctuation.terminator.statement.typst
       - begin: '#'
-        end: '[\s\n]|(;)'
+        # name: 'markup.expr.typst'
+        end: '(?=\s)|(;)'
         beginCaptures:
           '0':
             name: punctuation.definition.hash.typst
@@ -172,48 +173,48 @@ repository:
       - include: '#code-block'
       # let expressions: let ident|pattern = expr
       - begin: '(let)\b'
-        end: '\n|(?=\))|(?=;)|(?=])'
+        end: '(?=\n)|(?=\))|(?=;)|(?=])'
         beginCaptures:
           '1':
-            name: punctuation.definition.keyword.typst
+            name: storage.type.typst
         patterns:
           - include: '#let-expr'
       - begin: '(for)\b'
         # debugging
         # name: 'for.block.typst'
-        end: '\n|(?=\))|(?=;)|(?=])'
+        end: '(?=\n)|(?=\))|(?=;)|(?=])'
         captures:
           '1':
-            name: punctuation.definition.keyword.typst
+            name: keyword.control.typst
         patterns:
           - include: '#for-clause'
       - begin: '(else)?\b(if)\b'
         # debugging
         # name: 'if.block.typst'
-        end: '\n|(?=\))|(?=;)|(?=])'
+        end: '(?=\n)|(?=\))|(?=;)|(?=])'
         captures:
           '1':
-            name: punctuation.definition.keyword.typst
+            name: keyword.control.typst
           '2':
-            name: punctuation.definition.keyword.typst
+            name: keyword.control.typst
         patterns:
-          - include: '#if-clause'
-      - match: '(while|if|else|as|in)\b'
+          - include: '#code-expr'
+      - match: '(while|as|in)\b'
         captures:
           '1':
-            name: punctuation.definition.keyword.typst
+            name: keyword.control.typst
       - begin: '(show)\b'
-        end: '\n|(?=\))|(?=;)|(?=])'
+        end: '(?=\n)|(?=\))|(?=;)|(?=])'
         beginCaptures:
           '1':
-            name: punctuation.definition.keyword.typst
+            name: keyword.control.typst
         patterns:
           - include: '#show-expr'
       - begin: '(set)\b'
-        end: '\n|(?=\))|(?=;)|(?=])'
+        end: '(?=\n)|(?=\))|(?=;)|(?=])'
         beginCaptures:
           '1':
-            name: punctuation.definition.keyword.typst
+            name: keyword.control.typst
         patterns:
           - include: '#code-expr'
       - begin: '(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)(\()'
@@ -237,7 +238,7 @@ repository:
     patterns:
       # brace expressions: {...}
       - begin: \{
-        end: (\})[\p{XID_Start}_0-9]?
+        end: (\})
         beginCaptures:
           '0':
             name: meta.brace.curly.typst
@@ -268,7 +269,7 @@ repository:
   for-clause:
     patterns:
     - begin: '([\s\S]+)(as|in)\b'
-      end: '(?={)|(?=\))|(?=;)|(?=])'
+      end: '(?=[{\);\]])'
       beginCaptures:
         '1':
           patterns:
@@ -279,9 +280,6 @@ repository:
       patterns:
       - include: '#code-expr'
     - include: '#code-block'
-  if-clause:
-    patterns:
-    - include: '#code-expr'
   show-expr:
     patterns:
       - include: '#code-expr'

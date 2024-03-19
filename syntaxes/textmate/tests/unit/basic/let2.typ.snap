@@ -1,7 +1,7 @@
 >#(let x = 1)
 #^ source.typst punctuation.definition.hash.typst
 # ^ source.typst meta.brace.round.typst
-#  ^^^ source.typst punctuation.definition.keyword.typst
+#  ^^^ source.typst storage.type.typst
 #     ^ source.typst
 #      ^ source.typst variable.other.readwrite.typst
 #       ^ source.typst
@@ -12,7 +12,7 @@
 >#(let x = 1);
 #^ source.typst punctuation.definition.hash.typst
 # ^ source.typst meta.brace.round.typst
-#  ^^^ source.typst punctuation.definition.keyword.typst
+#  ^^^ source.typst storage.type.typst
 #     ^ source.typst
 #      ^ source.typst variable.other.readwrite.typst
 #       ^ source.typst
@@ -26,7 +26,7 @@
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst meta.brace.round.typst
 #   ^ source.typst meta.brace.round.typst
-#    ^^^ source.typst punctuation.definition.keyword.typst
+#    ^^^ source.typst storage.type.typst
 #       ^ source.typst
 #        ^ source.typst variable.other.readwrite.typst
 #         ^ source.typst
@@ -42,7 +42,7 @@
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst meta.brace.round.typst
 #   ^ source.typst meta.brace.round.typst
-#    ^^^ source.typst punctuation.definition.keyword.typst
+#    ^^^ source.typst storage.type.typst
 #       ^ source.typst
 #        ^ source.typst variable.other.readwrite.typst
 #         ^ source.typst

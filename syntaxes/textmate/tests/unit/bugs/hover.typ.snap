@@ -1,0 +1,29 @@
+>#let code(it, args: any, res: none, scope: (:));
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst storage.type.typst
+#    ^ source.typst
+#     ^^^^ source.typst entity.name.function.typst
+#         ^ source.typst meta.brace.round.typst
+#          ^^ source.typst variable.other.readwrite.typst
+#            ^ source.typst punctuation.separator.comma.typst
+#             ^ source.typst
+#              ^^^^ source.typst variable.other.readwrite.typst
+#                  ^ source.typst punctuation.separator.colon.typst
+#                   ^ source.typst
+#                    ^^^ source.typst variable.other.readwrite.typst
+#                       ^ source.typst punctuation.separator.comma.typst
+#                        ^ source.typst
+#                         ^^^ source.typst variable.other.readwrite.typst
+#                            ^ source.typst punctuation.separator.colon.typst
+#                             ^ source.typst
+#                              ^^^^ source.typst variable.other.readwrite.typst
+#                                  ^ source.typst punctuation.separator.comma.typst
+#                                   ^ source.typst
+#                                    ^^^^^ source.typst variable.other.readwrite.typst
+#                                         ^ source.typst punctuation.separator.colon.typst
+#                                          ^ source.typst
+#                                           ^ source.typst meta.brace.round.typst
+#                                            ^ source.typst punctuation.separator.colon.typst
+#                                             ^ source.typst meta.brace.round.typst
+#                                              ^ source.typst meta.brace.round.typst
+#                                               ^ source.typst punctuation.terminator.statement.typst
