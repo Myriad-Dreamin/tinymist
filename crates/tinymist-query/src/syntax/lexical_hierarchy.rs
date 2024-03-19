@@ -381,6 +381,7 @@ impl LexicalHierarchyWorker {
                 }
             }
         } else {
+            // todo: for loop variable
             match node.kind() {
                 SyntaxKind::LetBinding => 'let_binding: {
                     let name = node.children().find(|n| n.cast::<ast::Pattern>().is_some());

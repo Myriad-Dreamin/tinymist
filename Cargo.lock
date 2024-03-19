@@ -3664,6 +3664,7 @@ dependencies = [
  "ena",
  "fxhash",
  "hex",
+ "if_chain",
  "indexmap 2.2.5",
  "insta",
  "itertools 0.12.1",

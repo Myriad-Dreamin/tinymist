@@ -1,10 +1,11 @@
+use core::fmt;
 use std::{borrow::Cow, ops::Range};
 
-use ecow::eco_vec;
+use ecow::{eco_format, eco_vec};
 use log::debug;
 use lsp_types::{InlayHintKind, InlayHintLabel};
 use typst::{
-    foundations::{Args, Closure},
+    foundations::{Args, CastInfo, Closure},
     syntax::SyntaxNode,
     util::LazyHash,
 };
@@ -486,6 +487,8 @@ fn analyze_call_no_cache(func: Func, args: ast::Args<'_>) -> Option<CallInfo> {
 pub struct ParamSpec {
     /// The parameter's name.
     pub name: Cow<'static, str>,
+    /// The parameter's default name.
+    pub expr: Option<EcoString>,
     /// Creates an instance of the parameter's default value.
     pub default: Option<fn() -> Value>,
     /// Is the parameter positional?
@@ -503,6 +506,7 @@ impl ParamSpec {
     fn from_static(s: &ParamInfo) -> Arc<Self> {
         Arc::new(Self {
             name: Cow::Borrowed(s.name),
+            expr: Some(eco_format!("{}", TypeExpr(&s.input))),
             default: s.default,
             positional: s.positional,
             named: s.named,
@@ -512,16 +516,16 @@ impl ParamSpec {
 }
 
 #[derive(Debug, Clone)]
-struct Signature {
-    pos: Vec<Arc<ParamSpec>>,
-    named: HashMap<Cow<'static, str>, Arc<ParamSpec>>,
+pub struct Signature {
+    pub pos: Vec<Arc<ParamSpec>>,
+    pub named: HashMap<Cow<'static, str>, Arc<ParamSpec>>,
     has_fill_or_size_or_stroke: bool,
-    rest: Option<Arc<ParamSpec>>,
+    pub rest: Option<Arc<ParamSpec>>,
     _broken: bool,
 }
 
 #[comemo::memoize]
-fn analyze_signature(func: Func) -> Arc<Signature> {
+pub(crate) fn analyze_signature(func: Func) -> Arc<Signature> {
     use typst::foundations::func::Repr;
     let params = match func.inner() {
         Repr::With(..) => unreachable!(),
@@ -595,6 +599,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
             ast::Param::Pos(ast::Pattern::Placeholder(..)) => {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Borrowed("_"),
+                    expr: None,
                     default: None,
                     positional: true,
                     named: false,
@@ -611,15 +616,18 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
 
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(name.to_owned()),
+                    expr: None,
                     default: None,
                     positional: true,
                     named: false,
                     variadic: false,
                 }));
             }
+            // todo: pattern
             ast::Param::Named(n) => {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(n.name().as_str().to_owned()),
+                    expr: Some(unwrap_expr(n.expr()).to_untyped().clone().into_text()),
                     default: None,
                     positional: false,
                     named: true,
@@ -630,6 +638,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 let ident = n.sink_ident().map(|e| e.as_str());
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(ident.unwrap_or_default().to_owned()),
+                    expr: None,
                     default: None,
                     positional: false,
                     named: true,
@@ -652,6 +661,34 @@ fn is_one_line_(src: &Source, arg_node: &LinkedNode<'_>) -> Option<bool> {
     let ll = src.byte_to_line(lb.offset())?;
     let rl = src.byte_to_line(rb.offset())?;
     Some(ll == rl)
+}
+
+fn unwrap_expr(mut e: ast::Expr) -> ast::Expr {
+    while let ast::Expr::Parenthesized(p) = e {
+        e = p.expr();
+    }
+
+    e
+}
+
+struct TypeExpr<'a>(&'a CastInfo);
+
+impl<'a> fmt::Display for TypeExpr<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self.0 {
+            CastInfo::Any => "any",
+            CastInfo::Value(.., v) => v,
+            CastInfo::Type(v) => {
+                f.write_str(v.short_name())?;
+                return Ok(());
+            }
+            CastInfo::Union(v) => {
+                let mut values = v.iter().map(|e| TypeExpr(e).to_string());
+                f.write_str(&values.join(" | "))?;
+                return Ok(());
+            }
+        })
+    }
 }
 
 #[cfg(test)]
