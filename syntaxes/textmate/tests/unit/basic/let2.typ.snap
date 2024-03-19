@@ -1,10 +1,10 @@
 >#(let x = 1)
 #^ source.typst punctuation.definition.hash.typst
 # ^ source.typst meta.brace.round.typst
-#  ^^^ source.typst storage.type.typst
-#     ^ source.typst
-#      ^ source.typst variable.other.readwrite.typst
-#       ^ source.typst
+#  ^^^ source.typst meta.expr.let.typst storage.type.typst
+#     ^ source.typst meta.expr.let.typst
+#      ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#       ^ source.typst meta.expr.let.typst
 #        ^ source.typst keyword.operator.assignment.typst
 #         ^ source.typst
 #          ^ source.typst constant.numeric.integer.typst
@@ -12,10 +12,10 @@
 >#(let x = 1);
 #^ source.typst punctuation.definition.hash.typst
 # ^ source.typst meta.brace.round.typst
-#  ^^^ source.typst storage.type.typst
-#     ^ source.typst
-#      ^ source.typst variable.other.readwrite.typst
-#       ^ source.typst
+#  ^^^ source.typst meta.expr.let.typst storage.type.typst
+#     ^ source.typst meta.expr.let.typst
+#      ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#       ^ source.typst meta.expr.let.typst
 #        ^ source.typst keyword.operator.assignment.typst
 #         ^ source.typst
 #          ^ source.typst constant.numeric.integer.typst
@@ -26,10 +26,10 @@
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst meta.brace.round.typst
 #   ^ source.typst meta.brace.round.typst
-#    ^^^ source.typst storage.type.typst
-#       ^ source.typst
-#        ^ source.typst variable.other.readwrite.typst
-#         ^ source.typst
+#    ^^^ source.typst meta.expr.let.typst storage.type.typst
+#       ^ source.typst meta.expr.let.typst
+#        ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#         ^ source.typst meta.expr.let.typst
 #          ^ source.typst keyword.operator.assignment.typst
 #           ^ source.typst
 #            ^ source.typst constant.numeric.integer.typst
@@ -42,10 +42,10 @@
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst meta.brace.round.typst
 #   ^ source.typst meta.brace.round.typst
-#    ^^^ source.typst storage.type.typst
-#       ^ source.typst
-#        ^ source.typst variable.other.readwrite.typst
-#         ^ source.typst
+#    ^^^ source.typst meta.expr.let.typst storage.type.typst
+#       ^ source.typst meta.expr.let.typst
+#        ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#         ^ source.typst meta.expr.let.typst
 #          ^ source.typst keyword.operator.assignment.typst
 #           ^ source.typst
 #            ^ source.typst constant.numeric.integer.typst

@@ -1,11 +1,11 @@
 >#if 1
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst keyword.control.typst
+# ^^ source.typst keyword.control.conditional.typst
 #   ^ source.typst
 #    ^ source.typst constant.numeric.integer.typst
 >#if {} 1
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst keyword.control.typst
+# ^^ source.typst keyword.control.conditional.typst
 #   ^ source.typst
 #    ^ source.typst meta.brace.curly.typst
 #     ^ source.typst meta.brace.curly.typst
@@ -13,12 +13,12 @@
 #       ^ source.typst constant.numeric.integer.typst
 >#if {} else {} 1
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst keyword.control.typst
+# ^^ source.typst keyword.control.conditional.typst
 #   ^ source.typst
 #    ^ source.typst meta.brace.curly.typst
 #     ^ source.typst meta.brace.curly.typst
 #      ^ source.typst
-#       ^^^^ source.typst entity.other.interpolated.typst
+#       ^^^^ source.typst variable.other.readwrite.typst
 #           ^ source.typst
 #            ^ source.typst meta.brace.curly.typst
 #             ^ source.typst meta.brace.curly.typst
@@ -26,14 +26,14 @@
 #               ^ source.typst constant.numeric.integer.typst
 >#if 1 {} else {} 1
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst keyword.control.typst
+# ^^ source.typst keyword.control.conditional.typst
 #   ^ source.typst
 #    ^ source.typst constant.numeric.integer.typst
 #     ^ source.typst
 #      ^ source.typst meta.brace.curly.typst
 #       ^ source.typst meta.brace.curly.typst
 #        ^ source.typst
-#         ^^^^ source.typst entity.other.interpolated.typst
+#         ^^^^ source.typst variable.other.readwrite.typst
 #             ^ source.typst
 #              ^ source.typst meta.brace.curly.typst
 #               ^ source.typst meta.brace.curly.typst
@@ -41,7 +41,7 @@
 #                 ^ source.typst constant.numeric.integer.typst
 >#if [] {} else {} #1
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst keyword.control.typst
+# ^^ source.typst keyword.control.conditional.typst
 #   ^ source.typst
 #    ^ source.typst meta.brace.square.typ
 #     ^ source.typst meta.brace.square.typst
@@ -49,7 +49,7 @@
 #       ^ source.typst meta.brace.curly.typst
 #        ^ source.typst meta.brace.curly.typst
 #         ^ source.typst
-#          ^^^^ source.typst entity.other.interpolated.typst
+#          ^^^^ source.typst variable.other.readwrite.typst
 #              ^ source.typst
 #               ^ source.typst meta.brace.curly.typst
 #                ^ source.typst meta.brace.curly.typst
@@ -57,7 +57,7 @@
 #                   ^ source.typst constant.numeric.integer.typst
 >#if {} {} else {} {}
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst keyword.control.typst
+# ^^ source.typst keyword.control.conditional.typst
 #   ^ source.typst
 #    ^ source.typst meta.brace.curly.typst
 #     ^ source.typst meta.brace.curly.typst
@@ -65,7 +65,7 @@
 #       ^ source.typst meta.brace.curly.typst
 #        ^ source.typst meta.brace.curly.typst
 #         ^ source.typst
-#          ^^^^ source.typst entity.other.interpolated.typst
+#          ^^^^ source.typst variable.other.readwrite.typst
 #              ^ source.typst
 #               ^ source.typst meta.brace.curly.typst
 #                ^ source.typst meta.brace.curly.typst
@@ -74,30 +74,30 @@
 #                   ^ source.typst meta.brace.curly.typst
 >#if () {} else {} # a
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst keyword.control.typst
+# ^^ source.typst keyword.control.conditional.typst
 #   ^ source.typst
 #    ^^ source.typst meta.array.empty.typst
 #      ^ source.typst
 #       ^ source.typst meta.brace.curly.typst
 #        ^ source.typst meta.brace.curly.typst
 #         ^ source.typst
-#          ^^^^ source.typst entity.other.interpolated.typst
+#          ^^^^ source.typst variable.other.readwrite.typst
 #              ^ source.typst
 #               ^ source.typst meta.brace.curly.typst
 #                ^ source.typst meta.brace.curly.typst
 #                 ^^^ source.typst
-#                    ^ source.typst entity.other.interpolated.typst
+#                    ^ source.typst variable.other.readwrite.typst
 >
 >#if () {} else {}
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst keyword.control.typst
+# ^^ source.typst keyword.control.conditional.typst
 #   ^ source.typst
 #    ^^ source.typst meta.array.empty.typst
 #      ^ source.typst
 #       ^ source.typst meta.brace.curly.typst
 #        ^ source.typst meta.brace.curly.typst
 #         ^ source.typst
-#          ^^^^ source.typst entity.other.interpolated.typst
+#          ^^^^ source.typst variable.other.readwrite.typst
 #              ^ source.typst
 #               ^ source.typst meta.brace.curly.typst
 #                ^ source.typst meta.brace.curly.typst
@@ -106,14 +106,14 @@
 >
 >#if () {} else {}
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst keyword.control.typst
+# ^^ source.typst keyword.control.conditional.typst
 #   ^ source.typst
 #    ^^ source.typst meta.array.empty.typst
 #      ^ source.typst
 #       ^ source.typst meta.brace.curly.typst
 #        ^ source.typst meta.brace.curly.typst
 #         ^ source.typst
-#          ^^^^ source.typst entity.other.interpolated.typst
+#          ^^^^ source.typst variable.other.readwrite.typst
 #              ^ source.typst
 #               ^ source.typst meta.brace.curly.typst
 #                ^ source.typst meta.brace.curly.typst
@@ -122,14 +122,14 @@
 >
 >#if () {} else {}
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst keyword.control.typst
+# ^^ source.typst keyword.control.conditional.typst
 #   ^ source.typst
 #    ^^ source.typst meta.array.empty.typst
 #      ^ source.typst
 #       ^ source.typst meta.brace.curly.typst
 #        ^ source.typst meta.brace.curly.typst
 #         ^ source.typst
-#          ^^^^ source.typst entity.other.interpolated.typst
+#          ^^^^ source.typst variable.other.readwrite.typst
 #              ^ source.typst
 #               ^ source.typst meta.brace.curly.typst
 #                ^ source.typst meta.brace.curly.typst
@@ -137,14 +137,14 @@
 #^^ source.typst
 >#if () {} else {}
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst keyword.control.typst
+# ^^ source.typst keyword.control.conditional.typst
 #   ^ source.typst
 #    ^^ source.typst meta.array.empty.typst
 #      ^ source.typst
 #       ^ source.typst meta.brace.curly.typst
 #        ^ source.typst meta.brace.curly.typst
 #         ^ source.typst
-#          ^^^^ source.typst entity.other.interpolated.typst
+#          ^^^^ source.typst variable.other.readwrite.typst
 #              ^ source.typst
 #               ^ source.typst meta.brace.curly.typst
 #                ^ source.typst meta.brace.curly.typst

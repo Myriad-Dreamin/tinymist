@@ -1,17 +1,17 @@
 >#for i
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^^ source.typst
 >#for i in
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
 #       ^^ source.typst keyword.other.typst
 >#for i in range(1)
 #^ source.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -23,7 +23,7 @@
 #                 ^ source.typst meta.brace.round.typst
 >#for i in range(1) {}
 #^ source.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -38,7 +38,7 @@
 #                    ^ source.typst meta.brace.curly.typst
 >#for i in {}
 #^ source.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -48,7 +48,7 @@
 #           ^ source.typst meta.brace.curly.typst
 >#for i in {}; 1
 #^ source.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -60,7 +60,7 @@
 #             ^^^ source.typst
 >#for i in range(1) {}; 1
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -77,7 +77,7 @@
 #                      ^^^ source.typst
 >#for i in range(1) {}1
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -93,7 +93,7 @@
 #                     ^ source.typst
 >#for i in range(1) {}a
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -109,7 +109,7 @@
 #                     ^ source.typst
 >#for i in range(1) {} 1
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -125,7 +125,7 @@
 #                     ^^ source.typst
 >#for i in range(1) {} a
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -141,7 +141,7 @@
 #                     ^^ source.typst
 >#for i in range(1) {}
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -156,7 +156,7 @@
 #                    ^ source.typst meta.brace.curly.typst
 >#for i in range(1) {}; {}
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst
@@ -173,7 +173,7 @@
 #                      ^^^^ source.typst
 >#for i in range(1) {} {}
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst keyword.control.typst
+# ^^^ source.typst keyword.control.loop.typst
 #    ^ source.typst
 #     ^ source.typst variable.other.readwrite.typst
 #      ^ source.typst

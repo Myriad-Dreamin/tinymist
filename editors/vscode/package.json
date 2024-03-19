@@ -161,7 +161,7 @@
             {
                 "id": "typst-grammar",
                 "aliases": [
-                    "Typst Grammar"
+                    "Typst with Syntax Support"
                 ],
                 "configuration": "./language-configuration.json",
                 "icon": {

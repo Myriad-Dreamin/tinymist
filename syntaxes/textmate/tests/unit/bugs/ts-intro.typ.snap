@@ -3,7 +3,7 @@
 #    ^ source.typst punctuation.definition.hash.typst
 #     ^^^^ source.typst entity.name.function.typst
 #         ^ source.typst meta.brace.round.typst
-#          ^^^^ source.typst entity.other.interpolated.typst
+#          ^^^^ source.typst variable.other.readwrite.typst
 #              ^ source.typst punctuation.separator.colon.typst
 #               ^ source.typst
 #                ^^^ source.typst entity.name.function.typst
@@ -22,10 +22,10 @@
 #                                              ^ source.typst punctuation.definition.hash.typst
 #                                               ^^^^ source.typst entity.name.function.typst
 #                                                   ^ source.typst meta.brace.round.typst
-#                                                    ^^^^ source.typst entity.other.interpolated.typst
+#                                                    ^^^^ source.typst variable.other.readwrite.typst
 #                                                        ^ source.typst punctuation.separator.colon.typst
 #                                                         ^ source.typst
-#                                                          ^^^^ source.typst entity.other.interpolated.typst
+#                                                          ^^^^ source.typst variable.other.readwrite.typst
 #                                                              ^ source.typst punctuation.separator.comma.typst
 #                                                               ^ source.typst
 #                                                                ^ source.typst string.quoted.double.typst punctuation.definition.string.typst

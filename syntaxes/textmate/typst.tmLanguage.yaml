@@ -146,8 +146,6 @@ repository:
       # empty dictionary (:)
       - name: meta.dictionary.empty.typst
         match: \(\s*:\s*\)
-      - name: keyword.operator.typst
-        match: =>
       # parentheisized expressions: (...)
       - begin: \(
         end: \)
@@ -172,8 +170,9 @@ repository:
           - include: '#markup'
       - include: '#code-block'
       # let expressions: let ident|pattern = expr
-      - begin: '(let)\b'
-        end: '(?=\n)|(?=\))|(?=;)|(?=])'
+      - name: meta.expr.let.typst
+        begin: '(let)\b'
+        end: '(?=\n)|(?=\=)|(?=\))|(?=;)|(?=])'
         beginCaptures:
           '1':
             name: storage.type.typst
@@ -183,9 +182,9 @@ repository:
         # debugging
         # name: 'for.block.typst'
         end: '(?=\n)|(?=\))|(?=;)|(?=])'
-        captures:
+        beginCaptures:
           '1':
-            name: keyword.control.typst
+            name: keyword.control.loop.typst
         patterns:
           - include: '#for-clause'
       - begin: '(else)?\b(if)\b'
@@ -194,9 +193,9 @@ repository:
         end: '(?=\n)|(?=\))|(?=;)|(?=])'
         captures:
           '1':
-            name: keyword.control.typst
+            name: keyword.control.conditional.typst
           '2':
-            name: keyword.control.typst
+            name: keyword.control.conditional.typst
         patterns:
           - include: '#code-expr'
       - match: '(while|as|in)\b'
@@ -232,8 +231,33 @@ repository:
       - match: '(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)\b'
         captures:
           '1':
-            name: entity.other.interpolated.typst
+            name: variable.other.readwrite.typst
       - include: '#constants'
+      - name: keyword.operator.arrow.typst
+        match: =>
+      - name: keyword.operator.accessor.typst
+        match: \.
+      - name: keyword.control.loop.typst
+        match: \b(while|break|continue)\b
+      - name: keyword.operator.range.typst
+        match: \.\.
+      - name: keyword.operator.arithmetic.typst
+        match: '\+|\|/|(?<![[:alpha:]])(?<!\w)(?<!\d)-(?![[:alnum:]-][[:alpha:]_])'
+      - name: keyword.operator.relational.typst
+        match: ==|!=|<=|<|>=|>
+      - begin: '(\+=|-=|\*=|/=|=)'
+        end: '(?=\n)|(?=\))|(?=;)|(?=])|(?=\})'
+        beginCaptures:
+          '1':
+            name: keyword.operator.assignment.typst
+        patterns:
+          - include: '#code-expr'
+      - name: keyword.operator.word.typst
+        match: \b(and|or|not)\b
+      - name: keyword.control.import.typst
+        match: \b(import|include|export)\b
+      - name: keyword.control.flow.typst
+        match: \b(return)\b
   code-block:
     patterns:
       # brace expressions: {...}
@@ -260,12 +284,11 @@ repository:
           '0':
             name: meta.brace.round.typst
         patterns:
-          - include: '#code-params'
+          - name: meta.parameters.typst
+            include: '#code-params'
       - include: '#pattern-binding-items'
       - include: '#identifier'
-      - name: keyword.operator.assignment.typst
-        match: '='
-      - include: '#code-expr'
+      # - include: '#code-expr'
   for-clause:
     patterns:
     - begin: '([\s\S]+)(as|in)\b'
@@ -344,7 +367,8 @@ repository:
         match: ','
   code-params:
     patterns:
-      - include: '#pattern-binding-items'
+      - name: meta.parameter.binding.typst
+        include: '#pattern-binding-items'
       - name: punctuation.separator.colon.typst
         match: ':'
       - name: punctuation.separator.comma.typst
@@ -366,29 +390,8 @@ repository:
           '0':
             name: punctuation.definition.comment.typst
       - name: punctuation.separator.colon.typst
-        match: ':'
-      - name: punctuation.separator.comma.typst
-        match: ','
-      - name: keyword.operator.typst
-        match: =>|\.\.
-      - name: keyword.operator.relational.typst
-        match: ==|!=|<=|<|>=|>
-      - name: keyword.operator.assignment.typst
-        match: \+=|-=|\*=|/=|=
-      - name: keyword.operator.arithmetic.typst
-        match: '\+|\|/|(?<![[:alpha:]])(?<!\w)(?<!\d)-(?![[:alnum:]-][[:alpha:]_])'
-      - name: keyword.operator.word.typst
-        match: \b(and|or|not)\b
-      - name: keyword.other.typst
-        match: \b(let|as|in|set|show)\b
-      - name: keyword.control.conditional.typst
-        match: \b(if|else)\b
-      - name: keyword.control.loop.typst
-        match: \b(for|while|break|continue)\b
-      - name: keyword.control.import.typst
-        match: \b(import|include|export)\b
-      - name: keyword.control.flow.typst
-        match: \b(return)\b
+        match: ';'
+      - include: '#code-expr'
   constants:
     patterns:
       - name: constant.language.none.typst
