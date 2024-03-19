@@ -1,0 +1,85 @@
+>```typ
+#^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#   ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
+>abc
+#^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst
+>```
+#^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+>
+>```typ abc```
+#^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#   ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
+#      ^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst
+#          ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+>
+>#```typ abc```
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#    ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
+#       ^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst
+#           ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+>
+>#(```typ abc```)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#     ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
+#        ^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst
+#            ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+#               ^ source.typst meta.brace.round.typst
+>
+>#text(```typ https://zh.wikipedia.org```)
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst entity.name.function.typst
+#     ^ source.typst meta.brace.round.typst
+#      ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#         ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
+#            ^ source.typst markup.raw.block.typst meta.embedded.block.typst
+#             ^^^^^^^^^^^^^^^^^^^^^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.underline.link.typst
+#                                     ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+#                                        ^ source.typst meta.brace.round.typst
+>
+>#(
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+>  ```typ
+#^^ source.typst
+#  ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#     ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
+>  writing-markup
+#^^^^^^^^^^^^^^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst
+>  ```,
+#^^ source.typst markup.raw.block.typst meta.embedded.block.typst
+#  ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+#     ^ source.typst punctuation.separator.comma.typst
+>  ```typ
+#^^ source.typst
+#  ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#     ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
+>  writing-markup
+#^^^^^^^^^^^^^^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst
+>  ```
+#^^ source.typst markup.raw.block.typst meta.embedded.block.typst
+#  ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+>)
+#^ source.typst meta.brace.round.typst
+>
+>````typ
+#^^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#    ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
+>#image("/assets/files/香風とうふ店.jpg", width: 50pt)
+#^ source.typst markup.raw.block.typst meta.embedded.block.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst entity.name.function.typst
+#      ^ source.typst markup.raw.block.typst meta.embedded.block.typst meta.brace.round.typst
+#       ^ source.typst markup.raw.block.typst meta.embedded.block.typst string.quoted.double.typst punctuation.definition.string.typst
+#        ^^^^^^^^^^^^^^^^^^^^^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst string.quoted.double.typst
+#                                ^ source.typst markup.raw.block.typst meta.embedded.block.typst string.quoted.double.typst punctuation.definition.string.typst
+#                                 ^ source.typst markup.raw.block.typst meta.embedded.block.typst punctuation.separator.comma.typst
+#                                  ^ source.typst markup.raw.block.typst meta.embedded.block.typst
+#                                   ^^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst variable.other.readwrite.typst
+#                                        ^ source.typst markup.raw.block.typst meta.embedded.block.typst punctuation.separator.colon.typst
+#                                         ^ source.typst markup.raw.block.typst meta.embedded.block.typst
+#                                          ^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst constant.numeric.length.typst
+#                                              ^ source.typst markup.raw.block.typst meta.embedded.block.typst meta.brace.round.typst
+>````
+#^^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst

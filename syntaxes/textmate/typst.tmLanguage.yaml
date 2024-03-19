@@ -74,7 +74,7 @@ repository:
         end: '`'
         captures:
           '0':
-            name: punctuation.definition.raw.typst
+            name: punctuation.definition.raw.inline.typst
       - name: string.other.math.typst
         begin: \$
         end: \$
@@ -82,11 +82,9 @@ repository:
           '0':
             name: punctuation.definition.string.math.typst
       - name: markup.heading.typst
-        contentName: entity.name.section.typst
+        # contentName: entity.name.section.typst
         begin: ^\s*=+\s+
-        end: |-
-
-          |(?=<)
+        end: '\n|(?=<)'
         beginCaptures:
           '0':
             name: punctuation.definition.heading.typst
@@ -168,6 +166,12 @@ repository:
             name: meta.brace.square.typst
         patterns:
           - include: '#markup'
+      - name: entity.other.label.typst
+        match: '<[\p{XID_Start}_][\p{XID_Continue}_-]*>'
+        captures:
+          '1':
+            name: string.other.label.typst
+      - include: '#fenced_code_block'
       - include: '#code-block'
       # let expressions: let ident|pattern = expr
       - name: meta.expr.let.typst
@@ -428,1161 +432,912 @@ repository:
           '0':
             name: punctuation.definition.string.math.typst
   fenced_code_block_typst:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(typ|typst)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(typ|typst)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.typst
-        patterns:
-          - include: source.typst
+      - include: source.typst
   fenced_code_block_css:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(css|css.erb)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(css|css.erb)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.css
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.css
-        patterns:
-          - include: source.css
+      - include: source.css
   fenced_code_block_basic:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(html|htm|shtml|xhtml|inc|tmpl|tpl)((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(html|htm|shtml|xhtml|inc|tmpl|tpl)\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
+      - begin: (.*)
+        while: '(?!(`{3,}))'
         contentName: meta.embedded.block.html
         patterns:
           - include: text.html.basic
   fenced_code_block_ini:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(ini|conf)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(ini|conf)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.ini
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.ini
-        patterns:
-          - include: source.ini
+      - include: source.ini
   fenced_code_block_java:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(java|bsh)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(java|bsh)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.java
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.java
-        patterns:
-          - include: source.java
+      - include: source.java
   fenced_code_block_lua:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(lua)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(lua)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.lua
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.lua
-        patterns:
-          - include: source.lua
+      - include: source.lua
   fenced_code_block_makefile:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(Makefile|makefile|GNUmakefile|OCamlMakefile)((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(Makefile|makefile|GNUmakefile|OCamlMakefile)\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.makefile
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.makefile
-        patterns:
-          - include: source.makefile
+      - include: source.makefile
   fenced_code_block_perl:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(perl|pl|pm|pod|t|PL|psgi|vcl)((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(perl|pl|pm|pod|t|PL|psgi|vcl)\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.perl
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.perl
-        patterns:
-          - include: source.perl
+      - include: source.perl
   fenced_code_block_r:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(R|r|s|S|Rprofile|\{\.r.+?\})((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(R|r|s|S|Rprofile|\{\.r.+?\})\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.r
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.r
-        patterns:
-          - include: source.r
+      - include: source.r
   fenced_code_block_ruby:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(ruby|rb|rbx|rjs|Rakefile|rake|cgi|fcgi|gemspec|irbrc|Capfile|ru|prawn|Cheffile|Gemfile|Guardfile|Hobofile|Vagrantfile|Appraisals|Rantfile|Berksfile|Berksfile.lock|Thorfile|Puppetfile)((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(ruby|rb|rbx|rjs|Rakefile|rake|cgi|fcgi|gemspec|irbrc|Capfile|ru|prawn|Cheffile|Gemfile|Guardfile|Hobofile|Vagrantfile|Appraisals|Rantfile|Berksfile|Berksfile.lock|Thorfile|Puppetfile)\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.ruby
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.ruby
-        patterns:
-          - include: source.ruby
+      - include: source.ruby
   fenced_code_block_php:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(php|php3|php4|php5|phpt|phtml|aw|ctp)((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(php|php3|php4|php5|phpt|phtml|aw|ctp)\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
+      - begin: (.*)
+        while: '(?!(`{3,}))'
         contentName: meta.embedded.block.php
         patterns:
           - include: text.html.basic
           - include: source.php
   fenced_code_block_sql:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(sql|ddl|dml)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(sql|ddl|dml)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.sql
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.sql
-        patterns:
-          - include: source.sql
+      - include: source.sql
   fenced_code_block_vs_net:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(vb)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(vb)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.vs_net
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.vs_net
-        patterns:
-          - include: source.asp.vb.net
+      - include: source.asp.vb.net
   fenced_code_block_xml:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(xml|xsd|tld|jsp|pt|cpt|dtml|rss|opml)((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(xml|xsd|tld|jsp|pt|cpt|dtml|rss|opml)\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
+      - begin: (.*)
+        while: '(?!(`{3,}))'
         contentName: meta.embedded.block.xml
         patterns:
           - include: text.xml
   fenced_code_block_xsl:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(xsl|xslt)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(xsl|xslt)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
+      - begin: (.*)
+        while: '(?!(`{3,}))'
         contentName: meta.embedded.block.xsl
         patterns:
           - include: text.xml.xsl
   fenced_code_block_yaml:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(yaml|yml)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(yaml|yml)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.yaml
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.yaml
-        patterns:
-          - include: source.yaml
+      - include: source.yaml
   fenced_code_block_dosbatch:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(bat|batch)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(bat|batch)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.dosbatch
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.dosbatch
-        patterns:
-          - include: source.batchfile
+      - include: source.batchfile
   fenced_code_block_clojure:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(clj|cljs|clojure)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(clj|cljs|clojure)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.clojure
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.clojure
-        patterns:
-          - include: source.clojure
+      - include: source.clojure
   fenced_code_block_coffee:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(coffee|Cakefile|coffee.erb)((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(coffee|Cakefile|coffee.erb)\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.coffee
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.coffee
-        patterns:
-          - include: source.coffee
+      - include: source.coffee
   fenced_code_block_c:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(c|h)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(c|h)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.c
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.c
-        patterns:
-          - include: source.c
+      - include: source.c
   fenced_code_block_cpp:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(cpp|c\+\+|cxx)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(cpp|c\+\+|cxx)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.cpp source.cpp
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.cpp source.cpp
-        patterns:
-          - include: source.cpp
+      - include: source.cpp
   fenced_code_block_diff:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(patch|diff|rej)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(patch|diff|rej)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.diff
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.diff
-        patterns:
-          - include: source.diff
+      - include: source.diff
   fenced_code_block_dockerfile:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(dockerfile|Dockerfile)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(dockerfile|Dockerfile)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.dockerfile
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.dockerfile
-        patterns:
-          - include: source.dockerfile
+      - include: source.dockerfile
   fenced_code_block_git_commit:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(COMMIT_EDITMSG|MERGE_MSG)((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(COMMIT_EDITMSG|MERGE_MSG)\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
+      - begin: (.*)
+        while: '(?!(`{3,}))'
         contentName: meta.embedded.block.git_commit
         patterns:
           - include: text.git-commit
   fenced_code_block_git_rebase:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(git-rebase-todo)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(git-rebase-todo)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
+      - begin: (.*)
+        while: '(?!(`{3,}))'
         contentName: meta.embedded.block.git_rebase
         patterns:
           - include: text.git-rebase
   fenced_code_block_go:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(go|golang)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(go|golang)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.go
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.go
-        patterns:
-          - include: source.go
+      - include: source.go
   fenced_code_block_groovy:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(groovy|gvy)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(groovy|gvy)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.groovy
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.groovy
-        patterns:
-          - include: source.groovy
+      - include: source.groovy
   fenced_code_block_pug:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(jade|pug)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(jade|pug)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
+      - begin: (.*)
+        while: '(?!(`{3,}))'
         contentName: meta.embedded.block.pug
         patterns:
           - include: text.pug
   fenced_code_block_js:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(js|jsx|javascript|es6|mjs|cjs|dataviewjs|\{\.js.+?\})((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(js|jsx|javascript|es6|mjs|cjs|dataviewjs|\{\.js.+?\})\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.javascript
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.javascript
-        patterns:
-          - include: source.js
+      - include: source.js
   fenced_code_block_js_regexp:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(regexp)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(regexp)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.js_regexp
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.js_regexp
-        patterns:
-          - include: source.js.regexp
+      - include: source.js.regexp
   fenced_code_block_json:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(json|json5|sublime-settings|sublime-menu|sublime-keymap|sublime-mousemap|sublime-theme|sublime-build|sublime-project|sublime-completions)((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(json|json5|sublime-settings|sublime-menu|sublime-keymap|sublime-mousemap|sublime-theme|sublime-build|sublime-project|sublime-completions)\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.json
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.json
-        patterns:
-          - include: source.json
+      - include: source.json
   fenced_code_block_jsonc:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(jsonc)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(jsonc)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.jsonc
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.jsonc
-        patterns:
-          - include: source.json.comments
+      - include: source.json.comments
   fenced_code_block_less:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(less)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(less)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.less
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.less
-        patterns:
-          - include: source.css.less
+      - include: source.css.less
   fenced_code_block_objc:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(objectivec|objective-c|mm|objc|obj-c|m|h)((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(objectivec|objective-c|mm|objc|obj-c|m|h)\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.objc
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.objc
-        patterns:
-          - include: source.objc
+      - include: source.objc
   fenced_code_block_swift:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(swift)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(swift)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.swift
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.swift
-        patterns:
-          - include: source.swift
+      - include: source.swift
   fenced_code_block_scss:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(scss)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(scss)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.scss
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.scss
-        patterns:
-          - include: source.css.scss
+      - include: source.css.scss
   fenced_code_block_perl6:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(perl6|p6|pl6|pm6|nqp)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(perl6|p6|pl6|pm6|nqp)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.perl6
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.perl6
-        patterns:
-          - include: source.perl.6
+      - include: source.perl.6
   fenced_code_block_powershell:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(powershell|ps1|psm1|psd1)((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(powershell|ps1|psm1|psd1)\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.powershell
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.powershell
-        patterns:
-          - include: source.powershell
+      - include: source.powershell
   fenced_code_block_python:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(python|py|py3|rpy|pyw|cpy|SConstruct|Sconstruct|sconstruct|SConscript|gyp|gypi|\{\.python.+?\})((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(python|py|py3|rpy|pyw|cpy|SConstruct|Sconstruct|sconstruct|SConscript|gyp|gypi|\{\.python.+?\})\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.python
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.python
-        patterns:
-          - include: source.python
+      - include: source.python
   fenced_code_block_julia:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(julia|\{\.julia.+?\})((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(julia|\{\.julia.+?\})\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.julia
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.julia
-        patterns:
-          - include: source.julia
+      - include: source.julia
   fenced_code_block_regexp_python:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(re)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(re)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.regexp_python
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.regexp_python
-        patterns:
-          - include: source.regexp.python
+      - include: source.regexp.python
   fenced_code_block_rust:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(rust|rs|\{\.rust.+?\})((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(rust|rs|\{\.rust.+?\})\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.rust
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.rust
-        patterns:
-          - include: source.rust
+      - include: source.rust
   fenced_code_block_scala:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(scala|sbt)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(scala|sbt)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.scala
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.scala
-        patterns:
-          - include: source.scala
+      - include: source.scala
   fenced_code_block_shell:
     begin: >-
-      (^|\G)(\s*)(`{3,})\s*(?i:(shell|sh|bash|zsh|bashrc|bash_profile|bash_login|profile|bash_logout|.textmate_init|\{\.bash.+?\})((\s+|:|,|\{|\?)[^`]*)?$)
+      (`{3,})\s*(?i:(shell|sh|bash|zsh|bashrc|bash_profile|bash_login|profile|bash_logout|.textmate_init|\{\.bash.+?\})\b)
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.shellscript
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.shellscript
-        patterns:
-          - include: source.shell
+      - include: source.shell
   fenced_code_block_ts:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(typescript|ts)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(typescript|ts)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.typescript
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.typescript
-        patterns:
-          - include: source.ts
+      - include: source.ts
   fenced_code_block_tsx:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(tsx)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(tsx)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.typescriptreact
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.typescriptreact
-        patterns:
-          - include: source.tsx
+      - include: source.tsx
   fenced_code_block_csharp:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(cs|csharp|c#)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(cs|csharp|c#)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.csharp
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.csharp
-        patterns:
-          - include: source.cs
+      - include: source.cs
   fenced_code_block_fsharp:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(fs|fsharp|f#)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(fs|fsharp|f#)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.fsharp
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.fsharp
-        patterns:
-          - include: source.fsharp
+      - include: source.fsharp
   fenced_code_block_dart:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(dart)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(dart)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.dart
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.dart
-        patterns:
-          - include: source.dart
+      - include: source.dart
   fenced_code_block_handlebars:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(handlebars|hbs)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(handlebars|hbs)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
+      - begin: (.*)
+        while: '(?!(`{3,}))'
         contentName: meta.embedded.block.handlebars
         patterns:
           - include: text.html.handlebars
   fenced_code_block_markdown:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(markdown|md)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(markdown|md)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
+      - begin: (.*)
+        while: '(?!(`{3,}))'
         contentName: meta.embedded.block.markdown
         patterns:
           - include: text.html.markdown
   fenced_code_block_log:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(log)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(log)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
+      - begin: (.*)
+        while: '(?!(`{3,}))'
         contentName: meta.embedded.block.log
         patterns:
           - include: text.log
   fenced_code_block_erlang:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(erlang)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(erlang)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.erlang
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.erlang
-        patterns:
-          - include: source.erlang
+      - include: source.erlang
   fenced_code_block_elixir:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(elixir)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(elixir)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.elixir
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.elixir
-        patterns:
-          - include: source.elixir
+      - include: source.elixir
   fenced_code_block_latex:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(latex|tex)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(latex|tex)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
+      - begin: (.*)
+        while: '(?!(`{3,}))'
         contentName: meta.embedded.block.latex
         patterns:
           - include: text.tex.latex
   fenced_code_block_bibtex:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(bibtex)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(bibtex)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
+      - begin: (.*)
+        while: '(?!(`{3,}))'
         contentName: meta.embedded.block.bibtex
         patterns:
           - include: text.bibtex
   fenced_code_block_twig:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?i:(twig)((\s+|:|,|\{|\?)[^`]*)?$)'
+    begin: '(`{3,})\s*(?i:(twig)\b)'
     name: markup.raw.block.typst
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language.typst
-      '5':
-        name: fenced_code.block.language.attributes.typst
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
+    contentName: meta.embedded.block.twig
     patterns:
-      - begin: (^|\G)(\s*)(.*)
-        while: '(^|\G)(?!\s*([`~]{3,})\s*$)'
-        contentName: meta.embedded.block.twig
-        patterns:
-          - include: source.twig
+      - include: source.twig
   fenced_code_block:
     patterns:
       - include: '#fenced_code_block_typst'
@@ -1644,14 +1399,14 @@ repository:
       - include: '#fenced_code_block_twig'
       - include: '#fenced_code_block_unknown'
   fenced_code_block_unknown:
-    begin: '(^|\G)(\s*)(`{3,})\s*(?=([^`]*)?$)'
+    begin: '(`{3,})\s*(?=([^`]*)?$)'
     beginCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
-      '4':
+      '1':
+        name: punctuation.definition.raw.begin.typst
+      '2':
         name: fenced_code.block.language
-    end: '(^|\G)(\2|\s{0,3})(\3)\s*$'
+    end: '(\1)'
     endCaptures:
-      '3':
-        name: punctuation.definition.raw.typst
+      '1':
+        name: punctuation.definition.raw.end.typst
     name: markup.raw.block.typst
