@@ -30,14 +30,14 @@ const BRACE_AWARE_EXPR =
 const continuousCodeBlock: textmate.Pattern = {
   //   name: "meta.block.continuous.typst",
   begin: /\{/,
-  end: /(\})/,
+  end: /\}/,
   beginCaptures: {
     "0": {
       name: "meta.brace.curly.typst",
     },
   },
   endCaptures: {
-    "1": {
+    "0": {
       name: "meta.brace.curly.typst",
     },
   },
@@ -51,20 +51,20 @@ const continuousCodeBlock: textmate.Pattern = {
 const continuousContentBlock: textmate.Pattern = {
   //   name: "meta.block.continuous.typst",
   begin: /\[/,
-  end: /(\])/,
+  end: /\]/,
   beginCaptures: {
     "0": {
-      name: "meta.brace.bracket.typst",
+      name: "meta.brace.square.typst",
     },
   },
   endCaptures: {
-    "1": {
-      name: "meta.brace.bracket.typst",
+    "0": {
+      name: "meta.brace.square.typst",
     },
   },
   patterns: [
     {
-      include: "#code",
+      include: "#markup",
     },
   ],
 };
@@ -74,11 +74,13 @@ const primitiveTypes: textmate.PatternMatch = {
   name: "entity.name.type.primitive.typst",
 };
 
+const IDENTIFIER = /\b[\p{XID_Start}_][\p{XID_Continue}_-]*\b/;
+
 // todo: distinguish type and variable
 const identifier: textmate.PatternMatch = {
-  match: /(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)\b/,
+  match: IDENTIFIER,
   captures: {
-    "1": {
+    "0": {
       name: "variable.other.readwrite.typst",
     },
   },
@@ -183,12 +185,12 @@ const strictIf = (): textmate.Grammar => {
         name: "keyword.control.conditional.typst",
       },
       "2": {
-        name: "meta.brace.bracket.typst",
+        name: "meta.brace.square.typst",
       },
     },
     endCaptures: {
       "0": {
-        name: "meta.brace.bracket.typst",
+        name: "meta.brace.square.typst",
       },
     },
     patterns: [
@@ -341,6 +343,68 @@ const strictWhile = (): textmate.Grammar => {
   };
 };
 
+const callArgs: textmate.Pattern = {
+  begin: /\(/,
+  end: /\)/,
+  beginCaptures: {
+    "0": {
+      name: "meta.brace.round.typst",
+    },
+  },
+  endCaptures: {
+    "0": {
+      name: "meta.brace.round.typst",
+    },
+  },
+  patterns: [
+    {
+      match: /:/,
+      name: "punctuation.separator.colon.typst",
+    },
+    {
+      match: /,/,
+      name: "punctuation.separator.comma.typst",
+    },
+    {
+      include: "#code-expr",
+    },
+  ],
+};
+
+const funcCall = (strict: boolean): textmate.Pattern => {
+  return {
+    name: "meta.expr.call.typst",
+    begin: lookAhead(
+      strict
+        ? new RegExp(/(\.)?/.source + IDENTIFIER.source + /(?=\(|\[)/.source)
+        : new RegExp(
+            /(\.\s*)?/.source + IDENTIFIER.source + /\s*(?=\(|\[)/.source
+          )
+    ),
+    end: /(?<=\)|\])(?!\[|\()/,
+    patterns: [
+      // todo: comments?
+      //   {
+      //     include: "#comments",
+      //   },
+      {
+        match: /\./,
+        name: "keyword.operator.accessor.typst",
+      },
+      {
+        match: IDENTIFIER,
+        name: "entity.name.function.typst",
+      },
+      {
+        include: "#callArgs",
+      },
+      {
+        include: "#continuousContentBlock",
+      },
+    ],
+  };
+};
+
 export const typst: textmate.Grammar = {
   repository: {
     primitiveTypes,
@@ -348,6 +412,9 @@ export const typst: textmate.Grammar = {
     ...strictIf().repository,
     ...strictFor().repository,
     ...strictWhile().repository,
+    strictFuncCall: funcCall(true),
+    funcCall: funcCall(false),
+    callArgs,
     continuousCodeBlock,
     continuousContentBlock,
   },

@@ -203,18 +203,7 @@ repository:
             name: keyword.control.typst
         patterns:
           - include: '#code-expr'
-      - begin: '(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)(\()'
-        end: \)
-        beginCaptures:
-          '1':
-            name: entity.name.function.typst
-          '2':
-            name: meta.brace.round.typst
-        endCaptures:
-          '0':
-            name: meta.brace.round.typst
-        patterns:
-          - include: '#code-args'
+      - include: '#strictFuncCall'
       - include: '#primitiveTypes'
       - include: '#identifier'
       - include: '#constants'
@@ -223,7 +212,7 @@ repository:
       - name: keyword.operator.accessor.typst
         match: \.
       - name: keyword.control.loop.typst
-        match: \b(while|break|continue)\b
+        match: \b(break|continue)\b
       - name: keyword.operator.range.typst
         match: \.\.
       - name: keyword.operator.arithmetic.typst
@@ -324,13 +313,6 @@ repository:
       - name: punctuation.separator.comma.typst
         match: ','
   literal-content:
-    patterns:
-      - include: '#code-expr'
-      - name: punctuation.separator.colon.typst
-        match: ':'
-      - name: punctuation.separator.comma.typst
-        match: ','
-  code-args:
     patterns:
       - include: '#code-expr'
       - name: punctuation.separator.colon.typst

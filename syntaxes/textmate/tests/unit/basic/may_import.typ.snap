@@ -23,12 +23,12 @@
 #       ^^^^^^^^^^^^^^ source.typst
 >#import("base.typ")
 #^ source.typst punctuation.definition.hash.typst
-# ^^^^^^ source.typst entity.name.function.typst
-#       ^ source.typst meta.brace.round.typst
-#        ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
-#         ^^^^^^^^ source.typst string.quoted.double.typst
-#                 ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
-#                  ^ source.typst meta.brace.round.typst
+# ^^^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#       ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#        ^ source.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#         ^^^^^^^^ source.typst meta.expr.call.typst string.quoted.double.typst
+#                 ^ source.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#                  ^ source.typst meta.expr.call.typst meta.brace.round.typst
 >#import "base.typ": *
 #^ source.typst punctuation.definition.hash.typst
 # ^^^^^^ source.typst variable.other.readwrite.typst

@@ -16,13 +16,13 @@
 #   ^ source.typst meta.expr.if.typst
 #    ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
 #     ^ source.typst meta.expr.if.typst
-#      ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
-#       ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
+#      ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#       ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #        ^ source.typst meta.expr.if.typst
 #         ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #             ^ source.typst meta.expr.if.typst
-#              ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
-#               ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
+#              ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #                ^^^ source.typst
 >#if {} [] else [] #1
 #^ source.typst punctuation.definition.hash.typst
@@ -40,13 +40,13 @@
 #   ^ source.typst meta.expr.if.typst
 #    ^^ source.typst meta.expr.if.typst meta.array.empty.typst
 #      ^ source.typst meta.expr.if.typst
-#       ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
-#        ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
+#       ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#        ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #         ^ source.typst meta.expr.if.typst
 #          ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #              ^ source.typst meta.expr.if.typst
-#               ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
-#                ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#                ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #                 ^ source.typst
 #                  ^ source.typst punctuation.definition.hash.typst
 #                   ^ source.typst
@@ -58,13 +58,13 @@
 #   ^ source.typst meta.expr.if.typst
 #    ^^ source.typst meta.expr.if.typst meta.array.empty.typst
 #      ^ source.typst meta.expr.if.typst
-#       ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
-#        ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
+#       ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#        ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #         ^ source.typst meta.expr.if.typst
 #          ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #              ^ source.typst meta.expr.if.typst
-#               ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
-#                ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#                ^ source.typst meta.expr.if.typst meta.brace.square.typst
 >1
 #^^ source.typst
 >
@@ -74,13 +74,13 @@
 #   ^ source.typst meta.expr.if.typst
 #    ^^ source.typst meta.expr.if.typst meta.array.empty.typst
 #      ^ source.typst meta.expr.if.typst
-#       ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
-#        ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
+#       ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#        ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #         ^ source.typst meta.expr.if.typst
 #          ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #              ^ source.typst meta.expr.if.typst
-#               ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
-#                ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#                ^ source.typst meta.expr.if.typst meta.brace.square.typst
 >[]
 #^^^ source.typst
 >
@@ -90,13 +90,13 @@
 #   ^ source.typst meta.expr.if.typst
 #    ^^ source.typst meta.expr.if.typst meta.array.empty.typst
 #      ^ source.typst meta.expr.if.typst
-#       ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
-#        ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
+#       ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#        ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #         ^ source.typst meta.expr.if.typst
 #          ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #              ^ source.typst meta.expr.if.typst
-#               ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
-#                ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#                ^ source.typst meta.expr.if.typst meta.brace.square.typst
 >{
 #^^ source.typst
 >#if () [] else []
@@ -105,13 +105,13 @@
 #   ^ source.typst meta.expr.if.typst
 #    ^^ source.typst meta.expr.if.typst meta.array.empty.typst
 #      ^ source.typst meta.expr.if.typst
-#       ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
-#        ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
+#       ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#        ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #         ^ source.typst meta.expr.if.typst
 #          ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #              ^ source.typst meta.expr.if.typst
-#               ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
-#                ^ source.typst meta.expr.if.typst meta.brace.bracket.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#                ^ source.typst meta.expr.if.typst meta.brace.square.typst
 >
 >
 >1

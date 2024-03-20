@@ -18,13 +18,13 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst entity.name.function.typst
-#               ^ source.typst meta.expr.for.typst meta.brace.round.typst
-#                ^ source.typst meta.expr.for.typst constant.numeric.integer.typst
-#                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
+#                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst
-#                   ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
-#                    ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
+#                   ^ source.typst meta.expr.for.typst meta.brace.square.typst
+#                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 >#for i in []
 #^ source.typst punctuation.definition.hash.typst
 # ^^^ source.typst variable.other.readwrite.typst
@@ -41,13 +41,13 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst entity.name.function.typst
-#               ^ source.typst meta.expr.for.typst meta.brace.round.typst
-#                ^ source.typst meta.expr.for.typst constant.numeric.integer.typst
-#                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
+#                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst
-#                   ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
-#                    ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
+#                   ^ source.typst meta.expr.for.typst meta.brace.square.typst
+#                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                     ^ source.typst punctuation.terminator.statement.typst
 #                      ^^^ source.typst
 >#for i in range(1) []1
@@ -58,13 +58,13 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst entity.name.function.typst
-#               ^ source.typst meta.expr.for.typst meta.brace.round.typst
-#                ^ source.typst meta.expr.for.typst constant.numeric.integer.typst
-#                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
+#                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst
-#                   ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
-#                    ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
+#                   ^ source.typst meta.expr.for.typst meta.brace.square.typst
+#                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                     ^ source.typst constant.numeric.integer.typst
 >#for i in range(1) []a
 #^ source.typst punctuation.definition.hash.typst
@@ -74,13 +74,13 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst entity.name.function.typst
-#               ^ source.typst meta.expr.for.typst meta.brace.round.typst
-#                ^ source.typst meta.expr.for.typst constant.numeric.integer.typst
-#                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
+#                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst
-#                   ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
-#                    ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
+#                   ^ source.typst meta.expr.for.typst meta.brace.square.typst
+#                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                     ^ source.typst variable.other.readwrite.typst
 >#for i in range(1) [] 1
 #^ source.typst punctuation.definition.hash.typst
@@ -90,13 +90,13 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst entity.name.function.typst
-#               ^ source.typst meta.expr.for.typst meta.brace.round.typst
-#                ^ source.typst meta.expr.for.typst constant.numeric.integer.typst
-#                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
+#                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst
-#                   ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
-#                    ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
+#                   ^ source.typst meta.expr.for.typst meta.brace.square.typst
+#                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                     ^^^ source.typst
 >#for i in range(1) [] a
 #^ source.typst punctuation.definition.hash.typst
@@ -106,13 +106,13 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst entity.name.function.typst
-#               ^ source.typst meta.expr.for.typst meta.brace.round.typst
-#                ^ source.typst meta.expr.for.typst constant.numeric.integer.typst
-#                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
+#                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst
-#                   ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
-#                    ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
+#                   ^ source.typst meta.expr.for.typst meta.brace.square.typst
+#                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                     ^^^ source.typst
 >#for i in range(1) []
 #^ source.typst punctuation.definition.hash.typst
@@ -122,13 +122,13 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst entity.name.function.typst
-#               ^ source.typst meta.expr.for.typst meta.brace.round.typst
-#                ^ source.typst meta.expr.for.typst constant.numeric.integer.typst
-#                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
+#                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst
-#                   ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
-#                    ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
+#                   ^ source.typst meta.expr.for.typst meta.brace.square.typst
+#                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 >#for i in range(1) []; []
 #^ source.typst punctuation.definition.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
@@ -137,13 +137,13 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst entity.name.function.typst
-#               ^ source.typst meta.expr.for.typst meta.brace.round.typst
-#                ^ source.typst meta.expr.for.typst constant.numeric.integer.typst
-#                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
+#                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst
-#                   ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
-#                    ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
+#                   ^ source.typst meta.expr.for.typst meta.brace.square.typst
+#                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                     ^ source.typst punctuation.terminator.statement.typst
 #                      ^^^^ source.typst
 >#for i in range(1) [] []
@@ -154,13 +154,13 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
 #         ^ source.typst meta.expr.for.typst
-#          ^^^^^ source.typst meta.expr.for.typst entity.name.function.typst
-#               ^ source.typst meta.expr.for.typst meta.brace.round.typst
-#                ^ source.typst meta.expr.for.typst constant.numeric.integer.typst
-#                 ^ source.typst meta.expr.for.typst meta.brace.round.typst
+#          ^^^^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#               ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
+#                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.for.typst
-#                   ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
-#                    ^ source.typst meta.expr.for.typst meta.brace.bracket.typst
+#                   ^ source.typst meta.expr.for.typst meta.brace.square.typst
+#                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                     ^^^^ source.typst
 >1
 #^^ source.typst
