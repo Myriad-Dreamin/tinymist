@@ -186,10 +186,6 @@ repository:
       - include: '#forStatement'
       - include: '#whileStatement'
       - include: '#ifStatement'
-      - match: '(as|in)\b'
-        captures:
-          '1':
-            name: keyword.control.typst
       - begin: '(show)\b'
         end: '(?=\n)|(?=\))|(?=;)|(?=])'
         beginCaptures:
@@ -197,17 +193,15 @@ repository:
             name: keyword.control.typst
         patterns:
           - include: '#show-expr'
-      - begin: '(set)\b'
-        end: '(?=\n)|(?=\))|(?=;)|(?=])'
-        beginCaptures:
-          '1':
-            name: keyword.control.typst
-        patterns:
-          - include: '#code-expr'
+      - include: '#setStatement'
       - include: '#strictFuncCall'
       - include: '#primitiveTypes'
       - include: '#identifier'
       - include: '#constants'
+      - match: '(as|in)\b'
+        captures:
+          '1':
+            name: keyword.control.typst
       - name: keyword.operator.accessor.typst
         match: \.
       - name: keyword.control.loop.typst

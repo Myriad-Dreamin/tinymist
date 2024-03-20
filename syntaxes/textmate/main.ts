@@ -348,6 +348,78 @@ const strictWhile = (): textmate.Grammar => {
   };
 };
 
+const setStatement = (): textmate.Grammar => {
+  const setStatement: textmate.Pattern = {
+    name: "meta.expr.set.typst",
+    begin: lookAhead(new RegExp(/(set\b)\s*/.source + IDENTIFIER.source)),
+    end: /(?<=\))(?!if)|(?=[\s\{\}\[\];])/,
+    patterns: [
+      /// Matches any comments
+      {
+        include: "#comments",
+      },
+      /// Matches binding clause
+      {
+        include: "#setClause",
+      },
+      /// Matches condition after the set clause
+      {
+        include: "#setIfClause",
+      },
+    ],
+  };
+
+  const setClause: textmate.Pattern = {
+    // name: "meta.set.clause.bind.typst",
+    begin: /(set\b)\s*/,
+    end: /(?=if)|(?=[;\]}])/,
+    beginCaptures: {
+      "1": {
+        name: "keyword.control.other.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#comments",
+      },
+      /// Matches a func call after the set clause
+      {
+        include: "#funcCall",
+      },
+      {
+        include: "#identifier",
+      },
+    ],
+  };
+
+  const setIfClause: textmate.Pattern = {
+    // name: "meta.set.if.clause.cond.typst",
+    begin: /(if)\s*/,
+    end: /(?<=\S)|(?=[;\]}])/,
+    beginCaptures: {
+      "1": {
+        name: "keyword.control.conditional.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#comments",
+      },
+      {
+        include: "#code-expr",
+      },
+    ],
+  };
+
+  return {
+    repository: {
+      setStatement,
+      setClause,
+      setIfClause,
+    },
+  };
+};
+
 // todo: { f }(..args)
 // todo: ( f )(..args)
 const callArgs: textmate.Pattern = {
@@ -479,6 +551,7 @@ export const typst: textmate.Grammar = {
     ...strictIf().repository,
     ...strictFor().repository,
     ...strictWhile().repository,
+    ...setStatement().repository,
     strictFuncCall: funcCall(true),
     funcCall: funcCall(false),
     callArgs,
