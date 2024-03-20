@@ -1,0 +1,61 @@
+>#"abc" + 1
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#  ^^^ source.typst string.quoted.double.typst
+#     ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#      ^^^^^ source.typst
+>#"@myriaddreamin" + 1
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#  ^^^^^^^^^^^^^^ source.typst string.quoted.double.typst
+#                ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#                 ^^^^^ source.typst
+>#"[a]" + 1
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#  ^^^ source.typst string.quoted.double.typst
+#     ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#      ^^^^^ source.typst
+>#"{a}" + 1
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#  ^^^ source.typst string.quoted.double.typst
+#     ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#      ^^^^^ source.typst
+>#"\\a" + 1
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#  ^^ source.typst string.quoted.double.typst constant.character.escape.string.typst
+#    ^ source.typst string.quoted.double.typst
+#     ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#      ^^^^^ source.typst
+>#"\\" + 1
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#  ^^ source.typst string.quoted.double.typst constant.character.escape.string.typst
+#    ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#     ^^^^^ source.typst
+>#"\\\a" + 1
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#  ^^ source.typst string.quoted.double.typst constant.character.escape.string.typst
+#    ^^ source.typst string.quoted.double.typst
+#      ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#       ^^^^^ source.typst
+>#"\v" + 1
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#  ^^ source.typst string.quoted.double.typst
+#    ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#     ^^^^^ source.typst
+>#"\我" + 1
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#  ^^ source.typst string.quoted.double.typst
+#    ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#     ^^^^^ source.typst
+>#"//"
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#  ^^ source.typst string.quoted.double.typst
+#    ^ source.typst string.quoted.double.typst punctuation.definition.string.typst

@@ -1,0 +1,55 @@
+>#show: it => it
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst keyword.control.typst
+#     ^ source.typst punctuation.separator.colon.typst
+#      ^ source.typst
+#       ^^ source.typst variable.other.readwrite.typst
+#         ^ source.typst
+#          ^^ source.typst keyword.operator.arrow.typst
+#            ^ source.typst
+#             ^^ source.typst variable.other.readwrite.typst
+>#show text: it => it
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst keyword.control.typst
+#     ^ source.typst
+#      ^^^^ source.typst variable.other.readwrite.typst
+#          ^ source.typst punctuation.separator.colon.typst
+#           ^ source.typst
+#            ^^ source.typst variable.other.readwrite.typst
+#              ^ source.typst
+#               ^^ source.typst keyword.operator.arrow.typst
+#                 ^ source.typst
+#                  ^^ source.typst variable.other.readwrite.typst
+>#show: rect
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst keyword.control.typst
+#     ^ source.typst punctuation.separator.colon.typst
+#      ^ source.typst
+#       ^^^^ source.typst variable.other.readwrite.typst
+>#show: list.item.with()
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst keyword.control.typst
+#     ^ source.typst punctuation.separator.colon.typst
+#      ^ source.typst
+#       ^^^^ source.typst variable.other.readwrite.typst
+#           ^ source.typst keyword.operator.accessor.typst
+#            ^^^^ source.typst variable.other.readwrite.typst
+#                ^ source.typst keyword.operator.accessor.typst
+#                 ^^^^ source.typst entity.name.function.typst
+#                     ^ source.typst meta.brace.round.typst
+#                      ^ source.typst meta.brace.round.typst
+>#show: rect.with(width: 1pt)
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst keyword.control.typst
+#     ^ source.typst punctuation.separator.colon.typst
+#      ^ source.typst
+#       ^^^^ source.typst variable.other.readwrite.typst
+#           ^ source.typst keyword.operator.accessor.typst
+#            ^^^^ source.typst entity.name.function.typst
+#                ^ source.typst meta.brace.round.typst
+#                 ^^^^^ source.typst variable.other.readwrite.typst
+#                      ^ source.typst punctuation.separator.colon.typst
+#                       ^ source.typst
+#                        ^^^ source.typst constant.numeric.length.typst
+#                           ^ source.typst meta.brace.round.typst
+>

@@ -1,0 +1,26 @@
+>#text
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst variable.other.readwrite.typst
+>#我们
+#^ source.typst punctuation.definition.hash.typst
+# ^^ source.typst variable.other.readwrite.typst
+>#text("//")
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst entity.name.function.typst
+#     ^ source.typst meta.brace.round.typst
+#      ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#       ^^ source.typst string.quoted.double.typst
+#         ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#          ^ source.typst meta.brace.round.typst
+>#calc.rem(1, 1)
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst variable.other.readwrite.typst
+#     ^ source.typst keyword.operator.accessor.typst
+#      ^^^ source.typst entity.name.function.typst
+#         ^ source.typst meta.brace.round.typst
+#          ^ source.typst constant.numeric.integer.typst
+#           ^ source.typst punctuation.separator.comma.typst
+#            ^ source.typst
+#             ^ source.typst constant.numeric.integer.typst
+#              ^ source.typst meta.brace.round.typst
+>

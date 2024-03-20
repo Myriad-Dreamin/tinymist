@@ -1,0 +1,1 @@
+ by #text(fill: rgb("#3c9123"), "server") and #text(fill: blue, "browser"), there would be a data flow like this:
