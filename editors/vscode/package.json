@@ -1,5 +1,6 @@
 {
     "name": "tinymist",
+    "version": "0.11.1-rc2",
     "description": "An integrated language service for Typst",
     "repository": {
         "type": "git",
@@ -13,7 +14,6 @@
     ],
     "publisher": "myriad-dreamin",
     "license": "Apache-2.0",
-    "version": "0.11.0",
     "engines": {
         "vscode": "^1.71.0"
     },
