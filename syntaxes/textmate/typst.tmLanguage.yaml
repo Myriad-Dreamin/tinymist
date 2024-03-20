@@ -177,6 +177,8 @@ repository:
       - include: '#whileStatement'
       - include: '#ifStatement'
       - include: '#strictFuncCall'
+      - include: '#primitiveColors'
+      - include: '#primitiveFunctions'
       - include: '#primitiveTypes'
       - include: '#identifier'
       - include: '#constants'
@@ -202,7 +204,7 @@ repository:
       - name: keyword.operator.word.typst
         match: \b(and|or|not)\b
       - name: keyword.control.import.typst
-        match: \b(import|include|export)\b
+        match: \b(import|include)\b
       - name: keyword.control.flow.typst
         match: \b(return)\b
   code-block:
@@ -310,15 +312,7 @@ repository:
         match: \b\d+\b
       - name: constant.numeric.float.typst
         match: '\b(\d*)?\.?\d+([eE][+-]?\d+)?\b'
-      - name: string.quoted.double.typst
-        begin: '"'
-        end: '"'
-        captures:
-          '0':
-            name: punctuation.definition.string.typst
-        patterns:
-          - name: constant.character.escape.string.typst
-            match: '\\([\\"nrt]|u\{?[0-9a-zA-Z]*\}?)'
+      - include : '#stringLiteral'
       - name: string.other.math.typst
         begin: \$
         end: \$

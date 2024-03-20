@@ -23,11 +23,11 @@
 #       ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.brace.round.typst
 #        ^^^^^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst entity.name.function.typst
 #             ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
-#              ^^^^^^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
+#              ^^^^^^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst support.type.builtin.typst
 #                    ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst
 #                     ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst keyword.operator.arithmetic.typst
 #                      ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst
-#                       ^^^^^^^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
+#                       ^^^^^^^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst support.type.builtin.typst
 #                              ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst punctuation.separator.comma.typst
 #                               ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst
 #                                ^^^^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst

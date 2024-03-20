@@ -74,6 +74,17 @@ const continuousContentBlock: textmate.Pattern = {
   ],
 };
 
+const primitiveColors: textmate.Pattern = {
+  match:
+    /\b(red|blue|green|black|white|gray|silver|eastern|navy|aqua|teal|purple|fuchsia|maroon|orange|yellow|olive|lime|ltr|rtl|ttb|btt|start|left|center|right|end|top|horizon|bottom)\b/,
+  name: "support.type.builtin.typst",
+};
+
+const primitiveFunctions = {
+  match: /\b(?:luma|oklab|oklch|rgb|cmyk|range)\b/,
+  name: "support.function.builtin.typst",
+};
+
 const primitiveTypes: textmate.PatternMatch = {
   match: /\b(auto|any|none|false|true|str|int|float|bool|length|content)\b/,
   name: "entity.name.type.primitive.typst",
@@ -95,6 +106,34 @@ const markupLabel: textmate.PatternMatch = {
   name: "entity.other.label.typst",
   match: /<[\p{XID_Start}_][\p{XID_Continue}_-]*>/,
 };
+
+const stringLiteral: textmate.PatternBeginEnd = {
+  name: "string.quoted.double.typst",
+  begin: /"/,
+  end: /"/,
+  beginCaptures: {
+    "0": {
+      name: "punctuation.definition.string.typst",
+    },
+  },
+  endCaptures: {
+    "0": {
+      name: "punctuation.definition.string.typst",
+    },
+  },
+  patterns: [
+    {
+      match: /(\\(?:[^u]|u\{?[0-9a-zA-Z]*\}?))|[^\\"]+/,
+      captures: {
+        "1": {
+          name: "constant.character.escape.string.typst",
+        },
+      },
+    },
+  ],
+};
+
+// include
 
 const letStatement = (): textmate.Grammar => {
   const letStatement: textmate.Pattern = {
@@ -137,6 +176,11 @@ const letStatement = (): textmate.Grammar => {
         beginCaptures: {
           "1": {
             name: "entity.name.function.typst",
+            patterns: [
+              {
+                include: "#primitiveFunctions",
+              },
+            ],
           },
           "2": {
             name: "meta.brace.round.typst",
@@ -684,6 +728,11 @@ const funcCall = (strict: boolean): textmate.Pattern => {
       {
         match: IDENTIFIER,
         name: "entity.name.function.typst",
+        patterns: [
+          {
+            include: "#primitiveFunctions",
+          },
+        ],
       },
       {
         include: "#callArgs",
@@ -757,9 +806,12 @@ const arrowFunc: textmate.Pattern = {
 
 export const typst: textmate.Grammar = {
   repository: {
+    primitiveColors,
+    primitiveFunctions,
     primitiveTypes,
     identifier,
     markupLabel,
+    stringLiteral,
     ...letStatement().repository,
     ...ifStatement().repository,
     ...forStatement().repository,
