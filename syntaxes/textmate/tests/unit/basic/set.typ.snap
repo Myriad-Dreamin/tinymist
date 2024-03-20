@@ -126,8 +126,7 @@
 #                ^ source.typst meta.expr.set.typst
 #                 ^ source.typst meta.expr.set.typst meta.brace.curly.typst
 #                  ^ source.typst meta.expr.set.typst meta.brace.curly.typst
-#                   ^ source.typst meta.brace.curly.typst
-#                    ^ source.typst meta.brace.curly.typst
+#                   ^^^ source.typst
 >#set text("") if [][]
 #^ source.typst punctuation.definition.hash.typst
 # ^^^ source.typst meta.expr.set.typst keyword.control.other.typst

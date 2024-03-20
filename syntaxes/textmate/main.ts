@@ -90,7 +90,7 @@ const primitiveTypes: textmate.PatternMatch = {
   name: "entity.name.type.primitive.typst",
 };
 
-const IDENTIFIER = /\b[\p{XID_Start}_][\p{XID_Continue}_-]*\b/;
+const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_-]*\b/;
 
 // todo: distinguish type and variable
 const identifier: textmate.PatternMatch = {
