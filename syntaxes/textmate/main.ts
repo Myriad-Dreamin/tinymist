@@ -668,7 +668,7 @@ const setStatement = (): textmate.Grammar => {
   const setIfClause: textmate.Pattern = {
     // name: "meta.set.if.clause.cond.typst",
     begin: /(if)\s*/,
-    end: /(?<=\S)|(?=[;\]}])/,
+    end: /(?<=\S)(?<!not|and|or|\+|-|\*|\/|==|!=|<=|>=|\<|\>)(?!\s*(?:not|and|or|\+|-|\*|\/|==|!=|\<|\>|\.))|(?=[;\]}])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",

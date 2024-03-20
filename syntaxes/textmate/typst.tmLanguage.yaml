@@ -167,6 +167,12 @@ repository:
             name: meta.brace.square.typst
         patterns:
           - include: '#markup'
+      - name: keyword.control.loop.typst
+        match: \b(break|continue)\b
+      - name: keyword.operator.word.typst
+        match: \b(and|or|not)\b
+      - name: keyword.control.flow.typst
+        match: \b(return)\b
       - include: '#markupLabel'
       - include: '#fenced_code_block'
       - include: '#code-block'
@@ -190,8 +196,6 @@ repository:
             name: keyword.control.typst
       - name: keyword.operator.accessor.typst
         match: \.
-      - name: keyword.control.loop.typst
-        match: \b(break|continue)\b
       - name: keyword.operator.arithmetic.typst
         match: '\+|\|/|(?<![[:alpha:]])(?<!\w)(?<!\d)-(?![[:alnum:]-][[:alpha:]_])'
       - name: keyword.operator.relational.typst
@@ -203,10 +207,6 @@ repository:
             name: keyword.operator.assignment.typst
         patterns:
           - include: '#code-expr'
-      - name: keyword.operator.word.typst
-        match: \b(and|or|not)\b
-      - name: keyword.control.flow.typst
-        match: \b(return)\b
   code-block:
     patterns:
       # brace expressions: {...}
