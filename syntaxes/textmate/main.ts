@@ -136,8 +136,9 @@ const stringLiteral: textmate.PatternBeginEnd = {
 // include
 
 const includeStatement: textmate.Pattern = {
+  name: "meta.expr.include.typst",
   begin: /(\binclude\b)\s*/,
-  end: /(?=[\s\{\}\[\];])/,
+  end: /(?=[\n\}\];])/,
   beginCaptures: {
     "1": {
       name: "keyword.control.import.typst",
@@ -153,11 +154,97 @@ const includeStatement: textmate.Pattern = {
   ],
 };
 
+// todo: sometimes eat a character
+const importStatement = (): textmate.Grammar => {
+  const importStatement: textmate.Pattern = {
+    name: "meta.expr.import.typst",
+    begin: /(\bimport\b)\s*/,
+    end: /(?=[\n\}\];])/,
+    beginCaptures: {
+      "1": {
+        name: "keyword.control.import.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#comments",
+      },
+      {
+        include: "#importPathClause",
+      },
+      {
+        match: /\:/,
+        name: "punctuation.separator.colon.typst",
+      },
+      {
+        match: /\*/,
+        name: "keyword.operator.wildcard.typst",
+      },
+      {
+        match: /\,/,
+        name: "punctuation.separator.comma.typst",
+      },
+      {
+        include: "#importAsClause",
+      },
+      {
+        include: "#code-expr",
+      },
+    ],
+  };
+
+  /// import code-expr until as|:
+  const importPathClause: textmate.Pattern = {
+    begin: /(\bimport\b)\s*/,
+    end: /(?=\:|as)/,
+    beginCaptures: {
+      "1": {
+        name: "keyword.control.import.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#comments",
+      },
+      {
+        include: "#code-expr",
+      },
+    ],
+  };
+
+  /// as code-expr
+  const importAsClause: textmate.Pattern = {
+    begin: /(\bas\b)\s*/,
+    end: /(?=[\s\}\];])/,
+    beginCaptures: {
+      "1": {
+        name: "keyword.control.import.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#comments",
+      },
+      {
+        include: "#identifier",
+      },
+    ],
+  };
+
+  return {
+    repository: {
+      importStatement,
+      importPathClause,
+      importAsClause,
+    },
+  };
+};
+
 const letStatement = (): textmate.Grammar => {
   const letStatement: textmate.Pattern = {
     name: "meta.expr.let.typst",
     begin: lookAhead(/(let\b)/),
-    end: /(?!\()(?=[\s\{\}\[\]\);])/,
+    end: /(?!\()(?=[\s\}\]\);])/,
     patterns: [
       /// Matches any comments
       {
@@ -831,6 +918,7 @@ export const typst: textmate.Grammar = {
     markupLabel,
     stringLiteral,
     includeStatement,
+    ...importStatement().repository,
     ...letStatement().repository,
     ...ifStatement().repository,
     ...forStatement().repository,

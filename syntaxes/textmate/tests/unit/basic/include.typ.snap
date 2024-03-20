@@ -1,43 +1,43 @@
 >#include
 #^ source.typst punctuation.definition.hash.typst
-# ^^^^^^^ source.typst keyword.control.import.typst
+# ^^^^^^^ source.typst meta.expr.include.typst keyword.control.import.typst
 >#include "ident.typ"
-#^ source.typst
-# ^^^^^^^ source.typst keyword.control.import.typst
-#        ^ source.typst
-#         ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
-#          ^^^^^^^^^ source.typst string.quoted.double.typst
-#                   ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+#^ source.typst meta.expr.include.typst
+# ^^^^^^^ source.typst meta.expr.include.typst meta.expr.include.typst keyword.control.import.typst
+#        ^ source.typst meta.expr.include.typst meta.expr.include.typst
+#         ^ source.typst meta.expr.include.typst meta.expr.include.typst string.quoted.double.typst punctuation.definition.string.typst
+#          ^^^^^^^^^ source.typst meta.expr.include.typst meta.expr.include.typst string.quoted.double.typst
+#                   ^ source.typst meta.expr.include.typst meta.expr.include.typst string.quoted.double.typst punctuation.definition.string.typst
 >#include;"ident.typ"
 #^ source.typst punctuation.definition.hash.typst
-# ^^^^^^^ source.typst keyword.control.import.typst
+# ^^^^^^^ source.typst meta.expr.include.typst keyword.control.import.typst
 #        ^ source.typst punctuation.terminator.statement.typst
 #         ^^^^^^^^^^^^ source.typst
 >#include"ident.typ";
 #^ source.typst punctuation.definition.hash.typst
-# ^^^^^^^ source.typst keyword.control.import.typst
-#        ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
-#         ^^^^^^^^^ source.typst string.quoted.double.typst
-#                  ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
+# ^^^^^^^ source.typst meta.expr.include.typst keyword.control.import.typst
+#        ^ source.typst meta.expr.include.typst string.quoted.double.typst punctuation.definition.string.typst
+#         ^^^^^^^^^ source.typst meta.expr.include.typst string.quoted.double.typst
+#                  ^ source.typst meta.expr.include.typst string.quoted.double.typst punctuation.definition.string.typst
 #                   ^ source.typst punctuation.terminator.statement.typst
 >#include("ident.typ");
 #^ source.typst punctuation.definition.hash.typst
-# ^^^^^^^ source.typst keyword.control.import.typst
-#        ^ source.typst meta.brace.round.typst
-#         ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
-#          ^^^^^^^^^ source.typst string.quoted.double.typst
-#                   ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
-#                    ^ source.typst meta.brace.round.typst
+# ^^^^^^^ source.typst meta.expr.include.typst keyword.control.import.typst
+#        ^ source.typst meta.expr.include.typst meta.brace.round.typst
+#         ^ source.typst meta.expr.include.typst string.quoted.double.typst punctuation.definition.string.typst
+#          ^^^^^^^^^ source.typst meta.expr.include.typst string.quoted.double.typst
+#                   ^ source.typst meta.expr.include.typst string.quoted.double.typst punctuation.definition.string.typst
+#                    ^ source.typst meta.expr.include.typst meta.brace.round.typst
 #                     ^ source.typst punctuation.terminator.statement.typst
 >#include { "ident.typ" };
 #^ source.typst punctuation.definition.hash.typst
-# ^^^^^^^ source.typst keyword.control.import.typst
-#        ^ source.typst
-#         ^ source.typst meta.brace.curly.typst
-#          ^ source.typst
-#           ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
-#            ^^^^^^^^^ source.typst string.quoted.double.typst
-#                     ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
-#                      ^ source.typst
-#                       ^ source.typst meta.brace.curly.typst
+# ^^^^^^^ source.typst meta.expr.include.typst keyword.control.import.typst
+#        ^ source.typst meta.expr.include.typst
+#         ^ source.typst meta.expr.include.typst meta.brace.curly.typst
+#          ^ source.typst meta.expr.include.typst
+#           ^ source.typst meta.expr.include.typst string.quoted.double.typst punctuation.definition.string.typst
+#            ^^^^^^^^^ source.typst meta.expr.include.typst string.quoted.double.typst
+#                     ^ source.typst meta.expr.include.typst string.quoted.double.typst punctuation.definition.string.typst
+#                      ^ source.typst meta.expr.include.typst
+#                       ^ source.typst meta.expr.include.typst meta.brace.curly.typst
 #                        ^ source.typst punctuation.terminator.statement.typst

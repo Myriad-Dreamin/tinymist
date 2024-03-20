@@ -176,6 +176,7 @@ repository:
       - include: '#forStatement'
       - include: '#whileStatement'
       - include: '#ifStatement'
+      - include: '#importStatement'
       - include: '#includeStatement'
       - include: '#strictFuncCall'
       - include: '#primitiveColors'
@@ -204,8 +205,6 @@ repository:
           - include: '#code-expr'
       - name: keyword.operator.word.typst
         match: \b(and|or|not)\b
-      - name: keyword.control.import.typst
-        match: \b(import|include)\b
       - name: keyword.control.flow.typst
         match: \b(return)\b
   code-block:
