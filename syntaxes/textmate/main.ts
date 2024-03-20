@@ -2,16 +2,16 @@ import * as textmate from "./textmate";
 import * as yaml from "js-yaml";
 
 // JS-Snippet to generate pattern
-function generatePattern(maxDepth: number) {
-  const NOT_BRACE_PATTERN = "[^\\}\\{]";
+function generatePattern(maxDepth: number, lb: string, rb: string) {
+  const NOT_BRACE_PATTERN = `[^${rb}${lb}]`;
 
   // Unrolled Pattern variants: 0=default, 1=unrolled (more efficient)
-  let p = [`\\{${NOT_BRACE_PATTERN}*(?:`, `${NOT_BRACE_PATTERN}*)*\\}`];
+  let p = [`${lb}${NOT_BRACE_PATTERN}*(?:`, `${NOT_BRACE_PATTERN}*)*${rb}`];
 
   // Generate and display the pattern
   return (
     p[0].repeat(maxDepth) +
-    `\\{${NOT_BRACE_PATTERN}*\\}` +
+    `${lb}${NOT_BRACE_PATTERN}*${rb}` +
     p[1].repeat(maxDepth)
   );
 }
@@ -20,9 +20,12 @@ function lookAhead(pattern: RegExp) {
   return new RegExp(`(?=(?:${pattern.source}))`);
 }
 
-const CODE_BLOCK = generatePattern(6);
-const BRACE_FREE_EXPR = /[^\s\}\{][^\}\{]*/.source;
-const BRACE_AWARE_EXPR = BRACE_FREE_EXPR + `|(?:${CODE_BLOCK})`;
+const CODE_BLOCK = generatePattern(6, "\\{", "\\}");
+const CONTENT_BLOCK = generatePattern(6, "\\[", "\\]");
+const BRACE_FREE_EXPR = /[^\s\}\{\[\]][^\}\{\[\]]*/.source;
+const BRACE_AWARE_EXPR =
+  BRACE_FREE_EXPR +
+  `(?:(?:${CODE_BLOCK})|(?:${CONTENT_BLOCK})${BRACE_FREE_EXPR})?`;
 
 const continuousCodeBlock: textmate.Pattern = {
   //   name: "meta.block.continuous.typst",
@@ -45,6 +48,27 @@ const continuousCodeBlock: textmate.Pattern = {
   ],
 };
 
+const continuousContentBlock: textmate.Pattern = {
+  //   name: "meta.block.continuous.typst",
+  begin: /\[/,
+  end: /(\])/,
+  beginCaptures: {
+    "0": {
+      name: "meta.brace.bracket.typst",
+    },
+  },
+  endCaptures: {
+    "1": {
+      name: "meta.brace.bracket.typst",
+    },
+  },
+  patterns: [
+    {
+      include: "#code",
+    },
+  ],
+};
+
 /**
  * Matches a (strict grammar) if in markup context.
  */
@@ -53,10 +77,12 @@ const strictIf = (): textmate.Grammar => {
     name: "meta.expr.if.typst",
     begin: lookAhead(
       new RegExp(
-        /(else\b)?(if\b)\s+/.source + `(?:${BRACE_AWARE_EXPR})` + /\s*\{/.source
+        /(else\b)?(if\b)\s+/.source +
+          `(?:${BRACE_AWARE_EXPR})` +
+          /\s*[\{\[]/.source
       )
     ),
-    end: /(?<=\})(?!\s*else)/,
+    end: /(?<=\}|\])(?!\s*else)/,
     patterns: [
       /// Matches any comments
       {
@@ -72,9 +98,17 @@ const strictIf = (): textmate.Grammar => {
       {
         include: "#elseClause",
       },
+      /// Matches else content clause
+      {
+        include: "#elseContentClause",
+      },
       /// Matches a code block after the if clause
       {
         include: "#continuousCodeBlock",
+      },
+      /// Matches a content block after the if clause
+      {
+        include: "#continuousContentBlock",
       },
     ],
   };
@@ -82,7 +116,7 @@ const strictIf = (): textmate.Grammar => {
   const ifClause: textmate.Pattern = {
     //   name: "meta.if.clause.typst",
     begin: /(else\b)?(if)\s+/,
-    end: /(?=;|$|]|\}|\{)/,
+    end: /(?=;|$|]|\}|\{|\[)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",
@@ -125,12 +159,36 @@ const strictIf = (): textmate.Grammar => {
     ],
   };
 
+  const elseContentClause: textmate.Pattern = {
+    //   name: "meta.else.clause.typst",
+    begin: /(\belse)\s*(\[)/,
+    end: /\]/,
+    beginCaptures: {
+      "1": {
+        name: "keyword.control.conditional.typst",
+      },
+      "2": {
+        name: "meta.brace.bracket.typst",
+      },
+    },
+    endCaptures: {
+      "0": {
+        name: "meta.brace.bracket.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#code",
+      },
+    ],
+  };
+
   return {
     repository: {
       ifStatement,
       ifClause,
       elseClause,
-      continuousCodeBlock,
+      elseContentClause,
     },
   };
 };
@@ -143,10 +201,10 @@ const strictFor = (): textmate.Grammar => {
       new RegExp(
         /(for\b)\s*/.source +
           `(?:${BRACE_FREE_EXPR})\\s*(in)\\s*(?:${BRACE_AWARE_EXPR})` +
-          /\{/.source
+          /\s*[\{\[]/.source
       )
     ),
-    end: /(?<=\})/,
+    end: /(?<=\}|\])/,
     patterns: [
       /// Matches any comments
       {
@@ -160,6 +218,10 @@ const strictFor = (): textmate.Grammar => {
       {
         include: "#continuousCodeBlock",
       },
+      /// Matches a content block after the for clause
+      {
+        include: "#continuousContentBlock",
+      },
     ],
   };
 
@@ -167,7 +229,7 @@ const strictFor = (): textmate.Grammar => {
     // name: "meta.for.clause.bind.typst",
     // todo: consider comment in for /* {} */ in .. {}
     begin: new RegExp(/(for\b)\s*/.source + `(${BRACE_FREE_EXPR})\\s*(in)\\s*`),
-    end: /(?=;|$|]|\}|\{)/,
+    end: /(?=;|$|]|\}|\{|\[)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -212,6 +274,7 @@ export const typst: textmate.Grammar = {
     ...strictIf().repository,
     ...strictFor().repository,
     continuousCodeBlock,
+    continuousContentBlock,
   },
 };
 
