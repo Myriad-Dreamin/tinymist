@@ -269,10 +269,68 @@ const strictFor = (): textmate.Grammar => {
   };
 };
 
+const strictWhile = (): textmate.Grammar => {
+  // for v in expr { ... }
+  const whileStatement: textmate.Pattern = {
+    name: "meta.expr.while.typst",
+    begin: lookAhead(
+      new RegExp(
+        /(while\b)\s*/.source + `(?:${BRACE_AWARE_EXPR})` + /\s*[\{\[]/.source
+      )
+    ),
+    end: /(?<=\}|\])/,
+    patterns: [
+      /// Matches any comments
+      {
+        include: "#comments",
+      },
+      /// Matches while clause
+      {
+        include: "#whileClause",
+      },
+      /// Matches a code block after the while clause
+      {
+        include: "#continuousCodeBlock",
+      },
+      /// Matches a content block after the while clause
+      {
+        include: "#continuousContentBlock",
+      },
+    ],
+  };
+
+  const whileClause: textmate.Pattern = {
+    // name: "meta.while.clause.bind.typst",
+    begin: /(while\b)\s*/,
+    end: /(?=;|$|]|\}|\{|\[)/,
+    beginCaptures: {
+      "1": {
+        name: "keyword.control.loop.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#comments",
+      },
+      {
+        include: "#code-expr",
+      },
+    ],
+  };
+
+  return {
+    repository: {
+      whileStatement,
+      whileClause,
+    },
+  };
+};
+
 export const typst: textmate.Grammar = {
   repository: {
     ...strictIf().repository,
     ...strictFor().repository,
+    ...strictWhile().repository,
     continuousCodeBlock,
     continuousContentBlock,
   },

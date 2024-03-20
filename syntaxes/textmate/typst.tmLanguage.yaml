@@ -183,8 +183,9 @@ repository:
         patterns:
           - include: '#let-expr'
       - include: '#forStatement'
+      - include: '#whileStatement'
       - include: '#ifStatement'
-      - match: '(while|as|in)\b'
+      - match: '(as|in)\b'
         captures:
           '1':
             name: keyword.control.typst
