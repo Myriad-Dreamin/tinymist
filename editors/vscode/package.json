@@ -157,24 +157,27 @@
                     "light": "./icons/typst-small.png",
                     "dark": "./icons/typst-small.png"
                 }
-            },
-            {
-                "id": "typst-grammar",
-                "aliases": [
-                    "Typst with Syntax Support"
-                ],
-                "configuration": "./language-configuration.json",
-                "icon": {
-                    "light": "./icons/typst-small.png",
-                    "dark": "./icons/typst-small.png"
-                }
             }
         ],
         "grammars": [
             {
-                "language": "typst-grammar",
-                "scopeName": "source.typst-grammar",
-                "path": "./out/typst.tmLanguage.json"
+                "language": "typst",
+                "scopeName": "source.typst",
+                "path": "./out/typst.tmLanguage.json",
+                "balancedBracketScopes": [
+                    "*",
+                    "meta.expr",
+                    "meta.brace"
+                ],
+                "unbalancedBracketScopes": [
+                    "markup.raw.block.typst",
+                    "markup.raw.inline.typst",
+                    "string.other.label.typst",
+                    "string.quoted.double.typst",
+                    "constant.character.escape",
+                    "comment.block.typst",
+                    "comment.line.double-slash.typst"
+                ]
             }
         ],
         "semanticTokenTypes": [
