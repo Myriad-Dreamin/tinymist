@@ -96,6 +96,112 @@ const markupLabel: textmate.PatternMatch = {
   match: /<[\p{XID_Start}_][\p{XID_Continue}_-]*>/,
 };
 
+const letStatement = (): textmate.Grammar => {
+  const letStatement: textmate.Pattern = {
+    name: "meta.expr.let.typst",
+    begin: lookAhead(/(let\b)/),
+    end: /(?!\()(?=[\s\{\}\[\]\);])/,
+    patterns: [
+      /// Matches any comments
+      {
+        include: "#comments",
+      },
+      /// Matches binding clause
+      {
+        include: "#letBindingClause",
+      },
+      /// Matches init assignment clause
+      {
+        include: "#letInitClause",
+      },
+    ],
+  };
+
+  const letBindingClause: textmate.Pattern = {
+    // name: "meta.let.binding.typst",
+    begin: /(let\b)\s*/,
+    end: /(?=[=;\]}])/,
+    beginCaptures: {
+      "1": {
+        name: "storage.type.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#comments",
+      },
+      /// Matches a func call after the set clause
+      {
+        begin: /(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)(\()/,
+        end: /\)/,
+        beginCaptures: {
+          "1": {
+            name: "entity.name.function.typst",
+          },
+          "2": {
+            name: "meta.brace.round.typst",
+          },
+        },
+        endCaptures: {
+          "0": {
+            name: "meta.brace.round.typst",
+          },
+        },
+        patterns: [
+          {
+            include: "#code-params",
+          },
+        ],
+      },
+      {
+        begin: /\(/,
+        end: /\)/,
+        beginCaptures: {
+          "0": {
+            name: "meta.brace.round.typst",
+          },
+        },
+        endCaptures: {
+          "0": {
+            name: "meta.brace.round.typst",
+          },
+        },
+        patterns: [{ include: "#pattern-binding-items" }],
+      },
+      {
+        include: "#identifier",
+      },
+    ],
+  };
+
+  const letInitClause: textmate.Pattern = {
+    // name: "meta.let.init.typst",
+    begin: /=\s*/,
+    end: /(?<!\s*=)(?=[;\]})\n])/,
+    beginCaptures: {
+      "0": {
+        name: "keyword.operator.assignment.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#comments",
+      },
+      {
+        include: "#code-expr",
+      },
+    ],
+  };
+
+  return {
+    repository: {
+      letStatement,
+      letBindingClause,
+      letInitClause,
+    },
+  };
+};
+
 /**
  * Matches a (strict grammar) if in markup context.
  */
@@ -266,8 +372,21 @@ const forStatement = (): textmate.Grammar => {
           {
             include: "#comments",
           },
+          // todo: reuse pattern binding
           {
-            include: "#pattern-binding-items",
+            begin: /\(/,
+            end: /\)/,
+            beginCaptures: {
+              "0": {
+                name: "meta.brace.round.typst",
+              },
+            },
+            endCaptures: {
+              "0": {
+                name: "meta.brace.round.typst",
+              },
+            },
+            patterns: [{ include: "#pattern-binding-items" }],
           },
           {
             include: "#identifier",
@@ -641,6 +760,7 @@ export const typst: textmate.Grammar = {
     primitiveTypes,
     identifier,
     markupLabel,
+    ...letStatement().repository,
     ...ifStatement().repository,
     ...forStatement().repository,
     ...whileStatement().repository,

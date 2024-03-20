@@ -12,33 +12,32 @@
 #       ^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
 #           ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #            ^ source.typst meta.expr.let.typst
-#             ^ source.typst keyword.operator.assignment.typst
-#              ^ source.typst
-#               ^ source.typst meta.brace.round.typst
+#             ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#               ^ source.typst meta.expr.let.typst meta.brace.round.typst
 >  (
-#^^ source.typst
-#  ^ source.typst meta.brace.round.typst
+#^^ source.typst meta.expr.let.typst
+#  ^ source.typst meta.expr.let.typst meta.brace.round.typst
 >    pad(align(center + horizon, name)), 
-#^^^^ source.typst
-#    ^^^ source.typst meta.expr.call.typst entity.name.function.typst
-#       ^ source.typst meta.expr.call.typst meta.brace.round.typst
-#        ^^^^^ source.typst meta.expr.call.typst meta.expr.call.typst entity.name.function.typst
-#             ^ source.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
-#              ^^^^^^ source.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
-#                    ^ source.typst meta.expr.call.typst meta.expr.call.typst
-#                     ^ source.typst meta.expr.call.typst meta.expr.call.typst keyword.operator.arithmetic.typst
-#                      ^ source.typst meta.expr.call.typst meta.expr.call.typst
-#                       ^^^^^^^ source.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
-#                              ^ source.typst meta.expr.call.typst meta.expr.call.typst punctuation.separator.comma.typst
-#                               ^ source.typst meta.expr.call.typst meta.expr.call.typst
-#                                ^^^^ source.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
-#                                    ^ source.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
-#                                     ^ source.typst meta.expr.call.typst meta.brace.round.typst
-#                                      ^ source.typst punctuation.separator.comma.typst
-#                                       ^^ source.typst
+#^^^^ source.typst meta.expr.let.typst
+#    ^^^ source.typst meta.expr.let.typst meta.expr.call.typst entity.name.function.typst
+#       ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.brace.round.typst
+#        ^^^^^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst entity.name.function.typst
+#             ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
+#              ^^^^^^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
+#                    ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst
+#                     ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst keyword.operator.arithmetic.typst
+#                      ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst
+#                       ^^^^^^^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
+#                              ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst punctuation.separator.comma.typst
+#                               ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst
+#                                ^^^^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst variable.other.readwrite.typst
+#                                    ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
+#                                     ^ source.typst meta.expr.let.typst meta.expr.call.typst meta.brace.round.typst
+#                                      ^ source.typst meta.expr.let.typst punctuation.separator.comma.typst
+#                                       ^^ source.typst meta.expr.let.typst
 >  ),
-#^^ source.typst
-#  ^ source.typst meta.brace.round.typst
-#   ^ source.typst punctuation.separator.comma.typst
+#^^ source.typst meta.expr.let.typst
+#  ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#   ^ source.typst meta.expr.let.typst punctuation.separator.comma.typst
 >)
-#^ source.typst meta.brace.round.typst
+#^ source.typst meta.expr.let.typst meta.brace.round.typst

@@ -6,9 +6,8 @@
 #      ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #       ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #        ^ source.typst meta.expr.let.typst
-#         ^ source.typst keyword.operator.assignment.typst
-#          ^ source.typst
-#           ^ source.typst constant.numeric.integer.typst
+#         ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#           ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
 #            ^ source.typst punctuation.terminator.statement.typst
 >#let f(a) = 1;
 #^ source.typst punctuation.definition.hash.typst
@@ -19,9 +18,8 @@
 #       ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
 #        ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #         ^ source.typst meta.expr.let.typst
-#          ^ source.typst keyword.operator.assignment.typst
-#           ^ source.typst
-#            ^ source.typst constant.numeric.integer.typst
+#          ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#            ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
 #             ^ source.typst punctuation.terminator.statement.typst
 >#let f(a, b: none) = 1;
 #^ source.typst punctuation.definition.hash.typst
@@ -38,9 +36,8 @@
 #             ^^^^ source.typst meta.expr.let.typst entity.name.type.primitive.typst
 #                 ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.let.typst
-#                   ^ source.typst keyword.operator.assignment.typst
-#                    ^ source.typst
-#                     ^ source.typst constant.numeric.integer.typst
+#                   ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                     ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
 #                      ^ source.typst punctuation.terminator.statement.typst
 >#let f(a, (b, c)) = 1;
 #^ source.typst punctuation.definition.hash.typst
@@ -59,9 +56,8 @@
 #               ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                 ^ source.typst meta.expr.let.typst
-#                  ^ source.typst keyword.operator.assignment.typst
-#                   ^ source.typst
-#                    ^ source.typst constant.numeric.integer.typst
+#                  ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                    ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
 #                     ^ source.typst punctuation.terminator.statement.typst
 >#let f(a, (b, c: d)) = 1;
 #^ source.typst punctuation.definition.hash.typst
@@ -83,9 +79,8 @@
 #                  ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                   ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                    ^ source.typst meta.expr.let.typst
-#                     ^ source.typst keyword.operator.assignment.typst
-#                      ^ source.typst
-#                       ^ source.typst constant.numeric.integer.typst
+#                     ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                       ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
 #                        ^ source.typst punctuation.terminator.statement.typst
 >#let f((a, b)) = 1;
 #^ source.typst punctuation.definition.hash.typst
@@ -101,9 +96,8 @@
 #            ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #             ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #              ^ source.typst meta.expr.let.typst
-#               ^ source.typst keyword.operator.assignment.typst
-#                ^ source.typst
-#                 ^ source.typst constant.numeric.integer.typst
+#               ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                 ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
 #                  ^ source.typst punctuation.terminator.statement.typst
 >#let f((a, (c: (b: e)))) = 1;
 #^ source.typst punctuation.definition.hash.typst
@@ -129,9 +123,8 @@
 #                      ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                       ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                        ^ source.typst meta.expr.let.typst
-#                         ^ source.typst keyword.operator.assignment.typst
-#                          ^ source.typst
-#                           ^ source.typst constant.numeric.integer.typst
+#                         ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                           ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
 #                            ^ source.typst punctuation.terminator.statement.typst
 >#let f((a, ..)) = 1;
 #^ source.typst punctuation.definition.hash.typst
@@ -147,9 +140,8 @@
 #             ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #              ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #               ^ source.typst meta.expr.let.typst
-#                ^ source.typst keyword.operator.assignment.typst
-#                 ^ source.typst
-#                  ^ source.typst constant.numeric.integer.typst
+#                ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                  ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
 #                   ^ source.typst punctuation.terminator.statement.typst
 >#let f((.., a)) = 1;
 #^ source.typst punctuation.definition.hash.typst
@@ -165,7 +157,6 @@
 #             ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #              ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #               ^ source.typst meta.expr.let.typst
-#                ^ source.typst keyword.operator.assignment.typst
-#                 ^ source.typst
-#                  ^ source.typst constant.numeric.integer.typst
+#                ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                  ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
 #                   ^ source.typst punctuation.terminator.statement.typst
