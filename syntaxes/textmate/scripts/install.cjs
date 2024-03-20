@@ -11,9 +11,11 @@ const json = JSON.parse(data);
 
 json.scopeName = "source.typst-grammar";
 json.name = "typst-grammar";
-json.repository.fenced_code_block_typst.patterns = [
-  { include: "source.typst-grammar" },
-];
+// todo: make it back when we finished
+// json.repository.fenced_code_block_typst.patterns = [
+//   { include: "source.typst-grammar" }
+// ];
+delete json.repository.fenced_code_block_typst.patterns;
 
 const outPath = path.join(
   __dirname,
