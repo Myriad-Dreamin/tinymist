@@ -182,15 +182,7 @@ repository:
             name: storage.type.typst
         patterns:
           - include: '#let-expr'
-      - begin: '(for)\b'
-        # debugging
-        # name: 'for.block.typst'
-        end: '(?=\n)|(?=\))|(?=;)|(?=])'
-        beginCaptures:
-          '1':
-            name: keyword.control.loop.typst
-        patterns:
-          - include: '#for-clause'
+      - include: '#forStatement'
       - include: '#ifStatement'
       - match: '(while|as|in)\b'
         captures:
@@ -280,20 +272,6 @@ repository:
       - include: '#pattern-binding-items'
       - include: '#identifier'
       # - include: '#code-expr'
-  for-clause:
-    patterns:
-    - begin: '([\s\S]+)(as|in)\b'
-      end: '(?=[{\);\]])'
-      beginCaptures:
-        '1':
-          patterns:
-          - include: '#pattern-binding-items'
-          - include: '#identifier'
-        '2':
-          name: keyword.other.typst
-      patterns:
-      - include: '#code-expr'
-    - include: '#code-block'
   show-expr:
     patterns:
       - include: '#code-expr'

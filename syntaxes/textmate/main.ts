@@ -1,5 +1,6 @@
 import * as textmate from "./textmate";
 import * as yaml from "js-yaml";
+
 // JS-Snippet to generate pattern
 function generatePattern(maxDepth: number) {
   const NOT_BRACE_PATTERN = "[^\\}\\{]";
@@ -20,7 +21,8 @@ function lookAhead(pattern: RegExp) {
 }
 
 const CODE_BLOCK = generatePattern(6);
-const BRACE_AWARE_EXPR = /[^\s\}\{][^\}\{]*/.source + `|(?:${CODE_BLOCK})`;
+const BRACE_FREE_EXPR = /[^\s\}\{][^\}\{]*/.source;
+const BRACE_AWARE_EXPR = BRACE_FREE_EXPR + `|(?:${CODE_BLOCK})`;
 
 const continuousCodeBlock: textmate.Pattern = {
   //   name: "meta.block.continuous.typst",
@@ -43,104 +45,194 @@ const continuousCodeBlock: textmate.Pattern = {
   ],
 };
 
-const ifStatement: textmate.Pattern = {
-  name: "meta.expr.if.typst",
-  begin: lookAhead(
-    new RegExp(
-      /(else\b)?(if)\s+/.source + `(?:${BRACE_AWARE_EXPR})` + /\s*\{/.source
-    )
-  ),
-  end: /(?<=\})(?!\s*else)/,
-  patterns: [
-    /// Matches any comments
-    {
-      include: "#comments",
+/**
+ * Matches a (strict grammar) if in markup context.
+ */
+const strictIf = (): textmate.Grammar => {
+  const ifStatement: textmate.Pattern = {
+    name: "meta.expr.if.typst",
+    begin: lookAhead(
+      new RegExp(
+        /(else\b)?(if\b)\s+/.source + `(?:${BRACE_AWARE_EXPR})` + /\s*\{/.source
+      )
+    ),
+    end: /(?<=\})(?!\s*else)/,
+    patterns: [
+      /// Matches any comments
+      {
+        include: "#comments",
+      },
+      // todo
+      /// Matches if clause with a code block expression
+      /// Matches if clause
+      {
+        include: "#ifClause",
+      },
+      /// Matches else clause
+      {
+        include: "#elseClause",
+      },
+      /// Matches a code block after the if clause
+      {
+        include: "#continuousCodeBlock",
+      },
+    ],
+  };
+
+  const ifClause: textmate.Pattern = {
+    //   name: "meta.if.clause.typst",
+    begin: /(else\b)?(if)\s+/,
+    end: /(?=;|$|]|\}|\{)/,
+    beginCaptures: {
+      "1": {
+        name: "keyword.control.conditional.typst",
+      },
+      "2": {
+        name: "keyword.control.conditional.typst",
+      },
     },
-    // todo
-    /// Matches if statement with a code block expression
-    /// Matches if statement
-    {
-      include: "#ifClause",
+    patterns: [
+      {
+        include: "#comments",
+      },
+      {
+        include: "#code-expr",
+      },
+    ],
+  };
+
+  const elseClause: textmate.Pattern = {
+    //   name: "meta.else.clause.typst",
+    begin: /(\belse)\s*(\{)/,
+    end: /\}/,
+    beginCaptures: {
+      "1": {
+        name: "keyword.control.conditional.typst",
+      },
+      "2": {
+        name: "meta.brace.curly.typst",
+      },
     },
-    /// Matches else statement
-    {
-      include: "#elseClause",
+    endCaptures: {
+      "0": {
+        name: "meta.brace.curly.typst",
+      },
     },
-    /// Matches a code block after the if statement
-    {
-      include: "#continuousCodeBlock",
+    patterns: [
+      {
+        include: "#code",
+      },
+    ],
+  };
+
+  return {
+    repository: {
+      ifStatement,
+      ifClause,
+      elseClause,
+      continuousCodeBlock,
     },
-  ],
+  };
 };
 
-const ifClause: textmate.Pattern = {
-  //   name: "meta.if.clause.typst",
-  begin: /(else\b)?(if)\s+/,
-  end: /(?=;|$|]|\}|\{)/,
-  beginCaptures: {
-    "1": {
-      name: "keyword.control.conditional.typst",
-    },
-    "2": {
-      name: "keyword.control.conditional.typst",
-    },
-  },
-  patterns: [
-    {
-      include: "#comments",
-    },
-    {
-      include: "#code-expr",
-    },
-  ],
-};
+const strictFor = (): textmate.Grammar => {
+  // for v in expr { ... }
+  const forStatement: textmate.Pattern = {
+    name: "meta.expr.for.typst",
+    begin: lookAhead(
+      new RegExp(
+        /(for\b)\s*/.source +
+          `(?:${BRACE_FREE_EXPR})\\s*(in)\\s*(?:${BRACE_AWARE_EXPR})` +
+          /\{/.source
+      )
+    ),
+    end: /(?<=\})/,
+    patterns: [
+      /// Matches any comments
+      {
+        include: "#comments",
+      },
+      /// Matches for clause
+      {
+        include: "#forClause",
+      },
+      /// Matches a code block after the for clause
+      {
+        include: "#continuousCodeBlock",
+      },
+    ],
+  };
 
-const elseClause: textmate.Pattern = {
-  //   name: "meta.else.clause.typst",
-  begin: /(\belse)\s*(\{)/,
-  end: /\}/,
-  beginCaptures: {
-    "1": {
-      name: "keyword.control.conditional.typst",
+  const forClause: textmate.Pattern = {
+    // name: "meta.for.clause.bind.typst",
+    // todo: consider comment in for /* {} */ in .. {}
+    begin: new RegExp(/(for\b)\s*/.source + `(${BRACE_FREE_EXPR})\\s*(in)\\s*`),
+    end: /(?=;|$|]|\}|\{)/,
+    beginCaptures: {
+      "1": {
+        name: "keyword.control.loop.typst",
+      },
+      "2": {
+        patterns: [
+          {
+            include: "#comments",
+          },
+          {
+            include: "#pattern-binding-items",
+          },
+          {
+            include: "#identifier",
+          },
+        ],
+      },
+      "3": {
+        name: "keyword.operator.range.typst",
+      },
     },
-    "2": {
-      name: "meta.brace.curly.typst",
+    patterns: [
+      {
+        include: "#comments",
+      },
+      {
+        include: "#code-expr",
+      },
+    ],
+  };
+
+  return {
+    repository: {
+      forStatement,
+      forClause,
     },
-  },
-  endCaptures: {
-    "0": {
-      name: "meta.brace.curly.typst",
-    },
-  },
-  patterns: [
-    {
-      include: "#code",
-    },
-  ],
+  };
 };
 
 export const typst: textmate.Grammar = {
   repository: {
-    ifStatement,
-    ifClause,
-    elseClause,
+    ...strictIf().repository,
+    ...strictFor().repository,
     continuousCodeBlock,
   },
 };
 
-const fs = require("fs");
-const path = require("path");
+function generate() {
+  const fs = require("fs");
+  const path = require("path");
 
-const typstPath = path.join(__dirname, "../typst.tmLanguage");
+  const typstPath = path.join(__dirname, "../typst.tmLanguage");
 
-const base = fs.readFileSync(`${typstPath}.yaml`, "utf8");
-const baseObj = yaml.load(base) as textmate.Grammar;
+  const base = fs.readFileSync(`${typstPath}.yaml`, "utf8");
+  const baseObj = yaml.load(base) as textmate.Grammar;
 
-const compiled = textmate.compile(typst);
-baseObj.repository = Object.assign(
-  baseObj.repository || {},
-  JSON.parse(compiled).repository
-);
+  const compiled = textmate.compile(typst);
+  baseObj.repository = Object.assign(
+    baseObj.repository || {},
+    JSON.parse(compiled).repository
+  );
 
-// dump to file
-fs.writeFileSync(`${typstPath}.json`, JSON.stringify(baseObj));
+  // dump to file
+  fs.writeFileSync(`${typstPath}.json`, JSON.stringify(baseObj));
+}
+
+// console.log(typst!.repository!.forStatement);
+generate();
