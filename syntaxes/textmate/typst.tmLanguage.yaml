@@ -138,6 +138,7 @@ repository:
           - include: '#code-expr'
   code-expr:
     patterns:
+      - include: '#arrowFunc'
       # empty array ()
       - name: meta.array.empty.typst
         match: \(\s*\)
@@ -207,8 +208,6 @@ repository:
       - include: '#primitiveTypes'
       - include: '#identifier'
       - include: '#constants'
-      - name: keyword.operator.arrow.typst
-        match: =>
       - name: keyword.operator.accessor.typst
         match: \.
       - name: keyword.control.loop.typst

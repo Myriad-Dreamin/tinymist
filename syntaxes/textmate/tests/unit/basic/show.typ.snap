@@ -3,9 +3,9 @@
 # ^^^^ source.typst keyword.control.typst
 #     ^ source.typst punctuation.separator.colon.typst
 #      ^ source.typst
-#       ^^ source.typst variable.other.readwrite.typst
+#       ^^ source.typst variable.parameter.typst
 #         ^ source.typst
-#          ^^ source.typst keyword.operator.arrow.typst
+#          ^^ source.typst storage.type.function.arrow.typst
 #            ^ source.typst
 #             ^^ source.typst variable.other.readwrite.typst
 >#show text: it => it
@@ -15,9 +15,9 @@
 #      ^^^^ source.typst variable.other.readwrite.typst
 #          ^ source.typst punctuation.separator.colon.typst
 #           ^ source.typst
-#            ^^ source.typst variable.other.readwrite.typst
+#            ^^ source.typst variable.parameter.typst
 #              ^ source.typst
-#               ^^ source.typst keyword.operator.arrow.typst
+#               ^^ source.typst storage.type.function.arrow.typst
 #                 ^ source.typst
 #                  ^^ source.typst variable.other.readwrite.typst
 >#show: rect

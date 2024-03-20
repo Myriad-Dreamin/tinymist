@@ -20,6 +20,11 @@ function lookAhead(pattern: RegExp) {
   return new RegExp(`(?=(?:${pattern.source}))`);
 }
 
+function braceMatch(pattern: RegExp) {
+  return ("(?x)" + pattern.source) as unknown as RegExp;
+}
+
+const PAREN_BLOCK = generatePattern(6, "\\(", "\\)");
 const CODE_BLOCK = generatePattern(6, "\\{", "\\}");
 const CONTENT_BLOCK = generatePattern(6, "\\[", "\\]");
 const BRACE_FREE_EXPR = /[^\s\}\{\[\]][^\}\{\[\]]*/.source;
@@ -133,7 +138,7 @@ const strictIf = (): textmate.Grammar => {
   const ifClause: textmate.Pattern = {
     //   name: "meta.if.clause.typst",
     begin: /(else\b)?(if)\s+/,
-    end: /(?=;|$|]|\}|\{|\[)/,
+    end: /(?=[;\[\]{}]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",
@@ -246,7 +251,7 @@ const strictFor = (): textmate.Grammar => {
     // name: "meta.for.clause.bind.typst",
     // todo: consider comment in for /* {} */ in .. {}
     begin: new RegExp(/(for\b)\s*/.source + `(${BRACE_FREE_EXPR})\\s*(in)\\s*`),
-    end: /(?=;|$|]|\}|\{|\[)/,
+    end: /(?=[;\[\]{}]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -319,7 +324,7 @@ const strictWhile = (): textmate.Grammar => {
   const whileClause: textmate.Pattern = {
     // name: "meta.while.clause.bind.typst",
     begin: /(while\b)\s*/,
-    end: /(?=;|$|]|\}|\{|\[)/,
+    end: /(?=[;\[\]{}]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -343,6 +348,8 @@ const strictWhile = (): textmate.Grammar => {
   };
 };
 
+// todo: { f }(..args)
+// todo: ( f )(..args)
 const callArgs: textmate.Pattern = {
   begin: /\(/,
   end: /\)/,
@@ -405,6 +412,66 @@ const funcCall = (strict: boolean): textmate.Pattern => {
   };
 };
 
+// https://github.com/microsoft/vscode-textmate/blob/main/test-cases/themes/syntaxes/TypeScript.tmLanguage.json
+const arrowFunc: textmate.Pattern = {
+  name: "meta.expr.arrow-function.typst",
+  patterns: [
+    {
+      match: new RegExp(`(${IDENTIFIER.source})` + /\s*(?==>)/.source),
+      captures: {
+        "1": {
+          name: "variable.parameter.typst",
+        },
+      },
+    },
+    {
+      begin: braceMatch(lookAhead(new RegExp(PAREN_BLOCK + /\s*=>/.source))),
+      end: /(?==>)/,
+      patterns: [
+        {
+          include: "#comments",
+        },
+        {
+          begin: /\(/,
+          end: /\)/,
+          beginCaptures: {
+            "0": {
+              name: "meta.brace.round.typst",
+            },
+          },
+          endCaptures: {
+            "0": {
+              name: "meta.brace.round.typst",
+            },
+          },
+          patterns: [
+            {
+              include: "#code-params",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      begin: /=>/,
+      end: /(?<=\})|(?:(?!\{)(?=\S))/,
+      beginCaptures: {
+        "0": {
+          name: "storage.type.function.arrow.typst",
+        },
+      },
+      patterns: [
+        {
+          include: "#comments",
+        },
+        {
+          include: "#code-expr",
+        },
+      ],
+    },
+  ],
+};
+
 export const typst: textmate.Grammar = {
   repository: {
     primitiveTypes,
@@ -417,6 +484,7 @@ export const typst: textmate.Grammar = {
     callArgs,
     continuousCodeBlock,
     continuousContentBlock,
+    arrowFunc,
   },
 };
 
