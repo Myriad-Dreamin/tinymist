@@ -69,6 +69,21 @@ const continuousContentBlock: textmate.Pattern = {
   ],
 };
 
+const primitiveTypes: textmate.PatternMatch = {
+  match: /\b(auto|any|none|false|true|str|int|float|bool|length|content)\b/,
+  name: "entity.name.type.primitive.typst",
+};
+
+// todo: distinguish type and variable
+const identifier: textmate.PatternMatch = {
+  match: /(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)\b/,
+  captures: {
+    "1": {
+      name: "variable.other.readwrite.typst",
+    },
+  },
+};
+
 /**
  * Matches a (strict grammar) if in markup context.
  */
@@ -328,6 +343,8 @@ const strictWhile = (): textmate.Grammar => {
 
 export const typst: textmate.Grammar = {
   repository: {
+    primitiveTypes,
+    identifier,
     ...strictIf().repository,
     ...strictFor().repository,
     ...strictWhile().repository,

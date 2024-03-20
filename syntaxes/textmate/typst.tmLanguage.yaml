@@ -215,7 +215,8 @@ repository:
             name: meta.brace.round.typst
         patterns:
           - include: '#code-args'
-      - include : '#identifier'
+      - include: '#primitiveTypes'
+      - include: '#identifier'
       - include: '#constants'
       - name: keyword.operator.arrow.typst
         match: =>
@@ -316,6 +317,7 @@ repository:
         patterns:
           - include: '#pattern-binding-items'
       # parameter binding
+      - include: '#primitiveTypes'
       - include: '#identifier'
       - name: punctuation.separator.colon.typst
         match: ':'
@@ -343,15 +345,6 @@ repository:
         match: ':'
       - name: punctuation.separator.comma.typst
         match: ','
-  identifier:
-    patterns:
-      # todo: distinguish type and variable
-      - match: '\b(auto|any|none|false|true|str|int|float|bool|length|content)\b'
-        name: entity.name.type.primitive.typst
-      - match: '(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)\b'
-        captures:
-          '1':
-            name: variable.other.readwrite.typst
   code:
     patterns:
       - include: '#common'

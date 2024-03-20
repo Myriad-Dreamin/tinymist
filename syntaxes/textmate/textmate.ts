@@ -5,29 +5,35 @@ export interface Grammar {
 export type Repository = Record<string, Pattern>;
 
 export type PatternCommon = Pick<PatternAny, "comment" | "disabled" | "name">;
-export type PatternInclude = Pick<PatternAny, "include">;
-export type PatternMatch = Pick<PatternAny, "match">;
-export type PatternBeginEnd = Pick<
-  PatternAny,
-  | "begin"
-  | "end"
-  | "contentName"
-  | "beginCaptures"
-  | "endCaptures"
-  | "applyEndPatternLast"
-  | "patterns"
->;
-export type PatternBeginWhile = Pick<
-  PatternAny,
-  | "begin"
-  | "while"
-  | "contentName"
-  | "beginCaptures"
-  | "whileCaptures"
-  | "patterns"
->;
-export type Pattern = PatternCommon &
-  (PatternInclude | PatternMatch | PatternBeginEnd | PatternBeginWhile);
+export type PatternInclude = PatternCommon & Pick<PatternAny, "include">;
+export type PatternMatch = PatternCommon &
+  Pick<PatternAny, "match" | "captures">;
+export type PatternBeginEnd = PatternCommon &
+  Pick<
+    PatternAny,
+    | "begin"
+    | "end"
+    | "contentName"
+    | "beginCaptures"
+    | "endCaptures"
+    | "applyEndPatternLast"
+    | "patterns"
+  >;
+export type PatternBeginWhile = PatternCommon &
+  Pick<
+    PatternAny,
+    | "begin"
+    | "while"
+    | "contentName"
+    | "beginCaptures"
+    | "whileCaptures"
+    | "patterns"
+  >;
+export type Pattern =
+  | PatternInclude
+  | PatternMatch
+  | PatternBeginEnd
+  | PatternBeginWhile;
 
 interface PatternAny {
   /**
