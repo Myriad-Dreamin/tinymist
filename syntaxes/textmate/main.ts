@@ -91,10 +91,15 @@ const identifier: textmate.PatternMatch = {
   },
 };
 
+const markupLabel: textmate.PatternMatch = {
+  name: "entity.other.label.typst",
+  match: /<[\p{XID_Start}_][\p{XID_Continue}_-]*>/,
+};
+
 /**
  * Matches a (strict grammar) if in markup context.
  */
-const strictIf = (): textmate.Grammar => {
+const ifStatement = (): textmate.Grammar => {
   const ifStatement: textmate.Pattern = {
     name: "meta.expr.if.typst",
     begin: lookAhead(
@@ -215,7 +220,7 @@ const strictIf = (): textmate.Grammar => {
   };
 };
 
-const strictFor = (): textmate.Grammar => {
+const forStatement = (): textmate.Grammar => {
   // for v in expr { ... }
   const forStatement: textmate.Pattern = {
     name: "meta.expr.for.typst",
@@ -291,7 +296,7 @@ const strictFor = (): textmate.Grammar => {
   };
 };
 
-const strictWhile = (): textmate.Grammar => {
+const whileStatement = (): textmate.Grammar => {
   // for v in expr { ... }
   const whileStatement: textmate.Pattern = {
     name: "meta.expr.while.typst",
@@ -416,6 +421,93 @@ const setStatement = (): textmate.Grammar => {
       setStatement,
       setClause,
       setIfClause,
+    },
+  };
+};
+
+const showStatement = (): textmate.Grammar => {
+  const showStatement: textmate.Pattern = {
+    name: "meta.expr.show.typst",
+    begin: lookAhead(/(show\b)/),
+    end: /(?=[\s\{\}\[\];])/,
+    patterns: [
+      /// Matches any comments
+      {
+        include: "#comments",
+      },
+      /// Matches show any clause
+      {
+        include: "#showAnyClause",
+      },
+      /// Matches select clause
+      {
+        include: "#showSelectClause",
+      },
+      /// Matches substitution clause
+      {
+        include: "#showSubstClause",
+      },
+    ],
+  };
+
+  const showAnyClause: textmate.Pattern = {
+    // name: "meta.show.clause.select.typst",
+    match: /(show\b)\s*(?=\:)/,
+    captures: {
+      "1": {
+        name: "keyword.control.other.typst",
+      },
+    },
+  };
+
+  const showSelectClause: textmate.Pattern = {
+    // name: "meta.show.clause.select.typst",
+    begin: /(show\b)\s*/,
+    end: /(?=[:;\]}])/,
+    beginCaptures: {
+      "1": {
+        name: "keyword.control.other.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#comments",
+      },
+      {
+        include: "#markupLabel",
+      },
+      /// Matches a func call after the set clause
+      {
+        include: "#code-expr",
+      },
+    ],
+  };
+
+  const showSubstClause: textmate.Pattern = {
+    // name: "meta.show.clause.subst.typst",
+    begin: /(\:)\s*/,
+    end: /(?<!:)(?<=\S)(?!\S)|(?=[;\]}])/,
+    beginCaptures: {
+      "1": {
+        name: "punctuation.separator.colon.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#comments",
+      },
+      {
+        include: "#code-expr",
+      },
+    ],
+  };
+
+  return {
+    repository: {
+      showStatement,
+      showAnyClause,
+      showSelectClause,
+      showSubstClause,
     },
   };
 };
@@ -548,10 +640,12 @@ export const typst: textmate.Grammar = {
   repository: {
     primitiveTypes,
     identifier,
-    ...strictIf().repository,
-    ...strictFor().repository,
-    ...strictWhile().repository,
+    markupLabel,
+    ...ifStatement().repository,
+    ...forStatement().repository,
+    ...whileStatement().repository,
     ...setStatement().repository,
+    ...showStatement().repository,
     strictFuncCall: funcCall(true),
     funcCall: funcCall(false),
     callArgs,

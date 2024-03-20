@@ -183,17 +183,11 @@ repository:
             name: storage.type.typst
         patterns:
           - include: '#let-expr'
+      - include: '#showStatement'
+      - include: '#setStatement'
       - include: '#forStatement'
       - include: '#whileStatement'
       - include: '#ifStatement'
-      - begin: '(show)\b'
-        end: '(?=\n)|(?=\))|(?=;)|(?=])'
-        beginCaptures:
-          '1':
-            name: keyword.control.typst
-        patterns:
-          - include: '#show-expr'
-      - include: '#setStatement'
       - include: '#strictFuncCall'
       - include: '#primitiveTypes'
       - include: '#identifier'
@@ -206,8 +200,6 @@ repository:
         match: \.
       - name: keyword.control.loop.typst
         match: \b(break|continue)\b
-      - name: keyword.operator.range.typst
-        match: \.\.
       - name: keyword.operator.arithmetic.typst
         match: '\+|\|/|(?<![[:alpha:]])(?<!\w)(?<!\d)-(?![[:alnum:]-][[:alpha:]_])'
       - name: keyword.operator.relational.typst
