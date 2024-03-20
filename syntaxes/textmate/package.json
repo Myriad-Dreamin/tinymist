@@ -3,11 +3,12 @@
   "version": "0.11.1-rc2",
   "private": true,
   "scripts": {
-    "compile": "js-yaml typst.tmLanguage.yaml > typst.tmLanguage.json",
+    "compile": "npx tsc && node ./dist/main.js",
     "bundle": "node scripts/install.cjs",
     "test": "yarn compile && npx vscode-tmgrammar-snap --updateSnapshot tests/unit/**/*.typ"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "js-yaml": "^4.1.0",
     "vscode-tmgrammar-test": "^0.1.3"
   },

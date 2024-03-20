@@ -35,7 +35,7 @@
 #          ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
 #           ^ source.typst meta.expr.let.typst punctuation.separator.colon.typst
 #            ^ source.typst meta.expr.let.typst
-#             ^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#             ^^^^ source.typst meta.expr.let.typst entity.name.type.primitive.typst
 #                 ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                  ^ source.typst meta.expr.let.typst
 #                   ^ source.typst keyword.operator.assignment.typst

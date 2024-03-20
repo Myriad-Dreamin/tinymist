@@ -191,17 +191,7 @@ repository:
             name: keyword.control.loop.typst
         patterns:
           - include: '#for-clause'
-      - begin: '(else)?\b(if)\b'
-        # debugging
-        # name: 'if.block.typst'
-        end: '(?=\n)|(?=\))|(?=;)|(?=])'
-        captures:
-          '1':
-            name: keyword.control.conditional.typst
-          '2':
-            name: keyword.control.conditional.typst
-        patterns:
-          - include: '#code-expr'
+      - include: '#ifStatement'
       - match: '(while|as|in)\b'
         captures:
           '1':
@@ -232,10 +222,7 @@ repository:
             name: meta.brace.round.typst
         patterns:
           - include: '#code-args'
-      - match: '(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)\b'
-        captures:
-          '1':
-            name: variable.other.readwrite.typst
+      - include : '#identifier'
       - include: '#constants'
       - name: keyword.operator.arrow.typst
         match: =>
@@ -379,6 +366,9 @@ repository:
         match: ','
   identifier:
     patterns:
+      # todo: distinguish type and variable
+      - match: '\b(auto|any|none|false|true|str|int|float|bool|length|content)\b'
+        name: entity.name.type.primitive.typst
       - match: '(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)\b'
         captures:
           '1':
