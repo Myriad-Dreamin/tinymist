@@ -176,6 +176,7 @@ repository:
       - include: '#forStatement'
       - include: '#whileStatement'
       - include: '#ifStatement'
+      - include: '#includeStatement'
       - include: '#strictFuncCall'
       - include: '#primitiveColors'
       - include: '#primitiveFunctions'

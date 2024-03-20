@@ -135,6 +135,24 @@ const stringLiteral: textmate.PatternBeginEnd = {
 
 // include
 
+const includeStatement: textmate.Pattern = {
+  begin: /(\binclude\b)\s*/,
+  end: /(?=[\s\{\}\[\];])/,
+  beginCaptures: {
+    "1": {
+      name: "keyword.control.import.typst",
+    },
+  },
+  patterns: [
+    {
+      include: "#comments",
+    },
+    {
+      include: "#code-expr",
+    },
+  ],
+};
+
 const letStatement = (): textmate.Grammar => {
   const letStatement: textmate.Pattern = {
     name: "meta.expr.let.typst",
@@ -812,6 +830,7 @@ export const typst: textmate.Grammar = {
     identifier,
     markupLabel,
     stringLiteral,
+    includeStatement,
     ...letStatement().repository,
     ...ifStatement().repository,
     ...forStatement().repository,
