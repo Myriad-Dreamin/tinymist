@@ -3614,7 +3614,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.11.0"
+version = "0.11.1-rc2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3656,7 +3656,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.11.0"
+version = "0.11.1-rc2"
 dependencies = [
  "anyhow",
  "comemo",
