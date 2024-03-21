@@ -305,7 +305,7 @@ const markupEnterCode: textmate.Pattern = {
       },
     },
     {
-      //     # name: 'markup.expr.typst'
+      /// name: 'markup.expr.typst'
       begin: /#/,
       end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[])|(?=\s)|(;)/,
       beginCaptures: {
@@ -327,7 +327,154 @@ const markupEnterCode: textmate.Pattern = {
   ],
 };
 
+const code: textmate.Pattern = {
+  patterns: [
+    {
+      include: "#common",
+    },
+    {
+      include: "#comments",
+    },
+    {
+      name: "punctuation.separator.colon.typst",
+      match: /;/,
+    },
+    {
+      include: "#expression",
+    },
+  ],
+};
+
+const FLOAT_OR_INT =
+  /(?<!\)|\]|\}\d)(^|(?<=\s)|\b)(?:(\d*)?\.?\d+([eE][+-]?\d+)?|\d+\.)/;
+
+const floatUnit = (unit: RegExp, canDotSuff: boolean) =>
+  new RegExp(
+    FLOAT_OR_INT.source + (canDotSuff ? "" : "(?<!\\.)") + unit.source
+  );
+
+const constants: textmate.Pattern = {
+  patterns: [
+    {
+      name: "constant.language.none.typst",
+      match: /(?<!\)|\]|\})\bnone\b/,
+    },
+    {
+      name: "constant.language.auto.typst",
+      match: /(?<!\)|\]|\})\bauto\b/,
+    },
+    {
+      name: "constant.language.boolean.typst",
+      match: /(?<!\)|\]|\})\b(true|false)\b/,
+    },
+    {
+      name: "constant.numeric.length.typst",
+      match: floatUnit(/(mm|pt|cm|in|em)($|\b)/, false),
+    },
+    {
+      name: "constant.numeric.angle.typst",
+      match: floatUnit(/(rad|deg)($|\b)/, false),
+    },
+    {
+      name: "constant.numeric.percentage.typst",
+      match: floatUnit(/%/, true),
+    },
+    {
+      name: "constant.numeric.fr.typst",
+      match: floatUnit(/fr/, false),
+    },
+    {
+      name: "constant.numeric.integer.typst",
+      match: /(?<!\)|\]|\})(^|(?<=\s)|\b)\d+\b(?![\.eE])/,
+    },
+    {
+      name: "constant.numeric.float.typst",
+      match: floatUnit(/($|\b)/, true),
+    },
+    {
+      include: "#stringLiteral",
+    },
+    {
+      include: "#markupMath",
+    },
+  ],
+};
+
 const expression = (): textmate.Grammar => {
+  const expression: textmate.Pattern = {
+    patterns: [
+      { include: "#comments" },
+      { include: "#arrowFunc" },
+      { include: "#arrayOrDict" },
+      { include: "#contentBlock" },
+      {
+        match: /\b(break|continue)\b/,
+        name: "keyword.control.loop.typst",
+      },
+      {
+        match: /\b(and|or|not)\b/,
+        name: "keyword.operator.word.typst",
+      },
+      {
+        match: /\b(return)\b/,
+        name: "keyword.control.flow.typst",
+      },
+      { include: "#markupLabel" },
+      { include: "#blockRaw" },
+      { include: "#inlineRaw" },
+      { include: "#codeBlock" },
+      { include: "#letStatement" },
+      { include: "#showStatement" },
+      { include: "#setStatement" },
+      { include: "#forStatement" },
+      { include: "#whileStatement" },
+      { include: "#ifStatement" },
+      { include: "#importStatement" },
+      { include: "#includeStatement" },
+      { include: "#strictFuncCall" },
+      { include: "#primitiveColors" },
+      { include: "#primitiveFunctions" },
+      { include: "#primitiveTypes" },
+      { include: "#identifier" },
+      { include: "#constants" },
+      {
+        match: /(as|in)\b/,
+        captures: {
+          "1": {
+            name: "keyword.control.typst",
+          },
+        },
+      },
+      {
+        match: /\./,
+        name: "keyword.operator.accessor.typst",
+      },
+      {
+        match:
+          /\+|\\|\/|(?<![[:alpha:]])(?<!\w)(?<!\d)-(?![[:alnum:]-][[:alpha:]_])/,
+        name: "keyword.operator.arithmetic.typst",
+      },
+      {
+        match: /==|!=|<=|<|>=|>/,
+        name: "keyword.operator.relational.typst",
+      },
+      {
+        begin: /(\+=|-=|\*=|\/=|=)/,
+        end: /(?=[\n;\)\]\}])/,
+        beginCaptures: {
+          "1": {
+            name: "keyword.operator.assignment.typst",
+          },
+        },
+        patterns: [
+          {
+            include: "#expression",
+          },
+        ],
+      },
+    ],
+  };
+
   const arrayOrDict: textmate.Pattern = {
     patterns: [
       /// empty array ()
@@ -374,84 +521,25 @@ const expression = (): textmate.Grammar => {
         },
         patterns: [
           {
-            include: "#literal-content",
+            include: "#literalContent",
           },
         ],
       },
     ],
   };
 
-  const expression: textmate.Pattern = {
+  const literalContent: textmate.Pattern = {
     patterns: [
-      { include: "#arrowFunc" },
-      { include: "#arrayOrDict" },
-      { include: "#contentBlock" },
       {
-        match: /\b(break|continue)\b/,
-        name: "keyword.control.loop.typst",
+        name: "punctuation.separator.colon.typst",
+        match: /:/,
       },
       {
-        match: /\b(and|or|not)\b/,
-        name: "keyword.operator.word.typst",
+        name: "punctuation.separator.comma.typst",
+        match: /,/,
       },
       {
-        match: /\b(return)\b/,
-        name: "keyword.control.flow.typst",
-      },
-      { include: "#markupLabel" },
-      { include: "#blockRaw" },
-      { include: "#inlineRaw" },
-      { include: "#codeBlock" },
-      { include: "#letStatement" },
-      { include: "#showStatement" },
-      { include: "#setStatement" },
-      { include: "#forStatement" },
-      { include: "#whileStatement" },
-      { include: "#ifStatement" },
-      { include: "#importStatement" },
-      { include: "#includeStatement" },
-      { include: "#strictFuncCall" },
-      { include: "#primitiveColors" },
-      { include: "#primitiveFunctions" },
-      { include: "#primitiveTypes" },
-      { include: "#identifier" },
-      { include: "#constants" },
-      {
-        match: /(as|in)\b/,
-        captures: {
-          "1": {
-            name: "keyword.control.typst",
-          },
-        },
-      },
-      {
-        match: /\./,
-        name: "keyword.operator.accessor.typst",
-      },
-      //   - name: keyword.operator.arithmetic.typst
-      //     match: '\+|\|/|(?<![[:alpha:]])(?<!\w)(?<!\d)-(?![[:alnum:]-][[:alpha:]_])'
-      {
-        match:
-          /\+|\|\/|(?<![[:alpha:]])(?<!\w)(?<!\d)-(?![[:alnum:]-][[:alpha:]_])/,
-        name: "keyword.operator.arithmetic.typst",
-      },
-      {
-        match: /==|!=|<=|<|>=|>/,
-        name: "keyword.operator.relational.typst",
-      },
-      {
-        begin: /(\+=|-=|\*=|\/=|=)/,
-        end: /(?=[\n;\)\]\}])/,
-        beginCaptures: {
-          "1": {
-            name: "keyword.operator.assignment.typst",
-          },
-        },
-        patterns: [
-          {
-            include: "#expression",
-          },
-        ],
+        include: "#expression",
       },
     ],
   };
@@ -460,6 +548,7 @@ const expression = (): textmate.Grammar => {
     repository: {
       expression,
       arrayOrDict,
+      literalContent,
     },
   };
 };
@@ -502,11 +591,11 @@ const strictLineComment = lineCommentInner(true);
 const lineComment = lineCommentInner(false);
 
 const strictComments: textmate.Pattern = {
-  patterns: [blockComment, strictLineComment],
+  patterns: [{ include: "#blockComment" }, { include: "#strictLineComment" }],
 };
 
 const comments: textmate.Pattern = {
-  patterns: [blockComment, lineComment],
+  patterns: [{ include: "#blockComment" }, { include: "#lineComment" }],
 };
 
 const inlineRaw: textmate.Pattern = {
@@ -523,6 +612,14 @@ const inlineRaw: textmate.Pattern = {
       name: "punctuation.definition.raw.inline.typst",
     },
   },
+};
+
+const blockRaw: textmate.Pattern = {
+  patterns: [
+    {
+      include: "#blockRawGeneral",
+    },
+  ],
 };
 
 const blockRawGeneral: textmate.Pattern = {
@@ -730,7 +827,7 @@ const letStatement = (): textmate.Grammar => {
         },
         patterns: [
           {
-            include: "#code-params",
+            include: "#funcParams",
           },
         ],
       },
@@ -747,7 +844,7 @@ const letStatement = (): textmate.Grammar => {
             name: "meta.brace.round.typst",
           },
         },
-        patterns: [{ include: "#pattern-binding-items" }],
+        patterns: [{ include: "#patternBindingItems" }],
       },
       {
         include: "#identifier",
@@ -967,7 +1064,7 @@ const forStatement = (): textmate.Grammar => {
                 name: "meta.brace.round.typst",
               },
             },
-            patterns: [{ include: "#pattern-binding-items" }],
+            patterns: [{ include: "#patternBindingItems" }],
           },
           {
             include: "#identifier",
@@ -1243,6 +1340,76 @@ const callArgs: textmate.Pattern = {
   ],
 };
 
+const patternBindingItems: textmate.Pattern = {
+  patterns: [
+    /// rest binding
+    {
+      match: /(\.\.)(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)?/,
+      // debugging
+      // - name: meta.parameter.binding.typst
+      captures: {
+        "1": {
+          name: "keyword.operator.range.typst",
+        },
+        "2": {
+          name: "variable.other.readwrite.typst",
+        },
+      },
+    },
+    /// recursive binding
+    {
+      begin: /\(/,
+      end: /\)/,
+      beginCaptures: {
+        "0": {
+          name: "meta.brace.round.typst",
+        },
+      },
+      endCaptures: {
+        "0": {
+          name: "meta.brace.round.typst",
+        },
+      },
+      patterns: [
+        {
+          include: "#patternBindingItems",
+        },
+      ],
+    },
+    /// parameter binding
+    {
+      include: "#primitiveTypes",
+    },
+    {
+      include: "#identifier",
+    },
+    {
+      match: /:/,
+      name: "punctuation.separator.colon.typst",
+    },
+    {
+      match: /,/,
+      name: "punctuation.separator.comma.typst",
+    },
+  ],
+};
+
+const funcParams: textmate.Pattern = {
+  patterns: [
+    {
+      include: "#patternBindingItems",
+    },
+    {
+      match: /:/,
+      name: "punctuation.separator.colon.typst",
+    },
+    {
+      match: /,/,
+      name: "punctuation.separator.comma.typst",
+    },
+  ],
+};
+
 const funcCall = (strict: boolean): textmate.Pattern => {
   return {
     name: "meta.expr.call.typst",
@@ -1329,7 +1496,7 @@ const arrowFunc: textmate.Pattern = {
           },
           patterns: [
             {
-              include: "#code-params",
+              include: "#funcParams",
             },
           ],
         },
@@ -1360,6 +1527,8 @@ export const typst: textmate.Grammar = {
     common,
     markup,
     markupEnterCode,
+    code,
+    constants,
 
     primitiveColors,
     primitiveFunctions,
@@ -1376,7 +1545,9 @@ export const typst: textmate.Grammar = {
     strictLineComment,
 
     inlineRaw,
+    blockRaw,
     blockRawGeneral,
+
     markupBold,
     markupItalic,
     markupMath,
@@ -1395,6 +1566,8 @@ export const typst: textmate.Grammar = {
     strictFuncCall: funcCall(true),
     funcCall: funcCall(false),
     callArgs,
+    funcParams,
+    patternBindingItems,
     codeBlock,
     contentBlock,
     arrowFunc,
@@ -1407,17 +1580,42 @@ function generate() {
 
   const typstPath = path.join(__dirname, "../typst.tmLanguage");
 
-  const base = fs.readFileSync(`${typstPath}.yaml`, "utf8");
-  const baseObj = yaml.load(base) as textmate.Grammar;
-
   const compiled = textmate.compile(typst);
-  baseObj.repository = Object.assign(
-    baseObj.repository || {},
-    JSON.parse(compiled).repository
+  const repository = JSON.parse(compiled).repository;
+
+  // dump to file
+  fs.writeFileSync(
+    path.join(__dirname, "../typst.tmLanguage.json"),
+    JSON.stringify({
+      $schema:
+        "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+      scopeName: "source.typst",
+      name: "typst",
+      patterns: [
+        {
+          include: "#markup",
+        },
+      ],
+      repository,
+    })
   );
 
   // dump to file
-  fs.writeFileSync(`${typstPath}.json`, JSON.stringify(baseObj));
+  fs.writeFileSync(
+    path.join(__dirname, "../typst-code.tmLanguage.json"),
+    JSON.stringify({
+      $schema:
+        "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+      scopeName: "source.typst-code",
+      name: "typst-code",
+      patterns: [
+        {
+          include: "#code",
+        },
+      ],
+      repository,
+    })
+  );
 }
 
 // console.log(typst!.repository!.forStatement);
