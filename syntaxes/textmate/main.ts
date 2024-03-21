@@ -1,5 +1,4 @@
 import * as textmate from "./textmate";
-import * as yaml from "js-yaml";
 
 // JS-Snippet to generate pattern
 function generatePattern(maxDepth: number, lb: string, rb: string) {
