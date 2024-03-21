@@ -1,0 +1,7 @@
+>[\]]
+#^ source.typst
+# ^^ source.typst constant.character.escape.content.typst
+#   ^^ source.typst
+>\#1pt
+#^^ source.typst constant.character.escape.content.typst
+#  ^^^^ source.typst

@@ -816,6 +816,7 @@ const showStatement = (): textmate.Grammar => {
 // todo: { f }(..args)
 // todo: ( f )(..args)
 const callArgs: textmate.Pattern = {
+  //   name: "meta.call.args.typst",
   begin: /\(/,
   end: /\)/,
   beginCaptures: {
@@ -853,7 +854,7 @@ const funcCall = (strict: boolean): textmate.Pattern => {
             /(\.\s*)?/.source + IDENTIFIER.source + /\s*(?=\(|\[)/.source
           )
     ),
-    end: /(?<=\)|\])(?!\[|\()/,
+    end: /(?:(?<=\)|\])(?!\[|\())|(?=[\n\}\]\);]|$)/,
     patterns: [
       // todo: comments?
       //   {
@@ -871,6 +872,19 @@ const funcCall = (strict: boolean): textmate.Pattern => {
             include: "#primitiveFunctions",
           },
         ],
+      },
+      // empty args
+      {
+        // name: "meta.call.args.typst",
+        match: /(\()\s*(\))/,
+        captures: {
+          "1": {
+            name: "meta.brace.round.typst",
+          },
+          "2": {
+            name: "meta.brace.round.typst",
+          },
+        },
       },
       {
         include: "#callArgs",
