@@ -1,0 +1,87 @@
+>#let a = none;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#      ^ source.typst meta.expr.let.typst
+#       ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#         ^^^^ source.typst meta.expr.let.typst entity.name.type.primitive.typst
+#             ^ source.typst punctuation.terminator.statement.typst
+>#red = red
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst support.type.builtin.typst
+#    ^^^^^^^ source.typst
+>#red == red
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst support.type.builtin.typst
+#    ^^^^^^^^ source.typst
+>#(a = red)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst variable.other.readwrite.typst
+#   ^ source.typst
+#    ^ source.typst keyword.operator.assignment.typst
+#     ^ source.typst
+#      ^^^ source.typst support.type.builtin.typst
+#         ^ source.typst meta.brace.round.typst
+>#(red == red)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^ source.typst support.type.builtin.typst
+#     ^ source.typst
+#      ^^ source.typst keyword.operator.relational.typst
+#        ^ source.typst
+#         ^^^ source.typst support.type.builtin.typst
+#            ^ source.typst meta.brace.round.typst
+>
+>#a = red
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst variable.other.readwrite.typst
+#  ^^^^^^^ source.typst
+>#a += red
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst variable.other.readwrite.typst
+#  ^^^^^^^^ source.typst
+>#(a += red)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst variable.other.readwrite.typst
+#   ^ source.typst
+#    ^ source.typst keyword.operator.arithmetic.typst
+#     ^ source.typst keyword.operator.assignment.typst
+#      ^ source.typst
+#       ^^^ source.typst support.type.builtin.typst
+#          ^ source.typst meta.brace.round.typst
+>#not a
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst keyword.operator.word.typst
+#    ^^^ source.typst
+>#(not a)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^ source.typst keyword.operator.word.typst
+#     ^ source.typst
+#      ^ source.typst variable.other.readwrite.typst
+#       ^ source.typst meta.brace.round.typst
+>#(a and red)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst variable.other.readwrite.typst
+#   ^ source.typst
+#    ^^^ source.typst keyword.operator.word.typst
+#       ^ source.typst
+#        ^^^ source.typst support.type.builtin.typst
+#           ^ source.typst meta.brace.round.typst
+>#(a or red)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst variable.other.readwrite.typst
+#   ^ source.typst
+#    ^^ source.typst keyword.operator.word.typst
+#      ^ source.typst
+#       ^^^ source.typst support.type.builtin.typst
+#          ^ source.typst meta.brace.round.typst
+>#a and red
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst variable.other.readwrite.typst
+#  ^^^^^^^^^ source.typst

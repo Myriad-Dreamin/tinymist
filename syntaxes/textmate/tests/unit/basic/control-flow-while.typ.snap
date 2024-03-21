@@ -1,0 +1,129 @@
+>#while
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst variable.other.readwrite.typst
+>#while i
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst variable.other.readwrite.typst
+#      ^^^ source.typst
+>#while i {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+>#while i []
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.square.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.square.typst
+>#while i {}1
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#           ^^ source.typst
+>#while i []a
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.square.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.square.typst
+#           ^^ source.typst
+>#while i {} 1
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#           ^^^ source.typst
+>#while i [] a
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.square.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.square.typst
+#           ^^^ source.typst
+>#while i {};1
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#           ^ source.typst punctuation.terminator.statement.typst
+#            ^^ source.typst
+>#while i [];a
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.square.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.square.typst
+#           ^ source.typst punctuation.terminator.statement.typst
+#            ^^ source.typst
+>#while i {} {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#           ^^^^ source.typst
+>#while i [] []
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.square.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.square.typst
+#           ^^^^ source.typst
+>#while i [] {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.square.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.square.typst
+#           ^^^^ source.typst
+>
+>#while i {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+>1
+#^^ source.typst
+>
+>#while i []
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.while.typst
+#         ^ source.typst meta.expr.while.typst meta.brace.square.typst
+#          ^ source.typst meta.expr.while.typst meta.brace.square.typst
+>1
+#^^ source.typst
+>

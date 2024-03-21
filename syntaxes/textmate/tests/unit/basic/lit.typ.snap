@@ -1,0 +1,58 @@
+>#1.1em
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst constant.numeric.length.typst
+>#1.em
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst constant.numeric.float.typst
+#  ^ source.typst keyword.operator.accessor.typst
+#   ^^ source.typst variable.other.readwrite.typst
+>#.1em
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst keyword.operator.accessor.typst
+#  ^^^ source.typst constant.numeric.length.typst
+>#1.1%
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst constant.numeric.percentage.typst
+>#1.%
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst constant.numeric.percentage.typst
+>#.1%
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst keyword.operator.accessor.typst
+#  ^^ source.typst constant.numeric.percentage.typst
+>#1.1
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst constant.numeric.float.typst
+>#1.
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst constant.numeric.float.typst
+#  ^ source.typst keyword.operator.accessor.typst
+>#.1
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst keyword.operator.accessor.typst
+#  ^ source.typst constant.numeric.integer.typst
+>#1.1e1
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst constant.numeric.float.typst
+>#1
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst constant.numeric.integer.typst
+>#11
+#^ source.typst punctuation.definition.hash.typst
+# ^^ source.typst constant.numeric.integer.typst
+>#11.1
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst constant.numeric.float.typst
+>#11.11
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst constant.numeric.float.typst
+>#(1.11)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^ source.typst constant.numeric.float.typst
+#      ^ source.typst meta.brace.round.typst
+>#(11.1)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^ source.typst constant.numeric.float.typst
+#      ^ source.typst meta.brace.round.typst

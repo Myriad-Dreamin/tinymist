@@ -1,0 +1,11 @@
+>a *a* a
+#^^^^^^^^ source.typst
+>a*a*a*a*a
+#^^^^^^^^^^ source.typst
+>的*的*的*的*的
+#^^^^^^^^^^ source.typst
+>a_a_a_a_a
+#^^^^^^^^^^ source.typst
+>的_的_的_的_的
+#^^^^^^^^^^ source.typst
+>

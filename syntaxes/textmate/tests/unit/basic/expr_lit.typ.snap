@@ -1,12 +1,21 @@
 >#()
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst meta.array.empty.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst meta.brace.round.typst
 >#( )
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst meta.array.empty.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst
+#   ^ source.typst meta.brace.round.typst
 >#(:)
 #^ source.typst punctuation.definition.hash.typst
-# ^^^ source.typst meta.dictionary.empty.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst punctuation.separator.colon.typst
+#   ^ source.typst meta.brace.round.typst
 >#( : )
 #^ source.typst punctuation.definition.hash.typst
-# ^^^^^ source.typst meta.dictionary.empty.typst
+# ^ source.typst meta.brace.round.typst
+#  ^ source.typst
+#   ^ source.typst punctuation.separator.colon.typst
+#    ^ source.typst
+#     ^ source.typst meta.brace.round.typst

@@ -1,0 +1,171 @@
+>#if false and true {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#         ^ source.typst meta.expr.if.typst
+#          ^^^ source.typst meta.expr.if.typst keyword.operator.word.typst
+#             ^ source.typst meta.expr.if.typst
+#              ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#                  ^ source.typst meta.expr.if.typst
+#                   ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                    ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+>#if not false {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^^^ source.typst meta.expr.if.typst keyword.operator.word.typst
+#       ^ source.typst meta.expr.if.typst
+#        ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#             ^ source.typst meta.expr.if.typst
+#              ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+>#if 1 + 2 != 1 {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
+#     ^ source.typst meta.expr.if.typst
+#      ^ source.typst meta.expr.if.typst keyword.operator.arithmetic.typst
+#       ^ source.typst meta.expr.if.typst
+#        ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
+#         ^ source.typst meta.expr.if.typst
+#          ^^ source.typst meta.expr.if.typst keyword.operator.relational.typst
+#            ^ source.typst meta.expr.if.typst
+#             ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
+#              ^ source.typst meta.expr.if.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+>#if false and true {} else if false and true {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#         ^ source.typst meta.expr.if.typst
+#          ^^^ source.typst meta.expr.if.typst keyword.operator.word.typst
+#             ^ source.typst meta.expr.if.typst
+#              ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#                  ^ source.typst meta.expr.if.typst
+#                   ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                    ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                     ^^^^^^ source.typst meta.expr.if.typst
+#                           ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#                             ^ source.typst meta.expr.if.typst
+#                              ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#                                   ^ source.typst meta.expr.if.typst
+#                                    ^^^ source.typst meta.expr.if.typst keyword.operator.word.typst
+#                                       ^ source.typst meta.expr.if.typst
+#                                        ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#                                            ^ source.typst meta.expr.if.typst
+#                                             ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                                              ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+>#if not false {} else if not true {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^^^ source.typst meta.expr.if.typst keyword.operator.word.typst
+#       ^ source.typst meta.expr.if.typst
+#        ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#             ^ source.typst meta.expr.if.typst
+#              ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                ^^^^^^ source.typst meta.expr.if.typst
+#                      ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#                        ^ source.typst meta.expr.if.typst
+#                         ^^^ source.typst meta.expr.if.typst keyword.operator.word.typst
+#                            ^ source.typst meta.expr.if.typst
+#                             ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#                                 ^ source.typst meta.expr.if.typst
+#                                  ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                                   ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+>#if 1 + 2 != 1 {} else if 1 + 2 == 1 {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
+#     ^ source.typst meta.expr.if.typst
+#      ^ source.typst meta.expr.if.typst keyword.operator.arithmetic.typst
+#       ^ source.typst meta.expr.if.typst
+#        ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
+#         ^ source.typst meta.expr.if.typst
+#          ^^ source.typst meta.expr.if.typst keyword.operator.relational.typst
+#            ^ source.typst meta.expr.if.typst
+#             ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
+#              ^ source.typst meta.expr.if.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                 ^^^^^^ source.typst meta.expr.if.typst
+#                       ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#                         ^ source.typst meta.expr.if.typst
+#                          ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
+#                           ^ source.typst meta.expr.if.typst
+#                            ^ source.typst meta.expr.if.typst keyword.operator.arithmetic.typst
+#                             ^ source.typst meta.expr.if.typst
+#                              ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
+#                               ^ source.typst meta.expr.if.typst
+#                                ^^ source.typst meta.expr.if.typst keyword.operator.relational.typst
+#                                  ^ source.typst meta.expr.if.typst
+#                                   ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
+#                                    ^ source.typst meta.expr.if.typst
+#                                     ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#                                      ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+>#while false and true {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^^^^^ source.typst meta.expr.while.typst entity.name.type.primitive.typst
+#            ^ source.typst meta.expr.while.typst
+#             ^^^ source.typst meta.expr.while.typst keyword.operator.word.typst
+#                ^ source.typst meta.expr.while.typst
+#                 ^^^^ source.typst meta.expr.while.typst entity.name.type.primitive.typst
+#                     ^ source.typst meta.expr.while.typst
+#                      ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+#                       ^ source.typst meta.expr.while.typst meta.brace.curly.typst
+>#for i in (1, 2) {}
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
+#    ^ source.typst meta.expr.for.typst
+#     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
+#      ^ source.typst meta.expr.for.typst
+#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#         ^ source.typst meta.expr.for.typst
+#          ^ source.typst meta.expr.for.typst meta.brace.round.typst
+#           ^ source.typst meta.expr.for.typst constant.numeric.integer.typst
+#            ^ source.typst meta.expr.for.typst punctuation.separator.comma.typst
+#             ^ source.typst meta.expr.for.typst
+#              ^ source.typst meta.expr.for.typst constant.numeric.integer.typst
+#               ^ source.typst meta.expr.for.typst meta.brace.round.typst
+#                ^ source.typst meta.expr.for.typst
+#                 ^ source.typst meta.expr.for.typst meta.brace.curly.typst
+#                  ^ source.typst meta.expr.for.typst meta.brace.curly.typst
+>#set text(red) if false   and    true
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.set.typst keyword.control.other.typst
+#    ^ source.typst meta.expr.set.typst
+#     ^^^^ source.typst meta.expr.set.typst meta.expr.call.typst entity.name.function.typst
+#         ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
+#          ^^^ source.typst meta.expr.set.typst meta.expr.call.typst support.type.builtin.typst
+#             ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
+#              ^ source.typst meta.expr.set.typst
+#               ^^ source.typst meta.expr.set.typst keyword.control.conditional.typst
+#                 ^ source.typst meta.expr.set.typst
+#                  ^^^^^ source.typst meta.expr.set.typst entity.name.type.primitive.typst
+#                       ^^^ source.typst meta.expr.set.typst
+#                          ^^^ source.typst meta.expr.set.typst keyword.operator.word.typst
+#                             ^^^^ source.typst meta.expr.set.typst
+#                                 ^^^^ source.typst meta.expr.set.typst entity.name.type.primitive.typst
+>#set text(red) if   not          true
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.set.typst keyword.control.other.typst
+#    ^ source.typst meta.expr.set.typst
+#     ^^^^ source.typst meta.expr.set.typst meta.expr.call.typst entity.name.function.typst
+#         ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
+#          ^^^ source.typst meta.expr.set.typst meta.expr.call.typst support.type.builtin.typst
+#             ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
+#              ^ source.typst meta.expr.set.typst
+#               ^^ source.typst meta.expr.set.typst keyword.control.conditional.typst
+#                 ^^^ source.typst meta.expr.set.typst
+#                    ^^^ source.typst meta.expr.set.typst keyword.operator.word.typst
+#                       ^^^^^^^^^^ source.typst meta.expr.set.typst
+#                                 ^^^^ source.typst meta.expr.set.typst entity.name.type.primitive.typst
+>
