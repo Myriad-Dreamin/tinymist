@@ -22,3 +22,7 @@ https://zh.wikipedia.org
   writing-markup
   ```
 )
+
+#let escaped-sequences = (
+ ``, `\[`, ```\` ```, `\"`, [\`]
+)

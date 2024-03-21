@@ -133,7 +133,40 @@ const stringLiteral: textmate.PatternBeginEnd = {
   ],
 };
 
-// include
+const inlineRaw: textmate.Pattern = {
+  name: "markup.raw.inline.typst",
+  begin: /`/,
+  end: /`/,
+  beginCaptures: {
+    "0": {
+      name: "punctuation.definition.raw.inline.typst",
+    },
+  },
+  endCaptures: {
+    "0": {
+      name: "punctuation.definition.raw.inline.typst",
+    },
+  },
+};
+
+const blockRawGeneral: textmate.Pattern = {
+  name: "markup.raw.block.typst",
+  begin: new RegExp(/(`{3,})/.source + `(${IDENTIFIER.source}\b)?`),
+  beginCaptures: {
+    "1": {
+      name: "punctuation.definition.raw.begin.typst",
+    },
+    "2": {
+      name: "fenced_code.block.language",
+    },
+  },
+  end: /(\1)/,
+  endCaptures: {
+    "1": {
+      name: "punctuation.definition.raw.end.typst",
+    },
+  },
+};
 
 const includeStatement: textmate.Pattern = {
   name: "meta.expr.include.typst",
@@ -917,6 +950,10 @@ export const typst: textmate.Grammar = {
     identifier,
     markupLabel,
     stringLiteral,
+
+    inlineRaw,
+    blockRawGeneral,
+
     includeStatement,
     ...importStatement().repository,
     ...letStatement().repository,

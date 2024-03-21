@@ -27,6 +27,7 @@ repository:
     patterns:
       - include: '#comments'
       - include: '#fenced_code_block'
+      - include: '#inlineRaw'
   markup:
     patterns:
       - include: '#common'
@@ -69,12 +70,6 @@ repository:
           - include: '#markup'
       - name: markup.underline.link.typst
         match: 'https?://[0-9a-zA-Z~/%#&='',;\.\+\?]*'
-      - name: markup.raw.inline.typst
-        begin: '`'
-        end: '`'
-        captures:
-          '0':
-            name: punctuation.definition.raw.inline.typst
       - name: markup.other.math.typst
         begin: \$
         end: \$
@@ -175,6 +170,7 @@ repository:
         match: \b(return)\b
       - include: '#markupLabel'
       - include: '#fenced_code_block'
+      - include: '#inlineRaw'
       - include: '#code-block'
       - include: '#letStatement'
       - include: '#showStatement'
@@ -1291,16 +1287,4 @@ repository:
       - include: '#fenced_code_block_latex'
       - include: '#fenced_code_block_bibtex'
       - include: '#fenced_code_block_twig'
-      - include: '#fenced_code_block_unknown'
-  fenced_code_block_unknown:
-    begin: '(`{3,})\s*(?=([^`]*)?$)'
-    beginCaptures:
-      '1':
-        name: punctuation.definition.raw.begin.typst
-      '2':
-        name: fenced_code.block.language
-    end: '(\1)'
-    endCaptures:
-      '1':
-        name: punctuation.definition.raw.end.typst
-    name: markup.raw.block.typst
+      - include: '#blockRawGeneral'

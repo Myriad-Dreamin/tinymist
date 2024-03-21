@@ -72,3 +72,38 @@
 >)
 #^ source.typst meta.brace.round.typst
 >
+>#let escaped-sequences = (
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^^^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#                      ^ source.typst meta.expr.let.typst
+#                       ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                         ^ source.typst meta.expr.let.typst meta.brace.round.typst
+> ``, `\[`, ```\` ```, `\"`, [\`]
+#^ source.typst meta.expr.let.typst
+# ^ source.typst meta.expr.let.typst markup.raw.inline.typst punctuation.definition.raw.inline.typst
+#  ^ source.typst meta.expr.let.typst markup.raw.inline.typst punctuation.definition.raw.inline.typst
+#   ^ source.typst meta.expr.let.typst punctuation.separator.comma.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^ source.typst meta.expr.let.typst markup.raw.inline.typst punctuation.definition.raw.inline.typst
+#      ^^ source.typst meta.expr.let.typst markup.raw.inline.typst
+#        ^ source.typst meta.expr.let.typst markup.raw.inline.typst punctuation.definition.raw.inline.typst
+#         ^ source.typst meta.expr.let.typst punctuation.separator.comma.typst
+#          ^ source.typst meta.expr.let.typst
+#           ^^^ source.typst meta.expr.let.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#              ^^^ source.typst meta.expr.let.typst markup.raw.block.typst
+#                 ^^^ source.typst meta.expr.let.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+#                    ^ source.typst meta.expr.let.typst punctuation.separator.comma.typst
+#                     ^ source.typst meta.expr.let.typst
+#                      ^ source.typst meta.expr.let.typst markup.raw.inline.typst punctuation.definition.raw.inline.typst
+#                       ^^ source.typst meta.expr.let.typst markup.raw.inline.typst
+#                         ^ source.typst meta.expr.let.typst markup.raw.inline.typst punctuation.definition.raw.inline.typst
+#                          ^ source.typst meta.expr.let.typst punctuation.separator.comma.typst
+#                           ^ source.typst meta.expr.let.typst
+#                            ^ source.typst meta.expr.let.typst meta.brace.square.typ
+#                             ^^ source.typst meta.expr.let.typst constant.character.escape.content.typst
+#                               ^ source.typst meta.expr.let.typst meta.brace.square.typst
+>)
+#^ source.typst meta.expr.let.typst meta.brace.round.typst
+>
