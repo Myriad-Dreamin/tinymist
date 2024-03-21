@@ -65,8 +65,8 @@ fn def_tooltip(
         | crate::syntax::LexicalKind::Heading(..) => None,
         crate::syntax::LexicalKind::Var(LexicalVarKind::Function) => Some(
             LspHoverContents::Scalar(lsp_types::MarkedString::String(format!(
-                r#"```typ
-#let {name}({params});
+                r#"```typc
+let {name}({params});
 ```{doc}"#,
                 name = lnk.name,
                 params = ParamTooltip(&lnk),
@@ -84,9 +84,9 @@ fn def_tooltip(
                 .unwrap_or_default();
             Some(LspHoverContents::Scalar(lsp_types::MarkedString::String(
                 format!(
-                    r#"```typ
+                    r#"```typc
 {values}
-#let {name};
+let {name};
 ```{doc}"#,
                     name = lnk.name,
                     doc = DocTooltip::get(ctx, &lnk).unwrap_or_default(),

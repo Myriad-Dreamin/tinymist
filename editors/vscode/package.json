@@ -151,7 +151,24 @@
                     ".typ"
                 ],
                 "aliases": [
-                    "Typst"
+                    "Typst",
+                    "typst",
+                    "typ"
+                ],
+                "icon": {
+                    "light": "./icons/typst-small.png",
+                    "dark": "./icons/typst-small.png"
+                }
+            },
+            {
+                "id": "typst-code",
+                "configuration": "./language-configuration.json",
+                "extensions": [
+                    ".typc"
+                ],
+                "aliases": [
+                    "Typst (Code Mode)",
+                    "typc"
                 ],
                 "icon": {
                     "light": "./icons/typst-small.png",
@@ -164,6 +181,25 @@
                 "language": "typst",
                 "scopeName": "source.typst",
                 "path": "./out/typst.tmLanguage.json",
+                "balancedBracketScopes": [
+                    "*",
+                    "meta.expr",
+                    "meta.brace"
+                ],
+                "unbalancedBracketScopes": [
+                    "markup.raw.block.typst",
+                    "markup.raw.inline.typst",
+                    "string.other.label.typst",
+                    "string.quoted.double.typst",
+                    "constant.character.escape",
+                    "comment.block.typst",
+                    "comment.line.double-slash.typst"
+                ]
+            },
+            {
+                "language": "typst-code",
+                "scopeName": "source.typst-code",
+                "path": "./out/typst-code.tmLanguage.json",
                 "balancedBracketScopes": [
                     "*",
                     "meta.expr",
