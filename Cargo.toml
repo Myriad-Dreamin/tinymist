@@ -86,7 +86,7 @@ opt-level = 3
 opt-level = 3
 
 [profile.release]
-lto = true        # Enable link-time optimization
+# lto = true        # Enable link-time optimization
 debug = true
 opt-level = 3     # Optimize for speed
 codegen-units = 1 # Reduce number of codegen units to increase optimizations
