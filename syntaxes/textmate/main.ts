@@ -32,7 +32,8 @@ const BRACE_AWARE_EXPR =
   BRACE_FREE_EXPR +
   `(?:(?:${CODE_BLOCK})|(?:${CONTENT_BLOCK})${BRACE_FREE_EXPR})?`;
 
-const continuousCodeBlock: textmate.Pattern = {
+// todo: This is invokable
+const codeBlock: textmate.Pattern = {
   //   name: "meta.block.continuous.typst",
   begin: /\{/,
   end: /\}/,
@@ -53,7 +54,7 @@ const continuousCodeBlock: textmate.Pattern = {
   ],
 };
 
-const continuousContentBlock: textmate.Pattern = {
+const contentBlock: textmate.Pattern = {
   //   name: "meta.block.continuous.typst",
   begin: /\[/,
   end: /\]/,
@@ -177,6 +178,337 @@ const stringLiteral: textmate.PatternBeginEnd = {
   ],
 };
 
+const common: textmate.Pattern = {
+  patterns: [
+    {
+      include: "#strictComments",
+    },
+    {
+      include: "#blockRaw",
+    },
+    {
+      include: "#inlineRaw",
+    },
+  ],
+};
+
+const markup: textmate.Pattern = {
+  patterns: [
+    {
+      include: "#common",
+    },
+    {
+      include: "#markupEnterCode",
+    },
+    {
+      name: "constant.character.escape.content.typst",
+      match: /\\(?:[^u]|u\{?[0-9a-zA-Z]*\}?)/,
+    },
+    {
+      name: "punctuation.definition.linebreak.typst",
+      match: /\\/,
+    },
+    {
+      name: "punctuation.definition.nonbreaking-space.typst",
+      match: /\~/,
+    },
+    {
+      name: "punctuation.definition.shy.typst",
+      match: /-\?/,
+    },
+    {
+      name: "punctuation.definition.em-dash.typst",
+      match: /---/,
+    },
+    {
+      name: "punctuation.definition.en-dash.typst",
+      match: /--/,
+    },
+    {
+      name: "punctuation.definition.ellipsis.typst",
+      match: /\.\.\./,
+    },
+    // what is it?
+    // {
+    //   name: "constant.symbol.typst",
+    //   match: /:([a-zA-Z0-9]+:)+/,
+    // },
+    //       # These two markup are buggy
+    //       # - include: '#markupBold'
+    //       # - include: '#markupItalic'
+    {
+      name: "markup.underline.link.typst",
+      match: /https?:\/\/[0-9a-zA-Z~\/%#&='',;\.\+\?]*/,
+    },
+    {
+      include: "#markupMath",
+    },
+    {
+      include: "#markupHeading",
+    },
+    {
+      name: "punctuation.definition.list.unnumbered.typst",
+      match: /^\s*-\s+/,
+    },
+    {
+      name: "punctuation.definition.list.numbered.typst",
+      match: /^\s*([0-9]+\.|\+)\s+/,
+    },
+    {
+      match: /^\s*(\/)\s+([^:]*)(:)/,
+      captures: {
+        "1": {
+          name: "punctuation.definition.list.description.typst",
+        },
+        "2": {
+          patterns: [
+            {
+              include: "#markup",
+            },
+          ],
+        },
+        "3": {
+          name: "markup.list.term.typst",
+        },
+      },
+    },
+    {
+      include: "#markupLabel",
+    },
+    {
+      include: "#markupReference",
+    },
+  ],
+};
+
+const markupEnterCode: textmate.Pattern = {
+  patterns: [
+    /// hash and follows a space
+    {
+      match: /(#)\s/,
+      captures: {
+        "1": {
+          name: "punctuation.definition.hash.typst",
+        },
+      },
+    },
+    /// hash and follows a empty
+    {
+      match: /(#)(;)/,
+      captures: {
+        "1": {
+          name: "punctuation.definition.hash.typst",
+        },
+        "2": {
+          name: "punctuation.terminator.statement.typst",
+        },
+      },
+    },
+    {
+      //     # name: 'markup.expr.typst'
+      begin: /#/,
+      end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[])|(?=\s)|(;)/,
+      beginCaptures: {
+        "0": {
+          name: "punctuation.definition.hash.typst",
+        },
+      },
+      endCaptures: {
+        "1": {
+          name: "punctuation.terminator.statement.typst",
+        },
+      },
+      patterns: [
+        {
+          include: "#expression",
+        },
+      ],
+    },
+  ],
+};
+
+const expression = (): textmate.Grammar => {
+  const arrayOrDict: textmate.Pattern = {
+    patterns: [
+      /// empty array ()
+      {
+        match: /(\()\s*(\))/,
+        captures: {
+          "1": {
+            name: "meta.brace.round.typst",
+          },
+          "2": {
+            name: "meta.brace.round.typst",
+          },
+        },
+      },
+      /// empty dictionary (:)
+      {
+        match: /(\()\s*(:)\s*(\))/,
+        captures: {
+          "1": {
+            name: "meta.brace.round.typst",
+          },
+          "2": {
+            name: "punctuation.separator.colon.typst",
+          },
+          "3": {
+            name: "meta.brace.round.typst",
+          },
+        },
+      },
+      /// parentheisized expressions: (...)
+      // todo: This is invokable
+      {
+        begin: /\(/,
+        end: /\)/,
+        beginCaptures: {
+          "0": {
+            name: "meta.brace.round.typst",
+          },
+        },
+        endCaptures: {
+          "0": {
+            name: "meta.brace.round.typst",
+          },
+        },
+        patterns: [
+          {
+            include: "#literal-content",
+          },
+        ],
+      },
+    ],
+  };
+
+  const expression: textmate.Pattern = {
+    patterns: [
+      { include: "#arrowFunc" },
+      { include: "#arrayOrDict" },
+      { include: "#contentBlock" },
+      {
+        match: /\b(break|continue)\b/,
+        name: "keyword.control.loop.typst",
+      },
+      {
+        match: /\b(and|or|not)\b/,
+        name: "keyword.operator.word.typst",
+      },
+      {
+        match: /\b(return)\b/,
+        name: "keyword.control.flow.typst",
+      },
+      { include: "#markupLabel" },
+      { include: "#blockRaw" },
+      { include: "#inlineRaw" },
+      { include: "#codeBlock" },
+      { include: "#letStatement" },
+      { include: "#showStatement" },
+      { include: "#setStatement" },
+      { include: "#forStatement" },
+      { include: "#whileStatement" },
+      { include: "#ifStatement" },
+      { include: "#importStatement" },
+      { include: "#includeStatement" },
+      { include: "#strictFuncCall" },
+      { include: "#primitiveColors" },
+      { include: "#primitiveFunctions" },
+      { include: "#primitiveTypes" },
+      { include: "#identifier" },
+      { include: "#constants" },
+      {
+        match: /(as|in)\b/,
+        captures: {
+          "1": {
+            name: "keyword.control.typst",
+          },
+        },
+      },
+      {
+        match: /\./,
+        name: "keyword.operator.accessor.typst",
+      },
+      //   - name: keyword.operator.arithmetic.typst
+      //     match: '\+|\|/|(?<![[:alpha:]])(?<!\w)(?<!\d)-(?![[:alnum:]-][[:alpha:]_])'
+      {
+        match:
+          /\+|\|\/|(?<![[:alpha:]])(?<!\w)(?<!\d)-(?![[:alnum:]-][[:alpha:]_])/,
+        name: "keyword.operator.arithmetic.typst",
+      },
+      {
+        match: /==|!=|<=|<|>=|>/,
+        name: "keyword.operator.relational.typst",
+      },
+      {
+        begin: /(\+=|-=|\*=|\/=|=)/,
+        end: /(?=[\n;\)\]\}])/,
+        beginCaptures: {
+          "1": {
+            name: "keyword.operator.assignment.typst",
+          },
+        },
+        patterns: [
+          {
+            include: "#expression",
+          },
+        ],
+      },
+    ],
+  };
+
+  return {
+    repository: {
+      expression,
+      arrayOrDict,
+    },
+  };
+};
+
+const blockComment: textmate.Pattern = {
+  name: "comment.block.typst",
+  begin: /\/\*/,
+  end: /\*\//,
+  beginCaptures: {
+    "0": {
+      name: "punctuation.definition.comment.typst",
+    },
+  },
+  patterns: [
+    {
+      include: "#comments",
+    },
+  ],
+};
+
+const lineCommentInner = (strict: boolean): textmate.Pattern => {
+  return {
+    name: "comment.line.double-slash.typst",
+    begin: strict ? /(?<!:)\/\// : /\/\//,
+    end: /(?=$|\n)/,
+    beginCaptures: {
+      "0": {
+        name: "punctuation.definition.comment.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#comments",
+      },
+    ],
+  };
+};
+
+const strictLineComment = lineCommentInner(true);
+const lineComment = lineCommentInner(false);
+
+const strictComments: textmate.Pattern = {
+  patterns: [blockComment, strictLineComment],
+};
+
+const comments: textmate.Pattern = {
+  patterns: [blockComment, lineComment],
+};
+
 const inlineRaw: textmate.Pattern = {
   name: "markup.raw.inline.typst",
   begin: /`/,
@@ -249,7 +581,7 @@ const includeStatement: textmate.Pattern = {
       include: "#comments",
     },
     {
-      include: "#code-expr",
+      include: "#expression",
     },
   ],
 };
@@ -288,12 +620,12 @@ const importStatement = (): textmate.Grammar => {
         include: "#importAsClause",
       },
       {
-        include: "#code-expr",
+        include: "#expression",
       },
     ],
   };
 
-  /// import code-expr until as|:
+  /// import expression until as|:
   const importPathClause: textmate.Pattern = {
     begin: /(\bimport\b)\s*/,
     end: /(?=\:|as)/,
@@ -307,12 +639,12 @@ const importStatement = (): textmate.Grammar => {
         include: "#comments",
       },
       {
-        include: "#code-expr",
+        include: "#expression",
       },
     ],
   };
 
-  /// as code-expr
+  /// as expression
   const importAsClause: textmate.Pattern = {
     begin: /(\bas\b)\s*/,
     end: /(?=[\s\}\];])/,
@@ -437,7 +769,7 @@ const letStatement = (): textmate.Grammar => {
         include: "#comments",
       },
       {
-        include: "#code-expr",
+        include: "#expression",
       },
     ],
   };
@@ -486,11 +818,11 @@ const ifStatement = (): textmate.Grammar => {
       },
       /// Matches a code block after the if clause
       {
-        include: "#continuousCodeBlock",
+        include: "#codeBlock",
       },
       /// Matches a content block after the if clause
       {
-        include: "#continuousContentBlock",
+        include: "#contentBlock",
       },
     ],
   };
@@ -512,7 +844,7 @@ const ifStatement = (): textmate.Grammar => {
         include: "#comments",
       },
       {
-        include: "#code-expr",
+        include: "#expression",
       },
     ],
   };
@@ -598,11 +930,11 @@ const forStatement = (): textmate.Grammar => {
       },
       /// Matches a code block after the for clause
       {
-        include: "#continuousCodeBlock",
+        include: "#codeBlock",
       },
       /// Matches a content block after the for clause
       {
-        include: "#continuousContentBlock",
+        include: "#contentBlock",
       },
     ],
   };
@@ -651,7 +983,7 @@ const forStatement = (): textmate.Grammar => {
         include: "#comments",
       },
       {
-        include: "#code-expr",
+        include: "#expression",
       },
     ],
   };
@@ -685,11 +1017,11 @@ const whileStatement = (): textmate.Grammar => {
       },
       /// Matches a code block after the while clause
       {
-        include: "#continuousCodeBlock",
+        include: "#codeBlock",
       },
       /// Matches a content block after the while clause
       {
-        include: "#continuousContentBlock",
+        include: "#contentBlock",
       },
     ],
   };
@@ -708,7 +1040,7 @@ const whileStatement = (): textmate.Grammar => {
         include: "#comments",
       },
       {
-        include: "#code-expr",
+        include: "#expression",
       },
     ],
   };
@@ -779,7 +1111,7 @@ const setStatement = (): textmate.Grammar => {
         include: "#comments",
       },
       {
-        include: "#code-expr",
+        include: "#expression",
       },
     ],
   };
@@ -846,7 +1178,7 @@ const showStatement = (): textmate.Grammar => {
       },
       /// Matches a func call after the set clause
       {
-        include: "#code-expr",
+        include: "#expression",
       },
     ],
   };
@@ -865,7 +1197,7 @@ const showStatement = (): textmate.Grammar => {
         include: "#comments",
       },
       {
-        include: "#code-expr",
+        include: "#expression",
       },
     ],
   };
@@ -906,7 +1238,7 @@ const callArgs: textmate.Pattern = {
       name: "punctuation.separator.comma.typst",
     },
     {
-      include: "#code-expr",
+      include: "#expression",
     },
   ],
 };
@@ -957,7 +1289,7 @@ const funcCall = (strict: boolean): textmate.Pattern => {
         include: "#callArgs",
       },
       {
-        include: "#continuousContentBlock",
+        include: "#contentBlock",
       },
     ],
   };
@@ -1016,7 +1348,7 @@ const arrowFunc: textmate.Pattern = {
           include: "#comments",
         },
         {
-          include: "#code-expr",
+          include: "#expression",
         },
       ],
     },
@@ -1025,6 +1357,10 @@ const arrowFunc: textmate.Pattern = {
 
 export const typst: textmate.Grammar = {
   repository: {
+    common,
+    markup,
+    markupEnterCode,
+
     primitiveColors,
     primitiveFunctions,
     primitiveTypes,
@@ -1033,12 +1369,20 @@ export const typst: textmate.Grammar = {
     markupReference,
     stringLiteral,
 
+    comments,
+    strictComments,
+    blockComment,
+    lineComment,
+    strictLineComment,
+
     inlineRaw,
     blockRawGeneral,
     markupBold,
     markupItalic,
     markupMath,
     markupHeading,
+
+    ...expression().repository,
 
     includeStatement,
     ...importStatement().repository,
@@ -1051,8 +1395,8 @@ export const typst: textmate.Grammar = {
     strictFuncCall: funcCall(true),
     funcCall: funcCall(false),
     callArgs,
-    continuousCodeBlock,
-    continuousContentBlock,
+    codeBlock,
+    contentBlock,
     arrowFunc,
   },
 };

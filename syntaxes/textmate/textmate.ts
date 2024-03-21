@@ -5,7 +5,8 @@ export interface Grammar {
 export type Repository = Record<string, Pattern>;
 
 export type PatternCommon = Pick<PatternAny, "comment" | "disabled" | "name">;
-export type PatternInclude = PatternCommon & Pick<PatternAny, "include">;
+export type PatternInclude = PatternCommon &
+  (Pick<PatternAny, "include"> | Pick<PatternAny, "patterns">);
 export type PatternMatch = PatternCommon &
   Pick<PatternAny, "match" | "captures">;
 export type PatternBeginEnd = PatternCommon &

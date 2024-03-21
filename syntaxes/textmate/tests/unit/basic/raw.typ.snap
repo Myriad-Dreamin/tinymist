@@ -100,7 +100,7 @@
 #                         ^ source.typst meta.expr.let.typst markup.raw.inline.typst punctuation.definition.raw.inline.typst
 #                          ^ source.typst meta.expr.let.typst punctuation.separator.comma.typst
 #                           ^ source.typst meta.expr.let.typst
-#                            ^ source.typst meta.expr.let.typst meta.brace.square.typ
+#                            ^ source.typst meta.expr.let.typst meta.brace.square.typst
 #                             ^^ source.typst meta.expr.let.typst constant.character.escape.content.typst
 #                               ^ source.typst meta.expr.let.typst meta.brace.square.typst
 >)

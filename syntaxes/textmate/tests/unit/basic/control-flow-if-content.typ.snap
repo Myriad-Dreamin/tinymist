@@ -38,7 +38,8 @@
 #^ source.typst punctuation.definition.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst
-#    ^^ source.typst meta.expr.if.typst meta.array.empty.typst
+#    ^ source.typst meta.expr.if.typst meta.brace.round.typst
+#     ^ source.typst meta.expr.if.typst meta.brace.round.typst
 #      ^ source.typst meta.expr.if.typst
 #       ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #        ^ source.typst meta.expr.if.typst meta.brace.square.typst
@@ -56,7 +57,8 @@
 #^ source.typst punctuation.definition.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst
-#    ^^ source.typst meta.expr.if.typst meta.array.empty.typst
+#    ^ source.typst meta.expr.if.typst meta.brace.round.typst
+#     ^ source.typst meta.expr.if.typst meta.brace.round.typst
 #      ^ source.typst meta.expr.if.typst
 #       ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #        ^ source.typst meta.expr.if.typst meta.brace.square.typst
@@ -72,7 +74,8 @@
 #^ source.typst punctuation.definition.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst
-#    ^^ source.typst meta.expr.if.typst meta.array.empty.typst
+#    ^ source.typst meta.expr.if.typst meta.brace.round.typst
+#     ^ source.typst meta.expr.if.typst meta.brace.round.typst
 #      ^ source.typst meta.expr.if.typst
 #       ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #        ^ source.typst meta.expr.if.typst meta.brace.square.typst
@@ -88,7 +91,8 @@
 #^ source.typst punctuation.definition.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst
-#    ^^ source.typst meta.expr.if.typst meta.array.empty.typst
+#    ^ source.typst meta.expr.if.typst meta.brace.round.typst
+#     ^ source.typst meta.expr.if.typst meta.brace.round.typst
 #      ^ source.typst meta.expr.if.typst
 #       ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #        ^ source.typst meta.expr.if.typst meta.brace.square.typst
@@ -103,7 +107,8 @@
 #^ source.typst punctuation.definition.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst
-#    ^^ source.typst meta.expr.if.typst meta.array.empty.typst
+#    ^ source.typst meta.expr.if.typst meta.brace.round.typst
+#     ^ source.typst meta.expr.if.typst meta.brace.round.typst
 #      ^ source.typst meta.expr.if.typst
 #       ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #        ^ source.typst meta.expr.if.typst meta.brace.square.typst

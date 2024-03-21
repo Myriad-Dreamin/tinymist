@@ -76,7 +76,8 @@
 #   ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #    ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #     ^ source.typst meta.brace.round.typst
-#      ^^ source.typst meta.array.empty.typst
+#      ^ source.typst meta.brace.round.typst
+#       ^ source.typst meta.brace.round.typst
 >#( f())()
 #^ source.typst punctuation.definition.hash.typst
 # ^ source.typst meta.brace.round.typst
@@ -85,7 +86,8 @@
 #    ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #     ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #      ^ source.typst meta.brace.round.typst
-#       ^^ source.typst meta.array.empty.typst
+#       ^ source.typst meta.brace.round.typst
+#        ^ source.typst meta.brace.round.typst
 >#(f() )()
 #^ source.typst punctuation.definition.hash.typst
 # ^ source.typst meta.brace.round.typst
@@ -94,7 +96,8 @@
 #    ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #     ^ source.typst
 #      ^ source.typst meta.brace.round.typst
-#       ^^ source.typst meta.array.empty.typst
+#       ^ source.typst meta.brace.round.typst
+#        ^ source.typst meta.brace.round.typst
 >
 >#((f())(f()))
 #^ source.typst punctuation.definition.hash.typst
@@ -138,7 +141,8 @@
 #     ^ source.typst keyword.operator.accessor.typst
 #      ^ source.typst variable.other.readwrite.typst
 #       ^ source.typst meta.brace.round.typst
-#        ^^ source.typst meta.array.empty.typst
+#        ^ source.typst meta.brace.round.typst
+#         ^ source.typst meta.brace.round.typst
 >
 >#list.item[]
 #^ source.typst punctuation.definition.hash.typst
@@ -160,7 +164,8 @@
 #   ^ source.typst variable.other.readwrite.typst
 #    ^ source.typst
 #     ^ source.typst meta.brace.curly.typst
-#      ^^ source.typst meta.array.empty.typst
+#      ^ source.typst meta.brace.round.typst
+#       ^ source.typst meta.brace.round.typst
 >#({ f })()
 #^ source.typst punctuation.definition.hash.typst
 # ^ source.typst meta.brace.round.typst
@@ -170,7 +175,8 @@
 #     ^ source.typst
 #      ^ source.typst meta.brace.curly.typst
 #       ^ source.typst meta.brace.round.typst
-#        ^^ source.typst meta.array.empty.typst
+#        ^ source.typst meta.brace.round.typst
+#         ^ source.typst meta.brace.round.typst
 >#{ f } ()
 #^ source.typst punctuation.definition.hash.typst
 # ^ source.typst meta.brace.curly.typst
@@ -221,7 +227,8 @@
 #   ^^^ source.typst
 #      ^ source.typst variable.other.readwrite.typst
 #       ^^^ source.typst
-#          ^^ source.typst meta.array.empty.typst
+#          ^ source.typst meta.brace.round.typst
+#           ^ source.typst meta.brace.round.typst
 #            ^ source.typst meta.brace.round.typst
 >
 >
