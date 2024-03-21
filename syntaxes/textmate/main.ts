@@ -854,7 +854,7 @@ const funcCall = (strict: boolean): textmate.Pattern => {
             /(\.\s*)?/.source + IDENTIFIER.source + /\s*(?=\(|\[)/.source
           )
     ),
-    end: /(?:(?<=\)|\])(?!\[|\())|(?=[\n\}\]\);]|$)/,
+    end: /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\n\}\];]|$)/,
     patterns: [
       // todo: comments?
       //   {

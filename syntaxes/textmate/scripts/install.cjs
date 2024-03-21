@@ -15,7 +15,7 @@ json.name = "typst-grammar";
 // json.repository.fenced_code_block_typst.patterns = [
 //   { include: "source.typst-grammar" }
 // ];
-delete json.repository.fenced_code_block_typst.patterns;
+// delete json.repository.fenced_code_block_typst.patterns;
 
 const outPath = path.join(
   __dirname,

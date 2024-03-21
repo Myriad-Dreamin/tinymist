@@ -234,7 +234,9 @@
 #   ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
 #    ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
 #     ^ source.typst meta.brace.round.typst
-#      ^^^^^^^^ source.typst meta.expr.call.typst
+#      ^ source.typst meta.expr.call.typst keyword.operator.accessor.typst
+#       ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#           ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#            ^ source.typst meta.expr.call.typst meta.brace.round.typst
 >}
 #^ source.typst meta.brace.curly.typst
->
