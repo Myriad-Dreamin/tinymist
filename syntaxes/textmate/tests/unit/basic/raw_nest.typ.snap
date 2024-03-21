@@ -2,12 +2,11 @@
 #^^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
 #    ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
 >```typ
-#^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
-#   ^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.raw.block.typst fenced_code.block.language.typst
+#^^^^^^^ source.typst markup.raw.block.typst
 >abc
-#^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.raw.block.typst meta.embedded.block.typst
+#^^^^ source.typst markup.raw.block.typst
 >```
-#^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+#^^^^ source.typst markup.raw.block.typst
 >````
 #^^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
 >
@@ -15,16 +14,15 @@
 #^^^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
 #     ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
 >````md
-#^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
-#    ^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.raw.block.typst
+#^^^^^^^ source.typst markup.raw.block.typst
 >```typ
-#^^^^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.raw.block.typst
+#^^^^^^^ source.typst markup.raw.block.typst
 >abc
-#^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.raw.block.typst
+#^^^^ source.typst markup.raw.block.typst
 >```
-#^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.raw.block.typst
+#^^^^ source.typst markup.raw.block.typst
 >````
-#^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+#^^^^^ source.typst markup.raw.block.typst
 >`````
 #^^^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
 >

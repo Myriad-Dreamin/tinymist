@@ -31,7 +31,7 @@ repository:
   markup:
     patterns:
       - include: '#common'
-      - include: '#markup-hash'
+      - include: '#markupEnterCode'
       - name: constant.character.escape.content.typst
         match: '\\([\\/\[\]{}#*_=~`$-.]|u\{[0-9a-zA-Z]*\}?)'
       - name: punctuation.definition.linebreak.typst
@@ -48,43 +48,13 @@ repository:
         match: \.\.\.
       - name: constant.symbol.typst
         match: ':([a-zA-Z0-9]+:)+'
-      - name: markup.bold.typst
-        begin: (^\*|\*$|((?<=\W|_)\*)|(\*(?=\W|_)))
-        end: |-
-          (^\*|\*$|((?<=\W|_)\*)|(\*(?=\W|_)))|
-          |(?=\])
-        captures:
-          '0':
-            name: punctuation.definition.bold.typst
-        patterns:
-          - include: '#markup'
-      - name: markup.italic.typst
-        begin: (^_|_$|((?<=\W|_)_)|(_(?=\W|_)))
-        end: |-
-          (^_|_$|((?<=\W|_)_)|(_(?=\W|_)))|
-          |(?=\])
-        captures:
-          '0':
-            name: punctuation.definition.italic.typst
-        patterns:
-          - include: '#markup'
+      # These two markup are buggy
+      # - include: '#markupBold'
+      # - include: '#markupItalic'
       - name: markup.underline.link.typst
         match: 'https?://[0-9a-zA-Z~/%#&='',;\.\+\?]*'
-      - name: markup.other.math.typst
-        begin: \$
-        end: \$
-        captures:
-          '0':
-            name: punctuation.definition.string.math.typst
-      - name: markup.heading.typst
-        # contentName: entity.name.section.typst
-        begin: ^\s*=+\s+
-        end: '\n|(?=<)'
-        beginCaptures:
-          '0':
-            name: punctuation.definition.heading.typst
-        patterns:
-          - include: '#markup'
+      - include: '#markupMath'
+      - include: '#markupHeading'
       - name: punctuation.definition.list.unnumbered.typst
         match: ^\s*-\s+
       - name: punctuation.definition.list.numbered.typst
@@ -95,17 +65,9 @@ repository:
             name: punctuation.definition.list.description.typst
           '2':
             name: markup.list.term.typst
-      - name: entity.other.label.typst
-        match: '<[[:alpha:]_][[:alnum:]_-]*>'
-        captures:
-          '1':
-            name: punctuation.definition.label.typst
-      - name: entity.other.reference.typst
-        match: '(@)[[:alpha:]_][[:alnum:]_-]*'
-        captures:
-          '1':
-            name: punctuation.definition.reference.typst
-  markup-hash:
+      - include: '#markupLabel'
+      - include: '#markupReference'
+  markupEnterCode:
     patterns:
       # hash and follows a space
       - match: '(#)\s'
@@ -308,13 +270,8 @@ repository:
         match: (?<!\)|\]|\})\b\d+\b
       - name: constant.numeric.float.typst
         match: '(?<!\)|\]|\})\b(\d*)?\.?\d+([eE][+-]?\d+)?\b'
-      - include : '#stringLiteral'
-      - name: markup.other.math.typst
-        begin: \$
-        end: \$
-        captures:
-          '0':
-            name: punctuation.definition.string.math.typst
+      - include: '#stringLiteral'
+      - include: '#markupMath'
   fenced_code_block:
     patterns:
       - include: '#blockRawGeneral'

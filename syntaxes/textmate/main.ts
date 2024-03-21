@@ -90,6 +90,7 @@ const primitiveTypes: textmate.PatternMatch = {
   name: "entity.name.type.primitive.typst",
 };
 
+const IDENTIFIER_BARE = /[\p{XID_Start}_][\p{XID_Continue}_-]*/;
 const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_-]*\b/;
 
 // todo: distinguish type and variable
@@ -105,6 +106,49 @@ const identifier: textmate.PatternMatch = {
 const markupLabel: textmate.PatternMatch = {
   name: "entity.other.label.typst",
   match: /<[\p{XID_Start}_][\p{XID_Continue}_-]*>/,
+};
+
+const markupReference: textmate.PatternMatch = {
+  name: "entity.other.reference.typst",
+  match: /(@)[\p{XID_Start}_][\p{XID_Continue}_-]*/,
+  captures: {
+    "1": {
+      name: "punctuation.definition.reference.typst",
+    },
+  },
+};
+
+// todo: math mode
+const markupMath: textmate.Pattern = {
+  name: "markup.math.typst",
+  begin: /\$/,
+  end: /\$/,
+  beginCaptures: {
+    "0": {
+      name: "punctuation.definition.string.math.typst",
+    },
+  },
+  endCaptures: {
+    "0": {
+      name: "punctuation.definition.string.math.typst",
+    },
+  },
+};
+
+const markupHeading: textmate.Pattern = {
+  name: "markup.heading.typst",
+  begin: /^\s*=+\s+/,
+  end: /\n|(?=<)/,
+  beginCaptures: {
+    "0": {
+      name: "punctuation.definition.heading.typst",
+    },
+  },
+  patterns: [
+    {
+      include: "#markup",
+    },
+  ],
 };
 
 const stringLiteral: textmate.PatternBeginEnd = {
@@ -151,13 +195,13 @@ const inlineRaw: textmate.Pattern = {
 
 const blockRawGeneral: textmate.Pattern = {
   name: "markup.raw.block.typst",
-  begin: new RegExp(/(`{3,})/.source + `(${IDENTIFIER.source}\b)?`),
+  begin: new RegExp(/(`{3,})/.source + `(${IDENTIFIER_BARE.source}\\b)?`),
   beginCaptures: {
     "1": {
       name: "punctuation.definition.raw.begin.typst",
     },
     "2": {
-      name: "fenced_code.block.language",
+      name: "fenced_code.block.language.typst",
     },
   },
   end: /(\1)/,
@@ -167,6 +211,29 @@ const blockRawGeneral: textmate.Pattern = {
     },
   },
 };
+
+const markupAnnotate = (ch: string, style: string): textmate.Pattern => {
+  const MARKUP_BOUNDARY = /[\W_\p{Han}\p{Hangul}\p{Katakana}\p{Hiragana}]/;
+  const notationAtBound = `(^${ch}|${ch}$|((?<=${MARKUP_BOUNDARY.source})${ch})|(${ch}(?=${MARKUP_BOUNDARY.source})))`;
+  return {
+    name: `markup.${style}.typst`,
+    begin: new RegExp(notationAtBound),
+    end: new RegExp(notationAtBound + `\\n|(?=\\])`),
+    captures: {
+      "0": {
+        name: `punctuation.definition.${style}.typst`,
+      },
+    },
+    patterns: [
+      {
+        include: "#markup",
+      },
+    ],
+  };
+};
+
+const markupBold = markupAnnotate("\\*", "bold");
+const markupItalic = markupAnnotate("_", "italic");
 
 const includeStatement: textmate.Pattern = {
   name: "meta.expr.include.typst",
@@ -963,10 +1030,15 @@ export const typst: textmate.Grammar = {
     primitiveTypes,
     identifier,
     markupLabel,
+    markupReference,
     stringLiteral,
 
     inlineRaw,
     blockRawGeneral,
+    markupBold,
+    markupItalic,
+    markupMath,
+    markupHeading,
 
     includeStatement,
     ...importStatement().repository,
