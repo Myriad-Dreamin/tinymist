@@ -32,6 +32,8 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
         let glob_path = format!("fixtures/{name}/*.typ");
         insta::glob!(&glob_path, |path| {
             let contents = std::fs::read_to_string(path).unwrap();
+            #[cfg(windows)]
+            let contents = contents.replace("\r\n", "\n");
 
             run_with_sources(&contents, |w: &mut TypstSystemWorld, p| {
                 let paths = w

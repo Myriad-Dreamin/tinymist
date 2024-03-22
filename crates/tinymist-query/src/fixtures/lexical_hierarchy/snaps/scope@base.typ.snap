@@ -16,6 +16,6 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/base.typ
    "Var": "ValRef"
   },
   "name": "x",
-  "range": "14:15"
+  "range": "13:14"
  }
 ]

@@ -4,13 +4,13 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/redefine.typ
 ---
 {
- "x@18..19@s0.typ": {
+ "x@17..18@s0.typ": {
   "def": {
    "kind": {
     "Var": "Variable"
    },
    "name": "x",
-   "range": "18:19"
+   "range": "17:18"
   },
   "refs": []
  },
@@ -23,7 +23,7 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/redefine.typ
    "range": "5:6"
   },
   "refs": [
-   "x@22..23"
+   "x@21..22"
   ]
  }
 }

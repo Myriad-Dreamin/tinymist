@@ -4,25 +4,25 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/func.typ
 ---
 {
- "a@20..21@s0.typ": {
+ "a@19..20@s0.typ": {
   "def": {
    "kind": {
     "Var": "Variable"
    },
    "name": "a",
-   "range": "20:21"
+   "range": "19:20"
   },
   "refs": [
-   "a@25..26"
+   "a@24..25"
   ]
  },
- "f@18..19@s0.typ": {
+ "f@17..18@s0.typ": {
   "def": {
    "kind": {
     "Var": "Function"
    },
    "name": "f",
-   "range": "18:19"
+   "range": "17:18"
   },
   "refs": []
  },
