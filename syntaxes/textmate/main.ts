@@ -1345,6 +1345,10 @@ const callArgs: textmate.Pattern = {
   },
   patterns: [
     {
+      match: /\.\./,
+      name: "keyword.operator.spread.typst",
+    },
+    {
       match: /:/,
       name: "punctuation.separator.colon.typst",
     },
@@ -1358,22 +1362,26 @@ const callArgs: textmate.Pattern = {
   ],
 };
 
+const funcRestParam: textmate.Pattern = {
+  match: /(\.\.)(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)?/,
+  // debugging
+  // - name: meta.parameter.binding.typst
+  captures: {
+    "1": {
+      name: "keyword.operator.spread.typst",
+    },
+    "2": {
+      name: "variable.other.readwrite.typst",
+    },
+  },
+};
+
 const patternBindingItems: textmate.Pattern = {
   patterns: [
     { include: "#comments" },
     /// rest binding
     {
-      match: /(\.\.)(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)?/,
-      // debugging
-      // - name: meta.parameter.binding.typst
-      captures: {
-        "1": {
-          name: "keyword.operator.range.typst",
-        },
-        "2": {
-          name: "variable.other.readwrite.typst",
-        },
-      },
+      include: "#funcRestParam",
     },
     /// recursive binding
     {
@@ -1593,6 +1601,7 @@ export const typst: textmate.Grammar = {
     strictFuncCallOrPropAccess: funcCallOrPropAccess(true),
     // funcCallOrPropAccess: funcCallOrPropAccess(false),
     callArgs,
+    funcRestParam,
     funcParams,
     patternBindingItems,
     codeBlock,
