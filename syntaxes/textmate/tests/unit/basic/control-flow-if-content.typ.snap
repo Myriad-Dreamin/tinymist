@@ -1,15 +1,28 @@
 >#if 1
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst variable.other.readwrite.typst
-#   ^^^ source.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
 >#if [] 1
-#^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst variable.other.readwrite.typst
-#   ^^^^^^ source.typst
+#^ source.typst meta.expr.if.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#     ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#      ^ source.typst meta.expr.if.typst
+#       ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
 >#if [] else [] 1
-#^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst variable.other.readwrite.typst
-#   ^^^^^^^^^^^^^^ source.typst
+#^ source.typst meta.expr.if.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#     ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#      ^ source.typst meta.expr.if.typst
+#       ^^^^ source.typst meta.expr.if.typst variable.other.readwrite.typst
+#           ^ source.typst meta.expr.if.typst
+#            ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#             ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#              ^^^ source.typst
 >#if 1 [] else [] 1
 #^ source.typst punctuation.definition.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
@@ -26,14 +39,36 @@
 #                ^^^ source.typst
 >#if {} [] else [] #1
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst variable.other.readwrite.typst
-#   ^^^^^^^^^^^^^^^ source.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#     ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#      ^ source.typst meta.expr.if.typst
+#       ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#        ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#         ^ source.typst meta.expr.if.typst
+#          ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#              ^ source.typst meta.expr.if.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#                ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#                 ^ source.typst
 #                  ^ source.typst punctuation.definition.hash.typst
 #                   ^ source.typst constant.numeric.integer.typst
 >#if [] [] else [] []
 #^ source.typst punctuation.definition.hash.typst
-# ^^ source.typst variable.other.readwrite.typst
-#   ^^^^^^^^^^^^^^^^^^ source.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#   ^ source.typst meta.expr.if.typst
+#    ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#     ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#      ^ source.typst meta.expr.if.typst
+#       ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#        ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#         ^ source.typst meta.expr.if.typst
+#          ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#              ^ source.typst meta.expr.if.typst
+#               ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#                ^ source.typst meta.expr.if.typst meta.brace.square.typst
+#                 ^^^^ source.typst
 >#if () [] else [] # a
 #^ source.typst punctuation.definition.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
