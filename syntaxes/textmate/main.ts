@@ -883,6 +883,7 @@ const letStatement = (): textmate.Grammar => {
   };
 };
 
+// todo: #if [] == [] [] {}
 /**
  * Matches a (strict grammar) if in markup context.
  */
@@ -1489,6 +1490,7 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
   };
 };
 
+// todo: #x => y should be parsed as |#x|=>|y
 // https://github.com/microsoft/vscode-textmate/blob/main/test-cases/themes/syntaxes/TypeScript.tmLanguage.json
 const arrowFunc: textmate.Pattern = {
   name: "meta.expr.arrow-function.typst",
