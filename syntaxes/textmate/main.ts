@@ -96,11 +96,7 @@ const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_-]*\b/;
 // todo: distinguish type and variable
 const identifier: textmate.PatternMatch = {
   match: IDENTIFIER,
-  captures: {
-    "0": {
-      name: "variable.other.readwrite.typst",
-    },
-  },
+  name: "variable.other.readwrite.typst",
 };
 
 const markupLabel: textmate.PatternMatch = {
@@ -431,7 +427,7 @@ const expression = (): textmate.Grammar => {
       { include: "#ifStatement" },
       { include: "#importStatement" },
       { include: "#includeStatement" },
-      { include: "#strictFuncCall" },
+      { include: "#strictFuncCallOrPropAccess" },
       { include: "#primitiveColors" },
       { include: "#primitiveFunctions" },
       { include: "#primitiveTypes" },
@@ -1196,7 +1192,7 @@ const setStatement = (): textmate.Grammar => {
       },
       /// Matches a func call after the set clause
       {
-        include: "#funcCall",
+        include: "#strictFuncCallOrPropAccess",
       },
       {
         include: "#identifier",
@@ -1293,7 +1289,7 @@ const showStatement = (): textmate.Grammar => {
   const showSubstClause: textmate.Pattern = {
     // name: "meta.show.clause.subst.typst",
     begin: /(\:)\s*/,
-    end: /(?<!:)(?<=\S)(?!\S)|(?=[;\]}])/,
+    end: /(?<!:)(?<=\S)(?!\S)|(?=[\n;\]}])/,
     beginCaptures: {
       "1": {
         name: "punctuation.separator.colon.typst",
@@ -1352,6 +1348,7 @@ const callArgs: textmate.Pattern = {
 
 const patternBindingItems: textmate.Pattern = {
   patterns: [
+    { include: "#comments" },
     /// rest binding
     {
       match: /(\.\.)(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)?/,
@@ -1420,7 +1417,7 @@ const funcParams: textmate.Pattern = {
   ],
 };
 
-const funcCall = (strict: boolean): textmate.Pattern => {
+const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
   return {
     name: "meta.expr.call.typst",
     begin: lookAhead(
@@ -1441,13 +1438,19 @@ const funcCall = (strict: boolean): textmate.Pattern => {
         name: "keyword.operator.accessor.typst",
       },
       {
-        match: IDENTIFIER,
+        match: new RegExp(
+          IDENTIFIER.source +
+            (strict ? /(?=\(|\[)/.source : /\s*(?=\(|\[)/.source)
+        ),
         name: "entity.name.function.typst",
         patterns: [
           {
             include: "#primitiveFunctions",
           },
         ],
+      },
+      {
+        include: "#identifier",
       },
       // empty args
       {
@@ -1574,8 +1577,8 @@ export const typst: textmate.Grammar = {
     contextStatement,
     ...setStatement().repository,
     ...showStatement().repository,
-    strictFuncCall: funcCall(true),
-    funcCall: funcCall(false),
+    strictFuncCallOrPropAccess: funcCallOrPropAccess(true),
+    // funcCallOrPropAccess: funcCallOrPropAccess(false),
     callArgs,
     funcParams,
     patternBindingItems,
