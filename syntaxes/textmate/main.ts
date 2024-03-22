@@ -670,7 +670,7 @@ const markupItalic = markupAnnotate("_", "italic");
 const includeStatement: textmate.Pattern = {
   name: "meta.expr.include.typst",
   begin: /(\binclude\b)\s*/,
-  end: /(?=[\n\}\];])/,
+  end: /(?=[\n;\}\]\)])/,
   beginCaptures: {
     "1": {
       name: "keyword.control.import.typst",
@@ -691,7 +691,7 @@ const importStatement = (): textmate.Grammar => {
   const importStatement: textmate.Pattern = {
     name: "meta.expr.import.typst",
     begin: /(\bimport\b)\s*/,
-    end: /(?=[\n\}\];])/,
+    end: /(?=[\n;\}\]\)])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.import.typst",
@@ -747,7 +747,7 @@ const importStatement = (): textmate.Grammar => {
   /// as expression
   const importAsClause: textmate.Pattern = {
     begin: /(\bas\b)\s*/,
-    end: /(?=[\s\}\];])/,
+    end: /(?=[\s;\}\]\)])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.import.typst",
@@ -776,7 +776,7 @@ const letStatement = (): textmate.Grammar => {
   const letStatement: textmate.Pattern = {
     name: "meta.expr.let.typst",
     begin: lookAhead(/(let\b)/),
-    end: /(?!\()(?=[\s\}\]\);])/,
+    end: /(?!\()(?=[\s;\}\]\)])/,
     patterns: [
       /// Matches any comments
       {
@@ -1012,7 +1012,7 @@ const forStatement = (): textmate.Grammar => {
   const forStatement: textmate.Pattern = {
     name: "meta.expr.for.typst",
     begin: lookAhead(/(for\b)\s*/),
-    end: /(?<=[\}\]])(?=\s*[\n\S;\)\]\}])(?!\s*[\{\[])/,
+    end: /(?<=[\}\]])(?=\s*[\n\S;\}\]\)])(?!\s*[\{\[])/,
     patterns: [
       /// Matches any comments
       {
@@ -1039,7 +1039,7 @@ const forStatement = (): textmate.Grammar => {
     begin: new RegExp(
       /(for\b)\s*/.source + `(${BRACE_FREE_EXPR}|${CODE_BLOCK})\\s*(in)\\s*`
     ),
-    end: /(?=[;\[\]{}]|$)/,
+    end: /(?=[;{\[\}\]\)]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -1125,7 +1125,7 @@ const whileStatement = (): textmate.Grammar => {
   const whileClause: textmate.Pattern = {
     // name: "meta.while.clause.bind.typst",
     begin: /(while\b)\s*/,
-    end: /(?=[;\[\]{}]|$)/,
+    end: /(?=[;{\[\}\]\)]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -1152,7 +1152,7 @@ const whileStatement = (): textmate.Grammar => {
 const contextStatement: textmate.Pattern = {
   name: "meta.expr.context.typst",
   begin: /(context\b)\s*/,
-  end: /(?=[\n;\]}])/,
+  end: /(?=[\n;\}\]\)])/,
   beginCaptures: {
     "1": {
       name: "keyword.control.other.typst",
@@ -1172,7 +1172,7 @@ const setStatement = (): textmate.Grammar => {
   const setStatement: textmate.Pattern = {
     name: "meta.expr.set.typst",
     begin: lookAhead(new RegExp(/(set\b)\s*/.source + IDENTIFIER.source)),
-    end: /(?<=\))(?!if)|(?=[\s\{\}\[\];])/,
+    end: /(?<=\))(?!if)|(?=[\s;\{\[\}\]])/,
     patterns: [
       /// Matches any comments
       {
@@ -1215,7 +1215,7 @@ const setStatement = (): textmate.Grammar => {
   const setIfClause: textmate.Pattern = {
     // name: "meta.set.if.clause.cond.typst",
     begin: /(if)\s*/,
-    end: /(?<=\S)(?<!not|and|or|\+|-|\*|\/|==|!=|<=|>=|\<|\>)(?!\s*(?:not|and|or|\+|-|\*|\/|==|!=|\<|\>|\.))|(?=[\n;\]}])/,
+    end: /(?<=\S)(?<!not|and|or|\+|-|\*|\/|==|!=|<=|>=|\<|\>)(?!\s*(?:not|and|or|\+|-|\*|\/|==|!=|\<|\>|\.))|(?=[\n;\}\]])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",
@@ -1244,7 +1244,7 @@ const showStatement = (): textmate.Grammar => {
   const showStatement: textmate.Pattern = {
     name: "meta.expr.show.typst",
     begin: lookAhead(/(show\b)/),
-    end: /(?=[\s\{\}\[\];])/,
+    end: /(?=[\s;\{\[\}\]])/,
     patterns: [
       /// Matches any comments
       {
@@ -1278,7 +1278,7 @@ const showStatement = (): textmate.Grammar => {
   const showSelectClause: textmate.Pattern = {
     // name: "meta.show.clause.select.typst",
     begin: /(show\b)\s*/,
-    end: /(?=[:;\]}])/,
+    end: /(?=[:;\}\]])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.other.typst",
@@ -1301,7 +1301,7 @@ const showStatement = (): textmate.Grammar => {
   const showSubstClause: textmate.Pattern = {
     // name: "meta.show.clause.subst.typst",
     begin: /(\:)\s*/,
-    end: /(?<!:)(?<=\S)(?!\S)|(?=[\n;\]}])/,
+    end: /(?<!:)(?<=\S)(?!\S)|(?=[\n;\}\]])/,
     beginCaptures: {
       "1": {
         name: "punctuation.separator.colon.typst",
@@ -1439,7 +1439,7 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
             /(\.\s*)?/.source + IDENTIFIER.source + /\s*(?=\(|\[)/.source
           )
     ),
-    end: /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\n\}\];]|$)/,
+    end: /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\n;\}\]\)]|$)/,
     patterns: [
       // todo: comments?
       //   {
@@ -1529,7 +1529,7 @@ const arrowFunc: textmate.Pattern = {
     },
     {
       begin: /=>/,
-      end: /(?<=\}|\])|(?:(?!\{|\[)(?=\S|\n|;))/,
+      end: /(?<=\}|\])|(?:(?!\{|\[)(?=[\n\S;]))/,
       beginCaptures: {
         "0": {
           name: "storage.type.function.arrow.typst",
