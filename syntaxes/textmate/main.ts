@@ -563,7 +563,7 @@ const blockComment: textmate.Pattern = {
   },
   patterns: [
     {
-      include: "#comments",
+      include: "#blockComment",
     },
   ],
 };
@@ -578,11 +578,6 @@ const lineCommentInner = (strict: boolean): textmate.Pattern => {
         name: "punctuation.definition.comment.typst",
       },
     },
-    patterns: [
-      {
-        include: "#comments",
-      },
-    ],
   };
 };
 
@@ -1173,7 +1168,7 @@ const setStatement = (): textmate.Grammar => {
   const setClause: textmate.Pattern = {
     // name: "meta.set.clause.bind.typst",
     begin: /(set\b)\s*/,
-    end: /(?=if)|(?=[;\]}])/,
+    end: /(?=if)|(?=[\n;\]}])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.other.typst",
@@ -1196,7 +1191,7 @@ const setStatement = (): textmate.Grammar => {
   const setIfClause: textmate.Pattern = {
     // name: "meta.set.if.clause.cond.typst",
     begin: /(if)\s*/,
-    end: /(?<=\S)(?<!not|and|or|\+|-|\*|\/|==|!=|<=|>=|\<|\>)(?!\s*(?:not|and|or|\+|-|\*|\/|==|!=|\<|\>|\.))|(?=[;\]}])/,
+    end: /(?<=\S)(?<!not|and|or|\+|-|\*|\/|==|!=|<=|>=|\<|\>)(?!\s*(?:not|and|or|\+|-|\*|\/|==|!=|\<|\>|\.))|(?=[\n;\]}])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",

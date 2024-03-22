@@ -22,8 +22,8 @@
 #                ^^^ source.typst meta.expr.set.typst meta.expr.call.typst support.type.builtin.typst
 #                   ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
 >#set text("")
-#^ source.typst meta.expr.set.typst
-# ^^^ source.typst meta.expr.set.typst variable.other.readwrite.typst
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.set.typst keyword.control.other.typst
 #    ^ source.typst meta.expr.set.typst
 #     ^^^^ source.typst meta.expr.set.typst meta.expr.call.typst entity.name.function.typst
 #         ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
@@ -31,16 +31,16 @@
 #           ^ source.typst meta.expr.set.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
 #            ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
 >#set text(red)
-#^ source.typst meta.expr.set.typst
-# ^^^ source.typst meta.expr.set.typst variable.other.readwrite.typst
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.set.typst keyword.control.other.typst
 #    ^ source.typst meta.expr.set.typst
 #     ^^^^ source.typst meta.expr.set.typst meta.expr.call.typst entity.name.function.typst
 #         ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
 #          ^^^ source.typst meta.expr.set.typst meta.expr.call.typst support.type.builtin.typst
 #             ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
 >#set list.item(red);
-#^ source.typst meta.expr.set.typst
-# ^^^ source.typst meta.expr.set.typst variable.other.readwrite.typst
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.set.typst keyword.control.other.typst
 #    ^ source.typst meta.expr.set.typst
 #     ^^^^ source.typst meta.expr.set.typst variable.other.readwrite.typst
 #         ^ source.typst meta.expr.set.typst meta.expr.call.typst keyword.operator.accessor.typst
