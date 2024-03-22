@@ -1,12 +1,13 @@
 >#while
 #^ source.typst punctuation.definition.hash.typst
-# ^^^^^ source.typst variable.other.readwrite.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
 >#while i
-#^ source.typst punctuation.definition.hash.typst
-# ^^^^^ source.typst variable.other.readwrite.typst
-#      ^^^ source.typst
+#^ source.typst meta.expr.while.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+#      ^ source.typst meta.expr.while.typst
+#       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst
 >#while i {}
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst meta.expr.while.typst
 # ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
 #      ^ source.typst meta.expr.while.typst
 #       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst

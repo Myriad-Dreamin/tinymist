@@ -446,12 +446,12 @@ const expression = (): textmate.Grammar => {
       { include: "#identifier" },
       { include: "#constants" },
       {
-        match: /(as|in)\b/,
-        captures: {
-          "1": {
-            name: "keyword.control.typst",
-          },
-        },
+        match: /(as)\b/,
+        name: "keyword.control.typst",
+      },
+      {
+        match: /(in)\b/,
+        name: "keyword.operator.range.typst",
       },
       {
         match: /\./,
@@ -925,7 +925,7 @@ const ifStatement = (): textmate.Grammar => {
   const ifClause: textmate.Pattern = {
     //   name: "meta.if.clause.typst",
     begin: /(else\b)?(if)\s+/,
-    end: /(?<!if\s+)(?=[\[\{])|(?=[;\]}]|$)/,
+    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s+)(?=[\[\{])|(?=[;\]}]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",
@@ -1091,11 +1091,7 @@ const whileStatement = (): textmate.Grammar => {
   // for v in expr { ... }
   const whileStatement: textmate.Pattern = {
     name: "meta.expr.while.typst",
-    begin: lookAhead(
-      new RegExp(
-        /(while\b)\s*/.source + `(?:${BRACE_AWARE_EXPR})` + /\s*[\{\[]/.source
-      )
-    ),
+    begin: lookAhead(/(while\b)/),
     end: /(?<=\}|\])/,
     patterns: [
       /// Matches any comments
@@ -1120,7 +1116,7 @@ const whileStatement = (): textmate.Grammar => {
   const whileClause: textmate.Pattern = {
     // name: "meta.while.clause.bind.typst",
     begin: /(while\b)\s*/,
-    end: /(?=[;{\[\}\]\)]|$)/,
+    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s+)(?=[\[\{])|(?=[;\}\]\)]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -1210,7 +1206,7 @@ const setStatement = (): textmate.Grammar => {
   const setIfClause: textmate.Pattern = {
     // name: "meta.set.if.clause.cond.typst",
     begin: /(if)\s*/,
-    end: /(?<=\S)(?<!not|and|or|\+|-|\*|\/|==|!=|<=|>=|\<|\>)(?!\s*(?:not|and|or|\+|-|\*|\/|==|!=|\<|\>|\.))|(?=[\n;\}\]])/,
+    end: /(?<=\S)(?<!and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)(?!\s*(?:and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=|\.))|(?=[\n;\}\]])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",
