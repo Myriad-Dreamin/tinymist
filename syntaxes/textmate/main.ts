@@ -114,37 +114,9 @@ const markupReference: textmate.PatternMatch = {
   },
 };
 
-// todo: math mode
-const markupMath: textmate.Pattern = {
-  name: "markup.math.typst",
-  begin: /\$/,
-  end: /\$/,
-  beginCaptures: {
-    "0": {
-      name: "punctuation.definition.string.math.typst",
-    },
-  },
-  endCaptures: {
-    "0": {
-      name: "punctuation.definition.string.math.typst",
-    },
-  },
-};
-
-const markupHeading: textmate.Pattern = {
-  name: "markup.heading.typst",
-  begin: /^\s*=+\s+/,
-  end: /\n|(?=<)/,
-  beginCaptures: {
-    "0": {
-      name: "punctuation.definition.heading.typst",
-    },
-  },
-  patterns: [
-    {
-      include: "#markup",
-    },
-  ],
+const markupEscape: textmate.PatternMatch = {
+  name: "constant.character.escape.content.typst",
+  match: /\\(?:[^u]|u\{?[0-9a-zA-Z]*\}?)/,
 };
 
 const stringLiteral: textmate.PatternBeginEnd = {
@@ -173,6 +145,47 @@ const stringLiteral: textmate.PatternBeginEnd = {
   ],
 };
 
+// todo: math mode
+const markupMath: textmate.Pattern = {
+  name: "markup.math.typst",
+  begin: /\$/,
+  end: /\$/,
+  beginCaptures: {
+    "0": {
+      name: "punctuation.definition.string.math.typst",
+    },
+  },
+  endCaptures: {
+    "0": {
+      name: "punctuation.definition.string.math.typst",
+    },
+  },
+  patterns: [
+    {
+      include: "#markupEscape",
+    },
+    {
+      include: "#markupEnterCode",
+    },
+  ],
+};
+
+const markupHeading: textmate.Pattern = {
+  name: "markup.heading.typst",
+  begin: /^\s*=+\s+/,
+  end: /\n|(?=<)/,
+  beginCaptures: {
+    "0": {
+      name: "punctuation.definition.heading.typst",
+    },
+  },
+  patterns: [
+    {
+      include: "#markup",
+    },
+  ],
+};
+
 const common: textmate.Pattern = {
   patterns: [
     {
@@ -196,8 +209,7 @@ const markup: textmate.Pattern = {
       include: "#markupEnterCode",
     },
     {
-      name: "constant.character.escape.content.typst",
-      match: /\\(?:[^u]|u\{?[0-9a-zA-Z]*\}?)/,
+      include: "#markupEscape",
     },
     {
       name: "punctuation.definition.linebreak.typst",
@@ -1549,6 +1561,7 @@ export const typst: textmate.Grammar = {
     identifier,
     markupLabel,
     markupReference,
+    markupEscape,
     stringLiteral,
 
     comments,

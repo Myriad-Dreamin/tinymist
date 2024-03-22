@@ -1,0 +1,15 @@
+>$\$$
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^ source.typst markup.math.typst constant.character.escape.content.typst
+#   ^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>$ a #[$b$] $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^ source.typst markup.math.typst
+#    ^ source.typst markup.math.typst punctuation.definition.hash.typst
+#     ^ source.typst markup.math.typst meta.brace.square.typst
+#      ^ source.typst markup.math.typst markup.math.typst punctuation.definition.string.math.typst
+#       ^ source.typst markup.math.typst markup.math.typst
+#        ^ source.typst markup.math.typst markup.math.typst punctuation.definition.string.math.typst
+#         ^ source.typst markup.math.typst meta.brace.square.typst
+#          ^ source.typst markup.math.typst
+#           ^ source.typst markup.math.typst punctuation.definition.string.math.typst
