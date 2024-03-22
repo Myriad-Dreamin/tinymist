@@ -29,7 +29,7 @@ const CONTENT_BLOCK = generatePattern(6, "\\[", "\\]");
 const BRACE_FREE_EXPR = /[^\s\}\{\[\]][^\}\{\[\]]*/.source;
 const BRACE_AWARE_EXPR =
   BRACE_FREE_EXPR +
-  `(?:(?:${CODE_BLOCK})|(?:${CONTENT_BLOCK})${BRACE_FREE_EXPR})?`;
+  `(?:(?:(?:${CODE_BLOCK})|(?:${CONTENT_BLOCK}))${BRACE_FREE_EXPR})?`;
 
 // todo: This is invokable
 const codeBlock: textmate.Pattern = {
@@ -54,7 +54,7 @@ const codeBlock: textmate.Pattern = {
 };
 
 const contentBlock: textmate.Pattern = {
-  //   name: "meta.block.continuous.typst",
+  // name: "meta.block.content.typst",
   begin: /\[/,
   end: /\]/,
   beginCaptures: {
@@ -96,11 +96,7 @@ const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_-]*\b/;
 // todo: distinguish type and variable
 const identifier: textmate.PatternMatch = {
   match: IDENTIFIER,
-  captures: {
-    "0": {
-      name: "variable.other.readwrite.typst",
-    },
-  },
+  name: "variable.other.readwrite.typst",
 };
 
 const markupLabel: textmate.PatternMatch = {
@@ -118,37 +114,9 @@ const markupReference: textmate.PatternMatch = {
   },
 };
 
-// todo: math mode
-const markupMath: textmate.Pattern = {
-  name: "markup.math.typst",
-  begin: /\$/,
-  end: /\$/,
-  beginCaptures: {
-    "0": {
-      name: "punctuation.definition.string.math.typst",
-    },
-  },
-  endCaptures: {
-    "0": {
-      name: "punctuation.definition.string.math.typst",
-    },
-  },
-};
-
-const markupHeading: textmate.Pattern = {
-  name: "markup.heading.typst",
-  begin: /^\s*=+\s+/,
-  end: /\n|(?=<)/,
-  beginCaptures: {
-    "0": {
-      name: "punctuation.definition.heading.typst",
-    },
-  },
-  patterns: [
-    {
-      include: "#markup",
-    },
-  ],
+const markupEscape: textmate.PatternMatch = {
+  name: "constant.character.escape.content.typst",
+  match: /\\(?:[^u]|u\{?[0-9a-zA-Z]*\}?)/,
 };
 
 const stringLiteral: textmate.PatternBeginEnd = {
@@ -177,6 +145,47 @@ const stringLiteral: textmate.PatternBeginEnd = {
   ],
 };
 
+// todo: math mode
+const markupMath: textmate.Pattern = {
+  name: "markup.math.typst",
+  begin: /\$/,
+  end: /\$/,
+  beginCaptures: {
+    "0": {
+      name: "punctuation.definition.string.math.typst",
+    },
+  },
+  endCaptures: {
+    "0": {
+      name: "punctuation.definition.string.math.typst",
+    },
+  },
+  patterns: [
+    {
+      include: "#markupEscape",
+    },
+    {
+      include: "#markupEnterCode",
+    },
+  ],
+};
+
+const markupHeading: textmate.Pattern = {
+  name: "markup.heading.typst",
+  begin: /^\s*=+\s+/,
+  end: /\n|(?=<)/,
+  beginCaptures: {
+    "0": {
+      name: "punctuation.definition.heading.typst",
+    },
+  },
+  patterns: [
+    {
+      include: "#markup",
+    },
+  ],
+};
+
 const common: textmate.Pattern = {
   patterns: [
     {
@@ -200,8 +209,7 @@ const markup: textmate.Pattern = {
       include: "#markupEnterCode",
     },
     {
-      name: "constant.character.escape.content.typst",
-      match: /\\(?:[^u]|u\{?[0-9a-zA-Z]*\}?)/,
+      include: "#markupEscape",
     },
     {
       name: "punctuation.definition.linebreak.typst",
@@ -306,7 +314,7 @@ const markupEnterCode: textmate.Pattern = {
     {
       /// name: 'markup.expr.typst'
       begin: /#/,
-      end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[])|(?=\s)|(;)/,
+      end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[])|(?=[\s\]\}\)]|$)|(;)/,
       beginCaptures: {
         "0": {
           name: "punctuation.definition.hash.typst",
@@ -424,25 +432,26 @@ const expression = (): textmate.Grammar => {
       { include: "#codeBlock" },
       { include: "#letStatement" },
       { include: "#showStatement" },
+      { include: "#contextStatement" },
       { include: "#setStatement" },
       { include: "#forStatement" },
       { include: "#whileStatement" },
       { include: "#ifStatement" },
       { include: "#importStatement" },
       { include: "#includeStatement" },
-      { include: "#strictFuncCall" },
+      { include: "#strictFuncCallOrPropAccess" },
       { include: "#primitiveColors" },
       { include: "#primitiveFunctions" },
       { include: "#primitiveTypes" },
       { include: "#identifier" },
       { include: "#constants" },
       {
-        match: /(as|in)\b/,
-        captures: {
-          "1": {
-            name: "keyword.control.typst",
-          },
-        },
+        match: /(as)\b/,
+        name: "keyword.control.typst",
+      },
+      {
+        match: /(in)\b/,
+        name: "keyword.operator.range.typst",
       },
       {
         match: /\./,
@@ -563,7 +572,7 @@ const blockComment: textmate.Pattern = {
   },
   patterns: [
     {
-      include: "#comments",
+      include: "#blockComment",
     },
   ],
 };
@@ -578,11 +587,6 @@ const lineCommentInner = (strict: boolean): textmate.Pattern => {
         name: "punctuation.definition.comment.typst",
       },
     },
-    patterns: [
-      {
-        include: "#comments",
-      },
-    ],
   };
 };
 
@@ -666,7 +670,7 @@ const markupItalic = markupAnnotate("_", "italic");
 const includeStatement: textmate.Pattern = {
   name: "meta.expr.include.typst",
   begin: /(\binclude\b)\s*/,
-  end: /(?=[\n\}\];])/,
+  end: /(?=[\n;\}\]\)])/,
   beginCaptures: {
     "1": {
       name: "keyword.control.import.typst",
@@ -687,7 +691,7 @@ const importStatement = (): textmate.Grammar => {
   const importStatement: textmate.Pattern = {
     name: "meta.expr.import.typst",
     begin: /(\bimport\b)\s*/,
-    end: /(?=[\n\}\];])/,
+    end: /(?=[\n;\}\]\)])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.import.typst",
@@ -743,7 +747,7 @@ const importStatement = (): textmate.Grammar => {
   /// as expression
   const importAsClause: textmate.Pattern = {
     begin: /(\bas\b)\s*/,
-    end: /(?=[\s\}\];])/,
+    end: /(?=[\s;\}\]\)])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.import.typst",
@@ -772,7 +776,7 @@ const letStatement = (): textmate.Grammar => {
   const letStatement: textmate.Pattern = {
     name: "meta.expr.let.typst",
     begin: lookAhead(/(let\b)/),
-    end: /(?!\()(?=[\s\}\]\);])/,
+    end: /(?!\()(?=[\s;\}\]\)])/,
     patterns: [
       /// Matches any comments
       {
@@ -879,19 +883,14 @@ const letStatement = (): textmate.Grammar => {
   };
 };
 
+// todo: #if [] == [] [] {}
 /**
  * Matches a (strict grammar) if in markup context.
  */
 const ifStatement = (): textmate.Grammar => {
   const ifStatement: textmate.Pattern = {
     name: "meta.expr.if.typst",
-    begin: lookAhead(
-      new RegExp(
-        /(else\b)?(if\b)\s+/.source +
-          `(?:${BRACE_AWARE_EXPR})` +
-          /\s*[\{\[]/.source
-      )
-    ),
+    begin: lookAhead(/(else\b)?(if\b)/),
     end: /(?<=\}|\])(?!\s*else)/,
     patterns: [
       /// Matches any comments
@@ -926,7 +925,7 @@ const ifStatement = (): textmate.Grammar => {
   const ifClause: textmate.Pattern = {
     //   name: "meta.if.clause.typst",
     begin: /(else\b)?(if)\s+/,
-    end: /(?=[;\[\]{}]|$)/,
+    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s+)(?=[\[\{])|(?=[;\]}]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",
@@ -1007,14 +1006,8 @@ const forStatement = (): textmate.Grammar => {
   // for v in expr { ... }
   const forStatement: textmate.Pattern = {
     name: "meta.expr.for.typst",
-    begin: lookAhead(
-      new RegExp(
-        /(for\b)\s*/.source +
-          `(?:${BRACE_FREE_EXPR})\\s*(in)\\s*(?:${BRACE_AWARE_EXPR})` +
-          /\s*[\{\[]/.source
-      )
-    ),
-    end: /(?<=\}|\])/,
+    begin: lookAhead(/(for\b)\s*/),
+    end: /(?<=[\}\]])(?=\s*[\n\S;\}\]\)])(?!\s*[\{\[])/,
     patterns: [
       /// Matches any comments
       {
@@ -1038,8 +1031,10 @@ const forStatement = (): textmate.Grammar => {
   const forClause: textmate.Pattern = {
     // name: "meta.for.clause.bind.typst",
     // todo: consider comment in for /* {} */ in .. {}
-    begin: new RegExp(/(for\b)\s*/.source + `(${BRACE_FREE_EXPR})\\s*(in)\\s*`),
-    end: /(?=[;\[\]{}]|$)/,
+    begin: new RegExp(
+      /(for\b)\s*/.source + `(${BRACE_FREE_EXPR}|${CODE_BLOCK})\\s*(in)\\s*`
+    ),
+    end: /(?=[;{\[\}\]\)]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -1096,11 +1091,7 @@ const whileStatement = (): textmate.Grammar => {
   // for v in expr { ... }
   const whileStatement: textmate.Pattern = {
     name: "meta.expr.while.typst",
-    begin: lookAhead(
-      new RegExp(
-        /(while\b)\s*/.source + `(?:${BRACE_AWARE_EXPR})` + /\s*[\{\[]/.source
-      )
-    ),
+    begin: lookAhead(/(while\b)/),
     end: /(?<=\}|\])/,
     patterns: [
       /// Matches any comments
@@ -1125,7 +1116,7 @@ const whileStatement = (): textmate.Grammar => {
   const whileClause: textmate.Pattern = {
     // name: "meta.while.clause.bind.typst",
     begin: /(while\b)\s*/,
-    end: /(?=[;\[\]{}]|$)/,
+    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s+)(?=[\[\{])|(?=[;\}\]\)]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -1149,11 +1140,30 @@ const whileStatement = (): textmate.Grammar => {
   };
 };
 
+const contextStatement: textmate.Pattern = {
+  name: "meta.expr.context.typst",
+  begin: /(context\b)\s*/,
+  end: /(?=[\n;\}\]\)])/,
+  beginCaptures: {
+    "1": {
+      name: "keyword.control.other.typst",
+    },
+  },
+  patterns: [
+    {
+      include: "#comments",
+    },
+    {
+      include: "#expression",
+    },
+  ],
+};
+
 const setStatement = (): textmate.Grammar => {
   const setStatement: textmate.Pattern = {
     name: "meta.expr.set.typst",
     begin: lookAhead(new RegExp(/(set\b)\s*/.source + IDENTIFIER.source)),
-    end: /(?<=\))(?!if)|(?=[\s\{\}\[\];])/,
+    end: /(?<=\))(?!if)|(?=[\s;\{\[\}\]\)])/,
     patterns: [
       /// Matches any comments
       {
@@ -1173,7 +1183,7 @@ const setStatement = (): textmate.Grammar => {
   const setClause: textmate.Pattern = {
     // name: "meta.set.clause.bind.typst",
     begin: /(set\b)\s*/,
-    end: /(?=if)|(?=[;\]}])/,
+    end: /(?=if)|(?=[\n;\]}])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.other.typst",
@@ -1185,7 +1195,7 @@ const setStatement = (): textmate.Grammar => {
       },
       /// Matches a func call after the set clause
       {
-        include: "#funcCall",
+        include: "#strictFuncCallOrPropAccess",
       },
       {
         include: "#identifier",
@@ -1196,7 +1206,7 @@ const setStatement = (): textmate.Grammar => {
   const setIfClause: textmate.Pattern = {
     // name: "meta.set.if.clause.cond.typst",
     begin: /(if)\s*/,
-    end: /(?<=\S)(?<!not|and|or|\+|-|\*|\/|==|!=|<=|>=|\<|\>)(?!\s*(?:not|and|or|\+|-|\*|\/|==|!=|\<|\>|\.))|(?=[;\]}])/,
+    end: /(?<=\S)(?<!and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)(?!\s*(?:and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=|\.))|(?=[\n;\}\]\)])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",
@@ -1225,7 +1235,7 @@ const showStatement = (): textmate.Grammar => {
   const showStatement: textmate.Pattern = {
     name: "meta.expr.show.typst",
     begin: lookAhead(/(show\b)/),
-    end: /(?=[\s\{\}\[\];])/,
+    end: /(?=[\s;\{\[\}\]\)])/,
     patterns: [
       /// Matches any comments
       {
@@ -1259,7 +1269,7 @@ const showStatement = (): textmate.Grammar => {
   const showSelectClause: textmate.Pattern = {
     // name: "meta.show.clause.select.typst",
     begin: /(show\b)\s*/,
-    end: /(?=[:;\]}])/,
+    end: /(?=[:;\}\]])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.other.typst",
@@ -1282,7 +1292,7 @@ const showStatement = (): textmate.Grammar => {
   const showSubstClause: textmate.Pattern = {
     // name: "meta.show.clause.subst.typst",
     begin: /(\:)\s*/,
-    end: /(?<!:)(?<=\S)(?!\S)|(?=[;\]}])/,
+    end: /(?<!:)(?<=\S)(?!\S)|(?=[\n;\}\]\)])/,
     beginCaptures: {
       "1": {
         name: "punctuation.separator.colon.typst",
@@ -1326,6 +1336,10 @@ const callArgs: textmate.Pattern = {
   },
   patterns: [
     {
+      match: /\.\./,
+      name: "keyword.operator.spread.typst",
+    },
+    {
       match: /:/,
       name: "punctuation.separator.colon.typst",
     },
@@ -1339,21 +1353,26 @@ const callArgs: textmate.Pattern = {
   ],
 };
 
+const funcRestParam: textmate.Pattern = {
+  match: /(\.\.)(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)?/,
+  // debugging
+  // - name: meta.parameter.binding.typst
+  captures: {
+    "1": {
+      name: "keyword.operator.spread.typst",
+    },
+    "2": {
+      name: "variable.other.readwrite.typst",
+    },
+  },
+};
+
 const patternBindingItems: textmate.Pattern = {
   patterns: [
+    { include: "#comments" },
     /// rest binding
     {
-      match: /(\.\.)(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)?/,
-      // debugging
-      // - name: meta.parameter.binding.typst
-      captures: {
-        "1": {
-          name: "keyword.operator.range.typst",
-        },
-        "2": {
-          name: "variable.other.readwrite.typst",
-        },
-      },
+      include: "#funcRestParam",
     },
     /// recursive binding
     {
@@ -1409,7 +1428,7 @@ const funcParams: textmate.Pattern = {
   ],
 };
 
-const funcCall = (strict: boolean): textmate.Pattern => {
+const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
   return {
     name: "meta.expr.call.typst",
     begin: lookAhead(
@@ -1419,7 +1438,7 @@ const funcCall = (strict: boolean): textmate.Pattern => {
             /(\.\s*)?/.source + IDENTIFIER.source + /\s*(?=\(|\[)/.source
           )
     ),
-    end: /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\n\}\];]|$)/,
+    end: /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\n;\}\]\)]|$)/,
     patterns: [
       // todo: comments?
       //   {
@@ -1430,13 +1449,19 @@ const funcCall = (strict: boolean): textmate.Pattern => {
         name: "keyword.operator.accessor.typst",
       },
       {
-        match: IDENTIFIER,
+        match: new RegExp(
+          IDENTIFIER.source +
+            (strict ? /(?=\(|\[)/.source : /\s*(?=\(|\[)/.source)
+        ),
         name: "entity.name.function.typst",
         patterns: [
           {
             include: "#primitiveFunctions",
           },
         ],
+      },
+      {
+        include: "#identifier",
       },
       // empty args
       {
@@ -1461,6 +1486,7 @@ const funcCall = (strict: boolean): textmate.Pattern => {
   };
 };
 
+// todo: #x => y should be parsed as |#x|=>|y
 // https://github.com/microsoft/vscode-textmate/blob/main/test-cases/themes/syntaxes/TypeScript.tmLanguage.json
 const arrowFunc: textmate.Pattern = {
   name: "meta.expr.arrow-function.typst",
@@ -1503,7 +1529,7 @@ const arrowFunc: textmate.Pattern = {
     },
     {
       begin: /=>/,
-      end: /(?<=\})|(?:(?!\{)(?=\S))/,
+      end: /(?<=\}|\])|(?:(?!\{|\[)(?=[\n\S;]))/,
       beginCaptures: {
         "0": {
           name: "storage.type.function.arrow.typst",
@@ -1535,6 +1561,7 @@ export const typst: textmate.Grammar = {
     identifier,
     markupLabel,
     markupReference,
+    markupEscape,
     stringLiteral,
 
     comments,
@@ -1560,11 +1587,13 @@ export const typst: textmate.Grammar = {
     ...ifStatement().repository,
     ...forStatement().repository,
     ...whileStatement().repository,
+    contextStatement,
     ...setStatement().repository,
     ...showStatement().repository,
-    strictFuncCall: funcCall(true),
-    funcCall: funcCall(false),
+    strictFuncCallOrPropAccess: funcCallOrPropAccess(true),
+    // funcCallOrPropAccess: funcCallOrPropAccess(false),
     callArgs,
+    funcRestParam,
     funcParams,
     patternBindingItems,
     codeBlock,

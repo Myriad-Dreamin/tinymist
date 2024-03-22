@@ -1,0 +1,15 @@
+>#figure(caption: [test])[].caption
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#       ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#        ^^^^^^^ source.typst meta.expr.call.typst variable.other.readwrite.typst
+#               ^ source.typst meta.expr.call.typst punctuation.separator.colon.typst
+#                ^ source.typst meta.expr.call.typst
+#                 ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#                  ^^^^ source.typst meta.expr.call.typst
+#                      ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#                       ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#                        ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#                         ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#                          ^ source.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                           ^^^^^^^ source.typst meta.expr.call.typst variable.other.readwrite.typst

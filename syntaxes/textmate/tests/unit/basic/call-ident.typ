@@ -34,3 +34,11 @@
 #{
   ("").join()
 }
+
+#test([#": "])
+#{}
+
+#assert(str(it.fields().label))
+#{}
+
+#table(..range(6))
