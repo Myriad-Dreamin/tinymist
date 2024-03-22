@@ -193,7 +193,7 @@ pub mod typst_to_lsp {
             TypstCompletionKind::Func => LspCompletionKind::FUNCTION,
             TypstCompletionKind::Param => LspCompletionKind::VARIABLE,
             TypstCompletionKind::Constant => LspCompletionKind::CONSTANT,
-            TypstCompletionKind::Symbol(_) => LspCompletionKind::TEXT,
+            TypstCompletionKind::Symbol(_) => LspCompletionKind::FIELD,
             TypstCompletionKind::Type => LspCompletionKind::CLASS,
         }
     }
