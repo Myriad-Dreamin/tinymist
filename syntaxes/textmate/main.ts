@@ -1163,7 +1163,7 @@ const setStatement = (): textmate.Grammar => {
   const setStatement: textmate.Pattern = {
     name: "meta.expr.set.typst",
     begin: lookAhead(new RegExp(/(set\b)\s*/.source + IDENTIFIER.source)),
-    end: /(?<=\))(?!if)|(?=[\s;\{\[\}\]])/,
+    end: /(?<=\))(?!if)|(?=[\s;\{\[\}\]\)])/,
     patterns: [
       /// Matches any comments
       {
@@ -1206,7 +1206,7 @@ const setStatement = (): textmate.Grammar => {
   const setIfClause: textmate.Pattern = {
     // name: "meta.set.if.clause.cond.typst",
     begin: /(if)\s*/,
-    end: /(?<=\S)(?<!and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)(?!\s*(?:and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=|\.))|(?=[\n;\}\]])/,
+    end: /(?<=\S)(?<!and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)(?!\s*(?:and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=|\.))|(?=[\n;\}\]\)])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",
@@ -1235,7 +1235,7 @@ const showStatement = (): textmate.Grammar => {
   const showStatement: textmate.Pattern = {
     name: "meta.expr.show.typst",
     begin: lookAhead(/(show\b)/),
-    end: /(?=[\s;\{\[\}\]])/,
+    end: /(?=[\s;\{\[\}\]\)])/,
     patterns: [
       /// Matches any comments
       {
@@ -1292,7 +1292,7 @@ const showStatement = (): textmate.Grammar => {
   const showSubstClause: textmate.Pattern = {
     // name: "meta.show.clause.subst.typst",
     begin: /(\:)\s*/,
-    end: /(?<!:)(?<=\S)(?!\S)|(?=[\n;\}\]])/,
+    end: /(?<!:)(?<=\S)(?!\S)|(?=[\n;\}\]\)])/,
     beginCaptures: {
       "1": {
         name: "punctuation.separator.colon.typst",
