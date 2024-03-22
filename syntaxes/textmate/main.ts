@@ -29,7 +29,7 @@ const CONTENT_BLOCK = generatePattern(6, "\\[", "\\]");
 const BRACE_FREE_EXPR = /[^\s\}\{\[\]][^\}\{\[\]]*/.source;
 const BRACE_AWARE_EXPR =
   BRACE_FREE_EXPR +
-  `(?:(?:${CODE_BLOCK})|(?:${CONTENT_BLOCK})${BRACE_FREE_EXPR})?`;
+  `(?:(?:(?:${CODE_BLOCK})|(?:${CONTENT_BLOCK}))${BRACE_FREE_EXPR})?`;
 
 // todo: This is invokable
 const codeBlock: textmate.Pattern = {
@@ -424,6 +424,7 @@ const expression = (): textmate.Grammar => {
       { include: "#codeBlock" },
       { include: "#letStatement" },
       { include: "#showStatement" },
+      { include: "#contextStatement" },
       { include: "#setStatement" },
       { include: "#forStatement" },
       { include: "#whileStatement" },
@@ -1002,14 +1003,8 @@ const forStatement = (): textmate.Grammar => {
   // for v in expr { ... }
   const forStatement: textmate.Pattern = {
     name: "meta.expr.for.typst",
-    begin: lookAhead(
-      new RegExp(
-        /(for\b)\s*/.source +
-          `(?:${BRACE_FREE_EXPR})\\s*(in)\\s*(?:${BRACE_AWARE_EXPR})` +
-          /\s*[\{\[]/.source
-      )
-    ),
-    end: /(?<=\}|\])/,
+    begin: lookAhead(/(for\b)\s*/),
+    end: /(?<=[\}\]])(?=\s*[\n\S;\)\]\}])(?!\s*[\{\[])/,
     patterns: [
       /// Matches any comments
       {
@@ -1033,7 +1028,9 @@ const forStatement = (): textmate.Grammar => {
   const forClause: textmate.Pattern = {
     // name: "meta.for.clause.bind.typst",
     // todo: consider comment in for /* {} */ in .. {}
-    begin: new RegExp(/(for\b)\s*/.source + `(${BRACE_FREE_EXPR})\\s*(in)\\s*`),
+    begin: new RegExp(
+      /(for\b)\s*/.source + `(${BRACE_FREE_EXPR}|${CODE_BLOCK})\\s*(in)\\s*`
+    ),
     end: /(?=[;\[\]{}]|$)/,
     beginCaptures: {
       "1": {
@@ -1142,6 +1139,25 @@ const whileStatement = (): textmate.Grammar => {
       whileClause,
     },
   };
+};
+
+const contextStatement: textmate.Pattern = {
+  name: "meta.expr.context.typst",
+  begin: /(context\b)\s*/,
+  end: /(?=[\n;\]}])/,
+  beginCaptures: {
+    "1": {
+      name: "keyword.control.other.typst",
+    },
+  },
+  patterns: [
+    {
+      include: "#comments",
+    },
+    {
+      include: "#expression",
+    },
+  ],
 };
 
 const setStatement = (): textmate.Grammar => {
@@ -1555,6 +1571,7 @@ export const typst: textmate.Grammar = {
     ...ifStatement().repository,
     ...forStatement().repository,
     ...whileStatement().repository,
+    contextStatement,
     ...setStatement().repository,
     ...showStatement().repository,
     strictFuncCall: funcCall(true),
