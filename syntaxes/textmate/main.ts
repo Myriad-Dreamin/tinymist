@@ -54,7 +54,7 @@ const codeBlock: textmate.Pattern = {
 };
 
 const contentBlock: textmate.Pattern = {
-  //   name: "meta.block.continuous.typst",
+  // name: "meta.block.content.typst",
   begin: /\[/,
   end: /\]/,
   beginCaptures: {
@@ -302,7 +302,7 @@ const markupEnterCode: textmate.Pattern = {
     {
       /// name: 'markup.expr.typst'
       begin: /#/,
-      end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[])|(?=\s)|(;)/,
+      end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[])|(?=[\s\]\}\)]|$)|(;)/,
       beginCaptures: {
         "0": {
           name: "punctuation.definition.hash.typst",
@@ -1427,7 +1427,7 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
             /(\.\s*)?/.source + IDENTIFIER.source + /\s*(?=\(|\[)/.source
           )
     ),
-    end: /(?:(?<=\)|\])(?![\[\(\.]))|(?=[\n\}\];]|$)/,
+    end: /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\n\}\];]|$)/,
     patterns: [
       // todo: comments?
       //   {
@@ -1517,7 +1517,7 @@ const arrowFunc: textmate.Pattern = {
     },
     {
       begin: /=>/,
-      end: /(?<=\})|(?:(?!\{)(?=\S))/,
+      end: /(?<=\}|\])|(?:(?!\{|\[)(?=\S|\n|;))/,
       beginCaptures: {
         "0": {
           name: "storage.type.function.arrow.typst",
