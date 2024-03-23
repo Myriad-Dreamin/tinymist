@@ -35,7 +35,7 @@ Enable or disable semantic tokens (LSP syntax highlighting)
   - `disable`: Do not use semantic tokens for syntax highlighting
 - **Default**: `"enable"`
 
-## `noSystemFonts`
+## `systemFonts`
 
 A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler.
 
