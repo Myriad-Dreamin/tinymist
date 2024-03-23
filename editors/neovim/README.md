@@ -87,7 +87,7 @@ return {
 }
 ```
 
-You can copy or merge [lsp-folding.lua](./config/lsp-folding.lua) and [Plugin file](./plugins/tinymist.lua) to corresponding paths into `~/.config/nvim/` and restart Neovim.
+You can copy or merge [lsp-folding.lua](./config/lsp-folding.lua) to corresponding paths into `~/.config/nvim/` and restart Neovim.
 
 ## Contributing
 
