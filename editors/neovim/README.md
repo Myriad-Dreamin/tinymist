@@ -72,7 +72,7 @@ return {
 }
 ```
 
-See [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/blob/main/Configuration.md) for references.
+See [Tinymist Server Configuration](./Configuration.md) for references.
 
 ### Configuring Folding Range for Neovim Client
 
