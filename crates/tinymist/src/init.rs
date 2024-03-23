@@ -1,4 +1,3 @@
-use core::fmt;
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::bail;
@@ -12,8 +11,7 @@ use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
 use typst::foundations::IntoValue;
-use typst_ts_core::config::CompileOpts;
-use typst_ts_core::{ImmutPath, TypstDict};
+use typst_ts_core::{config::CompileOpts, ImmutPath, TypstDict};
 
 use crate::actor::cluster::CompileClusterActor;
 use crate::{invalid_params, LspHost, LspResult, TypstLanguageServer, TypstLanguageServerArgs};
@@ -77,8 +75,6 @@ pub struct CompileExtraOpts {
     pub font_paths: Vec<PathBuf>,
 }
 
-type Listener<T> = Box<dyn FnMut(&T) -> anyhow::Result<()>>;
-
 const CONFIG_ITEMS: &[&str] = &[
     "outputPath",
     "exportPdf",
@@ -89,7 +85,7 @@ const CONFIG_ITEMS: &[&str] = &[
 ];
 
 /// The user configuration read from the editor.
-#[derive(Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Config {
     /// The workspace roots from initialization.
     pub roots: Vec<PathBuf>,
@@ -105,8 +101,6 @@ pub struct Config {
     pub formatter: ExperimentalFormatterMode,
     /// Typst extra arguments.
     pub typst_extra_args: Option<CompileExtraOpts>,
-    semantic_tokens_listeners: Vec<Listener<SemanticTokensMode>>,
-    formatter_listeners: Vec<Listener<ExperimentalFormatterMode>>,
 }
 
 /// Common arguments of compile, watch, and query.
@@ -212,7 +206,6 @@ impl Config {
             self.export_pdf = ExportPdfMode::default();
         }
 
-        // todo: the command.root may be not absolute
         let root_path = update.get("rootPath");
         if let Some(root_path) = root_path {
             if root_path.is_null() {
@@ -230,9 +223,6 @@ impl Config {
             .map(SemanticTokensMode::deserialize)
             .and_then(Result::ok);
         if let Some(semantic_tokens) = semantic_tokens {
-            for listener in &mut self.semantic_tokens_listeners {
-                listener(&semantic_tokens)?;
-            }
             self.semantic_tokens = semantic_tokens;
         }
 
@@ -241,9 +231,6 @@ impl Config {
             .map(ExperimentalFormatterMode::deserialize)
             .and_then(Result::ok);
         if let Some(formatter) = formatter {
-            for listener in &mut self.formatter_listeners {
-                listener(&formatter)?;
-            }
             self.formatter = formatter;
         }
 
@@ -327,10 +314,6 @@ impl Config {
         None
     }
 
-    pub(crate) fn listen_semantic_tokens(&mut self, listener: Listener<SemanticTokensMode>) {
-        self.semantic_tokens_listeners.push(listener);
-    }
-
     fn validate(&self) -> anyhow::Result<()> {
         if let Some(root) = &self.root_path {
             if !root.is_absolute() {
@@ -348,50 +331,26 @@ impl Config {
 
         Ok(())
     }
-
-    // pub fn listen_formatting(&mut self, listener:
-    // Listener<ExperimentalFormatterMode>) {     self.formatter_listeners.
-    // push(listener); }
-}
-
-impl fmt::Debug for Config {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Config")
-            .field("export_pdf", &self.export_pdf)
-            .field("formatter", &self.formatter)
-            .field("semantic_tokens", &self.semantic_tokens)
-            .field("typst_extra_args", &self.typst_extra_args)
-            .field(
-                "semantic_tokens_listeners",
-                &format_args!("Vec[len = {}]", self.semantic_tokens_listeners.len()),
-            )
-            .field(
-                "formatter_listeners",
-                &format_args!("Vec[len = {}]", self.formatter_listeners.len()),
-            )
-            .finish()
-    }
 }
 
 /// Configuration set at initialization that won't change within a single
-/// session
+/// session.
 #[derive(Debug, Clone)]
 pub struct ConstConfig {
-    /// The position encoding, either UTF-8 or UTF-16.
+    /// Determined position encoding, either UTF-8 or UTF-16.
     /// Defaults to UTF-16 if not specified.
     pub position_encoding: PositionEncoding,
-    /// Enables dynamic registration of configuration
-    /// changes.
+    /// Allow dynamic registration of configuration changes.
     pub cfg_change_registration: bool,
-    /// Enables dynamic registration of semantic tokens.
+    /// Allow dynamic registration of semantic tokens.
     pub sema_tokens_dynamic_registration: bool,
-    /// Enables overlapping tokens.
+    /// Allow overlapping tokens.
     pub sema_tokens_overlapping_token_support: bool,
-    /// Enables multiline tokens.
+    /// Allow multiline tokens.
     pub sema_tokens_multiline_token_support: bool,
-    /// Whether Enables line folding doc.
+    /// Allow line folding on documents.
     pub doc_line_folding_only: bool,
-    /// Enables dynamic registration of document formatting.
+    /// Allow dynamic registration of document formatting.
     pub doc_fmt_dynamic_registration: bool,
 }
 
