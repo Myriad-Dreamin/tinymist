@@ -8,7 +8,7 @@ A VS Code or VS Codium extension for Typst. You can find the extension on:
 
 ## Features
 
-See [Tinymist features](https://github.com/Myriad-Dreamin/tinymist#features) for a list of features.
+See [Tinymist Features](https://github.com/Myriad-Dreamin/tinymist#features) for a list of features.
 
 ## Usage Tips
 
@@ -54,7 +54,6 @@ See [Tinymist features](https://github.com/Myriad-Dreamin/tinymist#features) for
     - e.g. `$root/target/foo` for `$root/target/foo.pdf`. This will ensure that the output is always output to `target/foo.pdf`.
   4. Note: the output path should be substituted as an absolute path.
 
-## Technical
+## Contributing
 
-The extension uses [Tinymist](https://github.com/Myriad-Dreamin/tinymist) on the
-backend.
+You can submit issues or make PRs to [GitHub](https://github.com/Myriad-Dreamin/tinymist).
