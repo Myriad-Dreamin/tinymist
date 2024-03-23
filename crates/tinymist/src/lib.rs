@@ -326,10 +326,8 @@ impl TypstLanguageServer {
     pub fn new(args: TypstLanguageServerArgs) -> Self {
         let tokens_ctx = SemanticTokenContext::new(
             args.const_config.position_encoding,
-            args.const_config
-                .supports_semantic_tokens_overlapping_token_support,
-            args.const_config
-                .supports_semantic_tokens_multiline_token_support,
+            args.const_config.sema_tokens_overlapping_token_support,
+            args.const_config.sema_tokens_multiline_token_support,
         );
         Self {
             client: args.client.clone(),
@@ -560,10 +558,7 @@ impl TypstLanguageServer {
     /// The server can use the `initialized` notification, for example, to
     /// dynamically register capabilities with the client.
     pub fn initialized(&mut self, _: InitializedParams) {
-        if self
-            .const_config()
-            .supports_semantic_tokens_dynamic_registration
-        {
+        if self.const_config().sema_tokens_dynamic_registration {
             trace!("setting up to dynamically register semantic token support");
 
             let client = self.client.clone();
@@ -598,7 +593,7 @@ impl TypstLanguageServer {
                 }));
         }
 
-        if self.const_config().supports_config_change_registration {
+        if self.const_config().cfg_change_registration {
             trace!("setting up to request config change notifications");
 
             const CONFIG_REGISTRATION_ID: &str = "config";
@@ -982,7 +977,7 @@ impl TypstLanguageServer {
 
     fn folding_range(&self, params: FoldingRangeParams) -> LspResult<Option<Vec<FoldingRange>>> {
         let path = as_path(params.text_document);
-        let line_folding_only = self.const_config().line_folding_only;
+        let line_folding_only = self.const_config().doc_line_folding_only;
         run_query!(self.FoldingRange(path, line_folding_only))
     }
 
