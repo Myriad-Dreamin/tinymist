@@ -19,9 +19,9 @@ You can also compile and install **latest** `tinymist` by [Cargo](https://www.ru
 cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked
 ```
 
-## Minimal Setup
+## Minimal Setup: LazyVim as an Example
 
-This section shows you a minimal way to setup tinymist in Neovim.
+This section shows you a minimal way to setup tinymist in Neovim (LazyVim).
 
 1. Copy or merge the [Autocmds file](./config/autocmds.lua) and [Plugin file](./plugins/tinymist.lua) to corresponding paths into `~/.config/nvim/`.
 
@@ -36,7 +36,7 @@ Please see [Extra Settings](#extra-settings) for more configuration.
 First, please check that tinymist can start with manual file association.
 
 ```
-:setfiletype typst
+:set filetype=typst
 ```
 
 If tinymist starts, that means you have not made correct file association. If not, there should be some errors in your lspconfig.
