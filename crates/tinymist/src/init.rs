@@ -18,110 +18,9 @@ use typst_ts_core::{ImmutPath, TypstDict};
 use crate::actor::cluster::CompileClusterActor;
 use crate::{invalid_params, LspHost, LspResult, TypstLanguageServer, TypstLanguageServerArgs};
 
-trait InitializeParamsExt {
-    fn position_encodings(&self) -> &[PositionEncodingKind];
-    fn supports_config_change_registration(&self) -> bool;
-    fn semantic_tokens_capabilities(&self) -> Option<&SemanticTokensClientCapabilities>;
-    fn document_formatting_capabilities(&self) -> Option<&DocumentFormattingClientCapabilities>;
-    fn supports_semantic_tokens_dynamic_registration(&self) -> bool;
-    fn supports_semantic_tokens_overlapping_token_support(&self) -> bool;
-    fn supports_semantic_tokens_multiline_token_support(&self) -> bool;
-    fn supports_document_formatting_dynamic_registration(&self) -> bool;
-    fn line_folding_only(&self) -> bool;
-    fn root_paths(&self) -> Vec<PathBuf>;
-
-    // todo: svelte-language-server responds to a Goto Definition request with
-    // LocationLink[] even if the client does not report the
-    // textDocument.definition.linkSupport capability.
-}
-
-impl InitializeParamsExt for InitializeParams {
-    fn position_encodings(&self) -> &[PositionEncodingKind] {
-        const DEFAULT_ENCODING: &[PositionEncodingKind; 1] = &[PositionEncodingKind::UTF16];
-        self.capabilities
-            .general
-            .as_ref()
-            .and_then(|general| general.position_encodings.as_ref())
-            .map(|encodings| encodings.as_slice())
-            .unwrap_or(DEFAULT_ENCODING)
-    }
-
-    fn supports_config_change_registration(&self) -> bool {
-        self.capabilities
-            .workspace
-            .as_ref()
-            .and_then(|workspace| workspace.configuration)
-            .unwrap_or(false)
-    }
-
-    fn line_folding_only(&self) -> bool {
-        self.capabilities
-            .text_document
-            .as_ref()
-            .and_then(|workspace| workspace.folding_range.as_ref())
-            .and_then(|folding| folding.line_folding_only)
-            .unwrap_or(false)
-    }
-
-    fn semantic_tokens_capabilities(&self) -> Option<&SemanticTokensClientCapabilities> {
-        self.capabilities
-            .text_document
-            .as_ref()?
-            .semantic_tokens
-            .as_ref()
-    }
-
-    fn document_formatting_capabilities(&self) -> Option<&DocumentFormattingClientCapabilities> {
-        self.capabilities
-            .text_document
-            .as_ref()?
-            .formatting
-            .as_ref()
-    }
-
-    fn supports_semantic_tokens_dynamic_registration(&self) -> bool {
-        self.semantic_tokens_capabilities()
-            .and_then(|semantic_tokens| semantic_tokens.dynamic_registration)
-            .unwrap_or(false)
-    }
-
-    fn supports_semantic_tokens_overlapping_token_support(&self) -> bool {
-        self.semantic_tokens_capabilities()
-            .and_then(|semantic_tokens| semantic_tokens.overlapping_token_support)
-            .unwrap_or(false)
-    }
-
-    fn supports_semantic_tokens_multiline_token_support(&self) -> bool {
-        self.semantic_tokens_capabilities()
-            .and_then(|semantic_tokens| semantic_tokens.multiline_token_support)
-            .unwrap_or(false)
-    }
-
-    fn supports_document_formatting_dynamic_registration(&self) -> bool {
-        self.document_formatting_capabilities()
-            .and_then(|document_format| document_format.dynamic_registration)
-            .unwrap_or(false)
-    }
-
-    #[allow(deprecated)] // `self.root_path` is marked as deprecated
-    fn root_paths(&self) -> Vec<PathBuf> {
-        match self.workspace_folders.as_ref() {
-            Some(roots) => roots
-                .iter()
-                .map(|root| &root.uri)
-                .map(Url::to_file_path)
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap(),
-            None => self
-                .root_uri
-                .as_ref()
-                .map(|uri| uri.to_file_path().unwrap())
-                .or_else(|| self.root_path.clone().map(PathBuf::from))
-                .into_iter()
-                .collect(),
-        }
-    }
-}
+// todo: svelte-language-server responds to a Goto Definition request with
+// LocationLink[] even if the client does not report the
+// textDocument.definition.linkSupport capability.
 
 /// The mode of the experimental formatter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -481,46 +380,77 @@ pub struct ConstConfig {
     /// The position encoding, either UTF-8 or UTF-16.
     /// Defaults to UTF-16 if not specified.
     pub position_encoding: PositionEncoding,
-    /// Whether the client supports dynamic registration of semantic tokens.
-    pub supports_semantic_tokens_dynamic_registration: bool,
-    /// Whether the client supports overlapping tokens.
-    pub supports_semantic_tokens_overlapping_token_support: bool,
-    /// Whether the client supports multiline tokens.
-    pub supports_semantic_tokens_multiline_token_support: bool,
-    /// Whether the client supports dynamic registration of document formatting.
-    pub supports_document_formatting_dynamic_registration: bool,
-    /// Whether the client supports dynamic registration of configuration
+    /// Enables dynamic registration of configuration
     /// changes.
-    pub supports_config_change_registration: bool,
-    /// Whether the client only supports line folding.
-    pub line_folding_only: bool,
-}
-
-impl ConstConfig {
-    fn choose_encoding(params: &InitializeParams) -> PositionEncoding {
-        let encodings = params.position_encodings();
-        if encodings.contains(&PositionEncodingKind::UTF8) {
-            PositionEncoding::Utf8
-        } else {
-            PositionEncoding::Utf16
-        }
-    }
+    pub cfg_change_registration: bool,
+    /// Enables dynamic registration of semantic tokens.
+    pub sema_tokens_dynamic_registration: bool,
+    /// Enables overlapping tokens.
+    pub sema_tokens_overlapping_token_support: bool,
+    /// Enables multiline tokens.
+    pub sema_tokens_multiline_token_support: bool,
+    /// Whether Enables line folding doc.
+    pub doc_line_folding_only: bool,
+    /// Enables dynamic registration of document formatting.
+    pub doc_fmt_dynamic_registration: bool,
 }
 
 impl From<&InitializeParams> for ConstConfig {
     fn from(params: &InitializeParams) -> Self {
+        const DEFAULT_ENCODING: &[PositionEncodingKind; 1] = &[PositionEncodingKind::UTF16];
+
+        let position_encoding = {
+            let encodings = params
+                .capabilities
+                .general
+                .as_ref()
+                .and_then(|general| general.position_encodings.as_ref())
+                .map(|encodings| encodings.as_slice())
+                .unwrap_or(DEFAULT_ENCODING);
+
+            if encodings.contains(&PositionEncodingKind::UTF8) {
+                PositionEncoding::Utf8
+            } else {
+                PositionEncoding::Utf16
+            }
+        };
+
+        let workspace_caps = params.capabilities.workspace.as_ref();
+        let supports_config_change_registration = workspace_caps
+            .and_then(|workspace| workspace.configuration)
+            .unwrap_or(false);
+
+        let doc_caps = params.capabilities.text_document.as_ref();
+        let folding_caps = doc_caps.and_then(|doc| doc.folding_range.as_ref());
+        let line_folding_only = folding_caps
+            .and_then(|folding| folding.line_folding_only)
+            .unwrap_or(true);
+
+        let semantic_tokens_caps = doc_caps.and_then(|doc| doc.semantic_tokens.as_ref());
+        let supports_semantic_tokens_dynamic_registration = semantic_tokens_caps
+            .and_then(|semantic_tokens| semantic_tokens.dynamic_registration)
+            .unwrap_or(false);
+        let supports_semantic_tokens_overlapping_token_support = semantic_tokens_caps
+            .and_then(|semantic_tokens| semantic_tokens.overlapping_token_support)
+            .unwrap_or(false);
+        let supports_semantic_tokens_multiline_token_support = semantic_tokens_caps
+            .and_then(|semantic_tokens| semantic_tokens.multiline_token_support)
+            .unwrap_or(false);
+
+        let formatter_caps = doc_caps.and_then(|doc| doc.formatting.as_ref());
+        let supports_document_formatting_dynamic_registration = formatter_caps
+            .and_then(|formatting| formatting.dynamic_registration)
+            .unwrap_or(false);
+
         Self {
-            position_encoding: Self::choose_encoding(params),
-            supports_semantic_tokens_dynamic_registration: params
-                .supports_semantic_tokens_dynamic_registration(),
-            supports_semantic_tokens_overlapping_token_support: params
-                .supports_semantic_tokens_overlapping_token_support(),
-            supports_semantic_tokens_multiline_token_support: params
-                .supports_semantic_tokens_multiline_token_support(),
-            supports_document_formatting_dynamic_registration: params
-                .supports_document_formatting_dynamic_registration(),
-            supports_config_change_registration: params.supports_config_change_registration(),
-            line_folding_only: params.line_folding_only(),
+            position_encoding,
+            sema_tokens_dynamic_registration: supports_semantic_tokens_dynamic_registration,
+            sema_tokens_overlapping_token_support:
+                supports_semantic_tokens_overlapping_token_support,
+            sema_tokens_multiline_token_support: supports_semantic_tokens_multiline_token_support,
+            doc_fmt_dynamic_registration: supports_document_formatting_dynamic_registration,
+            cfg_change_registration: supports_config_change_registration,
+            doc_line_folding_only: line_folding_only,
         }
     }
 }
@@ -567,11 +497,26 @@ impl Init {
         let mut service = TypstLanguageServer::new(TypstLanguageServerArgs {
             client: self.host.clone(),
             compile_opts: self.compile_opts,
-            const_config: cc,
+            const_config: cc.clone(),
             diag_tx,
         });
 
-        config.roots = params.root_paths();
+        config.roots = match params.workspace_folders.as_ref() {
+            Some(roots) => roots
+                .iter()
+                .map(|root| &root.uri)
+                .map(Url::to_file_path)
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap(),
+            #[allow(deprecated)] // `params.root_path` is marked as deprecated
+            None => params
+                .root_uri
+                .as_ref()
+                .map(|uri| uri.to_file_path().unwrap())
+                .or_else(|| params.root_path.clone().map(PathBuf::from))
+                .into_iter()
+                .collect(),
+        };
         if let Some(init) = &params.initialization_options {
             if let Err(err) = config
                 .update(init)
@@ -605,18 +550,14 @@ impl Init {
 
         // Respond to the host (LSP client)
         let semantic_tokens_provider = match service.config.semantic_tokens {
-            SemanticTokensMode::Enable
-                if !params.supports_semantic_tokens_dynamic_registration() =>
-            {
+            SemanticTokensMode::Enable if !cc.sema_tokens_dynamic_registration => {
                 Some(get_semantic_tokens_options().into())
             }
             _ => None,
         };
 
         let document_formatting_provider = match service.config.formatter {
-            ExperimentalFormatterMode::Enable
-                if !params.supports_document_formatting_dynamic_registration() =>
-            {
+            ExperimentalFormatterMode::Enable if !cc.doc_fmt_dynamic_registration => {
                 Some(OneOf::Left(true))
             }
             _ => None,
