@@ -428,7 +428,7 @@
         "build:frontend": "cd ../../tools/editor-tools/ && yarn run build",
         "build:syntax": "cd ../../syntaxes/textmate && yarn run compile && yarn run bundle",
         "build-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node16",
-        "vscode:prepublish": "yarn run build-base -- --minify && yarn run build:frontend && node scripts/postinstall.cjs",
+        "vscode:prepublish": "yarn run build-base -- --minify && yarn run build:frontend && node scripts/postinstall.cjs && node scripts/config-man.cjs",
         "package": "vsce package --yarn",
         "compile": "yarn run build-base -- --sourcemap && yarn run build:syntax && yarn run build:frontend && node scripts/postinstall.cjs",
         "watch": "yarn run build-base -- --sourcemap --watch",

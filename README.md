@@ -46,6 +46,7 @@ Extra features:
 ## Installation
 
 Follow the instructions to enable tinymist in your favorite editor.
++ [Neovim](./editors/neovim/README.md)
 + [VSCode](./editors/vscode/README.md)
 
 ## Acknowledgements
