@@ -4,13 +4,13 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/def_use/base2.typ
 ---
 {
- "y@28..29@s0.typ": {
+ "y@27..28@s0.typ": {
   "def": {
    "kind": {
     "Var": "Variable"
    },
    "name": "y",
-   "range": "28:29"
+   "range": "27:28"
   },
   "refs": []
  }

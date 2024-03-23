@@ -4,13 +4,13 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/destructing.typ
 ---
 {
- "a@29..30@s0.typ": {
+ "a@28..29@s0.typ": {
   "def": {
    "kind": {
     "Var": "Variable"
    },
    "name": "a",
-   "range": "29:30"
+   "range": "28:29"
   },
   "refs": []
  },
@@ -23,16 +23,16 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/destructing.typ
    "range": "6:7"
   },
   "refs": [
-   "a@41..42"
+   "a@40..41"
   ]
  },
- "b@32..33@s0.typ": {
+ "b@31..32@s0.typ": {
   "def": {
    "kind": {
     "Var": "Variable"
    },
    "name": "b",
-   "range": "32:33"
+   "range": "31:32"
   },
   "refs": []
  },
@@ -45,7 +45,7 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/destructing.typ
    "range": "9:10"
   },
   "refs": [
-   "b@38..39"
+   "b@37..38"
   ]
  }
 }

@@ -25,7 +25,7 @@ input_file: crates/tinymist-query/src/fixtures/def_use/param_scope.typ
    "range": "5:9"
   },
   "refs": [
-   "term@26..30"
+   "term@25..29"
   ]
  }
 }

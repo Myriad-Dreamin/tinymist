@@ -16,7 +16,7 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/func.typ
    "Var": "Function"
   },
   "name": "f",
-  "range": "18:19"
+  "range": "17:18"
  },
  {
   "children": [
@@ -25,18 +25,18 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/func.typ
      "Var": "Variable"
     },
     "name": "a",
-    "range": "20:21"
+    "range": "19:20"
    },
    {
     "kind": {
      "Var": "ValRef"
     },
     "name": "a",
-    "range": "25:26"
+    "range": "24:25"
    }
   ],
   "kind": "Block",
   "name": "",
-  "range": "25:26"
+  "range": "24:25"
  }
 ]

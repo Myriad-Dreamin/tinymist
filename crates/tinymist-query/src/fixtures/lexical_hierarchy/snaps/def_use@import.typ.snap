@@ -13,7 +13,7 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/import.typ
    "range": "8:18"
   },
   "refs": [
-   "base@21..25"
+   "base@20..24"
   ]
  }
 }

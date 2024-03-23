@@ -13,19 +13,19 @@ input_file: crates/tinymist-query/src/fixtures/def_use/import_star_recursive.typ
    "range": "5:6"
   },
   "refs": [
-   "x@25..26"
+   "x@24..25"
   ]
  },
- "y@28..29@base2.typ": {
+ "y@27..28@base2.typ": {
   "def": {
    "kind": {
     "Var": "Variable"
    },
    "name": "y",
-   "range": "28:29"
+   "range": "27:28"
   },
   "refs": [
-   "y@29..30"
+   "y@28..29"
   ]
  }
 }

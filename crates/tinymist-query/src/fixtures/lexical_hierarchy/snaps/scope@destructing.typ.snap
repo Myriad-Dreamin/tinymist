@@ -23,27 +23,27 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/destructing.typ
    "Var": "ValRef"
   },
   "name": "b",
-  "range": "38:39"
+  "range": "37:38"
  },
  {
   "kind": {
    "Var": "ValRef"
   },
   "name": "a",
-  "range": "41:42"
+  "range": "40:41"
  },
  {
   "kind": {
    "Var": "Variable"
   },
   "name": "a",
-  "range": "29:30"
+  "range": "28:29"
  },
  {
   "kind": {
    "Var": "Variable"
   },
   "name": "b",
-  "range": "32:33"
+  "range": "31:32"
  }
 ]

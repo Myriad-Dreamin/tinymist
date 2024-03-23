@@ -13,20 +13,20 @@ input_file: crates/tinymist-query/src/fixtures/def_use/import_ident.typ
    "range": "8:18"
   },
   "refs": [
-   "base@21..25",
-   "base@51..55"
+   "base@20..24",
+   "base@48..52"
   ]
  },
- "x@47..48@s0.typ": {
+ "x@45..46@s0.typ": {
   "def": {
    "kind": {
     "Mod": "Ident"
    },
    "name": "x",
-   "range": "47:48"
+   "range": "45:46"
   },
   "refs": [
-   "x@58..59"
+   "x@55..56"
   ]
  }
 }

@@ -16,7 +16,6 @@ env:
   CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
   CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
   SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
 
 jobs:
   pre_build:
@@ -76,9 +75,6 @@ jobs:
         with:
           submodules: recursive
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.4
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -121,6 +117,11 @@ jobs:
         run: |
           cargo build --release -p tinymist --target ${{ matrix.rust-target }}
         if: startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true'
+      - name: Test tinymist
+        shell: pwsh
+        run: |
+          cargo test --release --workspace --target ${{ matrix.rust-target }}
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && (matrix.platform == 'linux')
       - name: Rename debug symbols for windows
         if: matrix.platform == 'win32' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
@@ -211,7 +212,11 @@ jobs:
       - name: Build tinymist binary
         run: |
           cargo build --release -p tinymist --target $RUST_TARGET
-          mkdir -p editors/vscode/out
+      - name: Test tinymist
+        shell: pwsh
+        run: |
+          cargo test --release --workspace --target ${{ matrix.rust-target }}
+        if: startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true'
       - name: Split debug symbols
         run: |
           cd target/$RUST_TARGET/release
@@ -224,6 +229,7 @@ jobs:
           path: target/${{ env.RUST_TARGET }}/release/tinymist-${{ env.target }}.debug
       - name: Copy binary to output directory
         run: |
+          mkdir -p editors/vscode/out
           cp "target/${{ env.RUST_TARGET }}/release/tinymist" "editors/vscode/out/"
           cp "target/${{ env.RUST_TARGET }}/release/tinymist" "tinymist-${{ env.target }}"
       - name: Upload binary artifact
