@@ -11,6 +11,19 @@ See [Tinymist Features](https://github.com/Myriad-Dreamin/tinymist#features) for
 To enable LSP, you must install `tinymist`. You can find `tinymist` on:
 
 - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
+- Stable versions available with [mason.nvim](https://github.com/williamboman/mason.nvim).
+
+  ```lua
+  {
+    "williamboman/mason.nvim",
+    opts = {
+      ensure_installed = {
+        "tinymist",
+      },
+    },
+  }
+  ```
+
 - Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).
 
 You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).

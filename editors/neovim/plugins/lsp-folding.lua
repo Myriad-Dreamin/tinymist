@@ -10,7 +10,7 @@ return {
     end,
     config = true,
   },
-  -- add tinymist to lspconfig
+  -- lspconfig for nvim-ufo
   {
     "neovim/nvim-lspconfig",
     dependencies = "kevinhwang91/nvim-ufo", -- enable LSP-based folds
