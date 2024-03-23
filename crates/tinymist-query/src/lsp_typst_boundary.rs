@@ -71,6 +71,17 @@ pub mod lsp_to_typst {
         lsp_position_encoding: LspPositionEncoding,
         typst_source: &Source,
     ) -> Option<TypstOffset> {
+        if lsp_position.line >= typst_source.len_lines() as u32 {
+            if lsp_position.line > typst_source.len_lines() as u32 || lsp_position.character > 0 {
+                log::warn!(
+                    "LSP position is out of bounds: {:?}, while only {:?} lines and {:?} characters at the end.",
+                    lsp_position, typst_source.len_lines(), typst_source.line_to_range(typst_source.len_lines() - 1),
+                );
+            }
+
+            return Some(typst_source.len_bytes());
+        }
+
         match lsp_position_encoding {
             LspPositionEncoding::Utf8 => {
                 let line_index = lsp_position.line as usize;
@@ -299,6 +310,24 @@ mod test {
     use super::*;
 
     const ENCODING_TEST_STRING: &str = "test 🥺 test";
+
+    #[test]
+    fn issue_14_invalid_range() {
+        let source = Source::detached("#set page(height: 2cm)");
+        let rng = LspRange {
+            start: LspPosition {
+                line: 0,
+                character: 22,
+            },
+            // EOF
+            end: LspPosition {
+                line: 1,
+                character: 0,
+            },
+        };
+        let res = lsp_to_typst::range(rng, PositionEncoding::Utf16, &source).unwrap();
+        assert_eq!(res, 22..22);
+    }
 
     #[test]
     fn utf16_position_to_utf8_offset() {
