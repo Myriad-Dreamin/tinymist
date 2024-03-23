@@ -65,11 +65,9 @@ use tinymist_query::{
 };
 use tokio::sync::mpsc;
 use typst::diag::StrResult;
-use typst::syntax::package::VersionlessPackageSpec;
+use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use typst_ts_compiler::service::Compiler;
-use typst_ts_core::config::CompileOpts;
-use typst_ts_core::package::PackageSpec;
-use typst_ts_core::{error::prelude::*, ImmutPath};
+use typst_ts_core::{config::CompileOpts, error::prelude::*, ImmutPath};
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
 
@@ -296,14 +294,13 @@ pub struct TypstLanguageServerArgs {
 pub struct TypstLanguageServer {
     /// The language server client.
     pub client: LspHost,
+
+    // State to synchronize with the client.
     /// Whether the server is shutting down.
     pub shutdown_requested: bool,
-    /// Extra commands provided with `textDocument/executeCommand`.
-    pub exec_cmds: ExecuteCmdMap,
-    /// Regular notifications for dispatching.
-    pub notify_cmds: NotifyCmdMap,
-    /// Regular commands for dispatching.
-    pub regular_cmds: RegularCmdMap,
+    pub sema_tokens_registered: Option<bool>,
+
+    // Configurations
     /// User configuration from the editor.
     pub config: Config,
     /// Const configuration initialized at the start of the session.
@@ -311,6 +308,14 @@ pub struct TypstLanguageServer {
     pub const_config: ConstConfig,
     /// The default opts for the compiler.
     pub compile_opts: CompileOpts,
+
+    // Command maps
+    /// Extra commands provided with `textDocument/executeCommand`.
+    pub exec_cmds: ExecuteCmdMap,
+    /// Regular notifications for dispatching.
+    pub notify_cmds: NotifyCmdMap,
+    /// Regular commands for dispatching.
+    pub regular_cmds: RegularCmdMap,
 
     diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
     memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
@@ -332,6 +337,7 @@ impl TypstLanguageServer {
         Self {
             client: args.client.clone(),
             shutdown_requested: false,
+            sema_tokens_registered: None,
             config: Default::default(),
             const_config: args.const_config,
             compile_opts: args.compile_opts,
@@ -539,6 +545,36 @@ impl TypstLanguageServer {
 
         Ok(())
     }
+
+    fn react_sema_token_changes(&mut self, enable: bool) -> anyhow::Result<()> {
+        if !self.const_config().sema_tokens_dynamic_registration {
+            trace!("skip register semantic by config");
+            return Ok(());
+        }
+
+        let res = match (enable, self.sema_tokens_registered) {
+            (true, None | Some(false)) => {
+                trace!("registering semantic tokens");
+                let options = get_semantic_tokens_options();
+                self.client
+                    .register_capability(vec![get_semantic_tokens_registration(options)])
+                    .context("could not register semantic tokens")
+            }
+            (false, Some(true)) => {
+                trace!("unregistering semantic tokens");
+                self.client
+                    .unregister_capability(vec![get_semantic_tokens_unregistration()])
+                    .context("could not unregister semantic tokens")
+            }
+            (true, Some(true)) | (false, None | Some(false)) => Ok(()),
+        };
+
+        if res.is_ok() {
+            self.sema_tokens_registered = Some(enable);
+        }
+
+        res
+    }
 }
 
 /// Trait implemented by language server backends.
@@ -558,39 +594,13 @@ impl TypstLanguageServer {
     /// The server can use the `initialized` notification, for example, to
     /// dynamically register capabilities with the client.
     pub fn initialized(&mut self, _: InitializedParams) {
-        if self.const_config().sema_tokens_dynamic_registration {
-            trace!("setting up to dynamically register semantic token support");
-
-            let client = self.client.clone();
-            let register = move || {
-                trace!("dynamically registering semantic tokens");
-                let client = client.clone();
-                let options = get_semantic_tokens_options();
-                client
-                    .register_capability(vec![get_semantic_tokens_registration(options)])
-                    .context("could not register semantic tokens")
-            };
-
-            let client = self.client.clone();
-            let unregister = move || {
-                trace!("unregistering semantic tokens");
-                let client = client.clone();
-                client
-                    .unregister_capability(vec![get_semantic_tokens_unregistration()])
-                    .context("could not unregister semantic tokens")
-            };
-
-            if self.config.semantic_tokens == SemanticTokensMode::Enable {
-                if let Some(err) = register().err() {
-                    error!("could not dynamically register semantic tokens: {err}");
-                }
+        if self.const_config().sema_tokens_dynamic_registration
+            && self.config.semantic_tokens == SemanticTokensMode::Enable
+        {
+            let err = self.react_sema_token_changes(true);
+            if let Err(err) = err {
+                error!("could not register semantic tokens for initialization: {err}");
             }
-
-            self.config
-                .listen_semantic_tokens(Box::new(move |mode| match mode {
-                    SemanticTokensMode::Enable => register(),
-                    SemanticTokensMode::Disable => unregister(),
-                }));
         }
 
         if self.const_config().cfg_change_registration {
@@ -881,11 +891,11 @@ impl TypstLanguageServer {
     }
 
     fn on_changed_configuration(&mut self, values: Map<String, JsonValue>) -> LspResult<()> {
-        let output_directory = self.config.output_path.clone();
-        let export_pdf = self.config.export_pdf;
+        let config = self.config.clone();
         match self.config.update_by_map(&values) {
             Ok(()) => {}
             Err(err) => {
+                self.config = config;
                 error!("error applying new settings: {err}");
                 return Err(invalid_params(format!(
                     "error applying new settings: {err}"
@@ -894,7 +904,9 @@ impl TypstLanguageServer {
         }
 
         info!("new settings applied");
-        if output_directory != self.config.output_path || export_pdf != self.config.export_pdf {
+        if config.output_path != self.config.output_path
+            || config.export_pdf != self.config.export_pdf
+        {
             let config = PdfExportConfig {
                 substitute_pattern: self.config.output_path.clone(),
                 mode: self.config.export_pdf,
@@ -906,6 +918,15 @@ impl TypstLanguageServer {
                 if let Some(main) = self.main.as_ref() {
                     main.change_export_pdf(config);
                 }
+            }
+        }
+
+        if config.semantic_tokens != self.config.semantic_tokens {
+            let err = self.react_sema_token_changes(
+                self.config.semantic_tokens == SemanticTokensMode::Enable,
+            );
+            if let Err(err) = err {
+                error!("could not change semantic tokens config: {err}");
             }
         }
 
