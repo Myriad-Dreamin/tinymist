@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::bail;
@@ -11,10 +12,16 @@ use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
 use typst::foundations::IntoValue;
-use typst_ts_core::{config::CompileOpts, ImmutPath, TypstDict};
+use typst::util::Deferred;
+use typst_ts_core::error::prelude::*;
+use typst_ts_core::{ImmutPath, TypstDict};
 
 use crate::actor::cluster::CompileClusterActor;
-use crate::{invalid_params, LspHost, LspResult, TypstLanguageServer, TypstLanguageServerArgs};
+use crate::world::{CompileOpts, SharedFontResolver};
+use crate::{
+    invalid_params, CompileFontOpts, LspHost, LspResult, TypstLanguageServer,
+    TypstLanguageServerArgs,
+};
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
@@ -436,7 +443,7 @@ impl Init {
     /// # Errors
     /// Errors if the configuration could not be updated.
     pub fn initialize(
-        self,
+        mut self,
         params: InitializeParams,
     ) -> (TypstLanguageServer, LspResult<InitializeResult>) {
         // self.tracing_init();
@@ -447,44 +454,59 @@ impl Init {
             "initialized with const_config {const_config:?}",
             const_config = cc
         );
+        let mut config = Config {
+            roots: match params.workspace_folders.as_ref() {
+                Some(roots) => roots
+                    .iter()
+                    .map(|root| &root.uri)
+                    .map(Url::to_file_path)
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap(),
+                #[allow(deprecated)] // `params.root_path` is marked as deprecated
+                None => params
+                    .root_uri
+                    .as_ref()
+                    .map(|uri| uri.to_file_path().unwrap())
+                    .or_else(|| params.root_path.clone().map(PathBuf::from))
+                    .into_iter()
+                    .collect(),
+            },
+            ..Config::default()
+        };
+        let res = match &params.initialization_options {
+            Some(init) => config
+                .update(init)
+                .map_err(|e| e.to_string())
+                .map_err(invalid_params),
+            None => Ok(()),
+        };
 
-        let mut config = Config::default();
+        // prepare fonts
+        // todo: on font resolving failure, downgrade to a fake font book
+        let font = {
+            let opts = std::mem::take(&mut self.compile_opts.font);
+            if opts.font_paths.is_empty() {
+                if let Some(font_paths) = config.typst_extra_args.as_ref().map(|x| &x.font_paths) {
+                    self.compile_opts.font.font_paths = font_paths.clone();
+                }
+            }
+
+            Deferred::new(|| create_font_book(opts).expect("failed to create font book"))
+        };
 
         // Bootstrap server
         let (diag_tx, diag_rx) = mpsc::unbounded_channel();
 
         let mut service = TypstLanguageServer::new(TypstLanguageServerArgs {
             client: self.host.clone(),
-            compile_opts: self.compile_opts,
+            compile_opts: self.compile_opts.once,
             const_config: cc.clone(),
             diag_tx,
+            font,
         });
 
-        config.roots = match params.workspace_folders.as_ref() {
-            Some(roots) => roots
-                .iter()
-                .map(|root| &root.uri)
-                .map(Url::to_file_path)
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap(),
-            #[allow(deprecated)] // `params.root_path` is marked as deprecated
-            None => params
-                .root_uri
-                .as_ref()
-                .map(|uri| uri.to_file_path().unwrap())
-                .or_else(|| params.root_path.clone().map(PathBuf::from))
-                .into_iter()
-                .collect(),
-        };
-        if let Some(init) = &params.initialization_options {
-            if let Err(err) = config
-                .update(init)
-                .as_ref()
-                .map_err(ToString::to_string)
-                .map_err(invalid_params)
-            {
-                return (service, Err(err));
-            }
+        if let Err(err) = res {
+            return (service, Err(err));
         }
 
         info!("initialized with config {config:?}", config = config);
@@ -586,6 +608,14 @@ impl Init {
 
         (service, Ok(res))
     }
+}
+
+fn create_font_book(opts: CompileFontOpts) -> ZResult<SharedFontResolver> {
+    let res = crate::world::LspWorldBuilder::resolve_fonts(opts)?;
+    Ok(SharedFontResolver {
+        inner: Arc::new(res),
+        // inner: res,
+    })
 }
 
 #[cfg(test)]

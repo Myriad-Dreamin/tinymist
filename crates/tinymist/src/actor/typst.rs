@@ -1,6 +1,5 @@
 //! The typst actors running compilations.
 
-use core::fmt;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -26,19 +25,18 @@ use typst::{
 use typst_preview::{CompilationHandle, CompilationHandleImpl, CompileStatus};
 use typst_ts_compiler::{
     service::{
-        CompileDriver as CompileDriverInner, CompileExporter, CompileMiddleware, Compiler,
-        EnvWorld, WorkspaceProvider, WorldExporter,
+        CompileDriverImpl, CompileExporter, CompileMiddleware, Compiler, EnvWorld,
+        WorkspaceProvider, WorldExporter,
     },
     vfs::notify::{FileChangeSet, MemoryEvent},
-    TypstSystemWorld,
 };
 use typst_ts_core::{
-    config::CompileOpts, error::prelude::*, typst::prelude::EcoVec, Error, ImmutPath,
-    TypstDocument, TypstWorld,
+    error::prelude::*, typst::prelude::EcoVec, Error, ImmutPath, TypstDocument, TypstWorld,
 };
 
 use super::compile::CompileClient as TsCompileClient;
 use super::{compile::CompileActor as CompileActorInner, render::PdfExportConfig};
+use crate::world::{CompileOnceOpts, LspWorld, LspWorldBuilder, SharedFontResolver};
 use crate::ConstConfig;
 use crate::{
     actor::render::{PdfPathVars, RenderActorRequest},
@@ -60,19 +58,20 @@ pub trait CompilationHandle: Send + 'static {
     fn notify_compile(&self, res: Result<Arc<TypstDocument>, CompileStatus>);
 }
 
+type CompileDriverInner = CompileDriverImpl<LspWorld>;
 type CompileService<H> = CompileActorInner<Reporter<CompileExporter<CompileDriver>, H>>;
 type CompileClient<H> = TsCompileClient<CompileService<H>>;
 
 type DiagnosticsSender = mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>;
 
 pub enum OptsState {
-    Exact(CompileOpts),
-    Rootless(Box<dyn FnOnce(PathBuf) -> CompileOpts + Send + Sync>),
+    Exact(CompileOnceOpts),
+    Rootless(Box<dyn FnOnce(PathBuf) -> CompileOnceOpts + Send + Sync>),
 }
 impl OptsState {
     pub(crate) fn new(
         root: Option<Arc<Path>>,
-        opts: impl FnOnce(PathBuf) -> CompileOpts + Send + Sync + 'static,
+        opts: impl FnOnce(PathBuf) -> CompileOnceOpts + Send + Sync + 'static,
     ) -> OptsState {
         match root {
             Some(root) => OptsState::Exact(opts(root.as_ref().to_owned())),
@@ -86,6 +85,7 @@ pub fn create_server(
     diag_group: String,
     cfg: &ConstConfig,
     opts: OptsState,
+    font_resolver: Deferred<SharedFontResolver>,
     root: Option<ImmutPath>,
     entry: Option<ImmutPath>,
     snapshot: FileChangeSet,
@@ -136,14 +136,12 @@ pub fn create_server(
 
             let root: ImmutPath = opts.root_dir.as_path().into();
 
-            info!(
-                "TypstActor: creating server for {} with arguments {:#?}",
-                diag_group,
-                ShowOpts(&opts)
-            );
+            info!("TypstActor: creating server for {diag_group} with arguments {opts:#?}",);
+
+            let font_resolver = font_resolver.wait().clone();
 
             // todo: entry is PathBuf, which is inefficient
-            let compiler_driver = CompileDriver::new(opts, entry.clone(), handler);
+            let compiler_driver = CompileDriver::new(opts, font_resolver, entry.clone(), handler);
             let handler: CompileHandler = compiler_driver.handler.clone();
 
             let ontyped_render_tx = render_tx.clone();
@@ -187,20 +185,6 @@ pub fn create_server(
         inner,
         render_tx,
     )
-}
-
-struct ShowOpts<'a>(&'a CompileOpts);
-
-impl<'a> fmt::Debug for ShowOpts<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CompileOpts")
-            .field("root_dir", &self.0.root_dir)
-            .field("entry", &self.0.entry)
-            .field("inputs", &self.0.inputs)
-            .field("font_paths", &self.0.font_paths)
-            .field("no_system_fonts", &self.0.no_system_fonts)
-            .finish()
-    }
 }
 
 macro_rules! query_state {
@@ -263,8 +247,13 @@ impl CompileMiddleware for CompileDriver {
 }
 
 impl CompileDriver {
-    pub fn new(opts: CompileOpts, entry: Option<ImmutPath>, handler: CompileHandler) -> Self {
-        let world = TypstSystemWorld::new(opts).expect("incorrect options");
+    pub fn new(
+        opts: CompileOnceOpts,
+        font_resolver: SharedFontResolver,
+        entry: Option<ImmutPath>,
+        handler: CompileHandler,
+    ) -> Self {
+        let world = LspWorldBuilder::build(opts, font_resolver).expect("incorrect options");
         let driver = CompileDriverInner::new(world);
 
         let mut this = Self {
@@ -313,7 +302,7 @@ pub struct Reporter<C, H> {
     cb: H,
 }
 
-impl<C: Compiler<World = TypstSystemWorld>, H> CompileMiddleware for Reporter<C, H>
+impl<C: Compiler<World = LspWorld>, H> CompileMiddleware for Reporter<C, H>
 where
     H: CompilationHandle,
 {
@@ -358,7 +347,7 @@ impl<C: Compiler + WorldExporter, H> WorldExporter for Reporter<C, H> {
     }
 }
 
-impl<C: Compiler<World = TypstSystemWorld>, H> Reporter<C, H> {
+impl<C: Compiler<World = LspWorld>, H> Reporter<C, H> {
     fn push_diagnostics(&mut self, diagnostics: Option<DiagnosticsMap>) {
         let err = self.diag_tx.send((self.diag_group.clone(), diagnostics));
         if let Err(err) = err {
@@ -613,9 +602,9 @@ impl CompileActor {
     }
 }
 
-struct WrapWorld<'a>(&'a mut TypstSystemWorld);
+struct WrapWorld<'a>(&'a mut LspWorld);
 
-impl<'a> AnaylsisWorld for WrapWorld<'a> {
+impl<'a> AnaylsisResources for WrapWorld<'a> {
     fn world(&self) -> &dyn typst::World {
         self.0
     }

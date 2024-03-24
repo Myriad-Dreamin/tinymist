@@ -5,8 +5,9 @@ use typst::diag::{bail, eco_format, FileError, FileResult, StrResult};
 use typst::syntax::package::{PackageManifest, PackageSpec, TemplateInfo};
 use typst::syntax::VirtualPath;
 use typst::World;
-use typst_ts_compiler::TypstSystemWorld;
 use typst_ts_core::{Bytes, ImmutPath, TypstFileId};
+
+use crate::world::LspWorld;
 
 #[derive(Debug, Clone)]
 pub enum TemplateSource {
@@ -19,7 +20,7 @@ pub struct InitTask {
 }
 
 /// Execute an initialization command.
-pub fn get_entry(world: &TypstSystemWorld, tmpl: TemplateSource) -> StrResult<Bytes> {
+pub fn get_entry(world: &LspWorld, tmpl: TemplateSource) -> StrResult<Bytes> {
     let TemplateSource::Package(spec) = tmpl;
 
     let toml_id = TypstFileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
@@ -41,7 +42,7 @@ pub fn get_entry(world: &TypstSystemWorld, tmpl: TemplateSource) -> StrResult<By
 }
 
 /// Execute an initialization command.
-pub fn init(world: &TypstSystemWorld, task: InitTask) -> StrResult<PathBuf> {
+pub fn init(world: &LspWorld, task: InitTask) -> StrResult<PathBuf> {
     let TemplateSource::Package(spec) = task.tmpl;
     let project_dir = task
         .dir
@@ -71,7 +72,7 @@ pub fn init(world: &TypstSystemWorld, task: InitTask) -> StrResult<PathBuf> {
 }
 
 /// Parses the manifest of the package located at `package_path`.
-fn parse_manifest(world: &TypstSystemWorld, toml_id: TypstFileId) -> StrResult<PackageManifest> {
+fn parse_manifest(world: &LspWorld, toml_id: TypstFileId) -> StrResult<PackageManifest> {
     let toml_data = world
         .file(toml_id)
         .map_err(|err| eco_format!("failed to read package manifest ({})", err))?;
@@ -86,7 +87,7 @@ fn parse_manifest(world: &TypstSystemWorld, toml_id: TypstFileId) -> StrResult<P
 /// Creates the project directory with the template's contents and returns the
 /// path at which it was created.
 fn scaffold_project(
-    world: &TypstSystemWorld,
+    world: &LspWorld,
     tmpl_info: &TemplateInfo,
     toml_id: TypstFileId,
     project_dir: &Path,

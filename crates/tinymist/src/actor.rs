@@ -5,18 +5,18 @@ pub mod compile;
 pub mod render;
 pub mod typst;
 
-use std::{borrow::Cow, path::PathBuf};
+use std::path::PathBuf;
 
 use ::typst::diag::FileResult;
 use tokio::sync::{broadcast, watch};
 use typst_ts_compiler::vfs::notify::FileChangeSet;
-use typst_ts_core::{config::CompileOpts, ImmutPath};
+use typst_ts_core::ImmutPath;
 
 use self::{
     render::{PdfExportActor, PdfExportConfig},
     typst::{create_server, CompileActor, OptsState},
 };
-use crate::TypstLanguageServer;
+use crate::{world::CompileOnceOpts, TypstLanguageServer};
 
 impl TypstLanguageServer {
     pub fn server(&self, name: String, entry: Option<ImmutPath>) -> CompileActor {
@@ -51,15 +51,11 @@ impl TypstLanguageServer {
                         opts.inputs = inputs.clone();
                     }
                 }
-                if !extras.font_paths.is_empty() && opts.font_paths.is_empty() {
-                    opts.font_paths = extras.font_paths.clone();
-                }
             }
 
-            move |root_dir: PathBuf| CompileOpts {
-                root_dir,
+            move |root_dir: PathBuf| CompileOnceOpts {
                 // todo: additional inputs
-                with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+                root_dir,
                 ..opts
             }
         };
@@ -78,6 +74,7 @@ impl TypstLanguageServer {
             name,
             self.const_config(),
             OptsState::new(root_dir.clone(), opts),
+            self.font.clone(),
             root_dir,
             entry,
             snapshot,
