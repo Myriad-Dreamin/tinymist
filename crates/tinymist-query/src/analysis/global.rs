@@ -68,18 +68,22 @@ pub struct AnalysisCaches {
     module_deps: OnceCell<HashMap<TypstFileId, ModuleDependency>>,
 }
 
-pub trait AnaylsisWorld {
+/// The resources for analysis.
+pub trait AnaylsisResources {
+    /// Get the world surface for Typst compiler.
     fn world(&self) -> &dyn World;
 
+    /// Resolve the real path for a package spec.
     fn resolve(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError>;
 
+    /// Get all the files in the workspace.
     fn iter_dependencies(&self, f: &mut dyn FnMut(&ImmutPath, std::time::SystemTime));
 }
 
 /// The context for analyzers.
 pub struct AnalysisContext<'a> {
     /// The world surface for Typst compiler
-    pub world: &'a dyn AnaylsisWorld,
+    pub resources: &'a dyn AnaylsisResources,
     /// The analysis data
     pub analysis: CowMut<'a, Analysis>,
     caches: AnalysisCaches,
@@ -87,16 +91,17 @@ pub struct AnalysisContext<'a> {
 
 impl<'w> AnalysisContext<'w> {
     /// Create a new analysis context.
-    pub fn new(world: &'w dyn AnaylsisWorld, a: Analysis) -> Self {
+    pub fn new(world: &'w dyn AnaylsisResources, a: Analysis) -> Self {
         Self {
-            world,
+            resources: world,
             analysis: CowMut::Owned(a),
             caches: AnalysisCaches::default(),
         }
     }
 
+    /// Get the world surface for Typst compiler.
     pub fn world(&self) -> &dyn World {
-        self.world.world()
+        self.resources.world()
     }
 
     #[cfg(test)]
@@ -132,7 +137,7 @@ impl<'w> AnalysisContext<'w> {
         // Determine the root path relative to which the file path
         // will be resolved.
         let root = match id.package() {
-            Some(spec) => self.world.resolve(spec)?,
+            Some(spec) => self.resources.resolve(spec)?,
             None => self.analysis.root.clone(),
         };
 
@@ -189,24 +194,29 @@ impl<'w> AnalysisContext<'w> {
         }
     }
 
+    /// Get the position encoding during session.
+    pub(crate) fn position_encoding(&self) -> PositionEncoding {
+        self.analysis.position_encoding
+    }
+
+    /// Convert a LSP position to a Typst position.
     pub fn to_typst_pos(&self, position: LspPosition, src: &Source) -> Option<usize> {
         lsp_to_typst::position(position, self.analysis.position_encoding, src)
     }
 
-    pub fn to_typst_range(&self, position: LspRange, src: &Source) -> Option<TypstRange> {
-        lsp_to_typst::range(position, self.analysis.position_encoding, src)
-    }
-
+    /// Convert a Typst offset to a LSP position.
     pub fn to_lsp_pos(&self, typst_offset: usize, src: &Source) -> LspPosition {
         typst_to_lsp::offset_to_position(typst_offset, self.analysis.position_encoding, src)
     }
 
-    pub fn to_lsp_range(&self, position: TypstRange, src: &Source) -> LspRange {
-        typst_to_lsp::range(position, src, self.analysis.position_encoding)
+    /// Convert a LSP range to a Typst range.
+    pub fn to_typst_range(&self, position: LspRange, src: &Source) -> Option<TypstRange> {
+        lsp_to_typst::range(position, self.analysis.position_encoding, src)
     }
 
-    pub(crate) fn position_encoding(&self) -> PositionEncoding {
-        self.analysis.position_encoding
+    /// Convert a Typst range to a LSP range.
+    pub fn to_lsp_range(&self, position: TypstRange, src: &Source) -> LspRange {
+        typst_to_lsp::range(position, src, self.analysis.position_encoding)
     }
 }
 

@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use ::typst::{diag::FileResult, syntax::Source};
 use anyhow::anyhow;
 use lsp_types::TextDocumentContentChangeEvent;
-use tinymist_query::{lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, PositionEncoding};
+use tinymist_query::{
+    lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, PositionEncoding, SyntaxRequest,
+};
 use typst_ts_compiler::{
     vfs::notify::{FileChangeSet, MemoryEvent},
     Time,
@@ -169,7 +171,7 @@ macro_rules! query_source {
         let source = snapshot.content.clone();
 
         let enc = $self.const_config.position_encoding;
-        let res = $req.request(source, enc);
+        let res = $req.request(&source, enc);
         Ok(CompilerQueryResponse::$method(res))
     }};
 }

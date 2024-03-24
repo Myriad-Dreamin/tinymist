@@ -1,5 +1,8 @@
 //! Types for tokens used for Typst syntax
 
+// todo: remove this
+#![allow(missing_docs)]
+
 use lsp_types::{SemanticTokenModifier, SemanticTokenType};
 use strum::EnumIter;
 

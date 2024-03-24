@@ -1,64 +1,22 @@
 use std::ops::Range;
 
-use lsp_types::{
-    Registration, SemanticToken, SemanticTokensEdit, SemanticTokensFullOptions,
-    SemanticTokensLegend, SemanticTokensOptions, Unregistration,
-};
+use lsp_types::{SemanticToken, SemanticTokensEdit};
 use parking_lot::RwLock;
-use strum::IntoEnumIterator;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 
 use crate::{LspPosition, PositionEncoding};
 
 use self::delta::token_delta;
 use self::modifier_set::ModifierSet;
-use self::typst_tokens::{Modifier, TokenType};
 
 use self::delta::CacheInner as TokenCacheInner;
 
 mod delta;
 mod modifier_set;
 mod typst_tokens;
+pub use self::typst_tokens::{Modifier, TokenType};
 
-pub fn get_legend() -> SemanticTokensLegend {
-    SemanticTokensLegend {
-        token_types: TokenType::iter()
-            .filter(|e| *e != TokenType::None)
-            .map(Into::into)
-            .collect(),
-        token_modifiers: Modifier::iter().map(Into::into).collect(),
-    }
-}
-
-const SEMANTIC_TOKENS_REGISTRATION_ID: &str = "semantic_tokens";
-const SEMANTIC_TOKENS_METHOD_ID: &str = "textDocument/semanticTokens";
-
-pub fn get_semantic_tokens_registration(options: SemanticTokensOptions) -> Registration {
-    Registration {
-        id: SEMANTIC_TOKENS_REGISTRATION_ID.to_owned(),
-        method: SEMANTIC_TOKENS_METHOD_ID.to_owned(),
-        register_options: Some(
-            serde_json::to_value(options)
-                .expect("semantic tokens options should be representable as JSON value"),
-        ),
-    }
-}
-
-pub fn get_semantic_tokens_unregistration() -> Unregistration {
-    Unregistration {
-        id: SEMANTIC_TOKENS_REGISTRATION_ID.to_owned(),
-        method: SEMANTIC_TOKENS_METHOD_ID.to_owned(),
-    }
-}
-
-pub fn get_semantic_tokens_options() -> SemanticTokensOptions {
-    SemanticTokensOptions {
-        legend: get_legend(),
-        full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
-        ..Default::default()
-    }
-}
-
+/// A semantic token context providing incremental semantic tokens rendering.
 #[derive(Default)]
 pub struct SemanticTokenContext {
     cache: RwLock<TokenCacheInner>,
@@ -70,6 +28,7 @@ pub struct SemanticTokenContext {
 }
 
 impl SemanticTokenContext {
+    /// Create a new semantic token context.
     pub fn new(
         position_encoding: PositionEncoding,
         allow_overlapping_token: bool,
@@ -83,6 +42,7 @@ impl SemanticTokenContext {
         }
     }
 
+    /// Get the semantic tokens for a source.
     pub fn get_semantic_tokens_full(&self, source: &Source) -> (Vec<SemanticToken>, String) {
         let root = LinkedNode::new(source.root());
 
@@ -98,6 +58,7 @@ impl SemanticTokenContext {
         (output, result_id)
     }
 
+    /// Get the semantic tokens delta for a source.
     pub fn try_semantic_tokens_delta_from_result_id(
         &self,
         source: &Source,
@@ -292,7 +253,7 @@ impl Tokenizer {
 }
 
 #[derive(Clone, Default)]
-pub struct Token {
+struct Token {
     pub token_type: TokenType,
     pub modifiers: ModifierSet,
     pub range: Range<usize>,

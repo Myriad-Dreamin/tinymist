@@ -10,9 +10,9 @@ use log::{debug, error, info, trace, warn};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use tinymist_query::{
-    analysis::{Analysis, AnalysisContext, AnaylsisWorld},
+    analysis::{Analysis, AnalysisContext, AnaylsisResources},
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
-    OnExportRequest, OnSaveExportRequest, PositionEncoding, StatefulRequest, SyntaxRequest,
+    OnExportRequest, OnSaveExportRequest, PositionEncoding, SemanticRequest, StatefulRequest,
     VersionedDocument,
 };
 use tokio::sync::{broadcast, mpsc, oneshot, watch};

@@ -3,7 +3,7 @@ use lsp_types::TextEdit;
 
 use crate::{
     find_definition, find_references, prelude::*, syntax::get_deref_target,
-    validate_renaming_definition, SyntaxRequest,
+    validate_renaming_definition, SemanticRequest,
 };
 
 /// The [`textDocument/rename`] request is sent from the client to the server to
@@ -21,7 +21,7 @@ pub struct RenameRequest {
     pub new_name: String,
 }
 
-impl SyntaxRequest for RenameRequest {
+impl SemanticRequest for RenameRequest {
     type Response = WorkspaceEdit;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {

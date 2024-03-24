@@ -10,7 +10,7 @@ use crate::{
         find_source_by_import, get_deref_target, DerefTarget, IdentRef, LexicalKind,
         LexicalModKind, LexicalVarKind,
     },
-    SyntaxRequest,
+    SemanticRequest,
 };
 
 /// The [`textDocument/definition`] request asks the server for the definition
@@ -36,7 +36,7 @@ pub struct GotoDefinitionRequest {
     pub position: LspPosition,
 }
 
-impl SyntaxRequest for GotoDefinitionRequest {
+impl SemanticRequest for GotoDefinitionRequest {
     type Response = GotoDefinitionResponse;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
