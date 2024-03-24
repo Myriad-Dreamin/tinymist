@@ -1,5 +1,3 @@
-use typst_ts_compiler::NotifyApi;
-
 use crate::{
     prelude::*,
     syntax::{get_lexical_hierarchy, LexicalHierarchy, LexicalScopeKind},

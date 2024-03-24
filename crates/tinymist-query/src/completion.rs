@@ -35,7 +35,7 @@ impl StatefulRequest for CompletionRequest {
         let explicit = false;
 
         let (offset, completions) =
-            typst_ide::autocomplete(ctx.world, doc, &source, cursor, explicit)?;
+            typst_ide::autocomplete(ctx.world(), doc, &source, cursor, explicit)?;
 
         let lsp_start_position = ctx.to_lsp_pos(offset, &source);
         let replace_range = LspRange::new(lsp_start_position, self.position);

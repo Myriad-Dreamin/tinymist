@@ -11,7 +11,7 @@ use log::{debug, error, info, trace, warn};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use tinymist_query::{
-    analysis::{Analysis, AnalysisContext},
+    analysis::{Analysis, AnalysisContext, AnaylsisWorld},
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
     OnExportRequest, OnSaveExportRequest, PositionEncoding, StatefulRequest, SyntaxRequest,
     VersionedDocument,
@@ -370,8 +370,16 @@ impl<C: Compiler<World = TypstSystemWorld>, H> Reporter<C, H> {
         trace!("notify diagnostics: {:#?}", diagnostics);
 
         // todo encoding
+        let w = self.inner.world_mut();
+        let root = w.root.clone();
         let diagnostics = tinymist_query::convert_diagnostics(
-            self.inner.world(),
+            &AnalysisContext::new(
+                &WrapWorld(w),
+                Analysis {
+                    root,
+                    position_encoding: self.position_encoding,
+                },
+            ),
             diagnostics.as_ref(),
             self.position_encoding,
         );
@@ -605,6 +613,27 @@ impl CompileActor {
     }
 }
 
+struct WrapWorld<'a>(&'a mut TypstSystemWorld);
+
+impl<'a> AnaylsisWorld for WrapWorld<'a> {
+    fn world(&self) -> &dyn typst::World {
+        self.0
+    }
+
+    fn resolve(
+        &self,
+        spec: &typst_ts_core::package::PackageSpec,
+    ) -> Result<Arc<Path>, typst::diag::PackageError> {
+        use typst_ts_compiler::package::Registry;
+        self.0.registry.resolve(spec)
+    }
+
+    fn iter_dependencies(&self, f: &mut dyn FnMut(&ImmutPath, typst_ts_compiler::Time)) {
+        use typst_ts_compiler::NotifyApi;
+        self.0.iter_dependencies(f)
+    }
+}
+
 impl CompileActor {
     pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
         use CompilerQueryRequest::*;
@@ -686,11 +715,12 @@ impl CompileActor {
                 anyhow!("failed to prepare env")
             })?;
 
+            let w = WrapWorld(w);
             Ok(f(
                 &mut AnalysisContext::new(
-                    w,
+                    &w,
                     Analysis {
-                        root: w.root.clone(),
+                        root: w.0.root.clone(),
                         position_encoding: enc,
                     },
                 ),
@@ -722,10 +752,11 @@ impl CompileActor {
                 anyhow!("failed to prepare env")
             })?;
 
+            let w = WrapWorld(w);
             Ok(f(&mut AnalysisContext::new(
-                w,
+                &w,
                 Analysis {
-                    root: w.root.clone(),
+                    root: w.0.root.clone(),
                     position_encoding: enc,
                 },
             )))

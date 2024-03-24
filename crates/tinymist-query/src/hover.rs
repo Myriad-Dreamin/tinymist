@@ -31,7 +31,10 @@ impl StatefulRequest for HoverRequest {
 
         let contents = def_tooltip(ctx, &source, cursor).or_else(|| {
             Some(typst_to_lsp::tooltip(&tooltip(
-                ctx.world, doc, &source, cursor,
+                ctx.world(),
+                doc,
+                &source,
+                cursor,
             )?))
         })?;
 
@@ -76,7 +79,7 @@ let {name}({params});
         crate::syntax::LexicalKind::Var(LexicalVarKind::Variable) => {
             let deref_node = deref_target.node();
             // todo: check sensible length, value highlighting
-            let values = expr_tooltip(ctx.world, deref_node)
+            let values = expr_tooltip(ctx.world(), deref_node)
                 .map(|t| match t {
                     Tooltip::Text(s) => format!("// Values: {}", s),
                     Tooltip::Code(s) => format!("// Values: {}", s),

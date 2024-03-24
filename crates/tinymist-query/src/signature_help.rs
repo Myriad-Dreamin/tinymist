@@ -20,7 +20,7 @@ impl SyntaxRequest for SignatureHelpRequest {
             return None;
         }
 
-        let values = analyze_expr(ctx.world, &callee_node);
+        let values = analyze_expr(ctx.world(), &callee_node);
 
         let function = values.into_iter().find_map(|v| match v.0 {
             Value::Func(f) => Some(f),

@@ -53,7 +53,7 @@ impl SyntaxRequest for InlayHintRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let range = ctx.to_typst_range(self.range, &source)?;
 
-        let hints = inlay_hint(ctx.world, &source, range, ctx.position_encoding()).ok()?;
+        let hints = inlay_hint(ctx.world(), &source, range, ctx.position_encoding()).ok()?;
         debug!(
             "got inlay hints on {source:?} => {hints:?}",
             source = source.id(),

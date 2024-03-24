@@ -8,15 +8,10 @@ use once_cell::sync::OnceCell;
 use reflexo::{cow_mut::CowMut, ImmutPath};
 use typst::syntax::FileId as TypstFileId;
 use typst::{
-    diag::{eco_format, FileError, FileResult},
-    syntax::{Source, VirtualPath},
+    diag::{eco_format, FileError, FileResult, PackageError},
+    syntax::{package::PackageSpec, Source, VirtualPath},
     World,
 };
-use typst_ts_compiler::package::Registry;
-use typst_ts_compiler::TypstSystemWorld;
-// use typst_ts_compiler::TypstSystemWorld;
-// use typst_ts_compiler::{service::WorkspaceProvider, TypstSystemWorld};
-// use typst_ts_core::{cow_mut::CowMut, ImmutPath};
 
 use super::{get_def_use_inner, DefUseInfo};
 use crate::{
@@ -37,7 +32,7 @@ impl ModuleAnalysisCache {
     /// Get the source of a file.
     pub fn source(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Source> {
         self.source
-            .get_or_init(|| ctx.world.source(file_id))
+            .get_or_init(|| ctx.world().source(file_id))
             .clone()
     }
 
@@ -73,10 +68,18 @@ pub struct AnalysisCaches {
     module_deps: OnceCell<HashMap<TypstFileId, ModuleDependency>>,
 }
 
+pub trait AnaylsisWorld {
+    fn world(&self) -> &dyn World;
+
+    fn resolve(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError>;
+
+    fn iter_dependencies(&self, f: &mut dyn FnMut(&ImmutPath, std::time::SystemTime));
+}
+
 /// The context for analyzers.
 pub struct AnalysisContext<'a> {
     /// The world surface for Typst compiler
-    pub world: &'a TypstSystemWorld,
+    pub world: &'a dyn AnaylsisWorld,
     /// The analysis data
     pub analysis: CowMut<'a, Analysis>,
     caches: AnalysisCaches,
@@ -84,12 +87,16 @@ pub struct AnalysisContext<'a> {
 
 impl<'w> AnalysisContext<'w> {
     /// Create a new analysis context.
-    pub fn new(world: &'w TypstSystemWorld, a: Analysis) -> Self {
+    pub fn new(world: &'w dyn AnaylsisWorld, a: Analysis) -> Self {
         Self {
             world,
             analysis: CowMut::Owned(a),
             caches: AnalysisCaches::default(),
         }
+    }
+
+    pub fn world(&self) -> &dyn World {
+        self.world.world()
     }
 
     #[cfg(test)]
@@ -125,7 +132,7 @@ impl<'w> AnalysisContext<'w> {
         // Determine the root path relative to which the file path
         // will be resolved.
         let root = match id.package() {
-            Some(spec) => self.world.registry.resolve(spec)?,
+            Some(spec) => self.world.resolve(spec)?,
             None => self.analysis.root.clone(),
         };
 

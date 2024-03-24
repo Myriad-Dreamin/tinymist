@@ -9,20 +9,40 @@ use serde::Serialize;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use typst::syntax::{
     ast::{self, AstNode},
-    LinkedNode, Source, SyntaxKind, VirtualPath,
+    FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath,
 };
+use typst::{diag::PackageError, foundations::Bytes};
 use typst_ts_compiler::{
     service::{CompileDriver, Compiler, WorkspaceProvider},
-    ShadowApi,
+    NotifyApi, ShadowApi,
 };
-use typst_ts_core::{config::CompileOpts, Bytes, TypstFileId};
+use typst_ts_core::package::Registry;
+use typst_ts_core::{config::CompileOpts, package::PackageSpec};
 
 pub use insta::assert_snapshot;
 pub use typst_ts_compiler::TypstSystemWorld;
 
 use crate::{
-    analysis::Analysis, prelude::AnalysisContext, typst_to_lsp, LspPosition, PositionEncoding,
+    analysis::{Analysis, AnaylsisWorld},
+    prelude::AnalysisContext,
+    typst_to_lsp, LspPosition, PositionEncoding,
 };
+
+struct WrapWorld<'a>(&'a mut TypstSystemWorld);
+
+impl<'a> AnaylsisWorld for WrapWorld<'a> {
+    fn world(&self) -> &dyn typst::World {
+        self.0
+    }
+
+    fn resolve(&self, spec: &PackageSpec) -> Result<std::sync::Arc<Path>, PackageError> {
+        self.0.registry.resolve(spec)
+    }
+
+    fn iter_dependencies(&self, f: &mut dyn FnMut(&reflexo::ImmutPath, typst_ts_compiler::Time)) {
+        self.0.iter_dependencies(f)
+    }
+}
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) {
     let mut settings = insta::Settings::new();
@@ -46,10 +66,12 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
                         )
                     })
                     .collect::<Vec<_>>();
+                let root = w.workspace_root();
+                let w = WrapWorld(w);
                 let mut ctx = AnalysisContext::new(
-                    w,
+                    &w,
                     Analysis {
-                        root: w.workspace_root(),
+                        root,
                         position_encoding: PositionEncoding::Utf16,
                     },
                 );

@@ -7,7 +7,6 @@ use anyhow::{anyhow, Context};
 use ecow::{eco_vec, EcoVec};
 use log::info;
 use lsp_types::SymbolKind;
-use reflexo::error::prelude::*;
 use serde::{Deserialize, Serialize};
 use typst::{
     syntax::{
@@ -654,7 +653,7 @@ impl LexicalHierarchyWorker {
                     let name = if e.starts_with('@') {
                         let spec = e
                             .parse::<PackageSpec>()
-                            .context("parse package spec failed for name")?;
+                            .map_err(|e| anyhow!("parse package spec failed: {:?}", e))?;
                         spec.name.to_string()
                     } else {
                         let e = Path::new(e.as_ref())
