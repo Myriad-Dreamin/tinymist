@@ -47,7 +47,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
 
     const serverCommand = getServer(config);
     const fontPaths = config.fontPaths as string[] | null;
-    const noSystemFonts = config.noSystemFonts as boolean | null;
+    const withSystemFonts = config.systemFonts as boolean | null;
     const run = {
         command: serverCommand,
         args: [
@@ -57,7 +57,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
                 ? ["--mirror", "tinymist-lsp.log"]
                 : []),
             ...(fontPaths ?? []).flatMap((fontPath) => ["--font-path", vscodeVariables(fontPath)]),
-            ...(noSystemFonts ? ["--no-system-fonts"] : []),
+            ...(withSystemFonts ? [] : ["--no-system-fonts"]),
         ],
         options: { env: Object.assign({}, process.env, { RUST_BACKTRACE: "1" }) },
     };
