@@ -72,6 +72,7 @@ impl TypstLanguageServer {
 
         create_server(
             name,
+            &self.config,
             self.const_config(),
             OptsState::new(root_dir.clone(), opts),
             self.font.clone(),

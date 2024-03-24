@@ -108,14 +108,14 @@ undocumented_unsafe_blocks = "warn"
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
 typst-ide = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
 typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
+# typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
 
 # typst = { path = "../typst/crates/typst" }
 # typst-ide = { path = "../typst/crates/typst-ide" }
 # typst-pdf = { path = "../typst/crates/typst-pdf" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-# typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
-# reflexo = { path = "../typst.ts/crates/reflexo/" }
-# typst-ts-core = { path = "../typst.ts/core" }
-# typst-ts-compiler = { path = "../typst.ts/compiler" }
+typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
+reflexo = { path = "../typst.ts/crates/reflexo/" }
+typst-ts-core = { path = "../typst.ts/core" }
+typst-ts-compiler = { path = "../typst.ts/compiler" }

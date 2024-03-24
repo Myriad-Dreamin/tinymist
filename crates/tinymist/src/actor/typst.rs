@@ -25,8 +25,7 @@ use typst::{
 use typst_preview::{CompilationHandle, CompilationHandleImpl, CompileStatus};
 use typst_ts_compiler::{
     service::{
-        CompileDriverImpl, CompileExporter, CompileMiddleware, Compiler, EnvWorld,
-        WorkspaceProvider, WorldExporter,
+        CompileDriverImpl, CompileEnv, CompileMiddleware, Compiler, EnvWorld, WorkspaceProvider,
     },
     vfs::notify::{FileChangeSet, MemoryEvent},
 };
@@ -36,11 +35,14 @@ use typst_ts_core::{
 
 use super::compile::CompileClient as TsCompileClient;
 use super::{compile::CompileActor as CompileActorInner, render::PdfExportConfig};
-use crate::world::{CompileOnceOpts, LspWorld, LspWorldBuilder, SharedFontResolver};
 use crate::ConstConfig;
 use crate::{
     actor::render::{PdfPathVars, RenderActorRequest},
     utils,
+};
+use crate::{
+    world::{CompileOnceOpts, LspWorld, LspWorldBuilder, SharedFontResolver},
+    Config,
 };
 
 #[cfg(not(feature = "preview"))]
@@ -59,8 +61,8 @@ pub trait CompilationHandle: Send + 'static {
 }
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
-type CompileService<H> = CompileActorInner<Reporter<CompileExporter<CompileDriver>, H>>;
-type CompileClient<H> = TsCompileClient<CompileService<H>>;
+type CompileService = CompileActorInner<CompileDriver>;
+type CompileClient = TsCompileClient<CompileService>;
 
 type DiagnosticsSender = mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>;
 
@@ -83,6 +85,7 @@ impl OptsState {
 #[allow(clippy::too_many_arguments)]
 pub fn create_server(
     diag_group: String,
+    config: &Config,
     cfg: &ConstConfig,
     opts: OptsState,
     font_resolver: Deferred<SharedFontResolver>,
@@ -134,42 +137,34 @@ pub fn create_server(
                 }
             };
 
-            let root: ImmutPath = opts.root_dir.as_path().into();
-
             info!("TypstActor: creating server for {diag_group} with arguments {opts:#?}",);
 
             let font_resolver = font_resolver.wait().clone();
 
-            // todo: entry is PathBuf, which is inefficient
-            let compiler_driver = CompileDriver::new(opts, font_resolver, entry.clone(), handler);
-            let handler: CompileHandler = compiler_driver.handler.clone();
-
-            let ontyped_render_tx = render_tx.clone();
-            let driver = CompileExporter::new(compiler_driver).with_exporter(Box::new(
-                move |_w: &dyn TypstWorld, doc| {
-                    let _ = doc_sender.send(Some(doc));
-                    // todo: is it right that ignore zero broadcast receiver?
-                    let _ = ontyped_render_tx.send(RenderActorRequest::OnTyped);
-
-                    Ok(())
-                },
-            ));
-            let driver = Reporter {
+            let world = LspWorldBuilder::build(opts, font_resolver).expect("incorrect options");
+            let driver = CompileDriverInner::new(world);
+            let mut driver = CompileDriver {
+                inner: driver,
+                handler,
+                doc_sender,
+                render_tx: render_tx.clone(),
                 diag_group: diag_group.clone(),
                 position_encoding: pos_encoding,
                 diag_tx,
-                inner: driver,
-                cb: handler.clone(),
             };
-            let driver =
-                CompileActorInner::new(driver, root.clone(), entry.clone()).with_watch(true);
+            if let Some(entry) = entry.clone() {
+                // todo: entry is PathBuf, which is inefficient
+                driver.set_entry_file(entry.as_ref().to_owned());
+            }
 
-            let (server, client) = driver.split();
+            let actor = CompileActorInner::new(driver, entry.clone()).with_watch(true);
+            let (server, client) = actor.split();
 
             // We do send memory changes instead of initializing compiler with them.
             // This is because there are state recorded inside of the compiler actor, and we
             // must update them.
             client.add_memory_changes(MemoryEvent::Update(snapshot));
+
             current_runtime.spawn(server.spawn());
 
             client
@@ -178,6 +173,7 @@ pub fn create_server(
 
     CompileActor::new(
         diag_group,
+        config.clone(),
         root_tx,
         root,
         entry,
@@ -232,6 +228,13 @@ impl CompilationHandle for CompileHandler {
 pub struct CompileDriver {
     inner: CompileDriverInner,
     handler: CompileHandler,
+
+    doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
+    render_tx: broadcast::Sender<RenderActorRequest>,
+
+    diag_group: String,
+    position_encoding: PositionEncoding,
+    diag_tx: DiagnosticsSender,
 }
 
 impl CompileMiddleware for CompileDriver {
@@ -244,30 +247,35 @@ impl CompileMiddleware for CompileDriver {
     fn inner_mut(&mut self) -> &mut Self::Compiler {
         &mut self.inner
     }
+
+    fn wrap_compile(&mut self, env: &mut CompileEnv) -> SourceResult<Arc<typst::model::Document>> {
+        #[cfg(feature = "preview")]
+        self.handler.status(CompileStatus::Compiling);
+        match self.inner_mut().compile(env) {
+            Ok(doc) => {
+                #[cfg(feature = "preview")]
+                self.handler.notify_compile(Ok(doc.clone()));
+
+                let _ = self.doc_sender.send(Some(doc.clone()));
+                // todo: is it right that ignore zero broadcast receiver?
+                let _ = self.render_tx.send(RenderActorRequest::OnTyped);
+
+                self.notify_diagnostics(EcoVec::new());
+                Ok(doc)
+            }
+            Err(err) => {
+                #[cfg(feature = "preview")]
+                self.handler
+                    .notify_compile(Err(CompileStatus::CompileError));
+
+                self.notify_diagnostics(err);
+                Err(EcoVec::new())
+            }
+        }
+    }
 }
 
 impl CompileDriver {
-    pub fn new(
-        opts: CompileOnceOpts,
-        font_resolver: SharedFontResolver,
-        entry: Option<ImmutPath>,
-        handler: CompileHandler,
-    ) -> Self {
-        let world = LspWorldBuilder::build(opts, font_resolver).expect("incorrect options");
-        let driver = CompileDriverInner::new(world);
-
-        let mut this = Self {
-            inner: driver,
-            handler,
-        };
-
-        if let Some(entry) = entry {
-            this.set_entry_file(entry.as_ref().to_owned());
-        }
-
-        this
-    }
-
     // todo: determine root
     fn set_entry_file(&mut self, entry: PathBuf) {
         // let candidates = self
@@ -291,63 +299,7 @@ impl CompileDriver {
 
         self.inner.set_entry_file(entry);
     }
-}
 
-pub struct Reporter<C, H> {
-    diag_group: String,
-    position_encoding: PositionEncoding,
-    diag_tx: DiagnosticsSender,
-    inner: C,
-    #[allow(unused)]
-    cb: H,
-}
-
-impl<C: Compiler<World = LspWorld>, H> CompileMiddleware for Reporter<C, H>
-where
-    H: CompilationHandle,
-{
-    type Compiler = C;
-
-    fn inner(&self) -> &Self::Compiler {
-        &self.inner
-    }
-
-    fn inner_mut(&mut self) -> &mut Self::Compiler {
-        &mut self.inner
-    }
-
-    fn wrap_compile(
-        &mut self,
-        env: &mut typst_ts_compiler::service::CompileEnv,
-    ) -> SourceResult<Arc<TypstDocument>> {
-        #[cfg(feature = "preview")]
-        self.cb.status(CompileStatus::Compiling);
-        match self.inner_mut().compile(env) {
-            Ok(doc) => {
-                #[cfg(feature = "preview")]
-                self.cb.notify_compile(Ok(doc.clone()));
-
-                self.notify_diagnostics(EcoVec::new());
-                Ok(doc)
-            }
-            Err(err) => {
-                #[cfg(feature = "preview")]
-                self.cb.notify_compile(Err(CompileStatus::CompileError));
-
-                self.notify_diagnostics(err);
-                Err(EcoVec::new())
-            }
-        }
-    }
-}
-
-impl<C: Compiler + WorldExporter, H> WorldExporter for Reporter<C, H> {
-    fn export(&mut self, output: Arc<typst::model::Document>) -> SourceResult<()> {
-        self.inner.export(output)
-    }
-}
-
-impl<C: Compiler<World = LspWorld>, H> Reporter<C, H> {
     fn push_diagnostics(&mut self, diagnostics: Option<DiagnosticsMap>) {
         let err = self.diag_tx.send((self.diag_group.clone(), diagnostics));
         if let Err(err) = err {
@@ -386,10 +338,11 @@ impl<C: Compiler<World = LspWorld>, H> Reporter<C, H> {
 pub struct CompileActor {
     diag_group: String,
     position_encoding: PositionEncoding,
+    config: Config,
     root_tx: Mutex<Option<oneshot::Sender<Option<ImmutPath>>>>,
     root: OnceCell<Option<ImmutPath>>,
     entry: Arc<Mutex<Option<ImmutPath>>>,
-    inner: Deferred<CompileClient<CompileHandler>>,
+    inner: Deferred<CompileClient>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
 
@@ -397,15 +350,17 @@ impl CompileActor {
     #[allow(clippy::too_many_arguments)]
     fn new(
         diag_group: String,
+        config: Config,
         root_tx: oneshot::Sender<Option<ImmutPath>>,
         root: Option<ImmutPath>,
         entry: Option<ImmutPath>,
         position_encoding: PositionEncoding,
-        inner: Deferred<CompileClient<CompileHandler>>,
+        inner: Deferred<CompileClient>,
         render_tx: broadcast::Sender<RenderActorRequest>,
     ) -> Self {
         Self {
             diag_group,
+            config,
             root_tx: Mutex::new(root.is_none().then_some(root_tx)),
             root: match root {
                 Some(root) => OnceCell::from(Some(root)),
@@ -418,14 +373,14 @@ impl CompileActor {
         }
     }
 
-    fn inner(&self) -> &CompileClient<CompileHandler> {
+    fn inner(&self) -> &CompileClient {
         self.inner.wait()
     }
 
     /// Steal the compiler thread and run the given function.
     pub fn steal<Ret: Send + 'static>(
         &self,
-        f: impl FnOnce(&mut CompileService<CompileHandler>) -> Ret + Send + 'static,
+        f: impl FnOnce(&mut CompileService) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
         self.inner().steal(f)
     }
@@ -433,15 +388,13 @@ impl CompileActor {
     /// Steal the compiler thread and run the given function.
     pub async fn steal_async<Ret: Send + 'static>(
         &self,
-        f: impl FnOnce(&mut CompileService<CompileHandler>, tokio::runtime::Handle) -> Ret
-            + Send
-            + 'static,
+        f: impl FnOnce(&mut CompileService, tokio::runtime::Handle) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
         self.inner().steal_async(f).await
     }
 
     pub fn settle(&self) {
-        let _ = self.change_entry(None, |_| None);
+        let _ = self.change_entry(None);
         info!("TypstActor({}): settle requested", self.diag_group);
         let res = self.inner().settle();
         match res {
@@ -455,11 +408,7 @@ impl CompileActor {
         }
     }
 
-    pub fn change_entry(
-        &self,
-        path: Option<ImmutPath>,
-        resolve_root: impl FnOnce(Option<ImmutPath>) -> Option<ImmutPath>,
-    ) -> Result<(), Error> {
+    pub fn change_entry(&self, path: Option<ImmutPath>) -> Result<(), Error> {
         if path.as_deref().is_some_and(|p| !p.is_absolute()) {
             return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
         }
@@ -469,7 +418,7 @@ impl CompileActor {
                 info!("TypstActor({}): delayed root resolution", self.diag_group);
                 let mut root_tx = self.root_tx.lock();
                 let root_tx = root_tx.take().unwrap();
-                let root = resolve_root(path);
+                let root = self.config.determine_root(path.as_ref());
                 let _ = root_tx.send(root.clone());
 
                 info!("TypstActor({}): resolved root: {root:?}", self.diag_group);
@@ -512,7 +461,7 @@ impl CompileActor {
                 }
 
                 if let Some(path) = &path {
-                    let driver = &mut compiler.compiler.compiler.inner.compiler;
+                    let driver = &mut compiler.compiler.compiler.inner;
                     driver.set_entry_file(path.as_ref().to_owned());
                 }
 

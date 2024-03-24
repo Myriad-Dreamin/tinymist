@@ -30,7 +30,7 @@ use typst_ts_core::{
 
 use typst_ts_compiler::service::{
     features::FeatureSet, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter,
-    WorkspaceProvider, WorldExporter,
+    WorkspaceProvider,
 };
 
 use crate::{task::BorrowTask, utils};
@@ -89,8 +89,6 @@ struct SuspendState {
 pub struct CompileActor<C: Compiler> {
     /// The underlying compiler.
     pub compiler: CompileReporter<C>,
-    /// The root path of the workspace.
-    pub root: ImmutPath,
     /// Whether to enable file system watching.
     pub enable_watch: bool,
 
@@ -117,13 +115,12 @@ pub struct CompileActor<C: Compiler> {
     suspend_state: SuspendState,
 }
 
-impl<C: Compiler + ShadowApi + WorldExporter + Send + 'static> CompileActor<C>
+impl<C: Compiler + ShadowApi + Send + 'static> CompileActor<C>
 where
     C::World: for<'files> codespan_reporting::files::Files<'files, FileId = TypstFileId>,
 {
     pub fn new_with_features(
         compiler: C,
-        root: ImmutPath,
         entry: Option<ImmutPath>,
         feature_set: FeatureSet,
     ) -> Self {
@@ -138,7 +135,6 @@ where
         Self {
             compiler: CompileReporter::new(compiler)
                 .with_generic_reporter(ConsoleDiagReporter::default()),
-            root,
 
             logical_tick: 1,
             enable_watch: false,
@@ -161,8 +157,8 @@ where
     }
 
     /// Create a new compiler thread.
-    pub fn new(compiler: C, root: ImmutPath, entry: Option<ImmutPath>) -> Self {
-        Self::new_with_features(compiler, root, entry, FeatureSet::default())
+    pub fn new(compiler: C, entry: Option<ImmutPath>) -> Self {
+        Self::new_with_features(compiler, entry, FeatureSet::default())
     }
 
     pub fn success_doc(&self) -> Option<VersionedDocument> {
@@ -530,7 +526,7 @@ impl<C: Compiler> CompileActor<C> {
             self,
             CompileClient {
                 intr_tx: steal_send,
-                _ctx: typst_ts_core::PhantomParamData::default(),
+                _ctx: std::marker::PhantomData,
             },
         )
     }
@@ -544,7 +540,7 @@ impl<C: Compiler> CompileActor<C> {
 pub struct CompileClient<Ctx> {
     intr_tx: mpsc::UnboundedSender<ExternalInterrupt<Ctx>>,
 
-    _ctx: typst_ts_core::PhantomParamData<Ctx>,
+    _ctx: std::marker::PhantomData<fn(&mut Ctx)>,
 }
 
 unsafe impl<Ctx> Send for CompileClient<Ctx> {}
@@ -555,7 +551,7 @@ impl<Ctx> CompileClient<Ctx> {
         let (intr_tx, _) = mpsc::unbounded_channel();
         Self {
             intr_tx,
-            _ctx: typst_ts_core::PhantomParamData::default(),
+            _ctx: std::marker::PhantomData,
         }
     }
 }
