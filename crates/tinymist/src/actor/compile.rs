@@ -23,14 +23,14 @@ use typst_ts_compiler::{
     ShadowApi,
 };
 use typst_ts_core::{
+    config::compiler::EntryState,
     debug_loc::{SourceLocation, SourceSpanOffset},
     error::prelude::{map_string_err, ZResult},
-    ImmutPath, TypstDocument, TypstFileId,
+    TypstDocument, TypstFileId,
 };
 
 use typst_ts_compiler::service::{
-    features::FeatureSet, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter,
-    WorkspaceProvider,
+    features::FeatureSet, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter, EntryManager,
 };
 
 use crate::{task::BorrowTask, utils};
@@ -119,11 +119,7 @@ impl<C: Compiler + ShadowApi + Send + 'static> CompileActor<C>
 where
     C::World: for<'files> codespan_reporting::files::Files<'files, FileId = TypstFileId>,
 {
-    pub fn new_with_features(
-        compiler: C,
-        entry: Option<ImmutPath>,
-        feature_set: FeatureSet,
-    ) -> Self {
+    pub fn new_with_features(compiler: C, entry: EntryState, feature_set: FeatureSet) -> Self {
         let (steal_send, steal_recv) = mpsc::unbounded_channel();
 
         let watch_feature_set = Arc::new(
@@ -150,14 +146,14 @@ where
             steal_recv,
 
             suspend_state: SuspendState {
-                suspended: entry.is_none(),
+                suspended: entry.is_detached(),
                 dirty: false,
             },
         }
     }
 
     /// Create a new compiler thread.
-    pub fn new(compiler: C, entry: Option<ImmutPath>) -> Self {
+    pub fn new(compiler: C, entry: EntryState) -> Self {
         Self::new_with_features(compiler, entry, FeatureSet::default())
     }
 
@@ -323,8 +319,8 @@ where
         Some(compile_thread)
     }
 
-    pub(crate) fn change_entry(&mut self, entry: Option<Arc<Path>>) {
-        let suspending = entry.is_none();
+    pub(crate) fn change_entry(&mut self, entry: EntryState) {
+        let suspending = entry.is_detached();
         if suspending {
             self.suspend_state.suspended = true;
         } else {
@@ -623,7 +619,7 @@ pub struct DocToSrcJumpInfo {
 // todo: remove constraint to CompilerWorld
 impl<F: CompilerFeat, Ctx: Compiler<World = CompilerWorld<F>>> CompileClient<CompileActor<Ctx>>
 where
-    Ctx::World: WorkspaceProvider,
+    Ctx::World: EntryManager,
 {
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
@@ -639,7 +635,7 @@ where
             let world = this.compiler.world();
 
             let relative_path = filepath
-                .strip_prefix(&this.compiler.world().workspace_root())
+                .strip_prefix(&this.compiler.world().workspace_root()?)
                 .ok()?;
 
             let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
@@ -662,7 +658,7 @@ where
 
             let filepath = Path::new(&loc.filepath);
             let relative_path = filepath
-                .strip_prefix(&this.compiler.world().workspace_root())
+                .strip_prefix(&this.compiler.world().workspace_root()?)
                 .ok()?;
 
             let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));

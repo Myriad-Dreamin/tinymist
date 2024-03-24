@@ -6,8 +6,7 @@ use std::{
 };
 
 use anyhow::anyhow;
-use log::{debug, error, info, trace, warn};
-use once_cell::sync::OnceCell;
+use log::{debug, error, info, trace};
 use parking_lot::Mutex;
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnaylsisResources},
@@ -18,19 +17,17 @@ use tinymist_query::{
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use typst::{
     diag::{SourceDiagnostic, SourceResult},
-    syntax::VirtualPath,
     util::Deferred,
 };
 #[cfg(feature = "preview")]
 use typst_preview::{CompilationHandle, CompilationHandleImpl, CompileStatus};
 use typst_ts_compiler::{
-    service::{
-        CompileDriverImpl, CompileEnv, CompileMiddleware, Compiler, EnvWorld, WorkspaceProvider,
-    },
+    service::{CompileDriverImpl, CompileEnv, CompileMiddleware, Compiler, EntryManager, EnvWorld},
     vfs::notify::{FileChangeSet, MemoryEvent},
 };
 use typst_ts_core::{
-    error::prelude::*, typst::prelude::EcoVec, Error, ImmutPath, TypstDocument, TypstWorld,
+    config::compiler::EntryState, error::prelude::*, typst::prelude::EcoVec, Error, ImmutPath,
+    TypstDocument, TypstWorld,
 };
 
 use super::compile::CompileClient as TsCompileClient;
@@ -41,7 +38,7 @@ use crate::{
     utils,
 };
 use crate::{
-    world::{CompileOnceOpts, LspWorld, LspWorldBuilder, SharedFontResolver},
+    world::{LspWorld, LspWorldBuilder, SharedFontResolver},
     Config,
 };
 
@@ -66,45 +63,20 @@ type CompileClient = TsCompileClient<CompileService>;
 
 type DiagnosticsSender = mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>;
 
-pub enum OptsState {
-    Exact(CompileOnceOpts),
-    Rootless(Box<dyn FnOnce(PathBuf) -> CompileOnceOpts + Send + Sync>),
-}
-impl OptsState {
-    pub(crate) fn new(
-        root: Option<Arc<Path>>,
-        opts: impl FnOnce(PathBuf) -> CompileOnceOpts + Send + Sync + 'static,
-    ) -> OptsState {
-        match root {
-            Some(root) => OptsState::Exact(opts(root.as_ref().to_owned())),
-            None => OptsState::Rootless(Box::new(opts)),
-        }
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn create_server(
     diag_group: String,
     config: &Config,
     cfg: &ConstConfig,
-    opts: OptsState,
+    // opts: OptsState,
     font_resolver: Deferred<SharedFontResolver>,
-    root: Option<ImmutPath>,
-    entry: Option<ImmutPath>,
+    entry: EntryState,
     snapshot: FileChangeSet,
     diag_tx: DiagnosticsSender,
     doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 ) -> CompileActor {
     let pos_encoding = cfg.position_encoding;
-
-    info!(
-        "TypstActor: creating server for {} with opts(determined={:?})",
-        diag_group,
-        matches!(opts, OptsState::Exact(_))
-    );
-
-    let (root_tx, root_rx) = oneshot::channel();
 
     let inner = Deferred::new({
         let current_runtime = tokio::runtime::Handle::current();
@@ -118,32 +90,14 @@ pub fn create_server(
         let render_tx = render_tx.clone();
 
         move || {
-            let opts = match opts {
-                OptsState::Exact(opts) => opts,
-                OptsState::Rootless(opts) => {
-                    let root: ImmutPath = match utils::threaded_receive(root_rx) {
-                        Ok(Some(root)) => root,
-                        Ok(None) => {
-                            error!("TypstActor: failed to receive root path: root is none");
-                            return CompileClient::faked();
-                        }
-                        Err(err) => {
-                            error!("TypstActor: failed to receive root path: {:#}", err);
-                            return CompileClient::faked();
-                        }
-                    };
-
-                    opts(root.as_ref().into())
-                }
-            };
-
-            info!("TypstActor: creating server for {diag_group} with arguments {opts:#?}",);
+            info!("TypstActor: creating server for {diag_group}");
 
             let font_resolver = font_resolver.wait().clone();
 
-            let world = LspWorldBuilder::build(opts, font_resolver).expect("incorrect options");
+            let world =
+                LspWorldBuilder::build(entry.clone(), font_resolver).expect("incorrect options");
             let driver = CompileDriverInner::new(world);
-            let mut driver = CompileDriver {
+            let driver = CompileDriver {
                 inner: driver,
                 handler,
                 doc_sender,
@@ -152,12 +106,8 @@ pub fn create_server(
                 position_encoding: pos_encoding,
                 diag_tx,
             };
-            if let Some(entry) = entry.clone() {
-                // todo: entry is PathBuf, which is inefficient
-                driver.set_entry_file(entry.as_ref().to_owned());
-            }
 
-            let actor = CompileActorInner::new(driver, entry.clone()).with_watch(true);
+            let actor = CompileActorInner::new(driver, entry).with_watch(true);
             let (server, client) = actor.split();
 
             // We do send memory changes instead of initializing compiler with them.
@@ -174,8 +124,6 @@ pub fn create_server(
     CompileActor::new(
         diag_group,
         config.clone(),
-        root_tx,
-        root,
         entry,
         pos_encoding,
         inner,
@@ -276,30 +224,6 @@ impl CompileMiddleware for CompileDriver {
 }
 
 impl CompileDriver {
-    // todo: determine root
-    fn set_entry_file(&mut self, entry: PathBuf) {
-        // let candidates = self
-        //     .current
-        //     .iter()
-        //     .filter_map(|(root, package)| Some((root,
-        // package.uri_to_vpath(uri).ok()?)))     .inspect(|(package_root,
-        // path)| trace!(%package_root, ?path, %uri, "considering
-        // candidate for full id"));
-
-        // // Our candidates are projects containing a URI, so we expect to get
-        // a set of // subdirectories. The "best" is the "most
-        // specific", that is, the project that is a // subdirectory of
-        // the rest. This should have the longest length.
-        // let (best_package_root, best_path) =
-        //     candidates.max_by_key(|(_, path)|
-        // path.as_rootless_path().components().count())?;
-
-        // let package_id = PackageId::new_current(best_package_root.clone());
-        // let full_file_id = FullFileId::new(package_id, best_path);
-
-        self.inner.set_entry_file(entry);
-    }
-
     fn push_diagnostics(&mut self, diagnostics: Option<DiagnosticsMap>) {
         let err = self.diag_tx.send((self.diag_group.clone(), diagnostics));
         if let Err(err) = err {
@@ -312,7 +236,8 @@ impl CompileDriver {
 
         // todo encoding
         let w = self.inner.world_mut();
-        let root = w.root.clone();
+        // todo: root
+        let root = w.entry.root().clone().unwrap();
         let diagnostics = tinymist_query::convert_diagnostics(
             &AnalysisContext::new(
                 &WrapWorld(w),
@@ -328,8 +253,8 @@ impl CompileDriver {
         // todo: better way to remove diagnostics
         // todo: check all errors in this file
 
-        let main = self.inner.world().main;
-        let valid = main.is_some_and(|e| e.vpath() != &VirtualPath::new("detached.typ"));
+        let detached = self.inner.world().entry.is_detached();
+        let valid = !detached;
 
         self.push_diagnostics(valid.then_some(diagnostics));
     }
@@ -339,9 +264,9 @@ pub struct CompileActor {
     diag_group: String,
     position_encoding: PositionEncoding,
     config: Config,
-    root_tx: Mutex<Option<oneshot::Sender<Option<ImmutPath>>>>,
-    root: OnceCell<Option<ImmutPath>>,
-    entry: Arc<Mutex<Option<ImmutPath>>>,
+    // root_tx: Mutex<Option<oneshot::Sender<Option<ImmutPath>>>>,
+    // root: OnceCell<Option<ImmutPath>>,
+    entry: Arc<Mutex<EntryState>>,
     inner: Deferred<CompileClient>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
@@ -351,9 +276,7 @@ impl CompileActor {
     fn new(
         diag_group: String,
         config: Config,
-        root_tx: oneshot::Sender<Option<ImmutPath>>,
-        root: Option<ImmutPath>,
-        entry: Option<ImmutPath>,
+        entry: EntryState,
         position_encoding: PositionEncoding,
         inner: Deferred<CompileClient>,
         render_tx: broadcast::Sender<RenderActorRequest>,
@@ -361,11 +284,11 @@ impl CompileActor {
         Self {
             diag_group,
             config,
-            root_tx: Mutex::new(root.is_none().then_some(root_tx)),
-            root: match root {
-                Some(root) => OnceCell::from(Some(root)),
-                None => OnceCell::new(),
-            },
+            // root_tx: Mutex::new(root.is_none().then_some(root_tx)),
+            // root: match root {
+            //     Some(root) => OnceCell::from(Some(root)),
+            //     None => OnceCell::new(),
+            // },
             position_encoding,
             entry: Arc::new(Mutex::new(entry)),
             inner,
@@ -412,78 +335,62 @@ impl CompileActor {
         if path.as_deref().is_some_and(|p| !p.is_absolute()) {
             return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
         }
-        {
-            let path = path.clone();
-            self.root.get_or_init(|| {
-                info!("TypstActor({}): delayed root resolution", self.diag_group);
-                let mut root_tx = self.root_tx.lock();
-                let root_tx = root_tx.take().unwrap();
-                let root = self.config.determine_root(path.as_ref());
-                let _ = root_tx.send(root.clone());
 
-                info!("TypstActor({}): resolved root: {root:?}", self.diag_group);
-                root
-            })
-        };
+        let next_entry = self.config.determine_entry(path);
 
         // todo: more robust rollback logic
         let entry = self.entry.clone();
         let should_change = {
-            let mut entry = entry.lock();
-            let should_change = entry.as_deref() != path.as_deref();
-            let prev = entry.clone();
-            *entry = path.clone();
-
-            should_change.then_some(prev)
+            let prev_entry = entry.lock();
+            let should_change = next_entry != *prev_entry;
+            should_change.then(|| prev_entry.clone())
         };
 
         if let Some(prev) = should_change {
-            let next = path.clone();
+            let next = next_entry.clone();
 
             debug!(
-                "the entry file of TypstActor({}) is changed to {next:?}",
+                "the entry file of TypstActor({}) is changing to {next:?}",
                 self.diag_group,
             );
 
             self.render_tx
                 .send(RenderActorRequest::ChangeExportPath(PdfPathVars {
-                    root: self.root.get().cloned().flatten(),
-                    path: next.clone(),
+                    entry: next.clone(),
                 }))
                 .unwrap();
 
             // todo
             let res = self.steal(move |compiler| {
-                let root = compiler.compiler.world().workspace_root();
-                if path.as_ref().is_some_and(|p| !p.starts_with(&root)) {
-                    warn!("entry file is not in workspace root {path:?}");
-                    return;
-                }
+                compiler.change_entry(next.clone());
 
-                if let Some(path) = &path {
-                    let driver = &mut compiler.compiler.compiler.inner;
-                    driver.set_entry_file(path.as_ref().to_owned());
-                }
+                let next_is_detached = next.is_detached();
+                let res = compiler.compiler.world_mut().mutate_entry(next);
 
-                compiler.change_entry(path.clone());
-
-                if path.is_none() {
+                if next_is_detached {
                     info!("TypstActor: removing diag");
                     compiler.compiler.compiler.push_diagnostics(None);
                 }
+
+                res.map(|_| ())
+                    .map_err(|err| error_once!("failed to change entry", err: format!("{err:?}")))
             });
+
+            let res = match res {
+                Ok(res) => res,
+                Err(res) => Err(res),
+            };
 
             if res.is_err() {
                 self.render_tx
                     .send(RenderActorRequest::ChangeExportPath(PdfPathVars {
-                        root: self.root.get().cloned().flatten(),
-                        path: prev.clone(),
+                        entry: prev.clone(),
                     }))
                     .unwrap();
 
                 let mut entry = entry.lock();
                 // todo: the rollback is actually not atomic
-                if *entry == next {
+                if *entry == next_entry {
                     *entry = prev;
                 }
 
@@ -498,53 +405,18 @@ impl CompileActor {
         Ok(())
     }
 
-    pub fn add_memory_changes(
-        &self,
-        event: MemoryEvent,
-        resolve_root: impl FnOnce(Option<ImmutPath>) -> Option<ImmutPath>,
-    ) {
-        self.root.get_or_init(|| {
-            info!(
-                "TypstActor({}): delayed root resolution on memory change events",
-                self.diag_group
-            );
-
-            // determine path by event
-            let entry = {
-                let entry = self.entry.lock().clone();
-
-                entry.or_else(|| match &event {
-                    MemoryEvent::Sync(changeset) | MemoryEvent::Update(changeset) => changeset
-                        .inserts
-                        .first()
-                        .map(|e| e.0.clone())
-                        .or_else(|| changeset.removes.first().cloned()),
-                })
-            };
-
-            let mut root_tx = self.root_tx.lock();
-            let root_tx = root_tx.take().unwrap();
-            let root = resolve_root(entry);
-            let _ = root_tx.send(root.clone());
-
-            info!("TypstActor({}): resolved root: {root:?}", self.diag_group);
-            root
-        });
-
+    pub fn add_memory_changes(&self, event: MemoryEvent) {
         self.inner.wait().add_memory_changes(event);
     }
 
     pub(crate) fn change_export_pdf(&self, config: PdfExportConfig) {
-        let entry = self.entry.lock();
-        let path = entry
-            .as_ref()
-            .map(|e| e.clone().with_extension("pdf").into());
+        let entry = self.entry.lock().clone();
         let _ = self
             .render_tx
             .send(RenderActorRequest::ChangeConfig(PdfExportConfig {
                 substitute_pattern: config.substitute_pattern,
-                root: self.root.get().cloned().flatten(),
-                path,
+                // root: self.root.get().cloned().flatten(),
+                entry,
                 mode: config.mode,
             }))
             .unwrap();
@@ -636,13 +508,16 @@ impl CompileActor {
         let enc = self.position_encoding;
 
         self.steal(move |compiler| {
-            // todo: record analysis
             let doc = compiler.success_doc();
             let w = compiler.compiler.world_mut();
 
-            let Some(main) = w.main else {
+            let Some(main) = w.main_id() else {
                 log::error!("TypstActor: main file is not set");
                 return Err(anyhow!("main file is not set"));
+            };
+            let Some(root) = w.entry.root() else {
+                log::error!("TypstActor: root is not set");
+                return Err(anyhow!("root is not set"));
             };
             w.source(main).map_err(|err| {
                 log::info!("TypstActor: failed to prepare main file: {:?}", err);
@@ -658,7 +533,7 @@ impl CompileActor {
                 &mut AnalysisContext::new(
                     &w,
                     Analysis {
-                        root: w.0.root.clone(),
+                        root,
                         position_encoding: enc,
                     },
                 ),
@@ -672,14 +547,38 @@ impl CompileActor {
         f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
         let enc = self.position_encoding;
+        // let opts = match opts {
+        //     OptsState::Exact(opts) => opts,
+        //     OptsState::Rootless(opts) => {
+        //         let root: ImmutPath = match utils::threaded_receive(root_rx) {
+        //             Ok(Some(root)) => root,
+        //             Ok(None) => {
+        //                 error!("TypstActor: failed to receive root path: root is
+        // none");                 return CompileClient::faked();
+        //             }
+        //             Err(err) => {
+        //                 error!("TypstActor: failed to receive root path: {:#}", err);
+        //                 return CompileClient::faked();
+        //             }
+        //         };
+
+        //         opts(root.as_ref().into())
+        //     }
+        // };
+        // mut opts: CompileOnceOpts,
+        // let inputs = std::mem::take(&mut opts.inputs);
+        // w.set_inputs(Arc::new(Prehashed::new(inputs)));
 
         self.steal(move |compiler| {
-            // todo: record analysis
             let w = compiler.compiler.world_mut();
 
-            let Some(main) = w.main else {
+            let Some(main) = w.main_id() else {
                 log::error!("TypstActor: main file is not set");
                 return Err(anyhow!("main file is not set"));
+            };
+            let Some(root) = w.entry.root() else {
+                log::error!("TypstActor: root is not set");
+                return Err(anyhow!("root is not set"));
             };
             w.source(main).map_err(|err| {
                 log::info!("TypstActor: failed to prepare main file: {:?}", err);
@@ -694,7 +593,7 @@ impl CompileActor {
             Ok(f(&mut AnalysisContext::new(
                 &w,
                 Analysis {
-                    root: w.0.root.clone(),
+                    root,
                     position_encoding: enc,
                 },
             )))

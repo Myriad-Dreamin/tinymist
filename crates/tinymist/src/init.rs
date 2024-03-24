@@ -12,9 +12,11 @@ use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
 use typst::foundations::IntoValue;
+use typst::syntax::VirtualPath;
 use typst::util::Deferred;
+use typst_ts_core::config::compiler::EntryState;
 use typst_ts_core::error::prelude::*;
-use typst_ts_core::{ImmutPath, TypstDict};
+use typst_ts_core::{ImmutPath, TypstDict, TypstFileId as FileId};
 
 use crate::actor::cluster::CompileClusterActor;
 use crate::world::{CompileOpts, SharedFontResolver};
@@ -290,6 +292,18 @@ impl Config {
             return Some(path.as_path().into());
         }
 
+        if let Some(extras) = &self.typst_extra_args {
+            // todo: inputs
+            // if let Some(inputs) = extras.inputs.as_ref() {
+            //     if opts.inputs.is_empty() {
+            //         opts.inputs = inputs.clone();
+            //     }
+            // }
+            if let Some(root) = &extras.root_dir {
+                return Some(root.as_path().into());
+            }
+        }
+
         if let Some(path) = &self
             .typst_extra_args
             .as_ref()
@@ -319,6 +333,34 @@ impl Config {
         }
 
         None
+    }
+
+    pub fn determine_entry(&self, entry: Option<ImmutPath>) -> EntryState {
+        // todo: don't ignore entry from typst_extra_args
+        // entry: command.input,
+        let root_dir = self.determine_root(entry.as_ref());
+
+        let entry = match (entry, root_dir) {
+            (Some(entry), Some(root)) => match entry.strip_prefix(&root) {
+                Ok(stripped) => Some(EntryState::new_rooted(
+                    root,
+                    Some(FileId::new(None, VirtualPath::new(stripped))),
+                )),
+                Err(err) => {
+                    log::info!("Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}");
+                    EntryState::new_rootless(entry)
+                }
+            },
+            (Some(entry), None) => EntryState::new_rootless(entry),
+            (None, Some(root)) => Some(EntryState::new_workspace(root)),
+            (None, None) => None,
+        };
+
+        entry.unwrap_or_else(|| match self.determine_root(None) {
+            Some(root) => EntryState::new_workspace(root),
+            // todo
+            None => EntryState::new_detached(),
+        })
     }
 
     fn validate(&self) -> anyhow::Result<()> {
@@ -520,7 +562,7 @@ impl Init {
             published_primary: false,
         };
 
-        let primary = service.server("primary".to_owned(), None);
+        let primary = service.server("primary".to_owned(), service.config.determine_entry(None));
         if service.primary.is_some() {
             panic!("primary already initialized");
         }

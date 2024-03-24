@@ -13,10 +13,13 @@ use typst::syntax::{
 };
 use typst::{diag::PackageError, foundations::Bytes};
 use typst_ts_compiler::{
-    service::{CompileDriver, Compiler, WorkspaceProvider},
+    service::{CompileDriver, Compiler, EntryManager},
     NotifyApi, ShadowApi,
 };
-use typst_ts_core::package::Registry;
+use typst_ts_core::{
+    config::compiler::{EntryOpts, EntryState},
+    package::Registry,
+};
 use typst_ts_core::{config::CompileOpts, package::PackageSpec};
 
 pub use insta::assert_snapshot;
@@ -56,17 +59,14 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
             let contents = contents.replace("\r\n", "\n");
 
             run_with_sources(&contents, |w: &mut TypstSystemWorld, p| {
+                let root = w.workspace_root().unwrap();
                 let paths = w
                     .shadow_paths()
                     .into_iter()
                     .map(|p| {
-                        TypstFileId::new(
-                            None,
-                            VirtualPath::new(p.strip_prefix(w.workspace_root()).unwrap()),
-                        )
+                        TypstFileId::new(None, VirtualPath::new(p.strip_prefix(&root).unwrap()))
                     })
                     .collect::<Vec<_>>();
-                let root = w.workspace_root();
                 let w = WrapWorld(w);
                 let mut ctx = AnalysisContext::new(
                     &w,
@@ -89,7 +89,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut TypstSystemWorld, P
         PathBuf::from("/")
     };
     let mut world = TypstSystemWorld::new(CompileOpts {
-        root_dir: root.clone(),
+        entry: EntryOpts::new_rooted(root.as_path().into(), None),
         ..Default::default()
     })
     .unwrap();
@@ -121,15 +121,21 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut TypstSystemWorld, P
         last_pw = Some(pw);
     }
 
-    world.set_main_id(TypstFileId::new(None, VirtualPath::new("/main.typ")));
+    world.mutate_entry(EntryState::new_detached()).unwrap();
     let mut driver = CompileDriver::new(world);
     let _ = driver.compile(&mut Default::default());
 
     let pw = last_pw.unwrap();
-    driver.world_mut().set_main_id(TypstFileId::new(
-        None,
-        VirtualPath::new(pw.strip_prefix(root).unwrap()),
-    ));
+    driver
+        .world_mut()
+        .mutate_entry(EntryState::new_rooted(
+            root.as_path().into(),
+            Some(TypstFileId::new(
+                None,
+                VirtualPath::new(pw.strip_prefix(root).unwrap()),
+            )),
+        ))
+        .unwrap();
     f(driver.world_mut(), pw)
 }
 

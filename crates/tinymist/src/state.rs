@@ -24,7 +24,6 @@ pub struct MemoryFileMeta {
 
 impl TypstLanguageServer {
     /// Updates the main entry
-    // todo: the changed entry may be out of root directory
     pub fn update_main_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
         self.pinning = new_entry.is_some();
         match (new_entry, self.main.is_some()) {
@@ -33,7 +32,10 @@ impl TypstLanguageServer {
                 main.change_entry(Some(new_entry))?;
             }
             (Some(new_entry), false) => {
-                let main_node = self.server("main".to_owned(), Some(new_entry));
+                let main_node = self.server(
+                    "main".to_owned(),
+                    self.config.determine_entry(Some(new_entry)),
+                );
 
                 self.main = Some(main_node);
             }
@@ -60,9 +62,7 @@ impl TypstLanguageServer {
         let clients_to_notify = (primary.into_iter()).chain(main);
 
         for client in clients_to_notify {
-            client.add_memory_changes(MemoryEvent::Update(files.clone()), |e| {
-                self.config.determine_root(e.as_ref())
-            });
+            client.add_memory_changes(MemoryEvent::Update(files.clone()));
         }
 
         Ok(())

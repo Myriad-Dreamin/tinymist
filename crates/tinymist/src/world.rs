@@ -3,7 +3,9 @@ use std::{borrow::Cow, path::PathBuf, sync::Arc};
 use comemo::Prehashed;
 use serde::{Deserialize, Serialize};
 use typst_ts_core::{
-    config::CompileFontOpts as FontOptsInner, error::prelude::*, font::FontResolverImpl,
+    config::{compiler::EntryState, CompileFontOpts as FontOptsInner},
+    error::prelude::*,
+    font::FontResolverImpl,
     FontResolver, TypstDict,
 };
 
@@ -88,19 +90,13 @@ impl LspWorldBuilder {
     /// Create [`LspWorld`] with the given options.
     /// See SystemCompilerFeat for instantiation details.
     /// See [`CompileOpts`] for available options.
-    pub fn build(
-        mut opts: CompileOnceOpts,
-        font_resolver: SharedFontResolver,
-    ) -> ZResult<LspWorld> {
-        let inputs = std::mem::take(&mut opts.inputs);
-        let mut w = CompilerWorld::new_raw(
-            opts.root_dir.clone(),
+    pub fn build(entry: EntryState, font_resolver: SharedFontResolver) -> ZResult<LspWorld> {
+        Ok(CompilerWorld::new_raw(
+            entry,
             Vfs::new(SystemAccessModel {}),
             HttpRegistry::default(),
             font_resolver,
-        );
-        w.set_inputs(Arc::new(Prehashed::new(inputs)));
-        Ok(w)
+        ))
     }
 
     /// Resolve fonts from given options.
