@@ -30,11 +30,20 @@ fn convert_diagnostic(
     let uri;
     let lsp_range;
     if let Some((id, span)) = diagnostic_span_id(typst_diagnostic) {
-        uri = Url::from_file_path(project.path_for_id(id)?).unwrap();
+        uri = Url::from_file_path(project.path_for_id(id)?).map_err(|e| {
+            let _: () = e;
+            anyhow::anyhow!(
+                "could not convert path to URI: id: {id:?}, context: {:?}",
+                project.analysis.root
+            )
+        })?;
         let source = project.world().source(id)?;
         lsp_range = diagnostic_range(&source, span, position_encoding);
     } else {
-        uri = Url::from_file_path(project.analysis.root.clone()).unwrap();
+        uri = Url::from_file_path(project.analysis.root.clone()).map_err(|e| {
+            let _: () = e;
+            anyhow::anyhow!("could not convert path to URI: {:?}", project.analysis.root)
+        })?;
         lsp_range = LspRange::default();
     };
 
@@ -64,7 +73,13 @@ fn tracepoint_to_relatedinformation(
     position_encoding: PositionEncoding,
 ) -> anyhow::Result<Option<DiagnosticRelatedInformation>> {
     if let Some(id) = tracepoint.span.id() {
-        let uri = Url::from_file_path(project.path_for_id(id)?).unwrap();
+        let uri = Url::from_file_path(project.path_for_id(id)?).map_err(|e| {
+            let _: () = e;
+            anyhow::anyhow!(
+                "could not convert path to URI: id: {id:?}, context: {:?}",
+                project.analysis.root
+            )
+        })?;
         let source = project.world().source(id)?;
 
         if let Some(typst_range) = source.range(tracepoint.span) {
