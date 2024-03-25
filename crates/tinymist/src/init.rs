@@ -4,9 +4,11 @@ use std::{collections::HashMap, path::PathBuf};
 use anyhow::bail;
 use clap::builder::ValueParser;
 use clap::{ArgAction, Parser};
+use comemo::Prehashed;
 use itertools::Itertools;
 use log::{error, info, warn};
 use lsp_types::*;
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
@@ -19,7 +21,7 @@ use typst_ts_core::error::prelude::*;
 use typst_ts_core::{ImmutPath, TypstDict, TypstFileId as FileId};
 
 use crate::actor::cluster::CompileClusterActor;
-use crate::world::{CompileOpts, SharedFontResolver};
+use crate::world::{CompileOpts, ImmutDict, SharedFontResolver};
 use crate::{
     invalid_params, CompileFontOpts, LspHost, LspResult, TypstLanguageServer,
     TypstLanguageServerArgs,
@@ -77,7 +79,7 @@ pub struct CompileExtraOpts {
     pub entry: Option<PathBuf>,
 
     /// Additional input arguments to compile the entry file.
-    pub inputs: Option<TypstDict>,
+    pub inputs: ImmutDict,
 
     /// will remove later
     pub font_paths: Vec<PathBuf>,
@@ -264,19 +266,19 @@ impl Config {
                 };
 
                 // Convert the input pairs to a dictionary.
-                let inputs: Option<TypstDict> = if command.inputs.is_empty() {
-                    None
+                let inputs: TypstDict = if command.inputs.is_empty() {
+                    TypstDict::default()
                 } else {
                     let pairs = command.inputs.iter();
                     let pairs = pairs.map(|(k, v)| (k.as_str().into(), v.as_str().into_value()));
-                    Some(pairs.collect())
+                    pairs.collect()
                 };
 
                 // todo: the command.root may be not absolute
                 self.typst_extra_args = Some(CompileExtraOpts {
                     entry: command.input,
                     root_dir: command.root,
-                    inputs,
+                    inputs: Arc::new(Prehashed::new(inputs)),
                     font_paths: command.font_paths,
                 });
             }
@@ -292,12 +294,6 @@ impl Config {
         }
 
         if let Some(extras) = &self.typst_extra_args {
-            // todo: inputs
-            // if let Some(inputs) = extras.inputs.as_ref() {
-            //     if opts.inputs.is_empty() {
-            //         opts.inputs = inputs.clone();
-            //     }
-            // }
             if let Some(root) = &extras.root_dir {
                 return Some(root.as_path().into());
             }
@@ -337,6 +333,7 @@ impl Config {
     pub fn determine_entry(&self, entry: Option<ImmutPath>) -> EntryState {
         // todo: don't ignore entry from typst_extra_args
         // entry: command.input,
+
         let root_dir = self.determine_root(entry.as_ref());
 
         let entry = match (entry, root_dir) {
@@ -360,6 +357,16 @@ impl Config {
             // todo
             None => EntryState::new_detached(),
         })
+    }
+
+    pub fn determine_inputs(&self) -> ImmutDict {
+        static EMPTY: Lazy<ImmutDict> = Lazy::new(ImmutDict::default);
+
+        if let Some(extras) = &self.typst_extra_args {
+            return extras.inputs.clone();
+        }
+
+        EMPTY.clone()
     }
 
     fn validate(&self) -> anyhow::Result<()> {
@@ -561,7 +568,11 @@ impl Init {
             published_primary: false,
         };
 
-        let primary = service.server("primary".to_owned(), service.config.determine_entry(None));
+        let primary = service.server(
+            "primary".to_owned(),
+            service.config.determine_entry(None),
+            service.config.determine_inputs(),
+        );
         if service.primary.is_some() {
             panic!("primary already initialized");
         }

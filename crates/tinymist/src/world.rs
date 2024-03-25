@@ -83,6 +83,8 @@ impl typst_ts_compiler::world::CompilerFeat for SystemCompilerFeat {
 /// The compiler world in system environment.
 pub type LspWorld = CompilerWorld<SystemCompilerFeat>;
 
+pub type ImmutDict = Arc<Prehashed<TypstDict>>;
+
 pub struct LspWorldBuilder;
 // Self::resolve_fonts(opts)?,
 
@@ -90,13 +92,19 @@ impl LspWorldBuilder {
     /// Create [`LspWorld`] with the given options.
     /// See SystemCompilerFeat for instantiation details.
     /// See [`CompileOpts`] for available options.
-    pub fn build(entry: EntryState, font_resolver: SharedFontResolver) -> ZResult<LspWorld> {
-        Ok(CompilerWorld::new_raw(
+    pub fn build(
+        entry: EntryState,
+        font_resolver: SharedFontResolver,
+        inputs: ImmutDict,
+    ) -> ZResult<LspWorld> {
+        let mut res = CompilerWorld::new_raw(
             entry,
             Vfs::new(SystemAccessModel {}),
             HttpRegistry::default(),
             font_resolver,
-        ))
+        );
+        res.inputs = inputs;
+        Ok(res)
     }
 
     /// Resolve fonts from given options.
