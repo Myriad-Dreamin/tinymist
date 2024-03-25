@@ -1,12 +1,12 @@
 //! Bootstrap actors for Tinymist.
 
 pub mod cluster;
-pub mod compile;
 pub mod render;
-pub mod typst;
+pub mod typ_client;
+pub mod typ_server;
 
-use ::typst::{diag::FileResult, util::Deferred};
 use tokio::sync::{broadcast, watch};
+use typst::{diag::FileResult, util::Deferred};
 use typst_ts_compiler::{
     service::CompileDriverImpl,
     vfs::notify::{FileChangeSet, MemoryEvent},
@@ -15,10 +15,10 @@ use typst_ts_core::config::compiler::EntryState;
 
 use self::{
     render::{PdfExportActor, PdfExportConfig},
-    typst::{CompileActor, CompileHandler},
+    typ_client::{CompileClientActor, CompileDriver, CompileHandler},
+    typ_server::CompileServerActor,
 };
 use crate::{
-    actor::{compile::CompileActor as CompileActorInner, typst::CompileDriver},
     world::{LspWorld, LspWorldBuilder},
     TypstLanguageServer,
 };
@@ -26,7 +26,7 @@ use crate::{
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
 
 impl TypstLanguageServer {
-    pub fn server(&self, diag_group: String, entry: EntryState) -> CompileActor {
+    pub fn server(&self, diag_group: String, entry: EntryState) -> CompileClientActor {
         let (doc_tx, doc_rx) = watch::channel(None);
         let (render_tx, _) = broadcast::channel(10);
 
@@ -56,19 +56,21 @@ impl TypstLanguageServer {
         );
 
         // Create the server
-        let position_encoding = self.const_config().position_encoding;
         let inner = Deferred::new({
             let current_runtime = tokio::runtime::Handle::current();
             let handler = CompileHandler {
                 #[cfg(feature = "preview")]
                 inner: Arc::new(Mutex::new(None)),
+                diag_group: diag_group.clone(),
+                doc_tx,
+                render_tx: render_tx.clone(),
+                diag_tx: self.diag_tx.clone(),
             };
 
+            let position_encoding = self.const_config().position_encoding;
             let diag_group = diag_group.clone();
             let entry = entry.clone();
-            let diag_tx = self.diag_tx.clone();
             let font_resolver = self.font.clone();
-            let render_tx = render_tx.clone();
             move || {
                 log::info!("TypstActor: creating server for {diag_group}");
 
@@ -82,15 +84,11 @@ impl TypstLanguageServer {
                 let driver = CompileDriver {
                     inner: driver,
                     handler,
-                    doc_sender: doc_tx,
-                    render_tx: render_tx.clone(),
-                    diag_group: diag_group.clone(),
                     position_encoding,
-                    diag_tx,
                 };
 
                 // Create the actor
-                let actor = CompileActorInner::new(driver, entry).with_watch(true);
+                let actor = CompileServerActor::new(driver, entry).with_watch(true);
                 let (server, client) = actor.split();
 
                 // We do send memory changes instead of initializing compiler with them.
@@ -104,13 +102,6 @@ impl TypstLanguageServer {
             }
         });
 
-        CompileActor::new(
-            diag_group,
-            self.config.clone(),
-            entry,
-            position_encoding,
-            inner,
-            render_tx,
-        )
+        CompileClientActor::new(diag_group, self.config.clone(), entry, inner, render_tx)
     }
 }

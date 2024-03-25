@@ -1,3 +1,7 @@
+//! The [`CompileServerActor`] implementation borrowed from typst.ts.
+//!
+//! Please check `tinymist::actor::typ_client` for architecture details.
+
 use std::{
     collections::HashSet,
     num::NonZeroUsize,
@@ -99,7 +103,7 @@ struct SuspendState {
 }
 
 /// The compiler thread.
-pub struct CompileActor<C: Compiler> {
+pub struct CompileServerActor<C: Compiler> {
     /// The underlying compiler.
     pub compiler: CompileReporter<C>,
     /// Whether to enable file system watching.
@@ -128,7 +132,7 @@ pub struct CompileActor<C: Compiler> {
     suspend_state: SuspendState,
 }
 
-impl<C: Compiler + ShadowApi + Send + 'static> CompileActor<C>
+impl<C: Compiler + ShadowApi + Send + 'static> CompileServerActor<C>
 where
     C::World: for<'files> codespan_reporting::files::Files<'files, FileId = TypstFileId>,
 {
@@ -258,7 +262,7 @@ where
 
         // Spawn compiler thread.
         let compile_thread = ensure_single_thread("typst-compiler", async move {
-            log::debug!("CompileActor: initialized");
+            log::debug!("CompileServerActor: initialized");
 
             // Wait for first events.
             'event_loop: while let Some(event) = tokio::select! {
@@ -268,7 +272,7 @@ where
                     ExternalInterrupt::Task(task) => Some(CompilerInterrupt::Task(task)),
                     ExternalInterrupt::Memory(task) => Some(CompilerInterrupt::Memory(task)),
                     ExternalInterrupt::Settle(e) => {
-                        log::info!("CompileActor: requested stop");
+                        log::info!("CompileServerActor: requested stop");
                         e.send(()).ok();
                         break 'event_loop;
                     }
@@ -287,7 +291,7 @@ where
                                 need_recompile = true;
                             }
                             ExternalInterrupt::Settle(e) => {
-                                log::info!("CompileActor: requested stop");
+                                log::info!("CompileServerActor: requested stop");
                                 e.send(()).ok();
                                 break 'event_loop;
                             }
@@ -324,7 +328,7 @@ where
             }
 
             settle_notify();
-            log::info!("CompileActor: exited");
+            log::info!("CompileServerActor: exited");
         })
         .unwrap();
 
@@ -370,7 +374,7 @@ where
         let evict_start = std::time::Instant::now();
         comemo::evict(30);
         log::info!(
-            "CompileActor: evict compilation cache in {:?}",
+            "CompileServerActor: evict compilation cache in {:?}",
             evict_start.elapsed()
         );
 
@@ -397,7 +401,7 @@ where
             //
             // See [`CompileClient::steal`] for more information.
             CompilerInterrupt::Task(task) => {
-                log::debug!("CompileActor: execute task");
+                log::debug!("CompileServerActor: execute task");
 
                 task(self);
 
@@ -406,7 +410,7 @@ where
             }
             // Handle memory events.
             CompilerInterrupt::Memory(event) => {
-                log::debug!("CompileActor: memory event incoming");
+                log::debug!("CompileServerActor: memory event incoming");
 
                 // Emulate memory changes.
                 let mut files = HashSet::new();
@@ -453,13 +457,13 @@ where
             }
             // Handle file system events.
             CompilerInterrupt::Fs(event) => {
-                log::debug!("CompileActor: fs event incoming {:?}", event);
+                log::debug!("CompileServerActor: fs event incoming {:?}", event);
 
                 // Handle file system event if any.
                 if let Some(mut event) = event {
                     // Handle delayed upstream update event before applying file system changes
                     if self.apply_delayed_memory_changes(&mut event).is_none() {
-                        log::warn!("CompileActor: unknown upstream update event");
+                        log::warn!("CompileServerActor: unknown upstream update event");
                     }
 
                     // Apply file system changes.
@@ -508,7 +512,7 @@ where
                         Ok(content) => content,
                         Err(err) => {
                             log::error!(
-                                "CompileActor: read memory file at {}: {}",
+                                "CompileServerActor: read memory file at {}: {}",
                                 p.display(),
                                 err,
                             );
@@ -523,7 +527,7 @@ where
     }
 }
 
-impl<C: Compiler> CompileActor<C> {
+impl<C: Compiler> CompileServerActor<C> {
     pub fn with_watch(mut self, enable_watch: bool) -> Self {
         self.enable_watch = enable_watch;
         self
@@ -630,7 +634,8 @@ pub struct DocToSrcJumpInfo {
 }
 
 // todo: remove constraint to CompilerWorld
-impl<F: CompilerFeat, Ctx: Compiler<World = CompilerWorld<F>>> CompileClient<CompileActor<Ctx>>
+impl<F: CompilerFeat, Ctx: Compiler<World = CompilerWorld<F>>>
+    CompileClient<CompileServerActor<Ctx>>
 where
     Ctx::World: EntryManager,
 {
@@ -811,6 +816,6 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
 
 #[inline]
 fn log_send_error<T>(chan: &'static str, res: Result<(), mpsc::error::SendError<T>>) -> bool {
-    res.map_err(|err| log::warn!("CompileActor: send to {chan} error: {err}"))
+    res.map_err(|err| log::warn!("CompileServerActor: send to {chan} error: {err}"))
         .is_ok()
 }

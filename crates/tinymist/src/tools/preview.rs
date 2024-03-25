@@ -36,7 +36,7 @@ mod preview_exts {
     use typst_ts_core::debug_loc::SourceSpanOffset;
     use typst_ts_core::Error;
 
-    use crate::actor::typst::CompileActor;
+    use crate::actor::typ_client::CompileClientActor;
 
     impl SourceFileServer for CompileActor {
         async fn resolve_source_span(

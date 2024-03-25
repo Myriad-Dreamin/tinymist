@@ -1,4 +1,29 @@
 //! The typst actors running compilations.
+//!
+//! ```ascii
+//! ┌────────────────────────────────┐                      
+//! │    main::compile_actor (client)│                      
+//! └─────┬────────────────────▲─────┘                      
+//!       │                    │                            
+//! ┌─────▼────────────────────┴─────┐         ┌────────────┐
+//! │compiler::compile_actor (server)│◄───────►│notify_actor│
+//! └─────┬────────────────────▲─────┘         └────────────┘
+//!       │                    │                            
+//! ┌─────▼────────────────────┴─────┐ handler ┌────────────┐
+//! │compiler::compile_driver        ├────────►│ rest actors│
+//! └────────────────────────────────┘         └────────────┘
+//! ```
+//!
+//! We generally use typst in two ways.
+//! + creates a [`CompileDriver`] and run compilation in fly.
+//! + creates a [`CompileServerActor`], wraps the drvier, and runs
+//!   [`CompileDriver`] incrementally.
+//!
+//! For latter case, an additional [`CompileClientActor`] is created to
+//! control the [`CompileServerActor`].
+//!
+//! The [`CompileDriver`] will also keep a [`CompileHandler`] to push
+//! information to other actors.
 
 use std::{
     path::{Path, PathBuf},
@@ -16,40 +41,48 @@ use tinymist_query::{
 };
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use typst::{
-    diag::{SourceDiagnostic, SourceResult},
+    diag::{PackageError, SourceDiagnostic, SourceResult},
+    model::Document as TypstDocument,
+    syntax::package::PackageSpec,
     util::Deferred,
+    World as TypstWorld,
 };
 use typst_ts_compiler::{
     service::{CompileDriverImpl, CompileEnv, CompileMiddleware, Compiler, EntryManager, EnvWorld},
     vfs::notify::{FileChangeSet, MemoryEvent},
+    Time,
 };
 use typst_ts_core::{
     config::compiler::EntryState, error::prelude::*, typst::prelude::EcoVec, Error, ImmutPath,
-    TypstDocument, TypstWorld,
 };
 
-use super::compile::CompileClient as TsCompileClient;
-use super::{compile::CompileActor as CompileActorInner, render::PdfExportConfig};
-use crate::{
-    actor::compile::EntryStateExt,
-    tools::preview::{CompilationHandle, CompileStatus},
-};
+use super::typ_server::CompileClient as TsCompileClient;
+use super::{render::PdfExportConfig, typ_server::CompileServerActor};
 use crate::{
     actor::render::{PdfPathVars, RenderActorRequest},
     utils,
 };
+use crate::{
+    actor::typ_server::EntryStateExt,
+    tools::preview::{CompilationHandle, CompileStatus},
+};
 use crate::{world::LspWorld, Config};
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
-type CompileService = CompileActorInner<CompileDriver>;
+type CompileService = CompileServerActor<CompileDriver>;
 type CompileClient = TsCompileClient<CompileService>;
 
 type DiagnosticsSender = mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>;
 
-#[derive(Clone)]
 pub struct CompileHandler {
+    pub(super) diag_group: String,
+
     #[cfg(feature = "preview")]
     pub(super) inner: Arc<Mutex<Option<typst_preview::CompilationHandleImpl>>>,
+
+    pub(super) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
+    pub(super) render_tx: broadcast::Sender<RenderActorRequest>,
+    pub(super) diag_tx: DiagnosticsSender,
 }
 
 impl CompilationHandle for CompileHandler {
@@ -63,13 +96,33 @@ impl CompilationHandle for CompileHandler {
         }
     }
 
-    fn notify_compile(&self, _result: Result<Arc<TypstDocument>, CompileStatus>) {
+    fn notify_compile(&self, res: Result<Arc<TypstDocument>, CompileStatus>) {
+        match res.clone() {
+            Ok(doc) => {
+                let _ = self.doc_tx.send(Some(doc.clone()));
+                // todo: is it right that ignore zero broadcast receiver?
+                let _ = self.render_tx.send(RenderActorRequest::OnTyped);
+            }
+            Err(err) => {
+                self.notify_compile(Err(err));
+            }
+        }
+
         #[cfg(feature = "preview")]
         {
             let inner = self.inner.lock();
             if let Some(inner) = inner.as_ref() {
-                inner.notify_compile(_result.clone());
+                inner.notify_compile(res);
             }
+        }
+    }
+}
+
+impl CompileHandler {
+    fn push_diagnostics(&mut self, diagnostics: Option<DiagnosticsMap>) {
+        let err = self.diag_tx.send((self.diag_group.clone(), diagnostics));
+        if let Err(err) = err {
+            error!("failed to send diagnostics: {:#}", err);
         }
     }
 }
@@ -78,12 +131,7 @@ pub struct CompileDriver {
     pub(super) inner: CompileDriverInner,
     #[allow(unused)]
     pub(super) handler: CompileHandler,
-    pub(super) diag_group: String,
     pub(super) position_encoding: PositionEncoding,
-
-    pub(super) doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
-    pub(super) render_tx: broadcast::Sender<RenderActorRequest>,
-    pub(super) diag_tx: DiagnosticsSender,
 }
 
 impl CompileMiddleware for CompileDriver {
@@ -98,25 +146,16 @@ impl CompileMiddleware for CompileDriver {
     }
 
     fn wrap_compile(&mut self, env: &mut CompileEnv) -> SourceResult<Arc<typst::model::Document>> {
-        #[cfg(feature = "preview")]
         self.handler.status(CompileStatus::Compiling);
         match self.inner_mut().compile(env) {
             Ok(doc) => {
-                #[cfg(feature = "preview")]
                 self.handler.notify_compile(Ok(doc.clone()));
-
-                let _ = self.doc_sender.send(Some(doc.clone()));
-                // todo: is it right that ignore zero broadcast receiver?
-                let _ = self.render_tx.send(RenderActorRequest::OnTyped);
-
                 self.notify_diagnostics(EcoVec::new());
                 Ok(doc)
             }
             Err(err) => {
-                #[cfg(feature = "preview")]
                 self.handler
                     .notify_compile(Err(CompileStatus::CompileError));
-
                 self.notify_diagnostics(err);
                 Err(EcoVec::new())
             }
@@ -125,62 +164,99 @@ impl CompileMiddleware for CompileDriver {
 }
 
 impl CompileDriver {
-    fn push_diagnostics(&mut self, diagnostics: Option<DiagnosticsMap>) {
-        let err = self.diag_tx.send((self.diag_group.clone(), diagnostics));
-        if let Err(err) = err {
-            error!("failed to send diagnostics: {:#}", err);
-        }
-    }
-
     fn notify_diagnostics(&mut self, diagnostics: EcoVec<SourceDiagnostic>) {
         trace!("notify diagnostics: {:#?}", diagnostics);
 
+        let diagnostics =
+            self.run_analysis(|ctx| tinymist_query::convert_diagnostics(ctx, diagnostics.as_ref()));
+
+        match diagnostics {
+            Ok(diagnostics) => {
+                // todo: better way to remove diagnostics
+                // todo: check all errors in this file
+                let detached = self.inner.world().entry.is_inactive();
+                let valid = !detached;
+                self.handler.push_diagnostics(valid.then_some(diagnostics));
+            }
+            Err(err) => {
+                log::error!("TypstActor: failed to convert diagnostics: {:#}", err);
+                self.handler.push_diagnostics(None);
+            }
+        }
+    }
+
+    fn run_analysis<T>(
+        &mut self,
+        f: impl FnOnce(&mut AnalysisContext<'_>) -> T,
+    ) -> anyhow::Result<T> {
+        let enc = self.position_encoding;
         let w = self.inner.world_mut();
-        let root = w.entry.root().clone().unwrap();
-        let diagnostics = tinymist_query::convert_diagnostics(
-            &AnalysisContext::new(
-                &WrapWorld(w),
-                Analysis {
-                    root,
-                    position_encoding: self.position_encoding,
-                },
-            ),
-            diagnostics.as_ref(),
-            self.position_encoding,
-        );
 
-        // todo: better way to remove diagnostics
-        // todo: check all errors in this file
+        let Some(main) = w.main_id() else {
+            log::error!("TypstActor: main file is not set");
+            return Err(anyhow!("main file is not set"));
+        };
+        let Some(root) = w.entry.root() else {
+            log::error!("TypstActor: root is not set");
+            return Err(anyhow!("root is not set"));
+        };
+        w.source(main).map_err(|err| {
+            log::info!("TypstActor: failed to prepare main file: {:?}", err);
+            anyhow!("failed to get source: {err}")
+        })?;
+        w.prepare_env(&mut Default::default()).map_err(|err| {
+            log::error!("TypstActor: failed to prepare env: {:?}", err);
+            anyhow!("failed to prepare env")
+        })?;
 
-        let detached = self.inner.world().entry.is_inactive();
-        let valid = !detached;
+        struct WrapWorld<'a>(&'a mut LspWorld);
 
-        self.push_diagnostics(valid.then_some(diagnostics));
+        impl<'a> AnaylsisResources for WrapWorld<'a> {
+            fn world(&self) -> &dyn typst::World {
+                self.0
+            }
+
+            fn resolve(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError> {
+                use typst_ts_compiler::package::Registry;
+                self.0.registry.resolve(spec)
+            }
+
+            fn iter_dependencies(&self, f: &mut dyn FnMut(&ImmutPath, Time)) {
+                use typst_ts_compiler::NotifyApi;
+                self.0.iter_dependencies(f)
+            }
+        }
+
+        let w = WrapWorld(w);
+        Ok(f(&mut AnalysisContext::new(
+            &w,
+            Analysis {
+                root,
+                position_encoding: enc,
+            },
+        )))
     }
 }
 
-pub struct CompileActor {
+pub struct CompileClientActor {
     diag_group: String,
-    position_encoding: PositionEncoding,
     config: Config,
     entry: Arc<Mutex<EntryState>>,
     inner: Deferred<CompileClient>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
 
-impl CompileActor {
+impl CompileClientActor {
     pub(crate) fn new(
         diag_group: String,
         config: Config,
         entry: EntryState,
-        position_encoding: PositionEncoding,
         inner: Deferred<CompileClient>,
         render_tx: broadcast::Sender<RenderActorRequest>,
     ) -> Self {
         Self {
             diag_group,
             config,
-            position_encoding,
             entry: Arc::new(Mutex::new(entry)),
             inner,
             render_tx,
@@ -260,7 +336,7 @@ impl CompileActor {
 
                 if next_is_inactive {
                     info!("TypstActor: removing diag");
-                    compiler.compiler.compiler.push_diagnostics(None);
+                    compiler.compiler.compiler.handler.push_diagnostics(None);
                 }
 
                 res.map(|_| ())
@@ -314,28 +390,7 @@ impl CompileActor {
     }
 }
 
-struct WrapWorld<'a>(&'a mut LspWorld);
-
-impl<'a> AnaylsisResources for WrapWorld<'a> {
-    fn world(&self) -> &dyn typst::World {
-        self.0
-    }
-
-    fn resolve(
-        &self,
-        spec: &typst_ts_core::package::PackageSpec,
-    ) -> Result<Arc<Path>, typst::diag::PackageError> {
-        use typst_ts_compiler::package::Registry;
-        self.0.registry.resolve(spec)
-    }
-
-    fn iter_dependencies(&self, f: &mut dyn FnMut(&ImmutPath, typst_ts_compiler::Time)) {
-        use typst_ts_compiler::NotifyApi;
-        self.0.iter_dependencies(f)
-    }
-}
-
-impl CompileActor {
+impl CompileClientActor {
     pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
         use CompilerQueryRequest::*;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
@@ -410,40 +465,10 @@ impl CompileActor {
         &self,
         f: impl FnOnce(&mut AnalysisContext, Option<VersionedDocument>) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
-        let enc = self.position_encoding;
-
         self.steal(move |compiler| {
             let doc = compiler.success_doc();
-            let w = compiler.compiler.world_mut();
-
-            let Some(main) = w.main_id() else {
-                log::error!("TypstActor: main file is not set");
-                return Err(anyhow!("main file is not set"));
-            };
-            let Some(root) = w.entry.root() else {
-                log::error!("TypstActor: root is not set");
-                return Err(anyhow!("root is not set"));
-            };
-            w.source(main).map_err(|err| {
-                log::info!("TypstActor: failed to prepare main file: {:?}", err);
-                anyhow!("failed to get source: {err}")
-            })?;
-            w.prepare_env(&mut Default::default()).map_err(|err| {
-                log::error!("TypstActor: failed to prepare env: {:?}", err);
-                anyhow!("failed to prepare env")
-            })?;
-
-            let w = WrapWorld(w);
-            Ok(f(
-                &mut AnalysisContext::new(
-                    &w,
-                    Analysis {
-                        root,
-                        position_encoding: enc,
-                    },
-                ),
-                doc,
-            ))
+            let c = &mut compiler.compiler.compiler;
+            c.run_analysis(move |ctx| f(ctx, doc))
         })?
     }
 
@@ -451,35 +476,6 @@ impl CompileActor {
         &self,
         f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
-        let enc = self.position_encoding;
-        self.steal(move |compiler| {
-            let w = compiler.compiler.world_mut();
-
-            let Some(main) = w.main_id() else {
-                log::error!("TypstActor: main file is not set");
-                return Err(anyhow!("main file is not set"));
-            };
-            let Some(root) = w.entry.root() else {
-                log::error!("TypstActor: root is not set");
-                return Err(anyhow!("root is not set"));
-            };
-            w.source(main).map_err(|err| {
-                log::info!("TypstActor: failed to prepare main file: {:?}", err);
-                anyhow!("failed to get source: {err}")
-            })?;
-            w.prepare_env(&mut Default::default()).map_err(|err| {
-                log::error!("TypstActor: failed to prepare env: {:?}", err);
-                anyhow!("failed to prepare env")
-            })?;
-
-            let w = WrapWorld(w);
-            Ok(f(&mut AnalysisContext::new(
-                &w,
-                Analysis {
-                    root,
-                    position_encoding: enc,
-                },
-            )))
-        })?
+        self.steal(move |compiler| compiler.compiler.compiler.run_analysis(f))?
     }
 }

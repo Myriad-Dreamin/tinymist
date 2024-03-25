@@ -42,7 +42,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use std::{collections::HashMap, path::PathBuf};
 
-use actor::typst::CompileActor;
+use actor::typ_client::CompileClientActor;
 use anyhow::Context;
 use crossbeam_channel::select;
 use crossbeam_channel::Receiver;
@@ -324,9 +324,9 @@ pub struct TypstLanguageServer {
 
     diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
     memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
-    primary: Option<CompileActor>,
+    primary: Option<CompileClientActor>,
     pinning: bool,
-    main: Option<CompileActor>,
+    main: Option<CompileClientActor>,
     font: Deferred<SharedFontResolver>,
     tokens_ctx: SemanticTokenContext,
 }
@@ -369,7 +369,7 @@ impl TypstLanguageServer {
         &self.const_config
     }
 
-    fn primary(&self) -> &CompileActor {
+    fn primary(&self) -> &CompileClientActor {
         self.primary.as_ref().expect("primary")
     }
 
