@@ -97,15 +97,10 @@ impl CompilationHandle for CompileHandler {
     }
 
     fn notify_compile(&self, res: Result<Arc<TypstDocument>, CompileStatus>) {
-        match res.clone() {
-            Ok(doc) => {
-                let _ = self.doc_tx.send(Some(doc.clone()));
-                // todo: is it right that ignore zero broadcast receiver?
-                let _ = self.render_tx.send(RenderActorRequest::OnTyped);
-            }
-            Err(err) => {
-                self.notify_compile(Err(err));
-            }
+        if let Ok(doc) = res.clone() {
+            let _ = self.doc_tx.send(Some(doc.clone()));
+            // todo: is it right that ignore zero broadcast receiver?
+            let _ = self.render_tx.send(RenderActorRequest::OnTyped);
         }
 
         #[cfg(feature = "preview")]
