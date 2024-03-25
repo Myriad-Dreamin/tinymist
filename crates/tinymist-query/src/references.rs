@@ -29,7 +29,7 @@ impl SemanticRequest for ReferencesRequest {
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
         debug!("ast_node: {ast_node:?}", ast_node = ast_node);
-        let deref_target = get_deref_target(ast_node)?;
+        let deref_target = get_deref_target(ast_node, cursor)?;
 
         let def_use = ctx.def_use(source.clone())?;
         let locations = find_references(ctx, def_use, deref_target, ctx.position_encoding())?;
