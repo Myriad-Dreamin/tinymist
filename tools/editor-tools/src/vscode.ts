@@ -1,4 +1,18 @@
+import van from "vanjs-core";
+
 const vscodeAPI = typeof acquireVsCodeApi !== "undefined" && acquireVsCodeApi();
+
+export const traceData = van.state<string | undefined>(undefined);
+
+// todo
+// {
+//     "command": "tinymist.traceCurrentFile",
+//     "title": "Trace and visualize execution of the current Typst file",
+//     "when": "editorLangId == disabled",
+//     "category": "Typst"
+// }
+
+// panel.webview.postMessage({ type: "traceData", data: Mock });
 
 /// A frontend will try to setup a vscode channel if it is running
 /// in vscode.
@@ -6,7 +20,12 @@ export function setupVscodeChannel() {
   if (vscodeAPI?.postMessage) {
     // Handle messages sent from the extension to the webview
     window.addEventListener("message", (event: any) => {
-      void event;
+      switch (event.data.type) {
+        case "traceData": {
+          traceData.val = event.data.data;
+          break;
+        }
+      }
     });
   }
 }

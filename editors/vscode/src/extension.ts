@@ -127,6 +127,9 @@ async function startClient(context: ExtensionContext): Promise<void> {
             commandShowTemplateGallery(context)
         )
     );
+    context.subscriptions.push(
+        commands.registerCommand("tinymist.traceCurrentFile", () => commandShowTrace(context))
+    );
 
     return client.start();
 }
@@ -272,6 +275,18 @@ async function commandPinMain(isPin: boolean): Promise<void> {
 
 async function commandShowTemplateGallery(context: vscode.ExtensionContext): Promise<void> {
     await activateEditorTool(context, "template-gallery");
+}
+
+async function commandShowTrace(context: vscode.ExtensionContext): Promise<void> {
+    const activeEditor = window.activeTextEditor;
+    if (activeEditor === undefined) {
+        return;
+    }
+
+    const uri = activeEditor.document.uri.toString();
+    void uri;
+
+    await activateEditorTool(context, "tracing");
 }
 
 async function commandInitTemplate(

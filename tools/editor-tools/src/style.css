@@ -1,102 +1,132 @@
-html, body {
-    margin: 0;
+html,
+body {
+  margin: 0;
+}
+
+.flex-row {
+    display: flex;
+    flex-direction: row;
+}
+
+.flex-col {
+    display: flex;
+    flex-direction: column;
 }
 
 .tinymist-card {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0.75rem;
 }
 
 .template-card {
-    padding: 18px 24px;
-    margin: 1em 0;
+  padding: 18px 24px;
+  margin: 1em 0;
 }
 
 .tinymist-search {
-    width: calc(100% - 1em);
-    margin: 0.2em;
+  width: calc(100% - 1em);
+  margin: 0.2em;
 }
 
 .tinymist-author-container {
-    font-size: 0.8em;
+  font-size: 0.8em;
 }
 
 .tinymist-template-action-container {
-    margin-top: 0.2em;
-    margin-bottom: 0.3em;
+  margin-top: 0.2em;
+  margin-bottom: 0.3em;
 }
 
 .tinymist-category-container {
-    margin-bottom: 0.1em;
+  margin-bottom: 0.1em;
 }
 
 .tinymist-category {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 0.4rem;
-    padding: 0.1rem 0.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 0.4rem;
+  padding: 0.1rem 0.5rem;
 }
 
 .tinymist-category-filter {
-    display: flex;
-    margin-top: 6px;
-    gap: 0.5rem;
+  display: flex;
+  margin-top: 6px;
+  gap: 0.5rem;
 }
 
 .tinymist-template-actions .tinymist-button div {
-    height: 16px;
+  height: 16px;
 }
 
 .tinymist-button {
-    background: rgba(129, 60, 133, 0.6);
-    border: none;
-    border-radius: 0.2rem;
-    cursor: pointer;
-    transition: background 0.15s;
+  background: rgba(129, 60, 133, 0.6);
+  border: none;
+  border-radius: 0.2rem;
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
 .tinymist-button:hover {
-    background: rgba(129, 60, 133, 0.9);
+  background: rgba(129, 60, 133, 0.9);
 }
 
 .tinymist-button.activated {
-    background: rgba(129, 60, 133, 0.9);
+  background: rgba(129, 60, 133, 0.9);
 }
 
 #tinymist-app {
-    margin: 24px 28px;
+  margin: 24px 28px;
 }
 
 body.typst-preview-dark .tinymist-card {
-    background: rgba(193, 108, 108, 0.05);
+  background: rgba(193, 108, 108, 0.05);
 }
 body.typst-preview-dark .tinymist-category {
-    background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.05);
 }
 body.typst-preview-dark .tinymist-button {
-    background: rgba(129, 60, 133, 0.6);
+  background: rgba(129, 60, 133, 0.6);
 }
 body.typst-preview-dark .tinymist-button:hover {
-    background: rgba(129, 60, 133, 0.9);
+  background: rgba(129, 60, 133, 0.9);
 }
 body.typst-preview-dark .tinymist-button.activated {
-    background: rgba(129, 60, 133, 0.9);
+  background: rgba(129, 60, 133, 0.9);
 }
+body.typst-preview-dark .tinymist-button.warning {
+  background: rgba(252, 211, 55, 0.6);
+}
+body.typst-preview-dark .tinymist-button.warning:hover {
+  background: rgba(252, 211, 55, 0.9);
+}
+body.typst-preview-dark .tinymist-button.warning.activated {
+  background: rgba(252, 211, 55, 0.9);
+}
+
 body.typst-preview-light .tinymist-card {
-    background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.05);
 }
 body.typst-preview-light .tinymist-category {
-    background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.05);
 }
 body.typst-preview-light .tinymist-button {
-    background: rgba(186, 204, 217, 0.6);
+  background: rgba(186, 204, 217, 0.6);
 }
 body.typst-preview-light .tinymist-button:hover {
-    background: rgba(186, 204, 217, 0.9);
+  background: rgba(186, 204, 217, 0.9);
 }
 body.typst-preview-light .tinymist-button.activated {
-    background: rgba(186, 204, 217, 0.9);
+  background: rgba(186, 204, 217, 0.9);
+}
+body.typst-preview-light .tinymist-button.warning {
+  background: rgba(243, 202, 99, 0.6);
+}
+body.typst-preview-light .tinymist-button.warning:hover {
+  background: rgba(243, 202, 99, 0.9);
+}
+body.typst-preview-light .tinymist-button.warning.activated {
+  background: rgba(243, 202, 99, 0.9);
 }
 
 .tinymist-icon path {
-    fill: WindowText;
+  fill: WindowText;
 }
