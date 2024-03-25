@@ -109,12 +109,40 @@ pub trait StatefulRequest {
 
 #[allow(missing_docs)]
 mod polymorphic {
+    use serde::{Deserialize, Serialize};
+
     use super::prelude::*;
     use super::*;
+
+    #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+    pub enum PageSelection {
+        #[serde(rename = "first")]
+        First,
+        #[serde(rename = "merged")]
+        Merged,
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum ExportKind {
+        Pdf,
+        Svg { page: PageSelection },
+        Png { page: PageSelection },
+    }
+
+    impl ExportKind {
+        pub fn extension(&self) -> &str {
+            match self {
+                Self::Pdf => "pdf",
+                Self::Svg { .. } => "svg",
+                Self::Png { .. } => "png",
+            }
+        }
+    }
 
     #[derive(Debug, Clone)]
     pub struct OnExportRequest {
         pub path: PathBuf,
+        pub kind: ExportKind,
     }
 
     #[derive(Debug, Clone)]

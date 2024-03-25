@@ -43,6 +43,8 @@ codespan-reporting = "0.11"
 typst = "0.11.0"
 typst-ide = "0.11.0"
 typst-pdf = "0.11.0"
+typst-svg = "0.11.0"
+typst-render = "0.11.0"
 typst-assets = "0.11.0"
 reflexo = { version = "0.5.0-rc2", default-features = false, features = [
     "flat-vector",
@@ -107,6 +109,8 @@ undocumented_unsafe_blocks = "warn"
 
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
 typst-ide = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
+typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
+typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
 typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
 # typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
 

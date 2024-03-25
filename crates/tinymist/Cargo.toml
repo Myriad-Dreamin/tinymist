@@ -36,7 +36,9 @@ clap_complete_fig.workspace = true
 clap_mangen.workspace = true
 
 typst.workspace = true
+typst-svg.workspace = true
 typst-pdf.workspace = true
+typst-render.workspace = true
 typst-assets = { workspace = true, features = ["fonts"] }
 
 typst-ts-core = { workspace = true, default-features = false, features = [

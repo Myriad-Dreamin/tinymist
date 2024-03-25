@@ -99,7 +99,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
     });
 
     context.subscriptions.push(
-        commands.registerCommand("tinymist.exportCurrentPdf", commandExportCurrentPdf)
+        commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf"))
     );
     context.subscriptions.push(
         commands.registerCommand("typst-lsp.pinMainToCurrent", () => commandPinMain(true))
@@ -107,7 +107,9 @@ async function startClient(context: ExtensionContext): Promise<void> {
     context.subscriptions.push(
         commands.registerCommand("typst-lsp.unpinMain", () => commandPinMain(false))
     );
-    context.subscriptions.push(commands.registerCommand("tinymist.showPdf", commandShowPdf));
+    context.subscriptions.push(
+        commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf"))
+    );
     context.subscriptions.push(commands.registerCommand("tinymist.clearCache", commandClearCache));
     context.subscriptions.push(
         commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens)
@@ -195,19 +197,18 @@ function validateServer(path: string): { valid: true } | { valid: false; message
     }
 }
 
-async function commandExportCurrentPdf(): Promise<string | undefined> {
+async function commandExport(mode: string, extraOpts?: any): Promise<string | undefined> {
     const activeEditor = window.activeTextEditor;
     if (activeEditor === undefined) {
         return;
     }
 
-    const uri = activeEditor.document.uri.toString();
+    const uri = activeEditor.document.uri.fsPath;
 
     const res = await client?.sendRequest<string | null>("workspace/executeCommand", {
-        command: "tinymist.exportPdf",
-        arguments: [uri],
+        command: `tinymist.export${mode}`,
+        arguments: [uri, ...(extraOpts ? [extraOpts] : [])],
     });
-    console.log("export pdf", res);
     if (res === null) {
         return undefined;
     }
@@ -218,25 +219,25 @@ async function commandExportCurrentPdf(): Promise<string | undefined> {
  * Implements the functionality for the 'Show PDF' button shown in the editor title
  * if a `.typ` file is opened.
  */
-async function commandShowPdf(): Promise<void> {
+async function commandShow(kind: string, extraOpts?: any): Promise<void> {
     const activeEditor = window.activeTextEditor;
     if (activeEditor === undefined) {
         return;
     }
 
     // only create pdf if it does not exist yet
-    const pdfPath = await commandExportCurrentPdf();
+    const exportPath = await commandExport(kind, extraOpts);
 
-    if (pdfPath === undefined) {
+    if (exportPath === undefined) {
         // show error message
-        await window.showErrorMessage("Failed to create PDF");
+        await window.showErrorMessage("Failed to create");
         return;
     }
 
-    const pdfUri = Uri.file(pdfPath);
+    const exportUri = Uri.file(exportPath);
 
     // here we can be sure that the pdf exists
-    await commands.executeCommand("vscode.open", pdfUri, ViewColumn.Beside);
+    await commands.executeCommand("vscode.open", exportUri, ViewColumn.Beside);
 }
 
 async function commandClearCache(): Promise<void> {
@@ -443,17 +444,43 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
             break;
         }
         case "export-pdf": {
-            await commandShowPdf();
+            await commandShow("Pdf");
             break;
         }
         case "export-as": {
-            const fmt = await vscode.window.showQuickPick(["pdf"], {
-                title: "Format to export as",
-            });
-
-            if (fmt === "pdf") {
-                await commandShowPdf();
+            enum FastKind {
+                PDF = "PDF",
+                SVG = "SVG (First Page)",
+                SVGMerged = "SVG (Merged)",
+                PNG = "PNG (First Page)",
+                PNGMerged = "PNG (Merged)",
             }
+
+            const fmt = await vscode.window.showQuickPick(
+                [FastKind.PDF, FastKind.SVG, FastKind.SVGMerged, FastKind.PNG, FastKind.PNGMerged],
+                {
+                    title: "Format to export as",
+                }
+            );
+
+            switch (fmt) {
+                case FastKind.PDF:
+                    await commandShow("Pdf");
+                    break;
+                case FastKind.SVG:
+                    await commandShow("Svg");
+                    break;
+                case FastKind.SVGMerged:
+                    await commandShow("Svg", { page: "merged" });
+                    break;
+                case FastKind.PNG:
+                    await commandShow("Png");
+                    break;
+                case FastKind.PNGMerged:
+                    await commandShow("Png", { page: "merged" });
+                    break;
+            }
+
             break;
         }
         default: {
