@@ -5,19 +5,28 @@ pub mod compile;
 pub mod render;
 pub mod typst;
 
-use ::typst::diag::FileResult;
+use ::typst::{diag::FileResult, util::Deferred};
 use tokio::sync::{broadcast, watch};
-use typst_ts_compiler::vfs::notify::FileChangeSet;
+use typst_ts_compiler::{
+    service::CompileDriverImpl,
+    vfs::notify::{FileChangeSet, MemoryEvent},
+};
 use typst_ts_core::config::compiler::EntryState;
 
 use self::{
     render::{PdfExportActor, PdfExportConfig},
-    typst::{create_server, CompileActor},
+    typst::{CompileActor, CompileHandler},
 };
-use crate::TypstLanguageServer;
+use crate::{
+    actor::{compile::CompileActor as CompileActorInner, typst::CompileDriver},
+    world::{LspWorld, LspWorldBuilder},
+    TypstLanguageServer,
+};
+
+type CompileDriverInner = CompileDriverImpl<LspWorld>;
 
 impl TypstLanguageServer {
-    pub fn server(&self, name: String, entry: EntryState) -> CompileActor {
+    pub fn server(&self, diag_group: String, entry: EntryState) -> CompileActor {
         let (doc_tx, doc_rx) = watch::channel(None);
         let (render_tx, _) = broadcast::channel(10);
 
@@ -47,15 +56,60 @@ impl TypstLanguageServer {
         );
 
         // Create the server
-        create_server(
-            name,
-            &self.config,
-            self.const_config(),
-            self.font.clone(),
+        let position_encoding = self.const_config().position_encoding;
+        let inner = Deferred::new({
+            let current_runtime = tokio::runtime::Handle::current();
+            let handler = CompileHandler {
+                #[cfg(feature = "preview")]
+                inner: Arc::new(Mutex::new(None)),
+            };
+
+            let diag_group = diag_group.clone();
+            let entry = entry.clone();
+            let diag_tx = self.diag_tx.clone();
+            let font_resolver = self.font.clone();
+            let render_tx = render_tx.clone();
+            move || {
+                log::info!("TypstActor: creating server for {diag_group}");
+
+                // Create the world
+                let font_resolver = font_resolver.wait().clone();
+                let world = LspWorldBuilder::build(entry.clone(), font_resolver)
+                    .expect("incorrect options");
+
+                // Create the compiler
+                let driver = CompileDriverInner::new(world);
+                let driver = CompileDriver {
+                    inner: driver,
+                    handler,
+                    doc_sender: doc_tx,
+                    render_tx: render_tx.clone(),
+                    diag_group: diag_group.clone(),
+                    position_encoding,
+                    diag_tx,
+                };
+
+                // Create the actor
+                let actor = CompileActorInner::new(driver, entry).with_watch(true);
+                let (server, client) = actor.split();
+
+                // We do send memory changes instead of initializing compiler with them.
+                // This is because there are state recorded inside of the compiler actor, and we
+                // must update them.
+                client.add_memory_changes(MemoryEvent::Update(snapshot));
+
+                current_runtime.spawn(server.spawn());
+
+                client
+            }
+        });
+
+        CompileActor::new(
+            diag_group,
+            self.config.clone(),
             entry,
-            snapshot,
-            self.diag_tx.clone(),
-            doc_tx,
+            position_encoding,
+            inner,
             render_tx,
         )
     }

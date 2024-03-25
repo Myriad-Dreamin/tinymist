@@ -19,8 +19,6 @@ use typst::{
     diag::{SourceDiagnostic, SourceResult},
     util::Deferred,
 };
-#[cfg(feature = "preview")]
-use typst_preview::{CompilationHandle, CompilationHandleImpl, CompileStatus};
 use typst_ts_compiler::{
     service::{CompileDriverImpl, CompileEnv, CompileMiddleware, Compiler, EntryManager, EnvWorld},
     vfs::notify::{FileChangeSet, MemoryEvent},
@@ -32,30 +30,15 @@ use typst_ts_core::{
 
 use super::compile::CompileClient as TsCompileClient;
 use super::{compile::CompileActor as CompileActorInner, render::PdfExportConfig};
-use crate::{actor::compile::EntryStateExt, ConstConfig};
+use crate::{
+    actor::compile::EntryStateExt,
+    tools::preview::{CompilationHandle, CompileStatus},
+};
 use crate::{
     actor::render::{PdfPathVars, RenderActorRequest},
     utils,
 };
-use crate::{
-    world::{LspWorld, LspWorldBuilder, SharedFontResolver},
-    Config,
-};
-
-#[cfg(not(feature = "preview"))]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "kind", content = "data")]
-pub enum CompileStatus {
-    Compiling,
-    CompileSuccess,
-    CompileError,
-}
-
-#[cfg(not(feature = "preview"))]
-pub trait CompilationHandle: Send + 'static {
-    fn status(&self, status: CompileStatus);
-    fn notify_compile(&self, res: Result<Arc<TypstDocument>, CompileStatus>);
-}
+use crate::{world::LspWorld, Config};
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
 type CompileService = CompileActorInner<CompileDriver>;
@@ -63,92 +46,10 @@ type CompileClient = TsCompileClient<CompileService>;
 
 type DiagnosticsSender = mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>;
 
-#[allow(clippy::too_many_arguments)]
-pub fn create_server(
-    diag_group: String,
-    config: &Config,
-    cfg: &ConstConfig,
-    // opts: OptsState,
-    font_resolver: Deferred<SharedFontResolver>,
-    entry: EntryState,
-    snapshot: FileChangeSet,
-    diag_tx: DiagnosticsSender,
-    doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
-    render_tx: broadcast::Sender<RenderActorRequest>,
-) -> CompileActor {
-    let pos_encoding = cfg.position_encoding;
-
-    let inner = Deferred::new({
-        let current_runtime = tokio::runtime::Handle::current();
-        let handler = CompileHandler {
-            #[cfg(feature = "preview")]
-            inner: Arc::new(Mutex::new(None)),
-        };
-
-        let diag_group = diag_group.clone();
-        let entry = entry.clone();
-        let render_tx = render_tx.clone();
-
-        move || {
-            info!("TypstActor: creating server for {diag_group}");
-
-            let font_resolver = font_resolver.wait().clone();
-
-            let world =
-                LspWorldBuilder::build(entry.clone(), font_resolver).expect("incorrect options");
-            let driver = CompileDriverInner::new(world);
-            let driver = CompileDriver {
-                inner: driver,
-                handler,
-                doc_sender,
-                render_tx: render_tx.clone(),
-                diag_group: diag_group.clone(),
-                position_encoding: pos_encoding,
-                diag_tx,
-            };
-
-            let actor = CompileActorInner::new(driver, entry).with_watch(true);
-            let (server, client) = actor.split();
-
-            // We do send memory changes instead of initializing compiler with them.
-            // This is because there are state recorded inside of the compiler actor, and we
-            // must update them.
-            client.add_memory_changes(MemoryEvent::Update(snapshot));
-
-            current_runtime.spawn(server.spawn());
-
-            client
-        }
-    });
-
-    CompileActor::new(
-        diag_group,
-        config.clone(),
-        entry,
-        pos_encoding,
-        inner,
-        render_tx,
-    )
-}
-
-macro_rules! query_state {
-    ($self:ident, $method:ident, $req:expr) => {{
-        let res = $self.steal_state(move |w, doc| $req.request(w, doc));
-        res.map(CompilerQueryResponse::$method)
-    }};
-}
-
-macro_rules! query_world {
-    ($self:ident, $method:ident, $req:expr) => {{
-        let res = $self.steal_world(move |w| $req.request(w));
-        res.map(CompilerQueryResponse::$method)
-    }};
-}
-
 #[derive(Clone)]
 pub struct CompileHandler {
     #[cfg(feature = "preview")]
-    inner: Arc<Mutex<Option<CompilationHandleImpl>>>,
+    pub(super) inner: Arc<Mutex<Option<typst_preview::CompilationHandleImpl>>>,
 }
 
 impl CompilationHandle for CompileHandler {
@@ -174,16 +75,15 @@ impl CompilationHandle for CompileHandler {
 }
 
 pub struct CompileDriver {
-    inner: CompileDriverInner,
+    pub(super) inner: CompileDriverInner,
     #[allow(unused)]
-    handler: CompileHandler,
+    pub(super) handler: CompileHandler,
+    pub(super) diag_group: String,
+    pub(super) position_encoding: PositionEncoding,
 
-    doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
-    render_tx: broadcast::Sender<RenderActorRequest>,
-
-    diag_group: String,
-    position_encoding: PositionEncoding,
-    diag_tx: DiagnosticsSender,
+    pub(super) doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
+    pub(super) render_tx: broadcast::Sender<RenderActorRequest>,
+    pub(super) diag_tx: DiagnosticsSender,
 }
 
 impl CompileMiddleware for CompileDriver {
@@ -235,9 +135,7 @@ impl CompileDriver {
     fn notify_diagnostics(&mut self, diagnostics: EcoVec<SourceDiagnostic>) {
         trace!("notify diagnostics: {:#?}", diagnostics);
 
-        // todo encoding
         let w = self.inner.world_mut();
-        // todo: root
         let root = w.entry.root().clone().unwrap();
         let diagnostics = tinymist_query::convert_diagnostics(
             &AnalysisContext::new(
@@ -265,16 +163,13 @@ pub struct CompileActor {
     diag_group: String,
     position_encoding: PositionEncoding,
     config: Config,
-    // root_tx: Mutex<Option<oneshot::Sender<Option<ImmutPath>>>>,
-    // root: OnceCell<Option<ImmutPath>>,
     entry: Arc<Mutex<EntryState>>,
     inner: Deferred<CompileClient>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
 
 impl CompileActor {
-    #[allow(clippy::too_many_arguments)]
-    fn new(
+    pub(crate) fn new(
         diag_group: String,
         config: Config,
         entry: EntryState,
@@ -285,11 +180,6 @@ impl CompileActor {
         Self {
             diag_group,
             config,
-            // root_tx: Mutex::new(root.is_none().then_some(root_tx)),
-            // root: match root {
-            //     Some(root) => OnceCell::from(Some(root)),
-            //     None => OnceCell::new(),
-            // },
             position_encoding,
             entry: Arc::new(Mutex::new(entry)),
             inner,
@@ -450,6 +340,20 @@ impl CompileActor {
         use CompilerQueryRequest::*;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
+        macro_rules! query_state {
+            ($self:ident, $method:ident, $req:expr) => {{
+                let res = $self.steal_state(move |w, doc| $req.request(w, doc));
+                res.map(CompilerQueryResponse::$method)
+            }};
+        }
+
+        macro_rules! query_world {
+            ($self:ident, $method:ident, $req:expr) => {{
+                let res = $self.steal_world(move |w| $req.request(w));
+                res.map(CompilerQueryResponse::$method)
+            }};
+        }
+
         match query {
             CompilerQueryRequest::OnExport(OnExportRequest { path }) => {
                 Ok(CompilerQueryResponse::OnExport(self.on_export(path)?))
@@ -548,28 +452,6 @@ impl CompileActor {
         f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
         let enc = self.position_encoding;
-        // let opts = match opts {
-        //     OptsState::Exact(opts) => opts,
-        //     OptsState::Rootless(opts) => {
-        //         let root: ImmutPath = match utils::threaded_receive(root_rx) {
-        //             Ok(Some(root)) => root,
-        //             Ok(None) => {
-        //                 error!("TypstActor: failed to receive root path: root is
-        // none");                 return CompileClient::faked();
-        //             }
-        //             Err(err) => {
-        //                 error!("TypstActor: failed to receive root path: {:#}", err);
-        //                 return CompileClient::faked();
-        //             }
-        //         };
-
-        //         opts(root.as_ref().into())
-        //     }
-        // };
-        // mut opts: CompileOnceOpts,
-        // let inputs = std::mem::take(&mut opts.inputs);
-        // w.set_inputs(Arc::new(Prehashed::new(inputs)));
-
         self.steal(move |compiler| {
             let w = compiler.compiler.world_mut();
 
@@ -600,111 +482,4 @@ impl CompileActor {
             )))
         })?
     }
-}
-
-#[cfg(feature = "preview")]
-mod preview_exts {
-    use std::path::Path;
-
-    use typst::layout::Position;
-    use typst::syntax::Span;
-    use typst_preview::{
-        CompileHost, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
-        SourceFileServer,
-    };
-    use typst_ts_compiler::vfs::notify::FileChangeSet;
-    use typst_ts_compiler::vfs::notify::MemoryEvent;
-    use typst_ts_core::debug_loc::SourceSpanOffset;
-    use typst_ts_core::Error;
-
-    use super::CompileActor;
-
-    #[cfg(feature = "preview")]
-    impl SourceFileServer for CompileActor {
-        async fn resolve_source_span(
-            &mut self,
-            loc: Location,
-        ) -> Result<Option<SourceSpanOffset>, Error> {
-            let Location::Src(src_loc) = loc;
-            self.inner().resolve_src_location(src_loc).await
-        }
-
-        async fn resolve_document_position(
-            &mut self,
-            loc: Location,
-        ) -> Result<Option<Position>, Error> {
-            let Location::Src(src_loc) = loc;
-
-            let path = Path::new(&src_loc.filepath).to_owned();
-            let line = src_loc.pos.line;
-            let column = src_loc.pos.column;
-
-            self.inner()
-                .resolve_src_to_doc_jump(path, line, column)
-                .await
-        }
-
-        async fn resolve_source_location(
-            &mut self,
-            s: Span,
-            offset: Option<usize>,
-        ) -> Result<Option<DocToSrcJumpInfo>, Error> {
-            Ok(self
-                .inner()
-                .resolve_span_and_offset(s, offset)
-                .await
-                .map_err(|err| {
-                    log::error!("TypstActor: failed to resolve span and offset: {:#}", err);
-                })
-                .ok()
-                .flatten()
-                .map(|e| DocToSrcJumpInfo {
-                    filepath: e.filepath,
-                    start: e.start,
-                    end: e.end,
-                }))
-        }
-    }
-
-    #[cfg(feature = "preview")]
-    impl EditorServer for CompileActor {
-        async fn update_memory_files(
-            &mut self,
-            files: MemoryFiles,
-            reset_shadow: bool,
-        ) -> Result<(), Error> {
-            // todo: is it safe to believe that the path is normalized?
-            let now = std::time::SystemTime::now();
-            let files = FileChangeSet::new_inserts(
-                files
-                    .files
-                    .into_iter()
-                    .map(|(path, content)| {
-                        let content = content.as_bytes().into();
-                        // todo: cloning PathBuf -> Arc<Path>
-                        (path.into(), Ok((now, content)).into())
-                    })
-                    .collect(),
-            );
-            self.inner().add_memory_changes(if reset_shadow {
-                MemoryEvent::Sync(files)
-            } else {
-                MemoryEvent::Update(files)
-            });
-
-            Ok(())
-        }
-
-        async fn remove_shadow_files(&mut self, files: MemoryFilesShort) -> Result<(), Error> {
-            // todo: is it safe to believe that the path is normalized?
-            let files =
-                FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
-            self.inner().add_memory_changes(MemoryEvent::Update(files));
-
-            Ok(())
-        }
-    }
-
-    #[cfg(feature = "preview")]
-    impl CompileHost for CompileActor {}
 }
