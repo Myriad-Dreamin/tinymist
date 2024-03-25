@@ -44,11 +44,11 @@ typst = "0.11.0"
 typst-ide = "0.11.0"
 typst-pdf = "0.11.0"
 typst-assets = "0.11.0"
-reflexo = { version = "0.4.2-rc9", default-features = false, features = [
+reflexo = { version = "=0.4.2-rc10", default-features = false, features = [
     "flat-vector",
 ] }
-typst-ts-core = { version = "0.4.2-rc9" }
-typst-ts-compiler = { version = "0.4.2-rc9" }
+typst-ts-core = { version = "=0.4.2-rc10" }
+typst-ts-compiler = { version = "=0.4.2-rc10" }
 typst-preview = { version = "0.11.0" }
 
 lsp-server = "0.7.6"
@@ -115,7 +115,7 @@ typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tin
 # typst-pdf = { path = "../typst/crates/typst-pdf" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
-reflexo = { path = "../typst.ts/crates/reflexo/" }
-typst-ts-core = { path = "../typst.ts/core" }
-typst-ts-compiler = { path = "../typst.ts/compiler" }
+# typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
+# reflexo = { path = "../typst.ts/crates/reflexo/" }
+# typst-ts-core = { path = "../typst.ts/core" }
+# typst-ts-compiler = { path = "../typst.ts/compiler" }
