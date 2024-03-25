@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::anyhow;
-use log::{debug, error, info, trace};
+use log::{error, info, trace};
 use parking_lot::Mutex;
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnaylsisResources},
@@ -32,7 +32,7 @@ use typst_ts_core::{
 
 use super::compile::CompileClient as TsCompileClient;
 use super::{compile::CompileActor as CompileActorInner, render::PdfExportConfig};
-use crate::ConstConfig;
+use crate::{actor::compile::EntryStateExt, ConstConfig};
 use crate::{
     actor::render::{PdfPathVars, RenderActorRequest},
     utils,
@@ -175,6 +175,7 @@ impl CompilationHandle for CompileHandler {
 
 pub struct CompileDriver {
     inner: CompileDriverInner,
+    #[allow(unused)]
     handler: CompileHandler,
 
     doc_sender: watch::Sender<Option<Arc<TypstDocument>>>,
@@ -253,7 +254,7 @@ impl CompileDriver {
         // todo: better way to remove diagnostics
         // todo: check all errors in this file
 
-        let detached = self.inner.world().entry.is_detached();
+        let detached = self.inner.world().entry.is_inactive();
         let valid = !detached;
 
         self.push_diagnostics(valid.then_some(diagnostics));
@@ -349,7 +350,7 @@ impl CompileActor {
         if let Some(prev) = should_change {
             let next = next_entry.clone();
 
-            debug!(
+            info!(
                 "the entry file of TypstActor({}) is changing to {next:?}",
                 self.diag_group,
             );
@@ -364,10 +365,10 @@ impl CompileActor {
             let res = self.steal(move |compiler| {
                 compiler.change_entry(next.clone());
 
-                let next_is_detached = next.is_detached();
+                let next_is_inactive = next.is_inactive();
                 let res = compiler.compiler.world_mut().mutate_entry(next);
 
-                if next_is_detached {
+                if next_is_inactive {
                     info!("TypstActor: removing diag");
                     compiler.compiler.compiler.push_diagnostics(None);
                 }

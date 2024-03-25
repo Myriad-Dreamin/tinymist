@@ -35,6 +35,19 @@ use typst_ts_compiler::service::{
 
 use crate::{task::BorrowTask, utils};
 
+pub trait EntryStateExt {
+    fn is_inactive(&self) -> bool;
+}
+
+impl EntryStateExt for EntryState {
+    fn is_inactive(&self) -> bool {
+        matches!(
+            self,
+            EntryState::Detached | EntryState::Workspace { main: None, .. }
+        )
+    }
+}
+
 /// Interrupts for external sources
 enum ExternalInterrupt<Ctx> {
     /// Compile anyway.
@@ -146,7 +159,7 @@ where
             steal_recv,
 
             suspend_state: SuspendState {
-                suspended: entry.is_detached(),
+                suspended: entry.is_inactive(),
                 dirty: false,
             },
         }
@@ -320,7 +333,7 @@ where
     }
 
     pub(crate) fn change_entry(&mut self, entry: EntryState) {
-        let suspending = entry.is_detached();
+        let suspending = entry.is_inactive();
         if suspending {
             self.suspend_state.suspended = true;
         } else {

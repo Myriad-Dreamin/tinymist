@@ -254,7 +254,7 @@ async function commandPinMain(isPin: boolean): Promise<void> {
     if (!isPin) {
         await client?.sendRequest("workspace/executeCommand", {
             command: "tinymist.pinMain",
-            arguments: ["detached"],
+            arguments: [null],
         });
         return;
     }
