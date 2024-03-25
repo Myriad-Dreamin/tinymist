@@ -2712,7 +2712,6 @@ dependencies = [
  "dashmap",
  "ecow",
  "fxhash",
- "js-sys",
  "once_cell",
  "parking_lot",
  "path-clean",
@@ -2723,7 +2722,6 @@ dependencies = [
  "serde_with",
  "siphasher 1.0.0",
  "tiny-skia-path",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -4152,7 +4150,6 @@ dependencies = [
  "flate2",
  "fxhash",
  "hex",
- "js-sys",
  "log",
  "once_cell",
  "parking_lot",
@@ -4170,8 +4167,6 @@ dependencies = [
  "tiny-skia-path",
  "ttf-parser",
  "typst",
- "wasm-bindgen",
- "web-sys",
  "xmlparser",
 ]
 
