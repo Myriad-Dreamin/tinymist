@@ -35,9 +35,7 @@ use log::{error, info, trace};
 use parking_lot::Mutex;
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnaylsisResources},
-    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, ExportKind, FoldRequestFeature,
-    OnExportRequest, OnSaveExportRequest, PositionEncoding, SemanticRequest, StatefulRequest,
-    VersionedDocument,
+    DiagnosticsMap, ExportKind, PositionEncoding, VersionedDocument,
 };
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use typst::{
@@ -386,52 +384,7 @@ impl CompileClientActor {
 }
 
 impl CompileClientActor {
-    pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
-        use CompilerQueryRequest::*;
-        assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
-
-        macro_rules! query_state {
-            ($self:ident, $method:ident, $req:expr) => {{
-                let res = $self.steal_state(move |w, doc| $req.request(w, doc));
-                res.map(CompilerQueryResponse::$method)
-            }};
-        }
-
-        macro_rules! query_world {
-            ($self:ident, $method:ident, $req:expr) => {{
-                let res = $self.steal_world(move |w| $req.request(w));
-                res.map(CompilerQueryResponse::$method)
-            }};
-        }
-
-        match query {
-            CompilerQueryRequest::OnExport(OnExportRequest { kind, path }) => {
-                Ok(CompilerQueryResponse::OnExport(self.on_export(kind, path)?))
-            }
-            CompilerQueryRequest::OnSaveExport(OnSaveExportRequest { path }) => {
-                self.on_save_export(path)?;
-                Ok(CompilerQueryResponse::OnSaveExport(()))
-            }
-            Hover(req) => query_state!(self, Hover, req),
-            GotoDefinition(req) => query_world!(self, GotoDefinition, req),
-            GotoDeclaration(req) => query_world!(self, GotoDeclaration, req),
-            References(req) => query_world!(self, References, req),
-            InlayHint(req) => query_world!(self, InlayHint, req),
-            CodeLens(req) => query_world!(self, CodeLens, req),
-            Completion(req) => query_state!(self, Completion, req),
-            SignatureHelp(req) => query_world!(self, SignatureHelp, req),
-            Rename(req) => query_world!(self, Rename, req),
-            PrepareRename(req) => query_world!(self, PrepareRename, req),
-            Symbol(req) => query_world!(self, Symbol, req),
-            FoldingRange(..)
-            | SelectionRange(..)
-            | SemanticTokensDelta(..)
-            | DocumentSymbol(..)
-            | SemanticTokensFull(..) => unreachable!(),
-        }
-    }
-
-    fn on_export(&self, kind: ExportKind, path: PathBuf) -> anyhow::Result<Option<PathBuf>> {
+    pub fn on_export(&self, kind: ExportKind, path: PathBuf) -> anyhow::Result<Option<PathBuf>> {
         // todo: we currently doesn't respect the path argument...
         info!("CompileActor: on export: {}", path.display());
 
@@ -452,14 +405,14 @@ impl CompileClientActor {
         Ok(res)
     }
 
-    fn on_save_export(&self, path: PathBuf) -> anyhow::Result<()> {
+    pub fn on_save_export(&self, path: PathBuf) -> anyhow::Result<()> {
         info!("CompileActor: on save export: {}", path.display());
         let _ = self.render_tx.send(RenderActorRequest::OnSaved(path));
 
         Ok(())
     }
 
-    fn steal_state<T: Send + Sync + 'static>(
+    pub fn steal_state<T: Send + Sync + 'static>(
         &self,
         f: impl FnOnce(&mut AnalysisContext, Option<VersionedDocument>) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
@@ -470,7 +423,7 @@ impl CompileClientActor {
         })?
     }
 
-    fn steal_world<T: Send + Sync + 'static>(
+    pub fn steal_world<T: Send + Sync + 'static>(
         &self,
         f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
