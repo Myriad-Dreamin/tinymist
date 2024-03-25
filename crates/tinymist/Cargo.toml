@@ -39,7 +39,7 @@ typst.workspace = true
 typst-pdf.workspace = true
 typst-assets = { workspace = true, features = ["fonts"] }
 
-typst-ts-core = { version = "0.4.2-rc6", default-features = false, features = [
+typst-ts-core = { workspace = true, default-features = false, features = [
     "flat-vector",
     "vector-bbox",
     "no-content-hint",
