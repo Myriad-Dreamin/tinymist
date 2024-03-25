@@ -47,7 +47,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
 
     const serverCommand = getServer(config);
     const fontPaths = config.fontPaths as string[] | null;
-    const withSystemFonts = config.systemFonts as boolean | null;
+    const withSystemFonts = (config.systemFonts as boolean | null) !== false;
     const run = {
         command: serverCommand,
         args: [
