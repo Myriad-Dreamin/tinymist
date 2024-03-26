@@ -14,7 +14,7 @@ use typst_ts_compiler::{
 use typst_ts_core::config::compiler::EntryState;
 
 use self::{
-    render::{PdfExportActor, PdfExportConfig},
+    render::{ExportActor, ExportConfig},
     typ_client::{CompileClientActor, CompileDriver, CompileHandler},
     typ_server::CompileServerActor,
 };
@@ -30,12 +30,12 @@ impl TypstLanguageServer {
         let (doc_tx, doc_rx) = watch::channel(None);
         let (render_tx, _) = broadcast::channel(10);
 
-        // Run the PDF export actor before preparing cluster to avoid loss of events
+        // Run the Export actor before preparing cluster to avoid loss of events
         tokio::spawn(
-            PdfExportActor::new(
+            ExportActor::new(
                 doc_rx.clone(),
                 render_tx.subscribe(),
-                PdfExportConfig {
+                ExportConfig {
                     substitute_pattern: self.config.output_path.clone(),
                     entry: entry.clone(),
                     mode: self.config.export_pdf,

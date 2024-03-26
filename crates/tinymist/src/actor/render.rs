@@ -7,52 +7,61 @@ use std::{
 
 use anyhow::Context;
 use log::{error, info};
+use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::{
     broadcast::{self, error::RecvError},
     oneshot, watch,
 };
-use typst::foundations::Smart;
+use typst::{foundations::Smart, layout::Frame};
 use typst_ts_core::{config::compiler::EntryState, path::PathClean, ImmutPath, TypstDocument};
 
-use crate::ExportPdfMode;
+use crate::ExportMode;
+
+#[derive(Debug, Clone)]
+pub struct OneshotRendering {
+    pub kind: Option<ExportKind>,
+    // todo: bad arch...
+    pub callback: Arc<Mutex<Option<oneshot::Sender<Option<PathBuf>>>>>,
+}
 
 #[derive(Debug, Clone)]
 pub enum RenderActorRequest {
     OnTyped,
-    // todo: bad arch...
-    DoExport(Arc<Mutex<Option<oneshot::Sender<Option<PathBuf>>>>>),
+    Oneshot(OneshotRendering),
     OnSaved(PathBuf),
-    ChangeExportPath(PdfPathVars),
-    ChangeConfig(PdfExportConfig),
+    ChangeExportPath(PathVars),
+    ChangeConfig(ExportConfig),
 }
 
 #[derive(Debug, Clone)]
-pub struct PdfPathVars {
+pub struct PathVars {
     pub entry: EntryState,
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct PdfExportConfig {
+pub struct ExportConfig {
     pub substitute_pattern: String,
     pub entry: EntryState,
-    pub mode: ExportPdfMode,
+    pub mode: ExportMode,
 }
 
-pub struct PdfExportActor {
+pub struct ExportActor {
     render_rx: broadcast::Receiver<RenderActorRequest>,
     document: watch::Receiver<Option<Arc<TypstDocument>>>,
 
     pub substitute_pattern: String,
     pub entry: EntryState,
-    pub mode: ExportPdfMode,
+    pub mode: ExportMode,
+    pub kind: ExportKind,
 }
 
-impl PdfExportActor {
+impl ExportActor {
     pub fn new(
         document: watch::Receiver<Option<Arc<TypstDocument>>>,
         render_rx: broadcast::Receiver<RenderActorRequest>,
-        config: PdfExportConfig,
+        config: ExportConfig,
     ) -> Self {
         Self {
             render_rx,
@@ -60,27 +69,29 @@ impl PdfExportActor {
             substitute_pattern: config.substitute_pattern,
             entry: config.entry,
             mode: config.mode,
+            kind: ExportKind::Pdf,
         }
     }
 
     pub async fn run(mut self) {
+        let kind = &self.kind;
         loop {
             tokio::select! {
                 req = self.render_rx.recv() => {
                     let req = match req {
                         Ok(req) => req,
                         Err(RecvError::Closed) => {
-                            info!("render actor channel closed");
+                            info!("RenderActor(@{kind:?}): channel closed");
                             break;
                         }
                         Err(RecvError::Lagged(_)) => {
-                            info!("render actor channel lagged");
+                            info!("RenderActor(@{kind:?}): channel lagged");
                             continue;
                         }
 
                     };
 
-                    info!("PdfRenderActor: received request: {req:?}", req = req);
+                    info!("RenderActor: received request: {req:?}", req = req);
                     match req {
                         RenderActorRequest::ChangeConfig(cfg) => {
                             self.substitute_pattern = cfg.substitute_pattern;
@@ -91,18 +102,18 @@ impl PdfExportActor {
                             self.entry = cfg.entry;
                         }
                         _ => {
-                            let sender = match &req {
-                                RenderActorRequest::DoExport(sender) => Some(sender.clone()),
+                            let cb = match &req {
+                                RenderActorRequest::Oneshot(oneshot) => Some(oneshot.callback.clone()),
                                 _ => None,
                             };
                             let resp = self.check_mode_and_export(req).await;
-                            if let Some(sender) = sender {
-                                let Some(sender) = sender.lock().take() else {
-                                    error!("PdfRenderActor: sender is None");
+                            if let Some(cb) = cb {
+                                let Some(cb) = cb.lock().take() else {
+                                    error!("RenderActor(@{kind:?}): oneshot.callback is None");
                                     continue;
                                 };
-                                if let Err(e) = sender.send(resp) {
-                                    error!("PdfRenderActor: failed to send response: {err:?}", err = e);
+                                if let Err(e) = cb.send(resp) {
+                                    error!("RenderActor(@{kind:?}): failed to send response: {err:?}", err = e);
                                 }
                             }
                         }
@@ -110,28 +121,35 @@ impl PdfExportActor {
                 }
             }
         }
-        info!("PdfRenderActor: stopped");
+        info!("RenderActor(@{kind:?}): stopped");
     }
 
     async fn check_mode_and_export(&self, req: RenderActorRequest) -> Option<PathBuf> {
         let Some(document) = self.document.borrow().clone() else {
-            info!("PdfRenderActor: document is not ready");
+            info!("RenderActor: document is not ready");
             return None;
         };
 
         let eq_mode = match req {
-            RenderActorRequest::OnTyped => ExportPdfMode::OnType,
-            RenderActorRequest::DoExport(..) => ExportPdfMode::OnSave,
-            RenderActorRequest::OnSaved(..) => ExportPdfMode::OnSave,
+            RenderActorRequest::OnTyped => ExportMode::OnType,
+            RenderActorRequest::Oneshot(..) => ExportMode::OnSave,
+            RenderActorRequest::OnSaved(..) => ExportMode::OnSave,
             _ => unreachable!(),
         };
+
+        let kind = if let RenderActorRequest::Oneshot(oneshot) = &req {
+            oneshot.kind.as_ref()
+        } else {
+            None
+        };
+        let kind = kind.unwrap_or(&self.kind);
 
         // pub entry: EntryState,
         let root = self.entry.root();
         let main = self.entry.main();
 
         info!(
-            "PdfRenderActor: check path {:?} and root {:?} with output directory {}",
+            "RenderActor: check path {:?} and root {:?} with output directory {}",
             main, root, self.substitute_pattern
         );
 
@@ -145,78 +163,131 @@ impl PdfExportActor {
 
         let path = main.vpath().resolve(&root)?;
 
-        let should_do = matches!(req, RenderActorRequest::DoExport(..));
+        let should_do = matches!(req, RenderActorRequest::Oneshot(..));
         let should_do = should_do || get_mode(self.mode) == eq_mode;
-        let should_do = should_do || validate_document(&req, self.mode, &document);
+        let should_do = should_do
+            || 'validate_doc: {
+                let mode = self.mode;
+                info!(
+                    "RenderActor: validating document for export mode {mode:?} title is {title}",
+                    title = document.title.is_some()
+                );
+                if mode == ExportMode::OnDocumentHasTitle {
+                    break 'validate_doc document.title.is_some()
+                        && matches!(req, RenderActorRequest::OnSaved(..));
+                }
+
+                false
+            };
         if should_do {
-            return match self.export_pdf(&document, &root, &path).await {
+            return match self.export(kind, &document, &root, &path).await {
                 Ok(pdf) => Some(pdf),
                 Err(err) => {
-                    error!("PdfRenderActor: failed to export PDF: {err}", err = err);
+                    error!("RenderActor({kind:?}): failed to export {err}", err = err);
                     None
                 }
             };
         }
 
-        fn get_mode(mode: ExportPdfMode) -> ExportPdfMode {
-            if mode == ExportPdfMode::Auto {
-                return ExportPdfMode::Never;
+        fn get_mode(mode: ExportMode) -> ExportMode {
+            if mode == ExportMode::Auto {
+                return ExportMode::Never;
             }
 
             mode
         }
 
-        fn validate_document(
-            req: &RenderActorRequest,
-            mode: ExportPdfMode,
-            document: &TypstDocument,
-        ) -> bool {
-            info!(
-                "PdfRenderActor: validating document for export mode {mode:?} title is {title}",
-                title = document.title.is_some()
-            );
-            if mode == ExportPdfMode::OnDocumentHasTitle {
-                return document.title.is_some() && matches!(req, RenderActorRequest::OnSaved(..));
-            }
-
-            false
-        }
-
         None
     }
 
-    async fn export_pdf(
+    async fn export(
         &self,
+        kind: &ExportKind,
         doc: &TypstDocument,
         root: &Path,
         path: &Path,
     ) -> anyhow::Result<PathBuf> {
         let Some(to) = substitute_path(&self.substitute_pattern, root, path) else {
-            return Err(anyhow::anyhow!("failed to substitute path"));
+            return Err(anyhow::anyhow!(
+                "RenderActor({kind:?}): failed to substitute path"
+            ));
         };
         if to.is_relative() {
-            return Err(anyhow::anyhow!("path is relative: {to:?}"));
+            return Err(anyhow::anyhow!(
+                "RenderActor({kind:?}): path is relative: {to:?}"
+            ));
         }
         if to.is_dir() {
-            return Err(anyhow::anyhow!("path is a directory: {to:?}"));
+            return Err(anyhow::anyhow!(
+                "RenderActor({kind:?}): path is a directory: {to:?}"
+            ));
         }
 
-        let to = to.with_extension("pdf");
-        info!("exporting PDF {path:?} to {to:?}");
+        let to = to.with_extension(kind.extension());
+        info!("RenderActor({kind:?}): exporting {path:?} to {to:?}");
 
         if let Some(e) = to.parent() {
             if !e.exists() {
-                std::fs::create_dir_all(e).context("failed to create directory")?;
+                std::fs::create_dir_all(e).with_context(|| {
+                    format!("RenderActor({kind:?}): failed to create directory")
+                })?;
             }
         }
 
-        // todo: Some(pdf_uri.as_str())
-        // todo: timestamp world.now()
-        let data = typst_pdf::pdf(doc, Smart::Auto, None);
+        static DEFAULT_FRAME: Lazy<Frame> = Lazy::new(Frame::default);
+        let data = match kind {
+            ExportKind::Pdf => {
+                // todo: Some(pdf_uri.as_str())
+                // todo: timestamp world.now()
+                typst_pdf::pdf(doc, Smart::Auto, None)
+            }
+            ExportKind::Svg {
+                page: PageSelection::First,
+            } => typst_svg::svg(
+                doc.pages
+                    .first()
+                    .map(|f| &f.frame)
+                    .unwrap_or(&*DEFAULT_FRAME),
+            )
+            .into_bytes(),
+            ExportKind::Svg {
+                page: PageSelection::Merged,
+            } => typst_svg::svg_merged(doc, typst::layout::Abs::zero()).into_bytes(),
+            ExportKind::Png {
+                page: PageSelection::First,
+            } => {
+                let pixmap = typst_render::render(
+                    doc.pages
+                        .first()
+                        .map(|f| &f.frame)
+                        .unwrap_or(&*DEFAULT_FRAME),
+                    3.,
+                    typst::visualize::Color::WHITE,
+                );
+                pixmap
+                    .encode_png()
+                    .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
+            }
+            ExportKind::Png {
+                page: PageSelection::Merged,
+            } => {
+                let pixmap = typst_render::render_merged(
+                    doc,
+                    3.,
+                    typst::visualize::Color::WHITE,
+                    typst::layout::Abs::zero(),
+                    typst::visualize::Color::WHITE,
+                );
+                pixmap
+                    .encode_png()
+                    .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
+            }
+        };
 
-        std::fs::write(&to, data).context("failed to export PDF")?;
+        std::fs::write(&to, data)
+            .with_context(|| format!("RenderActor({kind:?}): failed to export"))?;
 
-        info!("PDF export complete");
+        info!("RenderActor({kind:?}): export complete");
         Ok(to)
     }
 }

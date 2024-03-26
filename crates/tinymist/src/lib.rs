@@ -57,12 +57,13 @@ use lsp_types::request::{
 use lsp_types::*;
 use parking_lot::{Mutex, RwLock};
 use paste::paste;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use state::MemoryFileMeta;
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
-    get_semantic_tokens_unregistration, DiagnosticsMap, SemanticTokenContext,
+    get_semantic_tokens_unregistration, DiagnosticsMap, ExportKind, PageSelection,
+    SemanticTokenContext,
 };
 use tokio::sync::mpsc;
 use typst::diag::StrResult;
@@ -75,7 +76,7 @@ pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
 use world::SharedFontResolver;
 pub use world::{CompileFontOpts, CompileOnceOpts, CompileOpts};
 
-use crate::actor::render::PdfExportConfig;
+use crate::actor::render::ExportConfig;
 use crate::init::*;
 use crate::tools::package::InitTask;
 
@@ -665,6 +666,8 @@ impl TypstLanguageServer {
 
         ExecuteCmdMap::from_iter([
             redirected_command!("tinymist.exportPdf", Self::export_pdf),
+            redirected_command!("tinymist.exportSvg", Self::export_svg),
+            redirected_command!("tinymist.exportPng", Self::export_png),
             redirected_command!("tinymist.doClearCache", Self::clear_cache),
             redirected_command!("tinymist.pinMain", Self::pin_document),
             redirected_command!("tinymist.focusMain", Self::focus_document),
@@ -688,25 +691,29 @@ impl TypstLanguageServer {
         Ok(Some(handler(self, arguments)?))
     }
 
-    /// Export the current document as a PDF file. The client is responsible for
-    /// passing the correct file URI.
-    ///
-    /// # Errors
-    /// Errors if a provided file URI is not a valid file URI.
+    /// Export the current document as a PDF file.
     pub fn export_pdf(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
-        if arguments.is_empty() {
-            return Err(invalid_params("Missing file URI argument"));
-        }
-        let Some(file_uri) = arguments.first().and_then(|v| v.as_str()) else {
-            return Err(invalid_params("Missing file URI as first argument"));
-        };
-        let file_uri =
-            Url::parse(file_uri).map_err(|_| invalid_params("Parameter is not a valid URI"))?;
-        let path = file_uri
-            .to_file_path()
-            .map_err(|_| invalid_params("URI is not a file URI"))?;
+        self.export(ExportKind::Pdf, arguments)
+    }
 
-        let res = run_query!(self.OnExport(path))?;
+    /// Export the current document as a Svg file.
+    pub fn export_svg(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        let opts = parse_opts(arguments.get(1))?;
+        self.export(ExportKind::Svg { page: opts.page }, arguments)
+    }
+
+    /// Export the current document as a Png file.
+    pub fn export_png(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        let opts = parse_opts(arguments.get(1))?;
+        self.export(ExportKind::Png { page: opts.page }, arguments)
+    }
+
+    /// Export the current document as some format. The client is responsible
+    /// for passing the correct absolute path of typst document.
+    pub fn export(&self, kind: ExportKind, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        let path = parse_path(arguments.first())?.as_ref().to_owned();
+
+        let res = run_query!(self.OnExport(path, kind))?;
         let res = serde_json::to_value(res).map_err(|_| internal_error("Cannot serialize path"))?;
 
         Ok(res)
@@ -841,7 +848,22 @@ impl TypstLanguageServer {
     }
 }
 
-fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ExportOpts {
+    page: PageSelection,
+}
+
+fn parse_opts(v: Option<&JsonValue>) -> LspResult<ExportOpts> {
+    Ok(match v {
+        Some(opts) => serde_json::from_value::<ExportOpts>(opts.clone())
+            .map_err(|_| invalid_params("The third argument is not a valid object"))?,
+        _ => ExportOpts {
+            page: PageSelection::First,
+        },
+    })
+}
+
+fn parse_path(v: Option<&JsonValue>) -> LspResult<ImmutPath> {
     let new_entry = match v {
         Some(JsonValue::String(s)) => {
             let s = Path::new(s);
@@ -849,9 +871,8 @@ fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
                 return Err(invalid_params("entry should be absolute"));
             }
 
-            Some(s.into())
+            s.into()
         }
-        Some(JsonValue::Null) => None,
         _ => {
             return Err(invalid_params(
                 "The first parameter is not a valid path or null",
@@ -860,6 +881,13 @@ fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
     };
 
     Ok(new_entry)
+}
+
+fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
+    match v {
+        Some(JsonValue::Null) => Ok(None),
+        v => Ok(Some(parse_path(v)?)),
+    }
 }
 
 /// Document Synchronization
@@ -914,10 +942,10 @@ impl TypstLanguageServer {
         if config.output_path != self.config.output_path
             || config.export_pdf != self.config.export_pdf
         {
-            let config = PdfExportConfig {
+            let config = ExportConfig {
                 substitute_pattern: self.config.output_path.clone(),
                 mode: self.config.export_pdf,
-                ..PdfExportConfig::default()
+                ..ExportConfig::default()
             };
 
             self.primary().change_export_pdf(config.clone());

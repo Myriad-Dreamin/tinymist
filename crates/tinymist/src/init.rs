@@ -40,20 +40,19 @@ pub enum ExperimentalFormatterMode {
     Enable,
 }
 
-/// The mode of PDF export.
+/// The mode of PDF/SVG/PNG export.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum ExportPdfMode {
+pub enum ExportMode {
     #[default]
     Auto,
     /// Select best solution automatically. (Recommended)
     Never,
-    /// Export PDF on saving the document, i.e. on `textDocument/didSave`
-    /// events.
+    /// Export on saving the document, i.e. on `textDocument/didSave` events.
     OnSave,
-    /// Export PDF on typing, i.e. on `textDocument/didChange` events.
+    /// Export on typing, i.e. on `textDocument/didChange` events.
     OnType,
-    /// Export PDFs when a document has a title, which is useful to filter out
+    /// Export when a document has a title, which is useful to filter out
     /// template files.
     OnDocumentHasTitle,
 }
@@ -101,7 +100,7 @@ pub struct Config {
     /// The output directory for PDF export.
     pub output_path: String,
     /// The mode of PDF export.
-    pub export_pdf: ExportPdfMode,
+    pub export_pdf: ExportMode,
     /// Specifies the root path of the project manually.
     pub root_path: Option<PathBuf>,
     /// Dynamic configuration for semantic tokens.
@@ -207,12 +206,12 @@ impl Config {
 
         let export_pdf = update
             .get("exportPdf")
-            .map(ExportPdfMode::deserialize)
+            .map(ExportMode::deserialize)
             .and_then(Result::ok);
         if let Some(export_pdf) = export_pdf {
             self.export_pdf = export_pdf;
         } else {
-            self.export_pdf = ExportPdfMode::default();
+            self.export_pdf = ExportMode::default();
         }
 
         let root_path = update.get("rootPath");
@@ -683,7 +682,7 @@ mod tests {
         config.update(&update).unwrap();
 
         assert_eq!(config.output_path, "out");
-        assert_eq!(config.export_pdf, ExportPdfMode::OnSave);
+        assert_eq!(config.export_pdf, ExportMode::OnSave);
         assert_eq!(config.root_path, Some(PathBuf::from(root_path)));
         assert_eq!(config.semantic_tokens, SemanticTokensMode::Enable);
         assert_eq!(config.formatter, ExperimentalFormatterMode::Enable);

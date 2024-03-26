@@ -35,7 +35,7 @@ use log::{error, info, trace};
 use parking_lot::Mutex;
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnaylsisResources},
-    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, FoldRequestFeature,
+    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, ExportKind, FoldRequestFeature,
     OnExportRequest, OnSaveExportRequest, PositionEncoding, SemanticRequest, StatefulRequest,
     VersionedDocument,
 };
@@ -57,9 +57,9 @@ use typst_ts_core::{
 };
 
 use super::typ_server::CompileClient as TsCompileClient;
-use super::{render::PdfExportConfig, typ_server::CompileServerActor};
+use super::{render::ExportConfig, typ_server::CompileServerActor};
 use crate::{
-    actor::render::{PdfPathVars, RenderActorRequest},
+    actor::render::{OneshotRendering, PathVars, RenderActorRequest},
     utils,
 };
 use crate::{
@@ -317,7 +317,7 @@ impl CompileClientActor {
             );
 
             self.render_tx
-                .send(RenderActorRequest::ChangeExportPath(PdfPathVars {
+                .send(RenderActorRequest::ChangeExportPath(PathVars {
                     entry: next.clone(),
                 }))
                 .unwrap();
@@ -345,7 +345,7 @@ impl CompileClientActor {
 
             if res.is_err() {
                 self.render_tx
-                    .send(RenderActorRequest::ChangeExportPath(PdfPathVars {
+                    .send(RenderActorRequest::ChangeExportPath(PathVars {
                         entry: prev.clone(),
                     }))
                     .unwrap();
@@ -371,11 +371,11 @@ impl CompileClientActor {
         self.inner.wait().add_memory_changes(event);
     }
 
-    pub(crate) fn change_export_pdf(&self, config: PdfExportConfig) {
+    pub(crate) fn change_export_pdf(&self, config: ExportConfig) {
         let entry = self.entry.lock().clone();
         let _ = self
             .render_tx
-            .send(RenderActorRequest::ChangeConfig(PdfExportConfig {
+            .send(RenderActorRequest::ChangeConfig(ExportConfig {
                 substitute_pattern: config.substitute_pattern,
                 // root: self.root.get().cloned().flatten(),
                 entry,
@@ -405,8 +405,8 @@ impl CompileClientActor {
         }
 
         match query {
-            CompilerQueryRequest::OnExport(OnExportRequest { path }) => {
-                Ok(CompilerQueryResponse::OnExport(self.on_export(path)?))
+            CompilerQueryRequest::OnExport(OnExportRequest { kind, path }) => {
+                Ok(CompilerQueryResponse::OnExport(self.on_export(kind, path)?))
             }
             CompilerQueryRequest::OnSaveExport(OnSaveExportRequest { path }) => {
                 self.on_save_export(path)?;
@@ -431,15 +431,18 @@ impl CompileClientActor {
         }
     }
 
-    fn on_export(&self, path: PathBuf) -> anyhow::Result<Option<PathBuf>> {
+    fn on_export(&self, kind: ExportKind, path: PathBuf) -> anyhow::Result<Option<PathBuf>> {
+        // todo: we currently doesn't respect the path argument...
         info!("CompileActor: on export: {}", path.display());
 
         let (tx, rx) = oneshot::channel();
 
-        let task = Arc::new(Mutex::new(Some(tx)));
-
+        let callback = Arc::new(Mutex::new(Some(tx)));
         self.render_tx
-            .send(RenderActorRequest::DoExport(task))
+            .send(RenderActorRequest::Oneshot(OneshotRendering {
+                kind: Some(kind),
+                callback,
+            }))
             .map_err(map_string_err("failed to send to sync_render"))?;
 
         let res: Option<PathBuf> = utils::threaded_receive(rx)?;
