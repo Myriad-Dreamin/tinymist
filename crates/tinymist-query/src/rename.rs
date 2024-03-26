@@ -33,7 +33,7 @@ impl SemanticRequest for RenameRequest {
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
         debug!("ast_node: {ast_node:?}", ast_node = ast_node);
 
-        let deref_target = get_deref_target(ast_node)?;
+        let deref_target = get_deref_target(ast_node, cursor)?;
 
         let lnk = find_definition(ctx, source.clone(), deref_target.clone())?;
 

@@ -64,7 +64,7 @@ fn def_tooltip(
 ) -> Option<LspHoverContents> {
     let leaf = LinkedNode::new(source.root()).leaf_at(cursor)?;
 
-    let deref_target = get_deref_target(leaf.clone())?;
+    let deref_target = get_deref_target(leaf.clone(), cursor)?;
 
     let lnk = find_definition(ctx, source.clone(), deref_target.clone())?;
 

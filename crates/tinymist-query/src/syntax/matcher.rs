@@ -67,9 +67,26 @@ fn is_mark(sk: SyntaxKind) -> bool {
     )
 }
 
-pub fn get_deref_target(node: LinkedNode) -> Option<DerefTarget> {
+pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget> {
+    fn same_line_skip(node: &LinkedNode, cursor: usize) -> bool {
+        // (ancestor.kind().is_trivia() && ancestor.text())
+        if !node.kind().is_trivia() {
+            return false;
+        }
+        let pref = node.text();
+        // slice
+        let pref = if cursor < pref.len() {
+            &pref[..cursor]
+        } else {
+            pref
+        };
+        // no newlines
+        // todo: if we are in markup mode, we should check if we are at start of node
+        !pref.contains('\n')
+    }
+
     let mut ancestor = node;
-    if ancestor.kind().is_trivia() || is_mark(ancestor.kind()) {
+    if same_line_skip(&ancestor, cursor) || is_mark(ancestor.kind()) {
         ancestor = ancestor.prev_sibling()?;
     }
 
