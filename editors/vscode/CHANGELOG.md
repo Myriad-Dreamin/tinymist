@@ -17,10 +17,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 * Allowed running server on rootless files and loading font once in https://github.com/Myriad-Dreamin/tinymist/pull/94
 * Uses positive system font config in https://github.com/Myriad-Dreamin/tinymist/pull/93 and https://github.com/Myriad-Dreamin/tinymist/pull/97
 
-### Grammar
+### Syntax/Semantic Highlighting
 
-* Provided correct semantic highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/71, https://github.com/Myriad-Dreamin/tinymist/pull/77, https://github.com/Myriad-Dreamin/tinymist/pull/80, and https://github.com/Myriad-Dreamin/tinymist/pull/85
-* Disabled bracket colorizing according to textmate scopes in https://github.com/Myriad-Dreamin/tinymist/pull/81
+* Provided correct semantic highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/71
+* Provided correct syntax highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/77, https://github.com/Myriad-Dreamin/tinymist/pull/80, and https://github.com/Myriad-Dreamin/tinymist/pull/85
+* Colorizes contextual bracket according to textmate scopes in https://github.com/Myriad-Dreamin/tinymist/pull/81
 
 ### Commands/Tools
 
