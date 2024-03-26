@@ -36,6 +36,7 @@ impl TypstLanguageServer {
                 let main_node = self.server(
                     "main".to_owned(),
                     self.config.determine_entry(Some(new_entry)),
+                    self.config.determine_inputs(),
                 );
 
                 self.main = Some(main_node);

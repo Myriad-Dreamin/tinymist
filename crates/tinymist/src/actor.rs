@@ -19,14 +19,19 @@ use self::{
     typ_server::CompileServerActor,
 };
 use crate::{
-    world::{LspWorld, LspWorldBuilder},
+    world::{ImmutDict, LspWorld, LspWorldBuilder},
     TypstLanguageServer,
 };
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
 
 impl TypstLanguageServer {
-    pub fn server(&self, diag_group: String, entry: EntryState) -> CompileClientActor {
+    pub fn server(
+        &self,
+        diag_group: String,
+        entry: EntryState,
+        inputs: ImmutDict,
+    ) -> CompileClientActor {
         let (doc_tx, doc_rx) = watch::channel(None);
         let (render_tx, _) = broadcast::channel(10);
 
@@ -76,7 +81,7 @@ impl TypstLanguageServer {
 
                 // Create the world
                 let font_resolver = font_resolver.wait().clone();
-                let world = LspWorldBuilder::build(entry.clone(), font_resolver)
+                let world = LspWorldBuilder::build(entry.clone(), font_resolver, inputs)
                     .expect("incorrect options");
 
                 // Create the compiler
