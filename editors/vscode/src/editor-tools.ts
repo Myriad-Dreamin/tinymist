@@ -38,24 +38,26 @@ export function getUserPackageData(context: vscode.ExtensionContext) {
 }
 
 export async function activateEditorTool(context: vscode.ExtensionContext, tool: string) {
-    if (tool !== "template-gallery") {
+    if (tool !== "template-gallery" && tool !== "tracing") {
         vscode.window.showErrorMessage(`Unknown editor tool: ${tool}`);
         return;
     }
 
+    const title = {
+        "template-gallery": "Template Gallery",
+        tracing: "Tracing",
+    }[tool];
+
     // Create and show a new WebView
     const panel = vscode.window.createWebviewPanel(
-        "tinymist-editor-tool", // 标识符
-        `Template Gallery`, // 面板标题
-        vscode.ViewColumn.Beside, // 显示在编辑器的哪一侧
+        `tinymist-${tool}`,
+        title,
+        vscode.ViewColumn.Beside, // Which sides
         {
-            enableScripts: true, // 启用 JS
+            enableScripts: true,
             retainContextWhenHidden: true,
         }
     );
-
-    const userPackageData = getUserPackageData(context);
-    const packageData = JSON.stringify(userPackageData.data);
 
     panel.webview.onDidReceiveMessage(async (message) => {
         console.log("onDidReceiveMessage", message);
@@ -97,6 +99,21 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
 
     let html = await loadHTMLFile(context, "./out/editor-tools/index.html");
     // packageData
-    html = html.replace(":[[preview:FavoritePlaceholder]]:", btoa(packageData));
+
+    html = html.replace(
+        /`editor-tools-args:{"page": [^`]*?`$/,
+        `\`editor-tools-args:{"page": "${tool}"}\``
+    );
+
+    switch (tool) {
+        case "template-gallery":
+            const userPackageData = getUserPackageData(context);
+            const packageData = JSON.stringify(userPackageData.data);
+            html = html.replace(":[[preview:FavoritePlaceholder]]:", btoa(packageData));
+            break;
+        case "tracing":
+            break;
+    }
+
     panel.webview.html = html;
 }
