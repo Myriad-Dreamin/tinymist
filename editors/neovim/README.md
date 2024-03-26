@@ -60,11 +60,11 @@ Please associate `.typ` file extension to `typst` filetype to start tinymist on 
 autocmd BufNewFile,BufRead *.typ setfiletype typst
 ```
 
-## Extra settings
+## Extra Settings
 
 ### Configuring LSP Server
 
-To configure LSP server, you can edit the `opts.servers.tinymist.settings`. For example, if you want to export PDF onType and output files in `$root_dir/target` directory:
+To configure LSP server, you can edit the `opts.servers.tinymist.settings`. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
 
 ```lua
 return {
