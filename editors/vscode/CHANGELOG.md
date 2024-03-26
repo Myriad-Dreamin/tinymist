@@ -4,6 +4,43 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.1 - [2024-03-26]
+
+### Editor
+
+* Integrated neovim support in https://github.com/Myriad-Dreamin/tinymist/pull/91
+
+### Compiler
+
+* (Fix) Always uses latest compiled document for lsp functions in https://github.com/Myriad-Dreamin/tinymist/pull/68
+* (Fix) Converts EOF position correctly in https://github.com/Myriad-Dreamin/tinymist/pull/92
+* Allowed running server on rootless files and loading font once in https://github.com/Myriad-Dreamin/tinymist/pull/94
+* Uses positive system font config in https://github.com/Myriad-Dreamin/tinymist/pull/93 and https://github.com/Myriad-Dreamin/tinymist/pull/97
+
+### Grammar
+
+* Provided correct semantic highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/71, https://github.com/Myriad-Dreamin/tinymist/pull/77, https://github.com/Myriad-Dreamin/tinymist/pull/80, and https://github.com/Myriad-Dreamin/tinymist/pull/85
+* Disabled bracket colorizing according to textmate scopes in https://github.com/Myriad-Dreamin/tinymist/pull/81
+
+### Commands/Tools
+
+* Fixed two bugs during initializing template in https://github.com/Myriad-Dreamin/tinymist/pull/65
+* Added svg and png export in code lens context in https://github.com/Myriad-Dreamin/tinymist/pull/101
+* Added tracing frontend in https://github.com/Myriad-Dreamin/tinymist/pull/98
+  * The frontend is implemented but there is trouble with the backend.
+
+### Hover (Tooltip)
+
+* Provided hover tooltip on user functions in https://github.com/Myriad-Dreamin/tinymist/pull/76
+* Parses comments for hover tooltip in https://github.com/Myriad-Dreamin/tinymist/pull/78
+
+### Misc
+
+* Provided dhat instrumenting feature for heap usage analysis in https://github.com/Myriad-Dreamin/tinymist/pull/64
+* Disabled lto in https://github.com/Myriad-Dreamin/tinymist/pull/84
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.0...v0.11.1
+
 ## v0.11.0 - [2024-03-17]
 
 ### Commands/Tools
