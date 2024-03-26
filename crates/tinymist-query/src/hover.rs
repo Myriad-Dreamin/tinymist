@@ -211,6 +211,7 @@ impl DocTooltip {
         // todo: import
         let target = def_target.node().clone();
         let mut node = def_target.node().clone();
+        let mut newline_count = 0;
         while let Some(prev) = node.prev_sibling() {
             node = prev;
             if node.kind() == SyntaxKind::Hash {
@@ -231,10 +232,24 @@ impl DocTooltip {
                     continue;
                 }
 
+                log::info!("found comment node: {:?}: {:?}", n.kind(), n.text());
+
                 if n.kind() == SyntaxKind::Hash {
+                    newline_count = 0;
                     continue;
                 }
+                if n.kind() == SyntaxKind::Space {
+                    if n.text().contains('\n') {
+                        newline_count += 1;
+                    }
+                    if newline_count > 1 {
+                        break;
+                    }
+                    continue;
+                }
+                newline_count = 0;
                 if n.kind() == SyntaxKind::LineComment {
+                    newline_count = 1;
                     // comments.push(n.text().strip_prefix("//")?.trim().to_owned());
                     // strip all slash prefix
                     let text = n.text().trim_start_matches('/');
