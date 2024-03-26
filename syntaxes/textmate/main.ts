@@ -25,11 +25,7 @@ function braceMatch(pattern: RegExp) {
 
 const PAREN_BLOCK = generatePattern(6, "\\(", "\\)");
 const CODE_BLOCK = generatePattern(6, "\\{", "\\}");
-const CONTENT_BLOCK = generatePattern(6, "\\[", "\\]");
 const BRACE_FREE_EXPR = /[^\s\}\{\[\]][^\}\{\[\]]*/.source;
-const BRACE_AWARE_EXPR =
-  BRACE_FREE_EXPR +
-  `(?:(?:(?:${CODE_BLOCK})|(?:${CONTENT_BLOCK}))${BRACE_FREE_EXPR})?`;
 
 // todo: This is invokable
 const codeBlock: textmate.Pattern = {
@@ -890,8 +886,8 @@ const letStatement = (): textmate.Grammar => {
 const ifStatement = (): textmate.Grammar => {
   const ifStatement: textmate.Pattern = {
     name: "meta.expr.if.typst",
-    begin: lookAhead(/(else\b)?(if\b)/),
-    end: /(?<=\}|\])(?!\s*else)/,
+    begin: lookAhead(/(else\s+)?(if\b)/),
+    end: /(?<=\}|\])(?!\s*else\b)/,
     patterns: [
       /// Matches any comments
       {
@@ -924,7 +920,7 @@ const ifStatement = (): textmate.Grammar => {
 
   const ifClause: textmate.Pattern = {
     //   name: "meta.if.clause.typst",
-    begin: /(else\b)?(if)\s+/,
+    begin: /(?:(\belse)\s+)?(\bif)\s+/,
     end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s+)(?=[\[\{])|(?=[;\]}]|$)/,
     beginCaptures: {
       "1": {
@@ -1163,7 +1159,7 @@ const setStatement = (): textmate.Grammar => {
   const setStatement: textmate.Pattern = {
     name: "meta.expr.set.typst",
     begin: lookAhead(new RegExp(/(set\b)\s*/.source + IDENTIFIER.source)),
-    end: /(?<=\))(?!if)|(?=[\s;\{\[\}\]\)])/,
+    end: /(?<=\))(?!\s*if\b)|(?=[\s;\{\[\}\]\)])/,
     patterns: [
       /// Matches any comments
       {
@@ -1205,7 +1201,7 @@ const setStatement = (): textmate.Grammar => {
 
   const setIfClause: textmate.Pattern = {
     // name: "meta.set.if.clause.cond.typst",
-    begin: /(if)\s*/,
+    begin: /(if\b)\s*/,
     end: /(?<=\S)(?<!and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)(?!\s*(?:and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=|\.))|(?=[\n;\}\]\)])/,
     beginCaptures: {
       "1": {
