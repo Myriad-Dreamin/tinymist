@@ -75,11 +75,8 @@
                 "tinymist.systemFonts": {
                     "title": "Whether to load system fonts for Typst compiler",
                     "description": "A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler.",
-                    "type": [
-                        "boolean",
-                        "null"
-                    ],
-                    "default": null
+                    "type": "boolean",
+                    "default": "true"
                 },
                 "tinymist.fontPaths": {
                     "title": "Font paths for Typst compiler",
