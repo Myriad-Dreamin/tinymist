@@ -5,14 +5,13 @@ pub type DiagnosticsMap = HashMap<Url, Vec<LspDiagnostic>>;
 
 /// Converts a list of Typst diagnostics to LSP diagnostics.
 pub fn convert_diagnostics<'a>(
-    project: &AnalysisContext,
+    ctx: &AnalysisContext,
     errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
-    position_encoding: PositionEncoding,
 ) -> DiagnosticsMap {
     errors
         .into_iter()
         .flat_map(|error| {
-            convert_diagnostic(project, error, position_encoding)
+            convert_diagnostic(ctx, error)
                 .map_err(move |conversion_err| {
                     error!("could not convert Typst error to diagnostic: {conversion_err:?} error to convert: {error:?}");
                 })
@@ -23,26 +22,25 @@ pub fn convert_diagnostics<'a>(
 }
 
 fn convert_diagnostic(
-    project: &AnalysisContext,
+    ctx: &AnalysisContext,
     typst_diagnostic: &TypstDiagnostic,
-    position_encoding: PositionEncoding,
 ) -> anyhow::Result<(Url, LspDiagnostic)> {
     let uri;
     let lsp_range;
     if let Some((id, span)) = diagnostic_span_id(typst_diagnostic) {
-        uri = Url::from_file_path(project.path_for_id(id)?).map_err(|e| {
+        uri = Url::from_file_path(ctx.path_for_id(id)?).map_err(|e| {
             let _: () = e;
             anyhow::anyhow!(
                 "could not convert path to URI: id: {id:?}, context: {:?}",
-                project.analysis.root
+                ctx.analysis.root
             )
         })?;
-        let source = project.world().source(id)?;
-        lsp_range = diagnostic_range(&source, span, position_encoding);
+        let source = ctx.world().source(id)?;
+        lsp_range = diagnostic_range(&source, span, ctx.position_encoding());
     } else {
-        uri = Url::from_file_path(project.analysis.root.clone()).map_err(|e| {
+        uri = Url::from_file_path(ctx.analysis.root.clone()).map_err(|e| {
             let _: () = e;
-            anyhow::anyhow!("could not convert path to URI: {:?}", project.analysis.root)
+            anyhow::anyhow!("could not convert path to URI: {:?}", ctx.analysis.root)
         })?;
         lsp_range = LspRange::default();
     };
@@ -53,7 +51,8 @@ fn convert_diagnostic(
     let typst_hints = &typst_diagnostic.hints;
     let lsp_message = format!("{typst_message}{}", diagnostic_hints(typst_hints));
 
-    let tracepoints = diagnostic_related_information(project, typst_diagnostic, position_encoding)?;
+    let tracepoints =
+        diagnostic_related_information(ctx, typst_diagnostic, ctx.position_encoding())?;
 
     let diagnostic = LspDiagnostic {
         range: lsp_range,

@@ -91,10 +91,19 @@ pub struct AnalysisContext<'a> {
 
 impl<'w> AnalysisContext<'w> {
     /// Create a new analysis context.
-    pub fn new(world: &'w dyn AnaylsisResources, a: Analysis) -> Self {
+    pub fn new(resources: &'w dyn AnaylsisResources, a: Analysis) -> Self {
         Self {
-            resources: world,
+            resources,
             analysis: CowMut::Owned(a),
+            caches: AnalysisCaches::default(),
+        }
+    }
+
+    /// Create a new analysis context with borrowing the analysis data.
+    pub fn new_borrow(resources: &'w dyn AnaylsisResources, a: &'w mut Analysis) -> Self {
+        Self {
+            resources,
+            analysis: CowMut::Borrowed(a),
             caches: AnalysisCaches::default(),
         }
     }
