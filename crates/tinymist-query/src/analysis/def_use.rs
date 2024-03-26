@@ -252,7 +252,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                         ModSrc::Expr(_) => {}
                         ModSrc::Path(p) => {
                             let src = find_source_by_import_path(
-                                self.ctx.ctx.world,
+                                self.ctx.ctx.world(),
                                 self.current_id,
                                 p.deref(),
                             );

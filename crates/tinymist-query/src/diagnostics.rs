@@ -5,7 +5,7 @@ pub type DiagnosticsMap = HashMap<Url, Vec<LspDiagnostic>>;
 
 /// Converts a list of Typst diagnostics to LSP diagnostics.
 pub fn convert_diagnostics<'a>(
-    project: &TypstSystemWorld,
+    project: &AnalysisContext,
     errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
     position_encoding: PositionEncoding,
 ) -> DiagnosticsMap {
@@ -23,7 +23,7 @@ pub fn convert_diagnostics<'a>(
 }
 
 fn convert_diagnostic(
-    project: &TypstSystemWorld,
+    project: &AnalysisContext,
     typst_diagnostic: &TypstDiagnostic,
     position_encoding: PositionEncoding,
 ) -> anyhow::Result<(Url, LspDiagnostic)> {
@@ -31,10 +31,10 @@ fn convert_diagnostic(
     let lsp_range;
     if let Some((id, span)) = diagnostic_span_id(typst_diagnostic) {
         uri = Url::from_file_path(project.path_for_id(id)?).unwrap();
-        let source = project.source(id)?;
+        let source = project.world().source(id)?;
         lsp_range = diagnostic_range(&source, span, position_encoding);
     } else {
-        uri = Url::from_file_path(project.root.clone()).unwrap();
+        uri = Url::from_file_path(project.analysis.root.clone()).unwrap();
         lsp_range = LspRange::default();
     };
 
@@ -59,13 +59,13 @@ fn convert_diagnostic(
 }
 
 fn tracepoint_to_relatedinformation(
-    project: &TypstSystemWorld,
+    project: &AnalysisContext,
     tracepoint: &Spanned<Tracepoint>,
     position_encoding: PositionEncoding,
 ) -> anyhow::Result<Option<DiagnosticRelatedInformation>> {
     if let Some(id) = tracepoint.span.id() {
         let uri = Url::from_file_path(project.path_for_id(id)?).unwrap();
-        let source = project.source(id)?;
+        let source = project.world().source(id)?;
 
         if let Some(typst_range) = source.range(tracepoint.span) {
             let lsp_range = typst_to_lsp::range(typst_range, &source, position_encoding);
@@ -84,7 +84,7 @@ fn tracepoint_to_relatedinformation(
 }
 
 fn diagnostic_related_information(
-    project: &TypstSystemWorld,
+    project: &AnalysisContext,
     typst_diagnostic: &TypstDiagnostic,
     position_encoding: PositionEncoding,
 ) -> anyhow::Result<Vec<DiagnosticRelatedInformation>> {

@@ -8,9 +8,18 @@ use crate::{
     DefinitionLink, LspHoverContents, StatefulRequest,
 };
 
+/// The [`textDocument/hover`] request asks the server for hover information at
+/// a given text document position.
+///
+/// [`textDocument/hover`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_hover
+///
+/// Such hover information typically includes type signature information and
+/// inline documentation for the symbol at the given text document position.
 #[derive(Debug, Clone)]
 pub struct HoverRequest {
+    /// The path of the document to get hover information for.
     pub path: PathBuf,
+    /// The position of the symbol to get hover information for.
     pub position: LspPosition,
 }
 
@@ -31,7 +40,10 @@ impl StatefulRequest for HoverRequest {
 
         let contents = def_tooltip(ctx, &source, cursor).or_else(|| {
             Some(typst_to_lsp::tooltip(&tooltip(
-                ctx.world, doc, &source, cursor,
+                ctx.world(),
+                doc,
+                &source,
+                cursor,
             )?))
         })?;
 
@@ -76,10 +88,10 @@ let {name}({params});
         crate::syntax::LexicalKind::Var(LexicalVarKind::Variable) => {
             let deref_node = deref_target.node();
             // todo: check sensible length, value highlighting
-            let values = expr_tooltip(ctx.world, deref_node)
+            let values = expr_tooltip(ctx.world(), deref_node)
                 .map(|t| match t {
-                    Tooltip::Text(s) => format!("// Values: {}", s),
-                    Tooltip::Code(s) => format!("// Values: {}", s),
+                    Tooltip::Text(s) => format!("// Values: {s}"),
+                    Tooltip::Code(s) => format!("// Values: {s}"),
                 })
                 .unwrap_or_default();
             Some(LspHoverContents::Scalar(lsp_types::MarkedString::String(

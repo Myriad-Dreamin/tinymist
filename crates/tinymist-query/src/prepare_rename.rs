@@ -1,4 +1,6 @@
-use crate::{find_definition, prelude::*, syntax::get_deref_target, DefinitionLink, SyntaxRequest};
+use crate::{
+    find_definition, prelude::*, syntax::get_deref_target, DefinitionLink, SemanticRequest,
+};
 use log::debug;
 
 /// The [`textDocument/prepareRename`] request is sent from the client to the
@@ -26,7 +28,7 @@ pub struct PrepareRenameRequest {
 
 // todo: rename alias
 // todo: rename import path?
-impl SyntaxRequest for PrepareRenameRequest {
+impl SemanticRequest for PrepareRenameRequest {
     type Response = PrepareRenameResponse;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {

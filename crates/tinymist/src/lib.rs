@@ -34,6 +34,7 @@ mod task;
 mod tools;
 pub mod transport;
 mod utils;
+mod world;
 
 use core::fmt;
 use std::path::Path;
@@ -66,10 +67,13 @@ use tinymist_query::{
 use tokio::sync::mpsc;
 use typst::diag::StrResult;
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
+use typst::util::Deferred;
 use typst_ts_compiler::service::Compiler;
-use typst_ts_core::{config::CompileOpts, error::prelude::*, ImmutPath};
+use typst_ts_core::{error::prelude::*, ImmutPath};
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
+use world::SharedFontResolver;
+pub use world::{CompileFontOpts, CompileOnceOpts, CompileOpts};
 
 use crate::actor::render::PdfExportConfig;
 use crate::init::*;
@@ -285,9 +289,10 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 
 pub struct TypstLanguageServerArgs {
     pub client: LspHost,
-    pub compile_opts: CompileOpts,
+    pub compile_opts: CompileOnceOpts,
     pub const_config: ConstConfig,
     pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
+    pub font: Deferred<SharedFontResolver>,
 }
 
 /// The object providing the language server functionality.
@@ -307,7 +312,7 @@ pub struct TypstLanguageServer {
     /// For example, the position encoding.
     pub const_config: ConstConfig,
     /// The default opts for the compiler.
-    pub compile_opts: CompileOpts,
+    pub compile_opts: CompileOnceOpts,
 
     // Command maps
     /// Extra commands provided with `textDocument/executeCommand`.
@@ -322,6 +327,7 @@ pub struct TypstLanguageServer {
     primary: Option<CompileActor>,
     pinning: bool,
     main: Option<CompileActor>,
+    font: Deferred<SharedFontResolver>,
     tokens_ctx: SemanticTokenContext,
 }
 
@@ -350,6 +356,7 @@ impl TypstLanguageServer {
             primary: None,
             pinning: false,
             main: None,
+            font: args.font,
             tokens_ctx,
         }
     }

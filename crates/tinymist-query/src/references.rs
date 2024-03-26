@@ -3,7 +3,7 @@ use log::debug;
 use crate::{
     prelude::*,
     syntax::{get_deref_target, DerefTarget, IdentRef},
-    SyntaxRequest,
+    SemanticRequest,
 };
 
 /// The [`textDocument/references`] request is sent from the client to the
@@ -19,7 +19,7 @@ pub struct ReferencesRequest {
     pub position: LspPosition,
 }
 
-impl SyntaxRequest for ReferencesRequest {
+impl SemanticRequest for ReferencesRequest {
     type Response = Vec<LspLocation>;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {

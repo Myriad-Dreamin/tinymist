@@ -1,3 +1,12 @@
+//! # tinymist-query
+//!
+//! **Note: this crate is under development. it currently doesn't ensure stable
+//! APIs, and heavily depending on some unstable crates.**
+//!
+//! This crate provides a set of APIs to query the information about the source
+//! code. Currently it provides:
+//! + language queries defined by the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
+
 mod adt;
 pub mod analysis;
 pub mod syntax;
@@ -8,7 +17,7 @@ pub(crate) mod diagnostics;
 use std::sync::Arc;
 
 pub use analysis::AnalysisContext;
-use typst::model::Document as TypstDocument;
+use typst::{model::Document as TypstDocument, syntax::Source};
 
 pub use diagnostics::*;
 pub(crate) mod code_lens;
@@ -48,31 +57,57 @@ pub use references::*;
 
 pub mod lsp_typst_boundary;
 pub use lsp_typst_boundary::*;
+pub(crate) mod lsp_features;
+pub use lsp_features::*;
 
 mod prelude;
 
+/// A compiled document with an self-incremented logical version.
 #[derive(Debug, Clone)]
 pub struct VersionedDocument {
+    /// The version of the document.
     pub version: usize,
+    /// The compiled document.
     pub document: Arc<TypstDocument>,
 }
 
+/// A request handler with given syntax information.
 pub trait SyntaxRequest {
+    /// The response type of the request.
     type Response;
 
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response>;
-}
-
-pub trait StatefulRequest {
-    type Response;
-
+    /// Request the information from the given source.
     fn request(
         self,
-        ctx: &mut AnalysisContext,
-        v: Option<VersionedDocument>,
+        source: &Source,
+        positing_encoding: PositionEncoding,
     ) -> Option<Self::Response>;
 }
 
+/// A request handler with given (semantic) analysis context.
+pub trait SemanticRequest {
+    /// The response type of the request.
+    type Response;
+
+    /// Request the information from the given context.
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response>;
+}
+
+/// A request handler with given (semantic) analysis context and a versioned
+/// document.
+pub trait StatefulRequest {
+    /// The response type of the request.
+    type Response;
+
+    /// Request the information from the given context.
+    fn request(
+        self,
+        ctx: &mut AnalysisContext,
+        doc: Option<VersionedDocument>,
+    ) -> Option<Self::Response>;
+}
+
+#[allow(missing_docs)]
 mod polymorphic {
     use super::prelude::*;
     use super::*;

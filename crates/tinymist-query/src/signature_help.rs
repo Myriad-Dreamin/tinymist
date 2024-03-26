@@ -1,12 +1,18 @@
-use crate::{prelude::*, SyntaxRequest};
+use crate::{prelude::*, SemanticRequest};
 
+/// The [`textDocument/signatureHelp`] request is sent from the client to the
+/// server to request signature information at a given cursor position.
+///
+/// [`textDocument/signatureHelp`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_signatureHelp
 #[derive(Debug, Clone)]
 pub struct SignatureHelpRequest {
+    /// The path of the document to get signature help for.
     pub path: PathBuf,
+    /// The position of the cursor to get signature help for.
     pub position: LspPosition,
 }
 
-impl SyntaxRequest for SignatureHelpRequest {
+impl SemanticRequest for SignatureHelpRequest {
     type Response = SignatureHelp;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
@@ -20,7 +26,7 @@ impl SyntaxRequest for SignatureHelpRequest {
             return None;
         }
 
-        let values = analyze_expr(ctx.world, &callee_node);
+        let values = analyze_expr(ctx.world(), &callee_node);
 
         let function = values.into_iter().find_map(|v| match v.0 {
             Value::Func(f) => Some(f),

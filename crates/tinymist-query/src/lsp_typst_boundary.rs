@@ -1,5 +1,8 @@
 //! Conversions between Typst and LSP types and representations
 
+// todo: remove this
+#![allow(missing_docs)]
+
 use lsp_types;
 
 pub type LspPosition = lsp_types::Position;

@@ -10,7 +10,7 @@ use crate::{
         find_source_by_import, get_deref_target, DerefTarget, IdentRef, LexicalKind,
         LexicalModKind, LexicalVarKind,
     },
-    SyntaxRequest,
+    SemanticRequest,
 };
 
 /// The [`textDocument/definition`] request asks the server for the definition
@@ -36,7 +36,7 @@ pub struct GotoDefinitionRequest {
     pub position: LspPosition,
 }
 
-impl SyntaxRequest for GotoDefinitionRequest {
+impl SemanticRequest for GotoDefinitionRequest {
     type Response = GotoDefinitionResponse;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
@@ -96,7 +96,7 @@ pub(crate) fn find_definition(
             let parent = path.parent()?;
             let def_fid = parent.span().id()?;
             let e = parent.cast::<ast::ModuleImport>()?;
-            let source = find_source_by_import(ctx.world, def_fid, e)?;
+            let source = find_source_by_import(ctx.world(), def_fid, e)?;
             return Some(DefinitionLink {
                 kind: LexicalKind::Mod(LexicalModKind::PathVar),
                 name: String::new(),
@@ -132,7 +132,7 @@ pub(crate) fn find_definition(
     let def_id = def_id.or_else(|| Some(def_use.get_def(source_id, &ident_ref)?.0));
     let def_info = def_id.and_then(|def_id| def_use.get_def_by_id(def_id));
 
-    let values = analyze_expr(ctx.world, &use_site);
+    let values = analyze_expr(ctx.world(), &use_site);
     for v in values {
         // mostly builtin functions
         if let Value::Func(f) = v.0 {
@@ -193,7 +193,7 @@ pub(crate) fn find_definition(
             let root = LinkedNode::new(def_source.root());
             let def_name = root.leaf_at(def.range.start + 1)?;
             log::info!("def_name for function: {def_name:?}", def_name = def_name);
-            let values = analyze_expr(ctx.world, &def_name);
+            let values = analyze_expr(ctx.world(), &def_name);
             let func = values.into_iter().find(|v| matches!(v.0, Value::Func(..)));
             log::info!("okay for function: {func:?}");
 

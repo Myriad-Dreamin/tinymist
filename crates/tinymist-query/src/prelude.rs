@@ -25,8 +25,6 @@ pub use typst::syntax::{
     LinkedNode, Source, Spanned, SyntaxKind,
 };
 pub use typst::World;
-// use typst_ts_compiler::service::WorkspaceProvider;
-pub use typst_ts_compiler::TypstSystemWorld;
 
 pub use crate::analysis::{analyze_expr, AnalysisContext};
 pub use crate::lsp_typst_boundary::{

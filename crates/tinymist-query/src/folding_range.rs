@@ -1,32 +1,46 @@
 use crate::{
     prelude::*,
     syntax::{get_lexical_hierarchy, LexicalHierarchy, LexicalKind, LexicalScopeKind},
+    SyntaxRequest,
 };
 
+/// The [`textDocument/foldingRange`] request is sent from the client to the
+/// server to return all folding ranges found in a given text document.
+///
+/// [`textDocument/foldingRange`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_foldingRange
+///
+/// # Compatibility
+///
+/// This request was introduced in specification version 3.10.0.
 #[derive(Debug, Clone)]
 pub struct FoldingRangeRequest {
+    /// The path of the document to get folding ranges for.
     pub path: PathBuf,
+    /// If set, the client can only provide folding ranges that consist of whole
+    /// lines.
     pub line_folding_only: bool,
 }
 
-impl FoldingRangeRequest {
-    pub fn request(
+impl SyntaxRequest for FoldingRangeRequest {
+    type Response = Vec<FoldingRange>;
+
+    fn request(
         self,
-        source: Source,
+        source: &Source,
         position_encoding: PositionEncoding,
-    ) -> Option<Vec<FoldingRange>> {
+    ) -> Option<Self::Response> {
         let line_folding_only = self.line_folding_only;
 
         let symbols = get_lexical_hierarchy(source.clone(), LexicalScopeKind::Braced)?;
 
         let mut results = vec![];
         let LspPosition { line, character } =
-            typst_to_lsp::offset_to_position(source.text().len(), position_encoding, &source);
+            typst_to_lsp::offset_to_position(source.text().len(), position_encoding, source);
         let loc = (line, Some(character));
 
         calc_folding_range(
             &symbols,
-            &source,
+            source,
             position_encoding,
             line_folding_only,
             loc,
@@ -126,7 +140,7 @@ mod tests {
 
             let source = world.source_by_path(&path).unwrap();
 
-            let result = request.request(source, PositionEncoding::Utf16);
+            let result = request.request(&source, PositionEncoding::Utf16);
             assert_snapshot!(JsonRepr::new_pure(result.unwrap()));
         });
     }

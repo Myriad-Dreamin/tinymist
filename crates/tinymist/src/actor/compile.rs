@@ -23,17 +23,30 @@ use typst_ts_compiler::{
     ShadowApi,
 };
 use typst_ts_core::{
+    config::compiler::EntryState,
     debug_loc::{SourceLocation, SourceSpanOffset},
     error::prelude::{map_string_err, ZResult},
-    ImmutPath, TypstDocument, TypstFileId,
+    TypstDocument, TypstFileId,
 };
 
 use typst_ts_compiler::service::{
-    features::FeatureSet, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter,
-    WorkspaceProvider, WorldExporter,
+    features::FeatureSet, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter, EntryManager,
 };
 
 use crate::{task::BorrowTask, utils};
+
+pub trait EntryStateExt {
+    fn is_inactive(&self) -> bool;
+}
+
+impl EntryStateExt for EntryState {
+    fn is_inactive(&self) -> bool {
+        matches!(
+            self,
+            EntryState::Detached | EntryState::Workspace { main: None, .. }
+        )
+    }
+}
 
 /// Interrupts for external sources
 enum ExternalInterrupt<Ctx> {
@@ -89,8 +102,6 @@ struct SuspendState {
 pub struct CompileActor<C: Compiler> {
     /// The underlying compiler.
     pub compiler: CompileReporter<C>,
-    /// The root path of the workspace.
-    pub root: ImmutPath,
     /// Whether to enable file system watching.
     pub enable_watch: bool,
 
@@ -117,16 +128,11 @@ pub struct CompileActor<C: Compiler> {
     suspend_state: SuspendState,
 }
 
-impl<C: Compiler + ShadowApi + WorldExporter + Send + 'static> CompileActor<C>
+impl<C: Compiler + ShadowApi + Send + 'static> CompileActor<C>
 where
     C::World: for<'files> codespan_reporting::files::Files<'files, FileId = TypstFileId>,
 {
-    pub fn new_with_features(
-        compiler: C,
-        root: ImmutPath,
-        entry: Option<ImmutPath>,
-        feature_set: FeatureSet,
-    ) -> Self {
+    pub fn new_with_features(compiler: C, entry: EntryState, feature_set: FeatureSet) -> Self {
         let (steal_send, steal_recv) = mpsc::unbounded_channel();
 
         let watch_feature_set = Arc::new(
@@ -138,7 +144,6 @@ where
         Self {
             compiler: CompileReporter::new(compiler)
                 .with_generic_reporter(ConsoleDiagReporter::default()),
-            root,
 
             logical_tick: 1,
             enable_watch: false,
@@ -154,15 +159,15 @@ where
             steal_recv,
 
             suspend_state: SuspendState {
-                suspended: entry.is_none(),
+                suspended: entry.is_inactive(),
                 dirty: false,
             },
         }
     }
 
     /// Create a new compiler thread.
-    pub fn new(compiler: C, root: ImmutPath, entry: Option<ImmutPath>) -> Self {
-        Self::new_with_features(compiler, root, entry, FeatureSet::default())
+    pub fn new(compiler: C, entry: EntryState) -> Self {
+        Self::new_with_features(compiler, entry, FeatureSet::default())
     }
 
     pub fn success_doc(&self) -> Option<VersionedDocument> {
@@ -327,8 +332,8 @@ where
         Some(compile_thread)
     }
 
-    pub(crate) fn change_entry(&mut self, entry: Option<Arc<Path>>) {
-        let suspending = entry.is_none();
+    pub(crate) fn change_entry(&mut self, entry: EntryState) {
+        let suspending = entry.is_inactive();
         if suspending {
             self.suspend_state.suspended = true;
         } else {
@@ -530,7 +535,7 @@ impl<C: Compiler> CompileActor<C> {
             self,
             CompileClient {
                 intr_tx: steal_send,
-                _ctx: typst_ts_core::PhantomParamData::default(),
+                _ctx: std::marker::PhantomData,
             },
         )
     }
@@ -544,7 +549,7 @@ impl<C: Compiler> CompileActor<C> {
 pub struct CompileClient<Ctx> {
     intr_tx: mpsc::UnboundedSender<ExternalInterrupt<Ctx>>,
 
-    _ctx: typst_ts_core::PhantomParamData<Ctx>,
+    _ctx: std::marker::PhantomData<fn(&mut Ctx)>,
 }
 
 unsafe impl<Ctx> Send for CompileClient<Ctx> {}
@@ -555,7 +560,7 @@ impl<Ctx> CompileClient<Ctx> {
         let (intr_tx, _) = mpsc::unbounded_channel();
         Self {
             intr_tx,
-            _ctx: typst_ts_core::PhantomParamData::default(),
+            _ctx: std::marker::PhantomData,
         }
     }
 }
@@ -627,7 +632,7 @@ pub struct DocToSrcJumpInfo {
 // todo: remove constraint to CompilerWorld
 impl<F: CompilerFeat, Ctx: Compiler<World = CompilerWorld<F>>> CompileClient<CompileActor<Ctx>>
 where
-    Ctx::World: WorkspaceProvider,
+    Ctx::World: EntryManager,
 {
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
@@ -643,7 +648,7 @@ where
             let world = this.compiler.world();
 
             let relative_path = filepath
-                .strip_prefix(&this.compiler.world().workspace_root())
+                .strip_prefix(&this.compiler.world().workspace_root()?)
                 .ok()?;
 
             let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
@@ -666,7 +671,7 @@ where
 
             let filepath = Path::new(&loc.filepath);
             let relative_path = filepath
-                .strip_prefix(&this.compiler.world().workspace_root())
+                .strip_prefix(&this.compiler.world().workspace_root()?)
                 .ok()?;
 
             let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));

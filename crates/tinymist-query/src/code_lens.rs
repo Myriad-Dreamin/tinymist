@@ -1,6 +1,6 @@
 use lsp_types::Command;
 
-use crate::{prelude::*, SyntaxRequest};
+use crate::{prelude::*, SemanticRequest};
 
 /// The [`textDocument/codeLens`] request is sent from the client to the server
 /// to compute code lenses for a given text document.
@@ -12,7 +12,7 @@ pub struct CodeLensRequest {
     pub path: PathBuf,
 }
 
-impl SyntaxRequest for CodeLensRequest {
+impl SemanticRequest for CodeLensRequest {
     type Response = Vec<CodeLens>;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {

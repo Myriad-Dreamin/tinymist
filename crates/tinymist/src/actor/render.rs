@@ -13,7 +13,7 @@ use tokio::sync::{
     oneshot, watch,
 };
 use typst::foundations::Smart;
-use typst_ts_core::{path::PathClean, ImmutPath, TypstDocument};
+use typst_ts_core::{config::compiler::EntryState, path::PathClean, ImmutPath, TypstDocument};
 
 use crate::ExportPdfMode;
 
@@ -29,15 +29,13 @@ pub enum RenderActorRequest {
 
 #[derive(Debug, Clone)]
 pub struct PdfPathVars {
-    pub root: Option<ImmutPath>,
-    pub path: Option<ImmutPath>,
+    pub entry: EntryState,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct PdfExportConfig {
     pub substitute_pattern: String,
-    pub root: Option<ImmutPath>,
-    pub path: Option<ImmutPath>,
+    pub entry: EntryState,
     pub mode: ExportPdfMode,
 }
 
@@ -46,8 +44,7 @@ pub struct PdfExportActor {
     document: watch::Receiver<Option<Arc<TypstDocument>>>,
 
     pub substitute_pattern: String,
-    pub root: Option<ImmutPath>,
-    pub path: Option<ImmutPath>,
+    pub entry: EntryState,
     pub mode: ExportPdfMode,
 }
 
@@ -61,8 +58,7 @@ impl PdfExportActor {
             render_rx,
             document,
             substitute_pattern: config.substitute_pattern,
-            root: config.root,
-            path: config.path,
+            entry: config.entry,
             mode: config.mode,
         }
     }
@@ -88,13 +84,11 @@ impl PdfExportActor {
                     match req {
                         RenderActorRequest::ChangeConfig(cfg) => {
                             self.substitute_pattern = cfg.substitute_pattern;
-                            self.root = cfg.root;
-                            self.path = cfg.path;
+                            self.entry = cfg.entry;
                             self.mode = cfg.mode;
                         }
                         RenderActorRequest::ChangeExportPath(cfg) => {
-                            self.root = cfg.root;
-                            self.path = cfg.path;
+                            self.entry = cfg.entry;
                         }
                         _ => {
                             let sender = match &req {
@@ -132,23 +126,36 @@ impl PdfExportActor {
             _ => unreachable!(),
         };
 
+        // pub entry: EntryState,
+        let root = self.entry.root();
+        let main = self.entry.main();
+
         info!(
-            "PdfRenderActor: check path {:?} with output directory {}",
-            self.path, self.substitute_pattern
+            "PdfRenderActor: check path {:?} and root {:?} with output directory {}",
+            main, root, self.substitute_pattern
         );
-        if let Some((root, path)) = self.root.as_ref().zip(self.path.as_ref()) {
-            let should_do = matches!(req, RenderActorRequest::DoExport(..));
-            let should_do = should_do || get_mode(self.mode) == eq_mode;
-            let should_do = should_do || validate_document(&req, self.mode, &document);
-            if should_do {
-                return match self.export_pdf(&document, root, path).await {
-                    Ok(pdf) => Some(pdf),
-                    Err(err) => {
-                        error!("PdfRenderActor: failed to export PDF: {err}", err = err);
-                        None
-                    }
-                };
-            }
+
+        let root = root?;
+        let main = main?;
+
+        // todo: package??
+        if main.package().is_some() {
+            return None;
+        }
+
+        let path = main.vpath().resolve(&root)?;
+
+        let should_do = matches!(req, RenderActorRequest::DoExport(..));
+        let should_do = should_do || get_mode(self.mode) == eq_mode;
+        let should_do = should_do || validate_document(&req, self.mode, &document);
+        if should_do {
+            return match self.export_pdf(&document, &root, &path).await {
+                Ok(pdf) => Some(pdf),
+                Err(err) => {
+                    error!("PdfRenderActor: failed to export PDF: {err}", err = err);
+                    None
+                }
+            };
         }
 
         fn get_mode(mode: ExportPdfMode) -> ExportPdfMode {

@@ -10,23 +10,30 @@ use typst::{
     util::LazyHash,
 };
 
-use crate::{prelude::*, SyntaxRequest};
+use crate::{prelude::*, SemanticRequest};
 
+/// Configuration for inlay hints.
 pub struct InlayHintConfig {
     // positional arguments group
+    /// Show inlay hints for positional arguments.
     pub on_pos_args: bool,
+    /// Disable inlay hints for single positional arguments.
     pub off_single_pos_arg: bool,
 
     // variadic arguments group
+    /// Show inlay hints for variadic arguments.
     pub on_variadic_args: bool,
+    /// Disable inlay hints for all variadic arguments but the first variadic
+    /// argument.
     pub only_first_variadic_args: bool,
 
-    // todo
     // The typst sugar grammar
+    /// Show inlay hints for content block arguments.
     pub on_content_block_args: bool,
 }
 
 impl InlayHintConfig {
+    /// A smart configuration that enables most useful inlay hints.
     pub const fn smart() -> Self {
         Self {
             on_pos_args: true,
@@ -40,20 +47,31 @@ impl InlayHintConfig {
     }
 }
 
+/// The [`textDocument/inlayHint`] request is sent from the client to the server
+/// to compute inlay hints for a given `(text document, range)` tuple that may
+/// be rendered in the editor in place with other text.
+///
+/// [`textDocument/inlayHint`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_inlayHint
+///
+/// # Compatibility
+///
+/// This request was introduced in specification version 3.17.0
 #[derive(Debug, Clone)]
 pub struct InlayHintRequest {
+    /// The path of the document to get inlay hints for.
     pub path: PathBuf,
+    /// The range of the document to get inlay hints for.
     pub range: LspRange,
 }
 
-impl SyntaxRequest for InlayHintRequest {
+impl SemanticRequest for InlayHintRequest {
     type Response = Vec<InlayHint>;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let range = ctx.to_typst_range(self.range, &source)?;
 
-        let hints = inlay_hint(ctx.world, &source, range, ctx.position_encoding()).ok()?;
+        let hints = inlay_hint(ctx.world(), &source, range, ctx.position_encoding()).ok()?;
         debug!(
             "got inlay hints on {source:?} => {hints:?}",
             source = source.id(),
@@ -516,7 +534,7 @@ impl ParamSpec {
 }
 
 #[derive(Debug, Clone)]
-pub struct Signature {
+pub(crate) struct Signature {
     pub pos: Vec<Arc<ParamSpec>>,
     pub named: HashMap<Cow<'static, str>, Arc<ParamSpec>>,
     has_fill_or_size_or_stroke: bool,

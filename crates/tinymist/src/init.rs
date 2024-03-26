@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::bail;
@@ -11,10 +12,18 @@ use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
 use typst::foundations::IntoValue;
-use typst_ts_core::{config::CompileOpts, ImmutPath, TypstDict};
+use typst::syntax::VirtualPath;
+use typst::util::Deferred;
+use typst_ts_core::config::compiler::EntryState;
+use typst_ts_core::error::prelude::*;
+use typst_ts_core::{ImmutPath, TypstDict, TypstFileId as FileId};
 
 use crate::actor::cluster::CompileClusterActor;
-use crate::{invalid_params, LspHost, LspResult, TypstLanguageServer, TypstLanguageServerArgs};
+use crate::world::{CompileOpts, SharedFontResolver};
+use crate::{
+    invalid_params, CompileFontOpts, LspHost, LspResult, TypstLanguageServer,
+    TypstLanguageServerArgs,
+};
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
@@ -283,6 +292,18 @@ impl Config {
             return Some(path.as_path().into());
         }
 
+        if let Some(extras) = &self.typst_extra_args {
+            // todo: inputs
+            // if let Some(inputs) = extras.inputs.as_ref() {
+            //     if opts.inputs.is_empty() {
+            //         opts.inputs = inputs.clone();
+            //     }
+            // }
+            if let Some(root) = &extras.root_dir {
+                return Some(root.as_path().into());
+            }
+        }
+
         if let Some(path) = &self
             .typst_extra_args
             .as_ref()
@@ -312,6 +333,34 @@ impl Config {
         }
 
         None
+    }
+
+    pub fn determine_entry(&self, entry: Option<ImmutPath>) -> EntryState {
+        // todo: don't ignore entry from typst_extra_args
+        // entry: command.input,
+        let root_dir = self.determine_root(entry.as_ref());
+
+        let entry = match (entry, root_dir) {
+            (Some(entry), Some(root)) => match entry.strip_prefix(&root) {
+                Ok(stripped) => Some(EntryState::new_rooted(
+                    root,
+                    Some(FileId::new(None, VirtualPath::new(stripped))),
+                )),
+                Err(err) => {
+                    log::info!("Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}");
+                    EntryState::new_rootless(entry)
+                }
+            },
+            (Some(entry), None) => EntryState::new_rootless(entry),
+            (None, Some(root)) => Some(EntryState::new_workspace(root)),
+            (None, None) => None,
+        };
+
+        entry.unwrap_or_else(|| match self.determine_root(None) {
+            Some(root) => EntryState::new_workspace(root),
+            // todo
+            None => EntryState::new_detached(),
+        })
     }
 
     fn validate(&self) -> anyhow::Result<()> {
@@ -436,7 +485,7 @@ impl Init {
     /// # Errors
     /// Errors if the configuration could not be updated.
     pub fn initialize(
-        self,
+        mut self,
         params: InitializeParams,
     ) -> (TypstLanguageServer, LspResult<InitializeResult>) {
         // self.tracing_init();
@@ -447,44 +496,59 @@ impl Init {
             "initialized with const_config {const_config:?}",
             const_config = cc
         );
+        let mut config = Config {
+            roots: match params.workspace_folders.as_ref() {
+                Some(roots) => roots
+                    .iter()
+                    .map(|root| &root.uri)
+                    .map(Url::to_file_path)
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap(),
+                #[allow(deprecated)] // `params.root_path` is marked as deprecated
+                None => params
+                    .root_uri
+                    .as_ref()
+                    .map(|uri| uri.to_file_path().unwrap())
+                    .or_else(|| params.root_path.clone().map(PathBuf::from))
+                    .into_iter()
+                    .collect(),
+            },
+            ..Config::default()
+        };
+        let res = match &params.initialization_options {
+            Some(init) => config
+                .update(init)
+                .map_err(|e| e.to_string())
+                .map_err(invalid_params),
+            None => Ok(()),
+        };
 
-        let mut config = Config::default();
+        // prepare fonts
+        // todo: on font resolving failure, downgrade to a fake font book
+        let font = {
+            let opts = std::mem::take(&mut self.compile_opts.font);
+            if opts.font_paths.is_empty() {
+                if let Some(font_paths) = config.typst_extra_args.as_ref().map(|x| &x.font_paths) {
+                    self.compile_opts.font.font_paths = font_paths.clone();
+                }
+            }
+
+            Deferred::new(|| create_font_book(opts).expect("failed to create font book"))
+        };
 
         // Bootstrap server
         let (diag_tx, diag_rx) = mpsc::unbounded_channel();
 
         let mut service = TypstLanguageServer::new(TypstLanguageServerArgs {
             client: self.host.clone(),
-            compile_opts: self.compile_opts,
+            compile_opts: self.compile_opts.once,
             const_config: cc.clone(),
             diag_tx,
+            font,
         });
 
-        config.roots = match params.workspace_folders.as_ref() {
-            Some(roots) => roots
-                .iter()
-                .map(|root| &root.uri)
-                .map(Url::to_file_path)
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap(),
-            #[allow(deprecated)] // `params.root_path` is marked as deprecated
-            None => params
-                .root_uri
-                .as_ref()
-                .map(|uri| uri.to_file_path().unwrap())
-                .or_else(|| params.root_path.clone().map(PathBuf::from))
-                .into_iter()
-                .collect(),
-        };
-        if let Some(init) = &params.initialization_options {
-            if let Err(err) = config
-                .update(init)
-                .as_ref()
-                .map_err(ToString::to_string)
-                .map_err(invalid_params)
-            {
-                return (service, Err(err));
-            }
+        if let Err(err) = res {
+            return (service, Err(err));
         }
 
         info!("initialized with config {config:?}", config = config);
@@ -498,7 +562,7 @@ impl Init {
             published_primary: false,
         };
 
-        let primary = service.server("primary".to_owned(), None);
+        let primary = service.server("primary".to_owned(), service.config.determine_entry(None));
         if service.primary.is_some() {
             panic!("primary already initialized");
         }
@@ -586,6 +650,14 @@ impl Init {
 
         (service, Ok(res))
     }
+}
+
+fn create_font_book(opts: CompileFontOpts) -> ZResult<SharedFontResolver> {
+    let res = crate::world::LspWorldBuilder::resolve_fonts(opts)?;
+    Ok(SharedFontResolver {
+        inner: Arc::new(res),
+        // inner: res,
+    })
 }
 
 #[cfg(test)]
