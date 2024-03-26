@@ -32,6 +32,12 @@ name = "typst"
 language-servers = ["tinymist"]
 ```
 
+## Tips
+
+### Working with Multiple-File Projects
+
+There is a way in [Neovim](../neovim/README.md#multiple-file-project-support), but might be no way in Helix regard to [How to Send Custom LSP commands](https://github.com/helix-editor/helix/discussions/3933).
+
 ## Extra Settings
 
 To configure LSP server, you can edit the `language-server.tinymist` section. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:

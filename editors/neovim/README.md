@@ -42,6 +42,21 @@ This section shows you a minimal way to setup tinymist in Neovim (LazyVim).
 
 Please see [Extra Settings](#extra-settings) for more configuration.
 
+## Tips
+
+### Working with Multiple-File Projects
+
+The solution is a bit internal, but you can set a main file temporarily by command.
+
+```lua
+# pin the main file
+vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.api.nvim_buf_get_name(0) } })
+# unpin the main file
+vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { nil } })
+```
+
+There is also a plan to support multiple-file project by workspace configuration, but I don't know what is neovim's way, so it needs further discussion.
+
 ## Troubleshooting
 
 ### tinymist does not start on creating/opening files
