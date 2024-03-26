@@ -60,7 +60,7 @@ impl TypstLanguageServer {
             let current_runtime = tokio::runtime::Handle::current();
             let handler = CompileHandler {
                 #[cfg(feature = "preview")]
-                inner: Arc::new(Mutex::new(None)),
+                inner: std::sync::Arc::new(parking_lot::Mutex::new(None)),
                 diag_group: diag_group.clone(),
                 doc_tx,
                 render_tx: render_tx.clone(),

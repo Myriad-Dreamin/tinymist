@@ -258,7 +258,7 @@ impl CompileClientActor {
         }
     }
 
-    fn inner(&self) -> &CompileClient {
+    pub fn inner(&self) -> &CompileClient {
         self.inner.wait()
     }
 

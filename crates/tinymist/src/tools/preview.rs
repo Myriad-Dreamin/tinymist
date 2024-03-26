@@ -1,7 +1,3 @@
-use std::sync::Arc;
-
-use typst_ts_core::TypstDocument;
-
 #[cfg(feature = "preview")]
 pub use typst_preview::CompileStatus;
 #[cfg(not(feature = "preview"))]
@@ -18,7 +14,10 @@ pub use typst_preview::CompilationHandle;
 #[cfg(not(feature = "preview"))]
 pub trait CompilationHandle: Send + 'static {
     fn status(&self, status: CompileStatus);
-    fn notify_compile(&self, res: Result<Arc<TypstDocument>, CompileStatus>);
+    fn notify_compile(
+        &self,
+        res: Result<std::sync::Arc<typst_ts_core::TypstDocument>, CompileStatus>,
+    );
 }
 
 #[cfg(feature = "preview")]
@@ -38,7 +37,7 @@ mod preview_exts {
 
     use crate::actor::typ_client::CompileClientActor;
 
-    impl SourceFileServer for CompileActor {
+    impl SourceFileServer for CompileClientActor {
         async fn resolve_source_span(
             &mut self,
             loc: Location,
@@ -84,7 +83,7 @@ mod preview_exts {
         }
     }
 
-    impl EditorServer for CompileActor {
+    impl EditorServer for CompileClientActor {
         async fn update_memory_files(
             &mut self,
             files: MemoryFiles,
@@ -122,5 +121,5 @@ mod preview_exts {
         }
     }
 
-    impl CompileHost for CompileActor {}
+    impl CompileHost for CompileClientActor {}
 }
