@@ -44,12 +44,12 @@ typst = "0.11.0"
 typst-ide = "0.11.0"
 typst-pdf = "0.11.0"
 typst-assets = "0.11.0"
-reflexo = { version = "=0.4.2-rc10", default-features = false, features = [
+reflexo = { version = "0.5.0-rc2", default-features = false, features = [
     "flat-vector",
 ] }
-typst-ts-core = { version = "=0.4.2-rc10" }
-typst-ts-compiler = { version = "=0.4.2-rc10" }
-typst-preview = { version = "0.11.0" }
+typst-ts-core = { version = "0.5.0-rc2" }
+typst-ts-compiler = { version = "0.5.0-rc2" }
+typst-preview = { version = "0.11.3" }
 
 lsp-server = "0.7.6"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
