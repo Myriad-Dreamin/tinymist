@@ -6,7 +6,8 @@ use ::typst::{diag::FileResult, syntax::Source};
 use anyhow::anyhow;
 use lsp_types::TextDocumentContentChangeEvent;
 use tinymist_query::{
-    lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, PositionEncoding, SyntaxRequest,
+    lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, OnExportRequest,
+    OnSaveExportRequest, PositionEncoding, SemanticRequest, StatefulRequest, SyntaxRequest,
 };
 use typst_ts_compiler::{
     vfs::notify::{FileChangeSet, MemoryEvent},
@@ -14,7 +15,7 @@ use typst_ts_compiler::{
 };
 use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
-use crate::TypstLanguageServer;
+use crate::{actor::typ_client::CompileClientActor, TypstLanguageServer};
 
 #[derive(Debug, Clone)]
 pub struct MemoryFileMeta {
@@ -184,6 +185,20 @@ macro_rules! query_tokens_cache {
     }};
 }
 
+macro_rules! query_state {
+    ($self:ident, $method:ident, $req:expr) => {{
+        let res = $self.steal_state(move |w, doc| $req.request(w, doc));
+        res.map(CompilerQueryResponse::$method)
+    }};
+}
+
+macro_rules! query_world {
+    ($self:ident, $method:ident, $req:expr) => {{
+        let res = $self.steal_world(move |w| $req.request(w));
+        res.map(CompilerQueryResponse::$method)
+    }};
+}
+
 impl TypstLanguageServer {
     pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
         use CompilerQueryRequest::*;
@@ -196,16 +211,50 @@ impl TypstLanguageServer {
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
             _ => {
                 match self.main.as_ref() {
-                    Some(main) if self.pinning => main.query(query),
+                    Some(main) if self.pinning => Self::query_on(main, query),
                     Some(..) | None => {
                         // todo: race condition, we need atomic primary query
                         if let Some(path) = query.associated_path() {
                             self.primary().change_entry(Some(path.into()))?;
                         }
-                        self.primary().query(query)
+                        Self::query_on(self.primary(), query)
                     }
                 }
             }
+        }
+    }
+
+    fn query_on(
+        client: &CompileClientActor,
+        query: CompilerQueryRequest,
+    ) -> anyhow::Result<CompilerQueryResponse> {
+        use CompilerQueryRequest::*;
+        assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
+
+        match query {
+            CompilerQueryRequest::OnExport(OnExportRequest { kind, path }) => Ok(
+                CompilerQueryResponse::OnExport(client.on_export(kind, path)?),
+            ),
+            CompilerQueryRequest::OnSaveExport(OnSaveExportRequest { path }) => {
+                client.on_save_export(path)?;
+                Ok(CompilerQueryResponse::OnSaveExport(()))
+            }
+            Hover(req) => query_state!(client, Hover, req),
+            GotoDefinition(req) => query_world!(client, GotoDefinition, req),
+            GotoDeclaration(req) => query_world!(client, GotoDeclaration, req),
+            References(req) => query_world!(client, References, req),
+            InlayHint(req) => query_world!(client, InlayHint, req),
+            CodeLens(req) => query_world!(client, CodeLens, req),
+            Completion(req) => query_state!(client, Completion, req),
+            SignatureHelp(req) => query_world!(client, SignatureHelp, req),
+            Rename(req) => query_world!(client, Rename, req),
+            PrepareRename(req) => query_world!(client, PrepareRename, req),
+            Symbol(req) => query_world!(client, Symbol, req),
+            FoldingRange(..)
+            | SelectionRange(..)
+            | SemanticTokensDelta(..)
+            | DocumentSymbol(..)
+            | SemanticTokensFull(..) => unreachable!(),
         }
     }
 }
