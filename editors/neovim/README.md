@@ -46,7 +46,7 @@ Please see [Extra Settings](#extra-settings) for more configuration.
 
 ### Working with Multiple-File Projects
 
-The solution is a bit internal, but you can pin a main file by command.
+The solution is a bit internal, which should get futher improvement, but you can pin a main file by command.
 
 ```lua
 # pin the main file
