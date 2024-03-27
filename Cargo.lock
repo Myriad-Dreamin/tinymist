@@ -3659,6 +3659,7 @@ dependencies = [
  "typst-preview",
  "typst-render",
  "typst-svg",
+ "typst-timing",
  "typst-ts-compiler",
  "typst-ts-core",
  "vergen",

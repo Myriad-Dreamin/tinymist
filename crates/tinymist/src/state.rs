@@ -15,7 +15,7 @@ use typst_ts_compiler::{
 };
 use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
-use crate::{actor::typ_client::CompileClientActor, TypstLanguageServer};
+use crate::{actor::typ_client::CompileClientActor, compiler::CompileServer, TypstLanguageServer};
 
 #[derive(Debug, Clone)]
 pub struct MemoryFileMeta {
@@ -35,8 +35,8 @@ impl TypstLanguageServer {
             (Some(new_entry), false) => {
                 let main_node = self.server(
                     "main".to_owned(),
-                    self.config.determine_entry(Some(new_entry)),
-                    self.config.determine_inputs(),
+                    self.config.compile.determine_entry(Some(new_entry)),
+                    self.config.compile.determine_inputs(),
                 );
 
                 self.main = Some(main_node);
@@ -257,5 +257,12 @@ impl TypstLanguageServer {
             | DocumentSymbol(..)
             | SemanticTokensFull(..) => unreachable!(),
         }
+    }
+}
+
+impl CompileServer {
+    pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
+        let client = self.compiler.as_ref().unwrap();
+        TypstLanguageServer::query_on(client, query)
     }
 }

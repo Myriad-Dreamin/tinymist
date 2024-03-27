@@ -1,38 +1,52 @@
-use std::path::PathBuf;
-
 use once_cell::sync::Lazy;
+use tinymist::transport::MirrorArgs;
 
-#[cfg(feature = "clap")]
-const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
+use tinymist::compiler_init::{CompileOnceArgs, FontArgs};
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 #[cfg_attr(feature = "clap", clap(name = "tinymist", author, version, about, long_version(LONG_VERSION.as_str())))]
 pub struct CliArguments {
     /// Mode of the binary
-    #[cfg_attr(
-        feature = "clap",
-        clap(long, default_value = "server", value_name = "FILE")
-    )]
-    pub mode: String,
-    /// Mirror the stdin to the file
-    #[cfg_attr(feature = "clap", clap(long, default_value = "", value_name = "FILE"))]
-    pub mirror: String,
-    /// Replay input from the file
-    #[cfg_attr(feature = "clap", clap(long, default_value = "", value_name = "FILE"))]
-    pub replay: String,
-    /// Font paths, which doesn't allow for dynamic configuration
-    #[cfg_attr(feature = "clap", clap(
-        long = "font-path",
-        value_name = "DIR",
-        action = clap::ArgAction::Append,
-        env = "TYPST_FONT_PATHS",
-        value_delimiter = ENV_PATH_SEP
-    ))]
-    pub font_paths: Vec<PathBuf>,
-    /// Exclude system fonts
+    #[cfg_attr(feature = "clap", clap(subcommand))]
+    pub command: Option<Commands>,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "clap", derive(clap::Subcommand))]
+pub enum Commands {
+    /// Run Language Server
+    Lsp(LspArgs),
+    /// Run Compile Server
+    Compile(CompileArgs),
+    /// Probe
+    Probe,
+}
+
+impl Default for Commands {
+    fn default() -> Self {
+        Self::Lsp(Default::default())
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
+pub struct CompileArgs {
     #[cfg_attr(feature = "clap", clap(long, default_value = "false"))]
-    pub no_system_fonts: bool,
+    pub persist: bool,
+    #[cfg_attr(feature = "clap", clap(flatten))]
+    pub mirror: MirrorArgs,
+    #[cfg_attr(feature = "clap", clap(flatten))]
+    pub compile: CompileOnceArgs,
+}
+
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
+pub struct LspArgs {
+    #[cfg_attr(feature = "clap", clap(flatten))]
+    pub mirror: MirrorArgs,
+    #[cfg_attr(feature = "clap", clap(flatten))]
+    pub font: FontArgs,
 }
 
 pub static LONG_VERSION: Lazy<String> = Lazy::new(|| {

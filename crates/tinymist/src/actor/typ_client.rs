@@ -56,15 +56,16 @@ use typst_ts_core::{
 
 use super::typ_server::CompileClient as TsCompileClient;
 use super::{render::ExportConfig, typ_server::CompileServerActor};
+use crate::world::LspWorld;
 use crate::{
     actor::render::{OneshotRendering, PathVars, RenderActorRequest},
+    compiler_init::CompileConfig,
     utils,
 };
 use crate::{
     actor::typ_server::EntryStateExt,
     tools::preview::{CompilationHandle, CompileStatus},
 };
-use crate::{world::LspWorld, Config};
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
 type CompileService = CompileServerActor<CompileDriver>;
@@ -178,7 +179,7 @@ impl CompileDriver {
         }
     }
 
-    fn run_analysis<T>(
+    pub fn run_analysis<T>(
         &mut self,
         f: impl FnOnce(&mut AnalysisContext<'_>) -> T,
     ) -> anyhow::Result<T> {
@@ -233,7 +234,7 @@ impl CompileDriver {
 
 pub struct CompileClientActor {
     diag_group: String,
-    config: Config,
+    config: CompileConfig,
     entry: Arc<Mutex<EntryState>>,
     inner: Deferred<CompileClient>,
     render_tx: broadcast::Sender<RenderActorRequest>,
@@ -242,7 +243,7 @@ pub struct CompileClientActor {
 impl CompileClientActor {
     pub(crate) fn new(
         diag_group: String,
-        config: Config,
+        config: CompileConfig,
         entry: EntryState,
         inner: Deferred<CompileClient>,
         render_tx: broadcast::Sender<RenderActorRequest>,
