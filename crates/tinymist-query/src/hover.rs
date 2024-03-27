@@ -3,7 +3,7 @@ use core::fmt;
 use crate::{
     analyze_signature, find_definition,
     prelude::*,
-    syntax::{get_def_target, get_deref_target, LexicalVarKind},
+    syntax::{find_document_before, get_deref_target, LexicalKind, LexicalVarKind},
     upstream::{expr_tooltip, tooltip, Tooltip},
     DefinitionLink, LspHoverContents, StatefulRequest,
 };
@@ -68,42 +68,58 @@ fn def_tooltip(
 
     let lnk = find_definition(ctx, source.clone(), deref_target.clone())?;
 
+    let mut results = vec![];
+
     match lnk.kind {
-        crate::syntax::LexicalKind::Mod(_)
-        | crate::syntax::LexicalKind::Var(LexicalVarKind::Label)
-        | crate::syntax::LexicalKind::Var(LexicalVarKind::LabelRef)
-        | crate::syntax::LexicalKind::Var(LexicalVarKind::ValRef)
-        | crate::syntax::LexicalKind::Block
-        | crate::syntax::LexicalKind::Heading(..) => None,
-        crate::syntax::LexicalKind::Var(LexicalVarKind::Function) => Some(
-            LspHoverContents::Scalar(lsp_types::MarkedString::String(format!(
-                r#"```typc
-let {name}({params});
-```{doc}"#,
-                name = lnk.name,
-                params = ParamTooltip(&lnk),
-                doc = DocTooltip::get(ctx, &lnk).unwrap_or_default(),
-            ))),
-        ),
-        crate::syntax::LexicalKind::Var(LexicalVarKind::Variable) => {
+        LexicalKind::Mod(_)
+        | LexicalKind::Var(LexicalVarKind::Label)
+        | LexicalKind::Var(LexicalVarKind::LabelRef)
+        | LexicalKind::Var(LexicalVarKind::ValRef)
+        | LexicalKind::Block
+        | LexicalKind::Heading(..) => None,
+        LexicalKind::Var(LexicalVarKind::Function) => {
+            results.push(MarkedString::LanguageString(LanguageString {
+                language: "typc".to_owned(),
+                value: format!(
+                    "let {name}({params});",
+                    name = lnk.name,
+                    params = ParamTooltip(&lnk)
+                ),
+            }));
+
+            if let Some(doc) = DocTooltip::get(ctx, &lnk) {
+                results.push(MarkedString::String(doc));
+            }
+
+            Some(LspHoverContents::Array(results))
+        }
+        LexicalKind::Var(LexicalVarKind::Variable) => {
             let deref_node = deref_target.node();
             // todo: check sensible length, value highlighting
-            let values = expr_tooltip(ctx.world(), deref_node)
-                .map(|t| match t {
-                    Tooltip::Text(s) => format!("// Values: {s}"),
-                    Tooltip::Code(s) => format!("// Values: {s}"),
-                })
-                .unwrap_or_default();
-            Some(LspHoverContents::Scalar(lsp_types::MarkedString::String(
-                format!(
-                    r#"```typc
-{values}
-let {name};
-```{doc}"#,
-                    name = lnk.name,
-                    doc = DocTooltip::get(ctx, &lnk).unwrap_or_default(),
-                ),
-            )))
+            if let Some(values) = expr_tooltip(ctx.world(), deref_node) {
+                match values {
+                    Tooltip::Text(values) => {
+                        results.push(MarkedString::String(format!("Values: {values}")));
+                    }
+                    Tooltip::Code(values) => {
+                        results.push(MarkedString::LanguageString(LanguageString {
+                            language: "typc".to_owned(),
+                            value: format!("// Values\n{values}"),
+                        }));
+                    }
+                }
+            }
+
+            results.push(MarkedString::LanguageString(LanguageString {
+                language: "typc".to_owned(),
+                value: format!("let {name};", name = lnk.name),
+            }));
+
+            if let Some(doc) = DocTooltip::get(ctx, &lnk) {
+                results.push(MarkedString::String(doc));
+            }
+
+            Some(LspHoverContents::Array(results))
         }
     }
 }
@@ -170,81 +186,18 @@ impl DocTooltip {
     }
 
     fn get_inner(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<String> {
-        // let doc = find_document_before(ctx, &lnk);
-
         if matches!(lnk.value, Some(Value::Func(..))) {
             if let Some(builtin) = Self::builtin_func_tooltip(lnk) {
                 return Some(builtin.to_owned());
             }
         };
 
-        Self::find_document_before(ctx, lnk)
+        let src = ctx.source_by_id(lnk.fid).ok()?;
+        find_document_before(&src, lnk.def_range.start)
     }
 }
 
 impl DocTooltip {
-    fn find_document_before(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<String> {
-        log::debug!("finding comment at: {:?}, {}", lnk.fid, lnk.def_range.start);
-        let src = ctx.source_by_id(lnk.fid).ok()?;
-        let root = LinkedNode::new(src.root());
-        let leaf = root.leaf_at(lnk.def_range.start + 1)?;
-        let def_target = get_def_target(leaf.clone())?;
-        log::info!("found comment target: {:?}", def_target.node().kind());
-        // collect all comments before the definition
-        let mut comments = vec![];
-        // todo: import
-        let target = def_target.node().clone();
-        let mut node = def_target.node().clone();
-        while let Some(prev) = node.prev_sibling() {
-            node = prev;
-            if node.kind() == SyntaxKind::Hash {
-                continue;
-            }
-
-            let start = node.range().end;
-            let end = target.range().start;
-
-            if end <= start {
-                break;
-            }
-
-            let nodes = node.parent()?.children();
-            for n in nodes {
-                let offset = n.offset();
-                if offset > end || offset < start {
-                    continue;
-                }
-
-                if n.kind() == SyntaxKind::Hash {
-                    continue;
-                }
-                if n.kind() == SyntaxKind::LineComment {
-                    // comments.push(n.text().strip_prefix("//")?.trim().to_owned());
-                    // strip all slash prefix
-                    let text = n.text().trim_start_matches('/');
-                    comments.push(text.trim().to_owned());
-                    continue;
-                }
-                if n.kind() == SyntaxKind::BlockComment {
-                    let text = n.text();
-                    let mut text = text.strip_prefix("/*")?.strip_suffix("*/")?.trim();
-                    // trip start star
-                    if text.starts_with('*') {
-                        text = text.strip_prefix('*')?.trim();
-                    }
-                    comments.push(text.to_owned());
-                }
-            }
-            break;
-        }
-
-        if comments.is_empty() {
-            return None;
-        }
-
-        Some(comments.join("\n"))
-    }
-
     fn builtin_func_tooltip(lnk: &DefinitionLink) -> Option<&'_ str> {
         let Some(Value::Func(func)) = &lnk.value else {
             return None;

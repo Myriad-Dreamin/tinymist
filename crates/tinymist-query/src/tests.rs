@@ -106,10 +106,12 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut TypstSystemWorld, P
 
         if source.starts_with("//") {
             let first_line = source.lines().next().unwrap();
-            source = source.strip_prefix(first_line).unwrap().trim();
-
             let content = first_line.strip_prefix("//").unwrap().trim();
-            path = content.strip_prefix("path:").map(|e| e.trim().to_owned())
+
+            if let Some(path_attr) = content.strip_prefix("path:") {
+                source = source.strip_prefix(first_line).unwrap().trim();
+                path = Some(path_attr.trim().to_owned())
+            }
         };
 
         let path = path.unwrap_or_else(|| format!("/s{i}.typ"));

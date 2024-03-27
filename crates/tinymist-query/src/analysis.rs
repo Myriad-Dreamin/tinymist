@@ -10,7 +10,6 @@ pub use global::*;
 
 #[cfg(test)]
 mod module_tests {
-    use ecow::EcoVec;
     use reflexo::path::unix_slash;
     use serde_json::json;
 
@@ -59,6 +58,56 @@ mod module_tests {
                 .collect::<Vec<_>>();
 
             assert_snapshot!(JsonRepr::new_pure(dependencies));
+        });
+    }
+}
+
+#[cfg(test)]
+mod matcher_tests {
+
+    use typst::syntax::LinkedNode;
+
+    use crate::{syntax::get_def_target, tests::*};
+
+    #[test]
+    fn test() {
+        snapshot_testing("match_def", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+
+            let root = LinkedNode::new(source.root());
+            let node = root.leaf_at(pos).unwrap();
+
+            let result = get_def_target(node).map(|e| format!("{:?}", e.node().range()));
+            let result = result.as_deref().unwrap_or("<nil>");
+
+            assert_snapshot!(result);
+        });
+    }
+}
+
+#[cfg(test)]
+mod document_tests {
+
+    use crate::syntax::find_document_before;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("docs", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+
+            let result = find_document_before(&source, pos);
+            let result = result.as_deref().unwrap_or("<nil>");
+
+            assert_snapshot!(result);
         });
     }
 }

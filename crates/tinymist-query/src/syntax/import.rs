@@ -1,12 +1,3 @@
-use std::path::Path;
-
-use ecow::EcoVec;
-use typst::syntax::{
-    ast,
-    package::{PackageManifest, PackageSpec},
-    FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath,
-};
-
 use crate::prelude::*;
 
 fn resolve_id_by_path(

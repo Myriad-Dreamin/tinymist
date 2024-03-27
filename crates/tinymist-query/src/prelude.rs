@@ -5,15 +5,16 @@ pub use std::{
     sync::Arc,
 };
 
+pub use ecow::EcoVec;
 pub use itertools::{Format, Itertools};
 pub use log::{error, trace};
 pub use lsp_types::{
     request::GotoDeclarationResponse, CodeLens, CompletionResponse, DiagnosticRelatedInformation,
     DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange, GotoDefinitionResponse,
-    Hover, InlayHint, Location as LspLocation, LocationLink, MarkupContent, MarkupKind,
-    Position as LspPosition, PrepareRenameResponse, SelectionRange, SemanticTokens,
-    SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp,
-    SignatureInformation, SymbolInformation, Url, WorkspaceEdit,
+    Hover, InlayHint, LanguageString, Location as LspLocation, LocationLink, MarkedString,
+    MarkupContent, MarkupKind, Position as LspPosition, PrepareRenameResponse, SelectionRange,
+    SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult,
+    SignatureHelp, SignatureInformation, SymbolInformation, Url, WorkspaceEdit,
 };
 pub use reflexo::vector::ir::DefId;
 pub use serde_json::Value as JsonValue;
@@ -22,7 +23,8 @@ pub use typst::foundations::{Func, ParamInfo, Value};
 pub use typst::syntax::FileId as TypstFileId;
 pub use typst::syntax::{
     ast::{self, AstNode},
-    LinkedNode, Source, Spanned, SyntaxKind,
+    package::{PackageManifest, PackageSpec},
+    LinkedNode, Source, Spanned, SyntaxKind, VirtualPath,
 };
 pub use typst::World;
 
