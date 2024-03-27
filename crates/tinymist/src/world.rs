@@ -67,6 +67,15 @@ impl FontResolver for SharedFontResolver {
     }
 }
 
+impl SharedFontResolver {
+    pub fn new(opts: CompileFontOpts) -> ZResult<Self> {
+        let res = crate::world::LspWorldBuilder::resolve_fonts(opts)?;
+        Ok(Self {
+            inner: Arc::new(res),
+        })
+    }
+}
+
 /// type trait of [`LspWorld`].
 #[derive(Debug, Clone, Copy)]
 pub struct SystemCompilerFeat;
