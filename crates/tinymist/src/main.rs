@@ -12,8 +12,7 @@ use log::{info, trace, warn};
 use lsp_types::{InitializeParams, InitializedParams};
 use parking_lot::RwLock;
 use serde::de::DeserializeOwned;
-use tinymist::{init::Init, transport::io_transport, LspHost};
-use typst_ts_core::config::CompileOpts;
+use tinymist::{init::Init, transport::io_transport, CompileFontOpts, CompileOpts, LspHost};
 
 use crate::args::CliArguments;
 
@@ -67,8 +66,11 @@ fn lsp(args: CliArguments, connection: Connection, force_exit: &mut bool) -> any
     let (mut service, initialize_result) = Init {
         host: host.clone(),
         compile_opts: CompileOpts {
-            font_paths: args.font_paths,
-            no_system_fonts: args.no_system_fonts,
+            font: CompileFontOpts {
+                font_paths: args.font_paths,
+                no_system_fonts: args.no_system_fonts,
+                ..Default::default()
+            },
             ..Default::default()
         },
     }

@@ -1,4 +1,6 @@
-use crate::{find_definition, prelude::*, syntax::get_deref_target, DefinitionLink, SyntaxRequest};
+use crate::{
+    find_definition, prelude::*, syntax::get_deref_target, DefinitionLink, SemanticRequest,
+};
 use log::debug;
 
 /// The [`textDocument/prepareRename`] request is sent from the client to the
@@ -26,7 +28,7 @@ pub struct PrepareRenameRequest {
 
 // todo: rename alias
 // todo: rename import path?
-impl SyntaxRequest for PrepareRenameRequest {
+impl SemanticRequest for PrepareRenameRequest {
     type Response = PrepareRenameResponse;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
@@ -38,7 +40,7 @@ impl SyntaxRequest for PrepareRenameRequest {
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
         debug!("ast_node: {ast_node:?}", ast_node = ast_node);
 
-        let deref_target = get_deref_target(ast_node)?;
+        let deref_target = get_deref_target(ast_node, cursor)?;
         let use_site = deref_target.node().clone();
         let origin_selection_range = ctx.to_lsp_range(use_site.range(), &source);
 

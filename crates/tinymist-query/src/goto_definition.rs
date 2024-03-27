@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use log::debug;
 use typst::foundations::Value;
-use typst_ts_core::TypstFileId;
+use typst::syntax::FileId as TypstFileId;
 
 use crate::{
     prelude::*,
@@ -10,7 +10,7 @@ use crate::{
         find_source_by_import, get_deref_target, DerefTarget, IdentRef, LexicalKind,
         LexicalModKind, LexicalVarKind,
     },
-    SyntaxRequest,
+    SemanticRequest,
 };
 
 /// The [`textDocument/definition`] request asks the server for the definition
@@ -36,7 +36,7 @@ pub struct GotoDefinitionRequest {
     pub position: LspPosition,
 }
 
-impl SyntaxRequest for GotoDefinitionRequest {
+impl SemanticRequest for GotoDefinitionRequest {
     type Response = GotoDefinitionResponse;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
@@ -47,13 +47,13 @@ impl SyntaxRequest for GotoDefinitionRequest {
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
         debug!("ast_node: {ast_node:?}", ast_node = ast_node);
 
-        let deref_target = get_deref_target(ast_node)?;
+        let deref_target = get_deref_target(ast_node, cursor)?;
         let use_site = deref_target.node().clone();
         let origin_selection_range = ctx.to_lsp_range(use_site.range(), &source);
 
         let def = find_definition(ctx, source.clone(), deref_target)?;
 
-        let span_path = ctx.world.path_for_id(def.fid).ok()?;
+        let span_path = ctx.path_for_id(def.fid).ok()?;
         let uri = Url::from_file_path(span_path).ok()?;
 
         let span_source = ctx.source_by_id(def.fid).ok()?;
@@ -72,6 +72,7 @@ impl SyntaxRequest for GotoDefinitionRequest {
 }
 
 pub(crate) struct DefinitionLink {
+    pub kind: LexicalKind,
     pub value: Option<Value>,
     pub fid: TypstFileId,
     pub name: String,
@@ -95,8 +96,9 @@ pub(crate) fn find_definition(
             let parent = path.parent()?;
             let def_fid = parent.span().id()?;
             let e = parent.cast::<ast::ModuleImport>()?;
-            let source = find_source_by_import(ctx.world, def_fid, e)?;
+            let source = find_source_by_import(ctx.world(), def_fid, e)?;
             return Some(DefinitionLink {
+                kind: LexicalKind::Mod(LexicalModKind::PathVar),
                 name: String::new(),
                 value: None,
                 fid: source.id(),
@@ -130,7 +132,7 @@ pub(crate) fn find_definition(
     let def_id = def_id.or_else(|| Some(def_use.get_def(source_id, &ident_ref)?.0));
     let def_info = def_id.and_then(|def_id| def_use.get_def_by_id(def_id));
 
-    let values = analyze_expr(ctx.world, &use_site);
+    let values = analyze_expr(ctx.world(), &use_site);
     for v in values {
         // mostly builtin functions
         if let Value::Func(f) = v.0 {
@@ -151,6 +153,7 @@ pub(crate) fn find_definition(
                 let source = ctx.source_by_id(fid).ok()?;
 
                 return Some(DefinitionLink {
+                    kind: LexicalKind::Var(LexicalVarKind::Function),
                     name: name.to_owned(),
                     value: Some(Value::Func(f.clone())),
                     fid,
@@ -178,6 +181,7 @@ pub(crate) fn find_definition(
             | LexicalModKind::Alias { .. }
             | LexicalModKind::Ident,
         ) => Some(DefinitionLink {
+            kind: def.kind.clone(),
             name: def.name.clone(),
             value: None,
             fid: def_fid,
@@ -189,19 +193,14 @@ pub(crate) fn find_definition(
             let root = LinkedNode::new(def_source.root());
             let def_name = root.leaf_at(def.range.start + 1)?;
             log::info!("def_name for function: {def_name:?}", def_name = def_name);
-            let values = analyze_expr(ctx.world, &def_name);
-            let Some(func) = values.into_iter().find_map(|v| match v.0 {
-                Value::Func(f) => Some(f),
-                _ => None,
-            }) else {
-                log::info!("no func found... {:?}", def.name);
-                return None;
-            };
+            let values = analyze_expr(ctx.world(), &def_name);
+            let func = values.into_iter().find(|v| matches!(v.0, Value::Func(..)));
             log::info!("okay for function: {func:?}");
 
             Some(DefinitionLink {
+                kind: def.kind.clone(),
                 name: def.name.clone(),
-                value: Some(Value::Func(func.clone())),
+                value: func.map(|v| v.0),
                 fid: def_fid,
                 def_range: def.range.clone(),
                 name_range: Some(def.range.clone()),
@@ -221,7 +220,7 @@ mod tests {
 
     #[test]
     fn test() {
-        snapshot_testing2("goto_definition", &|world, path| {
+        snapshot_testing("goto_definition", &|world, path| {
             let source = world.source_by_path(&path).unwrap();
 
             let request = GotoDefinitionRequest {

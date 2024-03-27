@@ -7,9 +7,11 @@ use std::{
 };
 
 use log::info;
+use reflexo::path::unix_slash;
+pub use reflexo::vector::ir::DefId;
 use serde::Serialize;
+use typst::syntax::FileId as TypstFileId;
 use typst::syntax::Source;
-use typst_ts_core::{path::unix_slash, TypstFileId};
 
 use super::SearchCtx;
 use crate::syntax::{
@@ -17,8 +19,6 @@ use crate::syntax::{
     LexicalScopeKind, LexicalVarKind, ModSrc,
 };
 use crate::{adt::snapshot_map::SnapshotMap, syntax::LexicalModKind};
-
-pub use typst_ts_core::vector::ir::DefId;
 
 /// The type namespace of def-use relations
 ///
@@ -252,7 +252,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                         ModSrc::Expr(_) => {}
                         ModSrc::Path(p) => {
                             let src = find_source_by_import_path(
-                                self.ctx.ctx.world,
+                                self.ctx.ctx.world(),
                                 self.current_id,
                                 p.deref(),
                             );

@@ -3,7 +3,7 @@ use lsp_types::TextEdit;
 
 use crate::{
     find_definition, find_references, prelude::*, syntax::get_deref_target,
-    validate_renaming_definition, SyntaxRequest,
+    validate_renaming_definition, SemanticRequest,
 };
 
 /// The [`textDocument/rename`] request is sent from the client to the server to
@@ -21,7 +21,7 @@ pub struct RenameRequest {
     pub new_name: String,
 }
 
-impl SyntaxRequest for RenameRequest {
+impl SemanticRequest for RenameRequest {
     type Response = WorkspaceEdit;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
@@ -33,7 +33,7 @@ impl SyntaxRequest for RenameRequest {
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
         debug!("ast_node: {ast_node:?}", ast_node = ast_node);
 
-        let deref_target = get_deref_target(ast_node)?;
+        let deref_target = get_deref_target(ast_node, cursor)?;
 
         let lnk = find_definition(ctx, source.clone(), deref_target.clone())?;
 
@@ -47,7 +47,7 @@ impl SyntaxRequest for RenameRequest {
         let def_loc = {
             let def_source = ctx.source_by_id(lnk.fid).ok()?;
 
-            let span_path = ctx.world.path_for_id(lnk.fid).ok()?;
+            let span_path = ctx.path_for_id(lnk.fid).ok()?;
             let uri = Url::from_file_path(span_path).ok()?;
 
             let Some(range) = lnk.name_range else {

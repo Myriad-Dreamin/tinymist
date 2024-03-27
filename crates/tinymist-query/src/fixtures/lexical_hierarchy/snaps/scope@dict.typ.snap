@@ -16,20 +16,20 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/dict.typ
    "Var": "ValRef"
   },
   "name": "z",
-  "range": "30:31"
+  "range": "28:29"
  },
  {
   "kind": {
    "Var": "ValRef"
   },
   "name": "z",
-  "range": "43:44"
+  "range": "40:41"
  },
  {
   "kind": {
    "Var": "Variable"
   },
   "name": "x",
-  "range": "18:19"
+  "range": "17:18"
  }
 ]

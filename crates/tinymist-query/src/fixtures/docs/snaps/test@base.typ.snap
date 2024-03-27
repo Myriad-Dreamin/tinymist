@@ -1,0 +1,6 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/docs/base.typ
+---
+This is X.

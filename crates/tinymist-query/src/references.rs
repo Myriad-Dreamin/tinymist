@@ -1,10 +1,9 @@
 use log::debug;
-use typst_ts_core::vector::ir::DefId;
 
 use crate::{
     prelude::*,
     syntax::{get_deref_target, DerefTarget, IdentRef},
-    SyntaxRequest,
+    SemanticRequest,
 };
 
 /// The [`textDocument/references`] request is sent from the client to the
@@ -20,7 +19,7 @@ pub struct ReferencesRequest {
     pub position: LspPosition,
 }
 
-impl SyntaxRequest for ReferencesRequest {
+impl SemanticRequest for ReferencesRequest {
     type Response = Vec<LspLocation>;
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
@@ -30,7 +29,7 @@ impl SyntaxRequest for ReferencesRequest {
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
         debug!("ast_node: {ast_node:?}", ast_node = ast_node);
-        let deref_target = get_deref_target(ast_node)?;
+        let deref_target = get_deref_target(ast_node, cursor)?;
 
         let def_use = ctx.def_use(source.clone())?;
         let locations = find_references(ctx, def_use, deref_target, ctx.position_encoding())?;
@@ -116,7 +115,7 @@ pub(crate) fn find_references_root(
     position_encoding: PositionEncoding,
 ) -> Option<Vec<LspLocation>> {
     let def_source = ctx.source_by_id(def_fid).ok()?;
-    let def_path = ctx.world.path_for_id(def_fid).ok()?;
+    let def_path = ctx.path_for_id(def_fid).ok()?;
     let uri = Url::from_file_path(def_path).ok()?;
 
     // todo: reuse uri, range to location
@@ -140,7 +139,7 @@ pub(crate) fn find_references_root(
             let ref_source = ctx.ctx.source_by_id(ref_fid).ok()?;
             let def_use = ctx.ctx.def_use(ref_source.clone())?;
 
-            let uri = ctx.ctx.world.path_for_id(ref_fid).ok()?;
+            let uri = ctx.ctx.path_for_id(ref_fid).ok()?;
             let uri = Url::from_file_path(uri).ok()?;
 
             let mut redefines = vec![];
@@ -176,7 +175,7 @@ mod tests {
     #[test]
     fn test() {
         // goto_definition
-        snapshot_testing2("references", &|world, path| {
+        snapshot_testing("references", &|world, path| {
             let source = world.source_by_path(&path).unwrap();
 
             let request = ReferencesRequest {

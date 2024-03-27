@@ -15,8 +15,6 @@ on:
 env:
   CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
   CARGO_TARGET_ARM_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
 
 jobs:
   pre_build:
@@ -76,40 +74,10 @@ jobs:
         with:
           submodules: recursive
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
-      - uses: actions/checkout@v4
-        with:
-          repository: Enter-tainer/typst-preview
-          path: external/typst-preview
-          ref: preview-disable-frontend
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.4
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 16
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
-      - name: Hack typst-preview
-        run: |
-          mv src/main.rs src/main.rsx
-        working-directory: ./external/typst-preview
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
-      - name: Build typst-dom
-        run: |
-          yarn
-          yarn build
-        working-directory: ./external/typst-preview/addons/typst-dom
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
-      - name: Build frontend
-        run: yarn
-        working-directory: ./external/typst-preview/addons/frontend
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
-      - name: Build typst-preview
-        run: |
-          yarn
-          yarn run compile
-        working-directory: ./external/typst-preview/addons/vscode
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Install deps
         run: yarn install
@@ -140,11 +108,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install gcc-arm-linux-gnueabihf
+      - name: Run rust-cache
+        uses: Swatinem/rust-cache@v2
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Build tinymist binary
         shell: pwsh
         run: |
           cargo build --release -p tinymist --target ${{ matrix.rust-target }}
         if: startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true'
+      - name: Test tinymist
+        run: |
+          cargo test --release --workspace --target ${{ matrix.rust-target }}
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && (matrix.platform == 'linux') && (matrix.arch == 'x64')
       - name: Rename debug symbols for windows
         if: matrix.platform == 'win32' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
@@ -223,30 +198,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.4
-      - uses: actions/checkout@v4
-        with:
-          repository: Enter-tainer/typst-preview
-          path: external/typst-preview
-          ref: preview-disable-frontend
-      - name: Hack typst-preview
-        run: |
-          mv src/main.rs src/main.rsx
-        working-directory: ./external/typst-preview
-      - name: Build typst-dom
-        run: |
-          yarn
-          yarn build
-        working-directory: ./external/typst-preview/addons/typst-dom
-      - name: Build frontend
-        run: yarn
-        working-directory: ./external/typst-preview/addons/frontend
-      - name: Build typst-preview
-        run: |
-          yarn
-          yarn run compile
-        working-directory: ./external/typst-preview/addons/vscode
+      - name: Run rust-cache
+        uses: Swatinem/rust-cache@v2
       - name: Install deps
         run: yarn install
       - name: Build vscode extension
@@ -257,7 +210,6 @@ jobs:
       - name: Build tinymist binary
         run: |
           cargo build --release -p tinymist --target $RUST_TARGET
-          mkdir -p editors/vscode/out
       - name: Split debug symbols
         run: |
           cd target/$RUST_TARGET/release
@@ -270,6 +222,7 @@ jobs:
           path: target/${{ env.RUST_TARGET }}/release/tinymist-${{ env.target }}.debug
       - name: Copy binary to output directory
         run: |
+          mkdir -p editors/vscode/out
           cp "target/${{ env.RUST_TARGET }}/release/tinymist" "editors/vscode/out/"
           cp "target/${{ env.RUST_TARGET }}/release/tinymist" "tinymist-${{ env.target }}"
       - name: Upload binary artifact

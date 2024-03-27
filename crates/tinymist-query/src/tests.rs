@@ -9,20 +9,45 @@ use serde::Serialize;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use typst::syntax::{
     ast::{self, AstNode},
-    LinkedNode, Source, SyntaxKind, VirtualPath,
+    FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath,
 };
+use typst::{diag::PackageError, foundations::Bytes};
 use typst_ts_compiler::{
-    service::{CompileDriver, Compiler, WorkspaceProvider},
-    ShadowApi,
+    service::{CompileDriver, Compiler, EntryManager},
+    NotifyApi, ShadowApi,
 };
-use typst_ts_core::{config::CompileOpts, Bytes, TypstFileId};
+use typst_ts_core::{
+    config::compiler::{EntryOpts, EntryState},
+    package::Registry,
+};
+use typst_ts_core::{config::CompileOpts, package::PackageSpec};
 
 pub use insta::assert_snapshot;
 pub use typst_ts_compiler::TypstSystemWorld;
 
-use crate::{prelude::AnalysisContext, typst_to_lsp, LspPosition, PositionEncoding};
+use crate::{
+    analysis::{Analysis, AnaylsisResources},
+    prelude::AnalysisContext,
+    typst_to_lsp, LspPosition, PositionEncoding,
+};
 
-pub fn snapshot_testing(name: &str, f: &impl Fn(&mut TypstSystemWorld, PathBuf)) {
+struct WrapWorld<'a>(&'a mut TypstSystemWorld);
+
+impl<'a> AnaylsisResources for WrapWorld<'a> {
+    fn world(&self) -> &dyn typst::World {
+        self.0
+    }
+
+    fn resolve(&self, spec: &PackageSpec) -> Result<std::sync::Arc<Path>, PackageError> {
+        self.0.registry.resolve(spec)
+    }
+
+    fn iter_dependencies(&self, f: &mut dyn FnMut(&reflexo::ImmutPath, typst_ts_compiler::Time)) {
+        self.0.iter_dependencies(f)
+    }
+}
+
+pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) {
     let mut settings = insta::Settings::new();
     settings.set_prepend_module_to_snapshot(false);
     settings.set_snapshot_path(format!("fixtures/{name}/snaps"));
@@ -30,27 +55,30 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut TypstSystemWorld, PathBuf))
         let glob_path = format!("fixtures/{name}/*.typ");
         insta::glob!(&glob_path, |path| {
             let contents = std::fs::read_to_string(path).unwrap();
+            #[cfg(windows)]
+            let contents = contents.replace("\r\n", "\n");
 
-            run_with_sources(&contents, f);
+            run_with_sources(&contents, |w: &mut TypstSystemWorld, p| {
+                let root = w.workspace_root().unwrap();
+                let paths = w
+                    .shadow_paths()
+                    .into_iter()
+                    .map(|p| {
+                        TypstFileId::new(None, VirtualPath::new(p.strip_prefix(&root).unwrap()))
+                    })
+                    .collect::<Vec<_>>();
+                let w = WrapWorld(w);
+                let mut ctx = AnalysisContext::new(
+                    &w,
+                    Analysis {
+                        root,
+                        position_encoding: PositionEncoding::Utf16,
+                    },
+                );
+                ctx.test_files(|| paths);
+                f(&mut ctx, p);
+            });
         });
-    });
-}
-
-pub fn snapshot_testing2(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) {
-    snapshot_testing(name, &|w, p| {
-        let paths = w
-            .shadow_paths()
-            .into_iter()
-            .map(|p| {
-                TypstFileId::new(
-                    None,
-                    VirtualPath::new(p.strip_prefix(w.workspace_root()).unwrap()),
-                )
-            })
-            .collect::<Vec<_>>();
-        let mut ctx = AnalysisContext::new(w, PositionEncoding::Utf16);
-        ctx.test_files(|| paths);
-        f(&mut ctx, p);
     });
 }
 
@@ -61,7 +89,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut TypstSystemWorld, P
         PathBuf::from("/")
     };
     let mut world = TypstSystemWorld::new(CompileOpts {
-        root_dir: root.clone(),
+        entry: EntryOpts::new_rooted(root.as_path().into(), None),
         ..Default::default()
     })
     .unwrap();
@@ -78,10 +106,12 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut TypstSystemWorld, P
 
         if source.starts_with("//") {
             let first_line = source.lines().next().unwrap();
-            source = source.strip_prefix(first_line).unwrap().trim();
-
             let content = first_line.strip_prefix("//").unwrap().trim();
-            path = content.strip_prefix("path:").map(|e| e.trim().to_owned())
+
+            if let Some(path_attr) = content.strip_prefix("path:") {
+                source = source.strip_prefix(first_line).unwrap().trim();
+                path = Some(path_attr.trim().to_owned())
+            }
         };
 
         let path = path.unwrap_or_else(|| format!("/s{i}.typ"));
@@ -93,15 +123,21 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut TypstSystemWorld, P
         last_pw = Some(pw);
     }
 
-    world.set_main_id(TypstFileId::new(None, VirtualPath::new("/main.typ")));
+    world.mutate_entry(EntryState::new_detached()).unwrap();
     let mut driver = CompileDriver::new(world);
     let _ = driver.compile(&mut Default::default());
 
     let pw = last_pw.unwrap();
-    driver.world_mut().set_main_id(TypstFileId::new(
-        None,
-        VirtualPath::new(pw.strip_prefix(root).unwrap()),
-    ));
+    driver
+        .world_mut()
+        .mutate_entry(EntryState::new_rooted(
+            root.as_path().into(),
+            Some(TypstFileId::new(
+                None,
+                VirtualPath::new(pw.strip_prefix(root).unwrap()),
+            )),
+        ))
+        .unwrap();
     f(driver.world_mut(), pw)
 }
 
@@ -289,5 +325,18 @@ impl Redact for RedactFields {
             Value::String(s) => Value::String(s),
             v => v,
         }
+    }
+}
+
+pub struct HashRepr<T>(pub T);
+
+// sha256
+impl fmt::Display for HashRepr<JsonRepr> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use sha2::{Digest, Sha256};
+
+        let res = self.0.to_string();
+        let hash = Sha256::digest(res).to_vec();
+        write!(f, "sha256:{}", hex::encode(hash))
     }
 }

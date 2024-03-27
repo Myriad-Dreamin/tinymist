@@ -1,0 +1,1 @@
+#figure(caption: [test])[].caption

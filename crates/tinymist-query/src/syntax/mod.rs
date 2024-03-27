@@ -1,11 +1,20 @@
-pub mod import;
+//! Analyzing the syntax of a source file.
+//!
+//! This module must hide all **AST details** from the rest of the codebase.
+
+// todo: remove this
+#![allow(missing_docs)]
+
+pub(crate) mod import;
 pub use import::*;
-pub mod lexical_hierarchy;
-pub(crate) use lexical_hierarchy::*;
-pub mod matcher;
+pub(crate) mod lexical_hierarchy;
+pub use lexical_hierarchy::*;
+pub(crate) mod matcher;
 pub use matcher::*;
-pub mod module;
+pub(crate) mod module;
 pub use module::*;
+pub(crate) mod comment;
+pub use comment::*;
 
 use core::fmt;
 use std::ops::Range;
@@ -70,7 +79,7 @@ impl<'de> Deserialize<'de> for IdentRef {
                 .split("..")
                 .map(|s| {
                     s.parse().map_err(|e| {
-                        serde::de::Error::custom(format!("failed to parse range: {}", e))
+                        serde::de::Error::custom(format!("failed to parse range: {e}"))
                     })
                 })
                 .collect::<Result<Vec<usize>, _>>()?;

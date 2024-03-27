@@ -13,24 +13,24 @@ input_file: crates/tinymist-query/src/fixtures/def_use/import_ident_alias.typ
    "range": "8:18"
   },
   "refs": [
-   "base@21..25",
-   "base@58..62"
+   "base@20..24",
+   "base@55..59"
   ]
  },
- "foo@52..55@s0.typ": {
+ "foo@50..53@s0.typ": {
   "def": {
    "kind": {
     "Mod": {
      "Alias": {
-      "target": "x@47..48"
+      "target": "x@45..46"
      }
     }
    },
    "name": "foo",
-   "range": "52:55"
+   "range": "50:53"
   },
   "refs": [
-   "foo@65..68"
+   "foo@62..65"
   ]
  }
 }

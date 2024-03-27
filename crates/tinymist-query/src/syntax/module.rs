@@ -1,17 +1,20 @@
-use std::{collections::HashMap, path::Path, sync::Once};
-
-use typst::syntax::VirtualPath;
-use typst_ts_core::{typst::prelude::EcoVec, TypstFileId};
-
-use crate::prelude::AnalysisContext;
+use std::{collections::HashMap, sync::Once};
 
 use super::find_imports;
+use crate::prelude::*;
 
+/// The dependency information of a module (file).
 pub struct ModuleDependency {
+    /// The dependencies of this module.
     pub dependencies: EcoVec<TypstFileId>,
+    /// The dependents of this module.
     pub dependents: EcoVec<TypstFileId>,
 }
 
+/// Construct the module dependencies of the given context.
+///
+/// It will scan all the files in the context, using [`AnalysisContext::files`],
+/// and find the dependencies and dependents of each file.
 pub fn construct_module_dependencies(
     ctx: &mut AnalysisContext,
 ) -> HashMap<TypstFileId, ModuleDependency> {
@@ -31,7 +34,7 @@ pub fn construct_module_dependencies(
         };
 
         let file_id = source.id();
-        let deps = find_imports(ctx.world, &source);
+        let deps = find_imports(ctx.world(), &source);
         dependencies
             .entry(file_id)
             .or_insert_with(|| ModuleDependency {
@@ -55,6 +58,9 @@ pub fn construct_module_dependencies(
     dependencies
 }
 
+/// Scan the files in the workspace and return the file ids.
+///
+/// Note: this function will touch the physical file system.
 pub fn scan_workspace_files(root: &Path) -> Vec<TypstFileId> {
     let mut res = vec![];
     for path in walkdir::WalkDir::new(root).follow_links(false).into_iter() {

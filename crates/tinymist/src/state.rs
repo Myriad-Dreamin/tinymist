@@ -5,14 +5,17 @@ use std::path::PathBuf;
 use ::typst::{diag::FileResult, syntax::Source};
 use anyhow::anyhow;
 use lsp_types::TextDocumentContentChangeEvent;
-use tinymist_query::{lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, PositionEncoding};
+use tinymist_query::{
+    lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, OnExportRequest,
+    OnSaveExportRequest, PositionEncoding, SemanticRequest, StatefulRequest, SyntaxRequest,
+};
 use typst_ts_compiler::{
     vfs::notify::{FileChangeSet, MemoryEvent},
     Time,
 };
 use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
-use crate::TypstLanguageServer;
+use crate::{actor::typ_client::CompileClientActor, TypstLanguageServer};
 
 #[derive(Debug, Clone)]
 pub struct MemoryFileMeta {
@@ -22,16 +25,19 @@ pub struct MemoryFileMeta {
 
 impl TypstLanguageServer {
     /// Updates the main entry
-    // todo: the changed entry may be out of root directory
     pub fn update_main_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
         self.pinning = new_entry.is_some();
         match (new_entry, self.main.is_some()) {
             (Some(new_entry), true) => {
                 let main = self.main.as_mut().unwrap();
-                main.change_entry(Some(new_entry), |e| self.config.determine_root(e.as_ref()))?;
+                main.change_entry(Some(new_entry))?;
             }
             (Some(new_entry), false) => {
-                let main_node = self.server("main".to_owned(), Some(new_entry));
+                let main_node = self.server(
+                    "main".to_owned(),
+                    self.config.determine_entry(Some(new_entry)),
+                    self.config.determine_inputs(),
+                );
 
                 self.main = Some(main_node);
             }
@@ -47,11 +53,7 @@ impl TypstLanguageServer {
 
     /// Updates the primary (focusing) entry
     pub fn update_primary_entry(&self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
-        self.primary().change_entry(new_entry.clone(), |e| {
-            self.config.determine_root(e.as_ref())
-        })?;
-
-        Ok(())
+        self.primary().change_entry(new_entry.clone())
     }
 }
 
@@ -62,9 +64,7 @@ impl TypstLanguageServer {
         let clients_to_notify = (primary.into_iter()).chain(main);
 
         for client in clients_to_notify {
-            client.add_memory_changes(MemoryEvent::Update(files.clone()), |e| {
-                self.config.determine_root(e.as_ref())
-            });
+            client.add_memory_changes(MemoryEvent::Update(files.clone()));
         }
 
         Ok(())
@@ -169,7 +169,7 @@ macro_rules! query_source {
         let source = snapshot.content.clone();
 
         let enc = $self.const_config.position_encoding;
-        let res = $req.request(source, enc);
+        let res = $req.request(&source, enc);
         Ok(CompilerQueryResponse::$method(res))
     }};
 }
@@ -181,9 +181,22 @@ macro_rules! query_tokens_cache {
         let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {:?}", path))?;
         let source = snapshot.content.clone();
 
-        let enc = $self.const_config.position_encoding;
-        let res = $req.request(&$self.tokens_cache, source, enc);
+        let res = $req.request(&$self.tokens_ctx, source);
         Ok(CompilerQueryResponse::$method(res))
+    }};
+}
+
+macro_rules! query_state {
+    ($self:ident, $method:ident, $req:expr) => {{
+        let res = $self.steal_state(move |w, doc| $req.request(w, doc));
+        res.map(CompilerQueryResponse::$method)
+    }};
+}
+
+macro_rules! query_world {
+    ($self:ident, $method:ident, $req:expr) => {{
+        let res = $self.steal_world(move |w| $req.request(w));
+        res.map(CompilerQueryResponse::$method)
     }};
 }
 
@@ -198,21 +211,51 @@ impl TypstLanguageServer {
             SelectionRange(req) => query_source!(self, SelectionRange, req),
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
             _ => {
-                let query_target = match self.main.as_ref() {
-                    Some(main) if self.pinning => main,
+                match self.main.as_ref() {
+                    Some(main) if self.pinning => Self::query_on(main, query),
                     Some(..) | None => {
                         // todo: race condition, we need atomic primary query
                         if let Some(path) = query.associated_path() {
-                            self.primary().change_entry(Some(path.into()), |e| {
-                                self.config.determine_root(e.as_ref())
-                            })?;
+                            self.primary().change_entry(Some(path.into()))?;
                         }
-                        self.primary()
+                        Self::query_on(self.primary(), query)
                     }
-                };
-
-                query_target.query(query)
+                }
             }
+        }
+    }
+
+    fn query_on(
+        client: &CompileClientActor,
+        query: CompilerQueryRequest,
+    ) -> anyhow::Result<CompilerQueryResponse> {
+        use CompilerQueryRequest::*;
+        assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
+
+        match query {
+            CompilerQueryRequest::OnExport(OnExportRequest { kind, path }) => Ok(
+                CompilerQueryResponse::OnExport(client.on_export(kind, path)?),
+            ),
+            CompilerQueryRequest::OnSaveExport(OnSaveExportRequest { path }) => {
+                client.on_save_export(path)?;
+                Ok(CompilerQueryResponse::OnSaveExport(()))
+            }
+            Hover(req) => query_state!(client, Hover, req),
+            GotoDefinition(req) => query_world!(client, GotoDefinition, req),
+            GotoDeclaration(req) => query_world!(client, GotoDeclaration, req),
+            References(req) => query_world!(client, References, req),
+            InlayHint(req) => query_world!(client, InlayHint, req),
+            CodeLens(req) => query_world!(client, CodeLens, req),
+            Completion(req) => query_state!(client, Completion, req),
+            SignatureHelp(req) => query_world!(client, SignatureHelp, req),
+            Rename(req) => query_world!(client, Rename, req),
+            PrepareRename(req) => query_world!(client, PrepareRename, req),
+            Symbol(req) => query_world!(client, Symbol, req),
+            FoldingRange(..)
+            | SelectionRange(..)
+            | SemanticTokensDelta(..)
+            | DocumentSymbol(..)
+            | SemanticTokensFull(..) => unreachable!(),
         }
     }
 }

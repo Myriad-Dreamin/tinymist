@@ -9,13 +9,13 @@ input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/base.typ
    "Var": "Variable"
   },
   "name": "x",
-  "range": "5:6"
+  "range": "33:34"
  },
  {
   "kind": {
    "Var": "ValRef"
   },
   "name": "x",
-  "range": "14:15"
+  "range": "41:42"
  }
 ]

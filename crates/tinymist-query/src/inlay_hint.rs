@@ -1,31 +1,39 @@
+use core::fmt;
 use std::{borrow::Cow, ops::Range};
 
+use ecow::{eco_format, eco_vec};
 use log::debug;
 use lsp_types::{InlayHintKind, InlayHintLabel};
 use typst::{
-    foundations::{Args, Closure},
+    foundations::{Args, CastInfo, Closure},
     syntax::SyntaxNode,
     util::LazyHash,
 };
-use typst_ts_core::typst::prelude::eco_vec;
 
-use crate::prelude::*;
+use crate::{prelude::*, SemanticRequest};
 
+/// Configuration for inlay hints.
 pub struct InlayHintConfig {
     // positional arguments group
+    /// Show inlay hints for positional arguments.
     pub on_pos_args: bool,
+    /// Disable inlay hints for single positional arguments.
     pub off_single_pos_arg: bool,
 
     // variadic arguments group
+    /// Show inlay hints for variadic arguments.
     pub on_variadic_args: bool,
+    /// Disable inlay hints for all variadic arguments but the first variadic
+    /// argument.
     pub only_first_variadic_args: bool,
 
-    // todo
     // The typst sugar grammar
+    /// Show inlay hints for content block arguments.
     pub on_content_block_args: bool,
 }
 
 impl InlayHintConfig {
+    /// A smart configuration that enables most useful inlay hints.
     pub const fn smart() -> Self {
         Self {
             on_pos_args: true,
@@ -39,22 +47,31 @@ impl InlayHintConfig {
     }
 }
 
+/// The [`textDocument/inlayHint`] request is sent from the client to the server
+/// to compute inlay hints for a given `(text document, range)` tuple that may
+/// be rendered in the editor in place with other text.
+///
+/// [`textDocument/inlayHint`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_inlayHint
+///
+/// # Compatibility
+///
+/// This request was introduced in specification version 3.17.0
 #[derive(Debug, Clone)]
 pub struct InlayHintRequest {
+    /// The path of the document to get inlay hints for.
     pub path: PathBuf,
+    /// The range of the document to get inlay hints for.
     pub range: LspRange,
 }
 
-impl InlayHintRequest {
-    pub fn request(
-        self,
-        world: &TypstSystemWorld,
-        position_encoding: PositionEncoding,
-    ) -> Option<Vec<InlayHint>> {
-        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-        let range = lsp_to_typst::range(self.range, position_encoding, &source)?;
+impl SemanticRequest for InlayHintRequest {
+    type Response = Vec<InlayHint>;
 
-        let hints = inlay_hint(world, &source, range, position_encoding).ok()?;
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+        let source = ctx.source_by_path(&self.path).ok()?;
+        let range = ctx.to_typst_range(self.range, &source)?;
+
+        let hints = inlay_hint(ctx.world(), &source, range, ctx.position_encoding()).ok()?;
         debug!(
             "got inlay hints on {source:?} => {hints:?}",
             source = source.id(),
@@ -70,7 +87,7 @@ impl InlayHintRequest {
 }
 
 fn inlay_hint(
-    world: &TypstSystemWorld,
+    world: &dyn World,
     source: &Source,
     range: Range<usize>,
     encoding: PositionEncoding,
@@ -78,7 +95,7 @@ fn inlay_hint(
     const SMART: InlayHintConfig = InlayHintConfig::smart();
 
     struct InlayHintWorker<'a> {
-        world: &'a TypstSystemWorld,
+        world: &'a dyn World,
         source: &'a Source,
         range: Range<usize>,
         encoding: PositionEncoding,
@@ -488,6 +505,8 @@ fn analyze_call_no_cache(func: Func, args: ast::Args<'_>) -> Option<CallInfo> {
 pub struct ParamSpec {
     /// The parameter's name.
     pub name: Cow<'static, str>,
+    /// The parameter's default name.
+    pub expr: Option<EcoString>,
     /// Creates an instance of the parameter's default value.
     pub default: Option<fn() -> Value>,
     /// Is the parameter positional?
@@ -505,6 +524,7 @@ impl ParamSpec {
     fn from_static(s: &ParamInfo) -> Arc<Self> {
         Arc::new(Self {
             name: Cow::Borrowed(s.name),
+            expr: Some(eco_format!("{}", TypeExpr(&s.input))),
             default: s.default,
             positional: s.positional,
             named: s.named,
@@ -514,16 +534,16 @@ impl ParamSpec {
 }
 
 #[derive(Debug, Clone)]
-struct Signature {
-    pos: Vec<Arc<ParamSpec>>,
-    named: HashMap<Cow<'static, str>, Arc<ParamSpec>>,
+pub(crate) struct Signature {
+    pub pos: Vec<Arc<ParamSpec>>,
+    pub named: HashMap<Cow<'static, str>, Arc<ParamSpec>>,
     has_fill_or_size_or_stroke: bool,
-    rest: Option<Arc<ParamSpec>>,
+    pub rest: Option<Arc<ParamSpec>>,
     _broken: bool,
 }
 
 #[comemo::memoize]
-fn analyze_signature(func: Func) -> Arc<Signature> {
+pub(crate) fn analyze_signature(func: Func) -> Arc<Signature> {
     use typst::foundations::func::Repr;
     let params = match func.inner() {
         Repr::With(..) => unreachable!(),
@@ -597,6 +617,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
             ast::Param::Pos(ast::Pattern::Placeholder(..)) => {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Borrowed("_"),
+                    expr: None,
                     default: None,
                     positional: true,
                     named: false,
@@ -613,15 +634,18 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
 
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(name.to_owned()),
+                    expr: None,
                     default: None,
                     positional: true,
                     named: false,
                     variadic: false,
                 }));
             }
+            // todo: pattern
             ast::Param::Named(n) => {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(n.name().as_str().to_owned()),
+                    expr: Some(unwrap_expr(n.expr()).to_untyped().clone().into_text()),
                     default: None,
                     positional: false,
                     named: true,
@@ -632,6 +656,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 let ident = n.sink_ident().map(|e| e.as_str());
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(ident.unwrap_or_default().to_owned()),
+                    expr: None,
                     default: None,
                     positional: false,
                     named: true,
@@ -656,6 +681,34 @@ fn is_one_line_(src: &Source, arg_node: &LinkedNode<'_>) -> Option<bool> {
     Some(ll == rl)
 }
 
+fn unwrap_expr(mut e: ast::Expr) -> ast::Expr {
+    while let ast::Expr::Parenthesized(p) = e {
+        e = p.expr();
+    }
+
+    e
+}
+
+struct TypeExpr<'a>(&'a CastInfo);
+
+impl<'a> fmt::Display for TypeExpr<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self.0 {
+            CastInfo::Any => "any",
+            CastInfo::Value(.., v) => v,
+            CastInfo::Type(v) => {
+                f.write_str(v.short_name())?;
+                return Ok(());
+            }
+            CastInfo::Union(v) => {
+                let mut values = v.iter().map(|e| TypeExpr(e).to_string());
+                f.write_str(&values.join(" | "))?;
+                return Ok(());
+            }
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -663,8 +716,8 @@ mod tests {
 
     #[test]
     fn smart() {
-        snapshot_testing("inlay_hints", &|world, path| {
-            let source = get_suitable_source_in_workspace(world, &path).unwrap();
+        snapshot_testing("inlay_hints", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
 
             let request = InlayHintRequest {
                 path: path.clone(),
@@ -675,7 +728,7 @@ mod tests {
                 ),
             };
 
-            let result = request.request(world, PositionEncoding::Utf16);
+            let result = request.request(ctx);
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

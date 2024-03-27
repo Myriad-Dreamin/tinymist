@@ -34,6 +34,7 @@ mod task;
 mod tools;
 pub mod transport;
 mod utils;
+mod world;
 
 use core::fmt;
 use std::path::Path;
@@ -41,7 +42,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use std::{collections::HashMap, path::PathBuf};
 
-use actor::typst::CompileActor;
+use actor::typ_client::CompileClientActor;
 use anyhow::Context;
 use crossbeam_channel::select;
 use crossbeam_channel::Receiver;
@@ -56,24 +57,26 @@ use lsp_types::request::{
 use lsp_types::*;
 use parking_lot::{Mutex, RwLock};
 use paste::paste;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use state::MemoryFileMeta;
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
-    get_semantic_tokens_unregistration, DiagnosticsMap, SemanticTokenCache,
+    get_semantic_tokens_unregistration, DiagnosticsMap, ExportKind, PageSelection,
+    SemanticTokenContext,
 };
 use tokio::sync::mpsc;
 use typst::diag::StrResult;
-use typst::syntax::package::VersionlessPackageSpec;
+use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
+use typst::util::Deferred;
 use typst_ts_compiler::service::Compiler;
-use typst_ts_core::config::CompileOpts;
-use typst_ts_core::package::PackageSpec;
 use typst_ts_core::{error::prelude::*, ImmutPath};
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
+use world::SharedFontResolver;
+pub use world::{CompileFontOpts, CompileOnceOpts, CompileOpts};
 
-use crate::actor::render::PdfExportConfig;
+use crate::actor::render::ExportConfig;
 use crate::init::*;
 use crate::tools::package::InitTask;
 
@@ -287,46 +290,61 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 
 pub struct TypstLanguageServerArgs {
     pub client: LspHost,
-    pub compile_opts: CompileOpts,
+    pub compile_opts: CompileOnceOpts,
     pub const_config: ConstConfig,
     pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
+    pub font: Deferred<SharedFontResolver>,
 }
 
 /// The object providing the language server functionality.
 pub struct TypstLanguageServer {
     /// The language server client.
     pub client: LspHost,
+
+    // State to synchronize with the client.
     /// Whether the server is shutting down.
     pub shutdown_requested: bool,
-    /// Extra commands provided with `textDocument/executeCommand`.
-    pub exec_cmds: ExecuteCmdMap,
-    /// Regular notifications for dispatching.
-    pub notify_cmds: NotifyCmdMap,
-    /// Regular commands for dispatching.
-    pub regular_cmds: RegularCmdMap,
+    pub sema_tokens_registered: Option<bool>,
+
+    // Configurations
     /// User configuration from the editor.
     pub config: Config,
     /// Const configuration initialized at the start of the session.
     /// For example, the position encoding.
     pub const_config: ConstConfig,
     /// The default opts for the compiler.
-    pub compile_opts: CompileOpts,
+    pub compile_opts: CompileOnceOpts,
+
+    // Command maps
+    /// Extra commands provided with `textDocument/executeCommand`.
+    pub exec_cmds: ExecuteCmdMap,
+    /// Regular notifications for dispatching.
+    pub notify_cmds: NotifyCmdMap,
+    /// Regular commands for dispatching.
+    pub regular_cmds: RegularCmdMap,
 
     diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
     memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
-    primary: Option<CompileActor>,
+    primary: Option<CompileClientActor>,
     pinning: bool,
-    main: Option<CompileActor>,
-    tokens_cache: SemanticTokenCache,
+    main: Option<CompileClientActor>,
+    font: Deferred<SharedFontResolver>,
+    tokens_ctx: SemanticTokenContext,
 }
 
 /// Getters and the main loop.
 impl TypstLanguageServer {
     /// Create a new language server.
     pub fn new(args: TypstLanguageServerArgs) -> Self {
+        let tokens_ctx = SemanticTokenContext::new(
+            args.const_config.position_encoding,
+            args.const_config.sema_tokens_overlapping_token_support,
+            args.const_config.sema_tokens_multiline_token_support,
+        );
         Self {
             client: args.client.clone(),
             shutdown_requested: false,
+            sema_tokens_registered: None,
             config: Default::default(),
             const_config: args.const_config,
             compile_opts: args.compile_opts,
@@ -339,7 +357,8 @@ impl TypstLanguageServer {
             primary: None,
             pinning: false,
             main: None,
-            tokens_cache: Default::default(),
+            font: args.font,
+            tokens_ctx,
         }
     }
 
@@ -351,7 +370,7 @@ impl TypstLanguageServer {
         &self.const_config
     }
 
-    fn primary(&self) -> &CompileActor {
+    fn primary(&self) -> &CompileClientActor {
         self.primary.as_ref().expect("primary")
     }
 
@@ -534,6 +553,36 @@ impl TypstLanguageServer {
 
         Ok(())
     }
+
+    fn react_sema_token_changes(&mut self, enable: bool) -> anyhow::Result<()> {
+        if !self.const_config().sema_tokens_dynamic_registration {
+            trace!("skip register semantic by config");
+            return Ok(());
+        }
+
+        let res = match (enable, self.sema_tokens_registered) {
+            (true, None | Some(false)) => {
+                trace!("registering semantic tokens");
+                let options = get_semantic_tokens_options();
+                self.client
+                    .register_capability(vec![get_semantic_tokens_registration(options)])
+                    .context("could not register semantic tokens")
+            }
+            (false, Some(true)) => {
+                trace!("unregistering semantic tokens");
+                self.client
+                    .unregister_capability(vec![get_semantic_tokens_unregistration()])
+                    .context("could not unregister semantic tokens")
+            }
+            (true, Some(true)) | (false, None | Some(false)) => Ok(()),
+        };
+
+        if res.is_ok() {
+            self.sema_tokens_registered = Some(enable);
+        }
+
+        res
+    }
 }
 
 /// Trait implemented by language server backends.
@@ -553,45 +602,16 @@ impl TypstLanguageServer {
     /// The server can use the `initialized` notification, for example, to
     /// dynamically register capabilities with the client.
     pub fn initialized(&mut self, _: InitializedParams) {
-        if self
-            .const_config()
-            .supports_semantic_tokens_dynamic_registration
+        if self.const_config().sema_tokens_dynamic_registration
+            && self.config.semantic_tokens == SemanticTokensMode::Enable
         {
-            trace!("setting up to dynamically register semantic token support");
-
-            let client = self.client.clone();
-            let register = move || {
-                trace!("dynamically registering semantic tokens");
-                let client = client.clone();
-                let options = get_semantic_tokens_options();
-                client
-                    .register_capability(vec![get_semantic_tokens_registration(options)])
-                    .context("could not register semantic tokens")
-            };
-
-            let client = self.client.clone();
-            let unregister = move || {
-                trace!("unregistering semantic tokens");
-                let client = client.clone();
-                client
-                    .unregister_capability(vec![get_semantic_tokens_unregistration()])
-                    .context("could not unregister semantic tokens")
-            };
-
-            if self.config.semantic_tokens == SemanticTokensMode::Enable {
-                if let Some(err) = register().err() {
-                    error!("could not dynamically register semantic tokens: {err}");
-                }
+            let err = self.react_sema_token_changes(true);
+            if let Err(err) = err {
+                error!("could not register semantic tokens for initialization: {err}");
             }
-
-            self.config
-                .listen_semantic_tokens(Box::new(move |mode| match mode {
-                    SemanticTokensMode::Enable => register(),
-                    SemanticTokensMode::Disable => unregister(),
-                }));
         }
 
-        if self.const_config().supports_config_change_registration {
+        if self.const_config().cfg_change_registration {
             trace!("setting up to request config change notifications");
 
             const CONFIG_REGISTRATION_ID: &str = "config";
@@ -646,6 +666,8 @@ impl TypstLanguageServer {
 
         ExecuteCmdMap::from_iter([
             redirected_command!("tinymist.exportPdf", Self::export_pdf),
+            redirected_command!("tinymist.exportSvg", Self::export_svg),
+            redirected_command!("tinymist.exportPng", Self::export_png),
             redirected_command!("tinymist.doClearCache", Self::clear_cache),
             redirected_command!("tinymist.pinMain", Self::pin_document),
             redirected_command!("tinymist.focusMain", Self::focus_document),
@@ -669,25 +691,29 @@ impl TypstLanguageServer {
         Ok(Some(handler(self, arguments)?))
     }
 
-    /// Export the current document as a PDF file. The client is responsible for
-    /// passing the correct file URI.
-    ///
-    /// # Errors
-    /// Errors if a provided file URI is not a valid file URI.
+    /// Export the current document as a PDF file.
     pub fn export_pdf(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
-        if arguments.is_empty() {
-            return Err(invalid_params("Missing file URI argument"));
-        }
-        let Some(file_uri) = arguments.first().and_then(|v| v.as_str()) else {
-            return Err(invalid_params("Missing file URI as first argument"));
-        };
-        let file_uri =
-            Url::parse(file_uri).map_err(|_| invalid_params("Parameter is not a valid URI"))?;
-        let path = file_uri
-            .to_file_path()
-            .map_err(|_| invalid_params("URI is not a file URI"))?;
+        self.export(ExportKind::Pdf, arguments)
+    }
 
-        let res = run_query!(self.OnExport(path))?;
+    /// Export the current document as a Svg file.
+    pub fn export_svg(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        let opts = parse_opts(arguments.get(1))?;
+        self.export(ExportKind::Svg { page: opts.page }, arguments)
+    }
+
+    /// Export the current document as a Png file.
+    pub fn export_png(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        let opts = parse_opts(arguments.get(1))?;
+        self.export(ExportKind::Png { page: opts.page }, arguments)
+    }
+
+    /// Export the current document as some format. The client is responsible
+    /// for passing the correct absolute path of typst document.
+    pub fn export(&self, kind: ExportKind, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        let path = parse_path(arguments.first())?.as_ref().to_owned();
+
+        let res = run_query!(self.OnExport(path, kind))?;
         let res = serde_json::to_value(res).map_err(|_| internal_error("Cannot serialize path"))?;
 
         Ok(res)
@@ -822,7 +848,22 @@ impl TypstLanguageServer {
     }
 }
 
-fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ExportOpts {
+    page: PageSelection,
+}
+
+fn parse_opts(v: Option<&JsonValue>) -> LspResult<ExportOpts> {
+    Ok(match v {
+        Some(opts) => serde_json::from_value::<ExportOpts>(opts.clone())
+            .map_err(|_| invalid_params("The third argument is not a valid object"))?,
+        _ => ExportOpts {
+            page: PageSelection::First,
+        },
+    })
+}
+
+fn parse_path(v: Option<&JsonValue>) -> LspResult<ImmutPath> {
     let new_entry = match v {
         Some(JsonValue::String(s)) => {
             let s = Path::new(s);
@@ -830,9 +871,8 @@ fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
                 return Err(invalid_params("entry should be absolute"));
             }
 
-            Some(s.into())
+            s.into()
         }
-        Some(JsonValue::Null) => None,
         _ => {
             return Err(invalid_params(
                 "The first parameter is not a valid path or null",
@@ -841,6 +881,13 @@ fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
     };
 
     Ok(new_entry)
+}
+
+fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
+    match v {
+        Some(JsonValue::Null) => Ok(None),
+        v => Ok(Some(parse_path(v)?)),
+    }
 }
 
 /// Document Synchronization
@@ -879,11 +926,11 @@ impl TypstLanguageServer {
     }
 
     fn on_changed_configuration(&mut self, values: Map<String, JsonValue>) -> LspResult<()> {
-        let output_directory = self.config.output_path.clone();
-        let export_pdf = self.config.export_pdf;
+        let config = self.config.clone();
         match self.config.update_by_map(&values) {
             Ok(()) => {}
             Err(err) => {
+                self.config = config;
                 error!("error applying new settings: {err}");
                 return Err(invalid_params(format!(
                     "error applying new settings: {err}"
@@ -892,11 +939,13 @@ impl TypstLanguageServer {
         }
 
         info!("new settings applied");
-        if output_directory != self.config.output_path || export_pdf != self.config.export_pdf {
-            let config = PdfExportConfig {
+        if config.output_path != self.config.output_path
+            || config.export_pdf != self.config.export_pdf
+        {
+            let config = ExportConfig {
                 substitute_pattern: self.config.output_path.clone(),
                 mode: self.config.export_pdf,
-                ..PdfExportConfig::default()
+                ..ExportConfig::default()
             };
 
             self.primary().change_export_pdf(config.clone());
@@ -904,6 +953,15 @@ impl TypstLanguageServer {
                 if let Some(main) = self.main.as_ref() {
                     main.change_export_pdf(config);
                 }
+            }
+        }
+
+        if config.semantic_tokens != self.config.semantic_tokens {
+            let err = self.react_sema_token_changes(
+                self.config.semantic_tokens == SemanticTokensMode::Enable,
+            );
+            if let Err(err) = err {
+                error!("could not change semantic tokens config: {err}");
             }
         }
 
@@ -975,7 +1033,7 @@ impl TypstLanguageServer {
 
     fn folding_range(&self, params: FoldingRangeParams) -> LspResult<Option<Vec<FoldingRange>>> {
         let path = as_path(params.text_document);
-        let line_folding_only = self.const_config().line_folding_only;
+        let line_folding_only = self.const_config().doc_line_folding_only;
         run_query!(self.FoldingRange(path, line_folding_only))
     }
 

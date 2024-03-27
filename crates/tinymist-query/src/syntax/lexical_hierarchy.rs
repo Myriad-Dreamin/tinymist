@@ -4,20 +4,17 @@ use std::{
 };
 
 use anyhow::{anyhow, Context};
+use ecow::{eco_vec, EcoVec};
 use log::info;
 use lsp_types::SymbolKind;
 use serde::{Deserialize, Serialize};
 use typst::{
     syntax::{
         ast::{self, AstNode},
+        package::PackageSpec,
         LinkedNode, Source, SyntaxKind,
     },
     util::LazyHash,
-};
-use typst_ts_core::{
-    error::prelude::WithContext,
-    package::PackageSpec,
-    typst::prelude::{eco_vec, EcoVec},
 };
 
 use super::IdentRef;
@@ -383,6 +380,7 @@ impl LexicalHierarchyWorker {
                 }
             }
         } else {
+            // todo: for loop variable
             match node.kind() {
                 SyntaxKind::LetBinding => 'let_binding: {
                     let name = node.children().find(|n| n.cast::<ast::Pattern>().is_some());
@@ -655,7 +653,7 @@ impl LexicalHierarchyWorker {
                     let name = if e.starts_with('@') {
                         let spec = e
                             .parse::<PackageSpec>()
-                            .context("parse package spec failed for name")?;
+                            .map_err(|e| anyhow!("parse package spec failed: {:?}", e))?;
                         spec.name.to_string()
                     } else {
                         let e = Path::new(e.as_ref())

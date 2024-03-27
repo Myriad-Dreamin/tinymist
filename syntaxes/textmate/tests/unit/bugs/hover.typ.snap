@@ -1,0 +1,29 @@
+>#let code(it, args: any, res: none, scope: (:));
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^ source.typst meta.expr.let.typst entity.name.function.typst
+#         ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#          ^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#            ^ source.typst meta.expr.let.typst punctuation.separator.comma.typst
+#             ^ source.typst meta.expr.let.typst
+#              ^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#                  ^ source.typst meta.expr.let.typst punctuation.separator.colon.typst
+#                   ^ source.typst meta.expr.let.typst
+#                    ^^^ source.typst meta.expr.let.typst entity.name.type.primitive.typst
+#                       ^ source.typst meta.expr.let.typst punctuation.separator.comma.typst
+#                        ^ source.typst meta.expr.let.typst
+#                         ^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#                            ^ source.typst meta.expr.let.typst punctuation.separator.colon.typst
+#                             ^ source.typst meta.expr.let.typst
+#                              ^^^^ source.typst meta.expr.let.typst entity.name.type.primitive.typst
+#                                  ^ source.typst meta.expr.let.typst punctuation.separator.comma.typst
+#                                   ^ source.typst meta.expr.let.typst
+#                                    ^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#                                         ^ source.typst meta.expr.let.typst punctuation.separator.colon.typst
+#                                          ^ source.typst meta.expr.let.typst
+#                                           ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#                                            ^ source.typst meta.expr.let.typst punctuation.separator.colon.typst
+#                                             ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#                                              ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#                                               ^ source.typst punctuation.terminator.statement.typst

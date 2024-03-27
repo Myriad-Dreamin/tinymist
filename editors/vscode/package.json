@@ -1,6 +1,11 @@
 {
     "name": "tinymist",
+    "version": "0.11.1",
     "description": "An integrated language service for Typst",
+    "categories": [
+        "Programming Languages",
+        "Formatters"
+    ],
     "repository": {
         "type": "git",
         "url": "https://github.com/Myriad-Dreamin/tinymist"
@@ -13,7 +18,6 @@
     ],
     "publisher": "myriad-dreamin",
     "license": "Apache-2.0",
-    "version": "0.11.0",
     "engines": {
         "vscode": "^1.71.0"
     },
@@ -72,14 +76,11 @@
                         "Do not use semantic tokens for syntax highlighting"
                     ]
                 },
-                "tinymist.noSystemFonts": {
+                "tinymist.systemFonts": {
                     "title": "Whether to load system fonts for Typst compiler",
                     "description": "A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler.",
-                    "type": [
-                        "boolean",
-                        "null"
-                    ],
-                    "default": null
+                    "type": "boolean",
+                    "default": "true"
                 },
                 "tinymist.fontPaths": {
                     "title": "Font paths for Typst compiler",
@@ -151,12 +152,69 @@
                     ".typ"
                 ],
                 "aliases": [
-                    "Typst"
+                    "Typst",
+                    "typst",
+                    "typ"
                 ],
                 "icon": {
                     "light": "./icons/typst-small.png",
                     "dark": "./icons/typst-small.png"
                 }
+            },
+            {
+                "id": "typst-code",
+                "configuration": "./language-configuration.json",
+                "extensions": [
+                    ".typc"
+                ],
+                "aliases": [
+                    "Typst (Code Mode)",
+                    "typc"
+                ],
+                "icon": {
+                    "light": "./icons/typst-small.png",
+                    "dark": "./icons/typst-small.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "typst",
+                "scopeName": "source.typst",
+                "path": "./out/typst.tmLanguage.json",
+                "balancedBracketScopes": [
+                    "*",
+                    "meta.expr",
+                    "meta.brace"
+                ],
+                "unbalancedBracketScopes": [
+                    "markup.raw.block.typst",
+                    "markup.raw.inline.typst",
+                    "string.other.label.typst",
+                    "string.quoted.double.typst",
+                    "constant.character.escape",
+                    "comment.block.typst",
+                    "comment.line.double-slash.typst"
+                ]
+            },
+            {
+                "language": "typst-code",
+                "scopeName": "source.typst-code",
+                "path": "./out/typst-code.tmLanguage.json",
+                "balancedBracketScopes": [
+                    "*",
+                    "meta.expr",
+                    "meta.brace"
+                ],
+                "unbalancedBracketScopes": [
+                    "markup.raw.block.typst",
+                    "markup.raw.inline.typst",
+                    "string.other.label.typst",
+                    "string.quoted.double.typst",
+                    "constant.character.escape",
+                    "comment.block.typst",
+                    "comment.line.double-slash.typst"
+                ]
             }
         ],
         "semanticTokenTypes": [
@@ -369,10 +427,11 @@
     ],
     "scripts": {
         "build:frontend": "cd ../../tools/editor-tools/ && yarn run build",
+        "build:syntax": "cd ../../syntaxes/textmate && yarn run compile && yarn run bundle",
         "build-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node16",
-        "vscode:prepublish": "yarn run build-base -- --minify && yarn run build:frontend && node scripts/postinstall.cjs",
+        "vscode:prepublish": "yarn run build-base -- --minify && yarn run build:frontend && node scripts/postinstall.cjs && node scripts/config-man.cjs",
         "package": "vsce package --yarn",
-        "compile": "yarn run build-base -- --sourcemap && yarn run build:frontend && node scripts/postinstall.cjs",
+        "compile": "yarn run build-base -- --sourcemap && yarn run build:syntax && yarn run build:frontend && node scripts/postinstall.cjs",
         "watch": "yarn run build-base -- --sourcemap --watch",
         "check": "tsc --noEmit",
         "lint": "eslint ./src --ext .ts",

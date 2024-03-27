@@ -1,0 +1,31 @@
+{
+  "name": "typst-textmate",
+  "version": "0.11.1",
+  "private": true,
+  "scripts": {
+    "compile": "npx tsc && node ./dist/main.js",
+    "bundle": "node scripts/install.cjs",
+    "test": "yarn compile && npx vscode-tmgrammar-snap --updateSnapshot tests/unit/**/*.typ"
+  },
+  "devDependencies": {
+    "vscode-tmgrammar-test": "^0.1.3"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "typst",
+        "extensions": [
+          ".typ",
+          ".typc"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "typst",
+        "scopeName": "source.typst",
+        "path": "./typst.tmLanguage.json"
+      }
+    ]
+  }
+}

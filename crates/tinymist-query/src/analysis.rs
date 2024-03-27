@@ -1,3 +1,5 @@
+//! Semantic static and dynamic analysis of the source code.
+
 pub mod def_use;
 pub use def_use::*;
 pub mod track_values;
@@ -8,9 +10,8 @@ pub use global::*;
 
 #[cfg(test)]
 mod module_tests {
+    use reflexo::path::unix_slash;
     use serde_json::json;
-    use typst_ts_core::path::unix_slash;
-    use typst_ts_core::typst::prelude::EcoVec;
 
     use crate::prelude::*;
     use crate::syntax::module::*;
@@ -18,7 +19,7 @@ mod module_tests {
 
     #[test]
     fn test() {
-        snapshot_testing2("modules", &|ctx, _| {
+        snapshot_testing("modules", &|ctx, _| {
             fn ids(ids: EcoVec<TypstFileId>) -> Vec<String> {
                 let mut ids: Vec<String> = ids
                     .into_iter()
@@ -62,18 +63,68 @@ mod module_tests {
 }
 
 #[cfg(test)]
+mod matcher_tests {
+
+    use typst::syntax::LinkedNode;
+
+    use crate::{syntax::get_def_target, tests::*};
+
+    #[test]
+    fn test() {
+        snapshot_testing("match_def", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+
+            let root = LinkedNode::new(source.root());
+            let node = root.leaf_at(pos).unwrap();
+
+            let result = get_def_target(node).map(|e| format!("{:?}", e.node().range()));
+            let result = result.as_deref().unwrap_or("<nil>");
+
+            assert_snapshot!(result);
+        });
+    }
+}
+
+#[cfg(test)]
+mod document_tests {
+
+    use crate::syntax::find_document_before;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("docs", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+
+            let result = find_document_before(&source, pos);
+            let result = result.as_deref().unwrap_or("<nil>");
+
+            assert_snapshot!(result);
+        });
+    }
+}
+
+#[cfg(test)]
 mod lexical_hierarchy_tests {
     use def_use::DefUseSnapshot;
 
     use crate::analysis::def_use;
-    use crate::prelude::*;
+    // use crate::prelude::*;
     use crate::syntax::lexical_hierarchy;
     use crate::tests::*;
 
     #[test]
     fn scope() {
-        snapshot_testing("lexical_hierarchy", &|world, path| {
-            let source = get_suitable_source_in_workspace(world, &path).unwrap();
+        snapshot_testing("lexical_hierarchy", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
 
             let result = lexical_hierarchy::get_lexical_hierarchy(
                 source,
@@ -87,7 +138,7 @@ mod lexical_hierarchy_tests {
     #[test]
     fn test_def_use() {
         fn def_use(set: &str) {
-            snapshot_testing2(set, &|ctx, path| {
+            snapshot_testing(set, &|ctx, path| {
                 let source = ctx.source_by_path(&path).unwrap();
 
                 let result = ctx.def_use(source);

@@ -1,0 +1,26 @@
+>// Test
+#^^ source.typst comment.line.double-slash.typst punctuation.definition.comment.typst
+#  ^^^^^ source.typst comment.line.double-slash.typst
+>// Test: http://www.google.com
+#^^ source.typst comment.line.double-slash.typst punctuation.definition.comment.typst
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst comment.line.double-slash.typst
+>/* Test */
+#^^ source.typst comment.block.typst punctuation.definition.comment.typst
+#  ^^^^^^ source.typst comment.block.typst
+#        ^^ source.typst comment.block.typst
+>/* /* Test */ */
+#^^ source.typst comment.block.typst punctuation.definition.comment.typst
+#  ^ source.typst comment.block.typst
+#   ^^ source.typst comment.block.typst comment.block.typst punctuation.definition.comment.typst
+#     ^^^^^^ source.typst comment.block.typst comment.block.typst
+#           ^^ source.typst comment.block.typst comment.block.typst
+#             ^ source.typst comment.block.typst
+#              ^^ source.typst comment.block.typst
+>/* // */
+#^^ source.typst comment.block.typst punctuation.definition.comment.typst
+#  ^^^^ source.typst comment.block.typst
+#      ^^ source.typst comment.block.typst
+>// /* */
+#^^ source.typst comment.line.double-slash.typst punctuation.definition.comment.typst
+#  ^^^^^^ source.typst comment.line.double-slash.typst
+>

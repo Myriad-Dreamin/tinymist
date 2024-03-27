@@ -1,3 +1,7 @@
+//! The [`CompileServerActor`] implementation borrowed from typst.ts.
+//!
+//! Please check `tinymist::actor::typ_client` for architecture details.
+
 use std::{
     collections::HashSet,
     num::NonZeroUsize,
@@ -23,17 +27,30 @@ use typst_ts_compiler::{
     ShadowApi,
 };
 use typst_ts_core::{
+    config::compiler::EntryState,
     debug_loc::{SourceLocation, SourceSpanOffset},
     error::prelude::{map_string_err, ZResult},
-    ImmutPath, TypstDocument, TypstFileId,
+    TypstDocument, TypstFileId,
 };
 
 use typst_ts_compiler::service::{
-    features::FeatureSet, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter,
-    WorkspaceProvider, WorldExporter,
+    features::FeatureSet, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter, EntryManager,
 };
 
 use crate::{task::BorrowTask, utils};
+
+pub trait EntryStateExt {
+    fn is_inactive(&self) -> bool;
+}
+
+impl EntryStateExt for EntryState {
+    fn is_inactive(&self) -> bool {
+        matches!(
+            self,
+            EntryState::Detached | EntryState::Workspace { main: None, .. }
+        )
+    }
+}
 
 /// Interrupts for external sources
 enum ExternalInterrupt<Ctx> {
@@ -86,11 +103,9 @@ struct SuspendState {
 }
 
 /// The compiler thread.
-pub struct CompileActor<C: Compiler> {
+pub struct CompileServerActor<C: Compiler> {
     /// The underlying compiler.
     pub compiler: CompileReporter<C>,
-    /// The root path of the workspace.
-    pub root: ImmutPath,
     /// Whether to enable file system watching.
     pub enable_watch: bool,
 
@@ -103,6 +118,8 @@ pub struct CompileActor<C: Compiler> {
     estimated_shadow_files: HashSet<Arc<Path>>,
     /// The latest compiled document.
     latest_doc: Option<Arc<TypstDocument>>,
+    /// The latest successly compiled document.
+    latest_success_doc: Option<Arc<TypstDocument>>,
     /// feature set for compile_once mode.
     once_feature_set: Arc<FeatureSet>,
     /// Shared feature set for watch mode.
@@ -115,16 +132,11 @@ pub struct CompileActor<C: Compiler> {
     suspend_state: SuspendState,
 }
 
-impl<C: Compiler + ShadowApi + WorldExporter + Send + 'static> CompileActor<C>
+impl<C: Compiler + ShadowApi + Send + 'static> CompileServerActor<C>
 where
     C::World: for<'files> codespan_reporting::files::Files<'files, FileId = TypstFileId>,
 {
-    pub fn new_with_features(
-        compiler: C,
-        root: ImmutPath,
-        entry: Option<ImmutPath>,
-        feature_set: FeatureSet,
-    ) -> Self {
+    pub fn new_with_features(compiler: C, entry: EntryState, feature_set: FeatureSet) -> Self {
         let (steal_send, steal_recv) = mpsc::unbounded_channel();
 
         let watch_feature_set = Arc::new(
@@ -136,7 +148,6 @@ where
         Self {
             compiler: CompileReporter::new(compiler)
                 .with_generic_reporter(ConsoleDiagReporter::default()),
-            root,
 
             logical_tick: 1,
             enable_watch: false,
@@ -144,6 +155,7 @@ where
 
             estimated_shadow_files: Default::default(),
             latest_doc: None,
+            latest_success_doc: None,
             once_feature_set: Arc::new(feature_set),
             watch_feature_set,
 
@@ -151,15 +163,24 @@ where
             steal_recv,
 
             suspend_state: SuspendState {
-                suspended: entry.is_none(),
+                suspended: entry.is_inactive(),
                 dirty: false,
             },
         }
     }
 
     /// Create a new compiler thread.
-    pub fn new(compiler: C, root: ImmutPath, entry: Option<ImmutPath>) -> Self {
-        Self::new_with_features(compiler, root, entry, FeatureSet::default())
+    pub fn new(compiler: C, entry: EntryState) -> Self {
+        Self::new_with_features(compiler, entry, FeatureSet::default())
+    }
+
+    pub fn success_doc(&self) -> Option<VersionedDocument> {
+        self.latest_success_doc
+            .clone()
+            .map(|doc| VersionedDocument {
+                version: self.logical_tick,
+                document: doc,
+            })
     }
 
     pub fn doc(&self) -> Option<VersionedDocument> {
@@ -241,7 +262,7 @@ where
 
         // Spawn compiler thread.
         let compile_thread = ensure_single_thread("typst-compiler", async move {
-            log::debug!("CompileActor: initialized");
+            log::debug!("CompileServerActor: initialized");
 
             // Wait for first events.
             'event_loop: while let Some(event) = tokio::select! {
@@ -251,7 +272,7 @@ where
                     ExternalInterrupt::Task(task) => Some(CompilerInterrupt::Task(task)),
                     ExternalInterrupt::Memory(task) => Some(CompilerInterrupt::Memory(task)),
                     ExternalInterrupt::Settle(e) => {
-                        log::info!("CompileActor: requested stop");
+                        log::info!("CompileServerActor: requested stop");
                         e.send(()).ok();
                         break 'event_loop;
                     }
@@ -270,7 +291,7 @@ where
                                 need_recompile = true;
                             }
                             ExternalInterrupt::Settle(e) => {
-                                log::info!("CompileActor: requested stop");
+                                log::info!("CompileServerActor: requested stop");
                                 e.send(()).ok();
                                 break 'event_loop;
                             }
@@ -307,7 +328,7 @@ where
             }
 
             settle_notify();
-            log::info!("CompileActor: exited");
+            log::info!("CompileServerActor: exited");
         })
         .unwrap();
 
@@ -315,8 +336,8 @@ where
         Some(compile_thread)
     }
 
-    pub(crate) fn change_entry(&mut self, entry: Option<Arc<Path>>) {
-        let suspending = entry.is_none();
+    pub(crate) fn change_entry(&mut self, entry: EntryState) {
+        let suspending = entry.is_inactive();
         if suspending {
             self.suspend_state.suspended = true;
         } else {
@@ -325,6 +346,10 @@ where
                 self.steal_send.send(ExternalInterrupt::Compile).ok();
             }
         }
+
+        // Reset the document state.
+        self.latest_doc = None;
+        self.latest_success_doc = None;
     }
 
     /// Compile the document.
@@ -341,12 +366,15 @@ where
             .compiler
             .compile(&mut CompileEnv::default().configure_shared(self.watch_feature_set.clone()))
             .ok();
+        if self.latest_doc.is_some() {
+            self.latest_success_doc = self.latest_doc.clone();
+        }
 
         // Evict compilation cache.
         let evict_start = std::time::Instant::now();
         comemo::evict(30);
         log::info!(
-            "CompileActor: evict compilation cache in {:?}",
+            "CompileServerActor: evict compilation cache in {:?}",
             evict_start.elapsed()
         );
 
@@ -373,7 +401,7 @@ where
             //
             // See [`CompileClient::steal`] for more information.
             CompilerInterrupt::Task(task) => {
-                log::debug!("CompileActor: execute task");
+                log::debug!("CompileServerActor: execute task");
 
                 task(self);
 
@@ -382,7 +410,7 @@ where
             }
             // Handle memory events.
             CompilerInterrupt::Memory(event) => {
-                log::debug!("CompileActor: memory event incoming");
+                log::debug!("CompileServerActor: memory event incoming");
 
                 // Emulate memory changes.
                 let mut files = HashSet::new();
@@ -429,13 +457,13 @@ where
             }
             // Handle file system events.
             CompilerInterrupt::Fs(event) => {
-                log::debug!("CompileActor: fs event incoming {:?}", event);
+                log::debug!("CompileServerActor: fs event incoming {:?}", event);
 
                 // Handle file system event if any.
                 if let Some(mut event) = event {
                     // Handle delayed upstream update event before applying file system changes
                     if self.apply_delayed_memory_changes(&mut event).is_none() {
-                        log::warn!("CompileActor: unknown upstream update event");
+                        log::warn!("CompileServerActor: unknown upstream update event");
                     }
 
                     // Apply file system changes.
@@ -484,7 +512,7 @@ where
                         Ok(content) => content,
                         Err(err) => {
                             log::error!(
-                                "CompileActor: read memory file at {}: {}",
+                                "CompileServerActor: read memory file at {}: {}",
                                 p.display(),
                                 err,
                             );
@@ -499,7 +527,7 @@ where
     }
 }
 
-impl<C: Compiler> CompileActor<C> {
+impl<C: Compiler> CompileServerActor<C> {
     pub fn with_watch(mut self, enable_watch: bool) -> Self {
         self.enable_watch = enable_watch;
         self
@@ -511,7 +539,7 @@ impl<C: Compiler> CompileActor<C> {
             self,
             CompileClient {
                 intr_tx: steal_send,
-                _ctx: typst_ts_core::PhantomParamData::default(),
+                _ctx: std::marker::PhantomData,
             },
         )
     }
@@ -525,7 +553,7 @@ impl<C: Compiler> CompileActor<C> {
 pub struct CompileClient<Ctx> {
     intr_tx: mpsc::UnboundedSender<ExternalInterrupt<Ctx>>,
 
-    _ctx: typst_ts_core::PhantomParamData<Ctx>,
+    _ctx: std::marker::PhantomData<fn(&mut Ctx)>,
 }
 
 unsafe impl<Ctx> Send for CompileClient<Ctx> {}
@@ -536,7 +564,7 @@ impl<Ctx> CompileClient<Ctx> {
         let (intr_tx, _) = mpsc::unbounded_channel();
         Self {
             intr_tx,
-            _ctx: typst_ts_core::PhantomParamData::default(),
+            _ctx: std::marker::PhantomData,
         }
     }
 }
@@ -606,9 +634,10 @@ pub struct DocToSrcJumpInfo {
 }
 
 // todo: remove constraint to CompilerWorld
-impl<F: CompilerFeat, Ctx: Compiler<World = CompilerWorld<F>>> CompileClient<CompileActor<Ctx>>
+impl<F: CompilerFeat, Ctx: Compiler<World = CompilerWorld<F>>>
+    CompileClient<CompileServerActor<Ctx>>
 where
-    Ctx::World: WorkspaceProvider,
+    Ctx::World: EntryManager,
 {
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
@@ -624,7 +653,7 @@ where
             let world = this.compiler.world();
 
             let relative_path = filepath
-                .strip_prefix(&this.compiler.world().workspace_root())
+                .strip_prefix(&this.compiler.world().workspace_root()?)
                 .ok()?;
 
             let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
@@ -647,7 +676,7 @@ where
 
             let filepath = Path::new(&loc.filepath);
             let relative_path = filepath
-                .strip_prefix(&this.compiler.world().workspace_root())
+                .strip_prefix(&this.compiler.world().workspace_root()?)
                 .ok()?;
 
             let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
@@ -787,6 +816,6 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
 
 #[inline]
 fn log_send_error<T>(chan: &'static str, res: Result<(), mpsc::error::SendError<T>>) -> bool {
-    res.map_err(|err| log::warn!("CompileActor: send to {chan} error: {err}"))
+    res.map_err(|err| log::warn!("CompileServerActor: send to {chan} error: {err}"))
         .is_ok()
 }

@@ -67,9 +67,26 @@ fn is_mark(sk: SyntaxKind) -> bool {
     )
 }
 
-pub fn get_deref_target(node: LinkedNode) -> Option<DerefTarget> {
+pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget> {
+    fn same_line_skip(node: &LinkedNode, cursor: usize) -> bool {
+        // (ancestor.kind().is_trivia() && ancestor.text())
+        if !node.kind().is_trivia() {
+            return false;
+        }
+        let pref = node.text();
+        // slice
+        let pref = if cursor < pref.len() {
+            &pref[..cursor]
+        } else {
+            pref
+        };
+        // no newlines
+        // todo: if we are in markup mode, we should check if we are at start of node
+        !pref.contains('\n')
+    }
+
     let mut ancestor = node;
-    if ancestor.kind().is_trivia() || is_mark(ancestor.kind()) {
+    if same_line_skip(&ancestor, cursor) || is_mark(ancestor.kind()) {
         ancestor = ancestor.prev_sibling()?;
     }
 
@@ -104,6 +121,74 @@ pub fn get_deref_target(node: LinkedNode) -> Option<DerefTarget> {
         }
         ast::Expr::Import(..) => {
             return None;
+        }
+        _ => {
+            debug!("unsupported kind {kind:?}", kind = ancestor.kind());
+            return None;
+        }
+    })
+}
+
+#[derive(Debug, Clone)]
+pub enum DefTarget<'a> {
+    Let(LinkedNode<'a>),
+    Import(LinkedNode<'a>),
+}
+
+impl<'a> DefTarget<'a> {
+    pub fn node(&self) -> &LinkedNode {
+        match self {
+            DefTarget::Let(node) => node,
+            DefTarget::Import(node) => node,
+        }
+    }
+}
+
+pub fn get_def_target(node: LinkedNode) -> Option<DefTarget<'_>> {
+    let mut ancestor = node;
+    if ancestor.kind().is_trivia() || is_mark(ancestor.kind()) {
+        ancestor = ancestor.prev_sibling()?;
+    }
+
+    while !ancestor.is::<ast::Expr>() {
+        ancestor = ancestor.parent()?.clone();
+    }
+    debug!("def expr: {ancestor:?}");
+    let ancestor = deref_lvalue(ancestor)?;
+    debug!("def lvalue: {ancestor:?}");
+
+    let may_ident = ancestor.cast::<ast::Expr>()?;
+    if !may_ident.hash() && !matches!(may_ident, ast::Expr::MathIdent(_)) {
+        return None;
+    }
+
+    Some(match may_ident {
+        // todo: label, reference
+        // todo: import
+        // todo: include
+        ast::Expr::FuncCall(..) => return None,
+        ast::Expr::Set(..) => return None,
+        ast::Expr::Let(..) => DefTarget::Let(ancestor),
+        ast::Expr::Import(..) => DefTarget::Import(ancestor),
+        // todo: parameter
+        ast::Expr::Ident(..)
+        | ast::Expr::MathIdent(..)
+        | ast::Expr::FieldAccess(..)
+        | ast::Expr::Closure(..) => {
+            let mut ancestor = ancestor;
+            while !ancestor.is::<ast::LetBinding>() {
+                ancestor = ancestor.parent()?.clone();
+            }
+
+            DefTarget::Let(ancestor)
+        }
+        ast::Expr::Str(..) => {
+            let parent = ancestor.parent()?;
+            if parent.kind() != SyntaxKind::ModuleImport {
+                return None;
+            }
+
+            DefTarget::Import(parent.clone())
         }
         _ => {
             debug!("unsupported kind {kind:?}", kind = ancestor.kind());

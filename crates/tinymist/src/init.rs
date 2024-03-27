@@ -1,113 +1,35 @@
-use core::fmt;
+use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::bail;
 use clap::builder::ValueParser;
 use clap::{ArgAction, Parser};
+use comemo::Prehashed;
 use itertools::Itertools;
 use log::{error, info, warn};
 use lsp_types::*;
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
 use typst::foundations::IntoValue;
-use typst_ts_core::config::CompileOpts;
-use typst_ts_core::{ImmutPath, TypstDict};
+use typst::syntax::VirtualPath;
+use typst::util::Deferred;
+use typst_ts_core::config::compiler::EntryState;
+use typst_ts_core::error::prelude::*;
+use typst_ts_core::{ImmutPath, TypstDict, TypstFileId as FileId};
 
 use crate::actor::cluster::CompileClusterActor;
-use crate::{invalid_params, LspHost, LspResult, TypstLanguageServer, TypstLanguageServerArgs};
+use crate::world::{CompileOpts, ImmutDict, SharedFontResolver};
+use crate::{
+    invalid_params, CompileFontOpts, LspHost, LspResult, TypstLanguageServer,
+    TypstLanguageServerArgs,
+};
 
-trait InitializeParamsExt {
-    fn position_encodings(&self) -> &[PositionEncodingKind];
-    fn supports_config_change_registration(&self) -> bool;
-    fn semantic_tokens_capabilities(&self) -> Option<&SemanticTokensClientCapabilities>;
-    fn document_formatting_capabilities(&self) -> Option<&DocumentFormattingClientCapabilities>;
-    fn supports_semantic_tokens_dynamic_registration(&self) -> bool;
-    fn supports_document_formatting_dynamic_registration(&self) -> bool;
-    fn line_folding_only(&self) -> bool;
-    fn root_paths(&self) -> Vec<PathBuf>;
-
-    // todo: svelte-language-server responds to a Goto Definition request with
-    // LocationLink[] even if the client does not report the
-    // textDocument.definition.linkSupport capability.
-}
-
-impl InitializeParamsExt for InitializeParams {
-    fn position_encodings(&self) -> &[PositionEncodingKind] {
-        const DEFAULT_ENCODING: &[PositionEncodingKind; 1] = &[PositionEncodingKind::UTF16];
-        self.capabilities
-            .general
-            .as_ref()
-            .and_then(|general| general.position_encodings.as_ref())
-            .map(|encodings| encodings.as_slice())
-            .unwrap_or(DEFAULT_ENCODING)
-    }
-
-    fn supports_config_change_registration(&self) -> bool {
-        self.capabilities
-            .workspace
-            .as_ref()
-            .and_then(|workspace| workspace.configuration)
-            .unwrap_or(false)
-    }
-
-    fn line_folding_only(&self) -> bool {
-        self.capabilities
-            .text_document
-            .as_ref()
-            .and_then(|workspace| workspace.folding_range.as_ref())
-            .and_then(|folding| folding.line_folding_only)
-            .unwrap_or(false)
-    }
-
-    fn semantic_tokens_capabilities(&self) -> Option<&SemanticTokensClientCapabilities> {
-        self.capabilities
-            .text_document
-            .as_ref()?
-            .semantic_tokens
-            .as_ref()
-    }
-
-    fn document_formatting_capabilities(&self) -> Option<&DocumentFormattingClientCapabilities> {
-        self.capabilities
-            .text_document
-            .as_ref()?
-            .formatting
-            .as_ref()
-    }
-
-    fn supports_semantic_tokens_dynamic_registration(&self) -> bool {
-        self.semantic_tokens_capabilities()
-            .and_then(|semantic_tokens| semantic_tokens.dynamic_registration)
-            .unwrap_or(false)
-    }
-
-    fn supports_document_formatting_dynamic_registration(&self) -> bool {
-        self.document_formatting_capabilities()
-            .and_then(|document_format| document_format.dynamic_registration)
-            .unwrap_or(false)
-    }
-
-    #[allow(deprecated)] // `self.root_path` is marked as deprecated
-    fn root_paths(&self) -> Vec<PathBuf> {
-        match self.workspace_folders.as_ref() {
-            Some(roots) => roots
-                .iter()
-                .map(|root| &root.uri)
-                .map(Url::to_file_path)
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap(),
-            None => self
-                .root_uri
-                .as_ref()
-                .map(|uri| uri.to_file_path().unwrap())
-                .or_else(|| self.root_path.clone().map(PathBuf::from))
-                .into_iter()
-                .collect(),
-        }
-    }
-}
+// todo: svelte-language-server responds to a Goto Definition request with
+// LocationLink[] even if the client does not report the
+// textDocument.definition.linkSupport capability.
 
 /// The mode of the experimental formatter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -120,20 +42,19 @@ pub enum ExperimentalFormatterMode {
     Enable,
 }
 
-/// The mode of PDF export.
+/// The mode of PDF/SVG/PNG export.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum ExportPdfMode {
+pub enum ExportMode {
     #[default]
     Auto,
     /// Select best solution automatically. (Recommended)
     Never,
-    /// Export PDF on saving the document, i.e. on `textDocument/didSave`
-    /// events.
+    /// Export on saving the document, i.e. on `textDocument/didSave` events.
     OnSave,
-    /// Export PDF on typing, i.e. on `textDocument/didChange` events.
+    /// Export on typing, i.e. on `textDocument/didChange` events.
     OnType,
-    /// Export PDFs when a document has a title, which is useful to filter out
+    /// Export when a document has a title, which is useful to filter out
     /// template files.
     OnDocumentHasTitle,
 }
@@ -158,13 +79,11 @@ pub struct CompileExtraOpts {
     pub entry: Option<PathBuf>,
 
     /// Additional input arguments to compile the entry file.
-    pub inputs: Option<TypstDict>,
+    pub inputs: ImmutDict,
 
     /// will remove later
     pub font_paths: Vec<PathBuf>,
 }
-
-type Listener<T> = Box<dyn FnMut(&T) -> anyhow::Result<()>>;
 
 const CONFIG_ITEMS: &[&str] = &[
     "outputPath",
@@ -176,14 +95,14 @@ const CONFIG_ITEMS: &[&str] = &[
 ];
 
 /// The user configuration read from the editor.
-#[derive(Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Config {
     /// The workspace roots from initialization.
     pub roots: Vec<PathBuf>,
     /// The output directory for PDF export.
     pub output_path: String,
     /// The mode of PDF export.
-    pub export_pdf: ExportPdfMode,
+    pub export_pdf: ExportMode,
     /// Specifies the root path of the project manually.
     pub root_path: Option<PathBuf>,
     /// Dynamic configuration for semantic tokens.
@@ -192,8 +111,6 @@ pub struct Config {
     pub formatter: ExperimentalFormatterMode,
     /// Typst extra arguments.
     pub typst_extra_args: Option<CompileExtraOpts>,
-    semantic_tokens_listeners: Vec<Listener<SemanticTokensMode>>,
-    formatter_listeners: Vec<Listener<ExperimentalFormatterMode>>,
 }
 
 /// Common arguments of compile, watch, and query.
@@ -291,15 +208,14 @@ impl Config {
 
         let export_pdf = update
             .get("exportPdf")
-            .map(ExportPdfMode::deserialize)
+            .map(ExportMode::deserialize)
             .and_then(Result::ok);
         if let Some(export_pdf) = export_pdf {
             self.export_pdf = export_pdf;
         } else {
-            self.export_pdf = ExportPdfMode::default();
+            self.export_pdf = ExportMode::default();
         }
 
-        // todo: the command.root may be not absolute
         let root_path = update.get("rootPath");
         if let Some(root_path) = root_path {
             if root_path.is_null() {
@@ -317,9 +233,6 @@ impl Config {
             .map(SemanticTokensMode::deserialize)
             .and_then(Result::ok);
         if let Some(semantic_tokens) = semantic_tokens {
-            for listener in &mut self.semantic_tokens_listeners {
-                listener(&semantic_tokens)?;
-            }
             self.semantic_tokens = semantic_tokens;
         }
 
@@ -328,9 +241,6 @@ impl Config {
             .map(ExperimentalFormatterMode::deserialize)
             .and_then(Result::ok);
         if let Some(formatter) = formatter {
-            for listener in &mut self.formatter_listeners {
-                listener(&formatter)?;
-            }
             self.formatter = formatter;
         }
 
@@ -356,19 +266,19 @@ impl Config {
                 };
 
                 // Convert the input pairs to a dictionary.
-                let inputs: Option<TypstDict> = if command.inputs.is_empty() {
-                    None
+                let inputs: TypstDict = if command.inputs.is_empty() {
+                    TypstDict::default()
                 } else {
                     let pairs = command.inputs.iter();
                     let pairs = pairs.map(|(k, v)| (k.as_str().into(), v.as_str().into_value()));
-                    Some(pairs.collect())
+                    pairs.collect()
                 };
 
                 // todo: the command.root may be not absolute
                 self.typst_extra_args = Some(CompileExtraOpts {
                     entry: command.input,
                     root_dir: command.root,
-                    inputs,
+                    inputs: Arc::new(Prehashed::new(inputs)),
                     font_paths: command.font_paths,
                 });
             }
@@ -381,6 +291,12 @@ impl Config {
     pub fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
         if let Some(path) = &self.root_path {
             return Some(path.as_path().into());
+        }
+
+        if let Some(extras) = &self.typst_extra_args {
+            if let Some(root) = &extras.root_dir {
+                return Some(root.as_path().into());
+            }
         }
 
         if let Some(path) = &self
@@ -414,8 +330,43 @@ impl Config {
         None
     }
 
-    pub(crate) fn listen_semantic_tokens(&mut self, listener: Listener<SemanticTokensMode>) {
-        self.semantic_tokens_listeners.push(listener);
+    pub fn determine_entry(&self, entry: Option<ImmutPath>) -> EntryState {
+        // todo: don't ignore entry from typst_extra_args
+        // entry: command.input,
+
+        let root_dir = self.determine_root(entry.as_ref());
+
+        let entry = match (entry, root_dir) {
+            (Some(entry), Some(root)) => match entry.strip_prefix(&root) {
+                Ok(stripped) => Some(EntryState::new_rooted(
+                    root,
+                    Some(FileId::new(None, VirtualPath::new(stripped))),
+                )),
+                Err(err) => {
+                    log::info!("Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}");
+                    EntryState::new_rootless(entry)
+                }
+            },
+            (Some(entry), None) => EntryState::new_rootless(entry),
+            (None, Some(root)) => Some(EntryState::new_workspace(root)),
+            (None, None) => None,
+        };
+
+        entry.unwrap_or_else(|| match self.determine_root(None) {
+            Some(root) => EntryState::new_workspace(root),
+            // todo
+            None => EntryState::new_detached(),
+        })
+    }
+
+    pub fn determine_inputs(&self) -> ImmutDict {
+        static EMPTY: Lazy<ImmutDict> = Lazy::new(ImmutDict::default);
+
+        if let Some(extras) = &self.typst_extra_args {
+            return extras.inputs.clone();
+        }
+
+        EMPTY.clone()
     }
 
     fn validate(&self) -> anyhow::Result<()> {
@@ -435,70 +386,85 @@ impl Config {
 
         Ok(())
     }
-
-    // pub fn listen_formatting(&mut self, listener:
-    // Listener<ExperimentalFormatterMode>) {     self.formatter_listeners.
-    // push(listener); }
-}
-
-impl fmt::Debug for Config {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Config")
-            .field("export_pdf", &self.export_pdf)
-            .field("formatter", &self.formatter)
-            .field("semantic_tokens", &self.semantic_tokens)
-            .field("typst_extra_args", &self.typst_extra_args)
-            .field(
-                "semantic_tokens_listeners",
-                &format_args!("Vec[len = {}]", self.semantic_tokens_listeners.len()),
-            )
-            .field(
-                "formatter_listeners",
-                &format_args!("Vec[len = {}]", self.formatter_listeners.len()),
-            )
-            .finish()
-    }
 }
 
 /// Configuration set at initialization that won't change within a single
-/// session
+/// session.
 #[derive(Debug, Clone)]
 pub struct ConstConfig {
-    /// The position encoding, either UTF-8 or UTF-16.
+    /// Determined position encoding, either UTF-8 or UTF-16.
     /// Defaults to UTF-16 if not specified.
     pub position_encoding: PositionEncoding,
-    /// Whether the client supports dynamic registration of semantic tokens.
-    pub supports_semantic_tokens_dynamic_registration: bool,
-    /// Whether the client supports dynamic registration of document formatting.
-    pub supports_document_formatting_dynamic_registration: bool,
-    /// Whether the client supports dynamic registration of configuration
-    /// changes.
-    pub supports_config_change_registration: bool,
-    /// Whether the client only supports line folding.
-    pub line_folding_only: bool,
-}
-
-impl ConstConfig {
-    fn choose_encoding(params: &InitializeParams) -> PositionEncoding {
-        let encodings = params.position_encodings();
-        if encodings.contains(&PositionEncodingKind::UTF8) {
-            PositionEncoding::Utf8
-        } else {
-            PositionEncoding::Utf16
-        }
-    }
+    /// Allow dynamic registration of configuration changes.
+    pub cfg_change_registration: bool,
+    /// Allow dynamic registration of semantic tokens.
+    pub sema_tokens_dynamic_registration: bool,
+    /// Allow overlapping tokens.
+    pub sema_tokens_overlapping_token_support: bool,
+    /// Allow multiline tokens.
+    pub sema_tokens_multiline_token_support: bool,
+    /// Allow line folding on documents.
+    pub doc_line_folding_only: bool,
+    /// Allow dynamic registration of document formatting.
+    pub doc_fmt_dynamic_registration: bool,
 }
 
 impl From<&InitializeParams> for ConstConfig {
     fn from(params: &InitializeParams) -> Self {
+        const DEFAULT_ENCODING: &[PositionEncodingKind; 1] = &[PositionEncodingKind::UTF16];
+
+        let position_encoding = {
+            let encodings = params
+                .capabilities
+                .general
+                .as_ref()
+                .and_then(|general| general.position_encodings.as_ref())
+                .map(|encodings| encodings.as_slice())
+                .unwrap_or(DEFAULT_ENCODING);
+
+            if encodings.contains(&PositionEncodingKind::UTF8) {
+                PositionEncoding::Utf8
+            } else {
+                PositionEncoding::Utf16
+            }
+        };
+
+        let workspace_caps = params.capabilities.workspace.as_ref();
+        let supports_config_change_registration = workspace_caps
+            .and_then(|workspace| workspace.configuration)
+            .unwrap_or(false);
+
+        let doc_caps = params.capabilities.text_document.as_ref();
+        let folding_caps = doc_caps.and_then(|doc| doc.folding_range.as_ref());
+        let line_folding_only = folding_caps
+            .and_then(|folding| folding.line_folding_only)
+            .unwrap_or(true);
+
+        let semantic_tokens_caps = doc_caps.and_then(|doc| doc.semantic_tokens.as_ref());
+        let supports_semantic_tokens_dynamic_registration = semantic_tokens_caps
+            .and_then(|semantic_tokens| semantic_tokens.dynamic_registration)
+            .unwrap_or(false);
+        let supports_semantic_tokens_overlapping_token_support = semantic_tokens_caps
+            .and_then(|semantic_tokens| semantic_tokens.overlapping_token_support)
+            .unwrap_or(false);
+        let supports_semantic_tokens_multiline_token_support = semantic_tokens_caps
+            .and_then(|semantic_tokens| semantic_tokens.multiline_token_support)
+            .unwrap_or(false);
+
+        let formatter_caps = doc_caps.and_then(|doc| doc.formatting.as_ref());
+        let supports_document_formatting_dynamic_registration = formatter_caps
+            .and_then(|formatting| formatting.dynamic_registration)
+            .unwrap_or(false);
+
         Self {
-            position_encoding: Self::choose_encoding(params),
-            supports_semantic_tokens_dynamic_registration: params
-                .supports_semantic_tokens_dynamic_registration(),
-            supports_document_formatting_dynamic_registration: params
-                .supports_document_formatting_dynamic_registration(),
-            supports_config_change_registration: params.supports_config_change_registration(),
-            line_folding_only: params.line_folding_only(),
+            position_encoding,
+            sema_tokens_dynamic_registration: supports_semantic_tokens_dynamic_registration,
+            sema_tokens_overlapping_token_support:
+                supports_semantic_tokens_overlapping_token_support,
+            sema_tokens_multiline_token_support: supports_semantic_tokens_multiline_token_support,
+            doc_fmt_dynamic_registration: supports_document_formatting_dynamic_registration,
+            cfg_change_registration: supports_config_change_registration,
+            doc_line_folding_only: line_folding_only,
         }
     }
 }
@@ -525,7 +491,7 @@ impl Init {
     /// # Errors
     /// Errors if the configuration could not be updated.
     pub fn initialize(
-        self,
+        mut self,
         params: InitializeParams,
     ) -> (TypstLanguageServer, LspResult<InitializeResult>) {
         // self.tracing_init();
@@ -536,29 +502,59 @@ impl Init {
             "initialized with const_config {const_config:?}",
             const_config = cc
         );
+        let mut config = Config {
+            roots: match params.workspace_folders.as_ref() {
+                Some(roots) => roots
+                    .iter()
+                    .map(|root| &root.uri)
+                    .map(Url::to_file_path)
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap(),
+                #[allow(deprecated)] // `params.root_path` is marked as deprecated
+                None => params
+                    .root_uri
+                    .as_ref()
+                    .map(|uri| uri.to_file_path().unwrap())
+                    .or_else(|| params.root_path.clone().map(PathBuf::from))
+                    .into_iter()
+                    .collect(),
+            },
+            ..Config::default()
+        };
+        let res = match &params.initialization_options {
+            Some(init) => config
+                .update(init)
+                .map_err(|e| e.to_string())
+                .map_err(invalid_params),
+            None => Ok(()),
+        };
 
-        let mut config = Config::default();
+        // prepare fonts
+        // todo: on font resolving failure, downgrade to a fake font book
+        let font = {
+            let opts = std::mem::take(&mut self.compile_opts.font);
+            if opts.font_paths.is_empty() {
+                if let Some(font_paths) = config.typst_extra_args.as_ref().map(|x| &x.font_paths) {
+                    self.compile_opts.font.font_paths = font_paths.clone();
+                }
+            }
+
+            Deferred::new(|| create_font_book(opts).expect("failed to create font book"))
+        };
 
         // Bootstrap server
         let (diag_tx, diag_rx) = mpsc::unbounded_channel();
 
         let mut service = TypstLanguageServer::new(TypstLanguageServerArgs {
             client: self.host.clone(),
-            compile_opts: self.compile_opts,
-            const_config: cc,
+            compile_opts: self.compile_opts.once,
+            const_config: cc.clone(),
             diag_tx,
+            font,
         });
 
-        config.roots = params.root_paths();
-        if let Some(init) = &params.initialization_options {
-            if let Err(err) = config
-                .update(init)
-                .as_ref()
-                .map_err(ToString::to_string)
-                .map_err(invalid_params)
-            {
-                return (service, Err(err));
-            }
+        if let Err(err) = res {
+            return (service, Err(err));
         }
 
         info!("initialized with config {config:?}", config = config);
@@ -572,7 +568,11 @@ impl Init {
             published_primary: false,
         };
 
-        let primary = service.server("primary".to_owned(), None);
+        let primary = service.server(
+            "primary".to_owned(),
+            service.config.determine_entry(None),
+            service.config.determine_inputs(),
+        );
         if service.primary.is_some() {
             panic!("primary already initialized");
         }
@@ -583,18 +583,14 @@ impl Init {
 
         // Respond to the host (LSP client)
         let semantic_tokens_provider = match service.config.semantic_tokens {
-            SemanticTokensMode::Enable
-                if !params.supports_semantic_tokens_dynamic_registration() =>
-            {
+            SemanticTokensMode::Enable if !cc.sema_tokens_dynamic_registration => {
                 Some(get_semantic_tokens_options().into())
             }
             _ => None,
         };
 
         let document_formatting_provider = match service.config.formatter {
-            ExperimentalFormatterMode::Enable
-                if !params.supports_document_formatting_dynamic_registration() =>
-            {
+            ExperimentalFormatterMode::Enable if !cc.doc_fmt_dynamic_registration => {
                 Some(OneOf::Left(true))
             }
             _ => None,
@@ -666,6 +662,14 @@ impl Init {
     }
 }
 
+fn create_font_book(opts: CompileFontOpts) -> ZResult<SharedFontResolver> {
+    let res = crate::world::LspWorldBuilder::resolve_fonts(opts)?;
+    Ok(SharedFontResolver {
+        inner: Arc::new(res),
+        // inner: res,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -689,7 +693,7 @@ mod tests {
         config.update(&update).unwrap();
 
         assert_eq!(config.output_path, "out");
-        assert_eq!(config.export_pdf, ExportPdfMode::OnSave);
+        assert_eq!(config.export_pdf, ExportMode::OnSave);
         assert_eq!(config.root_path, Some(PathBuf::from(root_path)));
         assert_eq!(config.semantic_tokens, SemanticTokensMode::Enable);
         assert_eq!(config.formatter, ExperimentalFormatterMode::Enable);

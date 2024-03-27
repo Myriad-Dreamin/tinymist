@@ -10,22 +10,6 @@ assignees: ''
 **Describe the bug**
 A clear and concise description of what the bug is.
 
-**To Reproduce**
-Steps to reproduce the behavior (Library test):
-1. Declare a rust test 'fn test_xxx() { ... }' or typescript test 'it_should(function () { ... })'
-2. Execute test function
-3. See error
-
-Or (Shell code):
-
-1. Attach necessary resources to execute shell code
-2. Put down some shell code 'cargo run --bin typst-ts-cli -- ...'
-3. Execute shell code
-4. See error
-
-**Expected behavior**
-A clear and concise description of what you expected to happen.
-
 **Package/Software version:**
 
 VSCode version(Help -> About):
@@ -41,7 +25,17 @@ V8: 10.8.168.25-electron.0
 OS: Linux x64 6.4.12-x64v4-xanmod1
 ```
 
-tinymist extension version: `v0.7.3`
+tinymist extension version: `v0.11.0`. Get it by `tinymist --version` in terminal.
+```plain
+tinymist 
+Build Timestamp:     2024-03-22T02:18:18.207134800Z
+Build Git Describe:  v0.11.1-rc2-5-gf0a96cb-dirty
+Commit SHA:          f0a9...
+Commit Date:         None
+Commit Branch:       None
+Cargo Target Triple: x86_64-pc-windows-msvc
+Typst Version:       0.11.0
+```
 
 **Logs:**
 

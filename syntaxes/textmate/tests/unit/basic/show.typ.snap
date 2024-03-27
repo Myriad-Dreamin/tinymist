@@ -1,0 +1,132 @@
+>#show: it => it
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+#     ^ source.typst meta.expr.show.typst punctuation.separator.colon.typst
+#      ^ source.typst meta.expr.show.typst
+#       ^^ source.typst meta.expr.show.typst variable.parameter.typst
+#         ^ source.typst meta.expr.show.typst
+#          ^^ source.typst meta.expr.show.typst storage.type.function.arrow.typst
+#            ^ source.typst meta.expr.show.typst
+#             ^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+>#show text: it => it
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+#     ^ source.typst meta.expr.show.typst
+#      ^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.show.typst punctuation.separator.colon.typst
+#           ^ source.typst meta.expr.show.typst
+#            ^^ source.typst meta.expr.show.typst variable.parameter.typst
+#              ^ source.typst meta.expr.show.typst
+#               ^^ source.typst meta.expr.show.typst storage.type.function.arrow.typst
+#                 ^ source.typst meta.expr.show.typst
+#                  ^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+>#show: rect
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+#     ^ source.typst meta.expr.show.typst punctuation.separator.colon.typst
+#      ^ source.typst meta.expr.show.typst
+#       ^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+>#show: list.item.with()
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+#     ^ source.typst meta.expr.show.typst punctuation.separator.colon.typst
+#      ^ source.typst meta.expr.show.typst
+#       ^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#           ^ source.typst meta.expr.show.typst keyword.operator.accessor.typst
+#            ^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#                ^ source.typst meta.expr.show.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                 ^^^^ source.typst meta.expr.show.typst meta.expr.call.typst entity.name.function.typst
+#                     ^ source.typst meta.expr.show.typst meta.expr.call.typst meta.brace.round.typst
+#                      ^ source.typst meta.expr.show.typst meta.expr.call.typst meta.brace.round.typst
+>#show: rect.with(width: 1pt)
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+#     ^ source.typst meta.expr.show.typst punctuation.separator.colon.typst
+#      ^ source.typst meta.expr.show.typst
+#       ^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#           ^ source.typst meta.expr.show.typst meta.expr.call.typst keyword.operator.accessor.typst
+#            ^^^^ source.typst meta.expr.show.typst meta.expr.call.typst entity.name.function.typst
+#                ^ source.typst meta.expr.show.typst meta.expr.call.typst meta.brace.round.typst
+#                 ^^^^^ source.typst meta.expr.show.typst meta.expr.call.typst variable.other.readwrite.typst
+#                      ^ source.typst meta.expr.show.typst meta.expr.call.typst punctuation.separator.colon.typst
+#                       ^ source.typst meta.expr.show.typst meta.expr.call.typst
+#                        ^^^ source.typst meta.expr.show.typst meta.expr.call.typst constant.numeric.length.typst
+#                           ^ source.typst meta.expr.show.typst meta.expr.call.typst meta.brace.round.typst
+>#show <_>: rect
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+#     ^ source.typst meta.expr.show.typst
+#      ^^^ source.typst meta.expr.show.typst entity.other.label.typst
+#         ^ source.typst meta.expr.show.typst punctuation.separator.colon.typst
+#          ^ source.typst meta.expr.show.typst
+#           ^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+>#show "A": rect
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+#     ^ source.typst meta.expr.show.typst
+#      ^ source.typst meta.expr.show.typst string.quoted.double.typst punctuation.definition.string.typst
+#       ^ source.typst meta.expr.show.typst string.quoted.double.typst
+#        ^ source.typst meta.expr.show.typst string.quoted.double.typst punctuation.definition.string.typst
+#         ^ source.typst meta.expr.show.typst punctuation.separator.colon.typst
+#          ^ source.typst meta.expr.show.typst
+#           ^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+>#show regex("A"): (it) => it
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+#     ^ source.typst meta.expr.show.typst
+#      ^^^^^ source.typst meta.expr.show.typst meta.expr.call.typst entity.name.function.typst
+#           ^ source.typst meta.expr.show.typst meta.expr.call.typst meta.brace.round.typst
+#            ^ source.typst meta.expr.show.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#             ^ source.typst meta.expr.show.typst meta.expr.call.typst string.quoted.double.typst
+#              ^ source.typst meta.expr.show.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#               ^ source.typst meta.expr.show.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst meta.expr.show.typst punctuation.separator.colon.typst
+#                 ^ source.typst meta.expr.show.typst
+#                  ^ source.typst meta.expr.show.typst meta.brace.round.typst
+#                   ^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#                     ^ source.typst meta.expr.show.typst meta.brace.round.typst
+#                      ^ source.typst meta.expr.show.typst
+#                       ^^ source.typst meta.expr.show.typst storage.type.function.arrow.typst
+#                         ^ source.typst meta.expr.show.typst
+#                          ^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+>#show raw.where(block: true): {
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+#     ^ source.typst meta.expr.show.typst
+#      ^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#         ^ source.typst meta.expr.show.typst meta.expr.call.typst keyword.operator.accessor.typst
+#          ^^^^^ source.typst meta.expr.show.typst meta.expr.call.typst entity.name.function.typst
+#               ^ source.typst meta.expr.show.typst meta.expr.call.typst meta.brace.round.typst
+#                ^^^^^ source.typst meta.expr.show.typst meta.expr.call.typst variable.other.readwrite.typst
+#                     ^ source.typst meta.expr.show.typst meta.expr.call.typst punctuation.separator.colon.typst
+#                      ^ source.typst meta.expr.show.typst meta.expr.call.typst
+#                       ^^^^ source.typst meta.expr.show.typst meta.expr.call.typst entity.name.type.primitive.typst
+#                           ^ source.typst meta.expr.show.typst meta.expr.call.typst meta.brace.round.typst
+#                            ^ source.typst meta.expr.show.typst punctuation.separator.colon.typst
+#                             ^ source.typst meta.expr.show.typst
+#                              ^ source.typst meta.expr.show.typst meta.brace.curly.typst
+>  rect()
+#^^ source.typst meta.expr.show.typst
+#  ^^^^ source.typst meta.expr.show.typst meta.expr.call.typst entity.name.function.typst
+#      ^ source.typst meta.expr.show.typst meta.expr.call.typst meta.brace.round.typst
+#       ^ source.typst meta.expr.show.typst meta.expr.call.typst meta.brace.round.typst
+>}
+#^ source.typst meta.expr.show.typst meta.brace.curly.typst
+>#show { text }: (it) => it
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+#     ^ source.typst meta.expr.show.typst
+#      ^ source.typst meta.expr.show.typst meta.brace.curly.typst
+#       ^ source.typst meta.expr.show.typst
+#        ^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#            ^ source.typst meta.expr.show.typst
+#             ^ source.typst meta.expr.show.typst meta.brace.curly.typst
+#              ^ source.typst meta.expr.show.typst punctuation.separator.colon.typst
+#               ^ source.typst meta.expr.show.typst
+#                ^ source.typst meta.expr.show.typst meta.brace.round.typst
+#                 ^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#                   ^ source.typst meta.expr.show.typst meta.brace.round.typst
+#                    ^ source.typst meta.expr.show.typst
+#                     ^^ source.typst meta.expr.show.typst storage.type.function.arrow.typst
+#                       ^ source.typst meta.expr.show.typst
+#                        ^^ source.typst meta.expr.show.typst variable.other.readwrite.typst

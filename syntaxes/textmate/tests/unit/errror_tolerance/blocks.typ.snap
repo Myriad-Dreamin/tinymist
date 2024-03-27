@@ -1,0 +1,20 @@
+>#{func(}
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.curly.typst
+#  ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#      ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#       ^^ source.typst meta.expr.call.typst
+>#[func(]
+#^ source.typst meta.expr.call.typst
+# ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#  ^^^^^ source.typst meta.expr.call.typst
+#       ^ source.typst meta.expr.call.typst meta.brace.square.typst
+>#func("]
+#^ source.typst meta.expr.call.typst
+# ^^^^ source.typst meta.expr.call.typst meta.expr.call.typst entity.name.function.typst
+#     ^ source.typst meta.expr.call.typst meta.expr.call.typst meta.brace.round.typst
+#      ^ source.typst meta.expr.call.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#       ^^ source.typst meta.expr.call.typst meta.expr.call.typst string.quoted.double.typst
+>#{}
+#^^^^ source.typst meta.expr.call.typst meta.expr.call.typst string.quoted.double.typst
+>

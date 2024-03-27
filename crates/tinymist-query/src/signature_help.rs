@@ -1,19 +1,23 @@
-use crate::prelude::*;
+use crate::{prelude::*, SemanticRequest};
 
+/// The [`textDocument/signatureHelp`] request is sent from the client to the
+/// server to request signature information at a given cursor position.
+///
+/// [`textDocument/signatureHelp`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_signatureHelp
 #[derive(Debug, Clone)]
 pub struct SignatureHelpRequest {
+    /// The path of the document to get signature help for.
     pub path: PathBuf,
+    /// The position of the cursor to get signature help for.
     pub position: LspPosition,
 }
 
-impl SignatureHelpRequest {
-    pub fn request(
-        self,
-        world: &TypstSystemWorld,
-        position_encoding: PositionEncoding,
-    ) -> Option<SignatureHelp> {
-        let source = get_suitable_source_in_workspace(world, &self.path).ok()?;
-        let typst_offset = lsp_to_typst::position(self.position, position_encoding, &source)?;
+impl SemanticRequest for SignatureHelpRequest {
+    type Response = SignatureHelp;
+
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+        let source = ctx.source_by_path(&self.path).ok()?;
+        let typst_offset = ctx.to_typst_pos(self.position, &source)?;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(typst_offset + 1)?;
         let (callee, callee_node, args) = surrounding_function_syntax(&ast_node)?;
@@ -22,7 +26,7 @@ impl SignatureHelpRequest {
             return None;
         }
 
-        let values = analyze_expr(world, &callee_node);
+        let values = analyze_expr(ctx.world(), &callee_node);
 
         let function = values.into_iter().find_map(|v| match v.0 {
             Value::Func(f) => Some(f),

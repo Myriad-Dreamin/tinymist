@@ -1,0 +1,34 @@
+>[\]]
+#^ source.typst
+# ^^ source.typst constant.character.escape.content.typst
+#   ^^ source.typst
+>\#1pt
+#^^ source.typst constant.character.escape.content.typst
+#  ^^^^ source.typst
+>a \
+#^^ source.typst
+#  ^^ source.typst constant.character.escape.content.typst
+>a \ b \
+#^^ source.typst
+#  ^^ source.typst constant.character.escape.content.typst
+#    ^^ source.typst
+#      ^^ source.typst constant.character.escape.content.typst
+>#let x = 1; \
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#      ^ source.typst meta.expr.let.typst
+#       ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#         ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#          ^ source.typst punctuation.terminator.statement.typst
+#           ^ source.typst
+#            ^^ source.typst constant.character.escape.content.typst
+>#x \
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst variable.other.readwrite.typst
+#  ^ source.typst
+#   ^^ source.typst constant.character.escape.content.typst
+>#x
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst variable.other.readwrite.typst

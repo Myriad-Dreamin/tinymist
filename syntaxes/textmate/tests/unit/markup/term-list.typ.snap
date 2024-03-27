@@ -1,0 +1,29 @@
+>/ a
+#^^^^ source.typst
+>: b
+#^^^^ source.typst
+>
+>/ #text(red, "a"): b
+#^ source.typst punctuation.definition.list.description.typst
+# ^ source.typst
+#  ^ source.typst punctuation.definition.hash.typst
+#   ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#       ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#        ^^^ source.typst meta.expr.call.typst support.type.builtin.typst
+#           ^ source.typst meta.expr.call.typst punctuation.separator.comma.typst
+#            ^ source.typst meta.expr.call.typst
+#             ^ source.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#              ^ source.typst meta.expr.call.typst string.quoted.double.typst
+#               ^ source.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#                ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#                 ^ source.typst markup.list.term.typst
+#                  ^^^ source.typst
+>
+>/ a: b
+#^ source.typst punctuation.definition.list.description.typst
+# ^ source.typst
+#  ^ source.typst
+#   ^ source.typst markup.list.term.typst
+#    ^^^ source.typst
+>
+>

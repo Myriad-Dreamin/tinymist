@@ -36,10 +36,12 @@ clap_complete_fig.workspace = true
 clap_mangen.workspace = true
 
 typst.workspace = true
+typst-svg.workspace = true
 typst-pdf.workspace = true
+typst-render.workspace = true
 typst-assets = { workspace = true, features = ["fonts"] }
 
-typst-ts-core = { version = "0.4.2-rc6", default-features = false, features = [
+typst-ts-core = { workspace = true, default-features = false, features = [
     "flat-vector",
     "vector-bbox",
     "no-content-hint",
@@ -53,6 +55,7 @@ lsp-server.workspace = true
 crossbeam-channel.workspace = true
 lsp-types.workspace = true
 dhat = { version = "0.3.3", optional = true }
+chrono = { version = "0.4" }
 
 [features]
 default = ["cli", "preview"]
