@@ -9,6 +9,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ### Editor
 
 * Integrated neovim support in https://github.com/Myriad-Dreamin/tinymist/pull/91
+* docs: mention how to work with multiple-file projects in https://github.com/Myriad-Dreamin/tinymist/pull/108
+* feat: add minimal helix support in https://github.com/Myriad-Dreamin/tinymist/pull/107
 
 ### Compiler
 
@@ -20,7 +22,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ### Syntax/Semantic Highlighting
 
 * Provided correct semantic highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/71
-* Provided correct syntax highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/77, https://github.com/Myriad-Dreamin/tinymist/pull/80, and https://github.com/Myriad-Dreamin/tinymist/pull/85
+* Provided correct syntax highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/77, https://github.com/Myriad-Dreamin/tinymist/pull/80, https://github.com/Myriad-Dreamin/tinymist/pull/85, and https://github.com/Myriad-Dreamin/tinymist/pull/109
 * Colorizes contextual bracket according to textmate scopes in https://github.com/Myriad-Dreamin/tinymist/pull/81
 
 ### Commands/Tools
@@ -33,7 +35,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ### Hover (Tooltip)
 
 * Provided hover tooltip on user functions in https://github.com/Myriad-Dreamin/tinymist/pull/76
-* Parses comments for hover tooltip in https://github.com/Myriad-Dreamin/tinymist/pull/78
+* Parses comments for hover tooltip in https://github.com/Myriad-Dreamin/tinymist/pull/78 and https://github.com/Myriad-Dreamin/tinymist/pull/105
 
 ### Misc
 
