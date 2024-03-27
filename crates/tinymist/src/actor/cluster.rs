@@ -2,16 +2,15 @@
 
 use std::collections::HashMap;
 
-use futures::future::join_all;
 use log::info;
-use lsp_types::{Diagnostic, Url};
+use lsp_types::Url;
 use tinymist_query::{DiagnosticsMap, LspDiagnostic};
 use tokio::sync::mpsc;
 
-use crate::LspHost;
+use crate::{LspHost, TypstLanguageServer};
 
 pub struct CompileClusterActor {
-    pub host: LspHost,
+    pub host: LspHost<TypstLanguageServer>,
     pub diag_rx: mpsc::UnboundedReceiver<(String, Option<DiagnosticsMap>)>,
 
     pub diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
@@ -47,24 +46,10 @@ impl CompileClusterActor {
         info!("compile cluster actor is stopped");
     }
 
-    pub async fn do_publish_diagnostics(
-        host: &LspHost,
-        uri: Url,
-        diags: Vec<Diagnostic>,
-        version: Option<i32>,
-        ignored: bool,
-    ) {
-        if ignored {
-            return;
-        }
-
-        host.publish_diagnostics(uri, diags, version)
-    }
-
     async fn flush_primary_diagnostics(&mut self, enable: bool) {
         let affected = self.affect_map.get("primary");
 
-        let tasks = affected.into_iter().flatten().map(|url| {
+        for url in affected.into_iter().flatten() {
             let path_diags = self.diagnostics.get(url);
 
             let diags = path_diags.into_iter().flatten().filter_map(|(g, diags)| {
@@ -75,10 +60,8 @@ impl CompileClusterActor {
             });
             let to_publish = diags.flatten().cloned().collect();
 
-            Self::do_publish_diagnostics(&self.host, url.clone(), to_publish, None, false)
-        });
-
-        join_all(tasks).await;
+            self.host.publish_diagnostics(url.clone(), to_publish, None);
+        }
     }
 
     pub async fn publish(
@@ -111,7 +94,7 @@ impl CompileClusterActor {
         let next_aff = next_diag.into_iter().flatten().map(|(x, y)| (x, Some(y)));
 
         let tasks = prev_aff.into_iter().chain(next_aff);
-        let tasks = tasks.map(|(url, next)| {
+        for (url, next) in tasks {
             // Get the diagnostics from other groups
             let path_diags = self.diagnostics.entry(url.clone()).or_default();
             let rest_all = path_diags
@@ -139,16 +122,10 @@ impl CompileClusterActor {
                 }
             }
 
-            Self::do_publish_diagnostics(
-                &self.host,
-                url,
-                to_publish,
-                None,
-                is_primary && !with_primary,
-            )
-        });
-
-        join_all(tasks).await;
+            if !is_primary || with_primary {
+                self.host.publish_diagnostics(url, to_publish, None)
+            }
+        }
 
         if clear_all {
             // We just used the cache, and won't need it again, so we can update it now

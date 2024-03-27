@@ -51,7 +51,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
     const run = {
         command: serverCommand,
         args: [
-            ...["--mode", "server"],
+            ...["lsp"],
             /// The `--mirror` flag is only used in development/test mode for testing
             ...(context.extensionMode != ExtensionMode.Production
                 ? ["--mirror", "tinymist-lsp.log"]
@@ -174,8 +174,8 @@ function getServer(conf: Record<string, any>): string {
 
 function validateServer(path: string): { valid: true } | { valid: false; message: string } {
     try {
-        console.log("validate", path, "args", ["--mode", "probe"]);
-        const result = child_process.spawnSync(path, ["--mode", "probe"]);
+        console.log("validate", path, "args", ["probe"]);
+        const result = child_process.spawnSync(path, ["probe"]);
         if (result.status === 0) {
             return { valid: true };
         } else {

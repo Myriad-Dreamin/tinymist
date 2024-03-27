@@ -21,10 +21,10 @@ use typst_ts_core::error::prelude::*;
 use typst_ts_core::{ImmutPath, TypstDict, TypstFileId as FileId};
 
 use crate::actor::cluster::CompileClusterActor;
+use crate::harness::LspHost;
 use crate::world::{CompileOpts, ImmutDict, SharedFontResolver};
 use crate::{
-    invalid_params, CompileFontOpts, LspHost, LspResult, TypstLanguageServer,
-    TypstLanguageServerArgs,
+    invalid_params, CompileFontOpts, LspResult, TypstLanguageServer, TypstLanguageServerArgs,
 };
 
 // todo: svelte-language-server responds to a Goto Definition request with
@@ -470,7 +470,7 @@ impl From<&InitializeParams> for ConstConfig {
 }
 
 pub struct Init {
-    pub host: LspHost,
+    pub host: LspHost<TypstLanguageServer>,
     pub compile_opts: CompileOpts,
 }
 
@@ -532,10 +532,10 @@ impl Init {
         // prepare fonts
         // todo: on font resolving failure, downgrade to a fake font book
         let font = {
-            let opts = std::mem::take(&mut self.compile_opts.font);
+            let mut opts = std::mem::take(&mut self.compile_opts.font);
             if opts.font_paths.is_empty() {
                 if let Some(font_paths) = config.typst_extra_args.as_ref().map(|x| &x.font_paths) {
-                    self.compile_opts.font.font_paths = font_paths.clone();
+                    opts.font_paths = font_paths.clone();
                 }
             }
 

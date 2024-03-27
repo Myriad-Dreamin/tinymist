@@ -28,6 +28,7 @@
 
 // pub mod formatting;
 mod actor;
+pub mod harness;
 pub mod init;
 mod state;
 mod task;
@@ -47,15 +48,12 @@ use anyhow::Context;
 use crossbeam_channel::select;
 use crossbeam_channel::Receiver;
 use futures::future::BoxFuture;
+use harness::{InitializedLspDriver, LspHost};
 use log::{error, info, trace, warn};
 use lsp_server::{ErrorCode, Message, Notification, Request, ResponseError};
-use lsp_types::notification::{Notification as NotificationTrait, PublishDiagnostics};
-use lsp_types::request::{
-    GotoDeclarationParams, GotoDeclarationResponse, RegisterCapability, UnregisterCapability,
-    WorkspaceConfiguration,
-};
+use lsp_types::notification::Notification as NotificationTrait;
+use lsp_types::request::{GotoDeclarationParams, GotoDeclarationResponse, WorkspaceConfiguration};
 use lsp_types::*;
-use parking_lot::{Mutex, RwLock};
 use paste::paste;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
@@ -79,148 +77,6 @@ pub use world::{CompileFontOpts, CompileOnceOpts, CompileOpts};
 use crate::actor::render::ExportConfig;
 use crate::init::*;
 use crate::tools::package::InitTask;
-
-// Enforces drop order
-pub struct Handle<H, C> {
-    pub handle: H,
-    pub receiver: C,
-}
-
-pub type ReqHandler = for<'a> fn(&'a mut TypstLanguageServer, lsp_server::Response);
-type ReqQueue = lsp_server::ReqQueue<(String, Instant), ReqHandler>;
-
-/// The host for the language server, or known as the LSP client.
-#[derive(Debug, Clone)]
-pub struct LspHost {
-    sender: Arc<RwLock<Option<crossbeam_channel::Sender<Message>>>>,
-    req_queue: Arc<Mutex<ReqQueue>>,
-}
-
-impl LspHost {
-    /// Creates a new language server host.
-    pub fn new(sender: Arc<RwLock<Option<crossbeam_channel::Sender<Message>>>>) -> Self {
-        Self {
-            sender,
-            req_queue: Arc::new(Mutex::new(ReqQueue::default())),
-        }
-    }
-
-    pub fn send_request<R: lsp_types::request::Request>(
-        &self,
-        params: R::Params,
-        handler: ReqHandler,
-    ) {
-        let mut req_queue = self.req_queue.lock();
-        let sender = self.sender.read();
-        let Some(sender) = sender.as_ref() else {
-            warn!("closed connection, failed to send request");
-            return;
-        };
-        let request = req_queue
-            .outgoing
-            .register(R::METHOD.to_owned(), params, handler);
-        let Err(res) = sender.send(request.into()) else {
-            return;
-        };
-        warn!("failed to send request: {res:?}");
-    }
-
-    pub fn complete_request(
-        &self,
-        service: &mut TypstLanguageServer,
-        response: lsp_server::Response,
-    ) {
-        let mut req_queue = self.req_queue.lock();
-        let Some(handler) = req_queue.outgoing.complete(response.id.clone()) else {
-            warn!("received response for unknown request");
-            return;
-        };
-        drop(req_queue);
-        handler(service, response)
-    }
-
-    pub fn send_notification<N: lsp_types::notification::Notification>(&self, params: N::Params) {
-        let not = lsp_server::Notification::new(N::METHOD.to_owned(), params);
-
-        let sender = self.sender.read();
-        let Some(sender) = sender.as_ref() else {
-            warn!("closed connection, failed to send request");
-            return;
-        };
-        let Err(res) = sender.send(not.into()) else {
-            return;
-        };
-        warn!("failed to send notification: {res:?}");
-    }
-
-    pub fn register_request(&self, request: &lsp_server::Request, request_received: Instant) {
-        let mut req_queue = self.req_queue.lock();
-        info!(
-            "handling {} - ({}) at {:0.2?}",
-            request.method, request.id, request_received
-        );
-        req_queue.incoming.register(
-            request.id.clone(),
-            (request.method.clone(), request_received),
-        );
-    }
-    pub fn respond(&self, response: lsp_server::Response) {
-        let mut req_queue = self.req_queue.lock();
-        if let Some((method, start)) = req_queue.incoming.complete(response.id.clone()) {
-            let sender = self.sender.read();
-            let Some(sender) = sender.as_ref() else {
-                warn!("closed connection, failed to send request");
-                return;
-            };
-
-            // if let Some(err) = &response.error {
-            //     if err.message.starts_with("server panicked") {
-            //         self.poke_rust_analyzer_developer(format!("{}, check the log",
-            // err.message))     }
-            // }
-
-            let duration = start.elapsed();
-            info!(
-                "handled  {} - ({}) in {:0.2?}",
-                method, response.id, duration
-            );
-            let Err(res) = sender.send(response.into()) else {
-                return;
-            };
-            warn!("failed to send response: {res:?}");
-        }
-    }
-
-    fn publish_diagnostics(&self, uri: Url, diagnostics: Vec<Diagnostic>, version: Option<i32>) {
-        self.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-            uri,
-            diagnostics,
-            version,
-        });
-    }
-
-    // todo: handle error
-    fn register_capability(&self, registrations: Vec<Registration>) -> anyhow::Result<()> {
-        self.send_request::<RegisterCapability>(RegistrationParams { registrations }, |_, resp| {
-            if let Some(err) = resp.error {
-                log::error!("failed to register capability: {err:?}");
-            }
-        });
-        Ok(())
-    }
-
-    fn unregister_capability(&self, unregisterations: Vec<Unregistration>) -> anyhow::Result<()> {
-        self.send_request::<UnregisterCapability>(
-            UnregistrationParams { unregisterations },
-            |_, resp| {
-                if let Some(err) = resp.error {
-                    log::error!("failed to unregister capability: {err:?}");
-                }
-            },
-        );
-        Ok(())
-    }
-}
 
 #[derive(Debug)]
 enum Event {
@@ -289,7 +145,7 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 }
 
 pub struct TypstLanguageServerArgs {
-    pub client: LspHost,
+    pub client: LspHost<TypstLanguageServer>,
     pub compile_opts: CompileOnceOpts,
     pub const_config: ConstConfig,
     pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
@@ -299,7 +155,7 @@ pub struct TypstLanguageServerArgs {
 /// The object providing the language server functionality.
 pub struct TypstLanguageServer {
     /// The language server client.
-    pub client: LspHost,
+    pub client: LspHost<TypstLanguageServer>,
 
     // State to synchronize with the client.
     /// Whether the server is shutting down.
@@ -413,8 +269,50 @@ impl TypstLanguageServer {
             notify_fn!(DidChangeConfiguration, Self::did_change_configuration),
         ])
     }
+}
 
-    pub fn main_loop(&mut self, inbox: Receiver<Message>) -> anyhow::Result<()> {
+impl InitializedLspDriver for TypstLanguageServer {
+    /// The [`initialized`] notification is sent from the client to the server
+    /// after the client received the result of the initialize request but
+    /// before the client sends anything else.
+    ///
+    /// [`initialized`]: https://microsoft.github.io/language-server-protocol/specification#initialized
+    ///
+    /// The server can use the `initialized` notification, for example, to
+    /// dynamically register capabilities with the client.
+    fn initialized(&mut self, _: InitializedParams) {
+        if self.const_config().sema_tokens_dynamic_registration
+            && self.config.semantic_tokens == SemanticTokensMode::Enable
+        {
+            let err = self.react_sema_token_changes(true);
+            if let Err(err) = err {
+                error!("could not register semantic tokens for initialization: {err}");
+            }
+        }
+
+        if self.const_config().cfg_change_registration {
+            trace!("setting up to request config change notifications");
+
+            const CONFIG_REGISTRATION_ID: &str = "config";
+            const CONFIG_METHOD_ID: &str = "workspace/didChangeConfiguration";
+
+            let err = self
+                .client
+                .register_capability(vec![Registration {
+                    id: CONFIG_REGISTRATION_ID.to_owned(),
+                    method: CONFIG_METHOD_ID.to_owned(),
+                    register_options: None,
+                }])
+                .err();
+            if let Some(err) = err {
+                error!("could not register to watch config changes: {err}");
+            }
+        }
+
+        info!("server initialized");
+    }
+
+    fn main_loop(&mut self, inbox: crossbeam_channel::Receiver<Message>) -> anyhow::Result<()> {
         // todo: follow what rust analyzer does
         // Windows scheduler implements priority boosts: if thread waits for an
         // event (like a condvar), and event fires, priority of the thread is
@@ -449,7 +347,9 @@ impl TypstLanguageServer {
         warn!("client exited without proper shutdown sequence");
         Ok(())
     }
+}
 
+impl TypstLanguageServer {
     fn next_event(&self, inbox: &Receiver<lsp_server::Message>) -> Option<Event> {
         select! {
             recv(inbox) -> msg =>
@@ -593,46 +493,6 @@ impl TypstLanguageServer {
 ///
 /// [Language Server Protocol]: https://microsoft.github.io/language-server-protocol/
 impl TypstLanguageServer {
-    /// The [`initialized`] notification is sent from the client to the server
-    /// after the client received the result of the initialize request but
-    /// before the client sends anything else.
-    ///
-    /// [`initialized`]: https://microsoft.github.io/language-server-protocol/specification#initialized
-    ///
-    /// The server can use the `initialized` notification, for example, to
-    /// dynamically register capabilities with the client.
-    pub fn initialized(&mut self, _: InitializedParams) {
-        if self.const_config().sema_tokens_dynamic_registration
-            && self.config.semantic_tokens == SemanticTokensMode::Enable
-        {
-            let err = self.react_sema_token_changes(true);
-            if let Err(err) = err {
-                error!("could not register semantic tokens for initialization: {err}");
-            }
-        }
-
-        if self.const_config().cfg_change_registration {
-            trace!("setting up to request config change notifications");
-
-            const CONFIG_REGISTRATION_ID: &str = "config";
-            const CONFIG_METHOD_ID: &str = "workspace/didChangeConfiguration";
-
-            let err = self
-                .client
-                .register_capability(vec![Registration {
-                    id: CONFIG_REGISTRATION_ID.to_owned(),
-                    method: CONFIG_METHOD_ID.to_owned(),
-                    register_options: None,
-                }])
-                .err();
-            if let Some(err) = err {
-                error!("could not register to watch config changes: {err}");
-            }
-        }
-
-        info!("server initialized");
-    }
-
     /// The [`shutdown`] request asks the server to gracefully shut down, but to
     /// not exit.
     ///

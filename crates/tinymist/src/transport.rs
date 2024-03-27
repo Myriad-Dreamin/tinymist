@@ -3,11 +3,67 @@ use std::{
     thread,
 };
 
-use log::{info, trace};
-
 use crossbeam_channel::{bounded, Receiver, Sender};
 
 use crate::Message;
+
+use std::io::Read;
+
+use lsp_server::Connection;
+
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
+pub struct MirrorArgs {
+    /// Mirror the stdin to the file
+    #[cfg_attr(feature = "clap", clap(long, default_value = "", value_name = "FILE"))]
+    pub mirror: String,
+    /// Replay input from the file
+    #[cfg_attr(feature = "clap", clap(long, default_value = "", value_name = "FILE"))]
+    pub replay: String,
+}
+
+/// Note that we must have our logging only write out to stderr.
+pub fn with_stdio_transport(
+    args: MirrorArgs,
+    f: impl FnOnce(Connection, &mut bool) -> anyhow::Result<()>,
+) -> anyhow::Result<()> {
+    // Set up input and output
+    let replay = args.replay.clone();
+    let mirror = args.mirror.clone();
+    let i = move || -> Box<dyn BufRead> {
+        if !replay.is_empty() {
+            // Get input from file
+            let file = std::fs::File::open(&replay).unwrap();
+            let file = std::io::BufReader::new(file);
+            Box::new(file)
+        } else if mirror.is_empty() {
+            // Get input from stdin
+            let stdin = std::io::stdin().lock();
+            Box::new(stdin)
+        } else {
+            let file = std::fs::File::create(&mirror).unwrap();
+            let stdin = std::io::stdin().lock();
+            Box::new(MirrorWriter(stdin, file, std::sync::Once::new()))
+        }
+    };
+    let o = || std::io::stdout().lock();
+
+    // Create the transport. Includes the stdio (stdin and stdout) versions but this
+    // could also be implemented to use sockets or HTTP.
+    let (sender, receiver, io_threads) = io_transport(i, o);
+    let connection = Connection { sender, receiver };
+
+    // Start the LSP server
+    let mut force_exit = false;
+
+    f(connection, &mut force_exit)?;
+
+    if !force_exit {
+        io_threads.join()?;
+    }
+
+    Ok(())
+}
 
 /// Creates an LSP connection via io.
 ///
@@ -33,7 +89,7 @@ pub fn io_transport<I: BufRead, O: Write>(
             .into_iter()
             .try_for_each(|it| it.write(&mut out));
 
-        info!("writer thread finished");
+        log::info!("writer thread finished");
         res
     });
     let (reader_sender, reader_receiver) = bounded::<Message>(0);
@@ -42,7 +98,7 @@ pub fn io_transport<I: BufRead, O: Write>(
         while let Some(msg) = Message::read(&mut inp)? {
             let is_exit = matches!(&msg, Message::Notification(n) if n.method == "exit");
 
-            trace!("sending message {:#?}", msg);
+            log::trace!("sending message {:#?}", msg);
             reader_sender
                 .send(msg)
                 .expect("receiver was dropped, failed to send a message");
@@ -52,7 +108,7 @@ pub fn io_transport<I: BufRead, O: Write>(
             }
         }
 
-        info!("reader thread finished");
+        log::info!("reader thread finished");
         Ok(())
     });
     let threads = IoThreads { reader, writer };
@@ -82,5 +138,39 @@ impl IoThreads {
                 std::panic::panic_any(err);
             }
         }
+    }
+}
+
+struct MirrorWriter<R: Read, W: Write>(R, W, std::sync::Once);
+
+impl<R: Read, W: Write> Read for MirrorWriter<R, W> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let res = self.0.read(buf)?;
+
+        if let Err(err) = self.1.write_all(&buf[..res]) {
+            self.2.call_once(|| {
+                log::warn!("failed to write to mirror: {err}");
+            });
+        }
+
+        Ok(res)
+    }
+}
+
+impl<R: Read + BufRead, W: Write> BufRead for MirrorWriter<R, W> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.0.fill_buf()
+    }
+
+    fn consume(&mut self, amt: usize) {
+        let buf = self.0.fill_buf().unwrap();
+
+        if let Err(err) = self.1.write_all(&buf[..amt]) {
+            self.2.call_once(|| {
+                log::warn!("failed to write to mirror: {err}");
+            });
+        }
+
+        self.0.consume(amt);
     }
 }
