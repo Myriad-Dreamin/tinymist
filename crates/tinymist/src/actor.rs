@@ -1,6 +1,7 @@
 //! Bootstrap actors for Tinymist.
 
 pub mod cluster;
+mod formatting;
 pub mod render;
 pub mod typ_client;
 pub mod typ_server;
@@ -14,6 +15,7 @@ use typst_ts_compiler::{
 use typst_ts_core::config::compiler::EntryState;
 
 use self::{
+    formatting::run_format_thread,
     render::{ExportActor, ExportConfig},
     typ_client::{CompileClientActor, CompileDriver, CompileHandler},
     typ_server::CompileServerActor,
@@ -23,6 +25,8 @@ use crate::{
     world::{ImmutDict, LspWorld, LspWorldBuilder},
     TypstLanguageServer,
 };
+
+pub use formatting::{FormattingConfig, FormattingRequest};
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
 
@@ -112,5 +116,21 @@ impl TypstLanguageServer {
         inputs: ImmutDict,
     ) -> CompileClientActor {
         self.primary.server(diag_group, entry, inputs)
+    }
+
+    pub fn run_format_thread(&mut self) {
+        if self.format_thread.is_some() {
+            log::error!("formatting thread already started");
+            return;
+        }
+
+        let (tx_req, rx_req) = crossbeam_channel::unbounded();
+        self.format_thread = Some(tx_req.clone());
+
+        let client = self.client.clone();
+        let mode = self.config.formatter;
+        std::thread::spawn(move || {
+            run_format_thread(FormattingConfig { mode, width: 120 }, rx_req, client)
+        });
     }
 }

@@ -109,6 +109,7 @@ pub trait StatefulRequest {
 
 #[allow(missing_docs)]
 mod polymorphic {
+    use lsp_types::TextEdit;
     use serde::{Deserialize, Serialize};
 
     use super::prelude::*;
@@ -150,6 +151,12 @@ mod polymorphic {
         pub path: PathBuf,
     }
 
+    #[derive(Debug, Clone)]
+    pub struct FormattingRequest {
+        /// The path of the document to get semantic tokens for.
+        pub path: PathBuf,
+    }
+
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum FoldRequestFeature {
         PinnedFirst,
@@ -176,6 +183,7 @@ mod polymorphic {
         Symbol(SymbolRequest),
         SemanticTokensFull(SemanticTokensFullRequest),
         SemanticTokensDelta(SemanticTokensDeltaRequest),
+        Formatting(FormattingRequest),
         FoldingRange(FoldingRangeRequest),
         SelectionRange(SelectionRangeRequest),
     }
@@ -200,6 +208,7 @@ mod polymorphic {
                 CompilerQueryRequest::Symbol(..) => Mergable,
                 CompilerQueryRequest::SemanticTokensFull(..) => ContextFreeUnique,
                 CompilerQueryRequest::SemanticTokensDelta(..) => ContextFreeUnique,
+                CompilerQueryRequest::Formatting(..) => ContextFreeUnique,
                 CompilerQueryRequest::FoldingRange(..) => ContextFreeUnique,
                 CompilerQueryRequest::SelectionRange(..) => ContextFreeUnique,
             }
@@ -223,6 +232,7 @@ mod polymorphic {
                 CompilerQueryRequest::Symbol(..) => return None,
                 CompilerQueryRequest::SemanticTokensFull(req) => &req.path,
                 CompilerQueryRequest::SemanticTokensDelta(req) => &req.path,
+                CompilerQueryRequest::Formatting(req) => &req.path,
                 CompilerQueryRequest::FoldingRange(req) => &req.path,
                 CompilerQueryRequest::SelectionRange(req) => &req.path,
             })
@@ -247,6 +257,7 @@ mod polymorphic {
         Symbol(Option<Vec<SymbolInformation>>),
         SemanticTokensFull(Option<SemanticTokensResult>),
         SemanticTokensDelta(Option<SemanticTokensFullDeltaResult>),
+        Formatting(Option<Vec<TextEdit>>),
         FoldingRange(Option<Vec<FoldingRange>>),
         SelectionRange(Option<Vec<SelectionRange>>),
     }

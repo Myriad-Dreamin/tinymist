@@ -121,18 +121,18 @@
                     "default": "off",
                     "description": "Traces the communication between VS Code and the language server."
                 },
-                "tinymist.experimentalFormatterMode": {
+                "tinymist.formatterMode": {
                     "title": "Enable Experimental Formatter",
-                    "description": "The extension can format Typst files using typstfmt (experimental).",
+                    "description": "The extension can format Typst files using typstfmt or typstyle.",
                     "type": "string",
                     "default": "disable",
                     "enum": [
                         "disable",
-                        "enable"
+                        "typstyle"
                     ],
                     "enumDescriptions": [
                         "Formatter is not activated.",
-                        "Experimental formatter is activated."
+                        "Use typstyle formatter."
                     ]
                 }
             }

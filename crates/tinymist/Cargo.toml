@@ -40,6 +40,7 @@ typst-svg.workspace = true
 typst-pdf.workspace = true
 typst-render.workspace = true
 typst-timing.workspace = true
+typstyle.workspace = true
 typst-assets = { workspace = true, features = ["fonts"] }
 
 typst-ts-core = { workspace = true, default-features = false, features = [

@@ -1,6 +1,6 @@
 //! Bootstrap actors for Tinymist.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ::typst::{diag::FileResult, syntax::Source};
 use anyhow::anyhow;
@@ -162,16 +162,13 @@ macro_rules! run_query {
 }
 
 macro_rules! query_source {
-    ($self:ident, $method:ident, $req:expr) => {{
-        let path: ImmutPath = $req.path.clone().into();
-        let snapshot = $self.memory_changes.get(&path);
-        let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {:?}", path))?;
-        let source = snapshot.content.clone();
-
-        let enc = $self.const_config.position_encoding;
-        let res = $req.request(&source, enc);
-        Ok(CompilerQueryResponse::$method(res))
-    }};
+    ($self:ident, $method:ident, $req:expr) => {
+        $self.query_source(&$req.path.clone(), |source| {
+            let enc = $self.const_config.position_encoding;
+            let res = $req.request(&source, enc);
+            Ok(CompilerQueryResponse::$method(res))
+        })
+    };
 }
 
 macro_rules! query_tokens_cache {
@@ -201,6 +198,18 @@ macro_rules! query_world {
 }
 
 impl TypstLanguageServer {
+    pub fn query_source<T>(
+        &self,
+        p: &Path,
+        f: impl FnOnce(Source) -> anyhow::Result<T>,
+    ) -> anyhow::Result<T> {
+        let path: ImmutPath = p.into();
+        let snapshot = self.memory_changes.get(&path);
+        let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {:?}", path))?;
+        let source = snapshot.content.clone();
+        f(source)
+    }
+
     pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
         use CompilerQueryRequest::*;
 
@@ -254,6 +263,7 @@ impl TypstLanguageServer {
             FoldingRange(..)
             | SelectionRange(..)
             | SemanticTokensDelta(..)
+            | Formatting(..)
             | DocumentSymbol(..)
             | SemanticTokensFull(..) => unreachable!(),
         }

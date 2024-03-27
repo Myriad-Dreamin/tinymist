@@ -24,15 +24,15 @@ use crate::{
 // LocationLink[] even if the client does not report the
 // textDocument.definition.linkSupport capability.
 
-/// The mode of the experimental formatter.
+/// The mode of the formatter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum ExperimentalFormatterMode {
-    /// Disable the experimental formatter.
+pub enum FormatterMode {
+    /// Disable the formatter.
     #[default]
     Disable,
-    /// Enable the experimental formatter.
-    Enable,
+    /// Use typstyle formatter.
+    Typstyle,
 }
 
 /// The mode of PDF/SVG/PNG export.
@@ -83,7 +83,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "exportPdf",
     "rootPath",
     "semanticTokens",
-    "experimentalFormatterMode",
+    "formatterMode",
     "typstExtraArgs",
 ];
 
@@ -95,7 +95,7 @@ pub struct Config {
     /// Dynamic configuration for semantic tokens.
     pub semantic_tokens: SemanticTokensMode,
     /// Dynamic configuration for the experimental formatter.
-    pub formatter: ExperimentalFormatterMode,
+    pub formatter: FormatterMode,
 }
 
 impl Config {
@@ -153,8 +153,8 @@ impl Config {
         }
 
         let formatter = update
-            .get("experimentalFormatterMode")
-            .map(ExperimentalFormatterMode::deserialize)
+            .get("formatterMode")
+            .map(FormatterMode::deserialize)
             .and_then(Result::ok);
         if let Some(formatter) = formatter {
             self.formatter = formatter;
@@ -354,6 +354,8 @@ impl Init {
         service.primary.config = config.compile.clone();
         service.config = config;
 
+        service.run_format_thread();
+
         let cluster_actor = CompileClusterActor {
             host: self.host.clone(),
             diag_rx,
@@ -383,10 +385,9 @@ impl Init {
             _ => None,
         };
 
+        //  if !cc.doc_fmt_dynamic_registration
         let document_formatting_provider = match service.config.formatter {
-            ExperimentalFormatterMode::Enable if !cc.doc_fmt_dynamic_registration => {
-                Some(OneOf::Left(true))
-            }
+            FormatterMode::Typstyle => Some(OneOf::Left(true)),
             _ => None,
         };
 
@@ -480,7 +481,7 @@ mod tests {
             "exportPdf": "onSave",
             "rootPath": root_path,
             "semanticTokens": "enable",
-            "experimentalFormatterMode": "enable",
+            "formatterMode": "enable",
             "typstExtraArgs": ["--root", root_path]
         });
 
@@ -490,7 +491,7 @@ mod tests {
         assert_eq!(config.compile.export_pdf, ExportMode::OnSave);
         assert_eq!(config.compile.root_path, Some(PathBuf::from(root_path)));
         assert_eq!(config.semantic_tokens, SemanticTokensMode::Enable);
-        assert_eq!(config.formatter, ExperimentalFormatterMode::Enable);
+        assert_eq!(config.formatter, FormatterMode::Typstyle);
         assert_eq!(
             config.compile.typst_extra_args,
             Some(CompileExtraOpts {
