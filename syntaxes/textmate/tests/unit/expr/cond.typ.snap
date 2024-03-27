@@ -48,7 +48,9 @@
 #                  ^ source.typst meta.expr.if.typst
 #                   ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #                    ^ source.typst meta.expr.if.typst meta.brace.curly.typst
-#                     ^^^^^^ source.typst meta.expr.if.typst
+#                     ^ source.typst meta.expr.if.typst
+#                      ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#                          ^ source.typst meta.expr.if.typst
 #                           ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #                             ^ source.typst meta.expr.if.typst
 #                              ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
@@ -69,7 +71,9 @@
 #             ^ source.typst meta.expr.if.typst
 #              ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #               ^ source.typst meta.expr.if.typst meta.brace.curly.typst
-#                ^^^^^^ source.typst meta.expr.if.typst
+#                ^ source.typst meta.expr.if.typst
+#                 ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#                     ^ source.typst meta.expr.if.typst
 #                      ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #                        ^ source.typst meta.expr.if.typst
 #                         ^^^ source.typst meta.expr.if.typst keyword.operator.word.typst
@@ -94,7 +98,9 @@
 #              ^ source.typst meta.expr.if.typst
 #               ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #                ^ source.typst meta.expr.if.typst meta.brace.curly.typst
-#                 ^^^^^^ source.typst meta.expr.if.typst
+#                 ^ source.typst meta.expr.if.typst
+#                  ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#                      ^ source.typst meta.expr.if.typst
 #                       ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #                         ^ source.typst meta.expr.if.typst
 #                          ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
