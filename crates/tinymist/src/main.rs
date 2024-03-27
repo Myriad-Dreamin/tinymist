@@ -13,12 +13,11 @@ use tinymist::{
     compiler_init::{CompileInit, CompileInitializeParams},
     harness::{lsp_harness, InitializedLspDriver, LspDriver, LspHost},
     transport::with_stdio_transport,
-    CompileFontOpts, CompileOpts, Init, TypstLanguageServer,
+    CompileFontOpts, CompileOpts, Init, LspWorld, TypstLanguageServer,
 };
 use tokio::sync::mpsc;
-use typst::foundations::IntoValue;
-use typst_ts_compiler::service::{CompileReport, Compiler, ConsoleDiagReporter};
-use typst_ts_core::GenericExporter;
+use typst::{foundations::IntoValue, syntax::Span};
+use typst_ts_compiler::service::{Compiler, EntryManager};
 use typst_ts_core::TypstDict;
 
 use crate::args::{CliArguments, Commands, LspArgs};
@@ -100,7 +99,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
 }
 
 pub async fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
-    let (diag_tx, _) = mpsc::unbounded_channel();
+    let (diag_tx, _diag_rx) = mpsc::unbounded_channel();
 
     let mut input = PathBuf::from(args.compile.input.unwrap());
 
@@ -145,7 +144,8 @@ pub async fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
         log::info!("compile server did shut down");
     } else {
         {
-            let sender = Arc::new(RwLock::new(None));
+            let (s, _) = crossbeam_channel::unbounded();
+            let sender = Arc::new(RwLock::new(Some(s)));
             let host = LspHost::new(sender.clone());
 
             let _drop_connection = ForceDrop(sender);
@@ -164,51 +164,66 @@ pub async fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
 
             service.initialized(InitializedParams {});
 
-            service
-                .compiler()
-                .change_entry(Some(input.as_path().into()))
-                .unwrap();
-            let doc = service
+            let entry = service.config.determine_entry(Some(input.as_path().into()));
+            let (timings, doc) = service
                 .compiler()
                 .steal_async(|w, _| {
+                    w.compiler.world_mut().mutate_entry(entry).unwrap();
                     w.compiler.world_mut().inputs = inputs;
 
                     let mut env = Default::default();
-                    let t0 = std::time::Instant::now();
-                    match w.compiler.pure_compile(&mut env) {
-                        Ok(doc) => Some(doc),
-                        Err(e) => {
-                            let reporter = ConsoleDiagReporter::default();
+                    typst_timing::enable();
+                    let res = match w.compiler.pure_compile(&mut env) {
+                        Ok(doc) => Ok(doc),
+                        Err(errors) => {
+                            let diagnostics = w.compiler.compiler.run_analysis(|ctx| {
+                                tinymist_query::convert_diagnostics(ctx, errors.iter())
+                            });
 
-                            let res = reporter.export(
-                                w.compiler.world(),
-                                Arc::new((
-                                    env.features.clone(),
-                                    CompileReport::CompileError(
-                                        w.compiler.main_id(),
-                                        e,
-                                        t0.elapsed(),
-                                    ),
-                                )),
-                            );
-                            if let Err(e) = res {
-                                log::error!("failed to report diagnostics: {e:?}");
-                            }
-
-                            None
+                            Err(diagnostics.unwrap_or_default())
                         }
-                    }
+                    };
+
+                    let w = w.compiler.world();
+                    let mut writer = std::io::BufWriter::new(Vec::new());
+                    let _ = typst_timing::export_json(&mut writer, |span| {
+                        resolve_span(w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
+                    });
+
+                    let s = String::from_utf8(writer.into_inner().unwrap()).unwrap();
+
+                    (s, res)
                 })
                 .await
                 .unwrap();
 
-            let Some(doc) = doc else {
-                return Err(anyhow::anyhow!("cannot compile"));
+            let msg = match doc {
+                Ok(_doc) => {
+                    // let p = typst_pdf::pdf(&_doc, typst::foundations::Smart::Auto, None);
+                    // let output: PathBuf = input.with_extension("pdf");
+                    // tokio::fs::write(output, p).await.unwrap();
+
+                    lsp_server::Message::Notification(lsp_server::Notification {
+                        method: "tinymistExt/diagnostics".to_owned(),
+                        params: serde_json::json!([]),
+                    })
+                    .write(&mut std::io::stdout().lock())
+                    .unwrap();
+                    lsp_server::Message::Response(lsp_server::Response {
+                        id: 0.into(),
+                        result: Some(serde_json::json!({
+                            "tracing_data": timings,
+                        })),
+                        error: None,
+                    })
+                }
+                Err(diags) => lsp_server::Message::Notification(lsp_server::Notification {
+                    method: "tinymistExt/diagnostics".to_owned(),
+                    params: serde_json::json!(diags),
+                }),
             };
 
-            let p = typst_pdf::pdf(&doc, typst::foundations::Smart::Auto, None);
-            let output = input.with_extension("pdf");
-            tokio::fs::write(output, p).await.unwrap();
+            msg.write(&mut std::io::stdout().lock()).unwrap();
         }
     }
 
@@ -220,4 +235,14 @@ impl<T> Drop for ForceDrop<T> {
     fn drop(&mut self) {
         self.0.write().take();
     }
+}
+
+/// Turns a span into a (file, line) pair.
+fn resolve_span(world: &LspWorld, span: Span) -> Option<(String, u32)> {
+    use typst::World;
+    let id = span.id()?;
+    let source = world.source(id).ok()?;
+    let range = source.range(span)?;
+    let line = source.byte_to_line(range.start)?;
+    Some((format!("{id:?}"), line as u32 + 1))
 }

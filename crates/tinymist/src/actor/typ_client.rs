@@ -179,7 +179,7 @@ impl CompileDriver {
         }
     }
 
-    fn run_analysis<T>(
+    pub fn run_analysis<T>(
         &mut self,
         f: impl FnOnce(&mut AnalysisContext<'_>) -> T,
     ) -> anyhow::Result<T> {

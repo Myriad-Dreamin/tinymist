@@ -36,7 +36,7 @@ mod tools;
 pub mod transport;
 mod utils;
 mod world;
-pub use world::{CompileFontOpts, CompileOnceOpts, CompileOpts};
+pub use world::{CompileFontOpts, CompileOnceOpts, CompileOpts, LspWorld, LspWorldBuilder};
 mod server;
 pub use server::compiler;
 pub use server::compiler_init;
