@@ -101,7 +101,7 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
     // packageData
 
     html = html.replace(
-        /`editor-tools-args:{"page": [^`]*?`$/,
+        /`editor-tools-args:{"page": [^`]*?`/,
         `\`editor-tools-args:{"page": "${tool}"}\``
     );
 
