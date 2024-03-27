@@ -128,11 +128,13 @@
                     "default": "disable",
                     "enum": [
                         "disable",
-                        "typstyle"
+                        "typstyle",
+                        "typstfmt"
                     ],
                     "enumDescriptions": [
                         "Formatter is not activated.",
-                        "Use typstyle formatter."
+                        "Use typstyle formatter.",
+                        "Use typstfmt formatter."
                     ]
                 }
             }

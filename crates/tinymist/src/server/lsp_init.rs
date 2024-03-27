@@ -31,8 +31,10 @@ pub enum FormatterMode {
     /// Disable the formatter.
     #[default]
     Disable,
-    /// Use typstyle formatter.
+    /// Use `typstyle` formatter.
     Typstyle,
+    /// Use `typstfmt` formatter.
+    Typstfmt,
 }
 
 /// The mode of PDF/SVG/PNG export.
@@ -387,7 +389,11 @@ impl Init {
 
         //  if !cc.doc_fmt_dynamic_registration
         let document_formatting_provider = match service.config.formatter {
-            FormatterMode::Typstyle => Some(OneOf::Left(true)),
+            FormatterMode::Typstyle | FormatterMode::Typstfmt
+                if !cc.doc_fmt_dynamic_registration =>
+            {
+                Some(OneOf::Left(true))
+            }
             _ => None,
         };
 

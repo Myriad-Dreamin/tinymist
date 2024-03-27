@@ -577,14 +577,35 @@ checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 
 [[package]]
 name = "comemo"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf5705468fa80602ee6a5f9318306e6c428bffd53e43209a78bc05e6e667c6f4"
+dependencies = [
+ "comemo-macros 0.3.1",
+ "siphasher 1.0.1",
+]
+
+[[package]]
+name = "comemo"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df6916408a724339aa77b18214233355f3eb04c42eb895e5f8909215bd8a7a91"
 dependencies = [
- "comemo-macros",
+ "comemo-macros 0.4.0",
  "once_cell",
  "parking_lot",
  "siphasher 1.0.1",
+]
+
+[[package]]
+name = "comemo-macros"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54af6ac68ada2d161fa9cc1ab52676228e340866d094d6542107e74b82acc095"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.55",
 ]
 
 [[package]]
@@ -938,6 +959,15 @@ name = "downcast-rs"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
+
+[[package]]
+name = "ecow"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d1990d053cf6edf3f030682dba3b0eb65ef01fabb2686072765d8a17d6728e8"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "ecow"
@@ -1350,6 +1380,17 @@ dependencies = [
  "libgit2-sys",
  "log",
  "url",
+]
+
+[[package]]
+name = "globmatch"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3755076379cc2b2bbf53855fe718e1eed3093cfb769ebf5d290f617fa9cc09a0"
+dependencies = [
+ "globset",
+ "log",
+ "walkdir",
 ]
 
 [[package]]
@@ -1876,6 +1917,15 @@ checksum = "173609498df190136aa7dea1a91db051746d339e18476eed5ca40521f02d7aa5"
 dependencies = [
  "is-docker",
  "once_cell",
+]
+
+[[package]]
+name = "itertools"
+version = "0.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
+dependencies = [
+ "either",
 ]
 
 [[package]]
@@ -2730,9 +2780,9 @@ checksum = "247ea8050cb5c88b41a68b3269f5a2eb7ebff55851a564d96b035643418346e6"
 dependencies = [
  "base64 0.22.0",
  "bitvec",
- "comemo",
+ "comemo 0.4.0",
  "dashmap",
- "ecow",
+ "ecow 0.2.2",
  "fxhash",
  "once_cell",
  "parking_lot",
@@ -3642,7 +3692,7 @@ dependencies = [
  "clap_complete_fig",
  "clap_mangen",
  "codespan-reporting",
- "comemo",
+ "comemo 0.4.0",
  "crossbeam-channel",
  "dhat",
  "env_logger",
@@ -3659,7 +3709,7 @@ dependencies = [
  "tinymist-query",
  "tokio",
  "tokio-util",
- "toml",
+ "toml 0.8.12",
  "typst",
  "typst-assets",
  "typst-pdf",
@@ -3669,6 +3719,7 @@ dependencies = [
  "typst-timing",
  "typst-ts-compiler",
  "typst-ts-core",
+ "typstfmt_lib",
  "typstyle",
  "vergen",
  "walkdir",
@@ -3679,8 +3730,8 @@ name = "tinymist-query"
 version = "0.11.1"
 dependencies = [
  "anyhow",
- "comemo",
- "ecow",
+ "comemo 0.4.0",
+ "ecow 0.2.2",
  "ena",
  "fxhash",
  "hex",
@@ -3699,7 +3750,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "strum 0.26.2",
- "toml",
+ "toml 0.8.12",
  "typst",
  "typst-ide",
  "typst-ts-compiler",
@@ -3811,6 +3862,18 @@ dependencies = [
 
 [[package]]
 name = "toml"
+version = "0.7.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd79e69d3b627db300ff956027cc6c3798cef26d22526befdfcd12feeb6d2257"
+dependencies = [
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "toml_edit 0.19.15",
+]
+
+[[package]]
+name = "toml"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9dd1545e8208b4a5af1aa9bbd0b4cf7e9ea08fabc5d0a5c67fcaafa17433aa3"
@@ -3818,7 +3881,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "toml_edit",
+ "toml_edit 0.22.9",
 ]
 
 [[package]]
@@ -3832,6 +3895,19 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
+version = "0.19.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
+dependencies = [
+ "indexmap 2.2.6",
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "winnow 0.5.40",
+]
+
+[[package]]
+name = "toml_edit"
 version = "0.22.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e40bb779c5187258fd7aad0eb68cb8706a0a81fa712fbea808ab43c4b8374c4"
@@ -3840,7 +3916,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "winnow",
+ "winnow 0.6.5",
 ]
 
 [[package]]
@@ -3943,9 +4019,9 @@ dependencies = [
  "bitflags 2.5.0",
  "chinese-number",
  "ciborium",
- "comemo",
+ "comemo 0.4.0",
  "csv",
- "ecow",
+ "ecow 0.2.2",
  "fontdb",
  "hayagriva",
  "hypher",
@@ -3979,7 +4055,7 @@ dependencies = [
  "stacker",
  "syntect",
  "time",
- "toml",
+ "toml 0.8.12",
  "ttf-parser",
  "two-face",
  "typed-arena",
@@ -4006,8 +4082,8 @@ name = "typst-ide"
 version = "0.11.0"
 source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.0#88608109579929b0c1fbab12d7a2afaea0baaf74"
 dependencies = [
- "comemo",
- "ecow",
+ "comemo 0.4.0",
+ "ecow 0.2.2",
  "if_chain",
  "log",
  "serde",
@@ -4033,8 +4109,8 @@ source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.
 dependencies = [
  "base64 0.22.0",
  "bytemuck",
- "comemo",
- "ecow",
+ "comemo 0.4.0",
+ "ecow 0.2.2",
  "image",
  "miniz_oxide",
  "once_cell",
@@ -4062,7 +4138,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
- "comemo",
+ "comemo 0.4.0",
  "elsa",
  "env_logger",
  "futures",
@@ -4092,7 +4168,7 @@ version = "0.11.0"
 source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.0#88608109579929b0c1fbab12d7a2afaea0baaf74"
 dependencies = [
  "bytemuck",
- "comemo",
+ "comemo 0.4.0",
  "flate2",
  "image",
  "pixglyph",
@@ -4112,8 +4188,8 @@ version = "0.11.0"
 source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.0#88608109579929b0c1fbab12d7a2afaea0baaf74"
 dependencies = [
  "base64 0.22.0",
- "comemo",
- "ecow",
+ "comemo 0.4.0",
+ "ecow 0.2.2",
  "flate2",
  "ttf-parser",
  "typst",
@@ -4125,12 +4201,28 @@ dependencies = [
 
 [[package]]
 name = "typst-syntax"
+version = "0.7.0"
+source = "git+https://github.com/typst/typst.git?tag=v0.7.0#da8367e189b02918a8fe1a98fd3059fd11a82cd9"
+dependencies = [
+ "comemo 0.3.1",
+ "ecow 0.1.2",
+ "once_cell",
+ "serde",
+ "tracing",
+ "unicode-ident",
+ "unicode-math-class",
+ "unicode-segmentation",
+ "unscanny",
+]
+
+[[package]]
+name = "typst-syntax"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "367d86bf18f0363146bea1ea76fad19b54458695fdfad5e74ead3ede574b75fe"
 dependencies = [
- "comemo",
- "ecow",
+ "comemo 0.4.0",
+ "ecow 0.2.2",
  "once_cell",
  "serde",
  "unicode-ident",
@@ -4145,8 +4237,8 @@ name = "typst-syntax"
 version = "0.11.0"
 source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.0#88608109579929b0c1fbab12d7a2afaea0baaf74"
 dependencies = [
- "comemo",
- "ecow",
+ "comemo 0.4.0",
+ "ecow 0.2.2",
  "once_cell",
  "serde",
  "unicode-ident",
@@ -4177,7 +4269,7 @@ dependencies = [
  "base64 0.22.0",
  "chrono",
  "codespan-reporting",
- "comemo",
+ "comemo 0.4.0",
  "dirs",
  "dissimilar",
  "flate2",
@@ -4216,10 +4308,10 @@ dependencies = [
  "base64-serde",
  "bitvec",
  "byteorder",
- "comemo",
+ "comemo 0.4.0",
  "crossbeam-queue",
  "dashmap",
- "ecow",
+ "ecow 0.2.2",
  "elsa",
  "flate2",
  "fxhash",
@@ -4251,7 +4343,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6063f63c8e3ba3d4d7f4cb1a8fd96b096e8e713f24783278fea98dac0746966"
 dependencies = [
  "base64 0.22.0",
- "comemo",
+ "comemo 0.4.0",
  "log",
  "once_cell",
  "rayon",
@@ -4260,6 +4352,21 @@ dependencies = [
  "tiny-skia",
  "typst",
  "typst-ts-core",
+]
+
+[[package]]
+name = "typstfmt_lib"
+version = "0.2.7"
+source = "git+https://github.com/astrale-sharp/typstfmt?tag=0.2.7#46b4ec34b4726c3c6541012f433c68c22d9e509c"
+dependencies = [
+ "globmatch",
+ "itertools 0.10.5",
+ "regex",
+ "serde",
+ "toml 0.7.8",
+ "tracing",
+ "typst-syntax 0.7.0",
+ "unicode-segmentation",
 ]
 
 [[package]]
@@ -4856,6 +4963,15 @@ name = "windows_x86_64_msvc"
 version = "0.52.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32b752e52a2da0ddfbdbcc6fceadfeede4c939ed16d13e648833a61dfb611ed8"
+
+[[package]]
+name = "winnow"
+version = "0.5.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f593a95398737aeed53e489c785df13f3618e41dbcd6718c6addbf1395aa6876"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "winnow"

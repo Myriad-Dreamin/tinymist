@@ -44,6 +44,29 @@ pub fn run_format_thread(
                 });
                 f
             }
+            FormatterMode::Typstfmt => {
+                let config = typstfmt_lib::Config {
+                    max_line_length: 120,
+                    ..typstfmt_lib::Config::default()
+                };
+                let f: FmtFn = Box::new(move |e: Source| {
+                    let res = typstfmt_lib::format(e.text(), config);
+                    Ok(Some(vec![TextEdit {
+                        new_text: res,
+                        range: Range::new(
+                            Position {
+                                line: 0,
+                                character: 0,
+                            },
+                            Position {
+                                line: u32::MAX,
+                                character: u32::MAX,
+                            },
+                        ),
+                    }]))
+                });
+                f
+            }
             FormatterMode::Disable => {
                 let f: FmtFn = Box::new(|_| Ok(None));
                 f

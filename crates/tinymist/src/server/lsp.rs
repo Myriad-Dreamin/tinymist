@@ -188,6 +188,7 @@ pub struct TypstLanguageServer {
     /// Whether the server is shutting down.
     pub shutdown_requested: bool,
     pub sema_tokens_registered: Option<bool>,
+    pub formatter_registered: Option<bool>,
 
     // Configurations
     /// User configuration from the editor.
@@ -237,6 +238,7 @@ impl TypstLanguageServer {
             }),
             shutdown_requested: false,
             sema_tokens_registered: None,
+            formatter_registered: None,
             config: Default::default(),
             const_config: args.const_config,
             compile_opts: args.compile_opts,
@@ -323,6 +325,15 @@ impl InitializedLspDriver for TypstLanguageServer {
             let err = self.react_sema_token_changes(true);
             if let Err(err) = err {
                 error!("could not register semantic tokens for initialization: {err}");
+            }
+        }
+
+        if self.const_config().doc_fmt_dynamic_registration
+            && self.config.formatter != FormatterMode::Disable
+        {
+            let err = self.react_formatter_changes(true);
+            if let Err(err) = err {
+                error!("could not register formatter for initialization: {err}");
             }
         }
 
@@ -499,6 +510,53 @@ impl TypstLanguageServer {
 
         if res.is_ok() {
             self.sema_tokens_registered = Some(enable);
+        }
+
+        res
+    }
+
+    fn react_formatter_changes(&mut self, enable: bool) -> anyhow::Result<()> {
+        if !self.const_config().doc_fmt_dynamic_registration {
+            trace!("skip dynamic register formatter by config");
+            return Ok(());
+        }
+
+        const FORMATTING_REGISTRATION_ID: &str = "formatting";
+        const DOCUMENT_FORMATTING_METHOD_ID: &str = "textDocument/formatting";
+
+        pub fn get_formatting_registration() -> Registration {
+            Registration {
+                id: FORMATTING_REGISTRATION_ID.to_owned(),
+                method: DOCUMENT_FORMATTING_METHOD_ID.to_owned(),
+                register_options: None,
+            }
+        }
+
+        pub fn get_formatting_unregistration() -> Unregistration {
+            Unregistration {
+                id: FORMATTING_REGISTRATION_ID.to_owned(),
+                method: DOCUMENT_FORMATTING_METHOD_ID.to_owned(),
+            }
+        }
+
+        let res = match (enable, self.formatter_registered) {
+            (true, None | Some(false)) => {
+                trace!("registering formatter");
+                self.client
+                    .register_capability(vec![get_formatting_registration()])
+                    .context("could not register formatter")
+            }
+            (false, Some(true)) => {
+                trace!("unregistering formatter");
+                self.client
+                    .unregister_capability(vec![get_formatting_unregistration()])
+                    .context("could not unregister formatter")
+            }
+            (true, Some(true)) | (false, None | Some(false)) => Ok(()),
+        };
+
+        if res.is_ok() {
+            self.formatter_registered = Some(enable);
         }
 
         res
@@ -846,6 +904,10 @@ impl TypstLanguageServer {
         }
 
         if config.formatter != self.config.formatter {
+            let err = self.react_formatter_changes(self.config.formatter != FormatterMode::Disable);
+            if let Err(err) = err {
+                error!("could not change formatter config: {err}");
+            }
             if let Some(f) = &self.format_thread {
                 let err = f.send(FormattingRequest::ChangeConfig(FormattingConfig {
                     mode: self.config.formatter,
