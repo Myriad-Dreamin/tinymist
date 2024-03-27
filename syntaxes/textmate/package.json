@@ -1,6 +1,6 @@
 {
   "name": "typst-textmate",
-  "version": "0.11.1-rc2",
+  "version": "0.11.1",
   "private": true,
   "scripts": {
     "compile": "npx tsc && node ./dist/main.js",
