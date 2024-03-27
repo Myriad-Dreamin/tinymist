@@ -4,10 +4,12 @@
 !out/extension.js
 !out/tinymist
 !out/tinymist.exe
+!out/typst.tmLanguage.json
+!out/typst-code.tmLanguage.json
+!out/editor-tools/**
 !package.json
 !package-lock.json
 !icons/**
-!out/editor-tools/**
 !README.md
 !LICENSE
 !CHANGELOG.md
