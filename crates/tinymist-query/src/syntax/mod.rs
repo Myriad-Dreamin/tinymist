@@ -13,6 +13,8 @@ pub(crate) mod matcher;
 pub use matcher::*;
 pub(crate) mod module;
 pub use module::*;
+pub(crate) mod comment;
+pub use comment::*;
 
 use core::fmt;
 use std::ops::Range;

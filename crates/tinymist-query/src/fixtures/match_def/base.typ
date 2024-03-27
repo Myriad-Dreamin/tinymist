@@ -1,0 +1,1 @@
+#let /* ident after */ f(a) = a;

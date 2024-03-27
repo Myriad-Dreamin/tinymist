@@ -3,7 +3,7 @@ use core::fmt;
 use crate::{
     analyze_signature, find_definition,
     prelude::*,
-    syntax::{get_def_target, get_deref_target, LexicalKind, LexicalVarKind},
+    syntax::{find_document_before, get_deref_target, LexicalKind, LexicalVarKind},
     upstream::{expr_tooltip, tooltip, Tooltip},
     DefinitionLink, LspHoverContents, StatefulRequest,
 };
@@ -186,96 +186,18 @@ impl DocTooltip {
     }
 
     fn get_inner(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<String> {
-        // let doc = find_document_before(ctx, &lnk);
-
         if matches!(lnk.value, Some(Value::Func(..))) {
             if let Some(builtin) = Self::builtin_func_tooltip(lnk) {
                 return Some(builtin.to_owned());
             }
         };
 
-        Self::find_document_before(ctx, lnk)
+        let src = ctx.source_by_id(lnk.fid).ok()?;
+        find_document_before(&src, lnk.def_range.start)
     }
 }
 
 impl DocTooltip {
-    fn find_document_before(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<String> {
-        log::debug!("finding comment at: {:?}, {}", lnk.fid, lnk.def_range.start);
-        let src = ctx.source_by_id(lnk.fid).ok()?;
-        let root = LinkedNode::new(src.root());
-        let leaf = root.leaf_at(lnk.def_range.start + 1)?;
-        let def_target = get_def_target(leaf.clone())?;
-        log::info!("found comment target: {:?}", def_target.node().kind());
-        // collect all comments before the definition
-        let mut comments = vec![];
-        // todo: import
-        let target = def_target.node().clone();
-        let mut node = def_target.node().clone();
-        let mut newline_count = 0;
-        while let Some(prev) = node.prev_sibling() {
-            node = prev;
-            if node.kind() == SyntaxKind::Hash {
-                continue;
-            }
-
-            let start = node.range().end;
-            let end = target.range().start;
-
-            if end <= start {
-                break;
-            }
-
-            let nodes = node.parent()?.children();
-            for n in nodes {
-                let offset = n.offset();
-                if offset > end || offset < start {
-                    continue;
-                }
-
-                log::info!("found comment node: {:?}: {:?}", n.kind(), n.text());
-
-                if n.kind() == SyntaxKind::Hash {
-                    newline_count = 0;
-                    continue;
-                }
-                if n.kind() == SyntaxKind::Space {
-                    if n.text().contains('\n') {
-                        newline_count += 1;
-                    }
-                    if newline_count > 1 {
-                        break;
-                    }
-                    continue;
-                }
-                newline_count = 0;
-                if n.kind() == SyntaxKind::LineComment {
-                    newline_count = 1;
-                    // comments.push(n.text().strip_prefix("//")?.trim().to_owned());
-                    // strip all slash prefix
-                    let text = n.text().trim_start_matches('/');
-                    comments.push(text.trim().to_owned());
-                    continue;
-                }
-                if n.kind() == SyntaxKind::BlockComment {
-                    let text = n.text();
-                    let mut text = text.strip_prefix("/*")?.strip_suffix("*/")?.trim();
-                    // trip start star
-                    if text.starts_with('*') {
-                        text = text.strip_prefix('*')?.trim();
-                    }
-                    comments.push(text.to_owned());
-                }
-            }
-            break;
-        }
-
-        if comments.is_empty() {
-            return None;
-        }
-
-        Some(comments.join("\n"))
-    }
-
     fn builtin_func_tooltip(lnk: &DefinitionLink) -> Option<&'_ str> {
         let Some(Value::Func(func)) = &lnk.value else {
             return None;

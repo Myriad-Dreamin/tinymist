@@ -1,11 +1,7 @@
-use std::{collections::HashMap, path::Path, sync::Once};
-
-use ecow::EcoVec;
-use typst::syntax::{FileId as TypstFileId, VirtualPath};
-
-use crate::prelude::AnalysisContext;
+use std::{collections::HashMap, sync::Once};
 
 use super::find_imports;
+use crate::prelude::*;
 
 /// The dependency information of a module (file).
 pub struct ModuleDependency {
