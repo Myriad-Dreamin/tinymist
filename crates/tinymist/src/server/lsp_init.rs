@@ -487,7 +487,7 @@ mod tests {
             "exportPdf": "onSave",
             "rootPath": root_path,
             "semanticTokens": "enable",
-            "formatterMode": "enable",
+            "formatterMode": "typstyle",
             "typstExtraArgs": ["--root", root_path]
         });
 
