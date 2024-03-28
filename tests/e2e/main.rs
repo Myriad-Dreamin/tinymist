@@ -3,7 +3,7 @@ use std::{
     hash::Hash,
     io,
     path::{Path, PathBuf},
-    process::{Command, ExitStatus},
+    process::Command,
 };
 
 use lsp_server::RequestId;
@@ -29,9 +29,9 @@ fn find_git_root() -> io::Result<PathBuf> {
     std::env::current_dir()
 }
 
-fn exec<'a>(cmd: &str, args: impl IntoIterator<Item = &'a str>) -> ExitStatus {
-    handle_io(Command::new(cmd).args(args).status())
-}
+// fn exec<'a>(cmd: &str, args: impl IntoIterator<Item = &'a str>) -> ExitStatus
+// {     handle_io(Command::new(cmd).args(args).status())
+// }
 
 fn find_char_boundary(s: &str, i: usize) -> usize {
     for j in -4..4 {
@@ -139,7 +139,8 @@ fn e2e() {
     std::env::set_var("RUST_BACKTRACE", "full");
 
     let cwd = find_git_root().unwrap();
-    assert!(exec("cargo", ["build", "--release", "--bin", "tinymist"]).success());
+    // assert!(exec("cargo", ["build", "--release", "--bin",
+    // "tinymist"]).success());
     let root = cwd.join("target/e2e/tinymist");
     gen(&root.join("vscode"), |srv| {
         use lsp_types::notification::*;
