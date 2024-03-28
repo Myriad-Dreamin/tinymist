@@ -11,7 +11,7 @@ rust-version = "1.74"
 
 [workspace]
 resolver = "2"
-members = ["crates/*"]
+members = ["crates/*", "tests"]
 
 [workspace.dependencies]
 
@@ -84,6 +84,9 @@ serde_json = "1"
 divan = "0.1.14"
 insta = { version = "1.36", features = ["glob"] }
 
+tinymist = { path = "./crates/tinymist/" }
+tinymist-query = { path = "./crates/tinymist-query/" }
+
 [profile.dev.package.insta]
 opt-level = 3
 
@@ -127,3 +130,4 @@ typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tin
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
 # typst-ts-core = { path = "../typst.ts/core" }
 # typst-ts-compiler = { path = "../typst.ts/compiler" }
+# typstyle = { path = "../typstyle" }
