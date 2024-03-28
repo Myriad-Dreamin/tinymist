@@ -102,6 +102,12 @@ async function startClient(context: ExtensionContext): Promise<void> {
         commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf"))
     );
     context.subscriptions.push(
+        commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true))
+    );
+    context.subscriptions.push(
+        commands.registerCommand("tinymist.unpinMain", () => commandPinMain(false))
+    );
+    context.subscriptions.push(
         commands.registerCommand("typst-lsp.pinMainToCurrent", () => commandPinMain(true))
     );
     context.subscriptions.push(
