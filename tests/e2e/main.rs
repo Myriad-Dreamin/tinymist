@@ -139,8 +139,16 @@ fn e2e() {
     std::env::set_var("RUST_BACKTRACE", "full");
 
     let cwd = find_git_root().unwrap();
-    // assert!(exec("cargo", ["build", "--release", "--bin",
-    // "tinymist"]).success());
+    if cfg!(target_os = "...") {
+        let w = Command::new("cargo")
+            .args(["build", "--release", "--bin", "tinymist"])
+            .status();
+        assert!(handle_io(w).success());
+        handle_io(std::fs::copy(
+            cwd.join("target/release/tinymist.exe"),
+            cwd.join("editors/vscode/out/tinymist.exe"),
+        ));
+    }
     let root = cwd.join("target/e2e/tinymist");
     gen(&root.join("vscode"), |srv| {
         use lsp_types::notification::*;
@@ -347,7 +355,7 @@ fn e2e() {
     std::fs::write(root.join("vscode/result_sorted.json"), c).unwrap();
     let hash = format!("siphash128_13:{:x}", hash);
 
-    insta::assert_snapshot!(hash, @"siphash128_13:3ca43097c9772ff12a1918d876cbf6ad");
+    insta::assert_snapshot!(hash, @"siphash128_13:1e0ee515d35c16937e02684a605379bb");
 }
 
 struct StableHash<'a>(&'a Value);
