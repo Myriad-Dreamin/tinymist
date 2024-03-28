@@ -3603,7 +3603,6 @@ dependencies = [
  "reflexo",
  "serde",
  "serde_json",
- "tinymist",
 ]
 
 [[package]]
