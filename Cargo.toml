@@ -53,7 +53,7 @@ reflexo = { version = "0.5.0-rc2", default-features = false, features = [
 typst-ts-core = { version = "0.5.0-rc2", default-features = false }
 typst-ts-compiler = { version = "0.5.0-rc2" }
 typst-preview = { version = "0.11.3" }
-typstyle = "0.11.4"
+typstyle = "0.11.5"
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
 
 lsp-server = "0.7.6"

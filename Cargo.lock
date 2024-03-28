@@ -4384,9 +4384,9 @@ dependencies = [
 
 [[package]]
 name = "typstyle"
-version = "0.11.4"
+version = "0.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffc3c575170689efd2c1c3362f051dadd80782f96f5f06ccda2a754b706d5cba"
+checksum = "d6c988471bb18b9f743fed9bd2be724c872c442e58c213025bfe63e96b76cd18"
 dependencies = [
  "anyhow",
  "clap",
