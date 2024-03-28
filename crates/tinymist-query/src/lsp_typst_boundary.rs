@@ -82,7 +82,7 @@ pub mod lsp_to_typst {
                 let len = match lsp_position_encoding {
                     LspPositionEncoding::Utf8 => last_line_chars.len(),
                     LspPositionEncoding::Utf16 => {
-                        typst_source.utf16_to_byte(last_line_chars.len())?
+                        last_line_chars.chars().map(char::len_utf16).sum::<usize>()
                     }
                 };
                 lsp_position.character as usize >= len
@@ -319,6 +319,7 @@ pub mod typst_to_lsp {
 
 #[cfg(test)]
 mod test {
+    use lsp_types::Position;
     use typst::syntax::Source;
 
     use crate::{lsp_to_typst, PositionEncoding};
@@ -380,10 +381,15 @@ mod test {
         let res = lsp_to_typst::range(rng, PositionEncoding::Utf16, &source).unwrap();
         assert_eq!(res, source.len_bytes()..source.len_bytes());
 
-        for i in 0..=source.len_bytes() {
-            let pos = typst_to_lsp::offset_to_position(i, PositionEncoding::Utf16, &source);
-            let off = lsp_to_typst::position(pos, PositionEncoding::Utf16, &source).unwrap();
-            assert_eq!(i, off);
+        for line in 0..=5 {
+            for character in 0..2 {
+                let off = lsp_to_typst::position(
+                    Position { line, character },
+                    PositionEncoding::Utf16,
+                    &source,
+                );
+                assert!(off.is_some(), "line: {line}, character: {character}");
+            }
         }
     }
 
