@@ -74,8 +74,21 @@ pub mod lsp_to_typst {
         lsp_position_encoding: LspPositionEncoding,
         typst_source: &Source,
     ) -> Option<TypstOffset> {
-        if lsp_position.line >= typst_source.len_lines() as u32 {
-            if lsp_position.line > typst_source.len_lines() as u32 || lsp_position.character > 0 {
+        let lines = typst_source.len_lines() as u32;
+        if lsp_position.line >= lines
+            || (lsp_position.line + 1 == lines && {
+                let last_line_offset = typst_source.line_to_byte(lines as usize - 1)?;
+                let last_line_chars = &typst_source.text()[last_line_offset..];
+                let len = match lsp_position_encoding {
+                    LspPositionEncoding::Utf8 => last_line_chars.len(),
+                    LspPositionEncoding::Utf16 => {
+                        last_line_chars.chars().map(char::len_utf16).sum::<usize>()
+                    }
+                };
+                lsp_position.character as usize >= len
+            })
+        {
+            if lsp_position.line > lines || lsp_position.character > 0 {
                 log::warn!(
                     "LSP position is out of bounds: {:?}, while only {:?} lines and {:?} characters at the end.",
                     lsp_position, typst_source.len_lines(), typst_source.line_to_range(typst_source.len_lines() - 1),
@@ -306,6 +319,7 @@ pub mod typst_to_lsp {
 
 #[cfg(test)]
 mod test {
+    use lsp_types::Position;
     use typst::syntax::Source;
 
     use crate::{lsp_to_typst, PositionEncoding};
@@ -330,6 +344,53 @@ mod test {
         };
         let res = lsp_to_typst::range(rng, PositionEncoding::Utf16, &source).unwrap();
         assert_eq!(res, 22..22);
+    }
+
+    #[test]
+    fn issue_14_invalid_range_2() {
+        let source = Source::detached(
+            r"#let f(a) = {
+  a
+}
+",
+        );
+        let rng = LspRange {
+            start: LspPosition {
+                line: 2,
+                character: 1,
+            },
+            // EOF
+            end: LspPosition {
+                line: 3,
+                character: 0,
+            },
+        };
+        let res = lsp_to_typst::range(rng, PositionEncoding::Utf16, &source).unwrap();
+        assert_eq!(res, 19..source.len_bytes());
+        // EOF
+        let rng = LspRange {
+            start: LspPosition {
+                line: 3,
+                character: 1,
+            },
+            end: LspPosition {
+                line: 4,
+                character: 0,
+            },
+        };
+        let res = lsp_to_typst::range(rng, PositionEncoding::Utf16, &source).unwrap();
+        assert_eq!(res, source.len_bytes()..source.len_bytes());
+
+        for line in 0..=5 {
+            for character in 0..2 {
+                let off = lsp_to_typst::position(
+                    Position { line, character },
+                    PositionEncoding::Utf16,
+                    &source,
+                );
+                assert!(off.is_some(), "line: {line}, character: {character}");
+            }
+        }
     }
 
     #[test]

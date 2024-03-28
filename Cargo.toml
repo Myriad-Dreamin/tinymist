@@ -123,7 +123,10 @@ typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tin
 
 # typst = { path = "../typst/crates/typst" }
 # typst-ide = { path = "../typst/crates/typst-ide" }
+# typst-timing = { path = "../typst/crates/typst-timing" }
+# typst-svg = { path = "../typst/crates/typst-svg" }
 # typst-pdf = { path = "../typst/crates/typst-pdf" }
+# typst-render = { path = "../typst/crates/typst-render" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
 # typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
