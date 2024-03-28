@@ -53,15 +53,17 @@ reflexo = { version = "0.5.0-rc2", default-features = false, features = [
 typst-ts-core = { version = "0.5.0-rc2", default-features = false }
 typst-ts-compiler = { version = "0.5.0-rc2" }
 typst-preview = { version = "0.11.3" }
+typstyle = "0.11.4"
+typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
 
 lsp-server = "0.7.6"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
 crossbeam-channel = "0.5.12"
 
-clap = { version = "4.4", features = ["derive", "env", "unicode", "wrap_help"] }
+clap = { version = "4.5", features = ["derive", "env", "unicode", "wrap_help"] }
 clap_builder = { version = "4", features = ["string"] }
-clap_complete = "4.4"
-clap_complete_fig = "4.4"
+clap_complete = "4.5"
+clap_complete_fig = "4.5"
 clap_mangen = { version = "0.2.15" }
 vergen = { version = "8.2.5", features = [
     "build",

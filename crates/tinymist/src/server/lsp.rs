@@ -37,7 +37,7 @@ use crossbeam_channel::select;
 use crossbeam_channel::Receiver;
 use futures::future::BoxFuture;
 use log::{error, info, trace, warn};
-use lsp_server::{ErrorCode, Message, Notification, Request, ResponseError};
+use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, ResponseError};
 use lsp_types::notification::Notification as NotificationTrait;
 use lsp_types::request::{GotoDeclarationParams, GotoDeclarationResponse, WorkspaceConfiguration};
 use lsp_types::*;
@@ -60,6 +60,7 @@ use typst_ts_core::{error::prelude::*, ImmutPath};
 use super::lsp_init::*;
 use crate::actor::render::ExportConfig;
 use crate::actor::typ_client::CompileClientActor;
+use crate::actor::{FormattingConfig, FormattingRequest};
 use crate::compiler::{CompileServer, CompileServerArgs};
 use crate::compiler_init::CompilerConstConfig;
 use crate::harness::{InitializedLspDriver, LspHost};
@@ -83,14 +84,20 @@ impl fmt::Display for Event {
     }
 }
 
-struct Cancelled;
+pub(crate) struct Cancelled;
 
 type LspMethod<Res> = fn(srv: &mut TypstLanguageServer, args: JsonValue) -> LspResult<Res>;
 type LspHandler<Req, Res> = fn(srv: &mut TypstLanguageServer, args: Req) -> LspResult<Res>;
 
+/// Returns Ok(Some()) -> Already responded
+/// Returns Ok(None) -> Need to respond none
+/// Returns Err(..) -> Need t o respond error
+type LspRawHandler =
+    fn(srv: &mut TypstLanguageServer, args: (RequestId, JsonValue)) -> LspResult<Option<()>>;
+
 type ExecuteCmdMap = HashMap<&'static str, LspHandler<Vec<JsonValue>, JsonValue>>;
 type NotifyCmdMap = HashMap<&'static str, LspMethod<()>>;
-type RegularCmdMap = HashMap<&'static str, LspMethod<JsonValue>>;
+type RegularCmdMap = HashMap<&'static str, LspRawHandler>;
 
 macro_rules! exec_fn {
     ($ty: ty, Self::$method: ident, $($arg_key:ident),+ $(,)?) => {{
@@ -99,15 +106,44 @@ macro_rules! exec_fn {
     }};
 }
 
+macro_rules! request_fn_ {
+    ($desc: ty, Self::$method: ident) => {
+        (<$desc>::METHOD, {
+            const E: LspRawHandler = |this, (req_id, req)| {
+                let req: <$desc as lsp_types::request::Request>::Params =
+                    serde_json::from_value(req).unwrap(); // todo: soft unwrap
+                this.$method(req_id, req)
+            };
+            E
+        })
+    };
+}
+
 macro_rules! request_fn {
     ($desc: ty, Self::$method: ident) => {
         (<$desc>::METHOD, {
-            const E: LspMethod<JsonValue> = |this, req| {
+            const E: LspRawHandler = |this, (req_id, req)| {
                 let req: <$desc as lsp_types::request::Request>::Params =
                     serde_json::from_value(req).unwrap(); // todo: soft unwrap
-                let res = this.$method(req)?;
-                let res = serde_json::to_value(res).unwrap(); // todo: soft unwrap
-                Ok(res)
+                let res = this
+                    .$method(req)
+                    .map(|res| serde_json::to_value(res).unwrap()); // todo: soft unwrap
+
+                if let Ok(response) = result_to_response(req_id, res) {
+                    this.client.respond(response);
+                }
+
+                // todo: cancellation
+                // Err(e) => match e.downcast::<Cancelled>() {
+                //     Ok(cancelled) => return Err(cancelled),
+                //     Err(e) => lsp_server::Response::new_err(
+                //         id,
+                //         lsp_server::ErrorCode::InternalError as i32,
+                //         e.to_string(),
+                //     ),
+                // },
+
+                Ok(Some(()))
             };
             E
         })
@@ -152,6 +188,7 @@ pub struct TypstLanguageServer {
     /// Whether the server is shutting down.
     pub shutdown_requested: bool,
     pub sema_tokens_registered: Option<bool>,
+    pub formatter_registered: Option<bool>,
 
     // Configurations
     /// User configuration from the editor.
@@ -175,6 +212,7 @@ pub struct TypstLanguageServer {
     pub primary: CompileServer,
     pub main: Option<CompileClientActor>,
     pub tokens_ctx: SemanticTokenContext,
+    pub format_thread: Option<crossbeam_channel::Sender<FormattingRequest>>,
 }
 
 /// Getters and the main loop.
@@ -200,6 +238,7 @@ impl TypstLanguageServer {
             }),
             shutdown_requested: false,
             sema_tokens_registered: None,
+            formatter_registered: None,
             config: Default::default(),
             const_config: args.const_config,
             compile_opts: args.compile_opts,
@@ -212,6 +251,7 @@ impl TypstLanguageServer {
             pinning: false,
             main: None,
             tokens_ctx,
+            format_thread: None,
         }
     }
 
@@ -238,6 +278,7 @@ impl TypstLanguageServer {
             request_fn!(SemanticTokensFullDeltaRequest, Self::semantic_tokens_full_delta),
             request_fn!(DocumentSymbolRequest, Self::document_symbol),
             // Sync for low latency
+            request_fn_!(Formatting, Self::formatting),
             request_fn!(SelectionRangeRequest, Self::selection_range),
             // latency insensitive
             request_fn!(InlayHintRequest, Self::inlay_hint),
@@ -284,6 +325,15 @@ impl InitializedLspDriver for TypstLanguageServer {
             let err = self.react_sema_token_changes(true);
             if let Err(err) = err {
                 error!("could not register semantic tokens for initialization: {err}");
+            }
+        }
+
+        if self.const_config().doc_fmt_dynamic_registration
+            && self.config.formatter != FormatterMode::Disable
+        {
+            let err = self.react_formatter_changes(true);
+            if let Err(err) = err {
+                error!("could not register formatter for initialization: {err}");
             }
         }
 
@@ -394,30 +444,13 @@ impl TypstLanguageServer {
             return;
         };
 
-        let result = handler(self, req.params);
-
-        if let Ok(response) = result_to_response(req.id, result) {
-            self.client.respond(response);
+        let res = handler(self, (req.id.clone(), req.params));
+        if matches!(res, Ok(Some(()))) {
+            return;
         }
 
-        // todo: cancellation
-        // Err(e) => match e.downcast::<Cancelled>() {
-        //     Ok(cancelled) => return Err(cancelled),
-        //     Err(e) => lsp_server::Response::new_err(
-        //         id,
-        //         lsp_server::ErrorCode::InternalError as i32,
-        //         e.to_string(),
-        //     ),
-        // },
-        fn result_to_response(
-            id: lsp_server::RequestId,
-            result: Result<JsonValue, ResponseError>,
-        ) -> Result<lsp_server::Response, Cancelled> {
-            let res = match result {
-                Ok(resp) => lsp_server::Response::new_ok(id, resp),
-                Err(e) => lsp_server::Response::new_err(id, e.code, e.message),
-            };
-            Ok(res)
+        if let Ok(response) = result_to_response_(req.id, res) {
+            self.client.respond(response);
         }
     }
 
@@ -477,6 +510,53 @@ impl TypstLanguageServer {
 
         if res.is_ok() {
             self.sema_tokens_registered = Some(enable);
+        }
+
+        res
+    }
+
+    fn react_formatter_changes(&mut self, enable: bool) -> anyhow::Result<()> {
+        if !self.const_config().doc_fmt_dynamic_registration {
+            trace!("skip dynamic register formatter by config");
+            return Ok(());
+        }
+
+        const FORMATTING_REGISTRATION_ID: &str = "formatting";
+        const DOCUMENT_FORMATTING_METHOD_ID: &str = "textDocument/formatting";
+
+        pub fn get_formatting_registration() -> Registration {
+            Registration {
+                id: FORMATTING_REGISTRATION_ID.to_owned(),
+                method: DOCUMENT_FORMATTING_METHOD_ID.to_owned(),
+                register_options: None,
+            }
+        }
+
+        pub fn get_formatting_unregistration() -> Unregistration {
+            Unregistration {
+                id: FORMATTING_REGISTRATION_ID.to_owned(),
+                method: DOCUMENT_FORMATTING_METHOD_ID.to_owned(),
+            }
+        }
+
+        let res = match (enable, self.formatter_registered) {
+            (true, None | Some(false)) => {
+                trace!("registering formatter");
+                self.client
+                    .register_capability(vec![get_formatting_registration()])
+                    .context("could not register formatter")
+            }
+            (false, Some(true)) => {
+                trace!("unregistering formatter");
+                self.client
+                    .unregister_capability(vec![get_formatting_unregistration()])
+                    .context("could not unregister formatter")
+            }
+            (true, Some(true)) | (false, None | Some(false)) => Ok(()),
+        };
+
+        if res.is_ok() {
+            self.formatter_registered = Some(enable);
         }
 
         res
@@ -823,6 +903,22 @@ impl TypstLanguageServer {
             }
         }
 
+        if config.formatter != self.config.formatter {
+            let err = self.react_formatter_changes(self.config.formatter != FormatterMode::Disable);
+            if let Err(err) = err {
+                error!("could not change formatter config: {err}");
+            }
+            if let Some(f) = &self.format_thread {
+                let err = f.send(FormattingRequest::ChangeConfig(FormattingConfig {
+                    mode: self.config.formatter,
+                    width: 120,
+                }));
+                if let Err(err) = err {
+                    error!("could not change formatter config: {err}");
+                }
+            }
+        }
+
         // todo: watch changes of the root path
 
         Ok(())
@@ -929,6 +1025,26 @@ impl TypstLanguageServer {
         run_query!(self.SemanticTokensDelta(path, previous_result_id))
     }
 
+    fn formatting(
+        &self,
+        req_id: RequestId,
+        params: DocumentFormattingParams,
+    ) -> LspResult<Option<()>> {
+        if matches!(self.config.formatter, FormatterMode::Disable) {
+            return Ok(None);
+        }
+
+        let path = as_path(params.text_document);
+        self.query_source(&path, |source| {
+            if let Some(f) = &self.format_thread {
+                f.send(FormattingRequest::Formatting((req_id, source.clone())))?;
+            }
+
+            Ok(Some(()))
+        })
+        .map_err(|e| internal_error(format!("could not format document: {e}")))
+    }
+
     fn inlay_hint(&self, params: InlayHintParams) -> LspResult<Option<Vec<InlayHint>>> {
         let path = as_path(params.text_document);
         let range = params.range;
@@ -997,4 +1113,32 @@ pub fn method_not_found() -> ResponseError {
         message: "Method not found".to_string(),
         data: None,
     }
+}
+
+pub(crate) fn result_to_response_<T: Serialize>(
+    id: lsp_server::RequestId,
+    result: Result<T, ResponseError>,
+) -> Result<lsp_server::Response, Cancelled> {
+    let res = match result {
+        Ok(resp) => {
+            let resp = serde_json::to_value(resp);
+            match resp {
+                Ok(resp) => lsp_server::Response::new_ok(id, resp),
+                Err(e) => return result_to_response(id, Err(internal_error(e.to_string()))),
+            }
+        }
+        Err(e) => lsp_server::Response::new_err(id, e.code, e.message),
+    };
+    Ok(res)
+}
+
+fn result_to_response(
+    id: lsp_server::RequestId,
+    result: Result<JsonValue, ResponseError>,
+) -> Result<lsp_server::Response, Cancelled> {
+    let res = match result {
+        Ok(resp) => lsp_server::Response::new_ok(id, resp),
+        Err(e) => lsp_server::Response::new_err(id, e.code, e.message),
+    };
+    Ok(res)
 }
