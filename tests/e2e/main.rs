@@ -320,9 +320,9 @@ fn e2e() {
     });
 
     let tinymist_binary = if cfg!(windows) {
-        cwd.join("target/release/tinymist.exe")
+        cwd.join("editors/vscode/out/tinymist.exe")
     } else {
-        cwd.join("target/release/tinymist")
+        cwd.join("editors/vscode/out/tinymist")
     };
     let tinymist_binary = tinymist_binary.to_str().unwrap();
 

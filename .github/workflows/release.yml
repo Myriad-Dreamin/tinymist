@@ -116,6 +116,12 @@ jobs:
         run: |
           cargo build --release -p tinymist --target ${{ matrix.rust-target }}
         if: startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true'
+      - name: Copy binary to output directory
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        shell: pwsh
+        run: |
+          cp "target/${{ matrix.rust-target }}/release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "editors/vscode/out/"
+          cp "target/${{ matrix.rust-target }}/release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "tinymist-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       - name: Test tinymist
         run: |
           cargo test --release --workspace --target ${{ matrix.rust-target }}
@@ -155,12 +161,6 @@ jobs:
         with:
           name: tinymist-${{ env.target }}.dwarf
           path: target/${{ matrix.rust-target }}/release/tinymist-${{ env.target }}.dwarf
-      - name: Copy binary to output directory
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
-        shell: pwsh
-        run: |
-          cp "target/${{ matrix.rust-target }}/release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "editors/vscode/out/"
-          cp "target/${{ matrix.rust-target }}/release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "tinymist-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       - name: Upload binary artifact
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
