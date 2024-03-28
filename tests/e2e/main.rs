@@ -340,13 +340,13 @@ fn e2e() {
     let c = serde_json::to_string_pretty(&res).unwrap();
     std::fs::write(root.join("vscode/result.json"), c).unwrap();
     // let sorted_res
-    let sorted_res = sort_value(res);
+    let sorted_res = sort_and_redact_value(res);
     let c = serde_json::to_string_pretty(&sorted_res).unwrap();
     let hash = reflexo::hash::hash128(&c);
     std::fs::write(root.join("vscode/result_sorted.json"), c).unwrap();
     let hash = format!("siphash128_13:{:x}", hash);
 
-    insta::assert_snapshot!(hash, @"siphash128_13:4f30b93748c4d8bae8765011cc793425");
+    insta::assert_snapshot!(hash, @"siphash128_13:3ca43097c9772ff12a1918d876cbf6ad");
 }
 
 struct StableHash<'a>(&'a Value);
@@ -389,7 +389,7 @@ impl<'a> Hash for StableHash<'a> {
     }
 }
 
-fn sort_value(v: Value) -> Value {
+fn sort_and_redact_value(v: Value) -> Value {
     match v {
         Value::Null => Value::Null,
         Value::Bool(b) => Value::Bool(b),
@@ -398,14 +398,28 @@ fn sort_value(v: Value) -> Value {
         Value::Array(a) => {
             let mut a = a;
             a.sort_by(json_cmp);
-            Value::Array(a.into_iter().map(sort_value).collect())
+            Value::Array(a.into_iter().map(sort_and_redact_value).collect())
         }
         Value::Object(o) => {
             let mut keys = o.keys().collect::<Vec<_>>();
             keys.sort();
             Value::Object(
                 keys.into_iter()
-                    .map(|k| (k.clone(), sort_value(o[k].clone())))
+                    .map(|k| {
+                        (k.clone(), {
+                            let v = &o[k];
+                            if k == "uri" || k == "targetUri" {
+                                // get uri and set as file name
+                                let uri = v.as_str().unwrap();
+                                let uri = lsp_types::Url::parse(uri).unwrap();
+                                let path = uri.to_file_path().unwrap();
+                                let path = path.file_name().unwrap().to_str().unwrap();
+                                Value::String(path.to_owned())
+                            } else {
+                                sort_and_redact_value(v.clone())
+                            }
+                        })
+                    })
                     .collect(),
             )
         }
