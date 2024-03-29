@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::HashMap, path::Path, time::Instant};
+use std::{collections::HashMap, path::Path, sync::Arc, time::Instant};
 
 use crossbeam_channel::{select, Receiver};
 use log::{error, info, warn};
@@ -18,6 +18,7 @@ use crate::{
     compiler_init::{CompileConfig, CompilerConstConfig},
     harness::InitializedLspDriver,
     internal_error, invalid_params, method_not_found, run_query,
+    state::MemoryFileMeta,
     world::SharedFontResolver,
     LspHost, LspResult,
 };
@@ -101,10 +102,13 @@ pub struct CompileServer {
     // /// The default opts for the compiler.
     // pub compile_opts: CompileOnceOpts,
     pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
-    // pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
+
+    // Resources
     pub font: Deferred<SharedFontResolver>,
     pub compiler: Option<CompileClientActor>,
     pub handle: tokio::runtime::Handle,
+    /// Source synchronized with client
+    pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
 }
 
 impl CompileServer {
@@ -127,6 +131,7 @@ impl CompileServer {
             font,
             compiler: None,
             handle,
+            memory_changes: HashMap::new(),
 
             exec_cmds: Self::get_exec_commands(),
             regular_cmds: Self::get_regular_cmds(),
@@ -350,7 +355,7 @@ impl CompileServer {
             redirected_command!("tinymist.exportSvg", Self::export_svg),
             redirected_command!("tinymist.exportPng", Self::export_png),
             redirected_command!("tinymist.doClearCache", Self::clear_cache),
-            redirected_command!("tinymist.focusMain", Self::focus_document),
+            redirected_command!("tinymist.changeEntry", Self::change_entry),
         ])
     }
 
@@ -407,17 +412,13 @@ impl CompileServer {
     }
 
     /// Focus main file to some path.
-    pub fn focus_document(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn change_entry(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let new_entry = parse_path_or_null(arguments.first())?;
 
-        let update_result = self
-            .compiler
-            .as_ref()
-            .unwrap()
-            .change_entry(new_entry.clone());
+        let update_result = self.do_change_entry(new_entry.clone());
         update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
 
-        info!("file focused: {entry:?}", entry = new_entry);
+        info!("entry changed: {entry:?}", entry = new_entry);
         Ok(JsonValue::Null)
     }
 }
@@ -439,14 +440,7 @@ fn parse_opts(v: Option<&JsonValue>) -> LspResult<ExportOpts> {
 
 fn parse_path(v: Option<&JsonValue>) -> LspResult<ImmutPath> {
     let new_entry = match v {
-        Some(JsonValue::String(s)) => {
-            let s = Path::new(s);
-            if !s.is_absolute() {
-                return Err(invalid_params("entry should be absolute"));
-            }
-
-            s.into()
-        }
+        Some(JsonValue::String(s)) => Path::new(s).into(),
         _ => {
             return Err(invalid_params(
                 "The first parameter is not a valid path or null",

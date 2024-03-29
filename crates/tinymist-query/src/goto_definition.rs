@@ -54,7 +54,7 @@ impl SemanticRequest for GotoDefinitionRequest {
         let def = find_definition(ctx, source.clone(), deref_target)?;
 
         let span_path = ctx.path_for_id(def.fid).ok()?;
-        let uri = Url::from_file_path(span_path).ok()?;
+        let uri = path_to_url(&span_path).ok()?;
 
         let span_source = ctx.source_by_id(def.fid).ok()?;
         let range = ctx.to_lsp_range(def.def_range, &span_source);

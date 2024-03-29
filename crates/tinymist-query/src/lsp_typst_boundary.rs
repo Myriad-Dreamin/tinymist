@@ -3,7 +3,10 @@
 // todo: remove this
 #![allow(missing_docs)]
 
-use lsp_types;
+use std::path::{Path, PathBuf};
+
+use lsp_types::{self, Url};
+use reflexo::path::PathClean;
 
 pub type LspPosition = lsp_types::Position;
 /// The interpretation of an `LspCharacterOffset` depends on the
@@ -63,6 +66,41 @@ pub type LspCompletion = lsp_types::CompletionItem;
 pub type LspCompletionKind = lsp_types::CompletionItemKind;
 pub type TypstCompletion = typst_ide::Completion;
 pub type TypstCompletionKind = typst_ide::CompletionKind;
+
+const UNTITLED_ROOT: &str = "/untitled";
+
+pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
+    if let Ok(untitled) = path.strip_prefix(UNTITLED_ROOT) {
+        return Ok(Url::parse(&format!("untitled:{}", untitled.display()))?);
+    }
+
+    Url::from_file_path(path).map_err(|e| {
+        let _: () = e;
+        anyhow::anyhow!("could not convert path to URI: path: {path:?}",)
+    })
+}
+
+pub fn url_to_path(uri: Url) -> PathBuf {
+    if uri.scheme() == "file" {
+        return uri.to_file_path().unwrap();
+    }
+
+    if uri.scheme() == "untitled" {
+        let mut bytes = UNTITLED_ROOT.as_bytes().to_vec();
+
+        // This is rust-url's path_segments, but vscode's untitle doesn't like it.
+        let path = uri.path();
+        let segs = path.strip_prefix('/').unwrap_or(path).split('/');
+        for segment in segs {
+            bytes.push(b'/');
+            bytes.extend(percent_encoding::percent_decode(segment.as_bytes()));
+        }
+
+        return Path::new(String::from_utf8_lossy(&bytes).as_ref()).clean();
+    }
+
+    uri.to_file_path().unwrap()
+}
 
 pub mod lsp_to_typst {
     use typst::syntax::Source;
@@ -325,6 +363,17 @@ mod test {
     use crate::{lsp_to_typst, PositionEncoding};
 
     use super::*;
+
+    #[test]
+    fn test_untitled() {
+        let path = Path::new("/untitled/test");
+        let uri = path_to_url(path).unwrap();
+        assert_eq!(uri.scheme(), "untitled");
+        assert_eq!(uri.path(), "test");
+
+        let path = url_to_path(uri);
+        assert_eq!(path, Path::new("/untitled/test").clean());
+    }
 
     const ENCODING_TEST_STRING: &str = "test 🥺 test";
 

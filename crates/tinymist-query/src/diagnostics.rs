@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{path_to_url, prelude::*};
 
 /// Stores diagnostics for files.
 pub type DiagnosticsMap = HashMap<Url, Vec<LspDiagnostic>>;
@@ -28,20 +28,11 @@ fn convert_diagnostic(
     let uri;
     let lsp_range;
     if let Some((id, span)) = diagnostic_span_id(typst_diagnostic) {
-        uri = Url::from_file_path(ctx.path_for_id(id)?).map_err(|e| {
-            let _: () = e;
-            anyhow::anyhow!(
-                "could not convert path to URI: id: {id:?}, context: {:?}",
-                ctx.analysis.root
-            )
-        })?;
+        uri = path_to_url(&ctx.path_for_id(id)?)?;
         let source = ctx.world().source(id)?;
         lsp_range = diagnostic_range(&source, span, ctx.position_encoding());
     } else {
-        uri = Url::from_file_path(ctx.analysis.root.clone()).map_err(|e| {
-            let _: () = e;
-            anyhow::anyhow!("could not convert path to URI: {:?}", ctx.analysis.root)
-        })?;
+        uri = path_to_url(&ctx.analysis.root)?;
         lsp_range = LspRange::default();
     };
 
@@ -72,13 +63,7 @@ fn tracepoint_to_relatedinformation(
     position_encoding: PositionEncoding,
 ) -> anyhow::Result<Option<DiagnosticRelatedInformation>> {
     if let Some(id) = tracepoint.span.id() {
-        let uri = Url::from_file_path(project.path_for_id(id)?).map_err(|e| {
-            let _: () = e;
-            anyhow::anyhow!(
-                "could not convert path to URI: id: {id:?}, context: {:?}",
-                project.analysis.root
-            )
-        })?;
+        let uri = path_to_url(&project.path_for_id(id)?)?;
         let source = project.world().source(id)?;
 
         if let Some(typst_range) = source.range(tracepoint.span) {

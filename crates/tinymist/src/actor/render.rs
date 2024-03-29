@@ -294,6 +294,12 @@ impl ExportActor {
 
 #[comemo::memoize]
 fn substitute_path(substitute_pattern: &str, root: &Path, path: &Path) -> Option<ImmutPath> {
+    if let Ok(path) = path.strip_prefix("/untitled") {
+        let tmp = std::env::temp_dir();
+        let path = tmp.join("typst").join(path);
+        return Some(path.as_path().into());
+    }
+
     if substitute_pattern.is_empty() {
         return Some(path.to_path_buf().clean().into());
     }

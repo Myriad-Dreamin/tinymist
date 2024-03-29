@@ -60,7 +60,7 @@ impl SemanticRequest for GotoDeclarationRequest {
             let span_path = ctx.path_for_id(ref_id).ok()?;
             let range = ctx.to_lsp_range(ref_range, ref_source);
 
-            let uri = Url::from_file_path(span_path).ok()?;
+            let uri = path_to_url(&span_path).ok()?;
 
             links.push(LocationLink {
                 origin_selection_range: Some(origin_selection_range),

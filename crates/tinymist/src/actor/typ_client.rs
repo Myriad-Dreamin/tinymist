@@ -293,7 +293,10 @@ impl CompileClientActor {
     }
 
     pub fn change_entry(&self, path: Option<ImmutPath>) -> Result<(), Error> {
-        if path.as_deref().is_some_and(|p| !p.is_absolute()) {
+        if path
+            .as_deref()
+            .is_some_and(|p| !p.is_absolute() && !p.starts_with("/untitled"))
+        {
             return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
         }
 

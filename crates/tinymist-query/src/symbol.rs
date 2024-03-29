@@ -40,7 +40,7 @@ impl SemanticRequest for SymbolRequest {
             let Ok(source) = ctx.source_by_path(path) else {
                 return;
             };
-            let uri = Url::from_file_path(path).unwrap();
+            let uri = path_to_url(path).unwrap();
             let res = get_lexical_hierarchy(source.clone(), LexicalScopeKind::Symbol).and_then(
                 |symbols| {
                     self.pattern.as_ref().map(|pattern| {

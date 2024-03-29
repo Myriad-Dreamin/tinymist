@@ -68,7 +68,10 @@ async function startClient(context: ExtensionContext): Promise<void> {
     };
 
     const clientOptions: LanguageClientOptions = {
-        documentSelector: [{ scheme: "file", language: "typst" }],
+        documentSelector: [
+            { scheme: "file", language: "typst" },
+            { scheme: "untitled", language: "typst" },
+        ],
         initializationOptions: config,
         middleware: {
             workspace: {
@@ -92,10 +95,27 @@ async function startClient(context: ExtensionContext): Promise<void> {
     );
 
     window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
-        if (editor?.document.languageId !== "typst") {
+        if (editor?.document.isUntitled) {
+            return;
+        }
+        const langId = editor?.document.languageId;
+        // todo: plaintext detection
+        // if (langId === "plaintext") {
+        //     console.log("plaintext", langId, editor?.document.uri.fsPath);
+        // }
+        if (langId !== "typst") {
             return commandActivateDoc(undefined);
         }
-        return commandActivateDoc(editor);
+        return commandActivateDoc(editor?.document.uri.fsPath);
+    });
+    vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
+        if (doc.isUntitled && window.activeTextEditor?.document === doc) {
+            if (doc.languageId === "typst") {
+                return commandActivateDoc("/untitled/" + doc.uri.fsPath);
+            } else {
+                return commandActivateDoc(undefined);
+            }
+        }
     });
 
     context.subscriptions.push(
@@ -230,14 +250,30 @@ async function commandShow(kind: string, extraOpts?: any): Promise<void> {
 
     if (exportPath === undefined) {
         // show error message
-        await window.showErrorMessage("Failed to create");
+        await window.showErrorMessage(`Failed to export ${kind}`);
         return;
     }
 
     const exportUri = Uri.file(exportPath);
 
+    // find and replace exportUri
+    // todo: we may find them in tabs
+    vscode.window.tabGroups;
+
+    findTab: for (const editor of vscode.window.tabGroups.all) {
+        for (const tab of editor.tabs) {
+            if ((tab.input as any)?.uri.toString() === exportUri.toString()) {
+                await vscode.window.tabGroups.close(tab, true);
+                break findTab;
+            }
+        }
+    }
+
     // here we can be sure that the pdf exists
-    await commands.executeCommand("vscode.open", exportUri, ViewColumn.Beside);
+    await commands.executeCommand("vscode.open", exportUri, {
+        viewColumn: ViewColumn.Beside,
+        preserveFocus: true,
+    } as vscode.TextDocumentShowOptions);
 }
 
 async function commandClearCache(): Promise<void> {
@@ -410,10 +446,10 @@ async function commandInitTemplate(
     }
 }
 
-async function commandActivateDoc(editor: TextEditor | undefined): Promise<void> {
+async function commandActivateDoc(fsPath: string | undefined): Promise<void> {
     await client?.sendRequest("workspace/executeCommand", {
         command: "tinymist.focusMain",
-        arguments: [editor?.document.uri.fsPath],
+        arguments: [fsPath],
     });
 }
 
