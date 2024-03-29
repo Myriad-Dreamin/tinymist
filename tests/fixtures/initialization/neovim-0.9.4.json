@@ -1,0 +1,174 @@
+{
+  "processId": 3414686,
+  "clientInfo": { "version": "0.9.4", "name": "Neovim" },
+  "initializationOptions": {},
+  "capabilities": {
+    "window": {
+      "showMessage": {
+        "messageActionItem": { "additionalPropertiesSupport": false }
+      },
+      "workDoneProgress": true,
+      "showDocument": { "support": true }
+    },
+    "workspace": {
+      "applyEdit": true,
+      "workspaceFolders": true,
+      "semanticTokens": { "refreshSupport": true },
+      "didChangeWatchedFiles": {
+        "dynamicRegistration": true,
+        "relativePatternSupport": true
+      },
+      "workspaceEdit": {
+        "resourceOperations": ["rename", "create", "delete"]
+      },
+      "symbol": {
+        "dynamicRegistration": false,
+        "symbolKind": {
+          "valueSet": [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+            20, 21, 22, 23, 24, 25, 26
+          ]
+        },
+        "hierarchicalWorkspaceSymbolSupport": true
+      },
+      "configuration": true
+    },
+    "textDocument": {
+      "rename": { "prepareSupport": true, "dynamicRegistration": false },
+      "documentHighlight": { "dynamicRegistration": false },
+      "documentSymbol": {
+        "dynamicRegistration": false,
+        "symbolKind": {
+          "valueSet": [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+            20, 21, 22, 23, 24, 25, 26
+          ]
+        },
+        "hierarchicalDocumentSymbolSupport": true
+      },
+      "foldingRange": {
+        "lineFoldingOnly": true,
+        "dynamicRegistration": false
+      },
+      "semanticTokens": {
+        "formats": ["relative"],
+        "overlappingTokenSupport": true,
+        "requests": { "range": false, "full": { "delta": true } },
+        "serverCancelSupport": false,
+        "augmentsSyntaxTokens": true,
+        "dynamicRegistration": false,
+        "tokenModifiers": [
+          "declaration",
+          "definition",
+          "readonly",
+          "static",
+          "deprecated",
+          "abstract",
+          "async",
+          "modification",
+          "documentation",
+          "defaultLibrary"
+        ],
+        "tokenTypes": [
+          "namespace",
+          "type",
+          "class",
+          "enum",
+          "interface",
+          "struct",
+          "typeParameter",
+          "parameter",
+          "variable",
+          "property",
+          "enumMember",
+          "event",
+          "function",
+          "method",
+          "macro",
+          "keyword",
+          "modifier",
+          "comment",
+          "string",
+          "number",
+          "regexp",
+          "operator",
+          "decorator"
+        ],
+        "multilineTokenSupport": false
+      },
+      "publishDiagnostics": {
+        "relatedInformation": true,
+        "tagSupport": { "valueSet": [1, 2] }
+      },
+      "codeAction": {
+        "dataSupport": true,
+        "dynamicRegistration": false,
+        "codeActionLiteralSupport": {
+          "codeActionKind": {
+            "valueSet": [
+              "",
+              "quickfix",
+              "refactor",
+              "refactor.extract",
+              "refactor.inline",
+              "refactor.rewrite",
+              "source",
+              "source.organizeImports"
+            ]
+          }
+        },
+        "resolveSupport": { "properties": ["edit"] },
+        "isPreferredSupport": true
+      },
+      "callHierarchy": { "dynamicRegistration": false },
+      "completion": {
+        "completionItem": {
+          "resolveSupport": {
+            "properties": ["documentation", "detail", "additionalTextEdits"]
+          },
+          "snippetSupport": true,
+          "commitCharactersSupport": true,
+          "preselectSupport": true,
+          "deprecatedSupport": true,
+          "documentationFormat": ["markdown", "plaintext"],
+          "tagSupport": { "valueSet": [1] },
+          "insertReplaceSupport": true,
+          "labelDetailsSupport": true
+        },
+        "dynamicRegistration": false,
+        "completionItemKind": {
+          "valueSet": [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+            20, 21, 22, 23, 24, 25
+          ]
+        },
+        "contextSupport": false
+      },
+      "declaration": { "linkSupport": true },
+      "definition": { "linkSupport": true },
+      "signatureHelp": {
+        "signatureInformation": {
+          "documentationFormat": ["markdown", "plaintext"],
+          "parameterInformation": { "labelOffsetSupport": true },
+          "activeParameterSupport": true
+        },
+        "dynamicRegistration": false
+      },
+      "synchronization": {
+        "didSave": true,
+        "dynamicRegistration": false,
+        "willSaveWaitUntil": true,
+        "willSave": true
+      },
+      "hover": {
+        "contentFormat": ["markdown", "plaintext"],
+        "dynamicRegistration": false
+      },
+      "typeDefinition": { "linkSupport": true },
+      "references": { "dynamicRegistration": false },
+      "implementation": { "linkSupport": true }
+    }
+  },
+  "trace": "off",
+  "workspaceFolders": []
+}
