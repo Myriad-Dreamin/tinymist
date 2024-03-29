@@ -68,7 +68,7 @@ pub fn run_format_thread(
     log::info!("formatting thread did shut down");
 }
 
-/// Poolman's implementation of the diffing algorithm, borrowed from
+/// A simple implementation of the diffing algorithm, borrowed from
 /// [`Source::replace`].
 fn calc_diff(prev: Source, next: String, encoding: PositionEncoding) -> Option<Vec<TextEdit>> {
     let old = prev.text();
