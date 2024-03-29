@@ -211,7 +211,7 @@ fn e2e() {
                     work_done_progress_params: Default::default(),
                     text_document_position_params: pos.clone(),
                 }));
-                if log_lines == idx + 1 {
+                if log_lines == idx + 1 || log_lines == idx + 5 || log_lines == idx + 10 {
                     srv.request::<Completion>(json!(CompletionParams {
                         text_document_position: pos.clone(),
                         context: None,
@@ -359,7 +359,7 @@ fn e2e() {
     std::fs::write(root.join("vscode/result_sorted.json"), c).unwrap();
     let hash = format!("siphash128_13:{:x}", hash);
 
-    insta::assert_snapshot!(hash, @"siphash128_13:36c632b19a17dc9759a96876eb0bd7cb");
+    insta::assert_snapshot!(hash, @"siphash128_13:db9523369516f3a16997fc1913381d6e");
 }
 
 struct StableHash<'a>(&'a Value);
