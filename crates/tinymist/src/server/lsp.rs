@@ -186,9 +186,13 @@ pub struct TypstLanguageServer {
     // State to synchronize with the client.
     /// Whether the server is shutting down.
     pub shutdown_requested: bool,
+    /// Whether the server has registered semantic tokens capabilities.
     pub sema_tokens_registered: Option<bool>,
+    /// Whether the server has registered document formatter capabilities.
     pub formatter_registered: Option<bool>,
+    /// Whether client is pinning a file.
     pub pinning: bool,
+    /// The client focusing file.
     pub focusing: Option<ImmutPath>,
 
     // Configurations
@@ -208,10 +212,17 @@ pub struct TypstLanguageServer {
     /// Regular commands for dispatching.
     pub regular_cmds: RegularCmdMap,
 
+    // Resources
+    /// Source synchronized with client
     pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
+    /// The semantic token context.
     pub tokens_ctx: SemanticTokenContext,
+    /// The compiler for general purpose.
     pub primary: CompileServer,
+    /// The compilers for tasks
     pub dedicates: Vec<CompileServer>,
+    /// The formatter thread running in backend.
+    /// Note: The thread will exit if you drop the sender.
     pub format_thread: Option<crossbeam_channel::Sender<FormattingRequest>>,
 }
 
@@ -257,13 +268,11 @@ impl TypstLanguageServer {
     }
 
     /// Get the const configuration.
-    ///
-    /// # Panics
-    /// Panics if the const configuration is not initialized.
     pub fn const_config(&self) -> &ConstConfig {
         &self.const_config
     }
 
+    /// Get the primary compiler for those commands without task context.
     pub fn primary(&self) -> &CompileClientActor {
         self.primary.compiler.as_ref().expect("primary")
     }
@@ -323,7 +332,7 @@ impl InitializedLspDriver for TypstLanguageServer {
         if self.const_config().sema_tokens_dynamic_registration
             && self.config.semantic_tokens == SemanticTokensMode::Enable
         {
-            let err = self.react_sema_token_changes(true);
+            let err = self.enable_sema_token_caps(true);
             if let Err(err) = err {
                 error!("could not register semantic tokens for initialization: {err}");
             }
@@ -332,7 +341,7 @@ impl InitializedLspDriver for TypstLanguageServer {
         if self.const_config().doc_fmt_dynamic_registration
             && self.config.formatter != FormatterMode::Disable
         {
-            let err = self.react_formatter_changes(true);
+            let err = self.enable_formatter_caps(true);
             if let Err(err) = err {
                 error!("could not register formatter for initialization: {err}");
             }
@@ -361,6 +370,7 @@ impl InitializedLspDriver for TypstLanguageServer {
         info!("server initialized");
     }
 
+    /// Enters main loop after initialization.
     fn main_loop(&mut self, inbox: crossbeam_channel::Receiver<Message>) -> anyhow::Result<()> {
         // todo: follow what rust analyzer does
         // Windows scheduler implements priority boosts: if thread waits for an
@@ -399,6 +409,7 @@ impl InitializedLspDriver for TypstLanguageServer {
 }
 
 impl TypstLanguageServer {
+    /// Receives the next event from event sources.
     fn next_event(&self, inbox: &Receiver<lsp_server::Message>) -> Option<Event> {
         select! {
             recv(inbox) -> msg =>
@@ -406,6 +417,7 @@ impl TypstLanguageServer {
         }
     }
 
+    /// Handles an incoming event.
     fn handle_event(&mut self, event: Event) -> anyhow::Result<()> {
         let loop_start = Instant::now();
 
@@ -486,7 +498,8 @@ impl TypstLanguageServer {
         Ok(())
     }
 
-    fn react_sema_token_changes(&mut self, enable: bool) -> anyhow::Result<()> {
+    /// Registers or unregisters semantic tokens.
+    fn enable_sema_token_caps(&mut self, enable: bool) -> anyhow::Result<()> {
         if !self.const_config().sema_tokens_dynamic_registration {
             trace!("skip register semantic by config");
             return Ok(());
@@ -516,7 +529,8 @@ impl TypstLanguageServer {
         res
     }
 
-    fn react_formatter_changes(&mut self, enable: bool) -> anyhow::Result<()> {
+    /// Registers or unregisters document formatter.
+    fn enable_formatter_caps(&mut self, enable: bool) -> anyhow::Result<()> {
         if !self.const_config().doc_fmt_dynamic_registration {
             trace!("skip dynamic register formatter by config");
             return Ok(());
@@ -881,16 +895,15 @@ impl TypstLanguageServer {
         info!("new settings applied");
 
         if config.semantic_tokens != self.config.semantic_tokens {
-            let err = self.react_sema_token_changes(
-                self.config.semantic_tokens == SemanticTokensMode::Enable,
-            );
+            let err = self
+                .enable_sema_token_caps(self.config.semantic_tokens == SemanticTokensMode::Enable);
             if let Err(err) = err {
                 error!("could not change semantic tokens config: {err}");
             }
         }
 
         if config.formatter != self.config.formatter {
-            let err = self.react_formatter_changes(self.config.formatter != FormatterMode::Disable);
+            let err = self.enable_formatter_caps(self.config.formatter != FormatterMode::Disable);
             if let Err(err) = err {
                 error!("could not change formatter config: {err}");
             }
