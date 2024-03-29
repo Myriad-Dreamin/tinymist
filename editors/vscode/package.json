@@ -376,6 +376,16 @@
                 "category": "Typst"
             },
             {
+                "command": "tinymist.pinMainToCurrent",
+                "title": "Pin the main file to the currently opened document",
+                "category": "Typst"
+            },
+            {
+                "command": "tinymist.unpinMain",
+                "title": "Unpin the main file",
+                "category": "Typst"
+            },
+            {
                 "command": "tinymist.showPdf",
                 "title": "Show the compiled PDF of the currently opened typst file",
                 "category": "Typst",
