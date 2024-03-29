@@ -233,9 +233,17 @@ impl CompileConfig {
         // todo: don't ignore entry from typst_extra_args
         // entry: command.input,
 
+        // todo: formalize untitled path
+        // let is_untitled = entry.as_ref().is_some_and(|p| p.starts_with("/untitled"));
+        // let root_dir = self.determine_root(if is_untitled { None } else {
+        // entry.as_ref() });
         let root_dir = self.determine_root(entry.as_ref());
 
         let entry = match (entry, root_dir) {
+            // (Some(entry), Some(root)) if is_untitled => Some(EntryState::new_rooted(
+            //     root,
+            //     Some(FileId::new(None, VirtualPath::new(entry))),
+            // )),
             (Some(entry), Some(root)) => match entry.strip_prefix(&root) {
                 Ok(stripped) => Some(EntryState::new_rooted(
                     root,

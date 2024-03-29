@@ -55,6 +55,7 @@ use typst::diag::StrResult;
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use typst::util::Deferred;
 use typst_ts_compiler::service::Compiler;
+use typst_ts_core::path::PathClean;
 use typst_ts_core::{error::prelude::*, ImmutPath};
 
 use super::lsp_init::*;
@@ -63,7 +64,6 @@ use crate::actor::{FormattingConfig, FormattingRequest};
 use crate::compiler::{CompileServer, CompileServerArgs};
 use crate::compiler_init::CompilerConstConfig;
 use crate::harness::{InitializedLspDriver, LspHost};
-use crate::state::MemoryFileMeta;
 use crate::tools::package::InitTask;
 use crate::world::SharedFontResolver;
 use crate::{run_query, CompileOnceOpts, LspResult};
@@ -163,7 +163,11 @@ macro_rules! notify_fn {
 }
 
 fn as_path(inp: TextDocumentIdentifier) -> PathBuf {
-    inp.uri.to_file_path().unwrap()
+    as_path_(inp.uri)
+}
+
+fn as_path_(uri: Url) -> PathBuf {
+    tinymist_query::url_to_path(uri)
 }
 
 fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
@@ -213,8 +217,6 @@ pub struct TypstLanguageServer {
     pub regular_cmds: RegularCmdMap,
 
     // Resources
-    /// Source synchronized with client
-    pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
     /// The semantic token context.
     pub tokens_ctx: SemanticTokenContext,
     /// The compiler for general purpose.
@@ -259,7 +261,6 @@ impl TypstLanguageServer {
             regular_cmds: Self::get_regular_cmds(),
             notify_cmds: Self::get_notify_cmds(),
 
-            memory_changes: HashMap::new(),
             pinning: false,
             focusing: None,
             tokens_ctx,
@@ -818,14 +819,7 @@ fn parse_opts(v: Option<&JsonValue>) -> LspResult<ExportOpts> {
 
 fn parse_path(v: Option<&JsonValue>) -> LspResult<ImmutPath> {
     let new_entry = match v {
-        Some(JsonValue::String(s)) => {
-            let s = Path::new(s);
-            if !s.is_absolute() {
-                return Err(invalid_params("entry should be absolute"));
-            }
-
-            s.into()
-        }
+        Some(JsonValue::String(s)) => Path::new(s).clean().as_path().into(),
         _ => {
             return Err(invalid_params(
                 "The first parameter is not a valid path or null",
@@ -846,7 +840,8 @@ fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
 /// Document Synchronization
 impl TypstLanguageServer {
     fn did_open(&mut self, params: DidOpenTextDocumentParams) -> LspResult<()> {
-        let path = params.text_document.uri.to_file_path().unwrap();
+        log::info!("did open {:?}", params.text_document.uri);
+        let path = as_path_(params.text_document.uri);
         let text = params.text_document.text;
 
         self.create_source(path.clone(), text).unwrap();
@@ -854,7 +849,7 @@ impl TypstLanguageServer {
     }
 
     fn did_close(&mut self, params: DidCloseTextDocumentParams) -> LspResult<()> {
-        let path = params.text_document.uri.to_file_path().unwrap();
+        let path = as_path_(params.text_document.uri);
 
         self.remove_source(path.clone()).unwrap();
         // self.client.publish_diagnostics(uri, Vec::new(), None);
@@ -862,7 +857,7 @@ impl TypstLanguageServer {
     }
 
     fn did_change(&mut self, params: DidChangeTextDocumentParams) -> LspResult<()> {
-        let path = params.text_document.uri.to_file_path().unwrap();
+        let path = as_path_(params.text_document.uri);
         let changes = params.content_changes;
 
         self.edit_source(path.clone(), changes, self.const_config().position_encoding)
@@ -871,8 +866,7 @@ impl TypstLanguageServer {
     }
 
     fn did_save(&self, params: DidSaveTextDocumentParams) -> LspResult<()> {
-        let uri = params.text_document.uri;
-        let path = uri.to_file_path().unwrap();
+        let path = as_path(params.text_document);
 
         let _ = run_query!(self.OnSaveExport(path));
         Ok(())
@@ -1033,8 +1027,8 @@ impl TypstLanguageServer {
             return Ok(None);
         }
 
-        let path = as_path(params.text_document);
-        self.query_source(&path, |source| {
+        let path = as_path(params.text_document).as_path().into();
+        self.query_source(path, |source| {
             if let Some(f) = &self.format_thread {
                 f.send(FormattingRequest::Formatting((req_id, source.clone())))?;
             }
@@ -1140,4 +1134,16 @@ fn result_to_response(
         Err(e) => lsp_server::Response::new_err(id, e.code, e.message),
     };
     Ok(res)
+}
+
+#[test]
+fn test_as_path() {
+    let uri = Url::parse("untitled:/path/to/file").unwrap();
+    assert_eq!(as_path_(uri), Path::new("/untitled/path/to/file").clean());
+
+    let uri = Url::parse("untitled:/path/to/file%20with%20space").unwrap();
+    assert_eq!(
+        as_path_(uri),
+        Path::new("/untitled/path/to/file with space").clean()
+    );
 }

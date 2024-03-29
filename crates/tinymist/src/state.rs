@@ -1,6 +1,6 @@
 //! Bootstrap actors for Tinymist.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use ::typst::{diag::FileResult, syntax::Source};
 use anyhow::anyhow;
@@ -17,22 +17,28 @@ use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
 use crate::{actor::typ_client::CompileClientActor, compiler::CompileServer, TypstLanguageServer};
 
-#[derive(Debug, Clone)]
-pub struct MemoryFileMeta {
-    pub mt: Time,
-    pub content: Source,
+impl CompileServer {
+    /// Focus main file to some path.
+    pub fn do_change_entry(&self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+        self.compiler
+            .as_ref()
+            .unwrap()
+            .change_entry(new_entry.clone())?;
+
+        Ok(())
+    }
 }
 
 impl TypstLanguageServer {
     /// Pin the entry to the given path
     pub fn pin_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
         let pinning = new_entry.is_some();
-        self.primary().change_entry(new_entry)?;
+        self.primary.do_change_entry(new_entry)?;
         self.pinning = pinning;
 
         if !pinning {
             if let Some(e) = &self.focusing {
-                self.primary().change_entry(Some(e.clone()))?;
+                self.primary.do_change_entry(Some(e.clone()))?;
             }
         }
 
@@ -46,8 +52,14 @@ impl TypstLanguageServer {
             return Ok(());
         }
 
-        self.primary().change_entry(new_entry.clone())
+        self.primary.do_change_entry(new_entry.clone())
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct MemoryFileMeta {
+    pub mt: Time,
+    pub content: Source,
 }
 
 impl TypstLanguageServer {
@@ -67,7 +79,7 @@ impl TypstLanguageServer {
         let now = Time::now();
         let path: ImmutPath = path.into();
 
-        self.memory_changes.insert(
+        self.primary.memory_changes.insert(
             path.clone(),
             MemoryFileMeta {
                 mt: now,
@@ -87,7 +99,7 @@ impl TypstLanguageServer {
     pub fn remove_source(&mut self, path: PathBuf) -> Result<(), Error> {
         let path: ImmutPath = path.into();
 
-        self.memory_changes.remove(&path);
+        self.primary.memory_changes.remove(&path);
         log::info!("remove source: {:?}", path);
 
         // todo: is it safe to believe that the path is normalized?
@@ -106,6 +118,7 @@ impl TypstLanguageServer {
         let path: ImmutPath = path.into();
 
         let meta = self
+            .primary
             .memory_changes
             .get_mut(&path)
             .ok_or_else(|| error_once!("file missing", path: path.display()))?;
@@ -155,24 +168,25 @@ macro_rules! run_query {
 }
 
 macro_rules! query_source {
-    ($self:ident, $method:ident, $req:expr) => {
-        $self.query_source(&$req.path.clone(), |source| {
+    ($self:ident, $method:ident, $req:expr) => {{
+        let path: ImmutPath = $req.path.clone().into();
+
+        $self.query_source(path, |source| {
             let enc = $self.const_config.position_encoding;
             let res = $req.request(&source, enc);
             Ok(CompilerQueryResponse::$method(res))
         })
-    };
+    }};
 }
 
 macro_rules! query_tokens_cache {
     ($self:ident, $method:ident, $req:expr) => {{
         let path: ImmutPath = $req.path.clone().into();
-        let snapshot = $self.memory_changes.get(&path);
-        let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {:?}", path))?;
-        let source = snapshot.content.clone();
 
-        let res = $req.request(&$self.tokens_ctx, source);
-        Ok(CompilerQueryResponse::$method(res))
+        $self.query_source(path, |source| {
+            let res = $req.request(&$self.tokens_ctx, source);
+            Ok(CompilerQueryResponse::$method(res))
+        })
     }};
 }
 
@@ -193,11 +207,10 @@ macro_rules! query_world {
 impl TypstLanguageServer {
     pub fn query_source<T>(
         &self,
-        p: &Path,
+        path: ImmutPath,
         f: impl FnOnce(Source) -> anyhow::Result<T>,
     ) -> anyhow::Result<T> {
-        let path: ImmutPath = p.into();
-        let snapshot = self.memory_changes.get(&path);
+        let snapshot = self.primary.memory_changes.get(&path);
         let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {:?}", path))?;
         let source = snapshot.content.clone();
         f(source)
@@ -213,14 +226,14 @@ impl TypstLanguageServer {
             SelectionRange(req) => query_source!(self, SelectionRange, req),
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
             _ => {
-                let client = self.primary();
+                let client = &self.primary;
                 if !self.pinning {
                     // todo: race condition, we need atomic primary query
                     if let Some(path) = query.associated_path() {
-                        client.change_entry(Some(path.into()))?;
+                        client.do_change_entry(Some(path.into()))?;
                     }
                 }
-                Self::query_on(client, query)
+                Self::query_on(client.compiler(), query)
             }
         }
     }

@@ -116,7 +116,7 @@ pub(crate) fn find_references_root(
 ) -> Option<Vec<LspLocation>> {
     let def_source = ctx.source_by_id(def_fid).ok()?;
     let def_path = ctx.path_for_id(def_fid).ok()?;
-    let uri = Url::from_file_path(def_path).ok()?;
+    let uri = path_to_url(&def_path).ok()?;
 
     // todo: reuse uri, range to location
     let mut references = def_use
@@ -140,7 +140,7 @@ pub(crate) fn find_references_root(
             let def_use = ctx.ctx.def_use(ref_source.clone())?;
 
             let uri = ctx.ctx.path_for_id(ref_fid).ok()?;
-            let uri = Url::from_file_path(uri).ok()?;
+            let uri = path_to_url(&uri).ok()?;
 
             let mut redefines = vec![];
             if let Some((id, _def)) = def_use.get_def(def_fid, &def_ident) {
@@ -170,7 +170,7 @@ mod tests {
     use typst_ts_core::path::unix_slash;
 
     use super::*;
-    use crate::tests::*;
+    use crate::{tests::*, url_to_path};
 
     #[test]
     fn test() {
@@ -196,7 +196,7 @@ mod tests {
             let result = result.map(|v| {
                 v.into_iter()
                     .map(|l| {
-                        let fp = unix_slash(&l.uri.to_file_path().unwrap());
+                        let fp = unix_slash(&url_to_path(l.uri));
                         let fp = fp.strip_prefix("C:").unwrap_or(&fp);
                         format!(
                             "{fp}@{}:{}:{}:{}",
