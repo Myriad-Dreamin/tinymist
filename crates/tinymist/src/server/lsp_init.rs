@@ -380,14 +380,15 @@ impl Init {
         tokio::spawn(cluster_actor.run());
 
         // Respond to the host (LSP client)
+
+        // Register these capabilities statically if the client does not support dynamic
+        // registration
         let semantic_tokens_provider = match service.config.semantic_tokens {
             SemanticTokensMode::Enable if !cc.sema_tokens_dynamic_registration => {
                 Some(get_semantic_tokens_options().into())
             }
             _ => None,
         };
-
-        //  if !cc.doc_fmt_dynamic_registration
         let document_formatting_provider = match service.config.formatter {
             FormatterMode::Typstyle | FormatterMode::Typstfmt
                 if !cc.doc_fmt_dynamic_registration =>
@@ -467,7 +468,6 @@ fn create_font_book(opts: CompileFontOpts) -> ZResult<SharedFontResolver> {
     let res = crate::world::LspWorldBuilder::resolve_fonts(opts)?;
     Ok(SharedFontResolver {
         inner: Arc::new(res),
-        // inner: res,
     })
 }
 

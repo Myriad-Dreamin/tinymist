@@ -58,7 +58,6 @@ use typst_ts_compiler::service::Compiler;
 use typst_ts_core::{error::prelude::*, ImmutPath};
 
 use super::lsp_init::*;
-use crate::actor::render::ExportConfig;
 use crate::actor::typ_client::CompileClientActor;
 use crate::actor::{FormattingConfig, FormattingRequest};
 use crate::compiler::{CompileServer, CompileServerArgs};
@@ -187,8 +186,14 @@ pub struct TypstLanguageServer {
     // State to synchronize with the client.
     /// Whether the server is shutting down.
     pub shutdown_requested: bool,
+    /// Whether the server has registered semantic tokens capabilities.
     pub sema_tokens_registered: Option<bool>,
+    /// Whether the server has registered document formatter capabilities.
     pub formatter_registered: Option<bool>,
+    /// Whether client is pinning a file.
+    pub pinning: bool,
+    /// The client focusing file.
+    pub focusing: Option<ImmutPath>,
 
     // Configurations
     /// User configuration from the editor.
@@ -207,11 +212,17 @@ pub struct TypstLanguageServer {
     /// Regular commands for dispatching.
     pub regular_cmds: RegularCmdMap,
 
+    // Resources
+    /// Source synchronized with client
     pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
-    pub pinning: bool,
-    pub primary: CompileServer,
-    pub main: Option<CompileClientActor>,
+    /// The semantic token context.
     pub tokens_ctx: SemanticTokenContext,
+    /// The compiler for general purpose.
+    pub primary: CompileServer,
+    /// The compilers for tasks
+    pub dedicates: Vec<CompileServer>,
+    /// The formatter thread running in backend.
+    /// Note: The thread will exit if you drop the sender.
     pub format_thread: Option<crossbeam_channel::Sender<FormattingRequest>>,
 }
 
@@ -236,6 +247,7 @@ impl TypstLanguageServer {
                 font: args.font,
                 handle: tokio::runtime::Handle::current(),
             }),
+            dedicates: Vec::new(),
             shutdown_requested: false,
             sema_tokens_registered: None,
             formatter_registered: None,
@@ -249,20 +261,18 @@ impl TypstLanguageServer {
 
             memory_changes: HashMap::new(),
             pinning: false,
-            main: None,
+            focusing: None,
             tokens_ctx,
             format_thread: None,
         }
     }
 
     /// Get the const configuration.
-    ///
-    /// # Panics
-    /// Panics if the const configuration is not initialized.
     pub fn const_config(&self) -> &ConstConfig {
         &self.const_config
     }
 
+    /// Get the primary compiler for those commands without task context.
     pub fn primary(&self) -> &CompileClientActor {
         self.primary.compiler.as_ref().expect("primary")
     }
@@ -322,7 +332,7 @@ impl InitializedLspDriver for TypstLanguageServer {
         if self.const_config().sema_tokens_dynamic_registration
             && self.config.semantic_tokens == SemanticTokensMode::Enable
         {
-            let err = self.react_sema_token_changes(true);
+            let err = self.enable_sema_token_caps(true);
             if let Err(err) = err {
                 error!("could not register semantic tokens for initialization: {err}");
             }
@@ -331,7 +341,7 @@ impl InitializedLspDriver for TypstLanguageServer {
         if self.const_config().doc_fmt_dynamic_registration
             && self.config.formatter != FormatterMode::Disable
         {
-            let err = self.react_formatter_changes(true);
+            let err = self.enable_formatter_caps(true);
             if let Err(err) = err {
                 error!("could not register formatter for initialization: {err}");
             }
@@ -360,6 +370,7 @@ impl InitializedLspDriver for TypstLanguageServer {
         info!("server initialized");
     }
 
+    /// Enters main loop after initialization.
     fn main_loop(&mut self, inbox: crossbeam_channel::Receiver<Message>) -> anyhow::Result<()> {
         // todo: follow what rust analyzer does
         // Windows scheduler implements priority boosts: if thread waits for an
@@ -398,6 +409,7 @@ impl InitializedLspDriver for TypstLanguageServer {
 }
 
 impl TypstLanguageServer {
+    /// Receives the next event from event sources.
     fn next_event(&self, inbox: &Receiver<lsp_server::Message>) -> Option<Event> {
         select! {
             recv(inbox) -> msg =>
@@ -405,6 +417,7 @@ impl TypstLanguageServer {
         }
     }
 
+    /// Handles an incoming event.
     fn handle_event(&mut self, event: Event) -> anyhow::Result<()> {
         let loop_start = Instant::now();
 
@@ -485,7 +498,8 @@ impl TypstLanguageServer {
         Ok(())
     }
 
-    fn react_sema_token_changes(&mut self, enable: bool) -> anyhow::Result<()> {
+    /// Registers or unregisters semantic tokens.
+    fn enable_sema_token_caps(&mut self, enable: bool) -> anyhow::Result<()> {
         if !self.const_config().sema_tokens_dynamic_registration {
             trace!("skip register semantic by config");
             return Ok(());
@@ -515,7 +529,8 @@ impl TypstLanguageServer {
         res
     }
 
-    fn react_formatter_changes(&mut self, enable: bool) -> anyhow::Result<()> {
+    /// Registers or unregisters document formatter.
+    fn enable_formatter_caps(&mut self, enable: bool) -> anyhow::Result<()> {
         if !self.const_config().doc_fmt_dynamic_registration {
             trace!("skip dynamic register formatter by config");
             return Ok(());
@@ -670,7 +685,7 @@ impl TypstLanguageServer {
     pub fn pin_document(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let new_entry = parse_path_or_null(arguments.first())?;
 
-        let update_result = self.update_main_entry(new_entry.clone());
+        let update_result = self.pin_entry(new_entry.clone());
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
 
         info!("file pinned: {entry:?}", entry = new_entry);
@@ -678,10 +693,10 @@ impl TypstLanguageServer {
     }
 
     /// Focus main file to some path.
-    pub fn focus_document(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn focus_document(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let new_entry = parse_path_or_null(arguments.first())?;
 
-        let update_result = self.update_primary_entry(new_entry.clone());
+        let update_result = self.focus_entry(new_entry.clone());
         update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
 
         info!("file focused: {entry:?}", entry = new_entry);
@@ -878,33 +893,17 @@ impl TypstLanguageServer {
         self.primary.on_changed_configuration(values)?;
 
         info!("new settings applied");
-        if config.compile.output_path != self.config.compile.output_path
-            || config.compile.export_pdf != self.config.compile.export_pdf
-        {
-            let config = ExportConfig {
-                substitute_pattern: self.config.compile.output_path.clone(),
-                mode: self.config.compile.export_pdf,
-                ..ExportConfig::default()
-            };
-
-            {
-                if let Some(main) = self.main.as_ref() {
-                    main.change_export_pdf(config);
-                }
-            }
-        }
 
         if config.semantic_tokens != self.config.semantic_tokens {
-            let err = self.react_sema_token_changes(
-                self.config.semantic_tokens == SemanticTokensMode::Enable,
-            );
+            let err = self
+                .enable_sema_token_caps(self.config.semantic_tokens == SemanticTokensMode::Enable);
             if let Err(err) = err {
                 error!("could not change semantic tokens config: {err}");
             }
         }
 
         if config.formatter != self.config.formatter {
-            let err = self.react_formatter_changes(self.config.formatter != FormatterMode::Disable);
+            let err = self.enable_formatter_caps(self.config.formatter != FormatterMode::Disable);
             if let Err(err) = err {
                 error!("could not change formatter config: {err}");
             }
