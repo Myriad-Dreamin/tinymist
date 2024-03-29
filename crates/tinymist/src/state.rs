@@ -37,8 +37,10 @@ impl TypstLanguageServer {
         self.pinning = pinning;
 
         if !pinning {
-            if let Some(e) = &self.focusing {
-                self.primary.do_change_entry(Some(e.clone()))?;
+            let fallback = self.config.compile.determine_default_entry_path();
+            let fallback = fallback.or_else(|| self.focusing.clone());
+            if let Some(e) = fallback {
+                self.primary.do_change_entry(Some(e))?;
             }
         }
 
@@ -47,7 +49,7 @@ impl TypstLanguageServer {
 
     /// Updates the primary (focusing) entry
     pub fn focus_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
-        if self.pinning {
+        if self.pinning || self.config.compile.has_default_entry_path {
             self.focusing = new_entry;
             return Ok(());
         }
@@ -227,7 +229,7 @@ impl TypstLanguageServer {
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
             _ => {
                 let client = &self.primary;
-                if !self.pinning {
+                if !self.pinning && !self.config.compile.has_default_entry_path {
                     // todo: race condition, we need atomic primary query
                     if let Some(path) = query.associated_path() {
                         client.do_change_entry(Some(path.into()))?;

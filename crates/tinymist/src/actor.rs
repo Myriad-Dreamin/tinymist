@@ -74,7 +74,7 @@ impl CompileServer {
             let entry = entry.clone();
             let font_resolver = self.font.clone();
             move || {
-                log::info!("TypstActor: creating server for {diag_group}");
+                log::info!("TypstActor: creating server for {diag_group}, entry: {entry:?}, inputs: {inputs:?}");
 
                 // Create the world
                 let font_resolver = font_resolver.wait().clone();

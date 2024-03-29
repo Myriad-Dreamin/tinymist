@@ -11,11 +11,12 @@ use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
 use typst::util::Deferred;
 use typst_ts_core::error::prelude::*;
+use typst_ts_core::ImmutPath;
 
 use crate::actor::cluster::CompileClusterActor;
 use crate::compiler_init::CompileConfig;
 use crate::harness::LspHost;
-use crate::world::{CompileOpts, ImmutDict, SharedFontResolver};
+use crate::world::{ImmutDict, SharedFontResolver};
 use crate::{
     invalid_params, CompileFontOpts, LspResult, TypstLanguageServer, TypstLanguageServerArgs,
 };
@@ -71,7 +72,7 @@ pub struct CompileExtraOpts {
     pub root_dir: Option<PathBuf>,
 
     /// Path to entry
-    pub entry: Option<PathBuf>,
+    pub entry: Option<ImmutPath>,
 
     /// Additional input arguments to compile the entry file.
     pub inputs: ImmutDict,
@@ -163,7 +164,6 @@ impl Config {
         }
 
         self.compile.update_by_map(update)?;
-
         self.validate()?;
         Ok(())
     }
@@ -258,7 +258,7 @@ impl From<&InitializeParams> for ConstConfig {
 
 pub struct Init {
     pub host: LspHost<TypstLanguageServer>,
-    pub compile_opts: CompileOpts,
+    pub compile_opts: CompileFontOpts,
 }
 
 impl Init {
@@ -322,7 +322,7 @@ impl Init {
         // prepare fonts
         // todo: on font resolving failure, downgrade to a fake font book
         let font = {
-            let mut opts = std::mem::take(&mut self.compile_opts.font);
+            let mut opts = std::mem::take(&mut self.compile_opts);
             if opts.font_paths.is_empty() {
                 if let Some(font_paths) = config
                     .compile
@@ -342,7 +342,6 @@ impl Init {
 
         let mut service = TypstLanguageServer::new(TypstLanguageServerArgs {
             client: self.host.clone(),
-            compile_opts: self.compile_opts.once,
             const_config: cc.clone(),
             diag_tx,
             font,
@@ -366,9 +365,10 @@ impl Init {
             published_primary: false,
         };
 
+        let fallback = service.config.compile.determine_default_entry_path();
         let primary = service.server(
             "primary".to_owned(),
-            service.config.compile.determine_entry(None),
+            service.config.compile.determine_entry(fallback),
             service.config.compile.determine_inputs(),
         );
         if service.primary.compiler.is_some() {

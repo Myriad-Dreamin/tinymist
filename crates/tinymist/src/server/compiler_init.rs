@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::bail;
@@ -95,6 +95,7 @@ pub struct CompileConfig {
     pub root_path: Option<PathBuf>,
     /// Typst extra arguments.
     pub typst_extra_args: Option<CompileExtraOpts>,
+    pub has_default_entry_path: bool,
 }
 
 impl CompileConfig {
@@ -175,7 +176,7 @@ impl CompileConfig {
 
                 // todo: the command.root may be not absolute
                 self.typst_extra_args = Some(CompileExtraOpts {
-                    entry: command.input.map(PathBuf::from),
+                    entry: command.input.map(|e| Path::new(&e).into()),
                     root_dir: command.root,
                     inputs: Arc::new(Prehashed::new(inputs)),
                     font_paths: command.font.font_paths,
@@ -183,7 +184,9 @@ impl CompileConfig {
             }
         }
 
+        self.has_default_entry_path = self.determine_default_entry_path().is_some();
         self.validate()?;
+
         Ok(())
     }
 
@@ -227,6 +230,18 @@ impl CompileConfig {
         }
 
         None
+    }
+
+    pub fn determine_default_entry_path(&self) -> Option<ImmutPath> {
+        self.typst_extra_args.as_ref().and_then(|e| {
+            if let Some(e) = &e.entry {
+                if e.is_relative() {
+                    let root = self.determine_root(None)?;
+                    return Some(root.join(e).as_path().into());
+                }
+            }
+            e.entry.clone()
+        })
     }
 
     pub fn determine_entry(&self, entry: Option<ImmutPath>) -> EntryState {

@@ -66,7 +66,7 @@ use crate::compiler_init::CompilerConstConfig;
 use crate::harness::{InitializedLspDriver, LspHost};
 use crate::tools::package::InitTask;
 use crate::world::SharedFontResolver;
-use crate::{run_query, CompileOnceOpts, LspResult};
+use crate::{run_query, LspResult};
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
 
@@ -176,7 +176,6 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 
 pub struct TypstLanguageServerArgs {
     pub client: LspHost<TypstLanguageServer>,
-    pub compile_opts: CompileOnceOpts,
     pub const_config: ConstConfig,
     pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
     pub font: Deferred<SharedFontResolver>,
@@ -205,8 +204,6 @@ pub struct TypstLanguageServer {
     /// Const configuration initialized at the start of the session.
     /// For example, the position encoding.
     pub const_config: ConstConfig,
-    /// The default opts for the compiler.
-    pub compile_opts: CompileOnceOpts,
 
     // Command maps
     /// Extra commands provided with `textDocument/executeCommand`.
@@ -255,7 +252,6 @@ impl TypstLanguageServer {
             formatter_registered: None,
             config: Default::default(),
             const_config: args.const_config,
-            compile_opts: args.compile_opts,
 
             exec_cmds: Self::get_exec_commands(),
             regular_cmds: Self::get_regular_cmds(),
