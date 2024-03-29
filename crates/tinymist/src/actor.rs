@@ -129,8 +129,9 @@ impl TypstLanguageServer {
 
         let client = self.client.clone();
         let mode = self.config.formatter;
+        let enc = self.const_config.position_encoding;
         std::thread::spawn(move || {
-            run_format_thread(FormattingConfig { mode, width: 120 }, rx_req, client)
+            run_format_thread(FormattingConfig { mode, width: 120 }, rx_req, client, enc)
         });
     }
 }
