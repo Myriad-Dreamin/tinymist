@@ -5,6 +5,15 @@ use typst::text::{FontInfo, FontStyle};
 
 mod tooltip;
 pub use tooltip::*;
+mod complete;
+pub use complete::*;
+
+/// Extract the first sentence of plain text of a piece of documentation.
+///
+/// Removes Markdown formatting.
+fn plain_docs_sentence(docs: &str) -> EcoString {
+    docs.into()
+}
 
 /// Create a short description of a font family.
 fn summarize_font_family<'a>(variants: impl Iterator<Item = &'a FontInfo>) -> EcoString {

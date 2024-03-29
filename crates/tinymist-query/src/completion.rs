@@ -1,4 +1,4 @@
-use crate::{prelude::*, StatefulRequest};
+use crate::{prelude::*, upstream::autocomplete, StatefulRequest};
 
 /// The [`textDocument/completion`] request is sent from the client to the
 /// server to compute completion items at a given cursor position.
@@ -57,8 +57,7 @@ impl StatefulRequest for CompletionRequest {
         // assume that the completion is not explicit.
         let explicit = false;
 
-        let (offset, completions) =
-            typst_ide::autocomplete(ctx.world(), doc, &source, cursor, explicit)?;
+        let (offset, completions) = autocomplete(ctx.world(), doc, &source, cursor, explicit)?;
 
         let lsp_start_position = ctx.to_lsp_pos(offset, &source);
         let replace_range = LspRange::new(lsp_start_position, self.position);

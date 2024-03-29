@@ -64,8 +64,8 @@ impl From<PositionEncoding> for lsp_types::PositionEncodingKind {
 
 pub type LspCompletion = lsp_types::CompletionItem;
 pub type LspCompletionKind = lsp_types::CompletionItemKind;
-pub type TypstCompletion = typst_ide::Completion;
-pub type TypstCompletionKind = typst_ide::CompletionKind;
+pub type TypstCompletion = crate::upstream::Completion;
+pub type TypstCompletionKind = crate::upstream::CompletionKind;
 
 const UNTITLED_ROOT: &str = "/untitled";
 
@@ -257,7 +257,7 @@ pub mod typst_to_lsp {
             TypstCompletionKind::Syntax => LspCompletionKind::SNIPPET,
             TypstCompletionKind::Func => LspCompletionKind::FUNCTION,
             TypstCompletionKind::Param => LspCompletionKind::VARIABLE,
-            TypstCompletionKind::Constant => LspCompletionKind::CONSTANT,
+            TypstCompletionKind::Constant => LspCompletionKind::FIELD,
             TypstCompletionKind::Symbol(_) => LspCompletionKind::TEXT,
             TypstCompletionKind::Type => LspCompletionKind::CLASS,
         }

@@ -3765,9 +3765,9 @@ dependencies = [
  "strum 0.26.2",
  "toml 0.8.12",
  "typst",
- "typst-ide",
  "typst-ts-compiler",
  "typst-ts-core",
+ "unscanny",
  "walkdir",
 ]
 
@@ -4089,20 +4089,6 @@ name = "typst-assets"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f13f85360328da54847dd7fefaf272dfa5b6d1fdeb53f32938924c39bf5b2c6c"
-
-[[package]]
-name = "typst-ide"
-version = "0.11.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.0#88608109579929b0c1fbab12d7a2afaea0baaf74"
-dependencies = [
- "comemo 0.4.0",
- "ecow 0.2.2",
- "if_chain",
- "log",
- "serde",
- "typst",
- "unscanny",
-]
 
 [[package]]
 name = "typst-macros"

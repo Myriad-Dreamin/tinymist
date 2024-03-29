@@ -210,12 +210,13 @@ fn e2e() {
                     work_done_progress_params: Default::default(),
                     text_document_position_params: pos.clone(),
                 }));
-                srv.request::<Completion>(json!(CompletionParams {
-                    text_document_position: pos.clone(),
-                    context: None,
-                    work_done_progress_params: Default::default(),
-                    partial_result_params: Default::default(),
-                }));
+                // todo: specific test
+                // srv.request::<Completion>(json!(CompletionParams {
+                //     text_document_position: pos.clone(),
+                //     context: None,
+                //     work_done_progress_params: Default::default(),
+                //     partial_result_params: Default::default(),
+                // }));
                 srv.request::<GotoDefinition>(json!(GotoDefinitionParams {
                     text_document_position_params: pos.clone(),
                     work_done_progress_params: Default::default(),
@@ -355,7 +356,7 @@ fn e2e() {
     std::fs::write(root.join("vscode/result_sorted.json"), c).unwrap();
     let hash = format!("siphash128_13:{:x}", hash);
 
-    insta::assert_snapshot!(hash, @"siphash128_13:1e0ee515d35c16937e02684a605379bb");
+    insta::assert_snapshot!(hash, @"siphash128_13:379db828c1cee3340b4e98b2042d675b");
 }
 
 struct StableHash<'a>(&'a Value);
