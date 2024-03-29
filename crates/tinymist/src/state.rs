@@ -24,44 +24,37 @@ pub struct MemoryFileMeta {
 }
 
 impl TypstLanguageServer {
-    /// Updates the main entry
-    pub fn update_main_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
-        self.pinning = new_entry.is_some();
-        match (new_entry, self.main.is_some()) {
-            (Some(new_entry), true) => {
-                let main = self.main.as_mut().unwrap();
-                main.change_entry(Some(new_entry))?;
-            }
-            (Some(new_entry), false) => {
-                let main_node = self.server(
-                    "main".to_owned(),
-                    self.config.compile.determine_entry(Some(new_entry)),
-                    self.config.compile.determine_inputs(),
-                );
+    /// Pin the entry to the given path
+    pub fn pin_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+        let pinning = new_entry.is_some();
+        self.primary().change_entry(new_entry)?;
+        self.pinning = pinning;
 
-                self.main = Some(main_node);
+        if !pinning {
+            if let Some(e) = &self.focusing {
+                self.primary().change_entry(Some(e.clone()))?;
             }
-            (None, true) => {
-                let main = self.main.take().unwrap();
-                std::thread::spawn(move || main.settle());
-            }
-            (None, false) => {}
-        };
+        }
 
         Ok(())
     }
 
     /// Updates the primary (focusing) entry
-    pub fn update_primary_entry(&self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+    pub fn focus_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+        if self.pinning {
+            self.focusing = new_entry;
+            return Ok(());
+        }
+
         self.primary().change_entry(new_entry.clone())
     }
 }
 
 impl TypstLanguageServer {
     fn update_source(&self, files: FileChangeSet) -> Result<(), Error> {
-        let main = self.main.as_ref();
         let primary = Some(self.primary());
-        let clients_to_notify = (primary.into_iter()).chain(main);
+        let clients_to_notify =
+            (primary.into_iter()).chain(self.dedicates.iter().map(CompileServer::compiler));
 
         for client in clients_to_notify {
             client.add_memory_changes(MemoryEvent::Update(files.clone()));
@@ -220,16 +213,14 @@ impl TypstLanguageServer {
             SelectionRange(req) => query_source!(self, SelectionRange, req),
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
             _ => {
-                match self.main.as_ref() {
-                    Some(main) if self.pinning => Self::query_on(main, query),
-                    Some(..) | None => {
-                        // todo: race condition, we need atomic primary query
-                        if let Some(path) = query.associated_path() {
-                            self.primary().change_entry(Some(path.into()))?;
-                        }
-                        Self::query_on(self.primary(), query)
+                let client = self.primary();
+                if !self.pinning {
+                    // todo: race condition, we need atomic primary query
+                    if let Some(path) = query.associated_path() {
+                        client.change_entry(Some(path.into()))?;
                     }
                 }
+                Self::query_on(client, query)
             }
         }
     }

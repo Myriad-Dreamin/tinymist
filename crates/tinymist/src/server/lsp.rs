@@ -58,7 +58,6 @@ use typst_ts_compiler::service::Compiler;
 use typst_ts_core::{error::prelude::*, ImmutPath};
 
 use super::lsp_init::*;
-use crate::actor::render::ExportConfig;
 use crate::actor::typ_client::CompileClientActor;
 use crate::actor::{FormattingConfig, FormattingRequest};
 use crate::compiler::{CompileServer, CompileServerArgs};
@@ -189,6 +188,8 @@ pub struct TypstLanguageServer {
     pub shutdown_requested: bool,
     pub sema_tokens_registered: Option<bool>,
     pub formatter_registered: Option<bool>,
+    pub pinning: bool,
+    pub focusing: Option<ImmutPath>,
 
     // Configurations
     /// User configuration from the editor.
@@ -208,10 +209,9 @@ pub struct TypstLanguageServer {
     pub regular_cmds: RegularCmdMap,
 
     pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
-    pub pinning: bool,
-    pub primary: CompileServer,
-    pub main: Option<CompileClientActor>,
     pub tokens_ctx: SemanticTokenContext,
+    pub primary: CompileServer,
+    pub dedicates: Vec<CompileServer>,
     pub format_thread: Option<crossbeam_channel::Sender<FormattingRequest>>,
 }
 
@@ -236,6 +236,7 @@ impl TypstLanguageServer {
                 font: args.font,
                 handle: tokio::runtime::Handle::current(),
             }),
+            dedicates: Vec::new(),
             shutdown_requested: false,
             sema_tokens_registered: None,
             formatter_registered: None,
@@ -249,7 +250,7 @@ impl TypstLanguageServer {
 
             memory_changes: HashMap::new(),
             pinning: false,
-            main: None,
+            focusing: None,
             tokens_ctx,
             format_thread: None,
         }
@@ -670,7 +671,7 @@ impl TypstLanguageServer {
     pub fn pin_document(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let new_entry = parse_path_or_null(arguments.first())?;
 
-        let update_result = self.update_main_entry(new_entry.clone());
+        let update_result = self.pin_entry(new_entry.clone());
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
 
         info!("file pinned: {entry:?}", entry = new_entry);
@@ -678,10 +679,10 @@ impl TypstLanguageServer {
     }
 
     /// Focus main file to some path.
-    pub fn focus_document(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn focus_document(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let new_entry = parse_path_or_null(arguments.first())?;
 
-        let update_result = self.update_primary_entry(new_entry.clone());
+        let update_result = self.focus_entry(new_entry.clone());
         update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
 
         info!("file focused: {entry:?}", entry = new_entry);
@@ -878,21 +879,6 @@ impl TypstLanguageServer {
         self.primary.on_changed_configuration(values)?;
 
         info!("new settings applied");
-        if config.compile.output_path != self.config.compile.output_path
-            || config.compile.export_pdf != self.config.compile.export_pdf
-        {
-            let config = ExportConfig {
-                substitute_pattern: self.config.compile.output_path.clone(),
-                mode: self.config.compile.export_pdf,
-                ..ExportConfig::default()
-            };
-
-            {
-                if let Some(main) = self.main.as_ref() {
-                    main.change_export_pdf(config);
-                }
-            }
-        }
 
         if config.semantic_tokens != self.config.semantic_tokens {
             let err = self.react_sema_token_changes(
