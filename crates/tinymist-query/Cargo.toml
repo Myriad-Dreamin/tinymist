@@ -31,13 +31,13 @@ indexmap.workspace = true
 ecow.workspace = true
 
 typst.workspace = true
-typst-ide.workspace = true
 
 reflexo.workspace = true
 
 lsp-types.workspace = true
 if_chain = "1"
 percent-encoding = "2"
+unscanny = "0.1"
 
 [dev-dependencies]
 once_cell.workspace = true
