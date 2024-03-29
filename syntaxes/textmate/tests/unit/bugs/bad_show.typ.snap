@@ -1,0 +1,27 @@
+>#show math.equation: i-figured.show-equation.with(level:0,numbering:"(1)")
+#^ source.typst punctuation.definition.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+#     ^ source.typst meta.expr.show.typst
+#      ^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.show.typst keyword.operator.accessor.typst
+#           ^^^^^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#                   ^ source.typst meta.expr.show.typst punctuation.separator.colon.typst
+#                    ^ source.typst meta.expr.show.typst
+#                     ^^^^^^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#                              ^ source.typst meta.expr.show.typst keyword.operator.accessor.typst
+#                               ^^^^^^^^^^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#                                            ^ source.typst meta.expr.show.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                                             ^^^^ source.typst meta.expr.show.typst meta.expr.call.typst entity.name.function.typst
+#                                                 ^ source.typst meta.expr.show.typst meta.expr.call.typst meta.brace.round.typst
+#                                                  ^^^^^ source.typst meta.expr.show.typst meta.expr.call.typst variable.other.readwrite.typst
+#                                                       ^ source.typst meta.expr.show.typst meta.expr.call.typst punctuation.separator.colon.typst
+#                                                        ^ source.typst meta.expr.show.typst meta.expr.call.typst constant.numeric.integer.typst
+#                                                         ^ source.typst meta.expr.show.typst meta.expr.call.typst punctuation.separator.comma.typst
+#                                                          ^^^^^^^^^ source.typst meta.expr.show.typst meta.expr.call.typst variable.other.readwrite.typst
+#                                                                   ^ source.typst meta.expr.show.typst meta.expr.call.typst punctuation.separator.colon.typst
+#                                                                    ^ source.typst meta.expr.show.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#                                                                     ^^^ source.typst meta.expr.show.typst meta.expr.call.typst string.quoted.double.typst
+#                                                                        ^ source.typst meta.expr.show.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#                                                                         ^ source.typst meta.expr.show.typst meta.expr.call.typst meta.brace.round.typst
+>A and B
+#^^^^^^^^ source.typst

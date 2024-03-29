@@ -72,22 +72,23 @@ const contentBlock: textmate.Pattern = {
 
 const primitiveColors: textmate.Pattern = {
   match:
-    /\b(red|blue|green|black|white|gray|silver|eastern|navy|aqua|teal|purple|fuchsia|maroon|orange|yellow|olive|lime|ltr|rtl|ttb|btt|start|left|center|right|end|top|horizon|bottom)\b/,
+    /\b(red|blue|green|black|white|gray|silver|eastern|navy|aqua|teal|purple|fuchsia|maroon|orange|yellow|olive|lime|ltr|rtl|ttb|btt|start|left|center|right|end|top|horizon|bottom)\b(?!-)/,
   name: "support.type.builtin.typst",
 };
 
 const primitiveFunctions = {
-  match: /\b(?:luma|oklab|oklch|rgb|cmyk|range)\b/,
+  match: /\b(?:luma|oklab|oklch|rgb|cmyk|range)\b(?!-)/,
   name: "support.function.builtin.typst",
 };
 
 const primitiveTypes: textmate.PatternMatch = {
-  match: /\b(auto|any|none|false|true|str|int|float|bool|length|content)\b/,
+  match:
+    /\b(auto|any|none|false|true|str|int|float|bool|length|content)\b(?!-)/,
   name: "entity.name.type.primitive.typst",
 };
 
-const IDENTIFIER_BARE = /[\p{XID_Start}_][\p{XID_Continue}_-]*/;
-const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_-]*\b/;
+const IDENTIFIER_BARE = /[\p{XID_Start}_][\p{XID_Continue}_\-]*/;
+const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_\-]*/;
 
 // todo: distinguish type and variable
 const identifier: textmate.PatternMatch = {
@@ -97,12 +98,12 @@ const identifier: textmate.PatternMatch = {
 
 const markupLabel: textmate.PatternMatch = {
   name: "entity.other.label.typst",
-  match: /<[\p{XID_Start}_][\p{XID_Continue}_-]*>/,
+  match: /<[\p{XID_Start}_][\p{XID_Continue}_\-]*>/,
 };
 
 const markupReference: textmate.PatternMatch = {
   name: "entity.other.reference.typst",
-  match: /(@)[\p{XID_Start}_][\p{XID_Continue}_-]*/,
+  match: /(@)[\p{XID_Start}_][\p{XID_Continue}_\-]*/,
   captures: {
     "1": {
       name: "punctuation.definition.reference.typst",
@@ -360,15 +361,15 @@ const constants: textmate.Pattern = {
   patterns: [
     {
       name: "constant.language.none.typst",
-      match: /(?<!\)|\]|\})\bnone\b/,
+      match: /(?<!\)|\]|\})\bnone\b(?!-)/,
     },
     {
       name: "constant.language.auto.typst",
-      match: /(?<!\)|\]|\})\bauto\b/,
+      match: /(?<!\)|\]|\})\bauto\b(?!-)/,
     },
     {
       name: "constant.language.boolean.typst",
-      match: /(?<!\)|\]|\})\b(true|false)\b/,
+      match: /(?<!\)|\]|\})\b(true|false)\b(?!-)/,
     },
     {
       name: "constant.numeric.length.typst",
@@ -411,15 +412,15 @@ const expression = (): textmate.Grammar => {
       { include: "#arrayOrDict" },
       { include: "#contentBlock" },
       {
-        match: /\b(break|continue)\b/,
+        match: /\b(break|continue)\b(?!-)/,
         name: "keyword.control.loop.typst",
       },
       {
-        match: /\b(and|or|not)\b/,
+        match: /\b(and|or|not)\b(?!-)/,
         name: "keyword.operator.word.typst",
       },
       {
-        match: /\b(return)\b/,
+        match: /\b(return)\b(?!-)/,
         name: "keyword.control.flow.typst",
       },
       { include: "#markupLabel" },
@@ -442,11 +443,11 @@ const expression = (): textmate.Grammar => {
       { include: "#identifier" },
       { include: "#constants" },
       {
-        match: /(as)\b/,
+        match: /(as)\b(?!-)/,
         name: "keyword.control.typst",
       },
       {
-        match: /(in)\b/,
+        match: /(in)\b(?!-)/,
         name: "keyword.operator.range.typst",
       },
       {
@@ -665,7 +666,7 @@ const markupItalic = markupAnnotate("_", "italic");
 
 const includeStatement: textmate.Pattern = {
   name: "meta.expr.include.typst",
-  begin: /(\binclude\b)\s*/,
+  begin: /(\binclude\b(?!-))\s*/,
   end: /(?=[\n;\}\]\)])/,
   beginCaptures: {
     "1": {
@@ -686,7 +687,7 @@ const includeStatement: textmate.Pattern = {
 const importStatement = (): textmate.Grammar => {
   const importStatement: textmate.Pattern = {
     name: "meta.expr.import.typst",
-    begin: /(\bimport\b)\s*/,
+    begin: /(\bimport\b(?!-))\s*/,
     end: /(?=[\n;\}\]\)])/,
     beginCaptures: {
       "1": {
@@ -723,7 +724,8 @@ const importStatement = (): textmate.Grammar => {
 
   /// import expression until as|:
   const importPathClause: textmate.Pattern = {
-    begin: /(\bimport\b)\s*/,
+    begin: /(\bimport\b(?!-))\s*/,
+    // todo import as
     end: /(?=\:|as)/,
     beginCaptures: {
       "1": {
@@ -742,6 +744,7 @@ const importStatement = (): textmate.Grammar => {
 
   /// as expression
   const importAsClause: textmate.Pattern = {
+    // todo: as...
     begin: /(\bas\b)\s*/,
     end: /(?=[\s;\}\]\)])/,
     beginCaptures: {
@@ -771,7 +774,7 @@ const importStatement = (): textmate.Grammar => {
 const letStatement = (): textmate.Grammar => {
   const letStatement: textmate.Pattern = {
     name: "meta.expr.let.typst",
-    begin: lookAhead(/(let\b)/),
+    begin: lookAhead(/(let\b(?!-))/),
     end: /(?!\()(?=[\s;\}\]\)])/,
     patterns: [
       /// Matches any comments
@@ -791,7 +794,7 @@ const letStatement = (): textmate.Grammar => {
 
   const letBindingClause: textmate.Pattern = {
     // name: "meta.let.binding.typst",
-    begin: /(let\b)\s*/,
+    begin: /(let\b(?!-))\s*/,
     end: /(?=[=;\]}])/,
     beginCaptures: {
       "1": {
@@ -804,7 +807,7 @@ const letStatement = (): textmate.Grammar => {
       },
       /// Matches a func call after the set clause
       {
-        begin: /(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)(\()/,
+        begin: /(\b[\p{XID_Start}_][\p{XID_Continue}_\-]*)(\()/,
         end: /\)/,
         beginCaptures: {
           "1": {
@@ -886,8 +889,8 @@ const letStatement = (): textmate.Grammar => {
 const ifStatement = (): textmate.Grammar => {
   const ifStatement: textmate.Pattern = {
     name: "meta.expr.if.typst",
-    begin: lookAhead(/(else\s+)?(if\b)/),
-    end: /(?<=\}|\])(?!\s*else\b)/,
+    begin: lookAhead(/(else\s+)?(if\b(?!-))/),
+    end: /(?<=\}|\])(?!\s*else\b(?!-))/,
     patterns: [
       /// Matches any comments
       {
@@ -1002,7 +1005,7 @@ const forStatement = (): textmate.Grammar => {
   // for v in expr { ... }
   const forStatement: textmate.Pattern = {
     name: "meta.expr.for.typst",
-    begin: lookAhead(/(for\b)\s*/),
+    begin: lookAhead(/(for\b(?!-))\s*/),
     end: /(?<=[\}\]])(?=\s*[\n\S;\}\]\)])(?!\s*[\{\[])/,
     patterns: [
       /// Matches any comments
@@ -1087,7 +1090,7 @@ const whileStatement = (): textmate.Grammar => {
   // for v in expr { ... }
   const whileStatement: textmate.Pattern = {
     name: "meta.expr.while.typst",
-    begin: lookAhead(/(while\b)/),
+    begin: lookAhead(/(while\b(?!-))/),
     end: /(?<=\}|\])/,
     patterns: [
       /// Matches any comments
@@ -1138,7 +1141,7 @@ const whileStatement = (): textmate.Grammar => {
 
 const contextStatement: textmate.Pattern = {
   name: "meta.expr.context.typst",
-  begin: /(context\b)\s*/,
+  begin: /(context\b(?!-))\s*/,
   end: /(?=[\n;\}\]\)])/,
   beginCaptures: {
     "1": {
@@ -1158,7 +1161,7 @@ const contextStatement: textmate.Pattern = {
 const setStatement = (): textmate.Grammar => {
   const setStatement: textmate.Pattern = {
     name: "meta.expr.set.typst",
-    begin: lookAhead(new RegExp(/(set\b)\s*/.source + IDENTIFIER.source)),
+    begin: lookAhead(new RegExp(/(set\b(?!-))\s*/.source + IDENTIFIER.source)),
     end: /(?<=\))(?!\s*if\b)|(?=[\s;\{\[\}\]\)])/,
     patterns: [
       /// Matches any comments
@@ -1201,7 +1204,7 @@ const setStatement = (): textmate.Grammar => {
 
   const setIfClause: textmate.Pattern = {
     // name: "meta.set.if.clause.cond.typst",
-    begin: /(if\b)\s*/,
+    begin: /(if\b(?!-))\s*/,
     end: /(?<=\S)(?<!and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)(?!\s*(?:and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=|\.))|(?=[\n;\}\]\)])/,
     beginCaptures: {
       "1": {
@@ -1230,7 +1233,7 @@ const setStatement = (): textmate.Grammar => {
 const showStatement = (): textmate.Grammar => {
   const showStatement: textmate.Pattern = {
     name: "meta.expr.show.typst",
-    begin: lookAhead(/(show\b)/),
+    begin: lookAhead(/(show\b(?!-))/),
     end: /(?=[\s;\{\[\}\]\)])/,
     patterns: [
       /// Matches any comments
@@ -1350,7 +1353,7 @@ const callArgs: textmate.Pattern = {
 };
 
 const funcRestParam: textmate.Pattern = {
-  match: /(\.\.)(\b[\p{XID_Start}_][\p{XID_Continue}_-]*)?/,
+  match: /(\.\.)(\b[\p{XID_Start}_][\p{XID_Continue}_\-]*)?/,
   // debugging
   // - name: meta.parameter.binding.typst
   captures: {
