@@ -355,7 +355,7 @@ fn e2e() {
     std::fs::write(root.join("vscode/result_sorted.json"), c).unwrap();
     let hash = format!("siphash128_13:{:x}", hash);
 
-    insta::assert_snapshot!(hash, @"siphash128_13:1e0ee515d35c16937e02684a605379bb");
+    insta::assert_snapshot!(hash, @"siphash128_13:1066654c05c2e86bc5ba29a0f174f382");
 }
 
 struct StableHash<'a>(&'a Value);
