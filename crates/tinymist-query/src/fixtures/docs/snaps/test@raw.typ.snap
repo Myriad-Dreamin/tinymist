@@ -1,0 +1,12 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/docs/raw.typ
+---
+ Docs for f.
+
+ ```typst
+ #show raw: it => it {
+   it
+ }
+ ```

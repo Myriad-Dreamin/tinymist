@@ -38,7 +38,7 @@ fn extract_document_between(node: &LinkedNode, rng: Range<usize>) -> Option<Stri
                 // comments.push(n.text().strip_prefix("//")?.trim().to_owned());
                 // strip all slash prefix
                 let text = n.text().trim_start_matches('/');
-                comments.push(text.trim().to_owned());
+                comments.push(text.to_owned());
                 continue;
             }
             SyntaxKind::BlockComment => {
@@ -61,7 +61,18 @@ fn extract_document_between(node: &LinkedNode, rng: Range<usize>) -> Option<Stri
         return None;
     }
 
-    Some(comments.join("\n"))
+    let dedent = comments.iter().fold(usize::MAX, |acc, c| {
+        let indent = c.chars().take_while(|c| c.is_whitespace()).count();
+        acc.min(indent)
+    });
+
+    let docs = comments
+        .iter()
+        .map(|c| c.chars().skip(dedent).collect::<String>())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Some(docs)
 }
 
 pub fn find_document_before(src: &Source, cursor: usize) -> Option<String> {
