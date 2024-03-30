@@ -1,6 +1,6 @@
 //! # tinymist
 //!
-//! This crate provides an integrated service for [Typst](https://typst.app/) [taɪpst]. It provides:
+//! This crate provides an integrated service for [Typst](https://typst.app/). It provides:
 //! + A language server following the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
 //!
 //! ## Architecture
@@ -43,7 +43,6 @@ pub use server::compiler_init;
 pub use server::lsp::*;
 pub use server::lsp_init::*;
 
-pub use lsp_server::Message;
 use lsp_server::ResponseError;
 
 type LspResult<Res> = Result<Res, ResponseError>;

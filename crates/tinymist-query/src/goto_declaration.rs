@@ -21,7 +21,7 @@ use crate::{
 /// The [`GotoDeclarationResponse::Link`](lsp_types::GotoDefinitionResponse::Link) return value
 /// was introduced in specification version 3.14.0 and requires client-side
 /// support in order to be used. It can be returned if the client set the
-/// following field to `true` in the [`initialize`](Self::initialize) method:
+/// following field to `true` in the `initialize` method:
 ///
 /// ```text
 /// InitializeParams::capabilities::text_document::declaration::link_support

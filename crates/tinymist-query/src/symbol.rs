@@ -17,7 +17,7 @@ use crate::{
 /// then need to resolve the range when necessary using the `workspaceSymbol/
 /// resolve` request.
 ///
-/// [`workspaceSymbol/resolve`]: Self::symbol_resolve
+/// // [`workspaceSymbol/resolve`]: Self::symbol_resolve
 ///
 /// Servers can only use this new model if clients advertise support for it via
 /// the `workspace.symbol.resolve_support` capability.

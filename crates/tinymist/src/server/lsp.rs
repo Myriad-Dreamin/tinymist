@@ -802,41 +802,6 @@ impl TypstLanguageServer {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ExportOpts {
-    page: PageSelection,
-}
-
-fn parse_opts(v: Option<&JsonValue>) -> LspResult<ExportOpts> {
-    Ok(match v {
-        Some(opts) => serde_json::from_value::<ExportOpts>(opts.clone())
-            .map_err(|_| invalid_params("The third argument is not a valid object"))?,
-        _ => ExportOpts {
-            page: PageSelection::First,
-        },
-    })
-}
-
-fn parse_path(v: Option<&JsonValue>) -> LspResult<ImmutPath> {
-    let new_entry = match v {
-        Some(JsonValue::String(s)) => Path::new(s).clean().as_path().into(),
-        _ => {
-            return Err(invalid_params(
-                "The first parameter is not a valid path or null",
-            ))
-        }
-    };
-
-    Ok(new_entry)
-}
-
-fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
-    match v {
-        Some(JsonValue::Null) => Ok(None),
-        v => Ok(Some(parse_path(v)?)),
-    }
-}
-
 /// Document Synchronization
 impl TypstLanguageServer {
     fn did_open(&mut self, params: DidOpenTextDocumentParams) -> LspResult<()> {
@@ -852,7 +817,6 @@ impl TypstLanguageServer {
         let path = as_path_(params.text_document.uri);
 
         self.remove_source(path.clone()).unwrap();
-        // self.client.publish_diagnostics(uri, Vec::new(), None);
         Ok(())
     }
 
@@ -1081,6 +1045,41 @@ impl TypstLanguageServer {
     fn symbol(&self, params: WorkspaceSymbolParams) -> LspResult<Option<Vec<SymbolInformation>>> {
         let pattern = (!params.query.is_empty()).then_some(params.query);
         run_query!(self.Symbol(pattern))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ExportOpts {
+    page: PageSelection,
+}
+
+fn parse_opts(v: Option<&JsonValue>) -> LspResult<ExportOpts> {
+    Ok(match v {
+        Some(opts) => serde_json::from_value::<ExportOpts>(opts.clone())
+            .map_err(|_| invalid_params("The third argument is not a valid object"))?,
+        _ => ExportOpts {
+            page: PageSelection::First,
+        },
+    })
+}
+
+fn parse_path(v: Option<&JsonValue>) -> LspResult<ImmutPath> {
+    let new_entry = match v {
+        Some(JsonValue::String(s)) => Path::new(s).clean().as_path().into(),
+        _ => {
+            return Err(invalid_params(
+                "The first parameter is not a valid path or null",
+            ))
+        }
+    };
+
+    Ok(new_entry)
+}
+
+fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
+    match v {
+        Some(JsonValue::Null) => Ok(None),
+        v => Ok(Some(parse_path(v)?)),
     }
 }
 
