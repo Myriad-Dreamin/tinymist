@@ -25,7 +25,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ### Formatting
 
 * Supported formatters in https://github.com/Myriad-Dreamin/tinymist/pull/113
-  * Use `"formatterMode": "typstyle"` for `typstyle 0.11.6`
+  * Use `"formatterMode": "typstyle"` for `typstyle 0.11.7`
   * Use `"formatterMode": "typstfmt"` for `typstfmt 0.2.9`
 * feat: minimal diff algorithm for source formatting in https://github.com/Myriad-Dreamin/tinymist/pull/123
 
