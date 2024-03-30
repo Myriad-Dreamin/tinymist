@@ -72,12 +72,13 @@ Traces the communication between VS Code and the language server.
   - `verbose`
 - **Default**: `"off"`
 
-## `tinymist.experimentalFormatterMode`
+## `tinymist.formatterMode`
 
-The extension can format Typst files using typstfmt (experimental).
+The extension can format Typst files using typstfmt or typstyle.
 
 - **Type**: `string`
 - **Enum**:
   - `disable`: Formatter is not activated.
-  - `enable`: Experimental formatter is activated.
+  - `typstyle`: Use typstyle formatter.
+  - `typstfmt`: Use typstfmt formatter.
 - **Default**: `"disable"`

@@ -21,9 +21,9 @@
 //!
 //! ```sh
 //! # Record the input
-//! tinymist --mirror input.txt
+//! tinymist lsp --mirror input.txt
 //! # Replay the input
-//! tinymist --replay input.txt
+//! tinymist lsp --replay input.txt
 //! ```
 
 // pub mod formatting;

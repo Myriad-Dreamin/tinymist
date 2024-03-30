@@ -18,9 +18,9 @@ You can record the input during running the editors with Tinymist. You can then 
 
 ```sh
 # Record the input
-tinymist --mirror input.txt
+tinymist lsp --mirror input.txt
 # Replay the input
-tinymist --replay input.txt
+tinymist lsp --replay input.txt
 ```
 
 ## Analyze memory usage with DHAT
@@ -34,7 +34,7 @@ cargo build --release --bin tinymist --features dhat-heap
 The instrumented program is nothing different from the normal program, so you can mine the specific memory usage with a lsp session (recorded with `--mirror`) by replaying the input.
 
 ```sh
-./target/release/tinymist --replay input.txt
+./target/release/tinymist lsp --replay input.txt
 ...
 dhat: Total:     740,668,176 bytes in 1,646,987 blocks
 dhat: At t-gmax: 264,604,009 bytes in 317,241 blocks

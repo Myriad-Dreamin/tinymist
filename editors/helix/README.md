@@ -36,10 +36,25 @@ language-servers = ["tinymist"]
 
 ### Working with Multiple-File Projects
 
-There is a way in [Neovim](../neovim/README.md#multiple-file-project-support), and you can invoke related commands similarly by [:lsp-workspace-command](https://docs.helix-editor.com/commands.html) in helix.
+There is a way in [Neovim](../neovim/README.md#multiple-file-project-support), but you cannot invoke related commands with arguments by [:lsp-workspace-command](https://docs.helix-editor.com/commands.html) in helix. As a candidate solution, assuming your having following directory layout:
 
-+ You can bind `:lsp-workspace-command` to a keymap for ease of use.
-+ When multiple language servers are configured for a file, using `:lsp-workspace-command` will only show the commands for one of the servers, that means the tinymist commands may be overriden by other language servers, e.g. `ltex`. See [Issue: helix#9017](https://github.com/helix-editor/helix/issues/9017).
+```plain
+├── .helix
+│   └── languages.toml
+└── main.typ
+```
+
+
+You could create .helix/languages.toml in the project folder with the following contents:
+
+```toml
+[language-server.tinymist.config]
+typstExtraArgs = ["main.typ"]
+```
+
+Then all diagnostics and autocompletion will be computed according to the `main.typ`.
+
+Note: With that configuration, if you're seeing a file that is not reachable by `main.typ`, you will not get diagnostics and autocompletion correctly in that file.
 
 ## Extra Settings
 
