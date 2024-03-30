@@ -375,7 +375,7 @@ fn e2e() {
         });
 
         let hash = replay_log(&tinymist_binary, &root.join("neovim"));
-        insta::assert_snapshot!(hash, @"siphash128_13:802ea72298ca5ce6c23cb348dfe43bb5");
+        insta::assert_snapshot!(hash, @"siphash128_13:ff13445227b3b86b70905bba912bcd0a");
     }
 
     {
@@ -452,7 +452,7 @@ fn sort_and_redact_value(v: Value) -> Value {
                             if k == "uri" || k == "targetUri" {
                                 // get uri and set as file name
                                 let uri = v.as_str().unwrap();
-                                if uri == "file://" {
+                                if uri == "file://" || uri == "file:///" {
                                     Value::String("".to_owned())
                                 } else {
                                     let uri = lsp_types::Url::parse(uri).unwrap();
