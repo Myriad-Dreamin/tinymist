@@ -1001,7 +1001,7 @@ fn code_completions(ctx: &mut CompletionContext, hash: bool) {
     );
 
     ctx.snippet_completion(
-        "import (package)",
+        "import package",
         "import \"@${}\": ${items}",
         "Imports variables from another file.",
     );
