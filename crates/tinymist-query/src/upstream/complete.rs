@@ -18,6 +18,8 @@ use unscanny::Scanner;
 use super::{plain_docs_sentence, summarize_font_family};
 use crate::analysis::{analyze_expr, analyze_import, analyze_labels};
 
+mod ext;
+
 /// Autocomplete a cursor position in a source file.
 ///
 /// Returns the position from which the completions apply and a list of
@@ -38,6 +40,21 @@ pub fn autocomplete(
 ) -> Option<(usize, Vec<Completion>)> {
     let mut ctx = CompletionContext::new(world, document, source, cursor, explicit)?;
 
+    let _ = complete_comments(&mut ctx)
+        || complete_field_accesses(&mut ctx)
+        || complete_open_labels(&mut ctx)
+        || complete_imports(&mut ctx)
+        || complete_rules(&mut ctx)
+        || complete_params(&mut ctx)
+        || complete_markup(&mut ctx)
+        || complete_math(&mut ctx)
+        || complete_code(&mut ctx);
+
+    Some((ctx.from, ctx.completions))
+}
+
+pub fn autocomplete_(mut ctx: CompletionContext) -> Option<(usize, Vec<Completion>)> {
+    let _ = autocomplete;
     let _ = complete_comments(&mut ctx)
         || complete_field_accesses(&mut ctx)
         || complete_open_labels(&mut ctx)
@@ -83,6 +100,12 @@ pub enum CompletionKind {
     Constant,
     /// A symbol.
     Symbol(char),
+    /// A variable.
+    Variable,
+    /// A module.
+    Module,
+    /// A folder.
+    Folder,
 }
 
 /// Complete in comments. Or rather, don't!
@@ -312,7 +335,7 @@ fn complete_math(ctx: &mut CompletionContext) -> bool {
 /// Add completions for math snippets.
 #[rustfmt::skip]
 fn math_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(true, |_| true);
+    ctx.scope_completions_(true, |_| true);
 
     ctx.snippet_completion(
         "subscript",
@@ -594,7 +617,7 @@ fn complete_rules(ctx: &mut CompletionContext) -> bool {
 
 /// Add completions for all functions from the global scope.
 fn set_rule_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(true, |value| {
+    ctx.scope_completions_(true, |value| {
         matches!(
             value,
             Value::Func(func) if func.params()
@@ -607,7 +630,7 @@ fn set_rule_completions(ctx: &mut CompletionContext) {
 
 /// Add completions for selectors.
 fn show_rule_selector_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(
+    ctx.scope_completions_(
         false,
         |value| matches!(value, Value::Func(func) if func.element().is_some()),
     );
@@ -647,7 +670,7 @@ fn show_rule_recipe_completions(ctx: &mut CompletionContext) {
         "Transform the element with a function.",
     );
 
-    ctx.scope_completions(false, |value| matches!(value, Value::Func(_)));
+    ctx.scope_completions_(false, |value| matches!(value, Value::Func(_)));
 }
 
 /// Complete call and set rule parameters.
@@ -865,7 +888,7 @@ fn complete_code(ctx: &mut CompletionContext) -> bool {
 /// Add completions for expression snippets.
 #[rustfmt::skip]
 fn code_completions(ctx: &mut CompletionContext, hash: bool) {
-    ctx.scope_completions(true, |value| !hash || {
+    ctx.scope_completions_(true, |value| !hash || {
         matches!(value, Value::Symbol(_) | Value::Func(_) | Value::Type(_) | Value::Module(_))
     });
 
@@ -972,9 +995,9 @@ fn code_completions(ctx: &mut CompletionContext, hash: bool) {
     );
 
     ctx.snippet_completion(
-        "import (file)",
-        "import \"${file}.typ\": ${items}",
-        "Imports variables from another file.",
+        "import expression",
+        "import ${}",
+        "Imports items from another file.",
     );
 
     ctx.snippet_completion(
@@ -1017,25 +1040,25 @@ fn code_completions(ctx: &mut CompletionContext, hash: bool) {
 }
 
 /// Context for autocompletion.
-struct CompletionContext<'a> {
-    world: &'a (dyn World + 'a),
-    document: Option<&'a Document>,
-    global: &'a Scope,
-    math: &'a Scope,
-    text: &'a str,
-    before: &'a str,
-    after: &'a str,
-    leaf: LinkedNode<'a>,
-    cursor: usize,
-    explicit: bool,
-    from: usize,
-    completions: Vec<Completion>,
-    seen_casts: HashSet<u128>,
+pub struct CompletionContext<'a> {
+    pub world: &'a (dyn World + 'a),
+    pub document: Option<&'a Document>,
+    pub global: &'a Scope,
+    pub math: &'a Scope,
+    pub text: &'a str,
+    pub before: &'a str,
+    pub after: &'a str,
+    pub leaf: LinkedNode<'a>,
+    pub cursor: usize,
+    pub explicit: bool,
+    pub from: usize,
+    pub completions: Vec<Completion>,
+    pub seen_casts: HashSet<u128>,
 }
 
 impl<'a> CompletionContext<'a> {
     /// Create a new autocompletion context.
-    fn new(
+    pub fn new(
         world: &'a (dyn World + 'a),
         document: Option<&'a Document>,
         source: &'a Source,
@@ -1294,7 +1317,7 @@ impl<'a> CompletionContext<'a> {
                         "color.hsl(${h}, ${s}, ${l}, ${a})",
                         "A custom HSLA color.",
                     );
-                    self.scope_completions(false, |value| value.ty() == *ty);
+                    self.scope_completions_(false, |value| value.ty() == *ty);
                 } else if *ty == Type::of::<Label>() {
                     self.label_completions()
                 } else if *ty == Type::of::<Func>() {
@@ -1310,7 +1333,7 @@ impl<'a> CompletionContext<'a> {
                         apply: Some(eco_format!("${{{ty}}}")),
                         detail: Some(eco_format!("A value of type {ty}.")),
                     });
-                    self.scope_completions(false, |value| value.ty() == *ty);
+                    self.scope_completions_(false, |value| value.ty() == *ty);
                 }
             }
             CastInfo::Union(union) => {
@@ -1324,7 +1347,7 @@ impl<'a> CompletionContext<'a> {
     /// Add completions for definitions that are available at the cursor.
     ///
     /// Filters the global/math scope with the given filter.
-    fn scope_completions(&mut self, parens: bool, filter: impl Fn(&Value) -> bool) {
+    fn _scope_completions(&mut self, parens: bool, filter: impl Fn(&Value) -> bool) {
         let mut defined = BTreeSet::new();
 
         let mut ancestor = Some(self.leaf.clone());

@@ -267,14 +267,17 @@ pub mod typst_to_lsp {
         LspRange::new(lsp_start, lsp_end)
     }
 
-    fn completion_kind(typst_completion_kind: TypstCompletionKind) -> LspCompletionKind {
+    pub fn completion_kind(typst_completion_kind: TypstCompletionKind) -> LspCompletionKind {
         match typst_completion_kind {
             TypstCompletionKind::Syntax => LspCompletionKind::SNIPPET,
             TypstCompletionKind::Func => LspCompletionKind::FUNCTION,
             TypstCompletionKind::Param => LspCompletionKind::VARIABLE,
+            TypstCompletionKind::Variable => LspCompletionKind::VARIABLE,
             TypstCompletionKind::Constant => LspCompletionKind::CONSTANT,
             TypstCompletionKind::Symbol(_) => LspCompletionKind::FIELD,
             TypstCompletionKind::Type => LspCompletionKind::CLASS,
+            TypstCompletionKind::Module => LspCompletionKind::MODULE,
+            TypstCompletionKind::Folder => LspCompletionKind::FOLDER,
         }
     }
 
@@ -311,16 +314,6 @@ pub mod typst_to_lsp {
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             ..Default::default()
         }
-    }
-
-    pub fn completions(
-        typst_completions: &[TypstCompletion],
-        lsp_replace: LspRange,
-    ) -> Vec<LspCompletion> {
-        typst_completions
-            .iter()
-            .map(|typst_completion| completion(typst_completion, lsp_replace))
-            .collect_vec()
     }
 
     pub fn tooltip(typst_tooltip: &TypstTooltip) -> LspHoverContents {

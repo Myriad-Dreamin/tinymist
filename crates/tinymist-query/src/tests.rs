@@ -1,6 +1,7 @@
 use core::fmt;
 use std::{
     collections::HashSet,
+    ops::Range,
     path::{Path, PathBuf},
 };
 
@@ -139,6 +140,23 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut TypstSystemWorld, P
         ))
         .unwrap();
     f(driver.world_mut(), pw)
+}
+
+pub fn find_test_range(s: &Source) -> Range<usize> {
+    // /* range -3..-1 */
+    let re = s.text().find("/* range ").unwrap();
+    let re_base = re;
+    let re = re + "/* range ".len();
+    let re = re..s.text().find(" */").unwrap();
+    let re = &s.text()[re];
+    // split by ".."
+    let mut re = re.split("..");
+    // parse the range
+    let start: isize = re.next().unwrap().parse().unwrap();
+    let end: isize = re.next().unwrap().parse().unwrap();
+    let start = start + re_base as isize;
+    let end = end + re_base as isize;
+    start as usize..end as usize
 }
 
 pub fn find_test_position(s: &Source) -> LspPosition {

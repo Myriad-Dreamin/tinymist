@@ -414,6 +414,8 @@ impl Init {
                     trigger_characters: Some(vec![
                         String::from("#"),
                         String::from("."),
+                        String::from("/"),
+                        String::from("\""),
                         String::from("@"),
                     ]),
                     ..Default::default()

@@ -38,6 +38,7 @@ lsp-types.workspace = true
 if_chain = "1"
 percent-encoding = "2"
 unscanny = "0.1"
+pathdiff = "0.2"
 
 [dev-dependencies]
 once_cell.workspace = true
