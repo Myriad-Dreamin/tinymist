@@ -90,14 +90,14 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
 
 pub fn url_to_path(uri: Url) -> PathBuf {
     if uri.scheme() == "file" {
-        return uri.to_file_path().unwrap_or_else(|_| {
-            // typst converts an empty path to `Path::new("/")`, which is undesirable.
-            if !uri.has_host() && uri.path() == "/" {
-                return PathBuf::from("/untitled/nEoViM-BuG");
-            }
+        // typst converts an empty path to `Path::new("/")`, which is undesirable.
+        if !uri.has_host() && uri.path() == "/" {
+            return PathBuf::from("/untitled/nEoViM-BuG");
+        }
 
-            panic!("could not convert URI to path: URI: {uri:?}",)
-        });
+        return uri
+            .to_file_path()
+            .unwrap_or_else(|_| panic!("could not convert URI to path: URI: {uri:?}",));
     }
 
     if uri.scheme() == "untitled" {
