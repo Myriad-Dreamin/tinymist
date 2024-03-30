@@ -22,8 +22,18 @@ To initialize a Typst project:
 
 1. Open settings.
 2. Search for "Tinymist Formatter" and modify the value.
-  - Use `"formatterMode": "typstyle"` for [typstyle](https://github.com/Enter-tainer/typstyle)
-  - Use `"formatterMode": "typstfmt"` for [typstfmt](https://github.com/astrale-sharp/typstfmt)
+  - Use `"formatterMode": "typstyle"` for [typstyle](https://github.com/Enter-tainer/typstyle).
+  - Use `"formatterMode": "typstfmt"` for [typstfmt](https://github.com/astrale-sharp/typstfmt).
+
+Tips: to enable formatting on save, you should add extra settings for typst language:
+
+```json
+{
+  "[typst]": {
+    "editor.formatOnSave": true
+  }
+}
+```
 
 ### Configuring path to search fonts
 
@@ -81,7 +91,13 @@ You can pin a main file by command.
 
 ### Passing Extra CLI Arguments
 
-There is a **global** configuration `tinymist.typstExtraArgs` to pass extra arguments to tinymist LSP, like what you usually do with `typst-cli` CLI. For example, you can set it to `["--input=awa=1", "--input=abaaba=2"]` to configure `sys.inputs`.
+There is a **global** configuration `tinymist.typstExtraArgs` to pass extra arguments to tinymist LSP, like what you usually do with `typst-cli` CLI. For example, you can set it to `["--input=awa=1", "--input=abaaba=2", "main.typ"]` to configure `sys.inputs` and entry for compiler, which is equivalent to make LSP run like a `typst-cli` with such arguments:
+
+```
+typst watch --input=awa=1 --input=abaaba=2 main.typ
+```
+
+**Note:** Fix entry to `main.typ` may help multiple-file projects but you may loss diagnostics and autocompletions in unrelated files.
 
 Note: the arguments has quite low priority, and that may be overridden by other settings.
 
