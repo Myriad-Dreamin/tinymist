@@ -4,6 +4,48 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.2 - [2024-03-30]
+
+### Editor
+
+* (Fix) Passed correct arguments to editor tools in https://github.com/Myriad-Dreamin/tinymist/pull/111
+* (Fix) exposed pin/unpin commands for vscode in https://github.com/Myriad-Dreamin/tinymist/pull/121
+
+### Compiler
+
+* (Fix) Converting out of bounds offsets again in https://github.com/Myriad-Dreamin/tinymist/pull/115
+* Supported entry configuration in https://github.com/Myriad-Dreamin/tinymist/pull/122
+* Supported untitled url scheme for unsaved text buffer in https://github.com/Myriad-Dreamin/tinymist/pull/120 and https://github.com/Myriad-Dreamin/tinymist/pull/130
+
+### Commands/Tools
+
+* Allowed tracing typst programs in subprocess in https://github.com/Myriad-Dreamin/tinymist/pull/112
+  * This is part of backend for tracing tool, and we may finish a tracing tool in next week.
+
+### Formatting
+
+* Supported formatters in https://github.com/Myriad-Dreamin/tinymist/pull/113
+  * Use `"formatterMode": "typstyle"` for `typstyle 0.11.6`
+  * Use `"formatterMode": "typstfmt"` for `typstfmt 0.2.9`
+* feat: minimal diff algorithm for source formatting in https://github.com/Myriad-Dreamin/tinymist/pull/123
+
+### Completion
+
+* Fixed wrong completion kind in https://github.com/Myriad-Dreamin/tinymist/pull/124 and https://github.com/Myriad-Dreamin/tinymist/pull/127
+* Supported import path completion in https://github.com/Myriad-Dreamin/tinymist/pull/134
+* Not completing on definition itself anymore in https://github.com/Myriad-Dreamin/tinymist/pull/135
+
+### Syntax/Semantic Highlighting
+
+* (Fix) Corrected identifier/keyword boundaries in https://github.com/Myriad-Dreamin/tinymist/pull/128
+* Improved punctuation and keyword token kinds in https://github.com/Myriad-Dreamin/tinymist/pull/133
+
+### Hover (Tooltip)
+
+* fix: parse docstring dedents correctly in https://github.com/Myriad-Dreamin/tinymist/pull/132
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.1...v0.11.2
+
 ## v0.11.1 - [2024-03-26]
 
 ### Editor

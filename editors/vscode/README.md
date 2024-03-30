@@ -18,6 +18,13 @@ To initialize a Typst project:
 - Use command `Typst Init Template` (tinymist.initTemplate) to initialize a new Typst project based on a template.
 - Use command `Typst Show Template` (tinymist.showTemplateGallery) to show available Typst templates for picking up a template to initialize.
 
+### Configuring LSP-enhanced formatters
+
+1. Open settings.
+2. Search for "Tinymist Formatter" and modify the value.
+  - Use `"formatterMode": "typstyle"` for [typstyle](https://github.com/Enter-tainer/typstyle)
+  - Use `"formatterMode": "typstfmt"` for [typstfmt](https://github.com/astrale-sharp/typstfmt)
+
 ### Configuring path to search fonts
 
 To configure path to search fonts:
