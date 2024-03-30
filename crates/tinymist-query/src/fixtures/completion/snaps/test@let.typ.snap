@@ -1,8 +1,8 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on c( (68..70)
+description: Completion on c( (64..66)
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/completion/base.typ
+input_file: crates/tinymist-query/src/fixtures/completion/let.typ
 ---
 [
  {
@@ -128,7 +128,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
     }
    },
    {
-    "kind": 3,
+    "kind": 6,
     "label": "aab",
     "textEdit": {
      "newText": "aab",
@@ -145,7 +145,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
     }
    },
    {
-    "kind": 3,
+    "kind": 6,
     "label": "aabc",
     "textEdit": {
      "newText": "aabc",
@@ -252,7 +252,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
   "isIncomplete": true,
   "items": [
    {
-    "kind": 3,
+    "kind": 6,
     "label": "aabc",
     "textEdit": {
      "newText": "aabc",
