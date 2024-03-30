@@ -15,8 +15,11 @@ See [Tinymist Features](https://github.com/Myriad-Dreamin/tinymist#features) for
 ### Initializing with a Template
 
 To initialize a Typst project:
-- Use command `Typst Init Template` (tinymist.initTemplate) to initialize a new Typst project based on a template.
-- Use command `Typst Show Template` (tinymist.showTemplateGallery) to show available Typst templates for picking up a template to initialize.
+- Use command `Typst init template` (tinymist.initTemplate) to initialize a new Typst project based on a template.
+- Use command `Typst show template` (tinymist.showTemplateGallery) to show available Typst templates for picking up a template to initialize.
+
+🎉 If your template contains only a single file, you can also insert the template content in place with command:
+- Use command `Typst template in place` (tinymist.initTemplateInPlace) and input a template specifier for initialization.
 
 ### Configuring LSP-enhanced formatters
 
