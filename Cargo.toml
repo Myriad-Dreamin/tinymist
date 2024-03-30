@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.11.1"
+version = "0.11.2"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -52,7 +52,7 @@ reflexo = { version = "0.5.0-rc2", default-features = false, features = [
 typst-ts-core = { version = "0.5.0-rc2", default-features = false }
 typst-ts-compiler = { version = "0.5.0-rc2" }
 typst-preview = { version = "0.11.3" }
-typstyle = "0.11.5"
+typstyle = "0.11.7"
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
 
 lsp-server = "0.7.6"
