@@ -74,7 +74,7 @@ static EMPTY_URL: Lazy<Url> = Lazy::new(|| Url::parse("file://").unwrap());
 pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
     if let Ok(untitled) = path.strip_prefix(UNTITLED_ROOT) {
         // rust-url will panic on converting an empty path.
-        if untitled == Path::new("neovim-bug") {
+        if untitled == Path::new("nEoViM-BuG") {
             return Ok(EMPTY_URL.clone());
         }
 
@@ -93,7 +93,7 @@ pub fn url_to_path(uri: Url) -> PathBuf {
         return uri.to_file_path().unwrap_or_else(|_| {
             // typst converts an empty path to `Path::new("/")`, which is undesirable.
             if !uri.has_host() && uri.path() == "/" {
-                return PathBuf::from("/untitled/neovim-bug");
+                return PathBuf::from("/untitled/nEoViM-BuG");
             }
 
             panic!("could not convert URI to path: URI: {uri:?}",)
@@ -395,7 +395,7 @@ mod test {
         // https://github.com/neovim/nvim-lspconfig/pull/2226
         let uri = EMPTY_URL.clone();
         let path = url_to_path(uri);
-        assert_eq!(path, Path::new("/untitled/neovim-bug"));
+        assert_eq!(path, Path::new("/untitled/nEoViM-BuG"));
 
         let uri2 = path_to_url(&path).unwrap();
         assert_eq!(EMPTY_URL.clone(), uri2);
