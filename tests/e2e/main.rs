@@ -134,40 +134,32 @@ fn messages(output: Vec<u8>) -> Vec<lsp_server::Message> {
     messages
 }
 
-#[test]
-fn e2e() {
-    std::env::set_var("RUST_BACKTRACE", "full");
+struct SmokeArgs {
+    root: PathBuf,
+    init: String,
+    log: String,
+}
 
-    let cwd = find_git_root().unwrap();
-    if cfg!(target_os = "...") {
-        let w = Command::new("cargo")
-            .args(["build", "--release", "--bin", "tinymist"])
-            .status();
-        assert!(handle_io(w).success());
-        handle_io(std::fs::copy(
-            cwd.join("target/release/tinymist.exe"),
-            cwd.join("editors/vscode/out/tinymist.exe"),
-        ));
-    }
-    let root = cwd.join("target/e2e/tinymist");
-    gen(&root.join("vscode"), |srv| {
-        use lsp_types::notification::*;
-        use lsp_types::request::*;
-        use lsp_types::*;
-        let wp = root.join("vscode");
-        let wp_url = lsp_types::Url::from_directory_path(&wp).unwrap();
-        srv.request::<Initialize>(fixture("initialization/vscode", |v| {
-            v["rootUri"] = json!(wp_url);
-            v["rootPath"] = json!(wp);
+fn gen_smoke(args: SmokeArgs) {
+    use lsp_types::notification::*;
+    use lsp_types::request::*;
+    use lsp_types::*;
+
+    let SmokeArgs { root, init, log } = args;
+    gen(&root, |srv| {
+        let root_uri = lsp_types::Url::from_directory_path(&root).unwrap();
+        srv.request::<Initialize>(fixture(&init, |v| {
+            v["rootUri"] = json!(root_uri);
+            v["rootPath"] = json!(root);
             v["workspaceFolders"] = json!([{
-                "uri": wp_url,
+                "uri": root_uri,
                 "name": "tinymist",
             }]);
         }));
         srv.notify::<Initialized>(json!({}));
 
         // open editions/base.log and readlines
-        let log = std::fs::read_to_string("tests/fixtures/editions/base.log").unwrap();
+        let log = std::fs::read_to_string(&log).unwrap();
         let log = log.trim().split('\n').collect::<Vec<_>>();
         let mut uri_set = HashSet::new();
         let mut uris = Vec::new();
@@ -191,9 +183,12 @@ fn e2e() {
             }
 
             let uri_name = v["params"]["textDocument"]["uri"].as_str().unwrap();
-            let url_v = wp_url.join(uri_name).unwrap();
-            let uri = json!(url_v);
-            v["params"]["textDocument"]["uri"] = uri;
+            let url_v = if uri_name.starts_with("file:") || uri_name.starts_with("untitled:") {
+                lsp_types::Url::parse(uri_name).unwrap()
+            } else {
+                root_uri.join(uri_name).unwrap()
+            };
+            v["params"]["textDocument"]["uri"] = json!(url_v);
             let method = v["method"].as_str().unwrap();
             srv.notify_("textDocument/".to_owned() + method, v["params"].clone());
 
@@ -330,15 +325,12 @@ fn e2e() {
             }
         }
     });
+}
 
-    let tinymist_binary = if cfg!(windows) {
-        cwd.join("editors/vscode/out/tinymist.exe")
-    } else {
-        cwd.join("editors/vscode/out/tinymist")
-    };
+fn replay_log(tinymist_binary: &Path, root: &Path) -> String {
     let tinymist_binary = tinymist_binary.to_str().unwrap();
 
-    let log_file = root.join("vscode/mirror.log").to_str().unwrap().to_owned();
+    let log_file = root.join("mirror.log").to_str().unwrap().to_owned();
     let mut res = messages(exec_output(tinymist_binary, ["lsp", "--replay", &log_file]));
     // retain not notification
     res.retain(|msg| matches!(msg, lsp_server::Message::Response(_)));
@@ -351,15 +343,51 @@ fn e2e() {
     // print to result.log
     let res = serde_json::to_value(&res).unwrap();
     let c = serde_json::to_string_pretty(&res).unwrap();
-    std::fs::write(root.join("vscode/result.json"), c).unwrap();
+    std::fs::write(root.join("result.json"), c).unwrap();
     // let sorted_res
     let sorted_res = sort_and_redact_value(res);
     let c = serde_json::to_string_pretty(&sorted_res).unwrap();
     let hash = reflexo::hash::hash128(&c);
-    std::fs::write(root.join("vscode/result_sorted.json"), c).unwrap();
-    let hash = format!("siphash128_13:{:x}", hash);
+    std::fs::write(root.join("result_sorted.json"), c).unwrap();
 
-    insta::assert_snapshot!(hash, @"siphash128_13:db9523369516f3a16997fc1913381d6e");
+    format!("siphash128_13:{:x}", hash)
+}
+
+#[test]
+fn e2e() {
+    std::env::set_var("RUST_BACKTRACE", "full");
+
+    let cwd = find_git_root().unwrap();
+
+    let tinymist_binary = if cfg!(windows) {
+        cwd.join("editors/vscode/out/tinymist.exe")
+    } else {
+        cwd.join("editors/vscode/out/tinymist")
+    };
+
+    let root = cwd.join("target/e2e/tinymist");
+
+    {
+        gen_smoke(SmokeArgs {
+            root: root.join("neovim"),
+            init: "initialization/neovim-0.9.4".to_owned(),
+            log: "tests/fixtures/editions/neovim_unnamed_buffer.log".to_owned(),
+        });
+
+        let hash = replay_log(&tinymist_binary, &root.join("neovim"));
+        insta::assert_snapshot!(hash, @"siphash128_13:ff13445227b3b86b70905bba912bcd0a");
+    }
+
+    {
+        gen_smoke(SmokeArgs {
+            root: root.join("vscode"),
+            init: "initialization/vscode-1.87.2".to_owned(),
+            log: "tests/fixtures/editions/base.log".to_owned(),
+        });
+
+        let hash = replay_log(&tinymist_binary, &root.join("vscode"));
+        insta::assert_snapshot!(hash, @"siphash128_13:db9523369516f3a16997fc1913381d6e");
+    }
 }
 
 struct StableHash<'a>(&'a Value);
@@ -424,10 +452,19 @@ fn sort_and_redact_value(v: Value) -> Value {
                             if k == "uri" || k == "targetUri" {
                                 // get uri and set as file name
                                 let uri = v.as_str().unwrap();
-                                let uri = lsp_types::Url::parse(uri).unwrap();
-                                let path = uri.to_file_path().unwrap();
-                                let path = path.file_name().unwrap().to_str().unwrap();
-                                Value::String(path.to_owned())
+                                if uri == "file://" || uri == "file:///" {
+                                    Value::String("".to_owned())
+                                } else {
+                                    let uri = lsp_types::Url::parse(uri).unwrap();
+
+                                    match uri.to_file_path() {
+                                        Ok(path) => {
+                                            let path = path.file_name().unwrap().to_str().unwrap();
+                                            Value::String(path.to_owned())
+                                        }
+                                        Err(_) => Value::String(uri.to_string()),
+                                    }
+                                }
                             } else {
                                 sort_and_redact_value(v.clone())
                             }
