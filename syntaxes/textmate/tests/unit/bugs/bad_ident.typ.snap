@@ -1,0 +1,717 @@
+>
+>#let true- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.let.typst
+#           ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#             ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#              ^ source.typst punctuation.terminator.statement.typst
+>#let auto- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.let.typst
+#           ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#             ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#              ^ source.typst punctuation.terminator.statement.typst
+>#let any- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#         ^ source.typst meta.expr.let.typst
+#          ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#            ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#             ^ source.typst punctuation.terminator.statement.typst
+>#let none- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.let.typst
+#           ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#             ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#              ^ source.typst punctuation.terminator.statement.typst
+>#let false- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#           ^ source.typst meta.expr.let.typst
+#            ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#              ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#               ^ source.typst punctuation.terminator.statement.typst
+>#let true- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.let.typst
+#           ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#             ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#              ^ source.typst punctuation.terminator.statement.typst
+>#let break- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#           ^ source.typst meta.expr.let.typst
+#            ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#              ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#               ^ source.typst punctuation.terminator.statement.typst
+>#let continue- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#              ^ source.typst meta.expr.let.typst
+#               ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                 ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                  ^ source.typst punctuation.terminator.statement.typst
+>#let and- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#         ^ source.typst meta.expr.let.typst
+#          ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#            ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#             ^ source.typst punctuation.terminator.statement.typst
+>#let or- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.let.typst
+#         ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#           ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#            ^ source.typst punctuation.terminator.statement.typst
+>#let not- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#         ^ source.typst meta.expr.let.typst
+#          ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#            ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#             ^ source.typst punctuation.terminator.statement.typst
+>#let return- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#            ^ source.typst meta.expr.let.typst
+#             ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#               ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                ^ source.typst punctuation.terminator.statement.typst
+>#let as- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.let.typst
+#         ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#           ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#            ^ source.typst punctuation.terminator.statement.typst
+>#let in- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.let.typst
+#         ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#           ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#            ^ source.typst punctuation.terminator.statement.typst
+>#let include- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#             ^ source.typst meta.expr.let.typst
+#              ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                 ^ source.typst punctuation.terminator.statement.typst
+>#let import- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#            ^ source.typst meta.expr.let.typst
+#             ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#               ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                ^ source.typst punctuation.terminator.statement.typst
+>#let let- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#         ^ source.typst meta.expr.let.typst
+#          ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#            ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#             ^ source.typst punctuation.terminator.statement.typst
+>#let else- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.let.typst
+#           ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#             ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#              ^ source.typst punctuation.terminator.statement.typst
+>#let if- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.let.typst
+#         ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#           ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#            ^ source.typst punctuation.terminator.statement.typst
+>#let for- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#         ^ source.typst meta.expr.let.typst
+#          ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#            ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#             ^ source.typst punctuation.terminator.statement.typst
+>#let while- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#           ^ source.typst meta.expr.let.typst
+#            ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#              ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#               ^ source.typst punctuation.terminator.statement.typst
+>#let context- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#             ^ source.typst meta.expr.let.typst
+#              ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                 ^ source.typst punctuation.terminator.statement.typst
+>#let set- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#         ^ source.typst meta.expr.let.typst
+#          ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#            ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#             ^ source.typst punctuation.terminator.statement.typst
+>#let show- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.let.typst
+#           ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#             ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#              ^ source.typst punctuation.terminator.statement.typst
+>
+>#let x-true- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#            ^ source.typst meta.expr.let.typst
+#             ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#               ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                ^ source.typst punctuation.terminator.statement.typst
+>#let x-auto- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#            ^ source.typst meta.expr.let.typst
+#             ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#               ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                ^ source.typst punctuation.terminator.statement.typst
+>#let x-any- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#           ^ source.typst meta.expr.let.typst
+#            ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#              ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#               ^ source.typst punctuation.terminator.statement.typst
+>#let x-none- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#            ^ source.typst meta.expr.let.typst
+#             ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#               ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                ^ source.typst punctuation.terminator.statement.typst
+>#let x-false- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#             ^ source.typst meta.expr.let.typst
+#              ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                 ^ source.typst punctuation.terminator.statement.typst
+>#let x-true- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#            ^ source.typst meta.expr.let.typst
+#             ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#               ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                ^ source.typst punctuation.terminator.statement.typst
+>#let x-break- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#             ^ source.typst meta.expr.let.typst
+#              ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                 ^ source.typst punctuation.terminator.statement.typst
+>#let x-continue- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#                ^ source.typst meta.expr.let.typst
+#                 ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                   ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                    ^ source.typst punctuation.terminator.statement.typst
+>#let x-and- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#           ^ source.typst meta.expr.let.typst
+#            ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#              ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#               ^ source.typst punctuation.terminator.statement.typst
+>#let x-or- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.let.typst
+#           ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#             ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#              ^ source.typst punctuation.terminator.statement.typst
+>#let x-not- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#           ^ source.typst meta.expr.let.typst
+#            ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#              ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#               ^ source.typst punctuation.terminator.statement.typst
+>#let x-return- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#              ^ source.typst meta.expr.let.typst
+#               ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                 ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                  ^ source.typst punctuation.terminator.statement.typst
+>#let x-as- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.let.typst
+#           ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#             ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#              ^ source.typst punctuation.terminator.statement.typst
+>#let x-in- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.let.typst
+#           ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#             ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#              ^ source.typst punctuation.terminator.statement.typst
+>#let x-include- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#               ^ source.typst meta.expr.let.typst
+#                ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                  ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                   ^ source.typst punctuation.terminator.statement.typst
+>#let x-import- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#              ^ source.typst meta.expr.let.typst
+#               ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                 ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                  ^ source.typst punctuation.terminator.statement.typst
+>#let x-let- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#           ^ source.typst meta.expr.let.typst
+#            ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#              ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#               ^ source.typst punctuation.terminator.statement.typst
+>#let x-else- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#            ^ source.typst meta.expr.let.typst
+#             ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#               ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                ^ source.typst punctuation.terminator.statement.typst
+>#let x-if- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.let.typst
+#           ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#             ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#              ^ source.typst punctuation.terminator.statement.typst
+>#let x-for- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#           ^ source.typst meta.expr.let.typst
+#            ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#              ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#               ^ source.typst punctuation.terminator.statement.typst
+>#let x-while- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#             ^ source.typst meta.expr.let.typst
+#              ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                 ^ source.typst punctuation.terminator.statement.typst
+>#let x-context- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#               ^ source.typst meta.expr.let.typst
+#                ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                  ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                   ^ source.typst punctuation.terminator.statement.typst
+>#let x-set- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#           ^ source.typst meta.expr.let.typst
+#            ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#              ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#               ^ source.typst punctuation.terminator.statement.typst
+>#let x-show- = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#            ^ source.typst meta.expr.let.typst
+#             ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#               ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                ^ source.typst punctuation.terminator.statement.typst
+>
+>#let show-() = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^ source.typst meta.expr.let.typst entity.name.function.typst
+#          ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#           ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#            ^ source.typst meta.expr.let.typst
+#             ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#               ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                ^ source.typst punctuation.terminator.statement.typst
+>#let show-(show-) = 1;
+#^ source.typst punctuation.definition.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^^^ source.typst meta.expr.let.typst entity.name.function.typst
+#          ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#           ^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#                ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#                 ^ source.typst meta.expr.let.typst
+#                  ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#                    ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
+#                     ^ source.typst punctuation.terminator.statement.typst
+>
+>#(1pt-1pt)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^ source.typst constant.numeric.length.typst
+#     ^ source.typst
+#      ^^^ source.typst constant.numeric.length.typst
+#         ^ source.typst meta.brace.round.typst
+>#(1rad-1rad)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^ source.typst constant.numeric.angle.typst
+#      ^ source.typst
+#       ^^^^ source.typst constant.numeric.angle.typst
+#           ^ source.typst meta.brace.round.typst
+>#(true-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^ source.typst variable.other.readwrite.typst
+#       ^ source.typst meta.brace.round.typst
+>#(auto-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^ source.typst variable.other.readwrite.typst
+#       ^ source.typst meta.brace.round.typst
+>#(any-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^ source.typst variable.other.readwrite.typst
+#      ^ source.typst meta.brace.round.typst
+>#(none-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^ source.typst variable.other.readwrite.typst
+#       ^ source.typst meta.brace.round.typst
+>#(false-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^ source.typst variable.other.readwrite.typst
+#        ^ source.typst meta.brace.round.typst
+>#(true-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^ source.typst variable.other.readwrite.typst
+#       ^ source.typst meta.brace.round.typst
+>#(break-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^ source.typst variable.other.readwrite.typst
+#        ^ source.typst meta.brace.round.typst
+>#(continue-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^^^ source.typst variable.other.readwrite.typst
+#           ^ source.typst meta.brace.round.typst
+>#(and-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^ source.typst variable.other.readwrite.typst
+#      ^ source.typst meta.brace.round.typst
+>#(or-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^ source.typst variable.other.readwrite.typst
+#     ^ source.typst meta.brace.round.typst
+>#(not-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^ source.typst variable.other.readwrite.typst
+#      ^ source.typst meta.brace.round.typst
+>#(return-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^ source.typst variable.other.readwrite.typst
+#         ^ source.typst meta.brace.round.typst
+>#(as-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^ source.typst variable.other.readwrite.typst
+#     ^ source.typst meta.brace.round.typst
+>#(in-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^ source.typst variable.other.readwrite.typst
+#     ^ source.typst meta.brace.round.typst
+>#(include-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^^ source.typst variable.other.readwrite.typst
+#          ^ source.typst meta.brace.round.typst
+>#(import-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^ source.typst variable.other.readwrite.typst
+#         ^ source.typst meta.brace.round.typst
+>#(let-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^ source.typst variable.other.readwrite.typst
+#      ^ source.typst meta.brace.round.typst
+>#(else-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^ source.typst variable.other.readwrite.typst
+#       ^ source.typst meta.brace.round.typst
+>#(if-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^ source.typst variable.other.readwrite.typst
+#     ^ source.typst meta.brace.round.typst
+>#(for-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^ source.typst variable.other.readwrite.typst
+#      ^ source.typst meta.brace.round.typst
+>#(while-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^ source.typst variable.other.readwrite.typst
+#        ^ source.typst meta.brace.round.typst
+>#(context-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^^ source.typst variable.other.readwrite.typst
+#          ^ source.typst meta.brace.round.typst
+>#(set-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^ source.typst variable.other.readwrite.typst
+#      ^ source.typst meta.brace.round.typst
+>#(show-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^ source.typst variable.other.readwrite.typst
+#       ^ source.typst meta.brace.round.typst
+>
+>#(x-true-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^ source.typst variable.other.readwrite.typst
+#         ^ source.typst meta.brace.round.typst
+>#(x-auto-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^ source.typst variable.other.readwrite.typst
+#         ^ source.typst meta.brace.round.typst
+>#(x-any-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^ source.typst variable.other.readwrite.typst
+#        ^ source.typst meta.brace.round.typst
+>#(x-none-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^ source.typst variable.other.readwrite.typst
+#         ^ source.typst meta.brace.round.typst
+>#(x-false-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^^ source.typst variable.other.readwrite.typst
+#          ^ source.typst meta.brace.round.typst
+>#(x-true-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^ source.typst variable.other.readwrite.typst
+#         ^ source.typst meta.brace.round.typst
+>#(x-break-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^^ source.typst variable.other.readwrite.typst
+#          ^ source.typst meta.brace.round.typst
+>#(x-continue-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^^^^^ source.typst variable.other.readwrite.typst
+#             ^ source.typst meta.brace.round.typst
+>#(x-and-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^ source.typst variable.other.readwrite.typst
+#        ^ source.typst meta.brace.round.typst
+>#(x-or-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^ source.typst variable.other.readwrite.typst
+#       ^ source.typst meta.brace.round.typst
+>#(x-not-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^ source.typst variable.other.readwrite.typst
+#        ^ source.typst meta.brace.round.typst
+>#(x-return-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^^^ source.typst variable.other.readwrite.typst
+#           ^ source.typst meta.brace.round.typst
+>#(x-as-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^ source.typst variable.other.readwrite.typst
+#       ^ source.typst meta.brace.round.typst
+>#(x-in-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^ source.typst variable.other.readwrite.typst
+#       ^ source.typst meta.brace.round.typst
+>#(x-include-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^^^^ source.typst variable.other.readwrite.typst
+#            ^ source.typst meta.brace.round.typst
+>#(x-import-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^^^ source.typst variable.other.readwrite.typst
+#           ^ source.typst meta.brace.round.typst
+>#(x-let-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^ source.typst variable.other.readwrite.typst
+#        ^ source.typst meta.brace.round.typst
+>#(x-else-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^ source.typst variable.other.readwrite.typst
+#         ^ source.typst meta.brace.round.typst
+>#(x-if-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^ source.typst variable.other.readwrite.typst
+#       ^ source.typst meta.brace.round.typst
+>#(x-for-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^ source.typst variable.other.readwrite.typst
+#        ^ source.typst meta.brace.round.typst
+>#(x-while-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^^ source.typst variable.other.readwrite.typst
+#          ^ source.typst meta.brace.round.typst
+>#(x-context-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^^^^ source.typst variable.other.readwrite.typst
+#            ^ source.typst meta.brace.round.typst
+>#(x-set-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^ source.typst variable.other.readwrite.typst
+#        ^ source.typst meta.brace.round.typst
+>#(x-show-)
+#^ source.typst punctuation.definition.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^^ source.typst variable.other.readwrite.typst
+#         ^ source.typst meta.brace.round.typst
+>
+>A and B
+#^^^^^^^^ source.typst
