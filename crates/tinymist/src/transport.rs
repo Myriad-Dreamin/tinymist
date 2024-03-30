@@ -1,15 +1,10 @@
 use std::{
-    io::{self, BufRead, Write},
+    io::{self, BufRead, Read, Write},
     thread,
 };
 
 use crossbeam_channel::{bounded, Receiver, Sender};
-
-use crate::Message;
-
-use std::io::Read;
-
-use lsp_server::Connection;
+use lsp_server::{Connection, Message};
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]

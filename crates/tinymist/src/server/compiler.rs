@@ -82,6 +82,17 @@ pub struct CompileServer {
     /// The language server client.
     pub client: LspHost<CompileServer>,
 
+    // State to synchronize with the client.
+    /// Whether the server is shutting down.
+    pub shutdown_requested: bool,
+
+    // Configurations
+    /// User configuration from the editor.
+    pub config: CompileConfig,
+    /// Const configuration initialized at the start of the session.
+    /// For example, the position encoding.
+    pub const_config: CompilerConstConfig,
+
     // Command maps
     /// Extra commands provided with `textDocument/executeCommand`.
     pub exec_cmds: ExecuteCmdMap,
@@ -90,25 +101,17 @@ pub struct CompileServer {
     /// Regular commands for dispatching.
     pub regular_cmds: RegularCmdMap,
 
-    // State to synchronize with the client.
-    /// Whether the server is shutting down.
-    pub shutdown_requested: bool,
-    // Configurations
-    /// User configuration from the editor.
-    pub config: CompileConfig,
-    /// Const configuration initialized at the start of the session.
-    /// For example, the position encoding.
-    pub const_config: CompilerConstConfig,
-    // /// The default opts for the compiler.
-    // pub compile_opts: CompileOnceOpts,
-    pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
-
     // Resources
-    pub font: Deferred<SharedFontResolver>,
-    pub compiler: Option<CompileClientActor>,
+    /// The runtime handle to spawn tasks.
     pub handle: tokio::runtime::Handle,
+    /// The font resolver to use.
+    pub font: Deferred<SharedFontResolver>,
     /// Source synchronized with client
     pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
+    /// The diagnostics sender to send diagnostics to `crate::actor::cluster`.
+    pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
+    /// The compiler actor.
+    pub compiler: Option<CompileClientActor>,
 }
 
 impl CompileServer {

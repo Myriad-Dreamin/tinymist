@@ -6,9 +6,9 @@ use crate::{prelude::*, SemanticTokenContext};
 ///
 /// [`textDocument/semanticTokens/full/delta`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_semanticTokens
 ///
-/// Similar to [`semantic_tokens_full`](Self::semantic_tokens_full), except it
-/// returns a sequence of [`SemanticTokensEdit`] to transform a previous result
-/// into a new result.
+/// Similar to [`semantic_tokens_full`](crate::SemanticTokensFullRequest),
+/// except it returns a sequence of [`lsp_types::SemanticTokensEdit`] to
+/// transform a previous result into a new result.
 ///
 /// # Compatibility
 ///

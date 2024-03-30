@@ -11,7 +11,7 @@ use crate::{prelude::*, SemanticTokenContext};
 /// tokens with numbers. In addition, optional support for deltas is available,
 /// i.e. [`semantic_tokens_full_delta`].
 ///
-/// [`semantic_tokens_full_delta`]: Self::semantic_tokens_full_delta
+/// [`semantic_tokens_full_delta`]: crate::SemanticTokensDeltaRequest
 ///
 /// # Compatibility
 ///
