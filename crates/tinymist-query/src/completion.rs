@@ -83,6 +83,17 @@ impl StatefulRequest for CompletionRequest {
         let node = root.leaf_at(cursor);
         let deref_target = node.and_then(|node| get_deref_target(node, cursor));
 
+        if let Some(d) = &deref_target {
+            let node = d.node();
+            // skip if is the let binding item, todo, check whether the pattern is exact
+            if matches!(
+                node.parent_kind(),
+                Some(SyntaxKind::LetBinding | SyntaxKind::Closure)
+            ) {
+                return None;
+            }
+        }
+
         let mut match_ident = None;
         let mut completion_result = None;
         match deref_target {
@@ -184,7 +195,7 @@ fn complete_path(
     if !compl_path.is_dir() {
         compl_path = compl_path.parent().unwrap_or(Path::new(""));
     }
-    log::info!("compl_path: {src_path:?} + {path:?} -> {compl_path:?}");
+    log::debug!("compl_path: {src_path:?} + {path:?} -> {compl_path:?}");
 
     if compl_path.is_absolute() {
         log::warn!("absolute path completion is not supported for security consideration {path:?}");
@@ -192,7 +203,7 @@ fn complete_path(
     }
 
     let dirs = ctx.analysis.root.join(compl_path);
-    log::info!("compl_dirs: {dirs:?}");
+    log::debug!("compl_dirs: {dirs:?}");
     // find directory or files in the path
     let mut folder_completions = vec![];
     let mut module_completions = vec![];
@@ -231,7 +242,7 @@ fn complete_path(
             let w = pathdiff::diff_paths(&path, base)?;
             unix_slash(&w).into()
         };
-        log::info!("compl_label: {label:?}");
+        log::debug!("compl_label: {label:?}");
 
         if path.is_dir() {
             folder_completions.push(Completion {
@@ -286,7 +297,7 @@ fn complete_path(
                     ..Default::default()
                 };
 
-                log::info!("compl_res: {res:?}");
+                log::debug!("compl_res: {res:?}");
 
                 res
             })
