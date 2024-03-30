@@ -292,6 +292,10 @@ impl CompileClientActor {
         }
     }
 
+    pub fn sync_config(&mut self, config: CompileConfig) {
+        self.config = config;
+    }
+
     pub fn change_entry(&self, path: Option<ImmutPath>) -> Result<(), Error> {
         if path
             .as_deref()

@@ -315,6 +315,10 @@ impl CompileServer {
             }
         }
 
+        if let Some(e) = self.compiler.as_mut() {
+            e.sync_config(self.config.clone());
+        }
+
         info!("new settings applied");
         if config.output_path != self.config.output_path
             || config.export_pdf != self.config.export_pdf

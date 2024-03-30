@@ -13,7 +13,7 @@ use tinymist::{
     compiler_init::{CompileInit, CompileInitializeParams},
     harness::{lsp_harness, InitializedLspDriver, LspDriver, LspHost},
     transport::with_stdio_transport,
-    CompileFontOpts, CompileOpts, Init, LspWorld, TypstLanguageServer,
+    CompileFontOpts, Init, LspWorld, TypstLanguageServer,
 };
 use tokio::sync::mpsc;
 use typst::{foundations::IntoValue, syntax::Span};
@@ -82,12 +82,9 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
         ) {
             Init {
                 host,
-                compile_opts: CompileOpts {
-                    font: CompileFontOpts {
-                        font_paths: self.args.font.font_paths.clone(),
-                        no_system_fonts: self.args.font.no_system_fonts,
-                        ..Default::default()
-                    },
+                compile_opts: CompileFontOpts {
+                    font_paths: self.args.font.font_paths.clone(),
+                    no_system_fonts: self.args.font.no_system_fonts,
                     ..Default::default()
                 },
             }
