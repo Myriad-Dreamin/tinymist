@@ -1,5 +1,5 @@
 >#(it => it)
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^^ source.typst variable.parameter.typst
 #    ^ source.typst
@@ -8,7 +8,7 @@
 #        ^^ source.typst variable.other.readwrite.typst
 #          ^ source.typst meta.brace.round.typst
 >#((it) => it)
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst meta.brace.round.typst
 #   ^^ source.typst variable.other.readwrite.typst
@@ -19,7 +19,7 @@
 #          ^^ source.typst variable.other.readwrite.typst
 #            ^ source.typst meta.brace.round.typst
 >#((it) => (it))
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst meta.brace.round.typst
 #   ^^ source.typst variable.other.readwrite.typst
@@ -32,7 +32,7 @@
 #             ^ source.typst meta.brace.round.typst
 #              ^ source.typst meta.brace.round.typst
 >#((u, v) => (it))
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst meta.brace.round.typst
 #   ^ source.typst variable.other.readwrite.typst
@@ -48,7 +48,7 @@
 #               ^ source.typst meta.brace.round.typst
 #                ^ source.typst meta.brace.round.typst
 >#(((u, v) => (it)))
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst meta.brace.round.typst
 #   ^ source.typst meta.brace.round.typst
@@ -66,7 +66,7 @@
 #                 ^ source.typst meta.brace.round.typst
 #                  ^ source.typst meta.brace.round.typst
 >#((((u: t), v) => (it)))
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst meta.brace.round.typst
 #   ^ source.typst meta.brace.round.typst
@@ -89,7 +89,7 @@
 #                      ^ source.typst meta.brace.round.typst
 #                       ^ source.typst meta.brace.round.typst
 >#((((u: (t: (w: (x: x)))), (u: (t: (w: (x: y))))) => (it)))
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst meta.brace.round.typst
 #   ^ source.typst meta.brace.round.typst
@@ -147,7 +147,7 @@
 #                                                         ^ source.typst meta.brace.round.typst
 #                                                          ^ source.typst meta.brace.round.typst
 >#(it => {})
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^^ source.typst variable.parameter.typst
 #    ^ source.typst

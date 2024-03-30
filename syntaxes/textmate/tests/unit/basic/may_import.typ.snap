@@ -1,5 +1,5 @@
 >#let evil_import() = import "base.typ"
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^^^^^^^^^^^ source.typst meta.expr.let.typst entity.name.function.typst
@@ -13,14 +13,14 @@
 #                             ^^^^^^^^ source.typst meta.expr.let.typst meta.expr.import.typst string.quoted.double.typst
 #                                     ^ source.typst meta.expr.let.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
 >#import "base.typ"
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #       ^ source.typst meta.expr.import.typst
 #        ^ source.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
 #         ^^^^^^^^ source.typst meta.expr.import.typst string.quoted.double.typst
 #                 ^ source.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
 >#import ("base.typ")
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #       ^ source.typst meta.expr.import.typst
 #        ^ source.typst meta.expr.import.typst meta.brace.round.typst
@@ -29,7 +29,7 @@
 #                  ^ source.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
 #                   ^ source.typst meta.expr.import.typst meta.brace.round.typst
 >#import("base.typ")
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #       ^ source.typst meta.expr.import.typst meta.brace.round.typst
 #        ^ source.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
@@ -37,7 +37,7 @@
 #                 ^ source.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
 #                  ^ source.typst meta.expr.import.typst meta.brace.round.typst
 >#import "base.typ": *
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #       ^ source.typst meta.expr.import.typst
 #        ^ source.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
@@ -47,7 +47,7 @@
 #                   ^ source.typst meta.expr.import.typst
 #                    ^ source.typst meta.expr.import.typst keyword.operator.wildcard.typst
 >#import "base.typ" as t: *
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #       ^ source.typst meta.expr.import.typst
 #        ^ source.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
@@ -61,7 +61,7 @@
 #                        ^ source.typst meta.expr.import.typst
 #                         ^ source.typst meta.expr.import.typst keyword.operator.wildcard.typst
 >#import "base.typ": x
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #       ^ source.typst meta.expr.import.typst
 #        ^ source.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
@@ -71,7 +71,7 @@
 #                   ^ source.typst meta.expr.import.typst
 #                    ^ source.typst meta.expr.import.typst variable.other.readwrite.typst
 >#import "base.typ": x as foo
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #       ^ source.typst meta.expr.import.typst
 #        ^ source.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
@@ -85,7 +85,7 @@
 #                        ^ source.typst meta.expr.import.typst
 #                         ^^^ source.typst meta.expr.import.typst variable.other.readwrite.typst
 >#import "base.typ": x as foo, y
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #       ^ source.typst meta.expr.import.typst
 #        ^ source.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
@@ -102,7 +102,7 @@
 #                             ^ source.typst meta.expr.import.typst
 #                              ^ source.typst meta.expr.import.typst variable.other.readwrite.typst
 >#import "base.typ" as foo
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #       ^ source.typst meta.expr.import.typst
 #        ^ source.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
@@ -113,7 +113,7 @@
 #                     ^ source.typst meta.expr.import.typst
 #                      ^^^ source.typst meta.expr.import.typst variable.other.readwrite.typst
 >#import "base.typ" as foo: z, x as foo, y as t
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #       ^ source.typst meta.expr.import.typst
 #        ^ source.typst meta.expr.import.typst string.quoted.double.typst punctuation.definition.string.typst
@@ -141,7 +141,7 @@
 #                                            ^ source.typst meta.expr.import.typst
 #                                             ^ source.typst meta.expr.import.typst variable.other.readwrite.typst
 >#import cetz.draw: *
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #       ^ source.typst meta.expr.import.typst
 #        ^^^^ source.typst meta.expr.import.typst variable.other.readwrite.typst

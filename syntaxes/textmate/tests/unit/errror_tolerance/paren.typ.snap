@@ -1,6 +1,6 @@
 >
 >#((show: body => 2) * body)
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst meta.brace.round.typst
 #   ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst

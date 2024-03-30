@@ -13,14 +13,14 @@
 #           ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
 >
 >#```typ abc```
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
 #    ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
 #       ^^^^ source.typst markup.raw.block.typst
 #           ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
 >
 >#(```typ abc```)
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
 #     ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
@@ -29,7 +29,7 @@
 #               ^ source.typst meta.brace.round.typst
 >
 >#text(```typ https://zh.wikipedia.org```)
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #     ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #      ^^^ source.typst meta.expr.call.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
@@ -47,7 +47,7 @@
 #^^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
 >
 >#(
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 >  ```typ
 #^^ source.typst
@@ -72,7 +72,7 @@
 #^ source.typst meta.brace.round.typst
 >
 >#let escaped-sequences = (
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^^^^^^^^^^^^^^^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst

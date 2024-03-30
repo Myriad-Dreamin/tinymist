@@ -1,10 +1,10 @@
 >#(0)
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst constant.numeric.integer.typst
 #   ^ source.typst meta.brace.round.typst
 >#let f(name) = (
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst entity.name.function.typst

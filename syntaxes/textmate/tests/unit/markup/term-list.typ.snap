@@ -6,7 +6,7 @@
 >/ #text(red, "a"): b
 #^ source.typst punctuation.definition.list.description.typst
 # ^ source.typst
-#  ^ source.typst punctuation.definition.hash.typst
+#  ^ source.typst keyword.control.hash.typst
 #   ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #       ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #        ^^^ source.typst meta.expr.call.typst support.type.builtin.typst

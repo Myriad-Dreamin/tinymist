@@ -1,5 +1,5 @@
 >#let x = 1;
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
@@ -8,7 +8,7 @@
 #         ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
 #          ^ source.typst punctuation.terminator.statement.typst
 >#let (x) = 1;
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst meta.brace.round.typst
@@ -19,7 +19,7 @@
 #           ^ source.typst meta.expr.let.typst constant.numeric.integer.typst
 #            ^ source.typst punctuation.terminator.statement.typst
 >#let (x, y) = (1, 1);
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst meta.brace.round.typst
@@ -38,7 +38,7 @@
 #                   ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                    ^ source.typst punctuation.terminator.statement.typst
 >#let (x, (y, z)) = (1, (1, 1));
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst meta.brace.round.typst
@@ -67,7 +67,7 @@
 #                             ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                              ^ source.typst punctuation.terminator.statement.typst
 >#let (a: a) = (a: 1);
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst meta.brace.round.typst
@@ -86,7 +86,7 @@
 #                   ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                    ^ source.typst punctuation.terminator.statement.typst
 >#let (a, (b: b)) = (1, (b: 1));
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst meta.brace.round.typst
@@ -115,7 +115,7 @@
 #                             ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                              ^ source.typst punctuation.terminator.statement.typst
 >#let (a, (b: (c, (b: b)))) = (a, (b: (1, (b: b))));
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst meta.brace.round.typst
@@ -164,7 +164,7 @@
 #                                                 ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                                                  ^ source.typst punctuation.terminator.statement.typst
 >#let ((b: (c, (b: b))), a) = ((b: (1, (b: b))), a);
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst meta.brace.round.typst
@@ -213,7 +213,7 @@
 #                                                 ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                                                  ^ source.typst punctuation.terminator.statement.typst
 >#let (a, ..) = (1, 1);
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst meta.brace.round.typst
@@ -232,7 +232,7 @@
 #                    ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                     ^ source.typst punctuation.terminator.statement.typst
 >#let (.., a) = (1, 1);
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst meta.brace.round.typst
@@ -251,7 +251,7 @@
 #                    ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                     ^ source.typst punctuation.terminator.statement.typst
 >#let (a: a, ..) = (a: a);
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst meta.brace.round.typst
@@ -273,7 +273,7 @@
 #                       ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                        ^ source.typst punctuation.terminator.statement.typst
 >#let (.., a: a) = (a: a);
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst meta.brace.round.typst
@@ -295,7 +295,7 @@
 #                       ^ source.typst meta.expr.let.typst meta.brace.round.typst
 #                        ^ source.typst punctuation.terminator.statement.typst
 >#let (a: a, .., b: b) = (a: a, b: b);
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.let.typst storage.type.typst
 #    ^ source.typst meta.expr.let.typst
 #     ^ source.typst meta.expr.let.typst meta.brace.round.typst
