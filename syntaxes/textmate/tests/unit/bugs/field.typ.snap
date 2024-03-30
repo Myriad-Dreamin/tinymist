@@ -1,5 +1,5 @@
 >#figure(caption: [test])[].caption
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst entity.name.function.hash.typst
 # ^^^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #       ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #        ^^^^^^^ source.typst meta.expr.call.typst variable.other.readwrite.typst

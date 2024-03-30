@@ -1,5 +1,5 @@
 >#for i
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^^ source.typst meta.expr.for.typst
 >#for i in
 #^ source.typst meta.expr.for.typst
@@ -36,7 +36,7 @@
 #                   ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 >#for i in []
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
@@ -46,7 +46,7 @@
 #          ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #           ^ source.typst meta.expr.for.typst meta.brace.square.typst
 >#for i in []; 1
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
@@ -58,7 +58,7 @@
 #            ^ source.typst punctuation.terminator.statement.typst
 #             ^^^ source.typst
 >#for i in range(1) []; 1
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
@@ -75,7 +75,7 @@
 #                     ^ source.typst punctuation.terminator.statement.typst
 #                      ^^^ source.typst
 >#for i in range(1) []1
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
@@ -91,7 +91,7 @@
 #                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                     ^^ source.typst
 >#for i in range(1) []a
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
@@ -107,7 +107,7 @@
 #                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                     ^^ source.typst
 >#for i in range(1) [] 1
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
@@ -123,7 +123,7 @@
 #                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                     ^^^ source.typst
 >#for i in range(1) [] a
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
@@ -139,7 +139,7 @@
 #                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                     ^^^ source.typst
 >#for i in range(1) []
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
@@ -154,7 +154,7 @@
 #                   ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                    ^ source.typst meta.expr.for.typst meta.brace.square.typst
 >#for i in range(1) []; []
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
@@ -171,7 +171,7 @@
 #                     ^ source.typst punctuation.terminator.statement.typst
 #                      ^^^^ source.typst
 >#for i in range(1) [] []
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst

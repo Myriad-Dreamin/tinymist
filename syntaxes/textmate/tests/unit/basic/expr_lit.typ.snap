@@ -1,19 +1,19 @@
 >#()
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst meta.brace.round.typst
 >#( )
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst
 #   ^ source.typst meta.brace.round.typst
 >#(:)
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst punctuation.separator.colon.typst
 #   ^ source.typst meta.brace.round.typst
 >#( : )
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst
 #   ^ source.typst punctuation.separator.colon.typst

@@ -1,5 +1,5 @@
 >#{func(}
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.curly.typst
 #  ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #      ^ source.typst meta.expr.call.typst meta.brace.round.typst

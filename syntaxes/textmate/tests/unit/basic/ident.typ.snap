@@ -1,6 +1,6 @@
 >#text
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^^^^ source.typst variable.other.readwrite.typst
 >#我们
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^^ source.typst variable.other.readwrite.typst

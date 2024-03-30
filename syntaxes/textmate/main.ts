@@ -285,6 +285,29 @@ const markup: textmate.Pattern = {
   ],
 };
 
+const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
+  return {
+    /// name: 'markup.expr.typst'
+    begin: new RegExp("#" + seek.source),
+    end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[])|(?=[\s\]\}\)]|$)|(;)/,
+    beginCaptures: {
+      "0": {
+        name: kind,
+      },
+    },
+    endCaptures: {
+      "1": {
+        name: "punctuation.terminator.statement.typst",
+      },
+    },
+    patterns: [
+      {
+        include: "#expression",
+      },
+    ],
+  };
+};
+
 const markupEnterCode: textmate.Pattern = {
   patterns: [
     /// hash and follows a space
@@ -308,26 +331,25 @@ const markupEnterCode: textmate.Pattern = {
         },
       },
     },
-    {
-      /// name: 'markup.expr.typst'
-      begin: /#/,
-      end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[])|(?=[\s\]\}\)]|$)|(;)/,
-      beginCaptures: {
-        "0": {
-          name: "punctuation.definition.hash.typst",
-        },
-      },
-      endCaptures: {
-        "1": {
-          name: "punctuation.terminator.statement.typst",
-        },
-      },
-      patterns: [
-        {
-          include: "#expression",
-        },
-      ],
-    },
+    enterExpression(
+      "keyword.control.hash.typst",
+      /(?=(?:break|continue|and|or|not|return|as|in|include|import|let|else|if|for|while|context|set|show)\b(?!-))/
+    ),
+    enterExpression(
+      "entity.name.type.primitive.hash.typst",
+      /(?=(?:auto|any|none|false|true|str|int|float|bool|length|content)\b(?!-))/
+    ),
+    enterExpression(
+      "entity.name.function.hash.typst",
+      /(?=[\p{XID_Start}_][\p{XID_Continue}_\-]*\()/
+    ),
+    enterExpression(
+      "variable.other.readwrite.hash.typst",
+      /(?=[\p{XID_Start}_])/
+    ),
+    enterExpression("string.hash.hash.typst", /(?=\")/),
+    enterExpression("constant.numeric.hash.typst", /(?=\d)/),
+    enterExpression("keyword.control.hash.typst", new RegExp("")),
   ],
 };
 
@@ -417,7 +439,7 @@ const expression = (): textmate.Grammar => {
       },
       {
         match: /\b(and|or|not)\b(?!-)/,
-        name: "keyword.operator.word.typst",
+        name: "keyword.operator.logical.typst",
       },
       {
         match: /\b(return)\b(?!-)/,

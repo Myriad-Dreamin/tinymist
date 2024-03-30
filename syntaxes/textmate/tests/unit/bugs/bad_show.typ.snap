@@ -1,5 +1,5 @@
 >#show math.equation: i-figured.show-equation.with(level:0,numbering:"(1)")
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
 #     ^ source.typst meta.expr.show.typst
 #      ^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst

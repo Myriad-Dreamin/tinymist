@@ -3,8 +3,8 @@
 >#
 #^ source.typst punctuation.definition.hash.typst
 >#1pt #1pt
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst constant.numeric.hash.typst
 # ^^^ source.typst constant.numeric.length.typst
 #    ^ source.typst
-#     ^ source.typst punctuation.definition.hash.typst
+#     ^ source.typst constant.numeric.hash.typst
 #      ^^^ source.typst constant.numeric.length.typst

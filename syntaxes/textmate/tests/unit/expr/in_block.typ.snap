@@ -1,11 +1,11 @@
 >#{
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.curly.typst
 >  false                   and           true;
 #^^ source.typst
 #  ^^^^^ source.typst entity.name.type.primitive.typst
 #       ^^^^^^^^^^^^^^^^^^^ source.typst
-#                          ^^^ source.typst keyword.operator.word.typst
+#                          ^^^ source.typst keyword.operator.logical.typst
 #                             ^^^^^^^^^^^ source.typst
 #                                        ^^^^ source.typst entity.name.type.primitive.typst
 #                                            ^ source.typst punctuation.separator.colon.typst
@@ -33,7 +33,7 @@
 #^ source.typst meta.brace.curly.typst
 >
 >#{
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.curly.typst
 >  while false  == 3 {}
 #^^ source.typst
@@ -52,7 +52,7 @@
 #^ source.typst meta.brace.curly.typst
 >
 >#{
-#^ source.typst punctuation.definition.hash.typst
+#^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.curly.typst
 >  set text(red)                 if          false
 #^^ source.typst
@@ -68,7 +68,7 @@
 #                                            ^^^^^ source.typst meta.expr.set.typst entity.name.type.primitive.typst
 >  and true
 #^^ source.typst
-#  ^^^ source.typst keyword.operator.word.typst
+#  ^^^ source.typst keyword.operator.logical.typst
 #     ^ source.typst
 #      ^^^^ source.typst entity.name.type.primitive.typst
 >}
