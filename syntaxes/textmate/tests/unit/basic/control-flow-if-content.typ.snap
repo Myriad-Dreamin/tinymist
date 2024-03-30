@@ -52,7 +52,7 @@
 #               ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #                ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #                 ^ source.typst
-#                  ^ source.typst keyword.control.hash.typst
+#                  ^ source.typst constant.numeric.hash.typst
 #                   ^ source.typst constant.numeric.integer.typst
 >#if [] [] else [] []
 #^ source.typst keyword.control.hash.typst
@@ -84,7 +84,7 @@
 #               ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #                ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #                 ^ source.typst
-#                  ^ source.typst keyword.control.hash.typst
+#                  ^ source.typst punctuation.definition.hash.typst
 #                   ^ source.typst
 #                    ^^ source.typst
 >
@@ -157,7 +157,7 @@
 >1
 #^^ source.typst
 ># if () [] else []
-#^ source.typst keyword.control.hash.typst
+#^ source.typst punctuation.definition.hash.typst
 # ^ source.typst
 #  ^^^^^^^^^^^^^^^^^ source.typst
 >1

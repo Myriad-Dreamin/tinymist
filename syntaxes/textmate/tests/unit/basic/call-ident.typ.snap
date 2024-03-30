@@ -24,7 +24,7 @@
 #             ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
 #              ^ source.typst meta.expr.let.typst meta.brace.round.typst
 >#g.insert("g", g)
-#^ source.typst keyword.control.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^ source.typst variable.other.readwrite.typst
 #  ^ source.typst meta.expr.call.typst keyword.operator.accessor.typst
 #   ^^^^^^ source.typst meta.expr.call.typst entity.name.function.typst
@@ -38,32 +38,32 @@
 #                ^ source.typst meta.expr.call.typst meta.brace.round.typst
 >
 >#f()
-#^ source.typst keyword.control.hash.typst
+#^ source.typst entity.name.function.hash.typst
 # ^ source.typst meta.expr.call.typst entity.name.function.typst
 #  ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #   ^ source.typst meta.expr.call.typst meta.brace.round.typst
 >#f() []
-#^ source.typst keyword.control.hash.typst
+#^ source.typst entity.name.function.hash.typst
 # ^ source.typst meta.expr.call.typst entity.name.function.typst
 #  ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #   ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #    ^^^^ source.typst
 >#f() ()
-#^ source.typst keyword.control.hash.typst
+#^ source.typst entity.name.function.hash.typst
 # ^ source.typst meta.expr.call.typst entity.name.function.typst
 #  ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #   ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #    ^^^^ source.typst
 >#f ()
-#^ source.typst keyword.control.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^ source.typst variable.other.readwrite.typst
 #  ^^^^ source.typst
 >#f []
-#^ source.typst keyword.control.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^ source.typst variable.other.readwrite.typst
 #  ^^^^ source.typst
 >#f[] []
-#^ source.typst keyword.control.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^ source.typst meta.expr.call.typst entity.name.function.typst
 #  ^ source.typst meta.expr.call.typst meta.brace.square.typst
 #   ^ source.typst meta.expr.call.typst meta.brace.square.typst
@@ -114,14 +114,14 @@
 #           ^ source.typst meta.brace.round.typst
 #            ^ source.typst meta.brace.round.typst
 >#f()()
-#^ source.typst keyword.control.hash.typst
+#^ source.typst entity.name.function.hash.typst
 # ^ source.typst meta.expr.call.typst entity.name.function.typst
 #  ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #   ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #    ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #     ^ source.typst meta.expr.call.typst meta.brace.round.typst
 >#f(f)(f, f)
-#^ source.typst keyword.control.hash.typst
+#^ source.typst entity.name.function.hash.typst
 # ^ source.typst meta.expr.call.typst entity.name.function.typst
 #  ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #   ^ source.typst meta.expr.call.typst variable.other.readwrite.typst
@@ -145,14 +145,14 @@
 #         ^ source.typst meta.brace.round.typst
 >
 >#list.item[]
-#^ source.typst keyword.control.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^^^^ source.typst variable.other.readwrite.typst
 #     ^ source.typst meta.expr.call.typst keyword.operator.accessor.typst
 #      ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #          ^ source.typst meta.expr.call.typst meta.brace.square.typst
 #           ^ source.typst meta.expr.call.typst meta.brace.square.typst
 >#list[]
-#^ source.typst keyword.control.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #     ^ source.typst meta.expr.call.typst meta.brace.square.typst
 #      ^ source.typst meta.expr.call.typst meta.brace.square.typst
@@ -252,11 +252,11 @@
 #^ source.typst meta.brace.curly.typst
 >
 >#test([#": "])
-#^ source.typst keyword.control.hash.typst
+#^ source.typst entity.name.function.hash.typst
 # ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #     ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #      ^ source.typst meta.expr.call.typst meta.brace.square.typst
-#       ^ source.typst meta.expr.call.typst keyword.control.hash.typst
+#       ^ source.typst meta.expr.call.typst string.hash.hash.typst
 #        ^ source.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
 #         ^^ source.typst meta.expr.call.typst string.quoted.double.typst
 #           ^ source.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
@@ -268,7 +268,7 @@
 #  ^ source.typst meta.brace.curly.typst
 >
 >#assert(str(it.fields().label))
-#^ source.typst keyword.control.hash.typst
+#^ source.typst entity.name.function.hash.typst
 # ^^^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #       ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #        ^^^ source.typst meta.expr.call.typst meta.expr.call.typst entity.name.function.typst
@@ -288,7 +288,7 @@
 #  ^ source.typst meta.brace.curly.typst
 >
 >#table(..range(6))
-#^ source.typst keyword.control.hash.typst
+#^ source.typst entity.name.function.hash.typst
 # ^^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #      ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #       ^^ source.typst meta.expr.call.typst keyword.operator.spread.typst

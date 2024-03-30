@@ -25,10 +25,10 @@
 #           ^ source.typst
 #            ^^ source.typst constant.character.escape.content.typst
 >#x \
-#^ source.typst keyword.control.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^ source.typst variable.other.readwrite.typst
 #  ^ source.typst
 #   ^^ source.typst constant.character.escape.content.typst
 >#x
-#^ source.typst keyword.control.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^ source.typst variable.other.readwrite.typst

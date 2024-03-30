@@ -311,10 +311,9 @@ fn token_from_node(node: &LinkedNode) -> Option<TokenType> {
         RefMarker => Some(TokenType::Ref),
         Heading | HeadingMarker => Some(TokenType::Heading),
         ListMarker | EnumMarker | TermMarker => Some(TokenType::ListMarker),
+        Not | And | Or => Some(TokenType::Keyword),
         MathAlignPoint | Plus | Minus | Slash | Hat | Dot | Eq | EqEq | ExclEq | Lt | LtEq | Gt
-        | GtEq | PlusEq | HyphEq | StarEq | SlashEq | Dots | Arrow | Not | And | Or => {
-            Some(TokenType::Operator)
-        }
+        | GtEq | PlusEq | HyphEq | StarEq | SlashEq | Dots | Arrow => Some(TokenType::Operator),
         Dollar => Some(TokenType::Delimiter),
         None | Auto | Let | Show | If | Else | For | In | While | Break | Continue | Return
         | Import | Include | As | Set | Context => Some(TokenType::Keyword),

@@ -29,7 +29,7 @@
 #               ^ source.typst meta.brace.round.typst
 >
 >#text(```typ https://zh.wikipedia.org```)
-#^ source.typst keyword.control.hash.typst
+#^ source.typst entity.name.function.hash.typst
 # ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #     ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #      ^^^ source.typst meta.expr.call.typst markup.raw.block.typst punctuation.definition.raw.begin.typst

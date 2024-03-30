@@ -1,5 +1,5 @@
 >#x => y
-#^ source.typst keyword.control.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^ source.typst variable.parameter.typst
 #  ^ source.typst
 #   ^^ source.typst storage.type.function.arrow.typst

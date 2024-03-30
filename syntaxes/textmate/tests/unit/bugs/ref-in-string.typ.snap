@@ -1,5 +1,5 @@
 >#"@myriaddreamin"
-#^ source.typst keyword.control.hash.typst
+#^ source.typst string.hash.hash.typst
 # ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
 #  ^^^^^^^^^^^^^^ source.typst string.quoted.double.typst
 #                ^ source.typst string.quoted.double.typst punctuation.definition.string.typst

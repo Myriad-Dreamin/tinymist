@@ -1,6 +1,6 @@
 >#text
-#^ source.typst keyword.control.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^^^^ source.typst variable.other.readwrite.typst
 >#我们
-#^ source.typst keyword.control.hash.typst
+#^ source.typst variable.other.readwrite.hash.typst
 # ^^ source.typst variable.other.readwrite.typst
