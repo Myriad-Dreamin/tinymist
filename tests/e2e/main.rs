@@ -358,16 +358,6 @@ fn e2e() {
     std::env::set_var("RUST_BACKTRACE", "full");
 
     let cwd = find_git_root().unwrap();
-    if true {
-        let w = Command::new("cargo")
-            .args(["build", "--release", "--bin", "tinymist"])
-            .status();
-        assert!(handle_io(w).success());
-        handle_io(std::fs::copy(
-            cwd.join("target/release/tinymist.exe"),
-            cwd.join("editors/vscode/out/tinymist.exe"),
-        ));
-    }
 
     let tinymist_binary = if cfg!(windows) {
         cwd.join("editors/vscode/out/tinymist.exe")
