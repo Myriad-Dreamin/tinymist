@@ -54,12 +54,12 @@
 #          ^ source.typst meta.brace.round.typst
 >#not a
 #^ source.typst keyword.control.hash.typst
-# ^^^ source.typst keyword.operator.logical.typst
+# ^^^ source.typst keyword.other.logical.typst
 #    ^^^ source.typst
 >#(not a)
 #^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
-#  ^^^ source.typst keyword.operator.logical.typst
+#  ^^^ source.typst keyword.other.logical.typst
 #     ^ source.typst
 #      ^ source.typst variable.other.readwrite.typst
 #       ^ source.typst meta.brace.round.typst
@@ -68,7 +68,7 @@
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst variable.other.readwrite.typst
 #   ^ source.typst
-#    ^^^ source.typst keyword.operator.logical.typst
+#    ^^^ source.typst keyword.other.logical.typst
 #       ^ source.typst
 #        ^^^ source.typst support.type.builtin.typst
 #           ^ source.typst meta.brace.round.typst
@@ -77,7 +77,7 @@
 # ^ source.typst meta.brace.round.typst
 #  ^ source.typst variable.other.readwrite.typst
 #   ^ source.typst
-#    ^^ source.typst keyword.operator.logical.typst
+#    ^^ source.typst keyword.other.logical.typst
 #      ^ source.typst
 #       ^^^ source.typst support.type.builtin.typst
 #          ^ source.typst meta.brace.round.typst

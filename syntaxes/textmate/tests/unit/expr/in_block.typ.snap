@@ -5,7 +5,7 @@
 #^^ source.typst
 #  ^^^^^ source.typst entity.name.type.primitive.typst
 #       ^^^^^^^^^^^^^^^^^^^ source.typst
-#                          ^^^ source.typst keyword.operator.logical.typst
+#                          ^^^ source.typst keyword.other.logical.typst
 #                             ^^^^^^^^^^^ source.typst
 #                                        ^^^^ source.typst entity.name.type.primitive.typst
 #                                            ^ source.typst punctuation.separator.colon.typst
@@ -68,7 +68,7 @@
 #                                            ^^^^^ source.typst meta.expr.set.typst entity.name.type.primitive.typst
 >  and true
 #^^ source.typst
-#  ^^^ source.typst keyword.operator.logical.typst
+#  ^^^ source.typst keyword.other.logical.typst
 #     ^ source.typst
 #      ^^^^ source.typst entity.name.type.primitive.typst
 >}

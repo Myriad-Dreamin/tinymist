@@ -439,7 +439,7 @@ const expression = (): textmate.Grammar => {
       },
       {
         match: /\b(and|or|not)\b(?!-)/,
-        name: "keyword.operator.logical.typst",
+        name: "keyword.other.logical.typst",
       },
       {
         match: /\b(return)\b(?!-)/,
@@ -462,6 +462,7 @@ const expression = (): textmate.Grammar => {
       { include: "#primitiveColors" },
       { include: "#primitiveFunctions" },
       { include: "#primitiveTypes" },
+      // todo: enable if only if for completely right grammar
       { include: "#identifier" },
       { include: "#constants" },
       {
