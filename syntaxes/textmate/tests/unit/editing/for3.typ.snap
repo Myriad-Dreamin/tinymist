@@ -1,0 +1,11 @@
+>#for i in 
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
+#    ^ source.typst meta.expr.for.typst
+#     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
+#      ^ source.typst meta.expr.for.typst
+#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#         ^^ source.typst meta.expr.for.typst
+>
+>test
+#^^^^^ source.typst

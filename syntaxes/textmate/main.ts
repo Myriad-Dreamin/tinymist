@@ -1028,7 +1028,7 @@ const forStatement = (): textmate.Grammar => {
   const forStatement: textmate.Pattern = {
     name: "meta.expr.for.typst",
     begin: lookAhead(/(for\b(?!-))\s*/),
-    end: /(?<=[\}\]])(?=\s*[\n\S;\}\]\)])(?!\s*[\{\[])/,
+    end: /(?<=[\}\]])(?=\s*[\n\S;\}\]\)])(?!\s*[\{\[])|\n/,
     patterns: [
       /// Matches any comments
       {
@@ -1055,7 +1055,7 @@ const forStatement = (): textmate.Grammar => {
     begin: new RegExp(
       /(for\b)\s*/.source + `(${BRACE_FREE_EXPR}|${CODE_BLOCK})\\s*(in)\\s*`
     ),
-    end: /(?=[;{\[\}\]\)]|$)/,
+    end: /(?=[;{\[\}\]\)\n]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -1113,7 +1113,7 @@ const whileStatement = (): textmate.Grammar => {
   const whileStatement: textmate.Pattern = {
     name: "meta.expr.while.typst",
     begin: lookAhead(/(while\b(?!-))/),
-    end: /(?<=\}|\])/,
+    end: /(?<=\}|\])|\n/,
     patterns: [
       /// Matches any comments
       {
@@ -1137,7 +1137,7 @@ const whileStatement = (): textmate.Grammar => {
   const whileClause: textmate.Pattern = {
     // name: "meta.while.clause.bind.typst",
     begin: /(while\b)\s*/,
-    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s+)(?=[\[\{])|(?=[;\}\]\)]|$)/,
+    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s+)(?=[\[\{])|(?=[;\}\]\)\n]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",

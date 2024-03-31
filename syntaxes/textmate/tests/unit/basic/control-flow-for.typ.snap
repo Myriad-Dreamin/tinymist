@@ -1,8 +1,8 @@
 >#for i
 #^ source.typst keyword.control.hash.typst
-# ^^^^^^ source.typst meta.expr.for.typst
+# ^^^^^ source.typst meta.expr.for.typst
 >#for i in
-#^ source.typst meta.expr.for.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
@@ -21,7 +21,7 @@
 #                ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
 #                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
 >#for i in range(1) {}
-#^ source.typst meta.expr.for.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
