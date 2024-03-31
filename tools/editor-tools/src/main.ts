@@ -5,13 +5,14 @@ import { setupVscodeChannel } from "./vscode";
 import { TemplateGallery } from "./features/template-gallery";
 import { Tracing } from "./features/tracing";
 import { Summary } from "./features/summary";
+import { Diagnostics } from "./features/diagnostics";
 
 // const isDarkMode = () =>
 //   window.matchMedia?.("(prefers-color-scheme: dark)").matches;
 
 setupVscodeChannel();
 
-type PageComponent = "template-gallery" | "tracing" | "summary";
+type PageComponent = "template-gallery" | "tracing" | "summary" | "diagnostics";
 
 interface Arguments {
   page: PageComponent;
@@ -46,7 +47,9 @@ switch (args.page) {
     break;
   case "summary":
     van.add(appHook, Summary());
-    van.add(document.querySelector("#tinymist-app")!, Tracing());
+    break;
+  case "diagnostics":
+    van.add(appHook, Diagnostics());
     break;
   default:
     throw new Error(`Unknown page: ${args.page}`);
