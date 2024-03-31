@@ -817,7 +817,7 @@ const letStatement = (): textmate.Grammar => {
   const letBindingClause: textmate.Pattern = {
     // name: "meta.let.binding.typst",
     begin: /(let\b(?!-))\s*/,
-    end: /(?=[=;\]}])/,
+    end: /(?=[=;\]}\n])/,
     beginCaptures: {
       "1": {
         name: "storage.type.typst",
@@ -1290,7 +1290,7 @@ const showStatement = (): textmate.Grammar => {
   const showSelectClause: textmate.Pattern = {
     // name: "meta.show.clause.select.typst",
     begin: /(show\b)\s*/,
-    end: /(?=[:;\}\]])/,
+    end: /(?=[:;\}\]\n])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.other.typst",
