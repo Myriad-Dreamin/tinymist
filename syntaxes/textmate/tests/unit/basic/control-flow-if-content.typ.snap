@@ -4,7 +4,7 @@
 #   ^ source.typst meta.expr.if.typst
 #    ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
 >#if [] 1
-#^ source.typst meta.expr.if.typst
+#^ source.typst keyword.control.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst
 #    ^ source.typst meta.expr.if.typst meta.brace.square.typst
@@ -12,7 +12,7 @@
 #      ^ source.typst meta.expr.if.typst
 #       ^ source.typst meta.expr.if.typst constant.numeric.integer.typst
 >#if [] else [] 1
-#^ source.typst meta.expr.if.typst
+#^ source.typst keyword.control.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst
 #    ^ source.typst meta.expr.if.typst meta.brace.square.typst

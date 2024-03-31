@@ -1,0 +1,12 @@
+>
+>#show text.where
+#^ source.typst keyword.control.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+#     ^ source.typst meta.expr.show.typst
+#      ^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+#          ^ source.typst meta.expr.show.typst keyword.operator.accessor.typst
+#           ^^^^^ source.typst meta.expr.show.typst variable.other.readwrite.typst
+>
+>test
+#^^^^^ source.typst
+>

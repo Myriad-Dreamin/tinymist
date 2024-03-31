@@ -912,7 +912,7 @@ const ifStatement = (): textmate.Grammar => {
   const ifStatement: textmate.Pattern = {
     name: "meta.expr.if.typst",
     begin: lookAhead(/(else\s+)?(if\b(?!-))/),
-    end: /(?<=\}|\])(?!\s*else\b(?!-))/,
+    end: /(?<=\}|\])(?!\s*else\b(?!-))|\n/,
     patterns: [
       /// Matches any comments
       {
@@ -946,7 +946,7 @@ const ifStatement = (): textmate.Grammar => {
   const ifClause: textmate.Pattern = {
     //   name: "meta.if.clause.typst",
     begin: /(?:(\belse)\s+)?(\bif)\s+/,
-    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s+)(?=[\[\{])|(?=[;\]}]|$)/,
+    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s*)(?=[\[\{\n])|(?=[;\n\]}]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",

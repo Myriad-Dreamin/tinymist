@@ -1,0 +1,10 @@
+>
+>#if
+#^ source.typst keyword.control.hash.typst
+# ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+>
+>test #a
+#^^^^^ source.typst
+#     ^ source.typst variable.other.readwrite.hash.typst
+#      ^ source.typst variable.other.readwrite.typst
+>
