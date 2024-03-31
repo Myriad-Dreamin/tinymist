@@ -4,13 +4,14 @@ import van from "vanjs-core";
 import { setupVscodeChannel } from "./vscode";
 import { TemplateGallery } from "./features/template-gallery";
 import { Tracing } from "./features/tracing";
+import { Summary } from "./features/summary";
 
 // const isDarkMode = () =>
 //   window.matchMedia?.("(prefers-color-scheme: dark)").matches;
 
 setupVscodeChannel();
 
-type PageComponent = "template-gallery" | "tracing";
+type PageComponent = "template-gallery" | "tracing" | "summary";
 
 interface Arguments {
   page: PageComponent;
@@ -25,7 +26,7 @@ function retrieveArgs(): Arguments {
   ///   let frontend_html = frontend_html.replace(
   ///     "editor-tools-args:{}", ...);
   /// ```
-  let mode = `editor-tools-args:{"page": "tracing"}`;
+  let mode = `editor-tools-args:{"page": "summary"}`;
   /// Remove the placeholder prefix.
   mode = mode.replace("editor-tools-args:", "");
 
@@ -35,11 +36,16 @@ function retrieveArgs(): Arguments {
 
 const args = retrieveArgs();
 
+const appHook = document.querySelector("#tinymist-app")!;
 switch (args.page) {
   case "template-gallery":
-    van.add(document.querySelector("#tinymist-app")!, TemplateGallery());
+    van.add(appHook, TemplateGallery());
     break;
   case "tracing":
+    van.add(appHook, Tracing());
+    break;
+  case "summary":
+    van.add(appHook, Summary());
     van.add(document.querySelector("#tinymist-app")!, Tracing());
     break;
   default:

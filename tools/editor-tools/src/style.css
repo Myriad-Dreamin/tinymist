@@ -130,3 +130,7 @@ body.typst-preview-light .tinymist-button.warning.activated {
 .tinymist-icon path {
   fill: WindowText;
 }
+
+.hidden {
+  display: none;
+}
