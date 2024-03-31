@@ -912,7 +912,7 @@ const ifStatement = (): textmate.Grammar => {
   const ifStatement: textmate.Pattern = {
     name: "meta.expr.if.typst",
     begin: lookAhead(/(else\s+)?(if\b(?!-))/),
-    end: /(?<=\}|\])(?!\s*else\b(?!-))|\n/,
+    end: /(?<=\}|\])(?!\s*else\b(?!-))|(?=[;\}\]\)\n]|$)/,
     patterns: [
       /// Matches any comments
       {
@@ -1028,7 +1028,7 @@ const forStatement = (): textmate.Grammar => {
   const forStatement: textmate.Pattern = {
     name: "meta.expr.for.typst",
     begin: lookAhead(/(for\b(?!-))\s*/),
-    end: /(?<=[\}\]])(?=\s*[\n\S;\}\]\)])(?!\s*[\{\[])|\n/,
+    end: /(?<=[\}\]])(?=\s*[\n\S;\}\]\)])(?!\s*[\{\[])|(?=[;\}\]\)\n]|$)/,
     patterns: [
       /// Matches any comments
       {
@@ -1113,7 +1113,7 @@ const whileStatement = (): textmate.Grammar => {
   const whileStatement: textmate.Pattern = {
     name: "meta.expr.while.typst",
     begin: lookAhead(/(while\b(?!-))/),
-    end: /(?<=\}|\])|\n/,
+    end: /(?<=\}|\])|(?=[;\}\]\)\n]|$)/,
     patterns: [
       /// Matches any comments
       {

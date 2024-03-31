@@ -2,7 +2,7 @@
 #^ source.typst keyword.control.hash.typst
 # ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
 >#while i
-#^ source.typst meta.expr.while.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
 #      ^ source.typst meta.expr.while.typst
 #       ^ source.typst meta.expr.while.typst variable.other.readwrite.typst

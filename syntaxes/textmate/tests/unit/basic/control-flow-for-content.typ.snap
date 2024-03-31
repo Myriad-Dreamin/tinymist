@@ -9,7 +9,7 @@
 #      ^ source.typst meta.expr.for.typst
 #       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
 >#for i in range(1)
-#^ source.typst meta.expr.for.typst
+#^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #    ^ source.typst meta.expr.for.typst
 #     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
