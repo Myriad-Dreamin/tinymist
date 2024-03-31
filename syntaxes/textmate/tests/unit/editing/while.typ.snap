@@ -1,0 +1,6 @@
+>#while
+#^ source.typst keyword.control.hash.typst
+# ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
+>
+>test
+#^^^^^ source.typst

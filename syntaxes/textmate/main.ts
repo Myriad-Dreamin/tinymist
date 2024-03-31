@@ -439,7 +439,7 @@ const expression = (): textmate.Grammar => {
       },
       {
         match: /\b(and|or|not)\b(?!-)/,
-        name: "keyword.operator.logical.typst",
+        name: "keyword.other.logical.typst",
       },
       {
         match: /\b(return)\b(?!-)/,
@@ -462,6 +462,7 @@ const expression = (): textmate.Grammar => {
       { include: "#primitiveColors" },
       { include: "#primitiveFunctions" },
       { include: "#primitiveTypes" },
+      // todo: enable if only if for completely right grammar
       { include: "#identifier" },
       { include: "#constants" },
       {
@@ -817,7 +818,7 @@ const letStatement = (): textmate.Grammar => {
   const letBindingClause: textmate.Pattern = {
     // name: "meta.let.binding.typst",
     begin: /(let\b(?!-))\s*/,
-    end: /(?=[=;\]}])/,
+    end: /(?=[=;\]}\n])/,
     beginCaptures: {
       "1": {
         name: "storage.type.typst",
@@ -912,7 +913,7 @@ const ifStatement = (): textmate.Grammar => {
   const ifStatement: textmate.Pattern = {
     name: "meta.expr.if.typst",
     begin: lookAhead(/(else\s+)?(if\b(?!-))/),
-    end: /(?<=\}|\])(?!\s*else\b(?!-))/,
+    end: /(?<=\}|\])(?!\s*else\b(?!-))|(?=[;\}\]\)\n]|$)/,
     patterns: [
       /// Matches any comments
       {
@@ -946,7 +947,7 @@ const ifStatement = (): textmate.Grammar => {
   const ifClause: textmate.Pattern = {
     //   name: "meta.if.clause.typst",
     begin: /(?:(\belse)\s+)?(\bif)\s+/,
-    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s+)(?=[\[\{])|(?=[;\]}]|$)/,
+    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s*)(?=[\[\{\n])|(?=[;\n\]}]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",
@@ -1028,7 +1029,7 @@ const forStatement = (): textmate.Grammar => {
   const forStatement: textmate.Pattern = {
     name: "meta.expr.for.typst",
     begin: lookAhead(/(for\b(?!-))\s*/),
-    end: /(?<=[\}\]])(?=\s*[\n\S;\}\]\)])(?!\s*[\{\[])/,
+    end: /(?<=[\}\]])(?=\s*[\n\S;\}\]\)])(?!\s*[\{\[])|(?=[;\}\]\)\n]|$)/,
     patterns: [
       /// Matches any comments
       {
@@ -1055,7 +1056,7 @@ const forStatement = (): textmate.Grammar => {
     begin: new RegExp(
       /(for\b)\s*/.source + `(${BRACE_FREE_EXPR}|${CODE_BLOCK})\\s*(in)\\s*`
     ),
-    end: /(?=[;{\[\}\]\)]|$)/,
+    end: /(?=[;{\[\}\]\)\n]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -1113,7 +1114,7 @@ const whileStatement = (): textmate.Grammar => {
   const whileStatement: textmate.Pattern = {
     name: "meta.expr.while.typst",
     begin: lookAhead(/(while\b(?!-))/),
-    end: /(?<=\}|\])/,
+    end: /(?<=\}|\])|(?=[;\}\]\)\n]|$)/,
     patterns: [
       /// Matches any comments
       {
@@ -1137,7 +1138,7 @@ const whileStatement = (): textmate.Grammar => {
   const whileClause: textmate.Pattern = {
     // name: "meta.while.clause.bind.typst",
     begin: /(while\b)\s*/,
-    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s+)(?=[\[\{])|(?=[;\}\]\)]|$)/,
+    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s+)(?=[\[\{])|(?=[;\}\]\)\n]|$)/,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -1290,7 +1291,7 @@ const showStatement = (): textmate.Grammar => {
   const showSelectClause: textmate.Pattern = {
     // name: "meta.show.clause.select.typst",
     begin: /(show\b)\s*/,
-    end: /(?=[:;\}\]])/,
+    end: /(?=[:;\}\]\n])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.other.typst",

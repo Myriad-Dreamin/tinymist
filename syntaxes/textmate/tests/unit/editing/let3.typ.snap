@@ -1,0 +1,10 @@
+>
+>#let f
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+>
+>test
+#^^^^^ source.typst
+>

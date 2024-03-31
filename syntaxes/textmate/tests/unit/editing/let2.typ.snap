@@ -1,0 +1,8 @@
+>
+>#let
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+>
+>test
+#^^^^^ source.typst
+>

@@ -1,0 +1,8 @@
+>
+>#show
+#^ source.typst keyword.control.hash.typst
+# ^^^^ source.typst meta.expr.show.typst keyword.control.other.typst
+>
+>test
+#^^^^^ source.typst
+>
