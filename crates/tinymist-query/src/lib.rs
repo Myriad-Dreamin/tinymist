@@ -26,6 +26,8 @@ pub(crate) mod completion;
 pub use completion::*;
 pub(crate) mod document_symbol;
 pub use document_symbol::*;
+pub(crate) mod document_metrics;
+pub use document_metrics::*;
 pub(crate) mod folding_range;
 pub use folding_range::*;
 pub(crate) mod goto_declaration;
@@ -186,6 +188,8 @@ mod polymorphic {
         Formatting(FormattingRequest),
         FoldingRange(FoldingRangeRequest),
         SelectionRange(SelectionRangeRequest),
+
+        DocumentMetrics(DocumentMetricsRequest),
     }
 
     impl CompilerQueryRequest {
@@ -211,6 +215,8 @@ mod polymorphic {
                 CompilerQueryRequest::Formatting(..) => ContextFreeUnique,
                 CompilerQueryRequest::FoldingRange(..) => ContextFreeUnique,
                 CompilerQueryRequest::SelectionRange(..) => ContextFreeUnique,
+
+                CompilerQueryRequest::DocumentMetrics(..) => PinnedFirst,
             }
         }
 
@@ -235,6 +241,8 @@ mod polymorphic {
                 CompilerQueryRequest::Formatting(req) => &req.path,
                 CompilerQueryRequest::FoldingRange(req) => &req.path,
                 CompilerQueryRequest::SelectionRange(req) => &req.path,
+
+                CompilerQueryRequest::DocumentMetrics(req) => &req.path,
             })
         }
     }
@@ -260,6 +268,8 @@ mod polymorphic {
         Formatting(Option<Vec<TextEdit>>),
         FoldingRange(Option<Vec<FoldingRange>>),
         SelectionRange(Option<Vec<SelectionRange>>),
+
+        DocumentMetrics(Option<DocumentMetricsResponse>),
     }
 }
 

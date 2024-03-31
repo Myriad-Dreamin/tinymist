@@ -5,8 +5,9 @@ use std::{
 };
 
 use once_cell::sync::OnceCell;
-use reflexo::{cow_mut::CowMut, ImmutPath};
+use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
 use typst::syntax::FileId as TypstFileId;
+use typst::text::Font;
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
     syntax::{package::PackageSpec, Source, VirtualPath},
@@ -78,6 +79,11 @@ pub trait AnaylsisResources {
 
     /// Get all the files in the workspace.
     fn iter_dependencies(&self, f: &mut dyn FnMut(&ImmutPath, std::time::SystemTime));
+
+    /// Resolve extra font information.
+    fn font_info(&self, _font: Font) -> Option<Arc<DataSource>> {
+        None
+    }
 }
 
 /// The context for analyzers.

@@ -266,6 +266,9 @@ impl TypstLanguageServer {
             Rename(req) => query_world!(client, Rename, req),
             PrepareRename(req) => query_world!(client, PrepareRename, req),
             Symbol(req) => query_world!(client, Symbol, req),
+
+            DocumentMetrics(req) => query_state!(client, DocumentMetrics, req),
+
             FoldingRange(..)
             | SelectionRange(..)
             | SemanticTokensDelta(..)

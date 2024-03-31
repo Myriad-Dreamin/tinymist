@@ -410,6 +410,11 @@
                 "command": "tinymist.showTemplateGallery",
                 "title": "Show available Typst templates (gallery) for picking up a template to initialize",
                 "category": "Typst"
+            },
+            {
+                "command": "tinymist.showSummary",
+                "title": "Show current document summary",
+                "category": "Typst"
             }
         ],
         "menus": {

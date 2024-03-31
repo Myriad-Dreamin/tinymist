@@ -1,40 +1,6 @@
 import van, { ChildDom } from "vanjs-core";
+import { requestRevealPath } from "../vscode";
 const { div, a, span, code, br } = van.tags;
-
-const DOC_MOCK = {
-  fonts: [
-    {
-      name: "Song Ti",
-      postscriptName: "SongTi",
-      path: "C:\\Users",
-      uses: [
-        { span: "", content: "" },
-        { span: "", content: "" },
-        { span: "", content: "" },
-      ],
-    },
-    {
-      name: "Times New Roman",
-      postscriptName: "TimesNewRoman",
-      path: "C:\\Users",
-      uses: [
-        { span: "", content: "" },
-        { span: "", content: "" },
-        { span: "", content: "" },
-        { span: "", content: "" },
-      ],
-    },
-    {
-      name: "Microsoft YaHei",
-      postscriptName: "MicrosoftYaHei",
-      path: "C:\\Users",
-      uses: [
-        { span: "", content: "" },
-        { span: "", content: "" },
-      ],
-    },
-  ],
-};
 
 interface CompileArgs {
   root: string;
@@ -42,33 +8,72 @@ interface CompileArgs {
   inputs: Record<string, string>;
 }
 
-const ARGS_MOCK: CompileArgs = {
-  root: "C:\\Users\\OvO\\work\\rust\\tinymist",
-  fontPaths: [
-    "C:\\Users\\OvO\\work\\rust\\tinymist\\assets\\fonts",
-    "C:\\Users\\OvO\\work\\assets\\fonts",
-  ],
-  inputs: {
-    theme: "dark",
-    context: '{"preview":true}',
-  },
-};
-
 export const Summary = () => {
-  const docMetrics = van.state(DOC_MOCK);
   const compileArgs = van.state(ARGS_MOCK);
+  const documentMetricsData = `:[[preview:DocumentMetrics]]:`;
+  const docMetrics = van.state<DocumentMetrics>(
+    documentMetricsData.startsWith(":")
+      ? DOC_MOCK
+      : JSON.parse(atob(documentMetricsData))
+  );
+  console.log("docMetrics", docMetrics);
 
-  const FontSlot = (font: any) => {
+  const FontSlot = (font: FontInfo) => {
+    let fontName;
+    if (typeof font.source === "number") {
+      let w = docMetrics.val.spanInfo.sources[font.source];
+      let title;
+      if (w.kind === "fs") {
+        title = w.path;
+        fontName = a(
+          {
+            style:
+              "font-size: 1.2em; text-decoration: underline; cursor: pointer;",
+            title,
+            onclick() {
+              if (w.kind === "fs") {
+                requestRevealPath(w.path);
+              }
+            },
+          },
+          font.name
+        );
+      } else {
+        title = `Embedded: ${w.name}`;
+        fontName = span(
+          {
+            style: "font-size: 1.2em",
+            title,
+          },
+          font.name
+        );
+      }
+    } else {
+      fontName = a({ style: "font-size: 1.2em" }, font.name);
+    }
+
     return div(
       { style: "margin: 1.2em; margin-left: 0.5em" },
-      a({ href: font.path, style: "font-size: 1.2em" }, font.name),
+      fontName,
       " has ",
-      a({ href: "javascript:void(0)" }, font.uses.length),
+      font.usesScale,
       " use(s).",
       br(),
       code("PostScriptName"),
       ": ",
-      code(font.postscriptName)
+      code(font.postscriptName),
+      br(),
+      code("Family"),
+      ": ",
+      code(font.family || "N/A"),
+      br(),
+      code("Family (Identified by Typst)"),
+      ": ",
+      code(font.fixedFamily),
+      br(),
+      code("FullName"),
+      ": ",
+      code(font.fullName || "N/A")
     );
   };
 
@@ -133,10 +138,30 @@ export const Summary = () => {
       { class: `tinymist-card`, style: "flex: 1; width: 100%; padding: 10px" },
       div(
         van.derive(
-          () => `This document uses ${docMetrics.val.fonts.length} fonts.`
+          () => `This document uses ${docMetrics.val.fontInfo.length} fonts.`
         )
       ),
-      (_dom?: Element) => div(...docMetrics.val.fonts.map(FontSlot))
+      (_dom?: Element) =>
+        div(
+          ...docMetrics.val.fontInfo
+            .sort((x, y) => {
+              if (x.usesScale === undefined || y.usesScale === undefined) {
+                if (x.usesScale === undefined) {
+                  return 1;
+                }
+                if (y.usesScale === undefined) {
+                  return -1;
+                }
+
+                return x.name.localeCompare(y.name);
+              }
+              if (x.usesScale !== y.usesScale) {
+                return y.usesScale - x.usesScale;
+              }
+              return x.name.localeCompare(y.name);
+            })
+            .map(FontSlot)
+        )
     ),
     div(
       {
@@ -207,4 +232,97 @@ export const Summary = () => {
       )
     )
   );
+};
+
+interface SpanInfo {
+  sources: FontSource[];
+}
+
+interface FsFontSource {
+  kind: "fs";
+  path: string;
+}
+
+interface MemoryFontSource {
+  kind: "memory";
+  name: string;
+}
+
+type FontSource = FsFontSource | MemoryFontSource;
+
+interface AnnotatedContent {
+  content: string;
+  spanKind: string;
+  /// file >=  0, offset,  mapped length
+  /// file == -1,  delta,  mapped length
+  /// file =  -2,      0, skipped length
+  spans: number[];
+}
+
+interface FontInfo {
+  name: string;
+  postscriptName: string;
+  family?: string;
+  fullName?: string;
+  fixedFamily?: string;
+  source?: number;
+  index?: number;
+  usesScale?: number;
+  uses?: AnnotatedContent;
+}
+
+interface DocumentMetrics {
+  spanInfo: SpanInfo;
+  fontInfo: FontInfo[];
+}
+
+const DOC_MOCK: DocumentMetrics = {
+  spanInfo: {
+    sources: [
+      {
+        kind: "fs",
+        path: "C:\\Users\\OvO\\work\\assets\\fonts\\SongTi-Regular.ttf",
+      },
+      {
+        kind: "fs",
+        path: "C:\\Users\\OvO\\work\\assets\\fonts\\TimesNewRoman-Regular.ttf",
+      },
+      {
+        kind: "fs",
+        path: "C:\\Users\\OvO\\work\\assets\\fonts\\MicrosoftYaHei-Regular.ttf",
+      },
+    ],
+  },
+  fontInfo: [
+    {
+      name: "Song Ti",
+      postscriptName: "SongTi",
+      source: 0,
+      usesScale: 3,
+    },
+    {
+      name: "Times New Roman",
+      postscriptName: "TimesNewRoman",
+      source: 1,
+      usesScale: 4,
+    },
+    {
+      name: "Microsoft YaHei",
+      postscriptName: "MicrosoftYaHei",
+      source: 2,
+      usesScale: 2,
+    },
+  ],
+};
+
+const ARGS_MOCK: CompileArgs = {
+  root: "C:\\Users\\OvO\\work\\rust\\tinymist",
+  fontPaths: [
+    "C:\\Users\\OvO\\work\\rust\\tinymist\\assets\\fonts",
+    "C:\\Users\\OvO\\work\\assets\\fonts",
+  ],
+  inputs: {
+    theme: "dark",
+    context: '{"preview":true}',
+  },
 };

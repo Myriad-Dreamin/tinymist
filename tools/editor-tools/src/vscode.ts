@@ -41,3 +41,9 @@ export function requestInitTemplate(packageSpec: string) {
     vscodeAPI.postMessage({ type: "initTemplate", packageSpec });
   }
 }
+
+export function requestRevealPath(path: string) {
+  if (vscodeAPI?.postMessage) {
+    vscodeAPI.postMessage({ type: "revealPath", path });
+  }
+}
