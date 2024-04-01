@@ -479,6 +479,7 @@ impl LexicalHierarchyWorker {
 
                     self.get_symbols_in_first_expr(node.children().rev())?;
                 }
+                k if k.is_trivia() || k.is_keyword() || k.is_error() => {}
                 _ => {
                     for child in node.children() {
                         self.get_symbols(child)?;
