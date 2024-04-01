@@ -395,8 +395,8 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                     expr: None,
                     default: None,
                     positional: false,
-                    named: true,
-                    variadic: false,
+                    named: false,
+                    variadic: true,
                     settable: false,
                     docs: Cow::Borrowed(""),
                 }));

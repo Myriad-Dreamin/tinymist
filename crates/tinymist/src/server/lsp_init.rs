@@ -413,6 +413,7 @@ impl Init {
                 completion_provider: Some(CompletionOptions {
                     trigger_characters: Some(vec![
                         String::from("#"),
+                        String::from("("),
                         String::from("."),
                         String::from("/"),
                         String::from("\""),

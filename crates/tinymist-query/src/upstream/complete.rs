@@ -720,32 +720,6 @@ fn complete_params(ctx: &mut CompletionContext) -> bool {
     false
 }
 
-/// Add completions for the values of a named function parameter.
-fn named_param_value_completions<'a>(
-    ctx: &mut CompletionContext<'a, '_>,
-    callee: ast::Expr<'a>,
-    name: &str,
-) {
-    let Some(func) = resolve_global_callee(ctx, callee) else {
-        return;
-    };
-    let Some(param) = func.param(name) else {
-        return;
-    };
-    if !param.named {
-        return;
-    }
-
-    ctx.cast_completions(&param.input);
-    if name == "font" {
-        ctx.font_completions();
-    }
-
-    if ctx.before.ends_with(':') {
-        ctx.enrich(" ", "");
-    }
-}
-
 /// Complete in code mode.
 fn complete_code(ctx: &mut CompletionContext) -> bool {
     if matches!(

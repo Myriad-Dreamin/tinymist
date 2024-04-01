@@ -152,7 +152,7 @@ pub fn param_completions<'a>(
     set: bool,
     args: ast::Args<'a>,
 ) {
-    let Some(func) = resolve_global_callee(ctx, callee) else {
+    let Some(func) = resolve_callee(ctx, callee) else {
         return;
     };
 
@@ -203,9 +203,55 @@ pub fn param_completions<'a>(
     }
 }
 
+/// Add completions for the values of a named function parameter.
+pub fn named_param_value_completions<'a>(
+    ctx: &mut CompletionContext<'a, '_>,
+    callee: ast::Expr<'a>,
+    name: &str,
+) {
+    let Some(func) = resolve_callee(ctx, callee) else {
+        return;
+    };
+
+    use typst::foundations::func::Repr;
+    let mut func = func;
+    while let Repr::With(f) = func.inner() {
+        // todo: complete with positional arguments
+        // with_args.push(ArgValue::Instance(f.1.clone()));
+        func = f.0.clone();
+    }
+
+    let signature = analyze_signature(func.clone());
+
+    let Some(param) = signature.named.get(name) else {
+        return;
+    };
+    if !param.named {
+        return;
+    }
+
+    if let Some(expr) = &param.expr {
+        ctx.completions.push(Completion {
+            kind: CompletionKind::Constant,
+            label: expr.clone(),
+            apply: None,
+            detail: Some(plain_docs_sentence(&param.docs)),
+        });
+    }
+
+    ctx.cast_completions(&param.input);
+    if name == "font" {
+        ctx.font_completions();
+    }
+
+    if ctx.before.ends_with(':') {
+        ctx.enrich(" ", "");
+    }
+}
+
 /// Resolve a callee expression to a function.
 // todo: fallback to static analysis if we can't resolve the callee
-pub fn resolve_global_callee<'a>(
+pub fn resolve_callee<'a>(
     ctx: &mut CompletionContext<'a, '_>,
     callee: ast::Expr<'a>,
 ) -> Option<Func> {
