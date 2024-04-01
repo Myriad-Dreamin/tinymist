@@ -14,6 +14,10 @@ impl<'a> CompletionContext<'a> {
     pub fn scope_completions_(&mut self, parens: bool, filter: impl Fn(&Value) -> bool) {
         let mut defined = BTreeMap::new();
         let mut try_insert = |name: EcoString, kind: CompletionKind| {
+            if name.is_empty() {
+                return;
+            }
+
             if let std::collections::btree_map::Entry::Vacant(entry) = defined.entry(name) {
                 entry.insert(kind);
             }
@@ -74,11 +78,22 @@ impl<'a> CompletionContext<'a> {
                         }
                     }
                 }
-                if let Some(v) = parent.cast::<ast::ForLoop>() {
-                    if node.prev_sibling_kind() != Some(SyntaxKind::In) {
-                        let pattern = v.pattern();
-                        for ident in pattern.bindings() {
-                            try_insert(ident.get().clone(), CompletionKind::Variable);
+                if let Some(v) = node.cast::<ast::Closure>() {
+                    for param in v.params().children() {
+                        match param {
+                            ast::Param::Pos(pattern) => {
+                                for ident in pattern.bindings() {
+                                    try_insert(ident.get().clone(), CompletionKind::Variable);
+                                }
+                            }
+                            ast::Param::Named(n) => {
+                                try_insert(n.name().get().clone(), CompletionKind::Variable)
+                            }
+                            ast::Param::Spread(s) => {
+                                if let Some(sink_ident) = s.sink_ident() {
+                                    try_insert(sink_ident.get().clone(), CompletionKind::Variable)
+                                }
+                            }
                         }
                     }
                 }
