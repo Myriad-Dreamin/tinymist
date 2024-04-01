@@ -292,9 +292,10 @@ async function commandShow(kind: string, extraOpts?: any): Promise<void> {
     // todo: we may find them in tabs
     vscode.window.tabGroups;
 
+    let uriToFind = exportUri.toString();
     findTab: for (const editor of vscode.window.tabGroups.all) {
         for (const tab of editor.tabs) {
-            if ((tab.input as any)?.uri.toString() === exportUri.toString()) {
+            if ((tab.input as any)?.uri?.toString() === uriToFind) {
                 await vscode.window.tabGroups.close(tab, true);
                 break findTab;
             }
