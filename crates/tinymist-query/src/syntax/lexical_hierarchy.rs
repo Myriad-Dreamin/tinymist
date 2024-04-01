@@ -383,30 +383,41 @@ impl LexicalHierarchyWorker {
             // todo: for loop variable
             match node.kind() {
                 SyntaxKind::LetBinding => 'let_binding: {
-                    let name = node.children().find(|n| n.cast::<ast::Pattern>().is_some());
+                    let pattern = node.children().find(|n| n.cast::<ast::Pattern>().is_some());
 
-                    if let Some(name) = &name {
+                    if let Some(name) = &pattern {
                         let p = name.cast::<ast::Pattern>().unwrap();
 
-                        // special case
+                        // special case: it will then match SyntaxKind::Closure in the inner looking
+                        // up.
                         if matches!(p, ast::Pattern::Normal(ast::Expr::Closure(..))) {
-                            self.get_symbols_with(name.clone(), IdentContext::Ref)?;
+                            let closure = name.clone();
+                            self.get_symbols_with(closure, IdentContext::Ref)?;
                             break 'let_binding;
                         }
                     }
 
                     // reverse order for correct symbol affection
+                    let name_offset = pattern.as_ref().map(|e| e.offset());
                     if self.g == LexicalScopeKind::DefUse {
-                        self.get_symbols_in_first_expr(node.children().rev())?;
-                        if let Some(name) = name {
-                            self.get_symbols_with(name, IdentContext::Var)?;
-                        }
+                        self.get_symbols_in_first_expr(node.children().rev(), name_offset)?;
+                        self.get_symbols_in_opt_with(pattern, IdentContext::Var)?;
                     } else {
-                        if let Some(name) = name {
-                            self.get_symbols_with(name, IdentContext::Var)?;
-                        }
-                        self.get_symbols_in_first_expr(node.children().rev())?;
+                        self.get_symbols_in_opt_with(pattern, IdentContext::Var)?;
+                        self.get_symbols_in_first_expr(node.children().rev(), name_offset)?;
                     }
+                }
+                SyntaxKind::ForLoop => {
+                    let pattern = node.children().find(|n| n.is::<ast::Pattern>());
+                    let iterable = node
+                        .children()
+                        .skip_while(|n| n.kind() != SyntaxKind::In)
+                        .find(|e| e.is::<ast::Expr>());
+
+                    let iterable_offset = iterable.as_ref().map(|e| e.offset());
+                    self.get_symbols_in_opt_with(iterable, IdentContext::Ref)?;
+                    self.get_symbols_in_opt_with(pattern, IdentContext::Var)?;
+                    self.get_symbols_in_first_expr(node.children().rev(), iterable_offset)?;
                 }
                 SyntaxKind::Closure => {
                     let n = node.children().next();
@@ -432,9 +443,7 @@ impl LexicalHierarchyWorker {
                             if self.g == LexicalScopeKind::DefUse {
                                 let param =
                                     node.children().find(|n| n.kind() == SyntaxKind::Params);
-                                if let Some(param) = param {
-                                    self.get_symbols_with(param, IdentContext::Params)?;
-                                }
+                                self.get_symbols_in_opt_with(param, IdentContext::Params)?;
                             }
 
                             self.get_symbols_with(body, IdentContext::Ref)?;
@@ -467,17 +476,15 @@ impl LexicalHierarchyWorker {
                     });
                 }
                 SyntaxKind::FieldAccess => {
-                    self.get_symbols_in_first_expr(node.children())?;
+                    self.get_symbols_in_first_expr(node.children(), None)?;
                 }
                 SyntaxKind::Named => {
                     if self.ident_context == IdentContext::Params {
                         let ident = node.children().find(|n| n.kind() == SyntaxKind::Ident);
-                        if let Some(ident) = ident {
-                            self.get_symbols_with(ident, IdentContext::Var)?;
-                        }
+                        self.get_symbols_in_opt_with(ident, IdentContext::Var)?;
                     }
 
-                    self.get_symbols_in_first_expr(node.children().rev())?;
+                    self.get_symbols_in_first_expr(node.children().rev(), None)?;
                 }
                 k if k.is_trivia() || k.is_keyword() || k.is_error() => {}
                 _ => {
@@ -493,12 +500,29 @@ impl LexicalHierarchyWorker {
         Ok(())
     }
 
+    #[inline(always)]
+    fn get_symbols_in_opt_with(
+        &mut self,
+        node: Option<LinkedNode>,
+        context: IdentContext,
+    ) -> anyhow::Result<()> {
+        if let Some(node) = node {
+            self.get_symbols_with(node, context)?;
+        }
+
+        Ok(())
+    }
+
     fn get_symbols_in_first_expr<'a>(
         &mut self,
         mut nodes: impl Iterator<Item = LinkedNode<'a>>,
+        iterable_offset: Option<usize>,
     ) -> anyhow::Result<()> {
-        let body = nodes.find(|n| n.cast::<ast::Expr>().is_some());
+        let body = nodes.find(|n| n.is::<ast::Expr>());
         if let Some(body) = body {
+            if iterable_offset.is_some_and(|e| e >= body.offset()) {
+                return Ok(());
+            }
             self.get_symbols_with(body, IdentContext::Ref)?;
         }
 
