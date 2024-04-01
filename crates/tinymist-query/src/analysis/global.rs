@@ -115,7 +115,7 @@ impl<'w> AnalysisContext<'w> {
     }
 
     /// Get the world surface for Typst compiler.
-    pub fn world(&self) -> &dyn World {
+    pub fn world(&self) -> &'w dyn World {
         self.resources.world()
     }
 

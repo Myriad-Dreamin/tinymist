@@ -216,6 +216,10 @@ pub fn analyze_call_no_cache(func: Func, args: ast::Args<'_>) -> Option<CallInfo
 pub struct ParamSpec {
     /// The parameter's name.
     pub name: Cow<'static, str>,
+    /// Documentation for the parameter.
+    pub docs: Cow<'static, str>,
+    /// Describe what values this parameter accepts.
+    pub input: CastInfo,
     /// The parameter's default name.
     pub expr: Option<EcoString>,
     /// Creates an instance of the parameter's default value.
@@ -229,17 +233,22 @@ pub struct ParamSpec {
     pub named: bool,
     /// Can the parameter be given any number of times?
     pub variadic: bool,
+    /// Is the parameter settable with a set rule?
+    pub settable: bool,
 }
 
 impl ParamSpec {
     fn from_static(s: &ParamInfo) -> Arc<Self> {
         Arc::new(Self {
             name: Cow::Borrowed(s.name),
+            docs: Cow::Borrowed(s.docs),
+            input: s.input.clone(),
             expr: Some(eco_format!("{}", TypeExpr(&s.input))),
             default: s.default,
             positional: s.positional,
             named: s.named,
             variadic: s.variadic,
+            settable: s.settable,
         })
     }
 }
@@ -333,11 +342,14 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
             ast::Param::Pos(ast::Pattern::Placeholder(..)) => {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Borrowed("_"),
+                    input: CastInfo::Any,
                     expr: None,
                     default: None,
                     positional: true,
                     named: false,
                     variadic: false,
+                    settable: false,
+                    docs: Cow::Borrowed(""),
                 }));
             }
             ast::Param::Pos(e) => {
@@ -350,33 +362,43 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
 
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(name.to_owned()),
+                    input: CastInfo::Any,
                     expr: None,
                     default: None,
                     positional: true,
                     named: false,
                     variadic: false,
+                    settable: false,
+                    docs: Cow::Borrowed(""),
                 }));
             }
             // todo: pattern
             ast::Param::Named(n) => {
+                let expr = unwrap_expr(n.expr()).to_untyped().clone().into_text();
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(n.name().as_str().to_owned()),
-                    expr: Some(unwrap_expr(n.expr()).to_untyped().clone().into_text()),
+                    input: CastInfo::Any,
+                    expr: Some(expr.clone()),
                     default: None,
                     positional: false,
                     named: true,
                     variadic: false,
+                    settable: true,
+                    docs: Cow::Owned("Default value: ".to_owned() + expr.as_str()),
                 }));
             }
             ast::Param::Spread(n) => {
                 let ident = n.sink_ident().map(|e| e.as_str());
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(ident.unwrap_or_default().to_owned()),
+                    input: CastInfo::Any,
                     expr: None,
                     default: None,
                     positional: false,
                     named: true,
                     variadic: false,
+                    settable: false,
+                    docs: Cow::Borrowed(""),
                 }));
             }
         }
