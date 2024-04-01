@@ -1,6 +1,7 @@
 use super::{Completion, CompletionContext, CompletionKind};
 use std::collections::BTreeMap;
 
+use ecow::EcoString;
 use typst::foundations::Value;
 use typst::syntax::{ast, SyntaxKind};
 
@@ -12,6 +13,11 @@ impl<'a> CompletionContext<'a> {
     /// Filters the global/math scope with the given filter.
     pub fn scope_completions_(&mut self, parens: bool, filter: impl Fn(&Value) -> bool) {
         let mut defined = BTreeMap::new();
+        let mut try_insert = |name: EcoString, kind: CompletionKind| {
+            if let std::collections::btree_map::Entry::Vacant(entry) = defined.entry(name) {
+                entry.insert(kind);
+            }
+        };
 
         let mut ancestor = Some(self.leaf.clone());
         while let Some(node) = &ancestor {
@@ -23,7 +29,7 @@ impl<'a> CompletionContext<'a> {
                         ast::LetBindingKind::Normal(..) => CompletionKind::Variable,
                     };
                     for ident in v.kind().bindings() {
-                        defined.insert(ident.get().clone(), kind.clone());
+                        try_insert(ident.get().clone(), kind.clone());
                     }
                 }
 
@@ -39,13 +45,9 @@ impl<'a> CompletionContext<'a> {
                     }
                     if let Some(value) = analyzed {
                         if imports.is_none() {
-                            // todo: correct kind
-                            defined.extend(
-                                value
-                                    .name()
-                                    .map(Into::into)
-                                    .map(|e| (e, CompletionKind::Module)),
-                            );
+                            if let Some(name) = value.name() {
+                                try_insert(name.into(), CompletionKind::Module);
+                            }
                         } else if let Some(scope) = value.scope() {
                             for (name, v) in scope.iter() {
                                 let kind = match v {
@@ -54,7 +56,7 @@ impl<'a> CompletionContext<'a> {
                                     Value::Type(..) => CompletionKind::Type,
                                     _ => CompletionKind::Constant,
                                 };
-                                defined.insert(name.clone(), kind);
+                                try_insert(name.clone(), kind);
                             }
                         }
                     }
@@ -68,7 +70,15 @@ impl<'a> CompletionContext<'a> {
                     if node.prev_sibling_kind() != Some(SyntaxKind::In) {
                         let pattern = v.pattern();
                         for ident in pattern.bindings() {
-                            defined.insert(ident.get().clone(), CompletionKind::Variable);
+                            try_insert(ident.get().clone(), CompletionKind::Variable);
+                        }
+                    }
+                }
+                if let Some(v) = parent.cast::<ast::ForLoop>() {
+                    if node.prev_sibling_kind() != Some(SyntaxKind::In) {
+                        let pattern = v.pattern();
+                        for ident in pattern.bindings() {
+                            try_insert(ident.get().clone(), CompletionKind::Variable);
                         }
                     }
                 }
