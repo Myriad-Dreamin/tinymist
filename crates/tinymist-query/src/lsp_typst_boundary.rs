@@ -211,7 +211,7 @@ pub mod typst_to_lsp {
     use itertools::Itertools;
     use lazy_static::lazy_static;
     use lsp_types::{
-        CompletionTextEdit, Documentation, InsertTextFormat, LanguageString, MarkedString,
+        Command, CompletionTextEdit, Documentation, InsertTextFormat, LanguageString, MarkedString,
         MarkupContent, MarkupKind, TextEdit,
     };
     use regex::{Captures, Regex};
@@ -312,6 +312,10 @@ pub mod typst_to_lsp {
             detail: typst_completion.detail.as_ref().map(String::from),
             text_edit: Some(text_edit),
             insert_text_format: Some(InsertTextFormat::SNIPPET),
+            command: typst_completion.command.as_ref().map(|c| Command {
+                command: c.to_string(),
+                ..Default::default()
+            }),
             ..Default::default()
         }
     }
