@@ -51,7 +51,8 @@ use typst_ts_compiler::{
     Time,
 };
 use typst_ts_core::{
-    config::compiler::EntryState, error::prelude::*, typst::prelude::EcoVec, Error, ImmutPath,
+    config::compiler::EntryState, debug_loc::DataSource, error::prelude::*, typst::prelude::EcoVec,
+    Error, ImmutPath, TypstFont,
 };
 
 use super::typ_server::CompileClient as TsCompileClient;
@@ -218,6 +219,11 @@ impl CompileDriver {
             fn iter_dependencies(&self, f: &mut dyn FnMut(&ImmutPath, Time)) {
                 use typst_ts_compiler::NotifyApi;
                 self.0.iter_dependencies(f)
+            }
+
+            /// Resolve extra font information.
+            fn font_info(&self, font: TypstFont) -> Option<Arc<DataSource>> {
+                self.0.font_resolver.inner.describe_font(&font)
             }
         }
 

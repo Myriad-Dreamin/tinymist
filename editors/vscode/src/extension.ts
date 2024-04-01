@@ -122,6 +122,11 @@ async function startClient(context: ExtensionContext): Promise<void> {
         commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf"))
     );
     context.subscriptions.push(
+        commands.registerCommand("tinymist.getCurrentDocumentMetrics", () =>
+            commandGetCurrentDocumentMetrics()
+        )
+    );
+    context.subscriptions.push(
         commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true))
     );
     context.subscriptions.push(
@@ -154,6 +159,9 @@ async function startClient(context: ExtensionContext): Promise<void> {
         commands.registerCommand("tinymist.showTemplateGallery", () =>
             commandShowTemplateGallery(context)
         )
+    );
+    context.subscriptions.push(
+        commands.registerCommand("tinymist.showSummary", () => commandShowSummary(context))
     );
     context.subscriptions.push(
         commands.registerCommand("tinymist.traceCurrentFile", () => commandShowTrace(context))
@@ -241,6 +249,24 @@ async function commandExport(mode: string, extraOpts?: any): Promise<string | un
     return res;
 }
 
+async function commandGetCurrentDocumentMetrics(): Promise<any> {
+    const activeEditor = window.activeTextEditor;
+    if (activeEditor === undefined) {
+        return;
+    }
+
+    const fsPath = activeEditor.document.uri.fsPath;
+
+    const res = await client?.sendRequest<string | null>("workspace/executeCommand", {
+        command: `tinymist.getDocumentMetrics`,
+        arguments: [fsPath],
+    });
+    if (res === null) {
+        return undefined;
+    }
+    return res;
+}
+
 /**
  * Implements the functionality for the 'Show PDF' button shown in the editor title
  * if a `.typ` file is opened.
@@ -318,6 +344,10 @@ async function commandPinMain(isPin: boolean): Promise<void> {
 
 async function commandShowTemplateGallery(context: vscode.ExtensionContext): Promise<void> {
     await activateEditorTool(context, "template-gallery");
+}
+
+async function commandShowSummary(context: vscode.ExtensionContext): Promise<void> {
+    await activateEditorTool(context, "summary");
 }
 
 async function commandShowTrace(context: vscode.ExtensionContext): Promise<void> {
