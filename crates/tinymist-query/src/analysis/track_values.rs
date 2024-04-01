@@ -49,6 +49,7 @@ pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Opti
 
 /// Try to load a module from the current source file.
 pub fn analyze_import(world: &dyn World, source: &LinkedNode) -> Option<Value> {
+    let source_span = source.span();
     let (source, _) = analyze_expr(world, source).into_iter().next()?;
     if source.scope().is_some() {
         return Some(source);
@@ -72,7 +73,7 @@ pub fn analyze_import(world: &dyn World, source: &LinkedNode) -> Option<Value> {
         Scopes::new(Some(world.library())),
         Span::detached(),
     );
-    typst::eval::import(&mut vm, source, Span::detached(), true)
+    typst::eval::import(&mut vm, source, source_span, true)
         .ok()
         .map(Value::Module)
 }

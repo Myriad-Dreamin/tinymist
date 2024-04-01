@@ -27,36 +27,34 @@ impl<'a> CompletionContext<'a> {
                     }
                 }
 
+                // todo: cache
                 if let Some(v) = node.cast::<ast::ModuleImport>() {
                     let imports = v.imports();
-                    match imports {
-                        None | Some(ast::Imports::Wildcard) => {
-                            if let Some(value) = node
-                                .children()
-                                .find(|child| child.is::<ast::Expr>())
-                                .and_then(|source| analyze_import(self.world, &source))
-                            {
-                                if imports.is_none() {
-                                    // todo: correct kind
-                                    defined.extend(
-                                        value
-                                            .name()
-                                            .map(Into::into)
-                                            .map(|e| (e, CompletionKind::Variable)),
-                                    );
-                                } else if let Some(scope) = value.scope() {
-                                    for (name, _) in scope.iter() {
-                                        defined.insert(name.clone(), CompletionKind::Variable);
-                                    }
-                                }
-                            }
-                        }
-                        Some(ast::Imports::Items(items)) => {
-                            for item in items.iter() {
-                                defined.insert(
-                                    item.bound_name().get().clone(),
-                                    CompletionKind::Variable,
-                                );
+                    let anaylyze = node.children().find(|child| child.is::<ast::Expr>());
+                    let analyzed = anaylyze
+                        .as_ref()
+                        .and_then(|source| analyze_import(self.world, source));
+                    if analyzed.is_none() {
+                        log::info!("failed to analyze import: {:?}", anaylyze);
+                    }
+                    if let Some(value) = analyzed {
+                        if imports.is_none() {
+                            // todo: correct kind
+                            defined.extend(
+                                value
+                                    .name()
+                                    .map(Into::into)
+                                    .map(|e| (e, CompletionKind::Module)),
+                            );
+                        } else if let Some(scope) = value.scope() {
+                            for (name, v) in scope.iter() {
+                                let kind = match v {
+                                    Value::Func(..) => CompletionKind::Func,
+                                    Value::Module(..) => CompletionKind::Module,
+                                    Value::Type(..) => CompletionKind::Type,
+                                    _ => CompletionKind::Constant,
+                                };
+                                defined.insert(name.clone(), kind);
                             }
                         }
                     }
