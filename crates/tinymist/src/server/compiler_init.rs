@@ -8,7 +8,7 @@ use comemo::Prehashed;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::{Map, Value as JsonValue};
-use tinymist_query::{DiagnosticsMap, PositionEncoding};
+use tinymist_query::PositionEncoding;
 use tokio::sync::mpsc;
 use typst::foundations::IntoValue;
 use typst::syntax::FileId;
@@ -17,6 +17,7 @@ use typst::util::Deferred;
 use typst_ts_core::config::compiler::EntryState;
 use typst_ts_core::{ImmutPath, TypstDict};
 
+use crate::actor::cluster::CompileClusterRequest;
 use crate::compiler::{CompileServer, CompileServerArgs};
 use crate::harness::LspDriver;
 use crate::world::{ImmutDict, SharedFontResolver};
@@ -96,6 +97,7 @@ pub struct CompileConfig {
     /// Typst extra arguments.
     pub typst_extra_args: Option<CompileExtraOpts>,
     pub has_default_entry_path: bool,
+    pub disable_word_count: bool,
 }
 
 impl CompileConfig {
@@ -330,7 +332,7 @@ impl Default for CompilerConstConfig {
 pub struct CompileInit {
     pub handle: tokio::runtime::Handle,
     pub font: CompileFontOpts,
-    pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
+    pub diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
 }
 
 #[derive(Debug, Deserialize)]

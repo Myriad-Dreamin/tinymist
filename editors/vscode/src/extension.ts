@@ -20,6 +20,7 @@ import {
 } from "vscode-languageclient/node";
 import vscodeVariables from "vscode-variables";
 import { activateEditorTool, getUserPackageData } from "./editor-tools";
+import { wordCountItemProcess } from "./ui-extends";
 
 let client: LanguageClient | undefined = undefined;
 
@@ -93,6 +94,10 @@ async function startClient(context: ExtensionContext): Promise<void> {
         serverOptions,
         clientOptions
     );
+
+    client.onNotification("tinymist/compileStatus", (params) => {
+        wordCountItemProcess(params);
+    });
 
     window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
         if (editor?.document.isUntitled) {
@@ -170,6 +175,13 @@ async function startClient(context: ExtensionContext): Promise<void> {
     );
     context.subscriptions.push(
         commands.registerCommand("tinymist.traceCurrentFile", () => commandShowTrace(context))
+    );
+    context.subscriptions.push(
+        commands.registerCommand("tinymist.showLog", () => {
+            if (client) {
+                client.outputChannel.show();
+            }
+        })
     );
 
     return client.start();
