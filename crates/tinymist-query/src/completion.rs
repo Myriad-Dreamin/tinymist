@@ -6,7 +6,7 @@ use crate::{
     prelude::*,
     syntax::{get_deref_target, DerefTarget},
     typst_to_lsp::completion_kind,
-    upstream::{autocomplete_, Completion, CompletionContext, CompletionKind},
+    upstream::{autocomplete, Completion, CompletionContext, CompletionKind},
     LspCompletion, StatefulRequest,
 };
 
@@ -111,8 +111,8 @@ impl StatefulRequest for CompletionRequest {
         }
 
         let items = completion_result.or_else(|| {
-            let cc_ctx = CompletionContext::new(ctx.world(), doc, &source, cursor, explicit)?;
-            let (offset, mut completions) = autocomplete_(cc_ctx)?;
+            let cc_ctx = CompletionContext::new(ctx, doc, &source, cursor, explicit)?;
+            let (offset, mut completions) = autocomplete(cc_ctx)?;
 
             let replace_range;
             if match_ident.as_ref().is_some_and(|i| i.offset() == offset) {

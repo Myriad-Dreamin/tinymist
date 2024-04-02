@@ -1,13 +1,22 @@
 use super::{Completion, CompletionContext, CompletionKind};
 use std::collections::BTreeMap;
 
-use ecow::EcoString;
-use typst::foundations::Value;
+use ecow::{eco_format, EcoString};
+use typst::foundations::{Func, Value};
+use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, SyntaxKind};
 
-use crate::analysis::analyze_import;
+use crate::analysis::{analyze_import, analyze_signature};
+use crate::find_definition;
+use crate::prelude::analyze_expr;
+use crate::syntax::{get_deref_target, LexicalKind, LexicalVarKind};
+use crate::upstream::plain_docs_sentence;
 
-impl<'a> CompletionContext<'a> {
+impl<'a, 'w> CompletionContext<'a, 'w> {
+    pub fn world(&self) -> &'w dyn typst::World {
+        self.ctx.world()
+    }
+
     /// Add completions for definitions that are available at the cursor.
     ///
     /// Filters the global/math scope with the given filter.
@@ -43,7 +52,7 @@ impl<'a> CompletionContext<'a> {
                     let anaylyze = node.children().find(|child| child.is::<ast::Expr>());
                     let analyzed = anaylyze
                         .as_ref()
-                        .and_then(|source| analyze_import(self.world, source));
+                        .and_then(|source| analyze_import(self.world(), source));
                     if analyzed.is_none() {
                         log::info!("failed to analyze import: {:?}", anaylyze);
                     }
@@ -113,7 +122,10 @@ impl<'a> CompletionContext<'a> {
                 | Some(SyntaxKind::MathAttach)
         );
 
-        let scope = if in_math { self.math } else { self.global };
+        let lib = self.world().library();
+        let scope = if in_math { &lib.math } else { &lib.global }
+            .scope()
+            .clone();
         for (name, value) in scope.iter() {
             if filter(value) && !defined.contains_key(name) {
                 self.value_completion(Some(name.clone()), value, parens, None);
@@ -131,4 +143,119 @@ impl<'a> CompletionContext<'a> {
             }
         }
     }
+}
+
+/// Add completions for the parameters of a function.
+pub fn param_completions<'a>(
+    ctx: &mut CompletionContext<'a, '_>,
+    callee: ast::Expr<'a>,
+    set: bool,
+    args: ast::Args<'a>,
+) {
+    let Some(func) = resolve_global_callee(ctx, callee) else {
+        return;
+    };
+
+    use typst::foundations::func::Repr;
+    let mut func = func;
+    while let Repr::With(f) = func.inner() {
+        // todo: complete with positional arguments
+        // with_args.push(ArgValue::Instance(f.1.clone()));
+        func = f.0.clone();
+    }
+
+    let signature = analyze_signature(func.clone());
+
+    // Exclude named arguments which are already present.
+    let exclude: Vec<_> = args
+        .items()
+        .filter_map(|arg| match arg {
+            ast::Arg::Named(named) => Some(named.name()),
+            _ => None,
+        })
+        .collect();
+
+    for (name, param) in &signature.named {
+        if exclude.iter().any(|ident| ident.as_str() == name) {
+            continue;
+        }
+
+        if set && !param.settable {
+            continue;
+        }
+
+        if param.named {
+            ctx.completions.push(Completion {
+                kind: CompletionKind::Param,
+                label: param.name.clone().into(),
+                apply: Some(eco_format!("{}: ${{}}", param.name)),
+                detail: Some(plain_docs_sentence(&param.docs)),
+            });
+        }
+
+        if param.positional {
+            ctx.cast_completions(&param.input);
+        }
+    }
+
+    if ctx.before.ends_with(',') {
+        ctx.enrich(" ", "");
+    }
+}
+
+/// Resolve a callee expression to a function.
+// todo: fallback to static analysis if we can't resolve the callee
+pub fn resolve_global_callee<'a>(
+    ctx: &mut CompletionContext<'a, '_>,
+    callee: ast::Expr<'a>,
+) -> Option<Func> {
+    resolve_global_dyn_callee(ctx, callee)
+        .or_else(|| {
+            let source = ctx.ctx.source_by_id(callee.span().id()?).ok()?;
+            let node = source.find(callee.span())?;
+            let cursor = node.offset();
+            let deref_target = get_deref_target(node, cursor)?;
+            let def = find_definition(ctx.ctx, source.clone(), deref_target)?;
+            match def.kind {
+                LexicalKind::Var(LexicalVarKind::Function) => match def.value {
+                    Some(Value::Func(f)) => Some(f),
+                    _ => None,
+                },
+                _ => None,
+            }
+        })
+        .or_else(|| {
+            let lib = ctx.world().library();
+            let value = match callee {
+                ast::Expr::Ident(ident) => lib.global.scope().get(&ident)?,
+                ast::Expr::FieldAccess(access) => match access.target() {
+                    ast::Expr::Ident(target) => match lib.global.scope().get(&target)? {
+                        Value::Module(module) => module.field(&access.field()).ok()?,
+                        Value::Func(func) => func.field(&access.field()).ok()?,
+                        _ => return None,
+                    },
+                    _ => return None,
+                },
+                _ => return None,
+            };
+
+            match value {
+                Value::Func(func) => Some(func.clone()),
+                _ => None,
+            }
+        })
+}
+
+/// Resolve a callee expression to a dynamic function.
+// todo: fallback to static analysis if we can't resolve the callee
+fn resolve_global_dyn_callee<'a>(
+    ctx: &CompletionContext<'a, '_>,
+    callee: ast::Expr<'a>,
+) -> Option<Func> {
+    let values = analyze_expr(ctx.world(), &ctx.root.find(callee.span())?);
+
+    values.into_iter().find_map(|v| match v.0 {
+        Value::Func(f) => Some(f),
+        _ => None,
+    })
 }

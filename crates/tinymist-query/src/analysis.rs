@@ -1,5 +1,7 @@
 //! Semantic static and dynamic analysis of the source code.
 
+pub mod call;
+pub use call::*;
 pub mod def_use;
 pub use def_use::*;
 pub mod track_values;

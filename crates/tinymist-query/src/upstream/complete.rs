@@ -1,24 +1,25 @@
 use std::cmp::Reverse;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use serde::{Deserialize, Serialize};
 use typst::foundations::{
     fields_on, format_str, mutable_methods_on, repr, AutoValue, CastInfo, Func, Label, NoneValue,
-    Repr, Scope, StyleChain, Styles, Type, Value,
+    Repr, StyleChain, Styles, Type, Value,
 };
 use typst::model::Document;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
 use typst::visualize::Color;
-use typst::World;
 use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
 use crate::analysis::{analyze_expr, analyze_import, analyze_labels};
+use crate::AnalysisContext;
 
 mod ext;
+use ext::*;
 
 /// Autocomplete a cursor position in a source file.
 ///
@@ -31,30 +32,7 @@ mod ext;
 /// Passing a `document` (from a previous compilation) is optional, but enhances
 /// the autocompletions. Label completions, for instance, are only generated
 /// when the document is available.
-pub fn autocomplete(
-    world: &dyn World,
-    document: Option<&Document>,
-    source: &Source,
-    cursor: usize,
-    explicit: bool,
-) -> Option<(usize, Vec<Completion>)> {
-    let mut ctx = CompletionContext::new(world, document, source, cursor, explicit)?;
-
-    let _ = complete_comments(&mut ctx)
-        || complete_field_accesses(&mut ctx)
-        || complete_open_labels(&mut ctx)
-        || complete_imports(&mut ctx)
-        || complete_rules(&mut ctx)
-        || complete_params(&mut ctx)
-        || complete_markup(&mut ctx)
-        || complete_math(&mut ctx)
-        || complete_code(&mut ctx);
-
-    Some((ctx.from, ctx.completions))
-}
-
-pub fn autocomplete_(mut ctx: CompletionContext) -> Option<(usize, Vec<Completion>)> {
-    let _ = autocomplete;
+pub fn autocomplete(mut ctx: CompletionContext) -> Option<(usize, Vec<Completion>)> {
     let _ = complete_comments(&mut ctx)
         || complete_field_accesses(&mut ctx)
         || complete_open_labels(&mut ctx)
@@ -368,7 +346,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
         if prev.is::<ast::Expr>();
         if prev.parent_kind() != Some(SyntaxKind::Markup) ||
            prev.prev_sibling_kind() == Some(SyntaxKind::Hash);
-        if let Some((value, styles)) = analyze_expr(ctx.world, &prev).into_iter().next();
+        if let Some((value, styles)) = analyze_expr(ctx.world(), &prev).into_iter().next();
         then {
             ctx.from = ctx.cursor;
             field_access_completions(ctx, &value, &styles);
@@ -383,7 +361,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
         if prev.kind() == SyntaxKind::Dot;
         if let Some(prev_prev) = prev.prev_sibling();
         if prev_prev.is::<ast::Expr>();
-        if let Some((value, styles)) = analyze_expr(ctx.world, &prev_prev).into_iter().next();
+        if let Some((value, styles)) = analyze_expr(ctx.world(), &prev_prev).into_iter().next();
         then {
             ctx.from = ctx.leaf.offset();
             field_access_completions(ctx, &value, &styles);
@@ -552,11 +530,11 @@ fn complete_imports(ctx: &mut CompletionContext) -> bool {
 
 /// Add completions for all exports of a module.
 fn import_item_completions<'a>(
-    ctx: &mut CompletionContext<'a>,
+    ctx: &mut CompletionContext<'a, '_>,
     existing: ast::ImportItems<'a>,
     source: &LinkedNode,
 ) {
-    let Some(value) = analyze_import(ctx.world, source) else {
+    let Some(value) = analyze_import(ctx.world(), source) else {
         return;
     };
     let Some(scope) = value.scope() else { return };
@@ -742,58 +720,9 @@ fn complete_params(ctx: &mut CompletionContext) -> bool {
     false
 }
 
-/// Add completions for the parameters of a function.
-fn param_completions<'a>(
-    ctx: &mut CompletionContext<'a>,
-    callee: ast::Expr<'a>,
-    set: bool,
-    args: ast::Args<'a>,
-) {
-    let Some(func) = resolve_global_callee(ctx, callee) else {
-        return;
-    };
-    let Some(params) = func.params() else { return };
-
-    // Exclude named arguments which are already present.
-    let exclude: Vec<_> = args
-        .items()
-        .filter_map(|arg| match arg {
-            ast::Arg::Named(named) => Some(named.name()),
-            _ => None,
-        })
-        .collect();
-
-    for param in params {
-        if exclude.iter().any(|ident| ident.as_str() == param.name) {
-            continue;
-        }
-
-        if set && !param.settable {
-            continue;
-        }
-
-        if param.named {
-            ctx.completions.push(Completion {
-                kind: CompletionKind::Param,
-                label: param.name.into(),
-                apply: Some(eco_format!("{}: ${{}}", param.name)),
-                detail: Some(plain_docs_sentence(param.docs)),
-            });
-        }
-
-        if param.positional {
-            ctx.cast_completions(&param.input);
-        }
-    }
-
-    if ctx.before.ends_with(',') {
-        ctx.enrich(" ", "");
-    }
-}
-
 /// Add completions for the values of a named function parameter.
 fn named_param_value_completions<'a>(
-    ctx: &mut CompletionContext<'a>,
+    ctx: &mut CompletionContext<'a, '_>,
     callee: ast::Expr<'a>,
     name: &str,
 ) {
@@ -814,30 +743,6 @@ fn named_param_value_completions<'a>(
 
     if ctx.before.ends_with(':') {
         ctx.enrich(" ", "");
-    }
-}
-
-/// Resolve a callee expression to a global function.
-fn resolve_global_callee<'a>(
-    ctx: &CompletionContext<'a>,
-    callee: ast::Expr<'a>,
-) -> Option<&'a Func> {
-    let value = match callee {
-        ast::Expr::Ident(ident) => ctx.global.get(&ident)?,
-        ast::Expr::FieldAccess(access) => match access.target() {
-            ast::Expr::Ident(target) => match ctx.global.get(&target)? {
-                Value::Module(module) => module.field(&access.field()).ok()?,
-                Value::Func(func) => func.field(&access.field()).ok()?,
-                _ => return None,
-            },
-            _ => return None,
-        },
-        _ => return None,
-    };
-
-    match value {
-        Value::Func(func) => Some(func),
-        _ => None,
     }
 }
 
@@ -1040,14 +945,13 @@ fn code_completions(ctx: &mut CompletionContext, hash: bool) {
 }
 
 /// Context for autocompletion.
-pub struct CompletionContext<'a> {
-    pub world: &'a (dyn World + 'a),
+pub struct CompletionContext<'a, 'w> {
+    pub ctx: &'a mut AnalysisContext<'w>,
     pub document: Option<&'a Document>,
-    pub global: &'a Scope,
-    pub math: &'a Scope,
     pub text: &'a str,
     pub before: &'a str,
     pub after: &'a str,
+    pub root: LinkedNode<'a>,
     pub leaf: LinkedNode<'a>,
     pub cursor: usize,
     pub explicit: bool,
@@ -1056,26 +960,25 @@ pub struct CompletionContext<'a> {
     pub seen_casts: HashSet<u128>,
 }
 
-impl<'a> CompletionContext<'a> {
+impl<'a, 'w> CompletionContext<'a, 'w> {
     /// Create a new autocompletion context.
     pub fn new(
-        world: &'a (dyn World + 'a),
+        ctx: &'a mut AnalysisContext<'w>,
         document: Option<&'a Document>,
         source: &'a Source,
         cursor: usize,
         explicit: bool,
     ) -> Option<Self> {
         let text = source.text();
-        let library = world.library();
-        let leaf = LinkedNode::new(source.root()).leaf_at(cursor)?;
+        let root = LinkedNode::new(source.root());
+        let leaf = root.leaf_at(cursor)?;
         Some(Self {
-            world,
+            ctx,
             document,
-            global: library.global.scope(),
-            math: library.math.scope(),
             text,
             before: &text[..cursor],
             after: &text[cursor..],
+            root,
             leaf,
             cursor,
             explicit,
@@ -1116,7 +1019,7 @@ impl<'a> CompletionContext<'a> {
     /// Add completions for all font families.
     fn font_completions(&mut self) {
         let equation = self.before_window(25).contains("equation");
-        for (family, iter) in self.world.book().families() {
+        for (family, iter) in self.world().book().families() {
             let detail = summarize_font_family(iter);
             if !equation || family.contains("Math") {
                 self.value_completion(
@@ -1131,7 +1034,7 @@ impl<'a> CompletionContext<'a> {
 
     /// Add completions for all available packages.
     fn package_completions(&mut self, all_versions: bool) {
-        let mut packages: Vec<_> = self.world.packages().iter().collect();
+        let mut packages: Vec<_> = self.world().packages().iter().collect();
         packages.sort_by_key(|(spec, _)| (&spec.namespace, &spec.name, Reverse(spec.version)));
         if !all_versions {
             packages.dedup_by_key(|(spec, _)| (&spec.namespace, &spec.name));
@@ -1261,7 +1164,7 @@ impl<'a> CompletionContext<'a> {
     }
 
     /// Add completions for a castable.
-    fn cast_completions(&mut self, cast: &'a CastInfo) {
+    fn cast_completions(&mut self, cast: &CastInfo) {
         // Prevent duplicate completions from appearing.
         if !self.seen_casts.insert(typst::util::hash128(cast)) {
             return;
@@ -1340,95 +1243,6 @@ impl<'a> CompletionContext<'a> {
                 for info in union {
                     self.cast_completions(info);
                 }
-            }
-        }
-    }
-
-    /// Add completions for definitions that are available at the cursor.
-    ///
-    /// Filters the global/math scope with the given filter.
-    fn _scope_completions(&mut self, parens: bool, filter: impl Fn(&Value) -> bool) {
-        let mut defined = BTreeSet::new();
-
-        let mut ancestor = Some(self.leaf.clone());
-        while let Some(node) = &ancestor {
-            let mut sibling = Some(node.clone());
-            while let Some(node) = &sibling {
-                if let Some(v) = node.cast::<ast::LetBinding>() {
-                    for ident in v.kind().bindings() {
-                        defined.insert(ident.get().clone());
-                    }
-                }
-
-                if let Some(v) = node.cast::<ast::ModuleImport>() {
-                    let imports = v.imports();
-                    match imports {
-                        None | Some(ast::Imports::Wildcard) => {
-                            if let Some(value) = node
-                                .children()
-                                .find(|child| child.is::<ast::Expr>())
-                                .and_then(|source| analyze_import(self.world, &source))
-                            {
-                                if imports.is_none() {
-                                    defined.extend(value.name().map(Into::into));
-                                } else if let Some(scope) = value.scope() {
-                                    for (name, _) in scope.iter() {
-                                        defined.insert(name.clone());
-                                    }
-                                }
-                            }
-                        }
-                        Some(ast::Imports::Items(items)) => {
-                            for item in items.iter() {
-                                defined.insert(item.bound_name().get().clone());
-                            }
-                        }
-                    }
-                }
-
-                sibling = node.prev_sibling();
-            }
-
-            if let Some(parent) = node.parent() {
-                if let Some(v) = parent.cast::<ast::ForLoop>() {
-                    if node.prev_sibling_kind() != Some(SyntaxKind::In) {
-                        let pattern = v.pattern();
-                        for ident in pattern.bindings() {
-                            defined.insert(ident.get().clone());
-                        }
-                    }
-                }
-
-                ancestor = Some(parent.clone());
-                continue;
-            }
-
-            break;
-        }
-
-        let in_math = matches!(
-            self.leaf.parent_kind(),
-            Some(SyntaxKind::Equation)
-                | Some(SyntaxKind::Math)
-                | Some(SyntaxKind::MathFrac)
-                | Some(SyntaxKind::MathAttach)
-        );
-
-        let scope = if in_math { self.math } else { self.global };
-        for (name, value) in scope.iter() {
-            if filter(value) && !defined.contains(name) {
-                self.value_completion(Some(name.clone()), value, parens, None);
-            }
-        }
-
-        for name in defined {
-            if !name.is_empty() {
-                self.completions.push(Completion {
-                    kind: CompletionKind::Constant,
-                    label: name,
-                    apply: None,
-                    detail: None,
-                });
             }
         }
     }

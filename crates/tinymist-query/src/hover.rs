@@ -1,7 +1,8 @@
 use core::fmt;
 
 use crate::{
-    analyze_signature, find_definition,
+    analysis::analyze_signature,
+    find_definition,
     prelude::*,
     syntax::{find_document_before, get_deref_target, LexicalKind, LexicalVarKind},
     upstream::{expr_tooltip, tooltip, Tooltip},
