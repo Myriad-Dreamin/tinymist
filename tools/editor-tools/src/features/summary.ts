@@ -63,17 +63,17 @@ export const Summary = () => {
       ": ",
       code(font.postscriptName),
       br(),
-      code("Family"),
+      code(
+        font.fixedFamily === font.family
+          ? "Family"
+          : "Family (Identified by Typst)"
+      ),
       ": ",
-      code(font.family || "N/A"),
-      br(),
-      code("Family (Identified by Typst)"),
-      ": ",
-      code(font.fixedFamily),
-      br(),
-      code("FullName"),
-      ": ",
-      code(font.fullName || "N/A")
+      code(
+        font.fixedFamily === font.family
+          ? font.family
+          : `${font.family} (${font.fixedFamily})`
+      )
     );
   };
 
