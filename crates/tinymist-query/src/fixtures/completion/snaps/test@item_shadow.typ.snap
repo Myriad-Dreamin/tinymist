@@ -114,7 +114,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
     "kind": 3,
     "label": "aa",
     "textEdit": {
-     "newText": "aa",
+     "newText": "aa(${1:})",
      "range": {
       "end": {
        "character": 4,
@@ -131,7 +131,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
     "kind": 3,
     "label": "aac",
     "textEdit": {
-     "newText": "aac",
+     "newText": "aac(${1:})",
      "range": {
       "end": {
        "character": 4,
@@ -221,7 +221,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
     "kind": 3,
     "label": "aac",
     "textEdit": {
-     "newText": "aac",
+     "newText": "aac(${1:})",
      "range": {
       "end": {
        "character": 4,

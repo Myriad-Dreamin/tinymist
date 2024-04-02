@@ -114,7 +114,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_params.typ
     "kind": 3,
     "label": "aa",
     "textEdit": {
-     "newText": "aa",
+     "newText": "aa(${1:})",
      "range": {
       "end": {
        "character": 5,
