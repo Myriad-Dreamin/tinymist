@@ -251,7 +251,7 @@ pub fn named_param_value_completions<'a>(
         return;
     }
 
-    if let Some(expr) = &param.type_repr {
+    if let Some(expr) = &param.expr {
         ctx.completions.push(Completion {
             kind: CompletionKind::Constant,
             label: expr.clone(),
