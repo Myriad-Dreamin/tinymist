@@ -250,6 +250,7 @@ fn complete_path(
                 kind: CompletionKind::Folder,
                 apply: None,
                 detail: None,
+                command: None,
             });
         } else {
             module_completions.push(Completion {
@@ -257,6 +258,7 @@ fn complete_path(
                 kind: CompletionKind::Module,
                 apply: None,
                 detail: None,
+                command: None,
             });
         }
     }

@@ -60,10 +60,12 @@ pub struct Completion {
     pub apply: Option<EcoString>,
     /// An optional short description, at most one sentence.
     pub detail: Option<EcoString>,
+    /// An optional command to run when the completion is selected.
+    pub command: Option<&'static str>,
 }
 
 /// A kind of item that can be completed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum CompletionKind {
     /// A syntactical structure.
@@ -394,6 +396,7 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                 eco_format!("{method}()${{}}")
             }),
             detail: None,
+            command: None,
         })
     }
 
@@ -420,6 +423,7 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                         label: modifier.into(),
                         apply: None,
                         detail: None,
+                        command: None,
                     });
                 }
             }
@@ -454,6 +458,7 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                     label: name.clone(),
                     apply: None,
                     detail: None,
+                    command: None,
                 })
             }
         }
@@ -987,6 +992,12 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             label: label.into(),
             apply: Some(snippet.into()),
             detail: Some(docs.into()),
+            // VS Code doesn't do that... Auto triggering suggestion only happens on typing (word
+            // starts or trigger characters). However, you can use editor.action.triggerSuggest as
+            // command on a suggestion to "manually" retrigger suggest after inserting one
+            //
+            // todo: only vscode and neovim (0.9.1) support this
+            command: Some("editor.action.triggerSuggest"),
         });
     }
 
@@ -1041,6 +1052,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                 label: name.into(),
                 apply: Some(tags[0].into()),
                 detail: Some(repr::separated_list(&tags, " or ").into()),
+                command: None,
             });
         }
     }
@@ -1079,6 +1091,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                 }),
                 label: label.as_str().into(),
                 detail,
+                command: None,
             });
         }
     }
@@ -1105,8 +1118,10 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         });
 
         let mut apply = None;
+        let mut command = None;
         if parens && matches!(value, Value::Func(_)) {
             if let Value::Func(func) = value {
+                command = Some("editor.action.triggerSuggest");
                 if func
                     .params()
                     .is_some_and(|params| params.iter().all(|param| param.name == "self"))
@@ -1134,6 +1149,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             label,
             apply,
             detail,
+            command,
         });
     }
 
@@ -1209,6 +1225,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         label: ty.long_name().into(),
                         apply: Some(eco_format!("${{{ty}}}")),
                         detail: Some(eco_format!("A value of type {ty}.")),
+                        command: None,
                     });
                     self.scope_completions_(false, |value| value.ty() == *ty);
                 }

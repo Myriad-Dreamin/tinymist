@@ -134,12 +134,26 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
         for (name, kind) in defined {
             if !name.is_empty() {
-                self.completions.push(Completion {
-                    kind,
-                    label: name,
-                    apply: None,
-                    detail: None,
-                });
+                if kind == CompletionKind::Func {
+                    // todo: check arguments, if empty, jump to after the parens
+                    let apply = eco_format!("{}(${{}})", name);
+                    self.completions.push(Completion {
+                        kind,
+                        label: name,
+                        apply: Some(apply),
+                        detail: None,
+                        // todo: only vscode and neovim (0.9.1) support this
+                        command: Some("editor.action.triggerSuggest"),
+                    });
+                } else {
+                    self.completions.push(Completion {
+                        kind,
+                        label: name,
+                        apply: None,
+                        detail: None,
+                        command: None,
+                    });
+                }
             }
         }
     }
@@ -190,6 +204,13 @@ pub fn param_completions<'a>(
                 label: param.name.clone().into(),
                 apply: Some(eco_format!("{}: ${{}}", param.name)),
                 detail: Some(plain_docs_sentence(&param.docs)),
+                // todo: only vscode and neovim (0.9.1) support this
+                //
+                // VS Code doesn't do that... Auto triggering suggestion only happens on typing
+                // (word starts or trigger characters). However, you can use
+                // editor.action.triggerSuggest as command on a suggestion to
+                // "manually" retrigger suggest after inserting one
+                command: Some("editor.action.triggerSuggest"),
             });
         }
 
@@ -230,12 +251,13 @@ pub fn named_param_value_completions<'a>(
         return;
     }
 
-    if let Some(expr) = &param.type_repr {
+    if let Some(expr) = &param.expr {
         ctx.completions.push(Completion {
             kind: CompletionKind::Constant,
             label: expr.clone(),
             apply: None,
             detail: Some(plain_docs_sentence(&param.docs)),
+            command: None,
         });
     }
 
