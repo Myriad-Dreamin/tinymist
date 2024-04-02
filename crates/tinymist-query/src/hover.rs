@@ -155,7 +155,7 @@ impl<'a> fmt::Display for ParamTooltip<'a> {
         if !sig.named.is_empty() {
             let mut name_prints = vec![];
             for v in sig.named.values() {
-                name_prints.push((v.name.clone(), v.expr.clone()))
+                name_prints.push((v.name.clone(), v.type_repr.clone()))
             }
             name_prints.sort();
             for (k, v) in name_prints {

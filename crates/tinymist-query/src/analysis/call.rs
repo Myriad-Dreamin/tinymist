@@ -220,7 +220,9 @@ pub struct ParamSpec {
     pub docs: Cow<'static, str>,
     /// Describe what values this parameter accepts.
     pub input: CastInfo,
-    /// The parameter's default name.
+    /// The parameter's default name as type.
+    pub type_repr: Option<EcoString>,
+    /// The parameter's default name as value.
     pub expr: Option<EcoString>,
     /// Creates an instance of the parameter's default value.
     pub default: Option<fn() -> Value>,
@@ -243,7 +245,8 @@ impl ParamSpec {
             name: Cow::Borrowed(s.name),
             docs: Cow::Borrowed(s.docs),
             input: s.input.clone(),
-            expr: Some(eco_format!("{}", TypeExpr(&s.input))),
+            type_repr: Some(eco_format!("{}", TypeExpr(&s.input))),
+            expr: None,
             default: s.default,
             positional: s.positional,
             named: s.named,
@@ -343,6 +346,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Borrowed("_"),
                     input: CastInfo::Any,
+                    type_repr: None,
                     expr: None,
                     default: None,
                     positional: true,
@@ -363,6 +367,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(name.to_owned()),
                     input: CastInfo::Any,
+                    type_repr: None,
                     expr: None,
                     default: None,
                     positional: true,
@@ -378,6 +383,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(n.name().as_str().to_owned()),
                     input: CastInfo::Any,
+                    type_repr: Some(expr.clone()),
                     expr: Some(expr.clone()),
                     default: None,
                     positional: false,
@@ -392,11 +398,12 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(ident.unwrap_or_default().to_owned()),
                     input: CastInfo::Any,
+                    type_repr: None,
                     expr: None,
                     default: None,
                     positional: false,
-                    named: true,
-                    variadic: false,
+                    named: false,
+                    variadic: true,
                     settable: false,
                     docs: Cow::Borrowed(""),
                 }));
