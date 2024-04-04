@@ -51,6 +51,8 @@ impl StatefulRequest for HoverRequest {
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
         let range = ctx.to_lsp_range(ast_node.range(), &source);
 
+        // Neovim shows ugly hover if the hover content is in array, so we join them
+        // manually with divider bars.
         let mut contents = match contents {
             LspHoverContents::Array(contents) => contents
                 .into_iter()
@@ -96,6 +98,7 @@ impl StatefulRequest for HoverRequest {
 
                 None
             });
+
             log::info!("telescope position: {:?}", position);
             let content = position.and_then(|pos| ctx.resources.telescope_at(ctx, doc, pos));
             if let Some(preview_content) = content {
