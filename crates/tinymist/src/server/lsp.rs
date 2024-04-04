@@ -64,13 +64,14 @@ type LspHandler<Req, Res> = fn(srv: &mut TypstLanguageServer, args: Req) -> LspR
 
 /// Returns Ok(Some()) -> Already responded
 /// Returns Ok(None) -> Need to respond none
-/// Returns Err(..) -> Need t o respond error
+/// Returns Err(..) -> Need to respond error
 type LspRawHandler =
     fn(srv: &mut TypstLanguageServer, args: (RequestId, JsonValue)) -> LspResult<Option<()>>;
 
 type ExecuteCmdMap = HashMap<&'static str, LspHandler<Vec<JsonValue>, JsonValue>>;
 type NotifyCmdMap = HashMap<&'static str, LspMethod<()>>;
 type RegularCmdMap = HashMap<&'static str, LspRawHandler>;
+type ResourceMap = HashMap<ImmutPath, LspHandler<Vec<JsonValue>, JsonValue>>;
 
 macro_rules! exec_fn {
     ($ty: ty, Self::$method: ident, $($arg_key:ident),+ $(,)?) => {{
@@ -186,6 +187,8 @@ pub struct TypstLanguageServer {
     pub notify_cmds: NotifyCmdMap,
     /// Regular commands for dispatching.
     pub regular_cmds: RegularCmdMap,
+    /// Regular commands for dispatching.
+    pub resources_routes: ResourceMap,
 
     // Resources
     /// The semantic token context.
@@ -230,6 +233,7 @@ impl TypstLanguageServer {
             exec_cmds: Self::get_exec_commands(),
             regular_cmds: Self::get_regular_cmds(),
             notify_cmds: Self::get_notify_cmds(),
+            resources_routes: Self::get_resources_routes(),
 
             pinning: false,
             focusing: None,
@@ -598,6 +602,8 @@ impl TypstLanguageServer {
             redirected_command!("tinymist.doInitTemplate", Self::init_template),
             redirected_command!("tinymist.doGetTemplateEntry", Self::do_get_template_entry),
             redirected_command!("tinymist.getDocumentMetrics", Self::get_document_metrics),
+            // For Documentations
+            redirected_command!("tinymist.getResources", Self::get_resources),
         ])
     }
 
@@ -782,6 +788,48 @@ impl TypstLanguageServer {
             .map_err(|_| invalid_params("template entry is not a valid UTF-8 string"))?;
 
         Ok(JsonValue::String(entry))
+    }
+}
+
+impl TypstLanguageServer {
+    fn get_resources_routes() -> ResourceMap {
+        macro_rules! resources_at {
+            ($key: expr, Self::$method: ident) => {
+                (
+                    Path::new($key).clean().as_path().into(),
+                    exec_fn!(LspHandler<Vec<JsonValue>, JsonValue>, Self::$method, inputs),
+                )
+            };
+        }
+
+        ResourceMap::from_iter([
+            resources_at!("/symbols", Self::resources_alt_symbols),
+            resources_at!("/tutorial", Self::resource_tutoral),
+        ])
+    }
+
+    /// Get static resources with help of tinymist service, for example, a
+    /// static help pages for some typst function.
+    pub fn get_resources(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        let u = parse_path(arguments.first())?;
+
+        let Some(handler) = self.resources_routes.get(u.as_ref()) else {
+            error!("asked for unknown resource: {u:?}");
+            return Err(method_not_found());
+        };
+
+        // Note our redirection will keep the first path argument in the arguments vec.
+        handler(self, arguments)
+    }
+    /// Get the all valid symbols
+    pub fn resources_alt_symbols(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        let resp = self.get_symbol_resources();
+        resp.map_err(|e| internal_error(e.to_string()))
+    }
+
+    /// Get tutorial web page
+    pub fn resource_tutoral(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        Err(method_not_found())
     }
 }
 
@@ -1049,11 +1097,7 @@ fn parse_opts(v: Option<&JsonValue>) -> LspResult<ExportOpts> {
 fn parse_path(v: Option<&JsonValue>) -> LspResult<ImmutPath> {
     let new_entry = match v {
         Some(JsonValue::String(s)) => Path::new(s).clean().as_path().into(),
-        _ => {
-            return Err(invalid_params(
-                "The first parameter is not a valid path or null",
-            ))
-        }
+        _ => return Err(invalid_params("The first parameter is not a valid path")),
     };
 
     Ok(new_entry)

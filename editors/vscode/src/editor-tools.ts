@@ -38,13 +38,19 @@ export function getUserPackageData(context: vscode.ExtensionContext) {
 }
 
 export async function activateEditorTool(context: vscode.ExtensionContext, tool: string) {
-    if (tool !== "template-gallery" && tool !== "tracing" && tool !== "summary") {
+    if (
+        tool !== "template-gallery" &&
+        tool !== "tracing" &&
+        tool !== "summary" &&
+        tool !== "symbol-picker"
+    ) {
         vscode.window.showErrorMessage(`Unknown editor tool: ${tool}`);
         return;
     }
 
     const title = {
         "template-gallery": "Template Gallery",
+        "symbol-picker": "Symbol Picker",
         tracing: "Tracing",
         summary: "Summary",
     }[tool];
@@ -119,7 +125,7 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
             break;
         case "tracing":
             break;
-        case "summary":
+        case "summary": {
             // tinymist.getCurrentDocumentMetrics
             const result = await vscode.commands.executeCommand(
                 "tinymist.getCurrentDocumentMetrics"
@@ -134,6 +140,24 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
             const docMetrics = JSON.stringify(result);
             html = html.replace(":[[preview:DocumentMetrics]]:", btoa(docMetrics));
             break;
+        }
+        case "symbol-picker": {
+            // tinymist.getCurrentDocumentMetrics
+            const result = await vscode.commands.executeCommand(
+                "tinymist.getResources",
+                "/symbols"
+            );
+
+            if (!result) {
+                vscode.window.showErrorMessage("No document metrics available");
+                panel.dispose();
+                return;
+            }
+
+            const symbolInfo = JSON.stringify(result);
+            html = html.replace(":[[preview:SymbolInformation]]:", btoa(symbolInfo));
+            break;
+        }
     }
 
     panel.webview.html = html;

@@ -415,6 +415,11 @@
                 "command": "tinymist.showSummary",
                 "title": "Show current document summary",
                 "category": "Typst"
+            },
+            {
+                "command": "tinymist.showSymbolPicker",
+                "title": "Show symbol picker",
+                "category": "Typst"
             }
         ],
         "menus": {

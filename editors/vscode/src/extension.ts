@@ -164,6 +164,11 @@ async function startClient(context: ExtensionContext): Promise<void> {
         commands.registerCommand("tinymist.showSummary", () => commandShowSummary(context))
     );
     context.subscriptions.push(
+        commands.registerCommand("tinymist.showSymbolPicker", () =>
+            commandShowSymbolPicker(context)
+        )
+    );
+    context.subscriptions.push(
         commands.registerCommand("tinymist.traceCurrentFile", () => commandShowTrace(context))
     );
 
@@ -349,6 +354,10 @@ async function commandShowTemplateGallery(context: vscode.ExtensionContext): Pro
 
 async function commandShowSummary(context: vscode.ExtensionContext): Promise<void> {
     await activateEditorTool(context, "summary");
+}
+
+async function commandShowSymbolPicker(context: vscode.ExtensionContext): Promise<void> {
+    await activateEditorTool(context, "symbol-picker");
 }
 
 async function commandShowTrace(context: vscode.ExtensionContext): Promise<void> {
