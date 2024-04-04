@@ -48,7 +48,7 @@ pub(crate) fn find_references(
     let node = match deref_target {
         DerefTarget::VarAccess(node) => node,
         DerefTarget::Callee(node) => node,
-        DerefTarget::ImportPath(..) => {
+        DerefTarget::ImportPath(..) | DerefTarget::IncludePath(..) => {
             return None;
         }
     };

@@ -75,6 +75,9 @@ pub enum LexicalModKind {
     /// `import "foo.typ"`
     ///          ^^^
     PathVar,
+    /// `include "foo.typ"`
+    ///           ^^^
+    PathInclude,
     /// `import "foo": bar`
     ///                ^^^
     Ident,

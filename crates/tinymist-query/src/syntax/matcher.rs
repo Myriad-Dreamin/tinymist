@@ -16,6 +16,7 @@ pub enum DerefTarget<'a> {
     VarAccess(LinkedNode<'a>),
     Callee(LinkedNode<'a>),
     ImportPath(LinkedNode<'a>),
+    IncludePath(LinkedNode<'a>),
 }
 
 impl<'a> DerefTarget<'a> {
@@ -24,6 +25,7 @@ impl<'a> DerefTarget<'a> {
             DerefTarget::VarAccess(node) => node,
             DerefTarget::Callee(node) => node,
             DerefTarget::ImportPath(node) => node,
+            DerefTarget::IncludePath(node) => node,
         }
     }
 }
@@ -113,11 +115,14 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget> 
         }
         ast::Expr::Str(..) => {
             let parent = ancestor.parent()?;
-            if parent.kind() != SyntaxKind::ModuleImport {
-                return None;
+            if parent.kind() == SyntaxKind::ModuleImport {
+                return Some(DerefTarget::ImportPath(ancestor.find(may_ident.span())?));
+            }
+            if parent.kind() == SyntaxKind::ModuleInclude {
+                return Some(DerefTarget::IncludePath(ancestor.find(may_ident.span())?));
             }
 
-            return Some(DerefTarget::ImportPath(ancestor.find(may_ident.span())?));
+            return None;
         }
         ast::Expr::Import(..) => {
             return None;
