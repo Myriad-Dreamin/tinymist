@@ -1,15 +1,64 @@
 import "./symbol-picker.css";
 import van, { State } from "vanjs-core";
-import { SYMBOL_MOCK } from "./symbol-picker.mock";
+// import { SYMBOL_MOCK } from "./symbol-picker.mock";
 const { div, input, canvas, button } = van.tags;
 import MiniSearch from "minisearch";
 
+interface SymbolCategory {
+  value?: string;
+  name: string;
+}
+
+interface InstantiatedSymbolCategory {
+  value?: string;
+  name: string;
+  symbols?: InstantiatedSymbolItem[];
+}
+
+interface GlyphDesc {
+  fontIndex: number;
+  xAdvance?: number;
+  yAdvance?: number;
+  xMin?: number;
+  yMin?: number;
+  xMax?: number;
+  yMax?: number;
+  name?: string;
+  shape?: string;
+}
+
+interface SymbolItem {
+  id: string;
+  category?: string;
+  typstCode?: string;
+  categoryHuman?: string;
+  unicode: number;
+  glyphs: GlyphDesc[];
+}
+
+interface FontItem {
+  family: String;
+  capHeight: number;
+  ascender: number;
+  descender: number;
+  unitsPerEm: number;
+}
+
+interface SymbolInformation {
+  symbols: Record<string, SymbolItem>;
+  fontSelects?: FontItem[];
+  glyphDefs?: string;
+}
 type SelectedSymbolItem = Pick<SymbolItem, "typstCode">;
 interface InstantiatedSymbolItem {
   key: string;
   value: SymbolItem;
   elem: Element;
 }
+
+const SYMBOL_MOCK: SymbolInformation = {
+  symbols: {},
+};
 
 const SearchBar = (
   state: State<SymbolInformation>,
@@ -212,17 +261,6 @@ const CanvasPanel = () => {
   );
 };
 
-interface SymbolCategory {
-  value?: string;
-  name: string;
-}
-
-interface InstantiatedSymbolCategory {
-  value?: string;
-  name: string;
-  symbols?: InstantiatedSymbolItem[];
-}
-
 const CATEGORY_INFO: SymbolCategory[] = [
   {
     value: "greek",
@@ -269,41 +307,6 @@ const CATEGORY_INFO: SymbolCategory[] = [
 const categoryIndex = new Map(
   CATEGORY_INFO.map((cat) => [cat.value, cat.name.toLowerCase()])
 );
-
-interface GlyphDesc {
-  fontIndex: number;
-  xAdvance?: number;
-  yAdvance?: number;
-  xMin?: number;
-  yMin?: number;
-  xMax?: number;
-  yMax?: number;
-  name?: string;
-  shape?: string;
-}
-
-interface SymbolItem {
-  id: string;
-  category?: string;
-  typstCode?: string;
-  categoryHuman?: string;
-  unicode: number;
-  glyphs: GlyphDesc[];
-}
-
-interface FontItem {
-  family: String;
-  capHeight: number;
-  ascender: number;
-  descender: number;
-  unitsPerEm: number;
-}
-
-interface SymbolInformation {
-  symbols: Record<string, SymbolItem>;
-  fontSelects?: FontItem[];
-  glyphDefs?: string;
-}
 
 export const SymbolPicker = () => {
   const symbolInformationData = `:[[preview:SymbolInformation]]:`;
