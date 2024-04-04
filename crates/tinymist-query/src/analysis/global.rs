@@ -8,13 +8,13 @@ use std::{
 use ecow::EcoVec;
 use once_cell::sync::OnceCell;
 use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
-use typst::syntax::FileId as TypstFileId;
 use typst::text::Font;
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
     syntax::{package::PackageSpec, Source, VirtualPath},
     World,
 };
+use typst::{layout::Position, syntax::FileId as TypstFileId};
 
 use super::{get_def_use_inner, DefUseInfo};
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
     syntax::{
         construct_module_dependencies, scan_workspace_files, LexicalHierarchy, ModuleDependency,
     },
-    typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange,
+    typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange, VersionedDocument,
 };
 
 /// A cache for module-level analysis results of a module.
@@ -182,6 +182,16 @@ pub trait AnaylsisResources {
 
     /// Resolve extra font information.
     fn font_info(&self, _font: Font) -> Option<Arc<DataSource>> {
+        None
+    }
+
+    /// Resolve telescope image at the given position.
+    fn telescope_at(
+        &self,
+        _ctx: &mut AnalysisContext,
+        _doc: VersionedDocument,
+        _pos: Position,
+    ) -> Option<String> {
         None
     }
 }

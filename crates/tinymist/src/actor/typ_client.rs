@@ -39,9 +39,11 @@ use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnaylsisResources},
     DiagnosticsMap, ExportKind, ServerInfoReponse, VersionedDocument,
 };
+use tinymist_render::TelescopeRenderer;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use typst::{
     diag::{PackageError, SourceDiagnostic, SourceResult},
+    layout::Position,
     model::Document as TypstDocument,
     syntax::package::PackageSpec,
     util::Deferred,
@@ -249,6 +251,17 @@ impl CompileDriver {
             /// Resolve extra font information.
             fn font_info(&self, font: TypstFont) -> Option<Arc<DataSource>> {
                 self.0.font_resolver.inner.describe_font(&font)
+            }
+
+            /// Resolve telescope image at the given position.
+            fn telescope_at(
+                &self,
+                ctx: &mut AnalysisContext,
+                doc: VersionedDocument,
+                pos: Position,
+            ) -> Option<String> {
+                let renderer = TelescopeRenderer::new();
+                renderer.render_marked(ctx, doc, pos)
             }
         }
 

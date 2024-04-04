@@ -1,0 +1,21 @@
+[package]
+name = "tinymist-render"
+description = "Rendering features for tinymist."
+categories = ["compilers", "command-line-utilities"]
+keywords = ["api", "language", "typst"]
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+
+tinymist-query.workspace = true
+typst-ts-svg-exporter.workspace = true
+base64.workspace = true
+log.workspace = true
+
+[lints]
+workspace = true

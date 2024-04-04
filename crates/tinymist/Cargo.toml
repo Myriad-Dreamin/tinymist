@@ -12,7 +12,8 @@ repository.workspace = true
 
 [dependencies]
 
-tinymist-query = { path = "../tinymist-query" }
+tinymist-query.workspace = true
+tinymist-render.workspace = true
 
 once_cell.workspace = true
 anyhow.workspace = true

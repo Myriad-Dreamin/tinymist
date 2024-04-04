@@ -2,7 +2,7 @@ use core::fmt;
 
 use crate::{
     analysis::analyze_signature,
-    find_definition,
+    find_definition, jump_from_cursor,
     prelude::*,
     syntax::{find_document_before, get_deref_target, LexicalKind, LexicalVarKind},
     upstream::{expr_tooltip, tooltip, Tooltip},
@@ -32,7 +32,7 @@ impl StatefulRequest for HoverRequest {
         ctx: &mut AnalysisContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
-        let doc = doc.as_ref().map(|doc| doc.document.as_ref());
+        let doc_ref = doc.as_ref().map(|doc| doc.document.as_ref());
 
         let source = ctx.source_by_path(&self.path).ok()?;
         let offset = ctx.to_typst_pos(self.position, &source)?;
@@ -42,7 +42,7 @@ impl StatefulRequest for HoverRequest {
         let contents = def_tooltip(ctx, &source, cursor).or_else(|| {
             Some(typst_to_lsp::tooltip(&tooltip(
                 ctx.world(),
-                doc,
+                doc_ref,
                 &source,
                 cursor,
             )?))
@@ -51,23 +51,60 @@ impl StatefulRequest for HoverRequest {
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
         let range = ctx.to_lsp_range(ast_node.range(), &source);
 
-        let contents = match contents {
-            LspHoverContents::Array(contents) => LspHoverContents::Scalar(MarkedString::String(
-                contents
-                    .into_iter()
-                    .map(|e| match e {
-                        MarkedString::LanguageString(e) => {
-                            format!("```{}\n{}\n```", e.language, e.value)
-                        }
-                        MarkedString::String(e) => e,
-                    })
-                    .join("\n---\n"),
-            )),
-            contents => contents,
+        let mut contents = match contents {
+            LspHoverContents::Array(contents) => contents
+                .into_iter()
+                .map(|e| match e {
+                    MarkedString::LanguageString(e) => {
+                        format!("```{}\n{}\n```", e.language, e.value)
+                    }
+                    MarkedString::String(e) => e,
+                })
+                .join("\n---\n"),
+            LspHoverContents::Scalar(MarkedString::String(contents)) => contents,
+            LspHoverContents::Scalar(MarkedString::LanguageString(contents)) => {
+                format!("```{}\n{}\n```", contents.language, contents.value)
+            }
+            lsp_types::HoverContents::Markup(e) => {
+                match e.kind {
+                    MarkupKind::Markdown => e.value,
+                    // todo: escape
+                    MarkupKind::PlainText => e.value,
+                }
+            }
         };
 
+        if let Some(doc) = doc.clone() {
+            let position = jump_from_cursor(&doc.document, &source, cursor);
+            let position = position.or_else(|| {
+                for i in 1..100 {
+                    let next_cursor = cursor + i;
+                    if next_cursor < source.text().len() {
+                        let position = jump_from_cursor(&doc.document, &source, next_cursor);
+                        if position.is_some() {
+                            return position;
+                        }
+                    }
+                    let prev_cursor = cursor.checked_sub(i);
+                    if let Some(prev_cursor) = prev_cursor {
+                        let position = jump_from_cursor(&doc.document, &source, prev_cursor);
+                        if position.is_some() {
+                            return position;
+                        }
+                    }
+                }
+
+                None
+            });
+            log::info!("telescope position: {:?}", position);
+            let content = position.and_then(|pos| ctx.resources.telescope_at(ctx, doc, pos));
+            if let Some(preview_content) = content {
+                contents = format!("{preview_content}\n---\n{contents}");
+            }
+        }
+
         Some(Hover {
-            contents,
+            contents: LspHoverContents::Scalar(MarkedString::String(contents)),
             range: Some(range),
         })
     }
