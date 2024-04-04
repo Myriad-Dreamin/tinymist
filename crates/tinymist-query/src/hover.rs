@@ -51,6 +51,21 @@ impl StatefulRequest for HoverRequest {
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
         let range = ctx.to_lsp_range(ast_node.range(), &source);
 
+        let contents = match contents {
+            LspHoverContents::Array(contents) => LspHoverContents::Scalar(MarkedString::String(
+                contents
+                    .into_iter()
+                    .map(|e| match e {
+                        MarkedString::LanguageString(e) => {
+                            format!("```{}\n{}\n```", e.language, e.value)
+                        }
+                        MarkedString::String(e) => e,
+                    })
+                    .join("\n---\n"),
+            )),
+            contents => contents,
+        };
+
         Some(Hover {
             contents,
             range: Some(range),
