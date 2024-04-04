@@ -73,6 +73,29 @@ body {
   background: rgba(129, 60, 133, 0.9);
 }
 
+.tinymist-canvas-panel {
+  background: rgba(201, 209, 217, 0.15);
+  border-radius: 3px;
+  width: 160px;
+}
+
+.tinymist-symbol-cell {
+  background: rgba(201, 209, 217, 0.15);
+  border-radius: 3px;
+
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.tinymist-symbol-cell:hover {
+  color: rgba(68, 147, 248, 0.9);
+}
+
+.tinymist-symbol-cell.active {
+  color: rgba(249, 189, 16, 0.9);
+  transition: color 0.05s;
+}
+
 #tinymist-app {
   margin: 24px 28px;
 }

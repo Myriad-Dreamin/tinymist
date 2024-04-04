@@ -12,6 +12,7 @@
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "minisearch": "^6.3.0",
     "vanjs-core": "^1.5.0"
   },
   "devDependencies": {

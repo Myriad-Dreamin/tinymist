@@ -1,0 +1,19 @@
+.tinymist-symbol-main {
+  display: flex;
+  flex-direction: row;
+}
+
+.tinymist-symbol-left {
+  width: 200px;
+}
+
+/* Responsive layout - makes a one column layout instead of a two-column layout */
+@media (max-width: 500px) {
+  .tinymist-symbol-main {
+    flex-direction: column;
+  }
+
+  .tinymist-symbol-left {
+    width: 100%;
+  }
+}

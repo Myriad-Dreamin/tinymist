@@ -1,4 +1,3 @@
-// tinymist-app
 import "./style.css";
 import van from "vanjs-core";
 import { setupVscodeChannel } from "./vscode";
@@ -6,15 +5,20 @@ import { TemplateGallery } from "./features/template-gallery";
 import { Tracing } from "./features/tracing";
 import { Summary } from "./features/summary";
 import { Diagnostics } from "./features/diagnostics";
+import { SymbolPicker } from "./features/symbol-picker";
 
-// const isDarkMode = () =>
-//   window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+/// The components that can be rendered by the frontend.
+/// Typicially, each component corresponds to a single tool (Application).
+type PageComponent =
+  | "template-gallery"
+  | "tracing"
+  | "summary"
+  | "diagnostics"
+  | "symbol-picker";
 
-setupVscodeChannel();
-
-type PageComponent = "template-gallery" | "tracing" | "summary" | "diagnostics";
-
+/// The frontend arguments that are passed from the backend.
 interface Arguments {
+  /// The page to render.
   page: PageComponent;
 }
 
@@ -27,7 +31,7 @@ function retrieveArgs(): Arguments {
   ///   let frontend_html = frontend_html.replace(
   ///     "editor-tools-args:{}", ...);
   /// ```
-  let mode = `editor-tools-args:{"page": "summary"}`;
+  let mode = `editor-tools-args:{"page": "symbol-picker"}`;
   /// Remove the placeholder prefix.
   mode = mode.replace("editor-tools-args:", "");
 
@@ -35,22 +39,31 @@ function retrieveArgs(): Arguments {
   return JSON.parse(mode);
 }
 
-const args = retrieveArgs();
+function main() {
+  setupVscodeChannel();
 
-const appHook = document.querySelector("#tinymist-app")!;
-switch (args.page) {
-  case "template-gallery":
-    van.add(appHook, TemplateGallery());
-    break;
-  case "tracing":
-    van.add(appHook, Tracing());
-    break;
-  case "summary":
-    van.add(appHook, Summary());
-    break;
-  case "diagnostics":
-    van.add(appHook, Diagnostics());
-    break;
-  default:
-    throw new Error(`Unknown page: ${args.page}`);
+  const args = retrieveArgs();
+  const appHook = document.querySelector("#tinymist-app")!;
+
+  switch (args.page) {
+    case "template-gallery":
+      van.add(appHook, TemplateGallery());
+      break;
+    case "tracing":
+      van.add(appHook, Tracing());
+      break;
+    case "summary":
+      van.add(appHook, Summary());
+      break;
+    case "diagnostics":
+      van.add(appHook, Diagnostics());
+      break;
+    case "symbol-picker":
+      van.add(appHook, SymbolPicker());
+      break;
+    default:
+      throw new Error(`Unknown page: ${args.page}`);
+  }
 }
+
+main();
