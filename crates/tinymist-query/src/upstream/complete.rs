@@ -879,9 +879,15 @@ fn code_completions(ctx: &mut CompletionContext, hash: bool) {
     );
 
     ctx.snippet_completion(
-        "import expression",
+        "import module",
+        "import \"${}\"",
+        "Imports module from another file.",
+    );
+
+    ctx.snippet_completion(
+        "import module by expression",
         "import ${}",
-        "Imports items from another file.",
+        "Imports items by expression.",
     );
 
     ctx.snippet_completion(
