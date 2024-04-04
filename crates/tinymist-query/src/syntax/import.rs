@@ -40,14 +40,13 @@ pub fn find_source_by_import_path(
 }
 
 /// Find a source instance by its import node.
-pub fn find_source_by_import(
+pub fn find_source_by_expr(
     world: &dyn World,
     current: TypstFileId,
-    import_node: ast::ModuleImport,
+    e: ast::Expr,
 ) -> Option<Source> {
     // todo: this could be vaild: import("path.typ"), where v is parenthesized
-    let v = import_node.source();
-    match v {
+    match e {
         ast::Expr::Str(s) => find_source_by_import_path(world, current, s.get().as_str()),
         _ => None,
     }

@@ -102,7 +102,7 @@ impl StatefulRequest for CompletionRequest {
                     match_ident = Some(v);
                 }
             }
-            Some(DerefTarget::ImportPath(v)) => {
+            Some(DerefTarget::ImportPath(v) | DerefTarget::IncludePath(v)) => {
                 if !v.text().starts_with(r#""@"#) {
                     completion_result = complete_path(ctx, v, &source, cursor);
                 }

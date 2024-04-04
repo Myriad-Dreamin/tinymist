@@ -200,6 +200,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
         for e in e {
             match &e.info.kind {
                 LexicalKind::Heading(..) => unreachable!(),
+                LexicalKind::Mod(LexicalModKind::PathInclude) => {}
                 LexicalKind::Var(LexicalVarKind::Label) => {
                     self.insert(Ns::Label, e);
                 }

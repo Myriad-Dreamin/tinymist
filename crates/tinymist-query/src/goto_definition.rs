@@ -7,8 +7,8 @@ use typst::syntax::FileId as TypstFileId;
 use crate::{
     prelude::*,
     syntax::{
-        find_source_by_import, get_deref_target, DerefTarget, IdentRef, LexicalKind,
-        LexicalModKind, LexicalVarKind,
+        find_source_by_expr, get_deref_target, DerefTarget, IdentRef, LexicalKind, LexicalModKind,
+        LexicalVarKind,
     },
     SemanticRequest,
 };
@@ -95,10 +95,24 @@ pub(crate) fn find_definition(
         DerefTarget::ImportPath(path) => {
             let parent = path.parent()?;
             let def_fid = parent.span().id()?;
-            let e = parent.cast::<ast::ModuleImport>()?;
-            let source = find_source_by_import(ctx.world(), def_fid, e)?;
+            let import_node = parent.cast::<ast::ModuleImport>()?;
+            let source = find_source_by_expr(ctx.world(), def_fid, import_node.source())?;
             return Some(DefinitionLink {
                 kind: LexicalKind::Mod(LexicalModKind::PathVar),
+                name: String::new(),
+                value: None,
+                fid: source.id(),
+                def_range: (LinkedNode::new(source.root())).range(),
+                name_range: None,
+            });
+        }
+        DerefTarget::IncludePath(path) => {
+            let parent = path.parent()?;
+            let def_fid = parent.span().id()?;
+            let include_node = parent.cast::<ast::ModuleInclude>()?;
+            let source = find_source_by_expr(ctx.world(), def_fid, include_node.source())?;
+            return Some(DefinitionLink {
+                kind: LexicalKind::Mod(LexicalModKind::PathInclude),
                 name: String::new(),
                 value: None,
                 fid: source.id(),
@@ -177,6 +191,7 @@ pub(crate) fn find_definition(
         | LexicalKind::Mod(
             LexicalModKind::Module(..)
             | LexicalModKind::PathVar
+            | LexicalModKind::PathInclude
             | LexicalModKind::ModuleAlias
             | LexicalModKind::Alias { .. }
             | LexicalModKind::Ident,
