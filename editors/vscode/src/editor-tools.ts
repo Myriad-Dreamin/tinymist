@@ -126,19 +126,22 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
         case "tracing":
             break;
         case "summary": {
-            // tinymist.getCurrentDocumentMetrics
-            const result = await vscode.commands.executeCommand(
-                "tinymist.getCurrentDocumentMetrics"
-            );
+            const [docMetrics, serverInfo] = await fetchSummaryInfo();
 
-            if (!result) {
-                vscode.window.showErrorMessage("No document metrics available");
+            if (!docMetrics || !serverInfo) {
+                if (!docMetrics) {
+                    vscode.window.showErrorMessage("No document metrics available");
+                }
+                if (!serverInfo) {
+                    vscode.window.showErrorMessage("No server info");
+                }
+
                 panel.dispose();
                 return;
             }
 
-            const docMetrics = JSON.stringify(result);
             html = html.replace(":[[preview:DocumentMetrics]]:", btoa(docMetrics));
+            html = html.replace(":[[preview:ServerInfo]]:", btoa(serverInfo));
             break;
         }
         case "symbol-picker": {
@@ -149,7 +152,7 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
             );
 
             if (!result) {
-                vscode.window.showErrorMessage("No document metrics available");
+                vscode.window.showErrorMessage("No resource");
                 panel.dispose();
                 return;
             }
@@ -161,4 +164,42 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
     }
 
     panel.webview.html = html;
+}
+
+const waitTimeList = [100, 200, 400, 1000, 1200, 1500, 1800, 2000];
+async function fetchSummaryInfo(): Promise<[any | undefined, any | undefined]> {
+    let res: [any | undefined, any | undefined] = [undefined, undefined];
+
+    for (const to of waitTimeList) {
+        await work(res);
+        if (res[0] && res[1]) {
+            break;
+        }
+        // wait for a bit
+        await new Promise((resolve) => setTimeout(resolve, to));
+    }
+
+    return res;
+
+    async function work(res: [any | undefined, any | undefined]) {
+        if (!res[0]) {
+            const result = await vscode.commands.executeCommand(
+                "tinymist.getCurrentDocumentMetrics"
+            );
+            if (!result) {
+                return;
+            }
+            const docMetrics = JSON.stringify(result);
+            res[0] = docMetrics;
+        }
+
+        if (!res[1]) {
+            const result2 = await vscode.commands.executeCommand("tinymist.getServerInfo");
+            if (!result2) {
+                return;
+            }
+            const serverInfo = JSON.stringify(result2);
+            res[1] = serverInfo;
+        }
+    }
 }

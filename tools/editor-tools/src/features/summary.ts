@@ -2,14 +2,16 @@ import van, { ChildDom } from "vanjs-core";
 import { requestRevealPath } from "../vscode";
 const { div, a, span, code, br } = van.tags;
 
-interface CompileArgs {
+interface ServerInfo {
   root: string;
   fontPaths: string[];
   inputs: Record<string, string>;
+  estimatedMemoryUsage: Record<string, number>;
 }
 
+type ServerInfoMap = Record<string, ServerInfo>;
+
 export const Summary = () => {
-  const compileArgs = van.state(ARGS_MOCK);
   const documentMetricsData = `:[[preview:DocumentMetrics]]:`;
   const docMetrics = van.state<DocumentMetrics>(
     documentMetricsData.startsWith(":")
@@ -17,6 +19,13 @@ export const Summary = () => {
       : JSON.parse(atob(documentMetricsData))
   );
   console.log("docMetrics", docMetrics);
+  const serverInfoData = `:[[preview:ServerInfo]]:`;
+  const serverInfos = van.state<ServerInfoMap>(
+    serverInfoData.startsWith(":")
+      ? SERVER_INFO_MOCK
+      : JSON.parse(atob(serverInfoData))
+  );
+  console.log("serverInfos", serverInfos);
 
   const FontSlot = (font: FontInfo) => {
     let fontName;
@@ -79,7 +88,7 @@ export const Summary = () => {
 
   const ArgSlots = () => {
     const res: ChildDom[] = [];
-    let val = compileArgs.val;
+    let val = serverInfos.val["primary"];
     if (val.root) {
       res.push(
         div(
@@ -117,6 +126,12 @@ export const Summary = () => {
           code(...codeList)
         )
       );
+
+      for (const [key, usage] of Object.entries(val.estimatedMemoryUsage)) {
+        res.push(
+          div(a(code(`memoryUsage (${key})`)), ": ", code(humanSize(usage)))
+        );
+      }
     }
 
     return res;
@@ -315,14 +330,27 @@ const DOC_MOCK: DocumentMetrics = {
   ],
 };
 
-const ARGS_MOCK: CompileArgs = {
-  root: "C:\\Users\\OvO\\work\\rust\\tinymist",
-  fontPaths: [
-    "C:\\Users\\OvO\\work\\rust\\tinymist\\assets\\fonts",
-    "C:\\Users\\OvO\\work\\assets\\fonts",
-  ],
-  inputs: {
-    theme: "dark",
-    context: '{"preview":true}',
+const SERVER_INFO_MOCK: ServerInfoMap = {
+  primary: {
+    root: "C:\\Users\\OvO\\work\\rust\\tinymist",
+    fontPaths: [
+      "C:\\Users\\OvO\\work\\rust\\tinymist\\assets\\fonts",
+      "C:\\Users\\OvO\\work\\assets\\fonts",
+    ],
+    inputs: {
+      theme: "dark",
+      context: '{"preview":true}',
+    },
+    estimatedMemoryUsage: {},
   },
 };
+
+function humanSize(size: number) {
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let unit = 0;
+  while (size >= 768 && unit < units.length) {
+    size /= 1024;
+    unit++;
+  }
+  return `${size.toFixed(2)} ${units[unit]}`;
+}

@@ -26,6 +26,8 @@
 //! information to other actors.
 
 use std::{
+    collections::HashMap,
+    ops::Deref,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -35,7 +37,7 @@ use log::{error, info, trace};
 use parking_lot::Mutex;
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnaylsisResources},
-    DiagnosticsMap, ExportKind, PositionEncoding, VersionedDocument,
+    DiagnosticsMap, ExportKind, ServerInfoReponse, VersionedDocument,
 };
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use typst::{
@@ -143,7 +145,7 @@ pub struct CompileDriver {
     pub(super) inner: CompileDriverInner,
     #[allow(unused)]
     pub(super) handler: CompileHandler,
-    pub(super) position_encoding: PositionEncoding,
+    pub(super) analysis: Analysis,
 }
 
 impl CompileMiddleware for CompileDriver {
@@ -208,7 +210,6 @@ impl CompileDriver {
         &mut self,
         f: impl FnOnce(&mut AnalysisContext<'_>) -> T,
     ) -> anyhow::Result<T> {
-        let enc = self.position_encoding;
         let w = self.inner.world_mut();
 
         let Some(main) = w.main_id() else {
@@ -252,19 +253,15 @@ impl CompileDriver {
         }
 
         let w = WrapWorld(w);
-        Ok(f(&mut AnalysisContext::new(
-            &w,
-            Analysis {
-                root,
-                position_encoding: enc,
-            },
-        )))
+
+        self.analysis.root = root;
+        Ok(f(&mut AnalysisContext::new_borrow(&w, &mut self.analysis)))
     }
 }
 
 pub struct CompileClientActor {
-    diag_group: String,
-    config: CompileConfig,
+    pub diag_group: String,
+    pub config: CompileConfig,
     entry: Arc<Mutex<EntryState>>,
     inner: Deferred<CompileClient>,
     render_tx: broadcast::Sender<RenderActorRequest>,
@@ -418,6 +415,29 @@ impl CompileClientActor {
                 mode: config.mode,
             }))
             .unwrap();
+    }
+
+    pub fn collect_server_info(&self) -> anyhow::Result<HashMap<String, ServerInfoReponse>> {
+        let dg = self.diag_group.clone();
+        let res = self.steal(move |c| {
+            let cc = &c.compiler.compiler;
+
+            let info = ServerInfoReponse {
+                root: cc.world().entry.root().map(|e| e.as_ref().to_owned()),
+                // todo: font paths
+                // font_paths: cc.world().font_resolver.inner,
+                font_paths: vec![],
+                inputs: cc.world().inputs.as_ref().deref().clone(),
+                estimated_memory_usage: HashMap::from_iter([
+                    ("vfs".to_owned(), { cc.world().vfs.memory_usage() }),
+                    ("analysis".to_owned(), cc.analysis.estimated_memory()),
+                ]),
+            };
+
+            HashMap::from_iter([(dg, info)])
+        })?;
+
+        Ok(res)
     }
 }
 

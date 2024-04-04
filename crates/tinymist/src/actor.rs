@@ -6,6 +6,9 @@ pub mod render;
 pub mod typ_client;
 pub mod typ_server;
 
+use std::path::Path;
+
+use tinymist_query::analysis::Analysis;
 use tinymist_query::ExportKind;
 use tokio::sync::{broadcast, watch};
 use typst::util::Deferred;
@@ -107,7 +110,11 @@ impl CompileServer {
                 let driver = CompileDriver {
                     inner: driver,
                     handler,
-                    position_encoding,
+                    analysis: Analysis {
+                        position_encoding,
+                        root: Path::new("").into(),
+                        caches: Default::default(),
+                    },
                 };
 
                 // Create the actor
