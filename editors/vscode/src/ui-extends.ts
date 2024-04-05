@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { getFocusingFile } from "./extension";
 
 let statusBarItem: vscode.StatusBarItem;
 
@@ -26,6 +27,14 @@ export interface TinymistStatus {
     wordsCount: WordsCount;
 }
 
+export const triggerStatusBar = () => {
+    if (getFocusingFile()) {
+        statusBarItem.show();
+    } else {
+        statusBarItem.hide();
+    }
+};
+
 export function wordCountItemProcess(event: TinymistStatus) {
     statusBarItem = statusBarItem || initWordCountItem();
 
@@ -42,9 +51,6 @@ ${cjkChars} CJK Character(s)
     spaces = event.wordsCount?.spaces || 0;
     cjkChars = event.wordsCount?.cjkChars || 0;
 
-    // const style =
-    //     vscode.workspace.getConfiguration().get<string>("typst-preview.statusBarIndicator") ||
-    //     "compact";
     const style: string = "errorStatus";
     if (statusBarItem) {
         if (event.status === "compiling") {
@@ -57,7 +63,7 @@ ${cjkChars} CJK Character(s)
                 "statusBarItem.prominentBackground"
             );
             updateTooltip();
-            statusBarItem.show();
+            triggerStatusBar();
         } else if (event.status === "compileSuccess") {
             if (style === "compact") {
                 statusBarItem.text = "$(typst-guy)";
@@ -68,7 +74,7 @@ ${cjkChars} CJK Character(s)
                 "statusBarItem.prominentBackground"
             );
             updateTooltip();
-            statusBarItem.show();
+            triggerStatusBar();
         } else if (event.status === "compileError") {
             if (style === "compact") {
                 statusBarItem.text = "$(typst-guy)";
@@ -77,7 +83,7 @@ ${cjkChars} CJK Character(s)
             }
             statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
             updateTooltip();
-            statusBarItem.show();
+            triggerStatusBar();
         }
     }
 }

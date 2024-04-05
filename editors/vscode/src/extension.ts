@@ -5,7 +5,6 @@ import {
     commands,
     ViewColumn,
     Uri,
-    WorkspaceConfiguration,
     TextEditor,
     ExtensionMode,
 } from "vscode";
@@ -20,7 +19,7 @@ import {
 } from "vscode-languageclient/node";
 import vscodeVariables from "vscode-variables";
 import { activateEditorTool, getUserPackageData } from "./editor-tools";
-import { wordCountItemProcess } from "./ui-extends";
+import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
 
 let client: LanguageClient | undefined = undefined;
 
@@ -184,7 +183,21 @@ async function startClient(context: ExtensionContext): Promise<void> {
         })
     );
 
-    return client.start();
+    await client.start();
+
+    // Find first document to focus
+    const editor = window.activeTextEditor;
+    if (editor?.document.languageId === "typst" && editor.document.uri.fsPath) {
+        commandActivateDoc(editor.document.uri.fsPath);
+    } else {
+        window.visibleTextEditors.forEach((editor) => {
+            if (editor.document.languageId === "typst" && editor.document.uri.fsPath) {
+                commandActivateDoc(editor.document.uri.fsPath);
+            }
+        });
+    }
+
+    return;
 }
 
 export function deactivate(): Promise<void> | undefined {
@@ -504,7 +517,17 @@ async function commandInitTemplate(
     }
 }
 
+let focusingFile: string | undefined = undefined;
+export function getFocusingFile() {
+    return focusingFile;
+}
+
 async function commandActivateDoc(fsPath: string | undefined): Promise<void> {
+    // console.log("focus main", fsPath, new Error().stack);
+    focusingFile = fsPath;
+    if (!fsPath) {
+        triggerStatusBar();
+    }
     await client?.sendRequest("workspace/executeCommand", {
         command: "tinymist.focusMain",
         arguments: [fsPath],
