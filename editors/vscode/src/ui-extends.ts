@@ -39,10 +39,10 @@ export function wordCountItemProcess(event: TinymistStatus) {
     statusBarItem = statusBarItem || initWordCountItem();
 
     const updateTooltip = () => {
-        statusBarItem.tooltip = `${words} Word(s)
-${chars} Character(s)
-${spaces} Space(s)
-${cjkChars} CJK Character(s)
+        statusBarItem.tooltip = `${words} ${plural("Word", words)}
+${chars} ${plural("Character", chars)}
+${spaces} ${plural("Space", spaces)}
+${cjkChars} CJK ${plural("Character", cjkChars)}
 [Click to show logs]`;
     };
 
@@ -57,7 +57,7 @@ ${cjkChars} CJK Character(s)
             if (style === "compact") {
                 statusBarItem.text = "$(sync~spin)";
             } else if (style === "errorStatus") {
-                statusBarItem.text = `$(sync~spin) ${words} Word(s)`;
+                statusBarItem.text = `$(sync~spin) ${words} ${plural("Word", words)}`;
             }
             statusBarItem.backgroundColor = new vscode.ThemeColor(
                 "statusBarItem.prominentBackground"
@@ -68,7 +68,7 @@ ${cjkChars} CJK Character(s)
             if (style === "compact") {
                 statusBarItem.text = "$(typst-guy)";
             } else if (style === "errorStatus") {
-                statusBarItem.text = `$(sync) ${words} Word(s)`;
+                statusBarItem.text = `$(sync) ${words} ${plural("Word", words)}`;
             }
             statusBarItem.backgroundColor = new vscode.ThemeColor(
                 "statusBarItem.prominentBackground"
@@ -79,11 +79,18 @@ ${cjkChars} CJK Character(s)
             if (style === "compact") {
                 statusBarItem.text = "$(typst-guy)";
             } else if (style === "errorStatus") {
-                statusBarItem.text = `$(sync) ${words} Word(s)`;
+                statusBarItem.text = `$(sync) ${words} ${plural("Word", words)}`;
             }
             statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
             updateTooltip();
             triggerStatusBar();
         }
+    }
+}
+function plural(w: string, words: number): string {
+    if (words <= 1) {
+        return w;
+    } else {
+        return w + "s";
     }
 }
