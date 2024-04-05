@@ -74,6 +74,7 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
                     Analysis {
                         root,
                         position_encoding: PositionEncoding::Utf16,
+                        caches: Default::default(),
                     },
                 );
                 ctx.test_files(|| paths);

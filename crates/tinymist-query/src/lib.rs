@@ -113,6 +113,7 @@ pub trait StatefulRequest {
 mod polymorphic {
     use lsp_types::TextEdit;
     use serde::{Deserialize, Serialize};
+    use typst::foundations::Dict;
 
     use super::prelude::*;
     use super::*;
@@ -161,6 +162,19 @@ mod polymorphic {
         pub path: PathBuf,
     }
 
+    #[derive(Debug, Clone)]
+    pub struct ServerInfoRequest {}
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct ServerInfoReponse {
+        pub root: Option<PathBuf>,
+        #[serde(rename = "fontPaths")]
+        pub font_paths: Vec<PathBuf>,
+        pub inputs: Dict,
+        #[serde(rename = "estimatedMemoryUsage")]
+        pub estimated_memory_usage: HashMap<String, usize>,
+    }
+
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum FoldRequestFeature {
         PinnedFirst,
@@ -192,6 +206,7 @@ mod polymorphic {
         SelectionRange(SelectionRangeRequest),
 
         DocumentMetrics(DocumentMetricsRequest),
+        ServerInfo(ServerInfoRequest),
     }
 
     impl CompilerQueryRequest {
@@ -219,6 +234,7 @@ mod polymorphic {
                 CompilerQueryRequest::SelectionRange(..) => ContextFreeUnique,
 
                 CompilerQueryRequest::DocumentMetrics(..) => PinnedFirst,
+                CompilerQueryRequest::ServerInfo(..) => Mergable,
             }
         }
 
@@ -245,6 +261,7 @@ mod polymorphic {
                 CompilerQueryRequest::SelectionRange(req) => &req.path,
 
                 CompilerQueryRequest::DocumentMetrics(req) => &req.path,
+                CompilerQueryRequest::ServerInfo(..) => return None,
             })
         }
     }
@@ -272,6 +289,7 @@ mod polymorphic {
         SelectionRange(Option<Vec<SelectionRange>>),
 
         DocumentMetrics(Option<DocumentMetricsResponse>),
+        ServerInfo(Option<HashMap<String, ServerInfoReponse>>),
     }
 }
 

@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use reflexo::debug_loc::DataSource;
 use serde::{Deserialize, Serialize};
-use typst::text::Font;
+use typst::text::{Font, FontStretch, FontStyle, FontWeight};
 use typst::{
     layout::{Frame, FrameItem},
     model::Document,
@@ -39,6 +39,12 @@ pub struct DocumentFontInfo {
     /// The display name of the font, which is computed by this crate and
     /// unnecessary from any fields of the font file.
     pub name: String,
+    /// The style of the font.
+    pub style: FontStyle,
+    /// The weight of the font.
+    pub weight: FontWeight,
+    /// The stretch of the font.
+    pub stretch: FontStretch,
     /// The PostScript name of the font.
     pub postscript_name: Option<String>,
     /// The Family in font file.
@@ -165,12 +171,16 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
             .into_iter()
             .map(|(font, uses)| {
                 let extra = self.ctx.resources.font_info(font.clone());
+                let info = &font.info();
                 DocumentFontInfo {
-                    name: format!("{} ({:?})", font.info().family, font.info().variant),
+                    name: info.family.clone(),
+                    style: info.variant.style,
+                    weight: info.variant.weight,
+                    stretch: info.variant.stretch,
                     postscript_name: font.find_name(POST_SCRIPT_NAME),
                     full_name: font.find_name(FULL_NAME),
                     family: font.find_name(FAMILY),
-                    fixed_family: Some(font.info().family.clone()),
+                    fixed_family: Some(info.family.clone()),
                     source: extra.map(|e| self.internal_source(e)),
                     index: Some(font.index()),
                     uses_scale: Some(uses),

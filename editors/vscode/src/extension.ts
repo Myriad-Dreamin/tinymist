@@ -108,6 +108,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
         //     console.log("plaintext", langId, editor?.document.uri.fsPath);
         // }
         if (langId !== "typst") {
+            // console.log("not typst", langId, editor?.document.uri.fsPath);
             return commandActivateDoc(undefined);
         }
         return commandActivateDoc(editor?.document.uri.fsPath);
@@ -535,7 +536,6 @@ async function commandActivateDoc(fsPath: string | undefined): Promise<void> {
 }
 
 async function commandRunCodeLens(...args: string[]): Promise<void> {
-    console.log("run code lens", args);
     if (args.length === 0) {
         return;
     }

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { readFile } from "fs/promises";
+import { getFocusingFile } from "./extension";
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
     const filePath = path.resolve(context.extensionPath, relativePath);
@@ -59,7 +60,10 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
     const panel = vscode.window.createWebviewPanel(
         `tinymist-${tool}`,
         title,
-        vscode.ViewColumn.Beside, // Which sides
+        {
+            viewColumn: vscode.ViewColumn.Beside,
+            preserveFocus: tool == "summary",
+        }, // Which sides
         {
             enableScripts: true,
             retainContextWhenHidden: true,
@@ -126,19 +130,22 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
         case "tracing":
             break;
         case "summary": {
-            // tinymist.getCurrentDocumentMetrics
-            const result = await vscode.commands.executeCommand(
-                "tinymist.getCurrentDocumentMetrics"
-            );
+            const [docMetrics, serverInfo] = await fetchSummaryInfo();
 
-            if (!result) {
-                vscode.window.showErrorMessage("No document metrics available");
+            if (!docMetrics || !serverInfo) {
+                if (!docMetrics) {
+                    vscode.window.showErrorMessage("No document metrics available");
+                }
+                if (!serverInfo) {
+                    vscode.window.showErrorMessage("No server info");
+                }
+
                 panel.dispose();
                 return;
             }
 
-            const docMetrics = JSON.stringify(result);
             html = html.replace(":[[preview:DocumentMetrics]]:", btoa(docMetrics));
+            html = html.replace(":[[preview:ServerInfo]]:", btoa(serverInfo));
             break;
         }
         case "symbol-picker": {
@@ -149,7 +156,7 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
             );
 
             if (!result) {
-                vscode.window.showErrorMessage("No document metrics available");
+                vscode.window.showErrorMessage("No resource");
                 panel.dispose();
                 return;
             }
@@ -161,4 +168,49 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
     }
 
     panel.webview.html = html;
+}
+
+const waitTimeList = [100, 200, 400, 1000, 1200, 1500, 1800, 2000];
+async function fetchSummaryInfo(): Promise<[any | undefined, any | undefined]> {
+    let res: [any | undefined, any | undefined] = [undefined, undefined];
+
+    for (const to of waitTimeList) {
+        const focusingFile = getFocusingFile();
+        if (focusingFile === undefined) {
+            await vscode.window.showErrorMessage("No focusing typst file");
+            return res;
+        }
+
+        await work(focusingFile, res);
+        if (res[0] && res[1]) {
+            break;
+        }
+        // wait for a bit
+        await new Promise((resolve) => setTimeout(resolve, to));
+    }
+
+    return res;
+
+    async function work(focusingFile: string, res: [any | undefined, any | undefined]) {
+        if (!res[0]) {
+            const result = await vscode.commands.executeCommand(
+                "tinymist.getDocumentMetrics",
+                focusingFile
+            );
+            if (!result) {
+                return;
+            }
+            const docMetrics = JSON.stringify(result);
+            res[0] = docMetrics;
+        }
+
+        if (!res[1]) {
+            const result2 = await vscode.commands.executeCommand("tinymist.getServerInfo");
+            if (!result2) {
+                return;
+            }
+            const serverInfo = JSON.stringify(result2);
+            res[1] = serverInfo;
+        }
+    }
 }

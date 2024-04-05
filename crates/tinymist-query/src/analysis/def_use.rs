@@ -15,8 +15,7 @@ use typst::syntax::Source;
 
 use super::SearchCtx;
 use crate::syntax::{
-    find_source_by_import_path, get_lexical_hierarchy, IdentRef, LexicalHierarchy, LexicalKind,
-    LexicalScopeKind, LexicalVarKind, ModSrc,
+    find_source_by_import_path, IdentRef, LexicalHierarchy, LexicalKind, LexicalVarKind, ModSrc,
 };
 use crate::{adt::snapshot_map::SnapshotMap, syntax::LexicalModKind};
 
@@ -57,6 +56,23 @@ pub struct DefUseInfo {
 }
 
 impl DefUseInfo {
+    /// Get the estimated memory usage of the def-use information.
+    pub fn estimated_memory(&self) -> usize {
+        std::mem::size_of::<Self>()
+            + self.ident_defs.capacity()
+                * (std::mem::size_of::<IdentDef>() + std::mem::size_of::<IdentRef>() + 32)
+            + self.external_refs.capacity()
+                * (std::mem::size_of::<(TypstFileId, Option<String>)>()
+                    + std::mem::size_of::<Vec<(Option<DefId>, IdentRef)>>()
+                    + 32)
+            + self.ident_refs.capacity()
+                * (std::mem::size_of::<IdentRef>() + std::mem::size_of::<DefId>() + 32)
+            + (self.undefined_refs.capacity() * std::mem::size_of::<IdentRef>() + 32)
+            + (self.exports_refs.capacity() * std::mem::size_of::<DefId>() + 32)
+            + self.exports_defs.capacity()
+                * (std::mem::size_of::<String>() + std::mem::size_of::<DefId>() + 32)
+    }
+
     /// Get the definition id of a symbol by its name reference.
     pub fn get_ref(&self, ident: &IdentRef) -> Option<DefId> {
         self.ident_refs.get(ident).copied()
@@ -112,7 +128,7 @@ pub(super) fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<A
         return None;
     }
 
-    let e = get_lexical_hierarchy(source, LexicalScopeKind::DefUse)?;
+    let e = ctx.ctx.def_use_lexical_hierarchy(source)?;
 
     let mut collector = DefUseCollector {
         ctx,

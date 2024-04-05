@@ -151,9 +151,9 @@ impl TypstLanguageServer {
 
 #[macro_export]
 macro_rules! run_query {
-    ($self: ident.$query: ident ($($arg_key:ident),+ $(,)?)) => {{
+    ($self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
         use tinymist_query::*;
-        let req = paste! { [<$query Request>] { $($arg_key),+ } };
+        let req = paste! { [<$query Request>] { $($arg_key),* } };
         $self
             .query(CompilerQueryRequest::$query(req.clone()))
             .map_err(|err| {
@@ -268,6 +268,10 @@ impl TypstLanguageServer {
             Symbol(req) => query_world!(client, Symbol, req),
 
             DocumentMetrics(req) => query_state!(client, DocumentMetrics, req),
+            ServerInfo(_) => {
+                let res = client.collect_server_info()?;
+                Ok(CompilerQueryResponse::ServerInfo(Some(res)))
+            }
 
             FoldingRange(..)
             | SelectionRange(..)

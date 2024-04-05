@@ -2,14 +2,16 @@ import van, { ChildDom } from "vanjs-core";
 import { requestRevealPath } from "../vscode";
 const { div, a, span, code, br } = van.tags;
 
-interface CompileArgs {
+interface ServerInfo {
   root: string;
   fontPaths: string[];
   inputs: Record<string, string>;
+  estimatedMemoryUsage: Record<string, number>;
 }
 
+type ServerInfoMap = Record<string, ServerInfo>;
+
 export const Summary = () => {
-  const compileArgs = van.state(ARGS_MOCK);
   const documentMetricsData = `:[[preview:DocumentMetrics]]:`;
   const docMetrics = van.state<DocumentMetrics>(
     documentMetricsData.startsWith(":")
@@ -17,6 +19,13 @@ export const Summary = () => {
       : JSON.parse(atob(documentMetricsData))
   );
   console.log("docMetrics", docMetrics);
+  const serverInfoData = `:[[preview:ServerInfo]]:`;
+  const serverInfos = van.state<ServerInfoMap>(
+    serverInfoData.startsWith(":")
+      ? SERVER_INFO_MOCK
+      : JSON.parse(atob(serverInfoData))
+  );
+  console.log("serverInfos", serverInfos);
 
   const FontSlot = (font: FontInfo) => {
     let fontName;
@@ -59,6 +68,23 @@ export const Summary = () => {
       font.usesScale,
       " use(s).",
       br(),
+      code("Variant"),
+      ": ",
+      code(
+        font.style === "normal" || !font.style
+          ? ""
+          : `${humanStyle(font.style)}, `,
+        span(
+          { title: `Weight ${font.weight || 400}` },
+          `${humanWeight(font.weight)} Weight`
+        ),
+        ", ",
+        span(
+          { title: `Stretch ${(font.stretch || 1000) / 10}%` },
+          `${humanStretch(font.stretch)} Stretch`
+        )
+      ),
+      br(),
       code("PostScriptName"),
       ": ",
       code(font.postscriptName),
@@ -79,7 +105,7 @@ export const Summary = () => {
 
   const ArgSlots = () => {
     const res: ChildDom[] = [];
-    let val = compileArgs.val;
+    let val = serverInfos.val["primary"];
     if (val.root) {
       res.push(
         div(
@@ -117,6 +143,12 @@ export const Summary = () => {
           code(...codeList)
         )
       );
+
+      for (const [key, usage] of Object.entries(val.estimatedMemoryUsage)) {
+        res.push(
+          div(a(code(`memoryUsage (${key})`)), ": ", code(humanSize(usage)))
+        );
+      }
     }
 
     return res;
@@ -261,6 +293,9 @@ interface AnnotatedContent {
 
 interface FontInfo {
   name: string;
+  style?: string;
+  weight?: number;
+  stretch?: number;
   postscriptName: string;
   family?: string;
   fullName?: string;
@@ -315,14 +350,135 @@ const DOC_MOCK: DocumentMetrics = {
   ],
 };
 
-const ARGS_MOCK: CompileArgs = {
-  root: "C:\\Users\\OvO\\work\\rust\\tinymist",
-  fontPaths: [
-    "C:\\Users\\OvO\\work\\rust\\tinymist\\assets\\fonts",
-    "C:\\Users\\OvO\\work\\assets\\fonts",
-  ],
-  inputs: {
-    theme: "dark",
-    context: '{"preview":true}',
+const SERVER_INFO_MOCK: ServerInfoMap = {
+  primary: {
+    root: "C:\\Users\\OvO\\work\\rust\\tinymist",
+    fontPaths: [
+      "C:\\Users\\OvO\\work\\rust\\tinymist\\assets\\fonts",
+      "C:\\Users\\OvO\\work\\assets\\fonts",
+    ],
+    inputs: {
+      theme: "dark",
+      context: '{"preview":true}',
+    },
+    estimatedMemoryUsage: {},
   },
 };
+
+function humanSize(size: number) {
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let unit = 0;
+  while (size >= 768 && unit < units.length) {
+    size /= 1024;
+    unit++;
+  }
+  return `${size.toFixed(2)} ${units[unit]}`;
+}
+
+function almost(value: number, target: number, threshold = 0.01) {
+  return Math.abs(value - target) < threshold;
+}
+
+function humanStyle(style?: string) {
+  if (!style) {
+    return "Regular";
+  }
+
+  if (style === "italic") {
+    return "Italic";
+  }
+
+  if (style === "oblique") {
+    return "Oblique";
+  }
+
+  return `Style ${style}`;
+}
+
+function humanWeight(weight?: number) {
+  if (!weight) {
+    return "Regular";
+  }
+
+  if (almost(weight, 100)) {
+    return "Thin";
+  }
+
+  if (almost(weight, 200)) {
+    return "Extra Light";
+  }
+
+  if (almost(weight, 300)) {
+    return "Light";
+  }
+
+  if (almost(weight, 400)) {
+    return "Regular";
+  }
+
+  if (almost(weight, 500)) {
+    return "Medium";
+  }
+
+  if (almost(weight, 600)) {
+    return "Semibold";
+  }
+
+  if (almost(weight, 700)) {
+    return "Bold";
+  }
+
+  if (almost(weight, 800)) {
+    return "Extra Bold";
+  }
+
+  if (almost(weight, 900)) {
+    return "Black";
+  }
+
+  return `Weight ${weight}`;
+}
+
+function humanStretch(stretch?: number) {
+  if (!stretch) {
+    return "Normal";
+  }
+
+  if (almost(stretch, 500)) {
+    return "Ultra-condensed";
+  }
+
+  if (almost(stretch, 625)) {
+    return "Extra-condensed";
+  }
+
+  if (almost(stretch, 750)) {
+    return "Condensed";
+  }
+
+  if (almost(stretch, 875)) {
+    return "Semi-condensed";
+  }
+
+  if (almost(stretch, 1000)) {
+    return "Normal";
+  }
+
+  if (almost(stretch, 1125)) {
+    return "Semi-expanded";
+  }
+
+  if (almost(stretch, 1250)) {
+    return "Expanded";
+  }
+
+  if (almost(stretch, 1500)) {
+    return "Extra-expanded";
+  }
+
+  if (almost(stretch, 2000)) {
+    return "Ultra-expanded";
+  }
+
+  return `${stretch}`;
+}

@@ -1,9 +1,11 @@
 use std::{
     collections::{HashMap, HashSet},
+    hash::Hash,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
+use ecow::EcoVec;
 use once_cell::sync::OnceCell;
 use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
 use typst::syntax::FileId as TypstFileId;
@@ -17,7 +19,9 @@ use typst::{
 use super::{get_def_use_inner, DefUseInfo};
 use crate::{
     lsp_to_typst,
-    syntax::{construct_module_dependencies, scan_workspace_files, ModuleDependency},
+    syntax::{
+        construct_module_dependencies, scan_workspace_files, LexicalHierarchy, ModuleDependency,
+    },
     typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange,
 };
 
@@ -59,6 +63,102 @@ pub struct Analysis {
     pub root: ImmutPath,
     /// The position encoding for the workspace.
     pub position_encoding: PositionEncoding,
+    /// The global caches for analysis.
+    pub caches: AnalysisGlobalCaches,
+}
+
+impl Analysis {
+    /// Get estimated memory usage of the analysis data.
+    pub fn estimated_memory(&self) -> usize {
+        self.caches.modules.capacity() * 32
+            + self
+                .caches
+                .modules
+                .values()
+                .map(|v| {
+                    v.def_use_lexical_heirarchy
+                        .output
+                        .as_ref()
+                        .map_or(0, |e| e.iter().map(|e| e.estimated_memory()).sum())
+                })
+                .sum::<usize>()
+    }
+}
+
+struct ComputingNode<Inputs, Output> {
+    name: &'static str,
+    inputs: Option<Inputs>,
+    output: Option<Output>,
+}
+
+pub(crate) trait ComputeDebug {
+    fn compute_debug_repr(&self) -> impl std::fmt::Debug;
+}
+
+impl ComputeDebug for Source {
+    fn compute_debug_repr(&self) -> impl std::fmt::Debug {
+        self.id()
+    }
+}
+
+impl<Inputs, Output> ComputingNode<Inputs, Output> {
+    fn new(name: &'static str) -> Self {
+        Self {
+            name,
+            inputs: None,
+            output: None,
+        }
+    }
+
+    fn compute(
+        &mut self,
+        inputs: Inputs,
+        compute: impl FnOnce(Option<Inputs>, Inputs) -> Option<Output>,
+    ) -> Option<Output>
+    where
+        Inputs: ComputeDebug + Hash + Clone,
+        Output: Clone,
+    {
+        match &self.inputs {
+            Some(s) if reflexo::hash::hash128(&inputs) == reflexo::hash::hash128(&s) => {
+                log::debug!(
+                    "{}({:?}): hit cache",
+                    self.name,
+                    inputs.compute_debug_repr()
+                );
+                self.output.clone()
+            }
+            _ => {
+                log::info!("{}({:?}): compute", self.name, inputs.compute_debug_repr());
+                let output = compute(self.inputs.clone(), inputs.clone());
+                self.output = output.clone();
+                self.inputs = Some(inputs);
+                output
+            }
+        }
+    }
+}
+
+/// A cache for module-level analysis results of a module.
+///
+/// You should not holds across requests, because source code may change.
+pub struct ModuleAnalysisGlobalCache {
+    def_use_lexical_heirarchy: ComputingNode<Source, EcoVec<LexicalHierarchy>>,
+}
+
+impl Default for ModuleAnalysisGlobalCache {
+    fn default() -> Self {
+        Self {
+            def_use_lexical_heirarchy: ComputingNode::new("def_use_lexical_heirarchy"),
+        }
+    }
+}
+
+/// A global (compiler server spanned) cache for all level of analysis results
+/// of a module.
+#[derive(Default)]
+pub struct AnalysisGlobalCaches {
+    modules: HashMap<TypstFileId, ModuleAnalysisGlobalCache>,
 }
 
 /// A cache for all level of analysis results of a module.
@@ -232,6 +332,21 @@ impl<'w> AnalysisContext<'w> {
     /// Convert a Typst range to a LSP range.
     pub fn to_lsp_range(&self, position: TypstRange, src: &Source) -> LspRange {
         typst_to_lsp::range(position, src, self.analysis.position_encoding)
+    }
+
+    pub(crate) fn def_use_lexical_hierarchy(
+        &mut self,
+        source: Source,
+    ) -> Option<EcoVec<LexicalHierarchy>> {
+        self.analysis
+            .caches
+            .modules
+            .entry(source.id())
+            .or_default()
+            .def_use_lexical_heirarchy
+            .compute(source, |_before, after| {
+                crate::syntax::get_lexical_hierarchy(after, crate::syntax::LexicalScopeKind::DefUse)
+            })
     }
 }
 

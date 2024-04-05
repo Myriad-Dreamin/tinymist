@@ -602,6 +602,7 @@ impl TypstLanguageServer {
             redirected_command!("tinymist.doInitTemplate", Self::init_template),
             redirected_command!("tinymist.doGetTemplateEntry", Self::do_get_template_entry),
             redirected_command!("tinymist.getDocumentMetrics", Self::get_document_metrics),
+            redirected_command!("tinymist.getServerInfo", Self::get_server_info),
             // For Documentations
             redirected_command!("tinymist.getResources", Self::get_resources),
         ])
@@ -650,12 +651,21 @@ impl TypstLanguageServer {
         Ok(res)
     }
 
-    /// Export the current document as some format. The client is responsible
-    /// for passing the correct absolute path of typst document.
+    /// Get the metrics of the document.
     pub fn get_document_metrics(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let path = parse_path(arguments.first())?.as_ref().to_owned();
 
         let res = run_query!(self.DocumentMetrics(path))?;
+        let res = serde_json::to_value(res)
+            .map_err(|e| internal_error(format!("Cannot serialize response {e}")))?;
+
+        Ok(res)
+    }
+
+    /// Get the server info.
+    pub fn get_server_info(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        let res = run_query!(self.ServerInfo())?;
+
         let res = serde_json::to_value(res)
             .map_err(|e| internal_error(format!("Cannot serialize response {e}")))?;
 
