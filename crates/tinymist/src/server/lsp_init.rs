@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::bail;
@@ -10,7 +9,6 @@ use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
 use typst::util::Deferred;
-use typst_ts_core::error::prelude::*;
 use typst_ts_core::ImmutPath;
 
 use crate::actor::cluster::EditorActor;
@@ -339,7 +337,7 @@ impl Init {
                 }
             }
 
-            Deferred::new(|| create_font_book(opts).expect("failed to create font book"))
+            Deferred::new(|| SharedFontResolver::new(opts).expect("failed to create font book"))
         };
 
         // Bootstrap server
@@ -361,6 +359,7 @@ impl Init {
         service.config = config;
 
         service.run_format_thread();
+        service.run_user_action_thread();
 
         let cluster_actor = EditorActor {
             host: self.host.clone(),
@@ -471,13 +470,6 @@ impl Init {
 
         (service, Ok(res))
     }
-}
-
-fn create_font_book(opts: CompileFontOpts) -> ZResult<SharedFontResolver> {
-    let res = crate::world::LspWorldBuilder::resolve_fonts(opts)?;
-    Ok(SharedFontResolver {
-        inner: Arc::new(res),
-    })
 }
 
 #[cfg(test)]

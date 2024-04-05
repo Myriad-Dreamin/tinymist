@@ -209,7 +209,7 @@ pub async fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
                     lsp_server::Message::Response(lsp_server::Response {
                         id: 0.into(),
                         result: Some(serde_json::json!({
-                            "tracing_data": timings,
+                            "tracingData": timings,
                         })),
                         error: None,
                     })

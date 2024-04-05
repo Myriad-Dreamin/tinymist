@@ -5,6 +5,7 @@ mod formatting;
 pub mod render;
 pub mod typ_client;
 pub mod typ_server;
+mod user_action;
 
 use std::path::Path;
 
@@ -24,6 +25,7 @@ use self::{
     render::{ExportActor, ExportConfig},
     typ_client::{CompileClientActor, CompileDriver, CompileHandler},
     typ_server::CompileServerActor,
+    user_action::run_user_action_thread,
 };
 use crate::{
     compiler::CompileServer,
@@ -32,6 +34,7 @@ use crate::{
 };
 
 pub use formatting::{FormattingConfig, FormattingRequest};
+pub use user_action::{UserActionRequest, UserActionTraceRequest};
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
 
@@ -41,6 +44,7 @@ impl CompileServer {
         editor_group: String,
         entry: EntryState,
         inputs: ImmutDict,
+        snapshot: FileChangeSet,
     ) -> CompileClientActor {
         let (doc_tx, doc_rx) = watch::channel(None);
         let (render_tx, _) = broadcast::channel(10);
@@ -78,9 +82,6 @@ impl CompileServer {
                 .run(),
             );
         }
-
-        // Take all dirty files in memory as the initial snapshot
-        let snapshot = FileChangeSet::default();
 
         // Create the server
         let inner = Deferred::new({
@@ -148,12 +149,14 @@ impl TypstLanguageServer {
         entry: EntryState,
         inputs: ImmutDict,
     ) -> CompileClientActor {
-        self.primary.server(diag_group, entry, inputs)
+        // Take all dirty files in memory as the initial snapshot
+        self.primary
+            .server(diag_group, entry, inputs, self.primary.vfs_snapshot())
     }
 
     pub fn run_format_thread(&mut self) {
         if self.format_thread.is_some() {
-            log::error!("formatting thread already started");
+            log::error!("formatting thread is already started");
             return;
         }
 
@@ -166,5 +169,18 @@ impl TypstLanguageServer {
         std::thread::spawn(move || {
             run_format_thread(FormattingConfig { mode, width: 120 }, rx_req, client, enc)
         });
+    }
+
+    pub fn run_user_action_thread(&mut self) {
+        if self.user_action_threads.is_some() {
+            log::error!("user action threads are already started");
+            return;
+        }
+
+        let (tx_req, rx_req) = crossbeam_channel::unbounded();
+        self.user_action_threads = Some(tx_req.clone());
+
+        let client = self.client.clone();
+        std::thread::spawn(move || run_user_action_thread(rx_req, client));
     }
 }

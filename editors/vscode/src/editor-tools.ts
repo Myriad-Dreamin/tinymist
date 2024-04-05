@@ -62,7 +62,7 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
         title,
         {
             viewColumn: vscode.ViewColumn.Beside,
-            preserveFocus: tool == "summary",
+            preserveFocus: tool === "summary" || tool === "tracing",
         }, // Which sides
         {
             enableScripts: true,
@@ -111,7 +111,10 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
         }
     });
 
-    panel.onDidDispose(async () => {});
+    let disposed = false;
+    panel.onDidDispose(async () => {
+        disposed = true;
+    });
 
     let html = await loadHTMLFile(context, "./out/editor-tools/index.html");
     // packageData
@@ -121,14 +124,35 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
         `\`editor-tools-args:{"page": "${tool}"}\``
     );
 
+    let afterReloadHtml = undefined;
+
     switch (tool) {
         case "template-gallery":
             const userPackageData = getUserPackageData(context);
             const packageData = JSON.stringify(userPackageData.data);
             html = html.replace(":[[preview:FavoritePlaceholder]]:", btoa(packageData));
             break;
-        case "tracing":
+        case "tracing": {
+            const focusingFile = getFocusingFile();
+            if (focusingFile === undefined) {
+                await vscode.window.showErrorMessage("No focusing typst file");
+                return;
+            }
+            const traceDataTask = vscode.commands.executeCommand(
+                "tinymist.getDocumentTrace",
+                focusingFile
+            );
+
+            // do that after the html is reloaded
+            afterReloadHtml = async () => {
+                const traceData = await traceDataTask;
+                if (!disposed) {
+                    panel.webview.postMessage({ type: "traceData", data: traceData });
+                }
+            };
+
             break;
+        }
         case "summary": {
             const [docMetrics, serverInfo] = await fetchSummaryInfo();
 
@@ -168,6 +192,10 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
     }
 
     panel.webview.html = html;
+
+    if (afterReloadHtml) {
+        afterReloadHtml();
+    }
 }
 
 const waitTimeList = [100, 200, 400, 1000, 1200, 1500, 1800, 2000];

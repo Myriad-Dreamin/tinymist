@@ -34,6 +34,7 @@ impl SemanticRequest for CodeLensRequest {
             data: None,
         };
 
+        res.push(doc_lens("Trace", vec!["trace".into()]));
         res.push(doc_lens("Preview", vec!["preview".into()]));
         res.push(doc_lens("Preview in ..", vec!["preview-in".into()]));
         res.push(doc_lens("Export PDF", vec!["export-pdf".into()]));

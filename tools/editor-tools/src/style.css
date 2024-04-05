@@ -96,8 +96,12 @@ body {
   transition: color 0.05s;
 }
 
-#tinymist-app {
+#tinymist-app, .tinymist-main-window {
   margin: 24px 28px;
+}
+
+#tinymist-app.no-wrap {
+  margin: 0;
 }
 
 body.typst-preview-dark .tinymist-card {

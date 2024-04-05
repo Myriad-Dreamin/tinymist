@@ -2,17 +2,34 @@ import van from "vanjs-core";
 
 const vscodeAPI = typeof acquireVsCodeApi !== "undefined" && acquireVsCodeApi();
 
-export const traceData = van.state<string | undefined>(undefined);
+interface UserActionTraceRequest {
+  compilerProgram: string;
+  root: string;
+  main: string;
+  inputs: any;
+  fontPaths: string[];
+}
 
-// todo
-// {
-//     "command": "tinymist.traceCurrentFile",
-//     "title": "Trace and visualize execution of the current Typst file",
-//     "when": "editorLangId == disabled",
-//     "category": "Typst"
-// }
+export interface LspResponse {
+  id: number;
+  result: any;
+  error: any;
+}
 
-// panel.webview.postMessage({ type: "traceData", data: Mock });
+export interface LspNotification {
+  method: string;
+  params: any;
+}
+
+export type LspMessage = LspResponse | LspNotification;
+
+interface TraceReport {
+  request: UserActionTraceRequest;
+  messages: LspMessage[];
+  stderr: string;
+}
+
+export const traceData = van.state<TraceReport | undefined>(undefined);
 
 /// A frontend will try to setup a vscode channel if it is running
 /// in vscode.
