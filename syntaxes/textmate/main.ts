@@ -98,12 +98,13 @@ const identifier: textmate.PatternMatch = {
 
 const markupLabel: textmate.PatternMatch = {
   name: "entity.other.label.typst",
-  match: /<[\p{XID_Start}_][\p{XID_Continue}_\-]*>/,
+  match: /<[\p{XID_Start}_][\p{XID_Continue}_\-\.\:]*>/,
 };
 
 const markupReference: textmate.PatternMatch = {
   name: "entity.other.reference.typst",
-  match: /(@)[\p{XID_Start}_][\p{XID_Continue}_\-]*/,
+  match:
+    /(@)[\p{XID_Start}_](?:[\p{XID_Continue}_\-]|[\.\:](?!:[\.\:]*[^\p{XID_Continue}_\-\.\:]))*/,
   captures: {
     "1": {
       name: "punctuation.definition.reference.typst",
