@@ -6,6 +6,7 @@ pub mod render;
 pub mod typ_client;
 pub mod typ_server;
 
+use tinymist_query::ExportKind;
 use tokio::sync::{broadcast, watch};
 use typst::util::Deferred;
 use typst_ts_compiler::{
@@ -23,7 +24,7 @@ use self::{
 use crate::{
     compiler::CompileServer,
     world::{ImmutDict, LspWorld, LspWorldBuilder},
-    TypstLanguageServer,
+    ExportMode, TypstLanguageServer,
 };
 
 pub use formatting::{FormattingConfig, FormattingRequest};
@@ -33,26 +34,46 @@ type CompileDriverInner = CompileDriverImpl<LspWorld>;
 impl CompileServer {
     pub fn server(
         &self,
-        diag_group: String,
+        editor_group: String,
         entry: EntryState,
         inputs: ImmutDict,
     ) -> CompileClientActor {
         let (doc_tx, doc_rx) = watch::channel(None);
         let (render_tx, _) = broadcast::channel(10);
 
-        // Run the Export actor before preparing cluster to avoid loss of events
+        let config = ExportConfig {
+            substitute_pattern: self.config.output_path.clone(),
+            entry: entry.clone(),
+            mode: self.config.export_pdf,
+        };
+
+        // Run Export actors before preparing cluster to avoid loss of events
         self.handle.spawn(
             ExportActor::new(
+                editor_group.clone(),
                 doc_rx.clone(),
+                self.diag_tx.clone(),
                 render_tx.subscribe(),
-                ExportConfig {
-                    substitute_pattern: self.config.output_path.clone(),
-                    entry: entry.clone(),
-                    mode: self.config.export_pdf,
-                },
+                config.clone(),
+                ExportKind::Pdf,
             )
             .run(),
         );
+        if self.config.notify_compile_status {
+            let mut config = config;
+            config.mode = ExportMode::OnType;
+            self.handle.spawn(
+                ExportActor::new(
+                    editor_group.clone(),
+                    doc_rx.clone(),
+                    self.diag_tx.clone(),
+                    render_tx.subscribe(),
+                    config,
+                    ExportKind::WordCount,
+                )
+                .run(),
+            );
+        }
 
         // Take all dirty files in memory as the initial snapshot
         let snapshot = FileChangeSet::default();
@@ -63,14 +84,14 @@ impl CompileServer {
             let handler = CompileHandler {
                 #[cfg(feature = "preview")]
                 inner: std::sync::Arc::new(parking_lot::Mutex::new(None)),
-                diag_group: diag_group.clone(),
+                diag_group: editor_group.clone(),
                 doc_tx,
                 render_tx: render_tx.clone(),
-                diag_tx: self.diag_tx.clone(),
+                editor_tx: self.diag_tx.clone(),
             };
 
             let position_encoding = self.const_config().position_encoding;
-            let diag_group = diag_group.clone();
+            let diag_group = editor_group.clone();
             let entry = entry.clone();
             let font_resolver = self.font.clone();
             move || {
@@ -104,7 +125,7 @@ impl CompileServer {
             }
         });
 
-        CompileClientActor::new(diag_group, self.config.clone(), entry, inner, render_tx)
+        CompileClientActor::new(editor_group, self.config.clone(), entry, inner, render_tx)
     }
 }
 

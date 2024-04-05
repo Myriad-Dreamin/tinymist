@@ -7,37 +7,76 @@ use lsp_types::Url;
 use tinymist_query::{DiagnosticsMap, LspDiagnostic};
 use tokio::sync::mpsc;
 
-use crate::{LspHost, TypstLanguageServer};
+use crate::{tools::word_count::WordsCount, LspHost, TypstLanguageServer};
 
-pub struct CompileClusterActor {
+pub enum CompileClusterRequest {
+    Diag(String, Option<DiagnosticsMap>),
+    Status(String, TinymistCompileStatusEnum),
+    WordCount(String, Option<WordsCount>),
+}
+
+pub struct EditorActor {
     pub host: LspHost<TypstLanguageServer>,
-    pub diag_rx: mpsc::UnboundedReceiver<(String, Option<DiagnosticsMap>)>,
+    pub diag_rx: mpsc::UnboundedReceiver<CompileClusterRequest>,
 
     pub diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
     pub affect_map: HashMap<String, Vec<Url>>,
     pub published_primary: bool,
+    pub notify_compile_status: bool,
 }
 
-impl CompileClusterActor {
+impl EditorActor {
     pub async fn run(mut self) {
+        let mut compile_status = TinymistCompileStatusEnum::Compiling;
+        let mut words_count = None;
         loop {
             tokio::select! {
                 e = self.diag_rx.recv() => {
-                    let Some((group, diagnostics)) = e else {
-                        break;
-                    };
-                    info!("received diagnostics from {}: diag({:?})", group, diagnostics.as_ref().map(|e| e.len()));
+                    match e {
+                        Some(CompileClusterRequest::Diag(group, diagnostics)) => {
+                            info!("received diagnostics from {}: diag({:?})", group, diagnostics.as_ref().map(|e| e.len()));
 
-                    let with_primary = (self.affect_map.len() <= 1 && self.affect_map.contains_key("primary")) && group == "primary";
+                            let with_primary = (self.affect_map.len() <= 1 && self.affect_map.contains_key("primary")) && group == "primary";
 
-                    self.publish(group, diagnostics, with_primary).await;
+                            self.publish(group, diagnostics, with_primary).await;
 
-                    // Check with primary again after publish
-                    let again_with_primary = self.affect_map.len() == 1 && self.affect_map.contains_key("primary");
+                            // Check with primary again after publish
+                            let again_with_primary = self.affect_map.len() == 1 && self.affect_map.contains_key("primary");
 
-                    if !with_primary && self.published_primary != again_with_primary {
-                        self.flush_primary_diagnostics(again_with_primary).await;
-                        self.published_primary = again_with_primary;
+                            if !with_primary && self.published_primary != again_with_primary {
+                                self.flush_primary_diagnostics(again_with_primary).await;
+                                self.published_primary = again_with_primary;
+                            }
+                        }
+                        Some(CompileClusterRequest::Status(group, status)) => {
+                            log::debug!("received status request");
+                            if self.notify_compile_status {
+                                if group != "primary" {
+                                  continue;
+                                }
+                                compile_status = status;
+                                self.host.send_notification::<TinymistCompileStatus>(TinymistCompileStatus {
+                                    status: compile_status.clone(),
+                                    words_count: words_count.clone(),
+                                });
+                            }
+                        }
+                        Some(CompileClusterRequest::WordCount(group, wc)) => {
+                            log::debug!("received word count request");
+                            if self.notify_compile_status {
+                                if group != "primary" {
+                                continue;
+                                }
+                                words_count = wc;
+                                self.host.send_notification::<TinymistCompileStatus>(TinymistCompileStatus {
+                                    status: compile_status.clone(),
+                                    words_count: words_count.clone(),
+                                });
+                            }
+                        }
+                        None => {
+                            break;
+                        }
                     }
                 }
             }
@@ -135,4 +174,25 @@ impl CompileClusterActor {
             self.affect_map.insert(group, affect_list);
         }
     }
+}
+// Notification
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TinymistCompileStatusEnum {
+    Compiling,
+    CompileSuccess,
+    CompileError,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TinymistCompileStatus {
+    pub status: TinymistCompileStatusEnum,
+    #[serde(rename = "wordsCount")]
+    pub words_count: Option<WordsCount>,
+}
+
+impl lsp_types::notification::Notification for TinymistCompileStatus {
+    type Params = TinymistCompileStatus;
+    const METHOD: &'static str = "tinymist/compileStatus";
 }

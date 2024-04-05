@@ -128,6 +128,7 @@ mod polymorphic {
     #[derive(Debug, Clone)]
     pub enum ExportKind {
         Pdf,
+        WordCount,
         Svg { page: PageSelection },
         Png { page: PageSelection },
     }
@@ -136,6 +137,7 @@ mod polymorphic {
         pub fn extension(&self) -> &str {
             match self {
                 Self::Pdf => "pdf",
+                Self::WordCount => "txt",
                 Self::Svg { .. } => "svg",
                 Self::Png { .. } => "png",
             }

@@ -55,7 +55,10 @@ use typst_ts_core::{
     Error, ImmutPath, TypstFont,
 };
 
-use super::typ_server::CompileClient as TsCompileClient;
+use super::{
+    cluster::{CompileClusterRequest, TinymistCompileStatusEnum},
+    typ_server::CompileClient as TsCompileClient,
+};
 use super::{render::ExportConfig, typ_server::CompileServerActor};
 use crate::world::LspWorld;
 use crate::{
@@ -72,7 +75,7 @@ type CompileDriverInner = CompileDriverImpl<LspWorld>;
 type CompileService = CompileServerActor<CompileDriver>;
 type CompileClient = TsCompileClient<CompileService>;
 
-type DiagnosticsSender = mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>;
+type EditorSender = mpsc::UnboundedSender<CompileClusterRequest>;
 
 pub struct CompileHandler {
     pub(super) diag_group: String,
@@ -82,7 +85,7 @@ pub struct CompileHandler {
 
     pub(super) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
     pub(super) render_tx: broadcast::Sender<RenderActorRequest>,
-    pub(super) diag_tx: DiagnosticsSender,
+    pub(super) editor_tx: EditorSender,
 }
 
 impl CompilationHandle for CompileHandler {
@@ -103,6 +106,17 @@ impl CompilationHandle for CompileHandler {
             let _ = self.render_tx.send(RenderActorRequest::OnTyped);
         }
 
+        self.editor_tx
+            .send(CompileClusterRequest::Status(
+                self.diag_group.clone(),
+                if res.is_ok() {
+                    TinymistCompileStatusEnum::CompileSuccess
+                } else {
+                    TinymistCompileStatusEnum::CompileError
+                },
+            ))
+            .unwrap();
+
         #[cfg(feature = "preview")]
         {
             let inner = self.inner.lock();
@@ -115,7 +129,10 @@ impl CompilationHandle for CompileHandler {
 
 impl CompileHandler {
     fn push_diagnostics(&mut self, diagnostics: Option<DiagnosticsMap>) {
-        let err = self.diag_tx.send((self.diag_group.clone(), diagnostics));
+        let err = self.editor_tx.send(CompileClusterRequest::Diag(
+            self.diag_group.clone(),
+            diagnostics,
+        ));
         if let Err(err) = err {
             error!("failed to send diagnostics: {:#}", err);
         }
@@ -141,6 +158,13 @@ impl CompileMiddleware for CompileDriver {
     }
 
     fn wrap_compile(&mut self, env: &mut CompileEnv) -> SourceResult<Arc<typst::model::Document>> {
+        self.handler
+            .editor_tx
+            .send(CompileClusterRequest::Status(
+                self.handler.diag_group.clone(),
+                TinymistCompileStatusEnum::Compiling,
+            ))
+            .unwrap();
         self.handler.status(CompileStatus::Compiling);
         match self.inner_mut().compile(env) {
             Ok(doc) => {

@@ -21,8 +21,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
-    get_semantic_tokens_unregistration, DiagnosticsMap, ExportKind, PageSelection,
-    SemanticTokenContext,
+    get_semantic_tokens_unregistration, ExportKind, PageSelection, SemanticTokenContext,
 };
 use tokio::sync::mpsc;
 use typst::diag::StrResult;
@@ -33,6 +32,7 @@ use typst_ts_core::path::PathClean;
 use typst_ts_core::{error::prelude::*, ImmutPath};
 
 use super::lsp_init::*;
+use crate::actor::cluster::CompileClusterRequest;
 use crate::actor::typ_client::CompileClientActor;
 use crate::actor::{FormattingConfig, FormattingRequest};
 use crate::compiler::{CompileServer, CompileServerArgs};
@@ -152,7 +152,7 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 pub struct TypstLanguageServerArgs {
     pub client: LspHost<TypstLanguageServer>,
     pub const_config: ConstConfig,
-    pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
+    pub diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
     pub font: Deferred<SharedFontResolver>,
 }
 

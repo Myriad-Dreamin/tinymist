@@ -12,12 +12,14 @@ use parking_lot::Mutex;
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::{
     broadcast::{self, error::RecvError},
-    oneshot, watch,
+    mpsc, oneshot, watch,
 };
 use typst::{foundations::Smart, layout::Frame};
 use typst_ts_core::{config::compiler::EntryState, path::PathClean, ImmutPath, TypstDocument};
 
-use crate::ExportMode;
+use crate::{tools::word_count, ExportMode};
+
+use super::cluster::CompileClusterRequest;
 
 #[derive(Debug, Clone)]
 pub struct OneshotRendering {
@@ -48,6 +50,8 @@ pub struct ExportConfig {
 }
 
 pub struct ExportActor {
+    group: String,
+    editor_tx: mpsc::UnboundedSender<CompileClusterRequest>,
     render_rx: broadcast::Receiver<RenderActorRequest>,
     document: watch::Receiver<Option<Arc<TypstDocument>>>,
 
@@ -59,17 +63,22 @@ pub struct ExportActor {
 
 impl ExportActor {
     pub fn new(
+        group: String,
         document: watch::Receiver<Option<Arc<TypstDocument>>>,
+        editor_tx: mpsc::UnboundedSender<CompileClusterRequest>,
         render_rx: broadcast::Receiver<RenderActorRequest>,
         config: ExportConfig,
+        kind: ExportKind,
     ) -> Self {
         Self {
+            group,
+            editor_tx,
             render_rx,
             document,
             substitute_pattern: config.substitute_pattern,
             entry: config.entry,
             mode: config.mode,
-            kind: ExportKind::Pdf,
+            kind,
         }
     }
 
@@ -281,6 +290,15 @@ impl ExportActor {
                 pixmap
                     .encode_png()
                     .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
+            }
+            ExportKind::WordCount => {
+                let wc = word_count::word_count(doc);
+                log::debug!("word count: {wc:?}");
+                let _ = self.editor_tx.send(CompileClusterRequest::WordCount(
+                    self.group.clone(),
+                    Some(wc),
+                ));
+                return Ok(PathBuf::new());
             }
         };
 

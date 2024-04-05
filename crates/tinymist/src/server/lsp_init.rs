@@ -13,7 +13,7 @@ use typst::util::Deferred;
 use typst_ts_core::error::prelude::*;
 use typst_ts_core::ImmutPath;
 
-use crate::actor::cluster::CompileClusterActor;
+use crate::actor::cluster::EditorActor;
 use crate::compiler_init::CompileConfig;
 use crate::harness::LspHost;
 use crate::world::{ImmutDict, SharedFontResolver};
@@ -88,11 +88,14 @@ const CONFIG_ITEMS: &[&str] = &[
     "semanticTokens",
     "formatterMode",
     "typstExtraArgs",
+    "compileStatus",
 ];
 
 /// The user configuration read from the editor.
 #[derive(Debug, Default, Clone)]
 pub struct Config {
+    /// Specifies the root path of the project manually.
+    pub notify_compile_status: bool,
     /// The compile configurations
     pub compile: CompileConfig,
     /// Dynamic configuration for semantic tokens.
@@ -357,12 +360,13 @@ impl Init {
 
         service.run_format_thread();
 
-        let cluster_actor = CompileClusterActor {
+        let cluster_actor = EditorActor {
             host: self.host.clone(),
             diag_rx,
             diagnostics: HashMap::new(),
             affect_map: HashMap::new(),
             published_primary: false,
+            notify_compile_status: service.config.compile.notify_compile_status,
         };
 
         let fallback = service.config.compile.determine_default_entry_path();

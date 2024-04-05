@@ -3734,6 +3734,7 @@ dependencies = [
  "typst-ts-svg-exporter",
  "typstfmt_lib",
  "typstyle",
+ "unicode-script",
  "vergen",
  "walkdir",
 ]

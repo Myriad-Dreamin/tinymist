@@ -8,13 +8,13 @@ use lsp_types::{notification::Notification as _, ExecuteCommandParams};
 use paste::paste;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
-use tinymist_query::{DiagnosticsMap, ExportKind, PageSelection};
+use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typst::util::Deferred;
 use typst_ts_core::ImmutPath;
 
 use crate::{
-    actor::{render::ExportConfig, typ_client::CompileClientActor},
+    actor::{cluster::CompileClusterRequest, render::ExportConfig, typ_client::CompileClientActor},
     compiler_init::{CompileConfig, CompilerConstConfig},
     harness::InitializedLspDriver,
     internal_error, invalid_params, method_not_found, run_query,
@@ -72,7 +72,7 @@ pub struct CompileServerArgs {
     pub client: LspHost<CompileServer>,
     pub compile_config: CompileConfig,
     pub const_config: CompilerConstConfig,
-    pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
+    pub diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
     pub font: Deferred<SharedFontResolver>,
     pub handle: tokio::runtime::Handle,
 }
@@ -109,7 +109,7 @@ pub struct CompileServer {
     /// Source synchronized with client
     pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
     /// The diagnostics sender to send diagnostics to `crate::actor::cluster`.
-    pub diag_tx: mpsc::UnboundedSender<(String, Option<DiagnosticsMap>)>,
+    pub diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
     /// The compiler actor.
     pub compiler: Option<CompileClientActor>,
 }
