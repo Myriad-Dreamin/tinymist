@@ -46,12 +46,12 @@ typst-pdf = "0.11.0"
 typst-svg = "0.11.0"
 typst-render = "0.11.0"
 typst-assets = "0.11.0"
-reflexo = { version = "0.5.0-rc2", default-features = false, features = [
+reflexo = { version = "0.5.0-rc3", default-features = false, features = [
     "flat-vector",
 ] }
-typst-ts-core = { version = "0.5.0-rc2", default-features = false }
-typst-ts-compiler = { version = "0.5.0-rc2" }
-typst-ts-svg-exporter = { version = "0.5.0-rc2" }
+typst-ts-core = { version = "0.5.0-rc3", default-features = false }
+typst-ts-compiler = { version = "0.5.0-rc3" }
+typst-ts-svg-exporter = { version = "0.5.0-rc3" }
 typst-preview = { version = "0.11.3" }
 typstyle = "0.11.8"
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
@@ -127,10 +127,10 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "
 # typst-render = { path = "../typst/crates/typst-render" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9cced415e29e5e341ad4bdcc32ab3e67ffad74db" }
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9cced415e29e5e341ad4bdcc32ab3e67ffad74db" }
-typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9cced415e29e5e341ad4bdcc32ab3e67ffad74db" }
-typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9cced415e29e5e341ad4bdcc32ab3e67ffad74db" }
+# typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9cced415e29e5e341ad4bdcc32ab3e67ffad74db" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9cced415e29e5e341ad4bdcc32ab3e67ffad74db" }
+# typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9cced415e29e5e341ad4bdcc32ab3e67ffad74db" }
+# typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9cced415e29e5e341ad4bdcc32ab3e67ffad74db" }
 
 # typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
