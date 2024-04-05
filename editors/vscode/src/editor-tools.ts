@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { readFile } from "fs/promises";
+import { getFocusingFile } from "./extension";
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
     const filePath = path.resolve(context.extensionPath, relativePath);
@@ -59,7 +60,10 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
     const panel = vscode.window.createWebviewPanel(
         `tinymist-${tool}`,
         title,
-        vscode.ViewColumn.Beside, // Which sides
+        {
+            viewColumn: vscode.ViewColumn.Beside,
+            preserveFocus: tool == "summary",
+        }, // Which sides
         {
             enableScripts: true,
             retainContextWhenHidden: true,
@@ -171,7 +175,13 @@ async function fetchSummaryInfo(): Promise<[any | undefined, any | undefined]> {
     let res: [any | undefined, any | undefined] = [undefined, undefined];
 
     for (const to of waitTimeList) {
-        await work(res);
+        const focusingFile = getFocusingFile();
+        if (focusingFile === undefined) {
+            await vscode.window.showErrorMessage("No focusing typst file");
+            return res;
+        }
+
+        await work(focusingFile, res);
         if (res[0] && res[1]) {
             break;
         }
@@ -181,10 +191,11 @@ async function fetchSummaryInfo(): Promise<[any | undefined, any | undefined]> {
 
     return res;
 
-    async function work(res: [any | undefined, any | undefined]) {
+    async function work(focusingFile: string, res: [any | undefined, any | undefined]) {
         if (!res[0]) {
             const result = await vscode.commands.executeCommand(
-                "tinymist.getCurrentDocumentMetrics"
+                "tinymist.getDocumentMetrics",
+                focusingFile
             );
             if (!result) {
                 return;
