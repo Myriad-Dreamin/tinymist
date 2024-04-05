@@ -303,6 +303,7 @@ impl TypstLanguageServer {
             request_fn!(SelectionRangeRequest, Self::selection_range),
             // latency insensitive
             request_fn!(InlayHintRequest, Self::inlay_hint),
+            request_fn!(DocumentColor, Self::document_color),
             request_fn!(HoverRequest, Self::hover),
             request_fn!(CodeLensRequest, Self::code_lens),
             request_fn!(FoldingRangeRequest, Self::folding_range),
@@ -1145,6 +1146,14 @@ impl TypstLanguageServer {
         let path = as_path(params.text_document);
         let range = params.range;
         run_query!(self.InlayHint(path, range))
+    }
+
+    fn document_color(
+        &self,
+        params: DocumentColorParams,
+    ) -> LspResult<Option<Vec<ColorInformation>>> {
+        let path = as_path(params.text_document);
+        run_query!(self.DocumentColor(path))
     }
 
     fn code_lens(&self, params: CodeLensParams) -> LspResult<Option<Vec<CodeLens>>> {

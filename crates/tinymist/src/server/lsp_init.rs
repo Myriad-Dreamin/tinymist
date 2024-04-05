@@ -441,6 +441,7 @@ impl Init {
                         work_done_progress: None,
                     },
                 }),
+                color_provider: Some(ColorProviderCapability::Simple(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
                 workspace_symbol_provider: Some(OneOf::Left(true)),
                 selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),

@@ -2,6 +2,8 @@
 
 pub mod call;
 pub use call::*;
+pub mod color_exprs;
+pub use color_exprs::*;
 pub mod def_use;
 pub use def_use::*;
 pub mod track_values;

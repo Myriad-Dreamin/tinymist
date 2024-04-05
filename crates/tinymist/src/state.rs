@@ -260,6 +260,7 @@ impl TypstLanguageServer {
             GotoDeclaration(req) => query_world!(client, GotoDeclaration, req),
             References(req) => query_world!(client, References, req),
             InlayHint(req) => query_world!(client, InlayHint, req),
+            DocumentColor(req) => query_world!(client, DocumentColor, req),
             CodeLens(req) => query_world!(client, CodeLens, req),
             Completion(req) => query_state!(client, Completion, req),
             SignatureHelp(req) => query_world!(client, SignatureHelp, req),

@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/document_color.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/document_color/advanced.typ
+---
+[
+ {
+  "color": {
+   "alpha": 1.0,
+   "blue": 0.9411764740943909,
+   "green": 0.9411764740943909,
+   "red": 0.9411764740943909
+  },
+  "range": "0:9:0:18"
+ },
+ {
+  "color": {
+   "alpha": 1.0,
+   "blue": 0.699999988079071,
+   "green": 0.699999988079071,
+   "red": 0.699999988079071
+  },
+  "range": "1:9:1:18"
+ },
+ {
+  "color": {
+   "alpha": 1.0,
+   "blue": 0.003906190162524581,
+   "green": 0.003906702622771263,
+   "red": 0.003936947789043188
+  },
+  "range": "2:9:2:30"
+ }
+]
