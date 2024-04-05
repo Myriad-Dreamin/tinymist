@@ -24,6 +24,8 @@ pub(crate) mod code_lens;
 pub use code_lens::*;
 pub(crate) mod completion;
 pub use completion::*;
+pub(crate) mod color_presentation;
+pub use color_presentation::*;
 pub(crate) mod document_color;
 pub use document_color::*;
 pub(crate) mod document_symbol;
@@ -200,6 +202,7 @@ mod polymorphic {
         References(ReferencesRequest),
         InlayHint(InlayHintRequest),
         DocumentColor(DocumentColorRequest),
+        ColorPresentation(ColorPresentationRequest),
         CodeLens(CodeLensRequest),
         Completion(CompletionRequest),
         SignatureHelp(SignatureHelpRequest),
@@ -229,6 +232,7 @@ mod polymorphic {
                 CompilerQueryRequest::References(..) => PinnedFirst,
                 CompilerQueryRequest::InlayHint(..) => Unique,
                 CompilerQueryRequest::DocumentColor(..) => PinnedFirst,
+                CompilerQueryRequest::ColorPresentation(..) => ContextFreeUnique,
                 CompilerQueryRequest::CodeLens(..) => Unique,
                 CompilerQueryRequest::Completion(..) => Mergable,
                 CompilerQueryRequest::SignatureHelp(..) => PinnedFirst,
@@ -257,6 +261,7 @@ mod polymorphic {
                 CompilerQueryRequest::References(req) => &req.path,
                 CompilerQueryRequest::InlayHint(req) => &req.path,
                 CompilerQueryRequest::DocumentColor(req) => &req.path,
+                CompilerQueryRequest::ColorPresentation(req) => &req.path,
                 CompilerQueryRequest::CodeLens(req) => &req.path,
                 CompilerQueryRequest::Completion(req) => &req.path,
                 CompilerQueryRequest::SignatureHelp(req) => &req.path,
@@ -286,6 +291,7 @@ mod polymorphic {
         References(Option<Vec<LspLocation>>),
         InlayHint(Option<Vec<InlayHint>>),
         DocumentColor(Option<Vec<ColorInformation>>),
+        ColorPresentation(Option<Vec<ColorPresentation>>),
         CodeLens(Option<Vec<CodeLens>>),
         Completion(Option<CompletionResponse>),
         SignatureHelp(Option<SignatureHelp>),

@@ -227,6 +227,7 @@ impl TypstLanguageServer {
             FoldingRange(req) => query_source!(self, FoldingRange, req),
             SelectionRange(req) => query_source!(self, SelectionRange, req),
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
+            ColorPresentation(req) => Ok(CompilerQueryResponse::ColorPresentation(req.request())),
             _ => {
                 let client = &self.primary;
                 if !self.pinning && !self.config.compile.has_default_entry_path {
@@ -279,6 +280,7 @@ impl TypstLanguageServer {
             | SemanticTokensDelta(..)
             | Formatting(..)
             | DocumentSymbol(..)
+            | ColorPresentation(..)
             | SemanticTokensFull(..) => unreachable!(),
         }
     }

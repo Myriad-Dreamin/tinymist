@@ -92,7 +92,9 @@ impl<'a, 'w> ColorExprWorker<'a, 'w> {
             (false, ast::Arg::Pos(ast::Expr::Str(s))) => {
                 // parse hex
                 let color = typst::visualize::Color::from_str(s.get().as_str()).ok()?;
-                let arg = node.find(hex_or_color_or_r.span())?;
+                // todo: smarter
+                // let arg = node.find(hex_or_color_or_r.span())?;
+                let arg = node.find(call.span())?;
                 self.push_color(arg.range(), color);
             }
             (false, _) => {}

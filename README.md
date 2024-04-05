@@ -30,6 +30,9 @@ Language service (LSP) features:
   - Also known as "hovering tooltip".
 - [Inlay hints](https://www.jetbrains.com/help/idea/inlay-hints.html)
   - Inlay hints are special markers that appear in the editor and provide you with additional information about your code, like the names of the parameters that a called method expects.
+- [Color Provider](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-color-decorators)
+  - View all inlay colorful label for color literals in your document.
+  - Change the color literal's value by a color picker or its code presentation.
 - [Code Lens](https://code.visualstudio.com/blogs/2017/02/12/code-lens-roundup)
   - Should give contextual buttons along with code. For example, a button for exporting your document to various formats at the start of the document.
 - [Rename symbols](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#rename-symbols)
