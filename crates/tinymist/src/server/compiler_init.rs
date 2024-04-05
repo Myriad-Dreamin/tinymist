@@ -9,6 +9,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::PositionEncoding;
+use tinymist_render::PeriscopeArgs;
 use tokio::sync::mpsc;
 use typst::foundations::IntoValue;
 use typst::syntax::FileId;
@@ -94,10 +95,14 @@ pub struct CompileConfig {
     pub export_pdf: ExportMode,
     /// Specifies the root path of the project manually.
     pub root_path: Option<PathBuf>,
-    /// Specifies the root path of the project manually.
+    /// Notify the compile status to the editor.
     pub notify_compile_status: bool,
+    /// Enable periscope document in hover.
+    pub periscope_args: Option<PeriscopeArgs>,
     /// Typst extra arguments.
     pub typst_extra_args: Option<CompileExtraOpts>,
+    /// The preferred theme for the document.
+    pub preferred_theme: Option<String>,
     pub has_default_entry_path: bool,
 }
 
@@ -154,6 +159,34 @@ impl CompileConfig {
             }
         }
         self.notify_compile_status = compile_status.map_or(false, |e| e != "disable");
+
+        let preferred_theme = update.get("preferredTheme").and_then(|x| x.as_str());
+        self.preferred_theme = preferred_theme.map(str::to_owned);
+
+        // periscope_args
+        let periscope_args = update.get("hoverPeriscope");
+        let periscope_args: Option<PeriscopeArgs> = match periscope_args {
+            Some(serde_json::Value::String(e)) if e == "enable" => Some(PeriscopeArgs::default()),
+            Some(serde_json::Value::Null | serde_json::Value::String(..)) | None => None,
+            Some(periscope_args) => match serde_json::from_value(periscope_args.clone()) {
+                Ok(e) => Some(e),
+                Err(e) => {
+                    log::error!("failed to parse hoverPeriscope: {e}");
+                    return Ok(());
+                }
+            },
+        };
+        if let Some(mut periscope_args) = periscope_args {
+            if periscope_args.invert_color == "auto"
+                && self.preferred_theme.as_ref().is_some_and(|t| t == "dark")
+            {
+                periscope_args.invert_color = "always".to_owned();
+            }
+
+            self.periscope_args = Some(periscope_args);
+        } else {
+            self.periscope_args = None;
+        }
 
         'parse_extra_args: {
             if let Some(typst_extra_args) = update.get("typstExtraArgs") {

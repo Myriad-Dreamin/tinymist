@@ -3782,6 +3782,7 @@ version = "0.11.2"
 dependencies = [
  "base64 0.22.0",
  "log",
+ "serde",
  "tinymist-query",
  "typst-ts-svg-exporter",
 ]

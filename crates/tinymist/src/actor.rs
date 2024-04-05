@@ -10,6 +10,7 @@ use std::path::Path;
 
 use tinymist_query::analysis::Analysis;
 use tinymist_query::ExportKind;
+use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{broadcast, watch};
 use typst::util::Deferred;
 use typst_ts_compiler::{
@@ -94,6 +95,8 @@ impl CompileServer {
             };
 
             let position_encoding = self.const_config().position_encoding;
+            let enable_periscope = self.config.periscope_args.is_some();
+            let periscope_args = self.config.periscope_args.clone();
             let diag_group = editor_group.clone();
             let entry = entry.clone();
             let font_resolver = self.font.clone();
@@ -113,8 +116,10 @@ impl CompileServer {
                     analysis: Analysis {
                         position_encoding,
                         root: Path::new("").into(),
+                        enable_periscope,
                         caches: Default::default(),
                     },
+                    periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
                 };
 
                 // Create the actor

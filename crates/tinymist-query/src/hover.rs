@@ -76,33 +76,35 @@ impl StatefulRequest for HoverRequest {
             }
         };
 
-        if let Some(doc) = doc.clone() {
-            let position = jump_from_cursor(&doc.document, &source, cursor);
-            let position = position.or_else(|| {
-                for i in 1..100 {
-                    let next_cursor = cursor + i;
-                    if next_cursor < source.text().len() {
-                        let position = jump_from_cursor(&doc.document, &source, next_cursor);
-                        if position.is_some() {
-                            return position;
+        if ctx.analysis.enable_periscope {
+            if let Some(doc) = doc.clone() {
+                let position = jump_from_cursor(&doc.document, &source, cursor);
+                let position = position.or_else(|| {
+                    for i in 1..100 {
+                        let next_cursor = cursor + i;
+                        if next_cursor < source.text().len() {
+                            let position = jump_from_cursor(&doc.document, &source, next_cursor);
+                            if position.is_some() {
+                                return position;
+                            }
+                        }
+                        let prev_cursor = cursor.checked_sub(i);
+                        if let Some(prev_cursor) = prev_cursor {
+                            let position = jump_from_cursor(&doc.document, &source, prev_cursor);
+                            if position.is_some() {
+                                return position;
+                            }
                         }
                     }
-                    let prev_cursor = cursor.checked_sub(i);
-                    if let Some(prev_cursor) = prev_cursor {
-                        let position = jump_from_cursor(&doc.document, &source, prev_cursor);
-                        if position.is_some() {
-                            return position;
-                        }
-                    }
+
+                    None
+                });
+
+                log::info!("telescope position: {:?}", position);
+                let content = position.and_then(|pos| ctx.resources.periscope_at(ctx, doc, pos));
+                if let Some(preview_content) = content {
+                    contents = format!("{preview_content}\n---\n{contents}");
                 }
-
-                None
-            });
-
-            log::info!("telescope position: {:?}", position);
-            let content = position.and_then(|pos| ctx.resources.telescope_at(ctx, doc, pos));
-            if let Some(preview_content) = content {
-                contents = format!("{preview_content}\n---\n{contents}");
             }
         }
 

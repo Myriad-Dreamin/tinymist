@@ -12,6 +12,7 @@ repository.workspace = true
 
 [dependencies]
 
+serde.workspace = true
 tinymist-query.workspace = true
 typst-ts-svg-exporter.workspace = true
 base64.workspace = true

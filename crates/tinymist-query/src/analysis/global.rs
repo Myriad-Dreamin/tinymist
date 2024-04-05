@@ -63,6 +63,8 @@ pub struct Analysis {
     pub root: ImmutPath,
     /// The position encoding for the workspace.
     pub position_encoding: PositionEncoding,
+    /// The position encoding for the workspace.
+    pub enable_periscope: bool,
     /// The global caches for analysis.
     pub caches: AnalysisGlobalCaches,
 }
@@ -186,7 +188,7 @@ pub trait AnaylsisResources {
     }
 
     /// Resolve telescope image at the given position.
-    fn telescope_at(
+    fn periscope_at(
         &self,
         _ctx: &mut AnalysisContext,
         _doc: VersionedDocument,
