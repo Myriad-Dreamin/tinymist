@@ -627,6 +627,7 @@ const STR_VARIABLES = [
     "tinymist.outputPath",
 ];
 const STR_ARR_VARIABLES = ["fontPaths", "tinymist.fontPaths"];
+const PREFERRED_THEME = ["preferredTheme", "tinymist.preferredTheme"];
 
 // todo: documentation that, typstExtraArgs won't get variable extended
 function substVscodeVarsInConfig(keys: (string | undefined)[], values: unknown[]): unknown[] {
@@ -634,6 +635,9 @@ function substVscodeVarsInConfig(keys: (string | undefined)[], values: unknown[]
         const k = keys[i];
         if (!k) {
             return value;
+        }
+        if (PREFERRED_THEME.includes(k)) {
+            return determineVscodeTheme();
         }
         if (STR_VARIABLES.includes(k)) {
             return substVscodeVars(value as string);
@@ -648,3 +652,58 @@ function substVscodeVarsInConfig(keys: (string | undefined)[], values: unknown[]
         return value;
     });
 }
+
+function determineVscodeTheme(): any {
+    console.log("determineVscodeTheme", vscode.window.activeColorTheme.kind);
+    switch (vscode.window.activeColorTheme.kind) {
+        case vscode.ColorThemeKind.Dark:
+            return "dark";
+        default:
+            return "light";
+    }
+}
+
+// "tinymist.hoverPeriscope": {
+//     "title": "Show preview document in periscope mode on hovering",
+//     "description": "In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since neovim and helix don't have a such feature, it is disabled by default at the language server lebel.",
+//     "type": [
+//         "object",
+//         "string"
+//     ],
+//     "default": "disable",
+//     "enum": [
+//         "enable",
+//         "disable"
+//     ],
+//     "properties": {
+//         "yAbove": {
+//             "title": "Y above",
+//             "description": "The distance from the top of the screen to the top of the periscope hover.",
+//             "type": "number",
+//             "default": 55
+//         },
+//         "yBelow": {
+//             "title": "Y below",
+//             "description": "The distance from the bottom of the screen to the bottom of the periscope hover.",
+//             "type": "number",
+//             "default": 55
+//         },
+//         "scale": {
+//             "title": "Scale",
+//             "description": "The scale of the periscope hover.",
+//             "type": "number",
+//             "default": 1.5
+//         },
+//         "invertColors": {
+//             "title": "Invert colors",
+//             "description": "Invert the colors of the periscope to hover.",
+//             "type": "string",
+//             "enum": [
+//                 "auto",
+//                 "always",
+//                 "never"
+//             ],
+//             "default": "auto"
+//         }
+//     }
+// },

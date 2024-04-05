@@ -39,9 +39,11 @@ use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnaylsisResources},
     DiagnosticsMap, ExportKind, ServerInfoReponse, VersionedDocument,
 };
+use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use typst::{
     diag::{PackageError, SourceDiagnostic, SourceResult},
+    layout::Position,
     model::Document as TypstDocument,
     syntax::package::PackageSpec,
     util::Deferred,
@@ -146,6 +148,7 @@ pub struct CompileDriver {
     #[allow(unused)]
     pub(super) handler: CompileHandler,
     pub(super) analysis: Analysis,
+    pub(super) periscope: PeriscopeRenderer,
 }
 
 impl CompileMiddleware for CompileDriver {
@@ -229,7 +232,7 @@ impl CompileDriver {
             anyhow!("failed to prepare env")
         })?;
 
-        struct WrapWorld<'a>(&'a mut LspWorld);
+        struct WrapWorld<'a>(&'a mut LspWorld, &'a PeriscopeRenderer);
 
         impl<'a> AnaylsisResources for WrapWorld<'a> {
             fn world(&self) -> &dyn typst::World {
@@ -250,9 +253,19 @@ impl CompileDriver {
             fn font_info(&self, font: TypstFont) -> Option<Arc<DataSource>> {
                 self.0.font_resolver.inner.describe_font(&font)
             }
+
+            /// Resolve periscope image at the given position.
+            fn periscope_at(
+                &self,
+                ctx: &mut AnalysisContext,
+                doc: VersionedDocument,
+                pos: Position,
+            ) -> Option<String> {
+                self.1.render_marked(ctx, doc, pos)
+            }
         }
 
-        let w = WrapWorld(w);
+        let w = WrapWorld(w, &self.periscope);
 
         self.analysis.root = root;
         Ok(f(&mut AnalysisContext::new_borrow(&w, &mut self.analysis)))

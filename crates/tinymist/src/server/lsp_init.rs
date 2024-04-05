@@ -89,6 +89,8 @@ const CONFIG_ITEMS: &[&str] = &[
     "formatterMode",
     "typstExtraArgs",
     "compileStatus",
+    "preferredTheme",
+    "hoverPeriscope",
 ];
 
 /// The user configuration read from the editor.

@@ -38,6 +38,8 @@ pub(crate) mod hover;
 pub use hover::*;
 pub(crate) mod inlay_hint;
 pub use inlay_hint::*;
+pub(crate) mod jump;
+pub use jump::*;
 pub(crate) mod rename;
 pub use rename::*;
 pub(crate) mod selection_range;
@@ -63,6 +65,9 @@ pub(crate) mod lsp_features;
 pub use lsp_features::*;
 
 mod prelude;
+
+/// The physical position in a document.
+pub type FramePosition = typst::layout::Position;
 
 /// A compiled document with an self-incremented logical version.
 #[derive(Debug, Clone)]
