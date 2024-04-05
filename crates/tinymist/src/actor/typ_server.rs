@@ -372,7 +372,7 @@ where
 
         // Evict compilation cache.
         let evict_start = std::time::Instant::now();
-        comemo::evict(30);
+        comemo::evict(10);
         log::info!(
             "CompileServerActor: evict compilation cache in {:?}",
             evict_start.elapsed()
