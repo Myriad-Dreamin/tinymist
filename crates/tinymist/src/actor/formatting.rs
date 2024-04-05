@@ -36,7 +36,7 @@ pub fn run_format_thread(
             }
             FormatterMode::Typstfmt => {
                 let config = typstfmt_lib::Config {
-                    max_line_length: 120,
+                    max_line_length: c.width as usize,
                     ..typstfmt_lib::Config::default()
                 };
                 let f: FmtFn = Box::new(move |e: Source| {
