@@ -91,6 +91,16 @@
                     ],
                     "default": null
                 },
+                "tinymist.compileStatus": {
+                    "title": "Show/Report compilation status",
+                    "description": "In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since neovim and helix don't have a such feature, it is disabled by default at the language server lebel.",
+                    "type": "string",
+                    "default": "enable",
+                    "enum": [
+                        "enable",
+                        "disable"
+                    ]
+                },
                 "tinymist.typstExtraArgs": {
                     "title": "Specifies the arguments for Typst as same as typst-cli",
                     "description": "You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`.",

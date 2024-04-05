@@ -94,10 +94,11 @@ pub struct CompileConfig {
     pub export_pdf: ExportMode,
     /// Specifies the root path of the project manually.
     pub root_path: Option<PathBuf>,
+    /// Specifies the root path of the project manually.
+    pub notify_compile_status: bool,
     /// Typst extra arguments.
     pub typst_extra_args: Option<CompileExtraOpts>,
     pub has_default_entry_path: bool,
-    pub disable_word_count: bool,
 }
 
 impl CompileConfig {
@@ -145,6 +146,14 @@ impl CompileConfig {
         } else {
             self.root_path = None;
         }
+
+        let compile_status = update.get("compileStatus").and_then(|x| x.as_str());
+        if let Some(word_count) = compile_status {
+            if !matches!(word_count, "enable" | "disable") {
+                bail!("compileStatus must be either 'enable' or 'disable'");
+            }
+        }
+        self.notify_compile_status = compile_status.map_or(false, |e| e != "disable");
 
         'parse_extra_args: {
             if let Some(typst_extra_args) = update.get("typstExtraArgs") {

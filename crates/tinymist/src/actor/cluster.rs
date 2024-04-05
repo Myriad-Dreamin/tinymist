@@ -15,16 +15,17 @@ pub enum CompileClusterRequest {
     WordCount(String, Option<WordsCount>),
 }
 
-pub struct CompileClusterActor {
+pub struct EditorActor {
     pub host: LspHost<TypstLanguageServer>,
     pub diag_rx: mpsc::UnboundedReceiver<CompileClusterRequest>,
 
     pub diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
     pub affect_map: HashMap<String, Vec<Url>>,
     pub published_primary: bool,
+    pub notify_compile_status: bool,
 }
 
-impl CompileClusterActor {
+impl EditorActor {
     pub async fn run(mut self) {
         let mut compile_status = TinymistCompileStatusEnum::Compiling;
         let mut words_count = None;
@@ -49,25 +50,29 @@ impl CompileClusterActor {
                         }
                         Some(CompileClusterRequest::Status(group, status)) => {
                             log::debug!("received status request");
-                            if group != "primary" {
-                              continue;
+                            if self.notify_compile_status {
+                                if group != "primary" {
+                                  continue;
+                                }
+                                compile_status = status;
+                                self.host.send_notification::<TinymistCompileStatus>(TinymistCompileStatus {
+                                    status: compile_status.clone(),
+                                    words_count: words_count.clone(),
+                                });
                             }
-                            compile_status = status;
-                            self.host.send_notification::<TinymistCompileStatus>(TinymistCompileStatus {
-                                status: compile_status.clone(),
-                                words_count: words_count.clone(),
-                            });
                         }
                         Some(CompileClusterRequest::WordCount(group, wc)) => {
                             log::debug!("received word count request");
-                            if group != "primary" {
-                              continue;
+                            if self.notify_compile_status {
+                                if group != "primary" {
+                                continue;
+                                }
+                                words_count = wc;
+                                self.host.send_notification::<TinymistCompileStatus>(TinymistCompileStatus {
+                                    status: compile_status.clone(),
+                                    words_count: words_count.clone(),
+                                });
                             }
-                            words_count = wc;
-                            self.host.send_notification::<TinymistCompileStatus>(TinymistCompileStatus {
-                                status: compile_status.clone(),
-                                words_count: words_count.clone(),
-                            });
                         }
                         None => {
                             break;

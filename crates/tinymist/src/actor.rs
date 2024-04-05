@@ -59,7 +59,7 @@ impl CompileServer {
             )
             .run(),
         );
-        if !self.config.disable_word_count {
+        if self.config.notify_compile_status {
             let mut config = config;
             config.mode = ExportMode::OnType;
             self.handle.spawn(
