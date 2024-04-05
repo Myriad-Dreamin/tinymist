@@ -443,9 +443,7 @@ impl CompileClientActor {
 
             let info = ServerInfoReponse {
                 root: cc.world().entry.root().map(|e| e.as_ref().to_owned()),
-                // todo: font paths
-                // font_paths: cc.world().font_resolver.inner,
-                font_paths: vec![],
+                font_paths: cc.world().font_resolver.font_paths().to_owned(),
                 inputs: cc.world().inputs.as_ref().deref().clone(),
                 estimated_memory_usage: HashMap::from_iter([
                     ("vfs".to_owned(), { cc.world().vfs.memory_usage() }),
