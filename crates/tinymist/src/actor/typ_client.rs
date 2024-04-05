@@ -430,6 +430,12 @@ impl CompileClientActor {
             .unwrap();
     }
 
+    pub fn clear_cache(&self) {
+        let _ = self.steal(|c| {
+            c.compiler.compiler.analysis.caches = Default::default();
+        });
+    }
+
     pub fn collect_server_info(&self) -> anyhow::Result<HashMap<String, ServerInfoReponse>> {
         let dg = self.diag_group.clone();
         let res = self.steal(move |c| {

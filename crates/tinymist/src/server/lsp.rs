@@ -678,6 +678,13 @@ impl TypstLanguageServer {
     /// Errors if the cache could not be cleared.
     pub fn clear_cache(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         comemo::evict(0);
+        self.primary().clear_cache();
+        for v in Some(self.primary())
+            .into_iter()
+            .chain(self.dedicates.iter().map(|v| v.compiler()))
+        {
+            v.clear_cache();
+        }
         Ok(JsonValue::Null)
     }
 
