@@ -1,0 +1,76 @@
+>#set heading(numbering: "1.")
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.set.typst keyword.control.other.typst
+#    ^ source.typst meta.expr.set.typst
+#     ^^^^^^^ source.typst meta.expr.set.typst meta.expr.call.typst entity.name.function.typst
+#            ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
+#             ^^^^^^^^^ source.typst meta.expr.set.typst meta.expr.call.typst variable.other.readwrite.typst
+#                      ^ source.typst meta.expr.set.typst meta.expr.call.typst punctuation.separator.colon.typst
+#                       ^ source.typst meta.expr.set.typst meta.expr.call.typst
+#                        ^ source.typst meta.expr.set.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#                         ^^ source.typst meta.expr.set.typst meta.expr.call.typst string.quoted.double.typst
+#                           ^ source.typst meta.expr.set.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#                            ^ source.typst meta.expr.set.typst meta.expr.call.typst meta.brace.round.typst
+>= <test>
+#^^ source.typst markup.heading.typst punctuation.definition.heading.typst
+#  ^^^^^^ source.typst entity.other.label.typst
+>@test
+#^ source.typst entity.other.reference.typst punctuation.definition.reference.typst
+# ^^^^ source.typst entity.other.reference.typst
+>= <test->
+#^^ source.typst markup.heading.typst punctuation.definition.heading.typst
+#  ^^^^^^^ source.typst entity.other.label.typst
+>@test-
+#^ source.typst entity.other.reference.typst punctuation.definition.reference.typst
+# ^^^^^ source.typst entity.other.reference.typst
+>= <test:>
+#^^ source.typst markup.heading.typst punctuation.definition.heading.typst
+#  ^^^^^^^ source.typst entity.other.label.typst
+>@test:
+#^ source.typst entity.other.reference.typst punctuation.definition.reference.typst
+# ^^^^^ source.typst entity.other.reference.typst
+>= <test.>
+#^^ source.typst markup.heading.typst punctuation.definition.heading.typst
+#  ^^^^^^^ source.typst entity.other.label.typst
+>@test.
+#^ source.typst entity.other.reference.typst punctuation.definition.reference.typst
+# ^^^^^ source.typst entity.other.reference.typst
+>= <test.1>
+#^^ source.typst markup.heading.typst punctuation.definition.heading.typst
+#  ^^^^^^^^ source.typst entity.other.label.typst
+>@test.1
+#^ source.typst entity.other.reference.typst punctuation.definition.reference.typst
+# ^^^^^^ source.typst entity.other.reference.typst
+>= <test:1>
+#^^ source.typst markup.heading.typst punctuation.definition.heading.typst
+#  ^^^^^^^^ source.typst entity.other.label.typst
+>@test:1
+#^ source.typst entity.other.reference.typst punctuation.definition.reference.typst
+# ^^^^^^ source.typst entity.other.reference.typst
+>= <test::>
+#^^ source.typst markup.heading.typst punctuation.definition.heading.typst
+#  ^^^^^^^^ source.typst entity.other.label.typst
+>@test::
+#^ source.typst entity.other.reference.typst punctuation.definition.reference.typst
+# ^^^^ source.typst entity.other.reference.typst
+#     ^^^ source.typst
+>= <typst::World>
+#^^ source.typst markup.heading.typst punctuation.definition.heading.typst
+#  ^^^^^^^^^^^^^^ source.typst entity.other.label.typst
+>@typst::World
+#^ source.typst entity.other.reference.typst punctuation.definition.reference.typst
+# ^^^^^^^^^^^^ source.typst entity.other.reference.typst
+>= <test::.>
+#^^ source.typst markup.heading.typst punctuation.definition.heading.typst
+#  ^^^^^^^^^ source.typst entity.other.label.typst
+>@test::. e
+#^ source.typst entity.other.reference.typst punctuation.definition.reference.typst
+# ^^^^ source.typst entity.other.reference.typst
+#     ^^^^^^ source.typst
+>= <test: :.>
+#^^ source.typst markup.heading.typst punctuation.definition.heading.typst
+#  ^^^^^^^^^^^ source.typst
+>@test: :. e
+#^ source.typst entity.other.reference.typst punctuation.definition.reference.typst
+# ^^^^^ source.typst entity.other.reference.typst
+#      ^^^^^^ source.typst
