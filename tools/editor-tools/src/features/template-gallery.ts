@@ -195,7 +195,6 @@ class FilterState {
   }
 
   getIsFavorite(namespace: string, name: string) {
-    console.log(this.packageUserData);
     return this.packageUserData.val[namespace]?.[name]?.isFavorite;
   }
 
