@@ -502,33 +502,17 @@ impl CompileClientActor {
         &self,
         f: impl FnOnce(&mut AnalysisContext, Option<VersionedDocument>) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
-        let result = self.steal(move |compiler| {
+        self.steal(move |compiler| {
             let doc = compiler.success_doc();
             let c = &mut compiler.compiler.compiler;
             c.run_analysis(move |ctx| f(ctx, doc))
-        });
-
-        evict_global_cache();
-        result?
+        })?
     }
 
     pub fn steal_world<T: Send + Sync + 'static>(
         &self,
         f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
-        let result = self.steal(move |compiler| compiler.compiler.compiler.run_analysis(f));
-
-        evict_global_cache();
-        result?
+        self.steal(move |compiler| compiler.compiler.compiler.run_analysis(f))?
     }
-}
-
-fn evict_global_cache() {
-    // Evict compilation cache.
-    let evict_start = std::time::Instant::now();
-    comemo::evict(15);
-    log::info!(
-        "CompileClientActor: evict compilation cache in {:?}",
-        evict_start.elapsed()
-    );
 }
