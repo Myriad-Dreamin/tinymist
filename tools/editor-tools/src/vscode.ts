@@ -16,9 +16,23 @@ export interface LspResponse {
   error: any;
 }
 
+export interface LoC {
+  line: number;
+  character: number;
+}
+
+export interface VscodeDiagnostics {
+  path: string;
+  message: string;
+  range: {
+    start: LoC;
+    end: LoC;
+  };
+}
+
 export interface LspNotification {
   method: string;
-  params: any;
+  params: Record<string, VscodeDiagnostics[]>;
 }
 
 export type LspMessage = LspResponse | LspNotification;
@@ -29,6 +43,8 @@ interface TraceReport {
   stderr: string;
 }
 
+// import { traceDataMock } from "./vscode.trace.mock";
+// export const traceData = van.state<TraceReport | undefined>(traceDataMock);
 export const traceData = van.state<TraceReport | undefined>(undefined);
 
 /// A frontend will try to setup a vscode channel if it is running
