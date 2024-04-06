@@ -11,7 +11,7 @@ input_file: crates/tinymist-query/src/fixtures/document_color/rgb.typ
    "green": 0.800000011920929,
    "red": 0.800000011920929
   },
-  "range": "0:13:0:19"
+  "range": "0:9:0:20"
  },
  {
   "color": {
@@ -20,7 +20,7 @@ input_file: crates/tinymist-query/src/fixtures/document_color/rgb.typ
    "green": 1.0,
    "red": 0.7921568751335144
   },
-  "range": "2:13:2:22"
+  "range": "2:9:2:23"
  },
  {
   "color": {
@@ -29,6 +29,6 @@ input_file: crates/tinymist-query/src/fixtures/document_color/rgb.typ
    "green": 0.6784313917160034,
    "red": 0.8705882430076599
   },
-  "range": "3:13:3:24"
+  "range": "3:9:3:25"
  }
 ]

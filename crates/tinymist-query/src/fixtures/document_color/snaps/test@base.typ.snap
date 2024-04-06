@@ -11,6 +11,6 @@ input_file: crates/tinymist-query/src/fixtures/document_color/base.typ
    "green": 0.46666666865348816,
    "red": 0.46666666865348816
   },
-  "range": "0:13:0:19"
+  "range": "0:9:0:20"
  }
 ]
