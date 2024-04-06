@@ -174,13 +174,16 @@ impl CompileMiddleware for CompileDriver {
         match self.inner_mut().compile(env) {
             Ok(doc) => {
                 self.handler.notify_compile(Ok(doc.clone()));
-                self.notify_diagnostics(EcoVec::new());
+                self.notify_diagnostics(
+                    EcoVec::new(),
+                    env.tracer.as_ref().map(|e| e.clone().warnings()),
+                );
                 Ok(doc)
             }
             Err(err) => {
                 self.handler
                     .notify_compile(Err(CompileStatus::CompileError));
-                self.notify_diagnostics(err);
+                self.notify_diagnostics(err, env.tracer.as_ref().map(|e| e.clone().warnings()));
                 Err(EcoVec::new())
             }
         }
@@ -188,11 +191,19 @@ impl CompileMiddleware for CompileDriver {
 }
 
 impl CompileDriver {
-    fn notify_diagnostics(&mut self, diagnostics: EcoVec<SourceDiagnostic>) {
-        trace!("notify diagnostics: {:#?}", diagnostics);
+    fn notify_diagnostics(
+        &mut self,
+        errors: EcoVec<SourceDiagnostic>,
+        warnings: Option<EcoVec<SourceDiagnostic>>,
+    ) {
+        trace!("notify diagnostics: {:#?} {:#?}", errors, warnings);
 
-        let diagnostics =
-            self.run_analysis(|ctx| tinymist_query::convert_diagnostics(ctx, diagnostics.as_ref()));
+        let diagnostics = self.run_analysis(|ctx| {
+            tinymist_query::convert_diagnostics(
+                ctx,
+                errors.as_ref().iter().chain(warnings.iter().flatten()),
+            )
+        });
 
         match diagnostics {
             Ok(diagnostics) => {
