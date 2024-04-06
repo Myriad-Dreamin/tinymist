@@ -85,6 +85,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "rootPath",
     "semanticTokens",
     "formatterMode",
+    "formatterPrintWidth",
     "typstExtraArgs",
     "compileStatus",
     "preferredTheme",
@@ -102,6 +103,8 @@ pub struct Config {
     pub semantic_tokens: SemanticTokensMode,
     /// Dynamic configuration for the experimental formatter.
     pub formatter: FormatterMode,
+    /// Dynamic configuration for the experimental formatter.
+    pub formatter_print_width: u32,
 }
 
 impl Config {
@@ -164,6 +167,13 @@ impl Config {
             .and_then(Result::ok);
         if let Some(formatter) = formatter {
             self.formatter = formatter;
+        }
+
+        let print_width = update
+            .get("formatterPrintWidth")
+            .and_then(|e| serde_json::from_value::<u32>(e.clone()).ok());
+        if let Some(formatter) = print_width {
+            self.formatter_print_width = formatter;
         }
 
         self.compile.update_by_map(update)?;

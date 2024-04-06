@@ -48,6 +48,16 @@ Font paths, which doesn't allow for dynamic configuration. Note: you can use vsc
 
 - **Type**: `array` or `null`
 
+## `compileStatus`
+
+In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since neovim and helix don't have a such feature, it is disabled by default at the language server lebel.
+
+- **Type**: `string`
+- **Enum**:
+  - `enable`
+  - `disable`
+- **Default**: `"enable"`
+
 ## `typstExtraArgs`
 
 You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`.
@@ -82,3 +92,10 @@ The extension can format Typst files using typstfmt or typstyle.
   - `typstyle`: Use typstyle formatter.
   - `typstfmt`: Use typstfmt formatter.
 - **Default**: `"disable"`
+
+## `formatterPrintWidth`
+
+Set the print width for the formatter, which is a **soft limit** of characters per line. See [the definition of *Print Width*](https://prettier.io/docs/en/options.html#print-width). Note: this has lower priority than the formatter's specific configurations.
+
+- **Type**: `number`
+- **Default**: `120`

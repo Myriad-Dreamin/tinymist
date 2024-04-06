@@ -1005,7 +1005,7 @@ impl TypstLanguageServer {
             if let Some(f) = &self.format_thread {
                 let err = f.send(FormattingRequest::ChangeConfig(FormattingConfig {
                     mode: self.config.formatter,
-                    width: 120,
+                    width: self.config.formatter_print_width,
                 }));
                 if let Err(err) = err {
                     error!("could not change formatter config: {err}");
