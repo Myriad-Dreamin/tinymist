@@ -76,7 +76,8 @@
         const themeKind = document.body?.getAttribute("data-vscode-theme-kind");
         const serverDark =
           themeKind === "vscode-dark" ||
-          window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+          (typeof acquireVsCodeApi === "undefined" &&
+            window.matchMedia?.("(prefers-color-scheme: dark)").matches);
 
         const defaultDarkBackgroundColor = "rgb(17, 17, 17)";
         const defaultLightBackgroundColor = "rgb(255, 255, 255)";

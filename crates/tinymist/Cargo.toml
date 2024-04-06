@@ -63,6 +63,7 @@ lsp-types.workspace = true
 dhat = { version = "0.3.3", optional = true }
 chrono = { version = "0.4" }
 unicode-script = "0.5"
+base64.workspace = true
 
 [features]
 default = ["cli", "preview"]

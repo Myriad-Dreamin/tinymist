@@ -16,9 +16,9 @@ use tinymist::{
     CompileFontOpts, Init, LspWorld, TypstLanguageServer,
 };
 use tokio::sync::mpsc;
-use typst::{foundations::IntoValue, syntax::Span};
-use typst_ts_compiler::service::{Compiler, EntryManager};
-use typst_ts_core::TypstDict;
+use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
+use typst_ts_compiler::service::{CompileEnv, Compiler, EntryManager};
+use typst_ts_core::{typst::prelude::EcoVec, TypstDict};
 
 use crate::args::{CliArguments, Commands, LspArgs};
 
@@ -162,65 +162,72 @@ pub async fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
             service.initialized(InitializedParams {});
 
             let entry = service.config.determine_entry(Some(input.as_path().into()));
-            let (timings, doc) = service
+            let (timings, _doc, diagnostics) = service
                 .compiler()
-                .steal_async(|w, _| {
-                    w.compiler.world_mut().mutate_entry(entry).unwrap();
-                    w.compiler.world_mut().inputs = inputs;
+                .steal_async(|c, _| {
+                    c.compiler.world_mut().mutate_entry(entry).unwrap();
+                    c.compiler.world_mut().inputs = inputs;
 
-                    let mut env = Default::default();
+                    let mut env = CompileEnv {
+                        tracer: Some(Tracer::default()),
+                        ..Default::default()
+                    };
                     typst_timing::enable();
-                    let res = match w.compiler.pure_compile(&mut env) {
-                        Ok(doc) => Ok(doc),
-                        Err(errors) => {
-                            let diagnostics = w.compiler.compiler.run_analysis(|ctx| {
-                                tinymist_query::convert_diagnostics(ctx, errors.iter())
-                            });
-
-                            Err(diagnostics.unwrap_or_default())
+                    let mut errors = EcoVec::new();
+                    let res = match c.compiler.pure_compile(&mut env) {
+                        Ok(doc) => Some(doc),
+                        Err(e) => {
+                            errors = e;
+                            None
                         }
                     };
-
-                    let w = w.compiler.world();
+                    let world = c.compiler.world();
                     let mut writer = std::io::BufWriter::new(Vec::new());
                     let _ = typst_timing::export_json(&mut writer, |span| {
-                        resolve_span(w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
+                        resolve_span(world, span).unwrap_or_else(|| ("unknown".to_string(), 0))
                     });
 
                     let s = String::from_utf8(writer.into_inner().unwrap()).unwrap();
 
-                    (s, res)
+                    let warnings = env.tracer.map(|e| e.warnings());
+
+                    let diagnostics = c.compiler.compiler.run_analysis(|ctx| {
+                        tinymist_query::convert_diagnostics(
+                            ctx,
+                            warnings.iter().flatten().chain(errors.iter()),
+                        )
+                    });
+
+                    let diagnostics = diagnostics.unwrap_or_default();
+
+                    (s, res, diagnostics)
                 })
                 .await
                 .unwrap();
 
-            let msg = match doc {
-                Ok(_doc) => {
-                    // let p = typst_pdf::pdf(&_doc, typst::foundations::Smart::Auto, None);
-                    // let output: PathBuf = input.with_extension("pdf");
-                    // tokio::fs::write(output, p).await.unwrap();
+            lsp_server::Message::Notification(lsp_server::Notification {
+                method: "tinymistExt/diagnostics".to_owned(),
+                params: serde_json::json!(diagnostics),
+            })
+            .write(&mut std::io::stdout().lock())
+            .unwrap();
 
-                    lsp_server::Message::Notification(lsp_server::Notification {
-                        method: "tinymistExt/diagnostics".to_owned(),
-                        params: serde_json::json!([]),
-                    })
-                    .write(&mut std::io::stdout().lock())
-                    .unwrap();
-                    lsp_server::Message::Response(lsp_server::Response {
-                        id: 0.into(),
-                        result: Some(serde_json::json!({
-                            "tracing_data": timings,
-                        })),
-                        error: None,
-                    })
-                }
-                Err(diags) => lsp_server::Message::Notification(lsp_server::Notification {
-                    method: "tinymistExt/diagnostics".to_owned(),
-                    params: serde_json::json!(diags),
-                }),
-            };
+            // if let Some(_doc) = doc {
+            // let p = typst_pdf::pdf(&_doc,
+            // typst::foundations::Smart::Auto, None);
+            // let output: PathBuf = input.with_extension("pdf");
+            // tokio::fs::write(output, p).await.unwrap();
+            // }
 
-            msg.write(&mut std::io::stdout().lock()).unwrap();
+            lsp_server::Message::Response(lsp_server::Response {
+                id: 0.into(),
+                result: Some(serde_json::json!({
+                    "tracingData": timings,
+                })),
+                error: None,
+            })
+            .write(&mut std::io::stdout().lock())
+            .unwrap();
         }
     }
 

@@ -3696,6 +3696,7 @@ version = "0.11.2"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.22.0",
  "cargo_metadata",
  "chrono",
  "clap",

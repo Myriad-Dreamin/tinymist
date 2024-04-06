@@ -96,8 +96,25 @@ body {
   transition: color 0.05s;
 }
 
-#tinymist-app {
+#tinymist-app, .tinymist-main-window {
   margin: 24px 28px;
+}
+
+#tinymist-app code, .tinymist-main-window code, .tinymist-window code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+#tinymist-app.no-wrap {
+  margin: 0;
+}
+
+body.typst-preview-dark {
+  --modal-background: rgba(0, 0, 0, 0.6);
+}
+body.typst-preview-light {
+  --modal-background: rgba(255, 255, 255, 0.8);
 }
 
 body.typst-preview-dark .tinymist-card {

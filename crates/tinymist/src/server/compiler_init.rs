@@ -437,6 +437,7 @@ impl LspDriver for CompileInit {
             "primary".to_owned(),
             service.config.determine_entry(None),
             service.config.determine_inputs(),
+            service.vfs_snapshot(),
         );
         if service.compiler.is_some() {
             panic!("primary already initialized");

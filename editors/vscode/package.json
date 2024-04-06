@@ -430,6 +430,11 @@
                 "command": "tinymist.showSymbolPicker",
                 "title": "Show symbol picker",
                 "category": "Typst"
+            },
+            {
+                "command": "tinymist.traceCurrentFile",
+                "title": "Trace and visualize execution of the current Typst file",
+                "category": "Typst"
             }
         ],
         "menus": {

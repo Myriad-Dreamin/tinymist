@@ -1,12 +1,13 @@
 //! tinymist LSP mode
 
 use core::fmt;
+use std::ops::Deref;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use crossbeam_channel::select;
 use crossbeam_channel::Receiver;
 use futures::future::BoxFuture;
@@ -34,7 +35,9 @@ use typst_ts_core::{error::prelude::*, ImmutPath};
 use super::lsp_init::*;
 use crate::actor::cluster::CompileClusterRequest;
 use crate::actor::typ_client::CompileClientActor;
-use crate::actor::{FormattingConfig, FormattingRequest};
+use crate::actor::{
+    FormattingConfig, FormattingRequest, UserActionRequest, UserActionTraceRequest,
+};
 use crate::compiler::{CompileServer, CompileServerArgs};
 use crate::compiler_init::CompilerConstConfig;
 use crate::harness::{InitializedLspDriver, LspHost};
@@ -65,15 +68,15 @@ type LspHandler<Req, Res> = fn(srv: &mut TypstLanguageServer, args: Req) -> LspR
 /// Returns Ok(Some()) -> Already responded
 /// Returns Ok(None) -> Need to respond none
 /// Returns Err(..) -> Need to respond error
-type LspRawHandler =
-    fn(srv: &mut TypstLanguageServer, args: (RequestId, JsonValue)) -> LspResult<Option<()>>;
+type LspRawHandler<T> =
+    fn(srv: &mut TypstLanguageServer, args: (RequestId, T)) -> LspResult<Option<()>>;
 
-type ExecuteCmdMap = HashMap<&'static str, LspHandler<Vec<JsonValue>, JsonValue>>;
+type ExecuteCmdMap = HashMap<&'static str, LspRawHandler<Vec<JsonValue>>>;
 type NotifyCmdMap = HashMap<&'static str, LspMethod<()>>;
-type RegularCmdMap = HashMap<&'static str, LspRawHandler>;
+type RegularCmdMap = HashMap<&'static str, LspRawHandler<JsonValue>>;
 type ResourceMap = HashMap<ImmutPath, LspHandler<Vec<JsonValue>, JsonValue>>;
 
-macro_rules! exec_fn {
+macro_rules! resource_fn {
     ($ty: ty, Self::$method: ident, $($arg_key:ident),+ $(,)?) => {{
         const E: $ty = |this, $($arg_key),+| this.$method($($arg_key),+);
         E
@@ -83,7 +86,7 @@ macro_rules! exec_fn {
 macro_rules! request_fn_ {
     ($desc: ty, Self::$method: ident) => {
         (<$desc>::METHOD, {
-            const E: LspRawHandler = |this, (req_id, req)| {
+            const E: LspRawHandler<JsonValue> = |this, (req_id, req)| {
                 let req: <$desc as lsp_types::request::Request>::Params =
                     serde_json::from_value(req).unwrap(); // todo: soft unwrap
                 this.$method(req_id, req)
@@ -96,7 +99,7 @@ macro_rules! request_fn_ {
 macro_rules! request_fn {
     ($desc: ty, Self::$method: ident) => {
         (<$desc>::METHOD, {
-            const E: LspRawHandler = |this, (req_id, req)| {
+            const E: LspRawHandler<JsonValue> = |this, (req_id, req)| {
                 let req: <$desc as lsp_types::request::Request>::Params =
                     serde_json::from_value(req).unwrap(); // todo: soft unwrap
                 let res = this
@@ -116,6 +119,35 @@ macro_rules! request_fn {
                 //         e.to_string(),
                 //     ),
                 // },
+
+                Ok(Some(()))
+            };
+            E
+        })
+    };
+}
+
+macro_rules! exec_fn_ {
+    ($key: expr, Self::$method: ident) => {
+        ($key, {
+            {
+                const E: LspRawHandler<Vec<JsonValue>> =
+                    |this, (req_id, req)| this.$method(req_id, req);
+                E
+            }
+        })
+    };
+}
+
+macro_rules! exec_fn {
+    ($key: expr, Self::$method: ident) => {
+        ($key, {
+            const E: LspRawHandler<Vec<JsonValue>> = |this, (req_id, args)| {
+                let res = this.$method(args);
+
+                if let Ok(response) = result_to_response(req_id, res) {
+                    this.client.respond(response);
+                }
 
                 Ok(Some(()))
             };
@@ -200,6 +232,9 @@ pub struct TypstLanguageServer {
     /// The formatter thread running in backend.
     /// Note: The thread will exit if you drop the sender.
     pub format_thread: Option<crossbeam_channel::Sender<FormattingRequest>>,
+    /// The user action thread running in backend.
+    /// Note: The thread will exit if you drop the sender.
+    pub user_action_threads: Option<crossbeam_channel::Sender<UserActionRequest>>,
 }
 
 /// Getters and the main loop.
@@ -239,6 +274,7 @@ impl TypstLanguageServer {
             focusing: None,
             tokens_ctx,
             format_thread: None,
+            user_action_threads: None,
         }
     }
 
@@ -277,7 +313,7 @@ impl TypstLanguageServer {
             request_fn!(GotoDeclaration, Self::goto_declaration),
             request_fn!(References, Self::references),
             request_fn!(WorkspaceSymbolRequest, Self::symbol),
-            request_fn!(ExecuteCommand, Self::execute_command),
+            request_fn_!(ExecuteCommand, Self::on_execute_command),
         ])
     }
 
@@ -442,6 +478,25 @@ impl TypstLanguageServer {
         }
     }
 
+    /// The entry point for the `workspace/executeCommand` request.
+    fn on_execute_command(
+        &mut self,
+        req_id: RequestId,
+        params: ExecuteCommandParams,
+    ) -> LspResult<Option<()>> {
+        let ExecuteCommandParams {
+            command,
+            arguments,
+            work_done_progress_params: _,
+        } = params;
+        let Some(handler) = self.exec_cmds.get(command.as_str()) else {
+            error!("asked to execute unknown command");
+            return Err(method_not_found());
+        };
+
+        handler(self, (req_id.clone(), arguments))
+    }
+
     /// Handles an incoming notification.
     fn on_notification(
         &mut self,
@@ -583,44 +638,21 @@ impl TypstLanguageServer {
 /// Here are implemented the handlers for each command.
 impl TypstLanguageServer {
     fn get_exec_commands() -> ExecuteCmdMap {
-        macro_rules! redirected_command {
-            ($key: expr, Self::$method: ident) => {
-                (
-                    $key,
-                    exec_fn!(LspHandler<Vec<JsonValue>, JsonValue>, Self::$method, inputs),
-                )
-            };
-        }
-
         ExecuteCmdMap::from_iter([
-            redirected_command!("tinymist.exportPdf", Self::export_pdf),
-            redirected_command!("tinymist.exportSvg", Self::export_svg),
-            redirected_command!("tinymist.exportPng", Self::export_png),
-            redirected_command!("tinymist.doClearCache", Self::clear_cache),
-            redirected_command!("tinymist.pinMain", Self::pin_document),
-            redirected_command!("tinymist.focusMain", Self::focus_document),
-            redirected_command!("tinymist.doInitTemplate", Self::init_template),
-            redirected_command!("tinymist.doGetTemplateEntry", Self::do_get_template_entry),
-            redirected_command!("tinymist.getDocumentMetrics", Self::get_document_metrics),
-            redirected_command!("tinymist.getServerInfo", Self::get_server_info),
+            exec_fn!("tinymist.exportPdf", Self::export_pdf),
+            exec_fn!("tinymist.exportSvg", Self::export_svg),
+            exec_fn!("tinymist.exportPng", Self::export_png),
+            exec_fn!("tinymist.doClearCache", Self::clear_cache),
+            exec_fn!("tinymist.pinMain", Self::pin_document),
+            exec_fn!("tinymist.focusMain", Self::focus_document),
+            exec_fn!("tinymist.doInitTemplate", Self::init_template),
+            exec_fn!("tinymist.doGetTemplateEntry", Self::do_get_template_entry),
+            exec_fn_!("tinymist.getDocumentTrace", Self::get_document_trace),
+            exec_fn!("tinymist.getDocumentMetrics", Self::get_document_metrics),
+            exec_fn!("tinymist.getServerInfo", Self::get_server_info),
             // For Documentations
-            redirected_command!("tinymist.getResources", Self::get_resources),
+            exec_fn!("tinymist.getResources", Self::get_resources),
         ])
-    }
-
-    /// The entry point for the `workspace/executeCommand` request.
-    fn execute_command(&mut self, params: ExecuteCommandParams) -> LspResult<Option<JsonValue>> {
-        let ExecuteCommandParams {
-            command,
-            arguments,
-            work_done_progress_params: _,
-        } = params;
-        let Some(handler) = self.exec_cmds.get(command.as_str()) else {
-            error!("asked to execute unknown command");
-            return Err(method_not_found());
-        };
-
-        Ok(Some(handler(self, arguments)?))
     }
 
     /// Export the current document as a PDF file.
@@ -649,6 +681,64 @@ impl TypstLanguageServer {
         let res = serde_json::to_value(res).map_err(|_| internal_error("Cannot serialize path"))?;
 
         Ok(res)
+    }
+
+    /// Get the trace data of the document.
+    pub fn get_document_trace(
+        &self,
+        req_id: RequestId,
+        arguments: Vec<JsonValue>,
+    ) -> LspResult<Option<()>> {
+        let path = parse_path(arguments.first())?;
+
+        // get path to self program
+        let self_path = std::env::current_exe()
+            .map_err(|e| internal_error(format!("Cannot get typst compiler {e}")))?;
+
+        let thread = self.user_action_threads.clone();
+        let entry = self.config.compile.determine_entry(Some(path));
+
+        let res = self
+            .primary()
+            .steal(move |c| {
+                let cc = &c.compiler;
+
+                // todo: rootless file
+                // todo: memory dirty file
+                let root = entry.root().ok_or_else(|| {
+                    anyhow::anyhow!("root must be determined for trace, got {entry:?}")
+                })?;
+                let main = entry
+                    .main()
+                    .and_then(|e| e.vpath().resolve(&root))
+                    .ok_or_else(|| anyhow::anyhow!("main file must be resolved, got {entry:?}"))?;
+
+                if let Some(f) = thread {
+                    f.send(UserActionRequest::Trace((
+                        req_id,
+                        UserActionTraceRequest {
+                            compiler_program: self_path,
+                            root: root.as_ref().to_owned(),
+                            main,
+                            inputs: cc.world().inputs.as_ref().deref().clone(),
+                            font_paths: cc.world().font_resolver.font_paths().to_owned(),
+                        },
+                    )))
+                    .context("cannot send trace request")?;
+                } else {
+                    bail!("user action thread is not available");
+                }
+
+                Ok(Some(()))
+            })
+            .context("cannot steal primary compiler");
+
+        let res = match res {
+            Ok(res) => res,
+            Err(res) => Err(res),
+        };
+
+        res.map_err(|e| internal_error(format!("could not get document trace: {e}")))
     }
 
     /// Get the metrics of the document.
@@ -813,7 +903,7 @@ impl TypstLanguageServer {
             ($key: expr, Self::$method: ident) => {
                 (
                     Path::new($key).clean().as_path().into(),
-                    exec_fn!(LspHandler<Vec<JsonValue>, JsonValue>, Self::$method, inputs),
+                    resource_fn!(LspHandler<Vec<JsonValue>, JsonValue>, Self::$method, inputs),
                 )
             };
         }
@@ -1042,6 +1132,8 @@ impl TypstLanguageServer {
         self.query_source(path, |source| {
             if let Some(f) = &self.format_thread {
                 f.send(FormattingRequest::Formatting((req_id, source.clone())))?;
+            } else {
+                bail!("formatter thread is not available");
             }
 
             Ok(Some(()))

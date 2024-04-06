@@ -541,6 +541,10 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
     }
 
     switch (args[0]) {
+        case "trace": {
+            void vscode.commands.executeCommand(`tinymist.traceCurrentFile`);
+            break;
+        }
         case "preview": {
             void vscode.commands.executeCommand(`typst-preview.preview`);
             break;

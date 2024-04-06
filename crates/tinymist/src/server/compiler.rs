@@ -10,8 +10,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
-use typst::util::Deferred;
-use typst_ts_core::ImmutPath;
+use typst::{diag::FileResult, syntax::Source, util::Deferred};
+use typst_ts_compiler::vfs::notify::FileChangeSet;
+use typst_ts_core::{config::compiler::DETACHED_ENTRY, ImmutPath};
 
 use crate::{
     actor::{cluster::CompileClusterRequest, render::ExportConfig, typ_client::CompileClientActor},
@@ -148,6 +149,43 @@ impl CompileServer {
 
     pub fn compiler(&self) -> &CompileClientActor {
         self.compiler.as_ref().unwrap()
+    }
+
+    pub fn vfs_snapshot(&self) -> FileChangeSet {
+        FileChangeSet::new_inserts(
+            self.memory_changes
+                .iter()
+                .map(|(path, meta)| {
+                    let content = meta.content.clone().text().as_bytes().into();
+                    (path.clone(), FileResult::Ok((meta.mt, content)).into())
+                })
+                .collect(),
+        )
+    }
+
+    pub fn apply_vfs_snapshot(&mut self, changeset: FileChangeSet) {
+        for path in changeset.removes {
+            self.memory_changes.remove(&path);
+        }
+
+        for (path, file) in changeset.inserts {
+            let Ok(content) = file.content() else {
+                continue;
+            };
+            let Ok(mtime) = file.mtime() else {
+                continue;
+            };
+            let Ok(content) = std::str::from_utf8(content) else {
+                log::error!("invalid utf8 content in snapshot file: {path:?}");
+                continue;
+            };
+
+            let meta = MemoryFileMeta {
+                mt: *mtime,
+                content: Source::new(*DETACHED_ENTRY, content.to_owned()),
+            };
+            self.memory_changes.insert(path, meta);
+        }
     }
 
     #[rustfmt::skip]

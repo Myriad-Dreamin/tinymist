@@ -55,6 +55,7 @@ pub struct CompileFontOpts {
 
 #[derive(Debug, Clone)]
 pub struct SharedFontResolver {
+    font_paths: Vec<PathBuf>,
     pub inner: Arc<FontResolverImpl>,
 }
 
@@ -68,11 +69,35 @@ impl FontResolver for SharedFontResolver {
 }
 
 impl SharedFontResolver {
-    pub fn new(opts: CompileFontOpts) -> ZResult<Self> {
+    pub fn new(mut opts: CompileFontOpts) -> ZResult<Self> {
+        // todo: relative paths?
+        let mut has_relative_path = false;
+        for p in &opts.font_paths {
+            if p.is_relative() {
+                has_relative_path = true;
+                break;
+            }
+        }
+        if has_relative_path {
+            let current_dir = std::env::current_dir()
+                .context("failed to get current directory for relative font paths")?;
+            for p in &mut opts.font_paths {
+                if p.is_relative() {
+                    *p = current_dir.join(&p);
+                }
+            }
+        }
+
+        let font_paths = opts.font_paths.clone();
         let res = crate::world::LspWorldBuilder::resolve_fonts(opts)?;
         Ok(Self {
+            font_paths,
             inner: Arc::new(res),
         })
+    }
+
+    pub fn font_paths(&self) -> &[PathBuf] {
+        &self.font_paths
     }
 }
 
