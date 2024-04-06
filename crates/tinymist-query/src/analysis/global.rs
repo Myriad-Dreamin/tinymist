@@ -8,12 +8,12 @@ use std::{
 use ecow::EcoVec;
 use once_cell::sync::OnceCell;
 use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
-use typst::text::Font;
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
-    syntax::{package::PackageSpec, Source, VirtualPath},
+    syntax::{package::PackageSpec, Source, Span, VirtualPath},
     World,
 };
+use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
 use super::{get_def_use_inner, DefUseInfo};
@@ -359,6 +359,46 @@ impl<'w> AnalysisContext<'w> {
             .compute(source, |_before, after| {
                 crate::syntax::get_lexical_hierarchy(after, crate::syntax::LexicalScopeKind::DefUse)
             })
+    }
+
+    pub(crate) fn mini_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
+        Some(match rr {
+            ast::Expr::None(_) => Value::None,
+            ast::Expr::Auto(_) => Value::Auto,
+            ast::Expr::Bool(v) => Value::Bool(v.get()),
+            ast::Expr::Int(v) => Value::Int(v.get()),
+            ast::Expr::Float(v) => Value::Float(v.get()),
+            ast::Expr::Numeric(v) => Value::numeric(v.get()),
+            ast::Expr::Str(v) => Value::Str(v.get().into()),
+            e => {
+                use comemo::Track;
+                use typst::engine::*;
+                use typst::eval::*;
+                use typst::foundations::*;
+                use typst::introspection::*;
+
+                let mut locator = Locator::default();
+                let introspector = Introspector::default();
+                let mut tracer = Tracer::new();
+                let engine = Engine {
+                    world: self.world().track(),
+                    route: Route::default(),
+                    introspector: introspector.track(),
+                    locator: &mut locator,
+                    tracer: tracer.track_mut(),
+                };
+
+                let context = Context::none();
+                let mut vm = Vm::new(
+                    engine,
+                    context.track(),
+                    Scopes::new(Some(self.world().library())),
+                    Span::detached(),
+                );
+
+                return e.eval(&mut vm).ok();
+            }
+        })
     }
 }
 
