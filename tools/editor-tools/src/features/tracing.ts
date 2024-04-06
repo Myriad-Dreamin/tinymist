@@ -200,7 +200,7 @@ export const Tracing = () => {
         div(
           { style: "margin: 1em 0" },
           ...(msg.length > 0 ? [code(msg), br()] : []),
-          "Runs ",
+          "Run ",
           diffPath(rep.request.root, rep.request.main),
           " using ",
           shortProgram(rep.request.compilerProgram),
