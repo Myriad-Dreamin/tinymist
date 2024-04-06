@@ -4,6 +4,64 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.3 - [2024-04-06]
+
+### Editor
+
+* (Fix) Skipped tabs that have no URIs for reopening pdf in https://github.com/Myriad-Dreamin/tinymist/pull/147
+
+### Compiler
+
+* Evicting cache more frequently in https://github.com/Myriad-Dreamin/tinymist/pull/161
+* (Fix) Collecting warning diagnostics correctly in https://github.com/Myriad-Dreamin/tinymist/pull/169
+
+### Commands/Tools
+
+* Introduced summary page in https://github.com/Myriad-Dreamin/tinymist/pull/137, https://github.com/Myriad-Dreamin/tinymist/pull/154, https://github.com/Myriad-Dreamin/tinymist/pull/162, and https://github.com/Myriad-Dreamin/tinymist/pull/168
+* Introduced symbol picker in https://github.com/Myriad-Dreamin/tinymist/pull/155
+* Introduced periscope mode previewing in https://github.com/Myriad-Dreamin/tinymist/pull/164
+* Introduced status bar for showing words count, also for compiling status in https://github.com/Myriad-Dreamin/tinymist/pull/158
+* Supported tracing execution in current document in https://github.com/Myriad-Dreamin/tinymist/pull/166
+
+### Color Provider (New)
+
+* Added basic color providers in https://github.com/Myriad-Dreamin/tinymist/pull/171
+
+### Completion
+
+* (Fix) Performed correct dynamic analysis on imports in https://github.com/Myriad-Dreamin/tinymist/pull/143
+* (Fix) Correctly shadowed items for completion in https://github.com/Myriad-Dreamin/tinymist/pull/145
+* (Fix) Completing parameters in scope in https://github.com/Myriad-Dreamin/tinymist/pull/146
+* Completing parameters on user functions in https://github.com/Myriad-Dreamin/tinymist/pull/148
+* Completing parameter values on user functions in https://github.com/Myriad-Dreamin/tinymist/pull/149
+* Triggering autocompletion again after completing a function in https://github.com/Myriad-Dreamin/tinymist/pull/150
+* Recovered module completion in https://github.com/Myriad-Dreamin/tinymist/pull/151
+
+### Syntax/Semantic Highlighting
+
+* (Fix) Improved grammar on incomplete AST in https://github.com/Myriad-Dreamin/tinymist/pull/140
+* (Fix) Correctly parsing label and reference markup in https://github.com/Myriad-Dreamin/tinymist/pull/167
+
+### Definition
+
+* Supported go to paths to `#include` statement in https://github.com/Myriad-Dreamin/tinymist/pull/156
+
+### Formatting
+
+* Bumped to typstyle v0.11.11 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/163
+* Added common print width configuration for formatters in https://github.com/Myriad-Dreamin/tinymist/pull/170
+
+### Hover (Tooltip)
+
+* Joining array of hover contents by divider for neovim clients in https://github.com/Myriad-Dreamin/tinymist/pull/157
+
+### Internal Optimization
+
+* Analyzing lexical hierarchy on for loops in https://github.com/Myriad-Dreamin/tinymist/pull/142
+  * depended by autocompletion/definition/references/rename APIs.
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.2...v0.11.3
+
 ## v0.11.2 - [2024-03-30]
 
 ### Editor
