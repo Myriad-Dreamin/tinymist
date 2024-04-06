@@ -12,7 +12,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Compiler
 
-* Evicting cache more frequently in https://github.com/Myriad-Dreamin/tinymist/pull/161
+* ~~Evicting cache more frequently in https://github.com/Myriad-Dreamin/tinymist/pull/161~~
+  * Reverted in https://github.com/Myriad-Dreamin/tinymist/pull/173.
 * (Fix) Collecting warning diagnostics correctly in https://github.com/Myriad-Dreamin/tinymist/pull/169
 
 ### Commands/Tools
