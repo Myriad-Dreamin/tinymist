@@ -6,18 +6,13 @@ use std::{
     sync::Arc,
 };
 
+use ecow::EcoVec;
 use log::info;
 use reflexo::path::unix_slash;
-pub use reflexo::vector::ir::DefId;
-use serde::Serialize;
-use typst::syntax::FileId as TypstFileId;
-use typst::syntax::Source;
 
-use super::SearchCtx;
-use crate::syntax::{
-    find_source_by_import_path, IdentRef, LexicalHierarchy, LexicalKind, LexicalVarKind, ModSrc,
-};
-use crate::{adt::snapshot_map::SnapshotMap, syntax::LexicalModKind};
+use super::{prelude::*, ImportInfo};
+use crate::adt::snapshot_map::SnapshotMap;
+use crate::syntax::find_source_by_import_path;
 
 /// The type namespace of def-use relations
 ///
@@ -27,19 +22,6 @@ enum Ns {
     Label,
     /// Def-use for values
     Value,
-}
-
-/// A flat and transient reference to some symbol in a source file.
-///
-/// See [`IdentRef`] for definition of a "transient" reference.
-#[derive(Serialize, Clone)]
-pub struct IdentDef {
-    /// The name of the symbol.
-    pub name: String,
-    /// The kind of the symbol.
-    pub kind: LexicalKind,
-    /// The byte range of the symbol in the source file.
-    pub range: Range<usize>,
 }
 
 type ExternalRefMap = HashMap<(TypstFileId, Option<String>), Vec<(Option<DefId>, IdentRef)>>;
@@ -115,20 +97,13 @@ impl DefUseInfo {
     }
 }
 
-pub(super) fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<Arc<DefUseInfo>> {
+pub(super) fn get_def_use_inner(
+    ctx: &mut AnalysisContext,
+    source: Source,
+    e: EcoVec<LexicalHierarchy>,
+    _m: Arc<ImportInfo>,
+) -> Option<Arc<DefUseInfo>> {
     let current_id = source.id();
-    ctx.ctx.get_mut(current_id);
-    let c = ctx.ctx.get(current_id).unwrap();
-
-    if let Some(info) = c.def_use() {
-        return Some(info);
-    }
-
-    if !ctx.searched.insert(current_id) {
-        return None;
-    }
-
-    let e = ctx.ctx.def_use_lexical_hierarchy(source)?;
 
     let mut collector = DefUseCollector {
         ctx,
@@ -142,16 +117,12 @@ pub(super) fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<A
 
     collector.scan(&e);
     collector.calc_exports();
-    let res = Some(Arc::new(collector.info));
 
-    let c = ctx.ctx.get(current_id).unwrap();
-    // todo: cyclic import cause no any information
-    c.compute_def_use(|| res.clone());
-    res
+    Some(Arc::new(collector.info))
 }
 
-struct DefUseCollector<'a, 'b, 'w> {
-    ctx: &'a mut SearchCtx<'b, 'w>,
+struct DefUseCollector<'a, 'w> {
+    ctx: &'a mut AnalysisContext<'w>,
     info: DefUseInfo,
     label_scope: SnapshotMap<String, DefId>,
     id_scope: SnapshotMap<String, DefId>,
@@ -160,7 +131,7 @@ struct DefUseCollector<'a, 'b, 'w> {
     ext_src: Option<Source>,
 }
 
-impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
+impl<'a, 'w> DefUseCollector<'a, 'w> {
     fn enter<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let id_snap = self.id_scope.snapshot();
         let res = f(self);
@@ -181,8 +152,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
         let source = self.ext_src.as_ref()?;
 
         log::debug!("import for def use: {:?}, name: {name}", source.id());
-        let (_, external_info) =
-            Some(source.id()).zip(get_def_use_inner(self.ctx, source.clone()))?;
+        let (_, external_info) = Some(source.id()).zip(self.ctx.def_use(source.clone()))?;
 
         let ext_id = external_info.exports_defs.get(name)?;
         self.import_from(&external_info, *ext_id);
@@ -269,7 +239,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                         ModSrc::Expr(_) => {}
                         ModSrc::Path(p) => {
                             let src = find_source_by_import_path(
-                                self.ctx.ctx.world(),
+                                self.ctx.world(),
                                 self.current_id,
                                 p.deref(),
                             );
@@ -288,7 +258,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                     if let Some(source) = &self.ext_src {
                         info!("diving source for def use: {:?}", source.id());
                         let (_, external_info) =
-                            Some(source.id()).zip(get_def_use_inner(self.ctx, source.clone()))?;
+                            Some(source.id()).zip(self.ctx.def_use(source.clone()))?;
 
                         for ext_id in &external_info.exports_refs {
                             self.import_from(&external_info, *ext_id);

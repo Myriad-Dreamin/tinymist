@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -7,6 +8,7 @@ use std::{
 
 use ecow::EcoVec;
 use once_cell::sync::OnceCell;
+use parking_lot::RwLock;
 use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
@@ -16,7 +18,7 @@ use typst::{
 use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
-use super::{get_def_use_inner, DefUseInfo};
+use super::{DefUseInfo, ImportInfo};
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -28,6 +30,7 @@ use crate::{
 /// A cache for module-level analysis results of a module.
 ///
 /// You should not holds across requests, because source code may change.
+#[derive(Default)]
 pub struct ModuleAnalysisCache {
     source: OnceCell<FileResult<Source>>,
     def_use: OnceCell<Option<Arc<DefUseInfo>>>,
@@ -80,6 +83,7 @@ impl Analysis {
                 .map(|v| {
                     v.def_use_lexical_hierarchy
                         .output
+                        .read()
                         .as_ref()
                         .map_or(0, |e| e.iter().map(|e| e.estimated_memory()).sum())
                 })
@@ -89,8 +93,9 @@ impl Analysis {
 
 struct ComputingNode<Inputs, Output> {
     name: &'static str,
-    inputs: Option<Inputs>,
-    output: Option<Output>,
+    computing: AtomicBool,
+    inputs: RwLock<Option<Inputs>>,
+    output: RwLock<Option<Output>>,
 }
 
 pub(crate) trait ComputeDebug {
@@ -102,56 +107,96 @@ impl ComputeDebug for Source {
         self.id()
     }
 }
+impl ComputeDebug for EcoVec<LexicalHierarchy> {
+    fn compute_debug_repr(&self) -> impl std::fmt::Debug {
+        self.len()
+    }
+}
+
+impl ComputeDebug for Arc<ImportInfo> {
+    fn compute_debug_repr(&self) -> impl std::fmt::Debug {
+        self.imports.len()
+    }
+}
+
+impl<A, B> ComputeDebug for (A, B)
+where
+    A: ComputeDebug,
+    B: ComputeDebug,
+{
+    fn compute_debug_repr(&self) -> impl std::fmt::Debug {
+        (self.0.compute_debug_repr(), self.1.compute_debug_repr())
+    }
+}
 
 impl<Inputs, Output> ComputingNode<Inputs, Output> {
     fn new(name: &'static str) -> Self {
         Self {
             name,
-            inputs: None,
-            output: None,
+            computing: AtomicBool::new(false),
+            inputs: RwLock::new(None),
+            output: RwLock::new(None),
         }
     }
 
     fn compute(
-        &mut self,
+        &self,
         inputs: Inputs,
         compute: impl FnOnce(Option<Inputs>, Inputs) -> Option<Output>,
-    ) -> Option<Output>
+    ) -> Result<Option<Output>, ()>
     where
         Inputs: ComputeDebug + Hash + Clone,
         Output: Clone,
     {
-        match &self.inputs {
+        if self
+            .computing
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(());
+        }
+        let input_cmp = self.inputs.read();
+        let res = Ok(match input_cmp.as_ref() {
             Some(s) if reflexo::hash::hash128(&inputs) == reflexo::hash::hash128(&s) => {
                 log::debug!(
                     "{}({:?}): hit cache",
                     self.name,
                     inputs.compute_debug_repr()
                 );
-                self.output.clone()
+                self.output.read().clone()
             }
-            _ => {
+            s => {
+                let s = s.cloned();
+                drop(input_cmp);
                 log::info!("{}({:?}): compute", self.name, inputs.compute_debug_repr());
-                let output = compute(self.inputs.clone(), inputs.clone());
-                self.output = output.clone();
-                self.inputs = Some(inputs);
+                let output = compute(s, inputs.clone());
+                *self.output.write() = output.clone();
+                *self.inputs.write() = Some(inputs);
                 output
             }
-        }
+        });
+
+        self.computing
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        res
     }
 }
 
 /// A cache for module-level analysis results of a module.
 ///
 /// You should not holds across requests, because source code may change.
+#[allow(clippy::type_complexity)]
 pub struct ModuleAnalysisGlobalCache {
     def_use_lexical_hierarchy: ComputingNode<Source, EcoVec<LexicalHierarchy>>,
+    import: Arc<ComputingNode<EcoVec<LexicalHierarchy>, Arc<ImportInfo>>>,
+    def_use: Arc<ComputingNode<(EcoVec<LexicalHierarchy>, Arc<ImportInfo>), Arc<DefUseInfo>>>,
 }
 
 impl Default for ModuleAnalysisGlobalCache {
     fn default() -> Self {
         Self {
             def_use_lexical_hierarchy: ComputingNode::new("def_use_lexical_hierarchy"),
+            import: Arc::new(ComputingNode::new("import")),
+            def_use: Arc::new(ComputingNode::new("def_use")),
         }
     }
 }
@@ -300,16 +345,7 @@ impl<'w> AnalysisContext<'w> {
 
     /// Get the module-level analysis cache of a file.
     pub fn get_mut(&mut self, file_id: TypstFileId) -> &ModuleAnalysisCache {
-        self.caches.modules.entry(file_id).or_insert_with(|| {
-            let source = OnceCell::new();
-            let def_use = OnceCell::new();
-            ModuleAnalysisCache { source, def_use }
-        })
-    }
-
-    /// Get the def-use information of a source file.
-    pub fn def_use(&mut self, source: Source) -> Option<Arc<DefUseInfo>> {
-        get_def_use_inner(&mut self.fork_for_search(), source)
+        self.caches.modules.entry(file_id).or_default()
     }
 
     /// Fork a new context for searching in the workspace.
@@ -346,19 +382,53 @@ impl<'w> AnalysisContext<'w> {
         typst_to_lsp::range(position, src, self.analysis.position_encoding)
     }
 
-    pub(crate) fn def_use_lexical_hierarchy(
-        &mut self,
-        source: Source,
-    ) -> Option<EcoVec<LexicalHierarchy>> {
-        self.analysis
-            .caches
-            .modules
-            .entry(source.id())
-            .or_default()
+    /// Get the def-use information of a source file.
+    pub fn def_use(&mut self, source: Source) -> Option<Arc<DefUseInfo>> {
+        let fid = source.id();
+
+        if let Some(res) = self.caches.modules.entry(fid).or_default().def_use() {
+            return Some(res);
+        }
+
+        let cache = self.at_module(fid);
+        let l = cache
             .def_use_lexical_hierarchy
-            .compute(source, |_before, after| {
+            .compute(source.clone(), |_before, after| {
                 crate::syntax::get_lexical_hierarchy(after, crate::syntax::LexicalScopeKind::DefUse)
             })
+            .ok()
+            .flatten()?;
+
+        let source2 = source.clone();
+        let m = cache
+            .import
+            .clone()
+            .compute(l.clone(), |_before, after| {
+                crate::analysis::get_import_info(self, source2, after)
+            })
+            .ok()
+            .flatten()?;
+
+        let cache = self.at_module(fid);
+        let res = cache
+            .def_use
+            .clone()
+            .compute((l, m), |_before, after| {
+                crate::analysis::get_def_use_inner(self, source, after.0, after.1)
+            })
+            .ok()
+            .flatten();
+
+        self.caches
+            .modules
+            .entry(fid)
+            .or_default()
+            .compute_def_use(|| res.clone());
+        res
+    }
+
+    fn at_module(&mut self, fid: TypstFileId) -> &mut ModuleAnalysisGlobalCache {
+        self.analysis.caches.modules.entry(fid).or_default()
     }
 
     pub(crate) fn mini_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {

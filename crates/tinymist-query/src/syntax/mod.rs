@@ -94,3 +94,16 @@ impl<'de> Deserialize<'de> for IdentRef {
         })
     }
 }
+
+/// A flat and transient reference to some symbol in a source file.
+///
+/// See [`IdentRef`] for definition of a "transient" reference.
+#[derive(Serialize, Clone)]
+pub struct IdentDef {
+    /// The name of the symbol.
+    pub name: String,
+    /// The kind of the symbol.
+    pub kind: LexicalKind,
+    /// The byte range of the symbol in the source file.
+    pub range: Range<usize>,
+}
