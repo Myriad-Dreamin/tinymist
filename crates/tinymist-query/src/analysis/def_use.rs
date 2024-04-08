@@ -8,7 +8,6 @@ use std::{
 
 use ecow::EcoVec;
 use log::info;
-use reflexo::path::unix_slash;
 
 use super::{prelude::*, ImportInfo};
 use crate::adt::snapshot_map::SnapshotMap;
@@ -29,10 +28,13 @@ type ExternalRefMap = HashMap<(TypstFileId, Option<String>), Vec<(Option<DefId>,
 /// The def-use information of a source file.
 #[derive(Default)]
 pub struct DefUseInfo {
-    ident_defs: indexmap::IndexMap<(TypstFileId, IdentRef), IdentDef>,
+    /// The definitions of symbols.
+    pub ident_defs: indexmap::IndexMap<(TypstFileId, IdentRef), IdentDef>,
     external_refs: ExternalRefMap,
-    ident_refs: HashMap<IdentRef, DefId>,
-    undefined_refs: Vec<IdentRef>,
+    /// The references to defined symbols.
+    pub ident_refs: HashMap<IdentRef, DefId>,
+    /// The references to undefined symbols.
+    pub undefined_refs: Vec<IdentRef>,
     exports_refs: Vec<DefId>,
     exports_defs: HashMap<String, DefId>,
 }
@@ -344,68 +346,5 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
                 range: e.info.range.clone(),
             },
         );
-    }
-}
-
-/// A snapshot of the def-use information for testing.
-pub struct DefUseSnapshot<'a>(pub &'a DefUseInfo);
-
-impl<'a> Serialize for DefUseSnapshot<'a> {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeMap;
-        // HashMap<IdentRef, DefId>
-        let mut references: HashMap<DefId, Vec<IdentRef>> = {
-            let mut map = HashMap::new();
-            for (k, v) in &self.0.ident_refs {
-                map.entry(*v).or_insert_with(Vec::new).push(k.clone());
-            }
-            map
-        };
-        // sort
-        for (_, v) in references.iter_mut() {
-            v.sort();
-        }
-
-        #[derive(Serialize)]
-        struct DefUseEntry<'a> {
-            def: &'a IdentDef,
-            refs: &'a Vec<IdentRef>,
-        }
-
-        let mut state = serializer.serialize_map(None)?;
-        for (k, (ident_ref, ident_def)) in self.0.ident_defs.as_slice().iter().enumerate() {
-            let id = DefId(k as u64);
-
-            let empty_ref = Vec::new();
-            let entry = DefUseEntry {
-                def: ident_def,
-                refs: references.get(&id).unwrap_or(&empty_ref),
-            };
-
-            state.serialize_entry(
-                &format!(
-                    "{}@{}",
-                    ident_ref.1,
-                    unix_slash(ident_ref.0.vpath().as_rootless_path())
-                ),
-                &entry,
-            )?;
-        }
-
-        if !self.0.undefined_refs.is_empty() {
-            let mut undefined_refs = self.0.undefined_refs.clone();
-            undefined_refs.sort();
-            let entry = DefUseEntry {
-                def: &IdentDef {
-                    name: "<nil>".to_string(),
-                    kind: LexicalKind::Block,
-                    range: 0..0,
-                },
-                refs: &undefined_refs,
-            };
-            state.serialize_entry("<nil>", &entry)?;
-        }
-
-        state.end()
     }
 }

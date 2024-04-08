@@ -6,7 +6,7 @@ use std::{
 };
 
 use once_cell::sync::Lazy;
-use serde::Serialize;
+pub use serde::Serialize;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use typst::syntax::{
     ast::{self, AstNode},

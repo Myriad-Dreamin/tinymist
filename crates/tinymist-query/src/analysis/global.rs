@@ -9,7 +9,9 @@ use std::{
 use ecow::EcoVec;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
+use reflexo::hash::hash128;
 use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
+use typst::foundations;
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
     syntax::{package::PackageSpec, Source, Span, VirtualPath},
@@ -18,7 +20,7 @@ use typst::{
 use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
-use super::{DefUseInfo, ImportInfo};
+use super::{DefUseInfo, ImportInfo, Signature};
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -88,6 +90,12 @@ impl Analysis {
                         .map_or(0, |e| e.iter().map(|e| e.estimated_memory()).sum())
                 })
                 .sum::<usize>()
+    }
+
+    fn gc(&mut self) {
+        self.caches
+            .signatures
+            .retain(|_, (l, _, _)| (self.caches.lifetime - *l) < 30);
     }
 }
 
@@ -205,7 +213,32 @@ impl Default for ModuleAnalysisGlobalCache {
 /// of a module.
 #[derive(Default)]
 pub struct AnalysisGlobalCaches {
+    lifetime: u64,
     modules: HashMap<TypstFileId, ModuleAnalysisGlobalCache>,
+    signatures: HashMap<u128, (u64, foundations::Func, Arc<Signature>)>,
+}
+
+impl AnalysisGlobalCaches {
+    /// Get the signature of a function.
+    pub fn signature(&self, func: foundations::Func) -> Option<Arc<Signature>> {
+        self.signatures
+            .get(&hash128(&func))
+            .and_then(|(_, cached_func, s)| (func == *cached_func).then_some(s.clone()))
+    }
+
+    /// Compute the signature of a function.
+    pub fn compute_signature(
+        &mut self,
+        func: foundations::Func,
+        compute: impl FnOnce() -> Arc<Signature>,
+    ) -> Arc<Signature> {
+        let key = hash128(&func);
+        self.signatures
+            .entry(key)
+            .or_insert_with(|| (self.lifetime, func, compute()))
+            .2
+            .clone()
+    }
 }
 
 /// A cache for all level of analysis results of a module.
@@ -264,6 +297,9 @@ impl<'w> AnalysisContext<'w> {
 
     /// Create a new analysis context with borrowing the analysis data.
     pub fn new_borrow(resources: &'w dyn AnalysisResources, a: &'w mut Analysis) -> Self {
+        a.caches.lifetime += 1;
+        a.gc();
+
         Self {
             resources,
             analysis: CowMut::Borrowed(a),

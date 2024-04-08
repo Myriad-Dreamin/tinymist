@@ -178,7 +178,7 @@ pub fn param_completions<'a>(
         func = f.0.clone();
     }
 
-    let signature = analyze_signature(func.clone());
+    let signature = analyze_signature(ctx.ctx, func.clone());
 
     // Exclude named arguments which are already present.
     let exclude: Vec<_> = args
@@ -242,7 +242,7 @@ pub fn named_param_value_completions<'a>(
         func = f.0.clone();
     }
 
-    let signature = analyze_signature(func.clone());
+    let signature = analyze_signature(ctx.ctx, func.clone());
 
     let Some(param) = signature.named.get(name) else {
         return;
