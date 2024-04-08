@@ -43,16 +43,16 @@ pub struct CallInfo {
 /// Analyzes a function call.
 pub fn analyze_call(
     ctx: &mut AnalysisContext,
-    func: Func,
+    callee_node: LinkedNode,
     args: ast::Args<'_>,
 ) -> Option<Arc<CallInfo>> {
-    Some(Arc::new(analyze_call_no_cache(ctx, func, args)?))
+    Some(Arc::new(analyze_call_no_cache(ctx, callee_node, args)?))
 }
 
 /// Analyzes a function call without caching the result.
 pub fn analyze_call_no_cache(
     ctx: &mut AnalysisContext,
-    func: Func,
+    callee_node: LinkedNode,
     args: ast::Args<'_>,
 ) -> Option<CallInfo> {
     let _ = ctx;
@@ -63,6 +63,13 @@ pub fn analyze_call_no_cache(
     }
 
     let mut with_args = eco_vec![ArgValue::Instantiating(args)];
+
+    let values = analyze_expr(ctx.world(), &callee_node);
+    let func = values.into_iter().find_map(|v| match v.0 {
+        Value::Func(f) => Some(f),
+        _ => None,
+    })?;
+    log::debug!("got function {func:?}");
 
     use typst::foundations::func::Repr;
     let mut func = func;

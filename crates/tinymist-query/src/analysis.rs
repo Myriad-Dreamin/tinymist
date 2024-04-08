@@ -8,6 +8,8 @@ pub mod def_use;
 pub use def_use::*;
 pub mod import;
 pub use import::*;
+pub mod linked_def;
+pub use linked_def::*;
 pub mod signature;
 pub use signature::*;
 pub mod track_values;

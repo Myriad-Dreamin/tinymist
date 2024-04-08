@@ -148,15 +148,7 @@ fn inlay_hint(
                     let args = f.args();
                     let args_node = node.find(args.span())?;
 
-                    // todo: reduce many such patterns
-                    let values = analyze_expr(self.ctx.world(), &callee_node);
-                    let func = values.into_iter().find_map(|v| match v.0 {
-                        Value::Func(f) => Some(f),
-                        _ => None,
-                    })?;
-                    log::debug!("got function {func:?}");
-
-                    let call_info = analyze_call(self.ctx, func, args)?;
+                    let call_info = analyze_call(self.ctx, callee_node, args)?;
                     log::debug!("got call_info {call_info:?}");
 
                     let check_single_pos_arg = || {

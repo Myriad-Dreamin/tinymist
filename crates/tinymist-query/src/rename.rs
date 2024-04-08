@@ -2,7 +2,7 @@ use log::debug;
 use lsp_types::TextEdit;
 
 use crate::{
-    find_definition, find_references, prelude::*, syntax::get_deref_target,
+    analysis::find_definition, find_references, prelude::*, syntax::get_deref_target,
     validate_renaming_definition, SemanticRequest,
 };
 

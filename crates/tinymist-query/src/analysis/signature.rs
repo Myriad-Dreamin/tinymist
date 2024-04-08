@@ -77,6 +77,10 @@ pub struct Signature {
     _broken: bool,
 }
 
+// pub enum SignatureTarget<'a> {
+//     Static(LinkedNode<'a>)
+// }
+
 pub(crate) fn analyze_signature(ctx: &mut AnalysisContext, func: Func) -> Arc<Signature> {
     ctx.analysis
         .caches

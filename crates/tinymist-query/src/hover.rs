@@ -1,12 +1,12 @@
 use core::fmt;
 
 use crate::{
-    analysis::{analyze_signature, Signature},
-    find_definition, jump_from_cursor,
+    analysis::{analyze_signature, find_definition, DefinitionLink, Signature},
+    jump_from_cursor,
     prelude::*,
     syntax::{find_document_before, get_deref_target, LexicalKind, LexicalVarKind},
     upstream::{expr_tooltip, tooltip, Tooltip},
-    DefinitionLink, LspHoverContents, StatefulRequest,
+    LspHoverContents, StatefulRequest,
 };
 
 /// The [`textDocument/hover`] request asks the server for hover information at
@@ -279,5 +279,26 @@ impl DocTooltip {
         };
 
         Some(docs)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("hover", &|world, path| {
+            let source = world.source_by_path(&path).unwrap();
+
+            let request = HoverRequest {
+                path: path.clone(),
+                position: find_test_position(&source),
+            };
+
+            let result = request.request(world, None);
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
     }
 }
