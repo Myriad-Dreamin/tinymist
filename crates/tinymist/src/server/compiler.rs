@@ -371,7 +371,7 @@ impl CompileServer {
             };
 
             self.compiler
-                .as_ref()
+                .as_mut()
                 .unwrap()
                 .change_export_pdf(config.clone());
         }
@@ -457,7 +457,7 @@ impl CompileServer {
     }
 
     /// Focus main file to some path.
-    pub fn change_entry(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn change_entry(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let new_entry = parse_path_or_null(arguments.first())?;
 
         let update_result = self.do_change_entry(new_entry.clone());

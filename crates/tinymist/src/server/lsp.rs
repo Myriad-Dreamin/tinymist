@@ -658,25 +658,25 @@ impl TypstLanguageServer {
     }
 
     /// Export the current document as a PDF file.
-    pub fn export_pdf(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn export_pdf(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         self.export(ExportKind::Pdf, arguments)
     }
 
     /// Export the current document as a Svg file.
-    pub fn export_svg(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn export_svg(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let opts = parse_opts(arguments.get(1))?;
         self.export(ExportKind::Svg { page: opts.page }, arguments)
     }
 
     /// Export the current document as a Png file.
-    pub fn export_png(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn export_png(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let opts = parse_opts(arguments.get(1))?;
         self.export(ExportKind::Png { page: opts.page }, arguments)
     }
 
     /// Export the current document as some format. The client is responsible
     /// for passing the correct absolute path of typst document.
-    pub fn export(&self, kind: ExportKind, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn export(&mut self, kind: ExportKind, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let path = parse_path(arguments.first())?.as_ref().to_owned();
 
         let res = run_query!(self.OnExport(path, kind))?;
@@ -687,7 +687,7 @@ impl TypstLanguageServer {
 
     /// Get the trace data of the document.
     pub fn get_document_trace(
-        &self,
+        &mut self,
         req_id: RequestId,
         arguments: Vec<JsonValue>,
     ) -> LspResult<Option<()>> {
@@ -744,7 +744,7 @@ impl TypstLanguageServer {
     }
 
     /// Get the metrics of the document.
-    pub fn get_document_metrics(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn get_document_metrics(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let path = parse_path(arguments.first())?.as_ref().to_owned();
 
         let res = run_query!(self.DocumentMetrics(path))?;
@@ -755,7 +755,7 @@ impl TypstLanguageServer {
     }
 
     /// Get the server info.
-    pub fn get_server_info(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn get_server_info(&mut self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let res = run_query!(self.ServerInfo())?;
 
         let res = serde_json::to_value(res)
@@ -968,7 +968,7 @@ impl TypstLanguageServer {
         Ok(())
     }
 
-    fn did_save(&self, params: DidSaveTextDocumentParams) -> LspResult<()> {
+    fn did_save(&mut self, params: DidSaveTextDocumentParams) -> LspResult<()> {
         let path = as_path(params.text_document);
 
         let _ = run_query!(self.OnSaveExport(path));
@@ -1056,7 +1056,7 @@ impl TypstLanguageServer {
 /// Standard Language Features
 impl TypstLanguageServer {
     fn goto_definition(
-        &self,
+        &mut self,
         params: GotoDefinitionParams,
     ) -> LspResult<Option<GotoDefinitionResponse>> {
         let (path, position) = as_path_pos(params.text_document_position_params);
@@ -1064,31 +1064,34 @@ impl TypstLanguageServer {
     }
 
     fn goto_declaration(
-        &self,
+        &mut self,
         params: GotoDeclarationParams,
     ) -> LspResult<Option<GotoDeclarationResponse>> {
         let (path, position) = as_path_pos(params.text_document_position_params);
         run_query!(self.GotoDeclaration(path, position))
     }
 
-    fn references(&self, params: ReferenceParams) -> LspResult<Option<Vec<Location>>> {
+    fn references(&mut self, params: ReferenceParams) -> LspResult<Option<Vec<Location>>> {
         let (path, position) = as_path_pos(params.text_document_position);
         run_query!(self.References(path, position))
     }
 
-    fn hover(&self, params: HoverParams) -> LspResult<Option<Hover>> {
+    fn hover(&mut self, params: HoverParams) -> LspResult<Option<Hover>> {
         let (path, position) = as_path_pos(params.text_document_position_params);
         run_query!(self.Hover(path, position))
     }
 
-    fn folding_range(&self, params: FoldingRangeParams) -> LspResult<Option<Vec<FoldingRange>>> {
+    fn folding_range(
+        &mut self,
+        params: FoldingRangeParams,
+    ) -> LspResult<Option<Vec<FoldingRange>>> {
         let path = as_path(params.text_document);
         let line_folding_only = self.const_config().doc_line_folding_only;
         run_query!(self.FoldingRange(path, line_folding_only))
     }
 
     fn selection_range(
-        &self,
+        &mut self,
         params: SelectionRangeParams,
     ) -> LspResult<Option<Vec<SelectionRange>>> {
         let path = as_path(params.text_document);
@@ -1097,7 +1100,7 @@ impl TypstLanguageServer {
     }
 
     fn document_symbol(
-        &self,
+        &mut self,
         params: DocumentSymbolParams,
     ) -> LspResult<Option<DocumentSymbolResponse>> {
         let path = as_path(params.text_document);
@@ -1105,7 +1108,7 @@ impl TypstLanguageServer {
     }
 
     fn semantic_tokens_full(
-        &self,
+        &mut self,
         params: SemanticTokensParams,
     ) -> LspResult<Option<SemanticTokensResult>> {
         let path = as_path(params.text_document);
@@ -1113,7 +1116,7 @@ impl TypstLanguageServer {
     }
 
     fn semantic_tokens_full_delta(
-        &self,
+        &mut self,
         params: SemanticTokensDeltaParams,
     ) -> LspResult<Option<SemanticTokensFullDeltaResult>> {
         let path = as_path(params.text_document);
@@ -1143,14 +1146,14 @@ impl TypstLanguageServer {
         .map_err(|e| internal_error(format!("could not format document: {e}")))
     }
 
-    fn inlay_hint(&self, params: InlayHintParams) -> LspResult<Option<Vec<InlayHint>>> {
+    fn inlay_hint(&mut self, params: InlayHintParams) -> LspResult<Option<Vec<InlayHint>>> {
         let path = as_path(params.text_document);
         let range = params.range;
         run_query!(self.InlayHint(path, range))
     }
 
     fn document_color(
-        &self,
+        &mut self,
         params: DocumentColorParams,
     ) -> LspResult<Option<Vec<ColorInformation>>> {
         let path = as_path(params.text_document);
@@ -1158,7 +1161,7 @@ impl TypstLanguageServer {
     }
 
     fn color_presentation(
-        &self,
+        &mut self,
         params: ColorPresentationParams,
     ) -> LspResult<Option<Vec<ColorPresentation>>> {
         let path = as_path(params.text_document);
@@ -1167,12 +1170,12 @@ impl TypstLanguageServer {
         run_query!(self.ColorPresentation(path, color, range))
     }
 
-    fn code_lens(&self, params: CodeLensParams) -> LspResult<Option<Vec<CodeLens>>> {
+    fn code_lens(&mut self, params: CodeLensParams) -> LspResult<Option<Vec<CodeLens>>> {
         let path = as_path(params.text_document);
         run_query!(self.CodeLens(path))
     }
 
-    fn completion(&self, params: CompletionParams) -> LspResult<Option<CompletionResponse>> {
+    fn completion(&mut self, params: CompletionParams) -> LspResult<Option<CompletionResponse>> {
         let (path, position) = as_path_pos(params.text_document_position);
         let explicit = params
             .context
@@ -1182,26 +1185,29 @@ impl TypstLanguageServer {
         run_query!(self.Completion(path, position, explicit))
     }
 
-    fn signature_help(&self, params: SignatureHelpParams) -> LspResult<Option<SignatureHelp>> {
+    fn signature_help(&mut self, params: SignatureHelpParams) -> LspResult<Option<SignatureHelp>> {
         let (path, position) = as_path_pos(params.text_document_position_params);
         run_query!(self.SignatureHelp(path, position))
     }
 
-    fn rename(&self, params: RenameParams) -> LspResult<Option<WorkspaceEdit>> {
+    fn rename(&mut self, params: RenameParams) -> LspResult<Option<WorkspaceEdit>> {
         let (path, position) = as_path_pos(params.text_document_position);
         let new_name = params.new_name;
         run_query!(self.Rename(path, position, new_name))
     }
 
     fn prepare_rename(
-        &self,
+        &mut self,
         params: TextDocumentPositionParams,
     ) -> LspResult<Option<PrepareRenameResponse>> {
         let (path, position) = as_path_pos(params);
         run_query!(self.PrepareRename(path, position))
     }
 
-    fn symbol(&self, params: WorkspaceSymbolParams) -> LspResult<Option<Vec<SymbolInformation>>> {
+    fn symbol(
+        &mut self,
+        params: WorkspaceSymbolParams,
+    ) -> LspResult<Option<Vec<SymbolInformation>>> {
         let pattern = (!params.query.is_empty()).then_some(params.query);
         run_query!(self.Symbol(pattern))
     }
