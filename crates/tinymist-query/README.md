@@ -5,3 +5,7 @@
 
 This crate provides a set of APIs to query the information about the source code. Currently it provides:
 + language queries defined by the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
+
+## Contributing
+
+See [CONTRIBUTING.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CONTRIBUTING.md).

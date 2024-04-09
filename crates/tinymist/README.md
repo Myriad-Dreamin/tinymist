@@ -43,3 +43,7 @@ dhat: The data has been saved to dhat-heap.json, and is viewable with dhat/dh_vi
 ```
 
 Once you have the `dhat-heap.json`, you can visualize the memory usage with [the DHAT viewer](https://nnethercote.github.io/dh_view/dh_view.html).
+
+## Contributing
+
+See [CONTRIBUTING.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CONTRIBUTING.md).

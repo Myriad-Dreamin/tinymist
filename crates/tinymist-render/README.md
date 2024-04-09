@@ -5,3 +5,7 @@
 
 This crate provides rendering features for tinymist server. Currently it provides:
 + rendering in telescope mode for hover.
+
+## Contributing
+
+See [CONTRIBUTING.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CONTRIBUTING.md).
