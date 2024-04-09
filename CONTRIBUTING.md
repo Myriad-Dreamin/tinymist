@@ -25,3 +25,29 @@ cargo build
 ```
 
 To run VS Code extension locally, open the repository in VS Code and press `F5` to start a debug session to extension.
+
+## Run analyzer tests
+
+This is required if you have changed any code in `crates/tinymist-query`.
+
+To run analyzer tests for tinymist:
+
+```bash
+cargo insta test -p tinymist-query --accept
+```
+
+## Run e2e tests
+
+This is required if you have changed any code in `crates/tinymist` or `crates/tinymist-query`.
+
+To run e2e tests for tinymist on Linux:
+
+```bash
+./scripts/e2e.sh
+```
+
+To run e2e tests for tinymist on Windows:
+
+```bash
+./scripts/e2e.ps1
+```
