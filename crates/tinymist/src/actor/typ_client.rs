@@ -286,7 +286,7 @@ impl CompileDriver {
 pub struct CompileClientActor {
     pub diag_group: String,
     pub config: CompileConfig,
-    entry: Arc<Mutex<EntryState>>,
+    entry: EntryState,
     inner: Deferred<CompileClient>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
@@ -302,7 +302,7 @@ impl CompileClientActor {
         Self {
             diag_group,
             config,
-            entry: Arc::new(Mutex::new(entry)),
+            entry,
             inner,
             render_tx,
         }
@@ -328,7 +328,7 @@ impl CompileClientActor {
         self.inner().steal_async(f).await
     }
 
-    pub fn settle(&self) {
+    pub fn settle(&mut self) {
         let _ = self.change_entry(None);
         info!("TypstActor({}): settle requested", self.diag_group);
         let res = self.inner().settle();
@@ -347,7 +347,7 @@ impl CompileClientActor {
         self.config = config;
     }
 
-    pub fn change_entry(&self, path: Option<ImmutPath>) -> Result<(), Error> {
+    pub fn change_entry(&mut self, path: Option<ImmutPath>) -> Result<(), Error> {
         if path
             .as_deref()
             .is_some_and(|p| !p.is_absolute() && !p.starts_with("/untitled"))
@@ -357,15 +357,7 @@ impl CompileClientActor {
 
         let next_entry = self.config.determine_entry(path);
 
-        // todo: more robust rollback logic
-        let entry = self.entry.clone();
-        let should_change = {
-            let prev_entry = entry.lock();
-            let should_change = next_entry != *prev_entry;
-            should_change.then(|| prev_entry.clone())
-        };
-
-        if let Some(prev) = should_change {
+        if next_entry != self.entry {
             let next = next_entry.clone();
 
             info!(
@@ -403,22 +395,18 @@ impl CompileClientActor {
             if res.is_err() {
                 self.render_tx
                     .send(RenderActorRequest::ChangeExportPath(PathVars {
-                        entry: prev.clone(),
+                        entry: self.entry.clone(),
                     }))
                     .unwrap();
-
-                let mut entry = entry.lock();
-                // todo: the rollback is actually not atomic
-                if *entry == next_entry {
-                    *entry = prev;
-                }
 
                 return res;
             }
 
-            // todo: trigger recompile
+            // todo: better way to trigger recompile
             let files = FileChangeSet::new_inserts(vec![]);
             self.inner().add_memory_changes(MemoryEvent::Update(files));
+
+            self.entry = next_entry;
         }
 
         Ok(())
@@ -428,14 +416,12 @@ impl CompileClientActor {
         self.inner.wait().add_memory_changes(event);
     }
 
-    pub(crate) fn change_export_pdf(&self, config: ExportConfig) {
-        let entry = self.entry.lock().clone();
+    pub(crate) fn change_export_pdf(&mut self, config: ExportConfig) {
         let _ = self
             .render_tx
             .send(RenderActorRequest::ChangeConfig(ExportConfig {
                 substitute_pattern: config.substitute_pattern,
-                // root: self.root.get().cloned().flatten(),
-                entry,
+                entry: self.entry.clone(),
                 mode: config.mode,
             }))
             .unwrap();

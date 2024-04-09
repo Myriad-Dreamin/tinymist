@@ -19,9 +19,9 @@ use crate::{actor::typ_client::CompileClientActor, compiler::CompileServer, Typs
 
 impl CompileServer {
     /// Focus main file to some path.
-    pub fn do_change_entry(&self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+    pub fn do_change_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
         self.compiler
-            .as_ref()
+            .as_mut()
             .unwrap()
             .change_entry(new_entry.clone())?;
 
@@ -218,7 +218,7 @@ impl TypstLanguageServer {
         f(source)
     }
 
-    pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
+    pub fn query(&mut self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
         use CompilerQueryRequest::*;
 
         match query {
@@ -229,7 +229,7 @@ impl TypstLanguageServer {
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
             ColorPresentation(req) => Ok(CompilerQueryResponse::ColorPresentation(req.request())),
             _ => {
-                let client = &self.primary;
+                let client = &mut self.primary;
                 if !self.pinning && !self.config.compile.has_default_entry_path {
                     // todo: race condition, we need atomic primary query
                     if let Some(path) = query.associated_path() {
