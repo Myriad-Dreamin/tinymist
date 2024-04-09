@@ -1,7 +1,6 @@
 use std::ops::Range;
 
 use log::debug;
-use typst::foundations::Value;
 use typst::syntax::FileId as TypstFileId;
 
 use crate::{

@@ -26,6 +26,82 @@
                 "${workspaceFolder}/editors/vscode/out/**/*.js"
             ],
             "preLaunchTask": "VS Code Extension Prelaunch [Jaeger]"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'tinymist'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=tinymist",
+                    "--package=tinymist"
+                ],
+                "filter": {
+                    "name": "tinymist",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'tinymist-query'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=tinymist-query"
+                ],
+                "filter": {
+                    "name": "tinymist-query",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'tinymist-render'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=tinymist-render"
+                ],
+                "filter": {
+                    "name": "tinymist-render",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'tinymist-e2e-tests'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=tinymist-e2e-tests",
+                    "--package=tests"
+                ],
+                "filter": {
+                    "name": "tinymist-e2e-tests",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

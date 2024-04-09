@@ -372,8 +372,6 @@ mod test {
     use lsp_types::Position;
     use typst::syntax::Source;
 
-    use crate::{lsp_to_typst, PositionEncoding};
-
     use super::*;
 
     #[test]

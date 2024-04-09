@@ -310,7 +310,6 @@ fn complete_path(
 #[cfg(test)]
 mod tests {
     use insta::with_settings;
-    use lsp_types::{CompletionItem, CompletionList};
 
     use super::*;
     use crate::tests::*;

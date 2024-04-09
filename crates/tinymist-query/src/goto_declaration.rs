@@ -1,7 +1,6 @@
 use std::ops::Range;
 
 use log::debug;
-use lsp_types::LocationLink;
 
 use crate::{
     prelude::*,
