@@ -40,7 +40,7 @@ cargo insta test -p tinymist-query --accept
 
 This is required if you have changed any code in `crates/tinymist` or `crates/tinymist-query`.
 
-To run e2e tests for tinymist on Linux:
+To run e2e tests for tinymist on Unix systems:
 
 ```bash
 ./scripts/e2e.sh
