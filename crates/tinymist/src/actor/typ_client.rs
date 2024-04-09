@@ -1,14 +1,14 @@
 //! The typst actors running compilations.
 //!
 //! ```ascii
-//! ┌────────────────────────────────┐                      
-//! │    main::compile_actor (client)│                      
-//! └─────┬────────────────────▲─────┘                      
-//!       │                    │                            
+//! ┌────────────────────────────────┐
+//! │    main::compile_actor (client)│
+//! └─────┬────────────────────▲─────┘
+//!       │                    │
 //! ┌─────▼────────────────────┴─────┐         ┌────────────┐
 //! │compiler::compile_actor (server)│◄───────►│notify_actor│
 //! └─────┬────────────────────▲─────┘         └────────────┘
-//!       │                    │                            
+//!       │                    │
 //! ┌─────▼────────────────────┴─────┐ handler ┌────────────┐
 //! │compiler::compile_driver        ├────────►│ rest actors│
 //! └────────────────────────────────┘         └────────────┘
@@ -16,7 +16,7 @@
 //!
 //! We generally use typst in two ways.
 //! + creates a [`CompileDriver`] and run compilation in fly.
-//! + creates a [`CompileServerActor`], wraps the drvier, and runs
+//! + creates a [`CompileServerActor`], wraps the driver, and runs
 //!   [`CompileDriver`] incrementally.
 //!
 //! For latter case, an additional [`CompileClientActor`] is created to
@@ -36,8 +36,8 @@ use anyhow::anyhow;
 use log::{error, info, trace};
 use parking_lot::Mutex;
 use tinymist_query::{
-    analysis::{Analysis, AnalysisContext, AnaylsisResources},
-    DiagnosticsMap, ExportKind, ServerInfoReponse, VersionedDocument,
+    analysis::{Analysis, AnalysisContext, AnalysisResources},
+    DiagnosticsMap, ExportKind, ServerInfoResponse, VersionedDocument,
 };
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
@@ -245,7 +245,7 @@ impl CompileDriver {
 
         struct WrapWorld<'a>(&'a mut LspWorld, &'a PeriscopeRenderer);
 
-        impl<'a> AnaylsisResources for WrapWorld<'a> {
+        impl<'a> AnalysisResources for WrapWorld<'a> {
             fn world(&self) -> &dyn typst::World {
                 self.0
             }
@@ -447,12 +447,12 @@ impl CompileClientActor {
         });
     }
 
-    pub fn collect_server_info(&self) -> anyhow::Result<HashMap<String, ServerInfoReponse>> {
+    pub fn collect_server_info(&self) -> anyhow::Result<HashMap<String, ServerInfoResponse>> {
         let dg = self.diag_group.clone();
         let res = self.steal(move |c| {
             let cc = &c.compiler.compiler;
 
-            let info = ServerInfoReponse {
+            let info = ServerInfoResponse {
                 root: cc.world().entry.root().map(|e| e.as_ref().to_owned()),
                 font_paths: cc.world().font_resolver.font_paths().to_owned(),
                 inputs: cc.world().inputs.as_ref().deref().clone(),

@@ -70,7 +70,7 @@ impl SemanticRequest for GotoDeclarationRequest {
             });
         }
 
-        debug!("goto_declartion: {links:?}");
+        debug!("goto_declaration: {links:?}");
         Some(GotoDeclarationResponse::Link(links))
     }
 }

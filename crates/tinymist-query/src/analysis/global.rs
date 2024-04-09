@@ -78,7 +78,7 @@ impl Analysis {
                 .modules
                 .values()
                 .map(|v| {
-                    v.def_use_lexical_heirarchy
+                    v.def_use_lexical_hierarchy
                         .output
                         .as_ref()
                         .map_or(0, |e| e.iter().map(|e| e.estimated_memory()).sum())
@@ -145,13 +145,13 @@ impl<Inputs, Output> ComputingNode<Inputs, Output> {
 ///
 /// You should not holds across requests, because source code may change.
 pub struct ModuleAnalysisGlobalCache {
-    def_use_lexical_heirarchy: ComputingNode<Source, EcoVec<LexicalHierarchy>>,
+    def_use_lexical_hierarchy: ComputingNode<Source, EcoVec<LexicalHierarchy>>,
 }
 
 impl Default for ModuleAnalysisGlobalCache {
     fn default() -> Self {
         Self {
-            def_use_lexical_heirarchy: ComputingNode::new("def_use_lexical_heirarchy"),
+            def_use_lexical_hierarchy: ComputingNode::new("def_use_lexical_hierarchy"),
         }
     }
 }
@@ -172,7 +172,7 @@ pub struct AnalysisCaches {
 }
 
 /// The resources for analysis.
-pub trait AnaylsisResources {
+pub trait AnalysisResources {
     /// Get the world surface for Typst compiler.
     fn world(&self) -> &dyn World;
 
@@ -201,7 +201,7 @@ pub trait AnaylsisResources {
 /// The context for analyzers.
 pub struct AnalysisContext<'a> {
     /// The world surface for Typst compiler
-    pub resources: &'a dyn AnaylsisResources,
+    pub resources: &'a dyn AnalysisResources,
     /// The analysis data
     pub analysis: CowMut<'a, Analysis>,
     caches: AnalysisCaches,
@@ -209,7 +209,7 @@ pub struct AnalysisContext<'a> {
 
 impl<'w> AnalysisContext<'w> {
     /// Create a new analysis context.
-    pub fn new(resources: &'w dyn AnaylsisResources, a: Analysis) -> Self {
+    pub fn new(resources: &'w dyn AnalysisResources, a: Analysis) -> Self {
         Self {
             resources,
             analysis: CowMut::Owned(a),
@@ -218,7 +218,7 @@ impl<'w> AnalysisContext<'w> {
     }
 
     /// Create a new analysis context with borrowing the analysis data.
-    pub fn new_borrow(resources: &'w dyn AnaylsisResources, a: &'w mut Analysis) -> Self {
+    pub fn new_borrow(resources: &'w dyn AnalysisResources, a: &'w mut Analysis) -> Self {
         Self {
             resources,
             analysis: CowMut::Borrowed(a),
@@ -355,7 +355,7 @@ impl<'w> AnalysisContext<'w> {
             .modules
             .entry(source.id())
             .or_default()
-            .def_use_lexical_heirarchy
+            .def_use_lexical_hierarchy
             .compute(source, |_before, after| {
                 crate::syntax::get_lexical_hierarchy(after, crate::syntax::LexicalScopeKind::DefUse)
             })
