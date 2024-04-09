@@ -9,7 +9,7 @@ use typst::{
     foundations::{CastInfo, Closure, Func, ParamInfo, Value},
     syntax::{
         ast::{self, AstNode},
-        SyntaxKind,
+        LinkedNode, SyntaxKind,
     },
     util::LazyHash,
 };
@@ -82,9 +82,43 @@ pub struct Signature {
 // }
 
 pub(crate) fn analyze_signature(ctx: &mut AnalysisContext, func: Func) -> Arc<Signature> {
+    let _ = analyze_signature_v2;
     ctx.analysis
         .caches
         .compute_signature(func.clone(), || analyze_dyn_signature(func))
+}
+
+pub(crate) fn analyze_signature_v2(
+    ctx: &mut AnalysisContext,
+    callee_node: LinkedNode,
+) -> Option<Arc<Signature>> {
+    let _ = ctx;
+    // #[derive(Debug, Clone)]
+    // enum ArgValue<'a> {
+    //     Instance(Args),
+    //     Instantiating(ast::Args<'a>),
+    // }
+
+    // let mut with_args = eco_vec![ArgValue::Instantiating(args)];
+
+    let values = crate::analysis::analyze_expr(ctx.world(), &callee_node);
+    let func = values.into_iter().find_map(|v| match v.0 {
+        Value::Func(f) => Some(f),
+        _ => None,
+    })?;
+    log::debug!("got function {func:?}");
+
+    use typst::foundations::func::Repr;
+    let mut func = func;
+    while let Repr::With(f) = func.inner() {
+        // with_args.push(ArgValue::Instance(f.1.clone()));
+        func = f.0.clone();
+    }
+
+    let signature = analyze_signature(ctx, func);
+    trace!("got signature {signature:?}");
+
+    Some(signature)
 }
 
 pub(crate) fn analyze_dyn_signature(func: Func) -> Arc<Signature> {

@@ -231,3 +231,60 @@ mod lexical_hierarchy_tests {
         def_use("def_use");
     }
 }
+
+#[cfg(test)]
+mod signature_tests {
+
+    use core::fmt;
+
+    use typst::syntax::LinkedNode;
+
+    use crate::analysis::{analyze_signature_v2, Signature};
+    use crate::syntax::get_deref_target;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("signature", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+
+            let root = LinkedNode::new(source.root());
+            let callee_node = root.leaf_at(pos).unwrap();
+            let callee_node = get_deref_target(callee_node, pos).unwrap();
+            let callee_node = callee_node.node();
+
+            let result = analyze_signature_v2(ctx, callee_node.clone());
+
+            assert_snapshot!(SignatureSnapshot(result.as_deref()));
+        });
+    }
+
+    struct SignatureSnapshot<'a>(pub Option<&'a Signature>);
+
+    impl<'a> fmt::Display for SignatureSnapshot<'a> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self.0 {
+                Some(sig) => {
+                    writeln!(f, "fn(")?;
+                    for param in sig.pos.iter() {
+                        writeln!(f, " {},", param.name)?;
+                    }
+                    for (name, param) in sig.named.iter() {
+                        writeln!(f, " {}: {},", name, param.expr.clone().unwrap_or_default())?;
+                    }
+                    if let Some(sig) = &sig.rest {
+                        writeln!(f, " ...{}, ", sig.name)?;
+                    }
+                    write!(f, ")")?;
+
+                    Ok(())
+                }
+                None => write!(f, "<nil>"),
+            }
+        }
+    }
+}
