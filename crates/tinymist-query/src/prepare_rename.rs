@@ -85,11 +85,13 @@ pub(crate) fn validate_renaming_definition(lnk: &DefinitionLink) -> Option<()> {
         }
     }
 
-    if lnk.fid.package().is_some() {
+    let (fid, _def_range) = lnk.def_at.clone()?;
+
+    if fid.package().is_some() {
         debug!(
             "prepare_rename: {name} is in a package {pkg:?}",
             name = lnk.name,
-            pkg = lnk.fid.package()
+            pkg = fid.package()
         );
         return None;
     }

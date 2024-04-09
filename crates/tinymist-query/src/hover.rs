@@ -252,8 +252,10 @@ impl DocTooltip {
             }
         };
 
-        let src = ctx.source_by_id(lnk.fid).ok()?;
-        find_document_before(&src, lnk.def_range.start)
+        let (fid, def_range) = lnk.def_at.clone()?;
+
+        let src = ctx.source_by_id(fid).ok()?;
+        find_document_before(&src, def_range.start)
     }
 }
 

@@ -42,11 +42,13 @@ impl SemanticRequest for GotoDefinitionRequest {
 
         let def = find_definition(ctx, source.clone(), deref_target)?;
 
-        let span_path = ctx.path_for_id(def.fid).ok()?;
+        let (fid, def_range) = def.def_at?;
+
+        let span_path = ctx.path_for_id(fid).ok()?;
         let uri = path_to_url(&span_path).ok()?;
 
-        let span_source = ctx.source_by_id(def.fid).ok()?;
-        let range = ctx.to_lsp_range(def.def_range, &span_source);
+        let span_source = ctx.source_by_id(fid).ok()?;
+        let range = ctx.to_lsp_range(def_range, &span_source);
 
         let res = Some(GotoDefinitionResponse::Link(vec![LocationLink {
             origin_selection_range: Some(origin_selection_range),
@@ -55,7 +57,7 @@ impl SemanticRequest for GotoDefinitionRequest {
             target_selection_range: range,
         }]));
 
-        debug!("goto_definition: {:?} {res:?}", def.fid);
+        debug!("goto_definition: {fid:?} {res:?}");
         res
     }
 }

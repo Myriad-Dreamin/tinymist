@@ -3,8 +3,8 @@
 use std::ops::Range;
 
 use log::debug;
-use typst::foundations::Value;
 use typst::syntax::FileId as TypstFileId;
+use typst::{foundations::Value, syntax::Span};
 
 use super::prelude::*;
 use crate::{
@@ -21,12 +21,10 @@ pub struct DefinitionLink {
     pub kind: LexicalKind,
     /// A possible instance of the definition.
     pub value: Option<Value>,
-    /// The file id of the definition.
-    pub fid: TypstFileId,
     /// The name of the definition.
     pub name: String,
-    /// The range of the definition.
-    pub def_range: Range<usize>,
+    /// The location of the definition.
+    pub def_at: Option<(TypstFileId, Range<usize>)>,
     /// The range of the name of the definition.
     pub name_range: Option<Range<usize>>,
 }
@@ -53,8 +51,7 @@ pub fn find_definition(
                 kind: LexicalKind::Mod(LexicalModKind::PathVar),
                 name: String::new(),
                 value: None,
-                fid: source.id(),
-                def_range: (LinkedNode::new(source.root())).range(),
+                def_at: Some((source.id(), LinkedNode::new(source.root()).range())),
                 name_range: None,
             });
         }
@@ -67,8 +64,7 @@ pub fn find_definition(
                 kind: LexicalKind::Mod(LexicalModKind::PathInclude),
                 name: String::new(),
                 value: None,
-                fid: source.id(),
-                def_range: (LinkedNode::new(source.root())).range(),
+                def_at: Some((source.id(), (LinkedNode::new(source.root())).range())),
                 name_range: None,
             });
         }
@@ -121,17 +117,25 @@ pub fn find_definition(
                 return Some(DefinitionLink {
                     kind: LexicalKind::Var(LexicalVarKind::Function),
                     name: name.to_owned(),
-                    // value: Some(Value::Func(f.clone())),
-                    value: None,
-                    fid,
-                    def_range: source.find(span)?.range(),
+                    value: Some(Value::Func(f.clone())),
+                    // value: None,
+                    def_at: Some((fid, source.find(span)?.range())),
                     name_range: def_info.map(|(_, r)| r.range.clone()),
                 });
             }
         }
     }
 
-    let (def_fid, def) = def_info?;
+    let Some((def_fid, def)) = def_info else {
+        return resolve_global(ctx, use_site.clone()).and_then(move |f| {
+            value_to_def(
+                ctx,
+                f,
+                || Some(use_site.get().clone().into_text().to_string()),
+                None,
+            )
+        });
+    };
 
     match def.kind {
         LexicalKind::Heading(..) | LexicalKind::Block => unreachable!(),
@@ -152,8 +156,7 @@ pub fn find_definition(
             kind: def.kind.clone(),
             name: def.name.clone(),
             value: None,
-            fid: def_fid,
-            def_range: def.range.clone(),
+            def_at: Some((def_fid, def.range.clone())),
             name_range: Some(def.range.clone()),
         }),
         LexicalKind::Var(LexicalVarKind::Function) => {
@@ -168,10 +171,9 @@ pub fn find_definition(
             Some(DefinitionLink {
                 kind: def.kind.clone(),
                 name: def.name.clone(),
-                // value: func.map(|v| v.0),
-                value: None,
-                fid: def_fid,
-                def_range: def.range.clone(),
+                value: func.map(|v| v.0),
+                // value: None,
+                def_at: Some((def_fid, def.range.clone())),
                 name_range: Some(def.range.clone()),
             })
         }
@@ -207,23 +209,75 @@ pub fn resolve_callee(ctx: &mut AnalysisContext, callee: LinkedNode) -> Option<F
         }
     })
     .or_else(|| {
-        let lib = ctx.world().library();
-        let value = match callee.cast::<ast::Expr>()? {
-            ast::Expr::Ident(ident) => lib.global.scope().get(&ident)?,
-            ast::Expr::FieldAccess(access) => match access.target() {
-                ast::Expr::Ident(target) => match lib.global.scope().get(&target)? {
-                    Value::Module(module) => module.field(&access.field()).ok()?,
-                    Value::Func(func) => func.field(&access.field()).ok()?,
-                    _ => return None,
-                },
+        resolve_global(ctx, callee).and_then(|v| match v {
+            Value::Func(f) => Some(f),
+            _ => None,
+        })
+    })
+}
+
+// todo: math scope
+fn resolve_global(ctx: &AnalysisContext, callee: LinkedNode) -> Option<Value> {
+    let lib = ctx.world().library();
+    let v = match callee.cast::<ast::Expr>()? {
+        ast::Expr::Ident(ident) => lib.global.scope().get(&ident)?,
+        ast::Expr::FieldAccess(access) => match access.target() {
+            ast::Expr::Ident(target) => match lib.global.scope().get(&target)? {
+                Value::Module(module) => module.field(&access.field()).ok()?,
+                Value::Func(func) => func.field(&access.field()).ok()?,
                 _ => return None,
             },
             _ => return None,
-        };
+        },
+        _ => return None,
+    };
+    Some(v.clone())
+}
 
-        match value {
-            Value::Func(func) => Some(func.clone()),
-            _ => None,
+fn value_to_def(
+    ctx: &mut AnalysisContext,
+    value: Value,
+    name: impl FnOnce() -> Option<String>,
+    name_range: Option<Range<usize>>,
+) -> Option<DefinitionLink> {
+    let mut def_at = |span: Span| {
+        span.id().and_then(|fid| {
+            let source = ctx.source_by_id(fid).ok()?;
+            Some((fid, source.find(span)?.range()))
+        })
+    };
+
+    match value {
+        Value::Func(func) => {
+            let name = func.name().map(|e| e.to_owned()).or_else(name)?;
+            let span = func.span();
+            return Some(DefinitionLink {
+                kind: LexicalKind::Var(LexicalVarKind::Function),
+                name,
+                value: Some(Value::Func(func)),
+                def_at: def_at(span),
+                name_range,
+            });
         }
-    })
+        Value::Module(module) => {
+            let name = module.name().to_string();
+            return Some(DefinitionLink {
+                kind: LexicalKind::Var(LexicalVarKind::Variable),
+                name,
+                value: None,
+                def_at: None,
+                name_range,
+            });
+        }
+        _v => {
+            let name = name()?;
+            return Some(DefinitionLink {
+                kind: LexicalKind::Mod(LexicalModKind::PathVar),
+                name,
+                value: None,
+                def_at: None,
+                name_range,
+            });
+        }
+    }
 }
