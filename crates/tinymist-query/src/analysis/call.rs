@@ -1,10 +1,12 @@
 //! Hybrid analysis for function calls.
 
-use ecow::eco_vec;
-use typst::{foundations::Args, syntax::SyntaxNode};
+use typst::syntax::SyntaxNode;
 
-use super::{analyze_signature, ParamSpec, Signature};
-use crate::{analysis::PrimarySignature, prelude::*};
+use super::{ParamSpec, Signature};
+use crate::{
+    analysis::{analyze_signature_v2, PrimarySignature, SignatureTarget},
+    prelude::*,
+};
 
 /// Describes kind of a parameter.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,12 +43,18 @@ pub struct CallInfo {
 
 // todo: cache call
 /// Analyzes a function call.
-pub fn analyze_call(
-    ctx: &mut AnalysisContext,
-    callee_node: LinkedNode,
-    args: ast::Args<'_>,
-) -> Option<Arc<CallInfo>> {
-    Some(Arc::new(analyze_call_no_cache(ctx, callee_node, args)?))
+pub fn analyze_call<'a>(ctx: &mut AnalysisContext, node: LinkedNode<'a>) -> Option<Arc<CallInfo>> {
+    trace!("func call found: {:?}", node);
+    let f = node.cast::<ast::FuncCall>()?;
+
+    let callee = f.callee();
+    // todo: reduce many such patterns
+    if !callee.hash() && !matches!(callee, ast::Expr::MathIdent(_)) {
+        return None;
+    }
+
+    let callee_node = node.find(callee.span())?;
+    Some(Arc::new(analyze_call_no_cache(ctx, callee_node, f.args())?))
 }
 
 /// Analyzes a function call without caching the result.
@@ -56,30 +64,7 @@ pub fn analyze_call_no_cache(
     callee_node: LinkedNode,
     args: ast::Args<'_>,
 ) -> Option<CallInfo> {
-    let _ = ctx;
-    #[derive(Debug, Clone)]
-    enum ArgValue<'a> {
-        Instance(Args),
-        Instantiating(ast::Args<'a>),
-    }
-
-    let mut with_args = eco_vec![ArgValue::Instantiating(args)];
-
-    let values = analyze_expr(ctx.world(), &callee_node);
-    let func = values.into_iter().find_map(|v| match v.0 {
-        Value::Func(f) => Some(f),
-        _ => None,
-    })?;
-    log::debug!("got function {func:?}");
-
-    use typst::foundations::func::Repr;
-    let mut func = func;
-    while let Repr::With(f) = func.inner() {
-        with_args.push(ArgValue::Instance(f.1.clone()));
-        func = f.0.clone();
-    }
-
-    let signature = analyze_signature(ctx, func);
+    let signature = analyze_signature_v2(ctx, SignatureTarget::Syntax(callee_node))?;
     trace!("got signature {signature:?}");
 
     let mut info = CallInfo {
@@ -184,39 +169,34 @@ pub fn analyze_call_no_cache(
     };
     pos_builder.advance(&mut info, None);
 
-    for arg in with_args.iter().rev() {
-        match arg {
-            ArgValue::Instance(args) => {
-                for _ in args.items.iter().filter(|arg| arg.name.is_none()) {
-                    pos_builder.advance(&mut info, None);
-                }
-            }
-            ArgValue::Instantiating(args) => {
-                for arg in args.items() {
-                    let arg_tag = arg.to_untyped().clone();
-                    match arg {
-                        ast::Arg::Named(named) => {
-                            let n = named.name().as_str();
+    for args in signature.bindings().iter().rev() {
+        for _arg in args.items.iter().filter(|arg| arg.name.is_none()) {
+            pos_builder.advance(&mut info, None);
+        }
+    }
 
-                            if let Some(param) = signature.primary().named.get(n) {
-                                info.arg_mapping.insert(
-                                    arg_tag,
-                                    CallParamInfo {
-                                        kind: ParamKind::Named,
-                                        is_content_block: false,
-                                        param: param.clone(),
-                                        // types: eco_vec![],
-                                    },
-                                );
-                            }
-                        }
-                        ast::Arg::Pos(..) => {
-                            pos_builder.advance(&mut info, Some(arg_tag));
-                        }
-                        ast::Arg::Spread(..) => pos_builder.advance_rest(&mut info, Some(arg_tag)),
-                    }
+    for arg in args.items() {
+        let arg_tag = arg.to_untyped().clone();
+        match arg {
+            ast::Arg::Named(named) => {
+                let n = named.name().as_str();
+
+                if let Some(param) = signature.primary().named.get(n) {
+                    info.arg_mapping.insert(
+                        arg_tag,
+                        CallParamInfo {
+                            kind: ParamKind::Named,
+                            is_content_block: false,
+                            param: param.clone(),
+                            // types: eco_vec![],
+                        },
+                    );
                 }
             }
+            ast::Arg::Pos(..) => {
+                pos_builder.advance(&mut info, Some(arg_tag));
+            }
+            ast::Arg::Spread(..) => pos_builder.advance_rest(&mut info, Some(arg_tag)),
         }
     }
 

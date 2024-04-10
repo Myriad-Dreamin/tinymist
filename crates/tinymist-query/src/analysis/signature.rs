@@ -6,7 +6,7 @@ use ecow::{eco_format, eco_vec, EcoString, EcoVec};
 use itertools::Itertools;
 use log::trace;
 use typst::{
-    foundations::{Args, CastInfo, Closure, Func, ParamInfo, Value},
+    foundations::{Args, CastInfo, Closure, Func, ParamInfo, Repr, Value},
     syntax::{
         ast::{self, AstNode},
         LinkedNode, SyntaxKind,
@@ -78,6 +78,14 @@ impl Signature {
         match self {
             Signature::Primary(sig) => sig,
             Signature::Partial(sig) => &sig.signature,
+        }
+    }
+
+    /// Returns the with bindings of the signature.
+    pub fn bindings(&self) -> &[Args] {
+        match self {
+            Signature::Primary(_) => &[],
+            Signature::Partial(sig) => &sig.with_stack,
         }
     }
 }
