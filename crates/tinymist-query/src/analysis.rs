@@ -281,7 +281,11 @@ mod signature_tests {
                             if let Some(name) = &arg.name {
                                 write!(f, "{}: ", name)?;
                             }
-                            write!(f, "{}, ", arg.value.v.repr())?;
+                            write!(
+                                f,
+                                "{}, ",
+                                arg.value.as_ref().map(|v| v.repr()).unwrap_or_default()
+                            )?;
                         }
                         writeln!(f, "")?;
                     }

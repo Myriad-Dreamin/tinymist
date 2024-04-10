@@ -1,15 +1,16 @@
 //! Analysis of function signatures.
 use core::fmt;
-use std::{borrow::Cow, collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, ops::Range, sync::Arc};
 
 use ecow::{eco_format, eco_vec, EcoString, EcoVec};
 use itertools::Itertools;
 use log::trace;
+use typst::syntax::FileId as TypstFileId;
 use typst::{
-    foundations::{Args, CastInfo, Closure, Func, ParamInfo, Repr, Value},
+    foundations::{CastInfo, Closure, Func, ParamInfo, Repr, Value},
     syntax::{
         ast::{self, AstNode},
-        LinkedNode, SyntaxKind,
+        LinkedNode, Span, SyntaxKind,
     },
     util::LazyHash,
 };
@@ -82,7 +83,7 @@ impl Signature {
     }
 
     /// Returns the with bindings of the signature.
-    pub fn bindings(&self) -> &[Args] {
+    pub fn bindings(&self) -> &[ArgsInfo] {
         match self {
             Signature::Primary(_) => &[],
             Signature::Partial(sig) => &sig.with_stack,
@@ -104,13 +105,40 @@ pub struct PrimarySignature {
     _broken: bool,
 }
 
+/// Describes a function argument instance
+#[derive(Debug, Clone)]
+pub struct ArgInfo {
+    /// The argument's name.
+    pub name: Option<EcoString>,
+    /// The argument's value.
+    pub value: Option<Value>,
+}
+
+/// Describes a span.
+#[derive(Debug, Clone)]
+pub enum SpanInfo {
+    /// Unresolved raw span
+    Span(Span),
+    /// Resolved span
+    Range((TypstFileId, Range<usize>)),
+}
+
+/// Describes a function argument list.
+#[derive(Debug, Clone)]
+pub struct ArgsInfo {
+    /// The span of the argument list.
+    pub span: Option<SpanInfo>,
+    /// The arguments.
+    pub items: EcoVec<ArgInfo>,
+}
+
 /// Describes a function signature that is already partially applied.
 #[derive(Debug, Clone)]
 pub struct PartialSignature {
     /// The positional parameters.
     pub signature: Arc<PrimarySignature>,
     /// The stack of `fn.with(..)` calls.
-    pub with_stack: EcoVec<Args>,
+    pub with_stack: EcoVec<ArgsInfo>,
 }
 
 /// The language object that the signature is being analyzed for.
@@ -156,7 +184,18 @@ pub(crate) fn analyze_signature_v2(
     let mut with_stack = eco_vec![];
     let mut func = func;
     while let Repr::With(f) = func.inner() {
-        with_stack.push(f.1.clone());
+        with_stack.push(ArgsInfo {
+            span: None,
+            items: f
+                .1
+                .items
+                .iter()
+                .map(|arg| ArgInfo {
+                    name: arg.name.clone().map(From::from),
+                    value: Some(arg.value.v.clone()),
+                })
+                .collect(),
+        });
         func = f.0.clone();
     }
 
