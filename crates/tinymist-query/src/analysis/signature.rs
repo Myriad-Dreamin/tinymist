@@ -329,7 +329,7 @@ impl<'a> fmt::Display for TypeExpr<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self.0 {
             CastInfo::Any => "any",
-            CastInfo::Value(.., v) => v,
+            CastInfo::Value(v, _doc) => return write!(f, "{}", v.repr()),
             CastInfo::Type(v) => {
                 f.write_str(v.short_name())?;
                 return Ok(());
