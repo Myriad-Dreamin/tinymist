@@ -258,7 +258,11 @@ mod signature_tests {
             let callee_node = get_deref_target(callee_node, pos).unwrap();
             let callee_node = callee_node.node();
 
-            let result = analyze_signature_v2(ctx, SignatureTarget::Syntax(callee_node.clone()));
+            let result = analyze_signature_v2(
+                ctx,
+                source.clone(),
+                SignatureTarget::Syntax(callee_node.clone()),
+            );
 
             assert_snapshot!(SignatureSnapshot(result.as_ref()));
         });
@@ -342,7 +346,7 @@ mod call_info_tests {
                 call_node = parent.clone();
             }
 
-            let result = analyze_call(ctx, call_node);
+            let result = analyze_call(ctx, source.clone(), call_node);
 
             assert_snapshot!(CallSnapshot(result.as_deref()));
         });

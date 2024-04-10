@@ -198,6 +198,7 @@ pub struct ModuleAnalysisGlobalCache {
     import: Arc<ComputingNode<EcoVec<LexicalHierarchy>, Arc<ImportInfo>>>,
     def_use: Arc<ComputingNode<(EcoVec<LexicalHierarchy>, Arc<ImportInfo>), Arc<DefUseInfo>>>,
 
+    signature_source: Option<Source>,
     signatures: HashMap<usize, Signature>,
 }
 
@@ -208,6 +209,7 @@ impl Default for ModuleAnalysisGlobalCache {
             import: Arc::new(ComputingNode::new("import")),
             def_use: Arc::new(ComputingNode::new("def_use")),
 
+            signature_source: None,
             signatures: Default::default(),
         }
     }
@@ -224,14 +226,22 @@ pub struct AnalysisGlobalCaches {
 
 impl AnalysisGlobalCaches {
     /// Get the signature of a function.
-    pub fn signature(&self, func: &SignatureTarget) -> Option<Signature> {
+    pub fn signature(&self, source: Option<Source>, func: &SignatureTarget) -> Option<Signature> {
         match func {
-            SignatureTarget::Syntax(node) => self
-                .modules
-                .get(&node.span().id()?)?
-                .signatures
-                .get(&node.offset())
-                .cloned(),
+            SignatureTarget::Syntax(node) => {
+                // todo: performance
+                let cache = self.modules.get(&node.span().id()?)?;
+                if cache
+                    .signature_source
+                    .as_ref()
+                    .zip(source)
+                    .map_or(true, |(s, t)| hash128(s) != hash128(&t))
+                {
+                    return None;
+                }
+
+                cache.signatures.get(&node.offset()).cloned()
+            }
             SignatureTarget::Runtime(rt) => self
                 .signatures
                 .get(&hash128(rt))
@@ -242,19 +252,26 @@ impl AnalysisGlobalCaches {
     /// Compute the signature of a function.
     pub fn compute_signature(
         &mut self,
+        source: Option<Source>,
         func: SignatureTarget,
         compute: impl FnOnce() -> Signature,
     ) -> Signature {
         match func {
             SignatureTarget::Syntax(node) => {
+                let cache = self.modules.entry(node.span().id().unwrap()).or_default();
+                // todo: performance
+                if cache
+                    .signature_source
+                    .as_ref()
+                    .zip(source.as_ref())
+                    .map_or(true, |(s, t)| hash128(s) != hash128(t))
+                {
+                    cache.signature_source = source;
+                    cache.signatures.clear();
+                }
+
                 let key = node.offset();
-                self.modules
-                    .entry(node.span().id().unwrap())
-                    .or_default()
-                    .signatures
-                    .entry(key)
-                    .or_insert_with(compute)
-                    .clone()
+                cache.signatures.entry(key).or_insert_with(compute).clone()
             }
             SignatureTarget::Runtime(rt) => {
                 let key = hash128(&rt);
@@ -457,6 +474,7 @@ impl<'w> AnalysisContext<'w> {
         let l = cache
             .def_use_lexical_hierarchy
             .compute(source.clone(), |_before, after| {
+                cache.signatures.clear();
                 crate::syntax::get_lexical_hierarchy(after, crate::syntax::LexicalScopeKind::DefUse)
             })
             .ok()

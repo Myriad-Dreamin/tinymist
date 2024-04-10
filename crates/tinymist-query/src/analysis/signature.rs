@@ -5,7 +5,7 @@ use std::{borrow::Cow, collections::HashMap, ops::Range, sync::Arc};
 use ecow::{eco_format, eco_vec, EcoString, EcoVec};
 use itertools::Itertools;
 use log::trace;
-use typst::syntax::FileId as TypstFileId;
+use typst::syntax::{FileId as TypstFileId, Source};
 use typst::{
     foundations::{CastInfo, Closure, Func, ParamInfo, Repr, Value},
     syntax::{
@@ -150,19 +150,19 @@ pub enum SignatureTarget<'a> {
 }
 
 pub(crate) fn analyze_signature(ctx: &mut AnalysisContext, func: Func) -> Signature {
-    let _ = analyze_signature_v2;
     ctx.analysis
         .caches
-        .compute_signature(SignatureTarget::Runtime(func.clone()), || {
+        .compute_signature(None, SignatureTarget::Runtime(func.clone()), || {
             Signature::Primary(analyze_dyn_signature(func))
         })
 }
 
 pub(crate) fn analyze_signature_v2(
     ctx: &mut AnalysisContext,
+    source: Source,
     callee_node: SignatureTarget,
 ) -> Option<Signature> {
-    if let Some(sig) = ctx.analysis.caches.signature(&callee_node) {
+    if let Some(sig) = ctx.analysis.caches.signature(Some(source), &callee_node) {
         return Some(sig);
     }
 
@@ -202,7 +202,7 @@ pub(crate) fn analyze_signature_v2(
     let signature = ctx
         .analysis
         .caches
-        .compute_signature(SignatureTarget::Runtime(func.clone()), || {
+        .compute_signature(None, SignatureTarget::Runtime(func.clone()), || {
             Signature::Primary(analyze_dyn_signature(func))
         })
         .primary()

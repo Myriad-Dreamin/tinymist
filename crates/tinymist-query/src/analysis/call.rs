@@ -43,7 +43,11 @@ pub struct CallInfo {
 
 // todo: cache call
 /// Analyzes a function call.
-pub fn analyze_call<'a>(ctx: &mut AnalysisContext, node: LinkedNode<'a>) -> Option<Arc<CallInfo>> {
+pub fn analyze_call<'a>(
+    ctx: &mut AnalysisContext,
+    source: Source,
+    node: LinkedNode<'a>,
+) -> Option<Arc<CallInfo>> {
     trace!("func call found: {:?}", node);
     let f = node.cast::<ast::FuncCall>()?;
 
@@ -54,17 +58,23 @@ pub fn analyze_call<'a>(ctx: &mut AnalysisContext, node: LinkedNode<'a>) -> Opti
     }
 
     let callee_node = node.find(callee.span())?;
-    Some(Arc::new(analyze_call_no_cache(ctx, callee_node, f.args())?))
+    Some(Arc::new(analyze_call_no_cache(
+        ctx,
+        source,
+        callee_node,
+        f.args(),
+    )?))
 }
 
 /// Analyzes a function call without caching the result.
 // todo: testing
 pub fn analyze_call_no_cache(
     ctx: &mut AnalysisContext,
+    source: Source,
     callee_node: LinkedNode,
     args: ast::Args<'_>,
 ) -> Option<CallInfo> {
-    let signature = analyze_signature_v2(ctx, SignatureTarget::Syntax(callee_node))?;
+    let signature = analyze_signature_v2(ctx, source, SignatureTarget::Syntax(callee_node))?;
     trace!("got signature {signature:?}");
 
     let mut info = CallInfo {

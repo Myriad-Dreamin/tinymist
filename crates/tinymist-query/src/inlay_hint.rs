@@ -135,7 +135,7 @@ fn inlay_hint(
                 // Parameter inlay hints
                 SyntaxKind::FuncCall => {
                     trace!("func call found: {:?}", node);
-                    let call_info = analyze_call(self.ctx, node.clone())?;
+                    let call_info = analyze_call(self.ctx, self.source.clone(), node.clone())?;
                     log::debug!("got call_info {call_info:?}");
 
                     let f = node.cast::<ast::FuncCall>().unwrap();
