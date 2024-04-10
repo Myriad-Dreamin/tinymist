@@ -190,7 +190,9 @@ pub fn param_completions<'a>(
         })
         .collect();
 
-    for (name, param) in &signature.named {
+    let primary_sig = signature.primary();
+
+    for (name, param) in &primary_sig.named {
         if exclude.iter().any(|ident| ident.as_str() == name) {
             continue;
         }
@@ -249,7 +251,9 @@ pub fn named_param_value_completions<'a>(
 
     let signature = analyze_signature(ctx.ctx, func.clone());
 
-    let Some(param) = signature.named.get(name) else {
+    let primary_sig = signature.primary();
+
+    let Some(param) = primary_sig.named.get(name) else {
         return;
     };
     if !param.named {

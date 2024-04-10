@@ -187,7 +187,8 @@ fn def_tooltip(
     }
 }
 
-struct ParamTooltip(Option<Arc<Signature>>);
+// todo: hover with `with_stack`
+struct ParamTooltip(Option<Signature>);
 
 impl fmt::Display for ParamTooltip {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -202,18 +203,28 @@ impl fmt::Display for ParamTooltip {
             }
             f.write_str(", ")
         };
-        for p in &sig.pos {
+
+        let primary_sig = match sig {
+            Signature::Primary(sig) => sig,
+            Signature::Partial(sig) => {
+                let _ = sig.with_stack;
+
+                &sig.signature
+            }
+        };
+
+        for p in &primary_sig.pos {
             write_sep(f)?;
             write!(f, "{}", p.name)?;
         }
-        if let Some(rest) = &sig.rest {
+        if let Some(rest) = &primary_sig.rest {
             write_sep(f)?;
             write!(f, "{}", rest.name)?;
         }
 
-        if !sig.named.is_empty() {
+        if !primary_sig.named.is_empty() {
             let mut name_prints = vec![];
-            for v in sig.named.values() {
+            for v in primary_sig.named.values() {
                 name_prints.push((v.name.clone(), v.type_repr.clone()))
             }
             name_prints.sort();

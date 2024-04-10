@@ -229,7 +229,7 @@ fn inlay_hint(
                                 continue;
                             }
                             ParamKind::Positional
-                                if call_info.signature.has_fill_or_size_or_stroke =>
+                                if call_info.signature.primary().has_fill_or_size_or_stroke =>
                             {
                                 continue
                             }

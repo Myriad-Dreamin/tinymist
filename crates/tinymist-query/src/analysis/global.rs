@@ -20,7 +20,7 @@ use typst::{
 use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
-use super::{DefUseInfo, ImportInfo, Signature};
+use super::{DefUseInfo, ImportInfo, Signature, SignatureTarget};
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -197,6 +197,8 @@ pub struct ModuleAnalysisGlobalCache {
     def_use_lexical_hierarchy: ComputingNode<Source, EcoVec<LexicalHierarchy>>,
     import: Arc<ComputingNode<EcoVec<LexicalHierarchy>, Arc<ImportInfo>>>,
     def_use: Arc<ComputingNode<(EcoVec<LexicalHierarchy>, Arc<ImportInfo>), Arc<DefUseInfo>>>,
+
+    signatures: HashMap<usize, Signature>,
 }
 
 impl Default for ModuleAnalysisGlobalCache {
@@ -205,6 +207,8 @@ impl Default for ModuleAnalysisGlobalCache {
             def_use_lexical_hierarchy: ComputingNode::new("def_use_lexical_hierarchy"),
             import: Arc::new(ComputingNode::new("import")),
             def_use: Arc::new(ComputingNode::new("def_use")),
+
+            signatures: Default::default(),
         }
     }
 }
@@ -215,29 +219,52 @@ impl Default for ModuleAnalysisGlobalCache {
 pub struct AnalysisGlobalCaches {
     lifetime: u64,
     modules: HashMap<TypstFileId, ModuleAnalysisGlobalCache>,
-    signatures: HashMap<u128, (u64, foundations::Func, Arc<Signature>)>,
+    signatures: HashMap<u128, (u64, foundations::Func, Signature)>,
 }
 
 impl AnalysisGlobalCaches {
     /// Get the signature of a function.
-    pub fn signature(&self, func: foundations::Func) -> Option<Arc<Signature>> {
-        self.signatures
-            .get(&hash128(&func))
-            .and_then(|(_, cached_func, s)| (func == *cached_func).then_some(s.clone()))
+    pub fn signature(&self, func: &SignatureTarget) -> Option<Signature> {
+        match func {
+            SignatureTarget::Syntax(node) => self
+                .modules
+                .get(&node.span().id()?)?
+                .signatures
+                .get(&node.offset())
+                .cloned(),
+            SignatureTarget::Runtime(rt) => self
+                .signatures
+                .get(&hash128(rt))
+                .and_then(|(_, cached_func, s)| (rt == cached_func).then_some(s.clone())),
+        }
     }
 
     /// Compute the signature of a function.
     pub fn compute_signature(
         &mut self,
-        func: foundations::Func,
-        compute: impl FnOnce() -> Arc<Signature>,
-    ) -> Arc<Signature> {
-        let key = hash128(&func);
-        self.signatures
-            .entry(key)
-            .or_insert_with(|| (self.lifetime, func, compute()))
-            .2
-            .clone()
+        func: SignatureTarget,
+        compute: impl FnOnce() -> Signature,
+    ) -> Signature {
+        match func {
+            SignatureTarget::Syntax(node) => {
+                let key = node.offset();
+                self.modules
+                    .entry(node.span().id().unwrap())
+                    .or_default()
+                    .signatures
+                    .entry(key)
+                    .or_insert_with(compute)
+                    .clone()
+            }
+            SignatureTarget::Runtime(rt) => {
+                let key = hash128(&rt);
+                self.signatures
+                    .entry(key)
+                    .or_insert_with(|| (self.lifetime, rt, compute()))
+                    .2
+                    .clone()
+            }
+        }
     }
 }
 

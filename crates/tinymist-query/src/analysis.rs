@@ -237,9 +237,10 @@ mod signature_tests {
 
     use core::fmt;
 
+    use typst::foundations::Repr;
     use typst::syntax::LinkedNode;
 
-    use crate::analysis::{analyze_signature_v2, Signature};
+    use crate::analysis::{analyze_signature_v2, Signature, SignatureTarget};
     use crate::syntax::get_deref_target;
     use crate::tests::*;
 
@@ -257,9 +258,9 @@ mod signature_tests {
             let callee_node = get_deref_target(callee_node, pos).unwrap();
             let callee_node = callee_node.node();
 
-            let result = analyze_signature_v2(ctx, callee_node.clone());
+            let result = analyze_signature_v2(ctx, SignatureTarget::Syntax(callee_node.clone()));
 
-            assert_snapshot!(SignatureSnapshot(result.as_deref()));
+            assert_snapshot!(SignatureSnapshot(result.as_ref()));
         });
     }
 
@@ -267,24 +268,41 @@ mod signature_tests {
 
     impl<'a> fmt::Display for SignatureSnapshot<'a> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            match self.0 {
-                Some(sig) => {
-                    writeln!(f, "fn(")?;
-                    for param in sig.pos.iter() {
-                        writeln!(f, " {},", param.name)?;
-                    }
-                    for (name, param) in sig.named.iter() {
-                        writeln!(f, " {}: {},", name, param.expr.clone().unwrap_or_default())?;
-                    }
-                    if let Some(sig) = &sig.rest {
-                        writeln!(f, " ...{}, ", sig.name)?;
-                    }
-                    write!(f, ")")?;
+            let Some(sig) = self.0 else {
+                return write!(f, "<nil>");
+            };
 
-                    Ok(())
+            let primary_sig = match sig {
+                Signature::Primary(sig) => sig,
+                Signature::Partial(sig) => {
+                    for w in &sig.with_stack {
+                        write!(f, "with ")?;
+                        for arg in &w.items {
+                            if let Some(name) = &arg.name {
+                                write!(f, "{}: ", name)?;
+                            }
+                            write!(f, "{}, ", arg.value.v.repr())?;
+                        }
+                        writeln!(f, "")?;
+                    }
+
+                    &sig.signature
                 }
-                None => write!(f, "<nil>"),
+            };
+
+            writeln!(f, "fn(")?;
+            for param in primary_sig.pos.iter() {
+                writeln!(f, " {},", param.name)?;
             }
+            for (name, param) in primary_sig.named.iter() {
+                writeln!(f, " {}: {},", name, param.expr.clone().unwrap_or_default())?;
+            }
+            if let Some(primary_sig) = &primary_sig.rest {
+                writeln!(f, " ...{}, ", primary_sig.name)?;
+            }
+            write!(f, ")")?;
+
+            Ok(())
         }
     }
 }

@@ -4,7 +4,7 @@ use ecow::eco_vec;
 use typst::{foundations::Args, syntax::SyntaxNode};
 
 use super::{analyze_signature, ParamSpec, Signature};
-use crate::prelude::*;
+use crate::{analysis::PrimarySignature, prelude::*};
 
 /// Describes kind of a parameter.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,7 +33,7 @@ pub struct CallParamInfo {
 #[derive(Debug, Clone)]
 pub struct CallInfo {
     /// The called function's signature.
-    pub signature: Arc<Signature>,
+    pub signature: Signature,
     /// The mapping of arguments syntax nodes to their respective parameter
     /// info.
     pub arg_mapping: HashMap<SyntaxNode, CallParamInfo>,
@@ -50,6 +50,7 @@ pub fn analyze_call(
 }
 
 /// Analyzes a function call without caching the result.
+// todo: testing
 pub fn analyze_call_no_cache(
     ctx: &mut AnalysisContext,
     callee_node: LinkedNode,
@@ -95,7 +96,7 @@ pub fn analyze_call_no_cache(
 
     struct PosBuilder {
         state: PosState,
-        signature: Arc<Signature>,
+        signature: Arc<PrimarySignature>,
     }
 
     impl PosBuilder {
@@ -179,7 +180,7 @@ pub fn analyze_call_no_cache(
 
     let mut pos_builder = PosBuilder {
         state: PosState::Init,
-        signature: signature.clone(),
+        signature: signature.primary().clone(),
     };
     pos_builder.advance(&mut info, None);
 
@@ -197,7 +198,7 @@ pub fn analyze_call_no_cache(
                         ast::Arg::Named(named) => {
                             let n = named.name().as_str();
 
-                            if let Some(param) = signature.named.get(n) {
+                            if let Some(param) = signature.primary().named.get(n) {
                                 info.arg_mapping.insert(
                                     arg_tag,
                                     CallParamInfo {
