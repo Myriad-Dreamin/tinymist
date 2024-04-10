@@ -1,4 +1,4 @@
-use crate::{path_to_url, prelude::*};
+use crate::prelude::*;
 
 /// Stores diagnostics for files.
 pub type DiagnosticsMap = HashMap<Url, Vec<LspDiagnostic>>;

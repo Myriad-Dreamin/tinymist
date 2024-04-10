@@ -114,53 +114,53 @@ jobs:
       - name: Build tinymist binary
         shell: pwsh
         run: |
-          cargo build --release -p tinymist --target ${{ matrix.rust-target }}
+          cargo build --profile=gh-release -p tinymist --target ${{ matrix.rust-target }}
         if: startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true'
       - name: Rename debug symbols for windows
         if: matrix.platform == 'win32' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
-          cd target/${{ matrix.rust-target }}/release
+          cd target/${{ matrix.rust-target }}/gh-release
           cp tinymist.pdb tinymist-${{ env.target }}.pdb
       - name: Split debug symbols for linux
         if: matrix.platform == 'linux' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
-          cd target/${{ matrix.rust-target }}/release
+          cd target/${{ matrix.rust-target }}/gh-release
           llvm-objcopy --compress-debug-sections --only-keep-debug "tinymist" "tinymist-${{ env.target }}.debug"
           llvm-objcopy --strip-debug --add-gnu-debuglink="tinymist-${{ env.target }}.debug" "tinymist"
       - name: Collect debug symbols for mac
         if: matrix.platform == 'darwin' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         run: |
-          dsymutil -f "target/${{ matrix.rust-target }}/release/tinymist"
-          mv "target/${{ matrix.rust-target }}/release/tinymist.dwarf" "target/${{ matrix.rust-target }}/release/tinymist-${{ env.target }}.dwarf"
+          dsymutil -f "target/${{ matrix.rust-target }}/gh-release/tinymist"
+          mv "target/${{ matrix.rust-target }}/gh-release/tinymist.dwarf" "target/${{ matrix.rust-target }}/gh-release/tinymist-${{ env.target }}.dwarf"
       - name: Copy binary to output directory
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         shell: pwsh
         run: |
-          cp "target/${{ matrix.rust-target }}/release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "editors/vscode/out/"
-          cp "target/${{ matrix.rust-target }}/release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "tinymist-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
+          cp "target/${{ matrix.rust-target }}/gh-release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "editors/vscode/out/"
+          cp "target/${{ matrix.rust-target }}/gh-release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "tinymist-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       - name: Test tinymist
         run: |
-          cargo test --release --workspace --target ${{ matrix.rust-target }}
+          cargo test --profile=gh-release --workspace --target ${{ matrix.rust-target }}
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && (matrix.platform == 'linux') && (matrix.arch == 'x64')
       - name: Upload split debug symbols for windows
         if: matrix.platform == 'win32' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.pdb
-          path: target/${{ matrix.rust-target }}/release/tinymist-${{ env.target }}.pdb
+          path: target/${{ matrix.rust-target }}/gh-release/tinymist-${{ env.target }}.pdb
       - name: Upload split debug symbols for linux
         if: matrix.platform == 'linux' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.debug
-          path: target/${{ matrix.rust-target }}/release/tinymist-${{ env.target }}.debug
+          path: target/${{ matrix.rust-target }}/gh-release/tinymist-${{ env.target }}.debug
           compression-level: 0
       - name: Upload split debug symbols for mac
         if: matrix.platform == 'darwin' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.dwarf
-          path: target/${{ matrix.rust-target }}/release/tinymist-${{ env.target }}.dwarf
+          path: target/${{ matrix.rust-target }}/gh-release/tinymist-${{ env.target }}.dwarf
       - name: Upload binary artifact
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
@@ -209,22 +209,22 @@ jobs:
         working-directory: ./editors/vscode
       - name: Build tinymist binary
         run: |
-          cargo build --release -p tinymist --target $RUST_TARGET
+          cargo build --profile=gh-release -p tinymist --target $RUST_TARGET
       - name: Split debug symbols
         run: |
-          cd target/$RUST_TARGET/release
+          cd target/$RUST_TARGET/gh-release
           objcopy --compress-debug-sections --only-keep-debug "tinymist" "tinymist-${{ env.target }}.debug"
           objcopy --strip-debug --add-gnu-debuglink="tinymist-${{ env.target }}.debug" "tinymist"
       - name: Upload split debug symbols
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.debug
-          path: target/${{ env.RUST_TARGET }}/release/tinymist-${{ env.target }}.debug
+          path: target/${{ env.RUST_TARGET }}/gh-release/tinymist-${{ env.target }}.debug
       - name: Copy binary to output directory
         run: |
           mkdir -p editors/vscode/out
-          cp "target/${{ env.RUST_TARGET }}/release/tinymist" "editors/vscode/out/"
-          cp "target/${{ env.RUST_TARGET }}/release/tinymist" "tinymist-${{ env.target }}"
+          cp "target/${{ env.RUST_TARGET }}/gh-release/tinymist" "editors/vscode/out/"
+          cp "target/${{ env.RUST_TARGET }}/gh-release/tinymist" "tinymist-${{ env.target }}"
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:

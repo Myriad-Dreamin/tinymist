@@ -441,7 +441,7 @@ export const SymbolPicker = () => {
     ),
     div({ style: "flex: 1;" }, (_dom?: Element) =>
       div(
-        ...catergorize(
+        ...categorize(
           CATEGORY_INFO,
           pickSymbols(pickers.val, filteredPickers.val)
         )
@@ -452,7 +452,7 @@ export const SymbolPicker = () => {
   );
 };
 
-function catergorize(
+function categorize(
   catsRaw: SymbolCategory[],
   symInfo: InstantiatedSymbolItem[]
 ): InstantiatedSymbolCategory[] {

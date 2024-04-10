@@ -1,7 +1,6 @@
 use std::ops::Range;
 
 use log::debug;
-use typst::foundations::Value;
 use typst::syntax::FileId as TypstFileId;
 
 use crate::{
@@ -122,7 +121,7 @@ pub(crate) fn find_definition(
         }
     };
 
-    // syntatic definition
+    // syntactic definition
     let def_use = ctx.def_use(source)?;
     let ident_ref = match use_site.cast::<ast::Expr>()? {
         ast::Expr::Ident(e) => IdentRef {

@@ -27,14 +27,14 @@ pub use insta::assert_snapshot;
 pub use typst_ts_compiler::TypstSystemWorld;
 
 use crate::{
-    analysis::{Analysis, AnaylsisResources},
+    analysis::{Analysis, AnalysisResources},
     prelude::AnalysisContext,
     typst_to_lsp, LspPosition, PositionEncoding,
 };
 
 struct WrapWorld<'a>(&'a mut TypstSystemWorld);
 
-impl<'a> AnaylsisResources for WrapWorld<'a> {
+impl<'a> AnalysisResources for WrapWorld<'a> {
     fn world(&self) -> &dyn typst::World {
         self.0
     }

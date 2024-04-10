@@ -175,7 +175,7 @@ mod polymorphic {
     pub struct ServerInfoRequest {}
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct ServerInfoReponse {
+    pub struct ServerInfoResponse {
         pub root: Option<PathBuf>,
         #[serde(rename = "fontPaths")]
         pub font_paths: Vec<PathBuf>,
@@ -188,7 +188,7 @@ mod polymorphic {
     pub enum FoldRequestFeature {
         PinnedFirst,
         Unique,
-        Mergable,
+        Mergeable,
         ContextFreeUnique,
     }
 
@@ -224,8 +224,8 @@ mod polymorphic {
         pub fn fold_feature(&self) -> FoldRequestFeature {
             use FoldRequestFeature::*;
             match self {
-                CompilerQueryRequest::OnExport(..) => Mergable,
-                CompilerQueryRequest::OnSaveExport(..) => Mergable,
+                CompilerQueryRequest::OnExport(..) => Mergeable,
+                CompilerQueryRequest::OnSaveExport(..) => Mergeable,
                 CompilerQueryRequest::Hover(..) => PinnedFirst,
                 CompilerQueryRequest::GotoDefinition(..) => PinnedFirst,
                 CompilerQueryRequest::GotoDeclaration(..) => PinnedFirst,
@@ -234,12 +234,12 @@ mod polymorphic {
                 CompilerQueryRequest::DocumentColor(..) => PinnedFirst,
                 CompilerQueryRequest::ColorPresentation(..) => ContextFreeUnique,
                 CompilerQueryRequest::CodeLens(..) => Unique,
-                CompilerQueryRequest::Completion(..) => Mergable,
+                CompilerQueryRequest::Completion(..) => Mergeable,
                 CompilerQueryRequest::SignatureHelp(..) => PinnedFirst,
-                CompilerQueryRequest::Rename(..) => Mergable,
-                CompilerQueryRequest::PrepareRename(..) => Mergable,
+                CompilerQueryRequest::Rename(..) => Mergeable,
+                CompilerQueryRequest::PrepareRename(..) => Mergeable,
                 CompilerQueryRequest::DocumentSymbol(..) => ContextFreeUnique,
-                CompilerQueryRequest::Symbol(..) => Mergable,
+                CompilerQueryRequest::Symbol(..) => Mergeable,
                 CompilerQueryRequest::SemanticTokensFull(..) => ContextFreeUnique,
                 CompilerQueryRequest::SemanticTokensDelta(..) => ContextFreeUnique,
                 CompilerQueryRequest::Formatting(..) => ContextFreeUnique,
@@ -247,7 +247,7 @@ mod polymorphic {
                 CompilerQueryRequest::SelectionRange(..) => ContextFreeUnique,
 
                 CompilerQueryRequest::DocumentMetrics(..) => PinnedFirst,
-                CompilerQueryRequest::ServerInfo(..) => Mergable,
+                CompilerQueryRequest::ServerInfo(..) => Mergeable,
             }
         }
 
@@ -306,7 +306,7 @@ mod polymorphic {
         SelectionRange(Option<Vec<SelectionRange>>),
 
         DocumentMetrics(Option<DocumentMetricsResponse>),
-        ServerInfo(Option<HashMap<String, ServerInfoReponse>>),
+        ServerInfo(Option<HashMap<String, ServerInfoResponse>>),
     }
 }
 

@@ -8,7 +8,7 @@ import { Diagnostics } from "./features/diagnostics";
 import { SymbolPicker } from "./features/symbol-picker";
 
 /// The components that can be rendered by the frontend.
-/// Typicially, each component corresponds to a single tool (Application).
+/// Typically, each component corresponds to a single tool (Application).
 type PageComponent =
   | "template-gallery"
   | "tracing"

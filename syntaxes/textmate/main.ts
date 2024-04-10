@@ -27,7 +27,7 @@ const PAREN_BLOCK = generatePattern(6, "\\(", "\\)");
 const CODE_BLOCK = generatePattern(6, "\\{", "\\}");
 const BRACE_FREE_EXPR = /[^\s\}\{\[\]][^\}\{\[\]]*/.source;
 
-// todo: This is invokable
+// todo: This is invocable
 const codeBlock: textmate.Pattern = {
   //   name: "meta.block.continuous.typst",
   begin: /\{/,
@@ -534,7 +534,7 @@ const expression = (): textmate.Grammar => {
         },
       },
       /// parentheisized expressions: (...)
-      // todo: This is invokable
+      // todo: This is invocable
       {
         begin: /\(/,
         end: /\)/,

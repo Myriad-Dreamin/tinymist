@@ -45,7 +45,7 @@ pub fn find_source_by_expr(
     current: TypstFileId,
     e: ast::Expr,
 ) -> Option<Source> {
-    // todo: this could be vaild: import("path.typ"), where v is parenthesized
+    // todo: this could be valid: import("path.typ"), where v is parenthesized
     match e {
         ast::Expr::Str(s) => find_source_by_import_path(world, current, s.get().as_str()),
         _ => None,

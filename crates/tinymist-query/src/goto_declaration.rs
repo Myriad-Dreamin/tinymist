@@ -1,7 +1,6 @@
 use std::ops::Range;
 
 use log::debug;
-use lsp_types::LocationLink;
 
 use crate::{
     prelude::*,
@@ -70,7 +69,7 @@ impl SemanticRequest for GotoDeclarationRequest {
             });
         }
 
-        debug!("goto_declartion: {links:?}");
+        debug!("goto_declaration: {links:?}");
         Some(GotoDeclarationResponse::Link(links))
     }
 }
