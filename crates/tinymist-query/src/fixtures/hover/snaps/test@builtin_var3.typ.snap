@@ -1,0 +1,9 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/hover/builtin_var3.typ
+---
+{
+ "contents": "```typc\n// Values\n<module sys>\n```\n---\n```typc\nlet sys;\n```",
+ "range": "0:2:0:5"
+}

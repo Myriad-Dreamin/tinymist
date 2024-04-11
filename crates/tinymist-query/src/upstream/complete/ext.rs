@@ -6,7 +6,7 @@ use typst::foundations::Value;
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, SyntaxKind};
 
-use crate::analysis::{analyze_import, analyze_signature, resolve_callee};
+use crate::analysis::{analyze_dyn_signature, analyze_import, resolve_callee};
 use crate::upstream::plain_docs_sentence;
 
 impl<'a, 'w> CompletionContext<'a, 'w> {
@@ -179,7 +179,7 @@ pub fn param_completions<'a>(
         func = f.0.clone();
     }
 
-    let signature = analyze_signature(ctx.ctx, func.clone());
+    let signature = analyze_dyn_signature(ctx.ctx, func.clone());
 
     // Exclude named arguments which are already present.
     let exclude: Vec<_> = args
@@ -249,7 +249,7 @@ pub fn named_param_value_completions<'a>(
         func = f.0.clone();
     }
 
-    let signature = analyze_signature(ctx.ctx, func.clone());
+    let signature = analyze_dyn_signature(ctx.ctx, func.clone());
 
     let primary_sig = signature.primary();
 

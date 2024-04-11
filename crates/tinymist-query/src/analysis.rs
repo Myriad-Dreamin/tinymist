@@ -12,12 +12,81 @@ pub mod linked_def;
 pub use linked_def::*;
 pub mod signature;
 pub use signature::*;
+pub mod r#type;
+pub(crate) use r#type::*;
 pub mod track_values;
 pub use track_values::*;
 mod prelude;
 
 mod global;
 pub use global::*;
+
+#[cfg(test)]
+mod type_check_tests {
+
+    use core::fmt;
+
+    use typst::syntax::Source;
+
+    use crate::analysis::type_check;
+    use crate::tests::*;
+
+    use super::TypeCheckInfo;
+
+    #[test]
+    fn test() {
+        snapshot_testing("playground", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let result = type_check(ctx, source.clone());
+            let result = result
+                .as_deref()
+                .map(|e| format!("{:#?}", TypeCheckSnapshot(&source, e)));
+            let result = result.as_deref().unwrap_or("<nil>");
+
+            assert_snapshot!(result);
+        });
+    }
+
+    struct TypeCheckSnapshot<'a>(&'a Source, &'a TypeCheckInfo);
+
+    impl fmt::Debug for TypeCheckSnapshot<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let source = self.0;
+            let info = self.1;
+            let mut vars = info
+                .vars
+                .iter()
+                .map(|e| (e.1.name(), e.1))
+                .collect::<Vec<_>>();
+
+            vars.sort_by(|x, y| x.0.cmp(&y.0));
+
+            for (name, var) in vars {
+                writeln!(f, "{:?} = {:?}", name, info.simplify(var.get_ref()))?;
+            }
+
+            writeln!(f, "---")?;
+            let mut mapping = info
+                .mapping
+                .iter()
+                .map(|e| (source.range(*e.0).unwrap_or_default(), e.1))
+                .collect::<Vec<_>>();
+
+            mapping.sort_by(|x, y| {
+                x.0.start
+                    .cmp(&y.0.start)
+                    .then_with(|| x.0.end.cmp(&y.0.end))
+            });
+
+            for (range, value) in mapping {
+                writeln!(f, "{range:?} -> {value:?}")?;
+            }
+
+            Ok(())
+        }
+    }
+}
 
 #[cfg(test)]
 mod module_tests {
@@ -283,7 +352,7 @@ mod signature_tests {
                         write!(f, "with ")?;
                         for arg in &w.items {
                             if let Some(name) = &arg.name {
-                                write!(f, "{}: ", name)?;
+                                write!(f, "{name}: ")?;
                             }
                             write!(
                                 f,
@@ -291,7 +360,7 @@ mod signature_tests {
                                 arg.value.as_ref().map(|v| v.repr()).unwrap_or_default()
                             )?;
                         }
-                        writeln!(f, "")?;
+                        f.write_str("\n")?;
                     }
 
                     &sig.signature
