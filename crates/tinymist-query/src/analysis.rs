@@ -231,3 +231,143 @@ mod lexical_hierarchy_tests {
         def_use("def_use");
     }
 }
+
+#[cfg(test)]
+mod signature_tests {
+
+    use core::fmt;
+
+    use typst::foundations::Repr;
+    use typst::syntax::LinkedNode;
+
+    use crate::analysis::{analyze_signature_v2, Signature, SignatureTarget};
+    use crate::syntax::get_deref_target;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("signature", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+
+            let root = LinkedNode::new(source.root());
+            let callee_node = root.leaf_at(pos).unwrap();
+            let callee_node = get_deref_target(callee_node, pos).unwrap();
+            let callee_node = callee_node.node();
+
+            let result = analyze_signature_v2(
+                ctx,
+                source.clone(),
+                SignatureTarget::Syntax(callee_node.clone()),
+            );
+
+            assert_snapshot!(SignatureSnapshot(result.as_ref()));
+        });
+    }
+
+    struct SignatureSnapshot<'a>(pub Option<&'a Signature>);
+
+    impl<'a> fmt::Display for SignatureSnapshot<'a> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let Some(sig) = self.0 else {
+                return write!(f, "<nil>");
+            };
+
+            let primary_sig = match sig {
+                Signature::Primary(sig) => sig,
+                Signature::Partial(sig) => {
+                    for w in &sig.with_stack {
+                        write!(f, "with ")?;
+                        for arg in &w.items {
+                            if let Some(name) = &arg.name {
+                                write!(f, "{}: ", name)?;
+                            }
+                            write!(
+                                f,
+                                "{}, ",
+                                arg.value.as_ref().map(|v| v.repr()).unwrap_or_default()
+                            )?;
+                        }
+                        writeln!(f, "")?;
+                    }
+
+                    &sig.signature
+                }
+            };
+
+            writeln!(f, "fn(")?;
+            for param in primary_sig.pos.iter() {
+                writeln!(f, " {},", param.name)?;
+            }
+            for (name, param) in primary_sig.named.iter() {
+                writeln!(f, " {}: {},", name, param.expr.clone().unwrap_or_default())?;
+            }
+            if let Some(primary_sig) = &primary_sig.rest {
+                writeln!(f, " ...{}, ", primary_sig.name)?;
+            }
+            write!(f, ")")?;
+
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod call_info_tests {
+
+    use core::fmt;
+
+    use typst::syntax::{LinkedNode, SyntaxKind};
+
+    use crate::analysis::analyze_call;
+    use crate::tests::*;
+
+    use super::CallInfo;
+
+    #[test]
+    fn test() {
+        snapshot_testing("call_info", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+
+            let root = LinkedNode::new(source.root());
+            let mut call_node = root.leaf_at(pos + 1).unwrap();
+
+            while let Some(parent) = call_node.parent() {
+                if call_node.kind() == SyntaxKind::FuncCall {
+                    break;
+                }
+                call_node = parent.clone();
+            }
+
+            let result = analyze_call(ctx, source.clone(), call_node);
+
+            assert_snapshot!(CallSnapshot(result.as_deref()));
+        });
+    }
+
+    struct CallSnapshot<'a>(pub Option<&'a CallInfo>);
+
+    impl<'a> fmt::Display for CallSnapshot<'a> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let Some(ci) = self.0 else {
+                return write!(f, "<nil>");
+            };
+
+            let mut w = ci.arg_mapping.iter().collect::<Vec<_>>();
+            w.sort_by(|x, y| x.0.span().number().cmp(&y.0.span().number()));
+
+            for (arg, arg_call_info) in w {
+                writeln!(f, "{} -> {:?}", arg.clone().into_text(), arg_call_info)?;
+            }
+
+            Ok(())
+        }
+    }
+}

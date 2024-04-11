@@ -1,15 +1,16 @@
 //! Analysis of function signatures.
 use core::fmt;
-use std::{borrow::Cow, collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, ops::Range, sync::Arc};
 
-use ecow::{eco_format, EcoString};
+use ecow::{eco_format, eco_vec, EcoString, EcoVec};
 use itertools::Itertools;
 use log::trace;
+use typst::syntax::{FileId as TypstFileId, Source};
 use typst::{
-    foundations::{CastInfo, Closure, Func, ParamInfo, Value},
+    foundations::{CastInfo, Closure, Func, ParamInfo, Repr, Value},
     syntax::{
         ast::{self, AstNode},
-        SyntaxKind,
+        LinkedNode, Span, SyntaxKind,
     },
     util::LazyHash,
 };
@@ -65,7 +66,34 @@ impl ParamSpec {
 
 /// Describes a function signature.
 #[derive(Debug, Clone)]
-pub struct Signature {
+pub enum Signature {
+    /// A primary function signature.
+    Primary(Arc<PrimarySignature>),
+    /// A partially applied function signature.
+    Partial(Arc<PartialSignature>),
+}
+
+impl Signature {
+    /// Returns the primary signature if it is one.
+    pub fn primary(&self) -> &Arc<PrimarySignature> {
+        match self {
+            Signature::Primary(sig) => sig,
+            Signature::Partial(sig) => &sig.signature,
+        }
+    }
+
+    /// Returns the with bindings of the signature.
+    pub fn bindings(&self) -> &[ArgsInfo] {
+        match self {
+            Signature::Primary(_) => &[],
+            Signature::Partial(sig) => &sig.with_stack,
+        }
+    }
+}
+
+/// Describes a primary function signature.
+#[derive(Debug, Clone)]
+pub struct PrimarySignature {
     /// The positional parameters.
     pub pos: Vec<Arc<ParamSpec>>,
     /// The named parameters.
@@ -77,17 +105,121 @@ pub struct Signature {
     _broken: bool,
 }
 
-// pub enum SignatureTarget<'a> {
-//     Static(LinkedNode<'a>)
-// }
-
-pub(crate) fn analyze_signature(ctx: &mut AnalysisContext, func: Func) -> Arc<Signature> {
-    ctx.analysis
-        .caches
-        .compute_signature(func.clone(), || analyze_dyn_signature(func))
+/// Describes a function argument instance
+#[derive(Debug, Clone)]
+pub struct ArgInfo {
+    /// The argument's name.
+    pub name: Option<EcoString>,
+    /// The argument's value.
+    pub value: Option<Value>,
 }
 
-pub(crate) fn analyze_dyn_signature(func: Func) -> Arc<Signature> {
+/// Describes a span.
+#[derive(Debug, Clone)]
+pub enum SpanInfo {
+    /// Unresolved raw span
+    Span(Span),
+    /// Resolved span
+    Range((TypstFileId, Range<usize>)),
+}
+
+/// Describes a function argument list.
+#[derive(Debug, Clone)]
+pub struct ArgsInfo {
+    /// The span of the argument list.
+    pub span: Option<SpanInfo>,
+    /// The arguments.
+    pub items: EcoVec<ArgInfo>,
+}
+
+/// Describes a function signature that is already partially applied.
+#[derive(Debug, Clone)]
+pub struct PartialSignature {
+    /// The positional parameters.
+    pub signature: Arc<PrimarySignature>,
+    /// The stack of `fn.with(..)` calls.
+    pub with_stack: EcoVec<ArgsInfo>,
+}
+
+/// The language object that the signature is being analyzed for.
+pub enum SignatureTarget<'a> {
+    /// A static node without knowing the function at runtime.
+    Syntax(LinkedNode<'a>),
+    /// A function that is known at runtime.
+    Runtime(Func),
+}
+
+pub(crate) fn analyze_signature(ctx: &mut AnalysisContext, func: Func) -> Signature {
+    ctx.analysis
+        .caches
+        .compute_signature(None, SignatureTarget::Runtime(func.clone()), || {
+            Signature::Primary(analyze_dyn_signature(func))
+        })
+}
+
+pub(crate) fn analyze_signature_v2(
+    ctx: &mut AnalysisContext,
+    source: Source,
+    callee_node: SignatureTarget,
+) -> Option<Signature> {
+    if let Some(sig) = ctx.analysis.caches.signature(Some(source), &callee_node) {
+        return Some(sig);
+    }
+
+    let func = match callee_node {
+        SignatureTarget::Syntax(node) => {
+            let values = crate::analysis::analyze_expr(ctx.world(), &node);
+            let func = values.into_iter().find_map(|v| match v.0 {
+                Value::Func(f) => Some(f),
+                _ => None,
+            })?;
+            log::debug!("got function {func:?}");
+
+            func
+        }
+        SignatureTarget::Runtime(func) => func,
+    };
+
+    use typst::foundations::func::Repr;
+    let mut with_stack = eco_vec![];
+    let mut func = func;
+    while let Repr::With(f) = func.inner() {
+        with_stack.push(ArgsInfo {
+            span: None,
+            items: f
+                .1
+                .items
+                .iter()
+                .map(|arg| ArgInfo {
+                    name: arg.name.clone().map(From::from),
+                    value: Some(arg.value.v.clone()),
+                })
+                .collect(),
+        });
+        func = f.0.clone();
+    }
+
+    let signature = ctx
+        .analysis
+        .caches
+        .compute_signature(None, SignatureTarget::Runtime(func.clone()), || {
+            Signature::Primary(analyze_dyn_signature(func))
+        })
+        .primary()
+        .clone();
+    trace!("got signature {signature:?}");
+
+    if with_stack.is_empty() {
+        return Some(Signature::Primary(signature));
+    }
+
+    Some(Signature::Partial(Arc::new(PartialSignature {
+        signature,
+        with_stack,
+    })))
+}
+
+pub(crate) fn analyze_dyn_signature(func: Func) -> Arc<PrimarySignature> {
     use typst::foundations::func::Repr;
     let params = match func.inner() {
         Repr::With(..) => unreachable!(),
@@ -136,7 +268,7 @@ pub(crate) fn analyze_dyn_signature(func: Func) -> Arc<Signature> {
         }
     }
 
-    Arc::new(Signature {
+    Arc::new(PrimarySignature {
         pos,
         named,
         rest,
@@ -244,7 +376,7 @@ impl<'a> fmt::Display for TypeExpr<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self.0 {
             CastInfo::Any => "any",
-            CastInfo::Value(.., v) => v,
+            CastInfo::Value(v, _doc) => return write!(f, "{}", v.repr()),
             CastInfo::Type(v) => {
                 f.write_str(v.short_name())?;
                 return Ok(());

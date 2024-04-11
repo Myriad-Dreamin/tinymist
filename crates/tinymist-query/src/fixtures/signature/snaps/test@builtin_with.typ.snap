@@ -1,0 +1,14 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: SignatureSnapshot(result.as_ref())
+input_file: crates/tinymist-query/src/fixtures/signature/builtin_with.typ
+---
+with 50%, 50%, 50%, 
+fn(
+ red,
+ green,
+ blue,
+ alpha,
+ hex,
+ color,
+)

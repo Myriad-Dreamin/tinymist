@@ -1,0 +1,13 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: SignatureSnapshot(result.as_deref())
+input_file: crates/tinymist-query/src/fixtures/signature/builtin.typ
+---
+fn(
+ red,
+ green,
+ blue,
+ alpha,
+ hex,
+ color,
+)

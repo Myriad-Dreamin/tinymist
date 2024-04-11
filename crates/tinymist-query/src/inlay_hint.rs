@@ -135,21 +135,12 @@ fn inlay_hint(
                 // Parameter inlay hints
                 SyntaxKind::FuncCall => {
                     trace!("func call found: {:?}", node);
+                    let call_info = analyze_call(self.ctx, self.source.clone(), node.clone())?;
+                    log::debug!("got call_info {call_info:?}");
+
                     let f = node.cast::<ast::FuncCall>().unwrap();
-
-                    let callee = f.callee();
-                    // todo: reduce many such patterns
-                    if !callee.hash() && !matches!(callee, ast::Expr::MathIdent(_)) {
-                        return None;
-                    }
-
-                    let callee_node = node.find(callee.span())?;
-
                     let args = f.args();
                     let args_node = node.find(args.span())?;
-
-                    let call_info = analyze_call(self.ctx, callee_node, args)?;
-                    log::debug!("got call_info {call_info:?}");
 
                     let check_single_pos_arg = || {
                         let mut pos = 0;
@@ -229,7 +220,7 @@ fn inlay_hint(
                                 continue;
                             }
                             ParamKind::Positional
-                                if call_info.signature.has_fill_or_size_or_stroke =>
+                                if call_info.signature.primary().has_fill_or_size_or_stroke =>
                             {
                                 continue
                             }
