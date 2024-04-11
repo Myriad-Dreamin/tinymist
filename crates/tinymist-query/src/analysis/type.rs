@@ -507,7 +507,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
     fn check_inner(&mut self, root: LinkedNode) -> Option<FlowType> {
         Some(match root.kind() {
-            SyntaxKind::Markup => return self.check_markup(root),
+            SyntaxKind::Markup => return self.check_in_mode(root, InterpretMode::Markup),
             SyntaxKind::Text => FlowType::Content,
             SyntaxKind::Space => FlowType::Content,
             SyntaxKind::Linebreak => FlowType::Content,
@@ -534,7 +534,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::TermItem => return self.check_children(root),
             SyntaxKind::TermMarker => FlowType::Content,
             SyntaxKind::Equation => return self.check_children(root),
-            SyntaxKind::Math => return self.check_math(root),
+            SyntaxKind::Math => return self.check_in_mode(root, InterpretMode::Math),
             SyntaxKind::MathIdent => return self.check_math_ident(root),
             SyntaxKind::MathAlignPoint => FlowType::Content,
             SyntaxKind::MathDelimited => return self.check_children(root),
@@ -595,7 +595,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::Import => FlowType::Clause,
             SyntaxKind::Include => FlowType::Clause,
             SyntaxKind::As => FlowType::Clause,
-            SyntaxKind::Code => return self.check_code(root),
+            SyntaxKind::Code => return self.check_in_mode(root, InterpretMode::Code),
             SyntaxKind::Ident => return self.check_ident(root),
             SyntaxKind::Bool
             | SyntaxKind::Int
@@ -608,8 +608,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     .map(Box::new)
                     .map(FlowType::Value)
             }
-            SyntaxKind::CodeBlock => return self.check_code(root),
-            SyntaxKind::ContentBlock => return self.check_markup(root),
+            SyntaxKind::CodeBlock => return self.check_in_mode(root, InterpretMode::Code),
+            SyntaxKind::ContentBlock => return self.check_in_mode(root, InterpretMode::Markup),
             SyntaxKind::Parenthesized => return self.check_children(root),
             SyntaxKind::Array => return self.check_array(root),
             SyntaxKind::Dict => return self.check_dict(root),
@@ -646,25 +646,9 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         })
     }
 
-    fn check_markup(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_in_mode(&mut self, root: LinkedNode, into_mode: InterpretMode) -> Option<FlowType> {
         let mode = self.mode;
-        self.mode = InterpretMode::Markup;
-        let res = self.check_children(root);
-        self.mode = mode;
-        res
-    }
-
-    fn check_math(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
-        let mode = self.mode;
-        self.mode = InterpretMode::Math;
-        let res = self.check_children(root);
-        self.mode = mode;
-        res
-    }
-
-    fn check_code(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
-        let mode = self.mode;
-        self.mode = InterpretMode::Code;
+        self.mode = into_mode;
         let res = self.check_children(root);
         self.mode = mode;
         res
