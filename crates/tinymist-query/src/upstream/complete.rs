@@ -704,6 +704,7 @@ fn complete_params(ctx: &mut CompletionContext) -> bool {
             }
 
             named_param_value_completions(ctx, callee, &param);
+            code_completions(ctx, false);
             return true;
         }
     }
@@ -718,6 +719,7 @@ fn complete_params(ctx: &mut CompletionContext) -> bool {
             }
 
             param_completions(ctx, callee, set, args);
+            code_completions(ctx, false);
             return true;
         }
     }
