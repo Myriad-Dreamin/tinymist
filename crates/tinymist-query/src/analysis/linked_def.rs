@@ -247,37 +247,37 @@ fn value_to_def(
         })
     };
 
-    match value {
+    Some(match value {
         Value::Func(func) => {
             let name = func.name().map(|e| e.to_owned()).or_else(name)?;
             let span = func.span();
-            return Some(DefinitionLink {
+            DefinitionLink {
                 kind: LexicalKind::Var(LexicalVarKind::Function),
                 name,
                 value: Some(Value::Func(func)),
                 def_at: def_at(span),
                 name_range,
-            });
+            }
         }
         Value::Module(module) => {
             let name = module.name().to_string();
-            return Some(DefinitionLink {
+            DefinitionLink {
                 kind: LexicalKind::Var(LexicalVarKind::Variable),
                 name,
                 value: None,
                 def_at: None,
                 name_range,
-            });
+            }
         }
         _v => {
             let name = name()?;
-            return Some(DefinitionLink {
+            DefinitionLink {
                 kind: LexicalKind::Mod(LexicalModKind::PathVar),
                 name,
                 value: None,
                 def_at: None,
                 name_range,
-            });
+            }
         }
-    }
+    })
 }
