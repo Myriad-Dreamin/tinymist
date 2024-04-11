@@ -4,15 +4,9 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/playground/base.typ
 ---
 ---
-1..18 -> Element(image)
-7..17 -> Path(Image)
-21..37 -> (Type(string) | Type(bytes))
-26..36 -> Path(None)
+1..18 -> Any
+21..37 -> Any
 40..57 -> Any
-45..56 -> Path(Json)
 60..77 -> Any
-65..76 -> Path(Yaml)
 80..95 -> Any
-84..94 -> Path(Xml)
 98..115 -> Any
-103..114 -> Path(Toml)
