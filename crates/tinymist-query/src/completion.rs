@@ -174,6 +174,7 @@ impl StatefulRequest for CompletionRequest {
 #[cfg(test)]
 mod tests {
     use insta::with_settings;
+    use lsp_types::CompletionItem;
 
     use super::*;
     use crate::tests::*;
