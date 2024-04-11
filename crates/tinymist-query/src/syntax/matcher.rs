@@ -109,8 +109,6 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget> 
 
     Some(match may_ident {
         // todo: label, reference
-        // todo: import
-        // todo: include
         ast::Expr::FuncCall(call) => DerefTarget::Callee(ancestor.find(call.callee().span())?),
         ast::Expr::Set(set) => DerefTarget::Callee(ancestor.find(set.target().span())?),
         ast::Expr::Ident(..) | ast::Expr::MathIdent(..) | ast::Expr::FieldAccess(..) => {
