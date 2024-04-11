@@ -437,7 +437,7 @@ impl TypeCheckInfo {
         c.positives.clear();
         c.negatives.clear();
 
-        let mut worker = TypeCanoWorker {
+        let mut worker = TypeSimplifier {
             vars: &self.vars,
             cano_cache: &mut c.cano_cache,
             cano_local_cache: &mut c.cano_local_cache,
@@ -467,7 +467,10 @@ pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Ar
     };
     let lnk = LinkedNode::new(source.root());
 
+    let current = std::time::Instant::now();
     type_checker.check(lnk);
+    let elapsed = current.elapsed();
+    log::info!("Type checking on {:?} took {:?}", source.id(), elapsed);
 
     let _ = type_checker.info.mapping;
     let _ = type_checker.source;
@@ -1297,7 +1300,7 @@ struct TypeCanoStore {
     positives: HashSet<DefId>,
 }
 
-struct TypeCanoWorker<'a, 'b> {
+struct TypeSimplifier<'a, 'b> {
     vars: &'a HashMap<DefId, FlowVar>,
 
     cano_cache: &'b mut HashMap<u128, FlowType>,
@@ -1306,7 +1309,7 @@ struct TypeCanoWorker<'a, 'b> {
     positives: &'b mut HashSet<DefId>,
 }
 
-impl<'a, 'b> TypeCanoWorker<'a, 'b> {
+impl<'a, 'b> TypeSimplifier<'a, 'b> {
     fn simplify(&mut self, ty: FlowType) -> FlowType {
         // todo: hash safety
         let ty_key = hash128(&ty);
