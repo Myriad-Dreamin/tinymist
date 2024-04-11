@@ -263,11 +263,37 @@ impl fmt::Debug for FlowSignature {
 #[derive(Debug, Clone, Hash)]
 pub(crate) enum PathPreference {
     None,
+    Source,
     Image,
     Json,
     Yaml,
     Xml,
     Toml,
+}
+
+impl PathPreference {
+    pub(crate) fn match_ext(&self, ext: &std::ffi::OsStr) -> bool {
+        let ext = || ext.to_str().map(|e| e.to_lowercase()).unwrap_or_default();
+
+        match self {
+            PathPreference::None => true,
+            PathPreference::Source => {
+                matches!(ext().as_ref(), "typ")
+            }
+            PathPreference::Image => {
+                matches!(
+                    ext().as_ref(),
+                    "png" | "webp" | "jpg" | "jpeg" | "svg" | "svgz"
+                )
+            }
+            PathPreference::Json => {
+                matches!(ext().as_ref(), "json" | "jsonc" | "json5")
+            }
+            PathPreference::Yaml => matches!(ext().as_ref(), "yaml" | "yml"),
+            PathPreference::Xml => matches!(ext().as_ref(), "xml"),
+            PathPreference::Toml => matches!(ext().as_ref(), "toml"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Hash)]
@@ -301,6 +327,7 @@ pub(crate) enum FlowType {
     Unary(FlowUnaryType),
     Binary(FlowBinaryType),
     Value(Box<Value>),
+    ValueDoc(Box<(Value, &'static str)>),
     Element(Element),
 }
 
@@ -337,6 +364,7 @@ impl fmt::Debug for FlowType {
             FlowType::Unary(u) => write!(f, "{u:?}"),
             FlowType::Binary(b) => write!(f, "{b:?}"),
             FlowType::Value(v) => write!(f, "{v:?}"),
+            FlowType::ValueDoc(v) => write!(f, "{v:?}"),
             FlowType::Element(e) => write!(f, "{e:?}"),
         }
     }
@@ -354,7 +382,7 @@ impl FlowType {
 
         let ty = match c {
             CastInfo::Any => FlowType::Any,
-            CastInfo::Value(v, _) => FlowType::Value(Box::new(v.clone())),
+            CastInfo::Value(v, doc) => FlowType::ValueDoc(Box::new((v.clone(), *doc))),
             CastInfo::Type(ty) => FlowType::Value(Box::new(Value::Type(*ty))),
             CastInfo::Union(e) => FlowType::Union(Box::new(
                 e.iter()
@@ -408,7 +436,7 @@ impl FlowType {
 
         let ty = match &s {
             CastInfo::Any => FlowType::Any,
-            CastInfo::Value(v, _) => FlowType::Value(Box::new(v.clone())),
+            CastInfo::Value(v, doc) => FlowType::ValueDoc(Box::new((v.clone(), *doc))),
             CastInfo::Type(ty) => FlowType::Value(Box::new(Value::Type(*ty))),
             CastInfo::Union(e) => FlowType::Union(Box::new(
                 e.iter()
@@ -1085,6 +1113,11 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     self.check_apply_runtime(f, args, syntax_args, candidates);
                 }
             }
+            FlowType::ValueDoc(f) => {
+                if let Value::Func(f) = &f.0 {
+                    self.check_apply_runtime(f, args, syntax_args, candidates);
+                }
+            }
 
             FlowType::Array => {}
             FlowType::Dict => {}
@@ -1166,6 +1199,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::Union(..) => e,
             FlowType::Let(_) => e,
             FlowType::Value(..) => e,
+            FlowType::ValueDoc(..) => e,
 
             FlowType::Array => e,
             FlowType::Dict => e,
@@ -1397,6 +1431,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 }
             }
             FlowType::Value(_v) => {}
+            FlowType::ValueDoc(_v) => {}
             FlowType::Clause => {}
             FlowType::Undef => {}
             FlowType::Content => {}
@@ -1515,6 +1550,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             FlowType::Array => FlowType::Array,
             FlowType::Dict => FlowType::Dict,
             FlowType::Value(v) => FlowType::Value(v.clone()),
+            FlowType::ValueDoc(v) => FlowType::ValueDoc(v.clone()),
             FlowType::Element(v) => FlowType::Element(*v),
             FlowType::Clause => FlowType::Clause,
             FlowType::Undef => FlowType::Undef,

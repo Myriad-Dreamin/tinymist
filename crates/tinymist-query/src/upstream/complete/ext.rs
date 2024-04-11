@@ -1,13 +1,22 @@
-use super::{Completion, CompletionContext, CompletionKind};
 use std::collections::BTreeMap;
 
 use ecow::{eco_format, EcoString};
-use typst::foundations::Value;
+use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
+use reflexo::path::{unix_slash, PathClean};
+use typst::foundations::{AutoValue, Func, Label, NoneValue, Type, Value};
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, SyntaxKind};
+use typst::visualize::Color;
 
-use crate::analysis::{analyze_dyn_signature, analyze_import, resolve_callee};
+use super::{Completion, CompletionContext, CompletionKind};
+use crate::analysis::{
+    analyze_dyn_signature, analyze_import, resolve_callee, FlowBuiltinType, FlowType,
+    PathPreference,
+};
+use crate::syntax::param_index_at_leaf;
 use crate::upstream::plain_docs_sentence;
+
+use crate::{prelude::*, typst_to_lsp::completion_kind, LspCompletion};
 
 impl<'a, 'w> CompletionContext<'a, 'w> {
     pub fn world(&self) -> &'w dyn typst::World {
@@ -51,7 +60,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         .as_ref()
                         .and_then(|source| analyze_import(self.world(), source));
                     if analyzed.is_none() {
-                        log::info!("failed to analyze import: {:?}", anaylyze);
+                        log::debug!("failed to analyze import: {:?}", anaylyze);
                     }
                     if let Some(value) = analyzed {
                         if imports.is_none() {
@@ -179,6 +188,8 @@ pub fn param_completions<'a>(
         func = f.0.clone();
     }
 
+    let pos_index = param_index_at_leaf(&ctx.leaf, &func, args);
+
     let signature = analyze_dyn_signature(ctx.ctx, func.clone());
 
     // Exclude named arguments which are already present.
@@ -191,6 +202,23 @@ pub fn param_completions<'a>(
         .collect();
 
     let primary_sig = signature.primary();
+
+    log::debug!("pos_param_completion: {:?}", pos_index);
+
+    if let Some(pos_index) = pos_index {
+        let pos = primary_sig.pos.get(pos_index);
+        log::debug!("pos_param_completion_to: {:?}", pos);
+
+        if let Some(pos) = pos {
+            if set && !pos.settable {
+                return;
+            }
+
+            if pos.positional && type_completion(ctx, pos.infer_type.as_ref()).is_none() {
+                ctx.cast_completions(&pos.input);
+            }
+        }
+    }
 
     for (name, param) in &primary_sig.named {
         if exclude.iter().any(|ident| ident.as_str() == name) {
@@ -217,7 +245,7 @@ pub fn param_completions<'a>(
             });
         }
 
-        if param.positional {
+        if param.positional && type_completion(ctx, param.infer_type.as_ref()).is_none() {
             ctx.cast_completions(&param.input);
         }
     }
@@ -225,6 +253,144 @@ pub fn param_completions<'a>(
     if ctx.before.ends_with(',') {
         ctx.enrich(" ", "");
     }
+}
+
+fn type_completion(
+    ctx: &mut CompletionContext<'_, '_>,
+    infer_type: Option<&FlowType>,
+) -> Option<()> {
+    // Prevent duplicate completions from appearing.
+    if !ctx.seen_casts.insert(typst::util::hash128(&infer_type)) {
+        return Some(());
+    }
+
+    log::debug!("type_completion: {:?}", infer_type);
+
+    match infer_type? {
+        FlowType::Clause => return None,
+        FlowType::Undef => return None,
+        FlowType::Content => return None,
+        FlowType::Any => return None,
+        FlowType::Array => {
+            ctx.snippet_completion("()", "(${v})", "An array.");
+        }
+        FlowType::Dict => {
+            ctx.snippet_completion("()", "(${v})", "A dictionary.");
+        }
+        FlowType::None => ctx.snippet_completion("none", "none", "Nothing."),
+        FlowType::Infer => return None,
+        FlowType::FlowNone => return None,
+        FlowType::Auto => {
+            ctx.snippet_completion("auto", "auto", "A smart default.");
+        }
+        FlowType::Builtin(v) => match v {
+            FlowBuiltinType::Path(p) => {
+                let source = ctx.ctx.source_by_id(ctx.root.span().id()?).ok()?;
+
+                log::debug!(
+                    "type_path_completion: {:?}",
+                    &source.text()[ctx.cursor - 10..ctx.cursor]
+                );
+                ctx.completions2.extend(
+                    complete_path(ctx.ctx, None, &source, ctx.cursor, p)
+                        .into_iter()
+                        .flatten(),
+                );
+            }
+            FlowBuiltinType::Args => return None,
+        },
+        FlowType::Args(_) => return None,
+        FlowType::Func(_) => return None,
+        FlowType::With(_) => return None,
+        FlowType::At(_) => return None,
+        FlowType::Union(u) => {
+            for info in u.as_ref() {
+                type_completion(ctx, Some(info));
+            }
+        }
+        FlowType::Let(_) => return None,
+        FlowType::Var(_) => return None,
+        FlowType::Unary(_) => return None,
+        FlowType::Binary(_) => return None,
+        FlowType::Value(v) => {
+            if let Value::Type(ty) = v.as_ref() {
+                if *ty == Type::of::<NoneValue>() {
+                    ctx.snippet_completion("none", "none", "Nothing.")
+                } else if *ty == Type::of::<AutoValue>() {
+                    ctx.snippet_completion("auto", "auto", "A smart default.");
+                } else if *ty == Type::of::<bool>() {
+                    ctx.snippet_completion("false", "false", "No / Disabled.");
+                    ctx.snippet_completion("true", "true", "Yes / Enabled.");
+                } else if *ty == Type::of::<Color>() {
+                    ctx.snippet_completion("luma()", "luma(${v})", "A custom grayscale color.");
+                    ctx.snippet_completion(
+                        "rgb()",
+                        "rgb(${r}, ${g}, ${b}, ${a})",
+                        "A custom RGBA color.",
+                    );
+                    ctx.snippet_completion(
+                        "cmyk()",
+                        "cmyk(${c}, ${m}, ${y}, ${k})",
+                        "A custom CMYK color.",
+                    );
+                    ctx.snippet_completion(
+                        "oklab()",
+                        "oklab(${l}, ${a}, ${b}, ${alpha})",
+                        "A custom Oklab color.",
+                    );
+                    ctx.snippet_completion(
+                        "oklch()",
+                        "oklch(${l}, ${chroma}, ${hue}, ${alpha})",
+                        "A custom Oklch color.",
+                    );
+                    ctx.snippet_completion(
+                        "color.linear-rgb()",
+                        "color.linear-rgb(${r}, ${g}, ${b}, ${a})",
+                        "A custom linear RGBA color.",
+                    );
+                    ctx.snippet_completion(
+                        "color.hsv()",
+                        "color.hsv(${h}, ${s}, ${v}, ${a})",
+                        "A custom HSVA color.",
+                    );
+                    ctx.snippet_completion(
+                        "color.hsl()",
+                        "color.hsl(${h}, ${s}, ${l}, ${a})",
+                        "A custom HSLA color.",
+                    );
+                    ctx.scope_completions_(false, |value| value.ty() == *ty);
+                } else if *ty == Type::of::<Label>() {
+                    ctx.label_completions()
+                } else if *ty == Type::of::<Func>() {
+                    ctx.snippet_completion(
+                        "function",
+                        "(${params}) => ${output}",
+                        "A custom function.",
+                    );
+                } else {
+                    ctx.completions.push(Completion {
+                        kind: CompletionKind::Syntax,
+                        label: ty.long_name().into(),
+                        apply: Some(eco_format!("${{{ty}}}")),
+                        detail: Some(eco_format!("A value of type {ty}.")),
+                        command: None,
+                    });
+                    ctx.scope_completions_(false, |value| value.ty() == *ty);
+                }
+            } else {
+                ctx.value_completion(None, v, true, None);
+            }
+        }
+        FlowType::ValueDoc(v) => {
+            let (value, docs) = v.as_ref();
+            ctx.value_completion(None, value, true, Some(docs));
+        }
+        FlowType::Element(e) => {
+            ctx.value_completion(Some(e.name().into()), &Value::Func((*e).into()), true, None);
+        } // CastInfo::Any => {}
+    };
+
+    Some(())
 }
 
 /// Add completions for the values of a named function parameter.
@@ -270,7 +436,9 @@ pub fn named_param_value_completions<'a>(
         });
     }
 
-    ctx.cast_completions(&param.input);
+    if type_completion(ctx, param.infer_type.as_ref()).is_none() {
+        ctx.cast_completions(&param.input);
+    }
     if name == "font" {
         ctx.font_completions();
     }
@@ -278,4 +446,170 @@ pub fn named_param_value_completions<'a>(
     if ctx.before.ends_with(':') {
         ctx.enrich(" ", "");
     }
+}
+
+pub fn complete_path(
+    ctx: &AnalysisContext,
+    v: Option<LinkedNode>,
+    source: &Source,
+    cursor: usize,
+    p: &PathPreference,
+) -> Option<Vec<CompletionItem>> {
+    let id = source.id();
+    if id.package().is_some() {
+        return None;
+    }
+
+    let is_in_text;
+    let text;
+    let rng;
+    if let Some(v) = v {
+        let vp = v.cast::<ast::Str>()?;
+        // todo: path escape
+        let real_content = vp.get();
+        let str_content = v.text();
+        let unquoted = &str_content[1..str_content.len() - 1];
+        if unquoted != real_content {
+            return None;
+        }
+
+        let vr = v.range();
+        let offset = vr.start + 1;
+        if cursor < offset || vr.end <= cursor || vr.len() < 2 {
+            return None;
+        }
+
+        text = &source.text()[offset..cursor];
+        rng = offset..vr.end - 1;
+        is_in_text = true;
+    } else {
+        text = "";
+        rng = cursor..cursor;
+        is_in_text = false;
+    }
+    let path = Path::new(&text);
+    let is_abs = path.is_absolute();
+
+    let src_path = id.vpath();
+    let base = src_path.resolve(&ctx.analysis.root)?;
+    let dst_path = src_path.join(path);
+    let mut compl_path = dst_path.as_rootless_path();
+    if !compl_path.is_dir() {
+        compl_path = compl_path.parent().unwrap_or(Path::new(""));
+    }
+    log::debug!("compl_path: {src_path:?} + {path:?} -> {compl_path:?}");
+
+    if compl_path.is_absolute() {
+        log::warn!("absolute path completion is not supported for security consideration {path:?}");
+        return None;
+    }
+
+    let dirs = ctx.analysis.root.join(compl_path);
+    log::debug!("compl_dirs: {dirs:?}");
+    // find directory or files in the path
+    let mut folder_completions = vec![];
+    let mut module_completions = vec![];
+    // todo: test it correctly
+    for entry in dirs.read_dir().ok()? {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        let path = entry.path();
+        log::trace!("compl_check_path: {path:?}");
+        if !path.is_dir() && !path.extension().is_some_and(|ext| p.match_ext(ext)) {
+            continue;
+        }
+        if path.is_dir()
+            || path
+                .file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with('.'))
+        {
+            continue;
+        }
+
+        // diff with root
+        let path = dirs.join(path);
+
+        // Skip self smartly
+        if path.clean() == base.clean() {
+            continue;
+        }
+
+        let label = if is_abs {
+            // diff with root
+            let w = path.strip_prefix(&ctx.analysis.root).ok()?;
+            eco_format!("/{}", unix_slash(w))
+        } else {
+            let base = base.parent()?;
+            let w = pathdiff::diff_paths(&path, base)?;
+            unix_slash(&w).into()
+        };
+        log::debug!("compl_label: {label:?}");
+
+        if path.is_dir() {
+            folder_completions.push(Completion {
+                label,
+                kind: CompletionKind::Folder,
+                apply: None,
+                detail: None,
+                command: None,
+            });
+        } else {
+            module_completions.push(Completion {
+                label,
+                kind: CompletionKind::Module,
+                apply: None,
+                detail: None,
+                command: None,
+            });
+        }
+    }
+
+    let replace_range = ctx.to_lsp_range(rng, source);
+
+    module_completions.sort_by(|a, b| a.label.cmp(&b.label));
+    folder_completions.sort_by(|a, b| a.label.cmp(&b.label));
+
+    let mut sorter = 0;
+    let digits = (module_completions.len() + folder_completions.len())
+        .to_string()
+        .len();
+    let completions = module_completions.into_iter().chain(folder_completions);
+    Some(
+        completions
+            .map(|typst_completion| {
+                let lsp_snippet = typst_completion
+                    .apply
+                    .as_ref()
+                    .unwrap_or(&typst_completion.label);
+                let text_edit = CompletionTextEdit::Edit(TextEdit::new(
+                    replace_range,
+                    if is_in_text {
+                        lsp_snippet.to_string()
+                    } else {
+                        format!(r#""{lsp_snippet}""#)
+                    },
+                ));
+
+                let sort_text = format!("{sorter:0>digits$}");
+                sorter += 1;
+
+                let res = LspCompletion {
+                    label: typst_completion.label.to_string(),
+                    kind: Some(completion_kind(typst_completion.kind.clone())),
+                    detail: typst_completion.detail.as_ref().map(String::from),
+                    text_edit: Some(text_edit),
+                    // don't sort me
+                    sort_text: Some(sort_text),
+                    filter_text: Some("".to_owned()),
+                    insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                    ..Default::default()
+                };
+
+                log::debug!("compl_res: {res:?}");
+
+                res
+            })
+            .collect_vec(),
+    )
 }

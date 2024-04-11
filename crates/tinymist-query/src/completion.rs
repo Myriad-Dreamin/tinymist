@@ -1,13 +1,10 @@
-use ecow::eco_format;
-use lsp_types::{CompletionItem, CompletionList, CompletionTextEdit, InsertTextFormat, TextEdit};
-use reflexo::path::{unix_slash, PathClean};
+use lsp_types::CompletionList;
 
 use crate::{
     prelude::*,
     syntax::{get_deref_target, DerefTarget},
-    typst_to_lsp::completion_kind,
-    upstream::{autocomplete, Completion, CompletionContext, CompletionKind},
-    LspCompletion, StatefulRequest,
+    upstream::{autocomplete, complete_path, CompletionContext},
+    StatefulRequest,
 };
 
 use self::typst_to_lsp::completion;
@@ -104,15 +101,26 @@ impl StatefulRequest for CompletionRequest {
             }
             Some(DerefTarget::ImportPath(v) | DerefTarget::IncludePath(v)) => {
                 if !v.text().starts_with(r#""@"#) {
-                    completion_result = complete_path(ctx, v, &source, cursor);
+                    completion_result = complete_path(
+                        ctx,
+                        Some(v),
+                        &source,
+                        cursor,
+                        &crate::analysis::PathPreference::Source,
+                    );
                 }
             }
             None => {}
         }
 
-        let items = completion_result.or_else(|| {
+        let mut completion_items_rest = None;
+
+        let mut items = completion_result.or_else(|| {
             let cc_ctx = CompletionContext::new(ctx, doc, &source, cursor, explicit)?;
-            let (offset, mut completions) = autocomplete(cc_ctx)?;
+            let (offset, mut completions, completions_items2) = autocomplete(cc_ctx)?;
+            if !completions_items2.is_empty() {
+                completion_items_rest = Some(completions_items2);
+            }
 
             let replace_range;
             if match_ident.as_ref().is_some_and(|i| i.offset() == offset) {
@@ -149,6 +157,10 @@ impl StatefulRequest for CompletionRequest {
             )
         })?;
 
+        if let Some(items_rest) = completion_items_rest.as_mut() {
+            items.append(items_rest);
+        }
+
         // To response completions in fine-grained manner, we need to mark result as
         // incomplete. This follows what rust-analyzer does.
         // https://github.com/rust-lang/rust-analyzer/blob/f5a9250147f6569d8d89334dc9cca79c0322729f/crates/rust-analyzer/src/handlers/request.rs#L940C55-L940C75
@@ -157,154 +169,6 @@ impl StatefulRequest for CompletionRequest {
             items,
         }))
     }
-}
-
-fn complete_path(
-    ctx: &AnalysisContext,
-    v: LinkedNode,
-    source: &Source,
-    cursor: usize,
-) -> Option<Vec<CompletionItem>> {
-    let id = source.id();
-    if id.package().is_some() {
-        return None;
-    }
-
-    let vp = v.cast::<ast::Str>()?;
-    // todo: path escape
-    let real_content = vp.get();
-    let text = v.text();
-    let unquoted = &text[1..text.len() - 1];
-    if unquoted != real_content {
-        return None;
-    }
-
-    let text = source.text();
-    let vr = v.range();
-    let offset = vr.start + 1;
-    if cursor < offset || vr.end <= cursor || vr.len() < 2 {
-        return None;
-    }
-    let path = Path::new(&text[offset..cursor]);
-    let is_abs = path.is_absolute();
-
-    let src_path = id.vpath();
-    let base = src_path.resolve(&ctx.analysis.root)?;
-    let dst_path = src_path.join(path);
-    let mut compl_path = dst_path.as_rootless_path();
-    if !compl_path.is_dir() {
-        compl_path = compl_path.parent().unwrap_or(Path::new(""));
-    }
-    log::debug!("compl_path: {src_path:?} + {path:?} -> {compl_path:?}");
-
-    if compl_path.is_absolute() {
-        log::warn!("absolute path completion is not supported for security consideration {path:?}");
-        return None;
-    }
-
-    let dirs = ctx.analysis.root.join(compl_path);
-    log::debug!("compl_dirs: {dirs:?}");
-    // find directory or files in the path
-    let mut folder_completions = vec![];
-    let mut module_completions = vec![];
-    // todo: test it correctly
-    for entry in dirs.read_dir().ok()? {
-        let Ok(entry) = entry else {
-            continue;
-        };
-        let path = entry.path();
-        log::trace!("compl_check_path: {path:?}");
-        if !path.is_dir() && !path.extension().is_some_and(|ext| ext == "typ") {
-            continue;
-        }
-        if path.is_dir()
-            && path
-                .file_name()
-                .is_some_and(|name| name.to_string_lossy().starts_with('.'))
-        {
-            continue;
-        }
-
-        // diff with root
-        let path = dirs.join(path);
-
-        // Skip self smartly
-        if path.clean() == base.clean() {
-            continue;
-        }
-
-        let label = if is_abs {
-            // diff with root
-            let w = path.strip_prefix(&ctx.analysis.root).ok()?;
-            eco_format!("/{}", unix_slash(w))
-        } else {
-            let base = base.parent()?;
-            let w = pathdiff::diff_paths(&path, base)?;
-            unix_slash(&w).into()
-        };
-        log::debug!("compl_label: {label:?}");
-
-        if path.is_dir() {
-            folder_completions.push(Completion {
-                label,
-                kind: CompletionKind::Folder,
-                apply: None,
-                detail: None,
-                command: None,
-            });
-        } else {
-            module_completions.push(Completion {
-                label,
-                kind: CompletionKind::Module,
-                apply: None,
-                detail: None,
-                command: None,
-            });
-        }
-    }
-
-    let rng = offset..vr.end - 1;
-    let replace_range = ctx.to_lsp_range(rng, source);
-
-    module_completions.sort_by(|a, b| a.label.cmp(&b.label));
-    folder_completions.sort_by(|a, b| a.label.cmp(&b.label));
-
-    let mut sorter = 0;
-    let digits = (module_completions.len() + folder_completions.len())
-        .to_string()
-        .len();
-    let completions = module_completions.into_iter().chain(folder_completions);
-    Some(
-        completions
-            .map(|typst_completion| {
-                let lsp_snippet = typst_completion
-                    .apply
-                    .as_ref()
-                    .unwrap_or(&typst_completion.label);
-                let text_edit =
-                    CompletionTextEdit::Edit(TextEdit::new(replace_range, lsp_snippet.to_string()));
-
-                let sort_text = format!("{sorter:0>digits$}");
-                sorter += 1;
-
-                let res = LspCompletion {
-                    label: typst_completion.label.to_string(),
-                    kind: Some(completion_kind(typst_completion.kind.clone())),
-                    detail: typst_completion.detail.as_ref().map(String::from),
-                    text_edit: Some(text_edit),
-                    // don't sort me
-                    sort_text: Some(sort_text),
-                    filter_text: Some("".to_owned()),
-                    insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
-                    ..Default::default()
-                };
-
-                log::debug!("compl_res: {res:?}");
-
-                res
-            })
-            .collect_vec(),
-    )
 }
 
 #[cfg(test)]

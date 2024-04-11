@@ -19,7 +19,7 @@ use crate::analysis::{analyze_expr, analyze_import, analyze_labels};
 use crate::AnalysisContext;
 
 mod ext;
-use ext::*;
+pub use ext::*;
 
 /// Autocomplete a cursor position in a source file.
 ///
@@ -32,7 +32,9 @@ use ext::*;
 /// Passing a `document` (from a previous compilation) is optional, but enhances
 /// the autocompletions. Label completions, for instance, are only generated
 /// when the document is available.
-pub fn autocomplete(mut ctx: CompletionContext) -> Option<(usize, Vec<Completion>)> {
+pub fn autocomplete(
+    mut ctx: CompletionContext,
+) -> Option<(usize, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
     let _ = complete_comments(&mut ctx)
         || complete_field_accesses(&mut ctx)
         || complete_open_labels(&mut ctx)
@@ -43,7 +45,7 @@ pub fn autocomplete(mut ctx: CompletionContext) -> Option<(usize, Vec<Completion
         || complete_math(&mut ctx)
         || complete_code(&mut ctx);
 
-    Some((ctx.from, ctx.completions))
+    Some((ctx.from, ctx.completions, ctx.completions2))
 }
 
 /// An autocompletion option.
@@ -944,6 +946,7 @@ pub struct CompletionContext<'a, 'w> {
     pub explicit: bool,
     pub from: usize,
     pub completions: Vec<Completion>,
+    pub completions2: Vec<lsp_types::CompletionItem>,
     pub seen_casts: HashSet<u128>,
 }
 
@@ -971,6 +974,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             explicit,
             from: cursor,
             completions: vec![],
+            completions2: vec![],
             seen_casts: HashSet::new(),
         })
     }

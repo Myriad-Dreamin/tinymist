@@ -20,7 +20,7 @@ pub use lsp_types::{
 pub use reflexo::vector::ir::DefId;
 pub use serde_json::Value as JsonValue;
 pub use typst::diag::{EcoString, FileError, FileResult, Tracepoint};
-pub use typst::foundations::{Func, ParamInfo, Value};
+pub use typst::foundations::{Func, Value};
 pub use typst::syntax::FileId as TypstFileId;
 pub use typst::syntax::{
     ast::{self, AstNode},

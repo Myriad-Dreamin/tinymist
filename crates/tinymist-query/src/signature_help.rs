@@ -1,4 +1,4 @@
-use crate::{prelude::*, SemanticRequest};
+use crate::{prelude::*, syntax::param_index_at_leaf, SemanticRequest};
 
 /// The [`textDocument/signatureHelp`] request is sent from the client to the
 /// server to request signature information at a given cursor position.
@@ -93,65 +93,6 @@ fn surrounding_function_syntax<'b>(
         _ => return None,
     };
     Some((callee, grand.find(callee.span())?, args))
-}
-
-fn param_index_at_leaf(leaf: &LinkedNode, function: &Func, args: ast::Args) -> Option<usize> {
-    let deciding = deciding_syntax(leaf);
-    let params = function.params()?;
-    let param_index = find_param_index(&deciding, params, args)?;
-    trace!("got param index {param_index}");
-    Some(param_index)
-}
-
-/// Find the piece of syntax that decides what we're completing.
-fn deciding_syntax<'b>(leaf: &'b LinkedNode) -> LinkedNode<'b> {
-    let mut deciding = leaf.clone();
-    while !matches!(
-        deciding.kind(),
-        SyntaxKind::LeftParen | SyntaxKind::Comma | SyntaxKind::Colon
-    ) {
-        let Some(prev) = deciding.prev_leaf() else {
-            break;
-        };
-        deciding = prev;
-    }
-    deciding
-}
-
-fn find_param_index(deciding: &LinkedNode, params: &[ParamInfo], args: ast::Args) -> Option<usize> {
-    match deciding.kind() {
-        // After colon: "func(param:|)", "func(param: |)".
-        SyntaxKind::Colon => {
-            let prev = deciding.prev_leaf()?;
-            let param_ident = prev.cast::<ast::Ident>()?;
-            params
-                .iter()
-                .position(|param| param.name == param_ident.as_str())
-        }
-        // Before: "func(|)", "func(hi|)", "func(12,|)".
-        SyntaxKind::Comma | SyntaxKind::LeftParen => {
-            let next = deciding.next_leaf();
-            let following_param = next.as_ref().and_then(|next| next.cast::<ast::Ident>());
-            match following_param {
-                Some(next) => params
-                    .iter()
-                    .position(|param| param.named && param.name.starts_with(next.as_str())),
-                None => {
-                    let positional_args_so_far = args
-                        .items()
-                        .filter(|arg| matches!(arg, ast::Arg::Pos(_)))
-                        .count();
-                    params
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, param)| param.positional)
-                        .map(|(i, _)| i)
-                        .nth(positional_args_so_far)
-                }
-            }
-        }
-        _ => None,
-    }
 }
 
 fn markdown_docs(docs: &str) -> Documentation {

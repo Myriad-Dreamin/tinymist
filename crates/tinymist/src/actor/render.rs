@@ -100,7 +100,7 @@ impl ExportActor {
 
                     };
 
-                    info!("RenderActor: received request: {req:?}", req = req);
+                    log::debug!("RenderActor: received request: {req:?}", req = req);
                     match req {
                         RenderActorRequest::ChangeConfig(cfg) => {
                             self.substitute_pattern = cfg.substitute_pattern;

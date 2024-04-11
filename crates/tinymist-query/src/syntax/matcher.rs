@@ -1,7 +1,10 @@
 use log::debug;
-use typst::syntax::{
-    ast::{self, AstNode},
-    LinkedNode, SyntaxKind,
+use typst::{
+    foundations::{Func, ParamInfo},
+    syntax::{
+        ast::{self, AstNode},
+        LinkedNode, SyntaxKind,
+    },
 };
 
 pub fn deref_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
@@ -200,4 +203,63 @@ pub fn get_def_target(node: LinkedNode) -> Option<DefTarget<'_>> {
             return None;
         }
     })
+}
+
+pub fn param_index_at_leaf(leaf: &LinkedNode, function: &Func, args: ast::Args) -> Option<usize> {
+    let deciding = deciding_syntax(leaf);
+    let params = function.params()?;
+    let param_index = find_param_index(&deciding, params, args)?;
+    log::trace!("got param index {param_index}");
+    Some(param_index)
+}
+
+/// Find the piece of syntax that decides what we're completing.
+fn deciding_syntax<'b>(leaf: &'b LinkedNode) -> LinkedNode<'b> {
+    let mut deciding = leaf.clone();
+    while !matches!(
+        deciding.kind(),
+        SyntaxKind::LeftParen | SyntaxKind::Comma | SyntaxKind::Colon
+    ) {
+        let Some(prev) = deciding.prev_leaf() else {
+            break;
+        };
+        deciding = prev;
+    }
+    deciding
+}
+
+fn find_param_index(deciding: &LinkedNode, params: &[ParamInfo], args: ast::Args) -> Option<usize> {
+    match deciding.kind() {
+        // After colon: "func(param:|)", "func(param: |)".
+        SyntaxKind::Colon => {
+            let prev = deciding.prev_leaf()?;
+            let param_ident = prev.cast::<ast::Ident>()?;
+            params
+                .iter()
+                .position(|param| param.name == param_ident.as_str())
+        }
+        // Before: "func(|)", "func(hi|)", "func(12,|)".
+        SyntaxKind::Comma | SyntaxKind::LeftParen => {
+            let next = deciding.next_leaf();
+            let following_param = next.as_ref().and_then(|next| next.cast::<ast::Ident>());
+            match following_param {
+                Some(next) => params
+                    .iter()
+                    .position(|param| param.named && param.name.starts_with(next.as_str())),
+                None => {
+                    let positional_args_so_far = args
+                        .items()
+                        .filter(|arg| matches!(arg, ast::Arg::Pos(_)))
+                        .count();
+                    params
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, param)| param.positional)
+                        .map(|(i, _)| i)
+                        .nth(positional_args_so_far)
+                }
+            }
+        }
+        _ => None,
+    }
 }
