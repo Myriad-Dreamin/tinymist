@@ -676,7 +676,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         };
 
         let Some(def_id) = self.def_use_info.get_ref(&ident_ref) else {
-            let v = resolve_global_value(self.ctx, root, mode != InterpretMode::Math)?;
+            let v = resolve_global_value(self.ctx, root, mode == InterpretMode::Math)?;
             return Some(FlowType::Value(Box::new(v)));
         };
         let var = self.info.vars.get(&def_id)?.clone();
@@ -768,6 +768,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let args = self.check_expr_in(func_call.args().span(), root.clone());
         let callee = self.check_expr_in(func_call.callee().span(), root.clone());
         let mut candidates = Vec::with_capacity(1);
+
+        log::debug!("func_call: {callee:?} with {args:?}");
 
         if let FlowType::Args(args) = args {
             self.check_apply(callee, &args, &func_call.args(), &mut candidates)?;
@@ -1101,7 +1103,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
             FlowType::Unary(_) => {}
             FlowType::Binary(_) => {}
-            FlowType::Element(_) => {}
+            FlowType::Element(_elem) => {}
         }
 
         Some(())
@@ -1236,7 +1238,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     ) -> Option<()> {
         let sig = analyze_dyn_signature(self.ctx, f.clone());
 
-        // println!("check runtime func {f:?} at args: {args:?}");
+        log::debug!("check runtime func {f:?} at args: {args:?}");
 
         let mut pos = sig
             .primary()
