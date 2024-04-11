@@ -174,7 +174,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
         )
     );
     context.subscriptions.push(
-        commands.registerCommand("tinymist.traceCurrentFile", () => commandShowTrace(context))
+        commands.registerCommand("tinymist.profileCurrentFile", () => commandShowTrace(context))
     );
     context.subscriptions.push(
         commands.registerCommand("tinymist.showLog", () => {
@@ -541,8 +541,8 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
     }
 
     switch (args[0]) {
-        case "trace": {
-            void vscode.commands.executeCommand(`tinymist.traceCurrentFile`);
+        case "profile": {
+            void vscode.commands.executeCommand(`tinymist.profileCurrentFile`);
             break;
         }
         case "preview": {

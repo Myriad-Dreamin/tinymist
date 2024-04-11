@@ -438,8 +438,8 @@
                 "category": "Typst"
             },
             {
-                "command": "tinymist.traceCurrentFile",
-                "title": "Trace and visualize execution of the current Typst file",
+                "command": "tinymist.profileCurrentFile",
+                "title": "Profile and visualize execution of the current Typst file",
                 "category": "Typst"
             }
         ],
