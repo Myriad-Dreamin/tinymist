@@ -1,7 +1,7 @@
 use core::fmt;
 
 use crate::{
-    analysis::{analyze_signature, find_definition, DefinitionLink, Signature},
+    analysis::{analyze_dyn_signature, find_definition, DefinitionLink, Signature},
     jump_from_cursor,
     prelude::*,
     syntax::{find_document_before, get_deref_target, LexicalKind, LexicalVarKind},
@@ -137,7 +137,7 @@ fn def_tooltip(
         | LexicalKind::Heading(..) => None,
         LexicalKind::Var(LexicalVarKind::Function) => {
             let sig = if let Some(Value::Func(func)) = &lnk.value {
-                Some(analyze_signature(ctx, func.clone()))
+                Some(analyze_dyn_signature(ctx, func.clone()))
             } else {
                 None
             };

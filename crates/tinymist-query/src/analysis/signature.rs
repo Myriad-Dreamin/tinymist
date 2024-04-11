@@ -15,7 +15,13 @@ use typst::{
     util::LazyHash,
 };
 
+use crate::analysis::resolve_callee;
+use crate::syntax::{get_def_target, get_deref_target, DefTarget};
 use crate::AnalysisContext;
+
+use super::{
+    find_definition, DefinitionLink, FlowType, FlowVar, LexicalKind, LexicalVarKind, TypeCheckInfo,
+};
 
 // pub fn analyze_signature
 
@@ -28,6 +34,8 @@ pub struct ParamSpec {
     pub docs: Cow<'static, str>,
     /// Describe what values this parameter accepts.
     pub input: CastInfo,
+    /// Inferred type of the parameter.
+    pub(crate) infer_type: Option<FlowType>,
     /// The parameter's default name as type.
     pub type_repr: Option<EcoString>,
     /// The parameter's default name as value.
@@ -48,18 +56,19 @@ pub struct ParamSpec {
 }
 
 impl ParamSpec {
-    fn from_static(s: &ParamInfo) -> Arc<Self> {
+    fn from_static(f: &Func, p: &ParamInfo) -> Arc<Self> {
         Arc::new(Self {
-            name: Cow::Borrowed(s.name),
-            docs: Cow::Borrowed(s.docs),
-            input: s.input.clone(),
-            type_repr: Some(eco_format!("{}", TypeExpr(&s.input))),
+            name: Cow::Borrowed(p.name),
+            docs: Cow::Borrowed(p.docs),
+            input: p.input.clone(),
+            infer_type: FlowType::from_param_site(f, p, &p.input),
+            type_repr: Some(eco_format!("{}", TypeExpr(&p.input))),
             expr: None,
-            default: s.default,
-            positional: s.positional,
-            named: s.named,
-            variadic: s.variadic,
-            settable: s.settable,
+            default: p.default,
+            positional: p.positional,
+            named: p.named,
+            variadic: p.variadic,
+            settable: p.settable,
         })
     }
 }
@@ -102,6 +111,8 @@ pub struct PrimarySignature {
     pub has_fill_or_size_or_stroke: bool,
     /// The rest parameter.
     pub rest: Option<Arc<ParamSpec>>,
+    /// The return type.
+    pub(crate) ret_ty: Option<FlowType>,
     _broken: bool,
 }
 
@@ -149,11 +160,11 @@ pub enum SignatureTarget<'a> {
     Runtime(Func),
 }
 
-pub(crate) fn analyze_signature(ctx: &mut AnalysisContext, func: Func) -> Signature {
+pub(crate) fn analyze_dyn_signature(ctx: &mut AnalysisContext, func: Func) -> Signature {
     ctx.analysis
         .caches
         .compute_signature(None, SignatureTarget::Runtime(func.clone()), || {
-            Signature::Primary(analyze_dyn_signature(func))
+            Signature::Primary(analyze_dyn_signature_inner(func))
         })
 }
 
@@ -162,19 +173,32 @@ pub(crate) fn analyze_signature_v2(
     source: Source,
     callee_node: SignatureTarget,
 ) -> Option<Signature> {
-    if let Some(sig) = ctx.analysis.caches.signature(Some(source), &callee_node) {
+    if let Some(sig) = ctx
+        .analysis
+        .caches
+        .signature(Some(source.clone()), &callee_node)
+    {
         return Some(sig);
     }
 
     let func = match callee_node {
         SignatureTarget::Syntax(node) => {
-            let values = crate::analysis::analyze_expr(ctx.world(), &node);
-            let func = values.into_iter().find_map(|v| match v.0 {
-                Value::Func(f) => Some(f),
-                _ => None,
-            })?;
-            log::debug!("got function {func:?}");
+            let _ = resolve_callee_v2;
 
+            // let res = resolve_callee_v2(ctx, node)?;
+
+            // let func = match res {
+            //     TryResolveCalleeResult::Syntax(lnk) => {
+            //         println!("Syntax {:?}", lnk.name);
+
+            //         return analyze_static_signature(ctx, source, lnk);
+            //     }
+            //     TryResolveCalleeResult::Runtime(func) => func,
+            // };
+
+            let func = resolve_callee(ctx, node)?;
+
+            log::debug!("got function {func:?}");
             func
         }
         SignatureTarget::Runtime(func) => func,
@@ -203,7 +227,7 @@ pub(crate) fn analyze_signature_v2(
         .analysis
         .caches
         .compute_signature(None, SignatureTarget::Runtime(func.clone()), || {
-            Signature::Primary(analyze_dyn_signature(func))
+            Signature::Primary(analyze_dyn_signature_inner(func))
         })
         .primary()
         .clone();
@@ -219,14 +243,94 @@ pub(crate) fn analyze_signature_v2(
     })))
 }
 
-pub(crate) fn analyze_dyn_signature(func: Func) -> Arc<PrimarySignature> {
+// fn analyze_static_signature(
+//     ctx: &mut AnalysisContext<'_>,
+//     source: Source,
+//     lnk: DefinitionLink,
+// ) -> Option<Signature> {
+//     let def_at = lnk.def_at?;
+//     let def_source = if def_at.0 == source.id() {
+//         source.clone()
+//     } else {
+//         ctx.source_by_id(def_at.0).ok()?
+//     };
+
+//     let root = LinkedNode::new(def_source.root());
+//     let def_node = root.leaf_at(def_at.1.start + 1)?;
+//     let def_node = get_def_target(def_node)?;
+//     let def_node = match def_node {
+//         DefTarget::Let(node) => node,
+//         DefTarget::Import(_) => return None,
+//     };
+
+//     println!("def_node {def_node:?}");
+
+//     None
+// }
+
+#[allow(dead_code)]
+enum TryResolveCalleeResult {
+    Syntax(DefinitionLink),
+    Runtime(Func),
+}
+
+/// Resolve a callee expression to a function but prefer to keep static.
+fn resolve_callee_v2(
+    ctx: &mut AnalysisContext,
+    callee: LinkedNode,
+) -> Option<TryResolveCalleeResult> {
+    let source = ctx.source_by_id(callee.span().id()?).ok()?;
+    let node = source.find(callee.span())?;
+    let cursor = node.offset();
+    let deref_target = get_deref_target(node, cursor)?;
+    let def = find_definition(ctx, source.clone(), deref_target)?;
+    if let LexicalKind::Var(LexicalVarKind::Function) = def.kind {
+        if let Some(Value::Func(f)) = def.value {
+            return Some(TryResolveCalleeResult::Runtime(f));
+        }
+    }
+
+    if let Some(def_at) = &def.def_at {
+        let def_source = if def_at.0 == source.id() {
+            source.clone()
+        } else {
+            ctx.source_by_id(def_at.0).ok()?
+        };
+
+        let _t = ctx.type_check(source)?;
+        let _ = FlowVar::name;
+        let _ = FlowVar::id;
+        let _ = TypeCheckInfo::simplify;
+
+        let root = LinkedNode::new(def_source.root());
+        let def_node = root.leaf_at(def_at.1.start + 1)?;
+        let def_node = get_def_target(def_node)?;
+        let _def_node = match def_node {
+            DefTarget::Let(node) => node,
+            DefTarget::Import(_) => return None,
+        };
+    }
+
+    Some(TryResolveCalleeResult::Syntax(def))
+}
+
+fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
     use typst::foundations::func::Repr;
-    let params = match func.inner() {
+    let (params, ret_ty) = match func.inner() {
         Repr::With(..) => unreachable!(),
-        Repr::Closure(c) => analyze_closure_signature(c.clone()),
+        Repr::Closure(c) => (analyze_closure_signature(c.clone()), None),
         Repr::Element(..) | Repr::Native(..) => {
+            let ret_ty = func
+                .returns()
+                .and_then(|r| FlowType::from_return_site(&func, r));
             let params = func.params().unwrap();
-            params.iter().map(ParamSpec::from_static).collect()
+            (
+                params
+                    .iter()
+                    .map(|p| ParamSpec::from_static(&func, p))
+                    .collect(),
+                ret_ty,
+            )
         }
     };
 
@@ -272,6 +376,7 @@ pub(crate) fn analyze_dyn_signature(func: Func) -> Arc<PrimarySignature> {
         pos,
         named,
         rest,
+        ret_ty,
         has_fill_or_size_or_stroke: has_fill || has_stroke || has_size,
         _broken: broken,
     })
@@ -294,6 +399,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Borrowed("_"),
                     input: CastInfo::Any,
+                    infer_type: None,
                     type_repr: None,
                     expr: None,
                     default: None,
@@ -315,6 +421,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(name.to_owned()),
                     input: CastInfo::Any,
+                    infer_type: None,
                     type_repr: None,
                     expr: None,
                     default: None,
@@ -331,6 +438,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(n.name().as_str().to_owned()),
                     input: CastInfo::Any,
+                    infer_type: None,
                     type_repr: Some(expr.clone()),
                     expr: Some(expr.clone()),
                     default: None,
@@ -346,6 +454,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: Cow::Owned(ident.unwrap_or_default().to_owned()),
                     input: CastInfo::Any,
+                    infer_type: None,
                     type_repr: None,
                     expr: None,
                     default: None,

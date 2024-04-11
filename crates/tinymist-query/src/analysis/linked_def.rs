@@ -127,7 +127,7 @@ pub fn find_definition(
     }
 
     let Some((def_fid, def)) = def_info else {
-        return resolve_global(ctx, use_site.clone()).and_then(move |f| {
+        return resolve_global_value(ctx, use_site.clone(), false).and_then(move |f| {
             value_to_def(
                 ctx,
                 f,
@@ -209,7 +209,7 @@ pub fn resolve_callee(ctx: &mut AnalysisContext, callee: LinkedNode) -> Option<F
         }
     })
     .or_else(|| {
-        resolve_global(ctx, callee).and_then(|v| match v {
+        resolve_global_value(ctx, callee, false).and_then(|v| match v {
             Value::Func(f) => Some(f),
             _ => None,
         })
@@ -217,12 +217,21 @@ pub fn resolve_callee(ctx: &mut AnalysisContext, callee: LinkedNode) -> Option<F
 }
 
 // todo: math scope
-fn resolve_global(ctx: &AnalysisContext, callee: LinkedNode) -> Option<Value> {
+pub(crate) fn resolve_global_value(
+    ctx: &AnalysisContext,
+    callee: LinkedNode,
+    is_math: bool,
+) -> Option<Value> {
     let lib = ctx.world().library();
+    let scope = if is_math {
+        lib.math.scope()
+    } else {
+        lib.global.scope()
+    };
     let v = match callee.cast::<ast::Expr>()? {
-        ast::Expr::Ident(ident) => lib.global.scope().get(&ident)?,
+        ast::Expr::Ident(ident) => scope.get(&ident)?,
         ast::Expr::FieldAccess(access) => match access.target() {
-            ast::Expr::Ident(target) => match lib.global.scope().get(&target)? {
+            ast::Expr::Ident(target) => match scope.get(&target)? {
                 Value::Module(module) => module.field(&access.field()).ok()?,
                 Value::Func(func) => func.field(&access.field()).ok()?,
                 _ => return None,

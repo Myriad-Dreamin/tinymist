@@ -11,6 +11,7 @@ use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use reflexo::hash::hash128;
 use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
+use typst::eval::Eval;
 use typst::foundations;
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
@@ -20,7 +21,7 @@ use typst::{
 use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
-use super::{DefUseInfo, ImportInfo, Signature, SignatureTarget};
+use super::{DefUseInfo, ImportInfo, Signature, SignatureTarget, TypeCheckInfo};
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -35,6 +36,7 @@ use crate::{
 #[derive(Default)]
 pub struct ModuleAnalysisCache {
     source: OnceCell<FileResult<Source>>,
+    top_level_eval: OnceCell<Option<Arc<TypeCheckInfo>>>,
     def_use: OnceCell<Option<Arc<DefUseInfo>>>,
 }
 
@@ -57,6 +59,19 @@ impl ModuleAnalysisCache {
         f: impl FnOnce() -> Option<Arc<DefUseInfo>>,
     ) -> Option<Arc<DefUseInfo>> {
         self.def_use.get_or_init(f).clone()
+    }
+
+    /// Try to get the top-level evaluation information of a file.
+    pub(crate) fn type_check(&self) -> Option<Arc<TypeCheckInfo>> {
+        self.top_level_eval.get().cloned().flatten()
+    }
+
+    /// Compute the top-level evaluation information of a file.
+    pub(crate) fn compute_type_check(
+        &self,
+        f: impl FnOnce() -> Option<Arc<TypeCheckInfo>>,
+    ) -> Option<Arc<TypeCheckInfo>> {
+        self.top_level_eval.get_or_init(f).clone()
     }
 }
 
@@ -195,9 +210,10 @@ impl<Inputs, Output> ComputingNode<Inputs, Output> {
 #[allow(clippy::type_complexity)]
 pub struct ModuleAnalysisGlobalCache {
     def_use_lexical_hierarchy: ComputingNode<Source, EcoVec<LexicalHierarchy>>,
-    import: Arc<ComputingNode<EcoVec<LexicalHierarchy>, Arc<ImportInfo>>>,
+    type_check: Arc<ComputingNode<Source, Arc<TypeCheckInfo>>>,
     def_use: Arc<ComputingNode<(EcoVec<LexicalHierarchy>, Arc<ImportInfo>), Arc<DefUseInfo>>>,
 
+    import: Arc<ComputingNode<EcoVec<LexicalHierarchy>, Arc<ImportInfo>>>,
     signature_source: Option<Source>,
     signatures: HashMap<usize, Signature>,
 }
@@ -206,6 +222,7 @@ impl Default for ModuleAnalysisGlobalCache {
     fn default() -> Self {
         Self {
             def_use_lexical_hierarchy: ComputingNode::new("def_use_lexical_hierarchy"),
+            type_check: Arc::new(ComputingNode::new("type_check")),
             import: Arc::new(ComputingNode::new("import")),
             def_use: Arc::new(ComputingNode::new("def_use")),
 
@@ -462,6 +479,34 @@ impl<'w> AnalysisContext<'w> {
         typst_to_lsp::range(position, src, self.analysis.position_encoding)
     }
 
+    /// Get the type check information of a source file.
+    pub(crate) fn type_check(&mut self, source: Source) -> Option<Arc<TypeCheckInfo>> {
+        let fid = source.id();
+
+        if let Some(res) = self.caches.modules.entry(fid).or_default().type_check() {
+            return Some(res);
+        }
+
+        let cache = self.at_module(fid);
+
+        let tl = cache.type_check.clone();
+        let res = tl
+            .compute(source, |_before, after| {
+                let next = crate::analysis::type_check(self, after);
+                next.or_else(|| tl.output.read().clone())
+            })
+            .ok()
+            .flatten();
+
+        self.caches
+            .modules
+            .entry(fid)
+            .or_default()
+            .compute_type_check(|| res.clone());
+
+        res
+    }
+
     /// Get the def-use information of a source file.
     pub fn def_use(&mut self, source: Source) -> Option<Arc<DefUseInfo>> {
         let fid = source.id();
@@ -512,6 +557,35 @@ impl<'w> AnalysisContext<'w> {
         self.analysis.caches.modules.entry(fid).or_default()
     }
 
+    pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
+        use comemo::Track;
+        use typst::engine::*;
+        use typst::eval::*;
+        use typst::foundations::*;
+        use typst::introspection::*;
+
+        let mut locator = Locator::default();
+        let introspector = Introspector::default();
+        let mut tracer = Tracer::new();
+        let engine = Engine {
+            world: self.world().track(),
+            route: Route::default(),
+            introspector: introspector.track(),
+            locator: &mut locator,
+            tracer: tracer.track_mut(),
+        };
+
+        let context = Context::none();
+        let mut vm = Vm::new(
+            engine,
+            context.track(),
+            Scopes::new(Some(self.world().library())),
+            Span::detached(),
+        );
+
+        f(&mut vm)
+    }
+
     pub(crate) fn mini_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
         Some(match rr {
             ast::Expr::None(_) => Value::None,
@@ -521,34 +595,7 @@ impl<'w> AnalysisContext<'w> {
             ast::Expr::Float(v) => Value::Float(v.get()),
             ast::Expr::Numeric(v) => Value::numeric(v.get()),
             ast::Expr::Str(v) => Value::Str(v.get().into()),
-            e => {
-                use comemo::Track;
-                use typst::engine::*;
-                use typst::eval::*;
-                use typst::foundations::*;
-                use typst::introspection::*;
-
-                let mut locator = Locator::default();
-                let introspector = Introspector::default();
-                let mut tracer = Tracer::new();
-                let engine = Engine {
-                    world: self.world().track(),
-                    route: Route::default(),
-                    introspector: introspector.track(),
-                    locator: &mut locator,
-                    tracer: tracer.track_mut(),
-                };
-
-                let context = Context::none();
-                let mut vm = Vm::new(
-                    engine,
-                    context.track(),
-                    Scopes::new(Some(self.world().library())),
-                    Span::detached(),
-                );
-
-                return e.eval(&mut vm).ok();
-            }
+            e => return self.with_vm(|vm| e.eval(vm).ok()),
         })
     }
 }

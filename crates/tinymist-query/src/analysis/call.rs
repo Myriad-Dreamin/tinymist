@@ -43,10 +43,10 @@ pub struct CallInfo {
 
 // todo: cache call
 /// Analyzes a function call.
-pub fn analyze_call<'a>(
+pub fn analyze_call(
     ctx: &mut AnalysisContext,
     source: Source,
-    node: LinkedNode<'a>,
+    node: LinkedNode,
 ) -> Option<Arc<CallInfo>> {
     trace!("func call found: {:?}", node);
     let f = node.cast::<ast::FuncCall>()?;

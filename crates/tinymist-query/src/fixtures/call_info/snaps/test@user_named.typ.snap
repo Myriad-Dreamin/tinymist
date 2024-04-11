@@ -3,5 +3,5 @@ source: crates/tinymist-query/src/analysis.rs
 expression: CallSnapshot(result.as_deref())
 input_file: crates/tinymist-query/src/fixtures/call_info/user_named.typ
 ---
-y: 1 -> CallParamInfo { kind: Named, is_content_block: false, param: ParamSpec { name: "y", docs: "Default value: none", input: Any, type_repr: Some("none"), expr: Some("none"), default: None, positional: false, named: true, variadic: false, settable: true } }
-1 -> CallParamInfo { kind: Positional, is_content_block: false, param: ParamSpec { name: "x", docs: "", input: Any, type_repr: None, expr: None, default: None, positional: true, named: false, variadic: false, settable: false } }
+y: 1 -> CallParamInfo { kind: Named, is_content_block: false, param: ParamSpec { name: "y", docs: "Default value: none", input: Any, infer_type: None, type_repr: Some("none"), expr: Some("none"), default: None, positional: false, named: true, variadic: false, settable: true } }
+1 -> CallParamInfo { kind: Positional, is_content_block: false, param: ParamSpec { name: "x", docs: "", input: Any, infer_type: None, type_repr: None, expr: None, default: None, positional: true, named: false, variadic: false, settable: false } }
