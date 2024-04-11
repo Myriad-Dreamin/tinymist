@@ -246,7 +246,7 @@ impl AnalysisGlobalCaches {
     pub fn signature(&self, source: Option<Source>, func: &SignatureTarget) -> Option<Signature> {
         match func {
             SignatureTarget::Syntax(node) => {
-                // todo: performance
+                // todo: check performance on peeking signature source frequently
                 let cache = self.modules.get(&node.span().id()?)?;
                 if cache
                     .signature_source
@@ -276,7 +276,7 @@ impl AnalysisGlobalCaches {
         match func {
             SignatureTarget::Syntax(node) => {
                 let cache = self.modules.entry(node.span().id().unwrap()).or_default();
-                // todo: performance
+                // todo: check performance on peeking signature source frequently
                 if cache
                     .signature_source
                     .as_ref()

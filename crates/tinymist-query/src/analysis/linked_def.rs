@@ -68,6 +68,10 @@ pub fn find_definition(
                 name_range: None,
             });
         }
+        // todo: label, reference
+        DerefTarget::Label(..) | DerefTarget::Ref(..) | DerefTarget::Normal(..) => {
+            return None;
+        }
     };
 
     // syntactic definition

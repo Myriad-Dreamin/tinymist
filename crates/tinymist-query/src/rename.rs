@@ -73,7 +73,7 @@ impl SemanticRequest for RenameRequest {
             });
         }
 
-        // todo: conflict analysis
+        // todo: name conflict analysis
         Some(WorkspaceEdit {
             changes: Some(editions),
             ..Default::default()

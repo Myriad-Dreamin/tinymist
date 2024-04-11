@@ -110,6 +110,8 @@ impl StatefulRequest for CompletionRequest {
                     );
                 }
             }
+            // todo: label, reference
+            Some(DerefTarget::Label(..) | DerefTarget::Ref(..) | DerefTarget::Normal(..)) => {}
             None => {}
         }
 

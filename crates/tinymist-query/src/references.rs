@@ -51,6 +51,10 @@ pub(crate) fn find_references(
         DerefTarget::ImportPath(..) | DerefTarget::IncludePath(..) => {
             return None;
         }
+        // todo: label, reference
+        DerefTarget::Label(..) | DerefTarget::Ref(..) | DerefTarget::Normal(..) => {
+            return None;
+        }
     };
 
     let mut may_ident = node.cast::<ast::Expr>()?;

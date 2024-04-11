@@ -14,25 +14,6 @@ pub fn deref_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
     Some(node)
 }
 
-#[derive(Debug, Clone)]
-pub enum DerefTarget<'a> {
-    VarAccess(LinkedNode<'a>),
-    Callee(LinkedNode<'a>),
-    ImportPath(LinkedNode<'a>),
-    IncludePath(LinkedNode<'a>),
-}
-
-impl<'a> DerefTarget<'a> {
-    pub fn node(&self) -> &LinkedNode {
-        match self {
-            DerefTarget::VarAccess(node) => node,
-            DerefTarget::Callee(node) => node,
-            DerefTarget::ImportPath(node) => node,
-            DerefTarget::IncludePath(node) => node,
-        }
-    }
-}
-
 fn is_mark(sk: SyntaxKind) -> bool {
     use SyntaxKind::*;
     matches!(
@@ -72,66 +53,93 @@ fn is_mark(sk: SyntaxKind) -> bool {
     )
 }
 
+#[derive(Debug, Clone)]
+pub enum DerefTarget<'a> {
+    Label(LinkedNode<'a>),
+    Ref(LinkedNode<'a>),
+    VarAccess(LinkedNode<'a>),
+    Callee(LinkedNode<'a>),
+    ImportPath(LinkedNode<'a>),
+    IncludePath(LinkedNode<'a>),
+    Normal(SyntaxKind, LinkedNode<'a>),
+}
+
+impl<'a> DerefTarget<'a> {
+    pub fn node(&self) -> &LinkedNode {
+        match self {
+            DerefTarget::Label(node) => node,
+            DerefTarget::Ref(node) => node,
+            DerefTarget::VarAccess(node) => node,
+            DerefTarget::Callee(node) => node,
+            DerefTarget::ImportPath(node) => node,
+            DerefTarget::IncludePath(node) => node,
+            DerefTarget::Normal(_, node) => node,
+        }
+    }
+}
+
 pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget> {
-    fn same_line_skip(node: &LinkedNode, cursor: usize) -> bool {
-        // (ancestor.kind().is_trivia() && ancestor.text())
+    /// Skips trivia nodes that are on the same line as the cursor.
+    fn skippable_trivia(node: &LinkedNode, cursor: usize) -> bool {
+        // A non-trivia node is our target so we stop at it.
         if !node.kind().is_trivia() {
             return false;
         }
+
+        // Get the trivia text before the cursor.
         let pref = node.text();
-        // slice
-        let pref = if cursor < pref.len() {
-            &pref[..cursor]
+        let pref = if node.range().contains(&cursor) {
+            &pref[..cursor - node.offset()]
         } else {
             pref
         };
-        // no newlines
+
+        // The deref target should be on the same line as the cursor.
         // todo: if we are in markup mode, we should check if we are at start of node
         !pref.contains('\n')
     }
 
-    let mut ancestor = node;
-    if same_line_skip(&ancestor, cursor) || is_mark(ancestor.kind()) {
-        ancestor = ancestor.prev_sibling()?;
+    // Move to the first non-trivia node before the cursor.
+    let mut node = node;
+    if skippable_trivia(&node, cursor) || is_mark(node.kind()) {
+        node = node.prev_sibling()?;
     }
 
+    // Move to the first ancestor that is an expression.
+    let mut ancestor = node;
     while !ancestor.is::<ast::Expr>() {
         ancestor = ancestor.parent()?.clone();
     }
     debug!("deref expr: {ancestor:?}");
-    let ancestor = deref_lvalue(ancestor)?;
-    debug!("deref lvalue: {ancestor:?}");
 
-    let may_ident = ancestor.cast::<ast::Expr>()?;
-    if !may_ident.hash() && !matches!(may_ident, ast::Expr::MathIdent(_)) {
-        return None;
-    }
+    // Unwrap all parentheses to get the actual expression.
+    let cano_expr = deref_lvalue(ancestor)?;
+    debug!("deref lvalue: {cano_expr:?}");
 
-    Some(match may_ident {
-        // todo: label, reference
-        ast::Expr::FuncCall(call) => DerefTarget::Callee(ancestor.find(call.callee().span())?),
-        ast::Expr::Set(set) => DerefTarget::Callee(ancestor.find(set.target().span())?),
+    // Identify convenient expression kinds.
+    let expr = cano_expr.cast::<ast::Expr>()?;
+    Some(match expr {
+        ast::Expr::Label(..) => DerefTarget::Label(cano_expr),
+        ast::Expr::Ref(..) => DerefTarget::Ref(cano_expr),
+        ast::Expr::FuncCall(call) => DerefTarget::Callee(cano_expr.find(call.callee().span())?),
+        ast::Expr::Set(set) => DerefTarget::Callee(cano_expr.find(set.target().span())?),
         ast::Expr::Ident(..) | ast::Expr::MathIdent(..) | ast::Expr::FieldAccess(..) => {
-            DerefTarget::VarAccess(ancestor.find(may_ident.span())?)
+            DerefTarget::VarAccess(cano_expr)
         }
         ast::Expr::Str(..) => {
-            let parent = ancestor.parent()?;
+            let parent = cano_expr.parent()?;
             if parent.kind() == SyntaxKind::ModuleImport {
-                return Some(DerefTarget::ImportPath(ancestor.find(may_ident.span())?));
+                DerefTarget::ImportPath(cano_expr)
+            } else if parent.kind() == SyntaxKind::ModuleInclude {
+                DerefTarget::IncludePath(cano_expr)
+            } else {
+                DerefTarget::Normal(cano_expr.kind(), cano_expr)
             }
-            if parent.kind() == SyntaxKind::ModuleInclude {
-                return Some(DerefTarget::IncludePath(ancestor.find(may_ident.span())?));
-            }
-
-            return None;
         }
-        ast::Expr::Import(..) => {
-            return None;
+        _ if expr.hash() || matches!(expr, ast::Expr::MathIdent(_)) => {
+            DerefTarget::Normal(cano_expr.kind(), cano_expr)
         }
-        _ => {
-            debug!("unsupported kind {kind:?}", kind = ancestor.kind());
-            return None;
-        }
+        _ => return None,
     })
 }
 
