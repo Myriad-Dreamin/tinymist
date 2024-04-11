@@ -35,7 +35,7 @@ mod type_check_tests {
 
     #[test]
     fn test() {
-        snapshot_testing("type_checker", &|ctx, path| {
+        snapshot_testing("type_check", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
             let result = type_check(ctx, source.clone());

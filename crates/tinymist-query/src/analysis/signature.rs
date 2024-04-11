@@ -268,6 +268,7 @@ pub(crate) fn analyze_signature_v2(
 //     None
 // }
 
+#[allow(dead_code)]
 enum TryResolveCalleeResult {
     Syntax(DefinitionLink),
     Runtime(Func),
