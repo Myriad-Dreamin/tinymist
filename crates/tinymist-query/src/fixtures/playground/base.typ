@@ -1,6 +1,2 @@
-#image("test.jpg");
-#read("test.jpg");
-#json("test.json");
-#yaml("test.yaml");
-#xml("test.xml");
-#toml("test.toml");
+#let x = 1;
+#(/* position after */ x);
