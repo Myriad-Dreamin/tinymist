@@ -6,18 +6,12 @@ use std::{
     sync::Arc,
 };
 
+use ecow::EcoVec;
 use log::info;
-use reflexo::path::unix_slash;
-pub use reflexo::vector::ir::DefId;
-use serde::Serialize;
-use typst::syntax::FileId as TypstFileId;
-use typst::syntax::Source;
 
-use super::SearchCtx;
-use crate::syntax::{
-    find_source_by_import_path, IdentRef, LexicalHierarchy, LexicalKind, LexicalVarKind, ModSrc,
-};
-use crate::{adt::snapshot_map::SnapshotMap, syntax::LexicalModKind};
+use super::{prelude::*, ImportInfo};
+use crate::adt::snapshot_map::SnapshotMap;
+use crate::syntax::find_source_by_import_path;
 
 /// The type namespace of def-use relations
 ///
@@ -29,28 +23,18 @@ enum Ns {
     Value,
 }
 
-/// A flat and transient reference to some symbol in a source file.
-///
-/// See [`IdentRef`] for definition of a "transient" reference.
-#[derive(Serialize, Clone)]
-pub struct IdentDef {
-    /// The name of the symbol.
-    pub name: String,
-    /// The kind of the symbol.
-    pub kind: LexicalKind,
-    /// The byte range of the symbol in the source file.
-    pub range: Range<usize>,
-}
-
 type ExternalRefMap = HashMap<(TypstFileId, Option<String>), Vec<(Option<DefId>, IdentRef)>>;
 
 /// The def-use information of a source file.
 #[derive(Default)]
 pub struct DefUseInfo {
-    ident_defs: indexmap::IndexMap<(TypstFileId, IdentRef), IdentDef>,
+    /// The definitions of symbols.
+    pub ident_defs: indexmap::IndexMap<(TypstFileId, IdentRef), IdentDef>,
     external_refs: ExternalRefMap,
-    ident_refs: HashMap<IdentRef, DefId>,
-    undefined_refs: Vec<IdentRef>,
+    /// The references to defined symbols.
+    pub ident_refs: HashMap<IdentRef, DefId>,
+    /// The references to undefined symbols.
+    pub undefined_refs: Vec<IdentRef>,
     exports_refs: Vec<DefId>,
     exports_defs: HashMap<String, DefId>,
 }
@@ -115,20 +99,13 @@ impl DefUseInfo {
     }
 }
 
-pub(super) fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<Arc<DefUseInfo>> {
+pub(super) fn get_def_use_inner(
+    ctx: &mut AnalysisContext,
+    source: Source,
+    e: EcoVec<LexicalHierarchy>,
+    _m: Arc<ImportInfo>,
+) -> Option<Arc<DefUseInfo>> {
     let current_id = source.id();
-    ctx.ctx.get_mut(current_id);
-    let c = ctx.ctx.get(current_id).unwrap();
-
-    if let Some(info) = c.def_use() {
-        return Some(info);
-    }
-
-    if !ctx.searched.insert(current_id) {
-        return None;
-    }
-
-    let e = ctx.ctx.def_use_lexical_hierarchy(source)?;
 
     let mut collector = DefUseCollector {
         ctx,
@@ -142,16 +119,12 @@ pub(super) fn get_def_use_inner(ctx: &mut SearchCtx, source: Source) -> Option<A
 
     collector.scan(&e);
     collector.calc_exports();
-    let res = Some(Arc::new(collector.info));
 
-    let c = ctx.ctx.get(current_id).unwrap();
-    // todo: cyclic import cause no any information
-    c.compute_def_use(|| res.clone());
-    res
+    Some(Arc::new(collector.info))
 }
 
-struct DefUseCollector<'a, 'b, 'w> {
-    ctx: &'a mut SearchCtx<'b, 'w>,
+struct DefUseCollector<'a, 'w> {
+    ctx: &'a mut AnalysisContext<'w>,
     info: DefUseInfo,
     label_scope: SnapshotMap<String, DefId>,
     id_scope: SnapshotMap<String, DefId>,
@@ -160,7 +133,7 @@ struct DefUseCollector<'a, 'b, 'w> {
     ext_src: Option<Source>,
 }
 
-impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
+impl<'a, 'w> DefUseCollector<'a, 'w> {
     fn enter<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let id_snap = self.id_scope.snapshot();
         let res = f(self);
@@ -181,8 +154,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
         let source = self.ext_src.as_ref()?;
 
         log::debug!("import for def use: {:?}, name: {name}", source.id());
-        let (_, external_info) =
-            Some(source.id()).zip(get_def_use_inner(self.ctx, source.clone()))?;
+        let (_, external_info) = Some(source.id()).zip(self.ctx.def_use(source.clone()))?;
 
         let ext_id = external_info.exports_defs.get(name)?;
         self.import_from(&external_info, *ext_id);
@@ -269,7 +241,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                         ModSrc::Expr(_) => {}
                         ModSrc::Path(p) => {
                             let src = find_source_by_import_path(
-                                self.ctx.ctx.world(),
+                                self.ctx.world(),
                                 self.current_id,
                                 p.deref(),
                             );
@@ -288,7 +260,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                     if let Some(source) = &self.ext_src {
                         info!("diving source for def use: {:?}", source.id());
                         let (_, external_info) =
-                            Some(source.id()).zip(get_def_use_inner(self.ctx, source.clone()))?;
+                            Some(source.id()).zip(self.ctx.def_use(source.clone()))?;
 
                         for ext_id in &external_info.exports_refs {
                             self.import_from(&external_info, *ext_id);
@@ -374,68 +346,5 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                 range: e.info.range.clone(),
             },
         );
-    }
-}
-
-/// A snapshot of the def-use information for testing.
-pub struct DefUseSnapshot<'a>(pub &'a DefUseInfo);
-
-impl<'a> Serialize for DefUseSnapshot<'a> {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::SerializeMap;
-        // HashMap<IdentRef, DefId>
-        let mut references: HashMap<DefId, Vec<IdentRef>> = {
-            let mut map = HashMap::new();
-            for (k, v) in &self.0.ident_refs {
-                map.entry(*v).or_insert_with(Vec::new).push(k.clone());
-            }
-            map
-        };
-        // sort
-        for (_, v) in references.iter_mut() {
-            v.sort();
-        }
-
-        #[derive(Serialize)]
-        struct DefUseEntry<'a> {
-            def: &'a IdentDef,
-            refs: &'a Vec<IdentRef>,
-        }
-
-        let mut state = serializer.serialize_map(None)?;
-        for (k, (ident_ref, ident_def)) in self.0.ident_defs.as_slice().iter().enumerate() {
-            let id = DefId(k as u64);
-
-            let empty_ref = Vec::new();
-            let entry = DefUseEntry {
-                def: ident_def,
-                refs: references.get(&id).unwrap_or(&empty_ref),
-            };
-
-            state.serialize_entry(
-                &format!(
-                    "{}@{}",
-                    ident_ref.1,
-                    unix_slash(ident_ref.0.vpath().as_rootless_path())
-                ),
-                &entry,
-            )?;
-        }
-
-        if !self.0.undefined_refs.is_empty() {
-            let mut undefined_refs = self.0.undefined_refs.clone();
-            undefined_refs.sort();
-            let entry = DefUseEntry {
-                def: &IdentDef {
-                    name: "<nil>".to_string(),
-                    kind: LexicalKind::Block,
-                    range: 0..0,
-                },
-                refs: &undefined_refs,
-            };
-            state.serialize_entry("<nil>", &entry)?;
-        }
-
-        state.end()
     }
 }

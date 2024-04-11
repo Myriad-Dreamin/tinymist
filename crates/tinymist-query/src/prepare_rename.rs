@@ -1,5 +1,8 @@
 use crate::{
-    find_definition, prelude::*, syntax::get_deref_target, DefinitionLink, SemanticRequest,
+    analysis::{find_definition, DefinitionLink},
+    prelude::*,
+    syntax::get_deref_target,
+    SemanticRequest,
 };
 use log::debug;
 
@@ -82,14 +85,37 @@ pub(crate) fn validate_renaming_definition(lnk: &DefinitionLink) -> Option<()> {
         }
     }
 
-    if lnk.fid.package().is_some() {
+    let (fid, _def_range) = lnk.def_at.clone()?;
+
+    if fid.package().is_some() {
         debug!(
             "prepare_rename: {name} is in a package {pkg:?}",
             name = lnk.name,
-            pkg = lnk.fid.package()
+            pkg = fid.package()
         );
         return None;
     }
 
     Some(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("prepare_rename", &|world, path| {
+            let source = world.source_by_path(&path).unwrap();
+
+            let request = PrepareRenameRequest {
+                path: path.clone(),
+                position: find_test_position(&source),
+            };
+
+            let result = request.request(world);
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
 }

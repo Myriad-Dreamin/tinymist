@@ -68,7 +68,7 @@ impl SemanticRequest for InlayHintRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let range = ctx.to_typst_range(self.range, &source)?;
 
-        let hints = inlay_hint(ctx.world(), &source, range, ctx.position_encoding()).ok()?;
+        let hints = inlay_hint(ctx, &source, range, ctx.position_encoding()).ok()?;
         debug!(
             "got inlay hints on {source:?} => {hints:?}",
             source = source.id(),
@@ -84,22 +84,22 @@ impl SemanticRequest for InlayHintRequest {
 }
 
 fn inlay_hint(
-    world: &dyn World,
+    ctx: &mut AnalysisContext,
     source: &Source,
     range: Range<usize>,
     encoding: PositionEncoding,
 ) -> FileResult<Vec<InlayHint>> {
     const SMART: InlayHintConfig = InlayHintConfig::smart();
 
-    struct InlayHintWorker<'a> {
-        world: &'a dyn World,
+    struct InlayHintWorker<'a, 'w> {
+        ctx: &'a mut AnalysisContext<'w>,
         source: &'a Source,
         range: Range<usize>,
         encoding: PositionEncoding,
         hints: Vec<InlayHint>,
     }
 
-    impl InlayHintWorker<'_> {
+    impl InlayHintWorker<'_, '_> {
         fn analyze(&mut self, node: LinkedNode) {
             let rng = node.range();
             if rng.start >= self.range.end || rng.end <= self.range.start {
@@ -148,15 +148,7 @@ fn inlay_hint(
                     let args = f.args();
                     let args_node = node.find(args.span())?;
 
-                    // todo: reduce many such patterns
-                    let values = analyze_expr(self.world, &callee_node);
-                    let func = values.into_iter().find_map(|v| match v.0 {
-                        Value::Func(f) => Some(f),
-                        _ => None,
-                    })?;
-                    log::debug!("got function {func:?}");
-
-                    let call_info = analyze_call(func, args)?;
+                    let call_info = analyze_call(self.ctx, callee_node, args)?;
                     log::debug!("got call_info {call_info:?}");
 
                     let check_single_pos_arg = || {
@@ -298,7 +290,7 @@ fn inlay_hint(
     }
 
     let mut worker = InlayHintWorker {
-        world,
+        ctx,
         source,
         range,
         encoding,

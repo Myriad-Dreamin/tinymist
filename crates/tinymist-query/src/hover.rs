@@ -1,12 +1,12 @@
 use core::fmt;
 
 use crate::{
-    analysis::analyze_signature,
-    find_definition, jump_from_cursor,
+    analysis::{analyze_signature, find_definition, DefinitionLink, Signature},
+    jump_from_cursor,
     prelude::*,
     syntax::{find_document_before, get_deref_target, LexicalKind, LexicalVarKind},
     upstream::{expr_tooltip, tooltip, Tooltip},
-    DefinitionLink, LspHoverContents, StatefulRequest,
+    LspHoverContents, StatefulRequest,
 };
 
 /// The [`textDocument/hover`] request asks the server for hover information at
@@ -136,12 +136,17 @@ fn def_tooltip(
         | LexicalKind::Block
         | LexicalKind::Heading(..) => None,
         LexicalKind::Var(LexicalVarKind::Function) => {
+            let sig = if let Some(Value::Func(func)) = &lnk.value {
+                Some(analyze_signature(ctx, func.clone()))
+            } else {
+                None
+            };
             results.push(MarkedString::LanguageString(LanguageString {
                 language: "typc".to_owned(),
                 value: format!(
                     "let {name}({params});",
                     name = lnk.name,
-                    params = ParamTooltip(&lnk)
+                    params = ParamTooltip(sig)
                 ),
             }));
 
@@ -182,16 +187,13 @@ fn def_tooltip(
     }
 }
 
-struct ParamTooltip<'a>(&'a DefinitionLink);
+struct ParamTooltip(Option<Arc<Signature>>);
 
-impl<'a> fmt::Display for ParamTooltip<'a> {
+impl fmt::Display for ParamTooltip {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Some(Value::Func(func)) = &self.0.value else {
+        let Some(sig) = &self.0 else {
             return Ok(());
         };
-
-        let sig = analyze_signature(func.clone());
-
         let mut is_first = true;
         let mut write_sep = |f: &mut fmt::Formatter<'_>| {
             if is_first {
@@ -250,8 +252,10 @@ impl DocTooltip {
             }
         };
 
-        let src = ctx.source_by_id(lnk.fid).ok()?;
-        find_document_before(&src, lnk.def_range.start)
+        let (fid, def_range) = lnk.def_at.clone()?;
+
+        let src = ctx.source_by_id(fid).ok()?;
+        find_document_before(&src, def_range.start)
     }
 }
 
@@ -277,5 +281,26 @@ impl DocTooltip {
         };
 
         Some(docs)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("hover", &|world, path| {
+            let source = world.source_by_path(&path).unwrap();
+
+            let request = HoverRequest {
+                path: path.clone(),
+                position: find_test_position(&source),
+            };
+
+            let result = request.request(world, None);
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
     }
 }

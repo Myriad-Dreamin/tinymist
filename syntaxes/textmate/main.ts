@@ -1671,3 +1671,10 @@ function generate() {
 
 // console.log(typst!.repository!.forStatement);
 generate();
+
+// todo: this is fixed in v0.11.0
+// #code(```typ
+//   #let a = 1; #let b = 2;
+//   #(a, b) = (4, 5)
+//   #a, #b
+//   ```)

@@ -2,7 +2,7 @@ use log::debug;
 use lsp_types::TextEdit;
 
 use crate::{
-    find_definition, find_references, prelude::*, syntax::get_deref_target,
+    analysis::find_definition, find_references, prelude::*, syntax::get_deref_target,
     validate_renaming_definition, SemanticRequest,
 };
 
@@ -44,10 +44,12 @@ impl SemanticRequest for RenameRequest {
 
         let mut editions = HashMap::new();
 
-        let def_loc = {
-            let def_source = ctx.source_by_id(lnk.fid).ok()?;
+        let (fid, _def_range) = lnk.def_at?;
 
-            let span_path = ctx.path_for_id(lnk.fid).ok()?;
+        let def_loc = {
+            let def_source = ctx.source_by_id(fid).ok()?;
+
+            let span_path = ctx.path_for_id(fid).ok()?;
             let uri = path_to_url(&span_path).ok()?;
 
             let Some(range) = lnk.name_range else {
