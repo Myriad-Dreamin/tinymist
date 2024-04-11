@@ -283,7 +283,6 @@ pub(crate) enum FlowType {
     Undef,
     Content,
     Any,
-    Ref,
     Array,
     Dict,
     None,
@@ -312,7 +311,6 @@ impl fmt::Debug for FlowType {
             FlowType::Undef => f.write_str("Undef"),
             FlowType::Content => f.write_str("Content"),
             FlowType::Any => f.write_str("Any"),
-            FlowType::Ref => f.write_str("Ref"),
             FlowType::Array => f.write_str("Array"),
             FlowType::Dict => f.write_str("Dict"),
             FlowType::None => f.write_str("None"),
@@ -477,7 +475,7 @@ pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Ar
     Some(Arc::new(info))
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum InterpretMode {
     Markup,
     Code,
@@ -508,6 +506,11 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     fn check_inner(&mut self, root: LinkedNode) -> Option<FlowType> {
         Some(match root.kind() {
             SyntaxKind::Markup => return self.check_in_mode(root, InterpretMode::Markup),
+            SyntaxKind::Math => return self.check_in_mode(root, InterpretMode::Math),
+            SyntaxKind::Code => return self.check_in_mode(root, InterpretMode::Code),
+            SyntaxKind::CodeBlock => return self.check_in_mode(root, InterpretMode::Code),
+            SyntaxKind::ContentBlock => return self.check_in_mode(root, InterpretMode::Markup),
+
             SyntaxKind::Text => FlowType::Content,
             SyntaxKind::Space => FlowType::Content,
             SyntaxKind::Linebreak => FlowType::Content,
@@ -515,8 +518,6 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::Escape => FlowType::Content,
             SyntaxKind::Shorthand => FlowType::Content,
             SyntaxKind::SmartQuote => FlowType::Content,
-            SyntaxKind::Strong => return self.check_children(root),
-            SyntaxKind::Emph => return self.check_children(root),
             SyntaxKind::Raw => FlowType::Content,
             SyntaxKind::RawLang => FlowType::Content,
             SyntaxKind::RawDelim => FlowType::Content,
@@ -525,23 +526,79 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::Label => FlowType::Content,
             SyntaxKind::Ref => FlowType::Content,
             SyntaxKind::RefMarker => FlowType::Content,
-            SyntaxKind::Heading => return self.check_children(root),
             SyntaxKind::HeadingMarker => FlowType::Content,
-            SyntaxKind::ListItem => return self.check_children(root),
-            SyntaxKind::ListMarker => FlowType::Content,
-            SyntaxKind::EnumItem => return self.check_children(root),
             SyntaxKind::EnumMarker => FlowType::Content,
-            SyntaxKind::TermItem => return self.check_children(root),
+            SyntaxKind::ListMarker => FlowType::Content,
             SyntaxKind::TermMarker => FlowType::Content,
-            SyntaxKind::Equation => return self.check_children(root),
-            SyntaxKind::Math => return self.check_in_mode(root, InterpretMode::Math),
-            SyntaxKind::MathIdent => return self.check_math_ident(root),
             SyntaxKind::MathAlignPoint => FlowType::Content,
+            SyntaxKind::MathPrimes => FlowType::Content,
+
+            SyntaxKind::Strong => return self.check_children(root),
+            SyntaxKind::Emph => return self.check_children(root),
+            SyntaxKind::Heading => return self.check_children(root),
+            SyntaxKind::ListItem => return self.check_children(root),
+            SyntaxKind::EnumItem => return self.check_children(root),
+            SyntaxKind::TermItem => return self.check_children(root),
+            SyntaxKind::Equation => return self.check_children(root),
             SyntaxKind::MathDelimited => return self.check_children(root),
             SyntaxKind::MathAttach => return self.check_children(root),
-            SyntaxKind::MathPrimes => FlowType::Content,
             SyntaxKind::MathFrac => return self.check_children(root),
             SyntaxKind::MathRoot => return self.check_children(root),
+
+            SyntaxKind::LoopBreak => FlowType::None,
+            SyntaxKind::LoopContinue => FlowType::None,
+            SyntaxKind::FuncReturn => FlowType::None,
+            SyntaxKind::LineComment => FlowType::None,
+            SyntaxKind::BlockComment => FlowType::None,
+            SyntaxKind::Error => FlowType::None,
+            SyntaxKind::Eof => FlowType::None,
+
+            SyntaxKind::None => FlowType::None,
+            SyntaxKind::Auto => FlowType::Auto,
+            SyntaxKind::Break => FlowType::FlowNone,
+            SyntaxKind::Continue => FlowType::FlowNone,
+            SyntaxKind::Return => FlowType::FlowNone,
+            SyntaxKind::Ident => return self.check_ident(root, InterpretMode::Code),
+            SyntaxKind::MathIdent => return self.check_ident(root, InterpretMode::Math),
+            SyntaxKind::Bool
+            | SyntaxKind::Int
+            | SyntaxKind::Float
+            | SyntaxKind::Numeric
+            | SyntaxKind::Str => {
+                return self
+                    .ctx
+                    .mini_eval(root.cast()?)
+                    .map(Box::new)
+                    .map(FlowType::Value)
+            }
+            SyntaxKind::Parenthesized => return self.check_children(root),
+            SyntaxKind::Array => return self.check_array(root),
+            SyntaxKind::Dict => return self.check_dict(root),
+            SyntaxKind::Unary => return self.check_unary(root),
+            SyntaxKind::Binary => return self.check_binary(root),
+            SyntaxKind::FieldAccess => return self.check_field_access(root),
+            SyntaxKind::FuncCall => return self.check_func_call(root),
+            SyntaxKind::Args => return self.check_args(root),
+            SyntaxKind::Closure => return self.check_closure(root),
+            SyntaxKind::LetBinding => return self.check_let(root),
+            SyntaxKind::SetRule => return self.check_set(root),
+            SyntaxKind::ShowRule => return self.check_show(root),
+            SyntaxKind::Contextual => return self.check_contextual(root),
+            SyntaxKind::Conditional => return self.check_conditional(root),
+            SyntaxKind::WhileLoop => return self.check_while_loop(root),
+            SyntaxKind::ForLoop => return self.check_for_loop(root),
+            SyntaxKind::ModuleImport => return self.check_module_import(root),
+            SyntaxKind::ModuleInclude => return self.check_module_include(root),
+            SyntaxKind::Destructuring => return self.check_destructuring(root),
+            SyntaxKind::DestructAssignment => return self.check_destruct_assign(root),
+
+            // Rest all are clauses
+            SyntaxKind::Named => FlowType::Clause,
+            SyntaxKind::Keyed => FlowType::Clause,
+            SyntaxKind::Spread => FlowType::Clause,
+            SyntaxKind::Params => FlowType::Clause,
+            SyntaxKind::ImportItems => FlowType::Clause,
+            SyntaxKind::RenamedImportItem => FlowType::Clause,
             SyntaxKind::Hash => FlowType::Clause,
             SyntaxKind::LeftBrace => FlowType::Clause,
             SyntaxKind::RightBrace => FlowType::Clause,
@@ -578,8 +635,6 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::Not => FlowType::Clause,
             SyntaxKind::And => FlowType::Clause,
             SyntaxKind::Or => FlowType::Clause,
-            SyntaxKind::None => FlowType::None,
-            SyntaxKind::Auto => FlowType::Auto,
             SyntaxKind::Let => FlowType::Clause,
             SyntaxKind::Set => FlowType::Clause,
             SyntaxKind::Show => FlowType::Clause,
@@ -589,60 +644,9 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::For => FlowType::Clause,
             SyntaxKind::In => FlowType::Clause,
             SyntaxKind::While => FlowType::Clause,
-            SyntaxKind::Break => FlowType::FlowNone,
-            SyntaxKind::Continue => FlowType::FlowNone,
-            SyntaxKind::Return => FlowType::FlowNone,
             SyntaxKind::Import => FlowType::Clause,
             SyntaxKind::Include => FlowType::Clause,
             SyntaxKind::As => FlowType::Clause,
-            SyntaxKind::Code => return self.check_in_mode(root, InterpretMode::Code),
-            SyntaxKind::Ident => return self.check_ident(root),
-            SyntaxKind::Bool
-            | SyntaxKind::Int
-            | SyntaxKind::Float
-            | SyntaxKind::Numeric
-            | SyntaxKind::Str => {
-                return self
-                    .ctx
-                    .mini_eval(root.cast()?)
-                    .map(Box::new)
-                    .map(FlowType::Value)
-            }
-            SyntaxKind::CodeBlock => return self.check_in_mode(root, InterpretMode::Code),
-            SyntaxKind::ContentBlock => return self.check_in_mode(root, InterpretMode::Markup),
-            SyntaxKind::Parenthesized => return self.check_children(root),
-            SyntaxKind::Array => return self.check_array(root),
-            SyntaxKind::Dict => return self.check_dict(root),
-            SyntaxKind::Named => FlowType::Clause,
-            SyntaxKind::Keyed => FlowType::Clause,
-            SyntaxKind::Unary => return self.check_unary(root),
-            SyntaxKind::Binary => return self.check_binary(root),
-            SyntaxKind::FieldAccess => return self.check_field_access(root),
-            SyntaxKind::FuncCall => return self.check_func_call(root),
-            SyntaxKind::Args => return self.check_args(root),
-            SyntaxKind::Spread => FlowType::Clause,
-            SyntaxKind::Closure => return self.check_closure(root),
-            SyntaxKind::Params => FlowType::Clause,
-            SyntaxKind::LetBinding => return self.check_let(root),
-            SyntaxKind::SetRule => return self.check_set(root),
-            SyntaxKind::ShowRule => return self.check_show(root),
-            SyntaxKind::Contextual => return self.check_contextual(root),
-            SyntaxKind::Conditional => return self.check_conditional(root),
-            SyntaxKind::WhileLoop => return self.check_while_loop(root),
-            SyntaxKind::ForLoop => return self.check_for_loop(root),
-            SyntaxKind::ModuleImport => return self.check_module_import(root),
-            SyntaxKind::ImportItems => FlowType::Clause,
-            SyntaxKind::RenamedImportItem => FlowType::Clause,
-            SyntaxKind::ModuleInclude => return self.check_module_include(root),
-            SyntaxKind::LoopBreak => FlowType::None,
-            SyntaxKind::LoopContinue => FlowType::None,
-            SyntaxKind::FuncReturn => FlowType::None,
-            SyntaxKind::Destructuring => return self.check_destructuring(root),
-            SyntaxKind::DestructAssignment => return self.check_destruct_assign(root),
-            SyntaxKind::LineComment => FlowType::None,
-            SyntaxKind::BlockComment => FlowType::None,
-            SyntaxKind::Error => FlowType::None,
-            SyntaxKind::Eof => FlowType::None,
         })
     }
 
@@ -661,7 +665,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         Some(FlowType::Content)
     }
 
-    fn check_ident(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_ident(&mut self, root: LinkedNode<'_>, mode: InterpretMode) -> Option<FlowType> {
         let ident: ast::Ident = root.cast()?;
         let ident_ref = IdentRef {
             name: ident.get().to_string(),
@@ -669,27 +673,12 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         };
 
         let Some(def_id) = self.def_use_info.get_ref(&ident_ref) else {
-            let v = resolve_global_value(self.ctx, root, false)?;
+            let v = resolve_global_value(self.ctx, root, mode != InterpretMode::Math)?;
             return Some(FlowType::Value(Box::new(v)));
         };
         let var = self.info.vars.get(&def_id)?.clone();
 
         Some(var.get_ref())
-    }
-
-    fn check_math_ident(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
-        let ident: ast::MathIdent = root.cast()?;
-        let ident_ref = IdentRef {
-            name: ident.get().to_string(),
-            range: root.range(),
-        };
-
-        let Some(def_id) = self.def_use_info.get_ref(&ident_ref) else {
-            let v = resolve_global_value(self.ctx, root, true)?;
-            return Some(FlowType::Value(Box::new(v)));
-        };
-        let (_fid, _def) = self.def_use_info.get_def_by_id(def_id)?;
-        Some(FlowType::Ref)
     }
 
     fn check_array(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
@@ -1098,7 +1087,6 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::Undef => {}
             FlowType::Content => {}
             FlowType::Any => {}
-            FlowType::Ref => {}
             FlowType::None => {}
             FlowType::Infer => {}
             FlowType::FlowNone => {}
@@ -1180,7 +1168,6 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::Undef => e,
             FlowType::Content => e,
             FlowType::Any => e,
-            FlowType::Ref => e,
             FlowType::None => e,
             FlowType::Infer => e,
             FlowType::FlowNone => e,
@@ -1409,7 +1396,6 @@ impl<'a, 'b> TypeCanoWorker<'a, 'b> {
             FlowType::Undef => {}
             FlowType::Content => {}
             FlowType::Any => {}
-            FlowType::Ref => {}
             FlowType::None => {}
             FlowType::Infer => {}
             FlowType::FlowNone => {}
@@ -1529,7 +1515,6 @@ impl<'a, 'b> TypeCanoWorker<'a, 'b> {
             FlowType::Undef => FlowType::Undef,
             FlowType::Content => FlowType::Content,
             FlowType::Any => FlowType::Any,
-            FlowType::Ref => FlowType::Ref,
             FlowType::None => FlowType::None,
             FlowType::Infer => FlowType::Infer,
             FlowType::FlowNone => FlowType::FlowNone,
