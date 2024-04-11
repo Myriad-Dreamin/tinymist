@@ -1,6 +1,7 @@
 use lsp_types::CompletionList;
 
 use crate::{
+    analysis::{FlowBuiltinType, FlowType},
     prelude::*,
     syntax::{get_deref_target, DerefTarget},
     upstream::{autocomplete, complete_path, CompletionContext},
@@ -110,7 +111,20 @@ impl StatefulRequest for CompletionRequest {
                     );
                 }
             }
-            Some(DerefTarget::Normal(SyntaxKind::Str, ..)) => {}
+            Some(DerefTarget::Normal(SyntaxKind::Str, cano_expr)) => {
+                let parent = cano_expr.parent()?;
+                if matches!(parent.kind(), SyntaxKind::Named | SyntaxKind::Args) {
+                    let ty_chk = ctx.type_check(source.clone());
+                    if let Some(ty_chk) = ty_chk {
+                        let ty = ty_chk.mapping.get(&cano_expr.span());
+                        log::info!("check string ty: {:?}", ty);
+                        if let Some(FlowType::Builtin(FlowBuiltinType::Path(path_filter))) = ty {
+                            completion_result =
+                                complete_path(ctx, Some(cano_expr), &source, cursor, path_filter);
+                        }
+                    }
+                }
+            }
             // todo: label, reference
             Some(DerefTarget::Label(..) | DerefTarget::Ref(..) | DerefTarget::Normal(..)) => {}
             None => {}

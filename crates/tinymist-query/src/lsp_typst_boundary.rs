@@ -277,6 +277,7 @@ pub mod typst_to_lsp {
             TypstCompletionKind::Symbol(_) => LspCompletionKind::FIELD,
             TypstCompletionKind::Type => LspCompletionKind::CLASS,
             TypstCompletionKind::Module => LspCompletionKind::MODULE,
+            TypstCompletionKind::File => LspCompletionKind::FILE,
             TypstCompletionKind::Folder => LspCompletionKind::FOLDER,
         }
     }

@@ -86,6 +86,8 @@ pub enum CompletionKind {
     Variable,
     /// A module.
     Module,
+    /// A file.
+    File,
     /// A folder.
     Folder,
 }

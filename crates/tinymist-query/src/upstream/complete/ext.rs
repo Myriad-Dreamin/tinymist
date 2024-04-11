@@ -488,7 +488,7 @@ pub fn complete_path(
         is_in_text = false;
     }
     let path = Path::new(&text);
-    let is_abs = path.is_absolute();
+    let has_root = path.has_root();
 
     let src_path = id.vpath();
     let base = src_path.resolve(&ctx.analysis.root)?;
@@ -515,14 +515,13 @@ pub fn complete_path(
             continue;
         };
         let path = entry.path();
-        log::trace!("compl_check_path: {path:?}");
+        log::debug!("compl_check_path: {path:?}");
         if !path.is_dir() && !path.extension().is_some_and(|ext| p.match_ext(ext)) {
             continue;
         }
-        if path.is_dir()
-            || path
-                .file_name()
-                .is_some_and(|name| name.to_string_lossy().starts_with('.'))
+        if path
+            .file_name()
+            .is_some_and(|name| name.to_string_lossy().starts_with('.'))
         {
             continue;
         }
@@ -535,7 +534,7 @@ pub fn complete_path(
             continue;
         }
 
-        let label = if is_abs {
+        let label = if has_root {
             // diff with root
             let w = path.strip_prefix(&ctx.analysis.root).ok()?;
             eco_format!("/{}", unix_slash(w))
@@ -555,9 +554,14 @@ pub fn complete_path(
                 command: None,
             });
         } else {
+            let kind = if label.as_str().ends_with(".typ") {
+                CompletionKind::Module
+            } else {
+                CompletionKind::File
+            };
             module_completions.push(Completion {
                 label,
-                kind: CompletionKind::Module,
+                kind,
                 apply: None,
                 detail: None,
                 command: None,
