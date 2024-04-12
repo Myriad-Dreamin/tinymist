@@ -19,7 +19,8 @@ use crate::analysis::{analyze_expr, analyze_import, analyze_labels};
 use crate::AnalysisContext;
 
 mod ext;
-pub use ext::*;
+pub use ext::complete_path;
+use ext::*;
 
 /// Autocomplete a cursor position in a source file.
 ///
@@ -36,6 +37,7 @@ pub fn autocomplete(
     mut ctx: CompletionContext,
 ) -> Option<(usize, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
     let _ = complete_comments(&mut ctx)
+        || complete_literal(&mut ctx).is_some()
         || complete_field_accesses(&mut ctx)
         || complete_open_labels(&mut ctx)
         || complete_imports(&mut ctx)
@@ -983,6 +985,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
     /// A small window of context before the cursor.
     fn before_window(&self, size: usize) -> &str {
+        // todo: bad slicing
         &self.before[self.cursor.saturating_sub(size)..]
     }
 

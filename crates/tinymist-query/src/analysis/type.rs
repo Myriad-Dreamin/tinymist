@@ -299,6 +299,12 @@ impl PathPreference {
 #[derive(Debug, Clone, Hash)]
 pub(crate) enum FlowBuiltinType {
     Args,
+    Stroke,
+    MarginLike,
+    FillColor,
+    TextSize,
+    TextFont,
+    DirParam,
     Path(PathPreference),
 }
 
@@ -427,6 +433,24 @@ impl FlowType {
                     return Some(FlowType::Builtin(FlowBuiltinType::Path(
                         PathPreference::Toml,
                     )))
+                }
+                ("text", "size") => return Some(FlowType::Builtin(FlowBuiltinType::TextSize)),
+                ("text" | "stack", "dir") => {
+                    return Some(FlowType::Builtin(FlowBuiltinType::DirParam))
+                }
+                ("text", "font") => return Some(FlowType::Builtin(FlowBuiltinType::TextFont)),
+                (
+                    "text" | "path" | "rect" | "ellipse" | "circle" | "box" | "block" | "table",
+                    "fill",
+                ) => return Some(FlowType::Builtin(FlowBuiltinType::FillColor)),
+                (
+                    //todo: table.hline, table.vline
+                    "text" | "path" | "rect" | "ellipse" | "circle" | "box" | "block" | "table"
+                    | "line" | "hline" | "vline",
+                    "stroke",
+                ) => return Some(FlowType::Builtin(FlowBuiltinType::Stroke)),
+                ("box" | "block", "margin" | "inset") => {
+                    return Some(FlowType::Builtin(FlowBuiltinType::MarginLike))
                 }
                 _ => {}
             },
@@ -1307,11 +1331,14 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 .find(|n| n.name().get() == name.as_ref());
             if let Some(named_ty) = named_ty {
                 self.constrain(named_in, named_ty);
-            }
-            if let Some(syntax_named) = syntax_named {
-                self.info
-                    .mapping
-                    .insert(syntax_named.span(), named_in.clone());
+                if let Some(syntax_named) = syntax_named {
+                    self.info
+                        .mapping
+                        .insert(syntax_named.span(), named_ty.clone());
+                    self.info
+                        .mapping
+                        .insert(syntax_named.expr().span(), named_ty.clone());
+                }
             }
         }
 

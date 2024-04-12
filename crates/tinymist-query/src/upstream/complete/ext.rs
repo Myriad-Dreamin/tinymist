@@ -230,7 +230,7 @@ pub fn param_completions<'a>(
         }
 
         if param.named {
-            ctx.completions.push(Completion {
+            let compl = Completion {
                 kind: CompletionKind::Param,
                 label: param.name.clone().into(),
                 apply: Some(eco_format!("{}: ${{}}", param.name)),
@@ -242,7 +242,34 @@ pub fn param_completions<'a>(
                 // editor.action.triggerSuggest as command on a suggestion to
                 // "manually" retrigger suggest after inserting one
                 command: Some("editor.action.triggerSuggest"),
-            });
+            };
+            match param.infer_type {
+                Some(FlowType::Builtin(FlowBuiltinType::TextSize)) => {
+                    for size_template in &[
+                        "10.5pt", "12pt", "9pt", "14pt", "8pt", "16pt", "18pt", "20pt", "22pt",
+                        "24pt", "28pt",
+                    ] {
+                        let compl = compl.clone();
+                        ctx.completions.push(Completion {
+                            label: eco_format!("{}: {}", param.name, size_template),
+                            apply: None,
+                            ..compl
+                        });
+                    }
+                }
+                Some(FlowType::Builtin(FlowBuiltinType::DirParam)) => {
+                    for dir_template in &["ltr", "rtl", "ttb", "btt"] {
+                        let compl = compl.clone();
+                        ctx.completions.push(Completion {
+                            label: eco_format!("{}: {}", param.name, dir_template),
+                            apply: None,
+                            ..compl
+                        });
+                    }
+                }
+                _ => {}
+            }
+            ctx.completions.push(compl);
         }
 
         if param.positional && type_completion(ctx, param.infer_type.as_ref()).is_none() {
@@ -298,6 +325,12 @@ fn type_completion(
                 );
             }
             FlowBuiltinType::Args => return None,
+            FlowBuiltinType::Stroke => return None,
+            FlowBuiltinType::FillColor => return None,
+            FlowBuiltinType::TextSize => return None,
+            FlowBuiltinType::TextFont => return None,
+            FlowBuiltinType::DirParam => return None,
+            FlowBuiltinType::MarginLike => return None,
         },
         FlowType::Args(_) => return None,
         FlowType::Func(_) => return None,
@@ -446,6 +479,87 @@ pub fn named_param_value_completions<'a>(
     if ctx.before.ends_with(':') {
         ctx.enrich(" ", "");
     }
+}
+
+pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
+    let parent = ctx.leaf.parent()?;
+    let parent = match parent.kind() {
+        SyntaxKind::Named => parent.parent()?,
+        _ => parent,
+    };
+    let named = match parent.parent() {
+        Some(v) => v.cast::<ast::Named>(),
+        None => return None,
+    };
+    // or empty array
+    let dict_span;
+    let dict_lit = match parent.kind() {
+        SyntaxKind::Dict => {
+            let dict_lit = parent.get().cast::<ast::Dict>()?;
+
+            dict_span = dict_lit.span();
+            dict_lit
+        }
+        SyntaxKind::Array => {
+            let w = parent.get().cast::<ast::Array>()?;
+            if w.items().next().is_some() {
+                return None;
+            }
+            dict_span = w.span();
+            ast::Dict::default()
+        }
+        _ => return None,
+    };
+
+    // query type of the dict
+    let id = dict_span.id()?;
+    let source = ctx.ctx.source_by_id(id).ok()?;
+    let ty_chk = ctx.ctx.type_check(source)?;
+
+    let dict_ty = ty_chk.mapping.get(&dict_span).or_else(|| {
+        let named = named?;
+        ty_chk.mapping.get(&named.span())
+    });
+    log::debug!("complete_literal: {:?}", dict_ty);
+    let dict_ty = dict_ty?;
+    match dict_ty {
+        FlowType::Builtin(FlowBuiltinType::Stroke) => {
+            // todo: filter
+            let _ = dict_lit;
+            for field in [
+                "paint",
+                "thickness",
+                "cap",
+                "join",
+                "miter_limit",
+                "dash",
+                "dash",
+                "miter-limit",
+            ] {
+                ctx.completions.push(Completion {
+                    kind: CompletionKind::Param,
+                    label: field.into(),
+                    apply: Some(eco_format!("{}: ${{}}", field)),
+                    detail: None,
+                    command: None,
+                });
+            }
+        }
+        FlowType::Builtin(FlowBuiltinType::MarginLike) => {
+            for field in ["x", "y", "top", "bottom", "left", "right", "rest"] {
+                ctx.completions.push(Completion {
+                    kind: CompletionKind::Param,
+                    label: field.into(),
+                    apply: Some(eco_format!("{}: ${{}}", field)),
+                    detail: None,
+                    command: None,
+                });
+            }
+        }
+        _ => {}
+    }
+
+    None
 }
 
 pub fn complete_path(

@@ -1,0 +1,73 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/infer2.typ
+---
+---
+1..52 -> Element(text)
+6..15 -> TextSize
+12..15 -> TextSize
+17..25 -> TextFont
+23..25 -> TextFont
+27..38 -> Stroke
+35..38 -> Stroke
+40..49 -> FillColor
+46..49 -> FillColor
+50..52 -> Type(content)
+54..82 -> Element(path)
+59..68 -> FillColor
+65..68 -> FillColor
+70..81 -> Stroke
+78..81 -> Stroke
+84..127 -> Element(line)
+89..100 -> Type(angle)
+96..100 -> Type(angle)
+102..113 -> Type(relative length)
+110..113 -> Type(relative length)
+115..126 -> Stroke
+123..126 -> Stroke
+129..220 -> Element(rect)
+134..144 -> (Type(relative length) | Type(auto))
+141..144 -> (Type(relative length) | Type(auto))
+146..157 -> (Type(relative length) | Type(auto))
+154..157 -> (Type(relative length) | Type(auto))
+159..168 -> FillColor
+165..168 -> FillColor
+170..181 -> Stroke
+178..181 -> Stroke
+183..194 -> (Type(relative length) | Type(dictionary))
+191..194 -> (Type(relative length) | Type(dictionary))
+196..206 -> (Type(relative length) | Type(dictionary))
+203..206 -> (Type(relative length) | Type(dictionary))
+208..219 -> (Type(relative length) | Type(dictionary))
+216..219 -> (Type(relative length) | Type(dictionary))
+222..253 -> Element(ellipse)
+230..239 -> FillColor
+236..239 -> FillColor
+241..252 -> Stroke
+249..252 -> Stroke
+255..285 -> Element(circle)
+262..271 -> FillColor
+268..271 -> FillColor
+273..284 -> Stroke
+281..284 -> Stroke
+287..314 -> Element(box)
+291..300 -> FillColor
+297..300 -> FillColor
+302..313 -> Stroke
+310..313 -> Stroke
+316..345 -> Element(block)
+322..331 -> FillColor
+328..331 -> FillColor
+333..344 -> Stroke
+341..344 -> Stroke
+347..439 -> Element(table)
+356..365 -> FillColor
+362..365 -> FillColor
+369..380 -> Stroke
+377..380 -> Stroke
+384..408 -> Type(content)
+412..436 -> Any
+441..457 -> Element(text)
+446..456 -> Stroke
+454..456 -> Stroke
