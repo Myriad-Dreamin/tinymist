@@ -63,7 +63,7 @@
 # ^ source.typst variable.other.readwrite.typst
 #  ^^^^ source.typst
 >#f[] []
-#^ source.typst variable.other.readwrite.hash.typst
+#^ source.typst entity.name.function.hash.typst
 # ^ source.typst meta.expr.call.typst entity.name.function.typst
 #  ^ source.typst meta.expr.call.typst meta.brace.square.typst
 #   ^ source.typst meta.expr.call.typst meta.brace.square.typst
@@ -152,7 +152,7 @@
 #          ^ source.typst meta.expr.call.typst meta.brace.square.typst
 #           ^ source.typst meta.expr.call.typst meta.brace.square.typst
 >#list[]
-#^ source.typst variable.other.readwrite.hash.typst
+#^ source.typst entity.name.function.hash.typst
 # ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #     ^ source.typst meta.expr.call.typst meta.brace.square.typst
 #      ^ source.typst meta.expr.call.typst meta.brace.square.typst

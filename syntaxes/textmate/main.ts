@@ -342,7 +342,7 @@ const markupEnterCode: textmate.Pattern = {
     ),
     enterExpression(
       "entity.name.function.hash.typst",
-      /(?=[\p{XID_Start}_][\p{XID_Continue}_\-]*\()/
+      /(?=[\p{XID_Start}_][\p{XID_Continue}_\-]*[\(\[])/
     ),
     enterExpression(
       "variable.other.readwrite.hash.typst",
