@@ -170,10 +170,10 @@ const markupMath: textmate.Pattern = {
 
 const markupHeading: textmate.Pattern = {
   name: "markup.heading.typst",
-  begin: /^\s*=+\s+/,
+  begin: /^\s*(=+)(?:(?=[\r\n]|$)|\s+)/,
   end: /\n|(?=<)/,
   beginCaptures: {
-    "0": {
+    "1": {
       name: "punctuation.definition.heading.typst",
     },
   },
