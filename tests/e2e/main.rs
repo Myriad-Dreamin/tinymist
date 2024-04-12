@@ -1,6 +1,5 @@
 use std::{
     collections::HashSet,
-    hash::Hash,
     io,
     path::{Path, PathBuf},
     process::Command,
@@ -387,46 +386,6 @@ fn e2e() {
 
         let hash = replay_log(&tinymist_binary, &root.join("vscode"));
         insta::assert_snapshot!(hash, @"siphash128_13:c70d30b7698cf5f89fbb80ccaa3f692c");
-    }
-}
-
-struct StableHash<'a>(&'a Value);
-
-impl<'a> Hash for StableHash<'a> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        match self.0 {
-            Value::Null => 0.hash(state),
-            Value::Bool(b) => b.hash(state),
-            Value::Number(n) => {
-                if let Some(n) = n.as_i64() {
-                    n.hash(state);
-                } else if let Some(n) = n.as_u64() {
-                    n.hash(state);
-                } else if let Some(n) = n.as_f64() {
-                    n.to_bits().hash(state);
-                } else {
-                    panic!("unexpected number type");
-                }
-            }
-            Value::String(s) => s.hash(state),
-            Value::Array(a) => {
-                let mut a = a.clone();
-                a.sort_by(json_cmp);
-                a.len().hash(state);
-                for v in a {
-                    StableHash(&v).hash(state);
-                }
-            }
-            Value::Object(o) => {
-                let mut keys = o.keys().collect::<Vec<_>>();
-                keys.sort();
-                keys.len().hash(state);
-                for k in keys {
-                    k.hash(state);
-                    StableHash(&o[k]).hash(state);
-                }
-            }
-        }
     }
 }
 
