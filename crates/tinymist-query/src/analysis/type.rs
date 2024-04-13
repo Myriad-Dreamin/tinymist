@@ -1,6 +1,5 @@
 //! Top-level evaluation of a source file.
 
-use core::fmt;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -10,7 +9,7 @@ use ecow::EcoString;
 use parking_lot::{Mutex, RwLock};
 use reflexo::{hash::hash128, vector::ir::DefId};
 use typst::{
-    foundations::{CastInfo, Element, Func, ParamInfo, Value},
+    foundations::{Func, Value},
     syntax::{
         ast::{self, AstNode},
         LinkedNode, Source, Span, SyntaxKind,
@@ -21,457 +20,10 @@ use crate::{analysis::analyze_dyn_signature, AnalysisContext};
 
 use super::{resolve_global_value, DefUseInfo, IdentRef};
 
-struct RefDebug<'a>(&'a FlowType);
-
-impl<'a> fmt::Debug for RefDebug<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            FlowType::Var(v) => write!(f, "@{}", v.1),
-            _ => write!(f, "{:?}", self.0),
-        }
-    }
-}
-#[derive(Debug, Clone, Hash)]
-pub(crate) enum FlowUnaryType {
-    Pos(Box<FlowType>),
-    Neg(Box<FlowType>),
-    Not(Box<FlowType>),
-}
-
-impl FlowUnaryType {
-    pub fn lhs(&self) -> &FlowType {
-        match self {
-            FlowUnaryType::Pos(e) => e,
-            FlowUnaryType::Neg(e) => e,
-            FlowUnaryType::Not(e) => e,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Hash)]
-pub(crate) enum FlowBinaryType {
-    Add(FlowBinaryRepr),
-    Sub(FlowBinaryRepr),
-    Mul(FlowBinaryRepr),
-    Div(FlowBinaryRepr),
-    And(FlowBinaryRepr),
-    Or(FlowBinaryRepr),
-    Eq(FlowBinaryRepr),
-    Neq(FlowBinaryRepr),
-    Lt(FlowBinaryRepr),
-    Leq(FlowBinaryRepr),
-    Gt(FlowBinaryRepr),
-    Geq(FlowBinaryRepr),
-    Assign(FlowBinaryRepr),
-    In(FlowBinaryRepr),
-    NotIn(FlowBinaryRepr),
-    AddAssign(FlowBinaryRepr),
-    SubAssign(FlowBinaryRepr),
-    MulAssign(FlowBinaryRepr),
-    DivAssign(FlowBinaryRepr),
-}
-
-impl FlowBinaryType {
-    pub fn repr(&self) -> &FlowBinaryRepr {
-        match self {
-            FlowBinaryType::Add(r)
-            | FlowBinaryType::Sub(r)
-            | FlowBinaryType::Mul(r)
-            | FlowBinaryType::Div(r)
-            | FlowBinaryType::And(r)
-            | FlowBinaryType::Or(r)
-            | FlowBinaryType::Eq(r)
-            | FlowBinaryType::Neq(r)
-            | FlowBinaryType::Lt(r)
-            | FlowBinaryType::Leq(r)
-            | FlowBinaryType::Gt(r)
-            | FlowBinaryType::Geq(r)
-            | FlowBinaryType::Assign(r)
-            | FlowBinaryType::In(r)
-            | FlowBinaryType::NotIn(r)
-            | FlowBinaryType::AddAssign(r)
-            | FlowBinaryType::SubAssign(r)
-            | FlowBinaryType::MulAssign(r)
-            | FlowBinaryType::DivAssign(r) => r,
-        }
-    }
-}
-
-#[derive(Clone, Hash)]
-pub(crate) struct FlowBinaryRepr(Box<(FlowType, FlowType)>);
-
-impl fmt::Debug for FlowBinaryRepr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // shorter
-        write!(f, "{:?}, {:?}", RefDebug(&self.0 .0), RefDebug(&self.0 .1))
-    }
-}
-
-#[derive(Clone, Hash)]
-pub(crate) struct FlowVarStore {
-    pub lbs: Vec<FlowType>,
-    pub ubs: Vec<FlowType>,
-}
-
-impl fmt::Debug for FlowVarStore {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // write!(f, "{}", self.name)
-        // also where
-        if !self.lbs.is_empty() {
-            write!(f, " ⪰ {:?}", self.lbs[0])?;
-            for lb in &self.lbs[1..] {
-                write!(f, " | {lb:?}")?;
-            }
-        }
-        if !self.ubs.is_empty() {
-            write!(f, " ⪯ {:?}", self.ubs[0])?;
-            for ub in &self.ubs[1..] {
-                write!(f, " & {ub:?}")?;
-            }
-        }
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-pub(crate) enum FlowVarKind {
-    Weak(Arc<RwLock<FlowVarStore>>),
-}
-
-#[derive(Clone)]
-pub(crate) struct FlowVar {
-    pub name: EcoString,
-    pub id: DefId,
-    pub kind: FlowVarKind,
-}
-
-impl std::hash::Hash for FlowVar {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        0.hash(state);
-        self.id.hash(state);
-    }
-}
-
-impl fmt::Debug for FlowVar {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "@{}", self.name)?;
-        match &self.kind {
-            // FlowVarKind::Strong(t) => write!(f, " = {:?}", t),
-            FlowVarKind::Weak(w) => write!(f, "{w:?}"),
-        }
-    }
-}
-
-impl FlowVar {
-    pub fn name(&self) -> EcoString {
-        self.name.clone()
-    }
-
-    pub fn id(&self) -> DefId {
-        self.id
-    }
-
-    pub fn get_ref(&self) -> FlowType {
-        FlowType::Var(Box::new((self.id, self.name.clone())))
-    }
-
-    fn ever_be(&self, exp: FlowType) {
-        match &self.kind {
-            // FlowVarKind::Strong(_t) => {}
-            FlowVarKind::Weak(w) => {
-                let mut w = w.write();
-                w.lbs.push(exp.clone());
-            }
-        }
-    }
-
-    fn as_strong(&mut self, exp: FlowType) {
-        // self.kind = FlowVarKind::Strong(value);
-        match &self.kind {
-            // FlowVarKind::Strong(_t) => {}
-            FlowVarKind::Weak(w) => {
-                let mut w = w.write();
-                w.lbs.push(exp.clone());
-            }
-        }
-    }
-}
-
-#[derive(Hash, Clone)]
-pub(crate) struct FlowAt(Box<(FlowType, EcoString)>);
-
-impl fmt::Debug for FlowAt {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}.{}", RefDebug(&self.0 .0), self.0 .1)
-    }
-}
-
-#[derive(Clone, Hash)]
-pub(crate) struct FlowArgs {
-    pub args: Vec<FlowType>,
-    pub named: Vec<(EcoString, FlowType)>,
-}
-impl FlowArgs {
-    fn start_match(&self) -> &[FlowType] {
-        &self.args
-    }
-}
-
-impl fmt::Debug for FlowArgs {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use std::fmt::Write;
-
-        f.write_str("&(")?;
-        if let Some((first, args)) = self.args.split_first() {
-            write!(f, "{first:?}")?;
-            for arg in args {
-                write!(f, "{arg:?}, ")?;
-            }
-        }
-        f.write_char(')')
-    }
-}
-
-#[derive(Clone, Hash)]
-pub(crate) struct FlowSignature {
-    pub pos: Vec<FlowType>,
-    pub named: Vec<(EcoString, FlowType)>,
-    pub rest: Option<FlowType>,
-    pub ret: FlowType,
-}
-
-impl fmt::Debug for FlowSignature {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("(")?;
-        if let Some((first, pos)) = self.pos.split_first() {
-            write!(f, "{first:?}")?;
-            for p in pos {
-                write!(f, ", {p:?}")?;
-            }
-        }
-        for (name, ty) in &self.named {
-            write!(f, ", {name}: {ty:?}")?;
-        }
-        if let Some(rest) = &self.rest {
-            write!(f, ", ...: {rest:?}")?;
-        }
-        f.write_str(") -> ")?;
-        write!(f, "{:?}", self.ret)
-    }
-}
-
-#[derive(Debug, Clone, Hash)]
-pub(crate) enum PathPreference {
-    None,
-    Source,
-    Image,
-    Json,
-    Yaml,
-    Xml,
-    Toml,
-}
-
-impl PathPreference {
-    pub(crate) fn match_ext(&self, ext: &std::ffi::OsStr) -> bool {
-        let ext = || ext.to_str().map(|e| e.to_lowercase()).unwrap_or_default();
-
-        match self {
-            PathPreference::None => true,
-            PathPreference::Source => {
-                matches!(ext().as_ref(), "typ")
-            }
-            PathPreference::Image => {
-                matches!(
-                    ext().as_ref(),
-                    "png" | "webp" | "jpg" | "jpeg" | "svg" | "svgz"
-                )
-            }
-            PathPreference::Json => {
-                matches!(ext().as_ref(), "json" | "jsonc" | "json5")
-            }
-            PathPreference::Yaml => matches!(ext().as_ref(), "yaml" | "yml"),
-            PathPreference::Xml => matches!(ext().as_ref(), "xml"),
-            PathPreference::Toml => matches!(ext().as_ref(), "toml"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Hash)]
-pub(crate) enum FlowBuiltinType {
-    Args,
-    Stroke,
-    MarginLike,
-    FillColor,
-    TextSize,
-    TextFont,
-    DirParam,
-    Path(PathPreference),
-}
-
-#[derive(Hash, Clone)]
-#[allow(clippy::box_collection)]
-pub(crate) enum FlowType {
-    Clause,
-    Undef,
-    Content,
-    Any,
-    Array,
-    Dict,
-    None,
-    Infer,
-    FlowNone,
-    Auto,
-    Builtin(FlowBuiltinType),
-
-    Args(Box<FlowArgs>),
-    Func(Box<FlowSignature>),
-    With(Box<(FlowType, Vec<FlowArgs>)>),
-    At(FlowAt),
-    Union(Box<Vec<FlowType>>),
-    Let(Arc<FlowVarStore>),
-    Var(Box<(DefId, EcoString)>),
-    Unary(FlowUnaryType),
-    Binary(FlowBinaryType),
-    Value(Box<Value>),
-    ValueDoc(Box<(Value, &'static str)>),
-    Element(Element),
-}
-
-impl fmt::Debug for FlowType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            FlowType::Clause => f.write_str("Clause"),
-            FlowType::Undef => f.write_str("Undef"),
-            FlowType::Content => f.write_str("Content"),
-            FlowType::Any => f.write_str("Any"),
-            FlowType::Array => f.write_str("Array"),
-            FlowType::Dict => f.write_str("Dict"),
-            FlowType::None => f.write_str("None"),
-            FlowType::Infer => f.write_str("Infer"),
-            FlowType::FlowNone => f.write_str("FlowNone"),
-            FlowType::Auto => f.write_str("Auto"),
-            FlowType::Builtin(t) => write!(f, "{t:?}"),
-            FlowType::Args(a) => write!(f, "&({a:?})"),
-            FlowType::Func(s) => write!(f, "{s:?}"),
-            FlowType::With(w) => write!(f, "({:?}).with(..{:?})", w.0, w.1),
-            FlowType::At(a) => write!(f, "{a:?}"),
-            FlowType::Union(u) => {
-                f.write_str("(")?;
-                if let Some((first, u)) = u.split_first() {
-                    write!(f, "{first:?}")?;
-                    for u in u {
-                        write!(f, " | {u:?}")?;
-                    }
-                }
-                f.write_str(")")
-            }
-            FlowType::Let(v) => write!(f, "{v:?}"),
-            FlowType::Var(v) => write!(f, "@{}", v.1),
-            FlowType::Unary(u) => write!(f, "{u:?}"),
-            FlowType::Binary(b) => write!(f, "{b:?}"),
-            FlowType::Value(v) => write!(f, "{v:?}"),
-            FlowType::ValueDoc(v) => write!(f, "{v:?}"),
-            FlowType::Element(e) => write!(f, "{e:?}"),
-        }
-    }
-}
-
-impl FlowType {
-    pub fn from_return_site(f: &Func, c: &'_ CastInfo) -> Option<Self> {
-        use typst::foundations::func::Repr;
-        match f.inner() {
-            Repr::Element(e) => return Some(FlowType::Element(*e)),
-            Repr::Closure(_) => {}
-            Repr::With(w) => return FlowType::from_return_site(&w.0, c),
-            Repr::Native(_) => {}
-        };
-
-        let ty = match c {
-            CastInfo::Any => FlowType::Any,
-            CastInfo::Value(v, doc) => FlowType::ValueDoc(Box::new((v.clone(), *doc))),
-            CastInfo::Type(ty) => FlowType::Value(Box::new(Value::Type(*ty))),
-            CastInfo::Union(e) => FlowType::Union(Box::new(
-                e.iter()
-                    .flat_map(|e| Self::from_return_site(f, e))
-                    .collect(),
-            )),
-        };
-
-        Some(ty)
-    }
-
-    pub(crate) fn from_param_site(f: &Func, p: &ParamInfo, s: &CastInfo) -> Option<FlowType> {
-        use typst::foundations::func::Repr;
-        match f.inner() {
-            Repr::Element(..) | Repr::Native(..) => match (f.name().unwrap(), p.name) {
-                ("image", "path") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::Path(
-                        PathPreference::Image,
-                    )))
-                }
-                ("read", "path") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::Path(
-                        PathPreference::None,
-                    )))
-                }
-                ("json", "path") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::Path(
-                        PathPreference::Json,
-                    )))
-                }
-                ("yaml", "path") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::Path(
-                        PathPreference::Yaml,
-                    )))
-                }
-                ("xml", "path") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::Path(
-                        PathPreference::Xml,
-                    )))
-                }
-                ("toml", "path") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::Path(
-                        PathPreference::Toml,
-                    )))
-                }
-                ("text", "size") => return Some(FlowType::Builtin(FlowBuiltinType::TextSize)),
-                ("text" | "stack", "dir") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::DirParam))
-                }
-                ("text", "font") => return Some(FlowType::Builtin(FlowBuiltinType::TextFont)),
-                (
-                    "text" | "path" | "rect" | "ellipse" | "circle" | "box" | "block" | "table",
-                    "fill",
-                ) => return Some(FlowType::Builtin(FlowBuiltinType::FillColor)),
-                (
-                    //todo: table.hline, table.vline
-                    "text" | "path" | "rect" | "ellipse" | "circle" | "box" | "block" | "table"
-                    | "line" | "hline" | "vline",
-                    "stroke",
-                ) => return Some(FlowType::Builtin(FlowBuiltinType::Stroke)),
-                ("box" | "block", "margin" | "inset") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::MarginLike))
-                }
-                _ => {}
-            },
-            Repr::Closure(_) => {}
-            Repr::With(w) => return FlowType::from_param_site(&w.0, p, s),
-        };
-
-        let ty = match &s {
-            CastInfo::Any => FlowType::Any,
-            CastInfo::Value(v, doc) => FlowType::ValueDoc(Box::new((v.clone(), *doc))),
-            CastInfo::Type(ty) => FlowType::Value(Box::new(Value::Type(*ty))),
-            CastInfo::Union(e) => FlowType::Union(Box::new(
-                e.iter()
-                    .flat_map(|e| Self::from_param_site(f, p, e))
-                    .collect(),
-            )),
-        };
-
-        Some(ty)
-    }
-}
+mod def;
+pub(crate) use def::*;
+mod builtin;
+pub(crate) use builtin::*;
 
 pub(crate) struct TypeCheckInfo {
     pub vars: HashMap<DefId, FlowVar>,
@@ -745,7 +297,9 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     fn check_dict(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
         let _dict: ast::Dict = root.cast()?;
 
-        Some(FlowType::Dict)
+        Some(FlowType::Dict(FlowRecord {
+            fields: Default::default(),
+        }))
     }
 
     fn check_unary(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
@@ -1127,6 +681,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
                 candidates.push(f.ret.clone());
             }
+            FlowType::Dict(_v) => {}
             // todo: with
             FlowType::With(_e) => {}
             FlowType::Args(_e) => {}
@@ -1144,7 +699,6 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
 
             FlowType::Array => {}
-            FlowType::Dict => {}
             FlowType::Clause => {}
             FlowType::Undef => {}
             FlowType::Content => {}
@@ -1218,6 +772,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 }
             }
             FlowType::Func(..) => e,
+            FlowType::Dict(..) => e,
             FlowType::With(..) => e,
             FlowType::Args(..) => e,
             FlowType::Union(..) => e,
@@ -1226,7 +781,6 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::ValueDoc(..) => e,
 
             FlowType::Array => e,
-            FlowType::Dict => e,
             FlowType::Clause => e,
             FlowType::Undef => e,
             FlowType::Content => e,
@@ -1422,6 +976,11 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 }
                 self.analyze(&f.ret, pol);
             }
+            FlowType::Dict(r) => {
+                for (_, p) in &r.fields {
+                    self.analyze(p, pol);
+                }
+            }
             FlowType::With(w) => {
                 self.analyze(&w.0, pol);
                 for m in &w.1 {
@@ -1470,7 +1029,6 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             FlowType::Builtin(_) => {}
             // todo
             FlowType::Array => {}
-            FlowType::Dict => {}
             FlowType::Element(_) => {}
         }
     }
@@ -1535,6 +1093,15 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                     ret,
                 }))
             }
+            FlowType::Dict(f) => {
+                let fields = f
+                    .fields
+                    .iter()
+                    .map(|p| (p.0.clone(), self.transform(&p.1, !pol)))
+                    .collect();
+
+                FlowType::Dict(FlowRecord { fields })
+            }
             FlowType::With(w) => {
                 let primary = self.transform(&w.0, pol);
                 FlowType::With(Box::new((primary, w.1.clone())))
@@ -1575,7 +1142,6 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             // todo
             FlowType::Let(_) => FlowType::Any,
             FlowType::Array => FlowType::Array,
-            FlowType::Dict => FlowType::Dict,
             FlowType::Value(v) => FlowType::Value(v.clone()),
             FlowType::ValueDoc(v) => FlowType::ValueDoc(v.clone()),
             FlowType::Element(v) => FlowType::Element(*v),

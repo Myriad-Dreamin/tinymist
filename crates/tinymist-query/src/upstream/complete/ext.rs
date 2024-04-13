@@ -301,7 +301,7 @@ fn type_completion(
         FlowType::Array => {
             ctx.snippet_completion("()", "(${v})", "An array.");
         }
-        FlowType::Dict => {
+        FlowType::Dict(..) => {
             ctx.snippet_completion("()", "(${v})", "A dictionary.");
         }
         FlowType::None => ctx.snippet_completion("none", "none", "Nothing."),
