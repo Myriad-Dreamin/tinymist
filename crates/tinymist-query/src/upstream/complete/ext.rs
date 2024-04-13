@@ -324,10 +324,10 @@ fn type_completion(
         FlowType::Content => return None,
         FlowType::Any => return None,
         FlowType::Array => {
-            ctx.snippet_completion("()", "(${v})", "An array.");
+            ctx.snippet_completion("()", "(${})", "An array.");
         }
         FlowType::Dict(..) => {
-            ctx.snippet_completion("()", "(${v})", "A dictionary.");
+            ctx.snippet_completion("()", "(${})", "A dictionary.");
         }
         FlowType::None => ctx.snippet_completion("none", "none", "Nothing."),
         FlowType::Infer => return None,

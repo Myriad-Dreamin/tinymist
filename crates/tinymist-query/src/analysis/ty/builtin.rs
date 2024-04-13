@@ -17,11 +17,11 @@ pub(crate) enum PathPreference {
     Yaml,
     Xml,
     Toml,
+    Bibliography,
+    RawTheme,
+    RawSyntax,
 }
 
-// todo: bib paths
-// todo: syntax paths
-// todo: theme paths
 impl PathPreference {
     pub(crate) fn match_ext(&self, ext: &std::ffi::OsStr) -> bool {
         let ext = || ext.to_str().map(|e| e.to_lowercase()).unwrap_or_default();
@@ -44,6 +44,11 @@ impl PathPreference {
             PathPreference::Xml => matches!(ext().as_ref(), "xml"),
             PathPreference::Toml => matches!(ext().as_ref(), "toml"),
             PathPreference::Csv => matches!(ext().as_ref(), "csv"),
+            PathPreference::Bibliography => matches!(ext().as_ref(), "yaml" | "yml" | "bib"),
+            PathPreference::RawSyntax => {
+                matches!(ext().as_ref(), "tmLanguage" | "sublime-syntax")
+            }
+            PathPreference::RawTheme => matches!(ext().as_ref(), "tmTheme" | "xml"),
         }
     }
 }
@@ -73,6 +78,15 @@ pub(in crate::analysis::ty) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<
         ))),
         ("toml", "path") => Some(FlowType::Builtin(FlowBuiltinType::Path(
             PathPreference::Toml,
+        ))),
+        ("raw", "theme") => Some(FlowType::Builtin(FlowBuiltinType::Path(
+            PathPreference::RawTheme,
+        ))),
+        ("raw", "syntaxes") => Some(FlowType::Builtin(FlowBuiltinType::Path(
+            PathPreference::RawSyntax,
+        ))),
+        ("bibliography", "path") => Some(FlowType::Builtin(FlowBuiltinType::Path(
+            PathPreference::Bibliography,
         ))),
         ("text", "size") => Some(FlowType::Builtin(FlowBuiltinType::TextSize)),
         ("text" | "stack", "dir") => Some(FlowType::Builtin(FlowBuiltinType::Dir)),
