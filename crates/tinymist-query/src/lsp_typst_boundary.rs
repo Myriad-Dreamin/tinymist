@@ -326,7 +326,7 @@ pub mod typst_to_lsp {
         let lsp_marked_string = match typst_tooltip {
             TypstTooltip::Text(text) => MarkedString::String(text.to_string()),
             TypstTooltip::Code(code) => MarkedString::LanguageString(LanguageString {
-                language: "typst".to_owned(),
+                language: "typc".to_owned(),
                 value: code.to_string(),
             }),
         };
