@@ -12,7 +12,8 @@ use typst::visualize::Color;
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::analysis::{
     analyze_dyn_signature, analyze_import, resolve_callee, FlowBuiltinType, FlowType,
-    PathPreference, FLOW_STROKE_DICT,
+    PathPreference, FLOW_INSET_DICT, FLOW_MARGIN_DICT, FLOW_OUTSET_DICT, FLOW_RADIUS_DICT,
+    FLOW_STROKE_DICT,
 };
 use crate::syntax::param_index_at_leaf;
 use crate::upstream::plain_docs_sentence;
@@ -273,7 +274,7 @@ pub fn param_completions<'a>(
                         });
                     }
                 }
-                Some(FlowType::Builtin(FlowBuiltinType::DirParam)) => {
+                Some(FlowType::Builtin(FlowBuiltinType::Dir)) => {
                     for dir_template in &["ltr", "rtl", "ttb", "btt"] {
                         let compl = compl.clone();
                         ctx.completions.push(Completion {
@@ -350,7 +351,8 @@ fn type_completion(
             }
             FlowBuiltinType::Args => return None,
             FlowBuiltinType::Stroke => {
-                ctx.snippet_completion("stroke()", "stroke(${v})", "Stroke function.");
+                ctx.snippet_completion("stroke()", "stroke(${})", "Stroke type.");
+                ctx.snippet_completion("()", "(${})", "Stroke dictionary.");
                 type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Color)), None);
                 type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
             }
@@ -396,8 +398,23 @@ fn type_completion(
             }
             FlowBuiltinType::TextSize => return None,
             FlowBuiltinType::TextFont => return None,
-            FlowBuiltinType::DirParam => return None,
-            FlowBuiltinType::MarginLike => return None,
+            FlowBuiltinType::Dir => return None,
+            FlowBuiltinType::Margin => {
+                ctx.snippet_completion("()", "(${})", "Margin dictionary.");
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+            }
+            FlowBuiltinType::Inset => {
+                ctx.snippet_completion("()", "(${})", "Inset dictionary.");
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+            }
+            FlowBuiltinType::Outset => {
+                ctx.snippet_completion("()", "(${})", "Outset dictionary.");
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+            }
+            FlowBuiltinType::Radius => {
+                ctx.snippet_completion("()", "(${})", "Radius dictionary.");
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+            }
             FlowBuiltinType::Length => {
                 ctx.snippet_completion("pt", "${1}pt", "Point length unit.");
                 ctx.snippet_completion("mm", "${1}mm", "Millimeter length unit.");
@@ -615,42 +632,28 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
         .collect::<HashSet<_>>();
 
     let dict_ty = dict_ty?;
-    match dict_ty {
-        FlowType::Builtin(FlowBuiltinType::Stroke) => {
-            // todo: filter
-            let _ = dict_lit;
-            for (key, _, _) in FLOW_STROKE_DICT.fields.iter() {
-                if existing.contains(key) {
-                    continue;
-                }
-
-                ctx.completions.push(Completion {
-                    kind: CompletionKind::Field,
-                    label: key.clone(),
-                    apply: Some(eco_format!("{}: ${{}}", key)),
-                    detail: None,
-                    // todo: only vscode and neovim (0.9.1) support this
-                    command: Some("editor.action.triggerSuggest"),
-                });
-            }
-        }
-        FlowType::Builtin(FlowBuiltinType::MarginLike) => {
-            for key in ["x", "y", "top", "bottom", "left", "right", "rest"] {
-                if existing.contains(key) {
-                    continue;
-                }
-
-                ctx.completions.push(Completion {
-                    kind: CompletionKind::Field,
-                    label: key.into(),
-                    apply: Some(eco_format!("{}: ${{}}", key)),
-                    detail: None,
-                    // todo: only vscode and neovim (0.9.1) support this
-                    command: Some("editor.action.triggerSuggest"),
-                });
-            }
-        }
+    let dict_interface = match dict_ty {
+        FlowType::Builtin(FlowBuiltinType::Stroke) => &FLOW_STROKE_DICT,
+        FlowType::Builtin(FlowBuiltinType::Margin) => &FLOW_MARGIN_DICT,
+        FlowType::Builtin(FlowBuiltinType::Inset) => &FLOW_INSET_DICT,
+        FlowType::Builtin(FlowBuiltinType::Outset) => &FLOW_OUTSET_DICT,
+        FlowType::Builtin(FlowBuiltinType::Radius) => &FLOW_RADIUS_DICT,
         _ => return None,
+    };
+
+    for (key, _, _) in dict_interface.fields.iter() {
+        if existing.contains(key) {
+            continue;
+        }
+
+        ctx.completions.push(Completion {
+            kind: CompletionKind::Field,
+            label: key.clone(),
+            apply: Some(eco_format!("{}: ${{}}", key)),
+            detail: None,
+            // todo: only vscode and neovim (0.9.1) support this
+            command: Some("editor.action.triggerSuggest"),
+        });
     }
 
     if ctx.before.ends_with(',') {

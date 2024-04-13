@@ -742,6 +742,14 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     fn constrain(&mut self, lhs: &FlowType, rhs: &FlowType) {
         static FLOW_STROKE_DICT_TYPE: Lazy<FlowType> =
             Lazy::new(|| FlowType::Dict(FLOW_STROKE_DICT.clone()));
+        static FLOW_MARGIN_DICT_TYPE: Lazy<FlowType> =
+            Lazy::new(|| FlowType::Dict(FLOW_MARGIN_DICT.clone()));
+        static FLOW_INSET_DICT_TYPE: Lazy<FlowType> =
+            Lazy::new(|| FlowType::Dict(FLOW_INSET_DICT.clone()));
+        static FLOW_OUTSET_DICT_TYPE: Lazy<FlowType> =
+            Lazy::new(|| FlowType::Dict(FLOW_OUTSET_DICT.clone()));
+        static FLOW_RADIUS_DICT_TYPE: Lazy<FlowType> =
+            Lazy::new(|| FlowType::Dict(FLOW_RADIUS_DICT.clone()));
 
         match (lhs, rhs) {
             (FlowType::Var(v), FlowType::Var(w)) => {
@@ -792,6 +800,46 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             (FlowType::Builtin(FlowBuiltinType::Stroke), rhs) => {
                 if rhs.is_dict() {
                     self.constrain(&FLOW_STROKE_DICT_TYPE, rhs);
+                }
+            }
+            (lhs, FlowType::Builtin(FlowBuiltinType::Margin)) => {
+                if lhs.is_dict() {
+                    self.constrain(lhs, &FLOW_MARGIN_DICT_TYPE);
+                }
+            }
+            (FlowType::Builtin(FlowBuiltinType::Margin), rhs) => {
+                if rhs.is_dict() {
+                    self.constrain(&FLOW_MARGIN_DICT_TYPE, rhs);
+                }
+            }
+            (lhs, FlowType::Builtin(FlowBuiltinType::Inset)) => {
+                if lhs.is_dict() {
+                    self.constrain(lhs, &FLOW_INSET_DICT_TYPE);
+                }
+            }
+            (FlowType::Builtin(FlowBuiltinType::Inset), rhs) => {
+                if rhs.is_dict() {
+                    self.constrain(&FLOW_INSET_DICT_TYPE, rhs);
+                }
+            }
+            (lhs, FlowType::Builtin(FlowBuiltinType::Outset)) => {
+                if lhs.is_dict() {
+                    self.constrain(lhs, &FLOW_OUTSET_DICT_TYPE);
+                }
+            }
+            (FlowType::Builtin(FlowBuiltinType::Outset), rhs) => {
+                if rhs.is_dict() {
+                    self.constrain(&FLOW_OUTSET_DICT_TYPE, rhs);
+                }
+            }
+            (lhs, FlowType::Builtin(FlowBuiltinType::Radius)) => {
+                if lhs.is_dict() {
+                    self.constrain(lhs, &FLOW_RADIUS_DICT_TYPE);
+                }
+            }
+            (FlowType::Builtin(FlowBuiltinType::Radius), rhs) => {
+                if rhs.is_dict() {
+                    self.constrain(&FLOW_RADIUS_DICT_TYPE, rhs);
                 }
             }
             (FlowType::Dict(lhs), FlowType::Dict(rhs)) => {

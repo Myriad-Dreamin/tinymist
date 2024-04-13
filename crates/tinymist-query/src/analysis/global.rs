@@ -493,7 +493,7 @@ impl<'w> AnalysisContext<'w> {
         let tl = cache.type_check.clone();
         let res = tl
             .compute(source, |_before, after| {
-                let next = crate::analysis::type_check(self, after);
+                let next = crate::analysis::ty::type_check(self, after);
                 next.or_else(|| tl.output.read().clone())
             })
             .ok()

@@ -9,7 +9,9 @@ use typst::{
     syntax::Span,
 };
 
-use super::{FlowBuiltinType, PathPreference};
+use crate::analysis::ty::param_mapping;
+
+use super::FlowBuiltinType;
 
 struct RefDebug<'a>(&'a FlowType);
 
@@ -117,57 +119,11 @@ impl FlowType {
     pub(crate) fn from_param_site(f: &Func, p: &ParamInfo, s: &CastInfo) -> Option<FlowType> {
         use typst::foundations::func::Repr;
         match f.inner() {
-            Repr::Element(..) | Repr::Native(..) => match (f.name().unwrap(), p.name) {
-                ("image", "path") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::Path(
-                        PathPreference::Image,
-                    )))
+            Repr::Element(..) | Repr::Native(..) => {
+                if let Some(ty) = param_mapping(f, p) {
+                    return Some(ty);
                 }
-                ("read", "path") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::Path(
-                        PathPreference::None,
-                    )))
-                }
-                ("json", "path") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::Path(
-                        PathPreference::Json,
-                    )))
-                }
-                ("yaml", "path") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::Path(
-                        PathPreference::Yaml,
-                    )))
-                }
-                ("xml", "path") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::Path(
-                        PathPreference::Xml,
-                    )))
-                }
-                ("toml", "path") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::Path(
-                        PathPreference::Toml,
-                    )))
-                }
-                ("text", "size") => return Some(FlowType::Builtin(FlowBuiltinType::TextSize)),
-                ("text" | "stack", "dir") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::DirParam))
-                }
-                ("text", "font") => return Some(FlowType::Builtin(FlowBuiltinType::TextFont)),
-                (
-                    "text" | "path" | "rect" | "ellipse" | "circle" | "box" | "block" | "table",
-                    "fill",
-                ) => return Some(FlowType::Builtin(FlowBuiltinType::Color)),
-                (
-                    //todo: table.hline, table.vline
-                    "text" | "path" | "rect" | "ellipse" | "circle" | "box" | "block" | "table"
-                    | "line" | "hline" | "vline",
-                    "stroke",
-                ) => return Some(FlowType::Builtin(FlowBuiltinType::Stroke)),
-                ("box" | "block", "margin" | "inset") => {
-                    return Some(FlowType::Builtin(FlowBuiltinType::MarginLike))
-                }
-                _ => {}
-            },
+            }
             Repr::Closure(_) => {}
             Repr::With(w) => return FlowType::from_param_site(&w.0, p, s),
         };
@@ -184,10 +140,6 @@ impl FlowType {
         };
 
         Some(ty)
-    }
-
-    pub fn from_string(s: EcoString) -> Self {
-        FlowType::Value(Box::new((Value::Str(s.into()), Span::detached())))
     }
 
     pub(crate) fn is_dict(&self) -> bool {
