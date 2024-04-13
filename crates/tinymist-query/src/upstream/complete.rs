@@ -36,7 +36,7 @@ use ext::*;
 /// when the document is available.
 pub fn autocomplete(
     mut ctx: CompletionContext,
-) -> Option<(usize, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
+) -> Option<(usize, bool, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
     let _ = complete_comments(&mut ctx)
         || complete_literal(&mut ctx).is_none() && {
             log::info!("continue after completing literal");
@@ -50,7 +50,7 @@ pub fn autocomplete(
                 || complete_code(&mut ctx)
         };
 
-    Some((ctx.from, ctx.completions, ctx.completions2))
+    Some((ctx.from, ctx.incomplete, ctx.completions, ctx.completions2))
 }
 
 /// An autocompletion option.
@@ -959,6 +959,7 @@ pub struct CompletionContext<'a, 'w> {
     pub from: usize,
     pub completions: Vec<Completion>,
     pub completions2: Vec<lsp_types::CompletionItem>,
+    pub incomplete: bool,
     pub seen_casts: HashSet<u128>,
 }
 
@@ -985,6 +986,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             cursor,
             explicit,
             from: cursor,
+            incomplete: true,
             completions: vec![],
             completions2: vec![],
             seen_casts: HashSet::new(),

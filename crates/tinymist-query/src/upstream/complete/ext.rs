@@ -551,6 +551,10 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     };
     log::debug!("check complete_literal 2: {:?}", ctx.leaf);
     let parent = &parent;
+    let parent = match parent.kind() {
+        SyntaxKind::Colon => parent.parent()?,
+        _ => parent,
+    };
     let (named, parent) = match parent.kind() {
         SyntaxKind::Named => (parent.cast::<ast::Named>(), parent.parent()?),
         SyntaxKind::LeftParen | SyntaxKind::Comma => (None, parent.parent()?),
@@ -587,7 +591,9 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     // todo: check if the dict is named
     if named_ty.is_some() {
         let res = type_completion(ctx, named_ty.as_ref(), None);
-        log::info!("complete_literal_res: {:?}", res);
+        if res.is_some() {
+            ctx.incomplete = false;
+        }
         return res;
     }
 
@@ -627,11 +633,6 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
                     command: Some("editor.action.triggerSuggest"),
                 });
             }
-
-            if ctx.before.ends_with(',') {
-                ctx.enrich(" ", "");
-            }
-            return Some(());
         }
         FlowType::Builtin(FlowBuiltinType::MarginLike) => {
             for key in ["x", "y", "top", "bottom", "left", "right", "rest"] {
@@ -648,16 +649,16 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
                     command: Some("editor.action.triggerSuggest"),
                 });
             }
-
-            if ctx.before.ends_with(',') {
-                ctx.enrich(" ", "");
-            }
-            return Some(());
         }
-        _ => {}
+        _ => return None,
     }
 
-    None
+    if ctx.before.ends_with(',') {
+        ctx.enrich(" ", "");
+    }
+    ctx.incomplete = false;
+
+    Some(())
 }
 
 pub fn complete_path(

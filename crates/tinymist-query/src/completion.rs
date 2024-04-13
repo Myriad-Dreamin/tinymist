@@ -131,13 +131,15 @@ impl StatefulRequest for CompletionRequest {
         }
 
         let mut completion_items_rest = None;
+        let mut is_incomplete = true;
 
         let mut items = completion_result.or_else(|| {
             let cc_ctx = CompletionContext::new(ctx, doc, &source, cursor, explicit)?;
-            let (offset, mut completions, completions_items2) = autocomplete(cc_ctx)?;
+            let (offset, ic, mut completions, completions_items2) = autocomplete(cc_ctx)?;
             if !completions_items2.is_empty() {
                 completion_items_rest = Some(completions_items2);
             }
+            is_incomplete = ic;
 
             let replace_range;
             if match_ident.as_ref().is_some_and(|i| i.offset() == offset) {
@@ -182,7 +184,7 @@ impl StatefulRequest for CompletionRequest {
         // incomplete. This follows what rust-analyzer does.
         // https://github.com/rust-lang/rust-analyzer/blob/f5a9250147f6569d8d89334dc9cca79c0322729f/crates/rust-analyzer/src/handlers/request.rs#L940C55-L940C75
         Some(CompletionResponse::List(CompletionList {
-            is_incomplete: true,
+            is_incomplete,
             items,
         }))
     }
