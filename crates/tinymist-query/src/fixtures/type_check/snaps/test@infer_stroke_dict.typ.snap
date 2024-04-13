@@ -1,0 +1,14 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/infer_stroke_dict.typ
+---
+---
+1..54 -> Element(text)
+6..51 -> Stroke
+14..51 -> Stroke
+18..30 -> Color
+25..30 -> Color
+34..48 -> Length
+45..48 -> Length
+52..54 -> Type(content)

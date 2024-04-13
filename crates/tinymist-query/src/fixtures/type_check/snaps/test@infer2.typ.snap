@@ -11,12 +11,12 @@ input_file: crates/tinymist-query/src/fixtures/type_check/infer2.typ
 23..25 -> TextFont
 27..38 -> Stroke
 35..38 -> Stroke
-40..49 -> FillColor
-46..49 -> FillColor
+40..49 -> Color
+46..49 -> Color
 50..52 -> Type(content)
 54..82 -> Element(path)
-59..68 -> FillColor
-65..68 -> FillColor
+59..68 -> Color
+65..68 -> Color
 70..81 -> Stroke
 78..81 -> Stroke
 84..127 -> Element(line)
@@ -31,8 +31,8 @@ input_file: crates/tinymist-query/src/fixtures/type_check/infer2.typ
 141..144 -> (Type(relative length) | Type(auto))
 146..157 -> (Type(relative length) | Type(auto))
 154..157 -> (Type(relative length) | Type(auto))
-159..168 -> FillColor
-165..168 -> FillColor
+159..168 -> Color
+165..168 -> Color
 170..181 -> Stroke
 178..181 -> Stroke
 183..194 -> (Type(relative length) | Type(dictionary))
@@ -42,28 +42,28 @@ input_file: crates/tinymist-query/src/fixtures/type_check/infer2.typ
 208..219 -> (Type(relative length) | Type(dictionary))
 216..219 -> (Type(relative length) | Type(dictionary))
 222..253 -> Element(ellipse)
-230..239 -> FillColor
-236..239 -> FillColor
+230..239 -> Color
+236..239 -> Color
 241..252 -> Stroke
 249..252 -> Stroke
 255..285 -> Element(circle)
-262..271 -> FillColor
-268..271 -> FillColor
+262..271 -> Color
+268..271 -> Color
 273..284 -> Stroke
 281..284 -> Stroke
 287..314 -> Element(box)
-291..300 -> FillColor
-297..300 -> FillColor
+291..300 -> Color
+297..300 -> Color
 302..313 -> Stroke
 310..313 -> Stroke
 316..345 -> Element(block)
-322..331 -> FillColor
-328..331 -> FillColor
+322..331 -> Color
+328..331 -> Color
 333..344 -> Stroke
 341..344 -> Stroke
 347..439 -> Element(table)
-356..365 -> FillColor
-362..365 -> FillColor
+356..365 -> Color
+362..365 -> Color
 369..380 -> Stroke
 377..380 -> Stroke
 384..408 -> Type(content)

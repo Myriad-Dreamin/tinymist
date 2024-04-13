@@ -430,6 +430,7 @@ impl Init {
                         String::from("#"),
                         String::from("("),
                         String::from("."),
+                        String::from(","),
                         String::from("/"),
                         String::from("\""),
                         String::from("@"),

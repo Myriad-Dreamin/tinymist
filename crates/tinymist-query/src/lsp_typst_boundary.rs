@@ -272,6 +272,7 @@ pub mod typst_to_lsp {
             TypstCompletionKind::Syntax => LspCompletionKind::SNIPPET,
             TypstCompletionKind::Func => LspCompletionKind::FUNCTION,
             TypstCompletionKind::Param => LspCompletionKind::VARIABLE,
+            TypstCompletionKind::Field => LspCompletionKind::FIELD,
             TypstCompletionKind::Variable => LspCompletionKind::VARIABLE,
             TypstCompletionKind::Constant => LspCompletionKind::CONSTANT,
             TypstCompletionKind::Symbol(_) => LspCompletionKind::FIELD,

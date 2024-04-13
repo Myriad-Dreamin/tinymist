@@ -13,6 +13,7 @@ use reflexo::hash::hash128;
 use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
 use typst::eval::Eval;
 use typst::foundations;
+use typst::syntax::SyntaxNode;
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
     syntax::{package::PackageSpec, Source, Span, VirtualPath},
@@ -21,7 +22,7 @@ use typst::{
 use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
-use super::{DefUseInfo, ImportInfo, Signature, SignatureTarget, TypeCheckInfo};
+use super::{DefUseInfo, FlowType, ImportInfo, Signature, SignatureTarget, TypeCheckInfo};
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -586,7 +587,7 @@ impl<'w> AnalysisContext<'w> {
         f(&mut vm)
     }
 
-    pub(crate) fn mini_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
+    pub(crate) fn const_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
         Some(match rr {
             ast::Expr::None(_) => Value::None,
             ast::Expr::Auto(_) => Value::Auto,
@@ -595,8 +596,24 @@ impl<'w> AnalysisContext<'w> {
             ast::Expr::Float(v) => Value::Float(v.get()),
             ast::Expr::Numeric(v) => Value::numeric(v.get()),
             ast::Expr::Str(v) => Value::Str(v.get().into()),
-            e => return self.with_vm(|vm| e.eval(vm).ok()),
+            _ => return None,
         })
+    }
+
+    pub(crate) fn mini_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
+        self.const_eval(rr)
+            .or_else(|| self.with_vm(|vm| rr.eval(vm).ok()))
+    }
+
+    pub(crate) fn type_of(&mut self, rr: &SyntaxNode) -> Option<FlowType> {
+        self.type_of_span(rr.span())
+    }
+
+    pub(crate) fn type_of_span(&mut self, s: Span) -> Option<FlowType> {
+        let id = s.id()?;
+        let source = self.source_by_id(id).ok()?;
+        let ty_chk = self.type_check(source)?;
+        ty_chk.mapping.get(&s).cloned()
     }
 }
 

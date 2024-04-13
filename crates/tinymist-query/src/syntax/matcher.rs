@@ -136,7 +136,9 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget> 
                 DerefTarget::Normal(cano_expr.kind(), cano_expr)
             }
         }
-        _ if expr.hash() || matches!(expr, ast::Expr::MathIdent(_)) => {
+        _ if expr.hash()
+            || matches!(cano_expr.kind(), SyntaxKind::MathIdent | SyntaxKind::Error) =>
+        {
             DerefTarget::Normal(cano_expr.kind(), cano_expr)
         }
         _ => return None,

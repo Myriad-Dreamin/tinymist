@@ -5,7 +5,8 @@ use std::{
     sync::Arc,
 };
 
-use ecow::EcoString;
+use ecow::{EcoString, EcoVec};
+use once_cell::sync::Lazy;
 use parking_lot::{Mutex, RwLock};
 use reflexo::{hash::hash128, vector::ir::DefId};
 use typst::{
@@ -76,7 +77,6 @@ pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Ar
     let elapsed = current.elapsed();
     log::info!("Type checking on {:?} took {:?}", source.id(), elapsed);
 
-    let _ = type_checker.info.mapping;
     let _ = type_checker.source;
 
     Some(Arc::new(info))
@@ -175,8 +175,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 return self
                     .ctx
                     .mini_eval(root.cast()?)
-                    .map(Box::new)
-                    .map(FlowType::Value)
+                    .map(|v| (FlowType::Value(Box::new((v, root.span())))))
             }
             SyntaxKind::Parenthesized => return self.check_children(root),
             SyntaxKind::Array => return self.check_array(root),
@@ -280,8 +279,9 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         };
 
         let Some(def_id) = self.def_use_info.get_ref(&ident_ref) else {
+            let s = root.span();
             let v = resolve_global_value(self.ctx, root, mode == InterpretMode::Math)?;
-            return Some(FlowType::Value(Box::new(v)));
+            return Some(FlowType::Value(Box::new((v, s))));
         };
         let var = self.info.vars.get(&def_id)?.clone();
 
@@ -295,18 +295,37 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     }
 
     fn check_dict(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
-        let _dict: ast::Dict = root.cast()?;
+        let dict: ast::Dict = root.cast()?;
 
-        Some(FlowType::Dict(FlowRecord {
-            fields: Default::default(),
-        }))
+        let mut fields = EcoVec::new();
+
+        for field in dict.items() {
+            match field {
+                ast::DictItem::Named(n) => {
+                    let name = n.name().get().clone();
+                    let value = self.check_expr_in(n.expr().span(), root.clone());
+                    fields.push((name, value, n.span()));
+                }
+                ast::DictItem::Keyed(k) => {
+                    let key = self.ctx.const_eval(k.key());
+                    if let Some(Value::Str(key)) = key {
+                        let value = self.check_expr_in(k.expr().span(), root.clone());
+                        fields.push((key.into(), value, k.span()));
+                    }
+                }
+                // todo: var dict union
+                ast::DictItem::Spread(_s) => {}
+            }
+        }
+
+        Some(FlowType::Dict(FlowRecord { fields }))
     }
 
     fn check_unary(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
         let unary: ast::Unary = root.cast()?;
 
         if let Some(constant) = self.ctx.mini_eval(ast::Expr::Unary(unary)) {
-            return Some(FlowType::Value(Box::new(constant)));
+            return Some(FlowType::Value(Box::new((constant, root.span()))));
         }
 
         let op = unary.op();
@@ -325,7 +344,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let binary: ast::Binary = root.cast()?;
 
         if let Some(constant) = self.ctx.mini_eval(ast::Expr::Binary(binary)) {
-            return Some(FlowType::Value(Box::new(constant)));
+            return Some(FlowType::Value(Box::new((constant, root.span()))));
         }
 
         let op = binary.op();
@@ -642,7 +661,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         syntax_args: &ast::Args,
         candidates: &mut Vec<FlowType>,
     ) -> Option<()> {
-        // println!("check func callee {callee:?}");
+        // log::debug!("check func callee {callee:?}");
 
         match &callee {
             FlowType::Var(v) => {
@@ -677,7 +696,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     }
                 }
 
-                // println!("check applied {v:?}");
+                // log::debug!("check applied {v:?}");
 
                 candidates.push(f.ret.clone());
             }
@@ -688,7 +707,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::Union(_e) => {}
             FlowType::Let(_) => {}
             FlowType::Value(f) => {
-                if let Value::Func(f) = f.as_ref() {
+                if let Value::Func(f) = &f.0 {
                     self.check_apply_runtime(f, args, syntax_args, candidates);
                 }
             }
@@ -721,6 +740,9 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     }
 
     fn constrain(&mut self, lhs: &FlowType, rhs: &FlowType) {
+        static FLOW_STROKE_DICT_TYPE: Lazy<FlowType> =
+            Lazy::new(|| FlowType::Dict(FLOW_STROKE_DICT.clone()));
+
         match (lhs, rhs) {
             (FlowType::Var(v), FlowType::Var(w)) => {
                 if v.0 .0 == w.0 .0 {
@@ -741,7 +763,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     }
                 }
             }
-            (_, FlowType::Var(v)) => {
+            (lhs, FlowType::Var(v)) => {
                 let v = self.info.vars.get(&v.0).unwrap();
                 match &v.kind {
                     FlowVarKind::Weak(v) => {
@@ -750,7 +772,59 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     }
                 }
             }
-            _ => {}
+            (FlowType::Union(v), rhs) => {
+                for e in v.iter() {
+                    self.constrain(e, rhs);
+                }
+            }
+            (lhs, FlowType::Union(v)) => {
+                for e in v.iter() {
+                    self.constrain(lhs, e);
+                }
+            }
+            (lhs, FlowType::Builtin(FlowBuiltinType::Stroke)) => {
+                // empty array is also a constructing dict but we can safely ignore it during
+                // type checking, since no fields are added yet.
+                if lhs.is_dict() {
+                    self.constrain(lhs, &FLOW_STROKE_DICT_TYPE);
+                }
+            }
+            (FlowType::Builtin(FlowBuiltinType::Stroke), rhs) => {
+                if rhs.is_dict() {
+                    self.constrain(&FLOW_STROKE_DICT_TYPE, rhs);
+                }
+            }
+            (FlowType::Dict(lhs), FlowType::Dict(rhs)) => {
+                for ((key, lhs, sl), (_, rhs, sr)) in lhs.intersect_keys(rhs) {
+                    log::debug!("constrain record item {key} {lhs:?} ⪯ {rhs:?}");
+                    self.constrain(lhs, rhs);
+                    if !sl.is_detached() {
+                        // todo: intersect/union
+                        self.info.mapping.entry(*sl).or_insert(rhs.clone());
+                    }
+                    if !sr.is_detached() {
+                        // todo: intersect/union
+                        self.info.mapping.entry(*sr).or_insert(lhs.clone());
+                    }
+                }
+            }
+            (FlowType::Value(lhs), rhs) => {
+                log::debug!("constrain value {lhs:?} ⪯ {rhs:?}");
+                if !lhs.1.is_detached() {
+                    // todo: intersect/union
+                    self.info.mapping.entry(lhs.1).or_insert(rhs.clone());
+                }
+            }
+            (lhs, FlowType::Value(rhs)) => {
+                log::debug!("constrain value {lhs:?} ⪯ {rhs:?}");
+                if !rhs.1.is_detached() {
+                    // todo: intersect/union
+                    self.info.mapping.entry(rhs.1).or_insert(lhs.clone());
+                }
+            }
+            _ => {
+                log::debug!("constrain {lhs:?} ⪯ {rhs:?}");
+            }
         }
     }
 
@@ -808,7 +882,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         match primary_type {
             FlowType::Func(v) => match method_name.as_str() {
                 "with" => {
-                    // println!("check method at args: {v:?}.with({args:?})");
+                    // log::debug!("check method at args: {v:?}.with({args:?})");
 
                     let f = v.as_ref();
                     let mut pos = f.pos.iter();
@@ -830,7 +904,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     _candidates.push(self.partial_apply(f, args));
                 }
                 "where" => {
-                    // println!("where method at args: {args:?}");
+                    // log::debug!("where method at args: {args:?}");
                 }
                 _ => {}
             },
@@ -977,7 +1051,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 self.analyze(&f.ret, pol);
             }
             FlowType::Dict(r) => {
-                for (_, p) in &r.fields {
+                for (_, p, _) in &r.fields {
                     self.analyze(p, pol);
                 }
             }
@@ -1044,7 +1118,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                     FlowVarKind::Weak(w) => {
                         let w = w.read();
 
-                        // println!("transform var {:?} {pol}", v.0);
+                        // log::debug!("transform var {:?} {pol}", v.0);
 
                         let mut lbs = Vec::with_capacity(w.lbs.len());
                         let mut ubs = Vec::with_capacity(w.ubs.len());
@@ -1097,7 +1171,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 let fields = f
                     .fields
                     .iter()
-                    .map(|p| (p.0.clone(), self.transform(&p.1, !pol)))
+                    .map(|p| (p.0.clone(), self.transform(&p.1, !pol), p.2))
                     .collect();
 
                 FlowType::Dict(FlowRecord { fields })

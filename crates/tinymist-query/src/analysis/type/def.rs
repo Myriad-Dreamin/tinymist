@@ -4,7 +4,10 @@ use std::sync::Arc;
 use ecow::{EcoString, EcoVec};
 use parking_lot::RwLock;
 use reflexo::vector::ir::DefId;
-use typst::foundations::{CastInfo, Element, Func, ParamInfo, Value};
+use typst::{
+    foundations::{CastInfo, Element, Func, ParamInfo, Value},
+    syntax::Span,
+};
 
 use super::{FlowBuiltinType, PathPreference};
 
@@ -32,7 +35,7 @@ pub(crate) enum FlowType {
     FlowNone,
     Auto,
     Builtin(FlowBuiltinType),
-    Value(Box<Value>),
+    Value(Box<(Value, Span)>),
     ValueDoc(Box<(Value, &'static str)>),
     Element(Element),
 
@@ -80,7 +83,7 @@ impl fmt::Debug for FlowType {
             FlowType::Var(v) => write!(f, "@{}", v.1),
             FlowType::Unary(u) => write!(f, "{u:?}"),
             FlowType::Binary(b) => write!(f, "{b:?}"),
-            FlowType::Value(v) => write!(f, "{v:?}"),
+            FlowType::Value(v) => write!(f, "{v:?}", v = v.0),
             FlowType::ValueDoc(v) => write!(f, "{v:?}"),
             FlowType::Element(e) => write!(f, "{e:?}"),
         }
@@ -100,7 +103,7 @@ impl FlowType {
         let ty = match c {
             CastInfo::Any => FlowType::Any,
             CastInfo::Value(v, doc) => FlowType::ValueDoc(Box::new((v.clone(), *doc))),
-            CastInfo::Type(ty) => FlowType::Value(Box::new(Value::Type(*ty))),
+            CastInfo::Type(ty) => FlowType::Value(Box::new((Value::Type(*ty), Span::detached()))),
             CastInfo::Union(e) => FlowType::Union(Box::new(
                 e.iter()
                     .flat_map(|e| Self::from_return_site(f, e))
@@ -153,7 +156,7 @@ impl FlowType {
                 (
                     "text" | "path" | "rect" | "ellipse" | "circle" | "box" | "block" | "table",
                     "fill",
-                ) => return Some(FlowType::Builtin(FlowBuiltinType::FillColor)),
+                ) => return Some(FlowType::Builtin(FlowBuiltinType::Color)),
                 (
                     //todo: table.hline, table.vline
                     "text" | "path" | "rect" | "ellipse" | "circle" | "box" | "block" | "table"
@@ -172,7 +175,7 @@ impl FlowType {
         let ty = match &s {
             CastInfo::Any => FlowType::Any,
             CastInfo::Value(v, doc) => FlowType::ValueDoc(Box::new((v.clone(), *doc))),
-            CastInfo::Type(ty) => FlowType::Value(Box::new(Value::Type(*ty))),
+            CastInfo::Type(ty) => FlowType::Value(Box::new((Value::Type(*ty), Span::detached()))),
             CastInfo::Union(e) => FlowType::Union(Box::new(
                 e.iter()
                     .flat_map(|e| Self::from_param_site(f, p, e))
@@ -181,6 +184,14 @@ impl FlowType {
         };
 
         Some(ty)
+    }
+
+    pub fn from_string(s: EcoString) -> Self {
+        FlowType::Value(Box::new((Value::Str(s.into()), Span::detached())))
+    }
+
+    pub(crate) fn is_dict(&self) -> bool {
+        matches!(self, FlowType::Dict(..))
     }
 }
 
@@ -415,14 +426,57 @@ impl fmt::Debug for FlowSignature {
 
 #[derive(Clone, Hash)]
 pub(crate) struct FlowRecord {
-    pub fields: EcoVec<(EcoString, FlowType)>,
+    pub fields: EcoVec<(EcoString, FlowType, Span)>,
+}
+impl FlowRecord {
+    pub(crate) fn intersect_keys_enumerate<'a>(
+        &'a self,
+        rhs: &'a FlowRecord,
+    ) -> impl Iterator<Item = (usize, usize)> + 'a {
+        let mut lhs = self;
+        let mut rhs = rhs;
+
+        // size optimization
+        let mut swapped = false;
+        if lhs.fields.len() < rhs.fields.len() {
+            swapped = true;
+            std::mem::swap(&mut lhs, &mut rhs);
+        }
+
+        lhs.fields
+            .iter()
+            .enumerate()
+            .filter_map(move |(i, (name, _, _))| {
+                rhs.fields
+                    .iter()
+                    .position(|(name2, _, _)| name == name2)
+                    .map(|j| (i, j))
+            })
+            .map(move |(i, j)| if swapped { (j, i) } else { (i, j) })
+    }
+
+    pub(crate) fn intersect_keys<'a>(
+        &'a self,
+        rhs: &'a FlowRecord,
+    ) -> impl Iterator<Item = (&(EcoString, FlowType, Span), &(EcoString, FlowType, Span))> + 'a
+    {
+        self.intersect_keys_enumerate(rhs)
+            .filter_map(move |(i, j)| {
+                self.fields
+                    .get(i)
+                    .and_then(|lhs| rhs.fields.get(j).map(|rhs| (lhs, rhs)))
+            })
+    }
 }
 
 impl fmt::Debug for FlowRecord {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("{")?;
-        if let Some((first, field)) = self.fields.iter().next() {
-            write!(f, "{first:?}: {field:?}")?;
+        if let Some((first, fields)) = self.fields.split_first() {
+            write!(f, "{name:?}: {ty:?}", name = first.0, ty = first.1)?;
+            for (name, ty, _) in fields {
+                write!(f, ", {name:?}: {ty:?}")?;
+            }
         }
         f.write_str("}")
     }
