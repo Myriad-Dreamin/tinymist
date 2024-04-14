@@ -4,6 +4,39 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.4 - [2024-04-14]
+
+This version is published with mostly internal optimizations.
+
+### Editor
+
+* (Change) Renamed trace feature to profile feature in https://github.com/Myriad-Dreamin/tinymist/pull/185
+
+### Compiler
+
+* (Fix) Set entry state on changing entry in https://github.com/Myriad-Dreamin/tinymist/pull/180
+  * will cause incorrect label completion.
+
+### Completion
+
+* Autocomplete with power of type inference in https://github.com/Myriad-Dreamin/tinymist/pull/183, https://github.com/Myriad-Dreamin/tinymist/pull/186, and https://github.com/Myriad-Dreamin/tinymist/pull/189
+  * See full list at https://github.com/Myriad-Dreamin/tinymist/blob/878a4146468b2a0e7a4435d7d0636df4f2133907/crates/tinymist-query/src/analysis/ty/builtin.rs
+* (Fix) slicing at an offset that is not char boundary in https://github.com/Myriad-Dreamin/tinymist/pull/188
+
+### Formatting
+
+* Bumped typstyle to v0.11.13 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/181
+
+### Syntax/Semantic Highlighting
+
+* Provided better grammar on incomplete heading in https://github.com/Myriad-Dreamin/tinymist/pull/187
+
+### Misc
+
+* (Fix) Improved release profile & fix typos by @QuarticCat in https://github.com/Myriad-Dreamin/tinymist/pull/177
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.3...v0.11.4
+
 ## v0.11.3 - [2024-04-06]
 
 ### Editor
