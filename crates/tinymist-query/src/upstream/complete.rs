@@ -9,6 +9,7 @@ use typst::foundations::{
     Repr, StyleChain, Styles, Type, Value,
 };
 use typst::model::Document;
+use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
 use typst::visualize::Color;
@@ -19,6 +20,7 @@ use crate::analysis::{analyze_expr, analyze_import, analyze_labels};
 use crate::AnalysisContext;
 
 mod ext;
+pub use ext::complete_path;
 use ext::*;
 
 /// Autocomplete a cursor position in a source file.
@@ -32,18 +34,23 @@ use ext::*;
 /// Passing a `document` (from a previous compilation) is optional, but enhances
 /// the autocompletions. Label completions, for instance, are only generated
 /// when the document is available.
-pub fn autocomplete(mut ctx: CompletionContext) -> Option<(usize, Vec<Completion>)> {
+pub fn autocomplete(
+    mut ctx: CompletionContext,
+) -> Option<(usize, bool, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
     let _ = complete_comments(&mut ctx)
-        || complete_field_accesses(&mut ctx)
-        || complete_open_labels(&mut ctx)
-        || complete_imports(&mut ctx)
-        || complete_rules(&mut ctx)
-        || complete_params(&mut ctx)
-        || complete_markup(&mut ctx)
-        || complete_math(&mut ctx)
-        || complete_code(&mut ctx);
+        || complete_literal(&mut ctx).is_none() && {
+            log::info!("continue after completing literal");
+            complete_field_accesses(&mut ctx)
+                || complete_open_labels(&mut ctx)
+                || complete_imports(&mut ctx)
+                || complete_rules(&mut ctx)
+                || complete_params(&mut ctx)
+                || complete_markup(&mut ctx)
+                || complete_math(&mut ctx)
+                || complete_code(&mut ctx)
+        };
 
-    Some((ctx.from, ctx.completions))
+    Some((ctx.from, ctx.incomplete, ctx.completions, ctx.completions2))
 }
 
 /// An autocompletion option.
@@ -76,6 +83,8 @@ pub enum CompletionKind {
     Type,
     /// A function parameter.
     Param,
+    /// A field.
+    Field,
     /// A constant.
     Constant,
     /// A symbol.
@@ -84,6 +93,8 @@ pub enum CompletionKind {
     Variable,
     /// A module.
     Module,
+    /// A file.
+    File,
     /// A folder.
     Folder,
 }
@@ -315,7 +326,7 @@ fn complete_math(ctx: &mut CompletionContext) -> bool {
 /// Add completions for math snippets.
 #[rustfmt::skip]
 fn math_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions_(true, |_| true);
+    ctx.scope_completions(true, |_| true);
 
     ctx.snippet_completion(
         "subscript",
@@ -600,7 +611,7 @@ fn complete_rules(ctx: &mut CompletionContext) -> bool {
 
 /// Add completions for all functions from the global scope.
 fn set_rule_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions_(true, |value| {
+    ctx.scope_completions(true, |value| {
         matches!(
             value,
             Value::Func(func) if func.params()
@@ -613,7 +624,7 @@ fn set_rule_completions(ctx: &mut CompletionContext) {
 
 /// Add completions for selectors.
 fn show_rule_selector_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions_(
+    ctx.scope_completions(
         false,
         |value| matches!(value, Value::Func(func) if func.element().is_some()),
     );
@@ -653,7 +664,7 @@ fn show_rule_recipe_completions(ctx: &mut CompletionContext) {
         "Transform the element with a function.",
     );
 
-    ctx.scope_completions_(false, |value| matches!(value, Value::Func(_)));
+    ctx.scope_completions(false, |value| matches!(value, Value::Func(_)));
 }
 
 /// Complete call and set rule parameters.
@@ -702,8 +713,13 @@ fn complete_params(ctx: &mut CompletionContext) -> bool {
             if let Some(next) = deciding.next_leaf() {
                 ctx.from = ctx.cursor.min(next.offset());
             }
+            let parent = deciding.parent().unwrap();
+            log::info!("named param parent: {:?}", parent);
+            // get type of this param
+            let ty = ctx.ctx.type_of(param.to_untyped());
+            log::info!("named param type: {:?}", ty);
 
-            named_param_value_completions(ctx, callee, &param);
+            named_param_value_completions(ctx, callee, &param, ty.as_ref());
             return true;
         }
     }
@@ -772,7 +788,7 @@ fn complete_code(ctx: &mut CompletionContext) -> bool {
 /// Add completions for expression snippets.
 #[rustfmt::skip]
 fn code_completions(ctx: &mut CompletionContext, hash: bool) {
-    ctx.scope_completions_(true, |value| !hash || {
+    ctx.scope_completions(true, |value| !hash || {
         matches!(value, Value::Symbol(_) | Value::Func(_) | Value::Type(_) | Value::Module(_))
     });
 
@@ -942,6 +958,8 @@ pub struct CompletionContext<'a, 'w> {
     pub explicit: bool,
     pub from: usize,
     pub completions: Vec<Completion>,
+    pub completions2: Vec<lsp_types::CompletionItem>,
+    pub incomplete: bool,
     pub seen_casts: HashSet<u128>,
 }
 
@@ -968,13 +986,16 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             cursor,
             explicit,
             from: cursor,
+            incomplete: true,
             completions: vec![],
+            completions2: vec![],
             seen_casts: HashSet::new(),
         })
     }
 
     /// A small window of context before the cursor.
     fn before_window(&self, size: usize) -> &str {
+        // todo: bad slicing
         &self.before[self.cursor.saturating_sub(size)..]
     }
 
@@ -1216,7 +1237,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         "color.hsl(${h}, ${s}, ${l}, ${a})",
                         "A custom HSLA color.",
                     );
-                    self.scope_completions_(false, |value| value.ty() == *ty);
+                    self.scope_completions(false, |value| value.ty() == *ty);
                 } else if *ty == Type::of::<Label>() {
                     self.label_completions()
                 } else if *ty == Type::of::<Func>() {
@@ -1233,7 +1254,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         detail: Some(eco_format!("A value of type {ty}.")),
                         command: None,
                     });
-                    self.scope_completions_(false, |value| value.ty() == *ty);
+                    self.scope_completions(false, |value| value.ty() == *ty);
                 }
             }
             CastInfo::Union(union) => {

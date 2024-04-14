@@ -12,8 +12,8 @@ pub mod linked_def;
 pub use linked_def::*;
 pub mod signature;
 pub use signature::*;
-pub mod r#type;
-pub(crate) use r#type::*;
+mod ty;
+pub(crate) use ty::*;
 pub mod track_values;
 pub use track_values::*;
 mod prelude;
@@ -28,7 +28,7 @@ mod type_check_tests {
 
     use typst::syntax::Source;
 
-    use crate::analysis::type_check;
+    use crate::analysis::ty;
     use crate::tests::*;
 
     use super::TypeCheckInfo;
@@ -38,7 +38,7 @@ mod type_check_tests {
         snapshot_testing("type_check", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let result = type_check(ctx, source.clone());
+            let result = ty::type_check(ctx, source.clone());
             let result = result
                 .as_deref()
                 .map(|e| format!("{:#?}", TypeCheckSnapshot(&source, e)));

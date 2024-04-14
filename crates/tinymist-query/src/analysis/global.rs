@@ -13,6 +13,7 @@ use reflexo::hash::hash128;
 use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
 use typst::eval::Eval;
 use typst::foundations;
+use typst::syntax::SyntaxNode;
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
     syntax::{package::PackageSpec, Source, Span, VirtualPath},
@@ -21,7 +22,9 @@ use typst::{
 use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
-use super::{DefUseInfo, ImportInfo, Signature, SignatureTarget, TypeCheckInfo};
+use super::{
+    DefUseInfo, FlowType, ImportInfo, PathPreference, Signature, SignatureTarget, TypeCheckInfo,
+};
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -246,7 +249,7 @@ impl AnalysisGlobalCaches {
     pub fn signature(&self, source: Option<Source>, func: &SignatureTarget) -> Option<Signature> {
         match func {
             SignatureTarget::Syntax(node) => {
-                // todo: performance
+                // todo: check performance on peeking signature source frequently
                 let cache = self.modules.get(&node.span().id()?)?;
                 if cache
                     .signature_source
@@ -276,7 +279,7 @@ impl AnalysisGlobalCaches {
         match func {
             SignatureTarget::Syntax(node) => {
                 let cache = self.modules.entry(node.span().id().unwrap()).or_default();
-                // todo: performance
+                // todo: check performance on peeking signature source frequently
                 if cache
                     .signature_source
                     .as_ref()
@@ -306,6 +309,7 @@ impl AnalysisGlobalCaches {
 #[derive(Default)]
 pub struct AnalysisCaches {
     modules: HashMap<TypstFileId, ModuleAnalysisCache>,
+    completion_files: OnceCell<Vec<PathBuf>>,
     root_files: OnceCell<Vec<TypstFileId>>,
     module_deps: OnceCell<HashMap<TypstFileId, ModuleDependency>>,
 }
@@ -374,15 +378,42 @@ impl<'w> AnalysisContext<'w> {
     }
 
     #[cfg(test)]
-    pub fn test_files(&mut self, f: impl FnOnce() -> Vec<TypstFileId>) -> &Vec<TypstFileId> {
-        self.caches.root_files.get_or_init(f)
+    pub fn test_completion_files(&mut self, f: impl FnOnce() -> Vec<PathBuf>) {
+        self.caches.completion_files.get_or_init(f);
     }
 
-    /// Get all the files in the workspace.
-    pub fn files(&mut self) -> &Vec<TypstFileId> {
+    #[cfg(test)]
+    pub fn test_files(&mut self, f: impl FnOnce() -> Vec<TypstFileId>) {
+        self.caches.root_files.get_or_init(f);
+    }
+
+    /// Get all the source files in the workspace.
+    pub(crate) fn completion_files(&self, pref: &PathPreference) -> impl Iterator<Item = &PathBuf> {
+        let r = pref.ext_matcher();
         self.caches
-            .root_files
-            .get_or_init(|| scan_workspace_files(&self.analysis.root))
+            .completion_files
+            .get_or_init(|| {
+                scan_workspace_files(
+                    &self.analysis.root,
+                    PathPreference::Special.ext_matcher(),
+                    |relative_path| relative_path.to_owned(),
+                )
+            })
+            .iter()
+            .filter(move |p| {
+                p.extension()
+                    .and_then(|p| p.to_str())
+                    .is_some_and(|e| r.is_match(e))
+            })
+    }
+
+    /// Get all the source files in the workspace.
+    pub fn source_files(&self) -> &Vec<TypstFileId> {
+        self.caches.root_files.get_or_init(|| {
+            self.completion_files(&PathPreference::Source)
+                .map(|p| TypstFileId::new(None, VirtualPath::new(p.as_path())))
+                .collect()
+        })
     }
 
     /// Get the module dependencies of the workspace.
@@ -492,7 +523,7 @@ impl<'w> AnalysisContext<'w> {
         let tl = cache.type_check.clone();
         let res = tl
             .compute(source, |_before, after| {
-                let next = crate::analysis::type_check(self, after);
+                let next = crate::analysis::ty::type_check(self, after);
                 next.or_else(|| tl.output.read().clone())
             })
             .ok()
@@ -586,7 +617,7 @@ impl<'w> AnalysisContext<'w> {
         f(&mut vm)
     }
 
-    pub(crate) fn mini_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
+    pub(crate) fn const_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
         Some(match rr {
             ast::Expr::None(_) => Value::None,
             ast::Expr::Auto(_) => Value::Auto,
@@ -595,8 +626,24 @@ impl<'w> AnalysisContext<'w> {
             ast::Expr::Float(v) => Value::Float(v.get()),
             ast::Expr::Numeric(v) => Value::numeric(v.get()),
             ast::Expr::Str(v) => Value::Str(v.get().into()),
-            e => return self.with_vm(|vm| e.eval(vm).ok()),
+            _ => return None,
         })
+    }
+
+    pub(crate) fn mini_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
+        self.const_eval(rr)
+            .or_else(|| self.with_vm(|vm| rr.eval(vm).ok()))
+    }
+
+    pub(crate) fn type_of(&mut self, rr: &SyntaxNode) -> Option<FlowType> {
+        self.type_of_span(rr.span())
+    }
+
+    pub(crate) fn type_of_span(&mut self, s: Span) -> Option<FlowType> {
+        let id = s.id()?;
+        let source = self.source_by_id(id).ok()?;
+        let ty_chk = self.type_check(source)?;
+        ty_chk.mapping.get(&s).cloned()
     }
 }
 

@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
 ---
 [
  {
-  "isIncomplete": true,
+  "isIncomplete": false,
   "items": [
    {
     "kind": 7,
@@ -215,7 +215,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
   ]
  },
  {
-  "isIncomplete": true,
+  "isIncomplete": false,
   "items": [
    {
     "kind": 3,

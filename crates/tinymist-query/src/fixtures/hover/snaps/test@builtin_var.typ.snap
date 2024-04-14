@@ -4,6 +4,6 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/hover/builtin_var.typ
 ---
 {
- "contents": "```typst\nrgb(\"#ff4136\")\n```",
+ "contents": "```typc\nrgb(\"#ff4136\")\n```",
  "range": "0:20:0:23"
 }

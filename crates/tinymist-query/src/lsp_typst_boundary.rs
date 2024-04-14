@@ -272,11 +272,13 @@ pub mod typst_to_lsp {
             TypstCompletionKind::Syntax => LspCompletionKind::SNIPPET,
             TypstCompletionKind::Func => LspCompletionKind::FUNCTION,
             TypstCompletionKind::Param => LspCompletionKind::VARIABLE,
+            TypstCompletionKind::Field => LspCompletionKind::FIELD,
             TypstCompletionKind::Variable => LspCompletionKind::VARIABLE,
             TypstCompletionKind::Constant => LspCompletionKind::CONSTANT,
             TypstCompletionKind::Symbol(_) => LspCompletionKind::FIELD,
             TypstCompletionKind::Type => LspCompletionKind::CLASS,
             TypstCompletionKind::Module => LspCompletionKind::MODULE,
+            TypstCompletionKind::File => LspCompletionKind::FILE,
             TypstCompletionKind::Folder => LspCompletionKind::FOLDER,
         }
     }
@@ -324,7 +326,7 @@ pub mod typst_to_lsp {
         let lsp_marked_string = match typst_tooltip {
             TypstTooltip::Text(text) => MarkedString::String(text.to_string()),
             TypstTooltip::Code(code) => MarkedString::LanguageString(LanguageString {
-                language: "typst".to_owned(),
+                language: "typc".to_owned(),
                 value: code.to_string(),
             }),
         };
