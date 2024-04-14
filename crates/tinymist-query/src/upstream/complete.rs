@@ -995,8 +995,11 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
     /// A small window of context before the cursor.
     fn before_window(&self, size: usize) -> &str {
-        // todo: bad slicing
-        &self.before[self.cursor.saturating_sub(size)..]
+        safe_str_slice(
+            self.before,
+            self.cursor.saturating_sub(size),
+            self.before.len(),
+        )
     }
 
     /// Add a prefix and suffix to all applications.
@@ -1263,5 +1266,22 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                 }
             }
         }
+    }
+}
+
+fn safe_str_slice(s: &str, mut start: usize, mut end: usize) -> &str {
+    // todo: bad slicing
+    // &self.before[self.cursor.saturating_sub(size)..]
+    while start < s.len() && !s.is_char_boundary(start) {
+        start += 1;
+    }
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+
+    if end >= start {
+        &s[start..end]
+    } else {
+        ""
     }
 }
