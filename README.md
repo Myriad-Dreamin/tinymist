@@ -47,7 +47,7 @@ Extra features:
 - [Editor tools](https://github.com/Myriad-Dreamin/tinymist/tree/main/tools/editor-tools):
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
   - Click a button in template gallery to initialize a new project with a template. (`tinymist.initTemplate` and `tinymist.initTemplateInPlace`)
-  - Trace execution in current document. (`tinymist.traceCurrentFile`)
+  - Trace execution in current document. (`tinymist.profileCurrentFile`)
 
 
 ## Installation
