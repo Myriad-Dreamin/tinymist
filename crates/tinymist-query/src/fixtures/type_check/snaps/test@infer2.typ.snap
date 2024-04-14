@@ -35,12 +35,12 @@ input_file: crates/tinymist-query/src/fixtures/type_check/infer2.typ
 165..168 -> Color
 170..181 -> Stroke
 178..181 -> Stroke
-183..194 -> (Type(relative length) | Type(dictionary))
-191..194 -> (Type(relative length) | Type(dictionary))
-196..206 -> (Type(relative length) | Type(dictionary))
-203..206 -> (Type(relative length) | Type(dictionary))
-208..219 -> (Type(relative length) | Type(dictionary))
-216..219 -> (Type(relative length) | Type(dictionary))
+183..194 -> Radius
+191..194 -> Radius
+196..206 -> Inset
+203..206 -> Inset
+208..219 -> Outset
+216..219 -> Outset
 222..253 -> Element(ellipse)
 230..239 -> Color
 236..239 -> Color

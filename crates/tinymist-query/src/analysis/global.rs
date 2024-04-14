@@ -378,8 +378,13 @@ impl<'w> AnalysisContext<'w> {
     }
 
     #[cfg(test)]
-    pub fn test_files(&mut self, f: impl FnOnce() -> Vec<TypstFileId>) -> &Vec<TypstFileId> {
-        self.caches.root_files.get_or_init(f)
+    pub fn test_completion_files(&mut self, f: impl FnOnce() -> Vec<PathBuf>) {
+        self.caches.completion_files.get_or_init(f);
+    }
+
+    #[cfg(test)]
+    pub fn test_files(&mut self, f: impl FnOnce() -> Vec<TypstFileId>) {
+        self.caches.root_files.get_or_init(f);
     }
 
     /// Get all the source files in the workspace.

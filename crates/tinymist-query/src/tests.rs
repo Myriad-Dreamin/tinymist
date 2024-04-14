@@ -78,6 +78,7 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
                         caches: Default::default(),
                     },
                 );
+                ctx.test_completion_files(Vec::new);
                 ctx.test_files(|| paths);
                 f(&mut ctx, p);
             });
