@@ -131,7 +131,7 @@ impl StatefulRequest for CompletionRequest {
         }
 
         let mut completion_items_rest = None;
-        let mut is_incomplete = true;
+        let is_incomplete = false;
 
         let mut items = completion_result.or_else(|| {
             let cc_ctx = CompletionContext::new(ctx, doc, &source, cursor, explicit)?;
@@ -139,7 +139,10 @@ impl StatefulRequest for CompletionRequest {
             if !completions_items2.is_empty() {
                 completion_items_rest = Some(completions_items2);
             }
-            is_incomplete = ic;
+            // todo: define it well, we were needing it because we wanted to do interactive
+            // path completion, but now we've scanned all the paths at the same time.
+            // is_incomplete = ic;
+            let _ = ic;
 
             let replace_range;
             if match_ident.as_ref().is_some_and(|i| i.offset() == offset) {

@@ -1,5 +1,6 @@
 use ecow::EcoVec;
 use once_cell::sync::Lazy;
+use regex::RegexSet;
 use typst::{
     foundations::{Func, ParamInfo, Value},
     syntax::Span,
@@ -10,6 +11,7 @@ use super::{FlowRecord, FlowType};
 #[derive(Debug, Clone, Hash)]
 pub(crate) enum PathPreference {
     None,
+    Special,
     Source,
     Csv,
     Image,
@@ -23,32 +25,58 @@ pub(crate) enum PathPreference {
 }
 
 impl PathPreference {
-    pub(crate) fn match_ext(&self, ext: &std::ffi::OsStr) -> bool {
-        let ext = || ext.to_str().map(|e| e.to_lowercase()).unwrap_or_default();
+    pub fn ext_matcher(&self) -> &'static RegexSet {
+        static SOURCE_REGSET: Lazy<RegexSet> =
+            Lazy::new(|| RegexSet::new([r"^typ$", r"^typc$"]).unwrap());
+        static IMAGE_REGSET: Lazy<RegexSet> = Lazy::new(|| {
+            RegexSet::new([
+                r"^png$", r"^webp$", r"^jpg$", r"^jpeg$", r"^svg$", r"^svgz$",
+            ])
+            .unwrap()
+        });
+        static JSON_REGSET: Lazy<RegexSet> =
+            Lazy::new(|| RegexSet::new([r"^json$", r"^jsonc$", r"^json5$"]).unwrap());
+        static YAML_REGSET: Lazy<RegexSet> =
+            Lazy::new(|| RegexSet::new([r"^yaml$", r"^yml$"]).unwrap());
+        static XML_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^xml$"]).unwrap());
+        static TOML_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^toml$"]).unwrap());
+        static CSV_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^csv$"]).unwrap());
+        static BIB_REGSET: Lazy<RegexSet> =
+            Lazy::new(|| RegexSet::new([r"^yaml$", r"^yml$", r"^bib$"]).unwrap());
+        static RAW_THEME_REGSET: Lazy<RegexSet> =
+            Lazy::new(|| RegexSet::new([r"^tmTheme$", r"^xml$"]).unwrap());
+        static RAW_SYNTAX_REGSET: Lazy<RegexSet> =
+            Lazy::new(|| RegexSet::new([r"^tmLanguage$", r"^sublime-syntax$"]).unwrap());
+        static ALL_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r".*"]).unwrap());
+        static ALL_SPECIAL_REGSET: Lazy<RegexSet> = Lazy::new(|| {
+            RegexSet::new({
+                let patterns = SOURCE_REGSET.patterns();
+                let patterns = patterns.iter().chain(IMAGE_REGSET.patterns());
+                let patterns = patterns.chain(JSON_REGSET.patterns());
+                let patterns = patterns.chain(YAML_REGSET.patterns());
+                let patterns = patterns.chain(XML_REGSET.patterns());
+                let patterns = patterns.chain(TOML_REGSET.patterns());
+                let patterns = patterns.chain(CSV_REGSET.patterns());
+                let patterns = patterns.chain(BIB_REGSET.patterns());
+                let patterns = patterns.chain(RAW_THEME_REGSET.patterns());
+                patterns.chain(RAW_SYNTAX_REGSET.patterns())
+            })
+            .unwrap()
+        });
 
         match self {
-            PathPreference::None => true,
-            PathPreference::Source => {
-                matches!(ext().as_ref(), "typ")
-            }
-            PathPreference::Image => {
-                matches!(
-                    ext().as_ref(),
-                    "png" | "webp" | "jpg" | "jpeg" | "svg" | "svgz"
-                )
-            }
-            PathPreference::Json => {
-                matches!(ext().as_ref(), "json" | "jsonc" | "json5")
-            }
-            PathPreference::Yaml => matches!(ext().as_ref(), "yaml" | "yml"),
-            PathPreference::Xml => matches!(ext().as_ref(), "xml"),
-            PathPreference::Toml => matches!(ext().as_ref(), "toml"),
-            PathPreference::Csv => matches!(ext().as_ref(), "csv"),
-            PathPreference::Bibliography => matches!(ext().as_ref(), "yaml" | "yml" | "bib"),
-            PathPreference::RawSyntax => {
-                matches!(ext().as_ref(), "tmLanguage" | "sublime-syntax")
-            }
-            PathPreference::RawTheme => matches!(ext().as_ref(), "tmTheme" | "xml"),
+            PathPreference::None => &ALL_REGSET,
+            PathPreference::Special => &ALL_SPECIAL_REGSET,
+            PathPreference::Source => &SOURCE_REGSET,
+            PathPreference::Csv => &CSV_REGSET,
+            PathPreference::Image => &IMAGE_REGSET,
+            PathPreference::Json => &JSON_REGSET,
+            PathPreference::Yaml => &YAML_REGSET,
+            PathPreference::Xml => &XML_REGSET,
+            PathPreference::Toml => &TOML_REGSET,
+            PathPreference::Bibliography => &BIB_REGSET,
+            PathPreference::RawTheme => &RAW_THEME_REGSET,
+            PathPreference::RawSyntax => &RAW_SYNTAX_REGSET,
         }
     }
 }
@@ -93,8 +121,8 @@ pub(in crate::analysis::ty) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<
         ("text", "font") => Some(FlowType::Builtin(FlowBuiltinType::TextFont)),
         (
             // todo: polygon.regular
-            "highlight" | "text" | "path" | "rect" | "ellipse" | "circle" | "polygon" | "box"
-            | "block" | "table" | "regular",
+            "page" | "highlight" | "text" | "path" | "rect" | "ellipse" | "circle" | "polygon"
+            | "box" | "block" | "table" | "regular",
             "fill",
         ) => Some(FlowType::Builtin(FlowBuiltinType::Color)),
         (

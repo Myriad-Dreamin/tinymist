@@ -22,7 +22,9 @@ use typst::{
 use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
-use super::{DefUseInfo, FlowType, ImportInfo, Signature, SignatureTarget, TypeCheckInfo};
+use super::{
+    DefUseInfo, FlowType, ImportInfo, PathPreference, Signature, SignatureTarget, TypeCheckInfo,
+};
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -307,6 +309,7 @@ impl AnalysisGlobalCaches {
 #[derive(Default)]
 pub struct AnalysisCaches {
     modules: HashMap<TypstFileId, ModuleAnalysisCache>,
+    completion_files: OnceCell<Vec<PathBuf>>,
     root_files: OnceCell<Vec<TypstFileId>>,
     module_deps: OnceCell<HashMap<TypstFileId, ModuleDependency>>,
 }
@@ -379,11 +382,33 @@ impl<'w> AnalysisContext<'w> {
         self.caches.root_files.get_or_init(f)
     }
 
-    /// Get all the files in the workspace.
-    pub fn files(&mut self) -> &Vec<TypstFileId> {
+    /// Get all the source files in the workspace.
+    pub(crate) fn completion_files(&self, pref: &PathPreference) -> impl Iterator<Item = &PathBuf> {
+        let r = pref.ext_matcher();
         self.caches
-            .root_files
-            .get_or_init(|| scan_workspace_files(&self.analysis.root))
+            .completion_files
+            .get_or_init(|| {
+                scan_workspace_files(
+                    &self.analysis.root,
+                    PathPreference::Special.ext_matcher(),
+                    |relative_path| relative_path.to_owned(),
+                )
+            })
+            .iter()
+            .filter(move |p| {
+                p.extension()
+                    .and_then(|p| p.to_str())
+                    .is_some_and(|e| r.is_match(e))
+            })
+    }
+
+    /// Get all the source files in the workspace.
+    pub fn source_files(&self) -> &Vec<TypstFileId> {
+        self.caches.root_files.get_or_init(|| {
+            self.completion_files(&PathPreference::Source)
+                .map(|p| TypstFileId::new(None, VirtualPath::new(p.as_path())))
+                .collect()
+        })
     }
 
     /// Get the module dependencies of the workspace.

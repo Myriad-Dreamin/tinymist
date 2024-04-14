@@ -720,27 +720,14 @@ pub fn complete_path(
         return None;
     }
 
-    let dirs = ctx.analysis.root.join(compl_path);
+    let dirs = ctx.analysis.root.clone();
     log::debug!("compl_dirs: {dirs:?}");
     // find directory or files in the path
     let mut folder_completions = vec![];
     let mut module_completions = vec![];
     // todo: test it correctly
-    for entry in dirs.read_dir().ok()? {
-        let Ok(entry) = entry else {
-            continue;
-        };
-        let path = entry.path();
+    for path in ctx.completion_files(p) {
         log::debug!("compl_check_path: {path:?}");
-        if !path.is_dir() && !path.extension().is_some_and(|ext| p.match_ext(ext)) {
-            continue;
-        }
-        if path
-            .file_name()
-            .is_some_and(|name| name.to_string_lossy().starts_with('.'))
-        {
-            continue;
-        }
 
         // diff with root
         let path = dirs.join(path);
@@ -762,33 +749,29 @@ pub fn complete_path(
         log::debug!("compl_label: {label:?}");
 
         if path.is_dir() {
-            folder_completions.push(Completion {
-                label,
-                kind: CompletionKind::Folder,
-                apply: None,
-                detail: None,
-                command: None,
-            });
+            folder_completions.push((label, CompletionKind::Folder));
         } else {
-            let kind = if label.as_str().ends_with(".typ") {
-                CompletionKind::Module
-            } else {
-                CompletionKind::File
-            };
-            module_completions.push(Completion {
-                label,
-                kind,
-                apply: None,
-                detail: None,
-                command: None,
-            });
+            module_completions.push((label, CompletionKind::File));
         }
     }
 
     let replace_range = ctx.to_lsp_range(rng, source);
 
-    module_completions.sort_by(|a, b| a.label.cmp(&b.label));
-    folder_completions.sort_by(|a, b| a.label.cmp(&b.label));
+    let path_priority_cmp = |a: &str, b: &str| {
+        // files are more important than dot started paths
+        if a.starts_with('.') || b.starts_with('.') {
+            // compare consecutive dots and slashes
+            let a_prefix = a.chars().take_while(|c| *c == '.' || *c == '/').count();
+            let b_prefix = b.chars().take_while(|c| *c == '.' || *c == '/').count();
+            if a_prefix != b_prefix {
+                return a_prefix.cmp(&b_prefix);
+            }
+        }
+        a.cmp(b)
+    };
+
+    module_completions.sort_by(|a, b| path_priority_cmp(&a.0, &b.0));
+    folder_completions.sort_by(|a, b| path_priority_cmp(&a.0, &b.0));
 
     let mut sorter = 0;
     let digits = (module_completions.len() + folder_completions.len())
@@ -798,10 +781,7 @@ pub fn complete_path(
     Some(
         completions
             .map(|typst_completion| {
-                let lsp_snippet = typst_completion
-                    .apply
-                    .as_ref()
-                    .unwrap_or(&typst_completion.label);
+                let lsp_snippet = &typst_completion.0;
                 let text_edit = CompletionTextEdit::Edit(TextEdit::new(
                     replace_range,
                     if is_in_text {
@@ -814,10 +794,11 @@ pub fn complete_path(
                 let sort_text = format!("{sorter:0>digits$}");
                 sorter += 1;
 
+                // todo: no all clients support label details
                 let res = LspCompletion {
-                    label: typst_completion.label.to_string(),
-                    kind: Some(completion_kind(typst_completion.kind.clone())),
-                    detail: typst_completion.detail.as_ref().map(String::from),
+                    label: typst_completion.0.to_string(),
+                    kind: Some(completion_kind(typst_completion.1.clone())),
+                    detail: None,
                     text_edit: Some(text_edit),
                     // don't sort me
                     sort_text: Some(sort_text),
