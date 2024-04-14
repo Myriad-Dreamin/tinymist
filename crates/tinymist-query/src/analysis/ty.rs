@@ -509,13 +509,29 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         Some(FlowType::Any)
     }
 
+    // todo: merge with func call, and regard difference (may be here)
     fn check_set(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
         let set_rule: ast::SetRule = root.cast()?;
 
-        let _target = self.check_expr_in(set_rule.target().span(), root.clone());
-        let _args = self.check_expr_in(set_rule.args().span(), root);
+        let callee = self.check_expr_in(set_rule.target().span(), root.clone());
+        let args = self.check_expr_in(set_rule.args().span(), root.clone());
+        let mut candidates = Vec::with_capacity(1);
 
-        Some(FlowType::Any)
+        log::debug!("set rule: {callee:?} with {args:?}");
+
+        if let FlowType::Args(args) = args {
+            self.check_apply(callee, &args, &set_rule.args(), &mut candidates)?;
+        }
+
+        if candidates.len() == 1 {
+            return Some(candidates[0].clone());
+        }
+
+        if candidates.is_empty() {
+            return Some(FlowType::Any);
+        }
+
+        Some(FlowType::Union(Box::new(candidates)))
     }
 
     fn check_show(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
