@@ -814,3 +814,19 @@ pub fn complete_path(
             .collect_vec(),
     )
 }
+
+#[cfg(test)]
+
+mod tests {
+    use crate::upstream::complete::safe_str_slice;
+
+    #[test]
+    fn test_before() {
+        const TEST_UTF8_STR: &str = "我们";
+        for i in 0..=TEST_UTF8_STR.len() {
+            for j in 0..=TEST_UTF8_STR.len() {
+                let _s = std::hint::black_box(safe_str_slice(TEST_UTF8_STR, i, j));
+            }
+        }
+    }
+}
