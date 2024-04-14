@@ -19,7 +19,7 @@ This version is published with mostly internal optimizations.
 
 ### Completion
 
-* Autocomplete with power of type inference in https://github.com/Myriad-Dreamin/tinymist/pull/183, https://github.com/Myriad-Dreamin/tinymist/pull/186, and https://github.com/Myriad-Dreamin/tinymist/pull/189
+* Autocompleting with power of type inference in https://github.com/Myriad-Dreamin/tinymist/pull/183, https://github.com/Myriad-Dreamin/tinymist/pull/186, and https://github.com/Myriad-Dreamin/tinymist/pull/189
   * See full list at https://github.com/Myriad-Dreamin/tinymist/blob/878a4146468b2a0e7a4435d7d0636df4f2133907/crates/tinymist-query/src/analysis/ty/builtin.rs
 * (Fix) slicing at an offset that is not char boundary in https://github.com/Myriad-Dreamin/tinymist/pull/188
 
