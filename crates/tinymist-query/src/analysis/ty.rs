@@ -118,10 +118,12 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::CodeBlock => return self.check_in_mode(root, InterpretMode::Code),
             SyntaxKind::ContentBlock => return self.check_in_mode(root, InterpretMode::Markup),
 
+            // todo: space effect
+            SyntaxKind::Space => FlowType::None,
+            SyntaxKind::Parbreak => FlowType::None,
+
             SyntaxKind::Text => FlowType::Content,
-            SyntaxKind::Space => FlowType::Content,
             SyntaxKind::Linebreak => FlowType::Content,
-            SyntaxKind::Parbreak => FlowType::Content,
             SyntaxKind::Escape => FlowType::Content,
             SyntaxKind::Shorthand => FlowType::Content,
             SyntaxKind::SmartQuote => FlowType::Content,
@@ -265,10 +267,12 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     }
 
     fn check_children(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+        let mut joiner = Joiner::default();
+
         for child in root.children() {
-            self.check(child);
+            joiner.join(self.check(child));
         }
-        Some(FlowType::Content)
+        Some(joiner.finalize())
     }
 
     fn check_ident(&mut self, root: LinkedNode<'_>, mode: InterpretMode) -> Option<FlowType> {
@@ -350,32 +354,10 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let op = binary.op();
         let lhs = self.check_expr_in(binary.lhs().span(), root.clone());
         let rhs = self.check_expr_in(binary.rhs().span(), root);
-        let repr = Box::new((lhs, rhs));
-
-        let ty = match op {
-            ast::BinOp::Add => FlowBinaryType::Add(repr),
-            ast::BinOp::Sub => FlowBinaryType::Sub(repr),
-            ast::BinOp::Mul => FlowBinaryType::Mul(repr),
-            ast::BinOp::Div => FlowBinaryType::Div(repr),
-            ast::BinOp::And => FlowBinaryType::And(repr),
-            ast::BinOp::Or => FlowBinaryType::Or(repr),
-            ast::BinOp::Eq => FlowBinaryType::Eq(repr),
-            ast::BinOp::Neq => FlowBinaryType::Neq(repr),
-            ast::BinOp::Lt => FlowBinaryType::Lt(repr),
-            ast::BinOp::Leq => FlowBinaryType::Leq(repr),
-            ast::BinOp::Gt => FlowBinaryType::Gt(repr),
-            ast::BinOp::Geq => FlowBinaryType::Geq(repr),
-            ast::BinOp::Assign => FlowBinaryType::Assign(repr),
-            ast::BinOp::In => FlowBinaryType::In(repr),
-            ast::BinOp::NotIn => FlowBinaryType::NotIn(repr),
-            ast::BinOp::AddAssign => FlowBinaryType::AddAssign(repr),
-            ast::BinOp::SubAssign => FlowBinaryType::SubAssign(repr),
-            ast::BinOp::MulAssign => FlowBinaryType::MulAssign(repr),
-            ast::BinOp::DivAssign => FlowBinaryType::DivAssign(repr),
-        };
+        let operands = Box::new((lhs, rhs));
 
         // Some(FlowType::Binary(ty))
-        Some(FlowType::Binary(ty))
+        Some(FlowType::Binary(FlowBinaryType { op, operands }))
     }
 
     fn check_field_access(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
@@ -545,25 +527,26 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         Some(FlowType::Any)
     }
 
+    // currently we do nothing on contextual
     fn check_contextual(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
         let contextual: ast::Contextual = root.cast()?;
 
-        let _body = self.check_expr_in(contextual.body().span(), root);
+        let body = self.check_expr_in(contextual.body().span(), root);
 
-        Some(FlowType::Content)
+        Some(FlowType::Unary(FlowUnaryType::Context(Box::new(body))))
     }
 
     fn check_conditional(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
         let conditional: ast::Conditional = root.cast()?;
 
-        let _cond = self.check_expr_in(conditional.condition().span(), root.clone());
-        let _then = self.check_expr_in(conditional.if_body().span(), root.clone());
-        let _else = conditional
+        let cond = self.check_expr_in(conditional.condition().span(), root.clone());
+        let then = self.check_expr_in(conditional.if_body().span(), root.clone());
+        let else_ = conditional
             .else_body()
             .map(|else_body| self.check_expr_in(else_body.span(), root.clone()))
             .unwrap_or(FlowType::None);
 
-        Some(FlowType::Any)
+        Some(FlowType::If(Box::new(FlowIfType { cond, then, else_ })))
     }
 
     fn check_while_loop(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
@@ -749,6 +732,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
             FlowType::Unary(_) => {}
             FlowType::Binary(_) => {}
+            FlowType::If(_) => {}
             FlowType::Element(_elem) => {}
         }
 
@@ -931,6 +915,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::At(e) => self.check_primary_type(e.0 .0.clone()),
             FlowType::Unary(_) => e,
             FlowType::Binary(_) => e,
+            FlowType::If(_) => e,
             FlowType::Element(_) => e,
         }
     }
@@ -1138,6 +1123,11 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 self.analyze(lhs, pol);
                 self.analyze(rhs, pol);
             }
+            FlowType::If(i) => {
+                self.analyze(&i.cond, pol);
+                self.analyze(&i.then, pol);
+                self.analyze(&i.else_, pol);
+            }
             FlowType::Union(v) => {
                 for ty in v.iter() {
                     self.analyze(ty, pol);
@@ -1267,6 +1257,11 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
 
                 FlowType::Binary(b2)
             }
+            FlowType::If(i) => {
+                let i2 = i.clone();
+
+                FlowType::If(i2)
+            }
             FlowType::Union(v) => {
                 let v2 = v.iter().map(|ty| self.transform(ty, pol)).collect();
 
@@ -1301,4 +1296,90 @@ fn to_ident_ref(root: &LinkedNode, c: ast::Ident) -> Option<IdentRef> {
         name: c.get().to_string(),
         range: root.find(c.span())?.range(),
     })
+}
+
+struct Joiner {
+    break_or_continue_or_return: bool,
+    definite: FlowType,
+    possibles: Vec<FlowType>,
+}
+impl Joiner {
+    fn finalize(self) -> FlowType {
+        if self.possibles.is_empty() {
+            return self.definite;
+        }
+
+        // let mut definite = self.definite.clone();
+        // for p in &self.possibles {
+        //     definite = definite.join(p);
+        // }
+
+        // println!("possibles: {:?} {:?}", self.definite, self.possibles);
+
+        FlowType::Any
+    }
+
+    fn join(&mut self, child: FlowType) {
+        if self.break_or_continue_or_return {
+            return;
+        }
+
+        match (child, &self.definite) {
+            (FlowType::Clause, _) => {}
+            (FlowType::Undef, _) => {}
+            (FlowType::Any, _) | (_, FlowType::Any) => {}
+            (FlowType::Infer, _) => {}
+            (FlowType::None, _) => {}
+            // todo: mystery flow none
+            (FlowType::FlowNone, _) => {}
+            (FlowType::Content, FlowType::Content) => {}
+            (FlowType::Content, FlowType::None) => self.definite = FlowType::Content,
+            (FlowType::Content, _) => self.definite = FlowType::Undef,
+            (FlowType::Var(v), _) => self.possibles.push(FlowType::Var(v)),
+            // todo: check possibles
+            (FlowType::Array, FlowType::None) => self.definite = FlowType::Array,
+            (FlowType::Array, _) => self.definite = FlowType::Undef,
+            // todo: possible some style
+            (FlowType::Auto, FlowType::None) => self.definite = FlowType::Auto,
+            (FlowType::Auto, _) => self.definite = FlowType::Undef,
+            (FlowType::Builtin(b), FlowType::None) => self.definite = FlowType::Builtin(b),
+            (FlowType::Builtin(..), _) => self.definite = FlowType::Undef,
+            // todo: value join
+            (FlowType::Value(v), FlowType::None) => self.definite = FlowType::Value(v),
+            (FlowType::Value(..), _) => self.definite = FlowType::Undef,
+            (FlowType::ValueDoc(v), FlowType::None) => self.definite = FlowType::ValueDoc(v),
+            (FlowType::ValueDoc(..), _) => self.definite = FlowType::Undef,
+            (FlowType::Element(e), FlowType::None) => self.definite = FlowType::Element(e),
+            (FlowType::Element(..), _) => self.definite = FlowType::Undef,
+            (FlowType::Func(f), FlowType::None) => self.definite = FlowType::Func(f),
+            (FlowType::Func(..), _) => self.definite = FlowType::Undef,
+            (FlowType::Dict(w), FlowType::None) => self.definite = FlowType::Dict(w),
+            (FlowType::Dict(..), _) => self.definite = FlowType::Undef,
+            (FlowType::With(w), FlowType::None) => self.definite = FlowType::With(w),
+            (FlowType::With(..), _) => self.definite = FlowType::Undef,
+            (FlowType::Args(w), FlowType::None) => self.definite = FlowType::Args(w),
+            (FlowType::Args(..), _) => self.definite = FlowType::Undef,
+            (FlowType::At(w), FlowType::None) => self.definite = FlowType::At(w),
+            (FlowType::At(..), _) => self.definite = FlowType::Undef,
+            (FlowType::Unary(w), FlowType::None) => self.definite = FlowType::Unary(w),
+            (FlowType::Unary(..), _) => self.definite = FlowType::Undef,
+            (FlowType::Binary(w), FlowType::None) => self.definite = FlowType::Binary(w),
+            (FlowType::Binary(..), _) => self.definite = FlowType::Undef,
+            (FlowType::If(w), FlowType::None) => self.definite = FlowType::If(w),
+            (FlowType::If(..), _) => self.definite = FlowType::Undef,
+            (FlowType::Union(w), FlowType::None) => self.definite = FlowType::Union(w),
+            (FlowType::Union(..), _) => self.definite = FlowType::Undef,
+            (FlowType::Let(w), FlowType::None) => self.definite = FlowType::Let(w),
+            (FlowType::Let(..), _) => self.definite = FlowType::Undef,
+        }
+    }
+}
+impl Default for Joiner {
+    fn default() -> Self {
+        Self {
+            break_or_continue_or_return: false,
+            definite: FlowType::None,
+            possibles: Vec::new(),
+        }
+    }
 }

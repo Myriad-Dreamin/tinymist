@@ -441,6 +441,7 @@ fn type_completion(
         FlowType::Var(_) => return None,
         FlowType::Unary(_) => return None,
         FlowType::Binary(_) => return None,
+        FlowType::If(_) => return None,
         FlowType::Value(v) => {
             if let Value::Type(ty) = &v.0 {
                 if *ty == Type::of::<NoneValue>() {
