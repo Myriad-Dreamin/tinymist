@@ -1015,8 +1015,6 @@ impl TypstLanguageServer {
             }
         }
 
-        // todo: watch changes of the root path
-
         Ok(())
     }
 

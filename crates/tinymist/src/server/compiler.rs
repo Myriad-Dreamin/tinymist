@@ -197,7 +197,6 @@ impl CompileServer {
     }
 
     fn get_notify_cmds() -> NotifyCmdMap {
-        // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
         // use lsp_types::notification::*;
         NotifyCmdMap::from_iter([
             // notify_fn!(DidOpenTextDocument, Self::did_open),
@@ -360,7 +359,8 @@ impl CompileServer {
             e.sync_config(self.config.clone());
         }
 
-        info!("new settings applied");
+        // todo: watch changes of the root path
+
         if config.output_path != self.config.output_path
             || config.export_pdf != self.config.export_pdf
         {
@@ -376,8 +376,7 @@ impl CompileServer {
                 .change_export_pdf(config.clone());
         }
 
-        // todo: watch changes of the root path
-
+        info!("new settings applied");
         Ok(())
     }
 }
