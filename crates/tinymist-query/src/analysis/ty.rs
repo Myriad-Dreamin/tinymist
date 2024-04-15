@@ -350,7 +350,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let op = binary.op();
         let lhs = self.check_expr_in(binary.lhs().span(), root.clone());
         let rhs = self.check_expr_in(binary.rhs().span(), root);
-        let repr = FlowBinaryRepr(Box::new((lhs, rhs)));
+        let repr = Box::new((lhs, rhs));
 
         let ty = match op {
             ast::BinOp::Add => FlowBinaryType::Add(repr),
@@ -1134,9 +1134,9 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             }
             FlowType::Unary(u) => self.analyze(u.lhs(), pol),
             FlowType::Binary(b) => {
-                let repr = b.repr();
-                self.analyze(&repr.0 .0, pol);
-                self.analyze(&repr.0 .1, pol);
+                let (lhs, rhs) = b.repr();
+                self.analyze(lhs, pol);
+                self.analyze(rhs, pol);
             }
             FlowType::Union(v) => {
                 for ty in v.iter() {

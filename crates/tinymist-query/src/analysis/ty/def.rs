@@ -166,29 +166,29 @@ impl FlowUnaryType {
 
 #[derive(Debug, Clone, Hash)]
 pub(crate) enum FlowBinaryType {
-    Add(FlowBinaryRepr),
-    Sub(FlowBinaryRepr),
-    Mul(FlowBinaryRepr),
-    Div(FlowBinaryRepr),
-    And(FlowBinaryRepr),
-    Or(FlowBinaryRepr),
-    Eq(FlowBinaryRepr),
-    Neq(FlowBinaryRepr),
-    Lt(FlowBinaryRepr),
-    Leq(FlowBinaryRepr),
-    Gt(FlowBinaryRepr),
-    Geq(FlowBinaryRepr),
-    Assign(FlowBinaryRepr),
-    In(FlowBinaryRepr),
-    NotIn(FlowBinaryRepr),
-    AddAssign(FlowBinaryRepr),
-    SubAssign(FlowBinaryRepr),
-    MulAssign(FlowBinaryRepr),
-    DivAssign(FlowBinaryRepr),
+    Add(Box<(FlowType, FlowType)>),
+    Sub(Box<(FlowType, FlowType)>),
+    Mul(Box<(FlowType, FlowType)>),
+    Div(Box<(FlowType, FlowType)>),
+    And(Box<(FlowType, FlowType)>),
+    Or(Box<(FlowType, FlowType)>),
+    Eq(Box<(FlowType, FlowType)>),
+    Neq(Box<(FlowType, FlowType)>),
+    Lt(Box<(FlowType, FlowType)>),
+    Leq(Box<(FlowType, FlowType)>),
+    Gt(Box<(FlowType, FlowType)>),
+    Geq(Box<(FlowType, FlowType)>),
+    Assign(Box<(FlowType, FlowType)>),
+    In(Box<(FlowType, FlowType)>),
+    NotIn(Box<(FlowType, FlowType)>),
+    AddAssign(Box<(FlowType, FlowType)>),
+    SubAssign(Box<(FlowType, FlowType)>),
+    MulAssign(Box<(FlowType, FlowType)>),
+    DivAssign(Box<(FlowType, FlowType)>),
 }
 
 impl FlowBinaryType {
-    pub fn repr(&self) -> &FlowBinaryRepr {
+    pub fn repr(&self) -> (&FlowType, &FlowType) {
         match self {
             FlowBinaryType::Add(r)
             | FlowBinaryType::Sub(r)
@@ -208,7 +208,7 @@ impl FlowBinaryType {
             | FlowBinaryType::AddAssign(r)
             | FlowBinaryType::SubAssign(r)
             | FlowBinaryType::MulAssign(r)
-            | FlowBinaryType::DivAssign(r) => r,
+            | FlowBinaryType::DivAssign(r) => (&r.0, &r.1),
         }
     }
 }
