@@ -117,8 +117,10 @@ pub(in crate::analysis::ty) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<
             PathPreference::Bibliography,
         ))),
         ("text", "size") => Some(FlowType::Builtin(FlowBuiltinType::TextSize)),
-        ("text" | "stack", "dir") => Some(FlowType::Builtin(FlowBuiltinType::Dir)),
         ("text", "font") => Some(FlowType::Builtin(FlowBuiltinType::TextFont)),
+        ("text", "lang") => Some(FlowType::Builtin(FlowBuiltinType::TextLang)),
+        ("text", "region") => Some(FlowType::Builtin(FlowBuiltinType::TextRegion)),
+        ("text" | "stack", "dir") => Some(FlowType::Builtin(FlowBuiltinType::Dir)),
         (
             // todo: polygon.regular
             "page" | "highlight" | "text" | "path" | "rect" | "ellipse" | "circle" | "polygon"
@@ -154,6 +156,8 @@ pub(crate) enum FlowBuiltinType {
     Color,
     TextSize,
     TextFont,
+    TextLang,
+    TextRegion,
 
     Dir,
     Length,
@@ -319,3 +323,5 @@ pub static FLOW_RADIUS_DICT: Lazy<FlowRecord> = Lazy::new(|| {
 // todo: text.font array
 // todo: stroke.dash can be an array
 // todo: csv.row-type can be an array or a dictionary
+
+// ISO 639
