@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use ecow::{eco_format, EcoString};
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
+use once_cell::sync::OnceCell;
 use reflexo::path::{unix_slash, PathClean};
 use typst::foundations::{AutoValue, Func, Label, NoneValue, Type, Value};
 use typst::layout::{Dir, Length};
@@ -11,7 +12,7 @@ use typst::visualize::Color;
 
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::analysis::{
-    analyze_dyn_signature, analyze_import, resolve_callee, FlowBuiltinType, FlowType,
+    analyze_dyn_signature, analyze_import, resolve_callee, FlowBuiltinType, FlowRecord, FlowType,
     PathPreference, FLOW_INSET_DICT, FLOW_MARGIN_DICT, FLOW_OUTSET_DICT, FLOW_RADIUS_DICT,
     FLOW_STROKE_DICT,
 };
@@ -614,21 +615,18 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     log::debug!("check complete_literal 3: {:?}", ctx.leaf);
 
     // or empty array
-    let dict_span;
-    let dict_lit = match parent.kind() {
+    let lit_span;
+    let (dict_lit, _tuple_lit) = match parent.kind() {
         SyntaxKind::Dict => {
             let dict_lit = parent.get().cast::<ast::Dict>()?;
 
-            dict_span = dict_lit.span();
-            dict_lit
+            lit_span = dict_lit.span();
+            (dict_lit, None)
         }
         SyntaxKind::Array => {
             let w = parent.get().cast::<ast::Array>()?;
-            if w.items().next().is_some() {
-                return None;
-            }
-            dict_span = w.span();
-            ast::Dict::default()
+            lit_span = w.span();
+            (ast::Dict::default(), Some(w))
         }
         _ => return None,
     };
@@ -636,65 +634,118 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     // query type of the dict
     let named_span = named.map(|n| n.span()).unwrap_or_else(Span::detached);
     let named_ty = ctx.ctx.type_of_span(named_span);
-    let dict_ty = ctx.ctx.type_of_span(dict_span);
-    log::info!("complete_literal: {dict_ty:?} {named_ty:?}");
+    let lit_ty = ctx.ctx.type_of_span(lit_span);
+    log::info!("complete_literal: {lit_ty:?} {named_ty:?}");
 
     // todo: grid/table.columns/rows/gutter/column-gutter/row-gutter array of length
     // todo: pattern.size array of length
     // todo: text.font array
     // todo: stroke.dash can be an array
 
-    // todo: check if the dict is named
-    if named_ty.is_some() {
-        let res = type_completion(ctx, named_ty.as_ref(), None);
-        if res.is_some() {
-            ctx.incomplete = false;
-        }
-        return res;
+    enum LitComplAction<'a> {
+        Dict(&'a FlowRecord),
+        Positional(&'a FlowType),
+    }
+    let existing = OnceCell::new();
+
+    struct LitComplWorker<'a, 'b, 'w> {
+        ctx: &'a mut CompletionContext<'b, 'w>,
+        dict_lit: ast::Dict<'a>,
+        existing: &'a OnceCell<HashSet<EcoString>>,
     }
 
-    let existing = dict_lit
-        .items()
-        .filter_map(|field| match field {
-            ast::DictItem::Named(n) => Some(n.name().get().clone()),
-            ast::DictItem::Keyed(k) => {
-                let key = ctx.ctx.const_eval(k.key());
-                if let Some(Value::Str(key)) = key {
-                    return Some(key.into());
-                }
-
-                None
-            }
-            // todo: var dict union
-            ast::DictItem::Spread(_s) => None,
-        })
-        .collect::<HashSet<_>>();
-
-    let dict_ty = dict_ty?;
-    let dict_interface = match dict_ty {
-        FlowType::Builtin(FlowBuiltinType::Stroke) => &FLOW_STROKE_DICT,
-        FlowType::Builtin(FlowBuiltinType::Margin) => &FLOW_MARGIN_DICT,
-        FlowType::Builtin(FlowBuiltinType::Inset) => &FLOW_INSET_DICT,
-        FlowType::Builtin(FlowBuiltinType::Outset) => &FLOW_OUTSET_DICT,
-        FlowType::Builtin(FlowBuiltinType::Radius) => &FLOW_RADIUS_DICT,
-        _ => return None,
+    let mut ctx = LitComplWorker {
+        ctx,
+        dict_lit,
+        existing: &existing,
     };
 
-    for (key, _, _) in dict_interface.fields.iter() {
-        if existing.contains(key) {
-            continue;
+    impl<'a, 'b, 'w> LitComplWorker<'a, 'b, 'w> {
+        fn on_iface(&mut self, lit_interface: LitComplAction<'_>) {
+            match lit_interface {
+                LitComplAction::Positional(a) => {
+                    type_completion(self.ctx, Some(a), None);
+                }
+                LitComplAction::Dict(dict_iface) => {
+                    let existing = self.existing.get_or_init(|| {
+                        self.dict_lit
+                            .items()
+                            .filter_map(|field| match field {
+                                ast::DictItem::Named(n) => Some(n.name().get().clone()),
+                                ast::DictItem::Keyed(k) => {
+                                    let key = self.ctx.ctx.const_eval(k.key());
+                                    if let Some(Value::Str(key)) = key {
+                                        return Some(key.into());
+                                    }
+
+                                    None
+                                }
+                                // todo: var dict union
+                                ast::DictItem::Spread(_s) => None,
+                            })
+                            .collect::<HashSet<_>>()
+                    });
+
+                    for (key, _, _) in dict_iface.fields.iter() {
+                        if existing.contains(key) {
+                            continue;
+                        }
+
+                        self.ctx.completions.push(Completion {
+                            kind: CompletionKind::Field,
+                            label: key.clone(),
+                            apply: Some(eco_format!("{}: ${{}}", key)),
+                            detail: None,
+                            label_detail: None,
+                            // todo: only vscode and neovim (0.9.1) support this
+                            command: Some("editor.action.triggerSuggest"),
+                        });
+                    }
+                }
+            }
         }
 
-        ctx.completions.push(Completion {
-            kind: CompletionKind::Field,
-            label: key.clone(),
-            apply: Some(eco_format!("{}: ${{}}", key)),
-            detail: None,
-            label_detail: None,
-            // todo: only vscode and neovim (0.9.1) support this
-            command: Some("editor.action.triggerSuggest"),
-        });
+        fn on_lit_ty(&mut self, ty: &FlowType) {
+            match ty {
+                FlowType::Builtin(FlowBuiltinType::Stroke) => {
+                    self.on_iface(LitComplAction::Dict(&FLOW_STROKE_DICT))
+                }
+                FlowType::Builtin(FlowBuiltinType::Margin) => {
+                    self.on_iface(LitComplAction::Dict(&FLOW_MARGIN_DICT))
+                }
+                FlowType::Builtin(FlowBuiltinType::Inset) => {
+                    self.on_iface(LitComplAction::Dict(&FLOW_INSET_DICT))
+                }
+                FlowType::Builtin(FlowBuiltinType::Outset) => {
+                    self.on_iface(LitComplAction::Dict(&FLOW_OUTSET_DICT))
+                }
+                FlowType::Builtin(FlowBuiltinType::Radius) => {
+                    self.on_iface(LitComplAction::Dict(&FLOW_RADIUS_DICT))
+                }
+                FlowType::Dict(d) => self.on_iface(LitComplAction::Dict(d)),
+                FlowType::Array(a) => self.on_iface(LitComplAction::Positional(a)),
+                FlowType::Union(u) => {
+                    for info in u.as_ref() {
+                        self.on_lit_ty(info);
+                    }
+                }
+                // todo: var, let, etc.
+                _ => {}
+            }
+        }
+
+        fn work(&mut self, named_ty: Option<FlowType>, lit_ty: Option<FlowType>) {
+            if let Some(named_ty) = &named_ty {
+                type_completion(self.ctx, Some(named_ty), None);
+            } else if let Some(lit_ty) = &lit_ty {
+                self.on_lit_ty(lit_ty);
+            }
+        }
     }
+
+    ctx.work(named_ty, lit_ty);
+
+    let ctx = ctx.ctx;
 
     if ctx.before.ends_with(',') {
         ctx.enrich(" ", "");
