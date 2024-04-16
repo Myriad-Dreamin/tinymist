@@ -4,7 +4,7 @@ use ecow::{eco_format, EcoString};
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
 use reflexo::path::{unix_slash, PathClean};
 use typst::foundations::{AutoValue, Func, Label, NoneValue, Type, Value};
-use typst::layout::Length;
+use typst::layout::{Dir, Length};
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, Span, SyntaxKind};
 use typst::visualize::Color;
@@ -326,7 +326,7 @@ fn type_completion(
         FlowType::Undef => return None,
         FlowType::Content => return None,
         FlowType::Any => return None,
-        FlowType::Array => {
+        FlowType::Tuple(..) | FlowType::Array(..) => {
             ctx.snippet_completion("()", "(${})", "An array.");
         }
         FlowType::Dict(..) => {
@@ -426,8 +426,13 @@ fn type_completion(
                     });
                 }
             }
-            FlowBuiltinType::TextFont => return None,
-            FlowBuiltinType::Dir => return None,
+            FlowBuiltinType::Dir => {
+                let ty = Type::of::<Dir>();
+                ctx.strict_scope_completions(false, |value| value.ty() == ty);
+            }
+            FlowBuiltinType::TextFont => {
+                ctx.font_completions();
+            }
             FlowBuiltinType::Margin => {
                 ctx.snippet_completion("()", "(${})", "Margin dictionary.");
                 type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
@@ -581,9 +586,6 @@ pub fn named_param_value_completions<'a>(
     {
         ctx.cast_completions(&param.input);
     }
-    if name == "font" {
-        ctx.font_completions();
-    }
 
     if ctx.before.ends_with(':') {
         ctx.enrich(" ", "");
@@ -635,7 +637,12 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     let named_span = named.map(|n| n.span()).unwrap_or_else(Span::detached);
     let named_ty = ctx.ctx.type_of_span(named_span);
     let dict_ty = ctx.ctx.type_of_span(dict_span);
-    log::info!("complete_literal: {:?} {:?}", dict_ty, named_ty);
+    log::info!("complete_literal: {dict_ty:?} {named_ty:?}");
+
+    // todo: grid/table.columns/rows/gutter/column-gutter/row-gutter array of length
+    // todo: pattern.size array of length
+    // todo: text.font array
+    // todo: stroke.dash can be an array
 
     // todo: check if the dict is named
     if named_ty.is_some() {

@@ -7,8 +7,8 @@ input_file: crates/tinymist-query/src/fixtures/type_check/infer2.typ
 1..52 -> Element(text)
 6..15 -> TextSize
 12..15 -> TextSize
-17..25 -> TextFont
-23..25 -> TextFont
+17..25 -> (TextFont | Array<TextFont>)
+23..25 -> (TextFont | Array<TextFont>)
 27..38 -> Stroke
 35..38 -> Stroke
 40..49 -> Color

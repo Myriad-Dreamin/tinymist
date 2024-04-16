@@ -295,7 +295,17 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     fn check_array(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
         let _arr: ast::Array = root.cast()?;
 
-        Some(FlowType::Array)
+        let mut elements = EcoVec::new();
+
+        for elem in root.children() {
+            let ty = self.check(elem);
+            if matches!(ty, FlowType::Clause) {
+                continue;
+            }
+            elements.push(ty);
+        }
+
+        Some(FlowType::Tuple(elements))
     }
 
     fn check_dict(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
@@ -700,6 +710,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 candidates.push(f.ret.clone());
             }
             FlowType::Dict(_v) => {}
+            FlowType::Tuple(_v) => {}
+            FlowType::Array(_v) => {}
             // todo: with
             FlowType::With(_e) => {}
             FlowType::Args(_e) => {}
@@ -716,7 +728,6 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 }
             }
 
-            FlowType::Array => {}
             FlowType::Clause => {}
             FlowType::Undef => {}
             FlowType::Content => {}
@@ -902,7 +913,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::Value(..) => e,
             FlowType::ValueDoc(..) => e,
 
-            FlowType::Array => e,
+            FlowType::Tuple(..) => e,
+            FlowType::Array(..) => e,
             FlowType::Clause => e,
             FlowType::Undef => e,
             FlowType::Content => e,
@@ -957,7 +969,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 }
                 _ => {}
             },
-            FlowType::Array => {}
+            FlowType::Array(..) => {}
+            FlowType::Dict(..) => {}
             _ => {}
         }
 
@@ -1104,6 +1117,14 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                     self.analyze(p, pol);
                 }
             }
+            FlowType::Tuple(e) => {
+                for ty in e.iter() {
+                    self.analyze(ty, pol);
+                }
+            }
+            FlowType::Array(e) => {
+                self.analyze(e, pol);
+            }
             FlowType::With(w) => {
                 self.analyze(&w.0, pol);
                 for m in &w.1 {
@@ -1155,8 +1176,6 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             FlowType::FlowNone => {}
             FlowType::Auto => {}
             FlowType::Builtin(_) => {}
-            // todo
-            FlowType::Array => {}
             FlowType::Element(_) => {}
         }
     }
@@ -1230,6 +1249,16 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
 
                 FlowType::Dict(FlowRecord { fields })
             }
+            FlowType::Tuple(e) => {
+                let e2 = e.iter().map(|ty| self.transform(ty, pol)).collect();
+
+                FlowType::Tuple(e2)
+            }
+            FlowType::Array(e) => {
+                let e2 = self.transform(e, pol);
+
+                FlowType::Array(Box::new(e2))
+            }
             FlowType::With(w) => {
                 let primary = self.transform(&w.0, pol);
                 FlowType::With(Box::new((primary, w.1.clone())))
@@ -1274,7 +1303,6 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             }
             // todo
             FlowType::Let(_) => FlowType::Any,
-            FlowType::Array => FlowType::Array,
             FlowType::Value(v) => FlowType::Value(v.clone()),
             FlowType::ValueDoc(v) => FlowType::ValueDoc(v.clone()),
             FlowType::Element(v) => FlowType::Element(*v),
@@ -1337,8 +1365,10 @@ impl Joiner {
             (FlowType::Content, _) => self.definite = FlowType::Undef,
             (FlowType::Var(v), _) => self.possibles.push(FlowType::Var(v)),
             // todo: check possibles
-            (FlowType::Array, FlowType::None) => self.definite = FlowType::Array,
-            (FlowType::Array, _) => self.definite = FlowType::Undef,
+            (FlowType::Array(e), FlowType::None) => self.definite = FlowType::Array(e),
+            (FlowType::Array(..), _) => self.definite = FlowType::Undef,
+            (FlowType::Tuple(e), FlowType::None) => self.definite = FlowType::Tuple(e),
+            (FlowType::Tuple(..), _) => self.definite = FlowType::Undef,
             // todo: possible some style
             (FlowType::Auto, FlowType::None) => self.definite = FlowType::Auto,
             (FlowType::Auto, _) => self.definite = FlowType::Undef,

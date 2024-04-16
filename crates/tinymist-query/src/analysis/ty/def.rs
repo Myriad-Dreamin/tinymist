@@ -31,7 +31,6 @@ pub(crate) enum FlowType {
     Undef,
     Content,
     Any,
-    Array,
     None,
     Infer,
     FlowNone,
@@ -44,6 +43,9 @@ pub(crate) enum FlowType {
     Var(Box<(DefId, EcoString)>),
     Func(Box<FlowSignature>),
     Dict(FlowRecord),
+    Array(Box<FlowType>),
+    // Note: may contains spread types
+    Tuple(EcoVec<FlowType>),
     With(Box<(FlowType, Vec<FlowArgs>)>),
     Args(Box<FlowArgs>),
     At(FlowAt),
@@ -61,7 +63,6 @@ impl fmt::Debug for FlowType {
             FlowType::Undef => f.write_str("Undef"),
             FlowType::Content => f.write_str("Content"),
             FlowType::Any => f.write_str("Any"),
-            FlowType::Array => f.write_str("Array"),
             FlowType::None => f.write_str("None"),
             FlowType::Infer => f.write_str("Infer"),
             FlowType::FlowNone => f.write_str("FlowNone"),
@@ -70,6 +71,14 @@ impl fmt::Debug for FlowType {
             FlowType::Args(a) => write!(f, "&({a:?})"),
             FlowType::Func(s) => write!(f, "{s:?}"),
             FlowType::Dict(r) => write!(f, "{r:?}"),
+            FlowType::Array(a) => write!(f, "Array<{a:?}>"),
+            FlowType::Tuple(t) => {
+                f.write_str("(")?;
+                for t in t {
+                    write!(f, "{t:?}, ")?;
+                }
+                f.write_str(")")
+            }
             FlowType::With(w) => write!(f, "({:?}).with(..{:?})", w.0, w.1),
             FlowType::At(a) => write!(f, "{a:?}"),
             FlowType::Union(u) => {

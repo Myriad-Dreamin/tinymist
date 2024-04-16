@@ -117,7 +117,15 @@ pub(in crate::analysis::ty) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<
             PathPreference::Bibliography,
         ))),
         ("text", "size") => Some(FlowType::Builtin(FlowBuiltinType::TextSize)),
-        ("text", "font") => Some(FlowType::Builtin(FlowBuiltinType::TextFont)),
+        ("text", "font") => {
+            static FONT_TYPE: Lazy<FlowType> = Lazy::new(|| {
+                FlowType::Union(Box::new(vec![
+                    FlowType::Builtin(FlowBuiltinType::TextFont),
+                    FlowType::Array(Box::new(FlowType::Builtin(FlowBuiltinType::TextFont))),
+                ]))
+            });
+            Some(FONT_TYPE.clone())
+        }
         ("text", "lang") => Some(FlowType::Builtin(FlowBuiltinType::TextLang)),
         ("text", "region") => Some(FlowType::Builtin(FlowBuiltinType::TextRegion)),
         ("text" | "stack", "dir") => Some(FlowType::Builtin(FlowBuiltinType::Dir)),
@@ -314,14 +322,12 @@ pub static FLOW_RADIUS_DICT: Lazy<FlowRecord> = Lazy::new(|| {
 // todo: numbering/supplement
 // todo: grid/table.columns/rows/gutter/column-gutter/row-gutter array of length
 // todo: pattern.size array of length
+// todo: text.font array
+// todo: stroke.dash can be an array
 // todo: grid/table.fill/align/stroke/inset can be a function
 // todo: math.cancel.angle can be a function
 // todo: text.features array/dictionary
 // todo: math.mat.augment
-// todo: text.lang
-// todo: text.region
-// todo: text.font array
-// todo: stroke.dash can be an array
 // todo: csv.row-type can be an array or a dictionary
 
 // ISO 639
