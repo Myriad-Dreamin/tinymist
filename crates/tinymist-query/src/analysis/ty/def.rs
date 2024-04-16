@@ -156,6 +156,17 @@ impl FlowType {
     pub(crate) fn is_dict(&self) -> bool {
         matches!(self, FlowType::Dict(..))
     }
+
+    pub(crate) fn from_types(e: impl ExactSizeIterator<Item = FlowType>) -> Self {
+        if e.len() == 0 {
+            FlowType::Any
+        } else if e.len() == 1 {
+            let mut e = e;
+            e.next().unwrap()
+        } else {
+            FlowType::Union(Box::new(e.collect()))
+        }
+    }
 }
 
 #[derive(Debug, Clone, Hash)]

@@ -23,7 +23,8 @@ use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
 use super::{
-    DefUseInfo, FlowType, ImportInfo, PathPreference, Signature, SignatureTarget, TypeCheckInfo,
+    literal_type_check, DefUseInfo, FlowType, ImportInfo, PathPreference, Signature,
+    SignatureTarget, TypeCheckInfo,
 };
 use crate::{
     lsp_to_typst,
@@ -644,6 +645,17 @@ impl<'w> AnalysisContext<'w> {
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(source)?;
         ty_chk.mapping.get(&s).cloned()
+    }
+
+    pub(crate) fn literal_type_of_span(&mut self, s: Span) -> Option<FlowType> {
+        let id = s.id()?;
+        let source = self.source_by_id(id).ok()?;
+        let ty_chk = self.type_check(source.clone())?;
+
+        source
+            .find(s)
+            .and_then(|e| literal_type_check(self, &ty_chk, e))
+            .or_else(|| ty_chk.mapping.get(&s).cloned())
     }
 }
 

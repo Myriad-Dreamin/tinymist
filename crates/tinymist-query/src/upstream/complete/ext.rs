@@ -613,7 +613,7 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     } else {
         parent
     };
-    log::debug!("check complete_literal 2: {:?}", ctx.leaf);
+    log::debug!("check complete_literal 2: {:?}", parent);
     let parent = &parent;
     let parent = match parent.kind() {
         SyntaxKind::Colon => parent.parent()?,
@@ -624,7 +624,7 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
         SyntaxKind::LeftParen | SyntaxKind::Comma => (None, parent.parent()?),
         _ => (None, parent),
     };
-    log::debug!("check complete_literal 3: {:?}", ctx.leaf);
+    log::debug!("check complete_literal 3: {:?}", parent);
 
     // or empty array
     let lit_span;
@@ -645,8 +645,8 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
 
     // query type of the dict
     let named_span = named.map(|n| n.span()).unwrap_or_else(Span::detached);
-    let named_ty = ctx.ctx.type_of_span(named_span);
-    let lit_ty = ctx.ctx.type_of_span(lit_span);
+    let named_ty = ctx.ctx.literal_type_of_span(named_span);
+    let lit_ty = ctx.ctx.literal_type_of_span(lit_span);
     log::info!("complete_literal: {lit_ty:?} {named_ty:?}");
 
     enum LitComplAction<'a> {

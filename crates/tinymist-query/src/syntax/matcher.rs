@@ -101,7 +101,7 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget> 
 
     // Move to the first non-trivia node before the cursor.
     let mut node = node;
-    if skippable_trivia(&node, cursor) || is_mark(node.kind()) {
+    if skippable_trivia(&node, cursor) {
         node = node.prev_sibling()?;
     }
 

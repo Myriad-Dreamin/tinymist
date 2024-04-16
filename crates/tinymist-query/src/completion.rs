@@ -84,9 +84,14 @@ impl StatefulRequest for CompletionRequest {
         if let Some(d) = &deref_target {
             let node = d.node();
             // skip if is the let binding item, todo, check whether the pattern is exact
+            // todo: check if the pattern(span) is exact, instead of just checking the
+            // parent kind
             if matches!(
-                node.parent_kind(),
-                Some(SyntaxKind::LetBinding | SyntaxKind::Closure)
+                (d, node.parent_kind()),
+                (
+                    DerefTarget::VarAccess(..),
+                    Some(SyntaxKind::LetBinding | SyntaxKind::Closure)
+                )
             ) {
                 return None;
             }

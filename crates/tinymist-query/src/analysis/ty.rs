@@ -25,6 +25,8 @@ mod def;
 pub(crate) use def::*;
 mod builtin;
 pub(crate) use builtin::*;
+mod literal_flow;
+pub(crate) use literal_flow::*;
 
 pub(crate) struct TypeCheckInfo {
     pub vars: HashMap<DefId, FlowVar>,
@@ -56,6 +58,7 @@ impl TypeCheckInfo {
 }
 
 pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Arc<TypeCheckInfo>> {
+    let _ = literal_type_check;
     let def_use_info = ctx.def_use(source.clone())?;
     let mut info = TypeCheckInfo {
         vars: HashMap::new(),
@@ -532,7 +535,9 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let _selector = show_rule
             .selector()
             .map(|sel| self.check_expr_in(sel.span(), root.clone()));
-        // let _args = self.check_expr_in(show_rule.args().span(), root)?;
+        let t = show_rule.transform();
+        // todo: infer it type by selector
+        let _transform = self.check_expr_in(t.span(), root.clone());
 
         Some(FlowType::Any)
     }
@@ -774,6 +779,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 let _ = w.0 .0;
             }
             (FlowType::Var(v), rhs) => {
+                log::debug!("constrain var {v:?} ⪯ {rhs:?}");
                 let w = self.info.vars.get_mut(&v.0).unwrap();
                 match &w.kind {
                     FlowVarKind::Weak(w) => {
@@ -783,6 +789,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 }
             }
             (lhs, FlowType::Var(v)) => {
+                log::debug!("constrain var {lhs:?} ⪯ {v:?}");
                 let v = self.info.vars.get(&v.0).unwrap();
                 match &v.kind {
                     FlowVarKind::Weak(v) => {

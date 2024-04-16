@@ -89,6 +89,44 @@ mod type_check_tests {
 }
 
 #[cfg(test)]
+mod literal_type_check_tests {
+
+    use insta::with_settings;
+    use typst::syntax::LinkedNode;
+
+    use crate::analysis::ty;
+    use crate::syntax::get_deref_target;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("literal_type_check", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+            let root = LinkedNode::new(source.root());
+            let node = root.leaf_at(pos + 1).unwrap();
+            let node = get_deref_target(node, pos + 1).unwrap();
+            let node = node.node().clone();
+            let text = node.get().clone().into_text();
+
+            let result = ty::type_check(ctx, source.clone());
+            let literal_type = result.and_then(|info| ty::literal_type_check(ctx, &info, node));
+
+            with_settings!({
+                description => format!("Check on {text:?} ({pos:?})"),
+            }, {
+                let literal_type = literal_type.map(|e| format!("{e:#?}"))
+                    .unwrap_or_else(|| "<nil>".to_string());
+                assert_snapshot!(literal_type);
+            })
+        });
+    }
+}
+
+#[cfg(test)]
 mod module_tests {
     use reflexo::path::unix_slash;
     use serde_json::json;
