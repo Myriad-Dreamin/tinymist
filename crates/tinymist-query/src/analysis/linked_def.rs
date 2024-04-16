@@ -98,38 +98,6 @@ pub fn find_definition(
     let def_id = def_id.or_else(|| Some(def_use.get_def(source_id, &ident_ref)?.0));
     let def_info = def_id.and_then(|def_id| def_use.get_def_by_id(def_id));
 
-    let values = analyze_expr(ctx.world(), &use_site);
-    for v in values {
-        // mostly builtin functions
-        if let Value::Func(f) = v.0 {
-            use typst::foundations::func::Repr;
-            match f.inner() {
-                // The with function should be resolved as the with position
-                Repr::Closure(..) | Repr::With(..) => continue,
-                Repr::Native(..) | Repr::Element(..) => {}
-            }
-
-            let name = f
-                .name()
-                .or_else(|| def_info.as_ref().map(|(_, r)| r.name.as_str()));
-
-            if let Some(name) = name {
-                let span = f.span();
-                let fid = span.id()?;
-                let source = ctx.source_by_id(fid).ok()?;
-
-                return Some(DefinitionLink {
-                    kind: LexicalKind::Var(LexicalVarKind::Function),
-                    name: name.to_owned(),
-                    value: Some(Value::Func(f.clone())),
-                    // value: None,
-                    def_at: Some((fid, source.find(span)?.range())),
-                    name_range: def_info.map(|(_, r)| r.range.clone()),
-                });
-            }
-        }
-    }
-
     let Some((def_fid, def)) = def_info else {
         return resolve_global_value(ctx, use_site.clone(), false).and_then(move |f| {
             value_to_def(
@@ -191,14 +159,6 @@ pub fn find_definition(
 /// Resolve a callee expression to a function.
 pub fn resolve_callee(ctx: &mut AnalysisContext, callee: LinkedNode) -> Option<Func> {
     {
-        let values = analyze_expr(ctx.world(), &callee);
-
-        values.into_iter().find_map(|v| match v.0 {
-            Value::Func(f) => Some(f),
-            _ => None,
-        })
-    }
-    .or_else(|| {
         let source = ctx.source_by_id(callee.span().id()?).ok()?;
         let node = source.find(callee.span())?;
         let cursor = node.offset();
@@ -211,9 +171,17 @@ pub fn resolve_callee(ctx: &mut AnalysisContext, callee: LinkedNode) -> Option<F
             },
             _ => None,
         }
+    }
+    .or_else(|| {
+        resolve_global_value(ctx, callee.clone(), false).and_then(|v| match v {
+            Value::Func(f) => Some(f),
+            _ => None,
+        })
     })
     .or_else(|| {
-        resolve_global_value(ctx, callee, false).and_then(|v| match v {
+        let values = analyze_expr(ctx.world(), &callee);
+
+        values.into_iter().find_map(|v| match v.0 {
             Value::Func(f) => Some(f),
             _ => None,
         })
