@@ -66,7 +66,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/infer2.typ
 362..365 -> Color
 369..380 -> Stroke
 377..380 -> Stroke
-384..408 -> Type(content)
+384..408 -> Any
 412..436 -> Any
 441..457 -> Element(text)
 446..456 -> Stroke

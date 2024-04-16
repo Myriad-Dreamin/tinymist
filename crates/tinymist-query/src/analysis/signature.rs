@@ -365,9 +365,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
             } else {
                 rest = Some(param.clone());
             }
-        }
-
-        if param.positional {
+        } else if param.positional {
             pos.push(param);
         }
     }
@@ -458,7 +456,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                     type_repr: None,
                     expr: None,
                     default: None,
-                    positional: false,
+                    positional: true,
                     named: false,
                     variadic: true,
                     settable: false,

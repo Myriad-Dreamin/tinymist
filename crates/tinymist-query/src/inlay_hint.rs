@@ -143,6 +143,7 @@ fn inlay_hint(
 
                     let check_single_pos_arg = || {
                         let mut pos = 0;
+                        let mut has_rest = false;
                         let mut content_pos = 0;
 
                         for arg in args.items() {
@@ -155,6 +156,10 @@ fn inlay_hint(
                             };
 
                             if info.kind != ParamKind::Named {
+                                if info.kind == ParamKind::Rest {
+                                    has_rest = true;
+                                    continue;
+                                }
                                 if info.is_content_block {
                                     content_pos += 1;
                                 } else {
@@ -167,7 +172,7 @@ fn inlay_hint(
                             }
                         }
 
-                        (pos <= 1, content_pos <= 1)
+                        (pos <= if has_rest { 0 } else { 1 }, content_pos <= 1)
                     };
 
                     let (disable_by_single_pos_arg, disable_by_single_content_pos_arg) =
@@ -234,9 +239,11 @@ fn inlay_hint(
                             }
                             ParamKind::Rest
                                 if (!SMART.on_variadic_args
+                                    || disable_by_single_pos_arg
                                     || (!is_first_variadic_arg
                                         && SMART.only_first_variadic_args)) =>
                             {
+                                is_first_variadic_arg = false;
                                 continue;
                             }
                             ParamKind::Rest => {
