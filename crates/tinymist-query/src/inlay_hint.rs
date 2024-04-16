@@ -1,6 +1,5 @@
 use std::ops::Range;
 
-use log::debug;
 use lsp_types::{InlayHintKind, InlayHintLabel};
 
 use crate::{
@@ -69,14 +68,14 @@ impl SemanticRequest for InlayHintRequest {
         let range = ctx.to_typst_range(self.range, &source)?;
 
         let hints = inlay_hint(ctx, &source, range, ctx.position_encoding()).ok()?;
-        debug!(
+        log::debug!(
             "got inlay hints on {source:?} => {hints:?}",
             source = source.id(),
             hints = hints.len()
         );
         if hints.is_empty() {
             let root = LinkedNode::new(source.root());
-            debug!("debug root {root:#?}");
+            log::debug!("debug root {root:#?}");
         }
 
         Some(hints)
