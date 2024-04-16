@@ -357,8 +357,8 @@ fn type_completion(
             FlowBuiltinType::Stroke => {
                 ctx.snippet_completion("stroke()", "stroke(${})", "Stroke type.");
                 ctx.snippet_completion("()", "(${})", "Stroke dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Color)), None);
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Color)), docs);
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
             }
             FlowBuiltinType::Color => {
                 ctx.snippet_completion("luma()", "luma(${v})", "A custom grayscale color.");
@@ -436,19 +436,19 @@ fn type_completion(
             }
             FlowBuiltinType::Margin => {
                 ctx.snippet_completion("()", "(${})", "Margin dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
             }
             FlowBuiltinType::Inset => {
                 ctx.snippet_completion("()", "(${})", "Inset dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
             }
             FlowBuiltinType::Outset => {
                 ctx.snippet_completion("()", "(${})", "Outset dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
             }
             FlowBuiltinType::Radius => {
                 ctx.snippet_completion("()", "(${})", "Radius dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
             }
             FlowBuiltinType::Length => {
                 ctx.snippet_completion("pt", "${1}pt", "Point length unit.");
@@ -458,6 +458,7 @@ fn type_completion(
                 ctx.snippet_completion("em", "${1}em", "Em length unit.");
                 let length_ty = Type::of::<Length>();
                 ctx.strict_scope_completions(false, |value| value.ty() == length_ty);
+                type_completion(ctx, Some(&FlowType::Auto), docs);
             }
             FlowBuiltinType::Float => {
                 ctx.snippet_completion("exponential notation", "${1}e${0}", "Exponential notation");
@@ -480,9 +481,9 @@ fn type_completion(
         FlowType::Value(v) => {
             if let Value::Type(ty) = &v.0 {
                 if *ty == Type::of::<NoneValue>() {
-                    ctx.snippet_completion("none", "none", "Nothing.")
+                    type_completion(ctx, Some(&FlowType::None), docs);
                 } else if *ty == Type::of::<AutoValue>() {
-                    ctx.snippet_completion("auto", "auto", "A smart default.");
+                    type_completion(ctx, Some(&FlowType::Auto), docs);
                 } else if *ty == Type::of::<bool>() {
                     ctx.snippet_completion("false", "false", "No / Disabled.");
                     ctx.snippet_completion("true", "true", "Yes / Enabled.");
@@ -507,13 +508,24 @@ fn type_completion(
                     });
                     ctx.strict_scope_completions(false, |value| value.ty() == *ty);
                 }
+            } else if v.0.ty() == Type::of::<NoneValue>() {
+                type_completion(ctx, Some(&FlowType::None), docs);
+            } else if v.0.ty() == Type::of::<AutoValue>() {
+                type_completion(ctx, Some(&FlowType::Auto), docs);
             } else {
                 ctx.value_completion(None, &v.0, true, docs);
             }
         }
         FlowType::ValueDoc(v) => {
             let (value, docs) = v.as_ref();
-            ctx.value_completion(None, value, true, Some(docs));
+            type_completion(
+                ctx,
+                Some(&FlowType::Value(Box::new((
+                    value.clone(),
+                    Span::detached(),
+                )))),
+                Some(*docs),
+            );
         }
         FlowType::Element(e) => {
             ctx.value_completion(Some(e.name().into()), &Value::Func((*e).into()), true, docs);
@@ -636,11 +648,6 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     let named_ty = ctx.ctx.type_of_span(named_span);
     let lit_ty = ctx.ctx.type_of_span(lit_span);
     log::info!("complete_literal: {lit_ty:?} {named_ty:?}");
-
-    // todo: grid/table.columns/rows/gutter/column-gutter/row-gutter array of length
-    // todo: pattern.size array of length
-    // todo: text.font array
-    // todo: stroke.dash can be an array
 
     enum LitComplAction<'a> {
         Dict(&'a FlowRecord),
