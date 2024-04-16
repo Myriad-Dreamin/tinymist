@@ -6,7 +6,7 @@ use parking_lot::RwLock;
 use reflexo::vector::ir::DefId;
 use typst::{
     foundations::{CastInfo, Element, Func, ParamInfo, Value},
-    syntax::Span,
+    syntax::{ast, Span},
 };
 
 use crate::analysis::ty::param_mapping;
@@ -49,6 +49,7 @@ pub(crate) enum FlowType {
     At(FlowAt),
     Unary(FlowUnaryType),
     Binary(FlowBinaryType),
+    If(Box<FlowIfType>),
     Union(Box<Vec<FlowType>>),
     Let(Arc<FlowVarStore>),
 }
@@ -85,6 +86,7 @@ impl fmt::Debug for FlowType {
             FlowType::Var(v) => write!(f, "@{}", v.1),
             FlowType::Unary(u) => write!(f, "{u:?}"),
             FlowType::Binary(b) => write!(f, "{b:?}"),
+            FlowType::If(i) => write!(f, "{i:?}"),
             FlowType::Value(v) => write!(f, "{v:?}", v = v.0),
             FlowType::ValueDoc(v) => write!(f, "{v:?}"),
             FlowType::Element(e) => write!(f, "{e:?}"),
@@ -152,6 +154,7 @@ pub(crate) enum FlowUnaryType {
     Pos(Box<FlowType>),
     Neg(Box<FlowType>),
     Not(Box<FlowType>),
+    Context(Box<FlowType>),
 }
 
 impl FlowUnaryType {
@@ -160,68 +163,31 @@ impl FlowUnaryType {
             FlowUnaryType::Pos(e) => e,
             FlowUnaryType::Neg(e) => e,
             FlowUnaryType::Not(e) => e,
+            FlowUnaryType::Context(e) => e,
         }
     }
 }
 
 #[derive(Debug, Clone, Hash)]
-pub(crate) enum FlowBinaryType {
-    Add(FlowBinaryRepr),
-    Sub(FlowBinaryRepr),
-    Mul(FlowBinaryRepr),
-    Div(FlowBinaryRepr),
-    And(FlowBinaryRepr),
-    Or(FlowBinaryRepr),
-    Eq(FlowBinaryRepr),
-    Neq(FlowBinaryRepr),
-    Lt(FlowBinaryRepr),
-    Leq(FlowBinaryRepr),
-    Gt(FlowBinaryRepr),
-    Geq(FlowBinaryRepr),
-    Assign(FlowBinaryRepr),
-    In(FlowBinaryRepr),
-    NotIn(FlowBinaryRepr),
-    AddAssign(FlowBinaryRepr),
-    SubAssign(FlowBinaryRepr),
-    MulAssign(FlowBinaryRepr),
-    DivAssign(FlowBinaryRepr),
+pub(crate) struct FlowBinaryType {
+    pub op: ast::BinOp,
+    pub operands: Box<(FlowType, FlowType)>,
 }
 
 impl FlowBinaryType {
-    pub fn repr(&self) -> &FlowBinaryRepr {
-        match self {
-            FlowBinaryType::Add(r)
-            | FlowBinaryType::Sub(r)
-            | FlowBinaryType::Mul(r)
-            | FlowBinaryType::Div(r)
-            | FlowBinaryType::And(r)
-            | FlowBinaryType::Or(r)
-            | FlowBinaryType::Eq(r)
-            | FlowBinaryType::Neq(r)
-            | FlowBinaryType::Lt(r)
-            | FlowBinaryType::Leq(r)
-            | FlowBinaryType::Gt(r)
-            | FlowBinaryType::Geq(r)
-            | FlowBinaryType::Assign(r)
-            | FlowBinaryType::In(r)
-            | FlowBinaryType::NotIn(r)
-            | FlowBinaryType::AddAssign(r)
-            | FlowBinaryType::SubAssign(r)
-            | FlowBinaryType::MulAssign(r)
-            | FlowBinaryType::DivAssign(r) => r,
-        }
+    pub fn repr(&self) -> (&FlowType, &FlowType) {
+        (&self.operands.0, &self.operands.1)
     }
 }
 
-#[derive(Clone, Hash)]
-pub(crate) struct FlowBinaryRepr(pub Box<(FlowType, FlowType)>);
-
-impl fmt::Debug for FlowBinaryRepr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // shorter
-        write!(f, "{:?}, {:?}", RefDebug(&self.0 .0), RefDebug(&self.0 .1))
-    }
+#[derive(Debug, Clone, Hash)]
+pub(crate) struct FlowIfType {
+    pub cond: FlowType,
+    pub then: FlowType,
+    pub else_: FlowType,
 }
+
+impl FlowIfType {}
 
 #[derive(Clone, Hash)]
 pub(crate) struct FlowVarStore {

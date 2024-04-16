@@ -289,9 +289,6 @@ impl CompileConfig {
     }
 
     pub fn determine_entry(&self, entry: Option<ImmutPath>) -> EntryState {
-        // todo: don't ignore entry from typst_extra_args
-        // entry: command.input,
-
         // todo: formalize untitled path
         // let is_untitled = entry.as_ref().is_some_and(|p| p.starts_with("/untitled"));
         // let root_dir = self.determine_root(if is_untitled { None } else {
@@ -320,7 +317,6 @@ impl CompileConfig {
 
         entry.unwrap_or_else(|| match self.determine_root(None) {
             Some(root) => EntryState::new_workspace(root),
-            // todo
             None => EntryState::new_detached(),
         })
     }
