@@ -1,4 +1,4 @@
-//! Top-level evaluation of a source file.
+//! Infer more than the principal type of some expression.
 
 use typst::syntax::{
     ast::{self, AstNode},

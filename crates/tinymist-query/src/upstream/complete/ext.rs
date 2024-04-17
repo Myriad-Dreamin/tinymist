@@ -339,6 +339,10 @@ fn type_completion(
         FlowType::Auto => {
             ctx.snippet_completion("auto", "auto", "A smart default.");
         }
+        FlowType::Boolean(_b) => {
+            ctx.snippet_completion("false", "false", "No / Disabled.");
+            ctx.snippet_completion("true", "true", "Yes / Enabled.");
+        }
         FlowType::Builtin(v) => match v {
             FlowBuiltinType::Path(p) => {
                 let source = ctx.ctx.source_by_id(ctx.root.span().id()?).ok()?;
@@ -928,3 +932,5 @@ mod tests {
         }
     }
 }
+
+// todo: doesn't complete parameter now, which is not good.

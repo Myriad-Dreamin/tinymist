@@ -1280,8 +1280,6 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 }
 
 fn safe_str_slice(s: &str, mut start: usize, mut end: usize) -> &str {
-    // todo: bad slicing
-    // &self.before[self.cursor.saturating_sub(size)..]
     while start < s.len() && !s.is_char_boundary(start) {
         start += 1;
     }

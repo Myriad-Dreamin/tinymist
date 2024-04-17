@@ -1,7 +1,7 @@
 //! Top-level evaluation of a source file.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -365,12 +365,46 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         }
 
         let op = binary.op();
-        let lhs = self.check_expr_in(binary.lhs().span(), root.clone());
-        let rhs = self.check_expr_in(binary.rhs().span(), root);
-        let operands = Box::new((lhs, rhs));
+        let lhs_span = binary.lhs().span();
+        let lhs = self.check_expr_in(lhs_span, root.clone());
+        let rhs_span = binary.rhs().span();
+        let rhs = self.check_expr_in(rhs_span, root);
 
-        // Some(FlowType::Binary(ty))
-        Some(FlowType::Binary(FlowBinaryType { op, operands }))
+        match op {
+            ast::BinOp::Add | ast::BinOp::Sub | ast::BinOp::Mul | ast::BinOp::Div => {}
+            ast::BinOp::Eq | ast::BinOp::Neq | ast::BinOp::Leq | ast::BinOp::Geq => {
+                self.check_comparable(&lhs, &rhs);
+                self.possible_ever_be(&lhs, &rhs);
+                self.possible_ever_be(&rhs, &lhs);
+            }
+            ast::BinOp::Lt | ast::BinOp::Gt => {
+                self.check_comparable(&lhs, &rhs);
+            }
+            ast::BinOp::And | ast::BinOp::Or => {
+                self.constrain(&lhs, &FlowType::Boolean(None));
+                self.constrain(&rhs, &FlowType::Boolean(None));
+            }
+            ast::BinOp::NotIn | ast::BinOp::In => {
+                self.check_containing(&rhs, &lhs, op == ast::BinOp::In);
+            }
+            ast::BinOp::Assign => {
+                self.check_assignable(&lhs, &rhs);
+                self.possible_ever_be(&lhs, &rhs);
+            }
+            ast::BinOp::AddAssign
+            | ast::BinOp::SubAssign
+            | ast::BinOp::MulAssign
+            | ast::BinOp::DivAssign => {
+                self.check_assignable(&lhs, &rhs);
+            }
+        }
+
+        let res = FlowType::Binary(FlowBinaryType {
+            op,
+            operands: Box::new((lhs, rhs)),
+        });
+
+        Some(res)
     }
 
     fn check_field_access(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
@@ -439,7 +473,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         // let _params = self.check_expr_in(closure.params().span(), root.clone());
 
         let mut pos = vec![];
-        let mut named = HashMap::new();
+        let mut named = BTreeMap::new();
         let mut rest = None;
 
         for param in closure.params().children() {
@@ -448,8 +482,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     pos.push(self.check_pattern(pattern, FlowType::Any, root.clone()));
                 }
                 ast::Param::Named(e) => {
-                    let exp = self.check_expr_in(e.span(), root.clone());
-                    let v = self.get_var(e.span(), to_ident_ref(&root, e.name())?)?;
+                    let exp = self.check_expr_in(e.expr().span(), root.clone());
+                    let v = self.get_var(e.name().span(), to_ident_ref(&root, e.name())?)?;
                     v.ever_be(exp);
                     named.insert(e.name().get().clone(), v.get_ref());
                 }
@@ -510,6 +544,9 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let callee = self.check_expr_in(set_rule.target().span(), root.clone());
         let args = self.check_expr_in(set_rule.args().span(), root.clone());
+        let _cond = set_rule
+            .condition()
+            .map(|cond| self.check_expr_in(cond.span(), root.clone()));
         let mut candidates = Vec::with_capacity(1);
 
         log::debug!("set rule: {callee:?} with {args:?}");
@@ -742,6 +779,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::FlowNone => {}
             FlowType::Auto => {}
             FlowType::Builtin(_) => {}
+            FlowType::Boolean(_) => {}
             FlowType::At(e) => {
                 let primary_type = self.check_primary_type(e.0 .0.clone());
                 self.check_apply_method(primary_type, e.0 .1.clone(), args, candidates);
@@ -934,6 +972,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::At(e) => self.check_primary_type(e.0 .0.clone()),
             FlowType::Unary(_) => e,
             FlowType::Binary(_) => e,
+            FlowType::Boolean(_) => e,
             FlowType::If(_) => e,
             FlowType::Element(_) => e,
         }
@@ -1049,6 +1088,41 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::Func(Box::new(f.clone())),
             vec![args.clone()],
         )))
+    }
+
+    fn check_comparable(&self, lhs: &FlowType, rhs: &FlowType) {
+        let _ = lhs;
+        let _ = rhs;
+    }
+
+    fn check_assignable(&self, lhs: &FlowType, rhs: &FlowType) {
+        let _ = lhs;
+        let _ = rhs;
+    }
+
+    fn check_containing(&self, container: &FlowType, elem: &FlowType, expected_in: bool) {
+        let _ = container;
+        let _ = elem;
+        let _ = expected_in;
+    }
+
+    fn possible_ever_be(&mut self, lhs: &FlowType, rhs: &FlowType) {
+        // todo: instantiataion
+        match rhs {
+            FlowType::Undef
+            | FlowType::Content
+            | FlowType::None
+            | FlowType::FlowNone
+            | FlowType::Auto
+            | FlowType::Element(..)
+            | FlowType::Builtin(..)
+            | FlowType::Value(..)
+            | FlowType::Boolean(..)
+            | FlowType::ValueDoc(..) => {
+                self.constrain(rhs, lhs);
+            }
+            _ => {}
+        }
     }
 }
 
@@ -1182,6 +1256,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             FlowType::Infer => {}
             FlowType::FlowNone => {}
             FlowType::Auto => {}
+            FlowType::Boolean(_) => {}
             FlowType::Builtin(_) => {}
             FlowType::Element(_) => {}
         }
@@ -1197,8 +1272,6 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 match &self.vars.get(&v.0).unwrap().kind {
                     FlowVarKind::Weak(w) => {
                         let w = w.read();
-
-                        // log::debug!("transform var {:?} {pol}", v.0);
 
                         let mut lbs = Vec::with_capacity(w.lbs.len());
                         let mut ubs = Vec::with_capacity(w.ubs.len());
@@ -1223,10 +1296,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                             }
                         }
 
-                        FlowType::Let(Arc::new(FlowVarStore {
-                            lbs: w.lbs.clone(),
-                            ubs: w.ubs.clone(),
-                        }))
+                        FlowType::Let(Arc::new(FlowVarStore { lbs, ubs }))
                     }
                 }
             }
@@ -1321,6 +1391,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             FlowType::Infer => FlowType::Infer,
             FlowType::FlowNone => FlowType::FlowNone,
             FlowType::Auto => FlowType::Auto,
+            FlowType::Boolean(b) => FlowType::Boolean(*b),
             FlowType::Builtin(b) => FlowType::Builtin(b.clone()),
         }
     }
@@ -1408,6 +1479,8 @@ impl Joiner {
             (FlowType::Union(..), _) => self.definite = FlowType::Undef,
             (FlowType::Let(w), FlowType::None) => self.definite = FlowType::Let(w),
             (FlowType::Let(..), _) => self.definite = FlowType::Undef,
+            (FlowType::Boolean(b), FlowType::None) => self.definite = FlowType::Boolean(b),
+            (FlowType::Boolean(..), _) => self.definite = FlowType::Undef,
         }
     }
 }

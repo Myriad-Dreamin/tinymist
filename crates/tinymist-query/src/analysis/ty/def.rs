@@ -35,6 +35,7 @@ pub(crate) enum FlowType {
     Infer,
     FlowNone,
     Auto,
+    Boolean(Option<bool>),
     Builtin(FlowBuiltinType),
     Value(Box<(Value, Span)>),
     ValueDoc(Box<(Value, &'static str)>),
@@ -99,6 +100,13 @@ impl fmt::Debug for FlowType {
             FlowType::Value(v) => write!(f, "{v:?}", v = v.0),
             FlowType::ValueDoc(v) => write!(f, "{v:?}"),
             FlowType::Element(e) => write!(f, "{e:?}"),
+            FlowType::Boolean(b) => {
+                if let Some(b) = b {
+                    write!(f, "{b}")
+                } else {
+                    f.write_str("Boolean")
+                }
+            }
         }
     }
 }
