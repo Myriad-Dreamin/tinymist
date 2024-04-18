@@ -1,0 +1,12 @@
+>$ x^"#" = "argmin"_(A x=b) ||x||_(cal(l)_2) $
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+# ^^^ source.typst markup.math.typst
+#    ^ source.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
+#     ^ source.typst markup.math.typst string.quoted.double.typst
+#      ^ source.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
+#       ^^^ source.typst markup.math.typst
+#          ^ source.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
+#           ^^^^^^ source.typst markup.math.typst string.quoted.double.typst
+#                 ^ source.typst markup.math.typst string.quoted.double.typst punctuation.definition.string.typst
+#                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst markup.math.typst
+#                                            ^ source.typst markup.math.typst punctuation.definition.string.math.typst

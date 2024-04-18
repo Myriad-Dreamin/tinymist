@@ -96,6 +96,11 @@ const identifier: textmate.PatternMatch = {
   name: "variable.other.readwrite.typst",
 };
 
+const mathIdentifier: textmate.PatternMatch = {
+  match: /\p{XID_Start}(?:\p{XID_Continue}(?!-))*/,
+  name: "variable.other.readwrite.typst",
+};
+
 const markupLabel: textmate.PatternMatch = {
   name: "entity.other.label.typst",
   match: /<[\p{XID_Start}_][\p{XID_Continue}_\-\.\:]*>/,
@@ -162,6 +167,13 @@ const markupMath: textmate.Pattern = {
     {
       include: "#markupEscape",
     },
+    {
+      include: "#stringLiteral",
+    },
+    // todo: correctly parse math identifier
+    // {
+    //   include: "#mathIdentifier",
+    // },
     {
       include: "#markupEnterCode",
     },
@@ -1582,6 +1594,7 @@ export const typst: textmate.Grammar = {
     primitiveFunctions,
     primitiveTypes,
     identifier,
+    mathIdentifier,
     markupLabel,
     markupReference,
     markupEscape,
