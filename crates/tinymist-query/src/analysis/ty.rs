@@ -28,6 +28,34 @@ pub(crate) use builtin::*;
 mod literal_flow;
 pub(crate) use literal_flow::*;
 
+/// Type checking at the source unit level.
+pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Arc<TypeCheckInfo>> {
+    let mut info = TypeCheckInfo::default();
+
+    // Retrieve def-use information for the source.
+    let def_use_info = ctx.def_use(source.clone())?;
+
+    let mut type_checker = TypeChecker {
+        ctx,
+        source: source.clone(),
+        def_use_info,
+        info: &mut info,
+        mode: InterpretMode::Markup,
+    };
+    let lnk = LinkedNode::new(source.root());
+
+    let type_check_start = std::time::Instant::now();
+    type_checker.check(lnk);
+    let elapsed = type_check_start.elapsed();
+    log::info!("Type checking on {:?} took {elapsed:?}", source.id());
+
+    // todo: cross-file unit type checking
+    let _ = type_checker.source;
+
+    Some(Arc::new(info))
+}
+
+#[derive(Default)]
 pub(crate) struct TypeCheckInfo {
     pub vars: HashMap<DefId, FlowVar>,
     pub mapping: HashMap<Span, FlowType>,
@@ -56,34 +84,6 @@ impl TypeCheckInfo {
 
         worker.simplify(ty, principal)
     }
-}
-
-pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Arc<TypeCheckInfo>> {
-    let _ = literal_type_check;
-    let def_use_info = ctx.def_use(source.clone())?;
-    let mut info = TypeCheckInfo {
-        vars: HashMap::new(),
-        mapping: HashMap::new(),
-
-        cano_cache: Mutex::new(TypeCanoStore::default()),
-    };
-    let mut type_checker = TypeChecker {
-        ctx,
-        source: source.clone(),
-        def_use_info,
-        info: &mut info,
-        mode: InterpretMode::Markup,
-    };
-    let lnk = LinkedNode::new(source.root());
-
-    let current = std::time::Instant::now();
-    type_checker.check(lnk);
-    let elapsed = current.elapsed();
-    log::info!("Type checking on {:?} took {:?}", source.id(), elapsed);
-
-    let _ = type_checker.source;
-
-    Some(Arc::new(info))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
