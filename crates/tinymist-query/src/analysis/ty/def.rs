@@ -11,7 +11,7 @@ use typst::{
 
 use crate::analysis::ty::param_mapping;
 
-use super::FlowBuiltinType;
+use super::{FlowBuiltinType, TypeCheckInfo};
 
 struct RefDebug<'a>(&'a FlowType);
 
@@ -173,6 +173,30 @@ impl FlowType {
             e.next().unwrap()
         } else {
             FlowType::Union(Box::new(e.collect()))
+        }
+    }
+
+    pub(crate) fn signatures(
+        &self,
+        ty_chk: &TypeCheckInfo,
+        principal: bool,
+    ) -> Option<Vec<FlowSignature>> {
+        let mut res = Vec::new();
+        check_signatures(self, &mut res, ty_chk, principal);
+        if res.is_empty() {
+            None
+        } else {
+            // todo: bad performance
+            for sig in &mut res {
+                for pos in &mut sig.pos {
+                    *pos = ty_chk.simplify(pos.clone(), principal);
+                }
+                for (_, ty) in &mut sig.named {
+                    *ty = ty_chk.simplify(ty.clone(), principal);
+                }
+            }
+
+            Some(res)
         }
     }
 }
@@ -425,5 +449,62 @@ impl fmt::Debug for FlowRecord {
             }
         }
         f.write_str("}")
+    }
+}
+
+fn instantiate_signature(
+    f: &FlowType,
+    args: Vec<FlowArgs>,
+    sigs: &mut Vec<FlowSignature>,
+    ty_chk: &TypeCheckInfo,
+    principal: bool,
+) {
+    let sigs_checkpoint = sigs.len();
+    check_signatures(f, sigs, ty_chk, principal);
+    if sigs.len() == sigs_checkpoint {
+        return;
+    }
+    for sig in &mut sigs[sigs_checkpoint..] {
+        // consume the positional arguments
+        sig.pos = if sig.pos.len() > args.len() {
+            sig.pos.split_off(args.len())
+        } else {
+            Vec::new()
+        };
+    }
+}
+
+fn check_signatures(
+    ty: &FlowType,
+    res: &mut Vec<FlowSignature>,
+    ty_chk: &TypeCheckInfo,
+    principal: bool,
+) {
+    match ty {
+        FlowType::Func(s) => res.push(*s.clone()),
+        FlowType::With(w) => {
+            instantiate_signature(&w.0, w.1.clone(), res, ty_chk, principal);
+        }
+        FlowType::Union(u) => {
+            for ty in u.iter() {
+                check_signatures(ty, res, ty_chk, principal);
+            }
+        }
+        FlowType::Var(u) => {
+            let var = ty_chk.vars.get(&u.0);
+            if let Some(var) = var {
+                let FlowVarKind::Weak(w) = &var.kind;
+                let w = w.read();
+                for lb in &w.ubs {
+                    check_signatures(lb, res, ty_chk, principal);
+                }
+                if !principal {
+                    for ub in &w.lbs {
+                        check_signatures(ub, res, ty_chk, principal);
+                    }
+                }
+            }
+        }
+        _ => {}
     }
 }

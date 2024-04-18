@@ -36,7 +36,7 @@ pub(crate) struct TypeCheckInfo {
 }
 
 impl TypeCheckInfo {
-    pub fn simplify(&self, ty: FlowType) -> FlowType {
+    pub fn simplify(&self, ty: FlowType, principal: bool) -> FlowType {
         let mut c = self.cano_cache.lock();
         let c = &mut *c;
 
@@ -45,6 +45,7 @@ impl TypeCheckInfo {
         c.negatives.clear();
 
         let mut worker = TypeSimplifier {
+            principal,
             vars: &self.vars,
             cano_cache: &mut c.cano_cache,
             cano_local_cache: &mut c.cano_local_cache,
@@ -53,7 +54,7 @@ impl TypeCheckInfo {
             negatives: &mut c.negatives,
         };
 
-        worker.simplify(ty)
+        worker.simplify(ty, principal)
     }
 }
 
@@ -1128,26 +1129,28 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
 #[derive(Default)]
 struct TypeCanoStore {
-    cano_cache: HashMap<u128, FlowType>,
-    cano_local_cache: HashMap<DefId, FlowType>,
+    cano_cache: HashMap<(u128, bool), FlowType>,
+    cano_local_cache: HashMap<(DefId, bool), FlowType>,
     negatives: HashSet<DefId>,
     positives: HashSet<DefId>,
 }
 
 struct TypeSimplifier<'a, 'b> {
+    principal: bool,
+
     vars: &'a HashMap<DefId, FlowVar>,
 
-    cano_cache: &'b mut HashMap<u128, FlowType>,
-    cano_local_cache: &'b mut HashMap<DefId, FlowType>,
+    cano_cache: &'b mut HashMap<(u128, bool), FlowType>,
+    cano_local_cache: &'b mut HashMap<(DefId, bool), FlowType>,
     negatives: &'b mut HashSet<DefId>,
     positives: &'b mut HashSet<DefId>,
 }
 
 impl<'a, 'b> TypeSimplifier<'a, 'b> {
-    fn simplify(&mut self, ty: FlowType) -> FlowType {
+    fn simplify(&mut self, ty: FlowType, principal: bool) -> FlowType {
         // todo: hash safety
         let ty_key = hash128(&ty);
-        if let Some(cano) = self.cano_cache.get(&ty_key) {
+        if let Some(cano) = self.cano_cache.get(&(ty_key, principal)) {
             return cano.clone();
         }
 
@@ -1265,23 +1268,31 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
     fn transform(&mut self, ty: &FlowType, pol: bool) -> FlowType {
         match ty {
             FlowType::Var(v) => {
-                if let Some(cano) = self.cano_local_cache.get(&v.0) {
+                if let Some(cano) = self.cano_local_cache.get(&(v.0, self.principal)) {
                     return cano.clone();
                 }
+                // todo: avoid cycle
+                self.cano_local_cache
+                    .insert((v.0, self.principal), FlowType::Any);
 
-                match &self.vars.get(&v.0).unwrap().kind {
+                let res = match &self.vars.get(&v.0).unwrap().kind {
                     FlowVarKind::Weak(w) => {
                         let w = w.read();
 
                         let mut lbs = Vec::with_capacity(w.lbs.len());
                         let mut ubs = Vec::with_capacity(w.ubs.len());
 
-                        if pol && !self.negatives.contains(&v.0) {
+                        log::info!(
+                            "transform var [principal={}] {v:?} with {w:?}",
+                            self.principal
+                        );
+
+                        if !self.principal || ((pol) && !self.negatives.contains(&v.0)) {
                             for lb in w.lbs.iter() {
                                 lbs.push(self.transform(lb, pol));
                             }
                         }
-                        if !pol && !self.positives.contains(&v.0) {
+                        if !self.principal || ((!pol) && !self.positives.contains(&v.0)) {
                             for ub in w.ubs.iter() {
                                 ubs.push(self.transform(ub, !pol));
                             }
@@ -1298,7 +1309,12 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
 
                         FlowType::Let(Arc::new(FlowVarStore { lbs, ubs }))
                     }
-                }
+                };
+
+                self.cano_local_cache
+                    .insert((v.0, self.principal), res.clone());
+
+                res
             }
             FlowType::Func(f) => {
                 let pos = f.pos.iter().map(|p| self.transform(p, !pol)).collect();

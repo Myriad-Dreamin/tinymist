@@ -16,7 +16,7 @@ use crate::analysis::{
     PathPreference, FLOW_INSET_DICT, FLOW_MARGIN_DICT, FLOW_OUTSET_DICT, FLOW_RADIUS_DICT,
     FLOW_STROKE_DICT,
 };
-use crate::syntax::param_index_at_leaf;
+use crate::syntax::{get_def_target, param_index_at_leaf, DefTarget};
 use crate::upstream::plain_docs_sentence;
 
 use crate::{prelude::*, typst_to_lsp::completion_kind, LspCompletion};
@@ -205,6 +205,26 @@ pub fn param_completions<'a>(
 
     let signature = analyze_dyn_signature(ctx.ctx, func.clone());
 
+    let def = func.span();
+    let type_sig = def.id().and_then(|id| {
+        let source = ctx.ctx.source_by_id(id).ok()?;
+        let def = get_def_target(source.find(def)?)?;
+        let DefTarget::Let(l) = def else {
+            return None;
+        };
+
+        let lb = l.cast::<ast::LetBinding>()?;
+        let ast::LetBindingKind::Closure(c) = lb.kind() else {
+            return None;
+        };
+
+        let fn_ty = ctx.ctx.type_of_span(c.span());
+        let info = ctx.ctx.type_check(source)?;
+
+        log::info!("function sig by type checking: {:?}", fn_ty);
+        fn_ty.and_then(|ty| ty.signatures(&info, false))
+    });
+
     // Exclude named arguments which are already present.
     let exclude: Vec<_> = args
         .items()
@@ -222,20 +242,27 @@ pub fn param_completions<'a>(
         let pos = primary_sig.pos.get(pos_index);
         log::debug!("pos_param_completion_to: {:?}", pos);
 
+        let mut doc = None;
+
         if let Some(pos) = pos {
             if set && !pos.settable {
                 return;
             }
 
+            // Some(&plain_docs_sentence(&pos.docs))
+            doc = Some(plain_docs_sentence(&pos.docs));
+
             if pos.positional
-                && type_completion(
-                    ctx,
-                    pos.infer_type.as_ref(),
-                    Some(&plain_docs_sentence(&pos.docs)),
-                )
-                .is_none()
+                && type_completion(ctx, pos.infer_type.as_ref(), doc.as_deref()).is_none()
             {
                 ctx.cast_completions(&pos.input);
+            }
+        }
+
+        for sig in type_sig.iter().flatten() {
+            if let Some(pos) = sig.pos.get(pos_index) {
+                log::info!("pos_param_completion by type: {:?}", pos);
+                type_completion(ctx, Some(pos), doc.as_deref());
             }
         }
     }
@@ -477,12 +504,24 @@ fn type_completion(
                 type_completion(ctx, Some(info), docs);
             }
         }
-        FlowType::Let(_) => return None,
+        FlowType::Let(e) => {
+            for ut in e.ubs.iter() {
+                type_completion(ctx, Some(ut), docs);
+            }
+            for lt in e.lbs.iter() {
+                type_completion(ctx, Some(lt), docs);
+            }
+        }
         FlowType::Var(_) => return None,
         FlowType::Unary(_) => return None,
         FlowType::Binary(_) => return None,
         FlowType::If(_) => return None,
         FlowType::Value(v) => {
+            // Prevent duplicate completions from appearing.
+            if !ctx.seen_casts.insert(typst::util::hash128(&v.0)) {
+                return Some(());
+            }
+
             if let Value::Type(ty) = &v.0 {
                 if *ty == Type::of::<NoneValue>() {
                     type_completion(ctx, Some(&FlowType::None), docs);
@@ -559,6 +598,26 @@ pub fn named_param_value_completions<'a>(
         return;
     };
 
+    let def = func.span();
+    let type_sig = def.id().and_then(|id| {
+        let source = ctx.ctx.source_by_id(id).ok()?;
+        let def = get_def_target(source.find(def)?)?;
+        let DefTarget::Let(l) = def else {
+            return None;
+        };
+
+        let lb = l.cast::<ast::LetBinding>()?;
+        let ast::LetBindingKind::Closure(c) = lb.kind() else {
+            return None;
+        };
+
+        let fn_ty = ctx.ctx.type_of_span(c.span());
+        let info = ctx.ctx.type_check(source)?;
+
+        log::info!("function sig by type checking: {:?}", fn_ty);
+        fn_ty.and_then(|ty| ty.signatures(&info, false))
+    });
+
     use typst::foundations::func::Repr;
     let mut func = func;
     while let Repr::With(f) = func.inner() {
@@ -578,20 +637,34 @@ pub fn named_param_value_completions<'a>(
         return;
     }
 
+    let doc = Some(plain_docs_sentence(&param.docs));
+
     // static analysis
     if let Some(ty) = ty {
-        type_completion(ctx, Some(ty), Some(&plain_docs_sentence(&param.docs)));
+        type_completion(ctx, Some(ty), doc.as_deref());
     }
 
-    if let Some(expr) = &param.expr {
-        ctx.completions.push(Completion {
-            kind: CompletionKind::Constant,
-            label: expr.clone(),
-            apply: None,
-            detail: Some(plain_docs_sentence(&param.docs)),
-            label_detail: None,
-            command: None,
-        });
+    let mut completed = false;
+    for sig in type_sig.iter().flatten() {
+        let named = sig.named.iter().find(|(n, _)| n.as_str() == name);
+        if let Some((_, param)) = named {
+            log::info!("named_param_completion by type: {:?}", param);
+            type_completion(ctx, Some(param), doc.as_deref());
+            completed = true;
+        }
+    }
+
+    if !completed {
+        if let Some(expr) = &param.expr {
+            ctx.completions.push(Completion {
+                kind: CompletionKind::Constant,
+                label: expr.clone(),
+                apply: None,
+                detail: doc.map(Into::into),
+                label_detail: None,
+                command: None,
+            });
+        }
     }
 
     if type_completion(

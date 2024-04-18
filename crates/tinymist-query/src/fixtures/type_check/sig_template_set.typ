@@ -1,5 +1,5 @@
 #let tmpl(content, authors: (), font: none, class: "article") = {
-  if class != "article" or class != "letter" {
+  if class != "article" and class != "letter" {
     panic("")
   }
 

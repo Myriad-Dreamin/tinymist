@@ -719,10 +719,10 @@ fn complete_params(ctx: &mut CompletionContext) -> bool {
                 ctx.from = ctx.cursor.min(next.offset());
             }
             let parent = deciding.parent().unwrap();
-            log::info!("named param parent: {:?}", parent);
+            log::debug!("named param parent: {:?}", parent);
             // get type of this param
             let ty = ctx.ctx.type_of(param.to_untyped());
-            log::info!("named param type: {:?}", ty);
+            log::debug!("named param type: {:?}", ty);
 
             named_param_value_completions(ctx, callee, &param, ty.as_ref());
             return true;

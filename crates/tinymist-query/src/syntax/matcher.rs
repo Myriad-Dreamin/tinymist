@@ -169,14 +169,11 @@ pub fn get_def_target(node: LinkedNode) -> Option<DefTarget<'_>> {
     while !ancestor.is::<ast::Expr>() {
         ancestor = ancestor.parent()?.clone();
     }
-    debug!("def expr: {ancestor:?}");
+    log::debug!("def expr: {ancestor:?}");
     let ancestor = deref_lvalue(ancestor)?;
-    debug!("def lvalue: {ancestor:?}");
+    log::debug!("def lvalue: {ancestor:?}");
 
     let may_ident = ancestor.cast::<ast::Expr>()?;
-    if !may_ident.hash() && !matches!(may_ident, ast::Expr::MathIdent(_)) {
-        return None;
-    }
 
     Some(match may_ident {
         // todo: label, reference
@@ -206,6 +203,7 @@ pub fn get_def_target(node: LinkedNode) -> Option<DefTarget<'_>> {
 
             DefTarget::Import(parent.clone())
         }
+        _ if may_ident.hash() => return None,
         _ => {
             debug!("unsupported kind {kind:?}", kind = ancestor.kind());
             return None;
