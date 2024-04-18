@@ -104,7 +104,7 @@ const markupLabel: textmate.PatternMatch = {
 const markupReference: textmate.PatternMatch = {
   name: "entity.other.reference.typst",
   match:
-    /(@)[\p{XID_Start}_](?:[\p{XID_Continue}_\-]|[\.\:](?!:[\.\:]*[^\p{XID_Continue}_\-\.\:]))*/,
+    /(@)[\p{XID_Start}_](?:[\p{XID_Continue}_\-]|[\.\:](?!:\s|$|([\.\:]*[^\p{XID_Continue}_\-\.\:])))*/,
   captures: {
     "1": {
       name: "punctuation.definition.reference.typst",

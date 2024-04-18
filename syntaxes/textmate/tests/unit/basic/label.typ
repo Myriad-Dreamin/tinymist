@@ -19,3 +19,7 @@
 @test::. e
 = <test: :.>
 @test: :. e
+
+A @netwok @arrgh.
+
+@fib:
