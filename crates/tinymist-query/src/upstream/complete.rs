@@ -60,6 +60,8 @@ pub struct Completion {
     pub kind: CompletionKind,
     /// The label the completion is shown with.
     pub label: EcoString,
+    /// The label the completion is shown with.
+    pub label_detail: Option<EcoString>,
     /// The completed version of the input, possibly described with snippet
     /// syntax like `${lhs} + ${rhs}`.
     ///
@@ -407,6 +409,7 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                 eco_format!("{method}()${{}}")
             }),
             detail: None,
+            label_detail: None,
             command: None,
         })
     }
@@ -434,6 +437,7 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                         label: modifier.into(),
                         apply: None,
                         detail: None,
+                        label_detail: None,
                         command: None,
                     });
                 }
@@ -469,6 +473,7 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                     label: name.clone(),
                     apply: None,
                     detail: None,
+                    label_detail: None,
                     command: None,
                 })
             }
@@ -1022,6 +1027,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             label: label.into(),
             apply: Some(snippet.into()),
             detail: Some(docs.into()),
+            label_detail: None,
             // VS Code doesn't do that... Auto triggering suggestion only happens on typing (word
             // starts or trigger characters). However, you can use editor.action.triggerSuggest as
             // command on a suggestion to "manually" retrigger suggest after inserting one
@@ -1082,6 +1088,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                 label: name.into(),
                 apply: Some(tags[0].into()),
                 detail: Some(repr::separated_list(&tags, " or ").into()),
+                label_detail: None,
                 command: None,
             });
         }
@@ -1121,6 +1128,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                 }),
                 label: label.as_str().into(),
                 detail,
+                label_detail: None,
                 command: None,
             });
         }
@@ -1179,6 +1187,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             label,
             apply,
             detail,
+            label_detail: None,
             command,
         });
     }
@@ -1255,6 +1264,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         label: ty.long_name().into(),
                         apply: Some(eco_format!("${{{ty}}}")),
                         detail: Some(eco_format!("A value of type {ty}.")),
+                        label_detail: None,
                         command: None,
                     });
                     self.scope_completions(false, |value| value.ty() == *ty);

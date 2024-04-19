@@ -211,8 +211,8 @@ pub mod typst_to_lsp {
     use itertools::Itertools;
     use lazy_static::lazy_static;
     use lsp_types::{
-        Command, CompletionTextEdit, Documentation, InsertTextFormat, LanguageString, MarkedString,
-        MarkupContent, MarkupKind, TextEdit,
+        Command, CompletionItemLabelDetails, CompletionTextEdit, Documentation, InsertTextFormat,
+        LanguageString, MarkedString, MarkupContent, MarkupKind, TextEdit,
     };
     use regex::{Captures, Regex};
     use typst::diag::EcoString;
@@ -312,6 +312,12 @@ pub mod typst_to_lsp {
             label: typst_completion.label.to_string(),
             kind: Some(completion_kind(typst_completion.kind.clone())),
             detail: typst_completion.detail.as_ref().map(String::from),
+            label_details: typst_completion.label_detail.as_ref().map(|e| {
+                CompletionItemLabelDetails {
+                    detail: None,
+                    description: Some(e.to_string()),
+                }
+            }),
             text_edit: Some(text_edit),
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             command: typst_completion.command.as_ref().map(|c| Command {

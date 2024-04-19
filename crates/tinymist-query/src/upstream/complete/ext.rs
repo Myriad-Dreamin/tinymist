@@ -158,6 +158,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         label: name,
                         apply: Some(apply),
                         detail: None,
+                        label_detail: None,
                         // todo: only vscode and neovim (0.9.1) support this
                         command: Some("editor.action.triggerSuggest"),
                     });
@@ -167,6 +168,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         label: name,
                         apply: None,
                         detail: None,
+                        label_detail: None,
                         command: None,
                     });
                 }
@@ -252,6 +254,7 @@ pub fn param_completions<'a>(
                 label: param.name.clone().into(),
                 apply: Some(eco_format!("{}: ${{}}", param.name)),
                 detail: Some(plain_docs_sentence(&param.docs)),
+                label_detail: None,
                 // todo: only vscode and neovim (0.9.1) support this
                 //
                 // VS Code doesn't do that... Auto triggering suggestion only happens on typing
@@ -397,6 +400,32 @@ fn type_completion(
                 ctx.strict_scope_completions(false, |value| value.ty() == color_ty);
             }
             FlowBuiltinType::TextSize => return None,
+            FlowBuiltinType::TextLang => {
+                for (&key, desc) in rust_iso639::ALL_MAP.entries() {
+                    let detail = eco_format!("An ISO 639-1/2/3 language code, {}.", desc.name);
+                    ctx.completions.push(Completion {
+                        kind: CompletionKind::Syntax,
+                        label: key.to_lowercase().into(),
+                        apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
+                        detail: Some(detail),
+                        label_detail: Some(desc.name.into()),
+                        command: None,
+                    });
+                }
+            }
+            FlowBuiltinType::TextRegion => {
+                for (&key, desc) in rust_iso3166::ALPHA2_MAP.entries() {
+                    let detail = eco_format!("An ISO 3166-1 alpha-2 region code, {}.", desc.name);
+                    ctx.completions.push(Completion {
+                        kind: CompletionKind::Syntax,
+                        label: key.to_lowercase().into(),
+                        apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
+                        detail: Some(detail),
+                        label_detail: Some(desc.name.into()),
+                        command: None,
+                    });
+                }
+            }
             FlowBuiltinType::TextFont => return None,
             FlowBuiltinType::Dir => return None,
             FlowBuiltinType::Margin => {
@@ -467,6 +496,7 @@ fn type_completion(
                         label: ty.long_name().into(),
                         apply: Some(eco_format!("${{{ty}}}")),
                         detail: Some(eco_format!("A value of type {ty}.")),
+                        label_detail: None,
                         command: None,
                     });
                     ctx.strict_scope_completions(false, |value| value.ty() == *ty);
@@ -537,6 +567,7 @@ pub fn named_param_value_completions<'a>(
             label: expr.clone(),
             apply: None,
             detail: Some(plain_docs_sentence(&param.docs)),
+            label_detail: None,
             command: None,
         });
     }
@@ -652,6 +683,7 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
             label: key.clone(),
             apply: Some(eco_format!("{}: ${{}}", key)),
             detail: None,
+            label_detail: None,
             // todo: only vscode and neovim (0.9.1) support this
             command: Some("editor.action.triggerSuggest"),
         });

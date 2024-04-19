@@ -40,6 +40,8 @@ percent-encoding = "2"
 unscanny = "0.1"
 pathdiff = "0.2"
 ttf-parser = "0.20.0"
+rust_iso639 = "0.0.1"
+rust_iso3166 = "0.1.4"
 
 [dev-dependencies]
 once_cell.workspace = true
