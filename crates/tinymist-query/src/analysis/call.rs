@@ -4,7 +4,7 @@ use typst::syntax::SyntaxNode;
 
 use super::{ParamSpec, Signature};
 use crate::{
-    analysis::{analyze_signature_v2, PrimarySignature, SignatureTarget},
+    analysis::{analyze_signature, PrimarySignature, SignatureTarget},
     prelude::*,
 };
 
@@ -74,7 +74,7 @@ pub fn analyze_call_no_cache(
     callee_node: LinkedNode,
     args: ast::Args<'_>,
 ) -> Option<CallInfo> {
-    let signature = analyze_signature_v2(ctx, source, SignatureTarget::Syntax(callee_node))?;
+    let signature = analyze_signature(ctx, source, SignatureTarget::Syntax(callee_node))?;
     trace!("got signature {signature:?}");
 
     let mut info = CallInfo {

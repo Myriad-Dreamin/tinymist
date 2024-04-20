@@ -9,108 +9,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
   "isIncomplete": false,
   "items": [
    {
-    "kind": 7,
-    "label": "array",
-    "textEdit": {
-     "newText": "array",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 5
-      },
-      "start": {
-       "character": 1,
-       "line": 5
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "parbreak",
-    "textEdit": {
-     "newText": "parbreak()${1:}",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 5
-      },
-      "start": {
-       "character": 1,
-       "line": 5
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "smallcaps",
-    "textEdit": {
-     "newText": "smallcaps(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 5
-      },
-      "start": {
-       "character": 1,
-       "line": 5
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "pagebreak",
-    "textEdit": {
-     "newText": "pagebreak(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 5
-      },
-      "start": {
-       "character": 1,
-       "line": 5
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "metadata",
-    "textEdit": {
-     "newText": "metadata(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 5
-      },
-      "start": {
-       "character": 1,
-       "line": 5
-      }
-     }
-    }
-   },
-   {
-    "kind": 21,
-    "label": "aqua",
-    "textEdit": {
-     "newText": "aqua",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 5
-      },
-      "start": {
-       "character": 1,
-       "line": 5
-      }
-     }
-    }
-   },
-   {
     "kind": 3,
     "label": "aa",
     "textEdit": {
@@ -179,10 +77,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
     }
    },
    {
-    "kind": 15,
-    "label": "import package",
+    "kind": 21,
+    "label": "aqua",
     "textEdit": {
-     "newText": "import \"@${1:}\": ${2:items}",
+     "newText": "aqua",
      "range": {
       "end": {
        "character": 4,
@@ -196,10 +94,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
     }
    },
    {
-    "kind": 15,
-    "label": "include (package)",
+    "kind": 7,
+    "label": "array",
     "textEdit": {
-     "newText": "include \"@${1:}\"",
+     "newText": "array",
      "range": {
       "end": {
        "character": 4,
@@ -234,6 +132,108 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
     "label": "dictionary literal",
     "textEdit": {
      "newText": "(${1:a: 1, b: 2})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 15,
+    "label": "import package",
+    "textEdit": {
+     "newText": "import \"@${1:}\": ${2:items}",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 15,
+    "label": "include (package)",
+    "textEdit": {
+     "newText": "include \"@${1:}\"",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "metadata",
+    "textEdit": {
+     "newText": "metadata(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "pagebreak",
+    "textEdit": {
+     "newText": "pagebreak(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "parbreak",
+    "textEdit": {
+     "newText": "parbreak()${1:}",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "smallcaps",
+    "textEdit": {
+     "newText": "smallcaps(${1:})",
      "range": {
       "end": {
        "character": 4,

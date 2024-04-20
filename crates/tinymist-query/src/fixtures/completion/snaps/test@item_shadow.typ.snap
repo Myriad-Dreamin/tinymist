@@ -9,10 +9,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
   "isIncomplete": false,
   "items": [
    {
-    "kind": 7,
-    "label": "array",
+    "kind": 3,
+    "label": "aa",
     "textEdit": {
-     "newText": "array",
+     "newText": "aa(${1:})",
      "range": {
       "end": {
        "character": 4,
@@ -27,60 +27,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
    },
    {
     "kind": 3,
-    "label": "parbreak",
+    "label": "aac",
     "textEdit": {
-     "newText": "parbreak()${1:}",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "smallcaps",
-    "textEdit": {
-     "newText": "smallcaps(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "pagebreak",
-    "textEdit": {
-     "newText": "pagebreak(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "metadata",
-    "textEdit": {
-     "newText": "metadata(${1:})",
+     "newText": "aac(${1:})",
      "range": {
       "end": {
        "character": 4,
@@ -111,10 +60,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
     }
    },
    {
-    "kind": 3,
-    "label": "aa",
+    "kind": 7,
+    "label": "array",
     "textEdit": {
-     "newText": "aa(${1:})",
+     "newText": "array",
      "range": {
       "end": {
        "character": 4,
@@ -128,10 +77,27 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
     }
    },
    {
-    "kind": 3,
-    "label": "aac",
+    "kind": 15,
+    "label": "array literal",
     "textEdit": {
-     "newText": "aac(${1:})",
+     "newText": "(${1:1, 2, 3})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 4
+      },
+      "start": {
+       "character": 1,
+       "line": 4
+      }
+     }
+    }
+   },
+   {
+    "kind": 15,
+    "label": "dictionary literal",
+    "textEdit": {
+     "newText": "(${1:a: 1, b: 2})",
      "range": {
       "end": {
        "character": 4,
@@ -179,10 +145,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
     }
    },
    {
-    "kind": 15,
-    "label": "array literal",
+    "kind": 3,
+    "label": "metadata",
     "textEdit": {
-     "newText": "(${1:1, 2, 3})",
+     "newText": "metadata(${1:})",
      "range": {
       "end": {
        "character": 4,
@@ -196,10 +162,44 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
     }
    },
    {
-    "kind": 15,
-    "label": "dictionary literal",
+    "kind": 3,
+    "label": "pagebreak",
     "textEdit": {
-     "newText": "(${1:a: 1, b: 2})",
+     "newText": "pagebreak(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 4
+      },
+      "start": {
+       "character": 1,
+       "line": 4
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "parbreak",
+    "textEdit": {
+     "newText": "parbreak()${1:}",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 4
+      },
+      "start": {
+       "character": 1,
+       "line": 4
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "smallcaps",
+    "textEdit": {
+     "newText": "smallcaps(${1:})",
      "range": {
       "end": {
        "character": 4,

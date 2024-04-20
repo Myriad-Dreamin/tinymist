@@ -1,0 +1,64 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (312..313)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/func_with_args.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "authors",
+    "textEdit": {
+     "newText": "authors: ${1:}",
+     "range": {
+      "end": {
+       "character": 11,
+       "line": 14
+      },
+      "start": {
+       "character": 11,
+       "line": 14
+      }
+     }
+    }
+   },
+   {
+    "kind": 6,
+    "label": "class",
+    "textEdit": {
+     "newText": "class: ${1:}",
+     "range": {
+      "end": {
+       "character": 11,
+       "line": 14
+      },
+      "start": {
+       "character": 11,
+       "line": 14
+      }
+     }
+    }
+   },
+   {
+    "kind": 6,
+    "label": "font",
+    "textEdit": {
+     "newText": "font: ${1:}",
+     "range": {
+      "end": {
+       "character": 11,
+       "line": 14
+      },
+      "start": {
+       "character": 11,
+       "line": 14
+      }
+     }
+    }
+   }
+  ]
+ }
+]

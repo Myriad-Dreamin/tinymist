@@ -12,9 +12,9 @@ use typst::visualize::Color;
 
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::analysis::{
-    analyze_dyn_signature, analyze_import, resolve_callee, FlowBuiltinType, FlowRecord, FlowType,
-    PathPreference, FLOW_INSET_DICT, FLOW_MARGIN_DICT, FLOW_OUTSET_DICT, FLOW_RADIUS_DICT,
-    FLOW_STROKE_DICT,
+    analyze_dyn_signature, analyze_import, resolve_call_target, FlowBuiltinType, FlowRecord,
+    FlowType, PathPreference, FLOW_INSET_DICT, FLOW_MARGIN_DICT, FLOW_OUTSET_DICT,
+    FLOW_RADIUS_DICT, FLOW_STROKE_DICT,
 };
 use crate::syntax::{get_non_strict_def_target, param_index_at_leaf, DefTarget};
 use crate::upstream::plain_docs_sentence;
@@ -185,13 +185,16 @@ pub fn param_completions<'a>(
     set: bool,
     args: ast::Args<'a>,
 ) {
-    let Some(func) = ctx
+    let Some(cc) = ctx
         .root
         .find(callee.span())
-        .and_then(|callee| resolve_callee(ctx.ctx, callee))
+        .and_then(|callee| resolve_call_target(ctx.ctx, callee))
     else {
         return;
     };
+    // todo: regards call convention
+    let this = cc.method_this().cloned();
+    let func = cc.callee();
 
     use typst::foundations::func::Repr;
     let mut func = func;
@@ -201,7 +204,8 @@ pub fn param_completions<'a>(
         func = f.0.clone();
     }
 
-    let pos_index = param_index_at_leaf(&ctx.leaf, &func, args);
+    let pos_index =
+        param_index_at_leaf(&ctx.leaf, &func, args).map(|i| if this.is_some() { i + 1 } else { i });
 
     let signature = analyze_dyn_signature(ctx.ctx, func.clone());
 
@@ -585,10 +589,10 @@ pub fn named_param_value_completions<'a>(
     name: &str,
     ty: Option<&FlowType>,
 ) {
-    let Some(func) = ctx
+    let Some(cc) = ctx
         .root
         .find(callee.span())
-        .and_then(|callee| resolve_callee(ctx.ctx, callee))
+        .and_then(|callee| resolve_call_target(ctx.ctx, callee))
     else {
         // static analysis
         if let Some(ty) = ty {
@@ -597,6 +601,8 @@ pub fn named_param_value_completions<'a>(
 
         return;
     };
+    // todo: regards call convention
+    let func = cc.callee();
 
     let def = func.span();
     let type_sig = def.id().and_then(|id| {

@@ -352,7 +352,7 @@ mod signature_tests {
     use typst::foundations::Repr;
     use typst::syntax::LinkedNode;
 
-    use crate::analysis::{analyze_signature_v2, Signature, SignatureTarget};
+    use crate::analysis::{analyze_signature, Signature, SignatureTarget};
     use crate::syntax::get_deref_target;
     use crate::tests::*;
 
@@ -370,7 +370,7 @@ mod signature_tests {
             let callee_node = get_deref_target(callee_node, pos).unwrap();
             let callee_node = callee_node.node();
 
-            let result = analyze_signature_v2(
+            let result = analyze_signature(
                 ctx,
                 source.clone(),
                 SignatureTarget::Syntax(callee_node.clone()),
