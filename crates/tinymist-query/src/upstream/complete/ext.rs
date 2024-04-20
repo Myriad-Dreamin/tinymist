@@ -152,10 +152,30 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         for (name, kind) in defined {
             if filter(None) && !name.is_empty() {
                 if kind == CompletionKind::Func {
+                    let apply = eco_format!("{}.with(${{}})", name);
+                    self.completions.push(Completion {
+                        kind: kind.clone(),
+                        label: eco_format!("{}.with", name),
+                        apply: Some(apply),
+                        detail: None,
+                        label_detail: None,
+                        // todo: only vscode and neovim (0.9.1) support this
+                        command: Some("editor.action.triggerSuggest"),
+                    });
+                    let apply = eco_format!("{}.where(${{}})", name);
+                    self.completions.push(Completion {
+                        kind: kind.clone(),
+                        label: eco_format!("{}.where", name),
+                        apply: Some(apply),
+                        detail: None,
+                        label_detail: None,
+                        // todo: only vscode and neovim (0.9.1) support this
+                        command: Some("editor.action.triggerSuggest"),
+                    });
                     // todo: check arguments, if empty, jump to after the parens
                     let apply = eco_format!("{}(${{}})", name);
                     self.completions.push(Completion {
-                        kind,
+                        kind: kind.clone(),
                         label: name,
                         apply: Some(apply),
                         detail: None,

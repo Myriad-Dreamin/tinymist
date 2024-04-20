@@ -26,6 +26,40 @@ input_file: crates/tinymist-query/src/fixtures/completion/let.typ
     }
    },
    {
+    "kind": 3,
+    "label": "aa.where",
+    "textEdit": {
+     "newText": "aa.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aa.with",
+    "textEdit": {
+     "newText": "aa.with(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
     "kind": 6,
     "label": "aab",
     "textEdit": {
@@ -64,6 +98,40 @@ input_file: crates/tinymist-query/src/fixtures/completion/let.typ
     "label": "aac",
     "textEdit": {
      "newText": "aac(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac.where",
+    "textEdit": {
+     "newText": "aac.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac.with",
+    "textEdit": {
+     "newText": "aac.with(${1:})",
      "range": {
       "end": {
        "character": 4,
@@ -273,6 +341,40 @@ input_file: crates/tinymist-query/src/fixtures/completion/let.typ
     "label": "aac",
     "textEdit": {
      "newText": "aac(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac.where",
+    "textEdit": {
+     "newText": "aac.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac.with",
+    "textEdit": {
+     "newText": "aac.with(${1:})",
      "range": {
       "end": {
        "character": 4,

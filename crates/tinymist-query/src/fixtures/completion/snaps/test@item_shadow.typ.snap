@@ -27,9 +27,77 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
    },
    {
     "kind": 3,
+    "label": "aa.where",
+    "textEdit": {
+     "newText": "aa.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 4
+      },
+      "start": {
+       "character": 1,
+       "line": 4
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aa.with",
+    "textEdit": {
+     "newText": "aa.with(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 4
+      },
+      "start": {
+       "character": 1,
+       "line": 4
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
     "label": "aac",
     "textEdit": {
      "newText": "aac(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 4
+      },
+      "start": {
+       "character": 1,
+       "line": 4
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac.where",
+    "textEdit": {
+     "newText": "aac.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 4
+      },
+      "start": {
+       "character": 1,
+       "line": 4
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac.with",
+    "textEdit": {
+     "newText": "aac.with(${1:})",
      "range": {
       "end": {
        "character": 4,
@@ -222,6 +290,40 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
     "label": "aac",
     "textEdit": {
      "newText": "aac(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 4
+      },
+      "start": {
+       "character": 1,
+       "line": 4
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac.where",
+    "textEdit": {
+     "newText": "aac.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 4
+      },
+      "start": {
+       "character": 1,
+       "line": 4
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac.with",
+    "textEdit": {
+     "newText": "aac.with(${1:})",
      "range": {
       "end": {
        "character": 4,
