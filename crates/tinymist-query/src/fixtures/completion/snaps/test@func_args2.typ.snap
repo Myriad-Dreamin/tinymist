@@ -11,6 +11,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_args2.typ
    {
     "kind": 6,
     "label": "class",
+    "sortText": "000",
     "textEdit": {
      "newText": " class: ${1:}",
      "range": {
@@ -28,6 +29,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_args2.typ
    {
     "kind": 6,
     "label": "font",
+    "sortText": "001",
     "textEdit": {
      "newText": " font: ${1:}",
      "range": {

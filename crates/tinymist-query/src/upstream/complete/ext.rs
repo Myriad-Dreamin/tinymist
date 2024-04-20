@@ -17,6 +17,7 @@ use crate::analysis::{
     FLOW_RADIUS_DICT, FLOW_STROKE_DICT,
 };
 use crate::syntax::{get_non_strict_def_target, param_index_at_leaf, DefTarget};
+use crate::upstream::complete::complete_code;
 use crate::upstream::plain_docs_sentence;
 
 use crate::{prelude::*, typst_to_lsp::completion_kind, LspCompletion};
@@ -157,20 +158,18 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         kind: kind.clone(),
                         label: eco_format!("{}.with", name),
                         apply: Some(apply),
-                        detail: None,
-                        label_detail: None,
                         // todo: only vscode and neovim (0.9.1) support this
                         command: Some("editor.action.triggerSuggest"),
+                        ..Default::default()
                     });
                     let apply = eco_format!("{}.where(${{}})", name);
                     self.completions.push(Completion {
                         kind: kind.clone(),
                         label: eco_format!("{}.where", name),
                         apply: Some(apply),
-                        detail: None,
-                        label_detail: None,
                         // todo: only vscode and neovim (0.9.1) support this
                         command: Some("editor.action.triggerSuggest"),
+                        ..Default::default()
                     });
                     // todo: check arguments, if empty, jump to after the parens
                     let apply = eco_format!("{}(${{}})", name);
@@ -178,24 +177,72 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         kind: kind.clone(),
                         label: name,
                         apply: Some(apply),
-                        detail: None,
-                        label_detail: None,
                         // todo: only vscode and neovim (0.9.1) support this
                         command: Some("editor.action.triggerSuggest"),
+                        ..Completion::default()
                     });
                 } else {
                     self.completions.push(Completion {
                         kind,
                         label: name,
-                        apply: None,
-                        detail: None,
-                        label_detail: None,
-                        command: None,
+                        ..Completion::default()
                     });
                 }
             }
         }
     }
+}
+
+fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
+    let mut completions = std::mem::take(&mut ctx.completions);
+    let explict = ctx.explicit;
+    ctx.explicit = true;
+    complete_code(ctx);
+    ctx.explicit = explict;
+
+    log::info!(
+        "sort_and_explicit_code_completion: {:#?} {:#?}",
+        completions,
+        ctx.completions
+    );
+
+    completions.sort_by(|a, b| {
+        a.sort_text
+            .as_ref()
+            .cmp(&b.sort_text.as_ref())
+            .then_with(|| a.label.cmp(&b.label))
+    });
+    ctx.completions.sort_by(|a, b| {
+        a.sort_text
+            .as_ref()
+            .cmp(&b.sort_text.as_ref())
+            .then_with(|| a.label.cmp(&b.label))
+    });
+
+    // todo: this is a bit messy, we can refactor for improving maintainability
+    // The messy code will finally gone, but to help us go over the mess stage, I
+    // drop some comment here.
+    //
+    // currently, there are only path completions in ctx.completions2
+    // and type/named param/positional param completions in completions
+    // and all rest less relevant completions inctx.completions
+    for (i, compl) in ctx.completions2.iter_mut().enumerate() {
+        compl.sort_text = Some(format!("{i:03}"));
+    }
+    let sort_base = ctx.completions2.len();
+    for (i, compl) in (completions.iter_mut().chain(ctx.completions.iter_mut())).enumerate() {
+        compl.sort_text = Some(eco_format!("{i:03}", i = i + sort_base));
+    }
+
+    log::info!(
+        "sort_and_explicit_code_completion after: {:#?} {:#?}",
+        completions,
+        ctx.completions
+    );
+
+    ctx.completions.append(&mut completions);
+
+    log::debug!("sort_and_explicit_code_completion: {:?}", ctx.completions);
 }
 
 /// Add completions for the parameters of a function.
@@ -314,6 +361,7 @@ pub fn param_completions<'a>(
                 // editor.action.triggerSuggest as command on a suggestion to
                 // "manually" retrigger suggest after inserting one
                 command: Some("editor.action.triggerSuggest"),
+                ..Completion::default()
             };
             match param.infer_type {
                 Some(FlowType::Builtin(FlowBuiltinType::TextSize)) => {
@@ -356,6 +404,7 @@ pub fn param_completions<'a>(
         }
     }
 
+    sort_and_explicit_code_completion(ctx);
     if ctx.before.ends_with(',') {
         ctx.enrich(" ", "");
     }
@@ -465,7 +514,7 @@ fn type_completion(
                         apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
                         detail: Some(detail),
                         label_detail: Some(desc.name.into()),
-                        command: None,
+                        ..Completion::default()
                     });
                 }
             }
@@ -478,7 +527,7 @@ fn type_completion(
                         apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
                         detail: Some(detail),
                         label_detail: Some(desc.name.into()),
-                        command: None,
+                        ..Completion::default()
                     });
                 }
             }
@@ -570,8 +619,7 @@ fn type_completion(
                         label: ty.long_name().into(),
                         apply: Some(eco_format!("${{{ty}}}")),
                         detail: Some(eco_format!("A value of type {ty}.")),
-                        label_detail: None,
-                        command: None,
+                        ..Completion::default()
                     });
                     ctx.strict_scope_completions(false, |value| value.ty() == *ty);
                 }
@@ -687,8 +735,7 @@ pub fn named_param_value_completions<'a>(
                 label: expr.clone(),
                 apply: None,
                 detail: doc.map(Into::into),
-                label_detail: None,
-                command: None,
+                ..Completion::default()
             });
         }
     }
@@ -703,6 +750,7 @@ pub fn named_param_value_completions<'a>(
         ctx.cast_completions(&param.input);
     }
 
+    sort_and_explicit_code_completion(ctx);
     if ctx.before.ends_with(':') {
         ctx.enrich(" ", "");
     }
@@ -805,10 +853,9 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
                             kind: CompletionKind::Field,
                             label: key.clone(),
                             apply: Some(eco_format!("{}: ${{}}", key)),
-                            detail: None,
-                            label_detail: None,
                             // todo: only vscode and neovim (0.9.1) support this
                             command: Some("editor.action.triggerSuggest"),
+                            ..Completion::default()
                         });
                     }
                 }
@@ -862,6 +909,7 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     }
     ctx.incomplete = false;
 
+    sort_and_explicit_code_completion(ctx);
     Some(())
 }
 

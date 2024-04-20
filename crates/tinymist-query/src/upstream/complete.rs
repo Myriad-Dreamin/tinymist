@@ -54,7 +54,7 @@ pub fn autocomplete(
 }
 
 /// An autocompletion option.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Completion {
     /// The kind of item this completes to.
     pub kind: CompletionKind,
@@ -62,6 +62,8 @@ pub struct Completion {
     pub label: EcoString,
     /// The label the completion is shown with.
     pub label_detail: Option<EcoString>,
+    /// The label the completion is shown with.
+    pub sort_text: Option<EcoString>,
     /// The completed version of the input, possibly described with snippet
     /// syntax like `${lhs} + ${rhs}`.
     ///
@@ -74,7 +76,7 @@ pub struct Completion {
 }
 
 /// A kind of item that can be completed.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum CompletionKind {
     /// A syntactical structure.
@@ -88,6 +90,7 @@ pub enum CompletionKind {
     /// A field.
     Field,
     /// A constant.
+    #[default]
     Constant,
     /// A symbol.
     Symbol(char),
@@ -408,9 +411,7 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
             } else {
                 eco_format!("{method}()${{}}")
             }),
-            detail: None,
-            label_detail: None,
-            command: None,
+            ..Completion::default()
         })
     }
 
@@ -435,10 +436,7 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                     ctx.completions.push(Completion {
                         kind: CompletionKind::Symbol(modified.get()),
                         label: modifier.into(),
-                        apply: None,
-                        detail: None,
-                        label_detail: None,
-                        command: None,
+                        ..Completion::default()
                     });
                 }
             }
@@ -471,10 +469,7 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                 ctx.completions.push(Completion {
                     kind: CompletionKind::Func,
                     label: name.clone(),
-                    apply: None,
-                    detail: None,
-                    label_detail: None,
-                    command: None,
+                    ..Completion::default()
                 })
             }
         }
@@ -1034,6 +1029,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             //
             // todo: only vscode and neovim (0.9.1) support this
             command: Some("editor.action.triggerSuggest"),
+            ..Completion::default()
         });
     }
 
@@ -1088,8 +1084,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                 label: name.into(),
                 apply: Some(tags[0].into()),
                 detail: Some(repr::separated_list(&tags, " or ").into()),
-                label_detail: None,
-                command: None,
+                ..Completion::default()
             });
         }
     }
@@ -1128,8 +1123,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                 }),
                 label: label.as_str().into(),
                 detail,
-                label_detail: None,
-                command: None,
+                ..Completion::default()
             });
         }
     }
@@ -1189,6 +1183,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             detail,
             label_detail: None,
             command,
+            ..Completion::default()
         });
     }
 
@@ -1264,8 +1259,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         label: ty.long_name().into(),
                         apply: Some(eco_format!("${{{ty}}}")),
                         detail: Some(eco_format!("A value of type {ty}.")),
-                        label_detail: None,
-                        command: None,
+                        ..Completion::default()
                     });
                     self.scope_completions(false, |value| value.ty() == *ty);
                 }
