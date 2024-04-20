@@ -91,6 +91,7 @@ pub fn analyze_call_no_cache(
 
     struct PosBuilder {
         state: PosState,
+        out_of_arg_list: bool,
         signature: Arc<PrimarySignature>,
     }
 
@@ -124,8 +125,8 @@ pub fn analyze_call_no_cache(
             };
 
             if let Some(arg) = arg {
-                // todo: process desugar
-                let is_content_block = arg.kind() == SyntaxKind::ContentBlock;
+                let is_content_block =
+                    self.out_of_arg_list && arg.kind() == SyntaxKind::ContentBlock;
                 info.arg_mapping.insert(
                     arg,
                     CallParamInfo {
@@ -158,8 +159,8 @@ pub fn analyze_call_no_cache(
             };
 
             if let Some(arg) = arg {
-                // todo: process desugar
-                let is_content_block = arg.kind() == SyntaxKind::ContentBlock;
+                let is_content_block =
+                    self.out_of_arg_list && arg.kind() == SyntaxKind::ContentBlock;
                 info.arg_mapping.insert(
                     arg,
                     CallParamInfo {
@@ -171,10 +172,15 @@ pub fn analyze_call_no_cache(
                 );
             }
         }
+
+        fn set_out_of_arg_list(&mut self, o: bool) {
+            self.out_of_arg_list = o;
+        }
     }
 
     let mut pos_builder = PosBuilder {
         state: PosState::Init,
+        out_of_arg_list: true,
         signature: signature.primary().clone(),
     };
     pos_builder.advance(&mut info, None);
@@ -185,8 +191,23 @@ pub fn analyze_call_no_cache(
         }
     }
 
-    for arg in args.items() {
-        let arg_tag = arg.to_untyped().clone();
+    for node in args.to_untyped().children() {
+        match node.kind() {
+            SyntaxKind::LeftParen => {
+                pos_builder.set_out_of_arg_list(false);
+                continue;
+            }
+            SyntaxKind::RightParen => {
+                pos_builder.set_out_of_arg_list(true);
+                continue;
+            }
+            _ => {}
+        }
+        let arg_tag = node.clone();
+        let Some(arg) = node.cast::<ast::Arg>() else {
+            continue;
+        };
+
         match arg {
             ast::Arg::Named(named) => {
                 let n = named.name().as_str();

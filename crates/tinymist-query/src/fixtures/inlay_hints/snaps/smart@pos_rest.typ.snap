@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/inlay_hint.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/inlay_hints/pos_rest.typ
+---
+[
+ {
+  "kind": 2,
+  "label": "a:",
+  "paddingRight": true,
+  "position": {
+   "character": 6,
+   "line": 1
+  }
+ },
+ {
+  "kind": 2,
+  "label": "b:",
+  "paddingRight": true,
+  "position": {
+   "character": 11,
+   "line": 1
+  }
+ },
+ {
+  "kind": 2,
+  "label": "..args:",
+  "paddingRight": true,
+  "position": {
+   "character": 16,
+   "line": 1
+  }
+ }
+]
