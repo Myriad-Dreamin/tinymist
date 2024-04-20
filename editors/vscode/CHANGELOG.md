@@ -4,6 +4,34 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.5 - [2024-04-20]
+
+### Completion
+
+* Fixed wrong check of param completion position at comma in https://github.com/Myriad-Dreamin/tinymist/pull/205
+* Completing text.lang/region in https://github.com/Myriad-Dreamin/tinymist/pull/199
+* Completing array/tuple literals in https://github.com/Myriad-Dreamin/tinymist/pull/201
+  * New array types completed: columns/ros/gutter/column-gutter/row-gutter/size/dash on various functions
+* Completing function arguments on signatures inferred by type checking in https://github.com/Myriad-Dreamin/tinymist/pull/203
+* Completing function arguments of func.where and func.with by its method target (this) in https://github.com/Myriad-Dreamin/tinymist/pull/204
+* Completing functions with where/with snippets in https://github.com/Myriad-Dreamin/tinymist/pull/206
+
+### Inlay Hint
+
+* Checking variadic/content arguments rules of inlay hints correctly in https://github.com/Myriad-Dreamin/tinymist/pull/202
+
+### Syntax/Semantic Highlighting
+
+* (Fix) Corrected parsing on reference names of which trailing dots or colons cannot be followed by space or EOF in https://github.com/Myriad-Dreamin/tinymist/pull/195
+* (Fix) Identifying string literals in math mode in https://github.com/Myriad-Dreamin/tinymist/pull/196
+
+### Misc
+
+* Bumped to typstyle v0.11.14 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/200
+* Preferring less uses of `analzer_expr` during definition analysis in https://github.com/Myriad-Dreamin/tinymist/pull/192
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.4...v0.11.5
+
 ## v0.11.4 - [2024-04-14]
 
 This version is published with mostly internal optimizations.
