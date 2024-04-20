@@ -1,5 +1,4 @@
 use ecow::EcoVec;
-use log::debug;
 use typst::{
     foundations::{Func, ParamInfo},
     syntax::{
@@ -102,7 +101,14 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'
 
     // Move to the first non-trivia node before the cursor.
     let mut node = node;
-    if skippable_trivia(&node, cursor) {
+    if skippable_trivia(&node, cursor) || {
+        is_mark(node.kind())
+            && (!matches!(node.kind(), SyntaxKind::LeftParen)
+                || !matches!(
+                    node.parent_kind(),
+                    Some(SyntaxKind::Array | SyntaxKind::Dict | SyntaxKind::Parenthesized)
+                ))
+    } {
         node = node.prev_sibling()?;
     }
 
@@ -111,11 +117,11 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'
     while !ancestor.is::<ast::Expr>() {
         ancestor = ancestor.parent()?.clone();
     }
-    debug!("deref expr: {ancestor:?}");
+    log::debug!("deref expr: {ancestor:?}");
 
     // Unwrap all parentheses to get the actual expression.
     let cano_expr = deref_lvalue(ancestor)?;
-    debug!("deref lvalue: {cano_expr:?}");
+    log::debug!("deref lvalue: {cano_expr:?}");
 
     // Identify convenient expression kinds.
     let expr = cano_expr.cast::<ast::Expr>()?;
@@ -161,7 +167,16 @@ impl<'a> DefTarget<'a> {
     }
 }
 
+// todo: whether we should distinguish between strict and non-strict def targets
+pub fn get_non_strict_def_target(node: LinkedNode) -> Option<DefTarget<'_>> {
+    get_def_target_(node, false)
+}
+
 pub fn get_def_target(node: LinkedNode) -> Option<DefTarget<'_>> {
+    get_def_target_(node, true)
+}
+
+fn get_def_target_(node: LinkedNode, strict: bool) -> Option<DefTarget<'_>> {
     let mut ancestor = node;
     if ancestor.kind().is_trivia() || is_mark(ancestor.kind()) {
         ancestor = ancestor.prev_sibling()?;
@@ -175,6 +190,9 @@ pub fn get_def_target(node: LinkedNode) -> Option<DefTarget<'_>> {
     log::debug!("def lvalue: {ancestor:?}");
 
     let may_ident = ancestor.cast::<ast::Expr>()?;
+    if strict && !may_ident.hash() && !matches!(may_ident, ast::Expr::MathIdent(_)) {
+        return None;
+    }
 
     Some(match may_ident {
         // todo: label, reference
@@ -206,7 +224,7 @@ pub fn get_def_target(node: LinkedNode) -> Option<DefTarget<'_>> {
         }
         _ if may_ident.hash() => return None,
         _ => {
-            debug!("unsupported kind {kind:?}", kind = ancestor.kind());
+            log::debug!("unsupported kind {kind:?}", kind = ancestor.kind());
             return None;
         }
     })

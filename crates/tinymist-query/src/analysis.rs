@@ -108,7 +108,12 @@ mod literal_type_check_tests {
                 .unwrap();
             let root = LinkedNode::new(source.root());
             let node = root.leaf_at(pos + 1).unwrap();
-            let target = get_check_target(node).unwrap();
+            let target = get_check_target(node).unwrap_or_else(|| {
+                panic!(
+                    "Failed to get check target at {pos:?} in {:?}",
+                    source.text()
+                )
+            });
             let text = target.node().clone().map(|n| n.get().clone().into_text());
             let text = text.unwrap_or_default();
 

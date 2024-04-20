@@ -3,4 +3,4 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/docs/param.typ
 ---
-Docs for f.
+<nil>

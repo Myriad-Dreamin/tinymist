@@ -16,7 +16,7 @@ use crate::analysis::{
     PathPreference, FLOW_INSET_DICT, FLOW_MARGIN_DICT, FLOW_OUTSET_DICT, FLOW_RADIUS_DICT,
     FLOW_STROKE_DICT,
 };
-use crate::syntax::{get_def_target, param_index_at_leaf, DefTarget};
+use crate::syntax::{get_non_strict_def_target, param_index_at_leaf, DefTarget};
 use crate::upstream::plain_docs_sentence;
 
 use crate::{prelude::*, typst_to_lsp::completion_kind, LspCompletion};
@@ -208,7 +208,7 @@ pub fn param_completions<'a>(
     let def = func.span();
     let type_sig = def.id().and_then(|id| {
         let source = ctx.ctx.source_by_id(id).ok()?;
-        let def = get_def_target(source.find(def)?)?;
+        let def = get_non_strict_def_target(source.find(def)?)?;
         let DefTarget::Let(l) = def else {
             return None;
         };
@@ -601,7 +601,7 @@ pub fn named_param_value_completions<'a>(
     let def = func.span();
     let type_sig = def.id().and_then(|id| {
         let source = ctx.ctx.source_by_id(id).ok()?;
-        let def = get_def_target(source.find(def)?)?;
+        let def = get_non_strict_def_target(source.find(def)?)?;
         let DefTarget::Let(l) = def else {
             return None;
         };
