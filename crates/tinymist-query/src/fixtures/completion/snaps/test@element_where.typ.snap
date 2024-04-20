@@ -1,0 +1,149 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (14..15)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/element_where.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "caption",
+    "textEdit": {
+     "newText": "caption: ${1:}",
+     "range": {
+      "end": {
+       "character": 14,
+       "line": 0
+      },
+      "start": {
+       "character": 14,
+       "line": 0
+      }
+     }
+    }
+   },
+   {
+    "kind": 15,
+    "label": "content",
+    "textEdit": {
+     "newText": "${1:content}",
+     "range": {
+      "end": {
+       "character": 14,
+       "line": 0
+      },
+      "start": {
+       "character": 14,
+       "line": 0
+      }
+     }
+    }
+   },
+   {
+    "kind": 6,
+    "label": "gap",
+    "textEdit": {
+     "newText": "gap: ${1:}",
+     "range": {
+      "end": {
+       "character": 14,
+       "line": 0
+      },
+      "start": {
+       "character": 14,
+       "line": 0
+      }
+     }
+    }
+   },
+   {
+    "kind": 6,
+    "label": "kind",
+    "textEdit": {
+     "newText": "kind: ${1:}",
+     "range": {
+      "end": {
+       "character": 14,
+       "line": 0
+      },
+      "start": {
+       "character": 14,
+       "line": 0
+      }
+     }
+    }
+   },
+   {
+    "kind": 6,
+    "label": "numbering",
+    "textEdit": {
+     "newText": "numbering: ${1:}",
+     "range": {
+      "end": {
+       "character": 14,
+       "line": 0
+      },
+      "start": {
+       "character": 14,
+       "line": 0
+      }
+     }
+    }
+   },
+   {
+    "kind": 6,
+    "label": "outlined",
+    "textEdit": {
+     "newText": "outlined: ${1:}",
+     "range": {
+      "end": {
+       "character": 14,
+       "line": 0
+      },
+      "start": {
+       "character": 14,
+       "line": 0
+      }
+     }
+    }
+   },
+   {
+    "kind": 6,
+    "label": "placement",
+    "textEdit": {
+     "newText": "placement: ${1:}",
+     "range": {
+      "end": {
+       "character": 14,
+       "line": 0
+      },
+      "start": {
+       "character": 14,
+       "line": 0
+      }
+     }
+    }
+   },
+   {
+    "kind": 6,
+    "label": "supplement",
+    "textEdit": {
+     "newText": "supplement: ${1:}",
+     "range": {
+      "end": {
+       "character": 14,
+       "line": 0
+      },
+      "start": {
+       "character": 14,
+       "line": 0
+      }
+     }
+    }
+   }
+  ]
+ }
+]

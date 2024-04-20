@@ -3,6 +3,8 @@
 use std::ops::Range;
 
 use log::debug;
+use once_cell::sync::Lazy;
+use typst::foundations::Type;
 use typst::syntax::FileId as TypstFileId;
 use typst::{foundations::Value, syntax::Span};
 
@@ -166,9 +168,115 @@ pub fn find_definition(
     }
 }
 
+/// The target of a dynamic call.
+#[derive(Debug, Clone)]
+pub struct DynCallTarget {
+    /// The function pointer.
+    pub func_ptr: Func,
+    /// The this pointer.
+    pub this: Option<Value>,
+}
+
+/// The calling convention of a function.
+pub enum CallConvention {
+    /// A static function.
+    Static(Func),
+    /// A method call with a this.
+    Method(Value, Func),
+    /// A function call by with binding.
+    With(Func),
+    /// A function call by where binding.
+    Where(Func),
+}
+
+impl CallConvention {
+    /// Get the function pointer of the call.
+    pub fn method_this(&self) -> Option<&Value> {
+        match self {
+            CallConvention::Static(_) => None,
+            CallConvention::Method(this, _) => Some(this),
+            CallConvention::With(_) => None,
+            CallConvention::Where(_) => None,
+        }
+    }
+
+    /// Get the function pointer of the call.
+    pub fn callee(self) -> Func {
+        match self {
+            CallConvention::Static(f) => f,
+            CallConvention::Method(_, f) => f,
+            CallConvention::With(f) => f,
+            CallConvention::Where(f) => f,
+        }
+    }
+}
+
+fn identify_call_convention(target: DynCallTarget) -> CallConvention {
+    match target.this {
+        Some(Value::Func(func)) if is_with_func(&target.func_ptr) => CallConvention::With(func),
+        Some(Value::Func(func)) if is_where_func(&target.func_ptr) => CallConvention::Where(func),
+        Some(this) => CallConvention::Method(this, target.func_ptr),
+        None => CallConvention::Static(target.func_ptr),
+    }
+}
+
+fn is_with_func(func_ptr: &Func) -> bool {
+    static WITH_FUNC: Lazy<Option<&'static Func>> = Lazy::new(|| {
+        let fn_ty = Type::of::<Func>();
+        let Some(Value::Func(f)) = fn_ty.scope().get("with") else {
+            return None;
+        };
+        Some(f)
+    });
+
+    is_same_native_func(*WITH_FUNC, func_ptr)
+}
+
+fn is_where_func(func_ptr: &Func) -> bool {
+    static WITH_FUNC: Lazy<Option<&'static Func>> = Lazy::new(|| {
+        let fn_ty = Type::of::<Func>();
+        let Some(Value::Func(f)) = fn_ty.scope().get("where") else {
+            return None;
+        };
+        Some(f)
+    });
+
+    is_same_native_func(*WITH_FUNC, func_ptr)
+}
+
+fn is_same_native_func(x: Option<&Func>, y: &Func) -> bool {
+    let Some(x) = x else {
+        return false;
+    };
+
+    use typst::foundations::func::Repr;
+    match (x.inner(), y.inner()) {
+        (Repr::Native(x), Repr::Native(y)) => x == y,
+        (Repr::Element(x), Repr::Element(y)) => x == y,
+        _ => false,
+    }
+}
+
+// todo: merge me with resolve_callee
+/// Resolve a call target to a function or a method with a this.
+pub fn resolve_call_target(
+    ctx: &mut AnalysisContext,
+    callee: LinkedNode,
+) -> Option<CallConvention> {
+    resolve_callee_(ctx, callee, true).map(identify_call_convention)
+}
+
 /// Resolve a callee expression to a function.
 pub fn resolve_callee(ctx: &mut AnalysisContext, callee: LinkedNode) -> Option<Func> {
-    {
+    resolve_callee_(ctx, callee, false).map(|e| e.func_ptr)
+}
+
+fn resolve_callee_(
+    ctx: &mut AnalysisContext,
+    callee: LinkedNode,
+    resolve_this: bool,
+) -> Option<DynCallTarget> {
+    None.or_else(|| {
         let source = ctx.source_by_id(callee.span().id()?).ok()?;
         let node = source.find(callee.span())?;
         let cursor = node.offset();
@@ -181,20 +289,54 @@ pub fn resolve_callee(ctx: &mut AnalysisContext, callee: LinkedNode) -> Option<F
             },
             _ => None,
         }
-    }
+    })
     .or_else(|| {
         resolve_global_value(ctx, callee.clone(), false).and_then(|v| match v {
             Value::Func(f) => Some(f),
             _ => None,
         })
     })
+    .map(|e| DynCallTarget {
+        func_ptr: e,
+        this: None,
+    })
     .or_else(|| {
         let values = analyze_expr(ctx.world(), &callee);
 
-        values.into_iter().find_map(|v| match v.0 {
+        if let Some(func) = values.into_iter().find_map(|v| match v.0 {
             Value::Func(f) => Some(f),
             _ => None,
-        })
+        }) {
+            return Some(DynCallTarget {
+                func_ptr: func,
+                this: None,
+            });
+        };
+
+        if resolve_this {
+            if let Some(access) = match callee.cast::<ast::Expr>() {
+                Some(ast::Expr::FieldAccess(access)) => Some(access),
+                _ => None,
+            } {
+                let target = access.target();
+                let field = access.field().get();
+                let values = analyze_expr(ctx.world(), &callee.find(target.span())?);
+                if let Some((this, func_ptr)) = values.into_iter().find_map(|(this, _styles)| {
+                    if let Some(Value::Func(f)) = this.ty().scope().get(field) {
+                        return Some((this, f.clone()));
+                    }
+
+                    None
+                }) {
+                    return Some(DynCallTarget {
+                        func_ptr,
+                        this: Some(this),
+                    });
+                }
+            }
+        }
+
+        None
     })
 }
 

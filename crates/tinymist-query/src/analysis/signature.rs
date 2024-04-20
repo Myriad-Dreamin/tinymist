@@ -166,7 +166,7 @@ pub(crate) fn analyze_dyn_signature(ctx: &mut AnalysisContext, func: Func) -> Si
         })
 }
 
-pub(crate) fn analyze_signature_v2(
+pub(crate) fn analyze_signature(
     ctx: &mut AnalysisContext,
     source: Source,
     callee_node: SignatureTarget,

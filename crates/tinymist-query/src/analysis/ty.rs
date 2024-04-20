@@ -989,7 +989,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         log::debug!("check method at {method_name:?} on {primary_type:?}");
         match primary_type {
             FlowType::Func(v) => match method_name.as_str() {
-                "with" => {
+                // todo: process where specially
+                "with" | "where" => {
                     // log::debug!("check method at args: {v:?}.with({args:?})");
 
                     let f = v.as_ref();
@@ -1010,9 +1011,6 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     }
 
                     _candidates.push(self.partial_apply(f, args));
-                }
-                "where" => {
-                    // log::debug!("where method at args: {args:?}");
                 }
                 _ => {}
             },

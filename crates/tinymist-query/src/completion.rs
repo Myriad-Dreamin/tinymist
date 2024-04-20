@@ -225,28 +225,48 @@ mod tests {
                     match resp {
                         CompletionResponse::List(l) => CompletionResponse::List(CompletionList {
                             is_incomplete: l.is_incomplete,
-                            items: l
-                                .items
-                                .into_iter()
-                                .map(|item| CompletionItem {
-                                    label: item.label,
-                                    kind: item.kind,
-                                    text_edit: item.text_edit,
-                                    ..Default::default()
-                                })
-                                .collect(),
+                            items: {
+                                let mut res: Vec<_> = l
+                                    .items
+                                    .into_iter()
+                                    .map(|item| CompletionItem {
+                                        label: item.label,
+                                        sort_text: item.sort_text,
+                                        kind: item.kind,
+                                        text_edit: item.text_edit,
+                                        ..Default::default()
+                                    })
+                                    .collect();
+
+                                res.sort_by(|a, b| {
+                                    a.sort_text
+                                        .as_ref()
+                                        .cmp(&b.sort_text.as_ref())
+                                        .then_with(|| a.label.cmp(&b.label))
+                                });
+                                res
+                            },
                         }),
-                        CompletionResponse::Array(items) => CompletionResponse::Array(
-                            items
+                        CompletionResponse::Array(items) => CompletionResponse::Array({
+                            let mut res: Vec<_> = items
                                 .into_iter()
                                 .map(|item| CompletionItem {
                                     label: item.label,
+                                    sort_text: item.sort_text,
                                     kind: item.kind,
                                     text_edit: item.text_edit,
                                     ..Default::default()
                                 })
-                                .collect(),
-                        ),
+                                .collect();
+
+                            res.sort_by(|a, b| {
+                                a.sort_text
+                                    .as_ref()
+                                    .cmp(&b.sort_text.as_ref())
+                                    .then_with(|| a.label.cmp(&b.label))
+                            });
+                            res
+                        }),
                     }
                 }));
             }
