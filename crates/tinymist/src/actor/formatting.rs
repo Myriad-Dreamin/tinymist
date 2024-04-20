@@ -29,7 +29,7 @@ pub fn run_format_thread(
             FormatterMode::Typstyle => {
                 let cw = c.width as usize;
                 let f: FmtFn = Box::new(move |e: Source| {
-                    let res = typstyle_core::pretty_print(e.text(), cw);
+                    let res = typstyle_core::Typstyle::new_with_src(e.clone(), cw).pretty_print();
                     Ok(calc_diff(e, res, position_encoding))
                 });
                 f
