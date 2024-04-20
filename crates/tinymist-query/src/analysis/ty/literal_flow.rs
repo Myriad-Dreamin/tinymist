@@ -5,15 +5,18 @@ use typst::syntax::{
     LinkedNode, SyntaxKind,
 };
 
-use crate::AnalysisContext;
+use crate::{syntax::CheckTarget, AnalysisContext};
 
 use super::{FlowType, FlowVarKind, TypeCheckInfo};
+
+// todo: detect recursive usage
 
 pub(crate) fn literal_type_check(
     _ctx: &mut AnalysisContext,
     info: &TypeCheckInfo,
-    node: LinkedNode,
+    node: CheckTarget<'_>,
 ) -> Option<FlowType> {
+    let node = node.node()?;
     let mut worker = LiteralTypeCheckWorker { _ctx, info };
 
     worker.check(node)

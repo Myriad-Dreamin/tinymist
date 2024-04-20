@@ -1,3 +1,4 @@
+use ecow::EcoVec;
 use log::debug;
 use typst::{
     foundations::{Func, ParamInfo},
@@ -65,7 +66,7 @@ pub enum DerefTarget<'a> {
 }
 
 impl<'a> DerefTarget<'a> {
-    pub fn node(&self) -> &LinkedNode {
+    pub fn node(&self) -> &LinkedNode<'a> {
         match self {
             DerefTarget::Label(node) => node,
             DerefTarget::Ref(node) => node,
@@ -78,7 +79,7 @@ impl<'a> DerefTarget<'a> {
     }
 }
 
-pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget> {
+pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'_>> {
     /// Skips trivia nodes that are on the same line as the cursor.
     fn skippable_trivia(node: &LinkedNode, cursor: usize) -> bool {
         // A non-trivia node is our target so we stop at it.
@@ -209,6 +210,105 @@ pub fn get_def_target(node: LinkedNode) -> Option<DefTarget<'_>> {
             return None;
         }
     })
+}
+
+#[derive(Debug, Clone)]
+pub enum ParamTarget<'a> {
+    Positional {
+        spreads: EcoVec<LinkedNode<'a>>,
+        positional: usize,
+        is_spread: bool,
+    },
+    Named(LinkedNode<'a>),
+}
+
+#[derive(Debug, Clone)]
+pub enum CheckTarget<'a> {
+    Param {
+        target: ParamTarget<'a>,
+        is_set: bool,
+    },
+    Normal(LinkedNode<'a>),
+}
+
+impl<'a> CheckTarget<'a> {
+    pub fn node(&self) -> Option<LinkedNode<'a>> {
+        Some(match self {
+            CheckTarget::Param { target, .. } => match target {
+                ParamTarget::Positional { .. } => return None,
+                ParamTarget::Named(node) => node.clone(),
+            },
+            CheckTarget::Normal(node) => node.clone(),
+        })
+    }
+}
+
+pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
+    let mut node = node;
+    while node.kind().is_trivia() {
+        node = node.prev_sibling()?;
+    }
+
+    let deref_target = get_deref_target(node.clone(), node.offset())?;
+
+    match deref_target {
+        DerefTarget::Callee(callee) => {
+            let parent = callee.parent()?;
+            let args = match parent.cast::<ast::Expr>() {
+                Some(ast::Expr::FuncCall(call)) => call.args(),
+                Some(ast::Expr::Set(set)) => set.args(),
+                _ => return None,
+            };
+            let args_node = node.find(args.span())?;
+
+            let param_target = get_param_target(args_node, node)?;
+            Some(CheckTarget::Param {
+                target: param_target,
+                is_set: parent.kind() == SyntaxKind::Set,
+            })
+        }
+        deref_target => Some(CheckTarget::Normal(deref_target.node().clone())),
+    }
+}
+
+fn get_param_target<'a>(
+    args_node: LinkedNode<'a>,
+    node: LinkedNode<'a>,
+) -> Option<ParamTarget<'a>> {
+    match node.kind() {
+        SyntaxKind::Colon => {
+            let prev = node.prev_leaf()?;
+            let param_ident = prev.cast::<ast::Ident>()?;
+            Some(ParamTarget::Named(args_node.find(param_ident.span())?))
+        }
+        SyntaxKind::Spread | SyntaxKind::Comma | SyntaxKind::LeftParen => {
+            let mut spreads = EcoVec::new();
+            let mut positional = 0;
+            let is_spread = node.kind() == SyntaxKind::Spread;
+
+            let args_before = args_node
+                .children()
+                .take_while(|arg| arg.range().end <= node.offset());
+            for ch in args_before {
+                match ch.cast::<ast::Arg>() {
+                    Some(ast::Arg::Pos(..)) => {
+                        positional += 1;
+                    }
+                    Some(ast::Arg::Spread(..)) => {
+                        spreads.push(ch);
+                    }
+                    Some(ast::Arg::Named(..)) | None => {}
+                }
+            }
+
+            Some(ParamTarget::Positional {
+                spreads,
+                positional,
+                is_spread,
+            })
+        }
+        _ => None,
+    }
 }
 
 pub fn param_index_at_leaf(leaf: &LinkedNode, function: &Func, args: ast::Args) -> Option<usize> {
