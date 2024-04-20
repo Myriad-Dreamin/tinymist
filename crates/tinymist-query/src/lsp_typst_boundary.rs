@@ -312,6 +312,7 @@ pub mod typst_to_lsp {
             label: typst_completion.label.to_string(),
             kind: Some(completion_kind(typst_completion.kind.clone())),
             detail: typst_completion.detail.as_ref().map(String::from),
+            sort_text: typst_completion.sort_text.as_ref().map(String::from),
             label_details: typst_completion.label_detail.as_ref().map(|e| {
                 CompletionItemLabelDetails {
                     detail: None,
