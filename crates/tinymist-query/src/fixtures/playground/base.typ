@@ -1,2 +1,2 @@
-#let y = /* position after */ ("Test",)
-#text(font: y)[]
+#let x = 1;
+#(/* position after */ x);
