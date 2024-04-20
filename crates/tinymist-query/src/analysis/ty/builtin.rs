@@ -2,7 +2,7 @@ use ecow::EcoVec;
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use typst::{
-    foundations::{Func, ParamInfo, Value},
+    foundations::{Func, ParamInfo, Type, Value},
     syntax::Span,
 };
 
@@ -81,75 +81,6 @@ impl PathPreference {
     }
 }
 
-pub(in crate::analysis::ty) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<FlowType> {
-    match (f.name().unwrap(), p.name) {
-        ("cbor", "path") => Some(FlowType::Builtin(FlowBuiltinType::Path(
-            PathPreference::None,
-        ))),
-        ("csv", "path") => Some(FlowType::Builtin(FlowBuiltinType::Path(
-            PathPreference::Csv,
-        ))),
-        ("image", "path") => Some(FlowType::Builtin(FlowBuiltinType::Path(
-            PathPreference::Image,
-        ))),
-        ("read", "path") => Some(FlowType::Builtin(FlowBuiltinType::Path(
-            PathPreference::None,
-        ))),
-        ("json", "path") => Some(FlowType::Builtin(FlowBuiltinType::Path(
-            PathPreference::Json,
-        ))),
-        ("yaml", "path") => Some(FlowType::Builtin(FlowBuiltinType::Path(
-            PathPreference::Yaml,
-        ))),
-        ("xml", "path") => Some(FlowType::Builtin(FlowBuiltinType::Path(
-            PathPreference::Xml,
-        ))),
-        ("toml", "path") => Some(FlowType::Builtin(FlowBuiltinType::Path(
-            PathPreference::Toml,
-        ))),
-        ("raw", "theme") => Some(FlowType::Builtin(FlowBuiltinType::Path(
-            PathPreference::RawTheme,
-        ))),
-        ("raw", "syntaxes") => Some(FlowType::Builtin(FlowBuiltinType::Path(
-            PathPreference::RawSyntax,
-        ))),
-        ("bibliography", "path") => Some(FlowType::Builtin(FlowBuiltinType::Path(
-            PathPreference::Bibliography,
-        ))),
-        ("text", "size") => Some(FlowType::Builtin(FlowBuiltinType::TextSize)),
-        ("text", "font") => Some(FlowType::Builtin(FlowBuiltinType::TextFont)),
-        ("text", "lang") => Some(FlowType::Builtin(FlowBuiltinType::TextLang)),
-        ("text", "region") => Some(FlowType::Builtin(FlowBuiltinType::TextRegion)),
-        ("text" | "stack", "dir") => Some(FlowType::Builtin(FlowBuiltinType::Dir)),
-        (
-            // todo: polygon.regular
-            "page" | "highlight" | "text" | "path" | "rect" | "ellipse" | "circle" | "polygon"
-            | "box" | "block" | "table" | "regular",
-            "fill",
-        ) => Some(FlowType::Builtin(FlowBuiltinType::Color)),
-        (
-            // todo: table.cell
-            "table" | "cell" | "block" | "box" | "circle" | "ellipse" | "rect" | "square",
-            "inset",
-        ) => Some(FlowType::Builtin(FlowBuiltinType::Inset)),
-        ("block" | "box" | "circle" | "ellipse" | "rect" | "square", "outset") => {
-            Some(FlowType::Builtin(FlowBuiltinType::Outset))
-        }
-        ("block" | "box" | "rect" | "square", "radius") => {
-            Some(FlowType::Builtin(FlowBuiltinType::Radius))
-        }
-        (
-            //todo: table.cell, table.hline, table.vline, math.cancel, grid.cell, polygon.regular
-            "cancel" | "highlight" | "overline" | "strike" | "underline" | "text" | "path" | "rect"
-            | "ellipse" | "circle" | "polygon" | "box" | "block" | "table" | "line" | "cell"
-            | "hline" | "vline" | "regular",
-            "stroke",
-        ) => Some(FlowType::Builtin(FlowBuiltinType::Stroke)),
-        ("page", "margin") => Some(FlowType::Builtin(FlowBuiltinType::Margin)),
-        _ => None,
-    }
-}
-
 #[derive(Debug, Clone, Hash)]
 pub(crate) enum FlowBuiltinType {
     Args,
@@ -172,23 +103,31 @@ pub(crate) enum FlowBuiltinType {
     Path(PathPreference),
 }
 
+use FlowBuiltinType::*;
+
 fn literally(s: impl FlowBuiltinLiterally) -> FlowType {
     s.literally()
 }
 
 trait FlowBuiltinLiterally {
-    fn literally(&self) -> FlowType;
+    fn literally(self) -> FlowType;
 }
 
 impl FlowBuiltinLiterally for &str {
-    fn literally(&self) -> FlowType {
+    fn literally(self) -> FlowType {
         FlowType::Value(Box::new((Value::Str((*self).into()), Span::detached())))
     }
 }
 
 impl FlowBuiltinLiterally for FlowBuiltinType {
-    fn literally(&self) -> FlowType {
+    fn literally(self) -> FlowType {
         FlowType::Builtin(self.clone())
+    }
+}
+
+impl FlowBuiltinLiterally for FlowType {
+    fn literally(self) -> FlowType {
+        self
     }
 }
 
@@ -228,7 +167,99 @@ macro_rules! flow_record {
     };
 }
 
-use FlowBuiltinType::*;
+pub(in crate::analysis::ty) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<FlowType> {
+    match (f.name().unwrap(), p.name) {
+        ("cbor", "path") => Some(literally(Path(PathPreference::None))),
+        ("csv", "path") => Some(literally(Path(PathPreference::Csv))),
+        ("image", "path") => Some(literally(Path(PathPreference::Image))),
+        ("read", "path") => Some(literally(Path(PathPreference::None))),
+        ("json", "path") => Some(literally(Path(PathPreference::Json))),
+        ("yaml", "path") => Some(literally(Path(PathPreference::Yaml))),
+        ("xml", "path") => Some(literally(Path(PathPreference::Xml))),
+        ("toml", "path") => Some(literally(Path(PathPreference::Toml))),
+        ("raw", "theme") => Some(literally(Path(PathPreference::RawTheme))),
+        ("raw", "syntaxes") => Some(literally(Path(PathPreference::RawSyntax))),
+        ("bibliography", "path") => Some(literally(Path(PathPreference::Bibliography))),
+        ("text", "size") => Some(literally(TextSize)),
+        ("text", "font") => {
+            static FONT_TYPE: Lazy<FlowType> = Lazy::new(|| {
+                FlowType::Union(Box::new(vec![
+                    literally(TextFont),
+                    FlowType::Array(Box::new(literally(TextFont))),
+                ]))
+            });
+            Some(FONT_TYPE.clone())
+        }
+        ("text", "lang") => Some(literally(TextLang)),
+        ("text", "region") => Some(literally(TextRegion)),
+        ("text" | "stack", "dir") => Some(literally(Dir)),
+        (
+            // todo: polygon.regular
+            "page" | "highlight" | "text" | "path" | "rect" | "ellipse" | "circle" | "polygon"
+            | "box" | "block" | "table" | "regular",
+            "fill",
+        ) => Some(literally(Color)),
+        (
+            // todo: table.cell
+            "table" | "cell" | "block" | "box" | "circle" | "ellipse" | "rect" | "square",
+            "inset",
+        ) => Some(literally(Inset)),
+        ("block" | "box" | "circle" | "ellipse" | "rect" | "square", "outset") => {
+            Some(literally(Outset))
+        }
+        ("block" | "box" | "rect" | "square", "radius") => Some(literally(Radius)),
+        ("grid" | "table", "columns" | "rows" | "gutter" | "column-gutter" | "row-gutter") => {
+            static COLUMN_TYPE: Lazy<FlowType> = Lazy::new(|| {
+                flow_union!(
+                    FlowType::Value(Box::new((Value::Auto, Span::detached()))),
+                    FlowType::Value(Box::new((Value::Type(Type::of::<i64>()), Span::detached()))),
+                    literally(Length),
+                    FlowType::Array(Box::new(literally(Length))),
+                )
+            });
+            Some(COLUMN_TYPE.clone())
+        }
+        ("pattern", "size") => {
+            static PATTERN_SIZE_TYPE: Lazy<FlowType> = Lazy::new(|| {
+                flow_union!(
+                    FlowType::Value(Box::new((Value::Auto, Span::detached()))),
+                    FlowType::Array(Box::new(FlowType::Builtin(Length))),
+                )
+            });
+            Some(PATTERN_SIZE_TYPE.clone())
+        }
+        ("stroke", "dash") => Some(FLOW_STROKE_DASH_TYPE.clone()),
+        (
+            //todo: table.cell, table.hline, table.vline, math.cancel, grid.cell, polygon.regular
+            "cancel" | "highlight" | "overline" | "strike" | "underline" | "text" | "path" | "rect"
+            | "ellipse" | "circle" | "polygon" | "box" | "block" | "table" | "line" | "cell"
+            | "hline" | "vline" | "regular",
+            "stroke",
+        ) => Some(FlowType::Builtin(Stroke)),
+        ("page", "margin") => Some(FlowType::Builtin(Margin)),
+        _ => None,
+    }
+}
+
+static FLOW_STROKE_DASH_TYPE: Lazy<FlowType> = Lazy::new(|| {
+    flow_union!(
+        "solid",
+        "dotted",
+        "densely-dotted",
+        "loosely-dotted",
+        "dashed",
+        "densely-dashed",
+        "loosely-dashed",
+        "dash-dotted",
+        "densely-dash-dotted",
+        "loosely-dash-dotted",
+        FlowType::Array(Box::new(flow_union!("dot", literally(Float)))),
+        FlowType::Dict(flow_record!(
+            "array" => FlowType::Array(Box::new(flow_union!("dot", literally(Float)))),
+            "phase" => literally(Length),
+        ))
+    )
+});
 
 pub static FLOW_STROKE_DICT: Lazy<FlowRecord> = Lazy::new(|| {
     flow_record!(
@@ -236,18 +267,7 @@ pub static FLOW_STROKE_DICT: Lazy<FlowRecord> = Lazy::new(|| {
         "thickness" => literally(Length),
         "cap" => flow_union!("butt", "round", "square"),
         "join" => flow_union!("miter", "round", "bevel"),
-        "dash" => flow_union!(
-            "solid",
-            "dotted",
-            "densely-dotted",
-            "loosely-dotted",
-            "dashed",
-            "densely-dashed",
-            "loosely-dashed",
-            "dash-dotted",
-            "densely-dash-dotted",
-            "loosely-dash-dotted",
-        ),
+        "dash" => FLOW_STROKE_DASH_TYPE.clone(),
         "miter-limit" => literally(Float),
     )
 });
@@ -318,10 +338,6 @@ pub static FLOW_RADIUS_DICT: Lazy<FlowRecord> = Lazy::new(|| {
 // todo: math.cancel.angle can be a function
 // todo: text.features array/dictionary
 // todo: math.mat.augment
-// todo: text.lang
-// todo: text.region
-// todo: text.font array
-// todo: stroke.dash can be an array
 // todo: csv.row-type can be an array or a dictionary
 
 // ISO 639

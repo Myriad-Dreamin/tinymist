@@ -2,16 +2,17 @@ use std::collections::{BTreeMap, HashSet};
 
 use ecow::{eco_format, EcoString};
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
+use once_cell::sync::OnceCell;
 use reflexo::path::{unix_slash, PathClean};
 use typst::foundations::{AutoValue, Func, Label, NoneValue, Type, Value};
-use typst::layout::Length;
+use typst::layout::{Dir, Length};
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, Span, SyntaxKind};
 use typst::visualize::Color;
 
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::analysis::{
-    analyze_dyn_signature, analyze_import, resolve_callee, FlowBuiltinType, FlowType,
+    analyze_dyn_signature, analyze_import, resolve_callee, FlowBuiltinType, FlowRecord, FlowType,
     PathPreference, FLOW_INSET_DICT, FLOW_MARGIN_DICT, FLOW_OUTSET_DICT, FLOW_RADIUS_DICT,
     FLOW_STROKE_DICT,
 };
@@ -326,7 +327,7 @@ fn type_completion(
         FlowType::Undef => return None,
         FlowType::Content => return None,
         FlowType::Any => return None,
-        FlowType::Array => {
+        FlowType::Tuple(..) | FlowType::Array(..) => {
             ctx.snippet_completion("()", "(${})", "An array.");
         }
         FlowType::Dict(..) => {
@@ -356,8 +357,8 @@ fn type_completion(
             FlowBuiltinType::Stroke => {
                 ctx.snippet_completion("stroke()", "stroke(${})", "Stroke type.");
                 ctx.snippet_completion("()", "(${})", "Stroke dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Color)), None);
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Color)), docs);
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
             }
             FlowBuiltinType::Color => {
                 ctx.snippet_completion("luma()", "luma(${v})", "A custom grayscale color.");
@@ -426,23 +427,28 @@ fn type_completion(
                     });
                 }
             }
-            FlowBuiltinType::TextFont => return None,
-            FlowBuiltinType::Dir => return None,
+            FlowBuiltinType::Dir => {
+                let ty = Type::of::<Dir>();
+                ctx.strict_scope_completions(false, |value| value.ty() == ty);
+            }
+            FlowBuiltinType::TextFont => {
+                ctx.font_completions();
+            }
             FlowBuiltinType::Margin => {
                 ctx.snippet_completion("()", "(${})", "Margin dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
             }
             FlowBuiltinType::Inset => {
                 ctx.snippet_completion("()", "(${})", "Inset dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
             }
             FlowBuiltinType::Outset => {
                 ctx.snippet_completion("()", "(${})", "Outset dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
             }
             FlowBuiltinType::Radius => {
                 ctx.snippet_completion("()", "(${})", "Radius dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), None);
+                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
             }
             FlowBuiltinType::Length => {
                 ctx.snippet_completion("pt", "${1}pt", "Point length unit.");
@@ -452,6 +458,7 @@ fn type_completion(
                 ctx.snippet_completion("em", "${1}em", "Em length unit.");
                 let length_ty = Type::of::<Length>();
                 ctx.strict_scope_completions(false, |value| value.ty() == length_ty);
+                type_completion(ctx, Some(&FlowType::Auto), docs);
             }
             FlowBuiltinType::Float => {
                 ctx.snippet_completion("exponential notation", "${1}e${0}", "Exponential notation");
@@ -474,9 +481,9 @@ fn type_completion(
         FlowType::Value(v) => {
             if let Value::Type(ty) = &v.0 {
                 if *ty == Type::of::<NoneValue>() {
-                    ctx.snippet_completion("none", "none", "Nothing.")
+                    type_completion(ctx, Some(&FlowType::None), docs);
                 } else if *ty == Type::of::<AutoValue>() {
-                    ctx.snippet_completion("auto", "auto", "A smart default.");
+                    type_completion(ctx, Some(&FlowType::Auto), docs);
                 } else if *ty == Type::of::<bool>() {
                     ctx.snippet_completion("false", "false", "No / Disabled.");
                     ctx.snippet_completion("true", "true", "Yes / Enabled.");
@@ -501,13 +508,24 @@ fn type_completion(
                     });
                     ctx.strict_scope_completions(false, |value| value.ty() == *ty);
                 }
+            } else if v.0.ty() == Type::of::<NoneValue>() {
+                type_completion(ctx, Some(&FlowType::None), docs);
+            } else if v.0.ty() == Type::of::<AutoValue>() {
+                type_completion(ctx, Some(&FlowType::Auto), docs);
             } else {
                 ctx.value_completion(None, &v.0, true, docs);
             }
         }
         FlowType::ValueDoc(v) => {
             let (value, docs) = v.as_ref();
-            ctx.value_completion(None, value, true, Some(docs));
+            type_completion(
+                ctx,
+                Some(&FlowType::Value(Box::new((
+                    value.clone(),
+                    Span::detached(),
+                )))),
+                Some(*docs),
+            );
         }
         FlowType::Element(e) => {
             ctx.value_completion(Some(e.name().into()), &Value::Func((*e).into()), true, docs);
@@ -581,9 +599,6 @@ pub fn named_param_value_completions<'a>(
     {
         ctx.cast_completions(&param.input);
     }
-    if name == "font" {
-        ctx.font_completions();
-    }
 
     if ctx.before.ends_with(':') {
         ctx.enrich(" ", "");
@@ -612,21 +627,18 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     log::debug!("check complete_literal 3: {:?}", ctx.leaf);
 
     // or empty array
-    let dict_span;
-    let dict_lit = match parent.kind() {
+    let lit_span;
+    let (dict_lit, _tuple_lit) = match parent.kind() {
         SyntaxKind::Dict => {
             let dict_lit = parent.get().cast::<ast::Dict>()?;
 
-            dict_span = dict_lit.span();
-            dict_lit
+            lit_span = dict_lit.span();
+            (dict_lit, None)
         }
         SyntaxKind::Array => {
             let w = parent.get().cast::<ast::Array>()?;
-            if w.items().next().is_some() {
-                return None;
-            }
-            dict_span = w.span();
-            ast::Dict::default()
+            lit_span = w.span();
+            (ast::Dict::default(), Some(w))
         }
         _ => return None,
     };
@@ -634,60 +646,113 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     // query type of the dict
     let named_span = named.map(|n| n.span()).unwrap_or_else(Span::detached);
     let named_ty = ctx.ctx.type_of_span(named_span);
-    let dict_ty = ctx.ctx.type_of_span(dict_span);
-    log::info!("complete_literal: {:?} {:?}", dict_ty, named_ty);
+    let lit_ty = ctx.ctx.type_of_span(lit_span);
+    log::info!("complete_literal: {lit_ty:?} {named_ty:?}");
 
-    // todo: check if the dict is named
-    if named_ty.is_some() {
-        let res = type_completion(ctx, named_ty.as_ref(), None);
-        if res.is_some() {
-            ctx.incomplete = false;
-        }
-        return res;
+    enum LitComplAction<'a> {
+        Dict(&'a FlowRecord),
+        Positional(&'a FlowType),
+    }
+    let existing = OnceCell::new();
+
+    struct LitComplWorker<'a, 'b, 'w> {
+        ctx: &'a mut CompletionContext<'b, 'w>,
+        dict_lit: ast::Dict<'a>,
+        existing: &'a OnceCell<HashSet<EcoString>>,
     }
 
-    let existing = dict_lit
-        .items()
-        .filter_map(|field| match field {
-            ast::DictItem::Named(n) => Some(n.name().get().clone()),
-            ast::DictItem::Keyed(k) => {
-                let key = ctx.ctx.const_eval(k.key());
-                if let Some(Value::Str(key)) = key {
-                    return Some(key.into());
-                }
-
-                None
-            }
-            // todo: var dict union
-            ast::DictItem::Spread(_s) => None,
-        })
-        .collect::<HashSet<_>>();
-
-    let dict_ty = dict_ty?;
-    let dict_interface = match dict_ty {
-        FlowType::Builtin(FlowBuiltinType::Stroke) => &FLOW_STROKE_DICT,
-        FlowType::Builtin(FlowBuiltinType::Margin) => &FLOW_MARGIN_DICT,
-        FlowType::Builtin(FlowBuiltinType::Inset) => &FLOW_INSET_DICT,
-        FlowType::Builtin(FlowBuiltinType::Outset) => &FLOW_OUTSET_DICT,
-        FlowType::Builtin(FlowBuiltinType::Radius) => &FLOW_RADIUS_DICT,
-        _ => return None,
+    let mut ctx = LitComplWorker {
+        ctx,
+        dict_lit,
+        existing: &existing,
     };
 
-    for (key, _, _) in dict_interface.fields.iter() {
-        if existing.contains(key) {
-            continue;
+    impl<'a, 'b, 'w> LitComplWorker<'a, 'b, 'w> {
+        fn on_iface(&mut self, lit_interface: LitComplAction<'_>) {
+            match lit_interface {
+                LitComplAction::Positional(a) => {
+                    type_completion(self.ctx, Some(a), None);
+                }
+                LitComplAction::Dict(dict_iface) => {
+                    let existing = self.existing.get_or_init(|| {
+                        self.dict_lit
+                            .items()
+                            .filter_map(|field| match field {
+                                ast::DictItem::Named(n) => Some(n.name().get().clone()),
+                                ast::DictItem::Keyed(k) => {
+                                    let key = self.ctx.ctx.const_eval(k.key());
+                                    if let Some(Value::Str(key)) = key {
+                                        return Some(key.into());
+                                    }
+
+                                    None
+                                }
+                                // todo: var dict union
+                                ast::DictItem::Spread(_s) => None,
+                            })
+                            .collect::<HashSet<_>>()
+                    });
+
+                    for (key, _, _) in dict_iface.fields.iter() {
+                        if existing.contains(key) {
+                            continue;
+                        }
+
+                        self.ctx.completions.push(Completion {
+                            kind: CompletionKind::Field,
+                            label: key.clone(),
+                            apply: Some(eco_format!("{}: ${{}}", key)),
+                            detail: None,
+                            label_detail: None,
+                            // todo: only vscode and neovim (0.9.1) support this
+                            command: Some("editor.action.triggerSuggest"),
+                        });
+                    }
+                }
+            }
         }
 
-        ctx.completions.push(Completion {
-            kind: CompletionKind::Field,
-            label: key.clone(),
-            apply: Some(eco_format!("{}: ${{}}", key)),
-            detail: None,
-            label_detail: None,
-            // todo: only vscode and neovim (0.9.1) support this
-            command: Some("editor.action.triggerSuggest"),
-        });
+        fn on_lit_ty(&mut self, ty: &FlowType) {
+            match ty {
+                FlowType::Builtin(FlowBuiltinType::Stroke) => {
+                    self.on_iface(LitComplAction::Dict(&FLOW_STROKE_DICT))
+                }
+                FlowType::Builtin(FlowBuiltinType::Margin) => {
+                    self.on_iface(LitComplAction::Dict(&FLOW_MARGIN_DICT))
+                }
+                FlowType::Builtin(FlowBuiltinType::Inset) => {
+                    self.on_iface(LitComplAction::Dict(&FLOW_INSET_DICT))
+                }
+                FlowType::Builtin(FlowBuiltinType::Outset) => {
+                    self.on_iface(LitComplAction::Dict(&FLOW_OUTSET_DICT))
+                }
+                FlowType::Builtin(FlowBuiltinType::Radius) => {
+                    self.on_iface(LitComplAction::Dict(&FLOW_RADIUS_DICT))
+                }
+                FlowType::Dict(d) => self.on_iface(LitComplAction::Dict(d)),
+                FlowType::Array(a) => self.on_iface(LitComplAction::Positional(a)),
+                FlowType::Union(u) => {
+                    for info in u.as_ref() {
+                        self.on_lit_ty(info);
+                    }
+                }
+                // todo: var, let, etc.
+                _ => {}
+            }
+        }
+
+        fn work(&mut self, named_ty: Option<FlowType>, lit_ty: Option<FlowType>) {
+            if let Some(named_ty) = &named_ty {
+                type_completion(self.ctx, Some(named_ty), None);
+            } else if let Some(lit_ty) = &lit_ty {
+                self.on_lit_ty(lit_ty);
+            }
+        }
     }
+
+    ctx.work(named_ty, lit_ty);
+
+    let ctx = ctx.ctx;
 
     if ctx.before.ends_with(',') {
         ctx.enrich(" ", "");
