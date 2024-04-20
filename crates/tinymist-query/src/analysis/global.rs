@@ -13,7 +13,7 @@ use reflexo::hash::hash128;
 use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
 use typst::eval::Eval;
 use typst::foundations;
-use typst::syntax::SyntaxNode;
+use typst::syntax::{LinkedNode, SyntaxNode};
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
     syntax::{package::PackageSpec, Source, Span, VirtualPath},
@@ -23,8 +23,10 @@ use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
 use super::{
-    DefUseInfo, FlowType, ImportInfo, PathPreference, Signature, SignatureTarget, TypeCheckInfo,
+    literal_type_check, DefUseInfo, FlowType, ImportInfo, PathPreference, Signature,
+    SignatureTarget, TypeCheckInfo,
 };
+use crate::syntax::get_check_target;
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -644,6 +646,25 @@ impl<'w> AnalysisContext<'w> {
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(source)?;
         ty_chk.mapping.get(&s).cloned()
+    }
+
+    pub(crate) fn literal_type_of_span(&mut self, s: Span) -> Option<FlowType> {
+        let id = s.id()?;
+        let source = self.source_by_id(id).ok()?;
+        let k = LinkedNode::new(source.root()).find(s)?;
+
+        self.literal_type_of_node(k)
+    }
+
+    pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<FlowType> {
+        let id = k.span().id()?;
+        let source = self.source_by_id(id).ok()?;
+        let ty_chk = self.type_check(source.clone())?;
+
+        let check_target = get_check_target(k.clone())?;
+
+        literal_type_check(self, &ty_chk, check_target.clone())
+            .or_else(|| ty_chk.mapping.get(&k.span()).cloned())
     }
 }
 

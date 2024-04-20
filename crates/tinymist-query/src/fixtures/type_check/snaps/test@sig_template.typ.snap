@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/sig_template.typ
+---
+"content" = Any
+"tmpl" = (Any) -> Any
+---
+5..9 -> @tmpl
+10..17 -> @content

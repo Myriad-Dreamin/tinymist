@@ -1,0 +1,1 @@
+#let tmpl(content) = content

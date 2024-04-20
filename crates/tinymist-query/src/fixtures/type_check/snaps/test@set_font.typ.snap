@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/set_font.typ
+---
+"font" = "Times New Roman"
+---
+5..9 -> @font
+41..51 -> (TextFont | Array<TextFont>)
+47..51 -> (TextFont | Array<TextFont>)

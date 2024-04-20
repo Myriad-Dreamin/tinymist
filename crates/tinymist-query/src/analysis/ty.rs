@@ -1,7 +1,7 @@
 //! Top-level evaluation of a source file.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -25,44 +25,16 @@ mod def;
 pub(crate) use def::*;
 mod builtin;
 pub(crate) use builtin::*;
+mod literal_flow;
+pub(crate) use literal_flow::*;
 
-pub(crate) struct TypeCheckInfo {
-    pub vars: HashMap<DefId, FlowVar>,
-    pub mapping: HashMap<Span, FlowType>,
-
-    cano_cache: Mutex<TypeCanoStore>,
-}
-
-impl TypeCheckInfo {
-    pub fn simplify(&self, ty: FlowType) -> FlowType {
-        let mut c = self.cano_cache.lock();
-        let c = &mut *c;
-
-        c.cano_local_cache.clear();
-        c.positives.clear();
-        c.negatives.clear();
-
-        let mut worker = TypeSimplifier {
-            vars: &self.vars,
-            cano_cache: &mut c.cano_cache,
-            cano_local_cache: &mut c.cano_local_cache,
-
-            positives: &mut c.positives,
-            negatives: &mut c.negatives,
-        };
-
-        worker.simplify(ty)
-    }
-}
-
+/// Type checking at the source unit level.
 pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Arc<TypeCheckInfo>> {
-    let def_use_info = ctx.def_use(source.clone())?;
-    let mut info = TypeCheckInfo {
-        vars: HashMap::new(),
-        mapping: HashMap::new(),
+    let mut info = TypeCheckInfo::default();
 
-        cano_cache: Mutex::new(TypeCanoStore::default()),
-    };
+    // Retrieve def-use information for the source.
+    let def_use_info = ctx.def_use(source.clone())?;
+
     let mut type_checker = TypeChecker {
         ctx,
         source: source.clone(),
@@ -72,14 +44,46 @@ pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Ar
     };
     let lnk = LinkedNode::new(source.root());
 
-    let current = std::time::Instant::now();
+    let type_check_start = std::time::Instant::now();
     type_checker.check(lnk);
-    let elapsed = current.elapsed();
-    log::info!("Type checking on {:?} took {:?}", source.id(), elapsed);
+    let elapsed = type_check_start.elapsed();
+    log::info!("Type checking on {:?} took {elapsed:?}", source.id());
 
+    // todo: cross-file unit type checking
     let _ = type_checker.source;
 
     Some(Arc::new(info))
+}
+
+#[derive(Default)]
+pub(crate) struct TypeCheckInfo {
+    pub vars: HashMap<DefId, FlowVar>,
+    pub mapping: HashMap<Span, FlowType>,
+
+    cano_cache: Mutex<TypeCanoStore>,
+}
+
+impl TypeCheckInfo {
+    pub fn simplify(&self, ty: FlowType, principal: bool) -> FlowType {
+        let mut c = self.cano_cache.lock();
+        let c = &mut *c;
+
+        c.cano_local_cache.clear();
+        c.positives.clear();
+        c.negatives.clear();
+
+        let mut worker = TypeSimplifier {
+            principal,
+            vars: &self.vars,
+            cano_cache: &mut c.cano_cache,
+            cano_local_cache: &mut c.cano_local_cache,
+
+            positives: &mut c.positives,
+            negatives: &mut c.negatives,
+        };
+
+        worker.simplify(ty, principal)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -362,12 +366,46 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         }
 
         let op = binary.op();
-        let lhs = self.check_expr_in(binary.lhs().span(), root.clone());
-        let rhs = self.check_expr_in(binary.rhs().span(), root);
-        let operands = Box::new((lhs, rhs));
+        let lhs_span = binary.lhs().span();
+        let lhs = self.check_expr_in(lhs_span, root.clone());
+        let rhs_span = binary.rhs().span();
+        let rhs = self.check_expr_in(rhs_span, root);
 
-        // Some(FlowType::Binary(ty))
-        Some(FlowType::Binary(FlowBinaryType { op, operands }))
+        match op {
+            ast::BinOp::Add | ast::BinOp::Sub | ast::BinOp::Mul | ast::BinOp::Div => {}
+            ast::BinOp::Eq | ast::BinOp::Neq | ast::BinOp::Leq | ast::BinOp::Geq => {
+                self.check_comparable(&lhs, &rhs);
+                self.possible_ever_be(&lhs, &rhs);
+                self.possible_ever_be(&rhs, &lhs);
+            }
+            ast::BinOp::Lt | ast::BinOp::Gt => {
+                self.check_comparable(&lhs, &rhs);
+            }
+            ast::BinOp::And | ast::BinOp::Or => {
+                self.constrain(&lhs, &FlowType::Boolean(None));
+                self.constrain(&rhs, &FlowType::Boolean(None));
+            }
+            ast::BinOp::NotIn | ast::BinOp::In => {
+                self.check_containing(&rhs, &lhs, op == ast::BinOp::In);
+            }
+            ast::BinOp::Assign => {
+                self.check_assignable(&lhs, &rhs);
+                self.possible_ever_be(&lhs, &rhs);
+            }
+            ast::BinOp::AddAssign
+            | ast::BinOp::SubAssign
+            | ast::BinOp::MulAssign
+            | ast::BinOp::DivAssign => {
+                self.check_assignable(&lhs, &rhs);
+            }
+        }
+
+        let res = FlowType::Binary(FlowBinaryType {
+            op,
+            operands: Box::new((lhs, rhs)),
+        });
+
+        Some(res)
     }
 
     fn check_field_access(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
@@ -436,7 +474,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         // let _params = self.check_expr_in(closure.params().span(), root.clone());
 
         let mut pos = vec![];
-        let mut named = HashMap::new();
+        let mut named = BTreeMap::new();
         let mut rest = None;
 
         for param in closure.params().children() {
@@ -445,8 +483,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     pos.push(self.check_pattern(pattern, FlowType::Any, root.clone()));
                 }
                 ast::Param::Named(e) => {
-                    let exp = self.check_expr_in(e.span(), root.clone());
-                    let v = self.get_var(e.span(), to_ident_ref(&root, e.name())?)?;
+                    let exp = self.check_expr_in(e.expr().span(), root.clone());
+                    let v = self.get_var(e.name().span(), to_ident_ref(&root, e.name())?)?;
                     v.ever_be(exp);
                     named.insert(e.name().get().clone(), v.get_ref());
                 }
@@ -507,6 +545,9 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let callee = self.check_expr_in(set_rule.target().span(), root.clone());
         let args = self.check_expr_in(set_rule.args().span(), root.clone());
+        let _cond = set_rule
+            .condition()
+            .map(|cond| self.check_expr_in(cond.span(), root.clone()));
         let mut candidates = Vec::with_capacity(1);
 
         log::debug!("set rule: {callee:?} with {args:?}");
@@ -532,7 +573,9 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let _selector = show_rule
             .selector()
             .map(|sel| self.check_expr_in(sel.span(), root.clone()));
-        // let _args = self.check_expr_in(show_rule.args().span(), root)?;
+        let t = show_rule.transform();
+        // todo: infer it type by selector
+        let _transform = self.check_expr_in(t.span(), root.clone());
 
         Some(FlowType::Any)
     }
@@ -737,6 +780,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::FlowNone => {}
             FlowType::Auto => {}
             FlowType::Builtin(_) => {}
+            FlowType::Boolean(_) => {}
             FlowType::At(e) => {
                 let primary_type = self.check_primary_type(e.0 .0.clone());
                 self.check_apply_method(primary_type, e.0 .1.clone(), args, candidates);
@@ -774,6 +818,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 let _ = w.0 .0;
             }
             (FlowType::Var(v), rhs) => {
+                log::debug!("constrain var {v:?} ⪯ {rhs:?}");
                 let w = self.info.vars.get_mut(&v.0).unwrap();
                 match &w.kind {
                     FlowVarKind::Weak(w) => {
@@ -783,6 +828,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 }
             }
             (lhs, FlowType::Var(v)) => {
+                log::debug!("constrain var {lhs:?} ⪯ {v:?}");
                 let v = self.info.vars.get(&v.0).unwrap();
                 match &v.kind {
                     FlowVarKind::Weak(v) => {
@@ -927,6 +973,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::At(e) => self.check_primary_type(e.0 .0.clone()),
             FlowType::Unary(_) => e,
             FlowType::Binary(_) => e,
+            FlowType::Boolean(_) => e,
             FlowType::If(_) => e,
             FlowType::Element(_) => e,
         }
@@ -1043,30 +1090,67 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             vec![args.clone()],
         )))
     }
+
+    fn check_comparable(&self, lhs: &FlowType, rhs: &FlowType) {
+        let _ = lhs;
+        let _ = rhs;
+    }
+
+    fn check_assignable(&self, lhs: &FlowType, rhs: &FlowType) {
+        let _ = lhs;
+        let _ = rhs;
+    }
+
+    fn check_containing(&self, container: &FlowType, elem: &FlowType, expected_in: bool) {
+        let _ = container;
+        let _ = elem;
+        let _ = expected_in;
+    }
+
+    fn possible_ever_be(&mut self, lhs: &FlowType, rhs: &FlowType) {
+        // todo: instantiataion
+        match rhs {
+            FlowType::Undef
+            | FlowType::Content
+            | FlowType::None
+            | FlowType::FlowNone
+            | FlowType::Auto
+            | FlowType::Element(..)
+            | FlowType::Builtin(..)
+            | FlowType::Value(..)
+            | FlowType::Boolean(..)
+            | FlowType::ValueDoc(..) => {
+                self.constrain(rhs, lhs);
+            }
+            _ => {}
+        }
+    }
 }
 
 #[derive(Default)]
 struct TypeCanoStore {
-    cano_cache: HashMap<u128, FlowType>,
-    cano_local_cache: HashMap<DefId, FlowType>,
+    cano_cache: HashMap<(u128, bool), FlowType>,
+    cano_local_cache: HashMap<(DefId, bool), FlowType>,
     negatives: HashSet<DefId>,
     positives: HashSet<DefId>,
 }
 
 struct TypeSimplifier<'a, 'b> {
+    principal: bool,
+
     vars: &'a HashMap<DefId, FlowVar>,
 
-    cano_cache: &'b mut HashMap<u128, FlowType>,
-    cano_local_cache: &'b mut HashMap<DefId, FlowType>,
+    cano_cache: &'b mut HashMap<(u128, bool), FlowType>,
+    cano_local_cache: &'b mut HashMap<(DefId, bool), FlowType>,
     negatives: &'b mut HashSet<DefId>,
     positives: &'b mut HashSet<DefId>,
 }
 
 impl<'a, 'b> TypeSimplifier<'a, 'b> {
-    fn simplify(&mut self, ty: FlowType) -> FlowType {
+    fn simplify(&mut self, ty: FlowType, principal: bool) -> FlowType {
         // todo: hash safety
         let ty_key = hash128(&ty);
-        if let Some(cano) = self.cano_cache.get(&ty_key) {
+        if let Some(cano) = self.cano_cache.get(&(ty_key, principal)) {
             return cano.clone();
         }
 
@@ -1175,6 +1259,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             FlowType::Infer => {}
             FlowType::FlowNone => {}
             FlowType::Auto => {}
+            FlowType::Boolean(_) => {}
             FlowType::Builtin(_) => {}
             FlowType::Element(_) => {}
         }
@@ -1183,25 +1268,31 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
     fn transform(&mut self, ty: &FlowType, pol: bool) -> FlowType {
         match ty {
             FlowType::Var(v) => {
-                if let Some(cano) = self.cano_local_cache.get(&v.0) {
+                if let Some(cano) = self.cano_local_cache.get(&(v.0, self.principal)) {
                     return cano.clone();
                 }
+                // todo: avoid cycle
+                self.cano_local_cache
+                    .insert((v.0, self.principal), FlowType::Any);
 
-                match &self.vars.get(&v.0).unwrap().kind {
+                let res = match &self.vars.get(&v.0).unwrap().kind {
                     FlowVarKind::Weak(w) => {
                         let w = w.read();
-
-                        // log::debug!("transform var {:?} {pol}", v.0);
 
                         let mut lbs = Vec::with_capacity(w.lbs.len());
                         let mut ubs = Vec::with_capacity(w.ubs.len());
 
-                        if pol && !self.negatives.contains(&v.0) {
+                        log::info!(
+                            "transform var [principal={}] {v:?} with {w:?}",
+                            self.principal
+                        );
+
+                        if !self.principal || ((pol) && !self.negatives.contains(&v.0)) {
                             for lb in w.lbs.iter() {
                                 lbs.push(self.transform(lb, pol));
                             }
                         }
-                        if !pol && !self.positives.contains(&v.0) {
+                        if !self.principal || ((!pol) && !self.positives.contains(&v.0)) {
                             for ub in w.ubs.iter() {
                                 ubs.push(self.transform(ub, !pol));
                             }
@@ -1216,12 +1307,14 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                             }
                         }
 
-                        FlowType::Let(Arc::new(FlowVarStore {
-                            lbs: w.lbs.clone(),
-                            ubs: w.ubs.clone(),
-                        }))
+                        FlowType::Let(Arc::new(FlowVarStore { lbs, ubs }))
                     }
-                }
+                };
+
+                self.cano_local_cache
+                    .insert((v.0, self.principal), res.clone());
+
+                res
             }
             FlowType::Func(f) => {
                 let pos = f.pos.iter().map(|p| self.transform(p, !pol)).collect();
@@ -1314,6 +1407,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             FlowType::Infer => FlowType::Infer,
             FlowType::FlowNone => FlowType::FlowNone,
             FlowType::Auto => FlowType::Auto,
+            FlowType::Boolean(b) => FlowType::Boolean(*b),
             FlowType::Builtin(b) => FlowType::Builtin(b.clone()),
         }
     }
@@ -1401,6 +1495,8 @@ impl Joiner {
             (FlowType::Union(..), _) => self.definite = FlowType::Undef,
             (FlowType::Let(w), FlowType::None) => self.definite = FlowType::Let(w),
             (FlowType::Let(..), _) => self.definite = FlowType::Undef,
+            (FlowType::Boolean(b), FlowType::None) => self.definite = FlowType::Boolean(b),
+            (FlowType::Boolean(..), _) => self.definite = FlowType::Undef,
         }
     }
 }

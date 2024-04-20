@@ -81,7 +81,7 @@ pub fn find_document_before(src: &Source, cursor: usize) -> Option<String> {
     let root = LinkedNode::new(src.root());
     let leaf = root.leaf_at(cursor)?;
     let def_target = get_def_target(leaf.clone())?;
-    log::info!("found docs target: {:?}", def_target.node().kind());
+    log::debug!("found docs target: {:?}", def_target.node().kind());
     // todo: import
     let target = def_target.node().clone();
     let mut node = target.clone();

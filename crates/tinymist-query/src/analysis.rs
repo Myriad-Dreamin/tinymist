@@ -63,7 +63,7 @@ mod type_check_tests {
             vars.sort_by(|x, y| x.0.cmp(&y.0));
 
             for (name, var) in vars {
-                writeln!(f, "{:?} = {:?}", name, info.simplify(var.get_ref()))?;
+                writeln!(f, "{:?} = {:?}", name, info.simplify(var.get_ref(), true))?;
             }
 
             writeln!(f, "---")?;
@@ -85,6 +85,49 @@ mod type_check_tests {
 
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod literal_type_check_tests {
+
+    use insta::with_settings;
+    use typst::syntax::LinkedNode;
+
+    use crate::analysis::ty;
+    use crate::syntax::get_check_target;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("literal_type_check", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+            let root = LinkedNode::new(source.root());
+            let node = root.leaf_at(pos + 1).unwrap();
+            let target = get_check_target(node).unwrap_or_else(|| {
+                panic!(
+                    "Failed to get check target at {pos:?} in {:?}",
+                    source.text()
+                )
+            });
+            let text = target.node().clone().map(|n| n.get().clone().into_text());
+            let text = text.unwrap_or_default();
+
+            let result = ty::type_check(ctx, source.clone());
+            let literal_type = result.and_then(|info| ty::literal_type_check(ctx, &info, target));
+
+            with_settings!({
+                description => format!("Check on {text:?} ({pos:?})"),
+            }, {
+                let literal_type = literal_type.map(|e| format!("{e:#?}"))
+                    .unwrap_or_else(|| "<nil>".to_string());
+                assert_snapshot!(literal_type);
+            })
+        });
     }
 }
 

@@ -19,9 +19,7 @@ use crate::analysis::resolve_callee;
 use crate::syntax::{get_def_target, get_deref_target, DefTarget};
 use crate::AnalysisContext;
 
-use super::{
-    find_definition, DefinitionLink, FlowType, FlowVar, LexicalKind, LexicalVarKind, TypeCheckInfo,
-};
+use super::{find_definition, DefinitionLink, FlowType, FlowVar, LexicalKind, LexicalVarKind};
 
 // pub fn analyze_signature
 
@@ -300,7 +298,6 @@ fn resolve_callee_v2(
         let _t = ctx.type_check(source)?;
         let _ = FlowVar::name;
         let _ = FlowVar::id;
-        let _ = TypeCheckInfo::simplify;
 
         let root = LinkedNode::new(def_source.root());
         let def_node = root.leaf_at(def_at.1.start + 1)?;
