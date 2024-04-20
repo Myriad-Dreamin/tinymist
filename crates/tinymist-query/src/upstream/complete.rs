@@ -732,7 +732,7 @@ fn complete_params(ctx: &mut CompletionContext) -> bool {
     // Parameters: "func(|)", "func(hi|)", "func(12,|)".
     if_chain! {
         if matches!(deciding.kind(), SyntaxKind::LeftParen | SyntaxKind::Comma);
-        if deciding.kind() != SyntaxKind::Comma || deciding.range().end < ctx.cursor;
+        if deciding.kind() != SyntaxKind::Comma || deciding.range().end <= ctx.cursor;
         then {
             if let Some(next) = deciding.next_leaf() {
                 ctx.from = ctx.cursor.min(next.offset());

@@ -7,6 +7,41 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_args2.typ
 [
  {
   "isIncomplete": false,
-  "items": []
+  "items": [
+   {
+    "kind": 6,
+    "label": "class",
+    "textEdit": {
+     "newText": " class: ${1:}",
+     "range": {
+      "end": {
+       "character": 18,
+       "line": 14
+      },
+      "start": {
+       "character": 18,
+       "line": 14
+      }
+     }
+    }
+   },
+   {
+    "kind": 6,
+    "label": "font",
+    "textEdit": {
+     "newText": " font: ${1:}",
+     "range": {
+      "end": {
+       "character": 18,
+       "line": 14
+      },
+      "start": {
+       "character": 18,
+       "line": 14
+      }
+     }
+    }
+   }
+  ]
  }
 ]
