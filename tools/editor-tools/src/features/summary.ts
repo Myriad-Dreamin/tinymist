@@ -205,7 +205,7 @@ export const Summary = () => {
         { style: "margin: 0.8em; margin-left: 0.5em" },
         div(
           `Its version is `,
-          a({ href: "javascript:void(0)" }, "0.11.4"),
+          a({ href: "javascript:void(0)" }, "0.11.5"),
           `.`
         ),
         div(`It is compiled with optimization level `, "3", `.`),
