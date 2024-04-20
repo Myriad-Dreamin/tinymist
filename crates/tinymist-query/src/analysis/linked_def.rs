@@ -177,7 +177,8 @@ pub struct DynCallTarget {
     pub this: Option<Value>,
 }
 
-/// The calling convention of a function.
+/// The call of a function with calling convention identified.
+#[derive(Debug, Clone)]
 pub enum CallConvention {
     /// A static function.
     Static(Func),
