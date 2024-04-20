@@ -334,8 +334,6 @@ pub static FLOW_RADIUS_DICT: Lazy<FlowRecord> = Lazy::new(|| {
 // todo: numbering/supplement
 // todo: grid/table.columns/rows/gutter/column-gutter/row-gutter array of length
 // todo: pattern.size array of length
-// todo: text.font array
-// todo: stroke.dash can be an array
 // todo: grid/table.fill/align/stroke/inset can be a function
 // todo: math.cancel.angle can be a function
 // todo: text.features array/dictionary
