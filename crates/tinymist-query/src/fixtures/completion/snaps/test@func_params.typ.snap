@@ -26,6 +26,40 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_params.typ
     }
    },
    {
+    "kind": 3,
+    "label": "aa.where",
+    "textEdit": {
+     "newText": "aa.where(${1:})",
+     "range": {
+      "end": {
+       "character": 5,
+       "line": 1
+      },
+      "start": {
+       "character": 2,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aa.with",
+    "textEdit": {
+     "newText": "aa.with(${1:})",
+     "range": {
+      "end": {
+       "character": 5,
+       "line": 1
+      },
+      "start": {
+       "character": 2,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
     "kind": 6,
     "label": "aab",
     "textEdit": {

@@ -27,9 +27,77 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
    },
    {
     "kind": 3,
+    "label": "aa.where",
+    "textEdit": {
+     "newText": "aa.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aa.with",
+    "textEdit": {
+     "newText": "aa.with(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
     "label": "aab",
     "textEdit": {
      "newText": "aab(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aab.where",
+    "textEdit": {
+     "newText": "aab.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aab.with",
+    "textEdit": {
+     "newText": "aab.with(${1:})",
      "range": {
       "end": {
        "character": 4,
@@ -61,9 +129,77 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
    },
    {
     "kind": 3,
+    "label": "aabc.where",
+    "textEdit": {
+     "newText": "aabc.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aabc.with",
+    "textEdit": {
+     "newText": "aabc.with(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
     "label": "aac",
     "textEdit": {
      "newText": "aac(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac.where",
+    "textEdit": {
+     "newText": "aac.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac.with",
+    "textEdit": {
+     "newText": "aac.with(${1:})",
      "range": {
       "end": {
        "character": 4,
@@ -270,9 +406,77 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
    },
    {
     "kind": 3,
+    "label": "aabc.where",
+    "textEdit": {
+     "newText": "aabc.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aabc.with",
+    "textEdit": {
+     "newText": "aabc.with(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
     "label": "aac",
     "textEdit": {
      "newText": "aac(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac.where",
+    "textEdit": {
+     "newText": "aac.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 5
+      },
+      "start": {
+       "character": 1,
+       "line": 5
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac.with",
+    "textEdit": {
+     "newText": "aac.with(${1:})",
      "range": {
       "end": {
        "character": 4,
