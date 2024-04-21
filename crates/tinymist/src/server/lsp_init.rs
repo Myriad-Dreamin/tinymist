@@ -426,6 +426,8 @@ impl Init {
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
                 completion_provider: Some(CompletionOptions {
+                    // Please update the language-configurations.json if you are changing this
+                    // setting.
                     trigger_characters: Some(vec![
                         String::from("#"),
                         String::from("("),

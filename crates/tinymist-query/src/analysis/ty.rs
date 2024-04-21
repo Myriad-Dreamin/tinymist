@@ -1280,7 +1280,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                         let mut lbs = Vec::with_capacity(w.lbs.len());
                         let mut ubs = Vec::with_capacity(w.ubs.len());
 
-                        log::info!(
+                        log::debug!(
                             "transform var [principal={}] {v:?} with {w:?}",
                             self.principal
                         );
