@@ -32,7 +32,7 @@
             "notIn": ["string"]
         }
     ],
-    "autoCloseBefore": "$ \n\t",
+    "autoCloseBefore": ";:.,=}])>$ \n\t",
     "surroundingPairs": [
         ["[", "]"],
         ["{", "}"],
