@@ -85,46 +85,41 @@ impl ExportActor {
     pub async fn run(mut self) {
         let kind = &self.kind;
         loop {
-            tokio::select! {
-                req = self.render_rx.recv() => {
-                    let req = match req {
-                        Ok(req) => req,
-                        Err(RecvError::Closed) => {
-                            info!("RenderActor(@{kind:?}): channel closed");
-                            break;
-                        }
-                        Err(RecvError::Lagged(_)) => {
-                            info!("RenderActor(@{kind:?}): channel lagged");
-                            continue;
-                        }
+            let req = match self.render_rx.recv().await {
+                Ok(req) => req,
+                Err(RecvError::Closed) => {
+                    info!("RenderActor(@{kind:?}): channel closed");
+                    break;
+                }
+                Err(RecvError::Lagged(_)) => {
+                    info!("RenderActor(@{kind:?}): channel lagged");
+                    continue;
+                }
+            };
 
+            log::debug!("RenderActor: received request: {req:?}");
+            match req {
+                RenderActorRequest::ChangeConfig(cfg) => {
+                    self.substitute_pattern = cfg.substitute_pattern;
+                    self.entry = cfg.entry;
+                    self.mode = cfg.mode;
+                }
+                RenderActorRequest::ChangeExportPath(cfg) => {
+                    self.entry = cfg.entry;
+                }
+                _ => {
+                    let cb = match &req {
+                        RenderActorRequest::Oneshot(oneshot) => Some(oneshot.callback.clone()),
+                        _ => None,
                     };
-
-                    log::debug!("RenderActor: received request: {req:?}", req = req);
-                    match req {
-                        RenderActorRequest::ChangeConfig(cfg) => {
-                            self.substitute_pattern = cfg.substitute_pattern;
-                            self.entry = cfg.entry;
-                            self.mode = cfg.mode;
-                        }
-                        RenderActorRequest::ChangeExportPath(cfg) => {
-                            self.entry = cfg.entry;
-                        }
-                        _ => {
-                            let cb = match &req {
-                                RenderActorRequest::Oneshot(oneshot) => Some(oneshot.callback.clone()),
-                                _ => None,
-                            };
-                            let resp = self.check_mode_and_export(req).await;
-                            if let Some(cb) = cb {
-                                let Some(cb) = cb.lock().take() else {
-                                    error!("RenderActor(@{kind:?}): oneshot.callback is None");
-                                    continue;
-                                };
-                                if let Err(e) = cb.send(resp) {
-                                    error!("RenderActor(@{kind:?}): failed to send response: {err:?}", err = e);
-                                }
-                            }
+                    let resp = self.check_mode_and_export(req).await;
+                    if let Some(cb) = cb {
+                        let Some(cb) = cb.lock().take() else {
+                            error!("RenderActor(@{kind:?}): oneshot.callback is None");
+                            continue;
+                        };
+                        if let Err(e) = cb.send(resp) {
+                            error!("RenderActor(@{kind:?}): failed to send response: {e:?}");
                         }
                     }
                 }
@@ -146,10 +141,9 @@ impl ExportActor {
             _ => unreachable!(),
         };
 
-        let kind = if let RenderActorRequest::Oneshot(oneshot) = &req {
-            oneshot.kind.as_ref()
-        } else {
-            None
+        let kind = match &req {
+            RenderActorRequest::Oneshot(oneshot) => oneshot.kind.as_ref(),
+            _ => None,
         };
         let kind = kind.unwrap_or(&self.kind);
 
@@ -172,38 +166,24 @@ impl ExportActor {
 
         let path = main.vpath().resolve(&root)?;
 
-        let should_do = matches!(req, RenderActorRequest::Oneshot(..));
-        let should_do = should_do || get_mode(self.mode) == eq_mode;
-        let should_do = should_do
-            || 'validate_doc: {
-                let mode = self.mode;
-                info!(
-                    "RenderActor: validating document for export mode {mode:?} title is {title}",
-                    title = document.title.is_some()
-                );
-                if mode == ExportMode::OnDocumentHasTitle {
-                    break 'validate_doc document.title.is_some()
-                        && matches!(req, RenderActorRequest::OnSaved(..));
-                }
-
-                false
-            };
+        let should_do = matches!(req, RenderActorRequest::Oneshot(..)) || eq_mode == self.mode || {
+            let mode = self.mode;
+            info!(
+                "RenderActor: validating document for export mode {mode:?} title is {title}",
+                title = document.title.is_some()
+            );
+            mode == ExportMode::OnDocumentHasTitle
+                && document.title.is_some()
+                && matches!(req, RenderActorRequest::OnSaved(..))
+        };
         if should_do {
             return match self.export(kind, &document, &root, &path).await {
                 Ok(pdf) => Some(pdf),
                 Err(err) => {
-                    error!("RenderActor({kind:?}): failed to export {err}", err = err);
+                    error!("RenderActor({kind:?}): failed to export {err}");
                     None
                 }
             };
-        }
-
-        fn get_mode(mode: ExportMode) -> ExportMode {
-            if mode == ExportMode::Auto {
-                return ExportMode::Never;
-            }
-
-            mode
         }
 
         None
