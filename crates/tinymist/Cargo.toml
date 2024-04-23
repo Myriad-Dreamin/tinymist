@@ -29,6 +29,7 @@ serde.workspace = true
 serde_json.workspace = true
 parking_lot.workspace = true
 paste.workspace = true
+rayon = "1.10.0"
 
 clap = { workspace = true, optional = true }
 clap_builder.workspace = true

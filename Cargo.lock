@@ -3803,6 +3803,7 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "paste",
+ "rayon",
  "serde",
  "serde_json",
  "tinymist-query",
