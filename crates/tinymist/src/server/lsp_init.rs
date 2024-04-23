@@ -271,6 +271,7 @@ impl From<&InitializeParams> for ConstConfig {
 
 pub struct Init {
     pub host: LspHost<TypstLanguageServer>,
+    pub handle: tokio::runtime::Handle,
     pub compile_opts: CompileFontOpts,
 }
 
@@ -357,6 +358,7 @@ impl Init {
             client: self.host.clone(),
             const_config: cc.clone(),
             diag_tx,
+            handle: self.handle.clone(),
             font,
         });
 
@@ -392,7 +394,7 @@ impl Init {
         service.primary.compiler = Some(primary);
 
         // Run the cluster in the background after we referencing it
-        tokio::spawn(cluster_actor.run());
+        self.handle.spawn(cluster_actor.run());
 
         // Respond to the host (LSP client)
 

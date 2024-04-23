@@ -8,6 +8,7 @@ use args::CompileArgs;
 use clap::Parser;
 use comemo::Prehashed;
 use lsp_types::{InitializeParams, InitializedParams};
+use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use tinymist::{
     compiler_init::{CompileInit, CompileInitializeParams},
@@ -26,9 +27,25 @@ use crate::args::{CliArguments, Commands, LspArgs};
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
+pub struct Runtimes {
+    pub tokio_runtime: tokio::runtime::Runtime,
+}
+
+impl Default for Runtimes {
+    fn default() -> Self {
+        let tokio_runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        Self { tokio_runtime }
+    }
+}
+
+static RUNTIMES: Lazy<Runtimes> = Lazy::new(Default::default);
+
 /// The main entry point.
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
@@ -49,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
 
     match args.command.unwrap_or_default() {
         Commands::Lsp(args) => lsp_main(args),
-        Commands::Compile(args) => compiler_main(args).await,
+        Commands::Compile(args) => compiler_main(args),
         Commands::Probe => Ok(()),
     }
 }
@@ -82,6 +99,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
         ) {
             Init {
                 host,
+                handle: RUNTIMES.tokio_runtime.handle().clone(),
                 compile_opts: CompileFontOpts {
                     font_paths: self.args.font.font_paths.clone(),
                     no_system_fonts: self.args.font.no_system_fonts,
@@ -95,7 +113,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
+pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
     let (diag_tx, _diag_rx) = mpsc::unbounded_channel();
 
     let mut input = PathBuf::from(args.compile.input.unwrap());
@@ -123,7 +141,7 @@ pub async fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
     }));
 
     let init = CompileInit {
-        handle: tokio::runtime::Handle::current(),
+        handle: RUNTIMES.tokio_runtime.handle().clone(),
         font: CompileFontOpts {
             font_paths: args.compile.font.font_paths.clone(),
             no_system_fonts: args.compile.font.no_system_fonts,
@@ -164,7 +182,7 @@ pub async fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
             let entry = service.config.determine_entry(Some(input.as_path().into()));
             let (timings, _doc, diagnostics) = service
                 .compiler()
-                .steal_async(|c, _| {
+                .steal(|c| {
                     c.compiler.world_mut().mutate_entry(entry).unwrap();
                     c.compiler.world_mut().inputs = inputs;
 
@@ -202,7 +220,6 @@ pub async fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
 
                     (s, res, diagnostics)
                 })
-                .await
                 .unwrap();
 
             lsp_server::Message::Notification(lsp_server::Notification {
