@@ -3,6 +3,7 @@ import van, { State } from "vanjs-core";
 // import { SYMBOL_MOCK } from "./symbol-picker.mock";
 const { div, input, canvas, button } = van.tags;
 import MiniSearch from "minisearch";
+import { Detypify, DetypifySymbol, Stroke } from "./symbol-picker.detypify";
 
 interface SymbolCategory {
   value?: string;
@@ -86,7 +87,7 @@ const SearchBar = (
       sym.categoryHuman = categoryIndex.get(sym.category);
       sym.typstCode = key;
     }
-    console.log("search", Object.values(state.val.symbols));
+    // console.log("search", Object.values(state.val.symbols));
     search.addAll(Object.values(state.val.symbols));
     return search;
   });
@@ -107,7 +108,7 @@ const SearchBar = (
   });
 };
 
-const CanvasPanel = () => {
+const CanvasPanel = (strokesState: State<Stroke[] | undefined>) => {
   const srcCanvas = canvas({
     width: "160",
     height: "160",
@@ -122,13 +123,15 @@ const CanvasPanel = () => {
   srcCtx.lineJoin = "round";
   srcCtx.lineCap = "round";
 
-  const dstCanvas = document.createElement("canvas");
-  dstCanvas.width = dstCanvas.height = 32;
-  const dstCtx = dstCanvas.getContext("2d", { willReadFrequently: true })!;
-  if (!dstCtx) {
-    throw new Error("Could not get context");
+  // todo: decouple with CanvasPanel
+  const serverDark = document.body.classList.contains("typst-preview-dark");
+  if (serverDark) {
+    srcCtx.fillStyle = "white";
+    srcCtx.strokeStyle = "white";
+  } else {
+    srcCtx.fillStyle = "black";
+    srcCtx.strokeStyle = "black";
   }
-  dstCtx.fillStyle = "white";
 
   type Point = [number, number];
   type PointEvent = Pick<MouseEvent, "offsetX" | "offsetY">;
@@ -136,98 +139,50 @@ const CanvasPanel = () => {
   let isDrawing = false;
   let currP: Point;
   let stroke: Point[];
-  let strokes: Point[][] = [];
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = 0;
-  let maxY = 0;
 
   const touchCall = (fn: (e: PointEvent) => any) => (e: TouchEvent) => {
-    const { left: touchL, top: touchT } = srcCanvas.getBoundingClientRect();
+    let rect = srcCanvas.getBoundingClientRect();
     fn({
-      offsetX: e.touches[0].clientX - touchL,
-      offsetY: e.touches[0].clientY - touchT,
+      offsetX: e.touches[0].clientX - rect.left,
+      offsetY: e.touches[0].clientY - rect.top,
     });
   };
 
   function drawStart({ offsetX, offsetY }: PointEvent) {
     isDrawing = true;
+
+    offsetX = Math.round(offsetX);
+    offsetY = Math.round(offsetY);
+
     currP = [offsetX, offsetY];
-    stroke = [currP!];
+    stroke = [currP];
   }
 
   function drawMove({ offsetX, offsetY }: PointEvent) {
     if (!isDrawing) return;
 
-    let prevP = currP;
+    offsetX = Math.round(offsetX);
+    offsetY = Math.round(offsetY);
+
+    srcCtx.beginPath();
+    srcCtx.moveTo(currP[0], currP[1]);
+    srcCtx.lineTo(offsetX, offsetY);
+    srcCtx.stroke();
+
     currP = [offsetX, offsetY];
     stroke.push(currP);
-
-    srcCtx.strokeStyle = "white";
-    srcCtx.beginPath();
-    srcCtx.moveTo(...prevP);
-    srcCtx.lineTo(...currP);
-    srcCtx.stroke();
   }
 
   function drawEnd() {
     if (!isDrawing) return; // normal mouse leave
     isDrawing = false;
-
-    // update
-    strokes.push(stroke);
-    let xs = stroke.map((p) => p[0]);
-    minX = Math.min(minX, ...xs);
-    maxX = Math.max(maxX, ...xs);
-    let ys = stroke.map((p) => p[1]);
-    minY = Math.min(minY, ...ys);
-    maxY = Math.max(maxY, ...ys);
-
-    // normalize
-    let dstWidth = dstCanvas.width;
-    let width = Math.max(maxX - minX, maxY - minY);
-    if (width == 0) return;
-    width *= 1.2;
-    let zeroX = (maxX + minX) / 2 - width / 2;
-    let zeroY = (maxY + minY) / 2 - width / 2;
-    let scale = dstWidth / width;
-
-    // draw to dstCanvas
-    dstCtx.fillRect(0, 0, dstWidth, dstWidth);
-    dstCtx.translate(0.5, 0.5);
-    for (let stroke of strokes) {
-      dstCtx.beginPath();
-      for (let [x, y] of stroke) {
-        dstCtx.lineTo(
-          Math.round((x - zeroX) * scale),
-          Math.round((y - zeroY) * scale)
-        );
-      }
-      dstCtx.stroke();
-    }
-    dstCtx.translate(-0.5, -0.5);
-
-    // // [debug] download dstCanvas image
-    // let img = document.createElement("a");
-    // img.href = dstCanvas.toDataURL();
-    // img.download = "test.png";
-    // img.click();
-
-    // to greyscale
-    let rgba = dstCtx.getImageData(0, 0, dstWidth, dstWidth).data;
-    let grey = new Float32Array(rgba.length / 4);
-    for (let i = 0; i < grey.length; ++i) {
-      grey[i] = rgba[i * 4] == 255 ? 1 : 0;
-    }
-    // greyscale = grey;
+    if (stroke.length === 1) return; // no line
+    strokesState.val = [...(strokesState.oldVal || []), stroke];
   }
 
   function drawClear() {
+    strokesState.val = undefined;
     srcCtx.clearRect(0, 0, srcCanvas.width, srcCanvas.height);
-    strokes = [];
-    minX = minY = Infinity;
-    maxX = maxY = 0;
-    // greyscale = null;
   }
 
   srcCanvas.addEventListener("mousedown", drawStart);
@@ -316,6 +271,17 @@ export const SymbolPicker = () => {
       : JSON.parse(atob(symbolInformationData))
   );
   console.log("symbolInformation", symInfo);
+  const detypifyPromise = Detypify.create();
+  const detypify = van.state<Detypify | undefined>(undefined);
+  detypifyPromise.then((d) => (detypify.val = d));
+  const strokes = van.state<Stroke[] | undefined>(undefined);
+  const drawCandidates = van.state<DetypifySymbol[] | undefined>();
+  (drawCandidates as any)._drawCandidateAsyncNode = van.derive(async () => {
+    if (strokes.val === undefined) return undefined;
+    if (!detypify.val || !strokes.val) return [];
+    drawCandidates.val = await detypify.val.candidates(strokes.val);
+  });
+
   // console.log("symbolInformationEnc", JSON.stringify(symInfo.val));
 
   const symbolDefs = div({
@@ -416,7 +382,7 @@ export const SymbolPicker = () => {
     undefined
   );
 
-  function pickSymbols(
+  function pickSymbolsBySearch(
     pickers: { key: string; value: SymbolItem; elem: Element }[],
     filteredPickers: SelectedSymbolItem[] | undefined
   ) {
@@ -424,6 +390,22 @@ export const SymbolPicker = () => {
     return pickers.filter((picker) =>
       filteredPickers.some((f) => f.typstCode === picker.key)
     );
+  }
+
+  function pickSymbolsByDrawCandidates(
+    pickers: { key: string; value: SymbolItem; elem: Element }[],
+    drawCandidates: DetypifySymbol[] | undefined
+  ) {
+    if (drawCandidates === undefined) return pickers;
+    if (!drawCandidates.length) return [];
+    return pickers.filter((picker) => {
+      if (!picker.value.typstCode) return false;
+      let c = picker.value.typstCode;
+      // remove sym. prefix
+      if (c.startsWith("sym.")) c = c.slice(4);
+
+      return drawCandidates.some((f) => f.names.includes(c));
+    });
   }
 
   return div(
@@ -437,13 +419,16 @@ export const SymbolPicker = () => {
         style: "flex: 0 0 auto; gap: 5px",
       },
       SearchBar(symInfo, filteredPickers),
-      CanvasPanel()
+      CanvasPanel(strokes)
     ),
     div({ style: "flex: 1;" }, (_dom?: Element) =>
       div(
         ...categorize(
           CATEGORY_INFO,
-          pickSymbols(pickers.val, filteredPickers.val)
+          pickSymbolsBySearch(
+            pickSymbolsByDrawCandidates(pickers.val, drawCandidates.val),
+            filteredPickers.val
+          )
         )
           .filter((cat) => cat.symbols?.length)
           .map((info) => CategoryPicker(info))

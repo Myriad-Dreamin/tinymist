@@ -23,3 +23,5 @@ dist/
 *.njsproj
 *.sln
 *.sw?
+
+assets/detypify
