@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import { getFocusingFile } from "./extension";
 
 let statusBarItem: vscode.StatusBarItem;
 
@@ -27,8 +26,9 @@ export interface TinymistStatus {
     wordsCount: WordsCount;
 }
 
-export const triggerStatusBar = () => {
-    if (getFocusingFile()) {
+export const triggerStatusBar = (show: boolean) => {
+    statusBarItem = statusBarItem || initWordCountItem();
+    if (show) {
         statusBarItem.show();
     } else {
         statusBarItem.hide();
@@ -63,7 +63,6 @@ ${cjkChars} CJK ${plural("Character", cjkChars)}
                 "statusBarItem.prominentBackground"
             );
             updateTooltip();
-            triggerStatusBar();
         } else if (event.status === "compileSuccess") {
             if (style === "compact") {
                 statusBarItem.text = "$(typst-guy)";
@@ -74,7 +73,6 @@ ${cjkChars} CJK ${plural("Character", cjkChars)}
                 "statusBarItem.prominentBackground"
             );
             updateTooltip();
-            triggerStatusBar();
         } else if (event.status === "compileError") {
             if (style === "compact") {
                 statusBarItem.text = "$(typst-guy)";
@@ -83,7 +81,6 @@ ${cjkChars} CJK ${plural("Character", cjkChars)}
             }
             statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
             updateTooltip();
-            triggerStatusBar();
         }
     }
 }
