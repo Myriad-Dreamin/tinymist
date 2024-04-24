@@ -182,6 +182,7 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 }
 
 pub struct TypstLanguageServerArgs {
+    pub handle: tokio::runtime::Handle,
     pub client: LspHost<TypstLanguageServer>,
     pub const_config: ConstConfig,
     pub diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
@@ -256,7 +257,7 @@ impl TypstLanguageServer {
                 },
                 diag_tx: args.diag_tx,
                 font: args.font,
-                handle: tokio::runtime::Handle::current(),
+                handle: args.handle,
             }),
             dedicates: Vec::new(),
             shutdown_requested: false,
