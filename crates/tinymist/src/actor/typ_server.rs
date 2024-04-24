@@ -5,7 +5,6 @@
 use std::{
     collections::HashSet,
     num::NonZeroUsize,
-    ops::Deref,
     path::{Path, PathBuf},
     sync::Arc,
     thread::JoinHandle,
@@ -21,7 +20,10 @@ use typst::{
 };
 
 use typst_ts_compiler::{
-    service::features::WITH_COMPILING_STATUS_FEATURE,
+    service::{
+        features::{FeatureSet, WITH_COMPILING_STATUS_FEATURE},
+        watch_deps, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter, EntryManager,
+    },
     vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage},
     world::{CompilerFeat, CompilerWorld},
     ShadowApi,
@@ -31,10 +33,6 @@ use typst_ts_core::{
     debug_loc::{SourceLocation, SourceSpanOffset},
     error::prelude::{map_string_err, ZResult},
     TypstDocument, TypstFileId,
-};
-
-use typst_ts_compiler::service::{
-    features::FeatureSet, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter, EntryManager,
 };
 
 use crate::{task::BorrowTask, utils};
@@ -52,35 +50,19 @@ impl EntryStateExt for EntryState {
     }
 }
 
-/// Interrupts for external sources
-enum ExternalInterrupt<Ctx> {
+enum Interrupt<Ctx> {
     /// Compile anyway.
     Compile,
-    /// Interrupted by settle request.
+    /// Borrow the compiler thread and run the task.
+    ///
+    /// See [`CompileClient<Ctx>::steal`] for more information.
+    Task(BorrowTask<Ctx>),
+    /// Memory file changes.
+    Memory(MemoryEvent),
+    /// File system event.
+    Fs(FilesystemEvent),
+    /// Request compiler to stop.
     Settle(oneshot::Sender<()>),
-    /// Interrupted by task.
-    ///
-    /// See [`CompileClient<Ctx>::steal`] for more information.
-    Task(BorrowTask<Ctx>),
-    /// Interrupted by memory file changes.
-    Memory(MemoryEvent),
-}
-
-/// Interrupts for the compiler thread.
-enum CompilerInterrupt<Ctx> {
-    /// Compile anyway.
-    Compile,
-    /// Interrupted by task.
-    ///
-    /// See [`CompileClient<Ctx>::steal`] for more information.
-    Task(BorrowTask<Ctx>),
-    /// Interrupted by memory file changes.
-    Memory(MemoryEvent),
-    /// Interrupted by file system event.
-    ///
-    /// If the event is `None`, it means the initial file system scan is done.
-    /// Otherwise, it means a file system event is received.
-    Fs(Option<FilesystemEvent>),
 }
 
 /// Responses from the compiler thread.
@@ -126,8 +108,8 @@ pub struct CompileServerActor<C: Compiler> {
     watch_feature_set: Arc<FeatureSet>,
 
     /// Internal channel for stealing the compiler thread.
-    steal_send: mpsc::UnboundedSender<ExternalInterrupt<Self>>,
-    steal_recv: mpsc::UnboundedReceiver<ExternalInterrupt<Self>>,
+    steal_tx: mpsc::UnboundedSender<Interrupt<Self>>,
+    steal_rx: mpsc::UnboundedReceiver<Interrupt<Self>>,
 
     suspend_state: SuspendState,
 }
@@ -137,13 +119,7 @@ where
     C::World: for<'files> codespan_reporting::files::Files<'files, FileId = TypstFileId>,
 {
     pub fn new_with_features(compiler: C, entry: EntryState, feature_set: FeatureSet) -> Self {
-        let (steal_send, steal_recv) = mpsc::unbounded_channel();
-
-        let watch_feature_set = Arc::new(
-            feature_set
-                .clone()
-                .configure(&WITH_COMPILING_STATUS_FEATURE, true),
-        );
+        let (steal_tx, steal_rx) = mpsc::unbounded_channel();
 
         Self {
             compiler: CompileReporter::new(compiler)
@@ -156,11 +132,13 @@ where
             estimated_shadow_files: Default::default(),
             latest_doc: None,
             latest_success_doc: None,
-            once_feature_set: Arc::new(feature_set),
-            watch_feature_set,
+            once_feature_set: Arc::new(feature_set.clone()),
+            watch_feature_set: Arc::new(
+                feature_set.configure(&WITH_COMPILING_STATUS_FEATURE, true),
+            ),
 
-            steal_send,
-            steal_recv,
+            steal_tx,
+            steal_rx,
 
             suspend_state: SuspendState {
                 suspended: entry.is_inactive(),
@@ -232,9 +210,8 @@ where
             return None;
         }
 
-        // Setup internal channels.
+        // Setup internal channel.
         let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (fs_tx, mut fs_rx) = tokio::sync::mpsc::unbounded_channel();
 
         let settle_notify_tx = dep_tx.clone();
         let settle_notify = move || {
@@ -253,98 +230,59 @@ where
 
         // Spawn file system watcher.
         // todo: don't compile if no entry
-        tokio::spawn(typst_ts_compiler::service::watch_deps(
-            dep_rx,
-            move |event| {
-                log_send_error("fs_event", fs_tx.send(Some(event)));
-            },
-        ));
+        let fs_tx = self.steal_tx.clone();
+        tokio::spawn(watch_deps(dep_rx, move |event| {
+            log_send_error("fs_event", fs_tx.send(Interrupt::Fs(event)));
+        }));
 
         // Spawn compiler thread.
-        let compile_thread = ensure_single_thread("typst-compiler", async move {
+        let thread_builder = std::thread::Builder::new().name("typst-compiler".to_owned());
+        let compile_thread = thread_builder.spawn(move || {
             log::debug!("CompileServerActor: initialized");
 
             // Wait for first events.
-            'event_loop: while let Some(event) = tokio::select! {
-                Some(it) = fs_rx.recv() => Some(CompilerInterrupt::Fs(it)),
-                Some(it) = self.steal_recv.recv() => match it {
-                    ExternalInterrupt::Compile => Some(CompilerInterrupt::Compile),
-                    ExternalInterrupt::Task(task) => Some(CompilerInterrupt::Task(task)),
-                    ExternalInterrupt::Memory(task) => Some(CompilerInterrupt::Memory(task)),
-                    ExternalInterrupt::Settle(e) => {
+            'event_loop: while let Some(mut event) = self.steal_rx.blocking_recv() {
+                // Accumulate events, the order of processing which is critical.
+                let mut need_compile = false;
+
+                'accumulate: loop {
+                    // Warp the logical clock by one.
+                    self.logical_tick += 1;
+
+                    if let Interrupt::Settle(e) = event {
                         log::info!("CompileServerActor: requested stop");
                         e.send(()).ok();
                         break 'event_loop;
                     }
-                },
-            } {
-                // Small step to warp the logical clock.
-                self.logical_tick += 1;
-
-                // Accumulate events, the order of processing which is critical.
-                let mut need_recompile = self.process(event, &compiler_ack);
-                let task_event = {
-                    let mut task_event = None;
-                    while let Ok(event) = self.steal_recv.try_recv() {
-                        match event {
-                            ExternalInterrupt::Compile => {
-                                need_recompile = true;
-                            }
-                            ExternalInterrupt::Settle(e) => {
-                                log::info!("CompileServerActor: requested stop");
-                                e.send(()).ok();
-                                break 'event_loop;
-                            }
-                            ExternalInterrupt::Task(task) => {
-                                task_event = Some(CompilerInterrupt::Task(task));
-                                break;
-                            }
-                            ExternalInterrupt::Memory(event) => {
-                                need_recompile = self
-                                    .process(CompilerInterrupt::Memory(event), &compiler_ack)
-                                    || need_recompile;
-                            }
-                        };
+                    if matches!(event, Interrupt::Task(_)) && need_compile {
+                        self.compile(&compiler_ack);
+                        need_compile = false;
                     }
-                    while let Ok(event) = fs_rx.try_recv() {
-                        need_recompile = self.process(CompilerInterrupt::Fs(event), &compiler_ack)
-                            || need_recompile;
-                    }
-                    task_event
-                };
+                    need_compile |= self.process(event, &compiler_ack);
 
-                // Compile if needed.
-                if need_recompile {
-                    self.compile(&compiler_ack);
+                    match self.steal_rx.try_recv() {
+                        Ok(new_event) => event = new_event,
+                        _ => break 'accumulate,
+                    }
                 }
 
-                // If there is a task event, execute it.
-                if let Some(event) = task_event {
-                    let need_recompile = self.process(event, &compiler_ack);
-                    if need_recompile {
-                        self.compile(&compiler_ack);
-                    }
+                if need_compile {
+                    self.compile(&compiler_ack);
                 }
             }
 
             settle_notify();
             log::info!("CompileServerActor: exited");
-        })
-        .unwrap();
+        });
 
         // Return the thread handle.
-        Some(compile_thread)
+        Some(compile_thread.unwrap())
     }
 
     pub(crate) fn change_entry(&mut self, entry: EntryState) {
-        let suspending = entry.is_inactive();
-        if suspending {
-            self.suspend_state.suspended = true;
-        } else {
-            self.suspend_state.suspended = false;
-            if self.suspend_state.dirty {
-                self.steal_send.send(ExternalInterrupt::Compile).ok();
-            }
+        self.suspend_state.suspended = entry.is_inactive();
+        if !self.suspend_state.suspended && self.suspend_state.dirty {
+            self.steal_tx.send(Interrupt::Compile).ok();
         }
 
         // Reset the document state.
@@ -362,10 +300,8 @@ where
         }
 
         // Compile the document.
-        self.latest_doc = self
-            .compiler
-            .compile(&mut CompileEnv::default().configure_shared(self.watch_feature_set.clone()))
-            .ok();
+        let mut env = self.make_env(self.watch_feature_set.clone());
+        self.latest_doc = self.compiler.compile(&mut env).ok();
         if self.latest_doc.is_some() {
             self.latest_success_doc = self.latest_doc.clone();
         }
@@ -373,10 +309,8 @@ where
         // Evict compilation cache.
         let evict_start = std::time::Instant::now();
         comemo::evict(30);
-        log::info!(
-            "CompileServerActor: evict compilation cache in {:?}",
-            evict_start.elapsed()
-        );
+        let elapsed = evict_start.elapsed();
+        log::info!("CompileServerActor: evict compilation cache in {elapsed:?}",);
 
         // Notify the new file dependencies.
         let mut deps = vec![];
@@ -385,57 +319,39 @@ where
         send(Notify(NotifyMessage::SyncDependency(deps)));
     }
 
-    /// Process some interrupt.
-    fn process(&mut self, event: CompilerInterrupt<Self>, send: impl Fn(CompilerResponse)) -> bool {
+    /// Process some interrupt. Return whether it needs compilation.
+    fn process(&mut self, event: Interrupt<Self>, send: impl Fn(CompilerResponse)) -> bool {
         use CompilerResponse::*;
-        // warp the logical clock by one.
-        self.logical_tick += 1;
 
         match event {
-            // Compile anyway.
-            CompilerInterrupt::Compile => {
-                // Will trigger compilation
-                true
-            }
-            // Borrow the compiler thread and run the task.
-            //
-            // See [`CompileClient::steal`] for more information.
-            CompilerInterrupt::Task(task) => {
+            Interrupt::Compile => true,
+            Interrupt::Task(task) => {
                 log::debug!("CompileServerActor: execute task");
-
                 task(self);
-
-                // Will never trigger compilation
                 false
             }
-            // Handle memory events.
-            CompilerInterrupt::Memory(event) => {
+            Interrupt::Memory(event) => {
                 log::debug!("CompileServerActor: memory event incoming");
 
                 // Emulate memory changes.
                 let mut files = HashSet::new();
                 if matches!(event, MemoryEvent::Sync(..)) {
-                    files = self.estimated_shadow_files.clone();
-                    self.estimated_shadow_files.clear();
+                    std::mem::swap(&mut files, &mut self.estimated_shadow_files);
                 }
-                match &event {
-                    MemoryEvent::Sync(event) | MemoryEvent::Update(event) => {
-                        for path in event.removes.iter().map(Deref::deref) {
-                            self.estimated_shadow_files.remove(path);
-                            files.insert(path.into());
-                        }
-                        for path in event.inserts.iter().map(|e| e.0.deref()) {
-                            self.estimated_shadow_files.insert(path.into());
-                            files.remove(path);
-                        }
-                    }
+
+                let (MemoryEvent::Sync(e) | MemoryEvent::Update(e)) = &event;
+                for path in &e.removes {
+                    self.estimated_shadow_files.remove(path);
+                    files.insert(Arc::clone(path));
+                }
+                for (path, _) in &e.inserts {
+                    self.estimated_shadow_files.insert(Arc::clone(path));
+                    files.remove(path);
                 }
 
                 // If there is no invalidation happening, apply memory changes directly.
                 if files.is_empty() && self.dirty_shadow_logical_tick == 0 {
                     self.apply_memory_changes(event);
-
-                    // Will trigger compilation
                     return true;
                 }
 
@@ -452,27 +368,22 @@ where
                     },
                 )));
 
-                // Delayed trigger compilation
                 false
             }
-            // Handle file system events.
-            CompilerInterrupt::Fs(event) => {
-                log::debug!("CompileServerActor: fs event incoming {:?}", event);
+            Interrupt::Fs(mut event) => {
+                log::debug!("CompileServerActor: fs event incoming {event:?}");
 
-                // Handle file system event if any.
-                if let Some(mut event) = event {
-                    // Handle delayed upstream update event before applying file system changes
-                    if self.apply_delayed_memory_changes(&mut event).is_none() {
-                        log::warn!("CompileServerActor: unknown upstream update event");
-                    }
-
-                    // Apply file system changes.
-                    self.compiler.notify_fs_event(event);
+                // Handle delayed upstream update event before applying file system changes
+                if self.apply_delayed_memory_changes(&mut event).is_none() {
+                    log::warn!("CompileServerActor: unknown upstream update event");
                 }
 
-                // Will trigger compilation
+                // Apply file system changes.
+                self.compiler.notify_fs_event(event);
+
                 true
             }
+            Interrupt::Settle(_) => unreachable!(),
         }
     }
 
@@ -533,15 +444,9 @@ impl<C: Compiler> CompileServerActor<C> {
         self
     }
 
-    pub fn split(self) -> (Self, CompileClient<Self>) {
-        let steal_send = self.steal_send.clone();
-        (
-            self,
-            CompileClient {
-                intr_tx: steal_send,
-                _ctx: std::marker::PhantomData,
-            },
-        )
+    pub fn client(&self) -> CompileClient<Self> {
+        let intr_tx = self.steal_tx.clone();
+        CompileClient { intr_tx }
     }
 
     pub fn document(&self) -> Option<Arc<TypstDocument>> {
@@ -551,25 +456,15 @@ impl<C: Compiler> CompileServerActor<C> {
 
 #[derive(Debug, Clone)]
 pub struct CompileClient<Ctx> {
-    intr_tx: mpsc::UnboundedSender<ExternalInterrupt<Ctx>>,
-
-    _ctx: std::marker::PhantomData<fn(&mut Ctx)>,
+    intr_tx: mpsc::UnboundedSender<Interrupt<Ctx>>,
 }
-
-unsafe impl<Ctx> Send for CompileClient<Ctx> {}
-unsafe impl<Ctx> Sync for CompileClient<Ctx> {}
 
 impl<Ctx> CompileClient<Ctx> {
     pub fn faked() -> Self {
         let (intr_tx, _) = mpsc::unbounded_channel();
-        Self {
-            intr_tx,
-            _ctx: std::marker::PhantomData,
-        }
+        Self { intr_tx }
     }
-}
 
-impl<Ctx> CompileClient<Ctx> {
     fn steal_inner<Ret: Send + 'static>(
         &self,
         f: impl FnOnce(&mut Ctx) -> Ret + Send + 'static,
@@ -585,7 +480,7 @@ impl<Ctx> CompileClient<Ctx> {
         });
 
         self.intr_tx
-            .send(ExternalInterrupt::Task(task))
+            .send(Interrupt::Task(task))
             .map_err(map_string_err("failed to send steal request"))?;
         Ok(rx)
     }
@@ -601,7 +496,7 @@ impl<Ctx> CompileClient<Ctx> {
         let (tx, rx) = oneshot::channel();
         // very weird if this is error, we unwrap it.
         self.intr_tx
-            .send(ExternalInterrupt::Settle(tx))
+            .send(Interrupt::Settle(tx))
             .map_err(map_string_err("failed to send settle request"))?;
         utils::threaded_receive(rx)
     }
@@ -619,10 +514,7 @@ impl<Ctx> CompileClient<Ctx> {
     }
 
     pub fn add_memory_changes(&self, event: MemoryEvent) {
-        log_send_error(
-            "mem_event",
-            self.intr_tx.send(ExternalInterrupt::Memory(event)),
-        );
+        log_send_error("mem_event", self.intr_tx.send(Interrupt::Memory(event)));
     }
 }
 
@@ -727,22 +619,6 @@ where
         })
         .await
     }
-}
-
-/// Spawn a thread and run the given future on it.
-///
-/// Note: the future is run on a single-threaded tokio runtime.
-fn ensure_single_thread<F: std::future::Future<Output = ()> + Send + 'static>(
-    name: &str,
-    f: F,
-) -> std::io::Result<std::thread::JoinHandle<()>> {
-    std::thread::Builder::new().name(name.to_owned()).spawn(|| {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(f);
-    })
 }
 
 /// Find the output location in the document for a cursor position.
