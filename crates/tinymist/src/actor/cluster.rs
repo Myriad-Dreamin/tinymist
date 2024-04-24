@@ -116,7 +116,7 @@ impl EditorActor {
 
         // Get sources that affected by this group in last round but not this time
         for url in affected.into_iter().flatten() {
-            if next_diag.is_none() || !next_diag.as_ref().unwrap().contains_key(&url) {
+            if !next_diag.as_ref().is_some_and(|e| e.contains_key(&url)) {
                 self.publish_inner(&group, with_primary, url, None)
             }
         }
