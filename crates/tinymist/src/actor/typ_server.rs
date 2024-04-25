@@ -485,6 +485,7 @@ impl<Ctx> CompileClient<Ctx> {
         Ok(rx)
     }
 
+    /// Steal the compiler thread and run the given function.
     pub fn steal<Ret: Send + 'static>(
         &self,
         f: impl FnOnce(&mut Ctx) -> Ret + Send + 'static,
@@ -492,25 +493,22 @@ impl<Ctx> CompileClient<Ctx> {
         utils::threaded_receive(self.steal_inner(f)?)
     }
 
+    /// Steal the compiler thread and run the given function.
+    pub async fn steal_async<Ret: Send + 'static>(
+        &self,
+        f: impl FnOnce(&mut Ctx) -> Ret + Send + 'static,
+    ) -> ZResult<Ret> {
+        self.steal_inner(f)?
+            .await
+            .map_err(map_string_err("failed to call steal_async"))
+    }
+
     pub fn settle(&self) -> ZResult<()> {
         let (tx, rx) = oneshot::channel();
-        // very weird if this is error, we unwrap it.
         self.intr_tx
             .send(Interrupt::Settle(tx))
             .map_err(map_string_err("failed to send settle request"))?;
         utils::threaded_receive(rx)
-    }
-
-    /// Steal the compiler thread and run the given function.
-    pub async fn steal_async<Ret: Send + 'static>(
-        &self,
-        f: impl FnOnce(&mut Ctx, tokio::runtime::Handle) -> Ret + Send + 'static,
-    ) -> ZResult<Ret> {
-        // get current async handle
-        let handle = tokio::runtime::Handle::current();
-        self.steal_inner(move |this: &mut Ctx| f(this, handle.clone()))?
-            .await
-            .map_err(map_string_err("failed to call steal_async"))
     }
 
     pub fn add_memory_changes(&self, event: MemoryEvent) {
@@ -539,7 +537,7 @@ where
         line: usize,
         character: usize,
     ) -> ZResult<Option<Position>> {
-        self.steal_async(move |this, _| {
+        self.steal_async(move |this| {
             let doc = this.document()?;
 
             let world = this.compiler.world();
@@ -563,7 +561,7 @@ where
         &self,
         loc: SourceLocation,
     ) -> ZResult<Option<SourceSpanOffset>> {
-        self.steal_async(move |this, _| {
+        self.steal_async(move |this| {
             let world = this.compiler.world();
 
             let filepath = Path::new(&loc.filepath);
@@ -600,7 +598,7 @@ where
         let resolve_off =
             |src: &Source, off: usize| src.byte_to_line(off).zip(src.byte_to_column(off));
 
-        self.steal_async(move |this, _| {
+        self.steal_async(move |this| {
             let world = this.compiler.world();
             let src_id = span.id()?;
             let source = world.source(src_id).ok()?;

@@ -312,7 +312,7 @@ impl CompileClientActor {
     /// Steal the compiler thread and run the given function.
     pub async fn steal_async<Ret: Send + 'static>(
         &self,
-        f: impl FnOnce(&mut CompileService, tokio::runtime::Handle) -> Ret + Send + 'static,
+        f: impl FnOnce(&mut CompileService) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
         self.inner().steal_async(f).await
     }
