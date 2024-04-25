@@ -18,7 +18,11 @@ import {
     type ServerOptions,
 } from "vscode-languageclient/node";
 import vscodeVariables from "vscode-variables";
-import { SymbolViewProvider, activateEditorTool, getUserPackageData } from "./editor-tools";
+import {
+    SymbolViewProvider as SymbolPickerProvider,
+    activateEditorTool,
+    getUserPackageData,
+} from "./editor-tools";
 import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
 
 let client: LanguageClient | undefined = undefined;
@@ -162,9 +166,9 @@ async function startClient(context: ExtensionContext): Promise<void> {
         })
     );
     // context.subscriptions.push
-    const provider = new SymbolViewProvider(context);
+    const provider = new SymbolPickerProvider(context);
     context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider("tinymist.symbol-preview", provider)
+        vscode.window.registerWebviewViewProvider("tinymist.side-symbol-picker", provider)
     );
 
     await client.start();

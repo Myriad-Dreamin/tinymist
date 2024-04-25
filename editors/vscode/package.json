@@ -36,9 +36,9 @@
         "views": {
             "tinymist-activitybar": [
                 {
-                    "id": "tinymist.symbol-preview",
+                    "id": "tinymist.side-symbol-picker",
                     "type": "webview",
-                    "name": "Symbol View"
+                    "name": "Symbol Picker"
                 }
             ]
         },
