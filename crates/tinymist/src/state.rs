@@ -222,6 +222,7 @@ impl TypstLanguageServer {
         use CompilerQueryRequest::*;
 
         match query {
+            InteractCodeContext(req) => query_source!(self, InteractCodeContext, req),
             SemanticTokensFull(req) => query_tokens_cache!(self, SemanticTokensFull, req),
             SemanticTokensDelta(req) => query_tokens_cache!(self, SemanticTokensDelta, req),
             FoldingRange(req) => query_source!(self, FoldingRange, req),
@@ -275,7 +276,8 @@ impl TypstLanguageServer {
                 Ok(CompilerQueryResponse::ServerInfo(Some(res)))
             }
 
-            FoldingRange(..)
+            InteractCodeContext(..)
+            | FoldingRange(..)
             | SelectionRange(..)
             | SemanticTokensDelta(..)
             | Formatting(..)

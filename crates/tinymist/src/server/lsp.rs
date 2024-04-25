@@ -650,6 +650,7 @@ impl TypstLanguageServer {
             exec_fn!("tinymist.focusMain", Self::focus_document),
             exec_fn!("tinymist.doInitTemplate", Self::init_template),
             exec_fn!("tinymist.doGetTemplateEntry", Self::do_get_template_entry),
+            exec_fn!("tinymist.interactCodeContext", Self::interact_code_context),
             exec_fn_!("tinymist.getDocumentTrace", Self::get_document_trace),
             exec_fn!("tinymist.getDocumentMetrics", Self::get_document_metrics),
             exec_fn!("tinymist.getServerInfo", Self::get_server_info),
@@ -682,6 +683,31 @@ impl TypstLanguageServer {
 
         let res = run_query!(self.OnExport(path, kind))?;
         let res = serde_json::to_value(res).map_err(|_| internal_error("Cannot serialize path"))?;
+
+        Ok(res)
+    }
+
+    /// Interact with the code context at the source file.
+    pub fn interact_code_context(&mut self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+        let queries = _arguments.into_iter().next().ok_or_else(|| {
+            invalid_params("The first parameter is not a valid code context query array")
+        })?;
+
+        #[derive(Debug, Clone, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct InteractCodeContextParams {
+            pub text_document: TextDocumentIdentifier,
+            pub query: Vec<tinymist_query::InteractCodeContextQuery>,
+        }
+
+        let params: InteractCodeContextParams = serde_json::from_value(queries)
+            .map_err(|e| invalid_params(format!("Cannot parse code context queries: {e}")))?;
+        let path = as_path(params.text_document);
+        let query = params.query;
+
+        let res = run_query!(self.InteractCodeContext(path, query))?;
+        let res =
+            serde_json::to_value(res).map_err(|_| internal_error("Cannot serialize responses"))?;
 
         Ok(res)
     }
