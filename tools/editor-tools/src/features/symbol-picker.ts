@@ -6,6 +6,7 @@ import MiniSearch from "minisearch";
 import { Detypify, DetypifySymbol, Stroke } from "./symbol-picker.detypify";
 import { ContributeIcon, HelpIcon } from "../icons";
 import { startModal } from "../components/modal";
+import { requestTextEdit } from "../vscode";
 
 interface SymbolCategory {
   value?: string;
@@ -430,7 +431,18 @@ export const SymbolPicker = () => {
           d.classList.add("active");
           setTimeout(() => d.classList.remove("active"), 500);
           // clipboard
-          navigator.clipboard.writeText(sym.typstCode || "");
+          const rest = sym.typstCode || "";
+          const markup = `#${rest}`;
+          // math mode will trim the sym. prefix
+          const math = `${rest.startsWith("sym.") ? rest.slice(4) : rest}`;
+          requestTextEdit({
+            newText: {
+              kind: "by-mode",
+              math,
+              markup,
+              rest,
+            },
+          });
         },
       },
       maskInfo ? div({ style: maskInfo }) : null

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { readFile } from "fs/promises";
-import { getFocusingFile } from "./extension";
+import { getFocusingFile, getLastFocusingDoc } from "./extension";
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
     const filePath = path.resolve(context.extensionPath, relativePath);
@@ -127,6 +127,84 @@ async function activateEditorToolAt(
                 await vscode.commands.executeCommand("tinymist.initTemplate", ...initArgs);
 
                 dispose();
+                break;
+            }
+            case "editText": {
+                const activeDocument = getLastFocusingDoc();
+                if (!activeDocument) {
+                    await vscode.window.showErrorMessage("No focusing document");
+                    return;
+                }
+
+                const editor = vscode.window.visibleTextEditors.find(
+                    (editor) => editor.document === activeDocument
+                );
+                if (!editor) {
+                    await vscode.window.showErrorMessage("No focusing editor");
+                    return;
+                }
+
+                // get cursor
+                const selection = editor.selection;
+                const selectionStart = selection.start;
+
+                const edit = message.edit;
+                if (typeof edit.newText === "string") {
+                    // replace the selection with the new text
+                    await editor.edit((editBuilder) => {
+                        editBuilder.replace(selection, edit.newText);
+                    });
+                } else {
+                    const {
+                        kind,
+                        math,
+                        comment,
+                        markup,
+                        code,
+                        string: stringContent,
+                        raw,
+                        rest,
+                    } = edit.newText;
+                    const newText = kind === "by-mode" ? rest || "" : "";
+
+                    const res = await vscode.commands.executeCommand<
+                        [{ mode: "math" | "markup" | "code" | "comment" | "string" | "raw" }]
+                    >("tinymist.interactCodeContext", {
+                        textDocument: {
+                            uri: activeDocument.uri.toString(),
+                        },
+                        query: [
+                            {
+                                kind: "modeAt",
+                                position: {
+                                    line: selectionStart.line,
+                                    character: selectionStart.character,
+                                },
+                            },
+                        ],
+                    });
+
+                    const mode = res[0].mode;
+
+                    await editor.edit((editBuilder) => {
+                        if (mode === "math") {
+                            editBuilder.replace(selection, math || newText);
+                        } else if (mode === "markup") {
+                            editBuilder.replace(selection, markup || newText);
+                        } else if (mode === "comment") {
+                            editBuilder.replace(selection, comment || markup || newText);
+                        } else if (mode === "string") {
+                            editBuilder.replace(selection, stringContent || raw || newText);
+                        } else if (mode === "raw") {
+                            editBuilder.replace(selection, raw || stringContent || newText);
+                        } else if (mode === "code") {
+                            editBuilder.replace(selection, code || newText);
+                        } else {
+                            editBuilder.replace(selection, newText);
+                        }
+                    });
+                }
+
                 break;
             }
             default: {

@@ -80,3 +80,29 @@ export function requestRevealPath(path: string) {
     vscodeAPI.postMessage({ type: "revealPath", path });
   }
 }
+
+export interface TextEdit {
+  range?: undefined;
+  newText:
+    | string
+    | {
+        kind: "by-mode";
+        math?: string;
+        markup?: string;
+        code?: string;
+        rest?: string;
+      };
+}
+
+export function requestTextEdit(edit: TextEdit) {
+  if (vscodeAPI?.postMessage) {
+    vscodeAPI.postMessage({ type: "editText", edit });
+  } else {
+    // copy to clipboard
+    navigator.clipboard.writeText(
+      typeof edit.newText === "string"
+        ? edit.newText
+        : edit.newText.code || edit.newText.rest || ""
+    );
+  }
+}

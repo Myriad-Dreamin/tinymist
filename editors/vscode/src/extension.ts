@@ -510,6 +510,9 @@ let focusingDoc: vscode.TextDocument | undefined = undefined;
 export function getFocusingFile() {
     return focusingFile;
 }
+export function getLastFocusingDoc() {
+    return focusingDoc;
+}
 
 async function commandActivateDoc(doc: vscode.TextDocument | undefined): Promise<void> {
     await commandActivateDocPath(doc, doc?.uri.fsPath);
