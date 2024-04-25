@@ -188,7 +188,20 @@ async function activateEditorToolAt(
 
                     await editor.edit((editBuilder) => {
                         if (mode === "math") {
-                            editBuilder.replace(selection, math || newText);
+                            // todo: whether to keep stupid
+                            // if it is before an identifier character, then add a space
+                            let replaceText = math || newText;
+                            let range = new vscode.Range(
+                                selectionStart.with(undefined, selectionStart.character - 1),
+                                selectionStart
+                            );
+                            const before =
+                                selectionStart.character > 0 ? activeDocument.getText(range) : "";
+                            if (before.match(/[\p{xid_start}\p{XID_Continue}_]/)) {
+                                replaceText = " " + math;
+                            }
+
+                            editBuilder.replace(selection, replaceText);
                         } else if (mode === "markup") {
                             editBuilder.replace(selection, markup || newText);
                         } else if (mode === "comment") {
