@@ -2,7 +2,7 @@
 //!
 //! ```ascii
 //! ┌────────────────────────────────┐
-//! │    main::compile_actor (client)│
+//! │  main::compile_actor (client)  │
 //! └─────┬────────────────────▲─────┘
 //!       │                    │
 //! ┌─────▼────────────────────┴─────┐         ┌────────────┐
@@ -10,7 +10,7 @@
 //! └─────┬────────────────────▲─────┘         └────────────┘
 //!       │                    │
 //! ┌─────▼────────────────────┴─────┐ handler ┌────────────┐
-//! │compiler::compile_driver        ├────────►│ rest actors│
+//! │    compiler::compile_driver    ├────────►│ rest actors│
 //! └────────────────────────────────┘         └────────────┘
 //! ```
 //!
@@ -61,18 +61,16 @@ use typst_ts_core::{
 
 use super::{
     cluster::{CompileClusterRequest, TinymistCompileStatusEnum},
-    typ_server::CompileClient as TsCompileClient,
+    render::ExportConfig,
+    typ_server::{CompileClient as TsCompileClient, CompileServerActor},
 };
-use super::{render::ExportConfig, typ_server::CompileServerActor};
-use crate::world::LspWorld;
 use crate::{
     actor::render::{OneshotRendering, PathVars, RenderActorRequest},
-    compiler_init::CompileConfig,
-    utils,
-};
-use crate::{
     actor::typ_server::EntryStateExt,
+    compiler_init::CompileConfig,
     tools::preview::{CompilationHandle, CompileStatus},
+    utils,
+    world::LspWorld,
 };
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
@@ -95,11 +93,8 @@ pub struct CompileHandler {
 impl CompilationHandle for CompileHandler {
     fn status(&self, _status: CompileStatus) {
         #[cfg(feature = "preview")]
-        {
-            let inner = self.inner.lock();
-            if let Some(inner) = inner.as_ref() {
-                inner.status(_status);
-            }
+        if let Some(inner) = self.inner.lock().as_ref() {
+            inner.status(_status);
         }
     }
 
@@ -122,23 +117,20 @@ impl CompilationHandle for CompileHandler {
             .unwrap();
 
         #[cfg(feature = "preview")]
-        {
-            let inner = self.inner.lock();
-            if let Some(inner) = inner.as_ref() {
-                inner.notify_compile(res);
-            }
+        if let Some(inner) = self.inner.lock().as_ref() {
+            inner.notify_compile(res);
         }
     }
 }
 
 impl CompileHandler {
     fn push_diagnostics(&mut self, diagnostics: Option<DiagnosticsMap>) {
-        let err = self.editor_tx.send(CompileClusterRequest::Diag(
+        let res = self.editor_tx.send(CompileClusterRequest::Diag(
             self.diag_group.clone(),
             diagnostics,
         ));
-        if let Err(err) = err {
-            error!("failed to send diagnostics: {:#}", err);
+        if let Err(err) = res {
+            error!("failed to send diagnostics: {err:#}");
         }
     }
 }
@@ -196,13 +188,10 @@ impl CompileDriver {
         errors: EcoVec<SourceDiagnostic>,
         warnings: Option<EcoVec<SourceDiagnostic>>,
     ) {
-        trace!("notify diagnostics: {:#?} {:#?}", errors, warnings);
+        trace!("notify diagnostics: {errors:#?} {warnings:#?}");
 
         let diagnostics = self.run_analysis(|ctx| {
-            tinymist_query::convert_diagnostics(
-                ctx,
-                errors.as_ref().iter().chain(warnings.iter().flatten()),
-            )
+            tinymist_query::convert_diagnostics(ctx, errors.iter().chain(warnings.iter().flatten()))
         });
 
         match diagnostics {
@@ -214,7 +203,7 @@ impl CompileDriver {
                 self.handler.push_diagnostics(valid.then_some(diagnostics));
             }
             Err(err) => {
-                log::error!("TypstActor: failed to convert diagnostics: {:#}", err);
+                error!("TypstActor: failed to convert diagnostics: {:#}", err);
                 self.handler.push_diagnostics(None);
             }
         }
@@ -227,19 +216,19 @@ impl CompileDriver {
         let w = self.inner.world_mut();
 
         let Some(main) = w.main_id() else {
-            log::error!("TypstActor: main file is not set");
+            error!("TypstActor: main file is not set");
             return Err(anyhow!("main file is not set"));
         };
         let Some(root) = w.entry.root() else {
-            log::error!("TypstActor: root is not set");
+            error!("TypstActor: root is not set");
             return Err(anyhow!("root is not set"));
         };
         w.source(main).map_err(|err| {
-            log::info!("TypstActor: failed to prepare main file: {:?}", err);
+            info!("TypstActor: failed to prepare main file: {err:?}");
             anyhow!("failed to get source: {err}")
         })?;
         w.prepare_env(&mut Default::default()).map_err(|err| {
-            log::error!("TypstActor: failed to prepare env: {:?}", err);
+            error!("TypstActor: failed to prepare env: {err:?}");
             anyhow!("failed to prepare env")
         })?;
 
@@ -323,7 +312,7 @@ impl CompileClientActor {
     /// Steal the compiler thread and run the given function.
     pub async fn steal_async<Ret: Send + 'static>(
         &self,
-        f: impl FnOnce(&mut CompileService, tokio::runtime::Handle) -> Ret + Send + 'static,
+        f: impl FnOnce(&mut CompileService) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
         self.inner().steal_async(f).await
     }
@@ -331,15 +320,9 @@ impl CompileClientActor {
     pub fn settle(&mut self) {
         let _ = self.change_entry(None);
         info!("TypstActor({}): settle requested", self.diag_group);
-        let res = self.inner().settle();
-        match res {
+        match self.inner().settle() {
             Ok(()) => info!("TypstActor({}): settled", self.diag_group),
-            Err(err) => {
-                error!(
-                    "TypstActor({}): failed to settle: {:#}",
-                    self.diag_group, err
-                );
-            }
+            Err(err) => error!("TypstActor({}): failed to settle: {err:#}", self.diag_group),
         }
     }
 
@@ -356,58 +339,39 @@ impl CompileClientActor {
         }
 
         let next_entry = self.config.determine_entry(path);
+        if next_entry == self.entry {
+            return Ok(());
+        }
 
-        if next_entry != self.entry {
-            let next = next_entry.clone();
+        let diag_group = &self.diag_group;
+        info!("the entry file of TypstActor({diag_group}) is changing to {next_entry:?}");
 
-            info!(
-                "the entry file of TypstActor({}) is changing to {next:?}",
-                self.diag_group,
-            );
+        // todo
+        let next = next_entry.clone();
+        self.steal(move |compiler| {
+            compiler.change_entry(next.clone());
 
-            self.render_tx
-                .send(RenderActorRequest::ChangeExportPath(PathVars {
-                    entry: next.clone(),
-                }))
-                .unwrap();
+            let next_is_inactive = next.is_inactive();
+            let res = compiler.compiler.world_mut().mutate_entry(next);
 
-            // todo
-            let res = self.steal(move |compiler| {
-                compiler.change_entry(next.clone());
-
-                let next_is_inactive = next.is_inactive();
-                let res = compiler.compiler.world_mut().mutate_entry(next);
-
-                if next_is_inactive {
-                    info!("TypstActor: removing diag");
-                    compiler.compiler.compiler.handler.push_diagnostics(None);
-                }
-
-                res.map(|_| ())
-                    .map_err(|err| error_once!("failed to change entry", err: format!("{err:?}")))
-            });
-
-            let res = match res {
-                Ok(res) => res,
-                Err(res) => Err(res),
-            };
-
-            if res.is_err() {
-                self.render_tx
-                    .send(RenderActorRequest::ChangeExportPath(PathVars {
-                        entry: self.entry.clone(),
-                    }))
-                    .unwrap();
-
-                return res;
+            if next_is_inactive {
+                info!("TypstActor: removing diag");
+                compiler.compiler.compiler.handler.push_diagnostics(None);
             }
 
-            // todo: better way to trigger recompile
-            let files = FileChangeSet::new_inserts(vec![]);
-            self.inner().add_memory_changes(MemoryEvent::Update(files));
+            res.map(|_| ())
+                .map_err(|err| error_once!("failed to change entry", err: format!("{err:?}")))
+        })??;
 
-            self.entry = next_entry;
-        }
+        let entry = next_entry.clone();
+        let req = RenderActorRequest::ChangeExportPath(PathVars { entry });
+        self.render_tx.send(req).unwrap();
+
+        // todo: better way to trigger recompile
+        let files = FileChangeSet::new_inserts(vec![]);
+        self.inner().add_memory_changes(MemoryEvent::Update(files));
+
+        self.entry = next_entry;
 
         Ok(())
     }
@@ -435,7 +399,7 @@ impl CompileClientActor {
 
     pub fn collect_server_info(&self) -> anyhow::Result<HashMap<String, ServerInfoResponse>> {
         let dg = self.diag_group.clone();
-        let res = self.steal(move |c| {
+        self.steal(move |c| {
             let cc = &c.compiler.compiler;
 
             let info = ServerInfoResponse {
@@ -443,19 +407,16 @@ impl CompileClientActor {
                 font_paths: cc.world().font_resolver.font_paths().to_owned(),
                 inputs: cc.world().inputs.as_ref().deref().clone(),
                 estimated_memory_usage: HashMap::from_iter([
-                    ("vfs".to_owned(), { cc.world().vfs.memory_usage() }),
+                    ("vfs".to_owned(), cc.world().vfs.memory_usage()),
                     ("analysis".to_owned(), cc.analysis.estimated_memory()),
                 ]),
             };
 
             HashMap::from_iter([(dg, info)])
-        })?;
-
-        Ok(res)
+        })
+        .map_err(|e| e.into())
     }
-}
 
-impl CompileClientActor {
     pub fn on_export(&self, kind: ExportKind, path: PathBuf) -> anyhow::Result<Option<PathBuf>> {
         // todo: we currently doesn't respect the path argument...
         info!("CompileActor: on export: {}", path.display());

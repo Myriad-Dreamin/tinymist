@@ -124,8 +124,8 @@ impl CompileServer {
                 };
 
                 // Create the actor
-                let actor = CompileServerActor::new(driver, entry).with_watch(true);
-                let (server, client) = actor.split();
+                let server = CompileServerActor::new(driver, entry).with_watch(true);
+                let client = server.client();
 
                 // We do send memory changes instead of initializing compiler with them.
                 // This is because there are state recorded inside of the compiler actor, and we
