@@ -57,6 +57,10 @@ Follow the instructions to enable tinymist in your favorite editor.
 + [Neovim](./editors/neovim/README.md)
 + [VSCode](./editors/vscode/README.md)
 
+## Packaging
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/tinymist.svg)](https://repology.org/project/tinymist/versions)
+
 ### Contributing
 
 Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for contribution guidelines.
