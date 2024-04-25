@@ -1,9 +1,11 @@
 import "./symbol-picker.css";
 import van, { State } from "vanjs-core";
-// import { SYMBOL_MOCK } from "./symbol-picker.mock";
-const { div, input, canvas, button } = van.tags;
+import { SYMBOL_MOCK } from "./symbol-picker.mock";
+const { div, input, canvas, button, h4, a, p, span } = van.tags;
 import MiniSearch from "minisearch";
 import { Detypify, DetypifySymbol, Stroke } from "./symbol-picker.detypify";
+import { ContributeIcon, HelpIcon } from "../icons";
+import { startModal } from "../components/modal";
 
 interface SymbolCategory {
   value?: string;
@@ -57,9 +59,9 @@ interface InstantiatedSymbolItem {
   elem: Element;
 }
 
-const SYMBOL_MOCK: SymbolInformation = {
-  symbols: {},
-};
+// const SYMBOL_MOCK: SymbolInformation = {
+//   symbols: {},
+// };
 
 const SearchBar = (
   state: State<SymbolInformation>,
@@ -203,6 +205,78 @@ const CanvasPanel = (strokesState: State<Stroke[] | undefined>) => {
       {
         class: "tinymist-canvas-panel",
       },
+      div(
+        {
+          style: "float: right; margin-right: -18px; cursor: pointer;",
+          title: `The offline handwritten stroke recognizer is powered by Detypify. Draw a symbol to search for it.`,
+          onclick: () => {
+            startModal(
+              p(
+                "The ",
+                span(
+                  { style: "font-weight: bold; text-decoration: underline" },
+                  "offline"
+                ),
+                " handwritten stroke recognizer is powered by ",
+                a(
+                  {
+                    href: "https://github.com/QuarticCat/detypify",
+                  },
+                  "Detypify"
+                ),
+                ". Draw a symbol to search for it."
+              ),
+              h4("Cannot find some symbols?"),
+              p(
+                "🔍: Check the supported symbols listed in ",
+                a(
+                  {
+                    href: "https://github.com/QuarticCat/detypify/blob/main/assets/supported-symbols.txt",
+                  },
+                  "supported-symbols.txt"
+                ),
+                "."
+              ),
+              p(
+                "❤️‍🔥: Click the ",
+                span({ style: "font-style: italic" }, "contribute mode button"),
+                " (",
+                ContributeIcon(16, true),
+                ") and contribute at ",
+                a(
+                  {
+                    href: "https://detypify.quarticcat.com/",
+                  },
+                  "Detypify"
+                ),
+                "."
+              ),
+              p(
+                "📝: Report the missing symbol to ",
+                a(
+                  {
+                    href: "https://github.com/QuarticCat/detypify/issues/new",
+                  },
+                  "GitHub Issues"
+                ),
+                "."
+              ),
+              h4("Like it?"),
+              p(
+                "Give a 🌟 to the ",
+                a(
+                  {
+                    href: "https://github.com/QuarticCat/detypify",
+                  },
+                  "Detypify"
+                ),
+                "!"
+              )
+            );
+          },
+        },
+        HelpIcon()
+      ),
       srcCanvas
     ),
     button(
