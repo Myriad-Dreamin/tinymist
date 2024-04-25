@@ -79,7 +79,7 @@ impl SyntaxRequest for InteractCodeContextRequest {
                     let leaf = root.leaf_at(pos);
                     let mut leaf = leaf.as_ref();
                     let mode = loop {
-                        log::info!("leaf for context: {:?}", leaf);
+                        log::debug!("leaf for context: {leaf:?}");
                         use SyntaxKind::*;
                         if let Some(t) = leaf {
                             match t.kind() {
