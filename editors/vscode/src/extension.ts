@@ -111,15 +111,21 @@ async function startClient(context: ExtensionContext): Promise<void> {
             // console.log("not typst", langId, editor?.document.uri.fsPath);
             return commandActivateDoc(undefined);
         }
-        return commandActivateDoc(editor?.document.uri.fsPath);
+        return commandActivateDoc(editor?.document);
     });
     vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
         if (doc.isUntitled && window.activeTextEditor?.document === doc) {
             if (doc.languageId === "typst") {
-                return commandActivateDoc("/untitled/" + doc.uri.fsPath);
+                return commandActivateDocPath(doc, "/untitled/" + doc.uri.fsPath);
             } else {
                 return commandActivateDoc(undefined);
             }
+        }
+    });
+    vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
+        if (focusingDoc === doc) {
+            focusingDoc = undefined;
+            commandActivateDoc(undefined);
         }
     });
 
@@ -189,11 +195,11 @@ async function startClient(context: ExtensionContext): Promise<void> {
     // Find first document to focus
     const editor = window.activeTextEditor;
     if (editor?.document.languageId === "typst" && editor.document.uri.fsPath) {
-        commandActivateDoc(editor.document.uri.fsPath);
+        commandActivateDoc(editor.document);
     } else {
         window.visibleTextEditors.forEach((editor) => {
             if (editor.document.languageId === "typst" && editor.document.uri.fsPath) {
-                commandActivateDoc(editor.document.uri.fsPath);
+                commandActivateDoc(editor.document);
             }
         });
     }
@@ -519,16 +525,29 @@ async function commandInitTemplate(
 }
 
 let focusingFile: string | undefined = undefined;
+let focusingDoc: vscode.TextDocument | undefined = undefined;
 export function getFocusingFile() {
     return focusingFile;
 }
 
-async function commandActivateDoc(fsPath: string | undefined): Promise<void> {
+async function commandActivateDoc(doc: vscode.TextDocument | undefined): Promise<void> {
+    await commandActivateDocPath(doc, doc?.uri.fsPath);
+}
+
+async function commandActivateDocPath(
+    doc: vscode.TextDocument | undefined,
+    fsPath: string | undefined
+): Promise<void> {
     // console.log("focus main", fsPath, new Error().stack);
     focusingFile = fsPath;
-    if (!fsPath) {
-        triggerStatusBar();
+    if (fsPath) {
+        focusingDoc = doc;
     }
+    if (focusingDoc?.isClosed) {
+        focusingDoc = undefined;
+    }
+    // remove the status bar until the last focusing file is closed
+    triggerStatusBar(!!(fsPath || focusingDoc?.isClosed === false));
     await client?.sendRequest("workspace/executeCommand", {
         command: "tinymist.focusMain",
         arguments: [fsPath],
