@@ -277,9 +277,11 @@ export const SymbolPicker = () => {
   const strokes = van.state<Stroke[] | undefined>(undefined);
   const drawCandidates = van.state<DetypifySymbol[] | undefined>();
   (drawCandidates as any)._drawCandidateAsyncNode = van.derive(async () => {
-    if (strokes.val === undefined) return undefined;
-    if (!detypify.val || !strokes.val) return [];
-    drawCandidates.val = await detypify.val.candidates(strokes.val);
+    let candidates;
+    if (strokes.val === undefined) candidates = undefined;
+    else if (!detypify.val || !strokes.val) candidates = [];
+    else candidates = await detypify.val.candidates(strokes.val);
+    drawCandidates.val = candidates;
   });
 
   // console.log("symbolInformationEnc", JSON.stringify(symInfo.val));
@@ -308,8 +310,9 @@ export const SymbolPicker = () => {
         return Math.abs(max - min);
       };
 
+      const bboxXWidth = diff(primaryGlyph.xMin, primaryGlyph.xMax);
       let xWidth = Math.max(
-        diff(primaryGlyph.xMin, primaryGlyph.xMax),
+        bboxXWidth,
         primaryGlyph.xAdvance || fontSelected.unitsPerEm
       );
 
@@ -333,8 +336,11 @@ export const SymbolPicker = () => {
           ? Math.abs(primaryGlyph.yMax || 0)
           : (Math.abs(primaryGlyph.yMax || 0) + yWidth) / 2;
 
+      // centering-x the symbol
+      let xShift = -(primaryGlyph.xMin || 0) + (xWidth - bboxXWidth) / 2;
+
       // translate(0, ${fontSelected.ascender * fontSelected.unitsPerEm})
-      const imageData = `<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="${symWidth}" height="${symHeight}" viewBox="0 0 ${xWidth} ${yWidth}" xmlns="http://www.w3.org/2000/svg" ><g transform="translate(0, ${yShift}) scale(1, -1)">${path?.outerHTML || ""}</g></svg>`;
+      const imageData = `<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="${symWidth}" height="${symHeight}" viewBox="0 0 ${xWidth} ${yWidth}" xmlns="http://www.w3.org/2000/svg" ><g transform="translate(${xShift}, ${yShift}) scale(1, -1)">${path?.outerHTML || ""}</g></svg>`;
       // console.log(sym.typstCode, div({ innerHTML: imageData }));
       maskInfo = `width: ${symWidth}; height: ${symHeight}; -webkit-mask-image: url('data:image/svg+xml;utf8,${encodeURIComponent(imageData)}'); -webkit-mask-size: auto ${symHeight}; -webkit-mask-repeat: no-repeat; transition: background-color 200ms; background-color: currentColor;`;
     }
