@@ -22,7 +22,26 @@
         "vscode": "^1.71.0"
     },
     "main": "./out/extension.js",
+    "icon": "./icons/ti.png",
     "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "tinymist-activitybar",
+                    "title": "Tinymist",
+                    "icon": "./icons/ti.png"
+                }
+            ]
+        },
+        "views": {
+            "tinymist-activitybar": [
+                {
+                    "id": "tinymist.symbol-preview",
+                    "type": "webview",
+                    "name": "Symbol View"
+                }
+            ]
+        },
         "configuration": {
             "type": "object",
             "title": "Tinymist Typst LSP",

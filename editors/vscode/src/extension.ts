@@ -18,7 +18,7 @@ import {
     type ServerOptions,
 } from "vscode-languageclient/node";
 import vscodeVariables from "vscode-variables";
-import { activateEditorTool, getUserPackageData } from "./editor-tools";
+import { SymbolViewProvider, activateEditorTool, getUserPackageData } from "./editor-tools";
 import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
 
 let client: LanguageClient | undefined = undefined;
@@ -130,64 +130,41 @@ async function startClient(context: ExtensionContext): Promise<void> {
     });
 
     context.subscriptions.push(
-        commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf"))
-    );
-    context.subscriptions.push(
+        commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
         commands.registerCommand("tinymist.getCurrentDocumentMetrics", () =>
             commandGetCurrentDocumentMetrics()
-        )
-    );
-    context.subscriptions.push(
-        commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true))
-    );
-    context.subscriptions.push(
-        commands.registerCommand("tinymist.unpinMain", () => commandPinMain(false))
-    );
-    context.subscriptions.push(
-        commands.registerCommand("typst-lsp.pinMainToCurrent", () => commandPinMain(true))
-    );
-    context.subscriptions.push(
-        commands.registerCommand("typst-lsp.unpinMain", () => commandPinMain(false))
-    );
-    context.subscriptions.push(
-        commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf"))
-    );
-    context.subscriptions.push(commands.registerCommand("tinymist.clearCache", commandClearCache));
-    context.subscriptions.push(
-        commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens)
-    );
-    context.subscriptions.push(
+        ),
+        commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true)),
+        commands.registerCommand("tinymist.unpinMain", () => commandPinMain(false)),
+        commands.registerCommand("typst-lsp.pinMainToCurrent", () => commandPinMain(true)),
+        commands.registerCommand("typst-lsp.unpinMain", () => commandPinMain(false)),
+        commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
+        commands.registerCommand("tinymist.clearCache", commandClearCache),
+        commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
         commands.registerCommand("tinymist.initTemplate", (...args) =>
             commandInitTemplate(context, false, ...args)
-        )
-    );
-    context.subscriptions.push(
+        ),
         commands.registerCommand("tinymist.initTemplateInPlace", (...args) =>
             commandInitTemplate(context, true, ...args)
-        )
-    );
-    context.subscriptions.push(
+        ),
         commands.registerCommand("tinymist.showTemplateGallery", () =>
             commandShowTemplateGallery(context)
-        )
-    );
-    context.subscriptions.push(
-        commands.registerCommand("tinymist.showSummary", () => commandShowSummary(context))
-    );
-    context.subscriptions.push(
+        ),
+        commands.registerCommand("tinymist.showSummary", () => commandShowSummary(context)),
         commands.registerCommand("tinymist.showSymbolPicker", () =>
             commandShowSymbolPicker(context)
-        )
-    );
-    context.subscriptions.push(
-        commands.registerCommand("tinymist.profileCurrentFile", () => commandShowTrace(context))
-    );
-    context.subscriptions.push(
+        ),
+        commands.registerCommand("tinymist.profileCurrentFile", () => commandShowTrace(context)),
         commands.registerCommand("tinymist.showLog", () => {
             if (client) {
                 client.outputChannel.show();
             }
         })
+    );
+    // context.subscriptions.push
+    const provider = new SymbolViewProvider(context);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider("tinymist.symbol-preview", provider)
     );
 
     await client.start();

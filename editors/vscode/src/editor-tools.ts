@@ -38,25 +38,17 @@ export function getUserPackageData(context: vscode.ExtensionContext) {
     return userPackageData;
 }
 
-export async function activateEditorTool(context: vscode.ExtensionContext, tool: string) {
-    if (
-        tool !== "template-gallery" &&
-        tool !== "tracing" &&
-        tool !== "summary" &&
-        tool !== "symbol-picker"
-    ) {
-        vscode.window.showErrorMessage(`Unknown editor tool: ${tool}`);
-        return;
-    }
-
+export async function activateEditorTool(
+    context: vscode.ExtensionContext,
+    tool: "template-gallery" | "tracing" | "summary" | "symbol-picker"
+) {
+    // Create and show a new WebView
     const title = {
         "template-gallery": "Template Gallery",
         "symbol-picker": "Symbol Picker",
         tracing: "Tracing",
         summary: "Summary",
     }[tool];
-
-    // Create and show a new WebView
     const panel = vscode.window.createWebviewPanel(
         `tinymist-${tool}`,
         title,
@@ -69,6 +61,38 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
             retainContextWhenHidden: true,
         }
     );
+
+    await activateEditorToolAt(context, tool, panel);
+}
+
+export class SymbolViewProvider implements vscode.WebviewViewProvider {
+    constructor(private context: vscode.ExtensionContext) {}
+
+    public resolveWebviewView(
+        webviewView: vscode.WebviewView,
+        _context: vscode.WebviewViewResolveContext,
+        _token: vscode.CancellationToken
+    ) {
+        webviewView.webview.options = {
+            // Allow scripts in the webview
+            enableScripts: true,
+        };
+
+        activateEditorToolAt(this.context, "symbol-picker", webviewView);
+    }
+}
+
+async function activateEditorToolAt(
+    context: vscode.ExtensionContext,
+    tool: "template-gallery" | "tracing" | "summary" | "symbol-picker",
+    panel: vscode.WebviewView | vscode.WebviewPanel
+) {
+    const dispose = () => {
+        // if has dispose method
+        if ("dispose" in panel) {
+            panel.dispose();
+        }
+    };
 
     panel.webview.onDidReceiveMessage(async (message) => {
         console.log("onDidReceiveMessage", message);
@@ -101,7 +125,8 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
                 initArgs.push(path[0].fsPath);
 
                 await vscode.commands.executeCommand("tinymist.initTemplate", ...initArgs);
-                panel.dispose();
+
+                dispose();
                 break;
             }
             default: {
@@ -164,7 +189,7 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
                     vscode.window.showErrorMessage("No server info");
                 }
 
-                panel.dispose();
+                dispose();
                 return;
             }
 
@@ -181,7 +206,7 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
 
             if (!result) {
                 vscode.window.showErrorMessage("No resource");
-                panel.dispose();
+                dispose();
                 return;
             }
 
