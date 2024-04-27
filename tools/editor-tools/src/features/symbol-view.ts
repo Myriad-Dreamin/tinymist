@@ -1,9 +1,9 @@
-import "./symbol-picker.css";
+import "./symbol-view.css";
 import van, { State } from "vanjs-core";
-// import { SYMBOL_MOCK } from "./symbol-picker.mock";
+// import { SYMBOL_MOCK } from "./symbol-view.mock";
 const { div, input, canvas, button, h4, a, p, span } = van.tags;
 import MiniSearch from "minisearch";
-import { Detypify, DetypifySymbol, Stroke } from "./symbol-picker.detypify";
+import { Detypify, DetypifySymbol, Stroke } from "./symbol-view.detypify";
 import { ContributeIcon, HelpIcon } from "../icons";
 import { startModal } from "../components/modal";
 import { requestTextEdit } from "../vscode";

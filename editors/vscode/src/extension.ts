@@ -168,7 +168,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
     // context.subscriptions.push
     const provider = new SymbolPickerProvider(context);
     context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider("tinymist.side-symbol-picker", provider)
+        vscode.window.registerWebviewViewProvider("tinymist.side-symbol-view", provider)
     );
 
     await client.start();
@@ -370,7 +370,7 @@ async function commandShowSummary(context: vscode.ExtensionContext): Promise<voi
 }
 
 async function commandShowSymbolPicker(context: vscode.ExtensionContext): Promise<void> {
-    await activateEditorTool(context, "symbol-picker");
+    await activateEditorTool(context, "symbol-view");
 }
 
 async function commandShowTrace(context: vscode.ExtensionContext): Promise<void> {

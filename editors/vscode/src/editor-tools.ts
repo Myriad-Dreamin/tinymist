@@ -40,12 +40,12 @@ export function getUserPackageData(context: vscode.ExtensionContext) {
 
 export async function activateEditorTool(
     context: vscode.ExtensionContext,
-    tool: "template-gallery" | "tracing" | "summary" | "symbol-picker"
+    tool: "template-gallery" | "tracing" | "summary" | "symbol-view"
 ) {
     // Create and show a new WebView
     const title = {
         "template-gallery": "Template Gallery",
-        "symbol-picker": "Symbol Picker",
+        "symbol-view": "Symbol View",
         tracing: "Tracing",
         summary: "Summary",
     }[tool];
@@ -78,13 +78,13 @@ export class SymbolViewProvider implements vscode.WebviewViewProvider {
             enableScripts: true,
         };
 
-        activateEditorToolAt(this.context, "symbol-picker", webviewView);
+        activateEditorToolAt(this.context, "symbol-view", webviewView);
     }
 }
 
 async function activateEditorToolAt(
     context: vscode.ExtensionContext,
-    tool: "template-gallery" | "tracing" | "summary" | "symbol-picker",
+    tool: "template-gallery" | "tracing" | "summary" | "symbol-view",
     panel: vscode.WebviewView | vscode.WebviewPanel
 ) {
     const dispose = () => {
@@ -288,7 +288,7 @@ async function activateEditorToolAt(
             html = html.replace(":[[preview:ServerInfo]]:", btoa(serverInfo));
             break;
         }
-        case "symbol-picker": {
+        case "symbol-view": {
             // tinymist.getCurrentDocumentMetrics
             const result = await vscode.commands.executeCommand(
                 "tinymist.getResources",
