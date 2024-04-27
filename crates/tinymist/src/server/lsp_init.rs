@@ -417,6 +417,8 @@ impl Init {
 
         let res = InitializeResult {
             capabilities: ServerCapabilities {
+                // todo: respect position_encoding
+                // position_encoding: Some(cc.position_encoding.into()),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 signature_help_provider: Some(SignatureHelpOptions {
                     trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
