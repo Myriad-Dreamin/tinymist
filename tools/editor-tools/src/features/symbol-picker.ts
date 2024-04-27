@@ -1,6 +1,6 @@
 import "./symbol-picker.css";
 import van, { State } from "vanjs-core";
-import { SYMBOL_MOCK } from "./symbol-picker.mock";
+// import { SYMBOL_MOCK } from "./symbol-picker.mock";
 const { div, input, canvas, button, h4, a, p, span } = van.tags;
 import MiniSearch from "minisearch";
 import { Detypify, DetypifySymbol, Stroke } from "./symbol-picker.detypify";
@@ -60,9 +60,9 @@ interface InstantiatedSymbolItem {
   elem: Element;
 }
 
-// const SYMBOL_MOCK: SymbolInformation = {
-//   symbols: {},
-// };
+const SYMBOL_MOCK: SymbolInformation = {
+  symbols: {},
+};
 
 const SearchBar = (
   state: State<SymbolInformation>,
