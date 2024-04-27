@@ -4,6 +4,7 @@ mod args;
 
 use std::{path::PathBuf, sync::Arc};
 
+use anyhow::bail;
 use args::CompileArgs;
 use clap::Parser;
 use comemo::Prehashed;
@@ -127,9 +128,7 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
         input = std::env::current_dir()?.join(input);
     }
     if !input.starts_with(&root_path) {
-        return Err(anyhow::anyhow!(
-            "input file is not within the root path: {input:?} not in {root_path:?}"
-        ));
+        bail!("input file is not within the root path: {input:?} not in {root_path:?}");
     }
 
     let inputs = Arc::new(Prehashed::new(if args.compile.inputs.is_empty() {

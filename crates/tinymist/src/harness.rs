@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
+use anyhow::bail;
 use log::{info, trace, warn};
 use lsp_types::InitializedParams;
 use parking_lot::RwLock;
@@ -240,9 +241,7 @@ pub fn lsp_harness<D: LspDriver>(
     };
     if let Err(e) = initialized_ack {
         *force_exit = !e.channel_is_disconnected();
-        return Err(anyhow::anyhow!(
-            "failed to receive initialized notification: {e:?}"
-        ));
+        bail!("failed to receive initialized notification: {e:?}");
     }
 
     service.initialized(InitializedParams {});

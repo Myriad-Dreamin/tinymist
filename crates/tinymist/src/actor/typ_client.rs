@@ -32,7 +32,7 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use log::{error, info, trace};
 use parking_lot::Mutex;
 use tinymist_query::{
@@ -217,11 +217,11 @@ impl CompileDriver {
 
         let Some(main) = w.main_id() else {
             error!("TypstActor: main file is not set");
-            return Err(anyhow!("main file is not set"));
+            bail!("main file is not set");
         };
         let Some(root) = w.entry.root() else {
             error!("TypstActor: root is not set");
-            return Err(anyhow!("root is not set"));
+            bail!("root is not set");
         };
         w.source(main).map_err(|err| {
             info!("TypstActor: failed to prepare main file: {err:?}");

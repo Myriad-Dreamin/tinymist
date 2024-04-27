@@ -5,6 +5,7 @@ use std::{
     sync::Arc,
 };
 
+use anyhow::bail;
 use anyhow::Context;
 use log::{error, info};
 use once_cell::sync::Lazy;
@@ -197,19 +198,13 @@ impl ExportActor {
         path: &Path,
     ) -> anyhow::Result<PathBuf> {
         let Some(to) = substitute_path(&self.substitute_pattern, root, path) else {
-            return Err(anyhow::anyhow!(
-                "RenderActor({kind:?}): failed to substitute path"
-            ));
+            bail!("RenderActor({kind:?}): failed to substitute path");
         };
         if to.is_relative() {
-            return Err(anyhow::anyhow!(
-                "RenderActor({kind:?}): path is relative: {to:?}"
-            ));
+            bail!("RenderActor({kind:?}): path is relative: {to:?}");
         }
         if to.is_dir() {
-            return Err(anyhow::anyhow!(
-                "RenderActor({kind:?}): path is a directory: {to:?}"
-            ));
+            bail!("RenderActor({kind:?}): path is a directory: {to:?}");
         }
 
         let to = to.with_extension(kind.extension());
