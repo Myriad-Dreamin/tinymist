@@ -168,7 +168,12 @@ body.typst-preview-light .tinymist-button.warning.activated {
 }
 
 .tinymist-icon path {
-  fill: WindowText;
+  fill: currentColor;
+}
+
+.tinymist-icon path.stroke-based {
+  fill: none;
+  stroke: currentColor;
 }
 
 .hidden {

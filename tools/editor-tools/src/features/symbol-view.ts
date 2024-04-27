@@ -1,8 +1,12 @@
-import "./symbol-picker.css";
+import "./symbol-view.css";
 import van, { State } from "vanjs-core";
-// import { SYMBOL_MOCK } from "./symbol-picker.mock";
-const { div, input, canvas, button } = van.tags;
+// import { SYMBOL_MOCK } from "./symbol-view.mock";
+const { div, input, canvas, button, h4, a, p, span } = van.tags;
 import MiniSearch from "minisearch";
+import { Detypify, DetypifySymbol, Stroke } from "./symbol-view.detypify";
+import { ContributeIcon, HelpIcon } from "../icons";
+import { startModal } from "../components/modal";
+import { requestTextEdit } from "../vscode";
 
 interface SymbolCategory {
   value?: string;
@@ -86,7 +90,7 @@ const SearchBar = (
       sym.categoryHuman = categoryIndex.get(sym.category);
       sym.typstCode = key;
     }
-    console.log("search", Object.values(state.val.symbols));
+    // console.log("search", Object.values(state.val.symbols));
     search.addAll(Object.values(state.val.symbols));
     return search;
   });
@@ -107,7 +111,7 @@ const SearchBar = (
   });
 };
 
-const CanvasPanel = () => {
+const CanvasPanel = (strokesState: State<Stroke[] | undefined>) => {
   const srcCanvas = canvas({
     width: "160",
     height: "160",
@@ -122,13 +126,15 @@ const CanvasPanel = () => {
   srcCtx.lineJoin = "round";
   srcCtx.lineCap = "round";
 
-  const dstCanvas = document.createElement("canvas");
-  dstCanvas.width = dstCanvas.height = 32;
-  const dstCtx = dstCanvas.getContext("2d", { willReadFrequently: true })!;
-  if (!dstCtx) {
-    throw new Error("Could not get context");
+  // todo: decouple with CanvasPanel
+  const serverDark = document.body.classList.contains("typst-preview-dark");
+  if (serverDark) {
+    srcCtx.fillStyle = "white";
+    srcCtx.strokeStyle = "white";
+  } else {
+    srcCtx.fillStyle = "black";
+    srcCtx.strokeStyle = "black";
   }
-  dstCtx.fillStyle = "white";
 
   type Point = [number, number];
   type PointEvent = Pick<MouseEvent, "offsetX" | "offsetY">;
@@ -136,98 +142,50 @@ const CanvasPanel = () => {
   let isDrawing = false;
   let currP: Point;
   let stroke: Point[];
-  let strokes: Point[][] = [];
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = 0;
-  let maxY = 0;
 
   const touchCall = (fn: (e: PointEvent) => any) => (e: TouchEvent) => {
-    const { left: touchL, top: touchT } = srcCanvas.getBoundingClientRect();
+    let rect = srcCanvas.getBoundingClientRect();
     fn({
-      offsetX: e.touches[0].clientX - touchL,
-      offsetY: e.touches[0].clientY - touchT,
+      offsetX: e.touches[0].clientX - rect.left,
+      offsetY: e.touches[0].clientY - rect.top,
     });
   };
 
   function drawStart({ offsetX, offsetY }: PointEvent) {
     isDrawing = true;
+
+    offsetX = Math.round(offsetX);
+    offsetY = Math.round(offsetY);
+
     currP = [offsetX, offsetY];
-    stroke = [currP!];
+    stroke = [currP];
   }
 
   function drawMove({ offsetX, offsetY }: PointEvent) {
     if (!isDrawing) return;
 
-    let prevP = currP;
+    offsetX = Math.round(offsetX);
+    offsetY = Math.round(offsetY);
+
+    srcCtx.beginPath();
+    srcCtx.moveTo(currP[0], currP[1]);
+    srcCtx.lineTo(offsetX, offsetY);
+    srcCtx.stroke();
+
     currP = [offsetX, offsetY];
     stroke.push(currP);
-
-    srcCtx.strokeStyle = "white";
-    srcCtx.beginPath();
-    srcCtx.moveTo(...prevP);
-    srcCtx.lineTo(...currP);
-    srcCtx.stroke();
   }
 
   function drawEnd() {
     if (!isDrawing) return; // normal mouse leave
     isDrawing = false;
-
-    // update
-    strokes.push(stroke);
-    let xs = stroke.map((p) => p[0]);
-    minX = Math.min(minX, ...xs);
-    maxX = Math.max(maxX, ...xs);
-    let ys = stroke.map((p) => p[1]);
-    minY = Math.min(minY, ...ys);
-    maxY = Math.max(maxY, ...ys);
-
-    // normalize
-    let dstWidth = dstCanvas.width;
-    let width = Math.max(maxX - minX, maxY - minY);
-    if (width == 0) return;
-    width *= 1.2;
-    let zeroX = (maxX + minX) / 2 - width / 2;
-    let zeroY = (maxY + minY) / 2 - width / 2;
-    let scale = dstWidth / width;
-
-    // draw to dstCanvas
-    dstCtx.fillRect(0, 0, dstWidth, dstWidth);
-    dstCtx.translate(0.5, 0.5);
-    for (let stroke of strokes) {
-      dstCtx.beginPath();
-      for (let [x, y] of stroke) {
-        dstCtx.lineTo(
-          Math.round((x - zeroX) * scale),
-          Math.round((y - zeroY) * scale)
-        );
-      }
-      dstCtx.stroke();
-    }
-    dstCtx.translate(-0.5, -0.5);
-
-    // // [debug] download dstCanvas image
-    // let img = document.createElement("a");
-    // img.href = dstCanvas.toDataURL();
-    // img.download = "test.png";
-    // img.click();
-
-    // to greyscale
-    let rgba = dstCtx.getImageData(0, 0, dstWidth, dstWidth).data;
-    let grey = new Float32Array(rgba.length / 4);
-    for (let i = 0; i < grey.length; ++i) {
-      grey[i] = rgba[i * 4] == 255 ? 1 : 0;
-    }
-    // greyscale = grey;
+    if (stroke.length === 1) return; // no line
+    strokesState.val = [...(strokesState.oldVal || []), stroke];
   }
 
   function drawClear() {
+    strokesState.val = undefined;
     srcCtx.clearRect(0, 0, srcCanvas.width, srcCanvas.height);
-    strokes = [];
-    minX = minY = Infinity;
-    maxX = maxY = 0;
-    // greyscale = null;
   }
 
   srcCanvas.addEventListener("mousedown", drawStart);
@@ -248,6 +206,78 @@ const CanvasPanel = () => {
       {
         class: "tinymist-canvas-panel",
       },
+      div(
+        {
+          style: "float: right; margin-right: -18px; cursor: pointer;",
+          title: `The offline handwritten stroke recognizer is powered by Detypify. Draw a symbol to search for it.`,
+          onclick: () => {
+            startModal(
+              p(
+                "The ",
+                span(
+                  { style: "font-weight: bold; text-decoration: underline" },
+                  "offline"
+                ),
+                " handwritten stroke recognizer is powered by ",
+                a(
+                  {
+                    href: "https://github.com/QuarticCat/detypify",
+                  },
+                  "Detypify"
+                ),
+                ". Draw a symbol to search for it."
+              ),
+              h4("Cannot find some symbols?"),
+              p(
+                "🔍: Check the supported symbols listed in ",
+                a(
+                  {
+                    href: "https://github.com/QuarticCat/detypify/blob/main/assets/supported-symbols.txt",
+                  },
+                  "supported-symbols.txt"
+                ),
+                "."
+              ),
+              p(
+                "❤️‍🔥: Click the ",
+                span({ style: "font-style: italic" }, "contribute mode button"),
+                " (",
+                ContributeIcon(16, true),
+                ") and contribute at ",
+                a(
+                  {
+                    href: "https://detypify.quarticcat.com/",
+                  },
+                  "Detypify"
+                ),
+                "."
+              ),
+              p(
+                "📝: Report the missing symbol to ",
+                a(
+                  {
+                    href: "https://github.com/QuarticCat/detypify/issues/new",
+                  },
+                  "GitHub Issues"
+                ),
+                "."
+              ),
+              h4("Like it?"),
+              p(
+                "Give a star🌟 to the ",
+                a(
+                  {
+                    href: "https://github.com/QuarticCat/detypify",
+                  },
+                  "Detypify"
+                ),
+                "!"
+              )
+            );
+          },
+        },
+        HelpIcon()
+      ),
       srcCanvas
     ),
     button(
@@ -316,6 +346,19 @@ export const SymbolPicker = () => {
       : JSON.parse(atob(symbolInformationData))
   );
   console.log("symbolInformation", symInfo);
+  const detypifyPromise = Detypify.create();
+  const detypify = van.state<Detypify | undefined>(undefined);
+  detypifyPromise.then((d) => (detypify.val = d));
+  const strokes = van.state<Stroke[] | undefined>(undefined);
+  const drawCandidates = van.state<DetypifySymbol[] | undefined>();
+  (drawCandidates as any)._drawCandidateAsyncNode = van.derive(async () => {
+    let candidates;
+    if (strokes.val === undefined) candidates = undefined;
+    else if (!detypify.val || !strokes.val) candidates = [];
+    else candidates = await detypify.val.candidates(strokes.val);
+    drawCandidates.val = candidates;
+  });
+
   // console.log("symbolInformationEnc", JSON.stringify(symInfo.val));
 
   const symbolDefs = div({
@@ -342,8 +385,9 @@ export const SymbolPicker = () => {
         return Math.abs(max - min);
       };
 
+      const bboxXWidth = diff(primaryGlyph.xMin, primaryGlyph.xMax);
       let xWidth = Math.max(
-        diff(primaryGlyph.xMin, primaryGlyph.xMax),
+        bboxXWidth,
         primaryGlyph.xAdvance || fontSelected.unitsPerEm
       );
 
@@ -367,8 +411,11 @@ export const SymbolPicker = () => {
           ? Math.abs(primaryGlyph.yMax || 0)
           : (Math.abs(primaryGlyph.yMax || 0) + yWidth) / 2;
 
+      // centering-x the symbol
+      let xShift = -(primaryGlyph.xMin || 0) + (xWidth - bboxXWidth) / 2;
+
       // translate(0, ${fontSelected.ascender * fontSelected.unitsPerEm})
-      const imageData = `<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="${symWidth}" height="${symHeight}" viewBox="0 0 ${xWidth} ${yWidth}" xmlns="http://www.w3.org/2000/svg" ><g transform="translate(0, ${yShift}) scale(1, -1)">${path?.outerHTML || ""}</g></svg>`;
+      const imageData = `<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="${symWidth}" height="${symHeight}" viewBox="0 0 ${xWidth} ${yWidth}" xmlns="http://www.w3.org/2000/svg" ><g transform="translate(${xShift}, ${yShift}) scale(1, -1)">${path?.outerHTML || ""}</g></svg>`;
       // console.log(sym.typstCode, div({ innerHTML: imageData }));
       maskInfo = `width: ${symWidth}; height: ${symHeight}; -webkit-mask-image: url('data:image/svg+xml;utf8,${encodeURIComponent(imageData)}'); -webkit-mask-size: auto ${symHeight}; -webkit-mask-repeat: no-repeat; transition: background-color 200ms; background-color: currentColor;`;
     }
@@ -384,7 +431,18 @@ export const SymbolPicker = () => {
           d.classList.add("active");
           setTimeout(() => d.classList.remove("active"), 500);
           // clipboard
-          navigator.clipboard.writeText(sym.typstCode || "");
+          const rest = sym.typstCode || "";
+          const markup = `#${rest}`;
+          // math mode will trim the sym. prefix
+          const math = `${rest.startsWith("sym.") ? rest.slice(4) : rest}`;
+          requestTextEdit({
+            newText: {
+              kind: "by-mode",
+              math,
+              markup,
+              rest,
+            },
+          });
         },
       },
       maskInfo ? div({ style: maskInfo }) : null
@@ -416,7 +474,7 @@ export const SymbolPicker = () => {
     undefined
   );
 
-  function pickSymbols(
+  function pickSymbolsBySearch(
     pickers: { key: string; value: SymbolItem; elem: Element }[],
     filteredPickers: SelectedSymbolItem[] | undefined
   ) {
@@ -424,6 +482,22 @@ export const SymbolPicker = () => {
     return pickers.filter((picker) =>
       filteredPickers.some((f) => f.typstCode === picker.key)
     );
+  }
+
+  function pickSymbolsByDrawCandidates(
+    pickers: { key: string; value: SymbolItem; elem: Element }[],
+    drawCandidates: DetypifySymbol[] | undefined
+  ) {
+    if (drawCandidates === undefined) return pickers;
+    if (!drawCandidates.length) return [];
+    return pickers.filter((picker) => {
+      if (!picker.value.typstCode) return false;
+      let c = picker.value.typstCode;
+      // remove sym. prefix
+      if (c.startsWith("sym.")) c = c.slice(4);
+
+      return drawCandidates.some((f) => f.names.includes(c));
+    });
   }
 
   return div(
@@ -437,13 +511,16 @@ export const SymbolPicker = () => {
         style: "flex: 0 0 auto; gap: 5px",
       },
       SearchBar(symInfo, filteredPickers),
-      CanvasPanel()
+      CanvasPanel(strokes)
     ),
     div({ style: "flex: 1;" }, (_dom?: Element) =>
       div(
         ...categorize(
           CATEGORY_INFO,
-          pickSymbols(pickers.val, filteredPickers.val)
+          pickSymbolsBySearch(
+            pickSymbolsByDrawCandidates(pickers.val, drawCandidates.val),
+            filteredPickers.val
+          )
         )
           .filter((cat) => cat.symbols?.length)
           .map((info) => CategoryPicker(info))

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { readFile } from "fs/promises";
-import { getFocusingFile } from "./extension";
+import { getFocusingFile, getLastFocusingDoc } from "./extension";
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
     const filePath = path.resolve(context.extensionPath, relativePath);
@@ -38,25 +38,17 @@ export function getUserPackageData(context: vscode.ExtensionContext) {
     return userPackageData;
 }
 
-export async function activateEditorTool(context: vscode.ExtensionContext, tool: string) {
-    if (
-        tool !== "template-gallery" &&
-        tool !== "tracing" &&
-        tool !== "summary" &&
-        tool !== "symbol-picker"
-    ) {
-        vscode.window.showErrorMessage(`Unknown editor tool: ${tool}`);
-        return;
-    }
-
+export async function activateEditorTool(
+    context: vscode.ExtensionContext,
+    tool: "template-gallery" | "tracing" | "summary" | "symbol-view"
+) {
+    // Create and show a new WebView
     const title = {
         "template-gallery": "Template Gallery",
-        "symbol-picker": "Symbol Picker",
+        "symbol-view": "Symbol View",
         tracing: "Tracing",
         summary: "Summary",
     }[tool];
-
-    // Create and show a new WebView
     const panel = vscode.window.createWebviewPanel(
         `tinymist-${tool}`,
         title,
@@ -69,6 +61,38 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
             retainContextWhenHidden: true,
         }
     );
+
+    await activateEditorToolAt(context, tool, panel);
+}
+
+export class SymbolViewProvider implements vscode.WebviewViewProvider {
+    constructor(private context: vscode.ExtensionContext) {}
+
+    public resolveWebviewView(
+        webviewView: vscode.WebviewView,
+        _context: vscode.WebviewViewResolveContext,
+        _token: vscode.CancellationToken
+    ) {
+        webviewView.webview.options = {
+            // Allow scripts in the webview
+            enableScripts: true,
+        };
+
+        activateEditorToolAt(this.context, "symbol-view", webviewView);
+    }
+}
+
+async function activateEditorToolAt(
+    context: vscode.ExtensionContext,
+    tool: "template-gallery" | "tracing" | "summary" | "symbol-view",
+    panel: vscode.WebviewView | vscode.WebviewPanel
+) {
+    const dispose = () => {
+        // if has dispose method
+        if ("dispose" in panel) {
+            panel.dispose();
+        }
+    };
 
     panel.webview.onDidReceiveMessage(async (message) => {
         console.log("onDidReceiveMessage", message);
@@ -101,7 +125,99 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
                 initArgs.push(path[0].fsPath);
 
                 await vscode.commands.executeCommand("tinymist.initTemplate", ...initArgs);
-                panel.dispose();
+
+                dispose();
+                break;
+            }
+            case "editText": {
+                const activeDocument = getLastFocusingDoc();
+                if (!activeDocument) {
+                    await vscode.window.showErrorMessage("No focusing document");
+                    return;
+                }
+
+                const editor = vscode.window.visibleTextEditors.find(
+                    (editor) => editor.document === activeDocument
+                );
+                if (!editor) {
+                    await vscode.window.showErrorMessage("No focusing editor");
+                    return;
+                }
+
+                // get cursor
+                const selection = editor.selection;
+                const selectionStart = selection.start;
+
+                const edit = message.edit;
+                if (typeof edit.newText === "string") {
+                    // replace the selection with the new text
+                    await editor.edit((editBuilder) => {
+                        editBuilder.replace(selection, edit.newText);
+                    });
+                } else {
+                    const {
+                        kind,
+                        math,
+                        comment,
+                        markup,
+                        code,
+                        string: stringContent,
+                        raw,
+                        rest,
+                    } = edit.newText;
+                    const newText = kind === "by-mode" ? rest || "" : "";
+
+                    const res = await vscode.commands.executeCommand<
+                        [{ mode: "math" | "markup" | "code" | "comment" | "string" | "raw" }]
+                    >("tinymist.interactCodeContext", {
+                        textDocument: {
+                            uri: activeDocument.uri.toString(),
+                        },
+                        query: [
+                            {
+                                kind: "modeAt",
+                                position: {
+                                    line: selectionStart.line,
+                                    character: selectionStart.character,
+                                },
+                            },
+                        ],
+                    });
+
+                    const mode = res[0].mode;
+
+                    await editor.edit((editBuilder) => {
+                        if (mode === "math") {
+                            // todo: whether to keep stupid
+                            // if it is before an identifier character, then add a space
+                            let replaceText = math || newText;
+                            let range = new vscode.Range(
+                                selectionStart.with(undefined, selectionStart.character - 1),
+                                selectionStart
+                            );
+                            const before =
+                                selectionStart.character > 0 ? activeDocument.getText(range) : "";
+                            if (before.match(/[\p{xid_start}\p{XID_Continue}_]/)) {
+                                replaceText = " " + math;
+                            }
+
+                            editBuilder.replace(selection, replaceText);
+                        } else if (mode === "markup") {
+                            editBuilder.replace(selection, markup || newText);
+                        } else if (mode === "comment") {
+                            editBuilder.replace(selection, comment || markup || newText);
+                        } else if (mode === "string") {
+                            editBuilder.replace(selection, stringContent || raw || newText);
+                        } else if (mode === "raw") {
+                            editBuilder.replace(selection, raw || stringContent || newText);
+                        } else if (mode === "code") {
+                            editBuilder.replace(selection, code || newText);
+                        } else {
+                            editBuilder.replace(selection, newText);
+                        }
+                    });
+                }
+
                 break;
             }
             default: {
@@ -164,7 +280,7 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
                     vscode.window.showErrorMessage("No server info");
                 }
 
-                panel.dispose();
+                dispose();
                 return;
             }
 
@@ -172,7 +288,7 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
             html = html.replace(":[[preview:ServerInfo]]:", btoa(serverInfo));
             break;
         }
-        case "symbol-picker": {
+        case "symbol-view": {
             // tinymist.getCurrentDocumentMetrics
             const result = await vscode.commands.executeCommand(
                 "tinymist.getResources",
@@ -181,7 +297,7 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
 
             if (!result) {
                 vscode.window.showErrorMessage("No resource");
-                panel.dispose();
+                dispose();
                 return;
             }
 

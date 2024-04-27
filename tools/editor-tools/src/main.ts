@@ -5,7 +5,7 @@ import { TemplateGallery } from "./features/template-gallery";
 import { Tracing } from "./features/tracing";
 import { Summary } from "./features/summary";
 import { Diagnostics } from "./features/diagnostics";
-import { SymbolPicker } from "./features/symbol-picker";
+import { SymbolPicker } from "./features/symbol-view";
 
 /// The components that can be rendered by the frontend.
 /// Typically, each component corresponds to a single tool (Application).
@@ -14,7 +14,7 @@ type PageComponent =
   | "tracing"
   | "summary"
   | "diagnostics"
-  | "symbol-picker";
+  | "symbol-view";
 
 /// The frontend arguments that are passed from the backend.
 interface Arguments {
@@ -31,7 +31,7 @@ function retrieveArgs(): Arguments {
   ///   let frontend_html = frontend_html.replace(
   ///     "editor-tools-args:{}", ...);
   /// ```
-  let mode = `editor-tools-args:{"page": "tracing"}`;
+  let mode = `editor-tools-args:{"page": "symbol-view"}`;
   /// Remove the placeholder prefix.
   mode = mode.replace("editor-tools-args:", "");
 
@@ -58,7 +58,7 @@ function main() {
     case "diagnostics":
       van.add(appHook, Diagnostics());
       break;
-    case "symbol-picker":
+    case "symbol-view":
       van.add(appHook, SymbolPicker());
       break;
     default:

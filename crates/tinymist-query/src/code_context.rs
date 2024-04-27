@@ -66,13 +66,20 @@ impl SyntaxRequest for InteractCodeContextRequest {
             match query {
                 InteractCodeContextQuery::ModeAt { position } => {
                     let pos = lsp_to_typst::position(position, positing_encoding, source)?;
+                    if pos == 0 || pos == source.text().len() {
+                        // smart special case
+                        responses.push(InteractCodeContextResponse::ModeAt {
+                            mode: InterpretMode::Markup,
+                        });
+                        continue;
+                    }
 
                     // get mode
                     let root = LinkedNode::new(source.root());
                     let leaf = root.leaf_at(pos);
                     let mut leaf = leaf.as_ref();
                     let mode = loop {
-                        log::info!("leaf for context: {:?}", leaf);
+                        log::debug!("leaf for context: {leaf:?}");
                         use SyntaxKind::*;
                         if let Some(t) = leaf {
                             match t.kind() {
@@ -82,7 +89,8 @@ impl SyntaxRequest for InteractCodeContextRequest {
                                 CodeBlock | Code => break InterpretMode::Code,
                                 ContentBlock | Markup => break InterpretMode::Markup,
                                 Equation | Math => break InterpretMode::Math,
-                                Space | Linebreak | Parbreak | Escape | Shorthand | SmartQuote
+                                Ident | FieldAccess | Bool | Int | Float | Numeric | Space
+                                | Linebreak | Parbreak | Escape | Shorthand | SmartQuote
                                 | RawLang | RawDelim | RawTrimmed | Hash | LeftBrace
                                 | RightBrace | LeftBracket | RightBracket | LeftParen
                                 | RightParen | Comma | Semicolon | Colon | Star | Underscore
@@ -96,10 +104,9 @@ impl SyntaxRequest for InteractCodeContextRequest {
                                 MathIdent | MathAlignPoint | MathDelimited | MathAttach
                                 | MathPrimes | MathFrac | MathRoot => break InterpretMode::Math,
                                 Let | Set | Show | Context | If | Else | For | In | While
-                                | Break | Continue | Return | Import | Include | Ident | Bool
-                                | Int | Float | Numeric | FieldAccess | Args | Spread | Closure
-                                | Params | LetBinding | SetRule | ShowRule | Contextual
-                                | Conditional | WhileLoop | ForLoop | ModuleImport
+                                | Break | Continue | Return | Import | Include | Args | Spread
+                                | Closure | Params | LetBinding | SetRule | ShowRule
+                                | Contextual | Conditional | WhileLoop | ForLoop | ModuleImport
                                 | ImportItems | RenamedImportItem | ModuleInclude | LoopBreak
                                 | LoopContinue | FuncReturn | FuncCall | Unary | Binary
                                 | Parenthesized | Dict | Array | Destructuring
