@@ -447,10 +447,6 @@ fn type_completion(
             FlowBuiltinType::Path(p) => {
                 let source = ctx.ctx.source_by_id(ctx.root.span().id()?).ok()?;
 
-                log::debug!(
-                    "type_path_completion: {:?}",
-                    &source.text()[ctx.cursor - 10..ctx.cursor]
-                );
                 ctx.completions2.extend(
                     complete_path(ctx.ctx, None, &source, ctx.cursor, p)
                         .into_iter()
