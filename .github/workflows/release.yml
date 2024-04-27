@@ -76,6 +76,7 @@ jobs:
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Download detypify assets
         run: |
+          apk --no-cache add curl
           mkdir -p tools/editor-tools/assets/
           curl -L https://github.com/QuarticCat/detypify/releases/download/0.2.3/train-out.zip -o train-out.zip
           unzip -d tools/editor-tools/assets/ train-out.zip
