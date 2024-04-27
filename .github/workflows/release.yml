@@ -74,6 +74,14 @@ jobs:
         with:
           submodules: recursive
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+      - name: Download detypify assets
+        run: |
+          mkdir -p mkdir -p tools/editor-tools/assets/
+          curl -L https://github.com/QuarticCat/detypify/releases/download/0.2.3/train-out.zip -o train-out.zip
+          unzip -d tools/editor-tools/assets/ train-out.zip
+          mv tools/editor-tools/assets/train-out/ tools/editor-tools/assets/detypify/
+          rm train-out.zip
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -198,6 +206,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Download detypify assets
+        run: |
+          mkdir -p mkdir -p tools/editor-tools/assets/
+          curl -L https://github.com/QuarticCat/detypify/releases/download/0.2.3/train-out.zip -o train-out.zip
+          unzip -d tools/editor-tools/assets/ train-out.zip
+          mv tools/editor-tools/assets/train-out/ tools/editor-tools/assets/detypify/
+          rm train-out.zip
       - name: Run rust-cache
         uses: Swatinem/rust-cache@v2
       - name: Install deps
