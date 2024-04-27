@@ -264,7 +264,7 @@ const CanvasPanel = (strokesState: State<Stroke[] | undefined>) => {
               ),
               h4("Like it?"),
               p(
-                "Give a 🌟 to the ",
+                "Give a star🌟 to the ",
                 a(
                   {
                     href: "https://github.com/QuarticCat/detypify",
