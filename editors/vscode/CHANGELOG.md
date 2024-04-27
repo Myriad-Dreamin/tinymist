@@ -4,6 +4,25 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.6 - [2024-04-27]
+
+### Editor
+
+* Added more auto closing pairs, surrounding pairs, and characters that could make auto closing before in https://github.com/Myriad-Dreamin/tinymist/pull/209
+* Hiding Status bar until the recent focus file is closed in https://github.com/Myriad-Dreamin/tinymist/pull/212
+
+### Compiler
+
+* (Fix) Removed a stupid debugging which may cause panic in https://github.com/Myriad-Dreamin/tinymist/pull/215
+
+### Commands/Tools
+
+* Completed symbol view in https://github.com/Myriad-Dreamin/tinymist/pull/218
+  * Not all symbols are categorized yet. If not, they are put into the "Misc" category.
+  * It is now showing in the activity bar (sidebar). Feel free to report any issues or suggestions for improvement.
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.5...v0.11.6
+
 ## v0.11.5 - [2024-04-20]
 
 ### Completion
