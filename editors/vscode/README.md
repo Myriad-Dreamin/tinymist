@@ -38,6 +38,16 @@ Tips: to enable formatting on save, you should add extra settings for typst lang
 }
 ```
 
+### Configuring/Using Tinymist's Activity Bar (Sidebar)
+
+If you don't like the activity bar, you can right-click on the activity bar and uncheck "Tinymist" to hide it.
+
+#### Symbol View
+
+- Search symbols by keywords, descriptions, or handwriting.
+- See symbols grouped by categories.
+- Click on a symbol, then it will be inserted into the editor.
+
 ### Configuring path to search fonts
 
 To configure path to search fonts:
