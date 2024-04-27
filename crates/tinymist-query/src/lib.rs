@@ -20,6 +20,8 @@ pub use analysis::AnalysisContext;
 use typst::{model::Document as TypstDocument, syntax::Source};
 
 pub use diagnostics::*;
+pub(crate) mod code_context;
+pub use code_context::*;
 pub(crate) mod code_lens;
 pub use code_lens::*;
 pub(crate) mod completion;
@@ -215,6 +217,7 @@ mod polymorphic {
         Formatting(FormattingRequest),
         FoldingRange(FoldingRangeRequest),
         SelectionRange(SelectionRangeRequest),
+        InteractCodeContext(InteractCodeContextRequest),
 
         DocumentMetrics(DocumentMetricsRequest),
         ServerInfo(ServerInfoRequest),
@@ -245,6 +248,7 @@ mod polymorphic {
                 CompilerQueryRequest::Formatting(..) => ContextFreeUnique,
                 CompilerQueryRequest::FoldingRange(..) => ContextFreeUnique,
                 CompilerQueryRequest::SelectionRange(..) => ContextFreeUnique,
+                CompilerQueryRequest::InteractCodeContext(..) => PinnedFirst,
 
                 CompilerQueryRequest::DocumentMetrics(..) => PinnedFirst,
                 CompilerQueryRequest::ServerInfo(..) => Mergeable,
@@ -274,6 +278,7 @@ mod polymorphic {
                 CompilerQueryRequest::Formatting(req) => &req.path,
                 CompilerQueryRequest::FoldingRange(req) => &req.path,
                 CompilerQueryRequest::SelectionRange(req) => &req.path,
+                CompilerQueryRequest::InteractCodeContext(req) => &req.path,
 
                 CompilerQueryRequest::DocumentMetrics(req) => &req.path,
                 CompilerQueryRequest::ServerInfo(..) => return None,
@@ -304,6 +309,7 @@ mod polymorphic {
         Formatting(Option<Vec<TextEdit>>),
         FoldingRange(Option<Vec<FoldingRange>>),
         SelectionRange(Option<Vec<SelectionRange>>),
+        InteractCodeContext(Option<Vec<InteractCodeContextResponse>>),
 
         DocumentMetrics(Option<DocumentMetricsResponse>),
         ServerInfo(Option<HashMap<String, ServerInfoResponse>>),
