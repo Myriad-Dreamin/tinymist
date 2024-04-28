@@ -1,5 +1,7 @@
 //! The actor that handles formatting.
 
+use std::iter::zip;
+
 use lsp_server::RequestId;
 use lsp_types::TextEdit;
 use tinymist_query::{typst_to_lsp, PositionEncoding};
@@ -76,10 +78,7 @@ fn calc_diff(prev: Source, next: String, encoding: PositionEncoding) -> Option<V
     let old = prev.text();
     let new = &next;
 
-    let mut prefix = old
-        .as_bytes()
-        .iter()
-        .zip(new.as_bytes())
+    let mut prefix = zip(old.bytes(), new.bytes())
         .take_while(|(x, y)| x == y)
         .count();
 
@@ -91,11 +90,7 @@ fn calc_diff(prev: Source, next: String, encoding: PositionEncoding) -> Option<V
         prefix -= 1;
     }
 
-    let mut suffix = old[prefix..]
-        .as_bytes()
-        .iter()
-        .zip(new[prefix..].as_bytes())
-        .rev()
+    let mut suffix = zip(old[prefix..].bytes().rev(), new[prefix..].bytes().rev())
         .take_while(|(x, y)| x == y)
         .count();
 
