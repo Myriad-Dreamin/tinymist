@@ -2,10 +2,10 @@
 
 pub mod editor;
 pub mod export;
-mod format;
+pub mod format;
 pub mod typ_client;
 pub mod typ_server;
-mod user_action;
+pub mod user_action;
 
 use std::path::Path;
 
@@ -32,9 +32,6 @@ use crate::{
     world::{ImmutDict, LspWorld, LspWorldBuilder},
     ExportMode, TypstLanguageServer,
 };
-
-pub use format::{FormatConfig, FormatRequest};
-pub use user_action::{TraceParams, UserActionRequest};
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
 
@@ -166,9 +163,8 @@ impl TypstLanguageServer {
         let client = self.client.clone();
         let mode = self.config.formatter;
         let enc = self.const_config.position_encoding;
-        std::thread::spawn(move || {
-            run_format_thread(FormatConfig { mode, width: 120 }, rx_req, client, enc)
-        });
+        let config = format::FormatConfig { mode, width: 120 };
+        std::thread::spawn(move || run_format_thread(config, rx_req, client, enc));
     }
 
     pub fn run_user_action_thread(&mut self) {
