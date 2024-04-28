@@ -15,9 +15,7 @@ use crate::actor::cluster::EditorActor;
 use crate::compiler_init::CompileConfig;
 use crate::harness::LspHost;
 use crate::world::{ImmutDict, SharedFontResolver};
-use crate::{
-    invalid_params, CompileFontOpts, LspResult, TypstLanguageServer, TypstLanguageServerArgs,
-};
+use crate::{invalid_params, CompileFontOpts, LspResult, TypstLanguageServer};
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
@@ -354,13 +352,13 @@ impl Init {
         // Bootstrap server
         let (diag_tx, diag_rx) = mpsc::unbounded_channel();
 
-        let mut service = TypstLanguageServer::new(TypstLanguageServerArgs {
-            client: self.host.clone(),
-            const_config: cc.clone(),
+        let mut service = TypstLanguageServer::new(
+            self.host.clone(),
+            cc.clone(),
             diag_tx,
-            handle: self.handle.clone(),
             font,
-        });
+            self.handle.clone(),
+        );
 
         if let Err(err) = res {
             return (service, Err(err));

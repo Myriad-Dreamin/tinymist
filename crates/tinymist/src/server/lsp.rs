@@ -38,7 +38,7 @@ use crate::actor::typ_client::CompileClientActor;
 use crate::actor::{
     FormattingConfig, FormattingRequest, UserActionRequest, UserActionTraceRequest,
 };
-use crate::compiler::{CompileServer, CompileServerArgs};
+use crate::compiler::CompileServer;
 use crate::compiler_init::CompilerConstConfig;
 use crate::harness::{InitializedLspDriver, LspHost};
 use crate::tools::package::InitTask;
@@ -181,14 +181,6 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
     (as_path(inp.text_document), inp.position)
 }
 
-pub struct TypstLanguageServerArgs {
-    pub handle: tokio::runtime::Handle,
-    pub client: LspHost<TypstLanguageServer>,
-    pub const_config: ConstConfig,
-    pub diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
-    pub font: Deferred<SharedFontResolver>,
-}
-
 /// The object providing the language server functionality.
 pub struct TypstLanguageServer {
     /// The language server client.
@@ -245,24 +237,30 @@ pub struct TypstLanguageServer {
 /// Getters and the main loop.
 impl TypstLanguageServer {
     /// Create a new language server.
-    pub fn new(args: TypstLanguageServerArgs) -> Self {
+    pub fn new(
+        client: LspHost<TypstLanguageServer>,
+        const_config: ConstConfig,
+        diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
+        font: Deferred<SharedFontResolver>,
+        handle: tokio::runtime::Handle,
+    ) -> Self {
         let tokens_ctx = SemanticTokenContext::new(
-            args.const_config.position_encoding,
-            args.const_config.sema_tokens_overlapping_token_support,
-            args.const_config.sema_tokens_multiline_token_support,
+            const_config.position_encoding,
+            const_config.sema_tokens_overlapping_token_support,
+            const_config.sema_tokens_multiline_token_support,
         );
         Self {
-            client: args.client.clone(),
-            primary: CompileServer::new(CompileServerArgs {
-                client: LspHost::new(Arc::new(RwLock::new(None))),
-                compile_config: Default::default(),
-                const_config: CompilerConstConfig {
-                    position_encoding: args.const_config.position_encoding,
+            client,
+            primary: CompileServer::new(
+                LspHost::new(Arc::new(RwLock::new(None))),
+                Default::default(),
+                CompilerConstConfig {
+                    position_encoding: const_config.position_encoding,
                 },
-                diag_tx: args.diag_tx,
-                font: args.font,
-                handle: args.handle,
-            }),
+                diag_tx,
+                font,
+                handle,
+            ),
             dedicates: Vec::new(),
             shutdown_requested: false,
             ever_focusing_by_activities: false,
@@ -270,7 +268,7 @@ impl TypstLanguageServer {
             sema_tokens_registered: None,
             formatter_registered: None,
             config: Default::default(),
-            const_config: args.const_config,
+            const_config,
 
             exec_cmds: Self::get_exec_commands(),
             regular_cmds: Self::get_regular_cmds(),

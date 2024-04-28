@@ -69,15 +69,6 @@ macro_rules! notify_fn {
     };
 }
 
-pub struct CompileServerArgs {
-    pub client: LspHost<CompileServer>,
-    pub compile_config: CompileConfig,
-    pub const_config: CompilerConstConfig,
-    pub diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
-    pub font: Deferred<SharedFontResolver>,
-    pub handle: tokio::runtime::Handle,
-}
-
 /// The object providing the language server functionality.
 pub struct CompileServer {
     /// The language server client.
@@ -116,16 +107,14 @@ pub struct CompileServer {
 }
 
 impl CompileServer {
-    pub fn new(args: CompileServerArgs) -> Self {
-        let CompileServerArgs {
-            client,
-            compile_config,
-            const_config,
-            diag_tx,
-            font,
-            handle,
-        } = args;
-
+    pub fn new(
+        client: LspHost<CompileServer>,
+        compile_config: CompileConfig,
+        const_config: CompilerConstConfig,
+        diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
+        font: Deferred<SharedFontResolver>,
+        handle: tokio::runtime::Handle,
+    ) -> Self {
         CompileServer {
             client,
             diag_tx,

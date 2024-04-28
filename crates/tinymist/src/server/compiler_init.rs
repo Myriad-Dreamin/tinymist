@@ -19,7 +19,7 @@ use typst_ts_core::config::compiler::EntryState;
 use typst_ts_core::{ImmutPath, TypstDict};
 
 use crate::actor::cluster::CompileClusterRequest;
-use crate::compiler::{CompileServer, CompileServerArgs};
+use crate::compiler::CompileServer;
 use crate::harness::LspDriver;
 use crate::world::{ImmutDict, SharedFontResolver};
 use crate::{CompileExtraOpts, CompileFontOpts, ExportMode, LspHost};
@@ -410,10 +410,10 @@ impl LspDriver for CompileInit {
             Deferred::new(|| SharedFontResolver::new(opts).expect("failed to create font book"))
         };
 
-        let args = CompileServerArgs {
+        let mut service = CompileServer::new(
             client,
             compile_config,
-            const_config: CompilerConstConfig {
+            CompilerConstConfig {
                 position_encoding: params
                     .position_encoding
                     .map(|x| match x.as_str() {
@@ -422,12 +422,10 @@ impl LspDriver for CompileInit {
                     })
                     .unwrap_or_default(),
             },
-            diag_tx: self.diag_tx,
-            handle: self.handle,
+            self.diag_tx,
             font,
-        };
-
-        let mut service = CompileServer::new(args);
+            self.handle,
+        );
 
         let primary = service.server(
             "primary".to_owned(),
