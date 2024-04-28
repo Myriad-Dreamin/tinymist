@@ -12,7 +12,7 @@ use std::path::Path;
 use tinymist_query::analysis::Analysis;
 use tinymist_query::ExportKind;
 use tinymist_render::PeriscopeRenderer;
-use tokio::sync::{broadcast, watch};
+use tokio::sync::{mpsc, watch};
 use typst::util::Deferred;
 use typst_ts_compiler::{
     service::CompileDriverImpl,
@@ -30,7 +30,7 @@ use self::{
 use crate::{
     compiler::CompileServer,
     world::{ImmutDict, LspWorld, LspWorldBuilder},
-    ExportMode, TypstLanguageServer,
+    TypstLanguageServer,
 };
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
@@ -44,41 +44,25 @@ impl CompileServer {
         snapshot: FileChangeSet,
     ) -> CompileClientActor {
         let (doc_tx, doc_rx) = watch::channel(None);
-        let (export_tx, _) = broadcast::channel(10);
-
-        let config = ExportConfig {
-            substitute_pattern: self.config.output_path.clone(),
-            entry: entry.clone(),
-            mode: self.config.export_pdf,
-        };
+        let (export_tx, export_rx) = mpsc::unbounded_channel();
 
         // Run Export actors before preparing cluster to avoid loss of events
         self.handle.spawn(
             ExportActor::new(
                 editor_group.clone(),
-                doc_rx.clone(),
+                doc_rx,
                 self.editor_tx.clone(),
-                export_tx.subscribe(),
-                config.clone(),
+                export_rx,
+                ExportConfig {
+                    substitute_pattern: self.config.output_path.clone(),
+                    entry: entry.clone(),
+                    mode: self.config.export_pdf,
+                },
                 ExportKind::Pdf,
+                self.config.notify_compile_status,
             )
             .run(),
         );
-        if self.config.notify_compile_status {
-            let mut config = config;
-            config.mode = ExportMode::OnType;
-            self.handle.spawn(
-                ExportActor::new(
-                    editor_group.clone(),
-                    doc_rx.clone(),
-                    self.editor_tx.clone(),
-                    export_tx.subscribe(),
-                    config,
-                    ExportKind::WordCount,
-                )
-                .run(),
-            );
-        }
 
         // Create the server
         let inner = Deferred::new({

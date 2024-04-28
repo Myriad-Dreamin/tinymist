@@ -9,25 +9,14 @@ use anyhow::bail;
 use anyhow::Context;
 use log::{error, info};
 use once_cell::sync::Lazy;
-use parking_lot::Mutex;
 use tinymist_query::{ExportKind, PageSelection};
-use tokio::sync::{
-    broadcast::{self, error::RecvError},
-    mpsc, oneshot, watch,
-};
-use typst::{foundations::Smart, layout::Frame};
+use tokio::sync::{mpsc, oneshot, watch};
+use typst::{foundations::Smart, layout::Abs, layout::Frame, visualize::Color};
 use typst_ts_core::{config::compiler::EntryState, path::PathClean, ImmutPath, TypstDocument};
 
 use crate::{tools::word_count, ExportMode};
 
 use super::editor::EditorRequest;
-
-#[derive(Debug, Clone)]
-pub struct OneshotRendering {
-    pub kind: Option<ExportKind>,
-    // todo: bad arch...
-    pub callback: Arc<Mutex<Option<oneshot::Sender<Option<PathBuf>>>>>,
-}
 
 #[derive(Debug, Clone, Default)]
 pub struct ExportConfig {
@@ -36,11 +25,11 @@ pub struct ExportConfig {
     pub mode: ExportMode,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum ExportRequest {
     OnTyped,
-    Oneshot(OneshotRendering),
     OnSaved(PathBuf),
+    Oneshot(Option<ExportKind>, oneshot::Sender<Option<PathBuf>>),
     Configure(ExportConfig),
     ChangeExportPath(EntryState),
 }
@@ -48,11 +37,12 @@ pub enum ExportRequest {
 pub struct ExportActor {
     group: String,
     editor_tx: mpsc::UnboundedSender<EditorRequest>,
-    export_rx: broadcast::Receiver<ExportRequest>,
+    export_rx: mpsc::UnboundedReceiver<ExportRequest>,
     document: watch::Receiver<Option<Arc<TypstDocument>>>,
 
     pub config: ExportConfig,
     pub kind: ExportKind,
+    pub count_words: bool,
 }
 
 impl ExportActor {
@@ -60,9 +50,10 @@ impl ExportActor {
         group: String,
         document: watch::Receiver<Option<Arc<TypstDocument>>>,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
-        export_rx: broadcast::Receiver<ExportRequest>,
+        export_rx: mpsc::UnboundedReceiver<ExportRequest>,
         config: ExportConfig,
         kind: ExportKind,
+        count_words: bool,
     ) -> Self {
         Self {
             group,
@@ -71,42 +62,34 @@ impl ExportActor {
             document,
             config,
             kind,
+            count_words,
         }
     }
 
     pub async fn run(mut self) {
         let kind = &self.kind;
-        loop {
-            let req = match self.export_rx.recv().await {
-                Ok(req) => req,
-                Err(RecvError::Closed) => {
-                    info!("RenderActor(@{kind:?}): channel closed");
-                    break;
-                }
-                Err(RecvError::Lagged(_)) => {
-                    info!("RenderActor(@{kind:?}): channel lagged");
-                    continue;
-                }
-            };
-
+        while let Some(req) = self.export_rx.recv().await {
             log::debug!("RenderActor: received request: {req:?}");
             match req {
                 ExportRequest::Configure(cfg) => self.config = cfg,
                 ExportRequest::ChangeExportPath(entry) => self.config.entry = entry,
-                _ => {
-                    let cb = match &req {
-                        ExportRequest::Oneshot(oneshot) => Some(oneshot.callback.clone()),
-                        _ => None,
+                ExportRequest::OnTyped => {
+                    let export = self.config.mode == ExportMode::OnType;
+                    self.check_mode_and_export(&self.kind, export).await;
+                }
+                ExportRequest::OnSaved(..) => {
+                    let export = match self.config.mode {
+                        ExportMode::OnSave => true,
+                        ExportMode::OnDocumentHasTitle => self.doc_has_title(),
+                        _ => false,
                     };
-                    let resp = self.check_mode_and_export(req).await;
-                    if let Some(cb) = cb {
-                        let Some(cb) = cb.lock().take() else {
-                            error!("RenderActor(@{kind:?}): oneshot.callback is None");
-                            continue;
-                        };
-                        if let Err(e) = cb.send(resp) {
-                            error!("RenderActor(@{kind:?}): failed to send response: {e:?}");
-                        }
+                    self.check_mode_and_export(&self.kind, export).await;
+                }
+                ExportRequest::Oneshot(kind, callback) => {
+                    let kind = kind.as_ref().unwrap_or(&self.kind);
+                    let resp = self.check_mode_and_export(kind, true).await;
+                    if let Err(err) = callback.send(resp) {
+                        error!("RenderActor(@{kind:?}): failed to send response: {err:?}");
                     }
                 }
             }
@@ -114,24 +97,16 @@ impl ExportActor {
         info!("RenderActor(@{kind:?}): stopped");
     }
 
-    async fn check_mode_and_export(&self, req: ExportRequest) -> Option<PathBuf> {
+    fn doc_has_title(&self) -> bool {
+        let doc = self.document.borrow();
+        doc.as_ref().and_then(|d| d.title.as_ref()).is_some()
+    }
+
+    async fn check_mode_and_export(&self, kind: &ExportKind, export: bool) -> Option<PathBuf> {
         let Some(document) = self.document.borrow().clone() else {
             info!("RenderActor: document is not ready");
             return None;
         };
-
-        let eq_mode = match req {
-            ExportRequest::OnTyped => ExportMode::OnType,
-            ExportRequest::Oneshot(..) => ExportMode::OnSave,
-            ExportRequest::OnSaved(..) => ExportMode::OnSave,
-            _ => unreachable!(),
-        };
-
-        let kind = match &req {
-            ExportRequest::Oneshot(oneshot) => oneshot.kind.as_ref(),
-            _ => None,
-        };
-        let kind = kind.unwrap_or(&self.kind);
 
         // pub entry: EntryState,
         let root = self.config.entry.root();
@@ -152,18 +127,17 @@ impl ExportActor {
 
         let path = main.vpath().resolve(&root)?;
 
-        let should_do =
-            matches!(req, ExportRequest::Oneshot(..)) || eq_mode == self.config.mode || {
-                let mode = self.config.mode;
-                info!(
-                    "RenderActor: validating document for export mode {mode:?} title is {title}",
-                    title = document.title.is_some()
-                );
-                mode == ExportMode::OnDocumentHasTitle
-                    && document.title.is_some()
-                    && matches!(req, ExportRequest::OnSaved(..))
-            };
-        if should_do {
+        // Count words if needed.
+        if self.count_words {
+            let wc = word_count::word_count(&document);
+            log::debug!("word count: {wc:?}");
+            let _ = self
+                .editor_tx
+                .send(EditorRequest::WordCount(self.group.clone(), Some(wc)));
+        }
+
+        // Export if needed.
+        if export {
             return match self.export(kind, &document, &root, &path).await {
                 Ok(pdf) => Some(pdf),
                 Err(err) => {
@@ -172,7 +146,6 @@ impl ExportActor {
                 }
             };
         }
-
         None
     }
 
@@ -183,6 +156,9 @@ impl ExportActor {
         root: &Path,
         path: &Path,
     ) -> anyhow::Result<PathBuf> {
+        use ExportKind::*;
+        use PageSelection::*;
+
         let Some(to) = substitute_path(&self.config.substitute_pattern, root, path) else {
             bail!("RenderActor({kind:?}): failed to substitute path");
         };
@@ -204,61 +180,23 @@ impl ExportActor {
             }
         }
 
-        static DEFAULT_FRAME: Lazy<Frame> = Lazy::new(Frame::default);
+        static BLANK: Lazy<Frame> = Lazy::new(Frame::default);
+        let first_frame = || doc.pages.first().map(|f| &f.frame).unwrap_or(&*BLANK);
         let data = match kind {
-            ExportKind::Pdf => {
+            Pdf => {
                 // todo: Some(pdf_uri.as_str())
                 // todo: timestamp world.now()
                 typst_pdf::pdf(doc, Smart::Auto, None)
             }
-            ExportKind::Svg {
-                page: PageSelection::First,
-            } => typst_svg::svg(
-                doc.pages
-                    .first()
-                    .map(|f| &f.frame)
-                    .unwrap_or(&*DEFAULT_FRAME),
-            )
-            .into_bytes(),
-            ExportKind::Svg {
-                page: PageSelection::Merged,
-            } => typst_svg::svg_merged(doc, typst::layout::Abs::zero()).into_bytes(),
-            ExportKind::Png {
-                page: PageSelection::First,
-            } => {
-                let pixmap = typst_render::render(
-                    doc.pages
-                        .first()
-                        .map(|f| &f.frame)
-                        .unwrap_or(&*DEFAULT_FRAME),
-                    3.,
-                    typst::visualize::Color::WHITE,
-                );
-                pixmap
+            Svg { page: First } => typst_svg::svg(first_frame()).into_bytes(),
+            Svg { page: Merged } => typst_svg::svg_merged(doc, Abs::zero()).into_bytes(),
+            Png { page: First } => typst_render::render(first_frame(), 3., Color::WHITE)
+                .encode_png()
+                .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?,
+            Png { page: Merged } => {
+                typst_render::render_merged(doc, 3., Color::WHITE, Abs::zero(), Color::WHITE)
                     .encode_png()
                     .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
-            }
-            ExportKind::Png {
-                page: PageSelection::Merged,
-            } => {
-                let pixmap = typst_render::render_merged(
-                    doc,
-                    3.,
-                    typst::visualize::Color::WHITE,
-                    typst::layout::Abs::zero(),
-                    typst::visualize::Color::WHITE,
-                );
-                pixmap
-                    .encode_png()
-                    .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
-            }
-            ExportKind::WordCount => {
-                let wc = word_count::word_count(doc);
-                log::debug!("word count: {wc:?}");
-                let _ = self
-                    .editor_tx
-                    .send(EditorRequest::WordCount(self.group.clone(), Some(wc)));
-                return Ok(PathBuf::new());
             }
         };
 

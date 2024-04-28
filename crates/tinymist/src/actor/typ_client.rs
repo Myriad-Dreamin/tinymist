@@ -40,7 +40,7 @@ use tinymist_query::{
     DiagnosticsMap, ExportKind, ServerInfoResponse, VersionedDocument,
 };
 use tinymist_render::PeriscopeRenderer;
-use tokio::sync::{broadcast, mpsc, oneshot, watch};
+use tokio::sync::{mpsc, oneshot, watch};
 use typst::{
     diag::{PackageError, SourceDiagnostic, SourceResult},
     layout::Position,
@@ -65,7 +65,7 @@ use super::{
     typ_server::{CompileClient as TsCompileClient, CompileServerActor},
 };
 use crate::{
-    actor::export::{ExportRequest, OneshotRendering},
+    actor::export::ExportRequest,
     actor::typ_server::EntryStateExt,
     compiler_init::CompileConfig,
     tools::preview::{CompilationHandle, CompileStatus},
@@ -86,7 +86,7 @@ pub struct CompileHandler {
     pub(super) inner: Arc<Mutex<Option<typst_preview::CompilationHandleImpl>>>,
 
     pub(super) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
-    pub(super) export_tx: broadcast::Sender<ExportRequest>,
+    pub(super) export_tx: mpsc::UnboundedSender<ExportRequest>,
     pub(super) editor_tx: EditorSender,
 }
 
@@ -101,7 +101,6 @@ impl CompilationHandle for CompileHandler {
     fn notify_compile(&self, res: Result<Arc<TypstDocument>, CompileStatus>) {
         if let Ok(doc) = res.clone() {
             let _ = self.doc_tx.send(Some(doc.clone()));
-            // todo: is it right that ignore zero broadcast receiver?
             let _ = self.export_tx.send(ExportRequest::OnTyped);
         }
 
@@ -276,7 +275,7 @@ pub struct CompileClientActor {
     pub config: CompileConfig,
     entry: EntryState,
     inner: Deferred<CompileClient>,
-    export_tx: broadcast::Sender<ExportRequest>,
+    export_tx: mpsc::UnboundedSender<ExportRequest>,
 }
 
 impl CompileClientActor {
@@ -285,7 +284,7 @@ impl CompileClientActor {
         config: CompileConfig,
         entry: EntryState,
         inner: Deferred<CompileClient>,
-        export_tx: broadcast::Sender<ExportRequest>,
+        export_tx: mpsc::UnboundedSender<ExportRequest>,
     ) -> Self {
         Self {
             diag_group,
@@ -364,7 +363,7 @@ impl CompileClientActor {
 
         let entry = next_entry.clone();
         let req = ExportRequest::ChangeExportPath(entry);
-        self.export_tx.send(req).unwrap();
+        let _ = self.export_tx.send(req);
 
         // todo: better way to trigger recompile
         let files = FileChangeSet::new_inserts(vec![]);
@@ -380,14 +379,10 @@ impl CompileClientActor {
     }
 
     pub(crate) fn change_export_pdf(&mut self, config: ExportConfig) {
+        let entry = self.entry.clone();
         let _ = self
             .export_tx
-            .send(ExportRequest::Configure(ExportConfig {
-                substitute_pattern: config.substitute_pattern,
-                entry: self.entry.clone(),
-                mode: config.mode,
-            }))
-            .unwrap();
+            .send(ExportRequest::Configure(ExportConfig { entry, ..config }));
     }
 
     pub fn clear_cache(&self) {
@@ -421,19 +416,10 @@ impl CompileClientActor {
         info!("CompileActor: on export: {}", path.display());
 
         let (tx, rx) = oneshot::channel();
-
-        let callback = Arc::new(Mutex::new(Some(tx)));
-        self.export_tx
-            .send(ExportRequest::Oneshot(OneshotRendering {
-                kind: Some(kind),
-                callback,
-            }))
-            .map_err(map_string_err("failed to send to sync_render"))?;
-
+        let _ = self.export_tx.send(ExportRequest::Oneshot(Some(kind), tx));
         let res: Option<PathBuf> = utils::threaded_receive(rx)?;
 
         info!("CompileActor: on export end: {path:?} as {res:?}");
-
         Ok(res)
     }
 
