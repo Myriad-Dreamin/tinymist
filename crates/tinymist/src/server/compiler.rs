@@ -15,7 +15,7 @@ use typst_ts_compiler::vfs::notify::FileChangeSet;
 use typst_ts_core::{config::compiler::DETACHED_ENTRY, ImmutPath};
 
 use crate::{
-    actor::{cluster::CompileClusterRequest, render::ExportConfig, typ_client::CompileClientActor},
+    actor::{cluster::EditorRequest, render::ExportConfig, typ_client::CompileClientActor},
     compiler_init::{CompileConfig, CompilerConstConfig},
     harness::InitializedLspDriver,
     internal_error, invalid_params, method_not_found, run_query,
@@ -101,7 +101,7 @@ pub struct CompileServer {
     /// Source synchronized with client
     pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
     /// The diagnostics sender to send diagnostics to `crate::actor::cluster`.
-    pub diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
+    pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
     /// The compiler actor.
     pub compiler: Option<CompileClientActor>,
 }
@@ -111,13 +111,13 @@ impl CompileServer {
         client: LspHost<CompileServer>,
         compile_config: CompileConfig,
         const_config: CompilerConstConfig,
-        diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
+        editor_tx: mpsc::UnboundedSender<EditorRequest>,
         font: Deferred<SharedFontResolver>,
         handle: tokio::runtime::Handle,
     ) -> Self {
         CompileServer {
             client,
-            diag_tx,
+            editor_tx,
             shutdown_requested: false,
             config: compile_config,
             const_config,

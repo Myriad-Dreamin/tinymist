@@ -350,12 +350,12 @@ impl Init {
         };
 
         // Bootstrap server
-        let (diag_tx, diag_rx) = mpsc::unbounded_channel();
+        let (editor_tx, editor_rx) = mpsc::unbounded_channel();
 
         let mut service = TypstLanguageServer::new(
             self.host.clone(),
             cc.clone(),
-            diag_tx,
+            editor_tx,
             font,
             self.handle.clone(),
         );
@@ -373,7 +373,7 @@ impl Init {
 
         let cluster_actor = EditorActor {
             host: self.host.clone(),
-            diag_rx,
+            editor_rx,
             diagnostics: HashMap::new(),
             affect_map: HashMap::new(),
             published_primary: false,

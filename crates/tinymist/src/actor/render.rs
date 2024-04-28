@@ -1,4 +1,4 @@
-//! The (PDF) render actor
+//! The actor that handles PDF export.
 
 use std::{
     path::{Path, PathBuf},
@@ -20,27 +20,13 @@ use typst_ts_core::{config::compiler::EntryState, path::PathClean, ImmutPath, Ty
 
 use crate::{tools::word_count, ExportMode};
 
-use super::cluster::CompileClusterRequest;
+use super::cluster::EditorRequest;
 
 #[derive(Debug, Clone)]
 pub struct OneshotRendering {
     pub kind: Option<ExportKind>,
     // todo: bad arch...
     pub callback: Arc<Mutex<Option<oneshot::Sender<Option<PathBuf>>>>>,
-}
-
-#[derive(Debug, Clone)]
-pub enum RenderActorRequest {
-    OnTyped,
-    Oneshot(OneshotRendering),
-    OnSaved(PathBuf),
-    ChangeExportPath(PathVars),
-    ChangeConfig(ExportConfig),
-}
-
-#[derive(Debug, Clone)]
-pub struct PathVars {
-    pub entry: EntryState,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -50,15 +36,22 @@ pub struct ExportConfig {
     pub mode: ExportMode,
 }
 
+#[derive(Debug, Clone)]
+pub enum ExportRequest {
+    OnTyped,
+    Oneshot(OneshotRendering),
+    OnSaved(PathBuf),
+    Configure(ExportConfig),
+    ChangeExportPath(EntryState),
+}
+
 pub struct ExportActor {
     group: String,
-    editor_tx: mpsc::UnboundedSender<CompileClusterRequest>,
-    render_rx: broadcast::Receiver<RenderActorRequest>,
+    editor_tx: mpsc::UnboundedSender<EditorRequest>,
+    export_rx: broadcast::Receiver<ExportRequest>,
     document: watch::Receiver<Option<Arc<TypstDocument>>>,
 
-    pub substitute_pattern: String,
-    pub entry: EntryState,
-    pub mode: ExportMode,
+    pub config: ExportConfig,
     pub kind: ExportKind,
 }
 
@@ -66,19 +59,17 @@ impl ExportActor {
     pub fn new(
         group: String,
         document: watch::Receiver<Option<Arc<TypstDocument>>>,
-        editor_tx: mpsc::UnboundedSender<CompileClusterRequest>,
-        render_rx: broadcast::Receiver<RenderActorRequest>,
+        editor_tx: mpsc::UnboundedSender<EditorRequest>,
+        export_rx: broadcast::Receiver<ExportRequest>,
         config: ExportConfig,
         kind: ExportKind,
     ) -> Self {
         Self {
             group,
             editor_tx,
-            render_rx,
+            export_rx,
             document,
-            substitute_pattern: config.substitute_pattern,
-            entry: config.entry,
-            mode: config.mode,
+            config,
             kind,
         }
     }
@@ -86,7 +77,7 @@ impl ExportActor {
     pub async fn run(mut self) {
         let kind = &self.kind;
         loop {
-            let req = match self.render_rx.recv().await {
+            let req = match self.export_rx.recv().await {
                 Ok(req) => req,
                 Err(RecvError::Closed) => {
                     info!("RenderActor(@{kind:?}): channel closed");
@@ -100,17 +91,11 @@ impl ExportActor {
 
             log::debug!("RenderActor: received request: {req:?}");
             match req {
-                RenderActorRequest::ChangeConfig(cfg) => {
-                    self.substitute_pattern = cfg.substitute_pattern;
-                    self.entry = cfg.entry;
-                    self.mode = cfg.mode;
-                }
-                RenderActorRequest::ChangeExportPath(cfg) => {
-                    self.entry = cfg.entry;
-                }
+                ExportRequest::Configure(cfg) => self.config = cfg,
+                ExportRequest::ChangeExportPath(entry) => self.config.entry = entry,
                 _ => {
                     let cb = match &req {
-                        RenderActorRequest::Oneshot(oneshot) => Some(oneshot.callback.clone()),
+                        ExportRequest::Oneshot(oneshot) => Some(oneshot.callback.clone()),
                         _ => None,
                     };
                     let resp = self.check_mode_and_export(req).await;
@@ -129,32 +114,32 @@ impl ExportActor {
         info!("RenderActor(@{kind:?}): stopped");
     }
 
-    async fn check_mode_and_export(&self, req: RenderActorRequest) -> Option<PathBuf> {
+    async fn check_mode_and_export(&self, req: ExportRequest) -> Option<PathBuf> {
         let Some(document) = self.document.borrow().clone() else {
             info!("RenderActor: document is not ready");
             return None;
         };
 
         let eq_mode = match req {
-            RenderActorRequest::OnTyped => ExportMode::OnType,
-            RenderActorRequest::Oneshot(..) => ExportMode::OnSave,
-            RenderActorRequest::OnSaved(..) => ExportMode::OnSave,
+            ExportRequest::OnTyped => ExportMode::OnType,
+            ExportRequest::Oneshot(..) => ExportMode::OnSave,
+            ExportRequest::OnSaved(..) => ExportMode::OnSave,
             _ => unreachable!(),
         };
 
         let kind = match &req {
-            RenderActorRequest::Oneshot(oneshot) => oneshot.kind.as_ref(),
+            ExportRequest::Oneshot(oneshot) => oneshot.kind.as_ref(),
             _ => None,
         };
         let kind = kind.unwrap_or(&self.kind);
 
         // pub entry: EntryState,
-        let root = self.entry.root();
-        let main = self.entry.main();
+        let root = self.config.entry.root();
+        let main = self.config.entry.main();
 
         info!(
             "RenderActor: check path {:?} and root {:?} with output directory {}",
-            main, root, self.substitute_pattern
+            main, root, self.config.substitute_pattern
         );
 
         let root = root?;
@@ -167,16 +152,17 @@ impl ExportActor {
 
         let path = main.vpath().resolve(&root)?;
 
-        let should_do = matches!(req, RenderActorRequest::Oneshot(..)) || eq_mode == self.mode || {
-            let mode = self.mode;
-            info!(
-                "RenderActor: validating document for export mode {mode:?} title is {title}",
-                title = document.title.is_some()
-            );
-            mode == ExportMode::OnDocumentHasTitle
-                && document.title.is_some()
-                && matches!(req, RenderActorRequest::OnSaved(..))
-        };
+        let should_do =
+            matches!(req, ExportRequest::Oneshot(..)) || eq_mode == self.config.mode || {
+                let mode = self.config.mode;
+                info!(
+                    "RenderActor: validating document for export mode {mode:?} title is {title}",
+                    title = document.title.is_some()
+                );
+                mode == ExportMode::OnDocumentHasTitle
+                    && document.title.is_some()
+                    && matches!(req, ExportRequest::OnSaved(..))
+            };
         if should_do {
             return match self.export(kind, &document, &root, &path).await {
                 Ok(pdf) => Some(pdf),
@@ -197,7 +183,7 @@ impl ExportActor {
         root: &Path,
         path: &Path,
     ) -> anyhow::Result<PathBuf> {
-        let Some(to) = substitute_path(&self.substitute_pattern, root, path) else {
+        let Some(to) = substitute_path(&self.config.substitute_pattern, root, path) else {
             bail!("RenderActor({kind:?}): failed to substitute path");
         };
         if to.is_relative() {
@@ -269,10 +255,9 @@ impl ExportActor {
             ExportKind::WordCount => {
                 let wc = word_count::word_count(doc);
                 log::debug!("word count: {wc:?}");
-                let _ = self.editor_tx.send(CompileClusterRequest::WordCount(
-                    self.group.clone(),
-                    Some(wc),
-                ));
+                let _ = self
+                    .editor_tx
+                    .send(EditorRequest::WordCount(self.group.clone(), Some(wc)));
                 return Ok(PathBuf::new());
             }
         };

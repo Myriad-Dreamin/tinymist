@@ -18,7 +18,7 @@ use typst::util::Deferred;
 use typst_ts_core::config::compiler::EntryState;
 use typst_ts_core::{ImmutPath, TypstDict};
 
-use crate::actor::cluster::CompileClusterRequest;
+use crate::actor::cluster::EditorRequest;
 use crate::compiler::CompileServer;
 use crate::harness::LspDriver;
 use crate::world::{ImmutDict, SharedFontResolver};
@@ -370,7 +370,7 @@ impl Default for CompilerConstConfig {
 pub struct CompileInit {
     pub handle: tokio::runtime::Handle,
     pub font: CompileFontOpts,
-    pub diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
+    pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -422,7 +422,7 @@ impl LspDriver for CompileInit {
                     })
                     .unwrap_or_default(),
             },
-            self.diag_tx,
+            self.editor_tx,
             font,
             self.handle,
         );

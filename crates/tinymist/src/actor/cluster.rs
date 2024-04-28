@@ -1,4 +1,4 @@
-//! The cluster actor running in background
+//! The actor that send notifications to the client.
 
 use std::collections::HashMap;
 
@@ -9,7 +9,7 @@ use tokio::sync::mpsc;
 
 use crate::{tools::word_count::WordsCount, LspHost, TypstLanguageServer};
 
-pub enum CompileClusterRequest {
+pub enum EditorRequest {
     Diag(String, Option<DiagnosticsMap>),
     Status(String, TinymistCompileStatusEnum),
     WordCount(String, Option<WordsCount>),
@@ -17,7 +17,7 @@ pub enum CompileClusterRequest {
 
 pub struct EditorActor {
     pub host: LspHost<TypstLanguageServer>,
-    pub diag_rx: mpsc::UnboundedReceiver<CompileClusterRequest>,
+    pub editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
 
     pub diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
     pub affect_map: HashMap<String, Vec<Url>>,
@@ -29,9 +29,9 @@ impl EditorActor {
     pub async fn run(mut self) {
         let mut compile_status = TinymistCompileStatusEnum::Compiling;
         let mut words_count = None;
-        while let Some(req) = self.diag_rx.recv().await {
+        while let Some(req) = self.editor_rx.recv().await {
             match req {
-                CompileClusterRequest::Diag(group, diagnostics) => {
+                EditorRequest::Diag(group, diagnostics) => {
                     info!(
                         "received diagnostics from {group}: diag({:?})",
                         diagnostics.as_ref().map(|e| e.len())
@@ -52,7 +52,7 @@ impl EditorActor {
                         self.published_primary = again_with_primary;
                     }
                 }
-                CompileClusterRequest::Status(group, status) => {
+                EditorRequest::Status(group, status) => {
                     log::debug!("received status request");
                     if self.notify_compile_status && group == "primary" {
                         compile_status = status;
@@ -64,7 +64,7 @@ impl EditorActor {
                         );
                     }
                 }
-                CompileClusterRequest::WordCount(group, wc) => {
+                EditorRequest::WordCount(group, wc) => {
                     log::debug!("received word count request");
                     if self.notify_compile_status && group == "primary" {
                         words_count = wc;

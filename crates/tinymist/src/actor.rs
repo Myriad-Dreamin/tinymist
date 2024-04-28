@@ -33,8 +33,8 @@ use crate::{
     ExportMode, TypstLanguageServer,
 };
 
-pub use formatting::{FormattingConfig, FormattingRequest};
-pub use user_action::{UserActionRequest, UserActionTraceRequest};
+pub use formatting::{FormatConfig, FormatRequest};
+pub use user_action::{UserActionRequest, TraceParams};
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
 
@@ -47,7 +47,7 @@ impl CompileServer {
         snapshot: FileChangeSet,
     ) -> CompileClientActor {
         let (doc_tx, doc_rx) = watch::channel(None);
-        let (render_tx, _) = broadcast::channel(10);
+        let (export_tx, _) = broadcast::channel(10);
 
         let config = ExportConfig {
             substitute_pattern: self.config.output_path.clone(),
@@ -60,8 +60,8 @@ impl CompileServer {
             ExportActor::new(
                 editor_group.clone(),
                 doc_rx.clone(),
-                self.diag_tx.clone(),
-                render_tx.subscribe(),
+                self.editor_tx.clone(),
+                export_tx.subscribe(),
                 config.clone(),
                 ExportKind::Pdf,
             )
@@ -74,8 +74,8 @@ impl CompileServer {
                 ExportActor::new(
                     editor_group.clone(),
                     doc_rx.clone(),
-                    self.diag_tx.clone(),
-                    render_tx.subscribe(),
+                    self.editor_tx.clone(),
+                    export_tx.subscribe(),
                     config,
                     ExportKind::WordCount,
                 )
@@ -91,8 +91,8 @@ impl CompileServer {
                 inner: std::sync::Arc::new(parking_lot::Mutex::new(None)),
                 diag_group: editor_group.clone(),
                 doc_tx,
-                render_tx: render_tx.clone(),
-                editor_tx: self.diag_tx.clone(),
+                export_tx: export_tx.clone(),
+                editor_tx: self.editor_tx.clone(),
             };
 
             let position_encoding = self.const_config().position_encoding;
@@ -138,7 +138,7 @@ impl CompileServer {
             }
         });
 
-        CompileClientActor::new(editor_group, self.config.clone(), entry, inner, render_tx)
+        CompileClientActor::new(editor_group, self.config.clone(), entry, inner, export_tx)
     }
 }
 
@@ -167,7 +167,7 @@ impl TypstLanguageServer {
         let mode = self.config.formatter;
         let enc = self.const_config.position_encoding;
         std::thread::spawn(move || {
-            run_format_thread(FormattingConfig { mode, width: 120 }, rx_req, client, enc)
+            run_format_thread(FormatConfig { mode, width: 120 }, rx_req, client, enc)
         });
     }
 

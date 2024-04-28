@@ -1,3 +1,5 @@
+//! The actor that handles formatting.
+
 use lsp_server::RequestId;
 use lsp_types::TextEdit;
 use tinymist_query::{typst_to_lsp, PositionEncoding};
@@ -6,24 +8,24 @@ use typst::syntax::Source;
 use crate::{result_to_response_, FormatterMode, LspHost, LspResult, TypstLanguageServer};
 
 #[derive(Debug, Clone)]
-pub struct FormattingConfig {
+pub struct FormatConfig {
     pub mode: FormatterMode,
     pub width: u32,
 }
 
-pub enum FormattingRequest {
-    ChangeConfig(FormattingConfig),
-    Formatting((RequestId, Source)),
+pub enum FormatRequest {
+    Configure(FormatConfig),
+    Format(RequestId, Source),
 }
 
 pub fn run_format_thread(
-    init_c: FormattingConfig,
-    rx_req: crossbeam_channel::Receiver<FormattingRequest>,
+    config: FormatConfig,
+    format_rx: crossbeam_channel::Receiver<FormatRequest>,
     client: LspHost<TypstLanguageServer>,
     position_encoding: PositionEncoding,
 ) {
     type FmtFn = Box<dyn Fn(Source) -> LspResult<Option<Vec<TextEdit>>>>;
-    let compile = |c: FormattingConfig| -> FmtFn {
+    let compile = |c: FormatConfig| -> FmtFn {
         log::info!("formatting thread with config: {c:#?}");
         match c.mode {
             FormatterMode::Typstyle => {
@@ -52,11 +54,11 @@ pub fn run_format_thread(
         }
     };
 
-    let mut f: FmtFn = compile(init_c);
-    while let Ok(req) = rx_req.recv() {
+    let mut f: FmtFn = compile(config);
+    while let Ok(req) = format_rx.recv() {
         match req {
-            FormattingRequest::ChangeConfig(c) => f = compile(c),
-            FormattingRequest::Formatting((id, source)) => {
+            FormatRequest::Configure(c) => f = compile(c),
+            FormatRequest::Format(id, source) => {
                 let res = f(source);
                 if let Ok(response) = result_to_response_(id, res) {
                     client.respond(response);

@@ -33,11 +33,9 @@ use typst_ts_core::path::PathClean;
 use typst_ts_core::{error::prelude::*, ImmutPath};
 
 use super::lsp_init::*;
-use crate::actor::cluster::CompileClusterRequest;
+use crate::actor::cluster::EditorRequest;
 use crate::actor::typ_client::CompileClientActor;
-use crate::actor::{
-    FormattingConfig, FormattingRequest, UserActionRequest, UserActionTraceRequest,
-};
+use crate::actor::{FormatConfig, FormatRequest, UserActionRequest, TraceParams};
 use crate::compiler::CompileServer;
 use crate::compiler_init::CompilerConstConfig;
 use crate::harness::{InitializedLspDriver, LspHost};
@@ -228,7 +226,7 @@ pub struct TypstLanguageServer {
     pub dedicates: Vec<CompileServer>,
     /// The formatter thread running in backend.
     /// Note: The thread will exit if you drop the sender.
-    pub format_thread: Option<crossbeam_channel::Sender<FormattingRequest>>,
+    pub format_thread: Option<crossbeam_channel::Sender<FormatRequest>>,
     /// The user action thread running in backend.
     /// Note: The thread will exit if you drop the sender.
     pub user_action_threads: Option<crossbeam_channel::Sender<UserActionRequest>>,
@@ -240,7 +238,7 @@ impl TypstLanguageServer {
     pub fn new(
         client: LspHost<TypstLanguageServer>,
         const_config: ConstConfig,
-        diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
+        editor_tx: mpsc::UnboundedSender<EditorRequest>,
         font: Deferred<SharedFontResolver>,
         handle: tokio::runtime::Handle,
     ) -> Self {
@@ -257,7 +255,7 @@ impl TypstLanguageServer {
                 CompilerConstConfig {
                     position_encoding: const_config.position_encoding,
                 },
-                diag_tx,
+                editor_tx,
                 font,
                 handle,
             ),
@@ -748,16 +746,16 @@ impl TypstLanguageServer {
                     .ok_or_else(|| anyhow::anyhow!("main file must be resolved, got {entry:?}"))?;
 
                 if let Some(f) = thread {
-                    f.send(UserActionRequest::Trace((
+                    f.send(UserActionRequest::Trace(
                         req_id,
-                        UserActionTraceRequest {
+                        TraceParams {
                             compiler_program: self_path,
                             root: root.as_ref().to_owned(),
                             main,
                             inputs: cc.world().inputs.as_ref().deref().clone(),
                             font_paths: cc.world().font_resolver.font_paths().to_owned(),
                         },
-                    )))
+                    ))
                     .context("cannot send trace request")?;
                 } else {
                     bail!("user action thread is not available");
@@ -1047,7 +1045,7 @@ impl TypstLanguageServer {
                 error!("could not change formatter config: {err}");
             }
             if let Some(f) = &self.format_thread {
-                let err = f.send(FormattingRequest::ChangeConfig(FormattingConfig {
+                let err = f.send(FormatRequest::Configure(FormatConfig {
                     mode: self.config.formatter,
                     width: self.config.formatter_print_width,
                 }));
@@ -1180,7 +1178,7 @@ impl TypstLanguageServer {
         let path = as_path(params.text_document).as_path().into();
         self.query_source(path, |source| {
             if let Some(f) = &self.format_thread {
-                f.send(FormattingRequest::Formatting((req_id, source.clone())))?;
+                f.send(FormatRequest::Format(req_id, source.clone()))?;
             } else {
                 bail!("formatter thread is not available");
             }

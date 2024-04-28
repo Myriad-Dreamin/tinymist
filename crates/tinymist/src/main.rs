@@ -115,7 +115,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
 }
 
 pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
-    let (diag_tx, _diag_rx) = mpsc::unbounded_channel();
+    let (editor_tx, _editor_rx) = mpsc::unbounded_channel();
 
     let mut input = PathBuf::from(args.compile.input.unwrap());
 
@@ -146,7 +146,7 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
             no_system_fonts: args.compile.font.no_system_fonts,
             ..Default::default()
         },
-        diag_tx,
+        editor_tx,
     };
     if args.persist {
         log::info!("starting compile server");
