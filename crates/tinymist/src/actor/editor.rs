@@ -16,16 +16,31 @@ pub enum EditorRequest {
 }
 
 pub struct EditorActor {
-    pub host: LspHost<TypstLanguageServer>,
-    pub editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
+    host: LspHost<TypstLanguageServer>,
+    editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
 
-    pub diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
-    pub affect_map: HashMap<String, Vec<Url>>,
-    pub published_primary: bool,
-    pub notify_compile_status: bool,
+    diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
+    affect_map: HashMap<String, Vec<Url>>,
+    published_primary: bool,
+    notify_compile_status: bool,
 }
 
 impl EditorActor {
+    pub fn new(
+        host: LspHost<TypstLanguageServer>,
+        editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
+        notify_compile_status: bool,
+    ) -> Self {
+        Self {
+            host,
+            editor_rx,
+            diagnostics: HashMap::new(),
+            affect_map: HashMap::new(),
+            published_primary: false,
+            notify_compile_status,
+        }
+    }
+
     pub async fn run(mut self) {
         let mut compile_status = TinymistCompileStatusEnum::Compiling;
         let mut words_count = None;

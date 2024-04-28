@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::bail;
 use itertools::Itertools;
@@ -151,38 +151,21 @@ impl Config {
     /// # Errors
     /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
-        let semantic_tokens = update
+        #![allow(clippy::option_map_unit_fn)]
+        update
             .get("semanticTokens")
-            .map(SemanticTokensMode::deserialize)
-            .and_then(Result::ok);
-        if let Some(semantic_tokens) = semantic_tokens {
-            self.semantic_tokens = semantic_tokens;
-        }
-
-        let formatter = update
+            .and_then(|v| SemanticTokensMode::deserialize(v).ok())
+            .map(|v| self.semantic_tokens = v);
+        update
             .get("formatterMode")
-            .map(FormatterMode::deserialize)
-            .and_then(Result::ok);
-        if let Some(formatter) = formatter {
-            self.formatter = formatter;
-        }
-
-        let print_width = update
+            .and_then(|v| FormatterMode::deserialize(v).ok())
+            .map(|v| self.formatter = v);
+        update
             .get("formatterPrintWidth")
-            .and_then(|e| serde_json::from_value::<u32>(e.clone()).ok());
-        if let Some(formatter) = print_width {
-            self.formatter_print_width = formatter;
-        }
-
+            .and_then(|v| u32::deserialize(v).ok())
+            .map(|v| self.formatter_print_width = v);
         self.compile.update_by_map(update)?;
-        self.validate()?;
-        Ok(())
-    }
-
-    fn validate(&self) -> anyhow::Result<()> {
-        self.compile.validate()?;
-
-        Ok(())
+        self.compile.validate()
     }
 }
 
@@ -227,42 +210,24 @@ impl From<&InitializeParams> for ConstConfig {
             }
         };
 
-        let workspace_caps = params.capabilities.workspace.as_ref();
-        let supports_config_change_registration = workspace_caps
-            .and_then(|workspace| workspace.configuration)
-            .unwrap_or(false);
+        let workspace = params.capabilities.workspace.as_ref();
+        let doc = params.capabilities.text_document.as_ref();
+        let sema = doc.and_then(|d| d.semantic_tokens.as_ref());
+        let format = doc.and_then(|d| d.formatting.as_ref());
+        let fold = doc.and_then(|d| d.folding_range.as_ref());
 
-        let doc_caps = params.capabilities.text_document.as_ref();
-        let folding_caps = doc_caps.and_then(|doc| doc.folding_range.as_ref());
-        let line_folding_only = folding_caps
-            .and_then(|folding| folding.line_folding_only)
-            .unwrap_or(true);
-
-        let semantic_tokens_caps = doc_caps.and_then(|doc| doc.semantic_tokens.as_ref());
-        let supports_semantic_tokens_dynamic_registration = semantic_tokens_caps
-            .and_then(|semantic_tokens| semantic_tokens.dynamic_registration)
-            .unwrap_or(false);
-        let supports_semantic_tokens_overlapping_token_support = semantic_tokens_caps
-            .and_then(|semantic_tokens| semantic_tokens.overlapping_token_support)
-            .unwrap_or(false);
-        let supports_semantic_tokens_multiline_token_support = semantic_tokens_caps
-            .and_then(|semantic_tokens| semantic_tokens.multiline_token_support)
-            .unwrap_or(false);
-
-        let formatter_caps = doc_caps.and_then(|doc| doc.formatting.as_ref());
-        let supports_document_formatting_dynamic_registration = formatter_caps
-            .and_then(|formatting| formatting.dynamic_registration)
-            .unwrap_or(false);
+        fn get(f: impl FnOnce() -> Option<bool>, default: bool) -> bool {
+            f().unwrap_or(default)
+        }
 
         Self {
             position_encoding,
-            sema_tokens_dynamic_registration: supports_semantic_tokens_dynamic_registration,
-            sema_tokens_overlapping_token_support:
-                supports_semantic_tokens_overlapping_token_support,
-            sema_tokens_multiline_token_support: supports_semantic_tokens_multiline_token_support,
-            doc_fmt_dynamic_registration: supports_document_formatting_dynamic_registration,
-            cfg_change_registration: supports_config_change_registration,
-            doc_line_folding_only: line_folding_only,
+            cfg_change_registration: get(|| workspace?.configuration, false),
+            sema_tokens_dynamic_registration: get(|| sema?.dynamic_registration, false),
+            sema_tokens_overlapping_token_support: get(|| sema?.overlapping_token_support, false),
+            sema_tokens_multiline_token_support: get(|| sema?.multiline_token_support, false),
+            doc_fmt_dynamic_registration: get(|| format?.dynamic_registration, false),
+            doc_line_folding_only: get(|| fold?.line_folding_only, true),
         }
     }
 }
@@ -297,19 +262,14 @@ impl Init {
 
         // Initialize configurations
         let cc = ConstConfig::from(&params);
-        info!(
-            "initialized with const_config {const_config:?}",
-            const_config = cc
-        );
+        info!("initialized with const_config {cc:?}");
         let mut config = Config {
             compile: CompileConfig {
                 roots: match params.workspace_folders.as_ref() {
                     Some(roots) => roots
                         .iter()
-                        .map(|root| &root.uri)
-                        .map(Url::to_file_path)
-                        .collect::<Result<Vec<_>, _>>()
-                        .unwrap(),
+                        .filter_map(|root| root.uri.to_file_path().ok())
+                        .collect::<Vec<_>>(),
                     #[allow(deprecated)] // `params.root_path` is marked as deprecated
                     None => params
                         .root_uri
@@ -371,14 +331,11 @@ impl Init {
         service.run_format_thread();
         service.run_user_action_thread();
 
-        let cluster_actor = EditorActor {
-            host: self.host.clone(),
+        let editor_actor = EditorActor::new(
+            self.host.clone(),
             editor_rx,
-            diagnostics: HashMap::new(),
-            affect_map: HashMap::new(),
-            published_primary: false,
-            notify_compile_status: service.config.compile.notify_compile_status,
-        };
+            service.config.compile.notify_compile_status,
+        );
 
         let fallback = service.config.compile.determine_default_entry_path();
         let primary = service.server(
@@ -392,7 +349,7 @@ impl Init {
         service.primary.compiler = Some(primary);
 
         // Run the cluster in the background after we referencing it
-        self.handle.spawn(cluster_actor.run());
+        self.handle.spawn(editor_actor.run());
 
         // Respond to the host (LSP client)
 
