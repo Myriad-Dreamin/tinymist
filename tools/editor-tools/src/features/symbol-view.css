@@ -17,3 +17,8 @@
     width: 100%;
   }
 }
+
+.tinymist-search-symbol {
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+}

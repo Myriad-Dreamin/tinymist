@@ -19,7 +19,7 @@ import {
 } from "vscode-languageclient/node";
 import vscodeVariables from "vscode-variables";
 import {
-    SymbolViewProvider as SymbolPickerProvider,
+    SymbolViewProvider as SymbolViewProvider,
     activateEditorTool,
     getUserPackageData,
 } from "./editor-tools";
@@ -155,9 +155,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
             commandShowTemplateGallery(context)
         ),
         commands.registerCommand("tinymist.showSummary", () => commandShowSummary(context)),
-        commands.registerCommand("tinymist.showSymbolPicker", () =>
-            commandShowSymbolPicker(context)
-        ),
+        commands.registerCommand("tinymist.showSymbolView", () => commandShowSymbolView(context)),
         commands.registerCommand("tinymist.profileCurrentFile", () => commandShowTrace(context)),
         commands.registerCommand("tinymist.showLog", () => {
             if (client) {
@@ -166,7 +164,7 @@ async function startClient(context: ExtensionContext): Promise<void> {
         })
     );
     // context.subscriptions.push
-    const provider = new SymbolPickerProvider(context);
+    const provider = new SymbolViewProvider(context);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider("tinymist.side-symbol-view", provider)
     );
@@ -369,7 +367,7 @@ async function commandShowSummary(context: vscode.ExtensionContext): Promise<voi
     await activateEditorTool(context, "summary");
 }
 
-async function commandShowSymbolPicker(context: vscode.ExtensionContext): Promise<void> {
+async function commandShowSymbolView(context: vscode.ExtensionContext): Promise<void> {
     await activateEditorTool(context, "symbol-view");
 }
 
