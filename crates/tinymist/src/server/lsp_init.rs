@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 use typst::util::Deferred;
 use typst_ts_core::ImmutPath;
 
-use crate::actor::cluster::EditorActor;
+use crate::actor::editor::EditorActor;
 use crate::compiler_init::CompileConfig;
 use crate::harness::LspHost;
 use crate::world::{ImmutDict, SharedFontResolver};

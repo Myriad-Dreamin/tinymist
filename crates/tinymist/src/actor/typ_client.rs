@@ -60,12 +60,12 @@ use typst_ts_core::{
 };
 
 use super::{
-    cluster::{EditorRequest, TinymistCompileStatusEnum},
-    render::ExportConfig,
+    editor::{EditorRequest, TinymistCompileStatusEnum},
+    export::ExportConfig,
     typ_server::{CompileClient as TsCompileClient, CompileServerActor},
 };
 use crate::{
-    actor::render::{ExportRequest, OneshotRendering},
+    actor::export::{ExportRequest, OneshotRendering},
     actor::typ_server::EntryStateExt,
     compiler_init::CompileConfig,
     tools::preview::{CompilationHandle, CompileStatus},

@@ -15,7 +15,7 @@ use typst_ts_compiler::vfs::notify::FileChangeSet;
 use typst_ts_core::{config::compiler::DETACHED_ENTRY, ImmutPath};
 
 use crate::{
-    actor::{cluster::EditorRequest, render::ExportConfig, typ_client::CompileClientActor},
+    actor::{editor::EditorRequest, export::ExportConfig, typ_client::CompileClientActor},
     compiler_init::{CompileConfig, CompilerConstConfig},
     harness::InitializedLspDriver,
     internal_error, invalid_params, method_not_found, run_query,

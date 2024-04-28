@@ -33,9 +33,9 @@ use typst_ts_core::path::PathClean;
 use typst_ts_core::{error::prelude::*, ImmutPath};
 
 use super::lsp_init::*;
-use crate::actor::cluster::EditorRequest;
+use crate::actor::editor::EditorRequest;
 use crate::actor::typ_client::CompileClientActor;
-use crate::actor::{FormatConfig, FormatRequest, UserActionRequest, TraceParams};
+use crate::actor::{FormatConfig, FormatRequest, TraceParams, UserActionRequest};
 use crate::compiler::CompileServer;
 use crate::compiler_init::CompilerConstConfig;
 use crate::harness::{InitializedLspDriver, LspHost};

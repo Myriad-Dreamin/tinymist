@@ -18,7 +18,7 @@ use typst::util::Deferred;
 use typst_ts_core::config::compiler::EntryState;
 use typst_ts_core::{ImmutPath, TypstDict};
 
-use crate::actor::cluster::EditorRequest;
+use crate::actor::editor::EditorRequest;
 use crate::compiler::CompileServer;
 use crate::harness::LspDriver;
 use crate::world::{ImmutDict, SharedFontResolver};

@@ -20,7 +20,7 @@ use typst_ts_core::{config::compiler::EntryState, path::PathClean, ImmutPath, Ty
 
 use crate::{tools::word_count, ExportMode};
 
-use super::cluster::EditorRequest;
+use super::editor::EditorRequest;
 
 #[derive(Debug, Clone)]
 pub struct OneshotRendering {

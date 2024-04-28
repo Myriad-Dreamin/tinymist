@@ -1,8 +1,8 @@
 //! Bootstrap actors for Tinymist.
 
-pub mod cluster;
-mod formatting;
-pub mod render;
+pub mod editor;
+pub mod export;
+mod format;
 pub mod typ_client;
 pub mod typ_server;
 mod user_action;
@@ -21,8 +21,8 @@ use typst_ts_compiler::{
 use typst_ts_core::config::compiler::EntryState;
 
 use self::{
-    formatting::run_format_thread,
-    render::{ExportActor, ExportConfig},
+    export::{ExportActor, ExportConfig},
+    format::run_format_thread,
     typ_client::{CompileClientActor, CompileDriver, CompileHandler},
     typ_server::CompileServerActor,
     user_action::run_user_action_thread,
@@ -33,8 +33,8 @@ use crate::{
     ExportMode, TypstLanguageServer,
 };
 
-pub use formatting::{FormatConfig, FormatRequest};
-pub use user_action::{UserActionRequest, TraceParams};
+pub use format::{FormatConfig, FormatRequest};
+pub use user_action::{TraceParams, UserActionRequest};
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
 
