@@ -189,9 +189,9 @@ pub struct TypstLanguageServer {
     /// Whether the server is shutting down.
     pub shutdown_requested: bool,
     /// Whether the server has registered semantic tokens capabilities.
-    pub sema_tokens_registered: Option<bool>,
+    pub sema_tokens_registered: bool,
     /// Whether the server has registered document formatter capabilities.
-    pub formatter_registered: Option<bool>,
+    pub formatter_registered: bool,
     /// Whether client is pinning a file.
     pub pinning: bool,
     /// The client focusing file.
@@ -264,8 +264,8 @@ impl TypstLanguageServer {
             shutdown_requested: false,
             ever_focusing_by_activities: false,
             ever_manual_focusing: false,
-            sema_tokens_registered: None,
-            formatter_registered: None,
+            sema_tokens_registered: false,
+            formatter_registered: false,
             config: Default::default(),
             const_config,
 
@@ -542,28 +542,24 @@ impl TypstLanguageServer {
             return Ok(());
         }
 
-        let res = match (enable, self.sema_tokens_registered) {
-            (true, None | Some(false)) => {
+        match (enable, self.sema_tokens_registered) {
+            (true, false) => {
                 trace!("registering semantic tokens");
                 let options = get_semantic_tokens_options();
                 self.client
                     .register_capability(vec![get_semantic_tokens_registration(options)])
+                    .inspect(|_| self.sema_tokens_registered = enable)
                     .context("could not register semantic tokens")
             }
-            (false, Some(true)) => {
+            (false, true) => {
                 trace!("unregistering semantic tokens");
                 self.client
                     .unregister_capability(vec![get_semantic_tokens_unregistration()])
+                    .inspect(|_| self.sema_tokens_registered = enable)
                     .context("could not unregister semantic tokens")
             }
-            (true, Some(true)) | (false, None | Some(false)) => Ok(()),
-        };
-
-        if res.is_ok() {
-            self.sema_tokens_registered = Some(enable);
+            _ => Ok(()),
         }
-
-        res
     }
 
     /// Registers or unregisters document formatter.
@@ -591,27 +587,23 @@ impl TypstLanguageServer {
             }
         }
 
-        let res = match (enable, self.formatter_registered) {
-            (true, None | Some(false)) => {
+        match (enable, self.formatter_registered) {
+            (true, false) => {
                 trace!("registering formatter");
                 self.client
                     .register_capability(vec![get_formatting_registration()])
+                    .inspect(|_| self.formatter_registered = enable)
                     .context("could not register formatter")
             }
-            (false, Some(true)) => {
+            (false, true) => {
                 trace!("unregistering formatter");
                 self.client
                     .unregister_capability(vec![get_formatting_unregistration()])
+                    .inspect(|_| self.formatter_registered = enable)
                     .context("could not unregister formatter")
             }
-            (true, Some(true)) | (false, None | Some(false)) => Ok(()),
-        };
-
-        if res.is_ok() {
-            self.formatter_registered = Some(enable);
+            _ => Ok(()),
         }
-
-        res
     }
 }
 
