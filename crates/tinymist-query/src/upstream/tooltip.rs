@@ -11,7 +11,7 @@ use typst::util::{round_2, Numeric};
 use typst::World;
 
 use super::summarize_font_family;
-use crate::analysis::{analyze_expr, analyze_labels};
+use crate::analysis::{analyze_expr, analyze_labels, DynLabel};
 
 /// Describe the item under the cursor.
 ///
@@ -161,7 +161,12 @@ fn label_tooltip(document: &Document, leaf: &LinkedNode) -> Option<Tooltip> {
         _ => return None,
     };
 
-    for (label, detail) in analyze_labels(document).0 {
+    for DynLabel {
+        label,
+        label_desc: _,
+        detail,
+    } in analyze_labels(document).0
+    {
         if label.as_str() == target {
             return Some(Tooltip::Text(detail?));
         }

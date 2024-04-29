@@ -78,36 +78,59 @@ pub fn analyze_import(world: &dyn World, source: &LinkedNode) -> Option<Value> {
         .map(Value::Module)
 }
 
+/// A label with a description and details.
+pub struct DynLabel {
+    /// The label itself.
+    pub label: Label,
+    /// A description of the label.
+    pub label_desc: Option<EcoString>,
+    /// Additional details about the label.
+    pub detail: Option<EcoString>,
+}
+
 /// Find all labels and details for them.
 ///
 /// Returns:
 /// - All labels and descriptions for them, if available
 /// - A split offset: All labels before this offset belong to nodes, all after
 ///   belong to a bibliography.
-pub fn analyze_labels(document: &Document) -> (Vec<(Label, Option<EcoString>)>, usize) {
+pub fn analyze_labels(document: &Document) -> (Vec<DynLabel>, usize) {
     let mut output = vec![];
 
     // Labels in the document.
     for elem in document.introspector.all() {
         let Some(label) = elem.label() else { continue };
-        let details = elem
-            .get_by_name("caption")
-            .or_else(|| elem.get_by_name("body"))
-            .and_then(|field| match field {
-                Value::Content(content) => Some(content),
-                _ => None,
-            })
-            .as_ref()
-            .unwrap_or(elem)
-            .plain_text();
-        output.push((label, Some(details)));
+        let (is_derived, details) = {
+            let derived = elem
+                .get_by_name("caption")
+                .or_else(|| elem.get_by_name("body"));
+
+            match derived {
+                Some(Value::Content(content)) => (true, content.plain_text()),
+                Some(Value::Str(s)) => (true, s.into()),
+                _ => (false, elem.plain_text()),
+            }
+        };
+        output.push(DynLabel {
+            label,
+            label_desc: Some(if is_derived {
+                details.clone()
+            } else {
+                eco_format!("{}(..)", elem.func().name())
+            }),
+            detail: Some(details),
+        });
     }
 
     let split = output.len();
 
     // Bibliography keys.
     for (key, detail) in BibliographyElem::keys(document.introspector.track()) {
-        output.push((Label::new(&key), detail));
+        output.push(DynLabel {
+            label: Label::new(&key),
+            label_desc: detail.clone(),
+            detail,
+        });
     }
 
     (output, split)
