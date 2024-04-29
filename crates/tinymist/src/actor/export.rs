@@ -67,48 +67,62 @@ impl ExportActor {
     }
 
     pub async fn run(mut self) {
-        // todo: accumulate like compile server if we have performance issue here
-        let kind = &self.kind;
-        while let Some(req) = self.export_rx.recv().await {
-            log::debug!("RenderActor: received request: {req:?}");
-            match req {
-                ExportRequest::ChangeConfig(cfg) => self.config = cfg,
-                ExportRequest::ChangeExportPath(entry) => self.config.entry = entry,
-                ExportRequest::OnTyped => {
-                    let export = self.config.mode == ExportMode::OnType;
-                    self.check_mode_and_export(&self.kind, export).await;
-                }
-                ExportRequest::OnSaved(..) => {
-                    let export = match self.config.mode {
-                        ExportMode::OnSave => true,
-                        ExportMode::OnDocumentHasTitle => self.doc_has_title(),
-                        _ => false,
-                    };
-                    self.check_mode_and_export(&self.kind, export).await;
-                }
-                ExportRequest::Oneshot(kind, callback) => {
-                    let kind = kind.as_ref().unwrap_or(&self.kind);
-                    let resp = self.check_mode_and_export(kind, true).await;
-                    if let Err(err) = callback.send(resp) {
-                        error!("RenderActor(@{kind:?}): failed to send response: {err:?}");
+        while let Some(mut req) = self.export_rx.recv().await {
+            let Some(doc) = self.document.borrow().clone() else {
+                info!("RenderActor: document is not ready");
+                continue;
+            };
+
+            let mut need_export = false;
+
+            'accumulate: loop {
+                log::debug!("RenderActor: received request: {req:?}");
+                match req {
+                    ExportRequest::ChangeConfig(cfg) => self.config = cfg,
+                    ExportRequest::ChangeExportPath(entry) => self.config.entry = entry,
+                    ExportRequest::OnTyped => need_export |= self.config.mode == ExportMode::OnType,
+                    ExportRequest::OnSaved(..) => match self.config.mode {
+                        ExportMode::OnSave => need_export = true,
+                        ExportMode::OnDocumentHasTitle => need_export |= doc.title.is_some(),
+                        _ => {}
+                    },
+                    ExportRequest::Oneshot(kind, callback) => {
+                        // Do oneshot export instantly without accumulation.
+                        let kind = kind.as_ref().unwrap_or(&self.kind);
+                        let resp = self.check_mode_and_export(kind, &doc).await;
+                        if let Err(err) = callback.send(resp) {
+                            error!("RenderActor(@{kind:?}): failed to send response: {err:?}");
+                        }
                     }
                 }
+
+                // Try to accumulate more requests.
+                match self.export_rx.try_recv() {
+                    Ok(new_req) => req = new_req,
+                    _ => break 'accumulate,
+                }
+            }
+
+            if need_export {
+                self.check_mode_and_export(&self.kind, &doc).await;
+            }
+
+            if self.count_words {
+                let wc = word_count::word_count(&doc);
+                log::debug!("word count: {wc:?}");
+                let _ = self
+                    .editor_tx
+                    .send(EditorRequest::WordCount(self.group.clone(), Some(wc)));
             }
         }
-        info!("RenderActor(@{kind:?}): stopped");
+        info!("RenderActor(@{:?}): stopped", &self.kind);
     }
 
-    fn doc_has_title(&self) -> bool {
-        let doc = self.document.borrow();
-        doc.as_ref().and_then(|d| d.title.as_ref()).is_some()
-    }
-
-    async fn check_mode_and_export(&self, kind: &ExportKind, export: bool) -> Option<PathBuf> {
-        let Some(document) = self.document.borrow().clone() else {
-            info!("RenderActor: document is not ready");
-            return None;
-        };
-
+    async fn check_mode_and_export(
+        &self,
+        kind: &ExportKind,
+        doc: &TypstDocument,
+    ) -> Option<PathBuf> {
         // pub entry: EntryState,
         let root = self.config.entry.root();
         let main = self.config.entry.main();
@@ -128,26 +142,13 @@ impl ExportActor {
 
         let path = main.vpath().resolve(&root)?;
 
-        // Count words if needed.
-        if self.count_words {
-            let wc = word_count::word_count(&document);
-            log::debug!("word count: {wc:?}");
-            let _ = self
-                .editor_tx
-                .send(EditorRequest::WordCount(self.group.clone(), Some(wc)));
+        match self.export(kind, doc, &root, &path).await {
+            Ok(pdf) => Some(pdf),
+            Err(err) => {
+                error!("RenderActor({kind:?}): failed to export {err}");
+                None
+            }
         }
-
-        // Export if needed.
-        if export {
-            return match self.export(kind, &document, &root, &path).await {
-                Ok(pdf) => Some(pdf),
-                Err(err) => {
-                    error!("RenderActor({kind:?}): failed to export {err}");
-                    None
-                }
-            };
-        }
-        None
     }
 
     async fn export(
