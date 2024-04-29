@@ -142,7 +142,7 @@ impl TypstLanguageServer {
         }
 
         let (tx_req, rx_req) = crossbeam_channel::unbounded();
-        self.format_thread = Some(tx_req.clone());
+        self.format_thread = Some(tx_req);
 
         let client = self.client.clone();
         let mode = self.config.formatter;
@@ -152,13 +152,13 @@ impl TypstLanguageServer {
     }
 
     pub fn run_user_action_thread(&mut self) {
-        if self.user_action_threads.is_some() {
+        if self.user_action_thread.is_some() {
             log::error!("user action threads are already started");
             return;
         }
 
         let (tx_req, rx_req) = crossbeam_channel::unbounded();
-        self.user_action_threads = Some(tx_req.clone());
+        self.user_action_thread = Some(tx_req);
 
         let client = self.client.clone();
         std::thread::spawn(move || run_user_action_thread(rx_req, client));

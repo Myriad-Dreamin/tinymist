@@ -30,7 +30,7 @@ pub enum ExportRequest {
     OnTyped,
     OnSaved(PathBuf),
     Oneshot(Option<ExportKind>, oneshot::Sender<Option<PathBuf>>),
-    Configure(ExportConfig),
+    ChangeConfig(ExportConfig),
     ChangeExportPath(EntryState),
 }
 
@@ -67,11 +67,12 @@ impl ExportActor {
     }
 
     pub async fn run(mut self) {
+        // todo: accumulate like compile server if we have performance issue here
         let kind = &self.kind;
         while let Some(req) = self.export_rx.recv().await {
             log::debug!("RenderActor: received request: {req:?}");
             match req {
-                ExportRequest::Configure(cfg) => self.config = cfg,
+                ExportRequest::ChangeConfig(cfg) => self.config = cfg,
                 ExportRequest::ChangeExportPath(entry) => self.config.entry = entry,
                 ExportRequest::OnTyped => {
                     let export = self.config.mode == ExportMode::OnType;

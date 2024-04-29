@@ -230,7 +230,7 @@ pub struct TypstLanguageServer {
     pub format_thread: Option<crossbeam_channel::Sender<FormatRequest>>,
     /// The user action thread running in backend.
     /// Note: The thread will exit if you drop the sender.
-    pub user_action_threads: Option<crossbeam_channel::Sender<UserActionRequest>>,
+    pub user_action_thread: Option<crossbeam_channel::Sender<UserActionRequest>>,
 }
 
 /// Getters and the main loop.
@@ -278,7 +278,7 @@ impl TypstLanguageServer {
             focusing: None,
             tokens_ctx,
             format_thread: None,
-            user_action_threads: None,
+            user_action_thread: None,
         }
     }
 
@@ -728,7 +728,7 @@ impl TypstLanguageServer {
         let self_path = std::env::current_exe()
             .map_err(|e| internal_error(format!("Cannot get typst compiler {e}")))?;
 
-        let thread = self.user_action_threads.clone();
+        let thread = self.user_action_thread.clone();
         let entry = self.config.compile.determine_entry(Some(path));
 
         let res = self
@@ -1046,7 +1046,7 @@ impl TypstLanguageServer {
                 error!("could not change formatter config: {err}");
             }
             if let Some(f) = &self.format_thread {
-                let err = f.send(FormatRequest::Configure(FormatConfig {
+                let err = f.send(FormatRequest::ChangeConfig(FormatConfig {
                     mode: self.config.formatter,
                     width: self.config.formatter_print_width,
                 }));

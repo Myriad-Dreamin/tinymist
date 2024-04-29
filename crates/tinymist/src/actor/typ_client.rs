@@ -382,7 +382,7 @@ impl CompileClientActor {
         let entry = self.entry.clone();
         let _ = self
             .export_tx
-            .send(ExportRequest::Configure(ExportConfig { entry, ..config }));
+            .send(ExportRequest::ChangeConfig(ExportConfig { entry, ..config }));
     }
 
     pub fn clear_cache(&self) {

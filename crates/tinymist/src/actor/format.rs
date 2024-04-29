@@ -16,7 +16,7 @@ pub struct FormatConfig {
 }
 
 pub enum FormatRequest {
-    Configure(FormatConfig),
+    ChangeConfig(FormatConfig),
     Format(RequestId, Source),
 }
 
@@ -32,34 +32,29 @@ pub fn run_format_thread(
         match c.mode {
             FormatterMode::Typstyle => {
                 let cw = c.width as usize;
-                let f: FmtFn = Box::new(move |e: Source| {
+                Box::new(move |e: Source| {
                     let res = typstyle_core::Typstyle::new_with_src(e.clone(), cw).pretty_print();
                     Ok(calc_diff(e, res, position_encoding))
-                });
-                f
+                })
             }
             FormatterMode::Typstfmt => {
                 let config = typstfmt_lib::Config {
                     max_line_length: c.width as usize,
                     ..typstfmt_lib::Config::default()
                 };
-                let f: FmtFn = Box::new(move |e: Source| {
+                Box::new(move |e: Source| {
                     let res = typstfmt_lib::format(e.text(), config);
                     Ok(calc_diff(e, res, position_encoding))
-                });
-                f
+                })
             }
-            FormatterMode::Disable => {
-                let f: FmtFn = Box::new(|_| Ok(None));
-                f
-            }
+            FormatterMode::Disable => Box::new(|_| Ok(None)),
         }
     };
 
     let mut f: FmtFn = compile(config);
     while let Ok(req) = format_rx.recv() {
         match req {
-            FormatRequest::Configure(c) => f = compile(c),
+            FormatRequest::ChangeConfig(c) => f = compile(c),
             FormatRequest::Format(id, source) => {
                 let res = f(source);
                 if let Ok(response) = result_to_response_(id, res) {

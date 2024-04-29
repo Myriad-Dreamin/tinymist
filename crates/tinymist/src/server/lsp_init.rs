@@ -66,13 +66,10 @@ pub enum SemanticTokensMode {
 pub struct CompileExtraOpts {
     /// The root directory for compilation routine.
     pub root_dir: Option<PathBuf>,
-
     /// Path to entry
     pub entry: Option<ImmutPath>,
-
     /// Additional input arguments to compile the entry file.
     pub inputs: ImmutDict,
-
     /// will remove later
     pub font_paths: Vec<PathBuf>,
 }
