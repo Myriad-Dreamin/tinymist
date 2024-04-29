@@ -132,10 +132,9 @@ mod polymorphic {
     use super::*;
 
     #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
     pub enum PageSelection {
-        #[serde(rename = "first")]
         First,
-        #[serde(rename = "merged")]
         Merged,
     }
 
@@ -177,12 +176,11 @@ mod polymorphic {
     pub struct ServerInfoRequest {}
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
     pub struct ServerInfoResponse {
         pub root: Option<PathBuf>,
-        #[serde(rename = "fontPaths")]
         pub font_paths: Vec<PathBuf>,
         pub inputs: Dict,
-        #[serde(rename = "estimatedMemoryUsage")]
         pub estimated_memory_usage: HashMap<String, usize>,
     }
 

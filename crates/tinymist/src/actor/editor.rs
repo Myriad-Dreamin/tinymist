@@ -185,9 +185,9 @@ pub enum TinymistCompileStatusEnum {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TinymistCompileStatus {
     pub status: TinymistCompileStatusEnum,
-    #[serde(rename = "wordsCount")]
     pub words_count: Option<WordsCount>,
 }
 

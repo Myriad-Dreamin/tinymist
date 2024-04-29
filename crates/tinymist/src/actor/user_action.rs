@@ -11,13 +11,12 @@ use typst_ts_core::TypstDict;
 use crate::{internal_error, result_to_response_, LspHost, TypstLanguageServer};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TraceParams {
-    #[serde(rename = "compilerProgram")]
     pub compiler_program: PathBuf,
     pub root: PathBuf,
     pub main: PathBuf,
     pub inputs: TypstDict,
-    #[serde(rename = "fontPaths")]
     pub font_paths: Vec<PathBuf>,
 }
 

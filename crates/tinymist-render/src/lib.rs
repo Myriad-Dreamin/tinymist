@@ -27,17 +27,15 @@ impl ExportFeature for PeriscopeExportFeature {
 
 /// The arguments for periscope renderer.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PeriscopeArgs {
     /// The distance above the center line.
-    #[serde(rename = "yAbove")]
     pub y_above: f32,
     /// The distance below the center line.
-    #[serde(rename = "yBelow")]
     pub y_below: f32,
     /// The scale of the image.
     pub scale: f32,
     /// Whether to invert the color. (will become smarter in the future)
-    #[serde(rename = "invertColor")]
     pub invert_color: String,
 }
 

@@ -844,8 +844,8 @@ impl TypstLanguageServer {
         use crate::tools::package::{self, determine_latest_version, TemplateSource};
 
         #[derive(Debug, Serialize)]
+        #[serde(rename_all = "camelCase")]
         struct InitResult {
-            #[serde(rename = "entryPath")]
             entry_path: PathBuf,
         }
 
