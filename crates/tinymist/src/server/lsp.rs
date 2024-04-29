@@ -245,8 +245,8 @@ impl TypstLanguageServer {
     ) -> Self {
         let tokens_ctx = SemanticTokenContext::new(
             const_config.position_encoding,
-            const_config.sema_tokens_overlapping_token_support,
-            const_config.sema_tokens_multiline_token_support,
+            const_config.tokens_overlapping_token_support,
+            const_config.tokens_multiline_token_support,
         );
         Self {
             client,
@@ -347,7 +347,7 @@ impl InitializedLspDriver for TypstLanguageServer {
     /// The server can use the `initialized` notification, for example, to
     /// dynamically register capabilities with the client.
     fn initialized(&mut self, params: InitializedParams) {
-        if self.const_config().sema_tokens_dynamic_registration
+        if self.const_config().tokens_dynamic_registration
             && self.config.semantic_tokens == SemanticTokensMode::Enable
         {
             let err = self.enable_sema_token_caps(true);
@@ -537,7 +537,7 @@ impl TypstLanguageServer {
 
     /// Registers or unregisters semantic tokens.
     fn enable_sema_token_caps(&mut self, enable: bool) -> anyhow::Result<()> {
-        if !self.const_config().sema_tokens_dynamic_registration {
+        if !self.const_config().tokens_dynamic_registration {
             trace!("skip register semantic by config");
             return Ok(());
         }

@@ -14,6 +14,7 @@ use typst_ts_core::ImmutPath;
 use crate::actor::editor::EditorActor;
 use crate::compiler_init::CompileConfig;
 use crate::harness::LspHost;
+use crate::utils::{try_, try_or};
 use crate::world::{ImmutDict, SharedFontResolver};
 use crate::{invalid_params, CompileFontOpts, LspResult, TypstLanguageServer};
 
@@ -149,17 +150,11 @@ impl Config {
     /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
         #![allow(clippy::option_map_unit_fn)]
-        update
-            .get("semanticTokens")
-            .and_then(|v| SemanticTokensMode::deserialize(v).ok())
+        try_(|| SemanticTokensMode::deserialize(update.get("semanticTokens")?).ok())
             .map(|v| self.semantic_tokens = v);
-        update
-            .get("formatterMode")
-            .and_then(|v| FormatterMode::deserialize(v).ok())
+        try_(|| FormatterMode::deserialize(update.get("formatterMode")?).ok())
             .map(|v| self.formatter = v);
-        update
-            .get("formatterPrintWidth")
-            .and_then(|v| u32::deserialize(v).ok())
+        try_(|| u32::deserialize(update.get("formatterPrintWidth")?).ok())
             .map(|v| self.formatter_print_width = v);
         self.compile.update_by_map(update)?;
         self.compile.validate()
@@ -176,11 +171,11 @@ pub struct ConstConfig {
     /// Allow dynamic registration of configuration changes.
     pub cfg_change_registration: bool,
     /// Allow dynamic registration of semantic tokens.
-    pub sema_tokens_dynamic_registration: bool,
+    pub tokens_dynamic_registration: bool,
     /// Allow overlapping tokens.
-    pub sema_tokens_overlapping_token_support: bool,
+    pub tokens_overlapping_token_support: bool,
     /// Allow multiline tokens.
-    pub sema_tokens_multiline_token_support: bool,
+    pub tokens_multiline_token_support: bool,
     /// Allow line folding on documents.
     pub doc_line_folding_only: bool,
     /// Allow dynamic registration of document formatting.
@@ -189,16 +184,12 @@ pub struct ConstConfig {
 
 impl From<&InitializeParams> for ConstConfig {
     fn from(params: &InitializeParams) -> Self {
-        const DEFAULT_ENCODING: &[PositionEncodingKind; 1] = &[PositionEncodingKind::UTF16];
+        const DEFAULT_ENCODING: &[PositionEncodingKind] = &[PositionEncodingKind::UTF16];
 
         let position_encoding = {
-            let encodings = params
-                .capabilities
-                .general
-                .as_ref()
-                .and_then(|general| general.position_encodings.as_ref())
-                .map(|encodings| encodings.as_slice())
-                .unwrap_or(DEFAULT_ENCODING);
+            let general = params.capabilities.general.as_ref();
+            let encodings = try_(|| Some(general?.position_encodings.as_ref()?.as_slice()));
+            let encodings = encodings.unwrap_or(DEFAULT_ENCODING);
 
             if encodings.contains(&PositionEncodingKind::UTF8) {
                 PositionEncoding::Utf8
@@ -209,22 +200,18 @@ impl From<&InitializeParams> for ConstConfig {
 
         let workspace = params.capabilities.workspace.as_ref();
         let doc = params.capabilities.text_document.as_ref();
-        let sema = doc.and_then(|d| d.semantic_tokens.as_ref());
-        let format = doc.and_then(|d| d.formatting.as_ref());
-        let fold = doc.and_then(|d| d.folding_range.as_ref());
-
-        fn get(f: impl FnOnce() -> Option<bool>, default: bool) -> bool {
-            f().unwrap_or(default)
-        }
+        let sema = try_(|| doc?.semantic_tokens.as_ref());
+        let fold = try_(|| doc?.folding_range.as_ref());
+        let format = try_(|| doc?.formatting.as_ref());
 
         Self {
             position_encoding,
-            cfg_change_registration: get(|| workspace?.configuration, false),
-            sema_tokens_dynamic_registration: get(|| sema?.dynamic_registration, false),
-            sema_tokens_overlapping_token_support: get(|| sema?.overlapping_token_support, false),
-            sema_tokens_multiline_token_support: get(|| sema?.multiline_token_support, false),
-            doc_fmt_dynamic_registration: get(|| format?.dynamic_registration, false),
-            doc_line_folding_only: get(|| fold?.line_folding_only, true),
+            cfg_change_registration: try_or(|| workspace?.configuration, false),
+            tokens_dynamic_registration: try_or(|| sema?.dynamic_registration, false),
+            tokens_overlapping_token_support: try_or(|| sema?.overlapping_token_support, false),
+            tokens_multiline_token_support: try_or(|| sema?.multiline_token_support, false),
+            doc_line_folding_only: try_or(|| fold?.line_folding_only, true),
+            doc_fmt_dynamic_registration: try_or(|| format?.dynamic_registration, false),
         }
     }
 }
@@ -353,7 +340,7 @@ impl Init {
         // Register these capabilities statically if the client does not support dynamic
         // registration
         let semantic_tokens_provider = match service.config.semantic_tokens {
-            SemanticTokensMode::Enable if !cc.sema_tokens_dynamic_registration => {
+            SemanticTokensMode::Enable if !cc.tokens_dynamic_registration => {
                 Some(get_semantic_tokens_options().into())
             }
             _ => None,

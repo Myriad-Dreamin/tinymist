@@ -20,6 +20,7 @@ use typst_ts_core::{ImmutPath, TypstDict};
 use crate::actor::editor::EditorRequest;
 use crate::compiler::CompileServer;
 use crate::harness::LspDriver;
+use crate::utils::{try_, try_or_default};
 use crate::world::{ImmutDict, SharedFontResolver};
 use crate::{CompileExtraOpts, CompileFontOpts, ExportMode, LspHost};
 
@@ -123,25 +124,15 @@ impl CompileConfig {
     /// # Errors
     /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
-        let output_path = update.get("outputPath").and_then(|v| v.as_str());
-        self.output_path = output_path.map(str::to_owned).unwrap_or_default();
-
-        let export_pdf = update
-            .get("exportPdf")
-            .and_then(|v| ExportMode::deserialize(v).ok());
-        self.export_pdf = export_pdf.unwrap_or_default();
-
-        let root_path = update.get("rootPath").and_then(|v| v.as_str());
-        self.root_path = root_path.map(PathBuf::from);
-
-        self.notify_compile_status = match update.get("compileStatus").and_then(|x| x.as_str()) {
+        self.output_path = try_or_default(|| Some(update.get("outputPath")?.as_str()?.to_owned()));
+        self.export_pdf = try_or_default(|| ExportMode::deserialize(update.get("exportPdf")?).ok());
+        self.root_path = try_(|| Some(update.get("rootPath")?.as_str()?.into()));
+        self.notify_compile_status = match try_(|| update.get("compileStatus")?.as_str()) {
             Some("enable") => true,
             Some("disable") | None => false,
             _ => bail!("compileStatus must be either 'enable' or 'disable'"),
         };
-
-        let preferred_theme = update.get("preferredTheme").and_then(|x| x.as_str());
-        self.preferred_theme = preferred_theme.map(str::to_owned);
+        self.preferred_theme = try_(|| Some(update.get("preferredTheme")?.as_str()?.to_owned()));
 
         // periscope_args
         self.periscope_args = match update.get("hoverPeriscope") {
@@ -204,10 +195,8 @@ impl CompileConfig {
             return Some(path.as_path().into());
         }
 
-        if let Some(extras) = &self.typst_extra_args {
-            if let Some(root) = &extras.root_dir {
-                return Some(root.as_path().into());
-            }
+        if let Some(root) = try_(|| self.typst_extra_args.as_ref()?.root_dir.as_ref()) {
+            return Some(root.as_path().into());
         }
 
         if let Some(entry) = entry {
