@@ -12,7 +12,7 @@ use crate::{tools::word_count::WordsCount, LspHost, TypstLanguageServer};
 pub enum EditorRequest {
     Diag(String, Option<DiagnosticsMap>),
     Status(String, TinymistCompileStatusEnum),
-    WordCount(String, Option<WordsCount>),
+    WordCount(String, WordsCount),
 }
 
 pub struct EditorActor {
@@ -82,7 +82,7 @@ impl EditorActor {
                 EditorRequest::WordCount(group, wc) => {
                     log::debug!("received word count request");
                     if self.notify_compile_status && group == "primary" {
-                        words_count = wc;
+                        words_count = Some(wc);
                         self.host.send_notification::<TinymistCompileStatus>(
                             TinymistCompileStatus {
                                 status: compile_status.clone(),

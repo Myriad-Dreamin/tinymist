@@ -112,7 +112,7 @@ impl ExportActor {
                 log::debug!("word count: {wc:?}");
                 let _ = self
                     .editor_tx
-                    .send(EditorRequest::WordCount(self.group.clone(), Some(wc)));
+                    .send(EditorRequest::WordCount(self.group.clone(), wc));
             }
         }
         info!("RenderActor(@{:?}): stopped", &self.kind);
