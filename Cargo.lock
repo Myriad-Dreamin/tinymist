@@ -3855,6 +3855,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "siphasher 1.0.1",
  "strum 0.26.2",
  "toml 0.8.12",
  "ttf-parser",

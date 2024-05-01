@@ -4,4 +4,4 @@ description: "Check on \"(\" (105)"
 expression: literal_type
 input_file: crates/tinymist-query/src/fixtures/post_type_check/user_func.typ
 ---
-TextFont
+( ⪯ TextFont & TextFont)

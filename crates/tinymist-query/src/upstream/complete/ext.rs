@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, HashSet};
 use ecow::{eco_format, EcoString};
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
 use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
 use reflexo::path::{unix_slash, PathClean};
 use typst::foundations::{AutoValue, Func, Label, NoneValue, Type, Value};
 use typst::layout::{Dir, Length};
@@ -437,6 +438,8 @@ fn type_completion(
                 label: f.clone(),
                 apply: Some(eco_format!("{}: ${{}}", f)),
                 detail: docs.map(Into::into),
+                // todo: only vscode and neovim (0.9.1) support this
+                command: Some("editor.action.triggerSuggest"),
                 ..Completion::default()
             });
         }
@@ -791,7 +794,7 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     struct LitComplWorker<'a, 'b, 'w> {
         ctx: &'a mut CompletionContext<'b, 'w>,
         dict_lit: ast::Dict<'a>,
-        existing: &'a OnceCell<HashSet<EcoString>>,
+        existing: &'a OnceCell<Mutex<HashSet<EcoString>>>,
     }
 
     let mut ctx = LitComplWorker {
@@ -808,26 +811,29 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
                 }
                 LitComplAction::Dict(dict_iface) => {
                     let existing = self.existing.get_or_init(|| {
-                        self.dict_lit
-                            .items()
-                            .filter_map(|field| match field {
-                                ast::DictItem::Named(n) => Some(n.name().get().clone()),
-                                ast::DictItem::Keyed(k) => {
-                                    let key = self.ctx.ctx.const_eval(k.key());
-                                    if let Some(Value::Str(key)) = key {
-                                        return Some(key.into());
-                                    }
+                        Mutex::new(
+                            self.dict_lit
+                                .items()
+                                .filter_map(|field| match field {
+                                    ast::DictItem::Named(n) => Some(n.name().get().clone()),
+                                    ast::DictItem::Keyed(k) => {
+                                        let key = self.ctx.ctx.const_eval(k.key());
+                                        if let Some(Value::Str(key)) = key {
+                                            return Some(key.into());
+                                        }
 
-                                    None
-                                }
-                                // todo: var dict union
-                                ast::DictItem::Spread(_s) => None,
-                            })
-                            .collect::<HashSet<_>>()
+                                        None
+                                    }
+                                    // todo: var dict union
+                                    ast::DictItem::Spread(_s) => None,
+                                })
+                                .collect::<HashSet<_>>(),
+                        )
                     });
+                    let mut existing = existing.lock();
 
                     for (key, _, _) in dict_iface.fields.iter() {
-                        if existing.contains(key) {
+                        if !existing.insert(key.clone()) {
                             continue;
                         }
 

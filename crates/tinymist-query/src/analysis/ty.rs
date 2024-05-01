@@ -40,6 +40,7 @@ pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Ar
         source: source.clone(),
         def_use_info,
         info: &mut info,
+        externals: HashMap::new(),
         mode: InterpretMode::Markup,
     };
     let lnk = LinkedNode::new(source.root());
@@ -83,17 +84,6 @@ impl TypeCheckInfo {
         };
 
         worker.simplify(ty, principal)
-    }
-
-    pub fn var_at(
-        &mut self,
-        var_site: Span,
-        def_id: DefId,
-        f: impl FnOnce() -> FlowVar,
-    ) -> &mut FlowVar {
-        let var = self.vars.entry(def_id).or_insert_with(f);
-        Self::witness_(var_site, var.get_ref(), &mut self.mapping);
-        var
     }
 
     // todo: distinguish at least, at most
@@ -141,6 +131,7 @@ struct TypeChecker<'a, 'w> {
     def_use_info: Arc<DefUseInfo>,
 
     info: &'a mut TypeCheckInfo,
+    externals: HashMap<DefId, Option<FlowType>>,
     mode: InterpretMode,
 }
 
@@ -328,12 +319,11 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             range: root.range(),
         };
 
-        let Some(def_id) = self.def_use_info.get_ref(&ident_ref) else {
+        let Some(var) = self.get_var(root.span(), ident_ref) else {
             let s = root.span();
             let v = resolve_global_value(self.ctx, root, mode == InterpretMode::Math)?;
             return Some(FlowType::Value(Box::new((v, s))));
         };
-        let var = self.info.vars.get(&def_id)?.clone();
 
         Some(var.get_ref())
     }
@@ -707,24 +697,48 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             .get_ref(&r)
             .or_else(|| Some(self.def_use_info.get_def(s.id()?, &r)?.0))?;
 
-        Some(self.info.var_at(s, def_id, || {
-            // let store = FlowVarStore {
-            //     name: r.name.into(),
-            //     id: def_id,
-            //     lbs: Vec::new(),
-            //     ubs: Vec::new(),
-            // };
-            // FlowVar(Arc::new(RwLock::new(store)))
-            FlowVar {
-                name: r.name.into(),
-                id: def_id,
-                kind: FlowVarKind::Weak(Arc::new(RwLock::new(FlowVarStore {
-                    lbs: Vec::new(),
-                    ubs: Vec::new(),
-                }))),
-                // kind: FlowVarKind::Strong(FlowType::Any),
-            }
-        }))
+        // todo: false positive of clippy
+        #[allow(clippy::map_entry)]
+        if !self.info.vars.contains_key(&def_id) {
+            let def = self.check_external(def_id);
+            let kind = FlowVarKind::Weak(Arc::new(RwLock::new(self.init_var(def))));
+            self.info.vars.insert(
+                def_id,
+                FlowVar {
+                    name: r.name.into(),
+                    id: def_id,
+                    kind,
+                },
+            );
+        }
+
+        let var = self.info.vars.get_mut(&def_id).unwrap();
+        TypeCheckInfo::witness_(s, var.get_ref(), &mut self.info.mapping);
+        Some(var)
+    }
+
+    fn check_external(&mut self, def_id: DefId) -> Option<FlowType> {
+        if let Some(ty) = self.externals.get(&def_id) {
+            return ty.clone();
+        }
+
+        let (def_id, def_pos) = self.def_use_info.get_def_by_id(def_id)?;
+        if def_id == self.source.id() {
+            return None;
+        }
+
+        let source = self.ctx.source_by_id(def_id).ok()?;
+        let ext_def_use_info = self.ctx.def_use(source.clone())?;
+        let ext_type_info = self.ctx.type_check(source)?;
+        let (ext_def_id, _) = ext_def_use_info.get_def(
+            def_id,
+            &IdentRef {
+                name: def_pos.name.clone(),
+                range: def_pos.range.clone(),
+            },
+        )?;
+        let ext_ty = ext_type_info.vars.get(&ext_def_id)?.get_ref();
+        Some(ext_type_info.simplify(ext_ty, false))
     }
 
     fn check_pattern(
@@ -1202,6 +1216,39 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
             _ => {}
         }
+    }
+
+    fn init_var(&mut self, def: Option<FlowType>) -> FlowVarStore {
+        let mut store = FlowVarStore {
+            lbs: vec![],
+            ubs: vec![],
+        };
+
+        let Some(def) = def else {
+            return store;
+        };
+
+        match def {
+            FlowType::Var(v) => {
+                let w = self.info.vars.get(&v.0).unwrap();
+                match &w.kind {
+                    FlowVarKind::Weak(w) => {
+                        let w = w.read();
+                        store.lbs.extend(w.lbs.iter().cloned());
+                        store.ubs.extend(w.ubs.iter().cloned());
+                    }
+                }
+            }
+            FlowType::Let(v) => {
+                store.lbs.extend(v.lbs.iter().cloned());
+                store.ubs.extend(v.ubs.iter().cloned());
+            }
+            _ => {
+                store.ubs.push(def);
+            }
+        }
+
+        store
     }
 }
 
