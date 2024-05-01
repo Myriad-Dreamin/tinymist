@@ -58,6 +58,23 @@ impl<'a> SignatureWrapper<'a> {
         }
     }
 
+    fn names(&self, mut f: impl FnMut(&str)) {
+        match &self.0 {
+            Abstracted::Type(sig) => {
+                for (k, _) in &sig.named {
+                    f(k);
+                }
+            }
+            Abstracted::Value(sig) => {
+                for (k, p) in &sig.primary().named {
+                    if p.infer_type.is_some() {
+                        f(k);
+                    }
+                }
+            }
+        }
+    }
+
     fn pos(&self, pos: usize) -> Option<&FlowType> {
         match &self.0 {
             Abstracted::Type(sig) => sig.pos.get(pos),
@@ -123,6 +140,15 @@ fn check_signature<'a>(
                 let nth = sig.pos(c + positional).or_else(|| sig.rest())?;
                 receiver.insert(nth, !pol);
 
+                // names
+                sig.names(|name| {
+                    // todo: reduce fields
+                    receiver.insert(
+                        &FlowType::Field(Box::new((name.into(), FlowType::Any, Span::detached()))),
+                        !pol,
+                    );
+                });
+
                 Some(())
             }
         }
@@ -153,7 +179,13 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
         let context = node.parent()?;
         log::debug!("post check: {:?}::{:?}", context.kind(), node.kind());
         let checked_context = self.check_context(context, node);
-        self.check_self(context, node, checked_context)
+        let res = self.check_self(context, node, checked_context);
+        log::debug!(
+            "post check(res): {:?}::{:?} -> {res:?}",
+            context.kind(),
+            node.kind(),
+        );
+        res
     }
 
     fn check_context_or(
@@ -174,9 +206,12 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
 
     fn check_target(
         &mut self,
-        node: CheckTarget,
+        node: Option<CheckTarget>,
         context_ty: Option<FlowType>,
     ) -> Option<FlowType> {
+        let Some(node) = node else {
+            return context_ty;
+        };
         log::debug!("post check target: {node:?}");
 
         match node {
@@ -197,7 +232,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
             }
             CheckTarget::Element { container, target } => {
                 let container_ty = self.check_context_or(&container, context_ty)?;
-                log::info!("post check element target: {container_ty:?}::{target:?}");
+                log::debug!("post check element target: {container_ty:?}::{target:?}");
 
                 let mut resp = SignatureReceiver::default();
 
@@ -257,7 +292,9 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                 }
             }
             // todo: constraint node
-            SyntaxKind::Named => self.check_target(get_check_target(context.clone())?, None),
+            SyntaxKind::Args | SyntaxKind::Named => {
+                self.check_target(get_check_target(context.clone()), None)
+            }
             _ => None,
         }
     }
@@ -277,7 +314,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
             }
             // todo: destructuring
             SyntaxKind::FieldAccess => self.check_context_or(context, context_ty),
-            _ => self.check_target(get_check_target(node.clone())?, context_ty),
+            _ => self.check_target(get_check_target(node.clone()), context_ty),
         }
     }
 

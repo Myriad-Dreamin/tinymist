@@ -825,6 +825,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::With(_e) => {}
             FlowType::Args(_e) => {}
             FlowType::Union(_e) => {}
+            FlowType::Field(_e) => {}
             FlowType::Let(_) => {}
             FlowType::Value(f) => {
                 if let Value::Func(f) = &f.0 {
@@ -1030,6 +1031,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
             FlowType::Tuple(..) => e,
             FlowType::Array(..) => e,
+            FlowType::Field(..) => e,
             FlowType::Clause => e,
             FlowType::Undef => e,
             FlowType::Content => e,
@@ -1325,6 +1327,9 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                     self.analyze(ub, pol);
                 }
             }
+            FlowType::Field(v) => {
+                self.analyze(&v.1, pol);
+            }
             FlowType::Value(_v) => {}
             FlowType::ValueDoc(_v) => {}
             FlowType::Clause => {}
@@ -1440,11 +1445,17 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
 
                 FlowType::Union(Box::new(v2))
             }
+            FlowType::Field(f) => {
+                let (x, y, z) = *f.clone();
+
+                FlowType::Field(Box::new((x, self.transform(&y, pol), z)))
+            }
             FlowType::At(a) => {
                 let a2 = a.clone();
 
                 FlowType::At(a2)
             }
+
             FlowType::Value(v) => FlowType::Value(v.clone()),
             FlowType::ValueDoc(v) => FlowType::ValueDoc(v.clone()),
             FlowType::Element(v) => FlowType::Element(*v),
@@ -1575,6 +1586,8 @@ impl Joiner {
             (FlowType::Union(..), _) => self.definite = FlowType::Undef,
             (FlowType::Let(w), FlowType::None) => self.definite = FlowType::Let(w),
             (FlowType::Let(..), _) => self.definite = FlowType::Undef,
+            (FlowType::Field(w), FlowType::None) => self.definite = FlowType::Field(w),
+            (FlowType::Field(..), _) => self.definite = FlowType::Undef,
             (FlowType::Boolean(b), FlowType::None) => self.definite = FlowType::Boolean(b),
             (FlowType::Boolean(..), _) => self.definite = FlowType::Undef,
         }
