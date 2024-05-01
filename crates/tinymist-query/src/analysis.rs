@@ -100,7 +100,7 @@ mod literal_type_check_tests {
 
     #[test]
     fn test() {
-        snapshot_testing("literal_type_check", &|ctx, path| {
+        snapshot_testing("post_type_check", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
             let pos = ctx
@@ -118,7 +118,7 @@ mod literal_type_check_tests {
             let text = text.unwrap_or_default();
 
             let result = ty::type_check(ctx, source.clone());
-            let literal_type = result.and_then(|info| ty::literal_type_check(ctx, &info, target));
+            let literal_type = result.and_then(|info| ty::post_type_check(ctx, &info, target));
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),

@@ -25,8 +25,8 @@ mod def;
 pub(crate) use def::*;
 mod builtin;
 pub(crate) use builtin::*;
-mod literal_flow;
-pub(crate) use literal_flow::*;
+mod post_check;
+pub(crate) use post_check::*;
 
 /// Type checking at the source unit level.
 pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Arc<TypeCheckInfo>> {

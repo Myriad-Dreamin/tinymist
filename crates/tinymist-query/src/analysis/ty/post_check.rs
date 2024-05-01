@@ -11,23 +11,25 @@ use super::{FlowType, FlowVarKind, TypeCheckInfo};
 
 // todo: detect recursive usage
 
-pub(crate) fn literal_type_check(
+/// With given type information, check the type of a literal expression again by
+/// touching the possible related nodes.
+pub(crate) fn post_type_check(
     _ctx: &mut AnalysisContext,
     info: &TypeCheckInfo,
     node: CheckTarget<'_>,
 ) -> Option<FlowType> {
     let node = node.node()?;
-    let mut worker = LiteralTypeCheckWorker { _ctx, info };
+    let mut worker = PostTypeCheckWorker { _ctx, info };
 
     worker.check(node)
 }
 
-struct LiteralTypeCheckWorker<'a, 'w> {
+struct PostTypeCheckWorker<'a, 'w> {
     _ctx: &'a mut AnalysisContext<'w>,
     info: &'a TypeCheckInfo,
 }
 
-impl<'a, 'w> LiteralTypeCheckWorker<'a, 'w> {
+impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
     fn check(&mut self, node: LinkedNode) -> Option<FlowType> {
         let parent = node.parent()?;
         match parent.kind() {
