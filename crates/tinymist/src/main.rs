@@ -5,24 +5,23 @@ mod args;
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::bail;
-use args::CompileArgs;
 use clap::Parser;
 use comemo::Prehashed;
 use lsp_types::{InitializeParams, InitializedParams};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
+use tokio::sync::mpsc;
+use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
+use typst_ts_compiler::service::{CompileEnv, Compiler, EntryManager};
+use typst_ts_core::{typst::prelude::EcoVec, TypstDict};
+
+use crate::args::{CliArguments, Commands, CompileArgs, LspArgs};
 use tinymist::{
     compiler_init::{CompileInit, CompileInitializeParams},
     harness::{lsp_harness, InitializedLspDriver, LspDriver, LspHost},
     transport::with_stdio_transport,
     CompileFontOpts, Init, LspWorld, TypstLanguageServer,
 };
-use tokio::sync::mpsc;
-use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
-use typst_ts_compiler::service::{CompileEnv, Compiler, EntryManager};
-use typst_ts_core::{typst::prelude::EcoVec, TypstDict};
-
-use crate::args::{CliArguments, Commands, LspArgs};
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -162,7 +161,7 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
             let sender = Arc::new(RwLock::new(Some(s)));
             let host = LspHost::new(sender.clone());
 
-            let _drop_connection = ForceDrop(sender);
+            let _drop_guard = ForceDrop(sender);
 
             let (mut service, res) = init.initialize(
                 host,
@@ -251,9 +250,10 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
 }
 
 struct ForceDrop<T>(Arc<RwLock<Option<T>>>);
+
 impl<T> Drop for ForceDrop<T> {
     fn drop(&mut self) {
-        self.0.write().take();
+        *self.0.write() = None;
     }
 }
 

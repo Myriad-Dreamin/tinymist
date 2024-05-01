@@ -224,6 +224,7 @@ impl CompileConfig {
 
     pub fn determine_default_entry_path(&self) -> Option<ImmutPath> {
         let extras = self.typst_extra_args.as_ref()?;
+        // todo: pre-compute this when updating config
         if let Some(entry) = &extras.entry {
             if entry.is_relative() {
                 let root = self.determine_root(None)?;

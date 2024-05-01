@@ -7,7 +7,7 @@ use lsp_types::TextEdit;
 use tinymist_query::{typst_to_lsp, PositionEncoding};
 use typst::syntax::Source;
 
-use crate::{result_to_response_, FormatterMode, LspHost, LspResult, TypstLanguageServer};
+use crate::{result_to_response, FormatterMode, LspHost, LspResult, TypstLanguageServer};
 
 #[derive(Debug, Clone)]
 pub struct FormatConfig {
@@ -57,9 +57,7 @@ pub fn run_format_thread(
             FormatRequest::ChangeConfig(c) => f = compile(c),
             FormatRequest::Format(id, source) => {
                 let res = f(source);
-                if let Ok(response) = result_to_response_(id, res) {
-                    client.respond(response);
-                }
+                client.respond(result_to_response(id, res));
             }
         }
     }

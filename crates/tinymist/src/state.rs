@@ -2,13 +2,13 @@
 
 use std::path::PathBuf;
 
-use ::typst::{diag::FileResult, syntax::Source};
 use anyhow::anyhow;
 use lsp_types::TextDocumentContentChangeEvent;
 use tinymist_query::{
     lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, OnExportRequest,
     OnSaveExportRequest, PositionEncoding, SemanticRequest, StatefulRequest, SyntaxRequest,
 };
+use typst::{diag::FileResult, syntax::Source};
 use typst_ts_compiler::{
     vfs::notify::{FileChangeSet, MemoryEvent},
     Time,
@@ -30,11 +30,10 @@ impl CompileServer {
 impl TypstLanguageServer {
     /// Pin the entry to the given path
     pub fn pin_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
-        let pinning = new_entry.is_some();
+        self.pinning = new_entry.is_some();
         self.primary.do_change_entry(new_entry)?;
-        self.pinning = pinning;
 
-        if !pinning {
+        if !self.pinning {
             let fallback = self.config.compile.determine_default_entry_path();
             let fallback = fallback.or_else(|| self.focusing.clone());
             if let Some(e) = fallback {
@@ -195,7 +194,7 @@ impl TypstLanguageServer {
 macro_rules! run_query {
     ($self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
         use tinymist_query::*;
-        let req = paste! { [<$query Request>] { $($arg_key),* } };
+        let req = paste::paste! { [<$query Request>] { $($arg_key),* } };
         $self
             .query(CompilerQueryRequest::$query(req.clone()))
             .map_err(|err| {
@@ -255,7 +254,7 @@ impl TypstLanguageServer {
         f: impl FnOnce(Source) -> anyhow::Result<T>,
     ) -> anyhow::Result<T> {
         let snapshot = self.primary.memory_changes.get(&path);
-        let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {:?}", path))?;
+        let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {path:?}"))?;
         let source = snapshot.content.clone();
         f(source)
     }
@@ -292,10 +291,10 @@ impl TypstLanguageServer {
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
         match query {
-            CompilerQueryRequest::OnExport(OnExportRequest { kind, path }) => Ok(
+            OnExport(OnExportRequest { kind, path }) => Ok(
                 CompilerQueryResponse::OnExport(client.on_export(kind, path)?),
             ),
-            CompilerQueryRequest::OnSaveExport(OnSaveExportRequest { path }) => {
+            OnSaveExport(OnSaveExportRequest { path }) => {
                 client.on_save_export(path)?;
                 Ok(CompilerQueryResponse::OnSaveExport(()))
             }
@@ -312,21 +311,12 @@ impl TypstLanguageServer {
             Rename(req) => query_state!(client, Rename, req),
             PrepareRename(req) => query_state!(client, PrepareRename, req),
             Symbol(req) => query_world!(client, Symbol, req),
-
             DocumentMetrics(req) => query_state!(client, DocumentMetrics, req),
             ServerInfo(_) => {
                 let res = client.collect_server_info()?;
                 Ok(CompilerQueryResponse::ServerInfo(Some(res)))
             }
-
-            InteractCodeContext(..)
-            | FoldingRange(..)
-            | SelectionRange(..)
-            | SemanticTokensDelta(..)
-            | Formatting(..)
-            | DocumentSymbol(..)
-            | ColorPresentation(..)
-            | SemanticTokensFull(..) => unreachable!(),
+            _ => unreachable!(),
         }
     }
 }

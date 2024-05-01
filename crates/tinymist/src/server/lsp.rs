@@ -1,6 +1,5 @@
 //! tinymist LSP mode
 
-use core::fmt;
 use std::ops::Deref;
 use std::path::Path;
 use std::sync::Arc;
@@ -8,16 +7,13 @@ use std::time::Instant;
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{bail, Context};
-use crossbeam_channel::select;
-use crossbeam_channel::Receiver;
 use futures::future::BoxFuture;
 use log::{error, info, trace, warn};
-use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, ResponseError};
+use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response, ResponseError};
 use lsp_types::notification::Notification as NotificationTrait;
 use lsp_types::request::{GotoDeclarationParams, GotoDeclarationResponse, WorkspaceConfiguration};
 use lsp_types::*;
-use parking_lot::lock_api::RwLock;
-use paste::paste;
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{
@@ -46,21 +42,6 @@ use crate::{run_query, LspResult};
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
 
-#[derive(Debug)]
-enum Event {
-    Lsp(lsp_server::Message),
-}
-
-impl fmt::Display for Event {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Event::Lsp(_) => write!(f, "Event::Lsp"),
-        }
-    }
-}
-
-pub(crate) struct Cancelled;
-
 type LspMethod<Res> = fn(srv: &mut TypstLanguageServer, args: JsonValue) -> LspResult<Res>;
 type LspHandler<Req, Res> = fn(srv: &mut TypstLanguageServer, args: Req) -> LspResult<Res>;
 
@@ -68,7 +49,7 @@ type LspHandler<Req, Res> = fn(srv: &mut TypstLanguageServer, args: Req) -> LspR
 /// Returns Ok(None) -> Need to respond none
 /// Returns Err(..) -> Need to respond error
 type LspRawHandler<T> =
-    fn(srv: &mut TypstLanguageServer, args: (RequestId, T)) -> LspResult<Option<()>>;
+    fn(srv: &mut TypstLanguageServer, req_id: RequestId, args: T) -> LspResult<Option<()>>;
 
 type ExecuteCmdMap = HashMap<&'static str, LspRawHandler<Vec<JsonValue>>>;
 type NotifyCmdMap = HashMap<&'static str, LspMethod<()>>;
@@ -85,7 +66,7 @@ macro_rules! resource_fn {
 macro_rules! request_fn_ {
     ($desc: ty, Self::$method: ident) => {
         (<$desc>::METHOD, {
-            const E: LspRawHandler<JsonValue> = |this, (req_id, req)| {
+            const E: LspRawHandler<JsonValue> = |this, req_id, req| {
                 let req: <$desc as lsp_types::request::Request>::Params =
                     serde_json::from_value(req).unwrap(); // todo: soft unwrap
                 this.$method(req_id, req)
@@ -98,26 +79,12 @@ macro_rules! request_fn_ {
 macro_rules! request_fn {
     ($desc: ty, Self::$method: ident) => {
         (<$desc>::METHOD, {
-            const E: LspRawHandler<JsonValue> = |this, (req_id, req)| {
+            const E: LspRawHandler<JsonValue> = |this, req_id, req| {
                 let req: <$desc as lsp_types::request::Request>::Params =
                     serde_json::from_value(req).unwrap(); // todo: soft unwrap
-                let res = this
-                    .$method(req)
-                    .map(|res| serde_json::to_value(res).unwrap()); // todo: soft unwrap
+                let res = this.$method(req);
 
-                if let Ok(response) = result_to_response(req_id, res) {
-                    this.client.respond(response);
-                }
-
-                // todo: cancellation
-                // Err(e) => match e.downcast::<Cancelled>() {
-                //     Ok(cancelled) => return Err(cancelled),
-                //     Err(e) => lsp_server::Response::new_err(
-                //         id,
-                //         lsp_server::ErrorCode::InternalError as i32,
-                //         e.to_string(),
-                //     ),
-                // },
+                this.client.respond(result_to_response(req_id, res));
 
                 Ok(Some(()))
             };
@@ -129,11 +96,8 @@ macro_rules! request_fn {
 macro_rules! exec_fn_ {
     ($key: expr, Self::$method: ident) => {
         ($key, {
-            {
-                const E: LspRawHandler<Vec<JsonValue>> =
-                    |this, (req_id, req)| this.$method(req_id, req);
-                E
-            }
+            const E: LspRawHandler<Vec<JsonValue>> = |this, req_id, req| this.$method(req_id, req);
+            E
         })
     };
 }
@@ -141,13 +105,9 @@ macro_rules! exec_fn_ {
 macro_rules! exec_fn {
     ($key: expr, Self::$method: ident) => {
         ($key, {
-            const E: LspRawHandler<Vec<JsonValue>> = |this, (req_id, args)| {
+            const E: LspRawHandler<Vec<JsonValue>> = |this, req_id, args| {
                 let res = this.$method(args);
-
-                if let Ok(response) = result_to_response(req_id, res) {
-                    this.client.respond(response);
-                }
-
+                this.client.respond(result_to_response(req_id, res));
                 Ok(Some(()))
             };
             E
@@ -410,15 +370,15 @@ impl InitializedLspDriver for TypstLanguageServer {
         //     SetThreadPriority(thread, thread_priority_above_normal);
         // }
 
-        while let Some(event) = self.next_event(&inbox) {
-            if matches!(
-                &event,
-                Event::Lsp(lsp_server::Message::Notification(Notification { method, .. }))
-                if method == lsp_types::notification::Exit::METHOD
-            ) {
-                return Ok(());
+        while let Ok(msg) = inbox.recv() {
+            const EXIT_METHOD: &str = lsp_types::notification::Exit::METHOD;
+            let loop_start = Instant::now();
+            match msg {
+                Message::Notification(not) if not.method == EXIT_METHOD => return Ok(()),
+                Message::Notification(not) => self.on_notification(loop_start, not)?,
+                Message::Request(req) => self.on_request(loop_start, req),
+                Message::Response(resp) => self.client.clone().complete_request(self, resp),
             }
-            self.handle_event(event)?;
         }
 
         warn!("client exited without proper shutdown sequence");
@@ -427,44 +387,15 @@ impl InitializedLspDriver for TypstLanguageServer {
 }
 
 impl TypstLanguageServer {
-    /// Receives the next event from event sources.
-    fn next_event(&self, inbox: &Receiver<lsp_server::Message>) -> Option<Event> {
-        select! {
-            recv(inbox) -> msg =>
-                msg.ok().map(Event::Lsp),
-        }
-    }
-
-    /// Handles an incoming event.
-    fn handle_event(&mut self, event: Event) -> anyhow::Result<()> {
-        let loop_start = Instant::now();
-
-        // let was_quiescent = self.is_quiescent();
-        match event {
-            Event::Lsp(msg) => match msg {
-                lsp_server::Message::Request(req) => self.on_new_request(loop_start, req),
-                lsp_server::Message::Notification(not) => self.on_notification(loop_start, not)?,
-                lsp_server::Message::Response(resp) => {
-                    self.client.clone().complete_request(self, resp)
-                }
-            },
-        }
-        Ok(())
-    }
-
     /// Registers and handles a request. This should only be called once per
     /// incoming request.
-    fn on_new_request(&mut self, request_received: Instant, req: Request) {
+    fn on_request(&mut self, request_received: Instant, req: Request) {
         self.client.register_request(&req, request_received);
-        self.on_request(req);
-    }
 
-    /// Handles a request.
-    fn on_request(&mut self, req: Request) {
         if self.shutdown_requested {
-            self.client.respond(lsp_server::Response::new_err(
+            self.client.respond(Response::new_err(
                 req.id.clone(),
-                lsp_server::ErrorCode::InvalidRequest as i32,
+                ErrorCode::InvalidRequest as i32,
                 "Shutdown already requested.".to_owned(),
             ));
             return;
@@ -475,14 +406,7 @@ impl TypstLanguageServer {
             return;
         };
 
-        let res = handler(self, (req.id.clone(), req.params));
-        if matches!(res, Ok(Some(()))) {
-            return;
-        }
-
-        if let Ok(response) = result_to_response_(req.id, res) {
-            self.client.respond(response);
-        }
+        let _ = handler(self, req.id.clone(), req.params);
     }
 
     /// The entry point for the `workspace/executeCommand` request.
@@ -492,16 +416,14 @@ impl TypstLanguageServer {
         params: ExecuteCommandParams,
     ) -> LspResult<Option<()>> {
         let ExecuteCommandParams {
-            command,
-            arguments,
-            work_done_progress_params: _,
+            command, arguments, ..
         } = params;
         let Some(handler) = self.exec_cmds.get(command.as_str()) else {
             error!("asked to execute unknown command");
             return Err(method_not_found());
         };
 
-        handler(self, (req_id.clone(), arguments))
+        handler(self, req_id.clone(), arguments)
     }
 
     /// Handles an incoming notification.
@@ -1312,32 +1234,20 @@ pub fn method_not_found() -> ResponseError {
     }
 }
 
-pub(crate) fn result_to_response_<T: Serialize>(
-    id: lsp_server::RequestId,
+pub(crate) fn result_to_response<T: Serialize>(
+    id: RequestId,
     result: Result<T, ResponseError>,
-) -> Result<lsp_server::Response, Cancelled> {
-    let res = match result {
-        Ok(resp) => {
-            let resp = serde_json::to_value(resp);
-            match resp {
-                Ok(resp) => lsp_server::Response::new_ok(id, resp),
-                Err(e) => return result_to_response(id, Err(internal_error(e.to_string()))),
+) -> Response {
+    match result {
+        Ok(resp) => match serde_json::to_value(resp) {
+            Ok(resp) => Response::new_ok(id, resp),
+            Err(e) => {
+                let e = internal_error(e.to_string());
+                Response::new_err(id, e.code, e.message)
             }
-        }
-        Err(e) => lsp_server::Response::new_err(id, e.code, e.message),
-    };
-    Ok(res)
-}
-
-fn result_to_response(
-    id: lsp_server::RequestId,
-    result: Result<JsonValue, ResponseError>,
-) -> Result<lsp_server::Response, Cancelled> {
-    let res = match result {
-        Ok(resp) => lsp_server::Response::new_ok(id, resp),
-        Err(e) => lsp_server::Response::new_err(id, e.code, e.message),
-    };
-    Ok(res)
+        },
+        Err(e) => Response::new_err(id, e.code, e.message),
+    }
 }
 
 #[test]

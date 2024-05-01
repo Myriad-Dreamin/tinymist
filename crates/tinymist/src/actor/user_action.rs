@@ -8,7 +8,7 @@ use lsp_server::RequestId;
 use serde::{Deserialize, Serialize};
 use typst_ts_core::TypstDict;
 
-use crate::{internal_error, result_to_response_, LspHost, TypstLanguageServer};
+use crate::{internal_error, result_to_response, LspHost, TypstLanguageServer};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,9 +34,7 @@ pub fn run_user_action_thread(
                 let res = run_trace_program(params)
                     .map_err(|e| internal_error(format!("failed to run trace program: {:?}", e)));
 
-                if let Ok(response) = result_to_response_(id, res) {
-                    client.respond(response);
-                }
+                client.respond(result_to_response(id, res));
             }
         }
     }

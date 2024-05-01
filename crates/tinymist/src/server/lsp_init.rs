@@ -149,13 +149,12 @@ impl Config {
     /// # Errors
     /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
-        #![allow(clippy::option_map_unit_fn)]
         try_(|| SemanticTokensMode::deserialize(update.get("semanticTokens")?).ok())
-            .map(|v| self.semantic_tokens = v);
+            .inspect(|v| self.semantic_tokens = *v);
         try_(|| FormatterMode::deserialize(update.get("formatterMode")?).ok())
-            .map(|v| self.formatter = v);
+            .inspect(|v| self.formatter = *v);
         try_(|| u32::deserialize(update.get("formatterPrintWidth")?).ok())
-            .map(|v| self.formatter_print_width = v);
+            .inspect(|v| self.formatter_print_width = *v);
         self.compile.update_by_map(update)?;
         self.compile.validate()
     }

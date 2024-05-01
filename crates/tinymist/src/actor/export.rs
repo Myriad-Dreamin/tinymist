@@ -40,9 +40,9 @@ pub struct ExportActor {
     export_rx: mpsc::UnboundedReceiver<ExportRequest>,
     document: watch::Receiver<Option<Arc<TypstDocument>>>,
 
-    pub config: ExportConfig,
-    pub kind: ExportKind,
-    pub count_words: bool,
+    config: ExportConfig,
+    kind: ExportKind,
+    count_words: bool,
 }
 
 impl ExportActor {
