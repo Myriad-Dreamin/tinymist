@@ -307,13 +307,16 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
     ) -> Option<FlowType> {
         match node.kind() {
             SyntaxKind::Ident => {
-                let ident = node.cast::<ast::Ident>()?;
-                let ty = self.info.mapping.get(&ident.span());
-                log::debug!("post check ident: {ident:?} -> {ty:?}");
+                let ty = self.info.mapping.get(&node.span());
+                log::debug!("post check ident: {node:?} -> {ty:?}");
                 self.simplify(ty?)
             }
             // todo: destructuring
-            SyntaxKind::FieldAccess => self.check_context_or(context, context_ty),
+            SyntaxKind::FieldAccess => {
+                let ty = self.info.mapping.get(&node.span());
+                self.simplify(ty?)
+                    .or_else(|| self.check_context_or(context, context_ty))
+            }
             _ => self.check_target(get_check_target(node.clone()), context_ty),
         }
     }

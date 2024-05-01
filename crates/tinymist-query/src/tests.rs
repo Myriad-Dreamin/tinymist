@@ -216,13 +216,17 @@ pub fn find_test_position(s: &Source) -> LspPosition {
     };
 
     'match_loop: loop {
-        if n.kind().is_trivia() {
+        if n.kind().is_trivia() || n.kind().is_error() {
             let m = if match_prev {
                 n.prev_sibling()
             } else {
                 n.next_sibling()
             };
             n = m.or_else(|| n.parent().cloned()).unwrap();
+            continue;
+        }
+        if matches!(n.kind(), SyntaxKind::Named) {
+            n = n.children().last().unwrap();
             continue;
         }
         if match_ident {
@@ -250,8 +254,6 @@ pub fn find_test_position(s: &Source) -> LspPosition {
         }
         break;
     }
-
-    // eprintln!("position: {:?} -> {:?}", n.offset(), n);
 
     typst_to_lsp::offset_to_position(n.offset(), PositionEncoding::Utf16, s)
 }

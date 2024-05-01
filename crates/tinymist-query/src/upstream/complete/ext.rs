@@ -669,6 +669,11 @@ pub fn named_param_value_completions<'a>(
     let func = cc.callee();
 
     let leaf_type = ctx.ctx.literal_type_of_node(ctx.leaf.clone());
+    log::debug!(
+        "named_param_completion_by_type: {:?} -> {:?}",
+        ctx.leaf.kind(),
+        leaf_type
+    );
 
     use typst::foundations::func::Repr;
     let mut func = func;
@@ -698,7 +703,7 @@ pub fn named_param_value_completions<'a>(
 
     let mut completed = false;
     if let Some(type_sig) = leaf_type {
-        log::info!("named_param_completion by type: {:?}", param);
+        log::debug!("named_param_completion by type: {:?}", param);
         type_completion(ctx, Some(&type_sig), doc.as_deref());
         completed = true;
     }
