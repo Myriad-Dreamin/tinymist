@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (319..320)
+description: Completion on / (364..365)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/func_args2.typ
 ---
@@ -17,11 +17,11 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_args2.typ
      "range": {
       "end": {
        "character": 18,
-       "line": 14
+       "line": 16
       },
       "start": {
        "character": 18,
-       "line": 14
+       "line": 16
       }
      }
     }
@@ -35,11 +35,11 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_args2.typ
      "range": {
       "end": {
        "character": 18,
-       "line": 14
+       "line": 16
       },
       "start": {
        "character": 18,
-       "line": 14
+       "line": 16
       }
      }
     }

@@ -215,7 +215,7 @@ mod matcher_tests {
 #[cfg(test)]
 mod document_tests {
 
-    use crate::syntax::find_document_before;
+    use crate::syntax::find_docs_before;
     use crate::tests::*;
 
     #[test]
@@ -227,7 +227,7 @@ mod document_tests {
                 .to_typst_pos(find_test_position(&source), &source)
                 .unwrap();
 
-            let result = find_document_before(&source, pos);
+            let result = find_docs_before(&source, pos);
             let result = result.as_deref().unwrap_or("<nil>");
 
             assert_snapshot!(result);

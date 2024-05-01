@@ -1,6 +1,6 @@
 use core::fmt;
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     ops::Range,
     path::{Path, PathBuf},
 };
@@ -84,6 +84,17 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
             });
         });
     });
+}
+
+pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
+    let mut props = HashMap::new();
+    for line in s.lines() {
+        let mut line = line.splitn(2, ':');
+        let key = line.next().unwrap().trim();
+        let value = line.next().unwrap().trim();
+        props.insert(key, value);
+    }
+    props
 }
 
 pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut TypstSystemWorld, PathBuf) -> T) -> T {

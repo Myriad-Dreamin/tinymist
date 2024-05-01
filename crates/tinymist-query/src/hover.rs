@@ -4,7 +4,7 @@ use crate::{
     analysis::{analyze_dyn_signature, find_definition, DefinitionLink, Signature},
     jump_from_cursor,
     prelude::*,
-    syntax::{find_document_before, get_deref_target, LexicalKind, LexicalVarKind},
+    syntax::{find_docs_before, get_deref_target, LexicalKind, LexicalVarKind},
     upstream::{expr_tooltip, tooltip, Tooltip},
     LspHoverContents, StatefulRequest,
 };
@@ -266,7 +266,7 @@ impl DocTooltip {
         let (fid, def_range) = lnk.def_at.clone()?;
 
         let src = ctx.source_by_id(fid).ok()?;
-        find_document_before(&src, def_range.start)
+        find_docs_before(&src, def_range.start)
     }
 }
 
