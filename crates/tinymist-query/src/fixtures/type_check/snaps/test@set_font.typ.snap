@@ -6,5 +6,6 @@ input_file: crates/tinymist-query/src/fixtures/type_check/set_font.typ
 "font" = "Times New Roman"
 ---
 5..9 -> @font
+36..40 -> Func(text)
 41..51 -> (TextFont | Array<TextFont>)
 47..51 -> (TextFont | Array<TextFont>)

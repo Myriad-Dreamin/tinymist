@@ -200,7 +200,7 @@ fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
     complete_code(ctx);
     ctx.explicit = explict;
 
-    log::info!(
+    log::debug!(
         "sort_and_explicit_code_completion: {:#?} {:#?}",
         completions,
         ctx.completions
@@ -234,7 +234,7 @@ fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
         compl.sort_text = Some(eco_format!("{i:03}", i = i + sort_base));
     }
 
-    log::info!(
+    log::debug!(
         "sort_and_explicit_code_completion after: {:#?} {:#?}",
         completions,
         ctx.completions
@@ -425,6 +425,7 @@ fn type_completion(
     match infer_type? {
         FlowType::Clause => return None,
         FlowType::Undef => return None,
+        FlowType::Space => return None,
         FlowType::Content => return None,
         FlowType::Any => return None,
         FlowType::Tuple(..) | FlowType::Array(..) => {
@@ -754,7 +755,7 @@ pub fn named_param_value_completions<'a>(
 
 pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     let parent = ctx.leaf.clone();
-    log::debug!("check complete_literal: {:?}", ctx.leaf);
+    log::info!("check complete_literal: {:?}", ctx.leaf);
     let parent = if parent.kind().is_trivia() {
         parent.prev_sibling()?
     } else {
@@ -766,10 +767,10 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
         SyntaxKind::Colon => parent.parent()?,
         _ => parent,
     };
-    let (named, parent) = match parent.kind() {
-        SyntaxKind::Named => (parent.cast::<ast::Named>(), parent.parent()?),
-        SyntaxKind::LeftParen | SyntaxKind::Comma => (None, parent.parent()?),
-        _ => (None, parent),
+    let parent = match parent.kind() {
+        SyntaxKind::Named => parent.parent()?,
+        SyntaxKind::LeftParen | SyntaxKind::Comma => parent.parent()?,
+        _ => parent,
     };
     log::debug!("check complete_literal 3: {:?}", parent);
 
@@ -791,8 +792,10 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     };
 
     // query type of the dict
-    let named_span = named.map(|n| n.span()).unwrap_or_else(Span::detached);
-    let named_ty = ctx.ctx.literal_type_of_span(named_span);
+    let named_ty = ctx
+        .ctx
+        .literal_type_of_node(ctx.leaf.clone())
+        .filter(|ty| !matches!(ty, FlowType::Any));
     let lit_ty = ctx.ctx.literal_type_of_span(lit_span);
     log::info!("complete_literal: {lit_ty:?} {named_ty:?}");
 

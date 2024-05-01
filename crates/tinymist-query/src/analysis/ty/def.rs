@@ -31,6 +31,7 @@ pub(crate) enum FlowType {
     Undef,
     Content,
     Any,
+    Space,
     None,
     Infer,
     FlowNone,
@@ -64,6 +65,7 @@ impl fmt::Debug for FlowType {
             FlowType::Undef => f.write_str("Undef"),
             FlowType::Content => f.write_str("Content"),
             FlowType::Any => f.write_str("Any"),
+            FlowType::Space => f.write_str("Space"),
             FlowType::None => f.write_str("None"),
             FlowType::Infer => f.write_str("Infer"),
             FlowType::FlowNone => f.write_str("FlowNone"),
@@ -92,7 +94,7 @@ impl fmt::Debug for FlowType {
                 }
                 f.write_str(")")
             }
-            FlowType::Let(v) => write!(f, "{v:?}"),
+            FlowType::Let(v) => write!(f, "({v:?})"),
             FlowType::Var(v) => write!(f, "@{}", v.1),
             FlowType::Unary(u) => write!(f, "{u:?}"),
             FlowType::Binary(b) => write!(f, "{b:?}"),
@@ -125,11 +127,14 @@ impl FlowType {
             CastInfo::Any => FlowType::Any,
             CastInfo::Value(v, doc) => FlowType::ValueDoc(Box::new((v.clone(), *doc))),
             CastInfo::Type(ty) => FlowType::Value(Box::new((Value::Type(*ty), Span::detached()))),
-            CastInfo::Union(e) => FlowType::Union(Box::new(
-                e.iter()
-                    .flat_map(|e| Self::from_return_site(f, e))
-                    .collect(),
-            )),
+            CastInfo::Union(e) => {
+                // flat union
+                let e = UnionIter(vec![e.as_slice().iter()]);
+
+                FlowType::Union(Box::new(
+                    e.flat_map(|e| Self::from_return_site(f, e)).collect(),
+                ))
+            }
         };
 
         Some(ty)
@@ -151,11 +156,14 @@ impl FlowType {
             CastInfo::Any => FlowType::Any,
             CastInfo::Value(v, doc) => FlowType::ValueDoc(Box::new((v.clone(), *doc))),
             CastInfo::Type(ty) => FlowType::Value(Box::new((Value::Type(*ty), Span::detached()))),
-            CastInfo::Union(e) => FlowType::Union(Box::new(
-                e.iter()
-                    .flat_map(|e| Self::from_param_site(f, p, e))
-                    .collect(),
-            )),
+            CastInfo::Union(e) => {
+                // flat union
+                let e = UnionIter(vec![e.as_slice().iter()]);
+
+                FlowType::Union(Box::new(
+                    e.flat_map(|e| Self::from_param_site(f, p, e)).collect(),
+                ))
+            }
         };
 
         Some(ty)
@@ -197,6 +205,28 @@ impl FlowType {
             }
 
             Some(res)
+        }
+    }
+}
+
+struct UnionIter<'a>(Vec<std::slice::Iter<'a, CastInfo>>);
+
+impl<'a> Iterator for UnionIter<'a> {
+    type Item = &'a CastInfo;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let iter = self.0.last_mut()?;
+            if let Some(e) = iter.next() {
+                match e {
+                    CastInfo::Union(e) => {
+                        self.0.push(e.as_slice().iter());
+                    }
+                    _ => return Some(e),
+                }
+            } else {
+                self.0.pop();
+            }
         }
     }
 }
@@ -372,6 +402,38 @@ pub(crate) struct FlowSignature {
     pub named: Vec<(EcoString, FlowType)>,
     pub rest: Option<FlowType>,
     pub ret: FlowType,
+}
+impl FlowSignature {
+    /// Array constructor
+    pub(crate) fn array_cons(elem: FlowType, anyify: bool) -> FlowSignature {
+        let ret = if anyify { FlowType::Any } else { elem.clone() };
+        FlowSignature {
+            pos: Vec::new(),
+            named: Vec::new(),
+            rest: Some(elem),
+            ret,
+        }
+    }
+
+    /// Dictionary constructor
+    pub(crate) fn dict_cons(named: &FlowRecord, anyify: bool) -> FlowSignature {
+        let ret = if anyify {
+            FlowType::Any
+        } else {
+            FlowType::Dict(named.clone())
+        };
+        FlowSignature {
+            pos: Vec::new(),
+            named: named
+                .fields
+                .clone()
+                .into_iter()
+                .map(|(name, ty, _)| (name, ty))
+                .collect(),
+            rest: None,
+            ret,
+        }
+    }
 }
 
 impl fmt::Debug for FlowSignature {

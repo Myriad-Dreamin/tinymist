@@ -113,9 +113,14 @@ impl TypeCheckInfo {
         // todo: intersect/union
         let site_store = mapping.entry(site);
         match site_store {
-            Entry::Occupied(e) => {
-                *e.into_mut() = FlowType::from_types([e.get().clone(), ty].into_iter());
-            }
+            Entry::Occupied(e) => match e.into_mut() {
+                FlowType::Union(v) => {
+                    v.push(ty);
+                }
+                e => {
+                    *e = FlowType::from_types([e.clone(), ty].into_iter());
+                }
+            },
             Entry::Vacant(e) => {
                 e.insert(ty);
             }
@@ -160,8 +165,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::ContentBlock => return self.check_in_mode(root, InterpretMode::Markup),
 
             // todo: space effect
-            SyntaxKind::Space => FlowType::None,
-            SyntaxKind::Parbreak => FlowType::None,
+            SyntaxKind::Space => FlowType::Space,
+            SyntaxKind::Parbreak => FlowType::Space,
 
             SyntaxKind::Text => FlowType::Content,
             SyntaxKind::Linebreak => FlowType::Content,
@@ -198,8 +203,6 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::LoopBreak => FlowType::None,
             SyntaxKind::LoopContinue => FlowType::None,
             SyntaxKind::FuncReturn => FlowType::None,
-            SyntaxKind::LineComment => FlowType::None,
-            SyntaxKind::BlockComment => FlowType::None,
             SyntaxKind::Error => FlowType::None,
             SyntaxKind::Eof => FlowType::None,
 
@@ -218,7 +221,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 return self
                     .ctx
                     .mini_eval(root.cast()?)
-                    .map(|v| (FlowType::Value(Box::new((v, root.span())))))
+                    .map(|v| (FlowType::Value(Box::new((v, Span::detached())))))
             }
             SyntaxKind::Parenthesized => return self.check_children(root),
             SyntaxKind::Array => return self.check_array(root),
@@ -242,6 +245,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::DestructAssignment => return self.check_destruct_assign(root),
 
             // Rest all are clauses
+            SyntaxKind::LineComment => FlowType::Clause,
+            SyntaxKind::BlockComment => FlowType::Clause,
             SyntaxKind::Named => FlowType::Clause,
             SyntaxKind::Keyed => FlowType::Clause,
             SyntaxKind::Spread => FlowType::Clause,
@@ -340,7 +345,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         for elem in root.children() {
             let ty = self.check(elem);
-            if matches!(ty, FlowType::Clause) {
+            if matches!(ty, FlowType::Clause | FlowType::Space) {
                 continue;
             }
             elements.push(ty);
@@ -380,7 +385,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let unary: ast::Unary = root.cast()?;
 
         if let Some(constant) = self.ctx.mini_eval(ast::Expr::Unary(unary)) {
-            return Some(FlowType::Value(Box::new((constant, root.span()))));
+            return Some(FlowType::Value(Box::new((constant, Span::detached()))));
         }
 
         let op = unary.op();
@@ -399,7 +404,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let binary: ast::Binary = root.cast()?;
 
         if let Some(constant) = self.ctx.mini_eval(ast::Expr::Binary(binary)) {
-            return Some(FlowType::Value(Box::new((constant, root.span()))));
+            return Some(FlowType::Value(Box::new((constant, Span::detached()))));
         }
 
         let op = binary.op();
@@ -839,6 +844,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::None => {}
             FlowType::Infer => {}
             FlowType::FlowNone => {}
+            FlowType::Space => {}
             FlowType::Auto => {}
             FlowType::Builtin(_) => {}
             FlowType::Boolean(_) => {}
@@ -1031,6 +1037,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::None => e,
             FlowType::Infer => e,
             FlowType::FlowNone => e,
+            FlowType::Space => e,
             FlowType::Auto => e,
             FlowType::Builtin(_) => e,
             FlowType::At(e) => self.check_primary_type(e.0 .0.clone()),
@@ -1327,6 +1334,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             FlowType::None => {}
             FlowType::Infer => {}
             FlowType::FlowNone => {}
+            FlowType::Space => {}
             FlowType::Auto => {}
             FlowType::Boolean(_) => {}
             FlowType::Builtin(_) => {}
@@ -1447,6 +1455,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             FlowType::None => FlowType::None,
             FlowType::Infer => FlowType::Infer,
             FlowType::FlowNone => FlowType::FlowNone,
+            FlowType::Space => FlowType::Space,
             FlowType::Auto => FlowType::Auto,
             FlowType::Boolean(b) => FlowType::Boolean(*b),
             FlowType::Builtin(b) => FlowType::Builtin(b.clone()),
@@ -1519,6 +1528,7 @@ impl Joiner {
         match (child, &self.definite) {
             (FlowType::Clause, _) => {}
             (FlowType::Undef, _) => {}
+            (FlowType::Space, _) => {}
             (FlowType::Any, _) | (_, FlowType::Any) => {}
             (FlowType::Infer, _) => {}
             (FlowType::None, _) => {}
