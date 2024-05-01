@@ -241,7 +241,7 @@ pub(crate) struct FlowIfType {
 
 impl FlowIfType {}
 
-#[derive(Clone, Hash)]
+#[derive(Clone, Hash, Default)]
 pub(crate) struct FlowVarStore {
     pub lbs: Vec<FlowType>,
     pub ubs: Vec<FlowType>,

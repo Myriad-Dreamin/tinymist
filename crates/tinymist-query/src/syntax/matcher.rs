@@ -80,7 +80,7 @@ impl<'a> DerefTarget<'a> {
 
 pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'_>> {
     /// Skips trivia nodes that are on the same line as the cursor.
-    fn skippable_trivia(node: &LinkedNode, cursor: usize) -> bool {
+    fn can_skip_trivia(node: &LinkedNode, cursor: usize) -> bool {
         // A non-trivia node is our target so we stop at it.
         if !node.kind().is_trivia() {
             return false;
@@ -101,7 +101,7 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'
 
     // Move to the first non-trivia node before the cursor.
     let mut node = node;
-    if skippable_trivia(&node, cursor) || {
+    if can_skip_trivia(&node, cursor) || {
         is_mark(node.kind())
             && (!matches!(node.kind(), SyntaxKind::LeftParen)
                 || !matches!(
@@ -243,6 +243,7 @@ pub enum ParamTarget<'a> {
 #[derive(Debug, Clone)]
 pub enum CheckTarget<'a> {
     Param {
+        callee: LinkedNode<'a>,
         target: ParamTarget<'a>,
         is_set: bool,
     },
@@ -277,12 +278,14 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
                 Some(ast::Expr::Set(set)) => set.args(),
                 _ => return None,
             };
-            let args_node = node.find(args.span())?;
+            let args_node = parent.find(args.span())?;
 
-            let param_target = get_param_target(args_node, node)?;
+            let is_set = parent.kind() == SyntaxKind::Set;
+            let target = get_param_target(args_node, node)?;
             Some(CheckTarget::Param {
-                target: param_target,
-                is_set: parent.kind() == SyntaxKind::Set,
+                callee,
+                target,
+                is_set,
             })
         }
         deref_target => Some(CheckTarget::Normal(deref_target.node().clone())),
@@ -294,6 +297,10 @@ fn get_param_target<'a>(
     node: LinkedNode<'a>,
 ) -> Option<ParamTarget<'a>> {
     match node.kind() {
+        SyntaxKind::Named => {
+            let param_ident = node.cast::<ast::Named>()?.name();
+            Some(ParamTarget::Named(args_node.find(param_ident.span())?))
+        }
         SyntaxKind::Colon => {
             let prev = node.prev_leaf()?;
             let param_ident = prev.cast::<ast::Ident>()?;

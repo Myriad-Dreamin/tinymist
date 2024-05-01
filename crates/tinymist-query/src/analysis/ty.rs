@@ -1,7 +1,7 @@
 //! Top-level evaluation of a source file.
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -84,6 +84,43 @@ impl TypeCheckInfo {
 
         worker.simplify(ty, principal)
     }
+
+    pub fn var_at(
+        &mut self,
+        var_site: Span,
+        def_id: DefId,
+        f: impl FnOnce() -> FlowVar,
+    ) -> &mut FlowVar {
+        let var = self.vars.entry(def_id).or_insert_with(f);
+        Self::witness_(var_site, var.get_ref(), &mut self.mapping);
+        var
+    }
+
+    // todo: distinguish at least, at most
+    pub fn witness_at_least(&mut self, site: Span, ty: FlowType) {
+        Self::witness_(site, ty, &mut self.mapping);
+    }
+
+    pub fn witness_at_most(&mut self, site: Span, ty: FlowType) {
+        Self::witness_(site, ty, &mut self.mapping);
+    }
+
+    fn witness_(site: Span, ty: FlowType, mapping: &mut HashMap<Span, FlowType>) {
+        if site.is_detached() {
+            return;
+        }
+
+        // todo: intersect/union
+        let site_store = mapping.entry(site);
+        match site_store {
+            Entry::Occupied(e) => {
+                *e.into_mut() = FlowType::from_types([e.get().clone(), ty].into_iter());
+            }
+            Entry::Vacant(e) => {
+                e.insert(ty);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,7 +145,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let w = self.check_inner(root).unwrap_or(FlowType::Undef);
 
         if let Some(s) = should_record {
-            self.info.mapping.insert(s, w.clone());
+            self.info.witness_at_least(s, w.clone());
         }
 
         w
@@ -427,7 +464,13 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         log::debug!("func_call: {callee:?} with {args:?}");
 
         if let FlowType::Args(args) = args {
-            self.check_apply(callee, &args, &func_call.args(), &mut candidates)?;
+            self.check_apply(
+                callee,
+                func_call.callee().span(),
+                &args,
+                &func_call.args(),
+                &mut candidates,
+            )?;
         }
 
         if candidates.len() == 1 {
@@ -553,7 +596,13 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         log::debug!("set rule: {callee:?} with {args:?}");
 
         if let FlowType::Args(args) = args {
-            self.check_apply(callee, &args, &set_rule.args(), &mut candidates)?;
+            self.check_apply(
+                callee,
+                set_rule.target().span(),
+                &args,
+                &set_rule.args(),
+                &mut candidates,
+            )?;
         }
 
         if candidates.len() == 1 {
@@ -653,7 +702,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             .get_ref(&r)
             .or_else(|| Some(self.def_use_info.get_def(s.id()?, &r)?.0))?;
 
-        let var = self.info.vars.entry(def_id).or_insert_with(|| {
+        Some(self.info.var_at(s, def_id, || {
             // let store = FlowVarStore {
             //     name: r.name.into(),
             //     id: def_id,
@@ -670,10 +719,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 }))),
                 // kind: FlowVarKind::Strong(FlowType::Any),
             }
-        });
-
-        self.info.mapping.insert(s, var.get_ref());
-        Some(var)
+        }))
     }
 
     fn check_pattern(
@@ -709,11 +755,12 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     fn check_apply(
         &mut self,
         callee: FlowType,
+        callee_span: Span,
         args: &FlowArgs,
         syntax_args: &ast::Args,
         candidates: &mut Vec<FlowType>,
     ) -> Option<()> {
-        // log::debug!("check func callee {callee:?}");
+        log::debug!("check func callee {callee:?}");
 
         match &callee {
             FlowType::Var(v) => {
@@ -722,15 +769,29 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     FlowVarKind::Weak(w) => {
                         let w = w.read();
                         for lb in w.lbs.iter() {
-                            self.check_apply(lb.clone(), args, syntax_args, candidates)?;
+                            self.check_apply(
+                                lb.clone(),
+                                callee_span,
+                                args,
+                                syntax_args,
+                                candidates,
+                            )?;
                         }
                         for ub in w.ubs.iter() {
-                            self.check_apply(ub.clone(), args, syntax_args, candidates)?;
+                            self.check_apply(
+                                ub.clone(),
+                                callee_span,
+                                args,
+                                syntax_args,
+                                candidates,
+                            )?;
                         }
                     }
                 }
             }
             FlowType::Func(v) => {
+                self.info.witness_at_least(callee_span, callee.clone());
+
                 let f = v.as_ref();
                 let mut pos = f.pos.iter();
                 // let mut named = f.named.clone();
@@ -762,12 +823,12 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::Let(_) => {}
             FlowType::Value(f) => {
                 if let Value::Func(f) = &f.0 {
-                    self.check_apply_runtime(f, args, syntax_args, candidates);
+                    self.check_apply_runtime(f, callee_span, args, syntax_args, candidates);
                 }
             }
             FlowType::ValueDoc(f) => {
                 if let Value::Func(f) = &f.0 {
-                    self.check_apply_runtime(f, args, syntax_args, candidates);
+                    self.check_apply_runtime(f, callee_span, args, syntax_args, candidates);
                 }
             }
 
@@ -783,7 +844,13 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::Boolean(_) => {}
             FlowType::At(e) => {
                 let primary_type = self.check_primary_type(e.0 .0.clone());
-                self.check_apply_method(primary_type, e.0 .1.clone(), args, candidates);
+                self.check_apply_method(
+                    primary_type,
+                    callee_span,
+                    e.0 .1.clone(),
+                    args,
+                    candidates,
+                );
             }
             FlowType::Unary(_) => {}
             FlowType::Binary(_) => {}
@@ -904,27 +971,23 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     log::debug!("constrain record item {key} {lhs:?} ⪯ {rhs:?}");
                     self.constrain(lhs, rhs);
                     if !sl.is_detached() {
-                        // todo: intersect/union
-                        self.info.mapping.entry(*sl).or_insert(rhs.clone());
+                        self.info.witness_at_most(*sl, rhs.clone());
                     }
                     if !sr.is_detached() {
-                        // todo: intersect/union
-                        self.info.mapping.entry(*sr).or_insert(lhs.clone());
+                        self.info.witness_at_least(*sr, lhs.clone());
                     }
                 }
             }
             (FlowType::Value(lhs), rhs) => {
                 log::debug!("constrain value {lhs:?} ⪯ {rhs:?}");
                 if !lhs.1.is_detached() {
-                    // todo: intersect/union
-                    self.info.mapping.entry(lhs.1).or_insert(rhs.clone());
+                    self.info.witness_at_most(lhs.1, rhs.clone());
                 }
             }
             (lhs, FlowType::Value(rhs)) => {
                 log::debug!("constrain value {lhs:?} ⪯ {rhs:?}");
                 if !rhs.1.is_detached() {
-                    // todo: intersect/union
-                    self.info.mapping.entry(rhs.1).or_insert(lhs.clone());
+                    self.info.witness_at_least(rhs.1, lhs.clone());
                 }
             }
             _ => {
@@ -982,11 +1045,14 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     fn check_apply_method(
         &mut self,
         primary_type: FlowType,
+        callee_span: Span,
         method_name: EcoString,
         args: &FlowArgs,
         _candidates: &mut Vec<FlowType>,
     ) -> Option<()> {
         log::debug!("check method at {method_name:?} on {primary_type:?}");
+        self.info
+            .witness_at_least(callee_span, primary_type.clone());
         match primary_type {
             FlowType::Func(v) => match method_name.as_str() {
                 // todo: process where specially
@@ -1025,10 +1091,16 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     fn check_apply_runtime(
         &mut self,
         f: &Func,
+        callee_span: Span,
         args: &FlowArgs,
         syntax_args: &ast::Args,
         candidates: &mut Vec<FlowType>,
     ) -> Option<()> {
+        // todo: hold signature
+        self.info.witness_at_least(
+            callee_span,
+            FlowType::Value(Box::new((Value::Func(f.clone()), Span::detached()))),
+        );
         let sig = analyze_dyn_signature(self.ctx, f.clone());
 
         log::debug!("check runtime func {f:?} at args: {args:?}");
@@ -1047,7 +1119,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             let pos_ty = pos.next().unwrap_or(&FlowType::Any);
             self.constrain(pos_in, pos_ty);
             if let Some(syntax_pos) = syntax_pos.next() {
-                self.info.mapping.insert(syntax_pos.span(), pos_ty.clone());
+                self.info
+                    .witness_at_least(syntax_pos.span(), pos_ty.clone());
             }
         }
 
@@ -1068,11 +1141,9 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 self.constrain(named_in, named_ty);
                 if let Some(syntax_named) = syntax_named {
                     self.info
-                        .mapping
-                        .insert(syntax_named.span(), named_ty.clone());
+                        .witness_at_least(syntax_named.span(), named_ty.clone());
                     self.info
-                        .mapping
-                        .insert(syntax_named.expr().span(), named_ty.clone());
+                        .witness_at_least(syntax_named.expr().span(), named_ty.clone());
                 }
             }
         }
@@ -1265,6 +1336,8 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
 
     fn transform(&mut self, ty: &FlowType, pol: bool) -> FlowType {
         match ty {
+            // todo
+            FlowType::Let(w) => self.transform_let(w, None, pol),
             FlowType::Var(v) => {
                 if let Some(cano) = self.cano_local_cache.get(&(v.0, self.principal)) {
                     return cano.clone();
@@ -1277,35 +1350,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                     FlowVarKind::Weak(w) => {
                         let w = w.read();
 
-                        let mut lbs = Vec::with_capacity(w.lbs.len());
-                        let mut ubs = Vec::with_capacity(w.ubs.len());
-
-                        log::debug!(
-                            "transform var [principal={}] {v:?} with {w:?}",
-                            self.principal
-                        );
-
-                        if !self.principal || ((pol) && !self.negatives.contains(&v.0)) {
-                            for lb in w.lbs.iter() {
-                                lbs.push(self.transform(lb, pol));
-                            }
-                        }
-                        if !self.principal || ((!pol) && !self.positives.contains(&v.0)) {
-                            for ub in w.ubs.iter() {
-                                ubs.push(self.transform(ub, !pol));
-                            }
-                        }
-
-                        if ubs.is_empty() {
-                            if lbs.len() == 1 {
-                                return lbs.pop().unwrap();
-                            }
-                            if lbs.is_empty() {
-                                return FlowType::Any;
-                            }
-                        }
-
-                        FlowType::Let(Arc::new(FlowVarStore { lbs, ubs }))
+                        self.transform_let(&w, Some(&v.0), pol)
                     }
                 };
 
@@ -1392,8 +1437,6 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
 
                 FlowType::At(a2)
             }
-            // todo
-            FlowType::Let(_) => FlowType::Any,
             FlowType::Value(v) => FlowType::Value(v.clone()),
             FlowType::ValueDoc(v) => FlowType::ValueDoc(v.clone()),
             FlowType::Element(v) => FlowType::Element(*v),
@@ -1408,6 +1451,35 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             FlowType::Boolean(b) => FlowType::Boolean(*b),
             FlowType::Builtin(b) => FlowType::Builtin(b.clone()),
         }
+    }
+
+    fn transform_let(&mut self, w: &FlowVarStore, def_id: Option<&DefId>, pol: bool) -> FlowType {
+        let mut lbs = Vec::with_capacity(w.lbs.len());
+        let mut ubs = Vec::with_capacity(w.ubs.len());
+
+        log::debug!("transform let [principal={}] with {w:?}", self.principal);
+
+        if !self.principal || ((pol) && !def_id.is_some_and(|i| self.negatives.contains(i))) {
+            for lb in w.lbs.iter() {
+                lbs.push(self.transform(lb, pol));
+            }
+        }
+        if !self.principal || ((!pol) && !def_id.is_some_and(|i| self.positives.contains(i))) {
+            for ub in w.ubs.iter() {
+                ubs.push(self.transform(ub, !pol));
+            }
+        }
+
+        if ubs.is_empty() {
+            if lbs.len() == 1 {
+                return lbs.pop().unwrap();
+            }
+            if lbs.is_empty() {
+                return FlowType::Any;
+            }
+        }
+
+        FlowType::Let(Arc::new(FlowVarStore { lbs, ubs }))
     }
 }
 
@@ -1434,7 +1506,7 @@ impl Joiner {
         //     definite = definite.join(p);
         // }
 
-        // println!("possibles: {:?} {:?}", self.definite, self.possibles);
+        // log::debug!("possibles: {:?} {:?}", self.definite, self.possibles);
 
         FlowType::Any
     }

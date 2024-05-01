@@ -95,7 +95,6 @@ mod literal_type_check_tests {
     use typst::syntax::LinkedNode;
 
     use crate::analysis::ty;
-    use crate::syntax::get_check_target;
     use crate::tests::*;
 
     #[test]
@@ -108,17 +107,10 @@ mod literal_type_check_tests {
                 .unwrap();
             let root = LinkedNode::new(source.root());
             let node = root.leaf_at(pos + 1).unwrap();
-            let target = get_check_target(node).unwrap_or_else(|| {
-                panic!(
-                    "Failed to get check target at {pos:?} in {:?}",
-                    source.text()
-                )
-            });
-            let text = target.node().clone().map(|n| n.get().clone().into_text());
-            let text = text.unwrap_or_default();
+            let text = node.get().clone().into_text();
 
             let result = ty::type_check(ctx, source.clone());
-            let literal_type = result.and_then(|info| ty::post_type_check(ctx, &info, target));
+            let literal_type = result.and_then(|info| ty::post_type_check(ctx, &info, node));
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),
