@@ -281,7 +281,7 @@ fn resolve_callee_v2(
     let node = source.find(callee.span())?;
     let cursor = node.offset();
     let deref_target = get_deref_target(node, cursor)?;
-    let def = find_definition(ctx, source.clone(), deref_target)?;
+    let def = find_definition(ctx, source.clone(), None, deref_target)?;
     if let LexicalKind::Var(LexicalVarKind::Function) = def.kind {
         if let Some(Value::Func(f)) = def.value {
             return Some(TryResolveCalleeResult::Runtime(f));

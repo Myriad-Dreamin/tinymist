@@ -258,7 +258,7 @@ impl TypstLanguageServer {
                 Ok(CompilerQueryResponse::OnSaveExport(()))
             }
             Hover(req) => query_state!(client, Hover, req),
-            GotoDefinition(req) => query_world!(client, GotoDefinition, req),
+            GotoDefinition(req) => query_state!(client, GotoDefinition, req),
             GotoDeclaration(req) => query_world!(client, GotoDeclaration, req),
             References(req) => query_world!(client, References, req),
             InlayHint(req) => query_world!(client, InlayHint, req),
@@ -266,8 +266,8 @@ impl TypstLanguageServer {
             CodeLens(req) => query_world!(client, CodeLens, req),
             Completion(req) => query_state!(client, Completion, req),
             SignatureHelp(req) => query_world!(client, SignatureHelp, req),
-            Rename(req) => query_world!(client, Rename, req),
-            PrepareRename(req) => query_world!(client, PrepareRename, req),
+            Rename(req) => query_state!(client, Rename, req),
+            PrepareRename(req) => query_state!(client, PrepareRename, req),
             Symbol(req) => query_world!(client, Symbol, req),
 
             DocumentMetrics(req) => query_state!(client, DocumentMetrics, req),

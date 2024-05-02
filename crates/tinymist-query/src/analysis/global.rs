@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use ecow::EcoVec;
+use ecow::{EcoString, EcoVec};
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use reflexo::hash::hash128;
@@ -16,6 +16,7 @@ use typst::foundations;
 use typst::syntax::{LinkedNode, SyntaxNode};
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
+    foundations::Bytes,
     syntax::{package::PackageSpec, Source, Span, VirtualPath},
     World,
 };
@@ -23,9 +24,10 @@ use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
 use super::{
-    post_type_check, DefUseInfo, FlowType, ImportInfo, PathPreference, Signature, SignatureTarget,
-    TypeCheckInfo,
+    analyze_bib, post_type_check, BibInfo, DefUseInfo, FlowType, ImportInfo, PathPreference,
+    Signature, SignatureTarget, TypeCheckInfo,
 };
+use crate::syntax::resolve_id_by_path;
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -39,13 +41,20 @@ use crate::{
 /// You should not holds across requests, because source code may change.
 #[derive(Default)]
 pub struct ModuleAnalysisCache {
+    file: OnceCell<FileResult<Bytes>>,
     source: OnceCell<FileResult<Source>>,
     import_info: OnceCell<Option<Arc<ImportInfo>>>,
     def_use: OnceCell<Option<Arc<DefUseInfo>>>,
     type_check: OnceCell<Option<Arc<TypeCheckInfo>>>,
+    bibliography: OnceCell<Option<Arc<BibInfo>>>,
 }
 
 impl ModuleAnalysisCache {
+    /// Get the bytes content of a file.
+    pub fn file(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Bytes> {
+        self.file.get_or_init(|| ctx.world().file(file_id)).clone()
+    }
+
     /// Get the source of a file.
     pub fn source(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Source> {
         self.source
@@ -53,12 +62,12 @@ impl ModuleAnalysisCache {
             .clone()
     }
 
-    /// Try to get the def-use information of a file.
+    /// Try to get the import information of a file.
     pub fn import_info(&self) -> Option<Arc<ImportInfo>> {
         self.import_info.get().cloned().flatten()
     }
 
-    /// Compute the def-use information of a file.
+    /// Compute the import information of a file.
     pub(crate) fn compute_import(
         &self,
         f: impl FnOnce() -> Option<Arc<ImportInfo>>,
@@ -90,6 +99,19 @@ impl ModuleAnalysisCache {
         f: impl FnOnce() -> Option<Arc<TypeCheckInfo>>,
     ) -> Option<Arc<TypeCheckInfo>> {
         self.type_check.get_or_init(f).clone()
+    }
+
+    /// Try to get the bibliography information of a file.
+    pub fn bibliography(&self) -> Option<Arc<BibInfo>> {
+        self.bibliography.get().cloned().flatten()
+    }
+
+    /// Compute the bibliography information of a file.
+    pub(crate) fn compute_bibliography(
+        &self,
+        f: impl FnOnce() -> Option<Arc<BibInfo>>,
+    ) -> Option<Arc<BibInfo>> {
+        self.bibliography.get_or_init(f).clone()
     }
 }
 
@@ -150,6 +172,11 @@ impl ComputeDebug for Source {
     }
 }
 impl ComputeDebug for EcoVec<LexicalHierarchy> {
+    fn compute_debug_repr(&self) -> impl std::fmt::Debug {
+        self.len()
+    }
+}
+impl ComputeDebug for EcoVec<(TypstFileId, Bytes)> {
     fn compute_debug_repr(&self) -> impl std::fmt::Debug {
         self.len()
     }
@@ -280,6 +307,7 @@ pub struct ModuleAnalysisGlobalCache {
     type_check: Arc<ComputingNode<Source, Arc<TypeCheckInfo>>>,
     def_use: Arc<ComputingNode<(EcoVec<LexicalHierarchy>, Arc<ImportInfo>), Arc<DefUseInfo>>>,
 
+    bibliography: Arc<ComputingNode<EcoVec<(TypstFileId, Bytes)>, Arc<BibInfo>>>,
     import: Arc<ComputingNode<EcoVec<LexicalHierarchy>, Arc<ImportInfo>>>,
     signature_source: Option<Source>,
     signatures: HashMap<usize, Signature>,
@@ -292,6 +320,7 @@ impl Default for ModuleAnalysisGlobalCache {
             type_check: Arc::new(ComputingNode::new("type_check")),
             import: Arc::new(ComputingNode::new("import")),
             def_use: Arc::new(ComputingNode::new("def_use")),
+            bibliography: Arc::new(ComputingNode::new("bibliography")),
 
             signature_source: None,
             signatures: Default::default(),
@@ -510,6 +539,12 @@ impl<'w> AnalysisContext<'w> {
         id.vpath().resolve(&root).ok_or(FileError::AccessDenied)
     }
 
+    /// Get the content of a file by file id.
+    pub fn file_by_id(&mut self, id: TypstFileId) -> FileResult<Bytes> {
+        self.get_mut(id);
+        self.get(id).unwrap().file(self, id)
+    }
+
     /// Get the source of a file by file id.
     pub fn source_by_id(&mut self, id: TypstFileId) -> FileResult<Source> {
         self.get_mut(id);
@@ -572,6 +607,29 @@ impl<'w> AnalysisContext<'w> {
     /// Convert a Typst range to a LSP range.
     pub fn to_lsp_range(&self, position: TypstRange, src: &Source) -> LspRange {
         typst_to_lsp::range(position, src, self.analysis.position_encoding)
+    }
+
+    /// Convert a Typst range to a LSP range.
+    pub fn to_lsp_range_(&mut self, position: TypstRange, fid: TypstFileId) -> Option<LspRange> {
+        let w = fid
+            .vpath()
+            .as_rootless_path()
+            .extension()
+            .and_then(|e| e.to_str());
+        // yaml/yml/bib
+        if matches!(w, Some("yaml" | "yml" | "bib")) {
+            let bytes = self.file_by_id(fid).ok()?;
+            let bytes_len = bytes.len();
+            let loc = get_loc_info(bytes)?;
+            // binary search
+            let start = find_loc(bytes_len, &loc, position.start, self.position_encoding())?;
+            let end = find_loc(bytes_len, &loc, position.end, self.position_encoding())?;
+            return Some(LspRange { start, end });
+        }
+
+        let source = self.source_by_id(fid).ok()?;
+
+        Some(self.to_lsp_range(position, &source))
     }
 
     /// Get the type check information of a source file.
@@ -680,6 +738,41 @@ impl<'w> AnalysisContext<'w> {
         res
     }
 
+    pub(crate) fn analyze_bib(
+        &mut self,
+        span: Span,
+        bib_paths: impl Iterator<Item = EcoString>,
+    ) -> Option<Arc<BibInfo>> {
+        let id = span.id()?;
+
+        if let Some(res) = self.caches.modules.entry(id).or_default().bibliography() {
+            return Some(res);
+        }
+
+        // the order are important
+        let paths = bib_paths
+            .flat_map(|s| {
+                let id = resolve_id_by_path(self.world(), id, &s)?;
+                Some((id, self.file_by_id(id).ok()?))
+            })
+            .collect::<EcoVec<_>>();
+
+        let cache = self.at_module(id);
+        let res = cache
+            .bibliography
+            .clone()
+            .compute(paths, |_, after| analyze_bib(after))
+            .ok()
+            .flatten();
+
+        self.caches
+            .modules
+            .entry(id)
+            .or_default()
+            .compute_bibliography(|| res.clone());
+        res
+    }
+
     fn at_module(&mut self, fid: TypstFileId) -> &mut ModuleAnalysisGlobalCache {
         self.analysis.caches.modules.entry(fid).or_default()
     }
@@ -757,6 +850,51 @@ impl<'w> AnalysisContext<'w> {
 
         post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.mapping.get(&k.span()).cloned())
     }
+}
+
+#[comemo::memoize]
+fn get_loc_info(bytes: Bytes) -> Option<EcoVec<(usize, String)>> {
+    let mut loc = EcoVec::new();
+    let mut offset = 0;
+    for line in bytes.split(|e| *e == b'\n') {
+        loc.push((offset, String::from_utf8(line.to_owned()).ok()?));
+        offset += line.len() + 1;
+    }
+    Some(loc)
+}
+
+fn find_loc(
+    len: usize,
+    loc: &EcoVec<(usize, String)>,
+    mut offset: usize,
+    encoding: PositionEncoding,
+) -> Option<LspPosition> {
+    if offset > len {
+        offset = len;
+    }
+
+    let r = match loc.binary_search_by_key(&offset, |line| line.0) {
+        Ok(i) => i,
+        Err(i) => i - 1,
+    };
+
+    let (start, s) = loc.get(r)?;
+    let byte_offset = offset.saturating_sub(*start);
+
+    let column_prefix = if byte_offset <= s.len() {
+        &s[..byte_offset]
+    } else {
+        let line = (r + 1) as u32;
+        return Some(LspPosition { line, character: 0 });
+    };
+
+    let line = r as u32;
+    let character = match encoding {
+        PositionEncoding::Utf8 => column_prefix.chars().count(),
+        PositionEncoding::Utf16 => column_prefix.chars().map(|c| c.len_utf16()).sum(),
+    } as u32;
+
+    Some(LspPosition { line, character })
 }
 
 /// The context for searching in the workspace.

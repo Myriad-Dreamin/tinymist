@@ -2,7 +2,6 @@ use crate::{
     analysis::{find_definition, DefinitionLink},
     prelude::*,
     syntax::get_deref_target,
-    SemanticRequest,
 };
 use log::debug;
 
@@ -31,10 +30,14 @@ pub struct PrepareRenameRequest {
 
 // todo: rename alias
 // todo: rename import path?
-impl SemanticRequest for PrepareRenameRequest {
+impl StatefulRequest for PrepareRenameRequest {
     type Response = PrepareRenameResponse;
 
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(
+        self,
+        ctx: &mut AnalysisContext,
+        doc: Option<VersionedDocument>,
+    ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
 
         let offset = ctx.to_typst_pos(self.position, &source)?;
@@ -47,7 +50,7 @@ impl SemanticRequest for PrepareRenameRequest {
         let use_site = deref_target.node().clone();
         let origin_selection_range = ctx.to_lsp_range(use_site.range(), &source);
 
-        let lnk = find_definition(ctx, source.clone(), deref_target)?;
+        let lnk = find_definition(ctx, source.clone(), doc.as_ref(), deref_target)?;
         validate_renaming_definition(&lnk)?;
 
         debug!("prepare_rename: {}", lnk.name);
@@ -114,7 +117,7 @@ mod tests {
                 position: find_test_position(&source),
             };
 
-            let result = request.request(world);
+            let result = request.request(world, None);
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

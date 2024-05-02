@@ -100,6 +100,9 @@ pub enum LexicalVarKind {
     /// `<foo>`
     ///   ^^^
     Label,
+    /// `x:`
+    ///  ^^
+    BibKey,
     /// `let foo`
     ///      ^^^
     Variable,

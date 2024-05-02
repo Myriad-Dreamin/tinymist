@@ -39,7 +39,7 @@ impl StatefulRequest for HoverRequest {
         // the typst's cursor is 1-based, so we need to add 1 to the offset
         let cursor = offset + 1;
 
-        let contents = def_tooltip(ctx, &source, cursor).or_else(|| {
+        let contents = def_tooltip(ctx, &source, doc.as_ref(), cursor).or_else(|| {
             Some(typst_to_lsp::tooltip(&tooltip(
                 ctx.world(),
                 doc_ref,
@@ -118,13 +118,14 @@ impl StatefulRequest for HoverRequest {
 fn def_tooltip(
     ctx: &mut AnalysisContext,
     source: &Source,
+    document: Option<&VersionedDocument>,
     cursor: usize,
 ) -> Option<LspHoverContents> {
     let leaf = LinkedNode::new(source.root()).leaf_at(cursor)?;
 
     let deref_target = get_deref_target(leaf.clone(), cursor)?;
 
-    let lnk = find_definition(ctx, source.clone(), deref_target.clone())?;
+    let lnk = find_definition(ctx, source.clone(), document, deref_target.clone())?;
 
     let mut results = vec![];
 
@@ -135,6 +136,11 @@ fn def_tooltip(
         | LexicalKind::Var(LexicalVarKind::ValRef)
         | LexicalKind::Block
         | LexicalKind::Heading(..) => None,
+        LexicalKind::Var(LexicalVarKind::BibKey) => {
+            results.push(MarkedString::String(format!("Bibliography: @{}", lnk.name)));
+
+            Some(LspHoverContents::Array(results))
+        }
         LexicalKind::Var(LexicalVarKind::Function) => {
             let sig = if let Some(Value::Func(func)) = &lnk.value {
                 Some(analyze_dyn_signature(ctx, func.clone()))

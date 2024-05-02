@@ -1,6 +1,6 @@
 use log::debug;
 
-use crate::{analysis::find_definition, prelude::*, syntax::get_deref_target, SemanticRequest};
+use crate::{analysis::find_definition, prelude::*, syntax::get_deref_target};
 
 /// The [`textDocument/definition`] request asks the server for the definition
 /// location of a symbol at a given text document position.
@@ -25,10 +25,14 @@ pub struct GotoDefinitionRequest {
     pub position: LspPosition,
 }
 
-impl SemanticRequest for GotoDefinitionRequest {
+impl StatefulRequest for GotoDefinitionRequest {
     type Response = GotoDefinitionResponse;
 
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(
+        self,
+        ctx: &mut AnalysisContext,
+        doc: Option<VersionedDocument>,
+    ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let offset = ctx.to_typst_pos(self.position, &source)?;
         let cursor = offset + 1;
@@ -40,15 +44,14 @@ impl SemanticRequest for GotoDefinitionRequest {
         let use_site = deref_target.node().clone();
         let origin_selection_range = ctx.to_lsp_range(use_site.range(), &source);
 
-        let def = find_definition(ctx, source.clone(), deref_target)?;
+        let def = find_definition(ctx, source.clone(), doc.as_ref(), deref_target)?;
 
         let (fid, def_range) = def.def_at?;
 
         let span_path = ctx.path_for_id(fid).ok()?;
         let uri = path_to_url(&span_path).ok()?;
 
-        let span_source = ctx.source_by_id(fid).ok()?;
-        let range = ctx.to_lsp_range(def_range, &span_source);
+        let range = ctx.to_lsp_range_(def_range, fid)?;
 
         let res = Some(GotoDefinitionResponse::Link(vec![LocationLink {
             origin_selection_range: Some(origin_selection_range),
@@ -57,7 +60,7 @@ impl SemanticRequest for GotoDefinitionRequest {
             target_selection_range: range,
         }]));
 
-        debug!("goto_definition: {fid:?} {res:?}");
+        log::info!("goto_definition: {fid:?} {res:?}");
         res
     }
 }
@@ -77,7 +80,7 @@ mod tests {
                 position: find_test_position(&source),
             };
 
-            let result = request.request(world);
+            let result = request.request(world, None);
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

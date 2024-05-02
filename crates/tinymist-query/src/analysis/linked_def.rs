@@ -4,11 +4,12 @@ use std::ops::Range;
 
 use log::debug;
 use once_cell::sync::Lazy;
-use typst::foundations::Type;
+use typst::foundations::{IntoValue, Label, Selector, Type};
+use typst::model::BibliographyElem;
 use typst::syntax::FileId as TypstFileId;
 use typst::{foundations::Value, syntax::Span};
 
-use super::prelude::*;
+use super::{prelude::*, BibInfo};
 use crate::{
     prelude::*,
     syntax::{
@@ -36,6 +37,7 @@ pub struct DefinitionLink {
 pub fn find_definition(
     ctx: &mut AnalysisContext<'_>,
     source: Source,
+    document: Option<&VersionedDocument>,
     deref_target: DerefTarget<'_>,
 ) -> Option<DefinitionLink> {
     let source_id = source.id();
@@ -70,8 +72,45 @@ pub fn find_definition(
                 name_range: None,
             });
         }
-        // todo: label, reference
-        DerefTarget::Label(..) | DerefTarget::Ref(..) | DerefTarget::Normal(..) => {
+        DerefTarget::Ref(r) => {
+            let ref_node = r.cast::<ast::Ref>()?.target();
+            let doc = document?;
+            let introspector = &doc.document.introspector;
+            let label = Label::new(ref_node);
+            let bib_elem = BibliographyElem::find(introspector.track())
+                .ok()
+                .and_then(|bib_elem| {
+                    ctx.analyze_bib(bib_elem.span(), {
+                        let Value::Array(arr) = bib_elem.path().clone().into_value() else {
+                            return None;
+                        };
+
+                        arr.into_iter().map(Value::cast).flat_map(|e| e.ok())
+                    })
+                });
+
+            return bib_elem
+                .and_then(|e| find_bib_definition(e, ref_node))
+                .or_else(|| {
+                    let sel = Selector::Label(label);
+                    let elem = introspector.query_first(&sel)?;
+                    let span = elem.span();
+                    let fid = span.id()?;
+
+                    let source = ctx.source_by_id(fid).ok()?;
+
+                    let rng = source.range(span)?;
+
+                    Some(DefinitionLink {
+                        kind: LexicalKind::Var(LexicalVarKind::Label),
+                        name: r.text().to_string(),
+                        value: None,
+                        def_at: Some((fid, rng.clone())),
+                        name_range: Some(rng.clone()),
+                    })
+                });
+        }
+        DerefTarget::Label(..) | DerefTarget::Normal(..) => {
             return None;
         }
     };
@@ -122,7 +161,9 @@ pub fn find_definition(
     };
 
     match def.kind {
-        LexicalKind::Heading(..) | LexicalKind::Block => unreachable!(),
+        LexicalKind::Var(LexicalVarKind::BibKey)
+        | LexicalKind::Heading(..)
+        | LexicalKind::Block => unreachable!(),
         LexicalKind::Var(
             LexicalVarKind::Variable
             | LexicalVarKind::ValRef
@@ -166,6 +207,20 @@ pub fn find_definition(
             None
         }
     }
+}
+
+fn find_bib_definition(bib_elem: Arc<BibInfo>, key: &str) -> Option<DefinitionLink> {
+    let entry = bib_elem.entries.get(key);
+    log::debug!("find_bib_definition: {key} => {entry:?}");
+    let entry = entry?;
+    Some(DefinitionLink {
+        kind: LexicalKind::Var(LexicalVarKind::BibKey),
+        name: key.to_string(),
+        value: None,
+        def_at: Some((entry.file_id, entry.span.clone())),
+        // todo: rename with regard to string format: yaml-key/bib etc.
+        name_range: Some(entry.span.clone()),
+    })
 }
 
 /// The target of a dynamic call.
@@ -282,7 +337,7 @@ fn resolve_callee_(
         let node = source.find(callee.span())?;
         let cursor = node.offset();
         let deref_target = get_deref_target(node, cursor)?;
-        let def = find_definition(ctx, source.clone(), deref_target)?;
+        let def = find_definition(ctx, source.clone(), None, deref_target)?;
         match def.kind {
             LexicalKind::Var(LexicalVarKind::Function) => match def.value {
                 Some(Value::Func(f)) => Some(f),
