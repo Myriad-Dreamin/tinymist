@@ -98,7 +98,7 @@ impl<'de> Deserialize<'de> for IdentRef {
 /// A flat and transient reference to some symbol in a source file.
 ///
 /// See [`IdentRef`] for definition of a "transient" reference.
-#[derive(Serialize, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct IdentDef {
     /// The name of the symbol.
     pub name: String,

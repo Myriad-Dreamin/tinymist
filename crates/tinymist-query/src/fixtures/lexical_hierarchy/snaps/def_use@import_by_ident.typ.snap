@@ -1,0 +1,31 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/import_by_ident.typ
+---
+{
+ "base@8..18@derive.typ": {
+  "def": {
+   "kind": {
+    "Mod": "PathVar"
+   },
+   "name": "base",
+   "range": "8:18"
+  },
+  "refs": [
+   "base@32..36"
+  ]
+ },
+ "f@5..6@base.typ": {
+  "def": {
+   "kind": {
+    "Var": "Function"
+   },
+   "name": "f",
+   "range": "5:6"
+  },
+  "refs": [
+   "f@41..42"
+  ]
+ }
+}
