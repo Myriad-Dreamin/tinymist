@@ -1212,12 +1212,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         }
 
         self.completions.push(Completion {
-            kind: match value {
-                Value::Func(_) => CompletionKind::Func,
-                Value::Type(_) => CompletionKind::Type,
-                Value::Symbol(s) => CompletionKind::Symbol(s.get()),
-                _ => CompletionKind::Constant,
-            },
+            kind: value_to_completion_kind(value),
             label,
             apply,
             detail,

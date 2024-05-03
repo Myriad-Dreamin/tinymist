@@ -48,9 +48,10 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
     pub fn scope_completions_(&mut self, parens: bool, filter: impl Fn(Option<&Value>) -> bool) {
         let mut defined = BTreeMap::new();
 
+        #[derive(Debug, Clone)]
         enum DefKind {
             Syntax(Span),
-            Instance(Spanned<Value>),
+            Instance(Span, Value),
         }
 
         let mut try_insert = |name: EcoString, kind: (CompletionKind, DefKind)| {
@@ -114,12 +115,12 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         })();
 
                         let def_kind = analyzed.clone().map(|module_ins| {
-                            DefKind::Instance(Spanned::new(
-                                module_ins,
+                            DefKind::Instance(
                                 v.new_name()
                                     .map(|n| n.span())
                                     .unwrap_or_else(Span::detached),
-                            ))
+                                module_ins,
+                            )
                         });
 
                         if let Some((name, def_kind)) = name.zip(def_kind) {
@@ -159,32 +160,23 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
                             if let Some(scope) = module_ins.scope() {
                                 for (name, v) in scope.iter() {
-                                    let kind = match v {
-                                        Value::Func(..) => CompletionKind::Func,
-                                        Value::Module(..) => CompletionKind::Module,
-                                        Value::Type(..) => CompletionKind::Type,
-                                        _ => CompletionKind::Constant,
-                                    };
+                                    let kind = value_to_completion_kind(v);
                                     let def_kind = match &import_filter {
                                         Some(import_filter) => {
                                             let w = import_filter.get(name);
                                             match w {
                                                 Some(DefKind::Syntax(span)) => {
-                                                    Some(DefKind::Instance(Spanned::new(
-                                                        v.clone(),
-                                                        *span,
-                                                    )))
+                                                    Some(DefKind::Instance(*span, v.clone()))
                                                 }
-                                                Some(DefKind::Instance(v)) => {
-                                                    Some(DefKind::Instance(v.clone()))
+                                                Some(DefKind::Instance(span, v)) => {
+                                                    Some(DefKind::Instance(*span, v.clone()))
                                                 }
                                                 None => None,
                                             }
                                         }
-                                        None => Some(DefKind::Instance(Spanned::new(
-                                            v.clone(),
-                                            Span::detached(),
-                                        ))),
+                                        None => {
+                                            Some(DefKind::Instance(Span::detached(), v.clone()))
+                                        }
                                     };
                                     if let Some(def_kind) = def_kind {
                                         try_insert(name.clone(), (kind, def_kind));
@@ -263,53 +255,175 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             .clone();
         for (name, value) in scope.iter() {
             if filter(Some(value)) && !defined.contains_key(name) {
-                self.value_completion(Some(name.clone()), value, parens, None);
+                defined.insert(
+                    name.clone(),
+                    (
+                        value_to_completion_kind(value),
+                        DefKind::Instance(Span::detached(), value.clone()),
+                    ),
+                );
             }
         }
 
+        enum SurroundingSyntax {
+            Regular,
+            Selector,
+            SetRule,
+        }
+
+        let surrounding_syntax = check_surrounding_syntax(&self.leaf)
+            .or_else(|| check_previous_syntax(&self.leaf))
+            .unwrap_or(SurroundingSyntax::Regular);
+
         for (name, (kind, def_kind)) in defined {
-            if filter(None) && !name.is_empty() {
-                let _ = types;
-                let _ = def_kind;
-                if kind == CompletionKind::Func {
-                    let apply = eco_format!("{}.with(${{}})", name);
+            if !filter(None) || name.is_empty() {
+                continue;
+            }
+            let _ = types;
+            if kind == CompletionKind::Func {
+                let base = Completion {
+                    kind: kind.clone(),
+                    // todo: only vscode and neovim (0.9.1) support this
+                    command: Some("editor.action.triggerSuggest"),
+                    ..Default::default()
+                };
+
+                let zero_args = match &def_kind {
+                    DefKind::Instance(_, Value::Func(func)) => func
+                        .params()
+                        .is_some_and(|params| params.iter().all(|param| param.name == "self")),
+                    _ => false,
+                };
+                let is_element = match &def_kind {
+                    DefKind::Instance(_, Value::Func(func)) => func.element().is_some(),
+                    _ => false,
+                };
+                log::debug!("is_element: {} {:?} -> {:?}", name, def_kind, is_element);
+
+                if !zero_args && matches!(surrounding_syntax, SurroundingSyntax::Regular) {
                     self.completions.push(Completion {
-                        kind: kind.clone(),
                         label: eco_format!("{}.with", name),
-                        apply: Some(apply),
-                        // todo: only vscode and neovim (0.9.1) support this
-                        command: Some("editor.action.triggerSuggest"),
-                        ..Default::default()
-                    });
-                    let apply = eco_format!("{}.where(${{}})", name);
-                    self.completions.push(Completion {
-                        kind: kind.clone(),
-                        label: eco_format!("{}.where", name),
-                        apply: Some(apply),
-                        // todo: only vscode and neovim (0.9.1) support this
-                        command: Some("editor.action.triggerSuggest"),
-                        ..Default::default()
-                    });
-                    // todo: check arguments, if empty, jump to after the parens
-                    let apply = eco_format!("{}(${{}})", name);
-                    self.completions.push(Completion {
-                        kind: kind.clone(),
-                        label: name,
-                        apply: Some(apply),
-                        // todo: only vscode and neovim (0.9.1) support this
-                        command: Some("editor.action.triggerSuggest"),
-                        ..Completion::default()
-                    });
-                } else {
-                    self.completions.push(Completion {
-                        kind,
-                        label: name,
-                        ..Completion::default()
+                        apply: Some(eco_format!("{}.with(${{}})", name)),
+                        ..base.clone()
                     });
                 }
+                if is_element && !matches!(surrounding_syntax, SurroundingSyntax::SetRule) {
+                    self.completions.push(Completion {
+                        label: eco_format!("{}.where", name),
+                        apply: Some(eco_format!("{}.where(${{}})", name)),
+                        ..base.clone()
+                    });
+                }
+
+                let bad_instantiate = matches!(
+                    surrounding_syntax,
+                    SurroundingSyntax::Selector | SurroundingSyntax::SetRule
+                ) && !is_element;
+                if !bad_instantiate {
+                    if !parens {
+                        self.completions.push(Completion {
+                            label: name,
+                            ..base
+                        });
+                    } else if zero_args {
+                        self.completions.push(Completion {
+                            apply: Some(eco_format!("{}()${{}}", name)),
+                            label: name,
+                            ..base
+                        });
+                    } else {
+                        self.completions.push(Completion {
+                            apply: Some(eco_format!("{}(${{}})", name)),
+                            label: name,
+                            ..base
+                        });
+                    }
+                }
+            } else if let DefKind::Instance(_, v) = def_kind {
+                let bad_instantiate = matches!(
+                    surrounding_syntax,
+                    SurroundingSyntax::Selector | SurroundingSyntax::SetRule
+                ) && !matches!(&v, Value::Func(func) if func.element().is_some());
+                if !bad_instantiate {
+                    self.value_completion(Some(name), &v, parens, None);
+                }
+            } else {
+                self.completions.push(Completion {
+                    kind,
+                    label: name,
+                    ..Completion::default()
+                });
             }
         }
+
+        fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> {
+            use SurroundingSyntax::*;
+            let mut met_args = false;
+            while let Some(parent) = leaf.parent() {
+                log::debug!(
+                    "check_surrounding_syntax: {:?}::{:?}",
+                    parent.kind(),
+                    leaf.kind()
+                );
+                match parent.kind() {
+                    SyntaxKind::CodeBlock | SyntaxKind::ContentBlock | SyntaxKind::Equation => {
+                        return Some(Regular);
+                    }
+                    SyntaxKind::Named => {
+                        return Some(Regular);
+                    }
+                    SyntaxKind::Args => {
+                        met_args = true;
+                    }
+                    SyntaxKind::SetRule => {
+                        let rule = parent.get().cast::<ast::SetRule>()?;
+                        if met_args || encolsed_by(parent, rule.condition().map(|s| s.span()), leaf)
+                        {
+                            return Some(Regular);
+                        } else {
+                            return Some(SetRule);
+                        }
+                    }
+                    SyntaxKind::ShowRule => {
+                        let rule = parent.get().cast::<ast::ShowRule>()?;
+                        if encolsed_by(parent, Some(rule.transform().span()), leaf) {
+                            return Some(Regular);
+                        } else {
+                            return Some(Selector); // query's first argument
+                        }
+                    }
+                    _ => {}
+                }
+
+                leaf = parent;
+            }
+
+            None
+        }
+
+        fn check_previous_syntax(leaf: &LinkedNode) -> Option<SurroundingSyntax> {
+            let mut leaf = leaf.clone();
+            if leaf.kind().is_trivia() {
+                leaf = leaf.prev_sibling()?;
+            }
+            if matches!(leaf.kind(), SyntaxKind::ShowRule | SyntaxKind::SetRule) {
+                return check_surrounding_syntax(&leaf.rightmost_leaf()?);
+            }
+
+            if matches!(leaf.kind(), SyntaxKind::Show) {
+                return Some(SurroundingSyntax::Selector);
+            }
+            if matches!(leaf.kind(), SyntaxKind::Set) {
+                return Some(SurroundingSyntax::SetRule);
+            }
+
+            None
+        }
     }
+}
+
+fn encolsed_by(parent: &LinkedNode, s: Option<Span>, leaf: &LinkedNode) -> bool {
+    s.and_then(|s| parent.find(s)?.find(leaf.span())).is_some()
 }
 
 fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
@@ -362,6 +476,16 @@ fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
     ctx.completions.append(&mut completions);
 
     log::debug!("sort_and_explicit_code_completion: {:?}", ctx.completions);
+}
+
+pub fn value_to_completion_kind(value: &Value) -> CompletionKind {
+    match value {
+        Value::Func(..) => CompletionKind::Func,
+        Value::Module(..) => CompletionKind::Module,
+        Value::Type(..) => CompletionKind::Type,
+        Value::Symbol(s) => CompletionKind::Symbol(s.get()),
+        _ => CompletionKind::Constant,
+    }
 }
 
 /// Add completions for the parameters of a function.
