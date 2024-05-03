@@ -102,6 +102,40 @@ pub(crate) enum FlowBuiltinType {
 
     Path(PathPreference),
 }
+impl FlowBuiltinType {
+    pub(crate) fn describe(&self) -> &'static str {
+        match self {
+            FlowBuiltinType::Args => "args",
+            FlowBuiltinType::Color => "color",
+            FlowBuiltinType::TextSize => "text.size",
+            FlowBuiltinType::TextFont => "text.font",
+            FlowBuiltinType::TextLang => "text.lang",
+            FlowBuiltinType::TextRegion => "text.region",
+            FlowBuiltinType::Dir => "dir",
+            FlowBuiltinType::Length => "length",
+            FlowBuiltinType::Float => "float",
+            FlowBuiltinType::Stroke => "stroke",
+            FlowBuiltinType::Margin => "margin",
+            FlowBuiltinType::Inset => "inset",
+            FlowBuiltinType::Outset => "outset",
+            FlowBuiltinType::Radius => "radius",
+            FlowBuiltinType::Path(s) => match s {
+                PathPreference::None => "[any]",
+                PathPreference::Special => "[any]",
+                PathPreference::Source => "[source]",
+                PathPreference::Csv => "[csv]",
+                PathPreference::Image => "[image]",
+                PathPreference::Json => "[json]",
+                PathPreference::Yaml => "[yaml]",
+                PathPreference::Xml => "[xml]",
+                PathPreference::Toml => "[toml]",
+                PathPreference::Bibliography => "[bib]",
+                PathPreference::RawTheme => "[theme]",
+                PathPreference::RawSyntax => "[syntax]",
+            },
+        }
+    }
+}
 
 use FlowBuiltinType::*;
 

@@ -1176,6 +1176,27 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         parens: bool,
         docs: Option<&str>,
     ) {
+        self.value_completion_(
+            label,
+            value,
+            parens,
+            match value {
+                Value::Symbol(s) => Some(symbol_label_detail(s.get())),
+                _ => None,
+            },
+            docs,
+        );
+    }
+
+    /// Add a completion for a specific value.
+    fn value_completion_(
+        &mut self,
+        label: Option<EcoString>,
+        value: &Value,
+        parens: bool,
+        label_detail: Option<EcoString>,
+        docs: Option<&str>,
+    ) {
         let at = label.as_deref().is_some_and(|field| !is_ident(field));
         let label = label.unwrap_or_else(|| value.repr());
 
@@ -1216,10 +1237,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             label,
             apply,
             detail,
-            label_detail: match value {
-                Value::Symbol(s) => Some(symbol_label_detail(s.get())),
-                _ => None,
-            },
+            label_detail,
             command,
             ..Completion::default()
         });

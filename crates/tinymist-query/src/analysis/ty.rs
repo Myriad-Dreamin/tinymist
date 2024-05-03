@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use parking_lot::{Mutex, RwLock};
 use reflexo::{hash::hash128, vector::ir::DefId};
 use typst::{
-    foundations::{Func, Value},
+    foundations::{Func, Repr, Value},
     syntax::{
         ast::{self, AstNode},
         LinkedNode, Source, Span, SyntaxKind,
@@ -84,6 +84,11 @@ impl TypeCheckInfo {
         };
 
         worker.simplify(ty, principal)
+    }
+
+    pub fn describe(&self, ty: &FlowType) -> Option<String> {
+        let mut worker = TypeDescriber::default();
+        worker.describe_root(ty)
     }
 
     // todo: distinguish at least, at most
@@ -1258,6 +1263,167 @@ struct TypeCanoStore {
     cano_local_cache: HashMap<(DefId, bool), FlowType>,
     negatives: HashSet<DefId>,
     positives: HashSet<DefId>,
+}
+
+#[derive(Default)]
+struct TypeDescriber {
+    described: HashSet<u128>,
+    results: HashSet<String>,
+    functions: Vec<FlowSignature>,
+}
+
+impl TypeDescriber {
+    fn describe_root(&mut self, ty: &FlowType) -> Option<String> {
+        // recursive structure
+        if self.described.contains(&hash128(ty)) {
+            return Some("$self".to_string());
+        }
+
+        let res = self.describe(ty);
+        if !res.is_empty() {
+            return Some(res);
+        }
+        self.described.insert(hash128(ty));
+
+        let mut results = std::mem::take(&mut self.results)
+            .into_iter()
+            .collect::<Vec<_>>();
+        let functions = std::mem::take(&mut self.functions);
+        if !functions.is_empty() {
+            // todo: union signature
+            // only first function is described
+            let f = functions[0].clone();
+
+            let mut res = String::new();
+            res.push('(');
+            let mut not_first = false;
+            for ty in f.pos.iter() {
+                if not_first {
+                    res.push_str(", ");
+                } else {
+                    not_first = true;
+                }
+                res.push_str(self.describe_root(ty).as_deref().unwrap_or("any"));
+            }
+            for (k, ty) in f.named.iter() {
+                if not_first {
+                    res.push_str(", ");
+                } else {
+                    not_first = true;
+                }
+                res.push_str(k);
+                res.push_str(": ");
+                res.push_str(self.describe_root(ty).as_deref().unwrap_or("any"));
+            }
+            if let Some(r) = &f.rest {
+                if not_first {
+                    res.push_str(", ");
+                }
+                res.push_str("..: ");
+                res.push_str(self.describe_root(r).as_deref().unwrap_or(""));
+                res.push_str("[]");
+            }
+            res.push_str(") => ");
+            res.push_str(self.describe_root(&f.ret).as_deref().unwrap_or("any"));
+            results.push(res);
+        }
+
+        if results.is_empty() {
+            return None;
+        }
+
+        results.sort();
+        results.dedup();
+        Some(results.join(" | "))
+    }
+
+    fn describe_iter(&mut self, ty: &[FlowType]) {
+        for ty in ty.iter() {
+            let desc = self.describe(ty);
+            self.results.insert(desc);
+        }
+    }
+
+    fn describe(&mut self, ty: &FlowType) -> String {
+        match ty {
+            FlowType::Var(..) => {}
+            FlowType::Union(tys) => {
+                self.describe_iter(tys);
+            }
+            FlowType::Let(lb) => {
+                self.describe_iter(&lb.lbs);
+                self.describe_iter(&lb.ubs);
+            }
+            FlowType::Func(f) => {
+                self.functions.push(*f.clone());
+            }
+            FlowType::Dict(..) => {
+                return "dict".to_string();
+            }
+            FlowType::Tuple(..) => {
+                return "array".to_string();
+            }
+            FlowType::Array(..) => {
+                return "array".to_string();
+            }
+            FlowType::With(w) => {
+                return self.describe(&w.0);
+            }
+            FlowType::Clause => {}
+            FlowType::Undef => {}
+            FlowType::Content => {
+                return "content".to_string();
+            }
+            FlowType::Any => {
+                return "any".to_string();
+            }
+            FlowType::Space => {}
+            FlowType::None => {
+                return "none".to_string();
+            }
+            FlowType::Infer => {}
+            FlowType::FlowNone => {
+                return "none".to_string();
+            }
+            FlowType::Auto => {
+                return "auto".to_string();
+            }
+            FlowType::Boolean(None) => {
+                return "boolean".to_string();
+            }
+            FlowType::Boolean(Some(b)) => {
+                return b.to_string();
+            }
+            FlowType::Builtin(b) => {
+                return b.describe().to_string();
+            }
+            FlowType::Value(v) => return v.0.repr().to_string(),
+            FlowType::ValueDoc(v) => return v.0.repr().to_string(),
+            FlowType::Field(..) => {
+                return "field".to_string();
+            }
+            FlowType::Element(..) => {
+                return "element".to_string();
+            }
+            FlowType::Args(..) => {
+                return "args".to_string();
+            }
+            FlowType::At(..) => {
+                return "any".to_string();
+            }
+            FlowType::Unary(..) => {
+                return "any".to_string();
+            }
+            FlowType::Binary(..) => {
+                return "any".to_string();
+            }
+            FlowType::If(..) => {
+                return "any".to_string();
+            }
+        }
+
+        String::new()
+    }
 }
 
 struct TypeSimplifier<'a, 'b> {

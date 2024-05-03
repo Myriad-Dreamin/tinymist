@@ -11,6 +11,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
    {
     "kind": 3,
     "label": "aa",
+    "labelDetails": {
+     "description": "() => 1"
+    },
     "textEdit": {
      "newText": "aa(${1:})",
      "range": {
@@ -28,6 +31,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
    {
     "kind": 3,
     "label": "aab",
+    "labelDetails": {
+     "description": "() => 1"
+    },
     "textEdit": {
      "newText": "aab(${1:})",
      "range": {
@@ -45,6 +51,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
    {
     "kind": 3,
     "label": "aabc",
+    "labelDetails": {
+     "description": "() => 1"
+    },
     "textEdit": {
      "newText": "aabc(${1:})",
      "range": {
@@ -62,6 +71,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
    {
     "kind": 3,
     "label": "aac",
+    "labelDetails": {
+     "description": "() => 1"
+    },
     "textEdit": {
      "newText": "aac(${1:})",
      "range": {
@@ -84,6 +96,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
    {
     "kind": 3,
     "label": "aabc",
+    "labelDetails": {
+     "description": "() => 1"
+    },
     "textEdit": {
      "newText": "aabc(${1:})",
      "range": {
@@ -101,6 +116,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
    {
     "kind": 3,
     "label": "aac",
+    "labelDetails": {
+     "description": "() => 1"
+    },
     "textEdit": {
      "newText": "aac(${1:})",
      "range": {

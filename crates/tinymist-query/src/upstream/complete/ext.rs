@@ -5,7 +5,7 @@ use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use reflexo::path::{unix_slash, PathClean};
-use typst::foundations::{AutoValue, Func, Label, NoneValue, Type, Value};
+use typst::foundations::{AutoValue, Func, Label, NoneValue, Repr, Type, Value};
 use typst::layout::{Dir, Length};
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, Span, SyntaxKind};
@@ -69,6 +69,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             let src = self.ctx.source_by_id(id).ok()?;
             self.ctx.type_check(src)
         })();
+        let types = types.as_ref();
 
         let mut ancestor = Some(self.leaf.clone());
         while let Some(node) = &ancestor {
@@ -279,10 +280,33 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             if !filter(None) || name.is_empty() {
                 continue;
             }
-            let _ = types;
+            let span = match def_kind {
+                DefKind::Syntax(span) => span,
+                DefKind::Instance(span, _) => span,
+            };
+            // we don't check literal type here for faster completion
+            let ty_detail = types
+                .and_then(|types| {
+                    if matches!(kind, CompletionKind::Symbol(..)) {
+                        return None;
+                    }
+
+                    let ty = types.mapping.get(&span)?;
+                    let ty = types.simplify(ty.clone(), false);
+                    types.describe(&ty).map(From::from)
+                })
+                .or_else(|| {
+                    if let DefKind::Instance(_, v) = &def_kind {
+                        Some(describe_value(self.ctx, v))
+                    } else {
+                        None
+                    }
+                });
+
             if kind == CompletionKind::Func {
                 let base = Completion {
                     kind: kind.clone(),
+                    label_detail: ty_detail,
                     // todo: only vscode and neovim (0.9.1) support this
                     command: Some("editor.action.triggerSuggest"),
                     ..Default::default()
@@ -345,12 +369,20 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                     SurroundingSyntax::Selector | SurroundingSyntax::SetRule
                 ) && !matches!(&v, Value::Func(func) if func.element().is_some());
                 if !bad_instantiate {
-                    self.value_completion(Some(name), &v, parens, None);
+                    self.value_completion_(
+                        Some(name),
+                        &v,
+                        parens,
+                        ty_detail.clone(),
+                        ty_detail.as_deref(),
+                    );
                 }
             } else {
                 self.completions.push(Completion {
                     kind,
                     label: name,
+                    label_detail: ty_detail.clone(),
+                    detail: ty_detail,
                     ..Completion::default()
                 });
             }
@@ -419,6 +451,38 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
             None
         }
+    }
+}
+
+fn describe_value(ctx: &mut AnalysisContext, v: &Value) -> EcoString {
+    match v {
+        Value::Func(f) => {
+            let mut f = f;
+            while let typst::foundations::func::Repr::With(with_f) = f.inner() {
+                f = &with_f.0;
+            }
+
+            let sig = analyze_dyn_signature(ctx, f.clone());
+            sig.primary()
+                .sig_ty
+                .as_ref()
+                .and_then(|e| e.describe())
+                .unwrap_or_else(|| "function".into())
+                .into()
+        }
+        Value::Module(m) => {
+            if let Some(fid) = m.file_id() {
+                let package = fid.package();
+                let path = unix_slash(fid.vpath().as_rootless_path());
+                if let Some(package) = package {
+                    return eco_format!("{package}:{path}");
+                }
+                return path.into();
+            }
+
+            "module".into()
+        }
+        _ => v.ty().repr(),
     }
 }
 

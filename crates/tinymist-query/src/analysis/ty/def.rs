@@ -11,7 +11,7 @@ use typst::{
 
 use crate::analysis::ty::param_mapping;
 
-use super::FlowBuiltinType;
+use super::{FlowBuiltinType, TypeDescriber};
 
 struct RefDebug<'a>(&'a FlowType);
 
@@ -169,6 +169,11 @@ impl FlowType {
         };
 
         Some(ty)
+    }
+
+    pub fn describe(&self) -> Option<String> {
+        let mut worker = TypeDescriber::default();
+        worker.describe_root(self)
     }
 
     pub(crate) fn is_dict(&self) -> bool {
@@ -410,6 +415,20 @@ impl FlowSignature {
                 .collect(),
             rest: None,
             ret,
+        }
+    }
+
+    pub(crate) fn new(
+        pos: impl Iterator<Item = FlowType>,
+        named: impl Iterator<Item = (EcoString, FlowType)>,
+        rest: Option<FlowType>,
+        ret_ty: Option<FlowType>,
+    ) -> Self {
+        FlowSignature {
+            pos: pos.collect(),
+            named: named.collect(),
+            rest,
+            ret: ret_ty.unwrap_or(FlowType::Any),
         }
     }
 }
