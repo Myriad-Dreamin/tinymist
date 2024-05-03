@@ -1,0 +1,154 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on c( (76..78)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "aa",
+    "textEdit": {
+     "newText": "aa(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aa.where",
+    "textEdit": {
+     "newText": "aa.where(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aa.with",
+    "textEdit": {
+     "newText": "aa.with(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aab",
+    "textEdit": {
+     "newText": "aab(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aabc",
+    "textEdit": {
+     "newText": "aabc(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac",
+    "textEdit": {
+     "newText": "aac(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "aabc",
+    "textEdit": {
+     "newText": "aabc(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac",
+    "textEdit": {
+     "newText": "aac(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]

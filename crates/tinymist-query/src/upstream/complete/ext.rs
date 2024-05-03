@@ -47,7 +47,13 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
     /// Filters the global/math scope with the given filter.
     pub fn scope_completions_(&mut self, parens: bool, filter: impl Fn(Option<&Value>) -> bool) {
         let mut defined = BTreeMap::new();
-        let mut try_insert = |name: EcoString, kind: CompletionKind| {
+
+        enum DefKind {
+            Syntax(Span),
+            Instance(Spanned<Value>),
+        }
+
+        let mut try_insert = |name: EcoString, kind: (CompletionKind, DefKind)| {
             if name.is_empty() {
                 return;
             }
@@ -56,6 +62,12 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                 entry.insert(kind);
             }
         };
+
+        let types = (|| {
+            let id = self.root.span().id()?;
+            let src = self.ctx.source_by_id(id).ok()?;
+            self.ctx.type_check(src)
+        })();
 
         let mut ancestor = Some(self.leaf.clone());
         while let Some(node) = &ancestor {
@@ -67,7 +79,10 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         ast::LetBindingKind::Normal(..) => CompletionKind::Variable,
                     };
                     for ident in v.kind().bindings() {
-                        try_insert(ident.get().clone(), kind.clone());
+                        try_insert(
+                            ident.get().clone(),
+                            (kind.clone(), DefKind::Syntax(ident.span())),
+                        );
                     }
                 }
 
@@ -81,22 +96,107 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                     if analyzed.is_none() {
                         log::debug!("failed to analyze import: {:?}", anaylyze);
                     }
-                    if let Some(value) = analyzed {
-                        if imports.is_none() {
-                            if let Some(name) = value.name() {
-                                try_insert(name.into(), CompletionKind::Module);
+
+                    // import it self
+                    if imports.is_none() || v.new_name().is_some() {
+                        // todo: name of import syntactically
+
+                        let name = (|| {
+                            if let Some(new_name) = v.new_name() {
+                                return Some(new_name.get().clone());
                             }
-                        } else if let Some(scope) = value.scope() {
-                            for (name, v) in scope.iter() {
-                                let kind = match v {
-                                    Value::Func(..) => CompletionKind::Func,
-                                    Value::Module(..) => CompletionKind::Module,
-                                    Value::Type(..) => CompletionKind::Type,
-                                    _ => CompletionKind::Constant,
-                                };
-                                try_insert(name.clone(), kind);
+                            if let Some(module_ins) = &analyzed {
+                                return module_ins.name().map(From::from);
+                            }
+
+                            // todo: name of import syntactically
+                            None
+                        })();
+
+                        let def_kind = analyzed.clone().map(|module_ins| {
+                            DefKind::Instance(Spanned::new(
+                                module_ins,
+                                v.new_name()
+                                    .map(|n| n.span())
+                                    .unwrap_or_else(Span::detached),
+                            ))
+                        });
+
+                        if let Some((name, def_kind)) = name.zip(def_kind) {
+                            try_insert(name, (CompletionKind::Module, def_kind));
+                        }
+                    }
+
+                    // import items
+                    match (imports, analyzed) {
+                        (Some(..), None) => {
+                            // todo: name of import syntactically
+                        }
+                        (Some(e), Some(module_ins)) => {
+                            let import_filter = match e {
+                                ast::Imports::Wildcard => None,
+                                ast::Imports::Items(e) => {
+                                    let mut filter = HashMap::new();
+                                    for item in e.iter() {
+                                        match item {
+                                            ast::ImportItem::Simple(n) => {
+                                                filter.insert(
+                                                    n.get().clone(),
+                                                    DefKind::Syntax(n.span()),
+                                                );
+                                            }
+                                            ast::ImportItem::Renamed(n) => {
+                                                filter.insert(
+                                                    n.new_name().get().clone(),
+                                                    DefKind::Syntax(n.span()),
+                                                );
+                                            }
+                                        }
+                                    }
+                                    Some(filter)
+                                }
+                            };
+
+                            if let Some(scope) = module_ins.scope() {
+                                for (name, v) in scope.iter() {
+                                    let kind = match v {
+                                        Value::Func(..) => CompletionKind::Func,
+                                        Value::Module(..) => CompletionKind::Module,
+                                        Value::Type(..) => CompletionKind::Type,
+                                        _ => CompletionKind::Constant,
+                                    };
+                                    let def_kind = match &import_filter {
+                                        Some(import_filter) => {
+                                            let w = import_filter.get(name);
+                                            match w {
+                                                Some(DefKind::Syntax(span)) => {
+                                                    Some(DefKind::Instance(Spanned::new(
+                                                        v.clone(),
+                                                        *span,
+                                                    )))
+                                                }
+                                                Some(DefKind::Instance(v)) => {
+                                                    Some(DefKind::Instance(v.clone()))
+                                                }
+                                                None => None,
+                                            }
+                                        }
+                                        None => Some(DefKind::Instance(Spanned::new(
+                                            v.clone(),
+                                            Span::detached(),
+                                        ))),
+                                    };
+                                    if let Some(def_kind) = def_kind {
+                                        try_insert(name.clone(), (kind, def_kind));
+                                    }
+                                }
+                            } else if let Some(filter) = import_filter {
+                                for (name, def_kind) in filter {
+                                    try_insert(name, (CompletionKind::Variable, def_kind));
+                                }
                             }
                         }
+                        _ => {}
                     }
                 }
 
@@ -108,7 +208,10 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                     if node.prev_sibling_kind() != Some(SyntaxKind::In) {
                         let pattern = v.pattern();
                         for ident in pattern.bindings() {
-                            try_insert(ident.get().clone(), CompletionKind::Variable);
+                            try_insert(
+                                ident.get().clone(),
+                                (CompletionKind::Variable, DefKind::Syntax(ident.span())),
+                            );
                         }
                     }
                 }
@@ -117,15 +220,22 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         match param {
                             ast::Param::Pos(pattern) => {
                                 for ident in pattern.bindings() {
-                                    try_insert(ident.get().clone(), CompletionKind::Variable);
+                                    try_insert(
+                                        ident.get().clone(),
+                                        (CompletionKind::Variable, DefKind::Syntax(ident.span())),
+                                    );
                                 }
                             }
-                            ast::Param::Named(n) => {
-                                try_insert(n.name().get().clone(), CompletionKind::Variable)
-                            }
+                            ast::Param::Named(n) => try_insert(
+                                n.name().get().clone(),
+                                (CompletionKind::Variable, DefKind::Syntax(n.name().span())),
+                            ),
                             ast::Param::Spread(s) => {
                                 if let Some(sink_ident) = s.sink_ident() {
-                                    try_insert(sink_ident.get().clone(), CompletionKind::Variable)
+                                    try_insert(
+                                        sink_ident.get().clone(),
+                                        (CompletionKind::Variable, DefKind::Syntax(s.span())),
+                                    )
                                 }
                             }
                         }
@@ -157,8 +267,10 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             }
         }
 
-        for (name, kind) in defined {
+        for (name, (kind, def_kind)) in defined {
             if filter(None) && !name.is_empty() {
+                let _ = types;
+                let _ = def_kind;
                 if kind == CompletionKind::Func {
                     let apply = eco_format!("{}.with(${{}})", name);
                     self.completions.push(Completion {

@@ -1,0 +1,69 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on c( (83..85)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/import.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "aab",
+    "textEdit": {
+     "newText": "aab(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "aac",
+    "textEdit": {
+     "newText": "aac(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "aac",
+    "textEdit": {
+     "newText": "aac(${1:})",
+     "range": {
+      "end": {
+       "character": 4,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
