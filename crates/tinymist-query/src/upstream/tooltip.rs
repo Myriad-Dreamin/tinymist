@@ -10,7 +10,7 @@ use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 use typst::util::{round_2, Numeric};
 use typst::World;
 
-use super::summarize_font_family;
+use super::{plain_docs_sentence, summarize_font_family};
 use crate::analysis::{analyze_expr, analyze_labels, DynLabel};
 
 /// Describe the item under the cursor.
@@ -61,7 +61,7 @@ pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
 
     if let [(value, _)] = values.as_slice() {
         if let Some(docs) = value.docs() {
-            return Some(Tooltip::Text(docs.into()));
+            return Some(Tooltip::Text(plain_docs_sentence(docs)));
         }
 
         if let &Value::Length(length) = value {
@@ -204,7 +204,7 @@ fn named_param_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> 
         if let Some(ident) = leaf.cast::<ast::Ident>();
         if let Some(param) = func.param(&ident);
         then {
-            return Some(Tooltip::Text(param.docs.into()));
+            return Some(Tooltip::Text(plain_docs_sentence(param.docs)));
         }
     }
 

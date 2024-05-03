@@ -611,7 +611,6 @@ pub fn param_completions<'a>(
                 return;
             }
 
-            // Some(&plain_docs_sentence(&pos.docs))
             doc = Some(plain_docs_sentence(&pos.docs));
 
             if pos.positional

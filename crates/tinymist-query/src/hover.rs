@@ -5,7 +5,7 @@ use crate::{
     jump_from_cursor,
     prelude::*,
     syntax::{find_docs_before, get_deref_target, LexicalKind, LexicalVarKind},
-    upstream::{expr_tooltip, tooltip, Tooltip},
+    upstream::{expr_tooltip, plain_docs_sentence, route_of_value, tooltip, Tooltip},
     LspHoverContents, StatefulRequest,
 };
 
@@ -115,6 +115,15 @@ impl StatefulRequest for HoverRequest {
     }
 }
 
+enum CommandOrLink {
+    Link(String),
+}
+
+struct CommandLink {
+    title: Option<String>,
+    command_or_links: Vec<CommandOrLink>,
+}
+
 fn def_tooltip(
     ctx: &mut AnalysisContext,
     source: &Source,
@@ -128,6 +137,7 @@ fn def_tooltip(
     let lnk = find_definition(ctx, source.clone(), document, deref_target.clone())?;
 
     let mut results = vec![];
+    let mut actions = vec![];
 
     match lnk.kind {
         LexicalKind::Mod(_)
@@ -160,6 +170,11 @@ fn def_tooltip(
                 results.push(MarkedString::String(doc));
             }
 
+            if let Some(link) = ExternalDocLink::get(ctx, &lnk) {
+                actions.push(link);
+            }
+
+            render_actions(&mut results, actions);
             Some(LspHoverContents::Array(results))
         }
         LexicalKind::Var(LexicalVarKind::Variable) => {
@@ -173,7 +188,7 @@ fn def_tooltip(
                     Tooltip::Code(values) => {
                         results.push(MarkedString::LanguageString(LanguageString {
                             language: "typc".to_owned(),
-                            value: format!("// Values\n{values}"),
+                            value: values.into(),
                         }));
                     }
                 }
@@ -188,9 +203,35 @@ fn def_tooltip(
                 results.push(MarkedString::String(doc));
             }
 
+            if let Some(link) = ExternalDocLink::get(ctx, &lnk) {
+                actions.push(link);
+            }
+
+            render_actions(&mut results, actions);
             Some(LspHoverContents::Array(results))
         }
     }
+}
+
+fn render_actions(results: &mut Vec<MarkedString>, actions: Vec<CommandLink>) {
+    let g = actions
+        .into_iter()
+        .map(|action| {
+            // https://github.com/rust-lang/rust-analyzer/blob/1a5bb27c018c947dab01ab70ffe1d267b0481a17/editors/code/src/client.ts#L59
+            let title = action.title.unwrap_or("".to_owned());
+            let command_or_links = action
+                .command_or_links
+                .into_iter()
+                .map(|col| match col {
+                    CommandOrLink::Link(link) => link,
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!("[{title}]({command_or_links})")
+        })
+        .collect::<Vec<_>>()
+        .join("___");
+    results.push(MarkedString::String(g));
 }
 
 // todo: hover with `with_stack`
@@ -255,6 +296,59 @@ impl fmt::Display for ParamTooltip {
     }
 }
 
+struct ExternalDocLink;
+
+impl ExternalDocLink {
+    fn get(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<CommandLink> {
+        self::ExternalDocLink::get_inner(ctx, lnk)
+    }
+
+    fn get_inner(_ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<CommandLink> {
+        if matches!(lnk.value, Some(Value::Func(..))) {
+            if let Some(builtin) = Self::builtin_func_tooltip("https://typst.app/docs/", lnk) {
+                return Some(builtin);
+            }
+        };
+
+        lnk.value
+            .as_ref()
+            .and_then(|value| Self::builtin_value_tooltip("https://typst.app/docs/", value))
+    }
+}
+
+impl ExternalDocLink {
+    fn builtin_func_tooltip(base: &str, lnk: &DefinitionLink) -> Option<CommandLink> {
+        let Some(Value::Func(func)) = &lnk.value else {
+            return None;
+        };
+
+        use typst::foundations::func::Repr;
+        let mut func = func;
+        loop {
+            match func.inner() {
+                Repr::Element(..) | Repr::Native(..) => {
+                    return Self::builtin_value_tooltip(base, &Value::Func(func.clone()));
+                }
+                Repr::With(w) => {
+                    func = &w.0;
+                }
+                Repr::Closure(..) => {
+                    return None;
+                }
+            }
+        }
+    }
+
+    fn builtin_value_tooltip(base: &str, value: &Value) -> Option<CommandLink> {
+        let route = route_of_value(value)?;
+        let link = format!("{base}/{route}");
+        Some(CommandLink {
+            title: Some("Open documentation".to_owned()),
+            command_or_links: vec![CommandOrLink::Link(link)],
+        })
+    }
+}
+
 struct DocTooltip;
 
 impl DocTooltip {
@@ -265,7 +359,7 @@ impl DocTooltip {
     fn get_inner(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<String> {
         if matches!(lnk.value, Some(Value::Func(..))) {
             if let Some(builtin) = Self::builtin_func_tooltip(lnk) {
-                return Some(builtin.to_owned());
+                return Some(plain_docs_sentence(builtin).into());
             }
         };
 
