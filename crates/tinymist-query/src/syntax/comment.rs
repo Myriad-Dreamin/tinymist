@@ -3,13 +3,17 @@ use std::ops::Range;
 use crate::prelude::*;
 use crate::syntax::get_def_target;
 
-fn extract_document_between(node: &LinkedNode, rng: Range<usize>) -> Option<String> {
+fn extract_document_between(
+    node: &LinkedNode,
+    rng: Range<usize>,
+    first_group: bool,
+) -> Option<String> {
     // collect all comments before the definition
     let mut comments = vec![];
 
     let mut newline_count = 0;
-    let nodes = node.parent()?.children();
-    for n in nodes {
+    let nodes = node.children();
+    'scan_comments: for n in nodes {
         let offset = n.offset();
         if !rng.contains(&offset) {
             continue;
@@ -26,11 +30,17 @@ fn extract_document_between(node: &LinkedNode, rng: Range<usize>) -> Option<Stri
                     newline_count += 1;
                 }
                 if newline_count > 1 {
+                    if first_group {
+                        break 'scan_comments;
+                    }
                     comments.clear();
                 }
             }
             SyntaxKind::Parbreak => {
                 newline_count = 2;
+                if first_group {
+                    break 'scan_comments;
+                }
                 comments.clear();
             }
             SyntaxKind::LineComment => {
@@ -75,14 +85,14 @@ fn extract_document_between(node: &LinkedNode, rng: Range<usize>) -> Option<Stri
     Some(docs)
 }
 
-pub fn find_document_before(src: &Source, cursor: usize) -> Option<String> {
+pub fn find_docs_before(src: &Source, cursor: usize) -> Option<String> {
     log::debug!("finding docs at: {id:?}, {cursor}", id = src.id());
 
     let root = LinkedNode::new(src.root());
     let leaf = root.leaf_at(cursor)?;
     let def_target = get_def_target(leaf.clone())?;
     log::debug!("found docs target: {:?}", def_target.node().kind());
-    // todo: import
+    // todo: import node
     let target = def_target.node().clone();
     let mut node = target.clone();
     while let Some(prev) = node.prev_sibling() {
@@ -98,12 +108,27 @@ pub fn find_document_before(src: &Source, cursor: usize) -> Option<String> {
             return None;
         }
 
-        return extract_document_between(&node, start..end);
+        return extract_document_between(node.parent()?, start..end, false);
     }
 
     if node.parent()?.range() == root.range() && node.prev_sibling().is_none() {
-        return extract_document_between(&node, root.offset()..node.range().start);
+        return extract_document_between(node.parent()?, root.offset()..node.range().start, false);
     }
 
     None
+}
+
+pub fn find_module_level_docs(src: &Source) -> Option<String> {
+    log::debug!("finding docs at: {id:?}", id = src.id());
+
+    let root = LinkedNode::new(src.root());
+    for n in root.children() {
+        if n.kind().is_trivia() {
+            continue;
+        }
+
+        return extract_document_between(&root, 0..n.offset(), true);
+    }
+
+    extract_document_between(&root, 0..src.text().len(), true)
 }

@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on c( (48..50)
+description: Completion on c( (69..71)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
 ---
@@ -16,45 +16,11 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
      "range": {
       "end": {
        "character": 4,
-       "line": 4
+       "line": 6
       },
       "start": {
        "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "aa.where",
-    "textEdit": {
-     "newText": "aa.where(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "aa.with",
-    "textEdit": {
-     "newText": "aa.with(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
+       "line": 6
       }
      }
     }
@@ -67,215 +33,11 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
      "range": {
       "end": {
        "character": 4,
-       "line": 4
+       "line": 6
       },
       "start": {
        "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "aac.where",
-    "textEdit": {
-     "newText": "aac.where(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "aac.with",
-    "textEdit": {
-     "newText": "aac.with(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 21,
-    "label": "aqua",
-    "textEdit": {
-     "newText": "aqua",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 7,
-    "label": "array",
-    "textEdit": {
-     "newText": "array",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 15,
-    "label": "array literal",
-    "textEdit": {
-     "newText": "(${1:1, 2, 3})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 15,
-    "label": "dictionary literal",
-    "textEdit": {
-     "newText": "(${1:a: 1, b: 2})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 15,
-    "label": "import package",
-    "textEdit": {
-     "newText": "import \"@${1:}\": ${2:items}",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 15,
-    "label": "include (package)",
-    "textEdit": {
-     "newText": "include \"@${1:}\"",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "metadata",
-    "textEdit": {
-     "newText": "metadata(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "pagebreak",
-    "textEdit": {
-     "newText": "pagebreak(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "parbreak",
-    "textEdit": {
-     "newText": "parbreak()${1:}",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "smallcaps",
-    "textEdit": {
-     "newText": "smallcaps(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
+       "line": 6
       }
      }
     }
@@ -293,45 +55,11 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow.typ
      "range": {
       "end": {
        "character": 4,
-       "line": 4
+       "line": 6
       },
       "start": {
        "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "aac.where",
-    "textEdit": {
-     "newText": "aac.where(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
-      }
-     }
-    }
-   },
-   {
-    "kind": 3,
-    "label": "aac.with",
-    "textEdit": {
-     "newText": "aac.with(${1:})",
-     "range": {
-      "end": {
-       "character": 4,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
-       "line": 4
+       "line": 6
       }
      }
     }

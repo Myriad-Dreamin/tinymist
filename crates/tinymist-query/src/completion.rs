@@ -200,11 +200,13 @@ impl StatefulRequest for CompletionRequest {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use insta::with_settings;
     use lsp_types::CompletionItem;
 
     use super::*;
-    use crate::tests::*;
+    use crate::{syntax::find_module_level_docs, tests::*};
 
     #[test]
     fn test() {
@@ -212,6 +214,52 @@ mod tests {
             let source = ctx.source_by_path(&path).unwrap();
             let rng = find_test_range(&source);
             let text = source.text()[rng.clone()].to_string();
+
+            let docs = find_module_level_docs(&source).unwrap_or_default();
+            let properties = get_test_properties(&docs);
+            let mut includes = HashSet::new();
+            let mut excludes = HashSet::new();
+
+            for kk in properties.get("contains").iter().flat_map(|v| v.split(',')) {
+                // split first char
+                let (kind, item) = kk.split_at(1);
+                if kind == "+" {
+                    includes.insert(item.trim());
+                } else if kind == "-" {
+                    excludes.insert(item.trim());
+                } else {
+                    includes.insert(kk.trim());
+                }
+            }
+            let get_items = |items: Vec<CompletionItem>| {
+                let mut res: Vec<_> = items
+                    .into_iter()
+                    .map(|item| CompletionItem {
+                        label: item.label,
+                        sort_text: item.sort_text,
+                        kind: item.kind,
+                        text_edit: item.text_edit,
+                        ..Default::default()
+                    })
+                    .filter(|item| {
+                        if includes.is_empty() {
+                            return true;
+                        }
+                        if !excludes.is_empty() && excludes.contains(item.label.as_str()) {
+                            panic!("{item:?} was excluded in {excludes:?}");
+                        }
+                        includes.contains(item.label.as_str())
+                    })
+                    .collect();
+
+                res.sort_by(|a, b| {
+                    a.sort_text
+                        .as_ref()
+                        .cmp(&b.sort_text.as_ref())
+                        .then_with(|| a.label.cmp(&b.label))
+                });
+                res
+            };
 
             let mut results = vec![];
             for s in rng.clone() {
@@ -225,48 +273,11 @@ mod tests {
                     match resp {
                         CompletionResponse::List(l) => CompletionResponse::List(CompletionList {
                             is_incomplete: l.is_incomplete,
-                            items: {
-                                let mut res: Vec<_> = l
-                                    .items
-                                    .into_iter()
-                                    .map(|item| CompletionItem {
-                                        label: item.label,
-                                        sort_text: item.sort_text,
-                                        kind: item.kind,
-                                        text_edit: item.text_edit,
-                                        ..Default::default()
-                                    })
-                                    .collect();
-
-                                res.sort_by(|a, b| {
-                                    a.sort_text
-                                        .as_ref()
-                                        .cmp(&b.sort_text.as_ref())
-                                        .then_with(|| a.label.cmp(&b.label))
-                                });
-                                res
-                            },
+                            items: get_items(l.items),
                         }),
-                        CompletionResponse::Array(items) => CompletionResponse::Array({
-                            let mut res: Vec<_> = items
-                                .into_iter()
-                                .map(|item| CompletionItem {
-                                    label: item.label,
-                                    sort_text: item.sort_text,
-                                    kind: item.kind,
-                                    text_edit: item.text_edit,
-                                    ..Default::default()
-                                })
-                                .collect();
-
-                            res.sort_by(|a, b| {
-                                a.sort_text
-                                    .as_ref()
-                                    .cmp(&b.sort_text.as_ref())
-                                    .then_with(|| a.label.cmp(&b.label))
-                            });
-                            res
-                        }),
+                        CompletionResponse::Array(items) => {
+                            CompletionResponse::Array(get_items(items))
+                        }
                     }
                 }));
             }
