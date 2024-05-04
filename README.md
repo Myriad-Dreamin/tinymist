@@ -61,6 +61,20 @@ Follow the instructions to enable tinymist in your favorite editor.
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/tinymist.svg)](https://repology.org/project/tinymist/versions)
 
+### Roadmap
+
+After development for two months, most of the features are implemented. There are still some features to be implemented, but I would like to leave them in typst v0.12.0. I'll also pick some of them to implement on my weekends. Also please feel free to contribute if you are interested in the following features.
+
+- Documentation and refactoring: It is my current focus.
+- Spell checking: There is already a branch but no suitable (default) spell checking library is found.
+- Syntax Highlighting for embedded languages in raw blocks: It almost works, but it is disabled because of wrong syntax highlighting on syntax errors in the raw blocks.
+- Periscope renderer: It is disabled since vscode reject to render SVGs containing foreignObjects.
+- Inlay hint: It is disabled **by default** because of performance issues.
+- Find references of labels, dictionary fields, and named function arguments.
+- Go to definition of dictionary fields and named function arguments.
+- Autocompletion for raw language tags.
+- Improve symbol view's appearance.
+
 ### Contributing
 
 Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for contribution guidelines.
