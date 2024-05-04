@@ -23,10 +23,9 @@ use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
 use super::{
-    literal_type_check, DefUseInfo, FlowType, ImportInfo, PathPreference, Signature,
-    SignatureTarget, TypeCheckInfo,
+    post_type_check, DefUseInfo, FlowType, ImportInfo, PathPreference, Signature, SignatureTarget,
+    TypeCheckInfo,
 };
-use crate::syntax::get_check_target;
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -661,10 +660,7 @@ impl<'w> AnalysisContext<'w> {
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(source.clone())?;
 
-        let check_target = get_check_target(k.clone())?;
-
-        literal_type_check(self, &ty_chk, check_target.clone())
-            .or_else(|| ty_chk.mapping.get(&k.span()).cloned())
+        post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.mapping.get(&k.span()).cloned())
     }
 }
 

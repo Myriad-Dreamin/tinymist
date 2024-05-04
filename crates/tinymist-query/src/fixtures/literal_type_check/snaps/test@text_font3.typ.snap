@@ -1,7 +1,0 @@
----
-source: crates/tinymist-query/src/analysis.rs
-description: "Check on \"(\\\"Test\\\",)\" (33)"
-expression: literal_type
-input_file: crates/tinymist-query/src/fixtures/literal_type_check/text_font3.typ
----
-(TextFont | Array<TextFont>)

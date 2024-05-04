@@ -80,7 +80,7 @@ impl<'a> DerefTarget<'a> {
 
 pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'_>> {
     /// Skips trivia nodes that are on the same line as the cursor.
-    fn skippable_trivia(node: &LinkedNode, cursor: usize) -> bool {
+    fn can_skip_trivia(node: &LinkedNode, cursor: usize) -> bool {
         // A non-trivia node is our target so we stop at it.
         if !node.kind().is_trivia() {
             return false;
@@ -101,7 +101,7 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'
 
     // Move to the first non-trivia node before the cursor.
     let mut node = node;
-    if skippable_trivia(&node, cursor) || {
+    if can_skip_trivia(&node, cursor) || {
         is_mark(node.kind())
             && (!matches!(node.kind(), SyntaxKind::LeftParen)
                 || !matches!(
@@ -239,12 +239,30 @@ pub enum ParamTarget<'a> {
     },
     Named(LinkedNode<'a>),
 }
+impl<'a> ParamTarget<'a> {
+    pub(crate) fn positional_from_before(before: bool) -> Self {
+        ParamTarget::Positional {
+            spreads: EcoVec::new(),
+            positional: if before { 0 } else { 1 },
+            is_spread: false,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum CheckTarget<'a> {
     Param {
+        callee: LinkedNode<'a>,
         target: ParamTarget<'a>,
         is_set: bool,
+    },
+    Element {
+        container: LinkedNode<'a>,
+        target: ParamTarget<'a>,
+    },
+    Paren {
+        container: LinkedNode<'a>,
+        is_before: bool,
     },
     Normal(LinkedNode<'a>),
 }
@@ -256,9 +274,20 @@ impl<'a> CheckTarget<'a> {
                 ParamTarget::Positional { .. } => return None,
                 ParamTarget::Named(node) => node.clone(),
             },
+            CheckTarget::Element { target, .. } => match target {
+                ParamTarget::Positional { .. } => return None,
+                ParamTarget::Named(node) => node.clone(),
+            },
+            CheckTarget::Paren { container, .. } => container.clone(),
             CheckTarget::Normal(node) => node.clone(),
         })
     }
+}
+
+enum ParamKind {
+    Call,
+    Array,
+    Dict,
 }
 
 pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
@@ -269,7 +298,7 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
 
     let deref_target = get_deref_target(node.clone(), node.offset())?;
 
-    match deref_target {
+    let deref_node = match deref_target {
         DerefTarget::Callee(callee) => {
             let parent = callee.parent()?;
             let args = match parent.cast::<ast::Expr>() {
@@ -277,29 +306,68 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
                 Some(ast::Expr::Set(set)) => set.args(),
                 _ => return None,
             };
-            let args_node = node.find(args.span())?;
+            let args_node = parent.find(args.span())?;
 
-            let param_target = get_param_target(args_node, node)?;
-            Some(CheckTarget::Param {
-                target: param_target,
-                is_set: parent.kind() == SyntaxKind::Set,
+            let is_set = parent.kind() == SyntaxKind::Set;
+            let target = get_param_target(args_node, node, ParamKind::Call)?;
+            return Some(CheckTarget::Param {
+                callee,
+                target,
+                is_set,
+            });
+        }
+        DerefTarget::ImportPath(node) | DerefTarget::IncludePath(node) => {
+            return Some(CheckTarget::Normal(node));
+        }
+        deref_target => deref_target.node().clone(),
+    };
+
+    let Some(node_parent) = node.parent() else {
+        return Some(CheckTarget::Normal(node));
+    };
+    match node_parent.kind() {
+        SyntaxKind::Array | SyntaxKind::Dict => {
+            let target = get_param_target(
+                node_parent.clone(),
+                node.clone(),
+                match node_parent.kind() {
+                    SyntaxKind::Array => ParamKind::Array,
+                    SyntaxKind::Dict => ParamKind::Dict,
+                    _ => unreachable!(),
+                },
+            )?;
+            Some(CheckTarget::Element {
+                container: node_parent.clone(),
+                target,
             })
         }
-        deref_target => Some(CheckTarget::Normal(deref_target.node().clone())),
+        SyntaxKind::Parenthesized => {
+            let is_before = node.offset() <= node_parent.offset() + 1;
+            Some(CheckTarget::Paren {
+                container: node_parent.clone(),
+                is_before,
+            })
+        }
+        _ => Some(CheckTarget::Normal(deref_node)),
     }
 }
 
 fn get_param_target<'a>(
     args_node: LinkedNode<'a>,
     node: LinkedNode<'a>,
+    param_kind: ParamKind,
 ) -> Option<ParamTarget<'a>> {
     match node.kind() {
+        SyntaxKind::Named => {
+            let param_ident = node.cast::<ast::Named>()?.name();
+            Some(ParamTarget::Named(args_node.find(param_ident.span())?))
+        }
         SyntaxKind::Colon => {
             let prev = node.prev_leaf()?;
             let param_ident = prev.cast::<ast::Ident>()?;
             Some(ParamTarget::Named(args_node.find(param_ident.span())?))
         }
-        SyntaxKind::Spread | SyntaxKind::Comma | SyntaxKind::LeftParen => {
+        _ => {
             let mut spreads = EcoVec::new();
             let mut positional = 0;
             let is_spread = node.kind() == SyntaxKind::Spread;
@@ -307,15 +375,39 @@ fn get_param_target<'a>(
             let args_before = args_node
                 .children()
                 .take_while(|arg| arg.range().end <= node.offset());
-            for ch in args_before {
-                match ch.cast::<ast::Arg>() {
-                    Some(ast::Arg::Pos(..)) => {
-                        positional += 1;
+            match param_kind {
+                ParamKind::Call => {
+                    for ch in args_before {
+                        match ch.cast::<ast::Arg>() {
+                            Some(ast::Arg::Pos(..)) => {
+                                positional += 1;
+                            }
+                            Some(ast::Arg::Spread(..)) => {
+                                spreads.push(ch);
+                            }
+                            Some(ast::Arg::Named(..)) | None => {}
+                        }
                     }
-                    Some(ast::Arg::Spread(..)) => {
-                        spreads.push(ch);
+                }
+                ParamKind::Array => {
+                    for ch in args_before {
+                        match ch.cast::<ast::ArrayItem>() {
+                            Some(ast::ArrayItem::Pos(..)) => {
+                                positional += 1;
+                            }
+                            Some(ast::ArrayItem::Spread(..)) => {
+                                spreads.push(ch);
+                            }
+                            _ => {}
+                        }
                     }
-                    Some(ast::Arg::Named(..)) | None => {}
+                }
+                ParamKind::Dict => {
+                    for ch in args_before {
+                        if let Some(ast::DictItem::Spread(..)) = ch.cast::<ast::DictItem>() {
+                            spreads.push(ch);
+                        }
+                    }
                 }
             }
 
@@ -325,7 +417,6 @@ fn get_param_target<'a>(
                 is_spread,
             })
         }
-        _ => None,
     }
 }
 

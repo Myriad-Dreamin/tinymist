@@ -11,7 +11,7 @@ use typst::{
 
 use crate::analysis::ty::param_mapping;
 
-use super::{FlowBuiltinType, TypeCheckInfo};
+use super::FlowBuiltinType;
 
 struct RefDebug<'a>(&'a FlowType);
 
@@ -31,6 +31,7 @@ pub(crate) enum FlowType {
     Undef,
     Content,
     Any,
+    Space,
     None,
     Infer,
     FlowNone,
@@ -39,6 +40,7 @@ pub(crate) enum FlowType {
     Builtin(FlowBuiltinType),
     Value(Box<(Value, Span)>),
     ValueDoc(Box<(Value, &'static str)>),
+    Field(Box<(EcoString, FlowType, Span)>),
     Element(Element),
 
     Var(Box<(DefId, EcoString)>),
@@ -64,6 +66,7 @@ impl fmt::Debug for FlowType {
             FlowType::Undef => f.write_str("Undef"),
             FlowType::Content => f.write_str("Content"),
             FlowType::Any => f.write_str("Any"),
+            FlowType::Space => f.write_str("Space"),
             FlowType::None => f.write_str("None"),
             FlowType::Infer => f.write_str("Infer"),
             FlowType::FlowNone => f.write_str("FlowNone"),
@@ -92,7 +95,8 @@ impl fmt::Debug for FlowType {
                 }
                 f.write_str(")")
             }
-            FlowType::Let(v) => write!(f, "{v:?}"),
+            FlowType::Let(v) => write!(f, "({v:?})"),
+            FlowType::Field(ff) => write!(f, "{:?}: {:?}", ff.0, ff.1),
             FlowType::Var(v) => write!(f, "@{}", v.1),
             FlowType::Unary(u) => write!(f, "{u:?}"),
             FlowType::Binary(b) => write!(f, "{b:?}"),
@@ -125,11 +129,14 @@ impl FlowType {
             CastInfo::Any => FlowType::Any,
             CastInfo::Value(v, doc) => FlowType::ValueDoc(Box::new((v.clone(), *doc))),
             CastInfo::Type(ty) => FlowType::Value(Box::new((Value::Type(*ty), Span::detached()))),
-            CastInfo::Union(e) => FlowType::Union(Box::new(
-                e.iter()
-                    .flat_map(|e| Self::from_return_site(f, e))
-                    .collect(),
-            )),
+            CastInfo::Union(e) => {
+                // flat union
+                let e = UnionIter(vec![e.as_slice().iter()]);
+
+                FlowType::Union(Box::new(
+                    e.flat_map(|e| Self::from_return_site(f, e)).collect(),
+                ))
+            }
         };
 
         Some(ty)
@@ -151,11 +158,14 @@ impl FlowType {
             CastInfo::Any => FlowType::Any,
             CastInfo::Value(v, doc) => FlowType::ValueDoc(Box::new((v.clone(), *doc))),
             CastInfo::Type(ty) => FlowType::Value(Box::new((Value::Type(*ty), Span::detached()))),
-            CastInfo::Union(e) => FlowType::Union(Box::new(
-                e.iter()
-                    .flat_map(|e| Self::from_param_site(f, p, e))
-                    .collect(),
-            )),
+            CastInfo::Union(e) => {
+                // flat union
+                let e = UnionIter(vec![e.as_slice().iter()]);
+
+                FlowType::Union(Box::new(
+                    e.flat_map(|e| Self::from_param_site(f, p, e)).collect(),
+                ))
+            }
         };
 
         Some(ty)
@@ -175,28 +185,26 @@ impl FlowType {
             FlowType::Union(Box::new(e.collect()))
         }
     }
+}
 
-    pub(crate) fn signatures(
-        &self,
-        ty_chk: &TypeCheckInfo,
-        principal: bool,
-    ) -> Option<Vec<FlowSignature>> {
-        let mut res = Vec::new();
-        check_signatures(self, &mut res, ty_chk, principal);
-        if res.is_empty() {
-            None
-        } else {
-            // todo: bad performance
-            for sig in &mut res {
-                for pos in &mut sig.pos {
-                    *pos = ty_chk.simplify(pos.clone(), principal);
+struct UnionIter<'a>(Vec<std::slice::Iter<'a, CastInfo>>);
+
+impl<'a> Iterator for UnionIter<'a> {
+    type Item = &'a CastInfo;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let iter = self.0.last_mut()?;
+            if let Some(e) = iter.next() {
+                match e {
+                    CastInfo::Union(e) => {
+                        self.0.push(e.as_slice().iter());
+                    }
+                    _ => return Some(e),
                 }
-                for (_, ty) in &mut sig.named {
-                    *ty = ty_chk.simplify(ty.clone(), principal);
-                }
+            } else {
+                self.0.pop();
             }
-
-            Some(res)
         }
     }
 }
@@ -241,7 +249,7 @@ pub(crate) struct FlowIfType {
 
 impl FlowIfType {}
 
-#[derive(Clone, Hash)]
+#[derive(Clone, Hash, Default)]
 pub(crate) struct FlowVarStore {
     pub lbs: Vec<FlowType>,
     pub ubs: Vec<FlowType>,
@@ -373,6 +381,38 @@ pub(crate) struct FlowSignature {
     pub rest: Option<FlowType>,
     pub ret: FlowType,
 }
+impl FlowSignature {
+    /// Array constructor
+    pub(crate) fn array_cons(elem: FlowType, anyify: bool) -> FlowSignature {
+        let ret = if anyify { FlowType::Any } else { elem.clone() };
+        FlowSignature {
+            pos: Vec::new(),
+            named: Vec::new(),
+            rest: Some(elem),
+            ret,
+        }
+    }
+
+    /// Dictionary constructor
+    pub(crate) fn dict_cons(named: &FlowRecord, anyify: bool) -> FlowSignature {
+        let ret = if anyify {
+            FlowType::Any
+        } else {
+            FlowType::Dict(named.clone())
+        };
+        FlowSignature {
+            pos: Vec::new(),
+            named: named
+                .fields
+                .clone()
+                .into_iter()
+                .map(|(name, ty, _)| (name, ty))
+                .collect(),
+            rest: None,
+            ret,
+        }
+    }
+}
 
 impl fmt::Debug for FlowSignature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -449,62 +489,5 @@ impl fmt::Debug for FlowRecord {
             }
         }
         f.write_str("}")
-    }
-}
-
-fn instantiate_signature(
-    f: &FlowType,
-    args: Vec<FlowArgs>,
-    sigs: &mut Vec<FlowSignature>,
-    ty_chk: &TypeCheckInfo,
-    principal: bool,
-) {
-    let sigs_checkpoint = sigs.len();
-    check_signatures(f, sigs, ty_chk, principal);
-    if sigs.len() == sigs_checkpoint {
-        return;
-    }
-    for sig in &mut sigs[sigs_checkpoint..] {
-        // consume the positional arguments
-        sig.pos = if sig.pos.len() > args.len() {
-            sig.pos.split_off(args.len())
-        } else {
-            Vec::new()
-        };
-    }
-}
-
-fn check_signatures(
-    ty: &FlowType,
-    res: &mut Vec<FlowSignature>,
-    ty_chk: &TypeCheckInfo,
-    principal: bool,
-) {
-    match ty {
-        FlowType::Func(s) => res.push(*s.clone()),
-        FlowType::With(w) => {
-            instantiate_signature(&w.0, w.1.clone(), res, ty_chk, principal);
-        }
-        FlowType::Union(u) => {
-            for ty in u.iter() {
-                check_signatures(ty, res, ty_chk, principal);
-            }
-        }
-        FlowType::Var(u) => {
-            let var = ty_chk.vars.get(&u.0);
-            if let Some(var) = var {
-                let FlowVarKind::Weak(w) = &var.kind;
-                let w = w.read();
-                for lb in &w.ubs {
-                    check_signatures(lb, res, ty_chk, principal);
-                }
-                if !principal {
-                    for ub in &w.lbs {
-                        check_signatures(ub, res, ty_chk, principal);
-                    }
-                }
-            }
-        }
-        _ => {}
     }
 }

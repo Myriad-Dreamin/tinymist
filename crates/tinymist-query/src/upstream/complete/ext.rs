@@ -16,7 +16,7 @@ use crate::analysis::{
     FlowType, PathPreference, FLOW_INSET_DICT, FLOW_MARGIN_DICT, FLOW_OUTSET_DICT,
     FLOW_RADIUS_DICT, FLOW_STROKE_DICT,
 };
-use crate::syntax::{get_non_strict_def_target, param_index_at_leaf, DefTarget};
+use crate::syntax::param_index_at_leaf;
 use crate::upstream::complete::complete_code;
 use crate::upstream::plain_docs_sentence;
 
@@ -33,6 +33,12 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
     pub fn strict_scope_completions(&mut self, parens: bool, filter: impl Fn(&Value) -> bool) {
         self.scope_completions_(parens, |v| v.map_or(false, &filter));
+    }
+
+    fn seen_field(&mut self, field: EcoString) -> bool {
+        !self
+            .seen_casts
+            .insert(typst::util::hash128(&FieldName(field)))
     }
 
     /// Add completions for definitions that are available at the cursor.
@@ -200,7 +206,7 @@ fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
     complete_code(ctx);
     ctx.explicit = explict;
 
-    log::info!(
+    log::debug!(
         "sort_and_explicit_code_completion: {:#?} {:#?}",
         completions,
         ctx.completions
@@ -234,7 +240,7 @@ fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
         compl.sort_text = Some(eco_format!("{i:03}", i = i + sort_base));
     }
 
-    log::info!(
+    log::debug!(
         "sort_and_explicit_code_completion after: {:#?} {:#?}",
         completions,
         ctx.completions
@@ -276,44 +282,23 @@ pub fn param_completions<'a>(
 
     let signature = analyze_dyn_signature(ctx.ctx, func.clone());
 
-    let def = func.span();
-    let type_sig = def.id().and_then(|id| {
-        let source = ctx.ctx.source_by_id(id).ok()?;
-        let def = get_non_strict_def_target(source.find(def)?)?;
-        let DefTarget::Let(l) = def else {
-            return None;
-        };
+    let leaf_type = ctx.ctx.literal_type_of_node(ctx.leaf.clone());
+    log::info!("pos_param_completion_by_type: {:?}", leaf_type);
 
-        let lb = l.cast::<ast::LetBinding>()?;
-        let ast::LetBindingKind::Closure(c) = lb.kind() else {
-            return None;
-        };
-
-        let fn_ty = ctx.ctx.type_of_span(c.span());
-        let info = ctx.ctx.type_check(source)?;
-
-        log::info!("function sig by type checking: {:?}", fn_ty);
-        fn_ty.and_then(|ty| ty.signatures(&info, false))
-    });
-
-    // Exclude named arguments which are already present.
-    let exclude: Vec<_> = args
-        .items()
-        .filter_map(|arg| match arg {
-            ast::Arg::Named(named) => Some(named.name()),
-            _ => None,
-        })
-        .collect();
+    for arg in args.items() {
+        if let ast::Arg::Named(named) = arg {
+            ctx.seen_field(named.name().get().clone());
+        }
+    }
 
     let primary_sig = signature.primary();
 
     log::debug!("pos_param_completion: {:?}", pos_index);
 
+    let mut doc = None;
     if let Some(pos_index) = pos_index {
         let pos = primary_sig.pos.get(pos_index);
         log::debug!("pos_param_completion_to: {:?}", pos);
-
-        let mut doc = None;
 
         if let Some(pos) = pos {
             if set && !pos.settable {
@@ -329,17 +314,14 @@ pub fn param_completions<'a>(
                 ctx.cast_completions(&pos.input);
             }
         }
+    }
 
-        for sig in type_sig.iter().flatten() {
-            if let Some(pos) = sig.pos.get(pos_index) {
-                log::info!("pos_param_completion by type: {:?}", pos);
-                type_completion(ctx, Some(pos), doc.as_deref());
-            }
-        }
+    if let Some(leaf_type) = leaf_type {
+        type_completion(ctx, Some(&leaf_type), doc.as_deref());
     }
 
     for (name, param) in &primary_sig.named {
-        if exclude.iter().any(|ident| ident.as_str() == name) {
+        if ctx.seen_field(name.as_ref().into()) {
             continue;
         }
 
@@ -425,6 +407,7 @@ fn type_completion(
     match infer_type? {
         FlowType::Clause => return None,
         FlowType::Undef => return None,
+        FlowType::Space => return None,
         FlowType::Content => return None,
         FlowType::Any => return None,
         FlowType::Tuple(..) | FlowType::Array(..) => {
@@ -442,6 +425,20 @@ fn type_completion(
         FlowType::Boolean(_b) => {
             ctx.snippet_completion("false", "false", "No / Disabled.");
             ctx.snippet_completion("true", "true", "Yes / Enabled.");
+        }
+        FlowType::Field(f) => {
+            let f = f.0.clone();
+            if ctx.seen_field(f.clone()) {
+                return Some(());
+            }
+
+            ctx.completions.push(Completion {
+                kind: CompletionKind::Field,
+                label: f.clone(),
+                apply: Some(eco_format!("{}: ${{}}", f)),
+                detail: docs.map(Into::into),
+                ..Completion::default()
+            });
         }
         FlowType::Builtin(v) => match v {
             FlowBuiltinType::Path(p) => {
@@ -646,6 +643,9 @@ fn type_completion(
     Some(())
 }
 
+#[derive(Debug, Clone, Hash)]
+struct FieldName(EcoString);
+
 /// Add completions for the values of a named function parameter.
 pub fn named_param_value_completions<'a>(
     ctx: &mut CompletionContext<'a, '_>,
@@ -668,25 +668,12 @@ pub fn named_param_value_completions<'a>(
     // todo: regards call convention
     let func = cc.callee();
 
-    let def = func.span();
-    let type_sig = def.id().and_then(|id| {
-        let source = ctx.ctx.source_by_id(id).ok()?;
-        let def = get_non_strict_def_target(source.find(def)?)?;
-        let DefTarget::Let(l) = def else {
-            return None;
-        };
-
-        let lb = l.cast::<ast::LetBinding>()?;
-        let ast::LetBindingKind::Closure(c) = lb.kind() else {
-            return None;
-        };
-
-        let fn_ty = ctx.ctx.type_of_span(c.span());
-        let info = ctx.ctx.type_check(source)?;
-
-        log::info!("function sig by type checking: {:?}", fn_ty);
-        fn_ty.and_then(|ty| ty.signatures(&info, false))
-    });
+    let leaf_type = ctx.ctx.literal_type_of_node(ctx.leaf.clone());
+    log::debug!(
+        "named_param_completion_by_type: {:?} -> {:?}",
+        ctx.leaf.kind(),
+        leaf_type
+    );
 
     use typst::foundations::func::Repr;
     let mut func = func;
@@ -715,13 +702,10 @@ pub fn named_param_value_completions<'a>(
     }
 
     let mut completed = false;
-    for sig in type_sig.iter().flatten() {
-        let named = sig.named.iter().find(|(n, _)| n.as_str() == name);
-        if let Some((_, param)) = named {
-            log::info!("named_param_completion by type: {:?}", param);
-            type_completion(ctx, Some(param), doc.as_deref());
-            completed = true;
-        }
+    if let Some(type_sig) = leaf_type {
+        log::debug!("named_param_completion by type: {:?}", param);
+        type_completion(ctx, Some(&type_sig), doc.as_deref());
+        completed = true;
     }
 
     if !completed {
@@ -754,7 +738,7 @@ pub fn named_param_value_completions<'a>(
 
 pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     let parent = ctx.leaf.clone();
-    log::debug!("check complete_literal: {:?}", ctx.leaf);
+    log::info!("check complete_literal: {:?}", ctx.leaf);
     let parent = if parent.kind().is_trivia() {
         parent.prev_sibling()?
     } else {
@@ -766,10 +750,10 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
         SyntaxKind::Colon => parent.parent()?,
         _ => parent,
     };
-    let (named, parent) = match parent.kind() {
-        SyntaxKind::Named => (parent.cast::<ast::Named>(), parent.parent()?),
-        SyntaxKind::LeftParen | SyntaxKind::Comma => (None, parent.parent()?),
-        _ => (None, parent),
+    let parent = match parent.kind() {
+        SyntaxKind::Named => parent.parent()?,
+        SyntaxKind::LeftParen | SyntaxKind::Comma => parent.parent()?,
+        _ => parent,
     };
     log::debug!("check complete_literal 3: {:?}", parent);
 
@@ -791,8 +775,10 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     };
 
     // query type of the dict
-    let named_span = named.map(|n| n.span()).unwrap_or_else(Span::detached);
-    let named_ty = ctx.ctx.literal_type_of_span(named_span);
+    let named_ty = ctx
+        .ctx
+        .literal_type_of_node(ctx.leaf.clone())
+        .filter(|ty| !matches!(ty, FlowType::Any));
     let lit_ty = ctx.ctx.literal_type_of_span(lit_span);
     log::info!("complete_literal: {lit_ty:?} {named_ty:?}");
 
@@ -880,6 +866,14 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
                 FlowType::Union(u) => {
                     for info in u.as_ref() {
                         self.on_lit_ty(info);
+                    }
+                }
+                FlowType::Let(u) => {
+                    for ut in u.ubs.iter() {
+                        self.on_lit_ty(ut);
+                    }
+                    for lt in u.lbs.iter() {
+                        self.on_lit_ty(lt);
                     }
                 }
                 // todo: var, let, etc.
