@@ -17,7 +17,7 @@ use typst::visualize::Color;
 use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
-use crate::analysis::{analyze_expr, analyze_import, analyze_labels};
+use crate::analysis::{analyze_expr, analyze_import, analyze_labels, DynLabel};
 use crate::AnalysisContext;
 
 mod ext;
@@ -1144,7 +1144,12 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             (0, split)
         };
 
-        for (label, detail) in labels.into_iter().skip(skip).take(take) {
+        for DynLabel {
+            label,
+            label_desc,
+            detail,
+        } in labels.into_iter().skip(skip).take(take)
+        {
             self.completions.push(Completion {
                 kind: CompletionKind::Constant,
                 apply: (open || close).then(|| {
@@ -1155,6 +1160,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         if close { ">" } else { "" }
                     )
                 }),
+                label_detail: label_desc,
                 label: label.as_str().into(),
                 detail,
                 ..Completion::default()
