@@ -38,7 +38,8 @@
                 {
                     "id": "tinymist.side-symbol-view",
                     "type": "webview",
-                    "name": "Symbol View"
+                    "name": "Symbol View",
+                    "when": "resourceLangId == typst"
                 }
             ]
         },
