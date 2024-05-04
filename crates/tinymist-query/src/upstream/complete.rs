@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::HashSet;
+use std::ops::Range;
 
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
@@ -995,10 +996,9 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
     /// A small window of context before the cursor.
     fn before_window(&self, size: usize) -> &str {
-        safe_str_slice(
+        slice_at(
             self.before,
-            self.cursor.saturating_sub(size),
-            self.before.len(),
+            self.cursor.saturating_sub(size)..self.before.len(),
         )
     }
 
@@ -1273,17 +1273,18 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
     }
 }
 
-fn safe_str_slice(s: &str, mut start: usize, mut end: usize) -> &str {
-    while start < s.len() && !s.is_char_boundary(start) {
-        start += 1;
+/// Slices a smaller string at character boundaries safely.
+fn slice_at(s: &str, mut rng: Range<usize>) -> &str {
+    while !rng.is_empty() && !s.is_char_boundary(rng.start) {
+        rng.start += 1;
     }
-    while end > 0 && !s.is_char_boundary(end) {
-        end -= 1;
+    while !rng.is_empty() && !s.is_char_boundary(rng.end) {
+        rng.end -= 1;
     }
 
-    if end >= start {
-        &s[start..end]
-    } else {
-        ""
+    if rng.is_empty() {
+        return "";
     }
+
+    &s[rng]
 }
