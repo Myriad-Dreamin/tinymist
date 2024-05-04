@@ -437,6 +437,7 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                     ctx.completions.push(Completion {
                         kind: CompletionKind::Symbol(modified.get()),
                         label: modifier.into(),
+                        label_detail: Some(symbol_label_detail(modified.get())),
                         ..Completion::default()
                     });
                 }
@@ -475,6 +476,39 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
             }
         }
         _ => {}
+    }
+}
+
+/// If is printable, return the symbol itself.
+/// Otherwise, return the symbol's unicode description.
+fn symbol_label_detail(ch: char) -> EcoString {
+    if !ch.is_whitespace() && !ch.is_control() {
+        return ch.into();
+    }
+    match ch {
+        ' ' => "space".into(),
+        '\t' => "tab".into(),
+        '\n' => "newline".into(),
+        '\r' => "carriage return".into(),
+        // replacer
+        '\u{200D}' => "zero width joiner".into(),
+        '\u{200C}' => "zero width non-joiner".into(),
+        '\u{200B}' => "zero width space".into(),
+        '\u{2060}' => "word joiner".into(),
+        // spaces
+        '\u{00A0}' => "non-breaking space".into(),
+        '\u{202F}' => "narrow no-break space".into(),
+        '\u{2002}' => "en space".into(),
+        '\u{2003}' => "em space".into(),
+        '\u{2004}' => "three-per-em space".into(),
+        '\u{2005}' => "four-per-em space".into(),
+        '\u{2006}' => "six-per-em space".into(),
+        '\u{2007}' => "figure space".into(),
+        '\u{205f}' => "medium mathematical space".into(),
+        '\u{2008}' => "punctuation space".into(),
+        '\u{2009}' => "thin space".into(),
+        '\u{200A}' => "hair space".into(),
+        _ => format!("\\u{{{:04x}}}", ch as u32).into(),
     }
 }
 
@@ -1181,7 +1215,10 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             label,
             apply,
             detail,
-            label_detail: None,
+            label_detail: match value {
+                Value::Symbol(s) => Some(symbol_label_detail(s.get())),
+                _ => None,
+            },
             command,
             ..Completion::default()
         });
