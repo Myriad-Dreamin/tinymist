@@ -4,6 +4,49 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.7 - [2024-05-05]
+
+### Editor
+
+* Improved icons in https://github.com/Myriad-Dreamin/tinymist/pull/242
+* Conditionally opening activity icon when lang id is typst by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/222
+* (Fix) Symbol view issues in https://github.com/Myriad-Dreamin/tinymist/pull/224
+* Disable inlay hints by default in https://github.com/Myriad-Dreamin/tinymist/pull/225
+
+### Completion
+
+* Triggering parameter hints instead of suggest on pos args in https://github.com/Myriad-Dreamin/tinymist/pull/243
+* Showing label descriptions for labels in https://github.com/Myriad-Dreamin/tinymist/pull/228 and https://github.com/Myriad-Dreamin/tinymist/pull/237
+* Showing graphic label descriptions for symbols in https://github.com/Myriad-Dreamin/tinymist/pull/227 and https://github.com/Myriad-Dreamin/tinymist/pull/237
+* feat: label descriptions according to types in https://github.com/Myriad-Dreamin/tinymist/pull/237
+* Filtering completions by module import in https://github.com/Myriad-Dreamin/tinymist/pull/234
+* Filtering completions by surrounding syntax for elements/selectors in https://github.com/Myriad-Dreamin/tinymist/pull/236
+
+### Code Action (New)
+
+* feat: provide code action to rewrite headings in https://github.com/Myriad-Dreamin/tinymist/pull/240
+
+### Definition
+
+* Finding definition of label references in https://github.com/Myriad-Dreamin/tinymist/pull/235
+
+### Hover
+
+* Handled/Added link in the hover documentation in https://github.com/Myriad-Dreamin/tinymist/pull/239
+
+### Signature Help
+
+* Reimplemented signature help with static analyses in https://github.com/Myriad-Dreamin/tinymist/pull/241
+
+### Misc
+
+* Added template for feature request in https://github.com/Myriad-Dreamin/tinymist/pull/238
+* Improved Dynamic analysis on import from dynamic expressions in https://github.com/Myriad-Dreamin/tinymist/pull/233
+* Performing Type check across modules in https://github.com/Myriad-Dreamin/tinymist/pull/232
+* Bumped to typstyle v0.11.17 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/223
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.6...v0.11.7
+
 ## v0.11.6 - [2024-04-27]
 
 ### Editor
