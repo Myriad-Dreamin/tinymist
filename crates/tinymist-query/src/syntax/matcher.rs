@@ -354,9 +354,12 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
 
 fn get_param_target<'a>(
     args_node: LinkedNode<'a>,
-    node: LinkedNode<'a>,
+    mut node: LinkedNode<'a>,
     param_kind: ParamKind,
 ) -> Option<ParamTarget<'a>> {
+    if node.kind() == SyntaxKind::RightParen {
+        node = node.prev_sibling()?;
+    }
     match node.kind() {
         SyntaxKind::Named => {
             let param_ident = node.cast::<ast::Named>()?.name();
