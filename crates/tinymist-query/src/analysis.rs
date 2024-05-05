@@ -1,5 +1,7 @@
 //! Semantic static and dynamic analysis of the source code.
 
+mod bib;
+pub(crate) use bib::*;
 pub mod call;
 pub use call::*;
 pub mod color_exprs;

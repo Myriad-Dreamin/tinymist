@@ -199,7 +199,9 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
     fn scan(&mut self, e: &'a [LexicalHierarchy]) -> Option<()> {
         for e in e {
             match &e.info.kind {
-                LexicalKind::Heading(..) => unreachable!(),
+                LexicalKind::Var(LexicalVarKind::BibKey) | LexicalKind::Heading(..) => {
+                    unreachable!()
+                }
                 LexicalKind::Var(LexicalVarKind::Label) => {
                     self.insert(Ns::Label, e);
                 }

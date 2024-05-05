@@ -5,6 +5,7 @@ pub use std::{
     sync::Arc,
 };
 
+pub use comemo::Track;
 pub use reflexo::vector::ir::DefId;
 pub use serde::Serialize;
 pub use typst::syntax::FileId as TypstFileId;
