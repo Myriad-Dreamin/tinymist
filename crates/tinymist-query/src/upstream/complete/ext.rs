@@ -313,7 +313,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                     kind: kind.clone(),
                     label_detail: ty_detail,
                     // todo: only vscode and neovim (0.9.1) support this
-                    command: Some("editor.action.triggerSuggest"),
+                    // command: Some("editor.action.triggerSuggest"),
                     ..Default::default()
                 };
 

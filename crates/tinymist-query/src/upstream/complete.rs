@@ -1029,7 +1029,9 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             // command on a suggestion to "manually" retrigger suggest after inserting one
             //
             // todo: only vscode and neovim (0.9.1) support this
-            command: Some("editor.action.triggerSuggest"),
+            command: snippet
+                .contains("${")
+                .then_some("editor.action.triggerSuggest"),
             ..Completion::default()
         });
     }
@@ -1178,10 +1180,8 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         });
 
         let mut apply = None;
-        let mut command = None;
         if parens && matches!(value, Value::Func(_)) {
             if let Value::Func(func) = value {
-                command = Some("editor.action.triggerSuggest");
                 if func
                     .params()
                     .is_some_and(|params| params.iter().all(|param| param.name == "self"))
@@ -1205,7 +1205,6 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             apply,
             detail,
             label_detail,
-            command,
             ..Completion::default()
         });
     }
