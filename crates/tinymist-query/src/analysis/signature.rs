@@ -369,15 +369,22 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         }
     }
 
-    let sig_ty = FlowSignature::new(
-        pos.iter()
-            .map(|e| e.infer_type.clone().unwrap_or(FlowType::Any)),
-        named.iter().map(|e| {
+    let mut named_vec: Vec<(EcoString, FlowType)> = named
+        .iter()
+        .map(|e| {
             (
                 e.0.as_ref().into(),
                 e.1.infer_type.clone().unwrap_or(FlowType::Any),
             )
-        }),
+        })
+        .collect::<Vec<_>>();
+
+    named_vec.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let sig_ty = FlowSignature::new(
+        pos.iter()
+            .map(|e| e.infer_type.clone().unwrap_or(FlowType::Any)),
+        named_vec.into_iter(),
         rest.as_ref()
             .map(|e| e.infer_type.clone().unwrap_or(FlowType::Any)),
         ret_ty.clone(),
