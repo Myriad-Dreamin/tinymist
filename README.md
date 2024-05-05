@@ -38,6 +38,8 @@ Language service (LSP) features:
 - [Rename symbols](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#rename-symbols)
 - [Help with function and method signatures](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#help-with-function-and-method-signatures)
 - [Workspace Symbols](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-all-symbol-definitions-in-folder)
+- [Code Action](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-code-actions)
+  - Increasing/Decreasing heading levels.
 
 Extra features:
 
