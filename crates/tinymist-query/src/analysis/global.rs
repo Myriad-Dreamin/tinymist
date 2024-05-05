@@ -40,8 +40,9 @@ use crate::{
 #[derive(Default)]
 pub struct ModuleAnalysisCache {
     source: OnceCell<FileResult<Source>>,
-    top_level_eval: OnceCell<Option<Arc<TypeCheckInfo>>>,
+    import_info: OnceCell<Option<Arc<ImportInfo>>>,
     def_use: OnceCell<Option<Arc<DefUseInfo>>>,
+    type_check: OnceCell<Option<Arc<TypeCheckInfo>>>,
 }
 
 impl ModuleAnalysisCache {
@@ -50,6 +51,19 @@ impl ModuleAnalysisCache {
         self.source
             .get_or_init(|| ctx.world().source(file_id))
             .clone()
+    }
+
+    /// Try to get the def-use information of a file.
+    pub fn import_info(&self) -> Option<Arc<ImportInfo>> {
+        self.import_info.get().cloned().flatten()
+    }
+
+    /// Compute the def-use information of a file.
+    pub(crate) fn compute_import(
+        &self,
+        f: impl FnOnce() -> Option<Arc<ImportInfo>>,
+    ) -> Option<Arc<ImportInfo>> {
+        self.import_info.get_or_init(f).clone()
     }
 
     /// Try to get the def-use information of a file.
@@ -65,17 +79,17 @@ impl ModuleAnalysisCache {
         self.def_use.get_or_init(f).clone()
     }
 
-    /// Try to get the top-level evaluation information of a file.
+    /// Try to get the type check information of a file.
     pub(crate) fn type_check(&self) -> Option<Arc<TypeCheckInfo>> {
-        self.top_level_eval.get().cloned().flatten()
+        self.type_check.get().cloned().flatten()
     }
 
-    /// Compute the top-level evaluation information of a file.
+    /// Compute the type check information of a file.
     pub(crate) fn compute_type_check(
         &self,
         f: impl FnOnce() -> Option<Arc<TypeCheckInfo>>,
     ) -> Option<Arc<TypeCheckInfo>> {
-        self.top_level_eval.get_or_init(f).clone()
+        self.type_check.get_or_init(f).clone()
     }
 }
 
@@ -593,6 +607,41 @@ impl<'w> AnalysisContext<'w> {
         res
     }
 
+    /// Get the import information of a source file.
+    pub fn import_info(&mut self, source: Source) -> Option<Arc<ImportInfo>> {
+        let fid = source.id();
+
+        if let Some(res) = self.caches.modules.entry(fid).or_default().import_info() {
+            return Some(res);
+        }
+
+        let cache = self.at_module(fid);
+        let l = cache
+            .def_use_lexical_hierarchy
+            .compute(source.clone(), |_before, after| {
+                cache.signatures.clear();
+                crate::syntax::get_lexical_hierarchy(after, crate::syntax::LexicalScopeKind::DefUse)
+            })
+            .ok()
+            .flatten()?;
+
+        let res = cache
+            .import
+            .clone()
+            .compute(l.clone(), |_before, after| {
+                crate::analysis::get_import_info(self, source, after)
+            })
+            .ok()
+            .flatten();
+
+        self.caches
+            .modules
+            .entry(fid)
+            .or_default()
+            .compute_import(|| res.clone());
+        res
+    }
+
     /// Get the def-use information of a source file.
     pub fn def_use(&mut self, source: Source) -> Option<Arc<DefUseInfo>> {
         let fid = source.id();
@@ -611,15 +660,7 @@ impl<'w> AnalysisContext<'w> {
             .ok()
             .flatten()?;
 
-        let source2 = source.clone();
-        let m = cache
-            .import
-            .clone()
-            .compute(l.clone(), |_before, after| {
-                crate::analysis::get_import_info(self, source2, after)
-            })
-            .ok()
-            .flatten()?;
+        let m = self.import_info(source.clone())?;
 
         let cache = self.at_module(fid);
         let res = cache

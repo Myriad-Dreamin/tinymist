@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
-fn resolve_id_by_path(
+/// Resolve a file id by its import path.
+pub fn resolve_id_by_path(
     world: &dyn World,
     current: TypstFileId,
     import_path: &str,
@@ -28,17 +29,6 @@ fn resolve_id_by_path(
     Some(TypstFileId::new(current.package().cloned(), vpath))
 }
 
-/// Find a source instance by its import path.
-pub fn find_source_by_import_path(
-    world: &dyn World,
-    current: TypstFileId,
-    import_path: &str,
-) -> Option<Source> {
-    world
-        .source(resolve_id_by_path(world, current, import_path)?)
-        .ok()
-}
-
 /// Find a source instance by its import node.
 pub fn find_source_by_expr(
     world: &dyn World,
@@ -47,63 +37,9 @@ pub fn find_source_by_expr(
 ) -> Option<Source> {
     // todo: this could be valid: import("path.typ"), where v is parenthesized
     match e {
-        ast::Expr::Str(s) => find_source_by_import_path(world, current, s.get().as_str()),
+        ast::Expr::Str(s) => world
+            .source(resolve_id_by_path(world, current, s.get().as_str())?)
+            .ok(),
         _ => None,
-    }
-}
-
-/// Find all static imports in a source.
-pub fn find_imports(world: &dyn World, source: &Source) -> EcoVec<TypstFileId> {
-    let root = LinkedNode::new(source.root());
-
-    let mut worker = ImportWorker {
-        world,
-        current: source.id(),
-        imports: EcoVec::new(),
-    };
-
-    worker.analyze(root);
-    let res = worker.imports;
-
-    let mut res: Vec<TypstFileId> = res.into_iter().map(|(id, _)| id).collect();
-    res.sort();
-    res.dedup();
-    res.into_iter().collect()
-}
-
-struct ImportWorker<'a> {
-    world: &'a dyn World,
-    current: TypstFileId,
-    imports: EcoVec<(TypstFileId, LinkedNode<'a>)>,
-}
-
-impl<'a> ImportWorker<'a> {
-    fn analyze(&mut self, node: LinkedNode<'a>) -> Option<()> {
-        match node.kind() {
-            SyntaxKind::ModuleImport => {
-                let i = node.cast::<ast::ModuleImport>().unwrap();
-                let src = i.source();
-                match src {
-                    ast::Expr::Str(s) => {
-                        // todo: source in packages
-                        let s = s.get();
-                        let id = resolve_id_by_path(self.world, self.current, s.as_str())?;
-
-                        self.imports.push((id, node));
-                    }
-                    // todo: handle dynamic import
-                    ast::Expr::FieldAccess(..) | ast::Expr::Ident(..) => {}
-                    _ => {}
-                }
-                return None;
-            }
-            SyntaxKind::ModuleInclude => {}
-            _ => {}
-        }
-        for child in node.children() {
-            self.analyze(child);
-        }
-
-        None
     }
 }

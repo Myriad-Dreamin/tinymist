@@ -3,7 +3,6 @@ use std::sync::Once;
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 
-use super::find_imports;
 use crate::prelude::*;
 
 /// The dependency information of a module (file).
@@ -37,14 +36,17 @@ pub fn construct_module_dependencies(
         };
 
         let file_id = source.id();
-        let deps = find_imports(ctx.world(), &source);
+        let Some(import) = ctx.import_info(source) else {
+            continue;
+        };
+
         dependencies
             .entry(file_id)
             .or_insert_with(|| ModuleDependency {
-                dependencies: deps.clone(),
+                dependencies: import.deps.clone(),
                 dependents: EcoVec::default(),
             });
-        for dep in deps {
+        for dep in import.deps.clone() {
             dependents
                 .entry(dep)
                 .or_insert_with(EcoVec::new)

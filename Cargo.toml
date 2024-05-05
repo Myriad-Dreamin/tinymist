@@ -118,12 +118,12 @@ undocumented_unsafe_blocks = "warn"
 [patch.crates-io]
 
 
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
-typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
-typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
-typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
-typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0-2" }
+typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0-2" }
+typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0-2" }
+typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0-2" }
+typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0-2" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.0-2" }
 
 # typst = { path = "../typst/crates/typst" }
 # typst-timing = { path = "../typst/crates/typst-timing" }

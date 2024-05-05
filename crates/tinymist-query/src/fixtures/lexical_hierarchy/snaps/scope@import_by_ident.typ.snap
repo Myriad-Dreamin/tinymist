@@ -1,0 +1,61 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lexical_hierarchy/import_by_ident.typ
+---
+[
+ {
+  "children": [
+   {
+    "kind": {
+     "Mod": "Star"
+    },
+    "name": "*",
+    "range": "22:23"
+   }
+  ],
+  "kind": {
+   "Mod": {
+    "Module": {
+     "Path": "derive.typ"
+    }
+   }
+  },
+  "name": "",
+  "range": "1:23"
+ },
+ {
+  "children": [
+   {
+    "kind": {
+     "Var": "ValRef"
+    },
+    "name": "base",
+    "range": "32:36"
+   },
+   {
+    "kind": {
+     "Mod": "Star"
+    },
+    "name": "*",
+    "range": "38:39"
+   }
+  ],
+  "kind": {
+   "Mod": {
+    "Module": {
+     "Expr": "@32..36"
+    }
+   }
+  },
+  "name": "",
+  "range": "25:39"
+ },
+ {
+  "kind": {
+   "Var": "ValRef"
+  },
+  "name": "f",
+  "range": "41:42"
+ }
+]

@@ -1,17 +1,12 @@
 //! Static analysis for def-use relations.
 
-use std::{
-    collections::HashMap,
-    ops::{Deref, Range},
-    sync::Arc,
-};
+use std::{collections::HashMap, ops::Range, sync::Arc};
 
 use ecow::EcoVec;
 use log::info;
 
 use super::{prelude::*, ImportInfo};
 use crate::adt::snapshot_map::SnapshotMap;
-use crate::syntax::find_source_by_import_path;
 
 /// The type namespace of def-use relations
 ///
@@ -118,7 +113,7 @@ pub(super) fn get_def_use_inner(
     ctx: &mut AnalysisContext,
     source: Source,
     e: EcoVec<LexicalHierarchy>,
-    _m: Arc<ImportInfo>,
+    import: Arc<ImportInfo>,
 ) -> Option<Arc<DefUseInfo>> {
     let current_id = source.id();
 
@@ -127,6 +122,7 @@ pub(super) fn get_def_use_inner(
         info: DefUseInfo::default(),
         id_scope: SnapshotMap::default(),
         label_scope: SnapshotMap::default(),
+        import,
 
         current_id,
         ext_src: None,
@@ -143,6 +139,7 @@ struct DefUseCollector<'a, 'w> {
     info: DefUseInfo,
     label_scope: SnapshotMap<String, DefId>,
     id_scope: SnapshotMap<String, DefId>,
+    import: Arc<ImportInfo>,
 
     current_id: TypstFileId,
     ext_src: Option<Source>,
@@ -203,7 +200,6 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
         for e in e {
             match &e.info.kind {
                 LexicalKind::Heading(..) => unreachable!(),
-                LexicalKind::Mod(LexicalModKind::PathInclude) => {}
                 LexicalKind::Var(LexicalVarKind::Label) => {
                     self.insert(Ns::Label, e);
                 }
@@ -212,6 +208,37 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
                 | LexicalKind::Var(LexicalVarKind::Variable) => {
                     self.insert(Ns::Value, e);
                 }
+                LexicalKind::Var(LexicalVarKind::ValRef) => self.insert_ref(Ns::Value, e),
+                LexicalKind::Block => {
+                    if let Some(e) = &e.children {
+                        self.enter(|this| this.scan(e.as_slice()))?;
+                    }
+                }
+
+                LexicalKind::Mod(LexicalModKind::Module(..)) => {
+                    let mut src = self.import.imports.get(&e.info.range)?.clone();
+                    info!("check import: {info:?} => {src:?}", info = e.info);
+                    std::mem::swap(&mut self.ext_src, &mut src);
+
+                    // todo: process import star
+                    if let Some(e) = &e.children {
+                        self.scan(e.as_slice())?;
+                    }
+
+                    std::mem::swap(&mut self.ext_src, &mut src);
+                }
+                LexicalKind::Mod(LexicalModKind::Star) => {
+                    if let Some(source) = &self.ext_src {
+                        info!("diving source for def use: {:?}", source.id());
+                        let (_, external_info) =
+                            Some(source.id()).zip(self.ctx.def_use(source.clone()))?;
+
+                        for ext_id in &external_info.exports_refs {
+                            self.import_from(&external_info, *ext_id);
+                        }
+                    }
+                }
+                LexicalKind::Mod(LexicalModKind::PathInclude) => {}
                 LexicalKind::Mod(LexicalModKind::PathVar)
                 | LexicalKind::Mod(LexicalModKind::ModuleAlias) => self.insert_module(Ns::Value, e),
                 LexicalKind::Mod(LexicalModKind::Ident) => match self.import_name(&e.info.name) {
@@ -242,43 +269,6 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
                                 target.range.clone(),
                                 Some(def_id),
                             );
-                        }
-                    }
-                }
-                LexicalKind::Var(LexicalVarKind::ValRef) => self.insert_ref(Ns::Value, e),
-                LexicalKind::Block => {
-                    if let Some(e) = &e.children {
-                        self.enter(|this| this.scan(e.as_slice()))?;
-                    }
-                }
-                LexicalKind::Mod(LexicalModKind::Module(p)) => {
-                    match p {
-                        ModSrc::Expr(_) => {}
-                        ModSrc::Path(p) => {
-                            let src = find_source_by_import_path(
-                                self.ctx.world(),
-                                self.current_id,
-                                p.deref(),
-                            );
-                            self.ext_src = src;
-                        }
-                    }
-
-                    // todo: process import star
-                    if let Some(e) = &e.children {
-                        self.scan(e.as_slice())?;
-                    }
-
-                    self.ext_src = None;
-                }
-                LexicalKind::Mod(LexicalModKind::Star) => {
-                    if let Some(source) = &self.ext_src {
-                        info!("diving source for def use: {:?}", source.id());
-                        let (_, external_info) =
-                            Some(source.id()).zip(self.ctx.def_use(source.clone()))?;
-
-                        for ext_id in &external_info.exports_refs {
-                            self.import_from(&external_info, *ext_id);
                         }
                     }
                 }

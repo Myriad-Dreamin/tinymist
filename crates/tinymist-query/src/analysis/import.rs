@@ -1,14 +1,21 @@
 //! Import analysis
 
 use ecow::EcoVec;
+use typst::{
+    foundations::Value,
+    syntax::{LinkedNode, SyntaxKind},
+};
 
-use crate::syntax::find_source_by_import_path;
+use crate::syntax::resolve_id_by_path;
 
+use super::analyze_import;
 pub use super::prelude::*;
 
 /// The import information of a source file.
 #[derive(Default)]
 pub struct ImportInfo {
+    /// The source files that this source file depends on.
+    pub deps: EcoVec<TypstFileId>,
     /// The source file that this source file imports.
     pub imports: indexmap::IndexMap<Range<usize>, Option<Source>>,
 }
@@ -28,15 +35,27 @@ pub(super) fn get_import_info(
     e: EcoVec<LexicalHierarchy>,
 ) -> Option<Arc<ImportInfo>> {
     let current_id = source.id();
+    let root = LinkedNode::new(source.root());
 
     let mut collector = ImportCollector {
         ctx,
         info: ImportInfo::default(),
 
         current_id,
+        root,
     };
 
     collector.scan(&e);
+
+    let mut deps: Vec<_> = collector
+        .info
+        .imports
+        .values()
+        .filter_map(|x| x.as_ref().map(|x| x.id()))
+        .collect();
+    deps.sort();
+    deps.dedup();
+    collector.info.deps = deps.into();
 
     Some(Arc::new(collector.info))
 }
@@ -46,6 +65,7 @@ struct ImportCollector<'a, 'w> {
     info: ImportInfo,
 
     current_id: TypstFileId,
+    root: LinkedNode<'a>,
 }
 
 impl<'a, 'w> ImportCollector<'a, 'w> {
@@ -67,18 +87,60 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
                     | LexicalModKind::Alias { .. }
                     | LexicalModKind::Star,
                 ) => {}
-                LexicalKind::Mod(LexicalModKind::Module(p)) => match p {
-                    ModSrc::Expr(_) => {}
-                    ModSrc::Path(p) => {
-                        let src = find_source_by_import_path(
-                            self.ctx.world(),
-                            self.current_id,
-                            p.deref(),
-                        );
-                        self.info.imports.insert(e.info.range.clone(), src);
-                    }
-                },
+                LexicalKind::Mod(LexicalModKind::Module(p)) => {
+                    let id = match p {
+                        ModSrc::Expr(exp) => {
+                            let exp = find_import_expr(self.root.leaf_at(exp.range.end));
+                            let val = exp
+                                .as_ref()
+                                .and_then(|exp| analyze_import(self.ctx.world(), exp));
+
+                            match val {
+                                Some(Value::Module(m)) => {
+                                    log::debug!(
+                                        "current id {:?} exp {:?} => id: {:?}",
+                                        self.current_id,
+                                        exp,
+                                        m.file_id()
+                                    );
+                                    m.file_id()
+                                }
+                                Some(Value::Str(m)) => resolve_id_by_path(
+                                    self.ctx.world(),
+                                    self.current_id,
+                                    m.as_str(),
+                                ),
+                                _ => None,
+                            }
+                        }
+                        ModSrc::Path(p) => {
+                            resolve_id_by_path(self.ctx.world(), self.current_id, p.deref())
+                        }
+                    };
+                    log::debug!(
+                        "current id {:?} range {:?} => id: {:?}",
+                        self.current_id,
+                        e.info.range,
+                        id
+                    );
+                    let source = id.and_then(|id| self.ctx.source_by_id(id).ok());
+                    self.info.imports.insert(e.info.range.clone(), source);
+                }
             }
         }
     }
+}
+
+fn find_import_expr(end: Option<LinkedNode>) -> Option<LinkedNode> {
+    let mut node = end?;
+    while let Some(parent) = node.parent() {
+        if matches!(
+            parent.kind(),
+            SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude
+        ) {
+            return Some(node);
+        }
+        node = parent.clone();
+    }
+    None
 }
