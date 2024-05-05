@@ -22,7 +22,7 @@
         "vscode": "^1.71.0"
     },
     "main": "./out/extension.js",
-    "icon": "./icons/ti.png",
+    "icon": "./icons/ti-white.png",
     "contributes": {
         "viewsContainers": {
             "activitybar": [
