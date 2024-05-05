@@ -157,6 +157,9 @@ async function startClient(context: ExtensionContext): Promise<void> {
         commands.registerCommand("tinymist.showSummary", () => commandShowSummary(context)),
         commands.registerCommand("tinymist.showSymbolView", () => commandShowSymbolView(context)),
         commands.registerCommand("tinymist.profileCurrentFile", () => commandShowTrace(context)),
+        // We would like to define it at the server side, but it is not possible for now.
+        // https://github.com/microsoft/language-server-protocol/issues/1117
+        commands.registerCommand("tinymist.triggerNamedCompletion", triggerNamedCompletion),
         commands.registerCommand("tinymist.showLog", () => {
             if (client) {
                 client.outputChannel.show();
@@ -666,6 +669,11 @@ function determineVscodeTheme(): any {
         default:
             return "light";
     }
+}
+
+function triggerNamedCompletion() {
+    vscode.commands.executeCommand("editor.action.triggerSuggest");
+    vscode.commands.executeCommand("editor.action.triggerParameterHints");
 }
 
 // "tinymist.hoverPeriscope": {

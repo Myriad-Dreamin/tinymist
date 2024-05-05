@@ -313,7 +313,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                     kind: kind.clone(),
                     label_detail: ty_detail,
                     // todo: only vscode and neovim (0.9.1) support this
-                    command: Some("editor.action.triggerSuggest"),
+                    command: Some("editor.action.triggerParameterHints"),
                     ..Default::default()
                 };
 
@@ -641,13 +641,7 @@ pub fn param_completions<'a>(
                 apply: Some(eco_format!("{}: ${{}}", param.name)),
                 detail: Some(plain_docs_sentence(&param.docs)),
                 label_detail: None,
-                // todo: only vscode and neovim (0.9.1) support this
-                //
-                // VS Code doesn't do that... Auto triggering suggestion only happens on typing
-                // (word starts or trigger characters). However, you can use
-                // editor.action.triggerSuggest as command on a suggestion to
-                // "manually" retrigger suggest after inserting one
-                command: Some("editor.action.triggerSuggest"),
+                command: Some("tinymist.triggerNamedCompletion"),
                 ..Completion::default()
             };
             match param.infer_type {
@@ -742,8 +736,7 @@ fn type_completion(
                 label: f.clone(),
                 apply: Some(eco_format!("{}: ${{}}", f)),
                 detail: docs.map(Into::into),
-                // todo: only vscode and neovim (0.9.1) support this
-                command: Some("editor.action.triggerSuggest"),
+                command: Some("tinymist.triggerNamedCompletion"),
                 ..Completion::default()
             });
         }
