@@ -374,7 +374,7 @@ fn e2e() {
         });
 
         let hash = replay_log(&tinymist_binary, &root.join("neovim"));
-        insta::assert_snapshot!(hash, @"siphash128_13:e271d06cb84deee97e86b0b2763d741a");
+        insta::assert_snapshot!(hash, @"siphash128_13:8a283a742935063715fbc8af6bff2b88");
     }
 
     {
@@ -385,7 +385,7 @@ fn e2e() {
         });
 
         let hash = replay_log(&tinymist_binary, &root.join("vscode"));
-        insta::assert_snapshot!(hash, @"siphash128_13:86c5b1c533652019b3d99f7079e19270");
+        insta::assert_snapshot!(hash, @"siphash128_13:5f118cda0949759f157a2c22b9433775");
     }
 }
 
