@@ -5,7 +5,7 @@ use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use reflexo::path::{unix_slash, PathClean};
-use typst::foundations::{AutoValue, Func, Label, NoneValue, Type, Value};
+use typst::foundations::{AutoValue, Func, Label, NoneValue, Repr, Type, Value};
 use typst::layout::{Dir, Length};
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, Span, SyntaxKind};
@@ -69,6 +69,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             let src = self.ctx.source_by_id(id).ok()?;
             self.ctx.type_check(src)
         })();
+        let types = types.as_ref();
 
         let mut ancestor = Some(self.leaf.clone());
         while let Some(node) = &ancestor {
@@ -279,10 +280,38 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             if !filter(None) || name.is_empty() {
                 continue;
             }
-            let _ = types;
+            let span = match def_kind {
+                DefKind::Syntax(span) => span,
+                DefKind::Instance(span, _) => span,
+            };
+            // we don't check literal type here for faster completion
+            let ty_detail = if let CompletionKind::Symbol(c) = &kind {
+                Some(symbol_label_detail(*c))
+            } else {
+                types
+                    .and_then(|types| {
+                        let ty = types.mapping.get(&span)?;
+                        let ty = types.simplify(ty.clone(), false);
+                        types.describe(&ty).map(From::from)
+                    })
+                    .or_else(|| {
+                        if let DefKind::Instance(_, v) = &def_kind {
+                            Some(describe_value(self.ctx, v))
+                        } else {
+                            None
+                        }
+                    })
+            };
+            let detail = if let CompletionKind::Symbol(c) = &kind {
+                Some(symbol_detail(*c))
+            } else {
+                ty_detail.clone()
+            };
+
             if kind == CompletionKind::Func {
                 let base = Completion {
                     kind: kind.clone(),
+                    label_detail: ty_detail,
                     // todo: only vscode and neovim (0.9.1) support this
                     command: Some("editor.action.triggerSuggest"),
                     ..Default::default()
@@ -345,12 +374,20 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                     SurroundingSyntax::Selector | SurroundingSyntax::SetRule
                 ) && !matches!(&v, Value::Func(func) if func.element().is_some());
                 if !bad_instantiate {
-                    self.value_completion(Some(name), &v, parens, None);
+                    self.value_completion_(
+                        Some(name),
+                        &v,
+                        parens,
+                        ty_detail.clone(),
+                        detail.as_deref(),
+                    );
                 }
             } else {
                 self.completions.push(Completion {
                     kind,
                     label: name,
+                    label_detail: ty_detail.clone(),
+                    detail,
                     ..Completion::default()
                 });
             }
@@ -419,6 +456,38 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
             None
         }
+    }
+}
+
+fn describe_value(ctx: &mut AnalysisContext, v: &Value) -> EcoString {
+    match v {
+        Value::Func(f) => {
+            let mut f = f;
+            while let typst::foundations::func::Repr::With(with_f) = f.inner() {
+                f = &with_f.0;
+            }
+
+            let sig = analyze_dyn_signature(ctx, f.clone());
+            sig.primary()
+                .sig_ty
+                .as_ref()
+                .and_then(|e| e.describe())
+                .unwrap_or_else(|| "function".into())
+                .into()
+        }
+        Value::Module(m) => {
+            if let Some(fid) = m.file_id() {
+                let package = fid.package();
+                let path = unix_slash(fid.vpath().as_rootless_path());
+                if let Some(package) = package {
+                    return eco_format!("{package}:{path}");
+                }
+                return path.into();
+            }
+
+            "module".into()
+        }
+        _ => v.ty().repr(),
     }
 }
 
@@ -1294,6 +1363,49 @@ pub fn complete_path(
             })
             .collect_vec(),
     )
+}
+
+/// If is printable, return the symbol itself.
+/// Otherwise, return the symbol's unicode detailed description.
+pub fn symbol_detail(ch: char) -> EcoString {
+    let ld = symbol_label_detail(ch);
+    if ld.starts_with("\\u") {
+        return ld;
+    }
+    format!("{}, unicode: `\\u{{{:04x}}}`", ld, ch as u32).into()
+}
+
+/// If is printable, return the symbol itself.
+/// Otherwise, return the symbol's unicode description.
+pub fn symbol_label_detail(ch: char) -> EcoString {
+    if !ch.is_whitespace() && !ch.is_control() {
+        return ch.into();
+    }
+    match ch {
+        ' ' => "space".into(),
+        '\t' => "tab".into(),
+        '\n' => "newline".into(),
+        '\r' => "carriage return".into(),
+        // replacer
+        '\u{200D}' => "zero width joiner".into(),
+        '\u{200C}' => "zero width non-joiner".into(),
+        '\u{200B}' => "zero width space".into(),
+        '\u{2060}' => "word joiner".into(),
+        // spaces
+        '\u{00A0}' => "non-breaking space".into(),
+        '\u{202F}' => "narrow no-break space".into(),
+        '\u{2002}' => "en space".into(),
+        '\u{2003}' => "em space".into(),
+        '\u{2004}' => "three-per-em space".into(),
+        '\u{2005}' => "four-per-em space".into(),
+        '\u{2006}' => "six-per-em space".into(),
+        '\u{2007}' => "figure space".into(),
+        '\u{205f}' => "medium mathematical space".into(),
+        '\u{2008}' => "punctuation space".into(),
+        '\u{2009}' => "thin space".into(),
+        '\u{200A}' => "hair space".into(),
+        _ => format!("\\u{{{:04x}}}", ch as u32).into(),
+    }
 }
 
 #[cfg(test)]

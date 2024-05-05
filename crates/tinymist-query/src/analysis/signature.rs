@@ -15,7 +15,7 @@ use typst::{
     util::LazyHash,
 };
 
-use crate::analysis::resolve_callee;
+use crate::analysis::{resolve_callee, FlowSignature};
 use crate::syntax::{get_def_target, get_deref_target, DefTarget};
 use crate::AnalysisContext;
 
@@ -111,6 +111,8 @@ pub struct PrimarySignature {
     pub rest: Option<Arc<ParamSpec>>,
     /// The return type.
     pub(crate) ret_ty: Option<FlowType>,
+    /// The signature type.
+    pub(crate) sig_ty: Option<FlowType>,
     _broken: bool,
 }
 
@@ -367,12 +369,33 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         }
     }
 
+    let mut named_vec: Vec<(EcoString, FlowType)> = named
+        .iter()
+        .map(|e| {
+            (
+                e.0.as_ref().into(),
+                e.1.infer_type.clone().unwrap_or(FlowType::Any),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    named_vec.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let sig_ty = FlowSignature::new(
+        pos.iter()
+            .map(|e| e.infer_type.clone().unwrap_or(FlowType::Any)),
+        named_vec.into_iter(),
+        rest.as_ref()
+            .map(|e| e.infer_type.clone().unwrap_or(FlowType::Any)),
+        ret_ty.clone(),
+    );
     Arc::new(PrimarySignature {
         pos,
         named,
         rest,
         ret_ty,
         has_fill_or_size_or_stroke: has_fill || has_stroke || has_size,
+        sig_ty: Some(FlowType::Func(Box::new(sig_ty))),
         _broken: broken,
     })
 }

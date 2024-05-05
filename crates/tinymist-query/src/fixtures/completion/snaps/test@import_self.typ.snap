@@ -11,6 +11,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_self.typ
    {
     "kind": 9,
     "label": "base",
+    "labelDetails": {
+     "description": "base.typ"
+    },
     "textEdit": {
      "newText": "base",
      "range": {
