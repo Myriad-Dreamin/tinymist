@@ -8,3 +8,4 @@ input_file: crates/tinymist-query/src/fixtures/type_check/sig_template.typ
 ---
 5..9 -> @tmpl
 10..17 -> @content
+21..28 -> @content

@@ -29,6 +29,7 @@ toml.workspace = true
 walkdir.workspace = true
 indexmap.workspace = true
 ecow.workspace = true
+siphasher.workspace = true
 
 typst.workspace = true
 

@@ -122,6 +122,7 @@ struct ComputingNode<Inputs, Output> {
     name: &'static str,
     computing: AtomicBool,
     inputs: RwLock<Option<Inputs>>,
+    slow_validate: RwLock<Option<u128>>,
     output: RwLock<Option<Output>>,
 }
 
@@ -162,6 +163,7 @@ impl<Inputs, Output> ComputingNode<Inputs, Output> {
             name,
             computing: AtomicBool::new(false),
             inputs: RwLock::new(None),
+            slow_validate: RwLock::new(None),
             output: RwLock::new(None),
         }
     }
@@ -169,6 +171,32 @@ impl<Inputs, Output> ComputingNode<Inputs, Output> {
     fn compute(
         &self,
         inputs: Inputs,
+        compute: impl FnOnce(Option<Inputs>, Inputs) -> Option<Output>,
+    ) -> Result<Option<Output>, ()>
+    where
+        Inputs: ComputeDebug + Hash + Clone,
+        Output: Clone,
+    {
+        self.compute_(inputs, Option::<fn() -> u128>::None, compute)
+    }
+
+    fn compute_with_validate(
+        &self,
+        inputs: Inputs,
+        slow_validate: impl FnOnce() -> u128,
+        compute: impl FnOnce(Option<Inputs>, Inputs) -> Option<Output>,
+    ) -> Result<Option<Output>, ()>
+    where
+        Inputs: ComputeDebug + Hash + Clone,
+        Output: Clone,
+    {
+        self.compute_(inputs, Some(slow_validate), compute)
+    }
+
+    fn compute_(
+        &self,
+        inputs: Inputs,
+        slow_validate: Option<impl FnOnce() -> u128>,
         compute: impl FnOnce(Option<Inputs>, Inputs) -> Option<Output>,
     ) -> Result<Option<Output>, ()>
     where
@@ -183,12 +211,16 @@ impl<Inputs, Output> ComputingNode<Inputs, Output> {
         }
         let input_cmp = self.inputs.read();
         let res = Ok(match input_cmp.as_ref() {
-            Some(s) if reflexo::hash::hash128(&inputs) == reflexo::hash::hash128(&s) => {
+            Some(s)
+                if reflexo::hash::hash128(&inputs) == reflexo::hash::hash128(&s)
+                    && self.is_slow_validated(slow_validate) =>
+            {
                 log::debug!(
                     "{}({:?}): hit cache",
                     self.name,
                     inputs.compute_debug_repr()
                 );
+
                 self.output.read().clone()
             }
             s => {
@@ -205,6 +237,23 @@ impl<Inputs, Output> ComputingNode<Inputs, Output> {
         self.computing
             .store(false, std::sync::atomic::Ordering::SeqCst);
         res
+    }
+
+    fn is_slow_validated(&self, slow_validate: Option<impl FnOnce() -> u128>) -> bool {
+        if let Some(slow_validate) = slow_validate {
+            let res = slow_validate();
+            if self
+                .slow_validate
+                .read()
+                .as_ref()
+                .map_or(true, |e| *e != res)
+            {
+                *self.slow_validate.write() = Some(res);
+                return false;
+            }
+        }
+
+        true
     }
 }
 
@@ -518,15 +567,20 @@ impl<'w> AnalysisContext<'w> {
         if let Some(res) = self.caches.modules.entry(fid).or_default().type_check() {
             return Some(res);
         }
+        let def_use = self.def_use(source.clone());
 
         let cache = self.at_module(fid);
 
         let tl = cache.type_check.clone();
         let res = tl
-            .compute(source, |_before, after| {
-                let next = crate::analysis::ty::type_check(self, after);
-                next.or_else(|| tl.output.read().clone())
-            })
+            .compute_with_validate(
+                source,
+                || def_use.map(|s| s.dep_hash(fid)).unwrap_or_default(),
+                |_before, after| {
+                    let next = crate::analysis::ty::type_check(self, after);
+                    next.or_else(|| tl.output.read().clone())
+                },
+            )
             .ok()
             .flatten();
 

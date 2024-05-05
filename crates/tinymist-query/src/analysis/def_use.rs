@@ -97,6 +97,21 @@ impl DefUseInfo {
     pub fn is_exported(&self, id: DefId) -> bool {
         self.exports_refs.contains(&id)
     }
+
+    /// Get the definition id of an exported symbol by its name.
+    pub fn dep_hash(&self, fid: TypstFileId) -> u128 {
+        use siphasher::sip128::Hasher128;
+        let mut hasher = reflexo::hash::FingerprintSipHasherBase::default();
+        for (dep_fid, def) in self.ident_defs.keys() {
+            if fid != *dep_fid {
+                continue;
+            }
+            fid.hash(&mut hasher);
+            def.hash(&mut hasher);
+        }
+
+        hasher.finish128().into()
+    }
 }
 
 pub(super) fn get_def_use_inner(
