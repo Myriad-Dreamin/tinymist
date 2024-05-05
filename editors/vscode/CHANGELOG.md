@@ -18,13 +18,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 * Triggering parameter hints instead of suggest on pos args in https://github.com/Myriad-Dreamin/tinymist/pull/243
 * Showing label descriptions for labels in https://github.com/Myriad-Dreamin/tinymist/pull/228 and https://github.com/Myriad-Dreamin/tinymist/pull/237
 * Showing graphic label descriptions for symbols in https://github.com/Myriad-Dreamin/tinymist/pull/227 and https://github.com/Myriad-Dreamin/tinymist/pull/237
-* feat: label descriptions according to types in https://github.com/Myriad-Dreamin/tinymist/pull/237
+* Showing label descriptions according to types in https://github.com/Myriad-Dreamin/tinymist/pull/237
 * Filtering completions by module import in https://github.com/Myriad-Dreamin/tinymist/pull/234
 * Filtering completions by surrounding syntax for elements/selectors in https://github.com/Myriad-Dreamin/tinymist/pull/236
 
 ### Code Action (New)
 
-* feat: provide code action to rewrite headings in https://github.com/Myriad-Dreamin/tinymist/pull/240
+* Provided code action to rewrite headings in https://github.com/Myriad-Dreamin/tinymist/pull/240
 
 ### Definition
 
