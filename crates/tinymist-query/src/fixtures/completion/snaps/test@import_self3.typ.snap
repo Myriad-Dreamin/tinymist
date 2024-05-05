@@ -12,7 +12,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_self3.typ
     "kind": 9,
     "label": "baz",
     "labelDetails": {
-     "description": "\\base.typ"
+     "description": "base.typ"
     },
     "textEdit": {
      "newText": "baz",
