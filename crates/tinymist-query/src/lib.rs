@@ -20,6 +20,8 @@ pub use analysis::AnalysisContext;
 use typst::{model::Document as TypstDocument, syntax::Source};
 
 pub use diagnostics::*;
+pub(crate) mod code_action;
+pub use code_action::*;
 pub(crate) mod code_context;
 pub use code_context::*;
 pub(crate) mod code_lens;
@@ -205,6 +207,7 @@ mod polymorphic {
         InlayHint(InlayHintRequest),
         DocumentColor(DocumentColorRequest),
         ColorPresentation(ColorPresentationRequest),
+        CodeAction(CodeActionRequest),
         CodeLens(CodeLensRequest),
         Completion(CompletionRequest),
         SignatureHelp(SignatureHelpRequest),
@@ -236,6 +239,7 @@ mod polymorphic {
                 CompilerQueryRequest::InlayHint(..) => Unique,
                 CompilerQueryRequest::DocumentColor(..) => PinnedFirst,
                 CompilerQueryRequest::ColorPresentation(..) => ContextFreeUnique,
+                CompilerQueryRequest::CodeAction(..) => Unique,
                 CompilerQueryRequest::CodeLens(..) => Unique,
                 CompilerQueryRequest::Completion(..) => Mergeable,
                 CompilerQueryRequest::SignatureHelp(..) => PinnedFirst,
@@ -266,6 +270,7 @@ mod polymorphic {
                 CompilerQueryRequest::InlayHint(req) => &req.path,
                 CompilerQueryRequest::DocumentColor(req) => &req.path,
                 CompilerQueryRequest::ColorPresentation(req) => &req.path,
+                CompilerQueryRequest::CodeAction(req) => &req.path,
                 CompilerQueryRequest::CodeLens(req) => &req.path,
                 CompilerQueryRequest::Completion(req) => &req.path,
                 CompilerQueryRequest::SignatureHelp(req) => &req.path,
@@ -297,6 +302,7 @@ mod polymorphic {
         InlayHint(Option<Vec<InlayHint>>),
         DocumentColor(Option<Vec<ColorInformation>>),
         ColorPresentation(Option<Vec<ColorPresentation>>),
+        CodeAction(Option<Vec<CodeActionOrCommand>>),
         CodeLens(Option<Vec<CodeLens>>),
         Completion(Option<CompletionResponse>),
         SignatureHelp(Option<SignatureHelp>),
