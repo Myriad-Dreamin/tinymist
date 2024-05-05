@@ -3892,7 +3892,6 @@ dependencies = [
  "rust_iso639",
  "serde",
  "serde_json",
- "serde_spanned",
  "sha2",
  "siphasher 1.0.1",
  "strum 0.26.2",
