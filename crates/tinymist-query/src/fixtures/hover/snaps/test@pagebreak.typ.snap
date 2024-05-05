@@ -4,6 +4,6 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/hover/pagebreak.typ
 ---
 {
- "contents": "```typc\nlet pagebreak(to: \"even\" | \"odd\" | none, weak: bool);\n```\n---\n\n\nA manual page break.\n\nMust not be used inside any containers.\n\n# Example\n```example\nThe next page contains\nmore details on compound theory.\n#pagebreak()\n\n== Compound Theory\nIn 1984, the first ...\n```",
+ "contents": "```typc\nlet pagebreak(to: \"even\" | \"odd\" | none, weak: bool);\n```\n---\n\n\nA manual page break.\n\nMust not be used inside any containers.\n\n# Example\n```example\nThe next page contains\nmore details on compound theory.\n#pagebreak()\n\n== Compound Theory\nIn 1984, the first ...\n```\n---\n[Open documentation](https://typst.app/docs//reference/layout/pagebreak/)",
  "range": "0:20:0:29"
 }

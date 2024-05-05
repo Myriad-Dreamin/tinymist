@@ -3,7 +3,6 @@
 use std::{collections::HashMap, ops::Range, sync::Arc};
 
 use ecow::EcoVec;
-use log::info;
 
 use super::{prelude::*, ImportInfo};
 use crate::adt::snapshot_map::SnapshotMap;
@@ -219,7 +218,7 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
 
                 LexicalKind::Mod(LexicalModKind::Module(..)) => {
                     let mut src = self.import.imports.get(&e.info.range)?.clone();
-                    info!("check import: {info:?} => {src:?}", info = e.info);
+                    log::debug!("check import: {info:?} => {src:?}", info = e.info);
                     std::mem::swap(&mut self.ext_src, &mut src);
 
                     // todo: process import star
@@ -231,7 +230,7 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
                 }
                 LexicalKind::Mod(LexicalModKind::Star) => {
                     if let Some(source) = &self.ext_src {
-                        info!("diving source for def use: {:?}", source.id());
+                        log::debug!("diving source for def use: {:?}", source.id());
                         let (_, external_info) =
                             Some(source.id()).zip(self.ctx.def_use(source.clone()))?;
 
