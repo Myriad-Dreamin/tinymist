@@ -353,10 +353,10 @@ impl ExternalDocLink {
     }
 }
 
-struct DocTooltip;
+pub(crate) struct DocTooltip;
 
 impl DocTooltip {
-    fn get(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<String> {
+    pub fn get(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<String> {
         self::DocTooltip::get_inner(ctx, lnk).map(|s| "\n\n".to_owned() + &s)
     }
 
