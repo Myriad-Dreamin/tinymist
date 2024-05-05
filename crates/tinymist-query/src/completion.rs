@@ -236,6 +236,7 @@ mod tests {
                     .into_iter()
                     .map(|item| CompletionItem {
                         label: item.label,
+                        label_details: item.label_details,
                         sort_text: item.sort_text,
                         kind: item.kind,
                         text_edit: item.text_edit,
