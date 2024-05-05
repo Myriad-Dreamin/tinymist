@@ -307,6 +307,7 @@ impl TypstLanguageServer {
             request_fn!(DocumentColor, Self::document_color),
             request_fn!(ColorPresentationRequest, Self::color_presentation),
             request_fn!(HoverRequest, Self::hover),
+            request_fn!(CodeActionRequest, Self::code_action),
             request_fn!(CodeLensRequest, Self::code_lens),
             request_fn!(FoldingRangeRequest, Self::folding_range),
             request_fn!(SignatureHelpRequest, Self::signature_help),
@@ -1193,6 +1194,15 @@ impl TypstLanguageServer {
         let color = params.color;
         let range = params.range;
         run_query!(self.ColorPresentation(path, color, range))
+    }
+
+    fn code_action(
+        &mut self,
+        params: CodeActionParams,
+    ) -> LspResult<Option<Vec<CodeActionOrCommand>>> {
+        let path = as_path(params.text_document);
+        let range = params.range;
+        run_query!(self.CodeAction(path, range))
     }
 
     fn code_lens(&mut self, params: CodeLensParams) -> LspResult<Option<Vec<CodeLens>>> {
