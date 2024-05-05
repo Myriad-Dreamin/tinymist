@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on c( (76..78)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/import_self2.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ }
+]
