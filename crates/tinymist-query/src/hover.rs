@@ -183,7 +183,7 @@ fn def_tooltip(
             if let Some(values) = expr_tooltip(ctx.world(), deref_node) {
                 match values {
                     Tooltip::Text(values) => {
-                        results.push(MarkedString::String(format!("Values: {values}")));
+                        results.push(MarkedString::String(values.into()));
                     }
                     Tooltip::Code(values) => {
                         results.push(MarkedString::LanguageString(LanguageString {
@@ -214,6 +214,10 @@ fn def_tooltip(
 }
 
 fn render_actions(results: &mut Vec<MarkedString>, actions: Vec<CommandLink>) {
+    if actions.is_empty() {
+        return;
+    }
+
     let g = actions
         .into_iter()
         .map(|action| {
