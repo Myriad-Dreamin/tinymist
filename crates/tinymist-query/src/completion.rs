@@ -99,6 +99,7 @@ impl StatefulRequest for CompletionRequest {
 
         let mut match_ident = None;
         let mut completion_result = None;
+        let is_callee = matches!(deref_target, Some(DerefTarget::Callee(..)));
         match deref_target {
             Some(DerefTarget::Callee(v) | DerefTarget::VarAccess(v)) => {
                 if v.is::<ast::Ident>() {
@@ -152,10 +153,9 @@ impl StatefulRequest for CompletionRequest {
             let replace_range;
             if match_ident.as_ref().is_some_and(|i| i.offset() == offset) {
                 let match_ident = match_ident.unwrap();
-                let rng = match_ident.range();
-                replace_range = ctx.to_lsp_range(match_ident.range(), &source);
-
+                let mut rng = match_ident.range();
                 let ident_prefix = source.text()[rng.start..cursor].to_string();
+
                 completions.retain(|c| {
                     // c.label
                     let mut prefix_matcher = c.label.chars();
@@ -171,6 +171,29 @@ impl StatefulRequest for CompletionRequest {
 
                     true
                 });
+
+                // if modifying some arguments, we need to truncate and add a comma
+                if !is_callee && cursor != rng.end && is_arg_like_context(&match_ident) {
+                    // extend comma
+                    for c in completions.iter_mut() {
+                        let apply = match &mut c.apply {
+                            Some(w) => w,
+                            None => {
+                                c.apply = Some(c.label.clone());
+                                c.apply.as_mut().unwrap()
+                            }
+                        };
+                        if apply.trim_end().ends_with(',') {
+                            continue;
+                        }
+                        apply.push_str(", ");
+                    }
+
+                    // Truncate
+                    rng.end = cursor;
+                }
+
+                replace_range = ctx.to_lsp_range(rng, &source);
             } else {
                 let lsp_start_position = ctx.to_lsp_pos(offset, &source);
                 replace_range = LspRange::new(lsp_start_position, self.position);
@@ -196,6 +219,28 @@ impl StatefulRequest for CompletionRequest {
             items,
         }))
     }
+}
+
+fn is_arg_like_context(mut matching: &LinkedNode) -> bool {
+    while let Some(parent) = matching.parent() {
+        use SyntaxKind::*;
+        // if parent.kind() == SyntaxKind::Markup | SyntaxKind::Markup |
+        // SyntaxKind::Markup {     return true;
+        // }
+        // if parent.kind() == SyntaxKind::Args {
+        //     return true;
+        // }
+
+        // todo: contextual
+        match parent.kind() {
+            ContentBlock | Equation | CodeBlock | Markup | Math | Code => return false,
+            Args | Params | Destructuring | Array | Dict => return true,
+            _ => {}
+        }
+
+        matching = parent;
+    }
+    false
 }
 
 #[cfg(test)]

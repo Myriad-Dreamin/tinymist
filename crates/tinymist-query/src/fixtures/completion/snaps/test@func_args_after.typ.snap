@@ -1,0 +1,31 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on u (371..372)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/func_args_after.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "class",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "class: ${1:}, ",
+     "range": {
+      "end": {
+       "character": 29,
+       "line": 16
+      },
+      "start": {
+       "character": 28,
+       "line": 16
+      }
+     }
+    }
+   }
+  ]
+ }
+]
