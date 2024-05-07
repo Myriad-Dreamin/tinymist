@@ -256,8 +256,8 @@ impl FlowIfType {}
 
 #[derive(Clone, Hash, Default)]
 pub(crate) struct FlowVarStore {
-    pub lbs: Vec<FlowType>,
-    pub ubs: Vec<FlowType>,
+    pub lbs: EcoVec<FlowType>,
+    pub ubs: EcoVec<FlowType>,
 }
 
 impl fmt::Debug for FlowVarStore {

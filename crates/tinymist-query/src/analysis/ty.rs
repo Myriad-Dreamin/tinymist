@@ -791,7 +791,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 let w = self.info.vars.get(&v.0).cloned()?;
                 match &w.kind {
                     FlowVarKind::Weak(w) => {
-                        let w = w.read();
+                        // It is instantiated here by clone.
+                        let w = w.read().clone();
                         for lb in w.lbs.iter() {
                             self.check_apply(
                                 lb.clone(),
@@ -1224,10 +1225,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     }
 
     fn init_var(&mut self, def: Option<FlowType>) -> FlowVarStore {
-        let mut store = FlowVarStore {
-            lbs: vec![],
-            ubs: vec![],
-        };
+        let mut store = FlowVarStore::default();
 
         let Some(def) = def else {
             return store;
@@ -1690,8 +1688,8 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
     }
 
     fn transform_let(&mut self, w: &FlowVarStore, def_id: Option<&DefId>, pol: bool) -> FlowType {
-        let mut lbs = Vec::with_capacity(w.lbs.len());
-        let mut ubs = Vec::with_capacity(w.ubs.len());
+        let mut lbs = EcoVec::with_capacity(w.lbs.len());
+        let mut ubs = EcoVec::with_capacity(w.ubs.len());
 
         log::debug!("transform let [principal={}] with {w:?}", self.principal);
 
