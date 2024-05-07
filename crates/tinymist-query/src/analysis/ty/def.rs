@@ -214,22 +214,23 @@ impl<'a> Iterator for UnionIter<'a> {
     }
 }
 
+#[derive(Debug, Clone, Copy, Hash)]
+pub(crate) enum UnaryOp {
+    Pos,
+    Neg,
+    Not,
+    Context,
+}
+
 #[derive(Debug, Clone, Hash)]
-pub(crate) enum FlowUnaryType {
-    Pos(Box<FlowType>),
-    Neg(Box<FlowType>),
-    Not(Box<FlowType>),
-    Context(Box<FlowType>),
+pub(crate) struct FlowUnaryType {
+    pub op: UnaryOp,
+    pub lhs: Box<FlowType>,
 }
 
 impl FlowUnaryType {
     pub fn lhs(&self) -> &FlowType {
-        match self {
-            FlowUnaryType::Pos(e) => e,
-            FlowUnaryType::Neg(e) => e,
-            FlowUnaryType::Not(e) => e,
-            FlowUnaryType::Context(e) => e,
-        }
+        &self.lhs
     }
 }
 
