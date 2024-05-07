@@ -1048,7 +1048,7 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     log::debug!("check complete_literal 2: {:?}", parent);
     let parent = &parent;
     let parent = match parent.kind() {
-        SyntaxKind::Colon => parent.parent()?,
+        SyntaxKind::Ident | SyntaxKind::Colon => parent.parent()?,
         _ => parent,
     };
     let parent = match parent.kind() {
@@ -1071,6 +1071,10 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
             let w = parent.get().cast::<ast::Array>()?;
             lit_span = w.span();
             (ast::Dict::default(), Some(w))
+        }
+        SyntaxKind::Parenthesized => {
+            lit_span = parent.span();
+            (ast::Dict::default(), None)
         }
         _ => return None,
     };
