@@ -4,6 +4,35 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.8 - [2024-05-07]
+
+### Hover
+
+* Improved open document tooltip in https://github.com/Myriad-Dreamin/tinymist/pull/254
+
+### Completion
+
+* Inserting commas in argument context for completing before identifiers in https://github.com/Myriad-Dreamin/tinymist/pull/251
+* Improved identifying literal expressions in https://github.com/Myriad-Dreamin/tinymist/pull/252
+* Identifying let context completely in https://github.com/Myriad-Dreamin/tinymist/pull/255
+  * To help complete after equal marker in `let b = ..`
+* Restoring left parenthesis and comma as trigger characters in https://github.com/Myriad-Dreamin/tinymist/pull/253
+  * This is needed for completion on literal expressions.
+
+### Type Checking
+
+* (Fix) Avoiding infinite loop in simplifying recursive functions in https://github.com/Myriad-Dreamin/tinymist/pull/246
+  * Fix a stack overflow in `ty.rs`
+* (Fix) Instantiating variable before applying variable function in https://github.com/Myriad-Dreamin/tinymist/pull/247
+  * Fix a deadlock in `ty.rs`
+* (Fix) Simplifying all substructure in https://github.com/Myriad-Dreamin/tinymist/pull/248
+  * Fix a panic in `ty.rs`
+* Improved join type inference in https://github.com/Myriad-Dreamin/tinymist/pull/249
+* Weakening inference from outer use in https://github.com/Myriad-Dreamin/tinymist/pull/250
+  * to reduce noise slightly for completion
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.7...v0.11.8
+
 ## v0.11.7 - [2024-05-05]
 
 ### Editor
