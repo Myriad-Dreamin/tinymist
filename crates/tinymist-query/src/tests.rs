@@ -158,18 +158,28 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut TypstSystemWorld, P
 
 pub fn find_test_range(s: &Source) -> Range<usize> {
     // /* range -3..-1 */
-    let re = s.text().find("/* range ").unwrap();
-    let re_base = re;
-    let re = re + "/* range ".len();
-    let re = re..s.text().find(" */").unwrap();
-    let re = &s.text()[re];
+    fn find_prefix(s: &str, sub: &str, left: bool) -> Option<(usize, usize, bool)> {
+        Some((s.find(sub)?, sub.len(), left))
+    }
+    let (re_base, re_len, is_after) = find_prefix(s.text(), "/* range after ", true)
+        .or_else(|| find_prefix(s.text(), "/* range ", false))
+        .unwrap();
+    let re_end = re_base + re_len;
+    let range_rng = re_end..(s.text()[re_end..].find(" */").unwrap() + re_end);
+    let range_base = if is_after {
+        range_rng.end + " */".len()
+    } else {
+        re_base
+    };
+    let range = &s.text()[range_rng];
     // split by ".."
-    let mut re = re.split("..");
+    let mut bounds = range.split("..");
     // parse the range
-    let start: isize = re.next().unwrap().parse().unwrap();
-    let end: isize = re.next().unwrap().parse().unwrap();
-    let start = start + re_base as isize;
-    let end = end + re_base as isize;
+    let start: isize = bounds.next().unwrap().parse().unwrap();
+    let end: isize = bounds.next().unwrap().parse().unwrap();
+
+    let start = start + range_base as isize;
+    let end = end + range_base as isize;
     start as usize..end as usize
 }
 
