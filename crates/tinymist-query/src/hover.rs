@@ -344,10 +344,11 @@ impl ExternalDocLink {
     }
 
     fn builtin_value_tooltip(base: &str, value: &Value) -> Option<CommandLink> {
+        let base = base.trim_end_matches('/');
         let route = route_of_value(value)?;
         let link = format!("{base}/{route}");
         Some(CommandLink {
-            title: Some("Open documentation".to_owned()),
+            title: Some("Open docs".to_owned()),
             command_or_links: vec![CommandOrLink::Link(link)],
         })
     }
