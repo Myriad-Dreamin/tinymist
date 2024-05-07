@@ -861,6 +861,35 @@ fn type_completion(
             FlowBuiltinType::Float => {
                 ctx.snippet_completion("exponential notation", "${1}e${0}", "Exponential notation");
             }
+            FlowBuiltinType::Type(ty) => {
+                if *ty == Type::of::<NoneValue>() {
+                    type_completion(ctx, Some(&FlowType::None), docs);
+                } else if *ty == Type::of::<AutoValue>() {
+                    type_completion(ctx, Some(&FlowType::Auto), docs);
+                } else if *ty == Type::of::<bool>() {
+                    ctx.snippet_completion("false", "false", "No / Disabled.");
+                    ctx.snippet_completion("true", "true", "Yes / Enabled.");
+                } else if *ty == Type::of::<Color>() {
+                    type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Color)), None);
+                } else if *ty == Type::of::<Label>() {
+                    ctx.label_completions()
+                } else if *ty == Type::of::<Func>() {
+                    ctx.snippet_completion(
+                        "function",
+                        "(${params}) => ${output}",
+                        "A custom function.",
+                    );
+                } else {
+                    ctx.completions.push(Completion {
+                        kind: CompletionKind::Syntax,
+                        label: ty.long_name().into(),
+                        apply: Some(eco_format!("${{{ty}}}")),
+                        detail: Some(eco_format!("A value of type {ty}.")),
+                        ..Completion::default()
+                    });
+                    ctx.strict_scope_completions(false, |value| value.ty() == *ty);
+                }
+            }
         },
         FlowType::Args(_) => return None,
         FlowType::Func(_) => return None,
@@ -890,33 +919,11 @@ fn type_completion(
             }
 
             if let Value::Type(ty) = &v.0 {
-                if *ty == Type::of::<NoneValue>() {
-                    type_completion(ctx, Some(&FlowType::None), docs);
-                } else if *ty == Type::of::<AutoValue>() {
-                    type_completion(ctx, Some(&FlowType::Auto), docs);
-                } else if *ty == Type::of::<bool>() {
-                    ctx.snippet_completion("false", "false", "No / Disabled.");
-                    ctx.snippet_completion("true", "true", "Yes / Enabled.");
-                } else if *ty == Type::of::<Color>() {
-                    type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Color)), None);
-                } else if *ty == Type::of::<Label>() {
-                    ctx.label_completions()
-                } else if *ty == Type::of::<Func>() {
-                    ctx.snippet_completion(
-                        "function",
-                        "(${params}) => ${output}",
-                        "A custom function.",
-                    );
-                } else {
-                    ctx.completions.push(Completion {
-                        kind: CompletionKind::Syntax,
-                        label: ty.long_name().into(),
-                        apply: Some(eco_format!("${{{ty}}}")),
-                        detail: Some(eco_format!("A value of type {ty}.")),
-                        ..Completion::default()
-                    });
-                    ctx.strict_scope_completions(false, |value| value.ty() == *ty);
-                }
+                type_completion(
+                    ctx,
+                    Some(&FlowType::Builtin(FlowBuiltinType::Type(*ty))),
+                    docs,
+                );
             } else if v.0.ty() == Type::of::<NoneValue>() {
                 type_completion(ctx, Some(&FlowType::None), docs);
             } else if v.0.ty() == Type::of::<AutoValue>() {
