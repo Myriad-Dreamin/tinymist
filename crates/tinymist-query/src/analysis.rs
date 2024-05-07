@@ -91,7 +91,7 @@ mod type_check_tests {
 }
 
 #[cfg(test)]
-mod literal_type_check_tests {
+mod post_type_check_tests {
 
     use insta::with_settings;
     use typst::syntax::LinkedNode;
@@ -118,6 +118,41 @@ mod literal_type_check_tests {
                 description => format!("Check on {text:?} ({pos:?})"),
             }, {
                 let literal_type = literal_type.map(|e| format!("{e:#?}"))
+                    .unwrap_or_else(|| "<nil>".to_string());
+                assert_snapshot!(literal_type);
+            })
+        });
+    }
+}
+
+#[cfg(test)]
+mod type_describe_tests {
+
+    use insta::with_settings;
+    use typst::syntax::LinkedNode;
+
+    use crate::analysis::ty;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("type_describe", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+            let root = LinkedNode::new(source.root());
+            let node = root.leaf_at(pos + 1).unwrap();
+            let text = node.get().clone().into_text();
+
+            let result = ty::type_check(ctx, source.clone());
+            let literal_type = result.and_then(|info| ty::post_type_check(ctx, &info, node));
+
+            with_settings!({
+                description => format!("Check on {text:?} ({pos:?})"),
+            }, {
+                let literal_type = literal_type.and_then(|e| e.describe())
                     .unwrap_or_else(|| "<nil>".to_string());
                 assert_snapshot!(literal_type);
             })

@@ -301,6 +301,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                             None
                         }
                     })
+                    .or_else(|| Some("any".into()))
             };
             let detail = if let CompletionKind::Symbol(c) = &kind {
                 Some(symbol_detail(*c))

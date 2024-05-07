@@ -1268,7 +1268,7 @@ struct TypeCanoStore {
 
 #[derive(Default)]
 struct TypeDescriber {
-    described: HashSet<u128>,
+    described: HashMap<u128, String>,
     results: HashSet<String>,
     functions: Vec<FlowSignature>,
 }
@@ -1276,15 +1276,15 @@ struct TypeDescriber {
 impl TypeDescriber {
     fn describe_root(&mut self, ty: &FlowType) -> Option<String> {
         // recursive structure
-        if self.described.contains(&hash128(ty)) {
-            return Some("$self".to_string());
+        if let Some(t) = self.described.get(&hash128(ty)) {
+            return Some(t.clone());
         }
 
         let res = self.describe(ty);
         if !res.is_empty() {
             return Some(res);
         }
-        self.described.insert(hash128(ty));
+        self.described.insert(hash128(ty), "$self".to_string());
 
         let mut results = std::mem::take(&mut self.results)
             .into_iter()
@@ -1330,18 +1330,23 @@ impl TypeDescriber {
         }
 
         if results.is_empty() {
+            self.described.insert(hash128(ty), "any".to_string());
             return None;
         }
 
         results.sort();
         results.dedup();
-        Some(results.join(" | "))
+        let res = results.join(" | ");
+        self.described.insert(hash128(ty), res.clone());
+        Some(res)
     }
 
     fn describe_iter(&mut self, ty: &[FlowType]) {
         for ty in ty.iter() {
             let desc = self.describe(ty);
-            self.results.insert(desc);
+            if !desc.is_empty() {
+                self.results.insert(desc);
+            }
         }
     }
 
@@ -1375,9 +1380,8 @@ impl TypeDescriber {
             FlowType::Content => {
                 return "content".to_string();
             }
-            FlowType::Any => {
-                return "any".to_string();
-            }
+            // Doesn't provide any information, hence we doesn't describe it intermediately here.
+            FlowType::Any => {}
             FlowType::Space => {}
             FlowType::None => {
                 return "none".to_string();
@@ -1746,8 +1750,12 @@ struct Joiner {
 }
 impl Joiner {
     fn finalize(self) -> FlowType {
+        log::debug!("join: {:?} {:?}", self.possibles, self.definite);
         if self.possibles.is_empty() {
             return self.definite;
+        }
+        if self.possibles.len() == 1 {
+            return self.possibles.into_iter().next().unwrap();
         }
 
         // let mut definite = self.definite.clone();
