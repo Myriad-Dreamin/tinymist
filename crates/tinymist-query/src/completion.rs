@@ -83,17 +83,19 @@ impl StatefulRequest for CompletionRequest {
 
         if let Some(d) = &deref_target {
             let node = d.node();
-            // skip if is the let binding item, todo, check whether the pattern is exact
-            // todo: check if the pattern(span) is exact, instead of just checking the
-            // parent kind
-            if matches!(
-                (d, node.parent_kind()),
-                (
-                    DerefTarget::VarAccess(..),
-                    Some(SyntaxKind::LetBinding | SyntaxKind::Closure)
-                )
-            ) {
-                return None;
+            // skip if is the let binding item *directly*
+            if matches!(d, DerefTarget::VarAccess(..)) {
+                match node.parent_kind() {
+                    // complete the init part of the let binding
+                    Some(SyntaxKind::LetBinding) => {
+                        let parent = node.parent()?;
+                        let parent_init = parent.cast::<ast::LetBinding>()?.init()?;
+                        let parent_init = parent.find(parent_init.span())?;
+                        parent_init.find(node.span())?;
+                    }
+                    Some(SyntaxKind::Closure) => return None,
+                    _ => {}
+                }
             }
         }
 
