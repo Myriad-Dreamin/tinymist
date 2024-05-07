@@ -60,14 +60,15 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
             .as_ref()
     }
 
-    fn local_edit(&self, edit: TextEdit) -> Option<WorkspaceEdit> {
+    fn local_edits(&self, edits: Vec<TextEdit>) -> Option<WorkspaceEdit> {
         Some(WorkspaceEdit {
-            changes: Some(HashMap::from_iter([(
-                self.local_url()?.clone(),
-                vec![edit],
-            )])),
+            changes: Some(HashMap::from_iter([(self.local_url()?.clone(), edits)])),
             ..Default::default()
         })
+    }
+
+    fn local_edit(&self, edit: TextEdit) -> Option<WorkspaceEdit> {
+        self.local_edits(vec![edit])
     }
 
     fn heading_actions(&mut self, leaf: &LinkedNode) -> Option<()> {
@@ -91,7 +92,6 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
                 })?),
                 ..CodeAction::default()
             });
-
             self.actions.push(action);
         }
 
@@ -105,21 +105,87 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
             })?),
             ..CodeAction::default()
         });
-
         self.actions.push(action);
+
+        Some(())
+    }
+
+    fn equation_actions(&mut self, leaf: &LinkedNode) -> Option<()> {
+        let equation = leaf.cast::<ast::Equation>()?;
+        let body = equation.body();
+        let is_block = equation.block();
+
+        let body = leaf.find(body.span())?;
+        let body_range = body.range();
+
+        let mut chs = leaf.children();
+        let chs = chs.by_ref();
+        let first_dollar = chs.take(1).find(|e| e.kind() == SyntaxKind::Dollar)?;
+        let last_dollar = chs.rev().take(1).find(|e| e.kind() == SyntaxKind::Dollar)?;
+
+        // erroneous equation
+        if first_dollar.offset() == last_dollar.offset() {
+            return None;
+        }
+
+        let front_range = self
+            .ctx
+            .to_lsp_range(first_dollar.range().end..body_range.start, &self.current);
+        let back_range = self
+            .ctx
+            .to_lsp_range(body_range.end..last_dollar.range().start, &self.current);
+
+        let rewrite_action = |title: &str, new_text: &str| {
+            Some(CodeActionOrCommand::CodeAction(CodeAction {
+                title: title.to_owned(),
+                kind: Some(CodeActionKind::REFACTOR_REWRITE),
+                edit: Some(self.local_edits(vec![
+                    TextEdit {
+                        range: front_range,
+                        new_text: new_text.to_owned(),
+                    },
+                    TextEdit {
+                        range: back_range,
+                        new_text: new_text.to_owned(),
+                    },
+                ])?),
+                ..CodeAction::default()
+            }))
+        };
+
+        // prepare actions
+        let a1 = if is_block {
+            rewrite_action("Convert to inline equation", "")?
+        } else {
+            rewrite_action("Convert to block equation", " ")?
+        };
+        let a2 = rewrite_action("Convert to multiple-line block equation", "\n");
+
+        self.actions.push(a1);
+        if let Some(a2) = a2 {
+            self.actions.push(a2);
+        }
 
         Some(())
     }
 
     fn work(&mut self, root: LinkedNode, cursor: usize) -> Option<()> {
         let mut node = root.leaf_at(cursor)?;
+
         let mut heading_resolved = false;
+        let mut equation_resolved = false;
+
         loop {
             match node.kind() {
                 // Only the deepest heading is considered
                 SyntaxKind::Heading if !heading_resolved => {
                     heading_resolved = true;
                     self.heading_actions(&node);
+                }
+                // Only the deepest equation is considered
+                SyntaxKind::Equation if !equation_resolved => {
+                    equation_resolved = true;
+                    self.equation_actions(&node);
                 }
                 _ => {}
             }
