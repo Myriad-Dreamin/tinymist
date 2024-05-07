@@ -1457,10 +1457,13 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 match &w.kind {
                     FlowVarKind::Weak(w) => {
                         let w = w.read();
-                        if pol {
-                            self.positives.insert(v.0);
+                        let inserted = if pol {
+                            self.positives.insert(v.0)
                         } else {
-                            self.negatives.insert(v.0);
+                            self.negatives.insert(v.0)
+                        };
+                        if !inserted {
+                            return;
                         }
 
                         if pol {
