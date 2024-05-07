@@ -385,14 +385,14 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let op = unary.op();
 
-        let expr = Box::new(self.check_expr_in(unary.expr().span(), root));
-        let ty = match op {
-            ast::UnOp::Pos => FlowUnaryType::Pos(expr),
-            ast::UnOp::Neg => FlowUnaryType::Neg(expr),
-            ast::UnOp::Not => FlowUnaryType::Not(expr),
+        let lhs = Box::new(self.check_expr_in(unary.expr().span(), root));
+        let op = match op {
+            ast::UnOp::Pos => UnaryOp::Pos,
+            ast::UnOp::Neg => UnaryOp::Neg,
+            ast::UnOp::Not => UnaryOp::Not,
         };
 
-        Some(FlowType::Unary(ty))
+        Some(FlowType::Unary(FlowUnaryType { op, lhs }))
     }
 
     fn check_binary(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
@@ -635,7 +635,10 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let body = self.check_expr_in(contextual.body().span(), root);
 
-        Some(FlowType::Unary(FlowUnaryType::Context(Box::new(body))))
+        Some(FlowType::Unary(FlowUnaryType {
+            op: UnaryOp::Context,
+            lhs: Box::new(body),
+        }))
     }
 
     fn check_conditional(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
@@ -1640,19 +1643,30 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 }))
             }
             FlowType::Unary(u) => {
-                let u2 = u.clone();
-
-                FlowType::Unary(u2)
+                let lhs = self.transform(u.lhs(), pol);
+                FlowType::Unary(FlowUnaryType {
+                    op: u.op,
+                    lhs: Box::new(lhs),
+                })
             }
             FlowType::Binary(b) => {
-                let b2 = b.clone();
+                let (lhs, rhs) = b.repr();
+                let lhs = self.transform(lhs, pol);
+                let rhs = self.transform(rhs, pol);
 
-                FlowType::Binary(b2)
+                FlowType::Binary(FlowBinaryType {
+                    op: b.op,
+                    operands: Box::new((lhs, rhs)),
+                })
             }
             FlowType::If(i) => {
-                let i2 = i.clone();
+                let i2 = *i.clone();
 
-                FlowType::If(i2)
+                FlowType::If(Box::new(FlowIfType {
+                    cond: self.transform(&i2.cond, pol),
+                    then: self.transform(&i2.then, pol),
+                    else_: self.transform(&i2.else_, pol),
+                }))
             }
             FlowType::Union(v) => {
                 let v2 = v.iter().map(|ty| self.transform(ty, pol)).collect();
@@ -1665,9 +1679,10 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 FlowType::Field(Box::new((x, self.transform(&y, pol), z)))
             }
             FlowType::At(a) => {
-                let a2 = a.clone();
+                let FlowAt(at) = a.clone();
+                let atee = self.transform(&at.0, pol);
 
-                FlowType::At(a2)
+                FlowType::At(FlowAt(Box::new((atee, at.1))))
             }
 
             FlowType::Value(v) => FlowType::Value(v.clone()),
