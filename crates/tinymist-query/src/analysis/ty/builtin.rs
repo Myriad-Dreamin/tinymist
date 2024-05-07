@@ -2,7 +2,8 @@ use ecow::EcoVec;
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use typst::{
-    foundations::{Func, ParamInfo, Type, Value},
+    foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
+    layout::Length,
     syntax::Span,
 };
 
@@ -100,9 +101,45 @@ pub(crate) enum FlowBuiltinType {
     Outset,
     Radius,
 
+    Type(typst::foundations::Type),
     Path(PathPreference),
 }
+
 impl FlowBuiltinType {
+    pub fn from_value(builtin: &Value) -> FlowType {
+        if let Value::Bool(v) = builtin {
+            return FlowType::Boolean(Some(*v));
+        }
+
+        Self::from_builtin(builtin.ty())
+    }
+
+    pub fn from_builtin(builtin: Type) -> FlowType {
+        if builtin == Type::of::<AutoValue>() {
+            return FlowType::Auto;
+        }
+        if builtin == Type::of::<NoneValue>() {
+            return FlowType::None;
+        }
+        if builtin == Type::of::<typst::visualize::Color>() {
+            return Color.literally();
+        }
+        if builtin == Type::of::<bool>() {
+            return FlowType::None;
+        }
+        if builtin == Type::of::<f64>() {
+            return Float.literally();
+        }
+        if builtin == Type::of::<Length>() {
+            return Length.literally();
+        }
+        if builtin == Type::of::<Content>() {
+            return FlowType::Content;
+        }
+
+        FlowBuiltinType::Type(builtin).literally()
+    }
+
     pub(crate) fn describe(&self) -> &'static str {
         match self {
             FlowBuiltinType::Args => "args",
@@ -119,6 +156,7 @@ impl FlowBuiltinType {
             FlowBuiltinType::Inset => "inset",
             FlowBuiltinType::Outset => "outset",
             FlowBuiltinType::Radius => "radius",
+            FlowBuiltinType::Type(ty) => ty.short_name(),
             FlowBuiltinType::Path(s) => match s {
                 PathPreference::None => "[any]",
                 PathPreference::Special => "[any]",

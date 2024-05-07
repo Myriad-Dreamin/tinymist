@@ -433,7 +433,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                     return;
                 };
                 match &v.kind {
-                    FlowVarKind::Weak(w) => {
+                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         let r = w.read();
                         for lb in &r.ubs {
                             self.check_signatures_(lb, pol, sig_kind, args, checker);

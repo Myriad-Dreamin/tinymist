@@ -283,6 +283,7 @@ impl fmt::Debug for FlowVarStore {
 
 #[derive(Clone)]
 pub(crate) enum FlowVarKind {
+    Strong(Arc<RwLock<FlowVarStore>>),
     Weak(Arc<RwLock<FlowVarStore>>),
 }
 
@@ -304,8 +305,7 @@ impl fmt::Debug for FlowVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "@{}", self.name)?;
         match &self.kind {
-            // FlowVarKind::Strong(t) => write!(f, " = {:?}", t),
-            FlowVarKind::Weak(w) => write!(f, "{w:?}"),
+            FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => write!(f, "{w:?}"),
         }
     }
 }
@@ -326,21 +326,19 @@ impl FlowVar {
     pub fn ever_be(&self, exp: FlowType) {
         match &self.kind {
             // FlowVarKind::Strong(_t) => {}
-            FlowVarKind::Weak(w) => {
+            FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                 let mut w = w.write();
                 w.lbs.push(exp.clone());
             }
         }
     }
 
-    pub fn as_strong(&mut self, exp: FlowType) {
-        // self.kind = FlowVarKind::Strong(value);
+    pub(crate) fn weaken(&mut self) {
         match &self.kind {
-            // FlowVarKind::Strong(_t) => {}
-            FlowVarKind::Weak(w) => {
-                let mut w = w.write();
-                w.lbs.push(exp.clone());
+            FlowVarKind::Strong(w) => {
+                self.kind = FlowVarKind::Weak(w.clone());
             }
+            FlowVarKind::Weak(_) => {}
         }
     }
 }

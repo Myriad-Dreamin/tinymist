@@ -531,6 +531,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     v.ever_be(exp);
                     named.insert(e.name().get().clone(), v.get_ref());
                 }
+                // todo: spread left/right
                 ast::Param::Spread(a) => {
                     if let Some(e) = a.sink_ident() {
                         let exp = FlowType::Builtin(FlowBuiltinType::Args);
@@ -545,9 +546,22 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let body = self.check_expr_in(closure.body().span(), root);
 
+        let named: Vec<(EcoString, FlowType)> = named.into_iter().collect();
+
+        // freeze the signature
+        for pos in pos.iter() {
+            self.weaken(pos);
+        }
+        for (_, named) in named.iter() {
+            self.weaken(named);
+        }
+        if let Some(rest) = &rest {
+            self.weaken(rest);
+        }
+
         Some(FlowType::Func(Box::new(FlowSignature {
             pos,
-            named: named.into_iter().collect(),
+            named,
             rest,
             ret: body,
         })))
@@ -565,7 +579,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     .unwrap_or_else(|| FlowType::Infer);
 
                 let v = self.get_var(c.span(), to_ident_ref(&root, c)?)?;
-                v.as_strong(value);
+                v.ever_be(value);
                 // todo lbs is the lexical signature.
             }
             ast::LetBindingKind::Normal(pattern) => {
@@ -709,7 +723,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         #[allow(clippy::map_entry)]
         if !self.info.vars.contains_key(&def_id) {
             let def = self.check_external(def_id);
-            let kind = FlowVarKind::Weak(Arc::new(RwLock::new(self.init_var(def))));
+            let kind = FlowVarKind::Strong(Arc::new(RwLock::new(self.init_var(def))));
             self.info.vars.insert(
                 def_id,
                 FlowVar {
@@ -793,7 +807,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::Var(v) => {
                 let w = self.info.vars.get(&v.0).cloned()?;
                 match &w.kind {
-                    FlowVarKind::Weak(w) => {
+                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         // It is instantiated here by clone.
                         let w = w.read().clone();
                         for lb in w.lbs.iter() {
@@ -917,20 +931,23 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             (FlowType::Var(v), rhs) => {
                 log::debug!("constrain var {v:?} ⪯ {rhs:?}");
                 let w = self.info.vars.get_mut(&v.0).unwrap();
+                // strict constraint on upper bound
+                let bound = rhs.clone();
                 match &w.kind {
-                    FlowVarKind::Weak(w) => {
+                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         let mut w = w.write();
-                        w.ubs.push(rhs.clone());
+                        w.ubs.push(bound);
                     }
                 }
             }
             (lhs, FlowType::Var(v)) => {
-                log::debug!("constrain var {lhs:?} ⪯ {v:?}");
-                let v = self.info.vars.get(&v.0).unwrap();
-                match &v.kind {
-                    FlowVarKind::Weak(v) => {
+                let w = self.info.vars.get(&v.0).unwrap();
+                let bound = self.weaken_constraint(lhs, &w.kind);
+                log::debug!("constrain var {v:?} ⪰ {bound:?}");
+                match &w.kind {
+                    FlowVarKind::Strong(v) | FlowVarKind::Weak(v) => {
                         let mut v = v.write();
-                        v.lbs.push(lhs.clone());
+                        v.lbs.push(bound);
                     }
                 }
             }
@@ -1031,7 +1048,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::Var(v) => {
                 let w = self.info.vars.get(&v.0).unwrap();
                 match &w.kind {
-                    FlowVarKind::Weak(w) => {
+                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         let w = w.read();
                         if !w.ubs.is_empty() {
                             return w.ubs[0].clone();
@@ -1238,7 +1255,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             FlowType::Var(v) => {
                 let w = self.info.vars.get(&v.0).unwrap();
                 match &w.kind {
-                    FlowVarKind::Weak(w) => {
+                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         let w = w.read();
                         store.lbs.extend(w.lbs.iter().cloned());
                         store.ubs.extend(w.ubs.iter().cloned());
@@ -1255,6 +1272,117 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         }
 
         store
+    }
+
+    fn weaken(&mut self, v: &FlowType) {
+        match v {
+            FlowType::Var(v) => {
+                let w = self.info.vars.get_mut(&v.0).unwrap();
+                w.weaken();
+            }
+            FlowType::Clause
+            | FlowType::Undef
+            | FlowType::Content
+            | FlowType::Any
+            | FlowType::Space
+            | FlowType::None
+            | FlowType::Infer
+            | FlowType::FlowNone
+            | FlowType::Auto
+            | FlowType::Boolean(_)
+            | FlowType::Builtin(_)
+            | FlowType::Value(_) => {}
+            FlowType::Element(_) => {}
+            FlowType::ValueDoc(_) => {}
+            FlowType::Field(v) => {
+                self.weaken(&v.1);
+            }
+            FlowType::Func(v) => {
+                for ty in v.pos.iter() {
+                    self.weaken(ty);
+                }
+                for (_, ty) in v.named.iter() {
+                    self.weaken(ty);
+                }
+                if let Some(ty) = &v.rest {
+                    self.weaken(ty);
+                }
+                self.weaken(&v.ret);
+            }
+            FlowType::Dict(v) => {
+                for (_, ty, _) in v.fields.iter() {
+                    self.weaken(ty);
+                }
+            }
+            FlowType::Array(v) => {
+                self.weaken(v);
+            }
+            FlowType::Tuple(v) => {
+                for ty in v.iter() {
+                    self.weaken(ty);
+                }
+            }
+            FlowType::With(v) => {
+                self.weaken(&v.0);
+                for args in v.1.iter() {
+                    for ty in args.args.iter() {
+                        self.weaken(ty);
+                    }
+                    for (_, ty) in args.named.iter() {
+                        self.weaken(ty);
+                    }
+                }
+            }
+            FlowType::Args(v) => {
+                for ty in v.args.iter() {
+                    self.weaken(ty);
+                }
+                for (_, ty) in v.named.iter() {
+                    self.weaken(ty);
+                }
+            }
+            FlowType::At(v) => {
+                self.weaken(&v.0 .0);
+            }
+            FlowType::Unary(v) => {
+                self.weaken(&v.lhs);
+            }
+            FlowType::Binary(v) => {
+                let (lhs, rhs) = v.repr();
+                self.weaken(lhs);
+                self.weaken(rhs);
+            }
+            FlowType::If(v) => {
+                self.weaken(&v.cond);
+                self.weaken(&v.then);
+                self.weaken(&v.else_);
+            }
+            FlowType::Union(v) => {
+                for ty in v.iter() {
+                    self.weaken(ty);
+                }
+            }
+            FlowType::Let(v) => {
+                for ty in v.lbs.iter() {
+                    self.weaken(ty);
+                }
+                for ty in v.ubs.iter() {
+                    self.weaken(ty);
+                }
+            }
+        }
+    }
+
+    fn weaken_constraint(&self, c: &FlowType, kind: &FlowVarKind) -> FlowType {
+        if matches!(kind, FlowVarKind::Strong(_)) {
+            return c.clone();
+        }
+
+        if let FlowType::Value(v) = c {
+            return FlowBuiltinType::from_value(&v.0);
+        }
+
+        c.clone()
     }
 }
 
@@ -1460,7 +1588,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             FlowType::Var(v) => {
                 let w = self.vars.get(&v.0).unwrap();
                 match &w.kind {
-                    FlowVarKind::Weak(w) => {
+                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         let w = w.read();
                         let inserted = if pol {
                             self.positives.insert(v.0)
@@ -1512,6 +1640,9 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 self.analyze(&w.0, pol);
                 for m in &w.1 {
                     for arg in m.args.iter() {
+                        self.analyze(arg, pol);
+                    }
+                    for (_, arg) in m.named.iter() {
                         self.analyze(arg, pol);
                     }
                 }
@@ -1581,7 +1712,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                     .insert((v.0, self.principal), FlowType::Any);
 
                 let res = match &self.vars.get(&v.0).unwrap().kind {
-                    FlowVarKind::Weak(w) => {
+                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         let w = w.read();
 
                         self.transform_let(&w, Some(&v.0), pol)
@@ -1631,7 +1762,23 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             }
             FlowType::With(w) => {
                 let primary = self.transform(&w.0, pol);
-                FlowType::With(Box::new((primary, w.1.clone())))
+                let args =
+                    w.1.iter()
+                        .map(|a| {
+                            let args_res = a.args.iter().map(|a| self.transform(a, pol)).collect();
+                            let named = a
+                                .named
+                                .iter()
+                                .map(|(n, a)| (n.clone(), self.transform(a, pol)))
+                                .collect();
+
+                            FlowArgs {
+                                args: args_res,
+                                named,
+                            }
+                        })
+                        .collect();
+                FlowType::With(Box::new((primary, args)))
             }
             FlowType::Args(args) => {
                 let args_res = args.args.iter().map(|a| self.transform(a, pol)).collect();
