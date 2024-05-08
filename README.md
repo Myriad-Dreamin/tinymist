@@ -58,6 +58,7 @@ Follow the instructions to enable tinymist in your favorite editor.
 + [Helix](./editors/helix/README.md)
 + [Neovim](./editors/neovim/README.md)
 + [VSCode](./editors/vscode/README.md)
++ [Zed](editors/zed/README.md)
 
 ## Packaging
 
