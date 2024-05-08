@@ -330,7 +330,7 @@ impl CompileClientActor {
         self.config = config;
     }
 
-    pub fn change_entry(&mut self, path: Option<ImmutPath>) -> Result<(), Error> {
+    pub fn change_entry(&mut self, path: Option<ImmutPath>) -> Result<bool, Error> {
         if path
             .as_deref()
             .is_some_and(|p| !p.is_absolute() && !p.starts_with("/untitled"))
@@ -340,7 +340,7 @@ impl CompileClientActor {
 
         let next_entry = self.config.determine_entry(path);
         if next_entry == self.entry {
-            return Ok(());
+            return Ok(false);
         }
 
         let diag_group = &self.diag_group;
@@ -373,7 +373,7 @@ impl CompileClientActor {
 
         self.entry = next_entry;
 
-        Ok(())
+        Ok(true)
     }
 
     pub fn add_memory_changes(&self, event: MemoryEvent) {
