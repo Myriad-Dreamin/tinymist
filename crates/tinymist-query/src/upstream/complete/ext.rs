@@ -21,7 +21,7 @@ use crate::syntax::param_index_at_leaf;
 use crate::upstream::complete::complete_code;
 use crate::upstream::plain_docs_sentence;
 
-use crate::{prelude::*, typst_to_lsp::completion_kind, LspCompletion};
+use crate::{completion_kind, prelude::*, LspCompletion};
 
 impl<'a, 'w> CompletionContext<'a, 'w> {
     pub fn world(&self) -> &'w dyn typst::World {
