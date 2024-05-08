@@ -8,7 +8,7 @@ use reflexo::path::{unix_slash, PathClean};
 use typst::foundations::{AutoValue, Func, Label, NoneValue, Repr, Type, Value};
 use typst::layout::{Dir, Length};
 use typst::syntax::ast::AstNode;
-use typst::syntax::{ast, Span, SyntaxKind};
+use typst::syntax::{ast, Span, SyntaxKind, SyntaxNode};
 use typst::visualize::Color;
 
 use super::{Completion, CompletionContext, CompletionKind};
@@ -1234,30 +1234,31 @@ pub fn complete_path(
     let text;
     let rng;
     if let Some(v) = v {
-        let vp = v.cast::<ast::Str>()?;
-        // todo: path escape
-        let real_content = vp.get();
-        let str_content = v.text();
-        let unquoted = &str_content[1..str_content.len() - 1];
-        if unquoted != real_content {
-            return None;
-        }
+        // todo: the non-str case
+        v.cast::<ast::Str>()?;
 
         let vr = v.range();
-        let offset = vr.start + 1;
-        if cursor < offset || vr.end <= cursor || vr.len() < 2 {
+        rng = vr.start + 1..vr.end - 1;
+        log::debug!("path_of: {rng:?} {cursor}");
+        if rng.start > rng.end || (cursor != rng.end && !rng.contains(&cursor)) {
             return None;
         }
 
-        text = &source.text()[offset..cursor];
-        rng = offset..vr.end - 1;
+        let mut w = EcoString::new();
+        w.push('"');
+        w.push_str(&source.text()[rng.start..cursor]);
+        w.push('"');
+        let partial_str = SyntaxNode::leaf(SyntaxKind::Str, w);
+        log::debug!("path_of: {rng:?} {partial_str:?}");
+
+        text = partial_str.cast::<ast::Str>()?.get();
         is_in_text = true;
     } else {
-        text = "";
+        text = EcoString::default();
         rng = cursor..cursor;
         is_in_text = false;
     }
-    let path = Path::new(&text);
+    let path = Path::new(text.as_str());
     let has_root = path.has_root();
 
     let src_path = id.vpath();
