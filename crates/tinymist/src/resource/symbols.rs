@@ -20,13 +20,14 @@ struct ResourceSymbolItem {
     glyphs: Vec<ResourceGlyphDesc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 enum SymCategory {
     Accent,
     Greek,
     ControlOrSpace,
     Misc,
+    Emoji,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -160,9 +161,11 @@ impl TypstLanguageServer {
     /// Get the all valid symbols
     pub fn get_symbol_resources(&self) -> ZResult<JsonValue> {
         let mut symbols = ResourceSymbolMap::new();
-        populate_scope(typst::symbols::sym().scope(), "sym", &mut symbols);
-        // currently we don't have plan on emoji
-        // populate_scope(typst::symbols::emoji().scope(), "emoji", &mut symbols);
+        use typst::symbols::{emoji, sym};
+        populate_scope(sym().scope(), "sym", SymCategory::Misc, &mut symbols);
+        // todo: disabling emoji module, as there is performant issue on emojis
+        let _ = emoji;
+        // populate_scope(emoji().scope(), "emoji", SymCategory::Emoji, &mut symbols);
 
         const PRELUDE: &str = r#"#show math.equation: set text(font: (
   "New Computer Modern Math",
@@ -367,7 +370,13 @@ fn trait_symbol_fonts(
     res
 }
 
-fn populate(sym: &Symbol, mod_name: &str, sym_name: &str, out: &mut ResourceSymbolMap) {
+fn populate(
+    sym: &Symbol,
+    mod_name: &str,
+    sym_name: &str,
+    fallback_cat: SymCategory,
+    out: &mut ResourceSymbolMap,
+) {
     for (modifier_name, ch) in sym.variants() {
         let mut name =
             String::with_capacity(mod_name.len() + sym_name.len() + modifier_name.len() + 2);
@@ -381,10 +390,7 @@ fn populate(sym: &Symbol, mod_name: &str, sym_name: &str, out: &mut ResourceSymb
             name.push_str(modifier_name);
         }
 
-        let category = CAT_MAP
-            .get(name.as_str())
-            .cloned()
-            .unwrap_or(SymCategory::Misc);
+        let category = CAT_MAP.get(name.as_str()).cloned().unwrap_or(fallback_cat);
         out.insert(
             name,
             ResourceSymbolItem {
@@ -396,12 +402,17 @@ fn populate(sym: &Symbol, mod_name: &str, sym_name: &str, out: &mut ResourceSymb
     }
 }
 
-fn populate_scope(sym: &Scope, mod_name: &str, out: &mut ResourceSymbolMap) {
+fn populate_scope(
+    sym: &Scope,
+    mod_name: &str,
+    fallback_cat: SymCategory,
+    out: &mut ResourceSymbolMap,
+) {
     for (k, v) in sym.iter() {
         let Value::Symbol(sym) = v else {
             continue;
         };
 
-        populate(sym, mod_name, k, out)
+        populate(sym, mod_name, k, fallback_cat, out)
     }
 }
