@@ -1,9 +1,23 @@
 use crate::{analysis::get_color_exprs, prelude::*, SemanticRequest};
 
-/// The
+/// The [`textDocument/documentColor`] request is sent from the client to the
+/// server to list all color references found in a given text document. Along
+/// with the range, a color value in RGB is returned.
+///
+/// [`textDocument/documentColor`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_documentColor
+///
+/// Clients can use the result to decorate color references in an editor. For
+/// example:
+///
+/// * Color boxes showing the actual color next to the reference
+/// * Show a color picker when a color reference is edited
+///
+/// # Compatibility
+///
+/// This request was introduced in specification version 3.6.0.
 #[derive(Debug, Clone)]
 pub struct DocumentColorRequest {
-    /// The.
+    /// The path of the document to request color for.
     pub path: PathBuf,
 }
 

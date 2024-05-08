@@ -3,10 +3,64 @@ use once_cell::sync::OnceCell;
 
 use crate::{prelude::*, SemanticRequest};
 
-/// The [`textDocument/codeLens`] request is sent from the client to the server
-/// to compute code lenses for a given text document.
+/// The [`textDocument/codeAction`] request is sent from the client to the
+/// server to compute commands for a given text document and range. These
+/// commands are typically code fixes to either fix problems or to
+/// beautify/refactor code.
 ///
-/// [`textDocument/codeLens`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_codeLens
+/// The result of a [`textDocument/codeAction`] request is an array of `Command`
+/// literals which are typically presented in the user interface.
+///
+/// [`textDocument/codeAction`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_codeAction
+///
+/// To ensure that a server is useful in many clients, the commands specified in
+/// a code actions should be handled by the server and not by the client (see
+/// [`workspace/executeCommand`] and
+/// `ServerCapabilities::execute_command_provider`). If the client supports
+/// providing edits with a code action, then the mode should be used.
+///
+/// When the command is selected the server should be contacted again (via the
+/// [`workspace/executeCommand`] request) to execute the command.
+///
+/// [`workspace/executeCommand`]: https://microsoft.github.io/language-server-protocol/specification#workspace_executeCommand
+///
+/// # Compatibility
+///
+/// ## Since version 3.16.0
+///
+/// A client can offer a server to delay the computation of code action
+/// properties during a `textDocument/codeAction` request. This is useful for
+/// cases where it is expensive to compute the value of a property (for example,
+/// the `edit` property).
+///
+/// Clients signal this through the `code_action.resolve_support` client
+/// capability which lists all properties a client can resolve lazily. The
+/// server capability `code_action_provider.resolve_provider` signals that a
+/// server will offer a `codeAction/resolve` route.
+///
+/// To help servers uniquely identify a code action in the resolve request, a
+/// code action literal may optionally carry a `data` property. This is also
+/// guarded by an additional client capability `code_action.data_support`. In
+/// general, a client should offer data support if it offers resolve support.
+///
+/// It should also be noted that servers shouldn’t alter existing attributes of
+/// a code action in a `codeAction/resolve` request.
+///
+/// ## Since version 3.8.0
+///
+/// Support for [`CodeAction`] literals to enable the following scenarios:
+///
+/// * The ability to directly return a workspace edit from the code action
+///   request. This avoids having another server roundtrip to execute an actual
+///   code action. However server providers should be aware that if the code
+///   action is expensive to compute or the edits are huge it might still be
+///   beneficial if the result is simply a command and the actual edit is only
+///   computed when needed.
+///
+/// * The ability to group code actions using a kind. Clients are allowed to
+///   ignore that information. However it allows them to better group code
+///   action, for example, into corresponding menus (e.g. all refactor code
+///   actions into a refactor menu).
 #[derive(Debug, Clone)]
 pub struct CodeActionRequest {
     /// The path of the document to request for.
@@ -71,18 +125,18 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
         self.local_edits(vec![edit])
     }
 
-    fn heading_actions(&mut self, leaf: &LinkedNode) -> Option<()> {
-        let h = leaf.cast::<ast::Heading>()?;
+    fn heading_actions(&mut self, node: &LinkedNode) -> Option<()> {
+        let h = node.cast::<ast::Heading>()?;
         let depth = h.depth().get();
 
         // Only the marker is replaced, for minimal text change
-        let marker = leaf
+        let marker = node
             .children()
             .find(|e| e.kind() == SyntaxKind::HeadingMarker)?;
         let marker_range = marker.range();
 
         if depth > 1 {
-            // decrease depth of heading
+            // Decrease depth of heading
             let action = CodeActionOrCommand::CodeAction(CodeAction {
                 title: "Decrease depth of heading".to_string(),
                 kind: Some(CodeActionKind::REFACTOR_REWRITE),
@@ -95,7 +149,7 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
             self.actions.push(action);
         }
 
-        // increase depth of heading
+        // Increase depth of heading
         let action = CodeActionOrCommand::CodeAction(CodeAction {
             title: "Increase depth of heading".to_string(),
             kind: Some(CodeActionKind::REFACTOR_REWRITE),
@@ -110,20 +164,21 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
         Some(())
     }
 
-    fn equation_actions(&mut self, leaf: &LinkedNode) -> Option<()> {
-        let equation = leaf.cast::<ast::Equation>()?;
+    fn equation_actions(&mut self, node: &LinkedNode) -> Option<()> {
+        let equation = node.cast::<ast::Equation>()?;
         let body = equation.body();
         let is_block = equation.block();
 
-        let body = leaf.find(body.span())?;
+        let body = node.find(body.span())?;
         let body_range = body.range();
 
-        let mut chs = leaf.children();
+        let mut chs = node.children();
         let chs = chs.by_ref();
         let first_dollar = chs.take(1).find(|e| e.kind() == SyntaxKind::Dollar)?;
         let last_dollar = chs.rev().take(1).find(|e| e.kind() == SyntaxKind::Dollar)?;
 
-        // erroneous equation
+        // Erroneous equation is skipped.
+        // For example, some unclosed equation.
         if first_dollar.offset() == last_dollar.offset() {
             return None;
         }
@@ -153,7 +208,7 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
             }))
         };
 
-        // prepare actions
+        // Prepare actions
         let a1 = if is_block {
             rewrite_action("Convert to inline equation", "")?
         } else {
@@ -170,7 +225,8 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
     }
 
     fn work(&mut self, root: LinkedNode, cursor: usize) -> Option<()> {
-        let mut node = root.leaf_at(cursor)?;
+        let node = root.leaf_at(cursor)?;
+        let mut node = &node;
 
         let mut heading_resolved = false;
         let mut equation_resolved = false;
@@ -180,17 +236,17 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
                 // Only the deepest heading is considered
                 SyntaxKind::Heading if !heading_resolved => {
                     heading_resolved = true;
-                    self.heading_actions(&node);
+                    self.heading_actions(node);
                 }
                 // Only the deepest equation is considered
                 SyntaxKind::Equation if !equation_resolved => {
                     equation_resolved = true;
-                    self.equation_actions(&node);
+                    self.equation_actions(node);
                 }
                 _ => {}
             }
 
-            node = node.parent()?.clone();
+            node = node.parent()?;
         }
     }
 }

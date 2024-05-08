@@ -41,8 +41,7 @@ impl StatefulRequest for GotoDefinitionRequest {
         debug!("ast_node: {ast_node:?}", ast_node = ast_node);
 
         let deref_target = get_deref_target(ast_node, cursor)?;
-        let use_site = deref_target.node().clone();
-        let origin_selection_range = ctx.to_lsp_range(use_site.range(), &source);
+        let origin_selection_range = ctx.to_lsp_range(deref_target.node().range(), &source);
 
         let def = find_definition(ctx, source.clone(), doc.as_ref(), deref_target)?;
 

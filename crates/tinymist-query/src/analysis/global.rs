@@ -7,6 +7,7 @@ use std::{
 };
 
 use ecow::{EcoString, EcoVec};
+use lsp_types::Url;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use reflexo::hash::hash128;
@@ -27,6 +28,7 @@ use super::{
     analyze_bib, post_type_check, BibInfo, DefUseInfo, FlowType, ImportInfo, PathPreference,
     Signature, SignatureTarget, TypeCheckInfo,
 };
+use crate::path_to_url;
 use crate::syntax::resolve_id_by_path;
 use crate::{
     lsp_to_typst,
@@ -537,6 +539,14 @@ impl<'w> AnalysisContext<'w> {
         // Join the path to the root. If it tries to escape, deny
         // access. Note: It can still escape via symlinks.
         id.vpath().resolve(&root).ok_or(FileError::AccessDenied)
+    }
+
+    /// Resolve the uri for a file id.
+    pub fn uri_for_id(&self, id: TypstFileId) -> Result<Url, FileError> {
+        self.path_for_id(id).and_then(|e| {
+            path_to_url(&e)
+                .map_err(|e| FileError::Other(Some(eco_format!("convert to url: {e:?}"))))
+        })
     }
 
     /// Get the content of a file by file id.
