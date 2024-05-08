@@ -1,6 +1,4 @@
-use log::debug;
-
-use crate::{analysis::find_definition, prelude::*, syntax::get_deref_target};
+use crate::{analysis::find_definition, prelude::*};
 
 /// The [`textDocument/definition`] request asks the server for the definition
 /// location of a symbol at a given text document position.
@@ -34,21 +32,14 @@ impl StatefulRequest for GotoDefinitionRequest {
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let offset = ctx.to_typst_pos(self.position, &source)?;
-        let cursor = offset + 1;
-
-        let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
-        debug!("ast_node: {ast_node:?}", ast_node = ast_node);
-
-        let deref_target = get_deref_target(ast_node, cursor)?;
+        let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
         let origin_selection_range = ctx.to_lsp_range(deref_target.node().range(), &source);
 
         let def = find_definition(ctx, source.clone(), doc.as_ref(), deref_target)?;
 
         let (fid, def_range) = def.def_at?;
 
-        let span_path = ctx.path_for_id(fid).ok()?;
-        let uri = path_to_url(&span_path).ok()?;
+        let uri = ctx.uri_for_id(fid).ok()?;
 
         let range = ctx.to_lsp_range_(def_range, fid)?;
 

@@ -2,7 +2,7 @@ use log::debug;
 
 use crate::{
     prelude::*,
-    syntax::{get_deref_target, DerefTarget, IdentRef},
+    syntax::{DerefTarget, IdentRef},
     SemanticRequest,
 };
 
@@ -24,12 +24,7 @@ impl SemanticRequest for ReferencesRequest {
 
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let offset = ctx.to_typst_pos(self.position, &source)?;
-        let cursor = offset + 1;
-
-        let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
-        debug!("ast_node: {ast_node:?}", ast_node = ast_node);
-        let deref_target = get_deref_target(ast_node, cursor)?;
+        let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
 
         let def_use = ctx.def_use(source.clone())?;
         let locations = find_references(ctx, def_use, deref_target, ctx.position_encoding())?;
@@ -119,8 +114,7 @@ pub(crate) fn find_references_root(
     position_encoding: PositionEncoding,
 ) -> Option<Vec<LspLocation>> {
     let def_source = ctx.source_by_id(def_fid).ok()?;
-    let def_path = ctx.path_for_id(def_fid).ok()?;
-    let uri = path_to_url(&def_path).ok()?;
+    let uri = ctx.uri_for_id(def_fid).ok()?;
 
     // todo: reuse uri, range to location
     let mut references = def_use
@@ -143,8 +137,7 @@ pub(crate) fn find_references_root(
             let ref_source = ctx.ctx.source_by_id(ref_fid).ok()?;
             let def_use = ctx.ctx.def_use(ref_source.clone())?;
 
-            let uri = ctx.ctx.path_for_id(ref_fid).ok()?;
-            let uri = path_to_url(&uri).ok()?;
+            let uri = ctx.ctx.uri_for_id(ref_fid).ok()?;
 
             let mut redefines = vec![];
             if let Some((id, _def)) = def_use.get_def(def_fid, &def_ident) {

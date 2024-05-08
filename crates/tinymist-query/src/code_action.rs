@@ -106,11 +106,7 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
 
     fn local_url(&self) -> Option<&Url> {
         self.local_url
-            .get_or_init(|| {
-                let id = self.current.id();
-                let path = self.ctx.path_for_id(id).ok()?;
-                path_to_url(path.as_path()).ok()
-            })
+            .get_or_init(|| self.ctx.uri_for_id(self.current.id()).ok())
             .as_ref()
     }
 

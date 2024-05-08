@@ -8,7 +8,7 @@ use regex::{Captures, Regex};
 use crate::{
     analysis::{FlowBuiltinType, FlowType},
     prelude::*,
-    syntax::{get_deref_target, DerefTarget},
+    syntax::DerefTarget,
     upstream::{autocomplete, complete_path, CompletionContext},
     StatefulRequest,
 };
@@ -57,7 +57,7 @@ impl StatefulRequest for CompletionRequest {
     ) -> Option<Self::Response> {
         let doc = doc.as_ref().map(|doc| doc.document.as_ref());
         let source = ctx.source_by_path(&self.path).ok()?;
-        let cursor = ceil_char_boundary(source.text(), ctx.to_typst_pos(self.position, &source)?);
+        let (cursor, deref_target) = ctx.deref_syntax_at_(&source, self.position, 0)?;
 
         // Please see <https://github.com/nvarner/typst-lsp/commit/2d66f26fb96ceb8e485f492e5b81e9db25c3e8ec>
         //
@@ -73,10 +73,6 @@ impl StatefulRequest for CompletionRequest {
         // Hence, we cannot distinguish between the two cases. Conservatively, we
         // assume that the completion is not explicit.
         let explicit = false;
-
-        let root = LinkedNode::new(source.root());
-        let node = root.leaf_at(cursor);
-        let deref_target = node.and_then(|node| get_deref_target(node, cursor));
 
         // Skip if is the let binding item *directly*
         if let Some(DerefTarget::VarAccess(node)) = &deref_target {
@@ -272,15 +268,6 @@ fn to_lsp_snippet(typst_snippet: &EcoString) -> String {
         });
 
     result.to_string()
-}
-
-fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
-    // while is not char boundary, move cursor to right
-    while cursor < text.len() && !text.is_char_boundary(cursor) {
-        cursor += 1;
-    }
-
-    cursor.min(text.len())
 }
 
 fn is_arg_like_context(mut matching: &LinkedNode) -> bool {

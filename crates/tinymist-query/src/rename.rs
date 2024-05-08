@@ -1,10 +1,4 @@
-use log::debug;
-use lsp_types::TextEdit;
-
-use crate::{
-    analysis::find_definition, find_references, prelude::*, syntax::get_deref_target,
-    validate_renaming_definition,
-};
+use crate::{analysis::find_definition, find_references, prelude::*, validate_renaming_definition};
 
 /// The [`textDocument/rename`] request is sent from the client to the server to
 /// ask the server to compute a workspace change so that the client can perform
@@ -30,14 +24,7 @@ impl StatefulRequest for RenameRequest {
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-
-        let offset = ctx.to_typst_pos(self.position, &source)?;
-        let cursor = offset + 1;
-
-        let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
-        debug!("ast_node: {ast_node:?}", ast_node = ast_node);
-
-        let deref_target = get_deref_target(ast_node, cursor)?;
+        let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
 
         let lnk = find_definition(ctx, source.clone(), doc.as_ref(), deref_target.clone())?;
 
@@ -53,8 +40,7 @@ impl StatefulRequest for RenameRequest {
         let def_loc = {
             let def_source = ctx.source_by_id(fid).ok()?;
 
-            let span_path = ctx.path_for_id(fid).ok()?;
-            let uri = path_to_url(&span_path).ok()?;
+            let uri = ctx.uri_for_id(fid).ok()?;
 
             let Some(range) = lnk.name_range else {
                 log::warn!("rename: no name range");

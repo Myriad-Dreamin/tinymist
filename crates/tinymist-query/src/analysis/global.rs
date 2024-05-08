@@ -29,7 +29,7 @@ use super::{
     Signature, SignatureTarget, TypeCheckInfo,
 };
 use crate::path_to_url;
-use crate::syntax::resolve_id_by_path;
+use crate::syntax::{get_deref_target, resolve_id_by_path, DerefTarget};
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -575,6 +575,31 @@ impl<'w> AnalysisContext<'w> {
         self.source_by_id(id)
     }
 
+    /// Get a syntax object at a position.
+    pub fn deref_syntax_at<'s>(
+        &mut self,
+        source: &'s Source,
+        position: LspPosition,
+        shift: usize,
+    ) -> Option<DerefTarget<'s>> {
+        let (_, deref_target) = self.deref_syntax_at_(source, position, shift)?;
+        deref_target
+    }
+
+    /// Get a syntax object at a position.
+    pub fn deref_syntax_at_<'s>(
+        &mut self,
+        source: &'s Source,
+        position: LspPosition,
+        shift: usize,
+    ) -> Option<(usize, Option<DerefTarget<'s>>)> {
+        let offset = self.to_typst_pos(position, source)?;
+        let cursor = ceil_char_boundary(source.text(), offset + shift);
+
+        let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
+        Some((cursor, get_deref_target(node, cursor)))
+    }
+
     /// Get the module-level analysis cache of a file.
     pub fn get(&self, file_id: TypstFileId) -> Option<&ModuleAnalysisCache> {
         self.caches.modules.get(&file_id)
@@ -860,6 +885,15 @@ impl<'w> AnalysisContext<'w> {
 
         post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.mapping.get(&k.span()).cloned())
     }
+}
+
+fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
+    // while is not char boundary, move cursor to right
+    while cursor < text.len() && !text.is_char_boundary(cursor) {
+        cursor += 1;
+    }
+
+    cursor.min(text.len())
 }
 
 #[comemo::memoize]
