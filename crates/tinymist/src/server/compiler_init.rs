@@ -125,7 +125,7 @@ impl CompileConfig {
     /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
         if let Some(JsonValue::String(output_path)) = update.get("outputPath") {
-            self.output_path = output_path.to_owned();
+            output_path.clone_into(&mut self.output_path);
         } else {
             self.output_path = String::new();
         }
@@ -180,7 +180,7 @@ impl CompileConfig {
             if periscope_args.invert_color == "auto"
                 && self.preferred_theme.as_ref().is_some_and(|t| t == "dark")
             {
-                periscope_args.invert_color = "always".to_owned();
+                "always".clone_into(&mut periscope_args.invert_color);
             }
 
             self.periscope_args = Some(periscope_args);
@@ -404,7 +404,7 @@ impl LspDriver for CompileInit {
                 .as_ref()
                 .map(|x| &x.font_paths)
             {
-                opts.font_paths = font_paths.clone();
+                opts.font_paths.clone_from(font_paths);
             }
 
             Deferred::new(|| SharedFontResolver::new(opts).expect("failed to create font book"))

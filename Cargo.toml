@@ -7,7 +7,7 @@ readme = "README.md"
 license = "Apache-2.0"
 homepage = "https://github.com/Myriad-Dreamin/tinymist"
 repository = "https://github.com/Myriad-Dreamin/tinymist"
-rust-version = "1.74"
+rust-version = "1.75"
 
 [workspace]
 resolver = "2"

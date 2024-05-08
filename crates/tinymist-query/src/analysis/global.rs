@@ -269,7 +269,7 @@ impl<Inputs, Output> ComputingNode<Inputs, Output> {
                 drop(input_cmp);
                 log::info!("{}({:?}): compute", self.name, inputs.compute_debug_repr());
                 let output = compute(s, inputs.clone());
-                *self.output.write() = output.clone();
+                self.output.write().clone_from(&output);
                 *self.inputs.write() = Some(inputs);
                 output
             }
