@@ -833,10 +833,12 @@ impl TypstLanguageServer {
             log::info!("first manual focusing is coming");
         }
 
-        let update_result = self.focus_entry(new_entry.clone());
-        update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
+        let ok = self.focus_entry(new_entry.clone());
+        let ok = ok.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
 
-        info!("file focused: {entry:?}", entry = new_entry);
+        if ok {
+            info!("file focused: {new_entry:?}");
+        }
         Ok(JsonValue::Null)
     }
 

@@ -19,13 +19,11 @@ use crate::{actor::typ_client::CompileClientActor, compiler::CompileServer, Typs
 
 impl CompileServer {
     /// Focus main file to some path.
-    pub fn do_change_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+    pub fn do_change_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<bool, Error> {
         self.compiler
             .as_mut()
             .unwrap()
-            .change_entry(new_entry.clone())?;
-
-        Ok(())
+            .change_entry(new_entry.clone())
     }
 }
 
@@ -48,10 +46,10 @@ impl TypstLanguageServer {
     }
 
     /// Updates the primary (focusing) entry
-    pub fn focus_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
+    pub fn focus_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<bool, Error> {
         if self.pinning || self.config.compile.has_default_entry_path {
             self.focusing = new_entry;
-            return Ok(());
+            return Ok(false);
         }
 
         self.primary.do_change_entry(new_entry.clone())
@@ -61,6 +59,10 @@ impl TypstLanguageServer {
     /// performing any focus command request.
     ///
     /// See https://github.com/microsoft/language-server-protocol/issues/718
+    ///
+    /// we do want to focus the file implicitly by `textDocument/diagnostic`
+    /// (pullDiagnostics mode), as suggested by language-server-protocol#718,
+    /// however, this has poor support, e.g. since neovim 0.10.0.
     pub fn implicit_focus_entry(
         &mut self,
         new_entry: impl FnOnce() -> Option<ImmutPath>,
@@ -86,10 +88,14 @@ impl TypstLanguageServer {
         let new_entry = new_entry();
 
         let update_result = self.focus_entry(new_entry.clone());
-        if let Err(err) = update_result {
-            log::warn!("could not focus file: {err}");
-        } else {
-            log::info!("file focused[implicit]: {entry:?}", entry = new_entry);
+        match update_result {
+            Ok(true) => {
+                log::info!("file focused[implicit,{site}]: {new_entry:?}");
+            }
+            Err(err) => {
+                log::warn!("could not focus file: {err}");
+            }
+            Ok(false) => {}
         }
     }
 }
