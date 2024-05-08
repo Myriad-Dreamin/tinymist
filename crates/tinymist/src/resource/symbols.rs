@@ -1,9 +1,14 @@
+use std::{collections::BTreeMap, path::Path, sync::Arc};
+
+use typst_ts_compiler::{service::EntryManager, ShadowApi};
+use typst_ts_core::{config::compiler::EntryState, font::GlyphId, TypstDocument, TypstFont};
+
 pub use super::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ResourceSymbolResponse {
-    symbols: HashMap<String, ResourceSymbolItem>,
+    symbols: BTreeMap<String, ResourceSymbolItem>,
     font_selects: Vec<FontItem>,
     glyph_defs: String,
 }
@@ -20,6 +25,7 @@ struct ResourceSymbolItem {
 enum SymCategory {
     Accent,
     Greek,
+    ControlOrSpace,
     Misc,
 }
 
@@ -48,7 +54,7 @@ struct FontItem {
     // vertical: bool,
 }
 
-type ResourceSymbolMap = HashMap<String, ResourceSymbolItem>;
+type ResourceSymbolMap = BTreeMap<String, ResourceSymbolItem>;
 
 static CAT_MAP: Lazy<HashMap<&str, SymCategory>> = Lazy::new(|| {
     use SymCategory::*;
@@ -128,6 +134,25 @@ static CAT_MAP: Lazy<HashMap<&str, SymCategory>> = Lazy::new(|| {
         ("sym.sigma.alt", Greek),
         ("sym.theta.alt", Greek),
         ("sym.ell", Greek),
+        ("sym.lrm", ControlOrSpace),
+        ("sym.rlm", ControlOrSpace),
+        ("sym.wj", ControlOrSpace),
+        ("sym.zwj", ControlOrSpace),
+        ("sym.zwnj", ControlOrSpace),
+        ("sym.zws", ControlOrSpace),
+        ("sym.space", ControlOrSpace),
+        ("sym.space.nobreak", ControlOrSpace),
+        ("sym.space.nobreak.narrow", ControlOrSpace),
+        ("sym.space.en", ControlOrSpace),
+        ("sym.space.quad", ControlOrSpace),
+        ("sym.space.third", ControlOrSpace),
+        ("sym.space.quarter", ControlOrSpace),
+        ("sym.space.sixth", ControlOrSpace),
+        ("sym.space.med", ControlOrSpace),
+        ("sym.space.fig", ControlOrSpace),
+        ("sym.space.punct", ControlOrSpace),
+        ("sym.space.thin", ControlOrSpace),
+        ("sym.space.hair", ControlOrSpace),
     ])
 });
 
@@ -139,69 +164,53 @@ impl TypstLanguageServer {
         // currently we don't have plan on emoji
         // populate_scope(typst::symbols::emoji().scope(), "emoji", &mut symbols);
 
-        let chars = symbols
-            .values()
-            .map(|e| char::from_u32(e.unicode).unwrap())
-            .collect::<String>();
+        const PRELUDE: &str = r#"#show math.equation: set text(font: (
+  "New Computer Modern Math",
+  "Latin Modern Math",
+  "STIX Two Math",
+  "Cambria Math",
+  "New Computer Modern",
+  "Cambria",
+))
+"#;
 
+        let math_shaping_text = symbols.iter().fold(PRELUDE.to_owned(), |mut o, (k, e)| {
+            use std::fmt::Write;
+            writeln!(o, "$#{k}$/* {} */#pagebreak()", e.unicode).ok();
+            o
+        });
+        log::debug!("math shaping text: {text}", text = math_shaping_text);
+
+        let symbols_ref = symbols.keys().cloned().collect::<Vec<_>>();
         let font = self
             .primary()
             .steal(move |e| {
-                use typst::text::FontVariant;
-                use typst::World;
-                let book = e.compiler.world().book();
+                let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
 
-                // todo: bad font fallback
+                let new_entry = EntryState::new_rootless(entry_path.clone())?;
+                let old_entry = e.compiler.world_mut().mutate_entry(new_entry).ok()?;
+                let prepared = e
+                    .compiler
+                    .map_shadow(&entry_path, math_shaping_text.into_bytes().into())
+                    .is_ok();
+                let sym_doc = prepared.then(|| e.compiler.pure_compile(&mut Default::default()));
+                e.compiler.world_mut().mutate_entry(old_entry).ok()?;
 
-                let fonts = &["New Computer Modern Math", "Latin Modern Math", "Cambria"];
-
-                let preferred_fonts = fonts
-                    .iter()
-                    .flat_map(|f| {
-                        let f = f.to_lowercase();
-                        book.select(&f, FontVariant::default())
-                            .and_then(|i| e.compiler.world().font(i))
-                    })
-                    .collect::<Vec<_>>();
-
-                let mut last_hit: Option<typst_ts_core::TypstFont> = None;
-
-                log::info!("font init: {hit:?}", hit = last_hit);
-
-                let fonts = chars
-                    .chars()
-                    .map(|c| {
-                        for font in &preferred_fonts {
-                            if font.info().coverage.contains(c as u32) {
-                                return Some(font.clone());
-                            }
-                        }
-
-                        if let Some(last_hit) = &last_hit {
-                            if last_hit.info().coverage.contains(c as u32) {
-                                return Some(last_hit.clone());
-                            }
-                        }
-
-                        let hit =
-                            book.select_fallback(None, FontVariant::default(), &c.to_string())?;
-                        last_hit = e.compiler.world().font(hit);
-
-                        log::info!("font hit: {hit:?}", hit = last_hit);
-
-                        last_hit.clone()
-                    })
-                    .collect::<Vec<_>>();
-
-                fonts
+                log::debug!(
+                    "sym doc: {doc:?}",
+                    doc = sym_doc.as_ref().map(|e| e.as_ref().map(|_| ()))
+                );
+                let doc = sym_doc.transpose().ok()??;
+                Some(trait_symbol_fonts(&doc, &symbols_ref))
             })
-            .ok();
+            .ok()
+            .flatten();
 
         let mut glyph_def = String::new();
 
         let mut collected_fonts = None;
 
-        if let Some(fonts) = font.clone() {
+        if let Some(glyph_mapping) = font.clone() {
             let glyph_provider = typst_ts_core::font::GlyphProvider::default();
             let glyph_pass =
                 typst_ts_core::vector::pass::ConvertInnerImpl::new(glyph_provider, false);
@@ -209,19 +218,17 @@ impl TypstLanguageServer {
             let mut glyph_renderer = Svg::default();
             let mut glyphs = vec![];
 
-            let font_collected = fonts
-                .iter()
-                .flatten()
+            let font_collected = glyph_mapping
+                .values()
+                .map(|e| e.0.clone())
                 .collect::<std::collections::HashSet<_>>()
                 .into_iter()
-                .cloned()
                 .collect::<Vec<_>>();
 
-            let mut render_char = |font: Option<&typst_ts_core::TypstFont>, u| {
-                let font = font?;
-                let font_index = font_collected.iter().position(|e| e == font).unwrap() as u32;
+            let mut render_sym = |u| {
+                let (font, id) = glyph_mapping.get(u)?.clone();
+                let font_index = font_collected.iter().position(|e| e == &font).unwrap() as u32;
 
-                let id = font.ttf().glyph_index(char::from_u32(u).unwrap())?;
                 let width = font.ttf().glyph_hor_advance(id);
                 let height = font.ttf().glyph_ver_advance(id);
                 let bbox = font.ttf().glyph_bounding_box(id);
@@ -248,8 +255,8 @@ impl TypstLanguageServer {
                 })
             };
 
-            for ((_, v), font) in symbols.iter_mut().zip(fonts.iter()) {
-                let Some(desc) = render_char(font.as_ref(), v.unicode) else {
+            for (k, v) in symbols.iter_mut() {
+                let Some(desc) = render_sym(k) else {
                     continue;
                 };
 
@@ -287,6 +294,77 @@ impl TypstLanguageServer {
 
         serde_json::to_value(resp).context("cannot serialize response")
     }
+}
+
+fn trait_symbol_fonts(
+    doc: &TypstDocument,
+    symbols: &[String],
+) -> HashMap<String, (TypstFont, GlyphId)> {
+    use typst::layout::Frame;
+    use typst::layout::FrameItem;
+
+    let mut worker = Worker {
+        symbols,
+        active: "",
+        res: HashMap::new(),
+    };
+    worker.work(doc);
+    let res = worker.res;
+
+    struct Worker<'a> {
+        symbols: &'a [String],
+        active: &'a str,
+        res: HashMap<String, (TypstFont, GlyphId)>,
+    }
+
+    impl Worker<'_> {
+        fn work(&mut self, doc: &TypstDocument) {
+            for (pg, s) in doc.pages.iter().zip(self.symbols.iter()) {
+                self.active = s;
+                self.work_frame(&pg.frame);
+            }
+        }
+
+        fn work_frame(&mut self, k: &Frame) {
+            for (_, item) in k.items() {
+                let text = match item {
+                    FrameItem::Group(g) => {
+                        self.work_frame(&g.frame);
+                        continue;
+                    }
+                    FrameItem::Text(text) => text,
+                    FrameItem::Shape(_, _) | FrameItem::Image(_, _, _) | FrameItem::Meta(_, _) => {
+                        continue
+                    }
+                };
+
+                let font = text.font.clone();
+                for g in &text.glyphs {
+                    let g_text = &text.text[g.range()];
+                    let chars_count = g_text.chars().count();
+                    if chars_count > 1 {
+                        log::warn!("multi char glyph: {g_text}");
+                        continue;
+                    }
+                    let Some(ch) = g_text.chars().next() else {
+                        continue;
+                    };
+                    if ch.is_whitespace() {
+                        continue;
+                    }
+                    log::debug!(
+                        "glyph: {active} => {ch} ({chc:x})",
+                        active = self.active,
+                        chc = ch as u32
+                    );
+                    self.res
+                        .insert(self.active.to_owned(), (font.clone(), GlyphId(g.id)));
+                }
+            }
+        }
+    }
+
+    res
 }
 
 fn populate(sym: &Symbol, mod_name: &str, sym_name: &str, out: &mut ResourceSymbolMap) {

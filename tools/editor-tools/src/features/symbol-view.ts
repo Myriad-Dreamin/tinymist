@@ -297,6 +297,10 @@ const CATEGORY_INFO: SymbolCategory[] = [
     name: "Greek Letters",
   },
   {
+    value: "controlOrSpace",
+    name: "Control Or Space",
+  },
+  {
     value: "hebrew",
     name: "Hebrew Letters",
   },
