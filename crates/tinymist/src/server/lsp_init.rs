@@ -344,7 +344,7 @@ impl Init {
                     .as_ref()
                     .map(|x| &x.font_paths)
                 {
-                    opts.font_paths = font_paths.clone();
+                    opts.font_paths.clone_from(font_paths);
                 }
             }
 

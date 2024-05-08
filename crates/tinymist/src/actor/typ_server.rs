@@ -303,7 +303,7 @@ where
         let mut env = self.make_env(self.watch_feature_set.clone());
         self.latest_doc = self.compiler.compile(&mut env).ok();
         if self.latest_doc.is_some() {
-            self.latest_success_doc = self.latest_doc.clone();
+            self.latest_success_doc.clone_from(&self.latest_doc);
         }
 
         // Evict compilation cache.
