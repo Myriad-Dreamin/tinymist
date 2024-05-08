@@ -205,6 +205,10 @@ pub struct TypstLanguageServer {
     pub pinning: bool,
     /// The client focusing file.
     pub focusing: Option<ImmutPath>,
+    /// The client ever focused implicitly by activities.
+    pub ever_focusing_by_activities: bool,
+    /// The client ever sent manual focusing request.
+    pub ever_manual_focusing: bool,
 
     // Configurations
     /// User configuration from the editor.
@@ -261,6 +265,8 @@ impl TypstLanguageServer {
             }),
             dedicates: Vec::new(),
             shutdown_requested: false,
+            ever_focusing_by_activities: false,
+            ever_manual_focusing: false,
             sema_tokens_registered: None,
             formatter_registered: None,
             config: Default::default(),
@@ -822,6 +828,11 @@ impl TypstLanguageServer {
     pub fn focus_document(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
         let new_entry = parse_path_or_null(arguments.first())?;
 
+        if !self.ever_manual_focusing {
+            self.ever_manual_focusing = true;
+            log::info!("first manual focusing is coming");
+        }
+
         let update_result = self.focus_entry(new_entry.clone());
         update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
 
@@ -977,6 +988,9 @@ impl TypstLanguageServer {
         let text = params.text_document.text;
 
         self.create_source(path.clone(), text).unwrap();
+
+        // Focus after opening
+        self.implicit_focus_entry(|| Some(path.as_path().into()), 'o');
         Ok(())
     }
 
@@ -1104,6 +1118,7 @@ impl TypstLanguageServer {
 
     fn hover(&mut self, params: HoverParams) -> LspResult<Option<Hover>> {
         let (path, position) = as_path_pos(params.text_document_position_params);
+        self.implicit_focus_entry(|| Some(path.as_path().into()), 'h');
         run_query!(self.Hover(path, position))
     }
 
@@ -1113,6 +1128,7 @@ impl TypstLanguageServer {
     ) -> LspResult<Option<Vec<FoldingRange>>> {
         let path = as_path(params.text_document);
         let line_folding_only = self.const_config().doc_line_folding_only;
+        self.implicit_focus_entry(|| Some(path.as_path().into()), 'f');
         run_query!(self.FoldingRange(path, line_folding_only))
     }
 
@@ -1138,6 +1154,7 @@ impl TypstLanguageServer {
         params: SemanticTokensParams,
     ) -> LspResult<Option<SemanticTokensResult>> {
         let path = as_path(params.text_document);
+        self.implicit_focus_entry(|| Some(path.as_path().into()), 't');
         run_query!(self.SemanticTokensFull(path))
     }
 
@@ -1147,6 +1164,7 @@ impl TypstLanguageServer {
     ) -> LspResult<Option<SemanticTokensFullDeltaResult>> {
         let path = as_path(params.text_document);
         let previous_result_id = params.previous_result_id;
+        self.implicit_focus_entry(|| Some(path.as_path().into()), 't');
         run_query!(self.SemanticTokensDelta(path, previous_result_id))
     }
 

@@ -56,6 +56,42 @@ impl TypstLanguageServer {
 
         self.primary.do_change_entry(new_entry.clone())
     }
+
+    /// This is used for tracking activating document status if a client is not
+    /// performing any focus command request.
+    ///
+    /// See https://github.com/microsoft/language-server-protocol/issues/718
+    pub fn implicit_focus_entry(
+        &mut self,
+        new_entry: impl FnOnce() -> Option<ImmutPath>,
+        site: char,
+    ) {
+        if self.ever_manual_focusing {
+            return;
+        }
+        // didOpen
+        match site {
+            // foldingRange, hover, semanticTokens
+            'f' | 'h' | 't' => {
+                self.ever_focusing_by_activities = true;
+            }
+            // didOpen
+            _ => {
+                if self.ever_focusing_by_activities {
+                    return;
+                }
+            }
+        }
+
+        let new_entry = new_entry();
+
+        let update_result = self.focus_entry(new_entry.clone());
+        if let Err(err) = update_result {
+            log::warn!("could not focus file: {err}");
+        } else {
+            log::info!("file focused[implicit]: {entry:?}", entry = new_entry);
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
