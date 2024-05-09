@@ -145,7 +145,7 @@ impl CompileConfig {
         };
         if let Some(args) = self.periscope_args.as_mut() {
             if args.invert_color == "auto" && self.preferred_theme.as_deref() == Some("dark") {
-                args.invert_color = "always".to_owned();
+                "always".clone_into(&mut args.invert_color);
             }
         }
 

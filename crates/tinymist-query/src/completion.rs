@@ -57,17 +57,7 @@ impl StatefulRequest for CompletionRequest {
     ) -> Option<Self::Response> {
         let doc = doc.as_ref().map(|doc| doc.document.as_ref());
         let source = ctx.source_by_path(&self.path).ok()?;
-        let cursor = {
-            let mut cursor = ctx.to_typst_pos(self.position, &source)?;
-            let text = source.text();
-
-            // while is not char boundary, move cursor to right
-            while cursor < text.len() && !text.is_char_boundary(cursor) {
-                cursor += 1;
-            }
-
-            cursor
-        };
+        let cursor = ceil_char_boundary(source.text(), ctx.to_typst_pos(self.position, &source)?);
 
         // Please see <https://github.com/nvarner/typst-lsp/commit/2d66f26fb96ceb8e485f492e5b81e9db25c3e8ec>
         //
@@ -88,24 +78,22 @@ impl StatefulRequest for CompletionRequest {
         let node = root.leaf_at(cursor);
         let deref_target = node.and_then(|node| get_deref_target(node, cursor));
 
-        if let Some(d) = &deref_target {
-            let node = d.node();
-            // skip if is the let binding item *directly*
-            if matches!(d, DerefTarget::VarAccess(..)) {
-                match node.parent_kind() {
-                    // complete the init part of the let binding
-                    Some(SyntaxKind::LetBinding) => {
-                        let parent = node.parent()?;
-                        let parent_init = parent.cast::<ast::LetBinding>()?.init()?;
-                        let parent_init = parent.find(parent_init.span())?;
-                        parent_init.find(node.span())?;
-                    }
-                    Some(SyntaxKind::Closure) => return None,
-                    _ => {}
+        // Skip if is the let binding item *directly*
+        if let Some(DerefTarget::VarAccess(node)) = &deref_target {
+            match node.parent_kind() {
+                // complete the init part of the let binding
+                Some(SyntaxKind::LetBinding) => {
+                    let parent = node.parent()?;
+                    let parent_init = parent.cast::<ast::LetBinding>()?.init()?;
+                    let parent_init = parent.find(parent_init.span())?;
+                    parent_init.find(node.span())?;
                 }
+                Some(SyntaxKind::Closure) => return None,
+                _ => {}
             }
         }
 
+        // Do some completion specific to the deref target
         let mut match_ident = None;
         let mut completion_result = None;
         let is_callee = matches!(deref_target, Some(DerefTarget::Callee(..)));
@@ -132,7 +120,7 @@ impl StatefulRequest for CompletionRequest {
                     let ty_chk = ctx.type_check(source.clone());
                     if let Some(ty_chk) = ty_chk {
                         let ty = ty_chk.mapping.get(&cano_expr.span());
-                        log::info!("check string ty: {:?}", ty);
+                        log::debug!("check string ty: {:?}", ty);
                         if let Some(FlowType::Builtin(FlowBuiltinType::Path(path_filter))) = ty {
                             completion_result =
                                 complete_path(ctx, Some(cano_expr), &source, cursor, path_filter);
@@ -284,6 +272,15 @@ fn to_lsp_snippet(typst_snippet: &EcoString) -> String {
         });
 
     result.to_string()
+}
+
+fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
+    // while is not char boundary, move cursor to right
+    while cursor < text.len() && !text.is_char_boundary(cursor) {
+        cursor += 1;
+    }
+
+    cursor.min(text.len())
 }
 
 fn is_arg_like_context(mut matching: &LinkedNode) -> bool {
