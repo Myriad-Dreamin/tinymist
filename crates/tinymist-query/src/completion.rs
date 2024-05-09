@@ -1,4 +1,9 @@
-use lsp_types::CompletionList;
+use lsp_types::{
+    Command, CompletionItemLabelDetails, CompletionList, CompletionTextEdit, InsertTextFormat,
+    TextEdit,
+};
+use once_cell::sync::Lazy;
+use regex::{Captures, Regex};
 
 use crate::{
     analysis::{FlowBuiltinType, FlowType},
@@ -8,7 +13,9 @@ use crate::{
     StatefulRequest,
 };
 
-use self::typst_to_lsp::completion;
+pub(crate) type LspCompletion = lsp_types::CompletionItem;
+pub(crate) type LspCompletionKind = lsp_types::CompletionItemKind;
+pub(crate) type TypstCompletionKind = crate::upstream::CompletionKind;
 
 /// The [`textDocument/completion`] request is sent from the client to the
 /// server to compute completion items at a given cursor position.
@@ -201,12 +208,36 @@ impl StatefulRequest for CompletionRequest {
                 replace_range = LspRange::new(lsp_start_position, self.position);
             }
 
-            Some(
-                completions
-                    .iter()
-                    .map(|typst_completion| completion(typst_completion, replace_range))
-                    .collect_vec(),
-            )
+            let completions = completions.iter().map(|typst_completion| {
+                let typst_snippet = typst_completion
+                    .apply
+                    .as_ref()
+                    .unwrap_or(&typst_completion.label);
+                let lsp_snippet = to_lsp_snippet(typst_snippet);
+                let text_edit = CompletionTextEdit::Edit(TextEdit::new(replace_range, lsp_snippet));
+
+                LspCompletion {
+                    label: typst_completion.label.to_string(),
+                    kind: Some(completion_kind(typst_completion.kind.clone())),
+                    detail: typst_completion.detail.as_ref().map(String::from),
+                    sort_text: typst_completion.sort_text.as_ref().map(String::from),
+                    label_details: typst_completion.label_detail.as_ref().map(|e| {
+                        CompletionItemLabelDetails {
+                            detail: None,
+                            description: Some(e.to_string()),
+                        }
+                    }),
+                    text_edit: Some(text_edit),
+                    insert_text_format: Some(InsertTextFormat::SNIPPET),
+                    command: typst_completion.command.as_ref().map(|c| Command {
+                        command: c.to_string(),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }
+            });
+
+            Some(completions.collect_vec())
         })?;
 
         if let Some(items_rest) = completion_items_rest.as_mut() {
@@ -223,15 +254,41 @@ impl StatefulRequest for CompletionRequest {
     }
 }
 
+pub(crate) fn completion_kind(typst_completion_kind: TypstCompletionKind) -> LspCompletionKind {
+    match typst_completion_kind {
+        TypstCompletionKind::Syntax => LspCompletionKind::SNIPPET,
+        TypstCompletionKind::Func => LspCompletionKind::FUNCTION,
+        TypstCompletionKind::Param => LspCompletionKind::VARIABLE,
+        TypstCompletionKind::Field => LspCompletionKind::FIELD,
+        TypstCompletionKind::Variable => LspCompletionKind::VARIABLE,
+        TypstCompletionKind::Constant => LspCompletionKind::CONSTANT,
+        TypstCompletionKind::Symbol(_) => LspCompletionKind::FIELD,
+        TypstCompletionKind::Type => LspCompletionKind::CLASS,
+        TypstCompletionKind::Module => LspCompletionKind::MODULE,
+        TypstCompletionKind::File => LspCompletionKind::FILE,
+        TypstCompletionKind::Folder => LspCompletionKind::FOLDER,
+    }
+}
+
+static TYPST_SNIPPET_PLACEHOLDER_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
+
+/// Adds numbering to placeholders in snippets
+fn to_lsp_snippet(typst_snippet: &EcoString) -> String {
+    let mut counter = 1;
+    let result =
+        TYPST_SNIPPET_PLACEHOLDER_RE.replace_all(typst_snippet.as_str(), |cap: &Captures| {
+            let substitution = format!("${{{}:{}}}", counter, &cap[1]);
+            counter += 1;
+            substitution
+        });
+
+    result.to_string()
+}
+
 fn is_arg_like_context(mut matching: &LinkedNode) -> bool {
     while let Some(parent) = matching.parent() {
         use SyntaxKind::*;
-        // if parent.kind() == SyntaxKind::Markup | SyntaxKind::Markup |
-        // SyntaxKind::Markup {     return true;
-        // }
-        // if parent.kind() == SyntaxKind::Args {
-        //     return true;
-        // }
 
         // todo: contextual
         match parent.kind() {

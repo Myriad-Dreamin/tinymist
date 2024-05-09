@@ -63,11 +63,6 @@ impl From<PositionEncoding> for lsp_types::PositionEncodingKind {
     }
 }
 
-pub type LspCompletion = lsp_types::CompletionItem;
-pub type LspCompletionKind = lsp_types::CompletionItemKind;
-pub type TypstCompletion = crate::upstream::Completion;
-pub type TypstCompletionKind = crate::upstream::CompletionKind;
-
 const UNTITLED_ROOT: &str = "/untitled";
 static EMPTY_URL: Lazy<Url> = Lazy::new(|| Url::parse("file://").unwrap());
 
@@ -208,15 +203,7 @@ pub mod lsp_to_typst {
 
 pub mod typst_to_lsp {
 
-    use itertools::Itertools;
-    use lazy_static::lazy_static;
-    use lsp_types::{
-        Command, CompletionItemLabelDetails, CompletionTextEdit, Documentation, InsertTextFormat,
-        LanguageString, MarkedString, MarkupContent, MarkupKind, TextEdit,
-    };
-    use regex::{Captures, Regex};
-    use typst::diag::EcoString;
-    use typst::foundations::{CastInfo, Repr};
+    use lsp_types::{LanguageString, MarkedString};
     use typst::syntax::Source;
 
     use super::*;
@@ -267,68 +254,6 @@ pub mod typst_to_lsp {
         LspRange::new(lsp_start, lsp_end)
     }
 
-    pub fn completion_kind(typst_completion_kind: TypstCompletionKind) -> LspCompletionKind {
-        match typst_completion_kind {
-            TypstCompletionKind::Syntax => LspCompletionKind::SNIPPET,
-            TypstCompletionKind::Func => LspCompletionKind::FUNCTION,
-            TypstCompletionKind::Param => LspCompletionKind::VARIABLE,
-            TypstCompletionKind::Field => LspCompletionKind::FIELD,
-            TypstCompletionKind::Variable => LspCompletionKind::VARIABLE,
-            TypstCompletionKind::Constant => LspCompletionKind::CONSTANT,
-            TypstCompletionKind::Symbol(_) => LspCompletionKind::FIELD,
-            TypstCompletionKind::Type => LspCompletionKind::CLASS,
-            TypstCompletionKind::Module => LspCompletionKind::MODULE,
-            TypstCompletionKind::File => LspCompletionKind::FILE,
-            TypstCompletionKind::Folder => LspCompletionKind::FOLDER,
-        }
-    }
-
-    lazy_static! {
-        static ref TYPST_SNIPPET_PLACEHOLDER_RE: Regex = Regex::new(r"\$\{(.*?)\}").unwrap();
-    }
-
-    /// Adds numbering to placeholders in snippets
-    fn snippet(typst_snippet: &EcoString) -> String {
-        let mut counter = 1;
-        let result =
-            TYPST_SNIPPET_PLACEHOLDER_RE.replace_all(typst_snippet.as_str(), |cap: &Captures| {
-                let substitution = format!("${{{}:{}}}", counter, &cap[1]);
-                counter += 1;
-                substitution
-            });
-
-        result.to_string()
-    }
-
-    pub fn completion(typst_completion: &TypstCompletion, lsp_replace: LspRange) -> LspCompletion {
-        let typst_snippet = typst_completion
-            .apply
-            .as_ref()
-            .unwrap_or(&typst_completion.label);
-        let lsp_snippet = snippet(typst_snippet);
-        let text_edit = CompletionTextEdit::Edit(TextEdit::new(lsp_replace, lsp_snippet));
-
-        LspCompletion {
-            label: typst_completion.label.to_string(),
-            kind: Some(completion_kind(typst_completion.kind.clone())),
-            detail: typst_completion.detail.as_ref().map(String::from),
-            sort_text: typst_completion.sort_text.as_ref().map(String::from),
-            label_details: typst_completion.label_detail.as_ref().map(|e| {
-                CompletionItemLabelDetails {
-                    detail: None,
-                    description: Some(e.to_string()),
-                }
-            }),
-            text_edit: Some(text_edit),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            command: typst_completion.command.as_ref().map(|c| Command {
-                command: c.to_string(),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }
-    }
-
     pub fn tooltip(typst_tooltip: &TypstTooltip) -> LspHoverContents {
         let lsp_marked_string = match typst_tooltip {
             TypstTooltip::Text(text) => MarkedString::String(text.to_string()),
@@ -338,41 +263,6 @@ pub mod typst_to_lsp {
             }),
         };
         LspHoverContents::Scalar(lsp_marked_string)
-    }
-
-    pub fn param_info(typst_param_info: &TypstParamInfo) -> LspParamInfo {
-        LspParamInfo {
-            label: lsp_types::ParameterLabel::Simple(typst_param_info.name.to_owned()),
-            documentation: param_info_to_docs(typst_param_info),
-        }
-    }
-
-    pub fn param_info_to_label(typst_param_info: &TypstParamInfo) -> String {
-        format!(
-            "{}: {}",
-            typst_param_info.name,
-            cast_info_to_label(&typst_param_info.input)
-        )
-    }
-
-    fn param_info_to_docs(typst_param_info: &TypstParamInfo) -> Option<Documentation> {
-        if !typst_param_info.docs.is_empty() {
-            Some(Documentation::MarkupContent(MarkupContent {
-                value: typst_param_info.docs.to_owned(),
-                kind: MarkupKind::Markdown,
-            }))
-        } else {
-            None
-        }
-    }
-
-    pub fn cast_info_to_label(cast_info: &CastInfo) -> String {
-        match cast_info {
-            CastInfo::Any => "any".to_owned(),
-            CastInfo::Value(value, _) => value.repr().to_string(),
-            CastInfo::Type(ty) => ty.to_string(),
-            CastInfo::Union(options) => options.iter().map(cast_info_to_label).join(" "),
-        }
     }
 }
 
