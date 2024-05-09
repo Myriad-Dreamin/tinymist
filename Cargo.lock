@@ -3879,7 +3879,6 @@ dependencies = [
  "indexmap 2.2.6",
  "insta",
  "itertools 0.12.1",
- "lazy_static",
  "log",
  "lsp-types",
  "once_cell",
