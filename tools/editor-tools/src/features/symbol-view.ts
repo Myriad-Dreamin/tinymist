@@ -297,6 +297,10 @@ const CATEGORY_INFO: SymbolCategory[] = [
     name: "Greek Letters",
   },
   {
+    value: "controlOrSpace",
+    name: "Control Or Space",
+  },
+  {
     value: "hebrew",
     name: "Hebrew Letters",
   },
@@ -327,6 +331,10 @@ const CATEGORY_INFO: SymbolCategory[] = [
   {
     value: "misc",
     name: "Miscellaneous",
+  },
+  {
+    value: "emoji",
+    name: "Emoji",
   },
   {
     value: "letterStyle",
@@ -371,53 +379,58 @@ export const SymbolPicker = () => {
   });
 
   const SymbolCell = (sym: SymbolItem) => {
-    let maskInfo = "";
+    let maskInfo = div();
 
     let symCellWidth = "36px";
 
     if (sym.glyphs?.length && sym.glyphs[0].shape) {
-      let fontSelected = symInfo.val.fontSelects![sym.glyphs[0].fontIndex];
-      let primaryGlyph = sym.glyphs[0];
-      const path = symbolDefs.querySelector(`#${primaryGlyph.shape}`);
+      setTimeout(() => {
+        let fontSelected = symInfo.val.fontSelects![sym.glyphs[0].fontIndex];
+        let primaryGlyph = sym.glyphs[0];
+        const path = symbolDefs.querySelector(`#${primaryGlyph.shape}`);
 
-      const diff = (min?: number, max?: number) => {
-        if (min === undefined || max === undefined) return 0;
-        return Math.abs(max - min);
-      };
+        const diff = (min?: number, max?: number) => {
+          if (min === undefined || max === undefined) return 0;
+          return Math.abs(max - min);
+        };
 
-      const bboxXWidth = diff(primaryGlyph.xMin, primaryGlyph.xMax);
-      let xWidth = Math.max(
-        bboxXWidth,
-        primaryGlyph.xAdvance || fontSelected.unitsPerEm
-      );
+        const bboxXWidth = diff(primaryGlyph.xMin, primaryGlyph.xMax);
+        let xWidth = Math.max(
+          bboxXWidth,
+          primaryGlyph.xAdvance || fontSelected.unitsPerEm
+        );
 
-      let yReal = diff(primaryGlyph.yMin, primaryGlyph.yMax);
-      let yGlobal = primaryGlyph.yAdvance || fontSelected.unitsPerEm;
-      let yWidth = Math.max(yReal, yGlobal);
+        let yReal = diff(primaryGlyph.yMin, primaryGlyph.yMax);
+        let yGlobal = primaryGlyph.yAdvance || fontSelected.unitsPerEm;
+        let yWidth = Math.max(yReal, yGlobal);
 
-      let symWidth;
-      let symHeight;
-      if (xWidth < yWidth) {
-        // = `${(primaryGlyph.xAdvance / fontSelected.unitsPerEm) * 33}px`;
-        symWidth = `${(xWidth / yWidth) * 33}px`;
-        symHeight = "33px";
-      } else {
-        symWidth = "33px";
-        symHeight = `${(yWidth / xWidth) * 33}px`;
-      }
+        let symWidth;
+        let symHeight;
+        if (xWidth < yWidth) {
+          // = `${(primaryGlyph.xAdvance / fontSelected.unitsPerEm) * 33}px`;
+          symWidth = `${(xWidth / yWidth) * 33}px`;
+          symHeight = "33px";
+        } else {
+          symWidth = "33px";
+          symHeight = `${(yWidth / xWidth) * 33}px`;
+        }
 
-      let yShift =
-        yReal >= yGlobal
-          ? Math.abs(primaryGlyph.yMax || 0)
-          : (Math.abs(primaryGlyph.yMax || 0) + yWidth) / 2;
+        let yShift =
+          yReal >= yGlobal
+            ? Math.abs(primaryGlyph.yMax || 0)
+            : (Math.abs(primaryGlyph.yMax || 0) + yWidth) / 2;
 
-      // centering-x the symbol
-      let xShift = -(primaryGlyph.xMin || 0) + (xWidth - bboxXWidth) / 2;
+        // centering-x the symbol
+        let xShift = -(primaryGlyph.xMin || 0) + (xWidth - bboxXWidth) / 2;
 
-      // translate(0, ${fontSelected.ascender * fontSelected.unitsPerEm})
-      const imageData = `<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="${symWidth}" height="${symHeight}" viewBox="0 0 ${xWidth} ${yWidth}" xmlns="http://www.w3.org/2000/svg" ><g transform="translate(${xShift}, ${yShift}) scale(1, -1)">${path?.outerHTML || ""}</g></svg>`;
-      // console.log(sym.typstCode, div({ innerHTML: imageData }));
-      maskInfo = `width: ${symWidth}; height: ${symHeight}; -webkit-mask-image: url('data:image/svg+xml;utf8,${encodeURIComponent(imageData)}'); -webkit-mask-size: auto ${symHeight}; -webkit-mask-repeat: no-repeat; transition: background-color 200ms; background-color: currentColor;`;
+        // translate(0, ${fontSelected.ascender * fontSelected.unitsPerEm})
+        const imageData = `<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="${symWidth}" height="${symHeight}" viewBox="0 0 ${xWidth} ${yWidth}" xmlns="http://www.w3.org/2000/svg" ><g transform="translate(${xShift}, ${yShift}) scale(1, -1)">${path?.outerHTML || ""}</g></svg>`;
+        // console.log(sym.typstCode, div({ innerHTML: imageData }));
+        maskInfo.setAttribute(
+          "style",
+          `width: ${symWidth}; height: ${symHeight}; -webkit-mask-image: url('data:image/svg+xml;utf8,${encodeURIComponent(imageData)}'); -webkit-mask-size: auto ${symHeight}; -webkit-mask-repeat: no-repeat; transition: background-color 200ms; background-color: currentColor;`
+        );
+      }, 1);
     }
 
     return div(
@@ -445,7 +458,7 @@ export const SymbolPicker = () => {
           });
         },
       },
-      maskInfo ? div({ style: maskInfo }) : null
+      maskInfo
     );
   };
 
