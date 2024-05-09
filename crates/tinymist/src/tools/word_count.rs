@@ -9,6 +9,7 @@ use unicode_script::{Script, UnicodeScript};
 
 /// Words count for a document.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WordsCount {
     /// Number of words.
     pub words: usize,
@@ -18,7 +19,6 @@ pub struct WordsCount {
     /// Multiple consecutive spaces are counted as one.
     pub spaces: usize,
     /// Number of CJK characters.
-    #[serde(rename = "cjkChars")]
     pub cjk_chars: usize,
 }
 

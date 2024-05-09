@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::bail;
 use itertools::Itertools;
@@ -11,13 +11,12 @@ use tokio::sync::mpsc;
 use typst::util::Deferred;
 use typst_ts_core::ImmutPath;
 
-use crate::actor::cluster::EditorActor;
+use crate::actor::editor::EditorActor;
 use crate::compiler_init::CompileConfig;
 use crate::harness::LspHost;
+use crate::utils::{try_, try_or};
 use crate::world::{ImmutDict, SharedFontResolver};
-use crate::{
-    invalid_params, CompileFontOpts, LspResult, TypstLanguageServer, TypstLanguageServerArgs,
-};
+use crate::{invalid_params, CompileFontOpts, LspResult, TypstLanguageServer};
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
@@ -68,13 +67,10 @@ pub enum SemanticTokensMode {
 pub struct CompileExtraOpts {
     /// The root directory for compilation routine.
     pub root_dir: Option<PathBuf>,
-
     /// Path to entry
     pub entry: Option<ImmutPath>,
-
     /// Additional input arguments to compile the entry file.
     pub inputs: ImmutDict,
-
     /// will remove later
     pub font_paths: Vec<PathBuf>,
 }
@@ -153,38 +149,14 @@ impl Config {
     /// # Errors
     /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
-        let semantic_tokens = update
-            .get("semanticTokens")
-            .map(SemanticTokensMode::deserialize)
-            .and_then(Result::ok);
-        if let Some(semantic_tokens) = semantic_tokens {
-            self.semantic_tokens = semantic_tokens;
-        }
-
-        let formatter = update
-            .get("formatterMode")
-            .map(FormatterMode::deserialize)
-            .and_then(Result::ok);
-        if let Some(formatter) = formatter {
-            self.formatter = formatter;
-        }
-
-        let print_width = update
-            .get("formatterPrintWidth")
-            .and_then(|e| serde_json::from_value::<u32>(e.clone()).ok());
-        if let Some(formatter) = print_width {
-            self.formatter_print_width = formatter;
-        }
-
+        try_(|| SemanticTokensMode::deserialize(update.get("semanticTokens")?).ok())
+            .inspect(|v| self.semantic_tokens = *v);
+        try_(|| FormatterMode::deserialize(update.get("formatterMode")?).ok())
+            .inspect(|v| self.formatter = *v);
+        try_(|| u32::deserialize(update.get("formatterPrintWidth")?).ok())
+            .inspect(|v| self.formatter_print_width = *v);
         self.compile.update_by_map(update)?;
-        self.validate()?;
-        Ok(())
-    }
-
-    fn validate(&self) -> anyhow::Result<()> {
-        self.compile.validate()?;
-
-        Ok(())
+        self.compile.validate()
     }
 }
 
@@ -198,11 +170,11 @@ pub struct ConstConfig {
     /// Allow dynamic registration of configuration changes.
     pub cfg_change_registration: bool,
     /// Allow dynamic registration of semantic tokens.
-    pub sema_tokens_dynamic_registration: bool,
+    pub tokens_dynamic_registration: bool,
     /// Allow overlapping tokens.
-    pub sema_tokens_overlapping_token_support: bool,
+    pub tokens_overlapping_token_support: bool,
     /// Allow multiline tokens.
-    pub sema_tokens_multiline_token_support: bool,
+    pub tokens_multiline_token_support: bool,
     /// Allow line folding on documents.
     pub doc_line_folding_only: bool,
     /// Allow dynamic registration of document formatting.
@@ -211,16 +183,12 @@ pub struct ConstConfig {
 
 impl From<&InitializeParams> for ConstConfig {
     fn from(params: &InitializeParams) -> Self {
-        const DEFAULT_ENCODING: &[PositionEncodingKind; 1] = &[PositionEncodingKind::UTF16];
+        const DEFAULT_ENCODING: &[PositionEncodingKind] = &[PositionEncodingKind::UTF16];
 
         let position_encoding = {
-            let encodings = params
-                .capabilities
-                .general
-                .as_ref()
-                .and_then(|general| general.position_encodings.as_ref())
-                .map(|encodings| encodings.as_slice())
-                .unwrap_or(DEFAULT_ENCODING);
+            let general = params.capabilities.general.as_ref();
+            let encodings = try_(|| Some(general?.position_encodings.as_ref()?.as_slice()));
+            let encodings = encodings.unwrap_or(DEFAULT_ENCODING);
 
             if encodings.contains(&PositionEncodingKind::UTF8) {
                 PositionEncoding::Utf8
@@ -229,42 +197,20 @@ impl From<&InitializeParams> for ConstConfig {
             }
         };
 
-        let workspace_caps = params.capabilities.workspace.as_ref();
-        let supports_config_change_registration = workspace_caps
-            .and_then(|workspace| workspace.configuration)
-            .unwrap_or(false);
-
-        let doc_caps = params.capabilities.text_document.as_ref();
-        let folding_caps = doc_caps.and_then(|doc| doc.folding_range.as_ref());
-        let line_folding_only = folding_caps
-            .and_then(|folding| folding.line_folding_only)
-            .unwrap_or(true);
-
-        let semantic_tokens_caps = doc_caps.and_then(|doc| doc.semantic_tokens.as_ref());
-        let supports_semantic_tokens_dynamic_registration = semantic_tokens_caps
-            .and_then(|semantic_tokens| semantic_tokens.dynamic_registration)
-            .unwrap_or(false);
-        let supports_semantic_tokens_overlapping_token_support = semantic_tokens_caps
-            .and_then(|semantic_tokens| semantic_tokens.overlapping_token_support)
-            .unwrap_or(false);
-        let supports_semantic_tokens_multiline_token_support = semantic_tokens_caps
-            .and_then(|semantic_tokens| semantic_tokens.multiline_token_support)
-            .unwrap_or(false);
-
-        let formatter_caps = doc_caps.and_then(|doc| doc.formatting.as_ref());
-        let supports_document_formatting_dynamic_registration = formatter_caps
-            .and_then(|formatting| formatting.dynamic_registration)
-            .unwrap_or(false);
+        let workspace = params.capabilities.workspace.as_ref();
+        let doc = params.capabilities.text_document.as_ref();
+        let sema = try_(|| doc?.semantic_tokens.as_ref());
+        let fold = try_(|| doc?.folding_range.as_ref());
+        let format = try_(|| doc?.formatting.as_ref());
 
         Self {
             position_encoding,
-            sema_tokens_dynamic_registration: supports_semantic_tokens_dynamic_registration,
-            sema_tokens_overlapping_token_support:
-                supports_semantic_tokens_overlapping_token_support,
-            sema_tokens_multiline_token_support: supports_semantic_tokens_multiline_token_support,
-            doc_fmt_dynamic_registration: supports_document_formatting_dynamic_registration,
-            cfg_change_registration: supports_config_change_registration,
-            doc_line_folding_only: line_folding_only,
+            cfg_change_registration: try_or(|| workspace?.configuration, false),
+            tokens_dynamic_registration: try_or(|| sema?.dynamic_registration, false),
+            tokens_overlapping_token_support: try_or(|| sema?.overlapping_token_support, false),
+            tokens_multiline_token_support: try_or(|| sema?.multiline_token_support, false),
+            doc_line_folding_only: try_or(|| fold?.line_folding_only, true),
+            doc_fmt_dynamic_registration: try_or(|| format?.dynamic_registration, false),
         }
     }
 }
@@ -299,19 +245,14 @@ impl Init {
 
         // Initialize configurations
         let cc = ConstConfig::from(&params);
-        info!(
-            "initialized with const_config {const_config:?}",
-            const_config = cc
-        );
+        info!("initialized with const_config {cc:?}");
         let mut config = Config {
             compile: CompileConfig {
                 roots: match params.workspace_folders.as_ref() {
                     Some(roots) => roots
                         .iter()
-                        .map(|root| &root.uri)
-                        .map(Url::to_file_path)
-                        .collect::<Result<Vec<_>, _>>()
-                        .unwrap(),
+                        .filter_map(|root| root.uri.to_file_path().ok())
+                        .collect::<Vec<_>>(),
                     #[allow(deprecated)] // `params.root_path` is marked as deprecated
                     None => params
                         .root_uri
@@ -352,15 +293,15 @@ impl Init {
         };
 
         // Bootstrap server
-        let (diag_tx, diag_rx) = mpsc::unbounded_channel();
+        let (editor_tx, editor_rx) = mpsc::unbounded_channel();
 
-        let mut service = TypstLanguageServer::new(TypstLanguageServerArgs {
-            client: self.host.clone(),
-            const_config: cc.clone(),
-            diag_tx,
-            handle: self.handle.clone(),
+        let mut service = TypstLanguageServer::new(
+            self.host.clone(),
+            cc.clone(),
+            editor_tx,
             font,
-        });
+            self.handle.clone(),
+        );
 
         if let Err(err) = res {
             return (service, Err(err));
@@ -373,14 +314,11 @@ impl Init {
         service.run_format_thread();
         service.run_user_action_thread();
 
-        let cluster_actor = EditorActor {
-            host: self.host.clone(),
-            diag_rx,
-            diagnostics: HashMap::new(),
-            affect_map: HashMap::new(),
-            published_primary: false,
-            notify_compile_status: service.config.compile.notify_compile_status,
-        };
+        let editor_actor = EditorActor::new(
+            self.host.clone(),
+            editor_rx,
+            service.config.compile.notify_compile_status,
+        );
 
         let fallback = service.config.compile.determine_default_entry_path();
         let primary = service.server(
@@ -394,14 +332,14 @@ impl Init {
         service.primary.compiler = Some(primary);
 
         // Run the cluster in the background after we referencing it
-        self.handle.spawn(cluster_actor.run());
+        self.handle.spawn(editor_actor.run());
 
         // Respond to the host (LSP client)
 
         // Register these capabilities statically if the client does not support dynamic
         // registration
         let semantic_tokens_provider = match service.config.semantic_tokens {
-            SemanticTokensMode::Enable if !cc.sema_tokens_dynamic_registration => {
+            SemanticTokensMode::Enable if !cc.tokens_dynamic_registration => {
                 Some(get_semantic_tokens_options().into())
             }
             _ => None,

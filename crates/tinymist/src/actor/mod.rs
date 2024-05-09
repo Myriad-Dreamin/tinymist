@@ -1,18 +1,18 @@
 //! Bootstrap actors for Tinymist.
 
-pub mod cluster;
-mod formatting;
-pub mod render;
+pub mod editor;
+pub mod export;
+pub mod format;
 pub mod typ_client;
 pub mod typ_server;
-mod user_action;
+pub mod user_action;
 
 use std::path::Path;
 
 use tinymist_query::analysis::Analysis;
 use tinymist_query::ExportKind;
 use tinymist_render::PeriscopeRenderer;
-use tokio::sync::{broadcast, watch};
+use tokio::sync::{mpsc, watch};
 use typst::util::Deferred;
 use typst_ts_compiler::{
     service::CompileDriverImpl,
@@ -21,8 +21,8 @@ use typst_ts_compiler::{
 use typst_ts_core::config::compiler::EntryState;
 
 use self::{
-    formatting::run_format_thread,
-    render::{ExportActor, ExportConfig},
+    export::{ExportActor, ExportConfig},
+    format::run_format_thread,
     typ_client::{CompileClientActor, CompileDriver, CompileHandler},
     typ_server::CompileServerActor,
     user_action::run_user_action_thread,
@@ -30,11 +30,8 @@ use self::{
 use crate::{
     compiler::CompileServer,
     world::{ImmutDict, LspWorld, LspWorldBuilder},
-    ExportMode, TypstLanguageServer,
+    TypstLanguageServer,
 };
-
-pub use formatting::{FormattingConfig, FormattingRequest};
-pub use user_action::{UserActionRequest, UserActionTraceRequest};
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
 
@@ -47,41 +44,25 @@ impl CompileServer {
         snapshot: FileChangeSet,
     ) -> CompileClientActor {
         let (doc_tx, doc_rx) = watch::channel(None);
-        let (render_tx, _) = broadcast::channel(10);
-
-        let config = ExportConfig {
-            substitute_pattern: self.config.output_path.clone(),
-            entry: entry.clone(),
-            mode: self.config.export_pdf,
-        };
+        let (export_tx, export_rx) = mpsc::unbounded_channel();
 
         // Run Export actors before preparing cluster to avoid loss of events
         self.handle.spawn(
             ExportActor::new(
                 editor_group.clone(),
-                doc_rx.clone(),
-                self.diag_tx.clone(),
-                render_tx.subscribe(),
-                config.clone(),
+                doc_rx,
+                self.editor_tx.clone(),
+                export_rx,
+                ExportConfig {
+                    substitute_pattern: self.config.output_path.clone(),
+                    entry: entry.clone(),
+                    mode: self.config.export_pdf,
+                },
                 ExportKind::Pdf,
+                self.config.notify_compile_status,
             )
             .run(),
         );
-        if self.config.notify_compile_status {
-            let mut config = config;
-            config.mode = ExportMode::OnType;
-            self.handle.spawn(
-                ExportActor::new(
-                    editor_group.clone(),
-                    doc_rx.clone(),
-                    self.diag_tx.clone(),
-                    render_tx.subscribe(),
-                    config,
-                    ExportKind::WordCount,
-                )
-                .run(),
-            );
-        }
 
         // Create the server
         let inner = Deferred::new({
@@ -91,8 +72,8 @@ impl CompileServer {
                 inner: std::sync::Arc::new(parking_lot::Mutex::new(None)),
                 diag_group: editor_group.clone(),
                 doc_tx,
-                render_tx: render_tx.clone(),
-                editor_tx: self.diag_tx.clone(),
+                export_tx: export_tx.clone(),
+                editor_tx: self.editor_tx.clone(),
             };
 
             let position_encoding = self.const_config().position_encoding;
@@ -138,7 +119,7 @@ impl CompileServer {
             }
         });
 
-        CompileClientActor::new(editor_group, self.config.clone(), entry, inner, render_tx)
+        CompileClientActor::new(editor_group, self.config.clone(), entry, inner, export_tx)
     }
 }
 
@@ -161,24 +142,23 @@ impl TypstLanguageServer {
         }
 
         let (tx_req, rx_req) = crossbeam_channel::unbounded();
-        self.format_thread = Some(tx_req.clone());
+        self.format_thread = Some(tx_req);
 
         let client = self.client.clone();
         let mode = self.config.formatter;
         let enc = self.const_config.position_encoding;
-        std::thread::spawn(move || {
-            run_format_thread(FormattingConfig { mode, width: 120 }, rx_req, client, enc)
-        });
+        let config = format::FormatConfig { mode, width: 120 };
+        std::thread::spawn(move || run_format_thread(config, rx_req, client, enc));
     }
 
     pub fn run_user_action_thread(&mut self) {
-        if self.user_action_threads.is_some() {
+        if self.user_action_thread.is_some() {
             log::error!("user action threads are already started");
             return;
         }
 
         let (tx_req, rx_req) = crossbeam_channel::unbounded();
-        self.user_action_threads = Some(tx_req.clone());
+        self.user_action_thread = Some(tx_req);
 
         let client = self.client.clone();
         std::thread::spawn(move || run_user_action_thread(rx_req, client));

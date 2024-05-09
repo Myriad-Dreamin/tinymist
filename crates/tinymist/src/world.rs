@@ -26,30 +26,24 @@ pub struct CompileOpts {
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CompileOnceOpts {
     /// The root directory for compilation routine.
-    #[serde(rename = "rootDir")]
     pub root_dir: PathBuf,
-
     /// Path to entry
     pub entry: PathBuf,
-
     /// Additional input arguments to compile the entry file.
     pub inputs: TypstDict,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CompileFontOpts {
     /// Path to font profile for cache
-    #[serde(rename = "fontProfileCachePath")]
     pub font_profile_cache_path: PathBuf,
-
     /// will remove later
-    #[serde(rename = "fontPaths")]
     pub font_paths: Vec<PathBuf>,
-
     /// Exclude system font paths
-    #[serde(rename = "noSystemFonts")]
     pub no_system_fonts: bool,
 }
 

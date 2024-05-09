@@ -1,66 +1,63 @@
+//! The actor that handles formatting.
+
+use std::iter::zip;
+
 use lsp_server::RequestId;
 use lsp_types::TextEdit;
 use tinymist_query::{typst_to_lsp, PositionEncoding};
 use typst::syntax::Source;
 
-use crate::{result_to_response_, FormatterMode, LspHost, LspResult, TypstLanguageServer};
+use crate::{result_to_response, FormatterMode, LspHost, LspResult, TypstLanguageServer};
 
 #[derive(Debug, Clone)]
-pub struct FormattingConfig {
+pub struct FormatConfig {
     pub mode: FormatterMode,
     pub width: u32,
 }
 
-pub enum FormattingRequest {
-    ChangeConfig(FormattingConfig),
-    Formatting((RequestId, Source)),
+pub enum FormatRequest {
+    ChangeConfig(FormatConfig),
+    Format(RequestId, Source),
 }
 
 pub fn run_format_thread(
-    init_c: FormattingConfig,
-    rx_req: crossbeam_channel::Receiver<FormattingRequest>,
+    config: FormatConfig,
+    format_rx: crossbeam_channel::Receiver<FormatRequest>,
     client: LspHost<TypstLanguageServer>,
     position_encoding: PositionEncoding,
 ) {
     type FmtFn = Box<dyn Fn(Source) -> LspResult<Option<Vec<TextEdit>>>>;
-    let compile = |c: FormattingConfig| -> FmtFn {
+    let compile = |c: FormatConfig| -> FmtFn {
         log::info!("formatting thread with config: {c:#?}");
         match c.mode {
             FormatterMode::Typstyle => {
                 let cw = c.width as usize;
-                let f: FmtFn = Box::new(move |e: Source| {
+                Box::new(move |e: Source| {
                     let res = typstyle_core::Typstyle::new_with_src(e.clone(), cw).pretty_print();
                     Ok(calc_diff(e, res, position_encoding))
-                });
-                f
+                })
             }
             FormatterMode::Typstfmt => {
                 let config = typstfmt_lib::Config {
                     max_line_length: c.width as usize,
                     ..typstfmt_lib::Config::default()
                 };
-                let f: FmtFn = Box::new(move |e: Source| {
+                Box::new(move |e: Source| {
                     let res = typstfmt_lib::format(e.text(), config);
                     Ok(calc_diff(e, res, position_encoding))
-                });
-                f
+                })
             }
-            FormatterMode::Disable => {
-                let f: FmtFn = Box::new(|_| Ok(None));
-                f
-            }
+            FormatterMode::Disable => Box::new(|_| Ok(None)),
         }
     };
 
-    let mut f: FmtFn = compile(init_c);
-    while let Ok(req) = rx_req.recv() {
+    let mut f: FmtFn = compile(config);
+    while let Ok(req) = format_rx.recv() {
         match req {
-            FormattingRequest::ChangeConfig(c) => f = compile(c),
-            FormattingRequest::Formatting((id, source)) => {
+            FormatRequest::ChangeConfig(c) => f = compile(c),
+            FormatRequest::Format(id, source) => {
                 let res = f(source);
-                if let Ok(response) = result_to_response_(id, res) {
-                    client.respond(response);
-                }
+                client.respond(result_to_response(id, res));
             }
         }
     }
@@ -74,10 +71,7 @@ fn calc_diff(prev: Source, next: String, encoding: PositionEncoding) -> Option<V
     let old = prev.text();
     let new = &next;
 
-    let mut prefix = old
-        .as_bytes()
-        .iter()
-        .zip(new.as_bytes())
+    let mut prefix = zip(old.bytes(), new.bytes())
         .take_while(|(x, y)| x == y)
         .count();
 
@@ -89,11 +83,7 @@ fn calc_diff(prev: Source, next: String, encoding: PositionEncoding) -> Option<V
         prefix -= 1;
     }
 
-    let mut suffix = old[prefix..]
-        .as_bytes()
-        .iter()
-        .zip(new[prefix..].as_bytes())
-        .rev()
+    let mut suffix = zip(old[prefix..].bytes().rev(), new[prefix..].bytes().rev())
         .take_while(|(x, y)| x == y)
         .count();
 

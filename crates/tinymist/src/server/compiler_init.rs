@@ -12,15 +12,15 @@ use tinymist_query::PositionEncoding;
 use tinymist_render::PeriscopeArgs;
 use tokio::sync::mpsc;
 use typst::foundations::IntoValue;
-use typst::syntax::FileId;
-use typst::syntax::VirtualPath;
+use typst::syntax::{FileId, VirtualPath};
 use typst::util::Deferred;
 use typst_ts_core::config::compiler::EntryState;
 use typst_ts_core::{ImmutPath, TypstDict};
 
-use crate::actor::cluster::CompileClusterRequest;
-use crate::compiler::{CompileServer, CompileServerArgs};
+use crate::actor::editor::EditorRequest;
+use crate::compiler::CompileServer;
 use crate::harness::LspDriver;
+use crate::utils::{try_, try_or_default};
 use crate::world::{ImmutDict, SharedFontResolver};
 use crate::{CompileExtraOpts, CompileFontOpts, ExportMode, LspHost};
 
@@ -124,68 +124,29 @@ impl CompileConfig {
     /// # Errors
     /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
-        if let Some(JsonValue::String(output_path)) = update.get("outputPath") {
-            output_path.clone_into(&mut self.output_path);
-        } else {
-            self.output_path = String::new();
-        }
-
-        let export_pdf = update
-            .get("exportPdf")
-            .map(ExportMode::deserialize)
-            .and_then(Result::ok);
-        if let Some(export_pdf) = export_pdf {
-            self.export_pdf = export_pdf;
-        } else {
-            self.export_pdf = ExportMode::default();
-        }
-
-        let root_path = update.get("rootPath");
-        if let Some(root_path) = root_path {
-            if root_path.is_null() {
-                self.root_path = None;
-            }
-            if let Some(root_path) = root_path.as_str().map(PathBuf::from) {
-                self.root_path = Some(root_path);
-            }
-        } else {
-            self.root_path = None;
-        }
-
-        let compile_status = update.get("compileStatus").and_then(|x| x.as_str());
-        if let Some(word_count) = compile_status {
-            if !matches!(word_count, "enable" | "disable") {
-                bail!("compileStatus must be either 'enable' or 'disable'");
-            }
-        }
-        self.notify_compile_status = compile_status.map_or(false, |e| e != "disable");
-
-        let preferred_theme = update.get("preferredTheme").and_then(|x| x.as_str());
-        self.preferred_theme = preferred_theme.map(str::to_owned);
+        self.output_path = try_or_default(|| Some(update.get("outputPath")?.as_str()?.to_owned()));
+        self.export_pdf = try_or_default(|| ExportMode::deserialize(update.get("exportPdf")?).ok());
+        self.root_path = try_(|| Some(update.get("rootPath")?.as_str()?.into()));
+        self.notify_compile_status = match try_(|| update.get("compileStatus")?.as_str()) {
+            Some("enable") => true,
+            Some("disable") | None => false,
+            _ => bail!("compileStatus must be either 'enable' or 'disable'"),
+        };
+        self.preferred_theme = try_(|| Some(update.get("preferredTheme")?.as_str()?.to_owned()));
 
         // periscope_args
-        let periscope_args = update.get("hoverPeriscope");
-        let periscope_args: Option<PeriscopeArgs> = match periscope_args {
+        self.periscope_args = match update.get("hoverPeriscope") {
             Some(serde_json::Value::String(e)) if e == "enable" => Some(PeriscopeArgs::default()),
             Some(serde_json::Value::Null | serde_json::Value::String(..)) | None => None,
             Some(periscope_args) => match serde_json::from_value(periscope_args.clone()) {
                 Ok(e) => Some(e),
-                Err(e) => {
-                    log::error!("failed to parse hoverPeriscope: {e}");
-                    return Ok(());
-                }
+                Err(e) => bail!("failed to parse hoverPeriscope: {e}"),
             },
         };
-        if let Some(mut periscope_args) = periscope_args {
-            if periscope_args.invert_color == "auto"
-                && self.preferred_theme.as_ref().is_some_and(|t| t == "dark")
-            {
-                "always".clone_into(&mut periscope_args.invert_color);
+        if let Some(args) = self.periscope_args.as_mut() {
+            if args.invert_color == "auto" && self.preferred_theme.as_deref() == Some("dark") {
+                args.invert_color = "always".to_owned();
             }
-
-            self.periscope_args = Some(periscope_args);
-        } else {
-            self.periscope_args = None;
         }
 
         'parse_extra_args: {
@@ -193,10 +154,7 @@ impl CompileConfig {
                 let typst_args: Vec<String> = match serde_json::from_value(typst_extra_args.clone())
                 {
                     Ok(e) => e,
-                    Err(e) => {
-                        log::error!("failed to parse typstExtraArgs: {e}");
-                        return Ok(());
-                    }
+                    Err(e) => bail!("failed to parse typstExtraArgs: {e}"),
                 };
 
                 let command = match CompileOnceArgs::try_parse_from(
@@ -229,9 +187,7 @@ impl CompileConfig {
         }
 
         self.has_default_entry_path = self.determine_default_entry_path().is_some();
-        self.validate()?;
-
-        Ok(())
+        self.validate()
     }
 
     pub fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
@@ -239,18 +195,8 @@ impl CompileConfig {
             return Some(path.as_path().into());
         }
 
-        if let Some(extras) = &self.typst_extra_args {
-            if let Some(root) = &extras.root_dir {
-                return Some(root.as_path().into());
-            }
-        }
-
-        if let Some(path) = &self
-            .typst_extra_args
-            .as_ref()
-            .and_then(|x| x.root_dir.clone())
-        {
-            return Some(path.as_path().into());
+        if let Some(root) = try_(|| self.typst_extra_args.as_ref()?.root_dir.as_ref()) {
+            return Some(root.as_path().into());
         }
 
         if let Some(entry) = entry {
@@ -277,15 +223,15 @@ impl CompileConfig {
     }
 
     pub fn determine_default_entry_path(&self) -> Option<ImmutPath> {
-        self.typst_extra_args.as_ref().and_then(|e| {
-            if let Some(e) = &e.entry {
-                if e.is_relative() {
-                    let root = self.determine_root(None)?;
-                    return Some(root.join(e).as_path().into());
-                }
+        let extras = self.typst_extra_args.as_ref()?;
+        // todo: pre-compute this when updating config
+        if let Some(entry) = &extras.entry {
+            if entry.is_relative() {
+                let root = self.determine_root(None)?;
+                return Some(root.join(entry).as_path().into());
             }
-            e.entry.clone()
-        })
+        }
+        extras.entry.clone()
     }
 
     pub fn determine_entry(&self, entry: Option<ImmutPath>) -> EntryState {
@@ -370,7 +316,7 @@ impl Default for CompilerConstConfig {
 pub struct CompileInit {
     pub handle: tokio::runtime::Handle,
     pub font: CompileFontOpts,
-    pub diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
+    pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -410,10 +356,10 @@ impl LspDriver for CompileInit {
             Deferred::new(|| SharedFontResolver::new(opts).expect("failed to create font book"))
         };
 
-        let args = CompileServerArgs {
+        let mut service = CompileServer::new(
             client,
             compile_config,
-            const_config: CompilerConstConfig {
+            CompilerConstConfig {
                 position_encoding: params
                     .position_encoding
                     .map(|x| match x.as_str() {
@@ -422,12 +368,10 @@ impl LspDriver for CompileInit {
                     })
                     .unwrap_or_default(),
             },
-            diag_tx: self.diag_tx,
-            handle: self.handle,
+            self.editor_tx,
             font,
-        };
-
-        let mut service = CompileServer::new(args);
+            self.handle,
+        );
 
         let primary = service.server(
             "primary".to_owned(),
@@ -435,10 +379,9 @@ impl LspDriver for CompileInit {
             service.config.determine_inputs(),
             service.vfs_snapshot(),
         );
-        if service.compiler.is_some() {
+        if service.compiler.replace(primary).is_some() {
             panic!("primary already initialized");
         }
-        service.compiler = Some(primary);
 
         (service, Ok(()))
     }

@@ -3,9 +3,8 @@ use std::{collections::HashMap, path::Path, sync::Arc, time::Instant};
 
 use crossbeam_channel::{select, Receiver};
 use log::{error, info, warn};
-use lsp_server::{Notification, Request, ResponseError};
+use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response, ResponseError};
 use lsp_types::{notification::Notification as _, ExecuteCommandParams};
-use paste::paste;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{ExportKind, PageSelection};
@@ -15,7 +14,7 @@ use typst_ts_compiler::vfs::notify::FileChangeSet;
 use typst_ts_core::{config::compiler::DETACHED_ENTRY, ImmutPath};
 
 use crate::{
-    actor::{cluster::CompileClusterRequest, render::ExportConfig, typ_client::CompileClientActor},
+    actor::{editor::EditorRequest, export::ExportConfig, typ_client::CompileClientActor},
     compiler_init::{CompileConfig, CompilerConstConfig},
     harness::InitializedLspDriver,
     internal_error, invalid_params, method_not_found, run_query,
@@ -46,9 +45,7 @@ macro_rules! request_fn {
             const E: LspMethod<JsonValue> = |this, req| {
                 let req: <$desc as lsp_types::request::Request>::Params =
                     serde_json::from_value(req).unwrap(); // todo: soft unwrap
-                let res = this.$method(req)?;
-                let res = serde_json::to_value(res).unwrap(); // todo: soft unwrap
-                Ok(res)
+                this.$method(req)
             };
             E
         })
@@ -67,15 +64,6 @@ macro_rules! notify_fn {
             E
         })
     };
-}
-
-pub struct CompileServerArgs {
-    pub client: LspHost<CompileServer>,
-    pub compile_config: CompileConfig,
-    pub const_config: CompilerConstConfig,
-    pub diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
-    pub font: Deferred<SharedFontResolver>,
-    pub handle: tokio::runtime::Handle,
 }
 
 /// The object providing the language server functionality.
@@ -110,25 +98,23 @@ pub struct CompileServer {
     /// Source synchronized with client
     pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
     /// The diagnostics sender to send diagnostics to `crate::actor::cluster`.
-    pub diag_tx: mpsc::UnboundedSender<CompileClusterRequest>,
+    pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
     /// The compiler actor.
     pub compiler: Option<CompileClientActor>,
 }
 
 impl CompileServer {
-    pub fn new(args: CompileServerArgs) -> Self {
-        let CompileServerArgs {
-            client,
-            compile_config,
-            const_config,
-            diag_tx,
-            font,
-            handle,
-        } = args;
-
+    pub fn new(
+        client: LspHost<CompileServer>,
+        compile_config: CompileConfig,
+        const_config: CompilerConstConfig,
+        editor_tx: mpsc::UnboundedSender<EditorRequest>,
+        font: Deferred<SharedFontResolver>,
+        handle: tokio::runtime::Handle,
+    ) -> Self {
         CompileServer {
             client,
-            diag_tx,
+            editor_tx,
             shutdown_requested: false,
             config: compile_config,
             const_config,
@@ -210,7 +196,7 @@ impl CompileServer {
 
 #[derive(Debug)]
 enum Event {
-    Lsp(lsp_server::Message),
+    Lsp(Message),
 }
 
 impl fmt::Display for Event {
@@ -224,14 +210,11 @@ impl fmt::Display for Event {
 impl InitializedLspDriver for CompileServer {
     fn initialized(&mut self, _params: lsp_types::InitializedParams) {}
 
-    fn main_loop(
-        &mut self,
-        inbox: crossbeam_channel::Receiver<lsp_server::Message>,
-    ) -> anyhow::Result<()> {
+    fn main_loop(&mut self, inbox: crossbeam_channel::Receiver<Message>) -> anyhow::Result<()> {
         while let Some(event) = self.next_event(&inbox) {
             if matches!(
                 &event,
-                Event::Lsp(lsp_server::Message::Notification(Notification { method, .. }))
+                Event::Lsp(Message::Notification(Notification { method, .. }))
                 if method == lsp_types::notification::Exit::METHOD
             ) {
                 return Ok(());
@@ -245,7 +228,7 @@ impl InitializedLspDriver for CompileServer {
 }
 
 impl CompileServer {
-    fn next_event(&self, inbox: &Receiver<lsp_server::Message>) -> Option<Event> {
+    fn next_event(&self, inbox: &Receiver<Message>) -> Option<Event> {
         select! {
             recv(inbox) -> msg =>
                 msg.ok().map(Event::Lsp),
@@ -258,11 +241,9 @@ impl CompileServer {
         // let was_quiescent = self.is_quiescent();
         match event {
             Event::Lsp(msg) => match msg {
-                lsp_server::Message::Request(req) => self.on_new_request(loop_start, req),
-                lsp_server::Message::Notification(not) => self.on_notification(loop_start, not)?,
-                lsp_server::Message::Response(resp) => {
-                    self.client.clone().complete_request(self, resp)
-                }
+                Message::Request(req) => self.on_request(loop_start, req),
+                Message::Notification(not) => self.on_notification(loop_start, not)?,
+                Message::Response(resp) => self.client.clone().complete_request(self, resp),
             },
         }
         Ok(())
@@ -270,17 +251,13 @@ impl CompileServer {
 
     /// Registers and handles a request. This should only be called once per
     /// incoming request.
-    fn on_new_request(&mut self, request_received: Instant, req: Request) {
+    fn on_request(&mut self, request_received: Instant, req: Request) {
         self.client.register_request(&req, request_received);
-        self.on_request(req);
-    }
 
-    /// Handles a request.
-    fn on_request(&mut self, req: Request) {
         if self.shutdown_requested {
-            self.client.respond(lsp_server::Response::new_err(
+            self.client.respond(Response::new_err(
                 req.id.clone(),
-                lsp_server::ErrorCode::InvalidRequest as i32,
+                ErrorCode::InvalidRequest as i32,
                 "Shutdown already requested.".to_owned(),
             ));
             return;
@@ -298,12 +275,12 @@ impl CompileServer {
         }
 
         fn result_to_response(
-            id: lsp_server::RequestId,
+            id: RequestId,
             result: Result<JsonValue, ResponseError>,
-        ) -> Result<lsp_server::Response, Cancelled> {
+        ) -> Result<Response, Cancelled> {
             let res = match result {
-                Ok(resp) => lsp_server::Response::new_ok(id, resp),
-                Err(e) => lsp_server::Response::new_err(id, e.code, e.message),
+                Ok(resp) => Response::new_ok(id, resp),
+                Err(e) => Response::new_err(id, e.code, e.message),
             };
             Ok(res)
         }
@@ -404,7 +381,7 @@ impl CompileServer {
     }
 
     /// The entry point for the `workspace/executeCommand` request.
-    fn execute_command(&mut self, params: ExecuteCommandParams) -> LspResult<Option<JsonValue>> {
+    fn execute_command(&mut self, params: ExecuteCommandParams) -> LspResult<JsonValue> {
         let ExecuteCommandParams {
             command,
             arguments,
@@ -414,8 +391,7 @@ impl CompileServer {
             error!("asked to execute unknown command");
             return Err(method_not_found());
         };
-
-        Ok(Some(handler(self, arguments)?))
+        handler(self, arguments)
     }
 
     /// Export the current document as a PDF file.

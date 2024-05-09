@@ -1,4 +1,4 @@
-//! The typst actors running compilations.
+//! The actor that runs compilations.
 //!
 //! ```ascii
 //! ┌────────────────────────────────┐
@@ -32,7 +32,7 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use log::{error, info, trace};
 use parking_lot::Mutex;
 use tinymist_query::{
@@ -40,7 +40,7 @@ use tinymist_query::{
     DiagnosticsMap, ExportKind, ServerInfoResponse, VersionedDocument,
 };
 use tinymist_render::PeriscopeRenderer;
-use tokio::sync::{broadcast, mpsc, oneshot, watch};
+use tokio::sync::{mpsc, oneshot, watch};
 use typst::{
     diag::{PackageError, SourceDiagnostic, SourceResult},
     layout::Position,
@@ -60,12 +60,12 @@ use typst_ts_core::{
 };
 
 use super::{
-    cluster::{CompileClusterRequest, TinymistCompileStatusEnum},
-    render::ExportConfig,
+    editor::{EditorRequest, TinymistCompileStatusEnum},
+    export::ExportConfig,
     typ_server::{CompileClient as TsCompileClient, CompileServerActor},
 };
 use crate::{
-    actor::render::{OneshotRendering, PathVars, RenderActorRequest},
+    actor::export::ExportRequest,
     actor::typ_server::EntryStateExt,
     compiler_init::CompileConfig,
     tools::preview::{CompilationHandle, CompileStatus},
@@ -77,7 +77,7 @@ type CompileDriverInner = CompileDriverImpl<LspWorld>;
 type CompileService = CompileServerActor<CompileDriver>;
 type CompileClient = TsCompileClient<CompileService>;
 
-type EditorSender = mpsc::UnboundedSender<CompileClusterRequest>;
+type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
 pub struct CompileHandler {
     pub(super) diag_group: String,
@@ -86,7 +86,7 @@ pub struct CompileHandler {
     pub(super) inner: Arc<Mutex<Option<typst_preview::CompilationHandleImpl>>>,
 
     pub(super) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
-    pub(super) render_tx: broadcast::Sender<RenderActorRequest>,
+    pub(super) export_tx: mpsc::UnboundedSender<ExportRequest>,
     pub(super) editor_tx: EditorSender,
 }
 
@@ -101,12 +101,11 @@ impl CompilationHandle for CompileHandler {
     fn notify_compile(&self, res: Result<Arc<TypstDocument>, CompileStatus>) {
         if let Ok(doc) = res.clone() {
             let _ = self.doc_tx.send(Some(doc.clone()));
-            // todo: is it right that ignore zero broadcast receiver?
-            let _ = self.render_tx.send(RenderActorRequest::OnTyped);
+            let _ = self.export_tx.send(ExportRequest::OnTyped);
         }
 
         self.editor_tx
-            .send(CompileClusterRequest::Status(
+            .send(EditorRequest::Status(
                 self.diag_group.clone(),
                 if res.is_ok() {
                     TinymistCompileStatusEnum::CompileSuccess
@@ -125,10 +124,9 @@ impl CompilationHandle for CompileHandler {
 
 impl CompileHandler {
     fn push_diagnostics(&mut self, diagnostics: Option<DiagnosticsMap>) {
-        let res = self.editor_tx.send(CompileClusterRequest::Diag(
-            self.diag_group.clone(),
-            diagnostics,
-        ));
+        let res = self
+            .editor_tx
+            .send(EditorRequest::Diag(self.diag_group.clone(), diagnostics));
         if let Err(err) = res {
             error!("failed to send diagnostics: {err:#}");
         }
@@ -157,7 +155,7 @@ impl CompileMiddleware for CompileDriver {
     fn wrap_compile(&mut self, env: &mut CompileEnv) -> SourceResult<Arc<typst::model::Document>> {
         self.handler
             .editor_tx
-            .send(CompileClusterRequest::Status(
+            .send(EditorRequest::Status(
                 self.handler.diag_group.clone(),
                 TinymistCompileStatusEnum::Compiling,
             ))
@@ -217,11 +215,11 @@ impl CompileDriver {
 
         let Some(main) = w.main_id() else {
             error!("TypstActor: main file is not set");
-            return Err(anyhow!("main file is not set"));
+            bail!("main file is not set");
         };
         let Some(root) = w.entry.root() else {
             error!("TypstActor: root is not set");
-            return Err(anyhow!("root is not set"));
+            bail!("root is not set");
         };
         w.source(main).map_err(|err| {
             info!("TypstActor: failed to prepare main file: {err:?}");
@@ -277,7 +275,7 @@ pub struct CompileClientActor {
     pub config: CompileConfig,
     entry: EntryState,
     inner: Deferred<CompileClient>,
-    render_tx: broadcast::Sender<RenderActorRequest>,
+    export_tx: mpsc::UnboundedSender<ExportRequest>,
 }
 
 impl CompileClientActor {
@@ -286,14 +284,14 @@ impl CompileClientActor {
         config: CompileConfig,
         entry: EntryState,
         inner: Deferred<CompileClient>,
-        render_tx: broadcast::Sender<RenderActorRequest>,
+        export_tx: mpsc::UnboundedSender<ExportRequest>,
     ) -> Self {
         Self {
             diag_group,
             config,
             entry,
             inner,
-            render_tx,
+            export_tx,
         }
     }
 
@@ -364,8 +362,8 @@ impl CompileClientActor {
         })??;
 
         let entry = next_entry.clone();
-        let req = RenderActorRequest::ChangeExportPath(PathVars { entry });
-        self.render_tx.send(req).unwrap();
+        let req = ExportRequest::ChangeExportPath(entry);
+        let _ = self.export_tx.send(req);
 
         // todo: better way to trigger recompile
         let files = FileChangeSet::new_inserts(vec![]);
@@ -381,14 +379,13 @@ impl CompileClientActor {
     }
 
     pub(crate) fn change_export_pdf(&mut self, config: ExportConfig) {
+        let entry = self.entry.clone();
         let _ = self
-            .render_tx
-            .send(RenderActorRequest::ChangeConfig(ExportConfig {
-                substitute_pattern: config.substitute_pattern,
-                entry: self.entry.clone(),
-                mode: config.mode,
-            }))
-            .unwrap();
+            .export_tx
+            .send(ExportRequest::ChangeConfig(ExportConfig {
+                entry,
+                ..config
+            }));
     }
 
     pub fn clear_cache(&self) {
@@ -422,25 +419,16 @@ impl CompileClientActor {
         info!("CompileActor: on export: {}", path.display());
 
         let (tx, rx) = oneshot::channel();
-
-        let callback = Arc::new(Mutex::new(Some(tx)));
-        self.render_tx
-            .send(RenderActorRequest::Oneshot(OneshotRendering {
-                kind: Some(kind),
-                callback,
-            }))
-            .map_err(map_string_err("failed to send to sync_render"))?;
-
+        let _ = self.export_tx.send(ExportRequest::Oneshot(Some(kind), tx));
         let res: Option<PathBuf> = utils::threaded_receive(rx)?;
 
         info!("CompileActor: on export end: {path:?} as {res:?}");
-
         Ok(res)
     }
 
     pub fn on_save_export(&self, path: PathBuf) -> anyhow::Result<()> {
         info!("CompileActor: on save export: {}", path.display());
-        let _ = self.render_tx.send(RenderActorRequest::OnSaved(path));
+        let _ = self.export_tx.send(ExportRequest::OnSaved(path));
 
         Ok(())
     }

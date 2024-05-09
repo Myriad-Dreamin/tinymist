@@ -242,24 +242,28 @@ where
 
             // Wait for first events.
             'event_loop: while let Some(mut event) = self.steal_rx.blocking_recv() {
-                // Accumulate events, the order of processing which is critical.
                 let mut need_compile = false;
 
                 'accumulate: loop {
                     // Warp the logical clock by one.
                     self.logical_tick += 1;
 
+                    // If settle, stop the actor.
                     if let Interrupt::Settle(e) = event {
                         log::info!("CompileServerActor: requested stop");
                         e.send(()).ok();
                         break 'event_loop;
                     }
+
+                    // Ensure complied before executing tasks.
                     if matches!(event, Interrupt::Task(_)) && need_compile {
                         self.compile(&compiler_ack);
                         need_compile = false;
                     }
+
                     need_compile |= self.process(event, &compiler_ack);
 
+                    // Try to accumulate more events.
                     match self.steal_rx.try_recv() {
                         Ok(new_event) => event = new_event,
                         _ => break 'accumulate,

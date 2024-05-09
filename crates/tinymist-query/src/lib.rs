@@ -132,17 +132,15 @@ mod polymorphic {
     use super::*;
 
     #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
     pub enum PageSelection {
-        #[serde(rename = "first")]
         First,
-        #[serde(rename = "merged")]
         Merged,
     }
 
     #[derive(Debug, Clone)]
     pub enum ExportKind {
         Pdf,
-        WordCount,
         Svg { page: PageSelection },
         Png { page: PageSelection },
     }
@@ -151,7 +149,6 @@ mod polymorphic {
         pub fn extension(&self) -> &str {
             match self {
                 Self::Pdf => "pdf",
-                Self::WordCount => "txt",
                 Self::Svg { .. } => "svg",
                 Self::Png { .. } => "png",
             }
@@ -179,12 +176,11 @@ mod polymorphic {
     pub struct ServerInfoRequest {}
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
     pub struct ServerInfoResponse {
         pub root: Option<PathBuf>,
-        #[serde(rename = "fontPaths")]
         pub font_paths: Vec<PathBuf>,
         pub inputs: Dict,
-        #[serde(rename = "estimatedMemoryUsage")]
         pub estimated_memory_usage: HashMap<String, usize>,
     }
 

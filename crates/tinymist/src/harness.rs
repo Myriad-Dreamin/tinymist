@@ -1,17 +1,14 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use log::{info, trace, warn};
-use lsp_types::InitializedParams;
-use parking_lot::RwLock;
-use serde::{de::DeserializeOwned, Serialize};
-
+use anyhow::bail;
+use log::{error, info, trace, warn};
 use lsp_server::{Connection, Message, Response};
-
 use lsp_types::notification::PublishDiagnostics;
 use lsp_types::request::{RegisterCapability, UnregisterCapability};
 use lsp_types::*;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
+use serde::{de::DeserializeOwned, Serialize};
 
 // Enforces drop order
 pub struct Handle<H, C> {
@@ -55,7 +52,7 @@ impl<S> LspHost<S> {
         let mut req_queue = self.req_queue.lock();
         let sender = self.sender.read();
         let Some(sender) = sender.as_ref() else {
-            warn!("closed connection, failed to send request");
+            warn!("failed to send request: connection closed");
             return;
         };
         let request = req_queue
@@ -82,7 +79,7 @@ impl<S> LspHost<S> {
 
         let sender = self.sender.read();
         let Some(sender) = sender.as_ref() else {
-            warn!("closed connection, failed to send request");
+            warn!("failed to send notification: connection closed");
             return;
         };
         let Err(res) = sender.send(not.into()) else {
@@ -102,12 +99,13 @@ impl<S> LspHost<S> {
             (request.method.clone(), request_received),
         );
     }
+
     pub fn respond(&self, response: lsp_server::Response) {
         let mut req_queue = self.req_queue.lock();
         if let Some((method, start)) = req_queue.incoming.complete(response.id.clone()) {
             let sender = self.sender.read();
             let Some(sender) = sender.as_ref() else {
-                warn!("closed connection, failed to send request");
+                warn!("failed to send response: connection closed");
                 return;
             };
 
@@ -146,7 +144,7 @@ impl<S> LspHost<S> {
     pub fn register_capability(&self, registrations: Vec<Registration>) -> anyhow::Result<()> {
         self.send_request::<RegisterCapability>(RegistrationParams { registrations }, |_, resp| {
             if let Some(err) = resp.error {
-                log::error!("failed to register capability: {err:?}");
+                error!("failed to register capability: {err:?}");
             }
         });
         Ok(())
@@ -160,7 +158,7 @@ impl<S> LspHost<S> {
             UnregistrationParams { unregisterations },
             |_, resp| {
                 if let Some(err) = resp.error {
-                    log::error!("failed to unregister capability: {err:?}");
+                    error!("failed to unregister capability: {err:?}");
                 }
             },
         );
@@ -198,7 +196,7 @@ pub fn lsp_harness<D: LspDriver>(
     let (initialize_id, initialize_params) = match connection.initialize_start() {
         Ok(it) => it,
         Err(e) => {
-            log::error!("failed to initialize: {e}");
+            error!("failed to initialize: {e}");
             *force_exit = !e.channel_is_disconnected();
             return Err(e.into());
         }
@@ -208,7 +206,7 @@ pub fn lsp_harness<D: LspDriver>(
     let sender = Arc::new(RwLock::new(Some(connection.sender)));
     let host = LspHost::new(sender.clone());
 
-    let _drop_connection = ForceDrop(sender);
+    let _drop_guard = ForceDrop(sender);
 
     let req = lsp_server::Request::new(initialize_id, "initialize".to_owned(), initialize_params);
     host.register_request(&req, request_received);
@@ -234,15 +232,13 @@ pub fn lsp_harness<D: LspDriver>(
             r#"expected initialized notification, got: {msg:?}"#
         ))),
         Err(e) => {
-            log::error!("failed to receive initialized notification: {e}");
+            error!("failed to receive initialized notification: {e}");
             Err(ProtocolError::disconnected())
         }
     };
     if let Err(e) = initialized_ack {
         *force_exit = !e.channel_is_disconnected();
-        return Err(anyhow::anyhow!(
-            "failed to receive initialized notification: {e:?}"
-        ));
+        bail!("failed to receive initialized notification: {e:?}");
     }
 
     service.initialized(InitializedParams {});
@@ -270,7 +266,7 @@ impl ProtocolError {
 struct ForceDrop<T>(Arc<RwLock<Option<T>>>);
 impl<T> Drop for ForceDrop<T> {
     fn drop(&mut self) {
-        self.0.write().take();
+        *self.0.write() = None;
     }
 }
 
@@ -279,5 +275,5 @@ pub fn from_json<T: DeserializeOwned>(
     json: &serde_json::Value,
 ) -> anyhow::Result<T> {
     serde_json::from_value(json.clone())
-        .map_err(|e| anyhow::format_err!("Failed to deserialize {what}: {e}; {json}"))
+        .map_err(|e| anyhow::anyhow!("Failed to deserialize {what}: {e}; {json}"))
 }

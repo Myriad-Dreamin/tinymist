@@ -1,11 +1,10 @@
 pub use super::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ResourceSymbolResponse {
     symbols: HashMap<String, ResourceSymbolItem>,
-    #[serde(rename = "fontSelects")]
     font_selects: Vec<FontItem>,
-    #[serde(rename = "glyphDefs")]
     glyph_defs: String,
 }
 
@@ -17,43 +16,34 @@ struct ResourceSymbolItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 enum SymCategory {
-    #[serde(rename = "accent")]
     Accent,
-    #[serde(rename = "greek")]
     Greek,
-    #[serde(rename = "misc")]
     Misc,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ResourceGlyphDesc {
-    #[serde(rename = "fontIndex")]
     font_index: u32,
-    #[serde(rename = "xAdvance")]
     x_advance: Option<u16>,
-    #[serde(rename = "yAdvance")]
     y_advance: Option<u16>,
-    #[serde(rename = "xMin")]
     x_min: Option<i16>,
-    #[serde(rename = "xMax")]
     x_max: Option<i16>,
-    #[serde(rename = "yMin")]
     y_min: Option<i16>,
-    #[serde(rename = "yMax")]
     y_max: Option<i16>,
     name: Option<String>,
     shape: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct FontItem {
     family: String,
-    #[serde(rename = "capHeight")]
     cap_height: f32,
     ascender: f32,
     descender: f32,
-    #[serde(rename = "unitsPerEm")]
     units_per_em: f32,
     // vertical: bool,
 }

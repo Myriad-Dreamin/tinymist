@@ -1,4 +1,4 @@
-//! The cluster actor running in background
+//! The actor that send notifications to the client.
 
 use std::collections::HashMap;
 
@@ -9,29 +9,44 @@ use tokio::sync::mpsc;
 
 use crate::{tools::word_count::WordsCount, LspHost, TypstLanguageServer};
 
-pub enum CompileClusterRequest {
+pub enum EditorRequest {
     Diag(String, Option<DiagnosticsMap>),
     Status(String, TinymistCompileStatusEnum),
-    WordCount(String, Option<WordsCount>),
+    WordCount(String, WordsCount),
 }
 
 pub struct EditorActor {
-    pub host: LspHost<TypstLanguageServer>,
-    pub diag_rx: mpsc::UnboundedReceiver<CompileClusterRequest>,
+    host: LspHost<TypstLanguageServer>,
+    editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
 
-    pub diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
-    pub affect_map: HashMap<String, Vec<Url>>,
-    pub published_primary: bool,
-    pub notify_compile_status: bool,
+    diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
+    affect_map: HashMap<String, Vec<Url>>,
+    published_primary: bool,
+    notify_compile_status: bool,
 }
 
 impl EditorActor {
+    pub fn new(
+        host: LspHost<TypstLanguageServer>,
+        editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
+        notify_compile_status: bool,
+    ) -> Self {
+        Self {
+            host,
+            editor_rx,
+            diagnostics: HashMap::new(),
+            affect_map: HashMap::new(),
+            published_primary: false,
+            notify_compile_status,
+        }
+    }
+
     pub async fn run(mut self) {
         let mut compile_status = TinymistCompileStatusEnum::Compiling;
         let mut words_count = None;
-        while let Some(req) = self.diag_rx.recv().await {
+        while let Some(req) = self.editor_rx.recv().await {
             match req {
-                CompileClusterRequest::Diag(group, diagnostics) => {
+                EditorRequest::Diag(group, diagnostics) => {
                     info!(
                         "received diagnostics from {group}: diag({:?})",
                         diagnostics.as_ref().map(|e| e.len())
@@ -52,7 +67,7 @@ impl EditorActor {
                         self.published_primary = again_with_primary;
                     }
                 }
-                CompileClusterRequest::Status(group, status) => {
+                EditorRequest::Status(group, status) => {
                     log::debug!("received status request");
                     if self.notify_compile_status && group == "primary" {
                         compile_status = status;
@@ -64,10 +79,10 @@ impl EditorActor {
                         );
                     }
                 }
-                CompileClusterRequest::WordCount(group, wc) => {
+                EditorRequest::WordCount(group, wc) => {
                     log::debug!("received word count request");
                     if self.notify_compile_status && group == "primary" {
-                        words_count = wc;
+                        words_count = Some(wc);
                         self.host.send_notification::<TinymistCompileStatus>(
                             TinymistCompileStatus {
                                 status: compile_status.clone(),
@@ -170,9 +185,9 @@ pub enum TinymistCompileStatusEnum {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TinymistCompileStatus {
     pub status: TinymistCompileStatusEnum,
-    #[serde(rename = "wordsCount")]
     pub words_count: Option<WordsCount>,
 }
 

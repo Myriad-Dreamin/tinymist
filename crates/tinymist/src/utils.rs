@@ -22,6 +22,18 @@ pub fn threaded_receive<T: Send>(f: oneshot::Receiver<T>) -> Result<T, Error> {
         .map_err(map_string_err("failed to recv from receive data"))
 }
 
+pub fn try_<T>(f: impl FnOnce() -> Option<T>) -> Option<T> {
+    f()
+}
+
+pub fn try_or<T>(f: impl FnOnce() -> Option<T>, default: T) -> T {
+    f().unwrap_or(default)
+}
+
+pub fn try_or_default<T: Default>(f: impl FnOnce() -> Option<T>) -> T {
+    f().unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     fn do_receive() {
