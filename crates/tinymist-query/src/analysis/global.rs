@@ -870,14 +870,6 @@ impl<'w> AnalysisContext<'w> {
         ty_chk.mapping.get(&s).cloned()
     }
 
-    pub(crate) fn literal_type_of_span(&mut self, s: Span) -> Option<FlowType> {
-        let id = s.id()?;
-        let source = self.source_by_id(id).ok()?;
-        let k = LinkedNode::new(source.root()).find(s)?;
-
-        self.literal_type_of_node(k)
-    }
-
     pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<FlowType> {
         let id = k.span().id()?;
         let source = self.source_by_id(id).ok()?;
