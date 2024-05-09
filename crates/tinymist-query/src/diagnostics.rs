@@ -28,7 +28,7 @@ fn convert_diagnostic(
     let uri;
     let lsp_range;
     if let Some((id, span)) = diagnostic_span_id(typst_diagnostic) {
-        uri = path_to_url(&ctx.path_for_id(id)?)?;
+        uri = ctx.uri_for_id(id)?;
         let source = ctx.world().source(id)?;
         lsp_range = diagnostic_range(&source, span, ctx.position_encoding());
     } else {
@@ -63,7 +63,7 @@ fn tracepoint_to_relatedinformation(
     position_encoding: PositionEncoding,
 ) -> anyhow::Result<Option<DiagnosticRelatedInformation>> {
     if let Some(id) = tracepoint.span.id() {
-        let uri = path_to_url(&project.path_for_id(id)?)?;
+        let uri = project.uri_for_id(id)?;
         let source = project.world().source(id)?;
 
         if let Some(typst_range) = source.range(tracepoint.span) {

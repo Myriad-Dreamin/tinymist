@@ -7,6 +7,7 @@ use std::{
 };
 
 use ecow::{EcoString, EcoVec};
+use lsp_types::Url;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use reflexo::hash::hash128;
@@ -27,7 +28,8 @@ use super::{
     analyze_bib, post_type_check, BibInfo, DefUseInfo, FlowType, ImportInfo, PathPreference,
     Signature, SignatureTarget, TypeCheckInfo,
 };
-use crate::syntax::resolve_id_by_path;
+use crate::path_to_url;
+use crate::syntax::{get_deref_target, resolve_id_by_path, DerefTarget};
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -539,6 +541,14 @@ impl<'w> AnalysisContext<'w> {
         id.vpath().resolve(&root).ok_or(FileError::AccessDenied)
     }
 
+    /// Resolve the uri for a file id.
+    pub fn uri_for_id(&self, id: TypstFileId) -> Result<Url, FileError> {
+        self.path_for_id(id).and_then(|e| {
+            path_to_url(&e)
+                .map_err(|e| FileError::Other(Some(eco_format!("convert to url: {e:?}"))))
+        })
+    }
+
     /// Get the content of a file by file id.
     pub fn file_by_id(&mut self, id: TypstFileId) -> FileResult<Bytes> {
         self.get_mut(id);
@@ -563,6 +573,31 @@ impl<'w> AnalysisContext<'w> {
 
         let id = TypstFileId::new(None, VirtualPath::new(relative_path));
         self.source_by_id(id)
+    }
+
+    /// Get a syntax object at a position.
+    pub fn deref_syntax_at<'s>(
+        &mut self,
+        source: &'s Source,
+        position: LspPosition,
+        shift: usize,
+    ) -> Option<DerefTarget<'s>> {
+        let (_, deref_target) = self.deref_syntax_at_(source, position, shift)?;
+        deref_target
+    }
+
+    /// Get a syntax object at a position.
+    pub fn deref_syntax_at_<'s>(
+        &mut self,
+        source: &'s Source,
+        position: LspPosition,
+        shift: usize,
+    ) -> Option<(usize, Option<DerefTarget<'s>>)> {
+        let offset = self.to_typst_pos(position, source)?;
+        let cursor = ceil_char_boundary(source.text(), offset + shift);
+
+        let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
+        Some((cursor, get_deref_target(node, cursor)))
     }
 
     /// Get the module-level analysis cache of a file.
@@ -850,6 +885,15 @@ impl<'w> AnalysisContext<'w> {
 
         post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.mapping.get(&k.span()).cloned())
     }
+}
+
+fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
+    // while is not char boundary, move cursor to right
+    while cursor < text.len() && !text.is_char_boundary(cursor) {
+        cursor += 1;
+    }
+
+    cursor.min(text.len())
 }
 
 #[comemo::memoize]
