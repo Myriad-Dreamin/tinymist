@@ -39,8 +39,8 @@ pub fn autocomplete(
     mut ctx: CompletionContext,
 ) -> Option<(usize, bool, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
     let _ = complete_comments(&mut ctx)
-        || complete_literal(&mut ctx).is_none() && {
-            log::info!("continue after completing literal");
+        || complete_type(&mut ctx).is_none() && {
+            log::info!("continue after completing type");
             complete_field_accesses(&mut ctx)
                 || complete_open_labels(&mut ctx)
                 || complete_imports(&mut ctx)

@@ -221,6 +221,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
         match node {
             CheckTarget::Param {
                 callee,
+                args: _,
                 target,
                 is_set,
             } => {
@@ -490,9 +491,9 @@ fn sig_context_of(context: &LinkedNode) -> SigParamKind {
         SyntaxKind::Array => {
             let c = context.cast::<ast::Array>();
             if c.is_some_and(|e| e.items().next().is_some()) {
-                SigParamKind::ArrayOrDict
-            } else {
                 SigParamKind::Array
+            } else {
+                SigParamKind::ArrayOrDict
             }
         }
         SyntaxKind::Dict => SigParamKind::Dict,

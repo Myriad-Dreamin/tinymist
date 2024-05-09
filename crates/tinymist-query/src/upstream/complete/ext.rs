@@ -1,9 +1,7 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 
 use ecow::{eco_format, EcoString};
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
-use once_cell::sync::OnceCell;
-use parking_lot::Mutex;
 use reflexo::path::{unix_slash, PathClean};
 use typst::foundations::{AutoValue, Func, Label, NoneValue, Repr, Type, Value};
 use typst::layout::{Dir, Length};
@@ -13,11 +11,10 @@ use typst::visualize::Color;
 
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::analysis::{
-    analyze_dyn_signature, analyze_import, resolve_call_target, FlowBuiltinType, FlowRecord,
-    FlowType, PathPreference, FLOW_INSET_DICT, FLOW_MARGIN_DICT, FLOW_OUTSET_DICT,
-    FLOW_RADIUS_DICT, FLOW_STROKE_DICT,
+    analyze_dyn_signature, analyze_import, resolve_call_target, FlowBuiltinType, FlowType,
+    PathPreference,
 };
-use crate::syntax::param_index_at_leaf;
+use crate::syntax::{param_index_at_leaf, CheckTarget};
 use crate::upstream::complete::complete_code;
 use crate::upstream::plain_docs_sentence;
 
@@ -1044,169 +1041,48 @@ pub fn named_param_value_completions<'a>(
     }
 }
 
-pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
-    let parent = ctx.leaf.clone();
-    log::info!("check complete_literal: {:?}", ctx.leaf);
-    let parent = if parent.kind().is_trivia() {
-        parent.prev_sibling()?
-    } else {
-        parent
-    };
-    log::debug!("check complete_literal 2: {:?}", parent);
-    let parent = &parent;
-    let parent = match parent.kind() {
-        SyntaxKind::Ident | SyntaxKind::Colon => parent.parent()?,
-        _ => parent,
-    };
-    let parent = match parent.kind() {
-        SyntaxKind::Named => parent.parent()?,
-        SyntaxKind::LeftParen | SyntaxKind::Comma => parent.parent()?,
-        _ => parent,
-    };
-    log::debug!("check complete_literal 3: {:?}", parent);
+/// Complete call and set rule parameters.
+pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
+    use crate::syntax::get_check_target;
 
-    // or empty array
-    let lit_span;
-    let (dict_lit, _tuple_lit) = match parent.kind() {
-        SyntaxKind::Dict => {
-            let dict_lit = parent.get().cast::<ast::Dict>()?;
+    let check_target = get_check_target(ctx.leaf.clone());
+    log::debug!("complete_type: pos {:?} -> {:#?}", ctx.leaf, check_target);
 
-            lit_span = dict_lit.span();
-            (dict_lit, None)
+    match check_target {
+        Some(CheckTarget::Element { container, .. }) => {
+            if let Some(container) = container.cast::<ast::Dict>() {
+                for named in container.items() {
+                    if let ast::DictItem::Named(named) = named {
+                        ctx.seen_field(named.name().get().clone());
+                    }
+                }
+            };
         }
-        SyntaxKind::Array => {
-            let w = parent.get().cast::<ast::Array>()?;
-            lit_span = w.span();
-            (ast::Dict::default(), Some(w))
+        Some(CheckTarget::Param { args, .. }) => {
+            let args = args.cast::<ast::Args>()?;
+            for arg in args.items() {
+                if let ast::Arg::Named(named) = arg {
+                    ctx.seen_field(named.name().get().clone());
+                }
+            }
         }
-        SyntaxKind::Parenthesized => {
-            lit_span = parent.span();
-            (ast::Dict::default(), None)
-        }
-        _ => return None,
-    };
+        Some(CheckTarget::Paren { .. }) => {}
+        Some(CheckTarget::Normal(..)) => return None,
+        None => return None,
+    }
 
-    // query type of the dict
-    let named_ty = ctx
+    let ty = ctx
         .ctx
         .literal_type_of_node(ctx.leaf.clone())
-        .filter(|ty| !matches!(ty, FlowType::Any));
-    let lit_ty = ctx.ctx.literal_type_of_span(lit_span);
-    log::info!("complete_literal: {lit_ty:?} {named_ty:?}");
+        .filter(|ty| !matches!(ty, FlowType::Any))?;
 
-    let existing = dict_lit
-        .items()
-        .filter_map(|field| match field {
-            ast::DictItem::Named(n) => Some(n.name().get().clone()),
-            ast::DictItem::Keyed(k) => {
-                let key = ctx.ctx.const_eval(k.key());
-                if let Some(Value::Str(key)) = key {
-                    return Some(key.into());
-                }
+    log::debug!("complete_type: ty  {:?} -> {:#?}", ctx.leaf, ty);
+    // log::debug!("complete_type: before {:?}", ctx.before.chars().last());
 
-                None
-            }
-            // todo: var dict union
-            ast::DictItem::Spread(_s) => None,
-        })
-        .collect::<HashSet<_>>();
-
-    for name in &existing {
-        ctx.seen_field(name.clone());
-    }
-
-    enum LitComplAction<'a> {
-        Dict(&'a FlowRecord),
-        Positional(&'a FlowType),
-    }
-    struct LitComplWorker<'a, 'b, 'w> {
-        ctx: &'a mut CompletionContext<'b, 'w>,
-        existing: HashSet<EcoString>,
-    }
-
-    let mut ctx = LitComplWorker { ctx, existing };
-
-    impl<'a, 'b, 'w> LitComplWorker<'a, 'b, 'w> {
-        fn on_iface(&mut self, lit_interface: LitComplAction<'_>) {
-            match lit_interface {
-                LitComplAction::Positional(a) => {
-                    type_completion(self.ctx, Some(a), None);
-                }
-                LitComplAction::Dict(dict_iface) => {
-                    let existing = &mut self.existing;
-
-                    for (key, _, _) in dict_iface.fields.iter() {
-                        if !existing.insert(key.clone()) {
-                            continue;
-                        }
-
-                        self.ctx.completions.push(Completion {
-                            kind: CompletionKind::Field,
-                            label: key.clone(),
-                            apply: Some(eco_format!("{}: ${{}}", key)),
-                            // todo: only vscode and neovim (0.9.1) support this
-                            command: Some("editor.action.triggerSuggest"),
-                            ..Completion::default()
-                        });
-                    }
-                }
-            }
-        }
-
-        fn on_lit_ty(&mut self, ty: &FlowType) {
-            match ty {
-                FlowType::Builtin(FlowBuiltinType::Stroke) => {
-                    self.on_iface(LitComplAction::Dict(&FLOW_STROKE_DICT))
-                }
-                FlowType::Builtin(FlowBuiltinType::Margin) => {
-                    self.on_iface(LitComplAction::Dict(&FLOW_MARGIN_DICT))
-                }
-                FlowType::Builtin(FlowBuiltinType::Inset) => {
-                    self.on_iface(LitComplAction::Dict(&FLOW_INSET_DICT))
-                }
-                FlowType::Builtin(FlowBuiltinType::Outset) => {
-                    self.on_iface(LitComplAction::Dict(&FLOW_OUTSET_DICT))
-                }
-                FlowType::Builtin(FlowBuiltinType::Radius) => {
-                    self.on_iface(LitComplAction::Dict(&FLOW_RADIUS_DICT))
-                }
-                FlowType::Dict(d) => self.on_iface(LitComplAction::Dict(d)),
-                FlowType::Array(a) => self.on_iface(LitComplAction::Positional(a)),
-                FlowType::Union(u) => {
-                    for info in u.as_ref() {
-                        self.on_lit_ty(info);
-                    }
-                }
-                FlowType::Let(u) => {
-                    for ut in u.ubs.iter() {
-                        self.on_lit_ty(ut);
-                    }
-                    for lt in u.lbs.iter() {
-                        self.on_lit_ty(lt);
-                    }
-                }
-                // todo: var, let, etc.
-                _ => {}
-            }
-        }
-
-        fn work(&mut self, named_ty: Option<FlowType>, lit_ty: Option<FlowType>) {
-            if let Some(named_ty) = &named_ty {
-                type_completion(self.ctx, Some(named_ty), None);
-            } else if let Some(lit_ty) = &lit_ty {
-                self.on_lit_ty(lit_ty);
-            }
-        }
-    }
-
-    ctx.work(named_ty, lit_ty);
-
-    let ctx = ctx.ctx;
-
-    if ctx.before.ends_with(',') {
+    type_completion(ctx, Some(&ty), None);
+    if ctx.before.ends_with(',') || ctx.before.ends_with(':') {
         ctx.enrich(" ", "");
     }
-    ctx.incomplete = false;
 
     sort_and_explicit_code_completion(ctx);
     Some(())

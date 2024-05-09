@@ -253,6 +253,7 @@ impl<'a> ParamTarget<'a> {
 pub enum CheckTarget<'a> {
     Param {
         callee: LinkedNode<'a>,
+        args: LinkedNode<'a>,
         target: ParamTarget<'a>,
         is_set: bool,
     },
@@ -306,12 +307,13 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
                 Some(ast::Expr::Set(set)) => set.args(),
                 _ => return None,
             };
-            let args_node = parent.find(args.span())?;
+            let args = parent.find(args.span())?;
 
             let is_set = parent.kind() == SyntaxKind::Set;
-            let target = get_param_target(args_node, node, ParamKind::Call)?;
+            let target = get_param_target(args.clone(), node, ParamKind::Call)?;
             return Some(CheckTarget::Param {
                 callee,
+                args,
                 target,
                 is_set,
             });
