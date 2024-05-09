@@ -37,6 +37,7 @@ pub(crate) fn post_type_check(
     worker.check(&node)
 }
 
+#[derive(Debug)]
 enum Abstracted<T, V> {
     Type(T),
     Value(V),
@@ -104,6 +105,7 @@ struct SignatureReceiver(FlowVarStore);
 
 impl SignatureReceiver {
     fn insert(&mut self, ty: &FlowType, pol: bool) {
+        log::debug!("post check receive: {ty:?}");
         if pol {
             self.0.lbs.push(ty.clone());
         } else {
@@ -137,8 +139,10 @@ fn check_signature<'a>(
 
                 // truncate args
                 let c = args.iter().map(|args| args.args.len()).sum::<usize>();
-                let nth = sig.pos(c + positional).or_else(|| sig.rest())?;
-                receiver.insert(nth, !pol);
+                let nth = sig.pos(c + positional).or_else(|| sig.rest());
+                if let Some(nth) = nth {
+                    receiver.insert(nth, !pol);
+                }
 
                 // names
                 sig.names(|name| {
@@ -232,7 +236,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
             }
             CheckTarget::Element { container, target } => {
                 let container_ty = self.check_context_or(&container, context_ty)?;
-                log::debug!("post check element target: {container_ty:?}::{target:?}");
+                log::debug!("post check element target: ({container_ty:?})::{target:?}");
 
                 let mut resp = SignatureReceiver::default();
 
@@ -251,7 +255,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                 is_before,
             } => {
                 let container_ty = self.check_context_or(&container, context_ty)?;
-                log::info!("post check param target: {container_ty:?}::{is_before:?}");
+                log::debug!("post check paren target: {container_ty:?}::{is_before:?}");
 
                 let mut resp = SignatureReceiver::default();
                 resp.0.lbs.push(container_ty.clone());
@@ -269,7 +273,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
             }
             CheckTarget::Normal(target) => {
                 let ty = self.check_context_or(&target, context_ty)?;
-                log::debug!("post check target: {ty:?}");
+                log::debug!("post check target normal: {ty:?}");
                 Some(ty)
             }
         }

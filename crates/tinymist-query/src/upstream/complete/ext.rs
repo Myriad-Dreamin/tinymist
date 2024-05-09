@@ -1094,23 +1094,37 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
     let lit_ty = ctx.ctx.literal_type_of_span(lit_span);
     log::info!("complete_literal: {lit_ty:?} {named_ty:?}");
 
+    let existing = dict_lit
+        .items()
+        .filter_map(|field| match field {
+            ast::DictItem::Named(n) => Some(n.name().get().clone()),
+            ast::DictItem::Keyed(k) => {
+                let key = ctx.ctx.const_eval(k.key());
+                if let Some(Value::Str(key)) = key {
+                    return Some(key.into());
+                }
+
+                None
+            }
+            // todo: var dict union
+            ast::DictItem::Spread(_s) => None,
+        })
+        .collect::<HashSet<_>>();
+
+    for name in &existing {
+        ctx.seen_field(name.clone());
+    }
+
     enum LitComplAction<'a> {
         Dict(&'a FlowRecord),
         Positional(&'a FlowType),
     }
-    let existing = OnceCell::new();
-
     struct LitComplWorker<'a, 'b, 'w> {
         ctx: &'a mut CompletionContext<'b, 'w>,
-        dict_lit: ast::Dict<'a>,
-        existing: &'a OnceCell<Mutex<HashSet<EcoString>>>,
+        existing: HashSet<EcoString>,
     }
 
-    let mut ctx = LitComplWorker {
-        ctx,
-        dict_lit,
-        existing: &existing,
-    };
+    let mut ctx = LitComplWorker { ctx, existing };
 
     impl<'a, 'b, 'w> LitComplWorker<'a, 'b, 'w> {
         fn on_iface(&mut self, lit_interface: LitComplAction<'_>) {
@@ -1119,27 +1133,7 @@ pub fn complete_literal(ctx: &mut CompletionContext) -> Option<()> {
                     type_completion(self.ctx, Some(a), None);
                 }
                 LitComplAction::Dict(dict_iface) => {
-                    let existing = self.existing.get_or_init(|| {
-                        Mutex::new(
-                            self.dict_lit
-                                .items()
-                                .filter_map(|field| match field {
-                                    ast::DictItem::Named(n) => Some(n.name().get().clone()),
-                                    ast::DictItem::Keyed(k) => {
-                                        let key = self.ctx.ctx.const_eval(k.key());
-                                        if let Some(Value::Str(key)) = key {
-                                            return Some(key.into());
-                                        }
-
-                                        None
-                                    }
-                                    // todo: var dict union
-                                    ast::DictItem::Spread(_s) => None,
-                                })
-                                .collect::<HashSet<_>>(),
-                        )
-                    });
-                    let mut existing = existing.lock();
+                    let existing = &mut self.existing;
 
                     for (key, _, _) in dict_iface.fields.iter() {
                         if !existing.insert(key.clone()) {
