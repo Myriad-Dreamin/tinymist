@@ -322,6 +322,15 @@ mod tests {
             let get_items = |items: Vec<CompletionItem>| {
                 let mut res: Vec<_> = items
                     .into_iter()
+                    .filter(|item| {
+                        if !excludes.is_empty() && excludes.contains(item.label.as_str()) {
+                            panic!("{item:?} was excluded in {excludes:?}");
+                        }
+                        if includes.is_empty() {
+                            return true;
+                        }
+                        includes.contains(item.label.as_str())
+                    })
                     .map(|item| CompletionItem {
                         label: item.label,
                         label_details: item.label_details,
@@ -329,15 +338,6 @@ mod tests {
                         kind: item.kind,
                         text_edit: item.text_edit,
                         ..Default::default()
-                    })
-                    .filter(|item| {
-                        if includes.is_empty() {
-                            return true;
-                        }
-                        if !excludes.is_empty() && excludes.contains(item.label.as_str()) {
-                            panic!("{item:?} was excluded in {excludes:?}");
-                        }
-                        includes.contains(item.label.as_str())
                     })
                     .collect();
 

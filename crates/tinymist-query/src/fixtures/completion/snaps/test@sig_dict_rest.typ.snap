@@ -1,0 +1,31 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on ) (74..75)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/sig_dict_rest.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 5,
+    "label": "cap",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "cap: ${1:}",
+     "range": {
+      "end": {
+       "character": 50,
+       "line": 2
+      },
+      "start": {
+       "character": 50,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
