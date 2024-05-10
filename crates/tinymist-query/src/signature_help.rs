@@ -1,5 +1,5 @@
 use crate::{
-    analysis::{analyze_dyn_signature, find_definition, FlowType},
+    analysis::{analyze_dyn_signature, find_definition, Ty},
     prelude::*,
     syntax::{get_check_target, get_deref_target, CheckTarget, ParamTarget},
     DocTooltip, LspParamInfo, SemanticRequest,
@@ -82,7 +82,7 @@ impl SemanticRequest for SignatureHelpRequest {
                 ty.name,
                 ty.infer_type
                     .as_ref()
-                    .unwrap_or(&FlowType::Any)
+                    .unwrap_or(&Ty::Any)
                     .describe()
                     .as_deref()
                     .unwrap_or("any")

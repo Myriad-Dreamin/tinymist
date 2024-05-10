@@ -795,8 +795,8 @@ fn type_completion(
                 let color_ty = Type::of::<Color>();
                 ctx.strict_scope_completions(false, |value| value.ty() == color_ty);
             }
-            FlowBuiltinType::TextSize => return None,
-            FlowBuiltinType::TextLang => {
+            BuiltinTy::TextSize => return None,
+            BuiltinTy::TextLang => {
                 for (&key, desc) in rust_iso639::ALL_MAP.entries() {
                     let detail = eco_format!("An ISO 639-1/2/3 language code, {}.", desc.name);
                     ctx.completions.push(Completion {
@@ -809,7 +809,7 @@ fn type_completion(
                     });
                 }
             }
-            FlowBuiltinType::TextRegion => {
+            BuiltinTy::TextRegion => {
                 for (&key, desc) in rust_iso3166::ALPHA2_MAP.entries() {
                     let detail = eco_format!("An ISO 3166-1 alpha-2 region code, {}.", desc.name);
                     ctx.completions.push(Completion {
@@ -822,30 +822,30 @@ fn type_completion(
                     });
                 }
             }
-            FlowBuiltinType::Dir => {
+            BuiltinTy::Dir => {
                 let ty = Type::of::<Dir>();
                 ctx.strict_scope_completions(false, |value| value.ty() == ty);
             }
-            FlowBuiltinType::TextFont => {
+            BuiltinTy::TextFont => {
                 ctx.font_completions();
             }
-            FlowBuiltinType::Margin => {
+            BuiltinTy::Margin => {
                 ctx.snippet_completion("()", "(${})", "Margin dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
+                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Length)), docs);
             }
-            FlowBuiltinType::Inset => {
+            BuiltinTy::Inset => {
                 ctx.snippet_completion("()", "(${})", "Inset dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
+                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Length)), docs);
             }
-            FlowBuiltinType::Outset => {
+            BuiltinTy::Outset => {
                 ctx.snippet_completion("()", "(${})", "Outset dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
+                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Length)), docs);
             }
-            FlowBuiltinType::Radius => {
+            BuiltinTy::Radius => {
                 ctx.snippet_completion("()", "(${})", "Radius dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
+                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Length)), docs);
             }
-            FlowBuiltinType::Length => {
+            BuiltinTy::Length => {
                 ctx.snippet_completion("pt", "${1}pt", "Point length unit.");
                 ctx.snippet_completion("mm", "${1}mm", "Millimeter length unit.");
                 ctx.snippet_completion("cm", "${1}cm", "Centimeter length unit.");
@@ -853,21 +853,21 @@ fn type_completion(
                 ctx.snippet_completion("em", "${1}em", "Em length unit.");
                 let length_ty = Type::of::<Length>();
                 ctx.strict_scope_completions(false, |value| value.ty() == length_ty);
-                type_completion(ctx, Some(&FlowType::Auto), docs);
+                type_completion(ctx, Some(&Ty::Auto), docs);
             }
-            FlowBuiltinType::Float => {
+            BuiltinTy::Float => {
                 ctx.snippet_completion("exponential notation", "${1}e${0}", "Exponential notation");
             }
-            FlowBuiltinType::Type(ty) => {
+            BuiltinTy::Type(ty) => {
                 if *ty == Type::of::<NoneValue>() {
-                    type_completion(ctx, Some(&FlowType::None), docs);
+                    type_completion(ctx, Some(&Ty::None), docs);
                 } else if *ty == Type::of::<AutoValue>() {
-                    type_completion(ctx, Some(&FlowType::Auto), docs);
+                    type_completion(ctx, Some(&Ty::Auto), docs);
                 } else if *ty == Type::of::<bool>() {
                     ctx.snippet_completion("false", "false", "No / Disabled.");
                     ctx.snippet_completion("true", "true", "Yes / Enabled.");
                 } else if *ty == Type::of::<Color>() {
-                    type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Color)), None);
+                    type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Color)), None);
                 } else if *ty == Type::of::<Label>() {
                     ctx.label_completions()
                 } else if *ty == Type::of::<Func>() {
@@ -887,17 +887,20 @@ fn type_completion(
                     ctx.strict_scope_completions(false, |value| value.ty() == *ty);
                 }
             }
+            BuiltinTy::Element(e) => {
+                ctx.value_completion(Some(e.name().into()), &Value::Func((*e).into()), true, docs);
+            }
         },
-        FlowType::Args(_) => return None,
-        FlowType::Func(_) => return None,
-        FlowType::With(_) => return None,
-        FlowType::At(_) => return None,
-        FlowType::Union(u) => {
+        Ty::Args(_) => return None,
+        Ty::Func(_) => return None,
+        Ty::With(_) => return None,
+        Ty::Select(_) => return None,
+        Ty::Union(u) => {
             for info in u.as_ref() {
                 type_completion(ctx, Some(info), docs);
             }
         }
-        FlowType::Let(e) => {
+        Ty::Let(e) => {
             for ut in e.ubs.iter() {
                 type_completion(ctx, Some(ut), docs);
             }
@@ -905,28 +908,24 @@ fn type_completion(
                 type_completion(ctx, Some(lt), docs);
             }
         }
-        FlowType::Var(_) => return None,
-        FlowType::Unary(_) => return None,
-        FlowType::Binary(_) => return None,
-        FlowType::If(_) => return None,
-        FlowType::Value(v) => {
+        Ty::Var(_) => return None,
+        Ty::Unary(_) => return None,
+        Ty::Binary(_) => return None,
+        Ty::If(_) => return None,
+        Ty::Value(v) => {
             // Prevent duplicate completions from appearing.
-            if !ctx.seen_casts.insert(typst::util::hash128(&v.0)) {
+            if !ctx.seen_casts.insert(typst::util::hash128(&v.val)) {
                 return Some(());
             }
 
-            if let Value::Type(ty) = &v.0 {
-                type_completion(
-                    ctx,
-                    Some(&FlowType::Builtin(FlowBuiltinType::Type(*ty))),
-                    docs,
-                );
-            } else if v.0.ty() == Type::of::<NoneValue>() {
-                type_completion(ctx, Some(&FlowType::None), docs);
-            } else if v.0.ty() == Type::of::<AutoValue>() {
-                type_completion(ctx, Some(&FlowType::Auto), docs);
+            if let Value::Type(ty) = &v.val {
+                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Type(*ty))), docs);
+            } else if v.val.ty() == Type::of::<NoneValue>() {
+                type_completion(ctx, Some(&Ty::None), docs);
+            } else if v.val.ty() == Type::of::<AutoValue>() {
+                type_completion(ctx, Some(&Ty::Auto), docs);
             } else {
-                ctx.value_completion(None, &v.0, true, docs);
+                ctx.value_completion(None, &v.val, true, docs);
             }
         }
         FlowType::ValueDoc(v) => {

@@ -1,4 +1,3 @@
-use ecow::EcoVec;
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use typst::{
@@ -7,9 +6,12 @@ use typst::{
     syntax::Span,
 };
 
-use super::{FlowRecord, FlowType};
+use crate::ty::InsTy;
 
-#[derive(Debug, Clone, Hash)]
+use super::Ty;
+use crate::analysis::ty::{Interned, RecordTy};
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) enum PathPreference {
     None,
     Special,
@@ -82,8 +84,8 @@ impl PathPreference {
     }
 }
 
-#[derive(Debug, Clone, Hash)]
-pub(crate) enum FlowBuiltinType {
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub(crate) enum BuiltinTy {
     Args,
     Color,
     TextSize,
@@ -102,30 +104,31 @@ pub(crate) enum FlowBuiltinType {
     Radius,
 
     Type(typst::foundations::Type),
+    Element(typst::foundations::Element),
     Path(PathPreference),
 }
 
-impl FlowBuiltinType {
-    pub fn from_value(builtin: &Value) -> FlowType {
+impl BuiltinTy {
+    pub fn from_value(builtin: &Value) -> Ty {
         if let Value::Bool(v) = builtin {
-            return FlowType::Boolean(Some(*v));
+            return Ty::Boolean(Some(*v));
         }
 
         Self::from_builtin(builtin.ty())
     }
 
-    pub fn from_builtin(builtin: Type) -> FlowType {
+    pub fn from_builtin(builtin: Type) -> Ty {
         if builtin == Type::of::<AutoValue>() {
-            return FlowType::Auto;
+            return Ty::Auto;
         }
         if builtin == Type::of::<NoneValue>() {
-            return FlowType::None;
+            return Ty::None;
         }
         if builtin == Type::of::<typst::visualize::Color>() {
             return Color.literally();
         }
         if builtin == Type::of::<bool>() {
-            return FlowType::None;
+            return Ty::None;
         }
         if builtin == Type::of::<f64>() {
             return Float.literally();
@@ -134,30 +137,31 @@ impl FlowBuiltinType {
             return Length.literally();
         }
         if builtin == Type::of::<Content>() {
-            return FlowType::Content;
+            return Ty::Content;
         }
 
-        FlowBuiltinType::Type(builtin).literally()
+        BuiltinTy::Type(builtin).literally()
     }
 
     pub(crate) fn describe(&self) -> &'static str {
         match self {
-            FlowBuiltinType::Args => "args",
-            FlowBuiltinType::Color => "color",
-            FlowBuiltinType::TextSize => "text.size",
-            FlowBuiltinType::TextFont => "text.font",
-            FlowBuiltinType::TextLang => "text.lang",
-            FlowBuiltinType::TextRegion => "text.region",
-            FlowBuiltinType::Dir => "dir",
-            FlowBuiltinType::Length => "length",
-            FlowBuiltinType::Float => "float",
-            FlowBuiltinType::Stroke => "stroke",
-            FlowBuiltinType::Margin => "margin",
-            FlowBuiltinType::Inset => "inset",
-            FlowBuiltinType::Outset => "outset",
-            FlowBuiltinType::Radius => "radius",
-            FlowBuiltinType::Type(ty) => ty.short_name(),
-            FlowBuiltinType::Path(s) => match s {
+            BuiltinTy::Args => "args",
+            BuiltinTy::Color => "color",
+            BuiltinTy::TextSize => "text.size",
+            BuiltinTy::TextFont => "text.font",
+            BuiltinTy::TextLang => "text.lang",
+            BuiltinTy::TextRegion => "text.region",
+            BuiltinTy::Dir => "dir",
+            BuiltinTy::Length => "length",
+            BuiltinTy::Float => "float",
+            BuiltinTy::Stroke => "stroke",
+            BuiltinTy::Margin => "margin",
+            BuiltinTy::Inset => "inset",
+            BuiltinTy::Outset => "outset",
+            BuiltinTy::Radius => "radius",
+            BuiltinTy::Type(ty) => ty.short_name(),
+            BuiltinTy::Element(ty) => ty.name(),
+            BuiltinTy::Path(s) => match s {
                 PathPreference::None => "[any]",
                 PathPreference::Special => "[any]",
                 PathPreference::Source => "[source]",
@@ -175,30 +179,30 @@ impl FlowBuiltinType {
     }
 }
 
-use FlowBuiltinType::*;
+use BuiltinTy::*;
 
-fn literally(s: impl FlowBuiltinLiterally) -> FlowType {
+fn literally(s: impl FlowBuiltinLiterally) -> Ty {
     s.literally()
 }
 
 trait FlowBuiltinLiterally {
-    fn literally(self) -> FlowType;
+    fn literally(self) -> Ty;
 }
 
 impl FlowBuiltinLiterally for &str {
-    fn literally(self) -> FlowType {
-        FlowType::Value(Box::new((Value::Str((*self).into()), Span::detached())))
+    fn literally(self) -> Ty {
+        Ty::Value(InsTy::new(Value::Str(self.into())))
     }
 }
 
-impl FlowBuiltinLiterally for FlowBuiltinType {
-    fn literally(self) -> FlowType {
-        FlowType::Builtin(self.clone())
+impl FlowBuiltinLiterally for BuiltinTy {
+    fn literally(self) -> Ty {
+        Ty::Builtin(self.clone())
     }
 }
 
-impl FlowBuiltinLiterally for FlowType {
-    fn literally(self) -> FlowType {
+impl FlowBuiltinLiterally for Ty {
+    fn literally(self) -> Ty {
         self
     }
 }
@@ -218,28 +222,26 @@ macro_rules! flow_builtin_union_inner {
 macro_rules! flow_union {
     // the first one is string
     ($($b:tt)*) => {
-        FlowType::Union(Box::new(flow_builtin_union_inner!( $($b)* )))
+        Ty::Union(Interned::new(flow_builtin_union_inner!( $($b)* )))
     };
 
 }
 
 macro_rules! flow_record {
     ($($name:expr => $ty:expr),* $(,)?) => {
-        FlowRecord {
-            fields: EcoVec::from_iter([
-                $(
-                    (
-                        $name.into(),
-                        $ty,
-                        Span::detached(),
-                    ),
-                )*
-            ])
-        }
+        RecordTy::new(vec![
+            $(
+                (
+                    $name.into(),
+                    $ty,
+                    Span::detached(),
+                ),
+            )*
+        ])
     };
 }
 
-pub(in crate::analysis::ty) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<FlowType> {
+pub(in crate::analysis::ty) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<Ty> {
     match (f.name().unwrap(), p.name) {
         ("cbor", "path") => Some(literally(Path(PathPreference::None))),
         ("csv", "path") => Some(literally(Path(PathPreference::Csv))),
@@ -254,10 +256,10 @@ pub(in crate::analysis::ty) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<
         ("bibliography", "path") => Some(literally(Path(PathPreference::Bibliography))),
         ("text", "size") => Some(literally(TextSize)),
         ("text", "font") => {
-            static FONT_TYPE: Lazy<FlowType> = Lazy::new(|| {
-                FlowType::Union(Box::new(vec![
+            static FONT_TYPE: Lazy<Ty> = Lazy::new(|| {
+                Ty::Union(Interned::new(vec![
                     literally(TextFont),
-                    FlowType::Array(Box::new(literally(TextFont))),
+                    Ty::Array(Interned::new(literally(TextFont))),
                 ]))
             });
             Some(FONT_TYPE.clone())
@@ -281,21 +283,21 @@ pub(in crate::analysis::ty) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<
         }
         ("block" | "box" | "rect" | "square", "radius") => Some(literally(Radius)),
         ("grid" | "table", "columns" | "rows" | "gutter" | "column-gutter" | "row-gutter") => {
-            static COLUMN_TYPE: Lazy<FlowType> = Lazy::new(|| {
+            static COLUMN_TYPE: Lazy<Ty> = Lazy::new(|| {
                 flow_union!(
-                    FlowType::Value(Box::new((Value::Auto, Span::detached()))),
-                    FlowType::Value(Box::new((Value::Type(Type::of::<i64>()), Span::detached()))),
+                    Ty::Value(InsTy::new(Value::Auto)),
+                    Ty::Value(InsTy::new(Value::Type(Type::of::<i64>()))),
                     literally(Length),
-                    FlowType::Array(Box::new(literally(Length))),
+                    Ty::Array(Interned::new(literally(Length))),
                 )
             });
             Some(COLUMN_TYPE.clone())
         }
         ("pattern", "size") => {
-            static PATTERN_SIZE_TYPE: Lazy<FlowType> = Lazy::new(|| {
+            static PATTERN_SIZE_TYPE: Lazy<Ty> = Lazy::new(|| {
                 flow_union!(
-                    FlowType::Value(Box::new((Value::Auto, Span::detached()))),
-                    FlowType::Array(Box::new(FlowType::Builtin(Length))),
+                    Ty::Value(InsTy::new(Value::Auto)),
+                    Ty::Array(Interned::new(Ty::Builtin(Length))),
                 )
             });
             Some(PATTERN_SIZE_TYPE.clone())
@@ -307,13 +309,13 @@ pub(in crate::analysis::ty) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<
             | "ellipse" | "circle" | "polygon" | "box" | "block" | "table" | "line" | "cell"
             | "hline" | "vline" | "regular",
             "stroke",
-        ) => Some(FlowType::Builtin(Stroke)),
-        ("page", "margin") => Some(FlowType::Builtin(Margin)),
+        ) => Some(Ty::Builtin(Stroke)),
+        ("page", "margin") => Some(Ty::Builtin(Margin)),
         _ => None,
     }
 }
 
-static FLOW_STROKE_DASH_TYPE: Lazy<FlowType> = Lazy::new(|| {
+static FLOW_STROKE_DASH_TYPE: Lazy<Ty> = Lazy::new(|| {
     flow_union!(
         "solid",
         "dotted",
@@ -325,15 +327,15 @@ static FLOW_STROKE_DASH_TYPE: Lazy<FlowType> = Lazy::new(|| {
         "dash-dotted",
         "densely-dash-dotted",
         "loosely-dash-dotted",
-        FlowType::Array(Box::new(flow_union!("dot", literally(Float)))),
-        FlowType::Dict(flow_record!(
-            "array" => FlowType::Array(Box::new(flow_union!("dot", literally(Float)))),
+        Ty::Array(Interned::new(flow_union!("dot", literally(Float)))),
+        Ty::Dict(flow_record!(
+            "array" => Ty::Array(Interned::new(flow_union!("dot", literally(Float)))),
             "phase" => literally(Length),
         ))
     )
 });
 
-pub static FLOW_STROKE_DICT: Lazy<FlowRecord> = Lazy::new(|| {
+pub static FLOW_STROKE_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     flow_record!(
         "paint" => literally(Color),
         "thickness" => literally(Length),
@@ -344,7 +346,7 @@ pub static FLOW_STROKE_DICT: Lazy<FlowRecord> = Lazy::new(|| {
     )
 });
 
-pub static FLOW_MARGIN_DICT: Lazy<FlowRecord> = Lazy::new(|| {
+pub static FLOW_MARGIN_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     flow_record!(
         "top" => literally(Length),
         "right" => literally(Length),
@@ -358,7 +360,7 @@ pub static FLOW_MARGIN_DICT: Lazy<FlowRecord> = Lazy::new(|| {
     )
 });
 
-pub static FLOW_INSET_DICT: Lazy<FlowRecord> = Lazy::new(|| {
+pub static FLOW_INSET_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     flow_record!(
         "top" => literally(Length),
         "right" => literally(Length),
@@ -370,7 +372,7 @@ pub static FLOW_INSET_DICT: Lazy<FlowRecord> = Lazy::new(|| {
     )
 });
 
-pub static FLOW_OUTSET_DICT: Lazy<FlowRecord> = Lazy::new(|| {
+pub static FLOW_OUTSET_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     flow_record!(
         "top" => literally(Length),
         "right" => literally(Length),
@@ -382,7 +384,7 @@ pub static FLOW_OUTSET_DICT: Lazy<FlowRecord> = Lazy::new(|| {
     )
 });
 
-pub static FLOW_RADIUS_DICT: Lazy<FlowRecord> = Lazy::new(|| {
+pub static FLOW_RADIUS_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     flow_record!(
         "top" => literally(Length),
         "right" => literally(Length),

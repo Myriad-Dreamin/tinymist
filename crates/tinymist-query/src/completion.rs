@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 
 use crate::{
-    analysis::{FlowBuiltinType, FlowType},
+    analysis::{BuiltinTy, Ty},
     prelude::*,
     syntax::DerefTarget,
     upstream::{autocomplete, complete_path, CompletionContext},
@@ -117,7 +117,7 @@ impl StatefulRequest for CompletionRequest {
                     if let Some(ty_chk) = ty_chk {
                         let ty = ty_chk.mapping.get(&cano_expr.span());
                         log::debug!("check string ty: {:?}", ty);
-                        if let Some(FlowType::Builtin(FlowBuiltinType::Path(path_filter))) = ty {
+                        if let Some(Ty::Builtin(BuiltinTy::Path(path_filter))) = ty {
                             completion_result =
                                 complete_path(ctx, Some(cano_expr), &source, cursor, path_filter);
                         }

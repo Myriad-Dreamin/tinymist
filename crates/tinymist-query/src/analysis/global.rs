@@ -25,8 +25,8 @@ use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
 use super::{
-    analyze_bib, post_type_check, BibInfo, DefUseInfo, FlowType, ImportInfo, PathPreference,
-    Signature, SignatureTarget, TypeCheckInfo,
+    analyze_bib, post_type_check, BibInfo, DefUseInfo, ImportInfo, PathPreference, Signature,
+    SignatureTarget, Ty, TypeCheckInfo,
 };
 use crate::path_to_url;
 use crate::syntax::{get_deref_target, resolve_id_by_path, DerefTarget};
@@ -859,18 +859,18 @@ impl<'w> AnalysisContext<'w> {
             .or_else(|| self.with_vm(|vm| rr.eval(vm).ok()))
     }
 
-    pub(crate) fn type_of(&mut self, rr: &SyntaxNode) -> Option<FlowType> {
+    pub(crate) fn type_of(&mut self, rr: &SyntaxNode) -> Option<Ty> {
         self.type_of_span(rr.span())
     }
 
-    pub(crate) fn type_of_span(&mut self, s: Span) -> Option<FlowType> {
+    pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {
         let id = s.id()?;
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(source)?;
         ty_chk.mapping.get(&s).cloned()
     }
 
-    pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<FlowType> {
+    pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<Ty> {
         let id = k.span().id()?;
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(source.clone())?;

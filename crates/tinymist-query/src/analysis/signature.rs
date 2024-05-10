@@ -15,11 +15,13 @@ use typst::{
     util::LazyHash,
 };
 
-use crate::analysis::{resolve_callee, FlowSignature};
+use crate::adt::interner::Interned;
+use crate::analysis::resolve_callee;
 use crate::syntax::{get_def_target, get_deref_target, DefTarget};
+use crate::ty::SigTy;
 use crate::AnalysisContext;
 
-use super::{find_definition, DefinitionLink, FlowType, FlowVar, LexicalKind, LexicalVarKind};
+use super::{find_definition, DefinitionLink, FlowVar, LexicalKind, LexicalVarKind, Ty};
 
 // pub fn analyze_signature
 
@@ -33,7 +35,7 @@ pub struct ParamSpec {
     /// Describe what values this parameter accepts.
     pub input: CastInfo,
     /// Inferred type of the parameter.
-    pub(crate) infer_type: Option<FlowType>,
+    pub(crate) infer_type: Option<Ty>,
     /// The parameter's default name as type.
     pub type_repr: Option<EcoString>,
     /// The parameter's default name as value.
@@ -59,7 +61,7 @@ impl ParamSpec {
             name: Cow::Borrowed(p.name),
             docs: Cow::Borrowed(p.docs),
             input: p.input.clone(),
-            infer_type: FlowType::from_param_site(f, p, &p.input),
+            infer_type: Ty::from_param_site(f, p, &p.input),
             type_repr: Some(eco_format!("{}", TypeExpr(&p.input))),
             expr: None,
             default: p.default,
@@ -110,9 +112,9 @@ pub struct PrimarySignature {
     /// The rest parameter.
     pub rest: Option<Arc<ParamSpec>>,
     /// The return type.
-    pub(crate) ret_ty: Option<FlowType>,
+    pub(crate) ret_ty: Option<Ty>,
     /// The signature type.
-    pub(crate) sig_ty: Option<FlowType>,
+    pub(crate) sig_ty: Option<Ty>,
     _broken: bool,
 }
 
@@ -319,9 +321,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         Repr::With(..) => unreachable!(),
         Repr::Closure(c) => (analyze_closure_signature(c.clone()), None),
         Repr::Element(..) | Repr::Native(..) => {
-            let ret_ty = func
-                .returns()
-                .and_then(|r| FlowType::from_return_site(&func, r));
+            let ret_ty = func.returns().and_then(|r| Ty::from_return_site(&func, r));
             let params = func.params().unwrap();
             (
                 params
@@ -369,24 +369,23 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         }
     }
 
-    let mut named_vec: Vec<(EcoString, FlowType)> = named
+    let mut named_vec: Vec<(EcoString, Ty)> = named
         .iter()
         .map(|e| {
             (
                 e.0.as_ref().into(),
-                e.1.infer_type.clone().unwrap_or(FlowType::Any),
+                e.1.infer_type.clone().unwrap_or(Ty::Any),
             )
         })
         .collect::<Vec<_>>();
 
     named_vec.sort_by(|a, b| a.0.cmp(&b.0));
 
-    let sig_ty = FlowSignature::new(
-        pos.iter()
-            .map(|e| e.infer_type.clone().unwrap_or(FlowType::Any)),
+    let sig_ty = SigTy::new(
+        pos.iter().map(|e| e.infer_type.clone().unwrap_or(Ty::Any)),
         named_vec.into_iter(),
         rest.as_ref()
-            .map(|e| e.infer_type.clone().unwrap_or(FlowType::Any)),
+            .map(|e| e.infer_type.clone().unwrap_or(Ty::Any)),
         ret_ty.clone(),
     );
     Arc::new(PrimarySignature {
@@ -395,7 +394,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         rest,
         ret_ty,
         has_fill_or_size_or_stroke: has_fill || has_stroke || has_size,
-        sig_ty: Some(FlowType::Func(Box::new(sig_ty))),
+        sig_ty: Some(Ty::Func(Interned::new(sig_ty))),
         _broken: broken,
     })
 }

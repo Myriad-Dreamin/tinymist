@@ -15,6 +15,7 @@ pub use linked_def::*;
 pub mod signature;
 pub use signature::*;
 mod ty;
+pub(crate) use crate::ty::*;
 pub(crate) use ty::*;
 pub mod track_values;
 pub use track_values::*;
