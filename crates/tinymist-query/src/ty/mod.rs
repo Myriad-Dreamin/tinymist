@@ -2,6 +2,7 @@ mod apply;
 mod bound;
 mod builtin;
 mod def;
+mod describe;
 mod sig;
 mod simplify;
 mod subst;
