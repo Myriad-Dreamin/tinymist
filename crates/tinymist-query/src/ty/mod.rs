@@ -1,15 +1,10 @@
+mod apply;
+mod bound;
 mod def;
-mod visit_sig;
+mod sig;
+mod subst;
+
+pub(crate) use apply::*;
+pub(crate) use bound::*;
 pub(crate) use def::*;
-pub(crate) use visit_sig::*;
-
-use typst::foundations::Func;
-
-use crate::adt::interner::Interned;
-
-pub enum Sig<'a> {
-    ArrayCons(&'a TyRef),
-    DictCons(&'a Interned<RecordTy>),
-    Type(&'a Interned<SigTy>),
-    Value(&'a Func),
-}
+pub(crate) use sig::*;
