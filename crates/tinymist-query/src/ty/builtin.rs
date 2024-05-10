@@ -6,10 +6,7 @@ use typst::{
     layout::Length,
 };
 
-use crate::{adt::interner::Interned, analysis::InsTy};
-
-use super::Ty;
-use crate::analysis::ty::RecordTy;
+use crate::{adt::interner::Interned, ty::*};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) enum PathPreference {
@@ -320,7 +317,7 @@ macro_rules! flow_record {
     };
 }
 
-pub(in crate::analysis::ty) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<Ty> {
+pub(super) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<Ty> {
     match (f.name().unwrap(), p.name) {
         ("cbor", "path") => Some(literally(Path(PathPreference::None))),
         ("csv", "path") => Some(literally(Path(PathPreference::Csv))),

@@ -1,37 +1,26 @@
-//! Top-level evaluation of a source file.
+//! Type checking on source file
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
-use ecow::EcoString;
 use reflexo::vector::ir::DefId;
-use typst::{
-    foundations::Value,
-    syntax::{
+use typst::syntax::{
         ast::{self, AstNode},
         LinkedNode, Source, Span, SyntaxKind,
-    },
 };
 
-use crate::{
-    adt::interner::Interned,
-    analysis::{ApplyChecker, TypeCheckInfo},
-    ty::{ArgsTy, IfTy, InsTy, RecordTy, SelectTy, SigTy, TypeBinary, TypeInterace, TypeUnary},
-    AnalysisContext,
-};
+use crate::analysis::Ty;
+use crate::{adt::interner::Interned, analysis::TypeCheckInfo, ty::TypeInterace, AnalysisContext};
 
 use super::{
-    resolve_global_value, DefUseInfo, FlowVarKind, IdentRef, TypeBounds, TypeVar, TypeVarBounds,
-    UnaryOp,
+    resolve_global_value, BuiltinTy, DefUseInfo, FlowVarKind, IdentRef, TypeBounds, TypeVar,
+    TypeVarBounds,
 };
 
-mod def;
-pub(crate) use def::*;
-mod builtin;
-pub(crate) use builtin::*;
+mod apply;
 mod post_check;
+mod syntax;
+
+pub(crate) use apply::*;
 pub(crate) use post_check::*;
 
 /// Type checking at the source unit level.
@@ -82,7 +71,7 @@ struct TypeChecker<'a, 'w> {
 impl<'a, 'w> TypeChecker<'a, 'w> {
     fn check(&mut self, root: LinkedNode) -> Ty {
         let should_record = matches!(root.kind(), SyntaxKind::FuncCall).then(|| root.span());
-        let w = self.check_inner(root).unwrap_or(Ty::Undef);
+        let w = self.check_syntax(root).unwrap_or(Ty::Undef);
 
         if let Some(s) = should_record {
             self.info.witness_at_least(s, w.clone());
