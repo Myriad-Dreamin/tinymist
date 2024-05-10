@@ -66,7 +66,7 @@ mod type_check_tests {
             vars.sort_by(|x, y| x.0.cmp(&y.0));
 
             for (name, var) in vars {
-                writeln!(f, "{:?} = {:?}", name, info.simplify(var.get_ref(), true))?;
+                writeln!(f, "{:?} = {:?}", name, info.simplify(var.as_type(), true))?;
             }
 
             writeln!(f, "---")?;

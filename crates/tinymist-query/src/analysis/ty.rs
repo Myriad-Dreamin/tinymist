@@ -1,25 +1,31 @@
 //! Top-level evaluation of a source file.
 
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     sync::Arc,
 };
 
-use ecow::{EcoString, EcoVec};
-use once_cell::sync::Lazy;
-use parking_lot::{Mutex, RwLock};
-use reflexo::{hash::hash128, vector::ir::DefId};
+use ecow::EcoString;
+use reflexo::vector::ir::DefId;
 use typst::{
-    foundations::{Func, Repr, Value},
+    foundations::Value,
     syntax::{
         ast::{self, AstNode},
         LinkedNode, Source, Span, SyntaxKind,
     },
 };
 
-use crate::{analysis::analyze_dyn_signature, AnalysisContext};
+use crate::{
+    adt::interner::Interned,
+    analysis::{ApplyChecker, TypeCheckInfo},
+    ty::{ArgsTy, IfTy, InsTy, RecordTy, SelectTy, SigTy, TypeBinary, TypeInterace, TypeUnary},
+    AnalysisContext,
+};
 
-use super::{resolve_global_value, DefUseInfo, IdentRef};
+use super::{
+    resolve_global_value, DefUseInfo, FlowVarKind, IdentRef, TypeBounds, TypeVar, TypeVarBounds,
+    UnaryOp,
+};
 
 mod def;
 pub(crate) use def::*;
@@ -56,73 +62,6 @@ pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Ar
     Some(Arc::new(info))
 }
 
-#[derive(Default)]
-pub(crate) struct TypeCheckInfo {
-    pub vars: HashMap<DefId, FlowVar>,
-    pub mapping: HashMap<Span, FlowType>,
-
-    cano_cache: Mutex<TypeCanoStore>,
-}
-
-impl TypeCheckInfo {
-    pub fn simplify(&self, ty: FlowType, principal: bool) -> FlowType {
-        let mut c = self.cano_cache.lock();
-        let c = &mut *c;
-
-        c.cano_local_cache.clear();
-        c.positives.clear();
-        c.negatives.clear();
-
-        let mut worker = TypeSimplifier {
-            principal,
-            vars: &self.vars,
-            cano_cache: &mut c.cano_cache,
-            cano_local_cache: &mut c.cano_local_cache,
-
-            positives: &mut c.positives,
-            negatives: &mut c.negatives,
-        };
-
-        worker.simplify(ty, principal)
-    }
-
-    pub fn describe(&self, ty: &FlowType) -> Option<String> {
-        let mut worker = TypeDescriber::default();
-        worker.describe_root(ty)
-    }
-
-    // todo: distinguish at least, at most
-    pub fn witness_at_least(&mut self, site: Span, ty: FlowType) {
-        Self::witness_(site, ty, &mut self.mapping);
-    }
-
-    pub fn witness_at_most(&mut self, site: Span, ty: FlowType) {
-        Self::witness_(site, ty, &mut self.mapping);
-    }
-
-    fn witness_(site: Span, ty: FlowType, mapping: &mut HashMap<Span, FlowType>) {
-        if site.is_detached() {
-            return;
-        }
-
-        // todo: intersect/union
-        let site_store = mapping.entry(site);
-        match site_store {
-            Entry::Occupied(e) => match e.into_mut() {
-                FlowType::Union(v) => {
-                    v.push(ty);
-                }
-                e => {
-                    *e = FlowType::from_types([e.clone(), ty].into_iter());
-                }
-            },
-            Entry::Vacant(e) => {
-                e.insert(ty);
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum InterpretMode {
     Markup,
@@ -136,14 +75,14 @@ struct TypeChecker<'a, 'w> {
     def_use_info: Arc<DefUseInfo>,
 
     info: &'a mut TypeCheckInfo,
-    externals: HashMap<DefId, Option<FlowType>>,
+    externals: HashMap<DefId, Option<Ty>>,
     mode: InterpretMode,
 }
 
 impl<'a, 'w> TypeChecker<'a, 'w> {
-    fn check(&mut self, root: LinkedNode) -> FlowType {
+    fn check(&mut self, root: LinkedNode) -> Ty {
         let should_record = matches!(root.kind(), SyntaxKind::FuncCall).then(|| root.span());
-        let w = self.check_inner(root).unwrap_or(FlowType::Undef);
+        let w = self.check_inner(root).unwrap_or(Ty::Undef);
 
         if let Some(s) = should_record {
             self.info.witness_at_least(s, w.clone());
@@ -152,7 +91,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         w
     }
 
-    fn check_inner(&mut self, root: LinkedNode) -> Option<FlowType> {
+    fn check_inner(&mut self, root: LinkedNode) -> Option<Ty> {
         Some(match root.kind() {
             SyntaxKind::Markup => return self.check_in_mode(root, InterpretMode::Markup),
             SyntaxKind::Math => return self.check_in_mode(root, InterpretMode::Math),
@@ -161,28 +100,28 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::ContentBlock => return self.check_in_mode(root, InterpretMode::Markup),
 
             // todo: space effect
-            SyntaxKind::Space => FlowType::Space,
-            SyntaxKind::Parbreak => FlowType::Space,
+            SyntaxKind::Space => Ty::Space,
+            SyntaxKind::Parbreak => Ty::Space,
 
-            SyntaxKind::Text => FlowType::Content,
-            SyntaxKind::Linebreak => FlowType::Content,
-            SyntaxKind::Escape => FlowType::Content,
-            SyntaxKind::Shorthand => FlowType::Content,
-            SyntaxKind::SmartQuote => FlowType::Content,
-            SyntaxKind::Raw => FlowType::Content,
-            SyntaxKind::RawLang => FlowType::Content,
-            SyntaxKind::RawDelim => FlowType::Content,
-            SyntaxKind::RawTrimmed => FlowType::Content,
-            SyntaxKind::Link => FlowType::Content,
-            SyntaxKind::Label => FlowType::Content,
-            SyntaxKind::Ref => FlowType::Content,
-            SyntaxKind::RefMarker => FlowType::Content,
-            SyntaxKind::HeadingMarker => FlowType::Content,
-            SyntaxKind::EnumMarker => FlowType::Content,
-            SyntaxKind::ListMarker => FlowType::Content,
-            SyntaxKind::TermMarker => FlowType::Content,
-            SyntaxKind::MathAlignPoint => FlowType::Content,
-            SyntaxKind::MathPrimes => FlowType::Content,
+            SyntaxKind::Text => Ty::Content,
+            SyntaxKind::Linebreak => Ty::Content,
+            SyntaxKind::Escape => Ty::Content,
+            SyntaxKind::Shorthand => Ty::Content,
+            SyntaxKind::SmartQuote => Ty::Content,
+            SyntaxKind::Raw => Ty::Content,
+            SyntaxKind::RawLang => Ty::Content,
+            SyntaxKind::RawDelim => Ty::Content,
+            SyntaxKind::RawTrimmed => Ty::Content,
+            SyntaxKind::Link => Ty::Content,
+            SyntaxKind::Label => Ty::Content,
+            SyntaxKind::Ref => Ty::Content,
+            SyntaxKind::RefMarker => Ty::Content,
+            SyntaxKind::HeadingMarker => Ty::Content,
+            SyntaxKind::EnumMarker => Ty::Content,
+            SyntaxKind::ListMarker => Ty::Content,
+            SyntaxKind::TermMarker => Ty::Content,
+            SyntaxKind::MathAlignPoint => Ty::Content,
+            SyntaxKind::MathPrimes => Ty::Content,
 
             SyntaxKind::Strong => return self.check_children(root),
             SyntaxKind::Emph => return self.check_children(root),
@@ -196,17 +135,17 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::MathFrac => return self.check_children(root),
             SyntaxKind::MathRoot => return self.check_children(root),
 
-            SyntaxKind::LoopBreak => FlowType::None,
-            SyntaxKind::LoopContinue => FlowType::None,
-            SyntaxKind::FuncReturn => FlowType::None,
-            SyntaxKind::Error => FlowType::None,
-            SyntaxKind::Eof => FlowType::None,
+            SyntaxKind::LoopBreak => Ty::None,
+            SyntaxKind::LoopContinue => Ty::None,
+            SyntaxKind::FuncReturn => Ty::None,
+            SyntaxKind::Error => Ty::None,
+            SyntaxKind::Eof => Ty::None,
 
-            SyntaxKind::None => FlowType::None,
-            SyntaxKind::Auto => FlowType::Auto,
-            SyntaxKind::Break => FlowType::FlowNone,
-            SyntaxKind::Continue => FlowType::FlowNone,
-            SyntaxKind::Return => FlowType::FlowNone,
+            SyntaxKind::None => Ty::None,
+            SyntaxKind::Auto => Ty::Auto,
+            SyntaxKind::Break => Ty::FlowNone,
+            SyntaxKind::Continue => Ty::FlowNone,
+            SyntaxKind::Return => Ty::FlowNone,
             SyntaxKind::Ident => return self.check_ident(root, InterpretMode::Code),
             SyntaxKind::MathIdent => return self.check_ident(root, InterpretMode::Math),
             SyntaxKind::Bool
@@ -217,7 +156,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 return self
                     .ctx
                     .mini_eval(root.cast()?)
-                    .map(|v| (FlowType::Value(Box::new((v, Span::detached())))))
+                    .map(|v| (Ty::Value(InsTy::new(v))))
             }
             SyntaxKind::Parenthesized => return self.check_children(root),
             SyntaxKind::Array => return self.check_array(root),
@@ -241,66 +180,66 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::DestructAssignment => return self.check_destruct_assign(root),
 
             // Rest all are clauses
-            SyntaxKind::LineComment => FlowType::Clause,
-            SyntaxKind::BlockComment => FlowType::Clause,
-            SyntaxKind::Named => FlowType::Clause,
-            SyntaxKind::Keyed => FlowType::Clause,
-            SyntaxKind::Spread => FlowType::Clause,
-            SyntaxKind::Params => FlowType::Clause,
-            SyntaxKind::ImportItems => FlowType::Clause,
-            SyntaxKind::RenamedImportItem => FlowType::Clause,
-            SyntaxKind::Hash => FlowType::Clause,
-            SyntaxKind::LeftBrace => FlowType::Clause,
-            SyntaxKind::RightBrace => FlowType::Clause,
-            SyntaxKind::LeftBracket => FlowType::Clause,
-            SyntaxKind::RightBracket => FlowType::Clause,
-            SyntaxKind::LeftParen => FlowType::Clause,
-            SyntaxKind::RightParen => FlowType::Clause,
-            SyntaxKind::Comma => FlowType::Clause,
-            SyntaxKind::Semicolon => FlowType::Clause,
-            SyntaxKind::Colon => FlowType::Clause,
-            SyntaxKind::Star => FlowType::Clause,
-            SyntaxKind::Underscore => FlowType::Clause,
-            SyntaxKind::Dollar => FlowType::Clause,
-            SyntaxKind::Plus => FlowType::Clause,
-            SyntaxKind::Minus => FlowType::Clause,
-            SyntaxKind::Slash => FlowType::Clause,
-            SyntaxKind::Hat => FlowType::Clause,
-            SyntaxKind::Prime => FlowType::Clause,
-            SyntaxKind::Dot => FlowType::Clause,
-            SyntaxKind::Eq => FlowType::Clause,
-            SyntaxKind::EqEq => FlowType::Clause,
-            SyntaxKind::ExclEq => FlowType::Clause,
-            SyntaxKind::Lt => FlowType::Clause,
-            SyntaxKind::LtEq => FlowType::Clause,
-            SyntaxKind::Gt => FlowType::Clause,
-            SyntaxKind::GtEq => FlowType::Clause,
-            SyntaxKind::PlusEq => FlowType::Clause,
-            SyntaxKind::HyphEq => FlowType::Clause,
-            SyntaxKind::StarEq => FlowType::Clause,
-            SyntaxKind::SlashEq => FlowType::Clause,
-            SyntaxKind::Dots => FlowType::Clause,
-            SyntaxKind::Arrow => FlowType::Clause,
-            SyntaxKind::Root => FlowType::Clause,
-            SyntaxKind::Not => FlowType::Clause,
-            SyntaxKind::And => FlowType::Clause,
-            SyntaxKind::Or => FlowType::Clause,
-            SyntaxKind::Let => FlowType::Clause,
-            SyntaxKind::Set => FlowType::Clause,
-            SyntaxKind::Show => FlowType::Clause,
-            SyntaxKind::Context => FlowType::Clause,
-            SyntaxKind::If => FlowType::Clause,
-            SyntaxKind::Else => FlowType::Clause,
-            SyntaxKind::For => FlowType::Clause,
-            SyntaxKind::In => FlowType::Clause,
-            SyntaxKind::While => FlowType::Clause,
-            SyntaxKind::Import => FlowType::Clause,
-            SyntaxKind::Include => FlowType::Clause,
-            SyntaxKind::As => FlowType::Clause,
+            SyntaxKind::LineComment => Ty::Clause,
+            SyntaxKind::BlockComment => Ty::Clause,
+            SyntaxKind::Named => Ty::Clause,
+            SyntaxKind::Keyed => Ty::Clause,
+            SyntaxKind::Spread => Ty::Clause,
+            SyntaxKind::Params => Ty::Clause,
+            SyntaxKind::ImportItems => Ty::Clause,
+            SyntaxKind::RenamedImportItem => Ty::Clause,
+            SyntaxKind::Hash => Ty::Clause,
+            SyntaxKind::LeftBrace => Ty::Clause,
+            SyntaxKind::RightBrace => Ty::Clause,
+            SyntaxKind::LeftBracket => Ty::Clause,
+            SyntaxKind::RightBracket => Ty::Clause,
+            SyntaxKind::LeftParen => Ty::Clause,
+            SyntaxKind::RightParen => Ty::Clause,
+            SyntaxKind::Comma => Ty::Clause,
+            SyntaxKind::Semicolon => Ty::Clause,
+            SyntaxKind::Colon => Ty::Clause,
+            SyntaxKind::Star => Ty::Clause,
+            SyntaxKind::Underscore => Ty::Clause,
+            SyntaxKind::Dollar => Ty::Clause,
+            SyntaxKind::Plus => Ty::Clause,
+            SyntaxKind::Minus => Ty::Clause,
+            SyntaxKind::Slash => Ty::Clause,
+            SyntaxKind::Hat => Ty::Clause,
+            SyntaxKind::Prime => Ty::Clause,
+            SyntaxKind::Dot => Ty::Clause,
+            SyntaxKind::Eq => Ty::Clause,
+            SyntaxKind::EqEq => Ty::Clause,
+            SyntaxKind::ExclEq => Ty::Clause,
+            SyntaxKind::Lt => Ty::Clause,
+            SyntaxKind::LtEq => Ty::Clause,
+            SyntaxKind::Gt => Ty::Clause,
+            SyntaxKind::GtEq => Ty::Clause,
+            SyntaxKind::PlusEq => Ty::Clause,
+            SyntaxKind::HyphEq => Ty::Clause,
+            SyntaxKind::StarEq => Ty::Clause,
+            SyntaxKind::SlashEq => Ty::Clause,
+            SyntaxKind::Dots => Ty::Clause,
+            SyntaxKind::Arrow => Ty::Clause,
+            SyntaxKind::Root => Ty::Clause,
+            SyntaxKind::Not => Ty::Clause,
+            SyntaxKind::And => Ty::Clause,
+            SyntaxKind::Or => Ty::Clause,
+            SyntaxKind::Let => Ty::Clause,
+            SyntaxKind::Set => Ty::Clause,
+            SyntaxKind::Show => Ty::Clause,
+            SyntaxKind::Context => Ty::Clause,
+            SyntaxKind::If => Ty::Clause,
+            SyntaxKind::Else => Ty::Clause,
+            SyntaxKind::For => Ty::Clause,
+            SyntaxKind::In => Ty::Clause,
+            SyntaxKind::While => Ty::Clause,
+            SyntaxKind::Import => Ty::Clause,
+            SyntaxKind::Include => Ty::Clause,
+            SyntaxKind::As => Ty::Clause,
         })
     }
 
-    fn check_in_mode(&mut self, root: LinkedNode, into_mode: InterpretMode) -> Option<FlowType> {
+    fn check_in_mode(&mut self, root: LinkedNode, into_mode: InterpretMode) -> Option<Ty> {
         let mode = self.mode;
         self.mode = into_mode;
         let res = self.check_children(root);
@@ -308,7 +247,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         res
     }
 
-    fn check_children(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_children(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let mut joiner = Joiner::default();
 
         for child in root.children() {
@@ -317,7 +256,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         Some(joiner.finalize())
     }
 
-    fn check_ident(&mut self, root: LinkedNode<'_>, mode: InterpretMode) -> Option<FlowType> {
+    fn check_ident(&mut self, root: LinkedNode<'_>, mode: InterpretMode) -> Option<Ty> {
         let ident: ast::Ident = root.cast()?;
         let ident_ref = IdentRef {
             name: ident.get().to_string(),
@@ -327,32 +266,32 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let Some(var) = self.get_var(root.span(), ident_ref) else {
             let s = root.span();
             let v = resolve_global_value(self.ctx, root, mode == InterpretMode::Math)?;
-            return Some(FlowType::Value(Box::new((v, s))));
+            return Some(Ty::Value(InsTy::new_at(v, s)));
         };
 
-        Some(var.get_ref())
+        Some(var.as_type())
     }
 
-    fn check_array(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_array(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let _arr: ast::Array = root.cast()?;
 
-        let mut elements = EcoVec::new();
+        let mut elements = Vec::new();
 
         for elem in root.children() {
             let ty = self.check(elem);
-            if matches!(ty, FlowType::Clause | FlowType::Space) {
+            if matches!(ty, Ty::Clause | Ty::Space) {
                 continue;
             }
             elements.push(ty);
         }
 
-        Some(FlowType::Tuple(elements))
+        Some(Ty::Tuple(Interned::new(elements)))
     }
 
-    fn check_dict(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_dict(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let dict: ast::Dict = root.cast()?;
 
-        let mut fields = EcoVec::new();
+        let mut fields = Vec::new();
 
         for field in dict.items() {
             match field {
@@ -373,33 +312,33 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
         }
 
-        Some(FlowType::Dict(FlowRecord { fields }))
+        Some(Ty::Dict(RecordTy::new(fields)))
     }
 
-    fn check_unary(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_unary(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let unary: ast::Unary = root.cast()?;
 
         if let Some(constant) = self.ctx.mini_eval(ast::Expr::Unary(unary)) {
-            return Some(FlowType::Value(Box::new((constant, Span::detached()))));
+            return Some(Ty::Value(InsTy::new(constant)));
         }
 
         let op = unary.op();
 
-        let lhs = Box::new(self.check_expr_in(unary.expr().span(), root));
+        let lhs = Interned::new(self.check_expr_in(unary.expr().span(), root));
         let op = match op {
             ast::UnOp::Pos => UnaryOp::Pos,
             ast::UnOp::Neg => UnaryOp::Neg,
             ast::UnOp::Not => UnaryOp::Not,
         };
 
-        Some(FlowType::Unary(FlowUnaryType { op, lhs }))
+        Some(Ty::Unary(Interned::new(TypeUnary { op, lhs })))
     }
 
-    fn check_binary(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_binary(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let binary: ast::Binary = root.cast()?;
 
         if let Some(constant) = self.ctx.mini_eval(ast::Expr::Binary(binary)) {
-            return Some(FlowType::Value(Box::new((constant, Span::detached()))));
+            return Some(Ty::Value(InsTy::new(constant)));
         }
 
         let op = binary.op();
@@ -419,8 +358,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 self.check_comparable(&lhs, &rhs);
             }
             ast::BinOp::And | ast::BinOp::Or => {
-                self.constrain(&lhs, &FlowType::Boolean(None));
-                self.constrain(&rhs, &FlowType::Boolean(None));
+                self.constrain(&lhs, &Ty::Boolean(None));
+                self.constrain(&rhs, &Ty::Boolean(None));
             }
             ast::BinOp::NotIn | ast::BinOp::In => {
                 self.check_containing(&rhs, &lhs, op == ast::BinOp::In);
@@ -437,54 +376,49 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
         }
 
-        let res = FlowType::Binary(FlowBinaryType {
+        let res = Ty::Binary(Interned::new(TypeBinary {
             op,
-            operands: Box::new((lhs, rhs)),
-        });
+            operands: Interned::new((lhs, rhs)),
+        }));
 
         Some(res)
     }
 
-    fn check_field_access(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_field_access(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let field_access: ast::FieldAccess = root.cast()?;
 
-        let obj = self.check_expr_in(field_access.target().span(), root.clone());
+        let ty = self.check_expr_in(field_access.target().span(), root.clone());
         let field = field_access.field().get().clone();
 
-        Some(FlowType::At(FlowAt(Box::new((obj, field)))))
+        Some(Ty::Select(Interned::new(SelectTy {
+            ty: Interned::new(ty),
+            select: Interned::new_str(&field),
+        })))
     }
 
-    fn check_func_call(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_func_call(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let func_call: ast::FuncCall = root.cast()?;
 
         let args = self.check_expr_in(func_call.args().span(), root.clone());
         let callee = self.check_expr_in(func_call.callee().span(), root.clone());
-        let mut candidates = Vec::with_capacity(1);
 
         log::debug!("func_call: {callee:?} with {args:?}");
 
-        if let FlowType::Args(args) = args {
-            self.check_apply(
-                callee,
-                func_call.callee().span(),
-                &args,
-                &func_call.args(),
-                &mut candidates,
-            )?;
+        if let Ty::Args(args) = args {
+            let mut worker = ApplyTypeChecker {
+                base: self,
+                call_site: func_call.callee().span(),
+                args: func_call.args(),
+                resultant: None,
+            };
+            callee.call(&args, true, &mut worker);
+            return worker.resultant;
         }
 
-        if candidates.len() == 1 {
-            return Some(candidates[0].clone());
-        }
-
-        if candidates.is_empty() {
-            return Some(FlowType::Any);
-        }
-
-        Some(FlowType::Union(Box::new(candidates)))
+        None
     }
 
-    fn check_args(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_args(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let args: ast::Args = root.cast()?;
 
         let mut args_res = Vec::new();
@@ -505,13 +439,12 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
         }
 
-        Some(FlowType::Args(Box::new(FlowArgs {
-            args: args_res,
-            named,
-        })))
+        let args = ArgsTy::new(args_res.into_iter(), named.into_iter(), None, None);
+
+        Some(Ty::Args(Interned::new(args)))
     }
 
-    fn check_closure(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_closure(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let closure: ast::Closure = root.cast()?;
 
         // let _params = self.check_expr_in(closure.params().span(), root.clone());
@@ -523,21 +456,21 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         for param in closure.params().children() {
             match param {
                 ast::Param::Pos(pattern) => {
-                    pos.push(self.check_pattern(pattern, FlowType::Any, root.clone()));
+                    pos.push(self.check_pattern(pattern, Ty::Any, root.clone()));
                 }
                 ast::Param::Named(e) => {
                     let exp = self.check_expr_in(e.expr().span(), root.clone());
                     let v = self.get_var(e.name().span(), to_ident_ref(&root, e.name())?)?;
                     v.ever_be(exp);
-                    named.insert(e.name().get().clone(), v.get_ref());
+                    named.insert(e.name().get().clone(), v.as_type());
                 }
                 // todo: spread left/right
                 ast::Param::Spread(a) => {
                     if let Some(e) = a.sink_ident() {
-                        let exp = FlowType::Builtin(FlowBuiltinType::Args);
+                        let exp = Ty::Builtin(BuiltinTy::Args);
                         let v = self.get_var(e.span(), to_ident_ref(&root, e)?)?;
                         v.ever_be(exp);
-                        rest = Some(v.get_ref());
+                        rest = Some(v.as_type());
                     }
                     // todo: ..(args)
                 }
@@ -546,7 +479,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let body = self.check_expr_in(closure.body().span(), root);
 
-        let named: Vec<(EcoString, FlowType)> = named.into_iter().collect();
+        let named: Vec<(EcoString, Ty)> = named.into_iter().collect();
 
         // freeze the signature
         for pos in pos.iter() {
@@ -559,15 +492,11 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             self.weaken(rest);
         }
 
-        Some(FlowType::Func(Box::new(FlowSignature {
-            pos,
-            named,
-            rest,
-            ret: body,
-        })))
+        let sig = SigTy::new(pos.into_iter(), named.into_iter(), rest, Some(body));
+        Some(Ty::Func(Interned::new(sig)))
     }
 
-    fn check_let(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_let(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let let_binding: ast::LetBinding = root.cast()?;
 
         match let_binding.kind() {
@@ -576,7 +505,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 let value = let_binding
                     .init()
                     .map(|init| self.check_expr_in(init.span(), root.clone()))
-                    .unwrap_or_else(|| FlowType::Infer);
+                    .unwrap_or_else(|| Ty::Infer);
 
                 let v = self.get_var(c.span(), to_ident_ref(&root, c)?)?;
                 v.ever_be(value);
@@ -587,17 +516,17 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 let value = let_binding
                     .init()
                     .map(|init| self.check_expr_in(init.span(), root.clone()))
-                    .unwrap_or_else(|| FlowType::Infer);
+                    .unwrap_or_else(|| Ty::Infer);
 
                 self.check_pattern(pattern, value, root.clone());
             }
         }
 
-        Some(FlowType::Any)
+        Some(Ty::Any)
     }
 
     // todo: merge with func call, and regard difference (may be here)
-    fn check_set(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_set(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let set_rule: ast::SetRule = root.cast()?;
 
         let callee = self.check_expr_in(set_rule.target().span(), root.clone());
@@ -605,32 +534,24 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let _cond = set_rule
             .condition()
             .map(|cond| self.check_expr_in(cond.span(), root.clone()));
-        let mut candidates = Vec::with_capacity(1);
 
         log::debug!("set rule: {callee:?} with {args:?}");
 
-        if let FlowType::Args(args) = args {
-            self.check_apply(
-                callee,
-                set_rule.target().span(),
-                &args,
-                &set_rule.args(),
-                &mut candidates,
-            )?;
+        if let Ty::Args(args) = args {
+            let mut worker = ApplyTypeChecker {
+                base: self,
+                call_site: set_rule.target().span(),
+                args: set_rule.args(),
+                resultant: None,
+            };
+            callee.call(&args, true, &mut worker);
+            return worker.resultant;
         }
 
-        if candidates.len() == 1 {
-            return Some(candidates[0].clone());
-        }
-
-        if candidates.is_empty() {
-            return Some(FlowType::Any);
-        }
-
-        Some(FlowType::Union(Box::new(candidates)))
+        None
     }
 
-    fn check_show(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_show(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let show_rule: ast::ShowRule = root.cast()?;
 
         let _selector = show_rule
@@ -640,22 +561,22 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         // todo: infer it type by selector
         let _transform = self.check_expr_in(t.span(), root.clone());
 
-        Some(FlowType::Any)
+        Some(Ty::Any)
     }
 
     // currently we do nothing on contextual
-    fn check_contextual(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_contextual(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let contextual: ast::Contextual = root.cast()?;
 
         let body = self.check_expr_in(contextual.body().span(), root);
 
-        Some(FlowType::Unary(FlowUnaryType {
+        Some(Ty::Unary(Interned::new(TypeUnary {
             op: UnaryOp::Context,
-            lhs: Box::new(body),
-        }))
+            lhs: Interned::new(body),
+        })))
     }
 
-    fn check_conditional(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_conditional(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let conditional: ast::Conditional = root.cast()?;
 
         let cond = self.check_expr_in(conditional.condition().span(), root.clone());
@@ -663,57 +584,60 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let else_ = conditional
             .else_body()
             .map(|else_body| self.check_expr_in(else_body.span(), root.clone()))
-            .unwrap_or(FlowType::None);
+            .unwrap_or(Ty::None);
 
-        Some(FlowType::If(Box::new(FlowIfType { cond, then, else_ })))
+        let cond = Interned::new(cond);
+        let then = Interned::new(then);
+        let else_ = Interned::new(else_);
+        Some(Ty::If(Interned::new(IfTy { cond, then, else_ })))
     }
 
-    fn check_while_loop(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_while_loop(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let while_loop: ast::WhileLoop = root.cast()?;
 
         let _cond = self.check_expr_in(while_loop.condition().span(), root.clone());
         let _body = self.check_expr_in(while_loop.body().span(), root);
 
-        Some(FlowType::Any)
+        Some(Ty::Any)
     }
 
-    fn check_for_loop(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_for_loop(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let for_loop: ast::ForLoop = root.cast()?;
 
         let _iter = self.check_expr_in(for_loop.iterable().span(), root.clone());
         let _pattern = self.check_expr_in(for_loop.pattern().span(), root.clone());
         let _body = self.check_expr_in(for_loop.body().span(), root);
 
-        Some(FlowType::Any)
+        Some(Ty::Any)
     }
 
-    fn check_module_import(&mut self, root: LinkedNode<'_>) -> Option<FlowType> {
+    fn check_module_import(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let _module_import: ast::ModuleImport = root.cast()?;
 
         // check all import items
 
-        Some(FlowType::None)
+        Some(Ty::None)
     }
 
-    fn check_module_include(&mut self, _root: LinkedNode<'_>) -> Option<FlowType> {
-        Some(FlowType::Content)
+    fn check_module_include(&mut self, _root: LinkedNode<'_>) -> Option<Ty> {
+        Some(Ty::Content)
     }
 
-    fn check_destructuring(&mut self, _root: LinkedNode<'_>) -> Option<FlowType> {
-        Some(FlowType::Any)
+    fn check_destructuring(&mut self, _root: LinkedNode<'_>) -> Option<Ty> {
+        Some(Ty::Any)
     }
 
-    fn check_destruct_assign(&mut self, _root: LinkedNode<'_>) -> Option<FlowType> {
-        Some(FlowType::None)
+    fn check_destruct_assign(&mut self, _root: LinkedNode<'_>) -> Option<Ty> {
+        Some(Ty::None)
     }
 
-    fn check_expr_in(&mut self, span: Span, root: LinkedNode<'_>) -> FlowType {
+    fn check_expr_in(&mut self, span: Span, root: LinkedNode<'_>) -> Ty {
         root.find(span)
             .map(|node| self.check(node))
-            .unwrap_or(FlowType::Undef)
+            .unwrap_or(Ty::Undef)
     }
 
-    fn get_var(&mut self, s: Span, r: IdentRef) -> Option<&mut FlowVar> {
+    fn get_var(&mut self, s: Span, r: IdentRef) -> Option<&mut TypeVarBounds> {
         let def_id = self
             .def_use_info
             .get_ref(&r)
@@ -723,23 +647,26 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         #[allow(clippy::map_entry)]
         if !self.info.vars.contains_key(&def_id) {
             let def = self.check_external(def_id);
-            let kind = FlowVarKind::Strong(Arc::new(RwLock::new(self.init_var(def))));
+            let init_expr = self.init_var(def);
             self.info.vars.insert(
                 def_id,
-                FlowVar {
-                    name: r.name.into(),
-                    id: def_id,
-                    kind,
+                TypeVarBounds::new(
+                    TypeVar {
+                    name: Interned::new_str(&r.name),
+                        def: def_id,
+                        syntax: None,
                 },
+                    init_expr,
+                ),
             );
         }
 
         let var = self.info.vars.get_mut(&def_id).unwrap();
-        TypeCheckInfo::witness_(s, var.get_ref(), &mut self.info.mapping);
+        TypeCheckInfo::witness_(s, var.as_type(), &mut self.info.mapping);
         Some(var)
     }
 
-    fn check_external(&mut self, def_id: DefId) -> Option<FlowType> {
+    fn check_external(&mut self, def_id: DefId) -> Option<Ty> {
         if let Some(ty) = self.externals.get(&def_id) {
             return ty.clone();
         }
@@ -763,33 +690,28 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         Some(ext_type_info.simplify(ext_ty, false))
     }
 
-    fn check_pattern(
-        &mut self,
-        pattern: ast::Pattern<'_>,
-        value: FlowType,
-        root: LinkedNode<'_>,
-    ) -> FlowType {
+    fn check_pattern(&mut self, pattern: ast::Pattern<'_>, value: Ty, root: LinkedNode<'_>) -> Ty {
         self.check_pattern_(pattern, value, root)
-            .unwrap_or(FlowType::Undef)
+            .unwrap_or(Ty::Undef)
     }
 
     fn check_pattern_(
         &mut self,
         pattern: ast::Pattern<'_>,
-        value: FlowType,
+        value: Ty,
         root: LinkedNode<'_>,
-    ) -> Option<FlowType> {
+    ) -> Option<Ty> {
         Some(match pattern {
             ast::Pattern::Normal(ast::Expr::Ident(ident)) => {
                 let v = self.get_var(ident.span(), to_ident_ref(&root, ident)?)?;
                 v.ever_be(value);
                 v.get_ref()
             }
-            ast::Pattern::Normal(_) => FlowType::Any,
-            ast::Pattern::Placeholder(_) => FlowType::Any,
+            ast::Pattern::Normal(_) => Ty::Any,
+            ast::Pattern::Placeholder(_) => Ty::Any,
             ast::Pattern::Parenthesized(exp) => self.check_pattern(exp.pattern(), value, root),
             // todo: pattern
-            ast::Pattern::Destructuring(_destruct) => FlowType::Any,
+            ast::Pattern::Destructuring(_destruct) => Ty::Any,
         })
     }
 
@@ -1892,11 +1814,11 @@ fn to_ident_ref(root: &LinkedNode, c: ast::Ident) -> Option<IdentRef> {
 
 struct Joiner {
     break_or_continue_or_return: bool,
-    definite: FlowType,
-    possibles: Vec<FlowType>,
+    definite: Ty,
+    possibles: Vec<Ty>,
 }
 impl Joiner {
-    fn finalize(self) -> FlowType {
+    fn finalize(self) -> Ty {
         log::debug!("join: {:?} {:?}", self.possibles, self.definite);
         if self.possibles.is_empty() {
             return self.definite;
@@ -1912,68 +1834,64 @@ impl Joiner {
 
         // log::debug!("possibles: {:?} {:?}", self.definite, self.possibles);
 
-        FlowType::Any
+        Ty::Any
     }
 
-    fn join(&mut self, child: FlowType) {
+    fn join(&mut self, child: Ty) {
         if self.break_or_continue_or_return {
             return;
         }
 
         match (child, &self.definite) {
-            (FlowType::Clause, _) => {}
-            (FlowType::Undef, _) => {}
-            (FlowType::Space, _) => {}
-            (FlowType::Any, _) | (_, FlowType::Any) => {}
-            (FlowType::Infer, _) => {}
-            (FlowType::None, _) => {}
+            (Ty::Clause, _) => {}
+            (Ty::Undef, _) => {}
+            (Ty::Space, _) => {}
+            (Ty::Any, _) | (_, Ty::Any) => {}
+            (Ty::Infer, _) => {}
+            (Ty::None, _) => {}
             // todo: mystery flow none
-            (FlowType::FlowNone, _) => {}
-            (FlowType::Content, FlowType::Content) => {}
-            (FlowType::Content, FlowType::None) => self.definite = FlowType::Content,
-            (FlowType::Content, _) => self.definite = FlowType::Undef,
-            (FlowType::Var(v), _) => self.possibles.push(FlowType::Var(v)),
+            (Ty::FlowNone, _) => {}
+            (Ty::Content, Ty::Content) => {}
+            (Ty::Content, Ty::None) => self.definite = Ty::Content,
+            (Ty::Content, _) => self.definite = Ty::Undef,
+            (Ty::Var(v), _) => self.possibles.push(Ty::Var(v)),
             // todo: check possibles
-            (FlowType::Array(e), FlowType::None) => self.definite = FlowType::Array(e),
-            (FlowType::Array(..), _) => self.definite = FlowType::Undef,
-            (FlowType::Tuple(e), FlowType::None) => self.definite = FlowType::Tuple(e),
-            (FlowType::Tuple(..), _) => self.definite = FlowType::Undef,
+            (Ty::Array(e), Ty::None) => self.definite = Ty::Array(e),
+            (Ty::Array(..), _) => self.definite = Ty::Undef,
+            (Ty::Tuple(e), Ty::None) => self.definite = Ty::Tuple(e),
+            (Ty::Tuple(..), _) => self.definite = Ty::Undef,
             // todo: possible some style
-            (FlowType::Auto, FlowType::None) => self.definite = FlowType::Auto,
-            (FlowType::Auto, _) => self.definite = FlowType::Undef,
-            (FlowType::Builtin(b), FlowType::None) => self.definite = FlowType::Builtin(b),
-            (FlowType::Builtin(..), _) => self.definite = FlowType::Undef,
+            (Ty::Auto, Ty::None) => self.definite = Ty::Auto,
+            (Ty::Auto, _) => self.definite = Ty::Undef,
+            (Ty::Builtin(b), Ty::None) => self.definite = Ty::Builtin(b),
+            (Ty::Builtin(..), _) => self.definite = Ty::Undef,
             // todo: value join
-            (FlowType::Value(v), FlowType::None) => self.definite = FlowType::Value(v),
-            (FlowType::Value(..), _) => self.definite = FlowType::Undef,
-            (FlowType::ValueDoc(v), FlowType::None) => self.definite = FlowType::ValueDoc(v),
-            (FlowType::ValueDoc(..), _) => self.definite = FlowType::Undef,
-            (FlowType::Element(e), FlowType::None) => self.definite = FlowType::Element(e),
-            (FlowType::Element(..), _) => self.definite = FlowType::Undef,
-            (FlowType::Func(f), FlowType::None) => self.definite = FlowType::Func(f),
-            (FlowType::Func(..), _) => self.definite = FlowType::Undef,
-            (FlowType::Dict(w), FlowType::None) => self.definite = FlowType::Dict(w),
-            (FlowType::Dict(..), _) => self.definite = FlowType::Undef,
-            (FlowType::With(w), FlowType::None) => self.definite = FlowType::With(w),
-            (FlowType::With(..), _) => self.definite = FlowType::Undef,
-            (FlowType::Args(w), FlowType::None) => self.definite = FlowType::Args(w),
-            (FlowType::Args(..), _) => self.definite = FlowType::Undef,
-            (FlowType::At(w), FlowType::None) => self.definite = FlowType::At(w),
-            (FlowType::At(..), _) => self.definite = FlowType::Undef,
-            (FlowType::Unary(w), FlowType::None) => self.definite = FlowType::Unary(w),
-            (FlowType::Unary(..), _) => self.definite = FlowType::Undef,
-            (FlowType::Binary(w), FlowType::None) => self.definite = FlowType::Binary(w),
-            (FlowType::Binary(..), _) => self.definite = FlowType::Undef,
-            (FlowType::If(w), FlowType::None) => self.definite = FlowType::If(w),
-            (FlowType::If(..), _) => self.definite = FlowType::Undef,
-            (FlowType::Union(w), FlowType::None) => self.definite = FlowType::Union(w),
-            (FlowType::Union(..), _) => self.definite = FlowType::Undef,
-            (FlowType::Let(w), FlowType::None) => self.definite = FlowType::Let(w),
-            (FlowType::Let(..), _) => self.definite = FlowType::Undef,
-            (FlowType::Field(w), FlowType::None) => self.definite = FlowType::Field(w),
-            (FlowType::Field(..), _) => self.definite = FlowType::Undef,
-            (FlowType::Boolean(b), FlowType::None) => self.definite = FlowType::Boolean(b),
-            (FlowType::Boolean(..), _) => self.definite = FlowType::Undef,
+            (Ty::Value(v), Ty::None) => self.definite = Ty::Value(v),
+            (Ty::Value(..), _) => self.definite = Ty::Undef,
+            (Ty::Func(f), Ty::None) => self.definite = Ty::Func(f),
+            (Ty::Func(..), _) => self.definite = Ty::Undef,
+            (Ty::Dict(w), Ty::None) => self.definite = Ty::Dict(w),
+            (Ty::Dict(..), _) => self.definite = Ty::Undef,
+            (Ty::With(w), Ty::None) => self.definite = Ty::With(w),
+            (Ty::With(..), _) => self.definite = Ty::Undef,
+            (Ty::Args(w), Ty::None) => self.definite = Ty::Args(w),
+            (Ty::Args(..), _) => self.definite = Ty::Undef,
+            (Ty::Select(w), Ty::None) => self.definite = Ty::Select(w),
+            (Ty::Select(..), _) => self.definite = Ty::Undef,
+            (Ty::Unary(w), Ty::None) => self.definite = Ty::Unary(w),
+            (Ty::Unary(..), _) => self.definite = Ty::Undef,
+            (Ty::Binary(w), Ty::None) => self.definite = Ty::Binary(w),
+            (Ty::Binary(..), _) => self.definite = Ty::Undef,
+            (Ty::If(w), Ty::None) => self.definite = Ty::If(w),
+            (Ty::If(..), _) => self.definite = Ty::Undef,
+            (Ty::Union(w), Ty::None) => self.definite = Ty::Union(w),
+            (Ty::Union(..), _) => self.definite = Ty::Undef,
+            (Ty::Let(w), Ty::None) => self.definite = Ty::Let(w),
+            (Ty::Let(..), _) => self.definite = Ty::Undef,
+            (Ty::Field(w), Ty::None) => self.definite = Ty::Field(w),
+            (Ty::Field(..), _) => self.definite = Ty::Undef,
+            (Ty::Boolean(b), Ty::None) => self.definite = Ty::Boolean(b),
+            (Ty::Boolean(..), _) => self.definite = Ty::Undef,
         }
     }
 }
@@ -1981,7 +1899,7 @@ impl Default for Joiner {
     fn default() -> Self {
         Self {
             break_or_continue_or_return: false,
-            definite: FlowType::None,
+            definite: Ty::None,
             possibles: Vec::new(),
         }
     }

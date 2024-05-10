@@ -1,8 +1,13 @@
 use core::fmt;
 use ecow::{EcoString, EcoVec};
 use once_cell::sync::OnceCell;
+use parking_lot::{Mutex, RwLock};
 use reflexo::vector::ir::DefId;
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::{hash_map::Entry, HashMap, HashSet},
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 use typst::{
     foundations::Value,
     syntax::{ast, Span, SyntaxNode},
@@ -10,10 +15,60 @@ use typst::{
 
 use crate::{
     adt::interner::{impl_internable, Interned},
-    analysis::{BuiltinTy, UnaryOp},
+    analysis::BuiltinTy,
 };
 
 pub type TyRef = Interned<Ty>;
+
+#[derive(Default)]
+pub(crate) struct TypeCheckInfo {
+    pub vars: HashMap<DefId, TypeVarBounds>,
+    pub mapping: HashMap<Span, Ty>,
+
+    pub(super) cano_cache: Mutex<TypeCanoStore>,
+}
+
+impl TypeCheckInfo {
+    // todo: distinguish at least, at most
+    pub fn witness_at_least(&mut self, site: Span, ty: Ty) {
+        Self::witness_(site, ty, &mut self.mapping);
+    }
+
+    pub fn witness_at_most(&mut self, site: Span, ty: Ty) {
+        Self::witness_(site, ty, &mut self.mapping);
+    }
+
+    pub(crate) fn witness_(site: Span, ty: Ty, mapping: &mut HashMap<Span, Ty>) {
+        if site.is_detached() {
+            return;
+        }
+
+        // todo: intersect/union
+        let site_store = mapping.entry(site);
+        match site_store {
+            Entry::Occupied(e) => match e.into_mut() {
+                Ty::Union(v) => {
+                    // v.push(ty);
+                    todo!()
+                }
+                e => {
+                    *e = Ty::from_types([e.clone(), ty].into_iter());
+                }
+            },
+            Entry::Vacant(e) => {
+                e.insert(ty);
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+pub(super) struct TypeCanoStore {
+    pub cano_cache: HashMap<(u128, bool), Ty>,
+    pub cano_local_cache: HashMap<(DefId, bool), Ty>,
+    pub negatives: HashSet<DefId>,
+    pub positives: HashSet<DefId>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeSource {
@@ -43,6 +98,24 @@ impl TypeSource {
                 Interned::new_str(name.as_str())
             })
             .clone()
+    }
+}
+
+pub trait TypeSurface {}
+
+pub trait TypeInterace {
+    fn bone(&self) -> &Interned<NameBone>;
+    fn interface(&self) -> impl Iterator<Item = (&Interned<str>, &Ty)>;
+}
+
+struct RefDebug<'a>(&'a Ty);
+
+impl<'a> fmt::Debug for RefDebug<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            Ty::Var(v) => write!(f, "@v{:?}", v.name()),
+            _ => write!(f, "{:?}", self.0),
+        }
     }
 }
 
@@ -102,6 +175,39 @@ impl NameBone {
     }
 }
 
+impl NameBone {
+    pub(crate) fn intersect_keys_enumerate<'a>(
+        &'a self,
+        rhs: &'a NameBone,
+    ) -> impl Iterator<Item = (usize, usize)> + 'a {
+        let mut lhs_iter = self.names.iter().enumerate();
+        let mut rhs_iter = rhs.names.iter().enumerate();
+
+        let mut lhs = lhs_iter.next();
+        let mut rhs = rhs_iter.next();
+
+        std::iter::from_fn(move || {
+            match (lhs, rhs) {
+                (Some((i, lhs_key)), Some((j, rhs_key))) => match lhs_key.cmp(rhs_key) {
+                    std::cmp::Ordering::Less => {
+                        lhs = lhs_iter.next();
+                    }
+                    std::cmp::Ordering::Greater => {
+                        rhs = rhs_iter.next();
+                    }
+                    std::cmp::Ordering::Equal => {
+                        lhs = lhs_iter.next();
+                        rhs = rhs_iter.next();
+                        return Some((i, j));
+                    }
+                },
+                _ => {}
+            }
+            None
+        })
+    }
+}
+
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct FieldTy {
     pub name: Interned<str>,
@@ -119,18 +225,104 @@ impl FieldTy {
     }
 }
 
-#[derive(Debug, Hash, Clone, PartialEq, Eq, Default)]
+#[derive(Hash, Clone, PartialEq, Eq, Default)]
 pub struct TypeBounds {
     pub lbs: EcoVec<Ty>,
     pub ubs: EcoVec<Ty>,
 }
 
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+impl fmt::Debug for TypeBounds {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // write!(f, "{}", self.name)
+        // also where
+        if !self.lbs.is_empty() {
+            write!(f, " ⪰ {:?}", self.lbs[0])?;
+            for lb in &self.lbs[1..] {
+                write!(f, " | {lb:?}")?;
+            }
+        }
+        if !self.ubs.is_empty() {
+            write!(f, " ⪯ {:?}", self.ubs[0])?;
+            for ub in &self.ubs[1..] {
+                write!(f, " & {ub:?}")?;
+            }
+        }
+        Ok(())
+    }
+}
+#[derive(Hash, Clone, PartialEq, Eq)]
 pub struct TypeVar {
     pub name: Interned<str>,
     pub def: DefId,
 
     pub syntax: Option<Interned<TypeSource>>,
+}
+
+impl fmt::Debug for TypeVar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "@{}", self.name)
+    }
+}
+
+#[derive(Clone)]
+pub(crate) enum FlowVarKind {
+    Strong(Arc<RwLock<TypeBounds>>),
+    Weak(Arc<RwLock<TypeBounds>>),
+}
+
+#[derive(Clone)]
+pub struct TypeVarBounds {
+    pub var: Interned<TypeVar>,
+    pub bounds: FlowVarKind,
+}
+
+impl fmt::Debug for TypeVarBounds {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.var)?;
+        match &self.bounds {
+            FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => write!(f, "{w:?}"),
+        }
+    }
+}
+
+impl TypeVarBounds {
+    pub fn name(&self) -> Interned<str> {
+        self.var.name.clone()
+    }
+
+    pub fn id(&self) -> DefId {
+        self.var.def
+    }
+
+    pub fn as_type(&self) -> Ty {
+        Ty::Var(self.var.clone())
+    }
+
+    pub(crate) fn new(var: TypeVar, init: TypeBounds) -> Self {
+        Self {
+            var: Interned::new(var),
+            bounds: FlowVarKind::Strong(Arc::new(RwLock::new(init))),
+        }
+    }
+
+    pub fn ever_be(&self, exp: Ty) {
+        match &self.bounds {
+            // FlowVarKind::Strong(_t) => {}
+            FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
+                let mut w = w.write();
+                w.lbs.push(exp.clone());
+            }
+        }
+    }
+
+    pub(crate) fn weaken(&mut self) {
+        match &self.bounds {
+            FlowVarKind::Strong(w) => {
+                self.bounds = FlowVarKind::Weak(w.clone());
+            }
+            FlowVarKind::Weak(_) => {}
+        }
+    }
 }
 
 impl TypeVar {
@@ -151,7 +343,7 @@ impl TypeVar {
     }
 }
 
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#[derive(Hash, Clone, PartialEq, Eq)]
 pub struct RecordTy {
     pub types: Interned<Vec<Ty>>,
     pub names: Interned<NameBone>,
@@ -179,6 +371,40 @@ impl RecordTy {
             names: Interned::new(names),
             syntax: None,
         })
+    }
+
+    pub(crate) fn intersect_keys<'a>(
+        &'a self,
+        rhs: &'a RecordTy,
+    ) -> impl Iterator<Item = (&Interned<str>, &Ty, &Ty)> + 'a {
+        self.names
+            .intersect_keys_enumerate(&rhs.names)
+            .filter_map(move |(i, j)| {
+                self.types
+                    .get(i)
+                    .and_then(|lhs| rhs.types.get(j).map(|rhs| (&self.names.names[i], lhs, rhs)))
+            })
+    }
+}
+
+impl TypeInterace for RecordTy {
+    fn bone(&self) -> &Interned<NameBone> {
+        &self.names
+    }
+
+    fn interface(&self) -> impl Iterator<Item = (&Interned<str>, &Ty)> {
+        self.names.names.iter().zip(self.types.iter())
+    }
+}
+
+impl fmt::Debug for RecordTy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("{")?;
+        interpersed(
+            f,
+            self.interface().map(|(name, ty)| ParamTy::Named(name, ty)),
+        )?;
+        f.write_str("}")
     }
 }
 
@@ -230,6 +456,10 @@ impl SigTy {
             has_free_variables: false,
             syntax: None,
         })
+    }
+
+    pub(crate) fn inputs(&self) -> impl Iterator<Item = &Ty> {
+        self.types.iter()
     }
 
     /// Dictionary constructor
@@ -350,16 +580,36 @@ impl fmt::Debug for SigTy {
 
 pub type ArgsTy = SigTy;
 
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#[derive(Hash, Clone, PartialEq, Eq)]
 pub struct SigWithTy {
     pub sig: TyRef,
     pub with: Interned<ArgsTy>,
 }
 
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+impl fmt::Debug for SigWithTy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}.with({:?})", self.sig, self.with)
+    }
+}
+
+#[derive(Hash, Clone, PartialEq, Eq)]
 pub struct SelectTy {
     pub ty: Interned<Ty>,
     pub select: Interned<str>,
+}
+
+impl fmt::Debug for SelectTy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}.{}", RefDebug(&self.ty), self.select)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub(crate) enum UnaryOp {
+    Pos,
+    Neg,
+    Not,
+    Context,
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
@@ -372,6 +622,12 @@ pub struct TypeUnary {
 pub struct TypeBinary {
     pub operands: Interned<(Ty, Ty)>,
     pub op: ast::BinOp,
+}
+
+impl TypeBinary {
+    pub fn repr(&self) -> &(Ty, Ty) {
+        &self.operands
+    }
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
@@ -464,6 +720,23 @@ impl fmt::Debug for Ty {
                     f.write_str("Boolean")
                 }
             }
+        }
+    }
+}
+
+impl Ty {
+    pub(crate) fn is_dict(&self) -> bool {
+        matches!(self, Ty::Dict(..))
+    }
+
+    pub(crate) fn from_types(e: impl ExactSizeIterator<Item = Ty>) -> Self {
+        if e.len() == 0 {
+            Ty::Any
+        } else if e.len() == 1 {
+            let mut e = e;
+            e.next().unwrap()
+        } else {
+            Ty::Union(Interned::new(e.collect()))
         }
     }
 }

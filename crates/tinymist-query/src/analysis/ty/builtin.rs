@@ -1,15 +1,15 @@
 use once_cell::sync::Lazy;
 use regex::RegexSet;
+use typst::{foundations::CastInfo, syntax::Span};
 use typst::{
     foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
     layout::Length,
-    syntax::Span,
 };
 
-use crate::ty::InsTy;
+use crate::{adt::interner::Interned, analysis::InsTy};
 
 use super::Ty;
-use crate::analysis::ty::{Interned, RecordTy};
+use crate::analysis::ty::RecordTy;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) enum PathPreference {
@@ -80,6 +80,85 @@ impl PathPreference {
             PathPreference::Bibliography => &BIB_REGSET,
             PathPreference::RawTheme => &RAW_THEME_REGSET,
             PathPreference::RawSyntax => &RAW_SYNTAX_REGSET,
+        }
+    }
+}
+
+impl Ty {
+    pub fn from_return_site(f: &Func, c: &'_ CastInfo) -> Option<Self> {
+        use typst::foundations::func::Repr;
+        match f.inner() {
+            Repr::Element(e) => return Some(Ty::Builtin(BuiltinTy::Element(*e))),
+            Repr::Closure(_) => {}
+            Repr::With(w) => return Ty::from_return_site(&w.0, c),
+            Repr::Native(_) => {}
+        };
+
+        let ty = match c {
+            CastInfo::Any => Ty::Any,
+            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), *doc)),
+            CastInfo::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
+            CastInfo::Union(e) => {
+                // flat union
+                let e = UnionIter(vec![e.as_slice().iter()]);
+
+                Ty::Union(Interned::new(
+                    e.flat_map(|e| Self::from_return_site(f, e)).collect(),
+                ))
+            }
+        };
+
+        Some(ty)
+    }
+
+    pub(crate) fn from_param_site(f: &Func, p: &ParamInfo, s: &CastInfo) -> Option<Ty> {
+        use typst::foundations::func::Repr;
+        match f.inner() {
+            Repr::Element(..) | Repr::Native(..) => {
+                if let Some(ty) = param_mapping(f, p) {
+                    return Some(ty);
+                }
+            }
+            Repr::Closure(_) => {}
+            Repr::With(w) => return Ty::from_param_site(&w.0, p, s),
+        };
+
+        let ty = match &s {
+            CastInfo::Any => Ty::Any,
+            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), *doc)),
+            CastInfo::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
+            CastInfo::Union(e) => {
+                // flat union
+                let e = UnionIter(vec![e.as_slice().iter()]);
+
+                Ty::Union(Interned::new(
+                    e.flat_map(|e| Self::from_param_site(f, p, e)).collect(),
+                ))
+            }
+        };
+
+        Some(ty)
+    }
+}
+
+struct UnionIter<'a>(Vec<std::slice::Iter<'a, CastInfo>>);
+
+impl<'a> Iterator for UnionIter<'a> {
+    type Item = &'a CastInfo;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let iter = self.0.last_mut()?;
+            if let Some(e) = iter.next() {
+                match e {
+                    CastInfo::Union(e) => {
+                        self.0.push(e.as_slice().iter());
+                    }
+                    _ => return Some(e),
+                }
+            } else {
+                self.0.pop();
+            }
         }
     }
 }
