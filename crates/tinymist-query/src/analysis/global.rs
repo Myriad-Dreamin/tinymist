@@ -867,7 +867,7 @@ impl<'w> AnalysisContext<'w> {
         let id = s.id()?;
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(source)?;
-        ty_chk.mapping.get(&s).cloned()
+        ty_chk.type_of(s)
     }
 
     pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<Ty> {
@@ -875,7 +875,7 @@ impl<'w> AnalysisContext<'w> {
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(source.clone())?;
 
-        post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.mapping.get(&k.span()).cloned())
+        post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.type_of(k.span()))
     }
 }
 

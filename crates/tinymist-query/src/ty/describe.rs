@@ -86,8 +86,6 @@ impl TypeDescriber {
             }
 
             results.push(res);
-
-            todo!()
         }
 
         if results.is_empty() {

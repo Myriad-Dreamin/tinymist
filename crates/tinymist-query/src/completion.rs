@@ -115,11 +115,11 @@ impl StatefulRequest for CompletionRequest {
                 if matches!(parent.kind(), SyntaxKind::Named | SyntaxKind::Args) {
                     let ty_chk = ctx.type_check(source.clone());
                     if let Some(ty_chk) = ty_chk {
-                        let ty = ty_chk.mapping.get(&cano_expr.span());
+                        let ty = ty_chk.type_of(cano_expr.span());
                         log::debug!("check string ty: {:?}", ty);
                         if let Some(Ty::Builtin(BuiltinTy::Path(path_filter))) = ty {
                             completion_result =
-                                complete_path(ctx, Some(cano_expr), &source, cursor, path_filter);
+                                complete_path(ctx, Some(cano_expr), &source, cursor, &path_filter);
                         }
                     }
                 }

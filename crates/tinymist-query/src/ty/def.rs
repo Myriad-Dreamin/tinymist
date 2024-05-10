@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use core::fmt;
 use ecow::{EcoString, EcoVec};
 use once_cell::sync::OnceCell;
@@ -23,7 +25,7 @@ pub type TyRef = Interned<Ty>;
 #[derive(Default)]
 pub(crate) struct TypeCheckInfo {
     pub vars: HashMap<DefId, TypeVarBounds>,
-    pub mapping: HashMap<Span, Ty>,
+    pub mapping: HashMap<Span, Vec<Ty>>,
 
     pub(super) cano_cache: Mutex<TypeCanoStore>,
 }
@@ -38,7 +40,7 @@ impl TypeCheckInfo {
         Self::witness_(site, ty, &mut self.mapping);
     }
 
-    pub(crate) fn witness_(site: Span, ty: Ty, mapping: &mut HashMap<Span, Ty>) {
+    pub(crate) fn witness_(site: Span, ty: Ty, mapping: &mut HashMap<Span, Vec<Ty>>) {
         if site.is_detached() {
             return;
         }
@@ -46,25 +48,26 @@ impl TypeCheckInfo {
         // todo: intersect/union
         let site_store = mapping.entry(site);
         match site_store {
-            Entry::Occupied(e) => match e.into_mut() {
-                Ty::Union(v) => {
-                    // v.push(ty);
-                    todo!()
-                }
-                e => {
-                    *e = Ty::from_types([e.clone(), ty].into_iter());
-                }
-            },
+            Entry::Occupied(e) => {
+                e.into_mut().push(ty);
+            }
             Entry::Vacant(e) => {
-                e.insert(ty);
+                e.insert(vec![ty]);
             }
         }
+    }
+
+    pub fn type_of(&self, site: Span) -> Option<Ty> {
+        self.mapping
+            .get(&site)
+            .cloned()
+            .map(|e| Ty::from_types(e.into_iter()))
     }
 }
 
 #[derive(Default)]
 pub(super) struct TypeCanoStore {
-    pub cano_cache: HashMap<(u128, bool), Ty>,
+    pub cano_cache: HashMap<(Ty, bool), Ty>,
     pub cano_local_cache: HashMap<(DefId, bool), Ty>,
     pub negatives: HashSet<DefId>,
     pub positives: HashSet<DefId>,
@@ -100,8 +103,6 @@ impl TypeSource {
             .clone()
     }
 }
-
-pub trait TypeSurface {}
 
 pub trait TypeInterace {
     fn bone(&self) -> &Interned<NameBone>;
@@ -186,24 +187,24 @@ impl NameBone {
         let mut lhs = lhs_iter.next();
         let mut rhs = rhs_iter.next();
 
-        std::iter::from_fn(move || {
-            match (lhs, rhs) {
-                (Some((i, lhs_key)), Some((j, rhs_key))) => match lhs_key.cmp(rhs_key) {
+        std::iter::from_fn(move || 'key_scanning: loop {
+            if let (Some((i, lhs_key)), Some((j, rhs_key))) = (lhs, rhs) {
+                match lhs_key.cmp(rhs_key) {
                     std::cmp::Ordering::Less => {
                         lhs = lhs_iter.next();
+                        continue 'key_scanning;
                     }
                     std::cmp::Ordering::Greater => {
                         rhs = rhs_iter.next();
+                        continue 'key_scanning;
                     }
                     std::cmp::Ordering::Equal => {
                         lhs = lhs_iter.next();
                         rhs = rhs_iter.next();
                         return Some((i, j));
                     }
-                },
-                _ => {}
+                }
             }
-            None
         })
     }
 }
@@ -417,9 +418,9 @@ enum ParamTy<'a> {
 impl fmt::Debug for ParamTy<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParamTy::Pos(ty) => write!(f, "{:?}", ty),
-            ParamTy::Named(name, ty) => write!(f, "{:?}: {:?}", name, ty),
-            ParamTy::Rest(ty) => write!(f, "...: {:?}", ty),
+            ParamTy::Pos(ty) => write!(f, "{ty:?}"),
+            ParamTy::Named(name, ty) => write!(f, "{name:?}: {ty:?}"),
+            ParamTy::Rest(ty) => write!(f, "...: {ty:?}[]"),
         }
     }
 }
@@ -496,10 +497,7 @@ impl SigTy {
         let spread_right = rest.is_some();
 
         let name_started = if spread_right { 1 } else { 0 } + types.len();
-        let types = pos
-            .chain(types.into_iter())
-            .chain(rest.into_iter())
-            .collect::<Vec<_>>();
+        let types = pos.chain(types).chain(rest).collect::<Vec<_>>();
 
         let name_started = (types.len() - name_started) as u32;
 
@@ -533,18 +531,18 @@ impl Default for SigTy {
 }
 
 impl SigTy {
-    fn positional_params(&self) -> impl Iterator<Item = &Ty> {
+    pub fn positional_params(&self) -> impl Iterator<Item = &Ty> {
         self.types.iter().take(self.name_started as usize)
     }
 
-    fn named_params(&self) -> impl Iterator<Item = (&Interned<str>, &Ty)> {
+    pub fn named_params(&self) -> impl Iterator<Item = (&Interned<str>, &Ty)> {
         let named_names = self.names.names.iter();
         let named_types = self.types.iter().skip(self.name_started as usize);
 
         named_names.zip(named_types)
     }
 
-    fn rest_param(&self) -> Option<&Ty> {
+    pub fn rest_param(&self) -> Option<&Ty> {
         if self.spread_right {
             self.types.last()
         } else {
@@ -552,7 +550,7 @@ impl SigTy {
         }
     }
 
-    fn named(&self, name: &Interned<str>) -> Option<&Ty> {
+    pub fn named(&self, name: &Interned<str>) -> Option<&Ty> {
         let idx = self.names.find(name)?;
         self.types.get(idx + self.name_started as usize)
     }
@@ -569,11 +567,11 @@ impl SigTy {
 impl fmt::Debug for SigTy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("(")?;
-        let pos = self.positional_params().map(|ty| ParamTy::Pos(ty));
+        let pos = self.positional_params().map(ParamTy::Pos);
         let named = self
             .named_params()
             .map(|(name, ty)| ParamTy::Named(name, ty));
-        let rest = self.rest_param().map(|ty| ParamTy::Rest(ty));
+        let rest = self.rest_param().map(ParamTy::Rest);
         interpersed(f, pos.chain(named).chain(rest))
     }
 }

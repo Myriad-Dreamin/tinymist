@@ -10,9 +10,9 @@ use typst::syntax::{ast, Span, SyntaxKind, SyntaxNode};
 use typst::visualize::Color;
 
 use super::{Completion, CompletionContext, CompletionKind};
+use crate::adt::interner::Interned;
 use crate::analysis::{
-    analyze_dyn_signature, analyze_import, resolve_call_target, FlowBuiltinType, FlowType,
-    PathPreference,
+    analyze_dyn_signature, analyze_import, resolve_call_target, BuiltinTy, PathPreference, Ty,
 };
 use crate::syntax::{param_index_at_leaf, CheckTarget};
 use crate::upstream::complete::complete_code;
@@ -33,7 +33,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         self.scope_completions_(parens, |v| v.map_or(false, &filter));
     }
 
-    fn seen_field(&mut self, field: EcoString) -> bool {
+    fn seen_field(&mut self, field: Interned<str>) -> bool {
         !self
             .seen_casts
             .insert(typst::util::hash128(&FieldName(field)))
@@ -287,8 +287,8 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             } else {
                 types
                     .and_then(|types| {
-                        let ty = types.mapping.get(&span)?;
-                        let ty = types.simplify(ty.clone(), false);
+                        let ty = types.type_of(span)?;
+                        let ty = types.simplify(ty, false);
                         types.describe(&ty).map(From::from)
                     })
                     .or_else(|| {
@@ -591,7 +591,7 @@ pub fn param_completions<'a>(
 
     for arg in args.items() {
         if let ast::Arg::Named(named) = arg {
-            ctx.seen_field(named.name().get().clone());
+            ctx.seen_field(named.name().get().into());
         }
     }
 
@@ -643,7 +643,7 @@ pub fn param_completions<'a>(
                 ..Completion::default()
             };
             match param.infer_type {
-                Some(FlowType::Builtin(FlowBuiltinType::TextSize)) => {
+                Some(Ty::Builtin(BuiltinTy::TextSize)) => {
                     for size_template in &[
                         "10.5pt", "12pt", "9pt", "14pt", "8pt", "16pt", "18pt", "20pt", "22pt",
                         "24pt", "28pt",
@@ -656,7 +656,7 @@ pub fn param_completions<'a>(
                         });
                     }
                 }
-                Some(FlowType::Builtin(FlowBuiltinType::Dir)) => {
+                Some(Ty::Builtin(BuiltinTy::Dir)) => {
                     for dir_template in &["ltr", "rtl", "ttb", "btt"] {
                         let compl = compl.clone();
                         ctx.completions.push(Completion {
@@ -691,7 +691,7 @@ pub fn param_completions<'a>(
 
 fn type_completion(
     ctx: &mut CompletionContext<'_, '_>,
-    infer_type: Option<&FlowType>,
+    infer_type: Option<&Ty>,
     docs: Option<&str>,
 ) -> Option<()> {
     // Prevent duplicate completions from appearing.
@@ -702,44 +702,44 @@ fn type_completion(
     log::info!("type_completion: {:?}", infer_type);
 
     match infer_type? {
-        FlowType::Clause => return None,
-        FlowType::Undef => return None,
-        FlowType::Space => return None,
-        FlowType::Content => return None,
-        FlowType::Any => return None,
-        FlowType::Tuple(..) | FlowType::Array(..) => {
+        Ty::Clause => return None,
+        Ty::Undef => return None,
+        Ty::Space => return None,
+        Ty::Content => return None,
+        Ty::Any => return None,
+        Ty::Tuple(..) | Ty::Array(..) => {
             ctx.snippet_completion("()", "(${})", "An array.");
         }
-        FlowType::Dict(..) => {
+        Ty::Dict(..) => {
             ctx.snippet_completion("()", "(${})", "A dictionary.");
         }
-        FlowType::None => ctx.snippet_completion("none", "none", "Nothing."),
-        FlowType::Infer => return None,
-        FlowType::FlowNone => return None,
-        FlowType::Auto => {
+        Ty::None => ctx.snippet_completion("none", "none", "Nothing."),
+        Ty::Infer => return None,
+        Ty::FlowNone => return None,
+        Ty::Auto => {
             ctx.snippet_completion("auto", "auto", "A smart default.");
         }
-        FlowType::Boolean(_b) => {
+        Ty::Boolean(_b) => {
             ctx.snippet_completion("false", "false", "No / Disabled.");
             ctx.snippet_completion("true", "true", "Yes / Enabled.");
         }
-        FlowType::Field(f) => {
-            let f = f.0.clone();
+        Ty::Field(f) => {
+            let f = &f.name;
             if ctx.seen_field(f.clone()) {
                 return Some(());
             }
 
             ctx.completions.push(Completion {
                 kind: CompletionKind::Field,
-                label: f.clone(),
+                label: f.into(),
                 apply: Some(eco_format!("{}: ${{}}", f)),
                 detail: docs.map(Into::into),
                 command: Some("tinymist.triggerNamedCompletion"),
                 ..Completion::default()
             });
         }
-        FlowType::Builtin(v) => match v {
-            FlowBuiltinType::Path(p) => {
+        Ty::Builtin(v) => match v {
+            BuiltinTy::Path(p) => {
                 let source = ctx.ctx.source_by_id(ctx.root.span().id()?).ok()?;
 
                 ctx.completions2.extend(
@@ -748,14 +748,14 @@ fn type_completion(
                         .flatten(),
                 );
             }
-            FlowBuiltinType::Args => return None,
-            FlowBuiltinType::Stroke => {
+            BuiltinTy::Args => return None,
+            BuiltinTy::Stroke => {
                 ctx.snippet_completion("stroke()", "stroke(${})", "Stroke type.");
                 ctx.snippet_completion("()", "(${})", "Stroke dictionary.");
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Color)), docs);
-                type_completion(ctx, Some(&FlowType::Builtin(FlowBuiltinType::Length)), docs);
+                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Color)), docs);
+                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Length)), docs);
             }
-            FlowBuiltinType::Color => {
+            BuiltinTy::Color => {
                 ctx.snippet_completion("luma()", "luma(${v})", "A custom grayscale color.");
                 ctx.snippet_completion(
                     "rgb()",
@@ -913,6 +913,8 @@ fn type_completion(
         Ty::Binary(_) => return None,
         Ty::If(_) => return None,
         Ty::Value(v) => {
+            let docs = v.syntax.as_ref().map(|s| s.doc.as_ref()).or(docs);
+
             // Prevent duplicate completions from appearing.
             if !ctx.seen_casts.insert(typst::util::hash128(&v.val)) {
                 return Some(());
@@ -928,34 +930,20 @@ fn type_completion(
                 ctx.value_completion(None, &v.val, true, docs);
             }
         }
-        FlowType::ValueDoc(v) => {
-            let (value, docs) = v.as_ref();
-            type_completion(
-                ctx,
-                Some(&FlowType::Value(Box::new((
-                    value.clone(),
-                    Span::detached(),
-                )))),
-                Some(*docs),
-            );
-        }
-        FlowType::Element(e) => {
-            ctx.value_completion(Some(e.name().into()), &Value::Func((*e).into()), true, docs);
-        } // CastInfo::Any => {}
     };
 
     Some(())
 }
 
 #[derive(Debug, Clone, Hash)]
-struct FieldName(EcoString);
+struct FieldName(Interned<str>);
 
 /// Add completions for the values of a named function parameter.
 pub fn named_param_value_completions<'a>(
     ctx: &mut CompletionContext<'a, '_>,
     callee: ast::Expr<'a>,
     name: &str,
-    ty: Option<&FlowType>,
+    ty: Option<&Ty>,
 ) {
     let Some(cc) = ctx
         .root
@@ -1052,7 +1040,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
             if let Some(container) = container.cast::<ast::Dict>() {
                 for named in container.items() {
                     if let ast::DictItem::Named(named) = named {
-                        ctx.seen_field(named.name().get().clone());
+                        ctx.seen_field(named.name().get().into());
                     }
                 }
             };
@@ -1061,7 +1049,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
             let args = args.cast::<ast::Args>()?;
             for arg in args.items() {
                 if let ast::Arg::Named(named) = arg {
-                    ctx.seen_field(named.name().get().clone());
+                    ctx.seen_field(named.name().get().into());
                 }
             }
         }
@@ -1073,7 +1061,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     let ty = ctx
         .ctx
         .literal_type_of_node(ctx.leaf.clone())
-        .filter(|ty| !matches!(ty, FlowType::Any))?;
+        .filter(|ty| !matches!(ty, Ty::Any))?;
 
     log::debug!("complete_type: ty  {:?} -> {:#?}", ctx.leaf, ty);
     // log::debug!("complete_type: before {:?}", ctx.before.chars().last());
