@@ -4,7 +4,8 @@
 //!
 //! todo: This is less efficient as the arc object will change its reference
 //! count every time it is cloned. todo: we may be able to optimize use by
-//! following approach: ```plain
+//! following approach:
+//! ```plain
 //! fn run_analyze(f) {
 //!   let local = thread_local_intern();
 //!   let res = f(local);

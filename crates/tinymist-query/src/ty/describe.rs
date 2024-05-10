@@ -78,12 +78,14 @@ impl TypeDescriber {
                 res.push_str(self.describe_root(r).as_deref().unwrap_or(""));
                 res.push_str("[]");
             }
-            res.push(')');
-
-            if let Some(ret) = &f.ret {
-                res.push_str(" => ");
-                res.push_str(self.describe_root(ret).as_deref().unwrap_or("any"));
-            }
+            res.push_str(") => ");
+            res.push_str(
+                f.ret
+                    .as_ref()
+                    .and_then(|ret| self.describe_root(ret))
+                    .as_deref()
+                    .unwrap_or("any"),
+            );
 
             results.push(res);
         }

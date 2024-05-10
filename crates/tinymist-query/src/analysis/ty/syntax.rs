@@ -333,10 +333,10 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 base: self,
                 call_site: func_call.callee().span(),
                 args: func_call.args(),
-                resultant: None,
+                resultant: vec![],
             };
             callee.call(&args, true, &mut worker);
-            return worker.resultant;
+            return Some(Ty::from_types(worker.resultant.into_iter()));
         }
 
         None
@@ -466,10 +466,10 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 base: self,
                 call_site: set_rule.target().span(),
                 args: set_rule.args(),
-                resultant: None,
+                resultant: vec![],
             };
             callee.call(&args, true, &mut worker);
-            return worker.resultant;
+            return Some(Ty::from_types(worker.resultant.into_iter()));
         }
 
         None

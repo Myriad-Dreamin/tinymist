@@ -13,7 +13,7 @@ use parking_lot::RwLock;
 use reflexo::hash::hash128;
 use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
 use typst::eval::Eval;
-use typst::foundations;
+use typst::foundations::{self, Func};
 use typst::syntax::{LinkedNode, SyntaxNode};
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
@@ -25,9 +25,11 @@ use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
 use super::{
-    analyze_bib, post_type_check, BibInfo, DefUseInfo, ImportInfo, PathPreference, Signature,
-    SignatureTarget, Ty, TypeCheckInfo,
+    analyze_bib, post_type_check, BibInfo, DefUseInfo, ImportInfo, PathPreference, SigTy,
+    Signature, SignatureTarget, Ty, TypeCheckInfo,
 };
+use crate::adt::interner::Interned;
+use crate::analysis::analyze_dyn_signature;
 use crate::path_to_url;
 use crate::syntax::{get_deref_target, resolve_id_by_path, DerefTarget};
 use crate::{
@@ -861,6 +863,11 @@ impl<'w> AnalysisContext<'w> {
 
     pub(crate) fn type_of(&mut self, rr: &SyntaxNode) -> Option<Ty> {
         self.type_of_span(rr.span())
+    }
+
+    pub(crate) fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>> {
+        log::debug!("check runtime func {func:?}");
+        Some(analyze_dyn_signature(self, func.clone()).type_sig())
     }
 
     pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {

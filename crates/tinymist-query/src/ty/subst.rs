@@ -15,24 +15,12 @@ impl<'a> Sig<'a> {
     }
 
     pub fn check_bind(&self, args: &Interned<ArgsTy>) -> Option<(HashMap<DefId, Ty>, Option<Ty>)> {
-        let (cano_sig, withs) = match *self {
-            Sig::With { sig, withs } => (sig, Some(withs)),
-            _ => (self, None),
-        };
+        let SigShape { sig, withs } = self.shape(None)?;
 
-        let sig_ins = match *cano_sig {
-            Sig::ArrayCons(a) => SigTy::array_cons(a.as_ref().clone(), false),
-            Sig::DictCons(d) => SigTy::dict_cons(d, false),
-            Sig::Value(_v) => return None,
-            // todo
-            Sig::With { .. } => return None,
-            Sig::Type(t) => t.clone(),
-        };
-
-        let has_free_vars = sig_ins.has_free_variables;
+        let has_free_vars = sig.has_free_variables;
 
         let mut arguments = HashMap::new();
-        for (arg_recv, arg_ins) in sig_ins.matches(args, withs) {
+        for (arg_recv, arg_ins) in sig.matches(args, withs) {
             if has_free_vars {
                 if let Ty::Var(arg_recv) = arg_recv {
                     arguments.insert(arg_recv.def, arg_ins.clone());
@@ -40,7 +28,7 @@ impl<'a> Sig<'a> {
             }
         }
 
-        Some((arguments, sig_ins.ret.clone()))
+        Some((arguments, sig.ret.clone()))
     }
 }
 

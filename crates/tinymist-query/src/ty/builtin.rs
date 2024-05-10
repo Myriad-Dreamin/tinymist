@@ -1,3 +1,5 @@
+use core::fmt;
+
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use typst::{foundations::CastInfo, syntax::Span};
@@ -160,7 +162,7 @@ impl<'a> Iterator for UnionIter<'a> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq)]
 pub(crate) enum BuiltinTy {
     Args,
     Color,
@@ -182,6 +184,30 @@ pub(crate) enum BuiltinTy {
     Type(typst::foundations::Type),
     Element(typst::foundations::Element),
     Path(PathPreference),
+}
+
+impl fmt::Debug for BuiltinTy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BuiltinTy::Args => write!(f, "Args"),
+            BuiltinTy::Color => write!(f, "Color"),
+            BuiltinTy::TextSize => write!(f, "TextSize"),
+            BuiltinTy::TextFont => write!(f, "TextFont"),
+            BuiltinTy::TextLang => write!(f, "TextLang"),
+            BuiltinTy::TextRegion => write!(f, "TextRegion"),
+            BuiltinTy::Dir => write!(f, "Dir"),
+            BuiltinTy::Length => write!(f, "Length"),
+            BuiltinTy::Float => write!(f, "Float"),
+            BuiltinTy::Stroke => write!(f, "Stroke"),
+            BuiltinTy::Margin => write!(f, "Margin"),
+            BuiltinTy::Inset => write!(f, "Inset"),
+            BuiltinTy::Outset => write!(f, "Outset"),
+            BuiltinTy::Radius => write!(f, "Radius"),
+            BuiltinTy::Type(ty) => write!(f, "Type({})", ty.long_name()),
+            BuiltinTy::Element(e) => e.fmt(f),
+            BuiltinTy::Path(p) => write!(f, "Path({p:?})"),
+        }
+    }
 }
 
 impl BuiltinTy {

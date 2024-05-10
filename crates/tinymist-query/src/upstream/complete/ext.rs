@@ -467,9 +467,8 @@ fn describe_value(ctx: &mut AnalysisContext, v: &Value) -> EcoString {
 
             let sig = analyze_dyn_signature(ctx, f.clone());
             sig.primary()
-                .sig_ty
-                .as_ref()
-                .and_then(|e| e.describe())
+                .ty()
+                .describe()
                 .unwrap_or_else(|| "function".into())
                 .into()
         }
@@ -634,7 +633,7 @@ pub fn param_completions<'a>(
 
         if param.named {
             let compl = Completion {
-                kind: CompletionKind::Param,
+                kind: CompletionKind::Field,
                 label: param.name.clone().into(),
                 apply: Some(eco_format!("{}: ${{}}", param.name)),
                 detail: Some(plain_docs_sentence(&param.docs)),

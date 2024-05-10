@@ -2,15 +2,61 @@ use typst::foundations::{Func, Value};
 
 use crate::{adt::interner::Interned, analysis::*, ty::def::*};
 
+#[derive(Debug, Clone, Copy)]
 pub enum Sig<'a> {
     Type(&'a Interned<SigTy>),
     ArrayCons(&'a TyRef),
     DictCons(&'a Interned<RecordTy>),
-    Value(&'a Func),
+    Value {
+        val: &'a Func,
+        at: &'a Ty,
+    },
+    Partialize(&'a Sig<'a>),
     With {
         sig: &'a Sig<'a>,
         withs: &'a Vec<Interned<ArgsTy>>,
+        at: &'a Ty,
     },
+}
+
+pub struct SigShape<'a> {
+    pub sig: Interned<SigTy>,
+    pub withs: Option<&'a Vec<Interned<SigTy>>>,
+}
+
+impl<'a> Sig<'a> {
+    pub fn ty(self) -> Option<Ty> {
+        Some(match self {
+            Sig::Type(t) => Ty::Func(t.clone()),
+            Sig::ArrayCons(t) => Ty::Array(t.clone()),
+            Sig::DictCons(t) => Ty::Dict(t.clone()),
+            Sig::Value { at, .. } => at.clone(),
+            Sig::With { at, .. } => at.clone(),
+            Sig::Partialize(..) => return None,
+        })
+    }
+
+    pub fn shape(self, ctx: Option<&mut AnalysisContext>) -> Option<SigShape<'a>> {
+        let (cano_sig, withs) = match self {
+            Sig::With { sig, withs, .. } => (*sig, Some(withs)),
+            _ => (self, None),
+        };
+
+        let sig_ins = match cano_sig {
+            Sig::ArrayCons(a) => SigTy::array_cons(a.as_ref().clone(), false),
+            Sig::DictCons(d) => SigTy::dict_cons(d, false),
+            Sig::Value { val, .. } => ctx?.type_of_func(val)?,
+            // todo
+            Sig::Partialize(..) => return None,
+            Sig::With { .. } => return None,
+            Sig::Type(t) => t.clone(),
+        };
+
+        Some(SigShape {
+            sig: sig_ins,
+            withs,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,6 +88,7 @@ impl Ty {
         let context = SigCheckContext {
             sig_kind,
             args: Vec::new(),
+            at: TyRef::new(Ty::Any),
         };
         let mut worker = SigCheckDriver {
             ctx: context,
@@ -55,6 +102,7 @@ impl Ty {
 pub struct SigCheckContext {
     pub sig_kind: SigSurfaceKind,
     pub args: Vec<Interned<SigTy>>,
+    pub at: TyRef,
 }
 
 pub struct SigCheckDriver<'a> {
@@ -107,14 +155,16 @@ impl<'a> SigCheckDriver<'a> {
             Ty::Value(v) => {
                 if self.func_as_sig() {
                     if let Value::Func(f) = &v.val {
-                        self.checker.check(Sig::Value(f), &mut self.ctx, pol);
+                        self.checker
+                            .check(Sig::Value { val: f, at: ty }, &mut self.ctx, pol);
                     }
                 }
             }
             Ty::Builtin(BuiltinTy::Element(e)) if self.func_as_sig() => {
                 // todo: distinguish between element and function
                 let f = (*e).into();
-                self.checker.check(Sig::Value(&f), &mut self.ctx, pol);
+                self.checker
+                    .check(Sig::Value { val: &f, at: ty }, &mut self.ctx, pol);
             }
             Ty::Func(sig) if self.func_as_sig() => {
                 self.checker.check(Sig::Type(sig), &mut self.ctx, pol);
@@ -170,7 +220,11 @@ impl<'a, 'b> BoundChecker for MethodDriver<'a, 'b> {
             Ty::Value(v) => {
                 if let Value::Func(f) = &v.val {
                     if self.is_binder() {
-                        self.0.checker.check(Sig::Value(f), &mut self.0.ctx, pol);
+                        self.0.checker.check(
+                            Sig::Partialize(&Sig::Value { val: f, at: ty }),
+                            &mut self.0.ctx,
+                            pol,
+                        );
                     } else {
                         // todo: general select operator
                     }
@@ -180,7 +234,11 @@ impl<'a, 'b> BoundChecker for MethodDriver<'a, 'b> {
                 // todo: distinguish between element and function
                 if self.is_binder() {
                     let f = (*e).into();
-                    self.0.checker.check(Sig::Value(&f), &mut self.0.ctx, pol);
+                    self.0.checker.check(
+                        Sig::Partialize(&Sig::Value { val: &f, at: ty }),
+                        &mut self.0.ctx,
+                        pol,
+                    );
                 } else {
                     // todo: general select operator
                 }

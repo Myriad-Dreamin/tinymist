@@ -6,30 +6,17 @@ input_file: crates/tinymist-query/src/fixtures/type_check/text_font.typ
 "x" = "Test"
 "y" = ("Test", )
 ---
-1..5 -> Func(text)
+1..5 -> (Type(content), Type(string), "alternates": Type(boolean), "baseline": Type(length), "bottom-edge": ("baseline" | "descender" | "bounds" | Type(length)), "cjk-latin-spacing": (Type(none) | Type(auto)), "dir": Dir, "discretionary-ligatures": Type(boolean), "fallback": Type(boolean), "features": (Type(array) | Type(dictionary)), "fill": Color, "font": (TextFont | Array<TextFont>), "fractions": Type(boolean), "historical-ligatures": Type(boolean), "hyphenate": (Type(boolean) | Type(auto)), "kerning": Type(boolean), "lang": TextLang, "ligatures": Type(boolean), "number-type": ("lining" | "old-style" | Type(auto)), "number-width": ("proportional" | "tabular" | Type(auto)), "overhang": Type(boolean), "region": TextRegion, "script": (Type(string) | Type(auto)), "size": TextSize, "slashed-zero": Type(boolean), "spacing": Type(relative length), "stretch": Type(ratio), "stroke": Stroke, "style": ("normal" | "italic" | "oblique"), "stylistic-set": (Type(integer) | Type(none)), "top-edge": ("ascender" | "cap-height" | "x-height" | "baseline" | "bounds" | Type(length)), "tracking": Type(length), "weight": (Type(integer) | "thin" | "extralight" | "light" | "regular" | "medium" | "semibold" | "bold" | "extrabold" | "black")) => Element(text)
 1..21 -> Element(text)
-6..18 -> (TextFont | Array<TextFont>)
-12..18 -> (TextFont | Array<TextFont>)
-19..21 -> Type(content)
-23..27 -> Func(text)
+23..27 -> (Type(content), Type(string), "alternates": Type(boolean), "baseline": Type(length), "bottom-edge": ("baseline" | "descender" | "bounds" | Type(length)), "cjk-latin-spacing": (Type(none) | Type(auto)), "dir": Dir, "discretionary-ligatures": Type(boolean), "fallback": Type(boolean), "features": (Type(array) | Type(dictionary)), "fill": Color, "font": (TextFont | Array<TextFont>), "fractions": Type(boolean), "historical-ligatures": Type(boolean), "hyphenate": (Type(boolean) | Type(auto)), "kerning": Type(boolean), "lang": TextLang, "ligatures": Type(boolean), "number-type": ("lining" | "old-style" | Type(auto)), "number-width": ("proportional" | "tabular" | Type(auto)), "overhang": Type(boolean), "region": TextRegion, "script": (Type(string) | Type(auto)), "size": TextSize, "slashed-zero": Type(boolean), "spacing": Type(relative length), "stretch": Type(ratio), "stroke": Stroke, "style": ("normal" | "italic" | "oblique"), "stylistic-set": (Type(integer) | Type(none)), "top-edge": ("ascender" | "cap-height" | "x-height" | "baseline" | "bounds" | Type(length)), "tracking": Type(length), "weight": (Type(integer) | "thin" | "extralight" | "light" | "regular" | "medium" | "semibold" | "bold" | "extrabold" | "black")) => Element(text)
 23..39 -> Element(text)
-28..36 -> (TextFont | Array<TextFont>)
-34..36 -> (TextFont | Array<TextFont>)
-37..39 -> Type(content)
-41..45 -> Func(text)
+41..45 -> (Type(content), Type(string), "alternates": Type(boolean), "baseline": Type(length), "bottom-edge": ("baseline" | "descender" | "bounds" | Type(length)), "cjk-latin-spacing": (Type(none) | Type(auto)), "dir": Dir, "discretionary-ligatures": Type(boolean), "fallback": Type(boolean), "features": (Type(array) | Type(dictionary)), "fill": Color, "font": (TextFont | Array<TextFont>), "fractions": Type(boolean), "historical-ligatures": Type(boolean), "hyphenate": (Type(boolean) | Type(auto)), "kerning": Type(boolean), "lang": TextLang, "ligatures": Type(boolean), "number-type": ("lining" | "old-style" | Type(auto)), "number-width": ("proportional" | "tabular" | Type(auto)), "overhang": Type(boolean), "region": TextRegion, "script": (Type(string) | Type(auto)), "size": TextSize, "slashed-zero": Type(boolean), "spacing": Type(relative length), "stretch": Type(ratio), "stroke": Stroke, "style": ("normal" | "italic" | "oblique"), "stylistic-set": (Type(integer) | Type(none)), "top-edge": ("ascender" | "cap-height" | "x-height" | "baseline" | "bounds" | Type(length)), "tracking": Type(length), "weight": (Type(integer) | "thin" | "extralight" | "light" | "regular" | "medium" | "semibold" | "bold" | "extrabold" | "black")) => Element(text)
 41..64 -> Element(text)
-46..61 -> (TextFont | Array<TextFont>)
-52..61 -> (TextFont | Array<TextFont>)
-62..64 -> Type(content)
 70..71 -> @x
-82..86 -> Func(text)
+82..86 -> (Type(content), Type(string), "alternates": Type(boolean), "baseline": Type(length), "bottom-edge": ("baseline" | "descender" | "bounds" | Type(length)), "cjk-latin-spacing": (Type(none) | Type(auto)), "dir": Dir, "discretionary-ligatures": Type(boolean), "fallback": Type(boolean), "features": (Type(array) | Type(dictionary)), "fill": Color, "font": (TextFont | Array<TextFont>), "fractions": Type(boolean), "historical-ligatures": Type(boolean), "hyphenate": (Type(boolean) | Type(auto)), "kerning": Type(boolean), "lang": TextLang, "ligatures": Type(boolean), "number-type": ("lining" | "old-style" | Type(auto)), "number-width": ("proportional" | "tabular" | Type(auto)), "overhang": Type(boolean), "region": TextRegion, "script": (Type(string) | Type(auto)), "size": TextSize, "slashed-zero": Type(boolean), "spacing": Type(relative length), "stretch": Type(ratio), "stroke": Stroke, "style": ("normal" | "italic" | "oblique"), "stylistic-set": (Type(integer) | Type(none)), "top-edge": ("ascender" | "cap-height" | "x-height" | "baseline" | "bounds" | Type(length)), "tracking": Type(length), "weight": (Type(integer) | "thin" | "extralight" | "light" | "regular" | "medium" | "semibold" | "bold" | "extrabold" | "black")) => Element(text)
 82..97 -> Element(text)
-87..94 -> (TextFont | Array<TextFont>)
-93..94 -> (@x | (TextFont | Array<TextFont>))
-95..97 -> Type(content)
+93..94 -> @x
 103..104 -> @y
-118..122 -> Func(text)
+118..122 -> (Type(content), Type(string), "alternates": Type(boolean), "baseline": Type(length), "bottom-edge": ("baseline" | "descender" | "bounds" | Type(length)), "cjk-latin-spacing": (Type(none) | Type(auto)), "dir": Dir, "discretionary-ligatures": Type(boolean), "fallback": Type(boolean), "features": (Type(array) | Type(dictionary)), "fill": Color, "font": (TextFont | Array<TextFont>), "fractions": Type(boolean), "historical-ligatures": Type(boolean), "hyphenate": (Type(boolean) | Type(auto)), "kerning": Type(boolean), "lang": TextLang, "ligatures": Type(boolean), "number-type": ("lining" | "old-style" | Type(auto)), "number-width": ("proportional" | "tabular" | Type(auto)), "overhang": Type(boolean), "region": TextRegion, "script": (Type(string) | Type(auto)), "size": TextSize, "slashed-zero": Type(boolean), "spacing": Type(relative length), "stretch": Type(ratio), "stroke": Stroke, "style": ("normal" | "italic" | "oblique"), "stylistic-set": (Type(integer) | Type(none)), "top-edge": ("ascender" | "cap-height" | "x-height" | "baseline" | "bounds" | Type(length)), "tracking": Type(length), "weight": (Type(integer) | "thin" | "extralight" | "light" | "regular" | "medium" | "semibold" | "bold" | "extrabold" | "black")) => Element(text)
 118..133 -> Element(text)
-123..130 -> (TextFont | Array<TextFont>)
-129..130 -> (@y | (TextFont | Array<TextFont>))
-131..133 -> Type(content)
+129..130 -> @y

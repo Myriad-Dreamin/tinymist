@@ -34,7 +34,7 @@ mod type_check_tests {
     use crate::analysis::ty;
     use crate::tests::*;
 
-    use super::TypeCheckInfo;
+    use super::{Ty, TypeCheckInfo};
 
     #[test]
     fn test() {
@@ -83,7 +83,8 @@ mod type_check_tests {
             });
 
             for (range, value) in mapping {
-                writeln!(f, "{range:?} -> {value:?}")?;
+                let ty = Ty::from_types(value.clone().into_iter());
+                writeln!(f, "{range:?} -> {ty:?}")?;
             }
 
             Ok(())

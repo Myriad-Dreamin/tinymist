@@ -98,6 +98,12 @@ impl Signature {
             Signature::Partial(sig) => &sig.with_stack,
         }
     }
+
+    pub(crate) fn type_sig(&self) -> Interned<SigTy> {
+        let primary = self.primary().sig_ty.clone();
+        // todo: with stack
+        primary
+    }
 }
 
 /// Describes a primary function signature.
@@ -114,8 +120,15 @@ pub struct PrimarySignature {
     /// The return type.
     pub(crate) ret_ty: Option<Ty>,
     /// The signature type.
-    pub(crate) sig_ty: Option<Ty>,
+    pub(crate) sig_ty: Interned<SigTy>,
     _broken: bool,
+}
+
+impl PrimarySignature {
+    /// Returns the type representation of the function.
+    pub(crate) fn ty(&self) -> Ty {
+        Ty::Func(self.sig_ty.clone())
+    }
 }
 
 /// Describes a function argument instance
@@ -392,7 +405,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         rest,
         ret_ty,
         has_fill_or_size_or_stroke: has_fill || has_stroke || has_size,
-        sig_ty: Some(Ty::Func(Interned::new(sig_ty))),
+        sig_ty: Interned::new(sig_ty),
         _broken: broken,
     })
 }

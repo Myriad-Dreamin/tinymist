@@ -4,8 +4,8 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/recursive.typ
 ---
 "a" = Any
-"f" = () -> Any
+"f" = () => Any
 ---
 27..28 -> @f
-33..34 -> (@a | (Any) -> Any)
+33..34 -> (@a | (Any) => Any)
 33..36 -> Any

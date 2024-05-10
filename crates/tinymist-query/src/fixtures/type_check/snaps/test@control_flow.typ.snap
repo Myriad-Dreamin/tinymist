@@ -3,14 +3,13 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/control_flow.typ
 ---
-"x0" = FlowIfType { cond: true, then: 1, else_: None }
-"x1" = FlowIfType { cond: false, then: 2, else_: None }
-"x2" = FlowUnaryType { op: Context, lhs: FlowIfType { cond: FlowBinaryType { op: Gt, operands: (Any, 0) }, then: 1, else_: 2 } }
+"x0" = IfTy { cond: true, then: 1, else_: None }
+"x1" = IfTy { cond: false, then: 2, else_: None }
+"x2" = TypeUnary { lhs: IfTy { cond: TypeBinary { operands: (Any, 0), op: Gt }, then: 1, else_: 2 }, op: Context }
 ---
 5..7 -> @x0
 31..33 -> @x1
 58..60 -> @x2
-74..78 -> Func(here)
+74..78 -> () => Type(location)
 74..80 -> Type(location)
-74..85 -> Type(location)
 74..87 -> Any
