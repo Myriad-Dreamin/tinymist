@@ -3,6 +3,7 @@ mod bound;
 mod builtin;
 mod def;
 mod sig;
+mod simplify;
 mod subst;
 
 pub(crate) use apply::*;

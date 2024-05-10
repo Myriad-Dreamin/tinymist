@@ -93,7 +93,7 @@ impl Ty {
 
         let ty = match c {
             CastInfo::Any => Ty::Any,
-            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), *doc)),
+            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), doc)),
             CastInfo::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
             CastInfo::Union(e) => {
                 // flat union
@@ -122,7 +122,7 @@ impl Ty {
 
         let ty = match &s {
             CastInfo::Any => Ty::Any,
-            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), *doc)),
+            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), doc)),
             CastInfo::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
             CastInfo::Union(e) => {
                 // flat union
