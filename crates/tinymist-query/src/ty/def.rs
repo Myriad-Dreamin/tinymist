@@ -361,20 +361,17 @@ pub struct RecordTy {
 }
 
 impl RecordTy {
-    pub(crate) fn shape_fields(mut fields: Vec<(EcoString, Ty, Span)>) -> (NameBone, Vec<Ty>) {
+    pub(crate) fn shape_fields(mut fields: Vec<(Interned<str>, Ty, Span)>) -> (NameBone, Vec<Ty>) {
         fields.sort_by(|a, b| a.0.cmp(&b.0));
         let names = NameBone {
-            names: fields
-                .iter()
-                .map(|(name, _, _)| Interned::new_str(name.as_str()))
-                .collect(),
+            names: fields.iter().map(|e| e.0.clone()).collect(),
         };
         let types = fields.into_iter().map(|(_, ty, _)| ty).collect::<Vec<_>>();
 
         (names, types)
     }
 
-    pub(crate) fn new(fields: Vec<(EcoString, Ty, Span)>) -> Interned<Self> {
+    pub(crate) fn new(fields: Vec<(Interned<str>, Ty, Span)>) -> Interned<Self> {
         let (names, types) = Self::shape_fields(fields);
         Interned::new(Self {
             types: Interned::new(types),
@@ -495,7 +492,7 @@ impl SigTy {
 
     pub(crate) fn new(
         pos: impl Iterator<Item = Ty>,
-        named: impl Iterator<Item = (EcoString, Ty)>,
+        named: impl Iterator<Item = (Interned<str>, Ty)>,
         rest: Option<Ty>,
         ret_ty: Option<Ty>,
     ) -> Self {
@@ -850,7 +847,9 @@ mod tests {
             ret: Option<&str>,
         ) -> Interned<SigTy> {
             let pos = pos.iter().map(|s| str_ins(s));
-            let named = named.iter().map(|(n, t)| (EcoString::from(*n), str_ins(t)));
+            let named = named
+                .iter()
+                .map(|(n, t)| (Interned::new_str(n), str_ins(t)));
             let rest = rest.map(str_ins);
             let ret = ret.map(str_ins);
             Interned::new(SigTy::new(pos, named, rest, ret))

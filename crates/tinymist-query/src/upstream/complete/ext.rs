@@ -34,9 +34,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
     }
 
     fn seen_field(&mut self, field: Interned<str>) -> bool {
-        !self
-            .seen_casts
-            .insert(typst::util::hash128(&FieldName(field)))
+        !self.seen_fields.insert(field)
     }
 
     /// Add completions for definitions that are available at the cursor.
@@ -934,14 +932,11 @@ fn type_completion(
     Some(())
 }
 
-#[derive(Debug, Clone, Hash)]
-struct FieldName(Interned<str>);
-
 /// Add completions for the values of a named function parameter.
 pub fn named_param_value_completions<'a>(
     ctx: &mut CompletionContext<'a, '_>,
     callee: ast::Expr<'a>,
-    name: &str,
+    name: &Interned<str>,
     ty: Option<&Ty>,
 ) {
     let Some(cc) = ctx

@@ -112,7 +112,7 @@ pub struct PrimarySignature {
     /// The positional parameters.
     pub pos: Vec<Arc<ParamSpec>>,
     /// The named parameters.
-    pub named: HashMap<Cow<'static, str>, Arc<ParamSpec>>,
+    pub named: HashMap<Interned<str>, Arc<ParamSpec>>,
     /// Whether the function has fill, stroke, or size parameters.
     pub has_fill_or_size_or_stroke: bool,
     /// The rest parameter.
@@ -366,7 +366,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
                 }
                 _ => {}
             }
-            named.insert(param.name.clone(), param.clone());
+            named.insert(Interned::new_str(param.name.as_ref()), param.clone());
         }
 
         if param.variadic {
@@ -380,14 +380,9 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         }
     }
 
-    let mut named_vec: Vec<(EcoString, Ty)> = named
+    let mut named_vec: Vec<(Interned<str>, Ty)> = named
         .iter()
-        .map(|e| {
-            (
-                e.0.as_ref().into(),
-                e.1.infer_type.clone().unwrap_or(Ty::Any),
-            )
-        })
+        .map(|e| (e.0.clone(), e.1.infer_type.clone().unwrap_or(Ty::Any)))
         .collect::<Vec<_>>();
 
     named_vec.sort_by(|a, b| a.0.cmp(&b.0));

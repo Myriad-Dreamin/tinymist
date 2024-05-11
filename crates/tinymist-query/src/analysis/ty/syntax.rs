@@ -2,7 +2,6 @@
 
 use std::collections::BTreeMap;
 
-use ecow::EcoString;
 use typst::{
     foundations::Value,
     syntax::{
@@ -220,7 +219,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         for field in dict.items() {
             match field {
                 ast::DictItem::Named(n) => {
-                    let name = n.name().get().clone();
+                    let name = Interned::new_str(n.name().get());
                     let value = self.check_expr_in(n.expr().span(), root.clone());
                     fields.push((name, value, n.span()));
                 }
@@ -228,7 +227,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     let key = self.ctx.const_eval(k.key());
                     if let Some(Value::Str(key)) = key {
                         let value = self.check_expr_in(k.expr().span(), root.clone());
-                        fields.push((key.into(), value, k.span()));
+                        fields.push((Interned::new_str(&key), value, k.span()));
                     }
                 }
                 // todo: var dict union
@@ -354,7 +353,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     args_res.push(self.check_expr_in(e.span(), root.clone()));
                 }
                 ast::Arg::Named(n) => {
-                    let name = n.name().get().clone();
+                    let name = Interned::new_str(n.name().get());
                     let value = self.check_expr_in(n.expr().span(), root.clone());
                     named.push((name, value));
                 }
@@ -386,7 +385,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     let exp = self.check_expr_in(e.expr().span(), root.clone());
                     let v = self.get_var(e.name().span(), to_ident_ref(&root, e.name())?)?;
                     v.ever_be(exp);
-                    named.insert(e.name().get().clone(), v.as_type());
+                    named.insert(Interned::new_str(e.name().get()), v.as_type());
                 }
                 // todo: spread left/right
                 ast::Param::Spread(a) => {
@@ -403,7 +402,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let body = self.check_expr_in(closure.body().span(), root);
 
-        let named: Vec<(EcoString, Ty)> = named.into_iter().collect();
+        let named: Vec<(Interned<str>, Ty)> = named.into_iter().collect();
 
         // freeze the signature
         for pos in pos.iter() {

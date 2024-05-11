@@ -35,8 +35,8 @@ pub(crate) fn post_type_check(
 
 #[derive(Default)]
 struct SignatureReceiver {
-    lbs_de: HashSet<Ty>,
-    ubs_de: HashSet<Ty>,
+    lbs_dedup: HashSet<Ty>,
+    ubs_dedup: HashSet<Ty>,
     bounds: TypeBounds,
 }
 
@@ -44,10 +44,10 @@ impl SignatureReceiver {
     fn insert(&mut self, ty: &Ty, pol: bool) {
         log::debug!("post check receive: {ty:?}");
         if !pol {
-            if self.lbs_de.insert(ty.clone()) {
+            if self.lbs_dedup.insert(ty.clone()) {
                 self.bounds.lbs.push(ty.clone());
             }
-        } else if self.ubs_de.insert(ty.clone()) {
+        } else if self.ubs_dedup.insert(ty.clone()) {
             self.bounds.ubs.push(ty.clone());
         }
     }

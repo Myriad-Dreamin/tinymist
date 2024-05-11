@@ -4,6 +4,7 @@ use typst::syntax::SyntaxNode;
 
 use super::{ParamSpec, Signature};
 use crate::{
+    adt::interner::Interned,
     analysis::{analyze_signature, PrimarySignature, SignatureTarget},
     prelude::*,
 };
@@ -210,9 +211,9 @@ pub fn analyze_call_no_cache(
 
         match arg {
             ast::Arg::Named(named) => {
-                let n = named.name().as_str();
+                let n = Interned::new_str(named.name().as_str());
 
-                if let Some(param) = signature.primary().named.get(n) {
+                if let Some(param) = signature.primary().named.get(&n) {
                     info.arg_mapping.insert(
                         arg_tag,
                         CallParamInfo {

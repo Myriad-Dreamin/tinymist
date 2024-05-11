@@ -62,6 +62,12 @@ impl<T: Internable> Interned<T> {
     }
 }
 
+// Note: It is dangerous to keep interned object temporarily (u128)
+// Case:
+// ```
+// insert(hash(Interned::new_str("a"))) == true
+// insert(hash(Interned::new_str("b"))) == true
+// ```
 impl Interned<str> {
     pub fn new_str(s: &str) -> Self {
         let (mut shard, hash) = Self::select(s);
