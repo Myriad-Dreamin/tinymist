@@ -3,7 +3,6 @@ import van, { State } from "vanjs-core";
 // import { SYMBOL_MOCK } from "./symbol-view.mock";
 const { div, input, canvas, button, h4, a, p, span } = van.tags;
 import MiniSearch from "minisearch";
-// @ts-ignore
 import { Detypify, DetypifySymbol, Stroke } from "detypify-service";
 import { ContributeIcon, HelpIcon } from "../icons";
 import { startModal } from "../components/modal";
@@ -364,7 +363,7 @@ export const SymbolPicker = () => {
     let candidates;
     if (strokes.val === undefined) candidates = undefined;
     else if (!detypify.val || !strokes.val) candidates = [];
-    else candidates = await detypify.val.candidates(strokes.val);
+    else candidates = await detypify.val.candidates(strokes.val, 5);
     drawCandidates.val = candidates;
   });
 
