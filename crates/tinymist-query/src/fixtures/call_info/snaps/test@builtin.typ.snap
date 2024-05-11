@@ -3,4 +3,4 @@ source: crates/tinymist-query/src/analysis.rs
 expression: CallSnapshot(result.as_deref())
 input_file: crates/tinymist-query/src/fixtures/call_info/builtin.typ
 ---
-1 -> CallParamInfo { kind: Positional, is_content_block: false, param: ParamSpec { name: "angle", docs: "The angle whose sine to calculate.", input: Union([Type(Type(integer)), Type(Type(float)), Type(Type(angle))]), infer_type: Some((Type(integer) | Type(float) | Type(angle))), type_repr: Some("int | float | angle"), expr: None, default: None, positional: true, named: false, variadic: false, settable: false } }
+1 -> CallParamInfo { kind: Positional, is_content_block: false, param: ParamSpec { name: "angle", docs: "The angle whose sine to calculate.", input: Union([Type(Type(integer)), Type(Type(float)), Type(Type(angle))]), base_type: Some((Type(integer) | Type(float) | Type(angle))), type_repr: Some("int | float | angle"), expr: None, default: None, positional: true, named: false, variadic: false, settable: false } }

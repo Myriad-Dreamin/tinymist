@@ -1,25 +1,21 @@
 //! Infer more than the principal type of some expression.
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
-use typst::{
-    foundations::Value,
-    syntax::{
-        ast::{self, AstNode},
-        LinkedNode, Span, SyntaxKind,
-    },
+use hashbrown::HashSet;
+use typst::syntax::{
+    ast::{self, AstNode},
+    LinkedNode, Span, SyntaxKind,
 };
 
 use crate::{
-    analysis::{analyze_dyn_signature, FlowVarStore, Signature},
-    syntax::{get_check_target, CheckTarget, ParamTarget},
+    adt::interner::Interned,
+    analysis::{ArgsTy, Sig, SigChecker, SigSurfaceKind, TypeBounds},
+    syntax::{get_check_target, get_check_target_by_context, CheckTarget, ParamTarget},
     AnalysisContext,
 };
 
-use super::{
-    FlowArgs, FlowBuiltinType, FlowRecord, FlowSignature, FlowType, FlowVarKind, TypeCheckInfo,
-    FLOW_INSET_DICT, FLOW_MARGIN_DICT, FLOW_OUTSET_DICT, FLOW_RADIUS_DICT, FLOW_STROKE_DICT,
-};
+use super::{FieldTy, SigShape, Ty, TypeCheckInfo};
 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.
@@ -27,7 +23,7 @@ pub(crate) fn post_type_check(
     _ctx: &mut AnalysisContext,
     info: &TypeCheckInfo,
     node: LinkedNode,
-) -> Option<FlowType> {
+) -> Option<Ty> {
     let mut worker = PostTypeCheckWorker {
         ctx: _ctx,
         checked: HashMap::new(),
@@ -37,90 +33,41 @@ pub(crate) fn post_type_check(
     worker.check(&node)
 }
 
-enum Abstracted<T, V> {
-    Type(T),
-    Value(V),
-}
-
-type AbstractedSignature<'a> = Abstracted<&'a FlowSignature, &'a Signature>;
-
-struct SignatureWrapper<'a>(AbstractedSignature<'a>);
-
-impl<'a> SignatureWrapper<'a> {
-    fn named(&self, name: &str) -> Option<&FlowType> {
-        match &self.0 {
-            Abstracted::Type(sig) => sig.named.iter().find(|(k, _)| k == name).map(|(_, v)| v),
-            Abstracted::Value(sig) => sig
-                .primary()
-                .named
-                .get(name)
-                .and_then(|p| p.infer_type.as_ref()),
-        }
-    }
-
-    fn names(&self, mut f: impl FnMut(&str)) {
-        match &self.0 {
-            Abstracted::Type(sig) => {
-                for (k, _) in &sig.named {
-                    f(k);
-                }
-            }
-            Abstracted::Value(sig) => {
-                for (k, p) in &sig.primary().named {
-                    if p.infer_type.is_some() {
-                        f(k);
-                    }
-                }
-            }
-        }
-    }
-
-    fn pos(&self, pos: usize) -> Option<&FlowType> {
-        match &self.0 {
-            Abstracted::Type(sig) => sig.pos.get(pos),
-            // todo: bindings
-            Abstracted::Value(sig) => sig
-                .primary()
-                .pos
-                .get(pos)
-                .and_then(|p| p.infer_type.as_ref()),
-        }
-    }
-
-    fn rest(&self) -> Option<&FlowType> {
-        match &self.0 {
-            Abstracted::Type(sig) => sig.rest.as_ref(),
-            Abstracted::Value(sig) => sig
-                .primary()
-                .rest
-                .as_ref()
-                .and_then(|p| p.infer_type.as_ref()),
-        }
-    }
-}
-
 #[derive(Default)]
-struct SignatureReceiver(FlowVarStore);
+struct SignatureReceiver {
+    lbs_dedup: HashSet<Ty>,
+    ubs_dedup: HashSet<Ty>,
+    bounds: TypeBounds,
+}
 
 impl SignatureReceiver {
-    fn insert(&mut self, ty: &FlowType, pol: bool) {
-        if pol {
-            self.0.lbs.push(ty.clone());
-        } else {
-            self.0.ubs.push(ty.clone());
+    fn insert(&mut self, ty: &Ty, pol: bool) {
+        log::debug!("post check receive: {ty:?}");
+        if !pol {
+            if self.lbs_dedup.insert(ty.clone()) {
+                self.bounds.lbs.push(ty.clone());
+            }
+        } else if self.ubs_dedup.insert(ty.clone()) {
+            self.bounds.ubs.push(ty.clone());
         }
+    }
+
+    fn finalize(self) -> Ty {
+        Ty::Let(Interned::new(self.bounds))
     }
 }
 
 fn check_signature<'a>(
     receiver: &'a mut SignatureReceiver,
     target: &'a ParamTarget,
-) -> impl FnMut(&mut PostTypeCheckWorker, SignatureWrapper, &[FlowArgs], bool) -> Option<()> + 'a {
-    move |_worker, sig, args, pol| {
+) -> impl FnMut(&mut PostTypeCheckWorker, Sig, &[Interned<ArgsTy>], bool) -> Option<()> + 'a {
+    move |worker, sig, args, pol| {
+        let SigShape { sig: sig_ins, .. } = sig.shape(Some(worker.ctx))?;
+
         match &target {
             ParamTarget::Named(n) => {
                 let ident = n.cast::<ast::Ident>()?;
-                let ty = sig.named(ident.get())?;
+                let ty = sig_ins.named(&Interned::new_str(ident.get()))?;
                 receiver.insert(ty, !pol);
 
                 Some(())
@@ -136,18 +83,21 @@ fn check_signature<'a>(
                 }
 
                 // truncate args
-                let c = args.iter().map(|args| args.args.len()).sum::<usize>();
-                let nth = sig.pos(c + positional).or_else(|| sig.rest())?;
-                receiver.insert(nth, !pol);
+                let c = args
+                    .iter()
+                    .map(|args| args.positional_params().len())
+                    .sum::<usize>();
+                let nth = sig_ins.pos(c + positional).or_else(|| sig_ins.rest_param());
+                if let Some(nth) = nth {
+                    receiver.insert(nth, !pol);
+                }
 
                 // names
-                sig.names(|name| {
-                    // todo: reduce fields
-                    receiver.insert(
-                        &FlowType::Field(Box::new((name.into(), FlowType::Any, Span::detached()))),
-                        !pol,
-                    );
-                });
+                for (name, _) in sig_ins.named_params() {
+                    // todo: reduce fields, fields ty
+                    let field = FieldTy::new_untyped(name.clone());
+                    receiver.insert(&Ty::Field(field), !pol);
+                }
 
                 Some(())
             }
@@ -157,12 +107,12 @@ fn check_signature<'a>(
 
 struct PostTypeCheckWorker<'a, 'w> {
     ctx: &'a mut AnalysisContext<'w>,
-    checked: HashMap<Span, Option<FlowType>>,
+    checked: HashMap<Span, Option<Ty>>,
     info: &'a TypeCheckInfo,
 }
 
 impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
-    fn check(&mut self, node: &LinkedNode) -> Option<FlowType> {
+    fn check(&mut self, node: &LinkedNode) -> Option<Ty> {
         let span = node.span();
         if let Some(ty) = self.checked.get(&span) {
             return ty.clone();
@@ -175,7 +125,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
         ty
     }
 
-    fn check_(&mut self, node: &LinkedNode) -> Option<FlowType> {
+    fn check_(&mut self, node: &LinkedNode) -> Option<Ty> {
         let context = node.parent()?;
         log::debug!("post check: {:?}::{:?}", context.kind(), node.kind());
         let checked_context = self.check_context(context, node);
@@ -188,27 +138,19 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
         res
     }
 
-    fn check_context_or(
-        &mut self,
-        context: &LinkedNode,
-        context_ty: Option<FlowType>,
-    ) -> Option<FlowType> {
+    fn check_context_or(&mut self, context: &LinkedNode, context_ty: Option<Ty>) -> Option<Ty> {
         let checked_context = self.check(context);
         if checked_context.is_some() && context_ty.is_some() {
             let c = checked_context?;
             let s = context_ty?;
 
-            Some(FlowType::from_types([c, s].into_iter()))
+            Some(Ty::from_types([c, s].into_iter()))
         } else {
             checked_context.or(context_ty)
         }
     }
 
-    fn check_target(
-        &mut self,
-        node: Option<CheckTarget>,
-        context_ty: Option<FlowType>,
-    ) -> Option<FlowType> {
+    fn check_target(&mut self, node: Option<CheckTarget>, context_ty: Option<Ty>) -> Option<Ty> {
         let Some(node) = node else {
             return context_ty;
         };
@@ -217,6 +159,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
         match node {
             CheckTarget::Param {
                 callee,
+                args: _,
                 target,
                 is_set,
             } => {
@@ -227,12 +170,12 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
 
                 self.check_signatures(&callee, false, &mut check_signature(&mut resp, &target));
 
-                log::debug!("post check target iterated: {:?}", resp.0);
-                Some(self.info.simplify(FlowType::Let(Arc::new(resp.0)), false))
+                log::debug!("post check target iterated: {:?}", resp.bounds);
+                Some(self.info.simplify(resp.finalize(), false))
             }
             CheckTarget::Element { container, target } => {
                 let container_ty = self.check_context_or(&container, context_ty)?;
-                log::debug!("post check element target: {container_ty:?}::{target:?}");
+                log::debug!("post check element target: ({container_ty:?})::{target:?}");
 
                 let mut resp = SignatureReceiver::default();
 
@@ -243,18 +186,18 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                     &mut check_signature(&mut resp, &target),
                 );
 
-                log::debug!("post check target iterated: {:?}", resp.0);
-                Some(self.info.simplify(FlowType::Let(Arc::new(resp.0)), false))
+                log::debug!("post check target iterated: {:?}", resp.bounds);
+                Some(self.info.simplify(resp.finalize(), false))
             }
             CheckTarget::Paren {
                 container,
                 is_before,
             } => {
                 let container_ty = self.check_context_or(&container, context_ty)?;
-                log::info!("post check param target: {container_ty:?}::{is_before:?}");
+                log::debug!("post check paren target: {container_ty:?}::{is_before:?}");
 
                 let mut resp = SignatureReceiver::default();
-                resp.0.lbs.push(container_ty.clone());
+                resp.bounds.lbs.push(container_ty.clone());
 
                 let target = ParamTarget::positional_from_before(true);
                 self.check_element_of(
@@ -264,18 +207,18 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                     &mut check_signature(&mut resp, &target),
                 );
 
-                log::debug!("post check target iterated: {:?}", resp.0);
-                Some(self.info.simplify(FlowType::Let(Arc::new(resp.0)), false))
+                log::debug!("post check target iterated: {:?}", resp.bounds);
+                Some(self.info.simplify(resp.finalize(), false))
             }
             CheckTarget::Normal(target) => {
                 let ty = self.check_context_or(&target, context_ty)?;
-                log::debug!("post check target: {ty:?}");
+                log::debug!("post check target normal: {ty:?}");
                 Some(ty)
             }
         }
     }
 
-    fn check_context(&mut self, context: &LinkedNode, node: &LinkedNode) -> Option<FlowType> {
+    fn check_context(&mut self, context: &LinkedNode, node: &LinkedNode) -> Option<Ty> {
         match context.kind() {
             SyntaxKind::LetBinding => {
                 let p = context.cast::<ast::LetBinding>()?;
@@ -291,10 +234,13 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                     }
                 }
             }
+            SyntaxKind::Args => self.check_target(
+                // todo: not well behaved
+                get_check_target_by_context(context.clone(), node.clone()),
+                None,
+            ),
             // todo: constraint node
-            SyntaxKind::Args | SyntaxKind::Named => {
-                self.check_target(get_check_target(context.clone()), None)
-            }
+            SyntaxKind::Named => self.check_target(get_check_target(context.clone()), None),
             _ => None,
         }
     }
@@ -303,33 +249,32 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
         &mut self,
         context: &LinkedNode,
         node: &LinkedNode,
-        context_ty: Option<FlowType>,
-    ) -> Option<FlowType> {
+        context_ty: Option<Ty>,
+    ) -> Option<Ty> {
         match node.kind() {
             SyntaxKind::Ident => {
-                let ty = self.info.mapping.get(&node.span());
+                let ty = self.info.type_of_span(node.span());
                 log::debug!("post check ident: {node:?} -> {ty:?}");
-                self.simplify(ty?)
+                self.simplify(&ty?)
             }
             // todo: destructuring
             SyntaxKind::FieldAccess => {
-                let ty = self.info.mapping.get(&node.span());
-                self.simplify(ty?)
+                let ty = self.info.type_of_span(node.span());
+                self.simplify(&ty?)
                     .or_else(|| self.check_context_or(context, context_ty))
             }
             _ => self.check_target(get_check_target(node.clone()), context_ty),
         }
     }
 
-    fn destruct_let(&mut self, pattern: ast::Pattern, node: LinkedNode) -> Option<FlowType> {
+    fn destruct_let(&mut self, pattern: ast::Pattern, node: LinkedNode) -> Option<Ty> {
         match pattern {
             ast::Pattern::Placeholder(_) => None,
             ast::Pattern::Normal(n) => {
                 let ast::Expr::Ident(ident) = n else {
                     return None;
                 };
-                let ty = self.info.mapping.get(&ident.span())?;
-                self.simplify(ty)
+                self.simplify(&self.info.type_of_span(ident.span())?)
             }
             ast::Pattern::Parenthesized(p) => {
                 self.destruct_let(p.expr().to_untyped().cast()?, node)
@@ -344,162 +289,63 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
 
     fn check_signatures(
         &mut self,
-        ty: &FlowType,
+        ty: &Ty,
         pol: bool,
-        checker: &mut impl FnMut(&mut Self, SignatureWrapper, &[FlowArgs], bool) -> Option<()>,
+        checker: &mut impl FnMut(&mut Self, Sig, &[Interned<ArgsTy>], bool) -> Option<()>,
     ) {
-        self.check_signatures_(ty, pol, SigParamKind::Call, &mut Vec::new(), checker);
+        ty.sig_surface(pol, SigSurfaceKind::Call, &mut (self, checker));
     }
 
-    fn check_element_of(
-        &mut self,
-        ty: &FlowType,
-        pol: bool,
-        context: &LinkedNode,
-        checker: &mut impl FnMut(&mut Self, SignatureWrapper, &[FlowArgs], bool) -> Option<()>,
-    ) {
-        self.check_signatures_(ty, pol, sig_context_of(context), &mut Vec::new(), checker);
+    fn check_element_of<T>(&mut self, ty: &Ty, pol: bool, context: &LinkedNode, checker: &mut T)
+    where
+        T: FnMut(&mut Self, Sig, &[Interned<ArgsTy>], bool) -> Option<()>,
+    {
+        ty.sig_surface(pol, sig_context_of(context), &mut (self, checker))
     }
 
-    fn check_signatures_(
-        &mut self,
-        ty: &FlowType,
-        pol: bool,
-        sig_kind: SigParamKind,
-        args: &mut Vec<FlowArgs>,
-        checker: &mut impl FnMut(&mut Self, SignatureWrapper, &[FlowArgs], bool) -> Option<()>,
-    ) {
-        match ty {
-            FlowType::Builtin(FlowBuiltinType::Stroke)
-                if matches!(sig_kind, SigParamKind::Dict | SigParamKind::ArrayOrDict) =>
-            {
-                self.check_dict_signature(&FLOW_STROKE_DICT, pol, checker);
-            }
-            FlowType::Builtin(FlowBuiltinType::Margin)
-                if matches!(sig_kind, SigParamKind::Dict | SigParamKind::ArrayOrDict) =>
-            {
-                self.check_dict_signature(&FLOW_MARGIN_DICT, pol, checker);
-            }
-            FlowType::Builtin(FlowBuiltinType::Inset)
-                if matches!(sig_kind, SigParamKind::Dict | SigParamKind::ArrayOrDict) =>
-            {
-                self.check_dict_signature(&FLOW_INSET_DICT, pol, checker);
-            }
-            FlowType::Builtin(FlowBuiltinType::Outset)
-                if matches!(sig_kind, SigParamKind::Dict | SigParamKind::ArrayOrDict) =>
-            {
-                self.check_dict_signature(&FLOW_OUTSET_DICT, pol, checker);
-            }
-            FlowType::Builtin(FlowBuiltinType::Radius)
-                if matches!(sig_kind, SigParamKind::Dict | SigParamKind::ArrayOrDict) =>
-            {
-                self.check_dict_signature(&FLOW_RADIUS_DICT, pol, checker);
-            }
-            FlowType::Func(sig) if sig_kind == SigParamKind::Call => {
-                checker(self, SignatureWrapper(Abstracted::Type(sig)), args, pol);
-            }
-            FlowType::Array(sig)
-                if matches!(sig_kind, SigParamKind::Array | SigParamKind::ArrayOrDict) =>
-            {
-                let sig = FlowSignature::array_cons(*sig.clone(), true);
-                checker(self, SignatureWrapper(Abstracted::Type(&sig)), args, pol);
-            }
-            FlowType::Dict(sig)
-                if matches!(sig_kind, SigParamKind::Dict | SigParamKind::ArrayOrDict) =>
-            {
-                self.check_dict_signature(sig, pol, checker);
-            }
-            FlowType::With(w) if sig_kind == SigParamKind::Call => {
-                let c = args.len();
-                args.extend(w.1.iter().cloned());
-                self.check_signatures_(&w.0, pol, sig_kind, args, checker);
-                args.truncate(c);
-            }
-            FlowType::Union(u) => {
-                for ty in u.iter() {
-                    self.check_signatures_(ty, pol, sig_kind, args, checker);
-                }
-            }
-            FlowType::Let(u) => {
-                for lb in &u.ubs {
-                    self.check_signatures_(lb, pol, sig_kind, args, checker);
-                }
-                for ub in &u.lbs {
-                    self.check_signatures_(ub, !pol, sig_kind, args, checker);
-                }
-            }
-            FlowType::Var(u) => {
-                let Some(v) = self.info.vars.get(&u.0) else {
-                    return;
-                };
-                match &v.kind {
-                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
-                        let r = w.read();
-                        for lb in &r.ubs {
-                            self.check_signatures_(lb, pol, sig_kind, args, checker);
-                        }
-                        for ub in &r.lbs {
-                            self.check_signatures_(ub, !pol, sig_kind, args, checker);
-                        }
-                    }
-                }
-            }
-            // todo: deduplicate checking early
-            FlowType::Value(v) => {
-                if sig_kind == SigParamKind::Call {
-                    if let Value::Func(f) = &v.0 {
-                        let sig = analyze_dyn_signature(self.ctx, f.clone());
-                        checker(self, SignatureWrapper(Abstracted::Value(&sig)), args, pol);
-                    }
-                }
-            }
-            FlowType::ValueDoc(v) => {
-                if sig_kind == SigParamKind::Call {
-                    if let Value::Func(f) = &v.0 {
-                        let sig = analyze_dyn_signature(self.ctx, f.clone());
-                        checker(self, SignatureWrapper(Abstracted::Value(&sig)), args, pol);
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn check_dict_signature(
-        &mut self,
-        sig: &FlowRecord,
-        pol: bool,
-        checker: &mut impl FnMut(&mut Self, SignatureWrapper, &[FlowArgs], bool) -> Option<()>,
-    ) {
-        let sig = FlowSignature::dict_cons(sig, true);
-        checker(self, SignatureWrapper(Abstracted::Type(&sig)), &[], pol);
-    }
-
-    fn simplify(&mut self, ty: &FlowType) -> Option<FlowType> {
+    fn simplify(&mut self, ty: &Ty) -> Option<Ty> {
         Some(self.info.simplify(ty.clone(), false))
     }
 }
 
-fn sig_context_of(context: &LinkedNode) -> SigParamKind {
-    match context.kind() {
-        SyntaxKind::Parenthesized => SigParamKind::ArrayOrDict,
-        SyntaxKind::Array => {
-            let c = context.cast::<ast::Array>();
-            if c.is_some_and(|e| e.items().next().is_some()) {
-                SigParamKind::ArrayOrDict
-            } else {
-                SigParamKind::Array
-            }
-        }
-        SyntaxKind::Dict => SigParamKind::Dict,
-        _ => SigParamKind::Array,
+impl<'a, 'w, T> SigChecker for (&mut PostTypeCheckWorker<'a, 'w>, &mut T)
+where
+    T: FnMut(&mut PostTypeCheckWorker<'a, 'w>, Sig, &[Interned<ArgsTy>], bool) -> Option<()>,
+{
+    fn check(
+        &mut self,
+        sig: Sig,
+        args: &mut crate::analysis::SigCheckContext,
+        pol: bool,
+    ) -> Option<()> {
+        self.1(self.0, sig, &args.args, pol)
+    }
+
+    fn check_var(
+        &mut self,
+        var: &Interned<crate::analysis::TypeVar>,
+        _pol: bool,
+    ) -> Option<TypeBounds> {
+        self.0
+            .info
+            .vars
+            .get(&var.def)
+            .map(|v| v.bounds.bounds().read().clone())
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SigParamKind {
-    Call,
-    Array,
-    Dict,
-    ArrayOrDict,
+fn sig_context_of(context: &LinkedNode) -> SigSurfaceKind {
+    match context.kind() {
+        SyntaxKind::Parenthesized => SigSurfaceKind::ArrayOrDict,
+        SyntaxKind::Array => {
+            let c = context.cast::<ast::Array>();
+            if c.is_some_and(|e| e.items().next().is_some()) {
+                SigSurfaceKind::Array
+            } else {
+                SigSurfaceKind::ArrayOrDict
+            }
+        }
+        SyntaxKind::Dict => SigSurfaceKind::Dict,
+        _ => SigSurfaceKind::Array,
+    }
 }

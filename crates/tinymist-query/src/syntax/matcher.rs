@@ -101,14 +101,7 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'
 
     // Move to the first non-trivia node before the cursor.
     let mut node = node;
-    if can_skip_trivia(&node, cursor) || {
-        is_mark(node.kind())
-            && (!matches!(node.kind(), SyntaxKind::LeftParen)
-                || !matches!(
-                    node.parent_kind(),
-                    Some(SyntaxKind::Array | SyntaxKind::Dict | SyntaxKind::Parenthesized)
-                ))
-    } {
+    if can_skip_trivia(&node, cursor) {
         node = node.prev_sibling()?;
     }
 
@@ -253,6 +246,7 @@ impl<'a> ParamTarget<'a> {
 pub enum CheckTarget<'a> {
     Param {
         callee: LinkedNode<'a>,
+        args: LinkedNode<'a>,
         target: ParamTarget<'a>,
         is_set: bool,
     },
@@ -284,10 +278,44 @@ impl<'a> CheckTarget<'a> {
     }
 }
 
+#[derive(Debug)]
 enum ParamKind {
     Call,
     Array,
     Dict,
+}
+
+pub fn get_check_target_by_context<'a>(
+    context: LinkedNode<'a>,
+    node: LinkedNode<'a>,
+) -> Option<CheckTarget<'a>> {
+    let context_deref_target = get_deref_target(context.clone(), node.offset())?;
+    let node_deref_target = get_deref_target(node.clone(), node.offset())?;
+
+    match context_deref_target {
+        DerefTarget::Callee(callee)
+            if matches!(node_deref_target, DerefTarget::Normal(..))
+                && !matches!(node_deref_target, DerefTarget::Callee(..)) =>
+        {
+            let parent = callee.parent()?;
+            let args = match parent.cast::<ast::Expr>() {
+                Some(ast::Expr::FuncCall(call)) => call.args(),
+                Some(ast::Expr::Set(set)) => set.args(),
+                _ => return None,
+            };
+            let args = parent.find(args.span())?;
+
+            let is_set = parent.kind() == SyntaxKind::Set;
+            let target = get_param_target(args.clone(), node, ParamKind::Call)?;
+            Some(CheckTarget::Param {
+                callee,
+                args,
+                target,
+                is_set,
+            })
+        }
+        _ => None,
+    }
 }
 
 pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
@@ -306,12 +334,13 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
                 Some(ast::Expr::Set(set)) => set.args(),
                 _ => return None,
             };
-            let args_node = parent.find(args.span())?;
+            let args = parent.find(args.span())?;
 
             let is_set = parent.kind() == SyntaxKind::Set;
-            let target = get_param_target(args_node, node, ParamKind::Call)?;
+            let target = get_param_target(args.clone(), node, ParamKind::Call)?;
             return Some(CheckTarget::Param {
                 callee,
+                args,
                 target,
                 is_set,
             });

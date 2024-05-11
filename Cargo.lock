@@ -3871,9 +3871,11 @@ dependencies = [
  "anyhow",
  "biblatex",
  "comemo 0.4.0",
+ "dashmap",
  "ecow 0.2.2",
  "ena",
  "fxhash",
+ "hashbrown 0.14.3",
  "hex",
  "if_chain",
  "indexmap 2.2.6",
@@ -3896,6 +3898,7 @@ dependencies = [
  "siphasher 1.0.1",
  "strum 0.26.2",
  "toml 0.8.12",
+ "triomphe",
  "ttf-parser",
  "typst",
  "typst-ts-compiler",
@@ -4113,6 +4116,12 @@ checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
 dependencies = [
  "once_cell",
 ]
+
+[[package]]
+name = "triomphe"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "859eb650cfee7434994602c3a68b25d77ad9e68c8a6cd491616ef86661382eb3"
 
 [[package]]
 name = "try-lock"

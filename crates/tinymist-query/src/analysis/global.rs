@@ -13,7 +13,7 @@ use parking_lot::RwLock;
 use reflexo::hash::hash128;
 use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
 use typst::eval::Eval;
-use typst::foundations;
+use typst::foundations::{self, Func};
 use typst::syntax::{LinkedNode, SyntaxNode};
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
@@ -25,9 +25,11 @@ use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
 use super::{
-    analyze_bib, post_type_check, BibInfo, DefUseInfo, FlowType, ImportInfo, PathPreference,
-    Signature, SignatureTarget, TypeCheckInfo,
+    analyze_bib, post_type_check, BibInfo, DefUseInfo, DefinitionLink, IdentRef, ImportInfo,
+    PathPreference, SigTy, Signature, SignatureTarget, Ty, TypeCheckInfo,
 };
+use crate::adt::interner::Interned;
+use crate::analysis::analyze_dyn_signature;
 use crate::path_to_url;
 use crate::syntax::{get_deref_target, resolve_id_by_path, DerefTarget};
 use crate::{
@@ -859,31 +861,41 @@ impl<'w> AnalysisContext<'w> {
             .or_else(|| self.with_vm(|vm| rr.eval(vm).ok()))
     }
 
-    pub(crate) fn type_of(&mut self, rr: &SyntaxNode) -> Option<FlowType> {
+    pub(crate) fn type_of(&mut self, rr: &SyntaxNode) -> Option<Ty> {
         self.type_of_span(rr.span())
     }
 
-    pub(crate) fn type_of_span(&mut self, s: Span) -> Option<FlowType> {
+    pub(crate) fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>> {
+        log::debug!("check runtime func {func:?}");
+        Some(analyze_dyn_signature(self, func.clone()).type_sig())
+    }
+
+    pub(crate) fn user_type_of_def(&mut self, source: &Source, def: &DefinitionLink) -> Option<Ty> {
+        let def_at = def.def_at.clone()?;
+        let ty_chk = self.type_check(source.clone())?;
+        let def_use = self.def_use(source.clone())?;
+
+        let def_ident = IdentRef {
+            name: def.name.clone(),
+            range: def_at.1,
+        };
+        let (def_id, _) = def_use.get_def(def_at.0, &def_ident)?;
+        ty_chk.type_of_def(def_id)
+    }
+
+    pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {
         let id = s.id()?;
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(source)?;
-        ty_chk.mapping.get(&s).cloned()
+        ty_chk.type_of_span(s)
     }
 
-    pub(crate) fn literal_type_of_span(&mut self, s: Span) -> Option<FlowType> {
-        let id = s.id()?;
-        let source = self.source_by_id(id).ok()?;
-        let k = LinkedNode::new(source.root()).find(s)?;
-
-        self.literal_type_of_node(k)
-    }
-
-    pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<FlowType> {
+    pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<Ty> {
         let id = k.span().id()?;
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(source.clone())?;
 
-        post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.mapping.get(&k.span()).cloned())
+        post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.type_of_span(k.span()))
     }
 }
 

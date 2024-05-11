@@ -4,4 +4,4 @@ description: "Check on \"(\" (49)"
 expression: literal_type
 input_file: crates/tinymist-query/src/fixtures/post_type_check/text_stroke3.typ
 ---
-Any
+( ⪯ "cap": Any & "dash": Any & "join": Any & "miter-limit": Any & "paint": Any & "thickness": Any)

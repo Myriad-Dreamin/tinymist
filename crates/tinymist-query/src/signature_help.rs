@@ -1,5 +1,5 @@
 use crate::{
-    analysis::{analyze_dyn_signature, find_definition, FlowType},
+    analysis::{analyze_dyn_signature, find_definition, Ty},
     prelude::*,
     syntax::{get_check_target, get_deref_target, CheckTarget, ParamTarget},
     DocTooltip, LspParamInfo, SemanticRequest,
@@ -33,6 +33,8 @@ impl SemanticRequest for SignatureHelpRequest {
 
         let def_link = find_definition(ctx, source.clone(), None, deref_target)?;
 
+        let type_sig = ctx.user_type_of_def(&source, &def_link);
+
         let documentation = DocTooltip::get(ctx, &def_link)
             .as_deref()
             .map(markdown_docs);
@@ -55,6 +57,10 @@ impl SemanticRequest for SignatureHelpRequest {
         let mut named = sig.primary().named.values().collect::<Vec<_>>();
         let rest = &sig.primary().rest;
 
+        let type_sig = type_sig.and_then(|type_sig| type_sig.sig_repr(true));
+
+        log::info!("got type signature {type_sig:?}");
+
         named.sort_by_key(|x| &x.name);
 
         let active_parameter = match &target {
@@ -72,27 +78,36 @@ impl SemanticRequest for SignatureHelpRequest {
         let mut params = Vec::new();
 
         label.push('(');
-        for ty in pos.iter().chain(named.into_iter()).chain(rest.iter()) {
+        let pos = pos
+            .iter()
+            .enumerate()
+            .map(|(i, pos)| (pos, type_sig.as_ref().and_then(|sig| sig.pos(i))));
+        let named = named
+            .into_iter()
+            .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.named(&x.name))));
+        let rest = rest
+            .iter()
+            .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.rest_param())));
+        for (param, ty) in pos.chain(named).chain(rest) {
             if !params.is_empty() {
                 label.push_str(", ");
             }
 
             label.push_str(&format!(
                 "{}: {}",
-                ty.name,
-                ty.infer_type
-                    .as_ref()
-                    .unwrap_or(&FlowType::Any)
+                param.name,
+                ty.or_else(|| param.base_type.as_ref())
+                    .unwrap_or(&Ty::Any)
                     .describe()
                     .as_deref()
                     .unwrap_or("any")
             ));
 
             params.push(LspParamInfo {
-                label: lsp_types::ParameterLabel::Simple(ty.name.clone().into()),
-                documentation: if !ty.docs.is_empty() {
+                label: lsp_types::ParameterLabel::Simple(param.name.as_ref().into()),
+                documentation: if !param.docs.is_empty() {
                     Some(Documentation::MarkupContent(MarkupContent {
-                        value: ty.docs.clone().into(),
+                        value: param.docs.clone().into(),
                         kind: MarkupKind::Markdown,
                     }))
                 } else {
@@ -101,7 +116,11 @@ impl SemanticRequest for SignatureHelpRequest {
             });
         }
         label.push(')');
-        if let Some(ret_ty) = sig.primary().ret_ty.as_ref() {
+        let ret = type_sig
+            .as_ref()
+            .and_then(|sig| sig.ret.as_ref())
+            .or_else(|| sig.primary().ret_ty.as_ref());
+        if let Some(ret_ty) = ret {
             label.push_str(" -> ");
             label.push_str(ret_ty.describe().as_deref().unwrap_or("any"));
         }

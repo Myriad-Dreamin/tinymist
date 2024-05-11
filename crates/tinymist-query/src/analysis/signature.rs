@@ -15,11 +15,13 @@ use typst::{
     util::LazyHash,
 };
 
-use crate::analysis::{resolve_callee, FlowSignature};
+use crate::adt::interner::Interned;
+use crate::analysis::resolve_callee;
 use crate::syntax::{get_def_target, get_deref_target, DefTarget};
+use crate::ty::SigTy;
 use crate::AnalysisContext;
 
-use super::{find_definition, DefinitionLink, FlowType, FlowVar, LexicalKind, LexicalVarKind};
+use super::{find_definition, DefinitionLink, LexicalKind, LexicalVarKind, Ty};
 
 // pub fn analyze_signature
 
@@ -27,13 +29,13 @@ use super::{find_definition, DefinitionLink, FlowType, FlowVar, LexicalKind, Lex
 #[derive(Debug, Clone)]
 pub struct ParamSpec {
     /// The parameter's name.
-    pub name: Cow<'static, str>,
+    pub name: Interned<str>,
     /// Documentation for the parameter.
     pub docs: Cow<'static, str>,
     /// Describe what values this parameter accepts.
     pub input: CastInfo,
     /// Inferred type of the parameter.
-    pub(crate) infer_type: Option<FlowType>,
+    pub(crate) base_type: Option<Ty>,
     /// The parameter's default name as type.
     pub type_repr: Option<EcoString>,
     /// The parameter's default name as value.
@@ -56,10 +58,10 @@ pub struct ParamSpec {
 impl ParamSpec {
     fn from_static(f: &Func, p: &ParamInfo) -> Arc<Self> {
         Arc::new(Self {
-            name: Cow::Borrowed(p.name),
+            name: Interned::new_str(p.name),
             docs: Cow::Borrowed(p.docs),
             input: p.input.clone(),
-            infer_type: FlowType::from_param_site(f, p, &p.input),
+            base_type: Ty::from_param_site(f, p, &p.input),
             type_repr: Some(eco_format!("{}", TypeExpr(&p.input))),
             expr: None,
             default: p.default,
@@ -96,6 +98,12 @@ impl Signature {
             Signature::Partial(sig) => &sig.with_stack,
         }
     }
+
+    pub(crate) fn type_sig(&self) -> Interned<SigTy> {
+        let primary = self.primary().sig_ty.clone();
+        // todo: with stack
+        primary
+    }
 }
 
 /// Describes a primary function signature.
@@ -104,16 +112,23 @@ pub struct PrimarySignature {
     /// The positional parameters.
     pub pos: Vec<Arc<ParamSpec>>,
     /// The named parameters.
-    pub named: HashMap<Cow<'static, str>, Arc<ParamSpec>>,
+    pub named: HashMap<Interned<str>, Arc<ParamSpec>>,
     /// Whether the function has fill, stroke, or size parameters.
     pub has_fill_or_size_or_stroke: bool,
     /// The rest parameter.
     pub rest: Option<Arc<ParamSpec>>,
     /// The return type.
-    pub(crate) ret_ty: Option<FlowType>,
+    pub(crate) ret_ty: Option<Ty>,
     /// The signature type.
-    pub(crate) sig_ty: Option<FlowType>,
+    pub(crate) sig_ty: Interned<SigTy>,
     _broken: bool,
+}
+
+impl PrimarySignature {
+    /// Returns the type representation of the function.
+    pub(crate) fn ty(&self) -> Ty {
+        Ty::Func(self.sig_ty.clone())
+    }
 }
 
 /// Describes a function argument instance
@@ -298,8 +313,6 @@ fn resolve_callee_v2(
         };
 
         let _t = ctx.type_check(source)?;
-        let _ = FlowVar::name;
-        let _ = FlowVar::id;
 
         let root = LinkedNode::new(def_source.root());
         let def_node = root.leaf_at(def_at.1.start + 1)?;
@@ -319,9 +332,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         Repr::With(..) => unreachable!(),
         Repr::Closure(c) => (analyze_closure_signature(c.clone()), None),
         Repr::Element(..) | Repr::Native(..) => {
-            let ret_ty = func
-                .returns()
-                .and_then(|r| FlowType::from_return_site(&func, r));
+            let ret_ty = func.returns().and_then(|r| Ty::from_return_site(&func, r));
             let params = func.params().unwrap();
             (
                 params
@@ -355,7 +366,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
                 }
                 _ => {}
             }
-            named.insert(param.name.clone(), param.clone());
+            named.insert(Interned::new_str(param.name.as_ref()), param.clone());
         }
 
         if param.variadic {
@@ -369,24 +380,18 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         }
     }
 
-    let mut named_vec: Vec<(EcoString, FlowType)> = named
+    let mut named_vec: Vec<(Interned<str>, Ty)> = named
         .iter()
-        .map(|e| {
-            (
-                e.0.as_ref().into(),
-                e.1.infer_type.clone().unwrap_or(FlowType::Any),
-            )
-        })
+        .map(|e| (e.0.clone(), e.1.base_type.clone().unwrap_or(Ty::Any)))
         .collect::<Vec<_>>();
 
     named_vec.sort_by(|a, b| a.0.cmp(&b.0));
 
-    let sig_ty = FlowSignature::new(
-        pos.iter()
-            .map(|e| e.infer_type.clone().unwrap_or(FlowType::Any)),
+    let sig_ty = SigTy::new(
+        pos.iter().map(|e| e.base_type.clone().unwrap_or(Ty::Any)),
         named_vec.into_iter(),
         rest.as_ref()
-            .map(|e| e.infer_type.clone().unwrap_or(FlowType::Any)),
+            .map(|e| e.base_type.clone().unwrap_or(Ty::Any)),
         ret_ty.clone(),
     );
     Arc::new(PrimarySignature {
@@ -395,7 +400,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         rest,
         ret_ty,
         has_fill_or_size_or_stroke: has_fill || has_stroke || has_size,
-        sig_ty: Some(FlowType::Func(Box::new(sig_ty))),
+        sig_ty: Interned::new(sig_ty),
         _broken: broken,
     })
 }
@@ -415,9 +420,9 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
         match param {
             ast::Param::Pos(ast::Pattern::Placeholder(..)) => {
                 params.push(Arc::new(ParamSpec {
-                    name: Cow::Borrowed("_"),
+                    name: Interned::new_str("_"),
                     input: CastInfo::Any,
-                    infer_type: None,
+                    base_type: None,
                     type_repr: None,
                     expr: None,
                     default: None,
@@ -437,9 +442,9 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 let name = name[0].as_str();
 
                 params.push(Arc::new(ParamSpec {
-                    name: Cow::Owned(name.to_owned()),
+                    name: Interned::new_str(name),
                     input: CastInfo::Any,
-                    infer_type: None,
+                    base_type: None,
                     type_repr: None,
                     expr: None,
                     default: None,
@@ -454,9 +459,9 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
             ast::Param::Named(n) => {
                 let expr = unwrap_expr(n.expr()).to_untyped().clone().into_text();
                 params.push(Arc::new(ParamSpec {
-                    name: Cow::Owned(n.name().as_str().to_owned()),
+                    name: Interned::new_str(n.name().as_str()),
                     input: CastInfo::Any,
-                    infer_type: None,
+                    base_type: None,
                     type_repr: Some(expr.clone()),
                     expr: Some(expr.clone()),
                     default: None,
@@ -470,9 +475,9 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
             ast::Param::Spread(n) => {
                 let ident = n.sink_ident().map(|e| e.as_str());
                 params.push(Arc::new(ParamSpec {
-                    name: Cow::Owned(ident.unwrap_or_default().to_owned()),
+                    name: Interned::new_str(ident.unwrap_or_default()),
                     input: CastInfo::Any,
-                    infer_type: None,
+                    base_type: None,
                     type_repr: None,
                     expr: None,
                     default: None,

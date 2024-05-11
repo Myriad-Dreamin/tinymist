@@ -6,19 +6,13 @@ input_file: crates/tinymist-query/src/fixtures/type_check/infer.typ
 ---
 1..6 -> Func(image)
 1..18 -> Element(image)
-7..17 -> Path(Image)
 21..25 -> Func(read)
 21..37 -> (Type(string) | Type(bytes))
-26..36 -> Path(None)
 40..44 -> Func(json)
 40..57 -> Any
-45..56 -> Path(Json)
 60..64 -> Func(yaml)
 60..77 -> Any
-65..76 -> Path(Yaml)
 80..83 -> Func(xml)
 80..95 -> Any
-84..94 -> Path(Xml)
 98..102 -> Func(toml)
 98..115 -> Any
-103..114 -> Path(Toml)

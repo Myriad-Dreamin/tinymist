@@ -17,6 +17,7 @@ use typst::visualize::Color;
 use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
+use crate::adt::interner::Interned;
 use crate::analysis::{analyze_expr, analyze_import, analyze_labels, DynLabel};
 use crate::AnalysisContext;
 
@@ -39,8 +40,8 @@ pub fn autocomplete(
     mut ctx: CompletionContext,
 ) -> Option<(usize, bool, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
     let _ = complete_comments(&mut ctx)
-        || complete_literal(&mut ctx).is_none() && {
-            log::info!("continue after completing literal");
+        || complete_type(&mut ctx).is_none() && {
+            log::info!("continue after completing type");
             complete_field_accesses(&mut ctx)
                 || complete_open_labels(&mut ctx)
                 || complete_imports(&mut ctx)
@@ -721,7 +722,7 @@ fn complete_params(ctx: &mut CompletionContext) -> bool {
             let ty = ctx.ctx.type_of(param.to_untyped());
             log::debug!("named param type: {:?}", ty);
 
-            named_param_value_completions(ctx, callee, &param, ty.as_ref());
+            named_param_value_completions(ctx, callee, &Interned::new_str(param.get()), ty.as_ref());
             return true;
         }
     }
@@ -963,6 +964,7 @@ pub struct CompletionContext<'a, 'w> {
     pub completions2: Vec<lsp_types::CompletionItem>,
     pub incomplete: bool,
     pub seen_casts: HashSet<u128>,
+    pub seen_fields: HashSet<Interned<str>>,
 }
 
 impl<'a, 'w> CompletionContext<'a, 'w> {
@@ -992,6 +994,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             completions: vec![],
             completions2: vec![],
             seen_casts: HashSet::new(),
+            seen_fields: HashSet::new(),
         })
     }
 

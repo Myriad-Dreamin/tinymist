@@ -4,11 +4,11 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/external.typ
 ---
 "bad-instantiate" = Any
-"prefix" = (, title: ( ⪯ Any)) -> FlowBinaryType { op: Add, operands: (FlowBinaryType { op: Add, operands: (FlowBinaryType { op: Add, operands: (Any, Infer) }, Infer) }, Infer) }
+"prefix" = ("title": ( ⪯ Any)) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, Infer), op: Add }, Infer), op: Add }, Infer), op: Add }
 "title" = None
 ---
 27..33 -> @prefix
 34..39 -> @title
-53..68 -> (@bad-instantiate | (Any) -> FlowBinaryType { op: Add, operands: (FlowBinaryType { op: Add, operands: (FlowBinaryType { op: Add, operands: (Any, Infer) }, Infer) }, Infer) })
-53..75 -> FlowBinaryType { op: Add, operands: (FlowBinaryType { op: Add, operands: (FlowBinaryType { op: Add, operands: (Any, Infer) }, Infer) }, Infer) }
+53..68 -> (@bad-instantiate | (Any) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, Infer), op: Add }, Infer), op: Add }, Infer), op: Add })
+53..75 -> TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, Infer), op: Add }, Infer), op: Add }, Infer), op: Add }
 69..74 -> @title

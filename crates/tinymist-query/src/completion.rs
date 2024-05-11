@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 
 use crate::{
-    analysis::{FlowBuiltinType, FlowType},
+    analysis::{BuiltinTy, Ty},
     prelude::*,
     syntax::DerefTarget,
     upstream::{autocomplete, complete_path, CompletionContext},
@@ -115,16 +115,15 @@ impl StatefulRequest for CompletionRequest {
                 if matches!(parent.kind(), SyntaxKind::Named | SyntaxKind::Args) {
                     let ty_chk = ctx.type_check(source.clone());
                     if let Some(ty_chk) = ty_chk {
-                        let ty = ty_chk.mapping.get(&cano_expr.span());
+                        let ty = ty_chk.type_of_span(cano_expr.span());
                         log::debug!("check string ty: {:?}", ty);
-                        if let Some(FlowType::Builtin(FlowBuiltinType::Path(path_filter))) = ty {
+                        if let Some(Ty::Builtin(BuiltinTy::Path(path_filter))) = ty {
                             completion_result =
-                                complete_path(ctx, Some(cano_expr), &source, cursor, path_filter);
+                                complete_path(ctx, Some(cano_expr), &source, cursor, &path_filter);
                         }
                     }
                 }
             }
-            // todo: label, reference
             Some(DerefTarget::Label(..) | DerefTarget::Ref(..) | DerefTarget::Normal(..)) => {}
             None => {}
         }
@@ -322,6 +321,15 @@ mod tests {
             let get_items = |items: Vec<CompletionItem>| {
                 let mut res: Vec<_> = items
                     .into_iter()
+                    .filter(|item| {
+                        if !excludes.is_empty() && excludes.contains(item.label.as_str()) {
+                            panic!("{item:?} was excluded in {excludes:?}");
+                        }
+                        if includes.is_empty() {
+                            return true;
+                        }
+                        includes.contains(item.label.as_str())
+                    })
                     .map(|item| CompletionItem {
                         label: item.label,
                         label_details: item.label_details,
@@ -329,15 +337,6 @@ mod tests {
                         kind: item.kind,
                         text_edit: item.text_edit,
                         ..Default::default()
-                    })
-                    .filter(|item| {
-                        if includes.is_empty() {
-                            return true;
-                        }
-                        if !excludes.is_empty() && excludes.contains(item.label.as_str()) {
-                            panic!("{item:?} was excluded in {excludes:?}");
-                        }
-                        includes.contains(item.label.as_str())
                     })
                     .collect();
 

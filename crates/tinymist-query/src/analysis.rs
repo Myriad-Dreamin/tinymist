@@ -15,6 +15,7 @@ pub use linked_def::*;
 pub mod signature;
 pub use signature::*;
 mod ty;
+pub(crate) use crate::ty::*;
 pub(crate) use ty::*;
 pub mod track_values;
 pub use track_values::*;
@@ -33,7 +34,7 @@ mod type_check_tests {
     use crate::analysis::ty;
     use crate::tests::*;
 
-    use super::TypeCheckInfo;
+    use super::{Ty, TypeCheckInfo};
 
     #[test]
     fn test() {
@@ -65,7 +66,7 @@ mod type_check_tests {
             vars.sort_by(|x, y| x.0.cmp(&y.0));
 
             for (name, var) in vars {
-                writeln!(f, "{:?} = {:?}", name, info.simplify(var.get_ref(), true))?;
+                writeln!(f, "{:?} = {:?}", name, info.simplify(var.as_type(), true))?;
             }
 
             writeln!(f, "---")?;
@@ -82,7 +83,8 @@ mod type_check_tests {
             });
 
             for (range, value) in mapping {
-                writeln!(f, "{range:?} -> {value:?}")?;
+                let ty = Ty::from_types(value.clone().into_iter());
+                writeln!(f, "{range:?} -> {ty:?}")?;
             }
 
             Ok(())

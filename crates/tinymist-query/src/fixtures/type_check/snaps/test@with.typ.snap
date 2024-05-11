@@ -3,14 +3,14 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/with.typ
 ---
-"f" = (Any) -> Any
-"g" = ((Any) -> Any).with(..[&(1)])
-"x" = ( ⪰ Any | Type(Type(integer)))
+"f" = (Any) => Any
+"g" = (Any | ((Any) => Any).with(..(1) => any))
+"x" = ( ⪰ Any | Type(integer))
 ---
 5..6 -> @f
 7..8 -> @x
 12..13 -> @x
 20..21 -> @g
 24..25 -> @f
-24..30 -> (@x) -> @x
-24..33 -> ((@x) -> @x).with(..[&(1)])
+24..30 -> (@x) => @x
+24..33 -> (@x | ((@x) => @x).with(..(1) => any))
