@@ -1473,7 +1473,9 @@ const funcCallOrPropAccess = (strict: boolean): textmate.Pattern => {
             /(\.\s*)?/.source + IDENTIFIER.source + /\s*(?=\(|\[)/.source
           )
     ),
-    end: /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\n;\}\]\)]|$)/,
+    end: strict
+      ? /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\s;\,\}\]\)]|$)/
+      : /(?:(?<=\)|\])(?:(?![\[\(\.])|$))|(?=[\n;\,\}\]\)]|$)/,
     patterns: [
       // todo: comments?
       //   {
@@ -1627,6 +1629,7 @@ export const typst: textmate.Grammar = {
     ...setStatement().repository,
     ...showStatement().repository,
     strictFuncCallOrPropAccess: funcCallOrPropAccess(true),
+    // todo: distinguish strict and non-strict for markup and code mode.
     // funcCallOrPropAccess: funcCallOrPropAccess(false),
     callArgs,
     funcRestParam,
