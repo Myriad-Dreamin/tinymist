@@ -4,9 +4,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use once_cell::sync::Lazy;
 use reflexo::vector::ir::DefId;
-use typst::syntax::{
-    ast::{self, AstNode},
-    LinkedNode, Source, Span, SyntaxKind,
+use typst::{
+    foundations::Value,
+    syntax::{
+        ast::{self, AstNode},
+        LinkedNode, Source, Span, SyntaxKind,
+    },
 };
 
 use crate::analysis::{Ty, *};
@@ -138,6 +141,14 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         static FLOW_OUTSET_DICT_TYPE: Lazy<Ty> = Lazy::new(|| Ty::Dict(FLOW_OUTSET_DICT.clone()));
         static FLOW_RADIUS_DICT_TYPE: Lazy<Ty> = Lazy::new(|| Ty::Dict(FLOW_RADIUS_DICT.clone()));
 
+        fn is_ty(ty: &Ty) -> bool {
+            match ty {
+                Ty::Builtin(BuiltinTy::Type(..)) => true,
+                Ty::Value(val) => matches!(val.val, Value::Type(..)),
+                _ => false,
+            }
+        }
+
         match (lhs, rhs) {
             (Ty::Var(v), Ty::Var(w)) => {
                 if v.def == w.def {
@@ -246,6 +257,23 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     // }
                 }
             }
+            (Ty::Unary(lhs), Ty::Unary(rhs)) if lhs.op == rhs.op => {
+                // todo: more information could be extracted from unary constraint structure
+                // e.g. type(l) == type(r)
+                self.constrain(&lhs.lhs, &rhs.lhs);
+            }
+            (Ty::Unary(lhs), rhs) if lhs.op == UnaryOp::TypeOf && is_ty(rhs) => {
+                log::debug!("constrain type of {lhs:?} ⪯ {rhs:?}");
+
+                self.constrain(&lhs.lhs, rhs);
+            }
+            (lhs, Ty::Unary(rhs)) if rhs.op == UnaryOp::TypeOf && is_ty(lhs) => {
+                log::debug!(
+                    "constrain type of {lhs:?} ⪯ {rhs:?} {:?}",
+                    matches!(lhs, Ty::Builtin(..))
+                );
+                self.constrain(lhs, &rhs.lhs);
+            }
             (Ty::Value(lhs), rhs) => {
                 log::debug!("constrain value {lhs:?} ⪯ {rhs:?}");
                 let _ = TypeCheckInfo::witness_at_most;
@@ -275,10 +303,24 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let _ = rhs;
     }
 
-    fn check_containing(&self, container: &Ty, elem: &Ty, expected_in: bool) {
-        let _ = container;
-        let _ = elem;
-        let _ = expected_in;
+    fn check_containing(&mut self, container: &Ty, elem: &Ty, expected_in: bool) {
+        let rhs = if expected_in {
+            match container {
+                Ty::Tuple(elements) => Ty::Union(elements.clone()),
+                _ => Ty::Unary(Interned::new(TypeUnary {
+                    op: UnaryOp::ElementOf,
+                    lhs: Interned::new(container.clone()),
+                })),
+            }
+        } else {
+            Ty::Unary(Interned::new(TypeUnary {
+                // todo: remove not element of
+                op: UnaryOp::NotElementOf,
+                lhs: Interned::new(container.clone()),
+            }))
+        };
+
+        self.constrain(elem, &rhs);
     }
 
     fn possible_ever_be(&mut self, lhs: &Ty, rhs: &Ty) {

@@ -10,6 +10,6 @@ input_file: crates/tinymist-query/src/fixtures/type_check/control_flow.typ
 5..7 -> @x0
 31..33 -> @x1
 58..60 -> @x2
-74..78 -> () => Type(location)
+74..78 -> Func(here)
 74..80 -> Type(location)
 74..87 -> Any

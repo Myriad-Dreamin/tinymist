@@ -5,6 +5,10 @@ use crate::{adt::interner::Interned, analysis::*, ty::def::*};
 #[derive(Debug, Clone, Copy)]
 pub enum Sig<'a> {
     Type(&'a Interned<SigTy>),
+    TypeCons {
+        val: &'a typst::foundations::Type,
+        at: &'a Ty,
+    },
     ArrayCons(&'a TyRef),
     DictCons(&'a Interned<RecordTy>),
     Value {
@@ -30,6 +34,7 @@ impl<'a> Sig<'a> {
             Sig::Type(t) => Ty::Func(t.clone()),
             Sig::ArrayCons(t) => Ty::Array(t.clone()),
             Sig::DictCons(t) => Ty::Dict(t.clone()),
+            Sig::TypeCons { val, .. } => Ty::Builtin(BuiltinTy::Type(*val)),
             Sig::Value { at, .. } => at.clone(),
             Sig::With { at, .. } => at.clone(),
             Sig::Partialize(..) => return None,
@@ -45,6 +50,7 @@ impl<'a> Sig<'a> {
         let sig_ins = match cano_sig {
             Sig::ArrayCons(a) => SigTy::array_cons(a.as_ref().clone(), false),
             Sig::DictCons(d) => SigTy::dict_cons(d, false),
+            Sig::TypeCons { val, .. } => ctx?.type_of_func(&val.constructor().ok()?)?,
             Sig::Value { val, .. } => ctx?.type_of_func(val)?,
             // todo
             Sig::Partialize(..) => return None,
@@ -154,11 +160,26 @@ impl<'a> SigCheckDriver<'a> {
             // todo: deduplicate checking early
             Ty::Value(v) => {
                 if self.func_as_sig() {
-                    if let Value::Func(f) = &v.val {
-                        self.checker
-                            .check(Sig::Value { val: f, at: ty }, &mut self.ctx, pol);
+                    match &v.val {
+                        Value::Func(f) => {
+                            self.checker
+                                .check(Sig::Value { val: f, at: ty }, &mut self.ctx, pol);
+                        }
+                        Value::Type(t) => {
+                            self.checker.check(
+                                Sig::TypeCons { val: t, at: ty },
+                                &mut self.ctx,
+                                pol,
+                            );
+                        }
+                        _ => {}
                     }
                 }
+            }
+            Ty::Builtin(BuiltinTy::Type(e)) if self.func_as_sig() => {
+                // todo: distinguish between element and function
+                self.checker
+                    .check(Sig::TypeCons { val: e, at: ty }, &mut self.ctx, pol);
             }
             Ty::Builtin(BuiltinTy::Element(e)) if self.func_as_sig() => {
                 // todo: distinguish between element and function

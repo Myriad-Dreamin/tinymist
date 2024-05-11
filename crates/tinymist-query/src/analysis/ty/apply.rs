@@ -1,6 +1,5 @@
 //! Type checking on source file
 
-use typst::foundations::Func;
 use typst::syntax::{ast, Span};
 
 use crate::analysis::Ty;
@@ -38,13 +37,36 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
             sig => (sig, false),
         };
 
-        if let Some(ty) = sig.call(args, pol) {
+        if let Some(ty) = sig.call(args, pol, Some(self.base.ctx)) {
             self.resultant.push(ty);
         }
 
+        // todo: remove this after we implemented dependent types
+        if let Sig::TypeCons { val, .. } = sig {
+            if *val == typst::foundations::Type::of::<typst::foundations::Type>() {
+                if let Some(p0) = args.pos(0) {
+                    self.resultant.push(Ty::Unary(Interned::new(TypeUnary {
+                        op: UnaryOp::TypeOf,
+                        lhs: Interned::new(p0.clone()),
+                    })));
+                }
+            }
+        }
+        // let v = val.inner();
+        // use typst::foundations::func::Repr;
+        // if let Repr::Native(v) = v {
+        //     match v.name {
+        //         "assert" => {}
+        //         "panic" => {}
+        //         _ => {}
+        //     }
+        // }
+
         let callee = sig.ty();
 
-        let SigShape { sig, withs } = sig.shape(Some(self.base.ctx)).unwrap();
+        let Some(SigShape { sig, withs }) = sig.shape(Some(self.base.ctx)) else {
+            return;
+        };
         for (arg_recv, arg_ins) in sig.matches(args, withs) {
             self.base.constrain(arg_ins, arg_recv);
         }
@@ -86,9 +108,5 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
         //         callee_span,
         //         FlowType::Value(TypeIns::new(Value::Func(f.clone()))),
         //     );
-    }
-
-    fn func_sig_of(&mut self, func: &Func) -> Option<Interned<SigTy>> {
-        self.base.ctx.type_of_func(func)
     }
 }

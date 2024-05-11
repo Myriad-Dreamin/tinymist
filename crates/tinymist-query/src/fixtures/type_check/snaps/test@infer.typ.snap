@@ -4,15 +4,15 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/infer.typ
 ---
 ---
-1..6 -> (Path(Image), "alt": (Type(string) | Type(none)), "fit": ("cover" | "contain" | "stretch"), "format": ("png" | "jpg" | "gif" | "svg" | Type(auto)), "height": (Type(relative length) | Type(auto)), "width": (Type(relative length) | Type(auto))) => Element(image)
+1..6 -> Func(image)
 1..18 -> Element(image)
-21..25 -> (Path(None), "encoding": ("utf8" | Type(none))) => (Type(string) | Type(bytes))
+21..25 -> Func(read)
 21..37 -> (Type(string) | Type(bytes))
-40..44 -> (Path(Json)) => Any
+40..44 -> Func(json)
 40..57 -> Any
-60..64 -> (Path(Yaml)) => Any
+60..64 -> Func(yaml)
 60..77 -> Any
-80..83 -> (Path(Xml)) => Any
+80..83 -> Func(xml)
 80..95 -> Any
-98..102 -> (Path(Toml)) => Any
+98..102 -> Func(toml)
 98..115 -> Any

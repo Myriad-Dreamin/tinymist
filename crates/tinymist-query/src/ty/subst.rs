@@ -3,8 +3,13 @@ use hashbrown::HashMap;
 use crate::{adt::interner::Interned, analysis::*, ty::def::*};
 
 impl<'a> Sig<'a> {
-    pub fn call(&self, args: &Interned<ArgsTy>, pol: bool) -> Option<Ty> {
-        let (bound_variables, body) = self.check_bind(args)?;
+    pub fn call(
+        &self,
+        args: &Interned<ArgsTy>,
+        pol: bool,
+        ctx: Option<&mut AnalysisContext>,
+    ) -> Option<Ty> {
+        let (bound_variables, body) = self.check_bind(args, ctx)?;
 
         if bound_variables.is_empty() {
             return body;
@@ -14,8 +19,12 @@ impl<'a> Sig<'a> {
         checker.ty(&body?, pol)
     }
 
-    pub fn check_bind(&self, args: &Interned<ArgsTy>) -> Option<(HashMap<DefId, Ty>, Option<Ty>)> {
-        let SigShape { sig, withs } = self.shape(None)?;
+    pub fn check_bind(
+        &self,
+        args: &Interned<ArgsTy>,
+        ctx: Option<&mut AnalysisContext>,
+    ) -> Option<(HashMap<DefId, Ty>, Option<Ty>)> {
+        let SigShape { sig, withs } = self.shape(ctx)?;
 
         let has_free_vars = sig.has_free_variables;
 

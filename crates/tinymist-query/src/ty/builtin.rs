@@ -344,7 +344,7 @@ macro_rules! flow_record {
 }
 
 pub(super) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<Ty> {
-    match (f.name().unwrap(), p.name) {
+    match (f.name()?, p.name) {
         ("cbor", "path") => Some(literally(Path(PathPreference::None))),
         ("csv", "path") => Some(literally(Path(PathPreference::Csv))),
         ("image", "path") => Some(literally(Path(PathPreference::Image))),

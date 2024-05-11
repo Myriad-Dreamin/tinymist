@@ -657,6 +657,9 @@ pub(crate) enum UnaryOp {
     Neg,
     Not,
     Context,
+    NotElementOf,
+    ElementOf,
+    TypeOf,
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
