@@ -1054,6 +1054,13 @@ detect-libc@^2.0.0:
   resolved "https://registry.yarnpkg.com/detect-libc/-/detect-libc-2.0.2.tgz#8ccf2ba9315350e1241b88d0ac3b0e1fbd99605d"
   integrity sha512-UX6sGumvvqSaXgdKGUsgZWqcUyIXZ/vZTrlRT/iobiKhGL0zL4d3osHj3uqllWJK+i+sixDS/3COVEOFbupFyw==
 
+detypify-service@0.2.3-beta.3:
+  version "0.2.3-beta.3"
+  resolved "https://registry.yarnpkg.com/detypify-service/-/detypify-service-0.2.3-beta.3.tgz#63b892221d60326890731343b39bd0773282d65c"
+  integrity sha512-bUBhfQMppEE9n/p0Kz1rj+DfR8V8wOA+OB5vCkpZ0A6aumGeUs5mIOEv/LG9+qx37OaEjtEXDp9pSmxRWxWhGQ==
+  dependencies:
+    onnxruntime-web "=1.17.1"
+
 diff-sequences@^29.4.3:
   version "29.6.3"
   resolved "https://registry.yarnpkg.com/diff-sequences/-/diff-sequences-29.6.3.tgz#4deaf894d11407c51efc8418012f9e70b84ea921"
@@ -2308,20 +2315,20 @@ once@^1.3.0, once@^1.3.1, once@^1.4.0:
   dependencies:
     wrappy "1"
 
-onnxruntime-common@1.17.3:
-  version "1.17.3"
-  resolved "https://registry.yarnpkg.com/onnxruntime-common/-/onnxruntime-common-1.17.3.tgz#aadc456477873a540ee3d611ae9cd4f3de7c43e5"
-  integrity sha512-IkbaDelNVX8cBfHFgsNADRIq2TlXMFWW+nG55mwWvQT4i0NZb32Jf35Pf6h9yjrnK78RjcnlNYaI37w394ovMw==
+onnxruntime-common@1.17.1:
+  version "1.17.1"
+  resolved "https://registry.yarnpkg.com/onnxruntime-common/-/onnxruntime-common-1.17.1.tgz#1d3cfcfe56f9a5fc2ef5530c8e8723c86708a290"
+  integrity sha512-6wLNhpn+1hnsKN+jq6ulqUEJ61TdRmyFkGCvtRNnZkAupH8Yfr805UeNxjl9jtiX9B1q48pq6Q/67fEFpxT7Dw==
 
-onnxruntime-web@^1.17.3:
-  version "1.17.3"
-  resolved "https://registry.yarnpkg.com/onnxruntime-web/-/onnxruntime-web-1.17.3.tgz#943063f9ddad0e5f787bc934938dd6c7fbe4897a"
-  integrity sha512-MSDrNUWgc1biP0YzY488OJ9n/jTMS9EXysgm9Aw4CUj2A836ALbO2J1sgzguWJeVUHTlM6p7tRzo8IGAgaXWKw==
+onnxruntime-web@=1.17.1:
+  version "1.17.1"
+  resolved "https://registry.yarnpkg.com/onnxruntime-web/-/onnxruntime-web-1.17.1.tgz#ff0c5ecdcc4063e653f3cac4ff8e049a57301f60"
+  integrity sha512-EotY9uJU4xFY/ZVZ2Zrl2OZmBcbTVTWn/2OOh4cCWODPwtsYN2xeJYgoz8LfCgZSrhenGg0q4ceYUWATXqEsYQ==
   dependencies:
     flatbuffers "^1.12.0"
     guid-typescript "^1.0.9"
     long "^5.2.3"
-    onnxruntime-common "1.17.3"
+    onnxruntime-common "1.17.1"
     platform "^1.3.6"
     protobufjs "^7.2.4"
 
@@ -2794,6 +2801,7 @@ std-env@^3.3.3:
   integrity sha512-JPbdCEQLj1w5GilpiHAx3qJvFndqybBysA3qUOnznweH4QbNYUsW/ea8QzSrnh0vNsezMMw5bcVool8lM0gwzg==
 
 "string-width-cjs@npm:string-width@^4.2.0", string-width@^4.1.0:
+  name string-width-cjs
   version "4.2.3"
   resolved "https://registry.yarnpkg.com/string-width/-/string-width-4.2.3.tgz#269c7117d27b05ad2e536830a8ec895ef9c6d010"
   integrity sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==

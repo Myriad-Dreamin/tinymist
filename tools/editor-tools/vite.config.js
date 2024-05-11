@@ -3,7 +3,7 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 
 export default defineConfig({
   plugins: [viteSingleFile()],
-  assetsInclude: ["assets/**/*.onnx"],
+  assetsInclude: ["**/*.onnx"],
   build: {
     minify: false,
     rollupOptions: {
