@@ -215,6 +215,7 @@ impl<'a, 'b> MethodDriver<'a, 'b> {
 
 impl<'a, 'b> BoundChecker for MethodDriver<'a, 'b> {
     fn collect(&mut self, ty: &Ty, pol: bool) {
+        log::debug!("check method: {ty:?}.{}", self.1.as_ref());
         match ty {
             // todo: deduplicate checking early
             Ty::Value(v) => {
@@ -239,6 +240,15 @@ impl<'a, 'b> BoundChecker for MethodDriver<'a, 'b> {
                         &mut self.0.ctx,
                         pol,
                     );
+                } else {
+                    // todo: general select operator
+                }
+            }
+            Ty::Func(sig) => {
+                if self.is_binder() {
+                    self.0
+                        .checker
+                        .check(Sig::Partialize(&Sig::Type(sig)), &mut self.0.ctx, pol);
                 } else {
                     // todo: general select operator
                 }
