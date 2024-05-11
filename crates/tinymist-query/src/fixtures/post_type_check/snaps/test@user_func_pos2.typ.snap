@@ -1,7 +1,7 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
-description: "Check on \"(\" (61)"
+description: "Check on \"(\" (85)"
 expression: literal_type
-input_file: crates/tinymist-query/src/fixtures/post_type_check/text_stroke1.typ
+input_file: crates/tinymist-query/src/fixtures/post_type_check/user_func_pos2.typ
 ---
 ( ⪯ "cap": Any & "dash": Any & "join": Any & "miter-limit": Any & "paint": Any & "thickness": Any)

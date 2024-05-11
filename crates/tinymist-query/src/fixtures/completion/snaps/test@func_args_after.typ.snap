@@ -9,7 +9,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_args_after.typ
   "isIncomplete": false,
   "items": [
    {
-    "kind": 6,
+    "kind": 5,
     "label": "class",
     "sortText": "000",
     "textEdit": {

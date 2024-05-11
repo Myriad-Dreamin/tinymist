@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use hashbrown::HashSet;
 use typst::syntax::{
     ast::{self, AstNode},
     LinkedNode, Span, SyntaxKind,
@@ -10,7 +11,7 @@ use typst::syntax::{
 use crate::{
     adt::interner::Interned,
     analysis::{ArgsTy, Sig, SigChecker, SigSurfaceKind, TypeBounds},
-    syntax::{get_check_target, CheckTarget, ParamTarget},
+    syntax::{get_check_target, get_check_target_by_context, CheckTarget, ParamTarget},
     AnalysisContext,
 };
 
@@ -33,16 +34,26 @@ pub(crate) fn post_type_check(
 }
 
 #[derive(Default)]
-struct SignatureReceiver(TypeBounds);
+struct SignatureReceiver {
+    lbs_de: HashSet<Ty>,
+    ubs_de: HashSet<Ty>,
+    bounds: TypeBounds,
+}
 
 impl SignatureReceiver {
     fn insert(&mut self, ty: &Ty, pol: bool) {
         log::debug!("post check receive: {ty:?}");
-        if pol {
-            self.0.lbs.push(ty.clone());
-        } else {
-            self.0.ubs.push(ty.clone());
+        if !pol {
+            if self.lbs_de.insert(ty.clone()) {
+                self.bounds.lbs.push(ty.clone());
+            }
+        } else if self.ubs_de.insert(ty.clone()) {
+            self.bounds.ubs.push(ty.clone());
         }
+    }
+
+    fn finalize(self) -> Ty {
+        Ty::Let(Interned::new(self.bounds))
     }
 }
 
@@ -159,8 +170,8 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
 
                 self.check_signatures(&callee, false, &mut check_signature(&mut resp, &target));
 
-                log::debug!("post check target iterated: {:?}", resp.0);
-                Some(self.info.simplify(Ty::Let(Interned::new(resp.0)), false))
+                log::debug!("post check target iterated: {:?}", resp.bounds);
+                Some(self.info.simplify(resp.finalize(), false))
             }
             CheckTarget::Element { container, target } => {
                 let container_ty = self.check_context_or(&container, context_ty)?;
@@ -175,8 +186,8 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                     &mut check_signature(&mut resp, &target),
                 );
 
-                log::debug!("post check target iterated: {:?}", resp.0);
-                Some(self.info.simplify(Ty::Let(Interned::new(resp.0)), false))
+                log::debug!("post check target iterated: {:?}", resp.bounds);
+                Some(self.info.simplify(resp.finalize(), false))
             }
             CheckTarget::Paren {
                 container,
@@ -186,7 +197,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                 log::debug!("post check paren target: {container_ty:?}::{is_before:?}");
 
                 let mut resp = SignatureReceiver::default();
-                resp.0.lbs.push(container_ty.clone());
+                resp.bounds.lbs.push(container_ty.clone());
 
                 let target = ParamTarget::positional_from_before(true);
                 self.check_element_of(
@@ -196,8 +207,8 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                     &mut check_signature(&mut resp, &target),
                 );
 
-                log::debug!("post check target iterated: {:?}", resp.0);
-                Some(self.info.simplify(Ty::Let(Interned::new(resp.0)), false))
+                log::debug!("post check target iterated: {:?}", resp.bounds);
+                Some(self.info.simplify(resp.finalize(), false))
             }
             CheckTarget::Normal(target) => {
                 let ty = self.check_context_or(&target, context_ty)?;
@@ -223,10 +234,12 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                     }
                 }
             }
+            SyntaxKind::Args => self.check_target(
+                get_check_target_by_context(context.clone(), node.clone()),
+                None,
+            ),
             // todo: constraint node
-            SyntaxKind::Args | SyntaxKind::Named => {
-                self.check_target(get_check_target(context.clone()), None)
-            }
+            SyntaxKind::Named => self.check_target(get_check_target(context.clone()), None),
             _ => None,
         }
     }
