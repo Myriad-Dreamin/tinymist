@@ -3,4 +3,4 @@ source: crates/tinymist-query/src/analysis.rs
 expression: CallSnapshot(result.as_deref())
 input_file: crates/tinymist-query/src/fixtures/call_info/builtin_poly2.typ
 ---
-"#fff" -> CallParamInfo { kind: Positional, is_content_block: false, param: ParamSpec { name: "red", docs: "The red component.", input: Union([Type(Type(integer)), Type(Type(ratio))]), infer_type: Some((Type(integer) | Type(ratio))), type_repr: Some("int | ratio"), expr: None, default: None, positional: true, named: false, variadic: false, settable: false } }
+"#fff" -> CallParamInfo { kind: Positional, is_content_block: false, param: ParamSpec { name: "red", docs: "The red component.", input: Union([Type(Type(integer)), Type(Type(ratio))]), base_type: Some((Type(integer) | Type(ratio))), type_repr: Some("int | ratio"), expr: None, default: None, positional: true, named: false, variadic: false, settable: false } }
