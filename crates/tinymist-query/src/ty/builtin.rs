@@ -500,16 +500,12 @@ pub static FLOW_RADIUS_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
     )
 });
 
-// todo bad case: function.with
-// todo bad case: function.where
 // todo bad case: array.fold
 // todo bad case: datetime
 // todo bad case: selector
 // todo: function signatures, for example: `locate(loc => ...)`
 
 // todo: numbering/supplement
-// todo: grid/table.columns/rows/gutter/column-gutter/row-gutter array of length
-// todo: pattern.size array of length
 // todo: grid/table.fill/align/stroke/inset can be a function
 // todo: math.cancel.angle can be a function
 // todo: text.features array/dictionary
