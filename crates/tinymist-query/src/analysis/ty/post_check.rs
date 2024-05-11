@@ -252,13 +252,13 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
     ) -> Option<Ty> {
         match node.kind() {
             SyntaxKind::Ident => {
-                let ty = self.info.type_of(node.span());
+                let ty = self.info.type_of_span(node.span());
                 log::debug!("post check ident: {node:?} -> {ty:?}");
                 self.simplify(&ty?)
             }
             // todo: destructuring
             SyntaxKind::FieldAccess => {
-                let ty = self.info.type_of(node.span());
+                let ty = self.info.type_of_span(node.span());
                 self.simplify(&ty?)
                     .or_else(|| self.check_context_or(context, context_ty))
             }
@@ -273,7 +273,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                 let ast::Expr::Ident(ident) = n else {
                     return None;
                 };
-                self.simplify(&self.info.type_of(ident.span())?)
+                self.simplify(&self.info.type_of_span(ident.span())?)
             }
             ast::Pattern::Parenthesized(p) => {
                 self.destruct_let(p.expr().to_untyped().cast()?, node)

@@ -285,7 +285,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             } else {
                 types
                     .and_then(|types| {
-                        let ty = types.type_of(span)?;
+                        let ty = types.type_of_span(span)?;
                         let ty = types.simplify(ty, false);
                         types.describe(&ty).map(From::from)
                     })
@@ -609,7 +609,7 @@ pub fn param_completions<'a>(
             doc = Some(plain_docs_sentence(&pos.docs));
 
             if pos.positional
-                && type_completion(ctx, pos.infer_type.as_ref(), doc.as_deref()).is_none()
+                && type_completion(ctx, pos.base_type.as_ref(), doc.as_deref()).is_none()
             {
                 ctx.cast_completions(&pos.input);
             }
@@ -632,14 +632,14 @@ pub fn param_completions<'a>(
         if param.named {
             let compl = Completion {
                 kind: CompletionKind::Field,
-                label: param.name.clone().into(),
+                label: param.name.as_ref().into(),
                 apply: Some(eco_format!("{}: ${{}}", param.name)),
                 detail: Some(plain_docs_sentence(&param.docs)),
                 label_detail: None,
                 command: Some("tinymist.triggerNamedCompletion"),
                 ..Completion::default()
             };
-            match param.infer_type {
+            match param.base_type {
                 Some(Ty::Builtin(BuiltinTy::TextSize)) => {
                     for size_template in &[
                         "10.5pt", "12pt", "9pt", "14pt", "8pt", "16pt", "18pt", "20pt", "22pt",
@@ -671,7 +671,7 @@ pub fn param_completions<'a>(
         if param.positional
             && type_completion(
                 ctx,
-                param.infer_type.as_ref(),
+                param.base_type.as_ref(),
                 Some(&plain_docs_sentence(&param.docs)),
             )
             .is_none()
@@ -1008,7 +1008,7 @@ pub fn named_param_value_completions<'a>(
 
     if type_completion(
         ctx,
-        param.infer_type.as_ref(),
+        param.base_type.as_ref(),
         Some(&plain_docs_sentence(&param.docs)),
     )
     .is_none()

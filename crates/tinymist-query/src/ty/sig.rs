@@ -103,6 +103,28 @@ impl Ty {
 
         worker.ty(self, pol);
     }
+
+    pub fn sig_repr(&self, pol: bool) -> Option<Interned<SigTy>> {
+        // todo: union sig
+        // let mut pos = vec![];
+        // let mut named = HashMap::new();
+        // let mut rest = None;
+        // let mut ret = None;
+
+        let mut primary = None;
+
+        self.sig_surface(
+            pol,
+            SigSurfaceKind::Call,
+            &mut |sig: Sig, _ctx: &mut SigCheckContext, _pol: bool| {
+                let sig = sig.shape(None)?;
+                primary = Some(sig.sig.clone());
+                Some(())
+            },
+        );
+
+        primary
+    }
 }
 
 pub struct SigCheckContext {

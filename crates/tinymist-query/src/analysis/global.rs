@@ -25,8 +25,8 @@ use typst::{foundations::Value, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
 use super::{
-    analyze_bib, post_type_check, BibInfo, DefUseInfo, ImportInfo, PathPreference, SigTy,
-    Signature, SignatureTarget, Ty, TypeCheckInfo,
+    analyze_bib, post_type_check, BibInfo, DefUseInfo, DefinitionLink, IdentRef, ImportInfo,
+    PathPreference, SigTy, Signature, SignatureTarget, Ty, TypeCheckInfo,
 };
 use crate::adt::interner::Interned;
 use crate::analysis::analyze_dyn_signature;
@@ -870,11 +870,24 @@ impl<'w> AnalysisContext<'w> {
         Some(analyze_dyn_signature(self, func.clone()).type_sig())
     }
 
+    pub(crate) fn user_type_of_def(&mut self, source: &Source, def: &DefinitionLink) -> Option<Ty> {
+        let def_at = def.def_at.clone()?;
+        let ty_chk = self.type_check(source.clone())?;
+        let def_use = self.def_use(source.clone())?;
+
+        let def_ident = IdentRef {
+            name: def.name.clone(),
+            range: def_at.1,
+        };
+        let (def_id, _) = def_use.get_def(def_at.0, &def_ident)?;
+        ty_chk.type_of_def(def_id)
+    }
+
     pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {
         let id = s.id()?;
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(source)?;
-        ty_chk.type_of(s)
+        ty_chk.type_of_span(s)
     }
 
     pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<Ty> {
@@ -882,7 +895,7 @@ impl<'w> AnalysisContext<'w> {
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(source.clone())?;
 
-        post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.type_of(k.span()))
+        post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.type_of_span(k.span()))
     }
 }
 

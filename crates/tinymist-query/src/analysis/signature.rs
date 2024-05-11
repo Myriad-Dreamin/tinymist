@@ -29,13 +29,13 @@ use super::{find_definition, DefinitionLink, LexicalKind, LexicalVarKind, Ty};
 #[derive(Debug, Clone)]
 pub struct ParamSpec {
     /// The parameter's name.
-    pub name: Cow<'static, str>,
+    pub name: Interned<str>,
     /// Documentation for the parameter.
     pub docs: Cow<'static, str>,
     /// Describe what values this parameter accepts.
     pub input: CastInfo,
     /// Inferred type of the parameter.
-    pub(crate) infer_type: Option<Ty>,
+    pub(crate) base_type: Option<Ty>,
     /// The parameter's default name as type.
     pub type_repr: Option<EcoString>,
     /// The parameter's default name as value.
@@ -58,10 +58,10 @@ pub struct ParamSpec {
 impl ParamSpec {
     fn from_static(f: &Func, p: &ParamInfo) -> Arc<Self> {
         Arc::new(Self {
-            name: Cow::Borrowed(p.name),
+            name: Interned::new_str(p.name),
             docs: Cow::Borrowed(p.docs),
             input: p.input.clone(),
-            infer_type: Ty::from_param_site(f, p, &p.input),
+            base_type: Ty::from_param_site(f, p, &p.input),
             type_repr: Some(eco_format!("{}", TypeExpr(&p.input))),
             expr: None,
             default: p.default,
@@ -382,16 +382,16 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
 
     let mut named_vec: Vec<(Interned<str>, Ty)> = named
         .iter()
-        .map(|e| (e.0.clone(), e.1.infer_type.clone().unwrap_or(Ty::Any)))
+        .map(|e| (e.0.clone(), e.1.base_type.clone().unwrap_or(Ty::Any)))
         .collect::<Vec<_>>();
 
     named_vec.sort_by(|a, b| a.0.cmp(&b.0));
 
     let sig_ty = SigTy::new(
-        pos.iter().map(|e| e.infer_type.clone().unwrap_or(Ty::Any)),
+        pos.iter().map(|e| e.base_type.clone().unwrap_or(Ty::Any)),
         named_vec.into_iter(),
         rest.as_ref()
-            .map(|e| e.infer_type.clone().unwrap_or(Ty::Any)),
+            .map(|e| e.base_type.clone().unwrap_or(Ty::Any)),
         ret_ty.clone(),
     );
     Arc::new(PrimarySignature {
@@ -420,9 +420,9 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
         match param {
             ast::Param::Pos(ast::Pattern::Placeholder(..)) => {
                 params.push(Arc::new(ParamSpec {
-                    name: Cow::Borrowed("_"),
+                    name: Interned::new_str("_"),
                     input: CastInfo::Any,
-                    infer_type: None,
+                    base_type: None,
                     type_repr: None,
                     expr: None,
                     default: None,
@@ -442,9 +442,9 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 let name = name[0].as_str();
 
                 params.push(Arc::new(ParamSpec {
-                    name: Cow::Owned(name.to_owned()),
+                    name: Interned::new_str(name),
                     input: CastInfo::Any,
-                    infer_type: None,
+                    base_type: None,
                     type_repr: None,
                     expr: None,
                     default: None,
@@ -459,9 +459,9 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
             ast::Param::Named(n) => {
                 let expr = unwrap_expr(n.expr()).to_untyped().clone().into_text();
                 params.push(Arc::new(ParamSpec {
-                    name: Cow::Owned(n.name().as_str().to_owned()),
+                    name: Interned::new_str(n.name().as_str()),
                     input: CastInfo::Any,
-                    infer_type: None,
+                    base_type: None,
                     type_repr: Some(expr.clone()),
                     expr: Some(expr.clone()),
                     default: None,
@@ -475,9 +475,9 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
             ast::Param::Spread(n) => {
                 let ident = n.sink_ident().map(|e| e.as_str());
                 params.push(Arc::new(ParamSpec {
-                    name: Cow::Owned(ident.unwrap_or_default().to_owned()),
+                    name: Interned::new_str(ident.unwrap_or_default()),
                     input: CastInfo::Any,
-                    infer_type: None,
+                    base_type: None,
                     type_repr: None,
                     expr: None,
                     default: None,

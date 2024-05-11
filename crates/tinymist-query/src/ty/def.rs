@@ -57,11 +57,15 @@ impl TypeCheckInfo {
         }
     }
 
-    pub fn type_of(&self, site: Span) -> Option<Ty> {
+    pub fn type_of_span(&self, site: Span) -> Option<Ty> {
         self.mapping
             .get(&site)
             .cloned()
             .map(|e| Ty::from_types(e.into_iter()))
+    }
+
+    pub fn type_of_def(&self, def: DefId) -> Option<Ty> {
+        Some(self.simplify(self.vars.get(&def).map(|e| e.as_type())?, false))
     }
 }
 
