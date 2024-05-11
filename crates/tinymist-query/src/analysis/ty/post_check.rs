@@ -235,6 +235,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                 }
             }
             SyntaxKind::Args => self.check_target(
+                // todo: not well behaved
                 get_check_target_by_context(context.clone(), node.clone()),
                 None,
             ),
