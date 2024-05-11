@@ -49,6 +49,10 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
             self.base.constrain(arg_ins, arg_recv);
         }
 
+        if let Some(callee) = callee.clone() {
+            self.base.info.witness_at_least(self.call_site, callee);
+        }
+
         if is_partialize {
             let Some(sig) = callee else {
                 log::warn!("Partialize is not implemented yet {sig:?}");
@@ -58,11 +62,6 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
                 sig: Interned::new(sig),
                 with: args.clone(),
             })));
-            return;
-        }
-
-        if let Some(callee) = callee {
-            self.base.info.witness_at_least(self.call_site, callee);
         }
 
         //            let f = v.as_ref();
