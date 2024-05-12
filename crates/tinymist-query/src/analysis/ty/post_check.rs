@@ -53,7 +53,7 @@ impl SignatureReceiver {
     }
 
     fn finalize(self) -> Ty {
-        Ty::Let(Interned::new(self.bounds))
+        Ty::Let(self.bounds.into())
     }
 }
 
@@ -67,7 +67,7 @@ fn check_signature<'a>(
         match &target {
             ParamTarget::Named(n) => {
                 let ident = n.cast::<ast::Ident>()?;
-                let ty = sig_ins.named(&Interned::new_str(ident.get()))?;
+                let ty = sig_ins.named(&ident.into())?;
                 receiver.insert(ty, !pol);
 
                 Some(())

@@ -722,7 +722,7 @@ fn complete_params(ctx: &mut CompletionContext) -> bool {
             let ty = ctx.ctx.type_of(param.to_untyped());
             log::debug!("named param type: {:?}", ty);
 
-            named_param_value_completions(ctx, callee, &Interned::new_str(param.get()), ty.as_ref());
+            named_param_value_completions(ctx, callee, &param.into(), ty.as_ref());
             return true;
         }
     }

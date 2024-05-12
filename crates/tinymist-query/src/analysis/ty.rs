@@ -13,7 +13,7 @@ use typst::{
 };
 
 use crate::analysis::{Ty, *};
-use crate::{adt::interner::Interned, analysis::TypeCheckInfo, ty::TypeInterace, AnalysisContext};
+use crate::{analysis::TypeCheckInfo, ty::TypeInterace, AnalysisContext};
 
 use super::{
     resolve_global_value, BuiltinTy, DefUseInfo, FlowVarKind, IdentRef, TypeBounds, TypeVar,
@@ -96,7 +96,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 def_id,
                 TypeVarBounds::new(
                     TypeVar {
-                        name: Interned::new_str(&r.name),
+                        name: r.name.as_str().into(),
                         def: def_id,
                         syntax: None,
                     },
@@ -307,17 +307,11 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let rhs = if expected_in {
             match container {
                 Ty::Tuple(elements) => Ty::Union(elements.clone()),
-                _ => Ty::Unary(Interned::new(TypeUnary {
-                    op: UnaryOp::ElementOf,
-                    lhs: Interned::new(container.clone()),
-                })),
+                _ => Ty::Unary(TypeUnary::new(UnaryOp::ElementOf, container.into())),
             }
         } else {
-            Ty::Unary(Interned::new(TypeUnary {
-                // todo: remove not element of
-                op: UnaryOp::NotElementOf,
-                lhs: Interned::new(container.clone()),
-            }))
+            // todo: remove not element of
+            Ty::Unary(TypeUnary::new(UnaryOp::NotElementOf, container.into()))
         };
 
         self.constrain(elem, &rhs);

@@ -27,6 +27,7 @@ use ecow::EcoString;
 use fxhash::FxHasher;
 use hashbrown::{hash_map::RawEntryMut, HashMap};
 use triomphe::Arc;
+use typst::{foundations::Str, syntax::ast::Ident};
 
 type InternMap<T> = DashMap<Arc<T>, (), BuildHasherDefault<FxHasher>>;
 type Guard<T> = dashmap::RwLockWriteGuard<
@@ -98,14 +99,45 @@ impl From<&str> for Interned<str> {
     }
 }
 
+impl From<Str> for Interned<str> {
+    fn from(s: Str) -> Self {
+        Interned::new_str(&s)
+    }
+}
+
+impl From<EcoString> for Interned<str> {
+    fn from(s: EcoString) -> Self {
+        Interned::new_str(&s)
+    }
+}
+
 impl From<&EcoString> for Interned<str> {
     fn from(s: &EcoString) -> Self {
         Interned::new_str(s)
     }
 }
+
+impl From<Ident<'_>> for Interned<str> {
+    fn from(s: Ident<'_>) -> Self {
+        Interned::new_str(s.get())
+    }
+}
+
 impl From<&Interned<str>> for EcoString {
     fn from(s: &Interned<str>) -> Self {
         s.as_ref().into()
+    }
+}
+
+impl<T: Internable> From<T> for Interned<T> {
+    fn from(s: T) -> Self {
+        Interned::new(s)
+    }
+}
+
+impl<T: Internable + Clone> From<&T> for Interned<T> {
+    fn from(s: &T) -> Self {
+        Interned::new(s.clone())
     }
 }
 

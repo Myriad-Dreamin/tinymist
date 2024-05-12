@@ -101,9 +101,7 @@ impl Ty {
                 // flat union
                 let e = UnionIter(vec![e.as_slice().iter()]);
 
-                Ty::Union(Interned::new(
-                    e.flat_map(|e| Self::from_return_site(f, e)).collect(),
-                ))
+                Ty::iter_union(e.flat_map(|e| Self::from_return_site(f, e)))
             }
         };
 
@@ -130,9 +128,7 @@ impl Ty {
                 // flat union
                 let e = UnionIter(vec![e.as_slice().iter()]);
 
-                Ty::Union(Interned::new(
-                    e.flat_map(|e| Self::from_param_site(f, p, e)).collect(),
-                ))
+                Ty::iter_union(e.flat_map(|e| Self::from_param_site(f, p, e)))
             }
         };
 
@@ -324,7 +320,7 @@ macro_rules! flow_builtin_union_inner {
 macro_rules! flow_union {
     // the first one is string
     ($($b:tt)*) => {
-        Ty::Union(Interned::new(flow_builtin_union_inner!( $($b)* )))
+        Ty::iter_union(flow_builtin_union_inner!( $($b)* ).into_iter())
     };
 
 }
@@ -359,10 +355,7 @@ pub(super) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<Ty> {
         ("text", "size") => Some(literally(TextSize)),
         ("text", "font") => {
             static FONT_TYPE: Lazy<Ty> = Lazy::new(|| {
-                Ty::Union(Interned::new(vec![
-                    literally(TextFont),
-                    Ty::Array(Interned::new(literally(TextFont))),
-                ]))
+                Ty::iter_union([literally(TextFont), Ty::Array(literally(TextFont).into())])
             });
             Some(FONT_TYPE.clone())
         }
@@ -390,7 +383,7 @@ pub(super) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<Ty> {
                     Ty::Value(InsTy::new(Value::Auto)),
                     Ty::Value(InsTy::new(Value::Type(Type::of::<i64>()))),
                     literally(Length),
-                    Ty::Array(Interned::new(literally(Length))),
+                    Ty::Array(literally(Length).into()),
                 )
             });
             Some(COLUMN_TYPE.clone())
@@ -399,7 +392,7 @@ pub(super) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<Ty> {
             static PATTERN_SIZE_TYPE: Lazy<Ty> = Lazy::new(|| {
                 flow_union!(
                     Ty::Value(InsTy::new(Value::Auto)),
-                    Ty::Array(Interned::new(Ty::Builtin(Length))),
+                    Ty::Array(Ty::Builtin(Length).into()),
                 )
             });
             Some(PATTERN_SIZE_TYPE.clone())
@@ -429,9 +422,9 @@ static FLOW_STROKE_DASH_TYPE: Lazy<Ty> = Lazy::new(|| {
         "dash-dotted",
         "densely-dash-dotted",
         "loosely-dash-dotted",
-        Ty::Array(Interned::new(flow_union!("dot", literally(Float)))),
+        Ty::Array(flow_union!("dot", literally(Float)).into()),
         Ty::Dict(flow_record!(
-            "array" => Ty::Array(Interned::new(flow_union!("dot", literally(Float)))),
+            "array" => Ty::Array(flow_union!("dot", literally(Float)).into()),
             "phase" => literally(Length),
         ))
     )
