@@ -1,6 +1,6 @@
 #import "pageless.typ": *
 #import "@preview/fletcher:0.4.4" as fletcher: *
-#let colors = (blue.darken(10%), olive, eastern)
+#let colors = (blue.lighten(10%), olive, eastern)
 #import fletcher.shapes: diamond
 
 #show: project.with(title: "Tinymist")
@@ -56,7 +56,7 @@ Four principles are followed:
         edge((2, -1), (2, 0), align(center)[Analysis\ Requests], "-}>"),
       ),
     ),
-    caption: [The I-O Graph of actors serving a LSP request or notification],
+    caption: [The IO Graph of actors serving a LSP request or notification],
   ) <fig:actor-serve-lsp-requests>
 
   A _Hover_ request is taken as example of that events.
@@ -127,7 +127,7 @@ Four principles are followed:
 
 == Command System
 
-The extra features are exposed via LSP's #link("https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand")[`workspace/executeCommand`] request, forming a command system. The commands in the system have a name convention.
+The extra features are exposed via LSP's #link("https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand")[`workspace/executeCommand`] request, forming a command system. The commands in the system share a name convention.
 
 - `export`#text(olive, `Fmt`). these commands perform export on some document, with a specific format (#text(olive, `Fmt`)), e.g. `exportPdf`.
 
@@ -151,9 +151,9 @@ The code context requests are useful for _Editor Frontends_ to check syntax and 
 
 == Handling Input Events
 
-The compilation triggers many side effects, but compiler actor is still almost pure. This is achieved by accepting all compile inputs by events.
+The compilation triggers many side effects, but the behavior of compiler actor is still easy to predicate. This is achieved by accepting all compile inputs by events.
 
-Let us take reading files from physical file system as example of processing compile inputs, as shown in @fig:overlay-vfs. The upper access model take precedence over the lower access model. The memory access model is updated _sequentially_ by `LspActor` receiving source change notifications, assigned with logical ticks $t_(L,n)$. The notify access model is also updated in same way by `NotifyActor`. When there is an absent access, the system access model initiates the request for the file system. The read contents from fs are assigned with logical access time $t_(M,n)$.
+Let us take reading files from physical file system as example of processing compile inputs, as shown in @fig:overlay-vfs. The upper access models take precedence over the lower access models. The memory access model is updated _sequentially_ by `LspActor` receiving source change notifications, assigned with logical ticks $t_(L,n)$. The notify access model is also updated in same way by `NotifyActor`. When there is an absent access, the system access model initiates the request for the file system directly. The read contents from fs are assigned with logical access time $t_(M,n)$.
 
 #let pg-hori-sep = 1.5
 #let pg-vert-sep = 0.7
@@ -232,17 +232,21 @@ Let us take reading files from physical file system as example of processing com
   caption: [The overlay virtual file system (VFS)],
 ) <fig:overlay-vfs>
 
-The problem is to ensure that: when the file has content at the real time $t_n$, the compiler can read the content correctly from access models at the time.
+The problem is to ensure that the compiler can read the content correctly from access models at the time.
 
-If there is an only active input source in a _small time window_, we can know the problem is solved, as the logical ticks $t_(L,n)$ and $t_(M,n)$ keep increasing, enforced by actors. For example, if only `LspActor` is active at the _small time window_, the memory access model receives the source changes in the order of $t_(L,n)$, since the it reads the events from the channel _sequentially_. The cases of two rest access models is more complicated, but also are ensured that compiler reads content in order of $t_(M,n)$.
+If there is an only active input source in a _small time window_, we can know the problem is solved, as the logical ticks $t_(L,n)$ and $t_(M,n)$ keep increasing, enforced by actors. For example, if there is only `LspActor` active at the _small time window_, the memory access model receives the source changes in the order of $t_(L,n)$, i.e. the _sequential_ order of receiving notifications. The cases of two rest access models is more complicated, but are also ensured that compiler reads content in order of $t_(M,n)$.
 
-Otherwise, the two input sources are both active in a _small time window_. However, this indicates that, the file in the memory access model at most time. Since the precedence, the compiler reads content in order of $t_(L,n)$ at the time.
+Otherwise, the two input sources are both active in a _small time window_ on a *same file*. However, this indicates that, the file is in already the memory access model at most time. Since the precedence, the compiler reads content in order of $t_(L,n)$ at the time.
 
-The only bad case can happen is that: When the two input sources are both active in a _small time window_ $delta$ on a *same file*, first `LspActor` removes the file from the memory access model and the compiler doesn't read content from file system in time $delta$. This is handled by tinymist by some tricks.
+The only bad case can happen is that: When the two input sources are both active in a _small time window_ $delta$ on a *same file*:
+- first `LspActor` removes the file from the memory access model, then compiler doesn't read content from file system in time $delta$.
+- first `NotifyActor` inserts the file from the inotify thread, then the LSP client (editor) overlays an older content in time $delta$.
+
+This is handled by tinymist by some tricks.
 
 === Record and Replay
 
-Tinymist can record these input events with assigned the logic ticks, by replaying the events, tinymist can reproduce the server state for debugging. This technique is learnt from the well-known LSP, clangd, and the well known emulator, QEMU.
+Tinymist can record these input events with assigned the logic ticks. By replaying the events, tinymist can reproduce the server state for debugging. This technique is learnt from the well-known LSP, clangd, and the well known emulator, QEMU.
 
 == Additional Concepts for Typst Language
 
@@ -290,3 +294,32 @@ With aboving constructors, we soonly get typst's type checker.
 - it performs the getting element operation by calls a corresponding $sig$.
 - the closure is converted into a typed lambda, in $sig$ type.
 - the pattern destructing are converted to array and dictionary constrains.
+
+== Notes on implementing LSP Features
+
+There are five basic analysis APIs:
+- _lexical hierarchy_ matches crucial lexical structures in the source file.
+- _def use info_ is computed based on _lexical hierarchy_\s.
+- _type check info_ is computed with _def use info_.
+- _find definition_ finds the definition based on _def use info_.
+- _find references_ finds the references based on _def use info_.
+
+The features are implemented based on basic analysis APIs:
+
+- The `textDocument/documentSymbol` returns a tree of nodes converted from the _lexical hierarchy_.
+
+- The `textDocument/foldingRange` also returns a tree of nodes converted from the _lexical hierarchy_ but with a different approach.
+
+- The `workspace/symbol` returns an array of nodes converted from all _lexical hierarchy_\s in workspace.
+
+- The `textDocument/definition` returns the result of _find definition_.
+
+- The `textDocument/completion` returns a list of types of _related_ nodes according to _type check info_, matched by _AST matchers_.
+
+- The `textDocument/hover` _finds definition_ and prints the definition with a checked type by _type check info_. Or, specific to typst, prints a set of inspected values during execution of the document.
+
+- The `textDocument/signatureHelp` also _finds definition_ and prints the signature with union of inferred signatures by _type check info_.
+
+- The `textDocument/prepareRename` _finds definition_ and determines whether it can be renamed.
+
+- The `textDocument/rename` _finds defintion and references_ and renamed them all.
