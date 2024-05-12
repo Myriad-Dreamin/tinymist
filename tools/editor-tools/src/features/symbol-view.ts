@@ -3,10 +3,28 @@ import van, { State } from "vanjs-core";
 // import { SYMBOL_MOCK } from "./symbol-view.mock";
 const { div, input, canvas, button, h4, a, p, span } = van.tags;
 import MiniSearch from "minisearch";
-import { Detypify, DetypifySymbol, Stroke } from "detypify-service";
+import { Detypify, DetypifySymbol, ortEnv } from "detypify-service";
 import { ContributeIcon, HelpIcon } from "../icons";
 import { startModal } from "../components/modal";
 import { requestTextEdit } from "../vscode";
+
+// The following code can make the onnxruntime-web totally offline but causes more than 10MB of bundle size.
+// @ts-ignore
+// import onnxWasmUrl from "../../../../node_modules/onnxruntime-web/dist/ort-wasm-simd.wasm?url";
+// ortEnv.wasm.numThreads = 4;
+// ortEnv.wasm.simd = true;
+// ortEnv.wasm.proxy = false;
+// ortEnv.wasm.trace = false;
+// ortEnv.wasm.wasmPaths = {
+//   "ort-wasm-simd.wasm": onnxWasmUrl,
+// };
+
+ortEnv.wasm.numThreads = 4;
+ortEnv.wasm.wasmPaths =
+  "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/";
+
+type Point = [number, number];
+type Stroke = Point[];
 
 interface SymbolCategory {
   value?: string;
@@ -354,7 +372,7 @@ export const SymbolPicker = () => {
       : JSON.parse(atob(symbolInformationData))
   );
   console.log("symbolInformation", symInfo);
-  const detypifyPromise = Detypify.load();
+  const detypifyPromise = Detypify.create();
   const detypify = van.state<Detypify | undefined>(undefined);
   detypifyPromise.then((d: any) => (detypify.val = d));
   const strokes = van.state<Stroke[] | undefined>(undefined);

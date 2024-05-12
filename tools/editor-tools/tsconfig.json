@@ -5,7 +5,7 @@
     "module": "ESNext",
     "lib": ["es2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
-    "types": ["./src/global.d.ts", "./types/detypify.d.ts"],
+    "types": ["./src/global.d.ts"],
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -20,5 +20,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "types"]
+  "include": ["src"]
 }

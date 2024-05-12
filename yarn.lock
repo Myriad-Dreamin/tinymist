@@ -1054,10 +1054,10 @@ detect-libc@^2.0.0:
   resolved "https://registry.yarnpkg.com/detect-libc/-/detect-libc-2.0.2.tgz#8ccf2ba9315350e1241b88d0ac3b0e1fbd99605d"
   integrity sha512-UX6sGumvvqSaXgdKGUsgZWqcUyIXZ/vZTrlRT/iobiKhGL0zL4d3osHj3uqllWJK+i+sixDS/3COVEOFbupFyw==
 
-detypify-service@0.2.3-beta.3:
-  version "0.2.3-beta.3"
-  resolved "https://registry.yarnpkg.com/detypify-service/-/detypify-service-0.2.3-beta.3.tgz#63b892221d60326890731343b39bd0773282d65c"
-  integrity sha512-bUBhfQMppEE9n/p0Kz1rj+DfR8V8wOA+OB5vCkpZ0A6aumGeUs5mIOEv/LG9+qx37OaEjtEXDp9pSmxRWxWhGQ==
+detypify-service@0.2.4:
+  version "0.2.4"
+  resolved "https://registry.yarnpkg.com/detypify-service/-/detypify-service-0.2.4.tgz#00e54b8c0120d6e39919e2cda0d20af520521f66"
+  integrity sha512-bhcYoS6ijKJLQlVol0eoaZlnCO6iXYbJrBh7oyXg+I6v7SaBhN+uQeaeLpS1xg+q+t9ujUm3/llj1HkSVBmqzQ==
   dependencies:
     onnxruntime-web "=1.17.1"
 
