@@ -149,11 +149,11 @@ The extra features are exposed via LSP's #link("https://microsoft.github.io/lang
 
 The code context requests are useful for _Editor Frontends_ to check syntax and semantic the multiple positions. For example an editor frontend can filter some completion list by acquire the code context at current position.
 
-== Replayable Input Events
+== Handling Input Events
 
 The compilation triggers many side effects, but compiler actor is still almost pure. This is achieved by accepting all compile inputs by events.
 
-Let us take reading files from physical file system as example of processing compile inputs, as shown in @fig:overlay-vfs.
+Let us take reading files from physical file system as example of processing compile inputs, as shown in @fig:overlay-vfs. The upper access model take precedence over the lower access model. The memory access model is updated _sequentially_ by `LspActor` receiving source change notifications, assigned with logical ticks $t_(L,n)$. The notify access model is also updated in same way by `NotifyActor`. When there is an absent access, the system access model initiates the request for the file system. The read contents from fs are assigned with logical access time $t_(M,n)$.
 
 #let pg-hori-sep = 1.5
 #let pg-vert-sep = 0.7
@@ -214,7 +214,7 @@ Let us take reading files from physical file system as example of processing com
         },
         node(
           (-1.3, 0),
-          rotate(-90deg, rect(stroke: (bottom: (thickness: 1pt, dash: "dashed")), width: 120pt)[Side Effects]),
+          rotate(-90deg, rect(stroke: (bottom: (thickness: 1pt, dash: "dashed")), width: 120pt)[Input Sources]),
         ),
         node(
           (pg-hori-sep + 1.45, 0),
@@ -232,14 +232,61 @@ Let us take reading files from physical file system as example of processing com
   caption: [The overlay virtual file system (VFS)],
 ) <fig:overlay-vfs>
 
-== Query System
+The problem is to ensure that: when the file has content at the real time $t_n$, the compiler can read the content correctly from access models at the time.
 
-The query system takes a _stack scoped_ context object. Initially, the query system holds...
+If there is an only active input source in a _small time window_, we can know the problem is solved, as the logical ticks $t_(L,n)$ and $t_(M,n)$ keep increasing, enforced by actors. For example, if only `LspActor` is active at the _small time window_, the memory access model receives the source changes in the order of $t_(L,n)$, since the it reads the events from the channel _sequentially_. The cases of two rest access models is more complicated, but also are ensured that compiler reads content in order of $t_(M,n)$.
+
+Otherwise, the two input sources are both active in a _small time window_. However, this indicates that, the file in the memory access model at most time. Since the precedence, the compiler reads content in order of $t_(L,n)$ at the time.
+
+The only bad case can happen is that: When the two input sources are both active in a _small time window_ $delta$ on a *same file*, first `LspActor` removes the file from the memory access model and the compiler doesn't read content from file system in time $delta$. This is handled by tinymist by some tricks.
+
+=== Record and Replay
+
+Tinymist can record these input events with assigned the logic ticks, by replaying the events, tinymist can reproduce the server state for debugging. This technique is learnt from the well-known LSP, clangd, and the well known emulator, QEMU.
 
 == Additional Concepts for Typst Language
 
-=== Matchers
+=== AST Matchers
 
-=== Definitions and Uses (References)
+Many analyzers don't check AST node relationships directly. The AST matchers provide some indirect structure for analyzers.
+
+- Most code checks the syntax object matched by `get_deref_target` or `get_check_target`.
+- The folding range analyzer and def-use analyzer check the source file on the structure named _lexical hierarchy_.
+- The type checker checks constraint collected by a trivial node-to-type converter.
 
 === Type System
+
+The underlying techniques are not easy to understand, but there are some links:
+- bidirectional type checking: https://jaked.org/blog/2021-09-15-Reconstructing-TypeScript-part-1
+- type system borrowed here: https://github.com/hkust-taco/mlscript
+
+Some tricks are taken for help reducing the complexity of code:
+
+First, the array literals are identified as tuple type, that each cell of the array has type individually.
+
+#let sig = $sans("sig")$
+#let ags = $sans("args")$
+
+Second, the $sig$ and the $sans("argument")$ type are reused frequently.
+
+- the $sans("tup")$ type is notated as $(tau_1,..,tau_n)$, and the $sans("arr")$ type is a special tuple type $sans("arr") ::= sans("arr")(tau)$.
+
+- the $sans("rec")$ type is imported from #link("https://github.com/hkust-taco/mlscript")[mlscript], notated as ${a_1=tau_1,..,a_n=tau_n}$.
+
+- the $sig$ type consists of:
+  - a positional argument list, in $sans("tup")$ type.
+  - a named argument list, in $sans("rec")$ type.
+  - an optional rest argument, in $sans("arr")$ type.
+  - an *optional* body, in any type.
+
+  notated as $sig := sig(sans("tup")(tau_1,..,tau_n),sans("rec")(a_1=tau_(n+1),..,a_m=tau_(n+m)),..sans("arr")(tau_(n+m+1))) arrow psi$
+- the $sans("argument")$ is a $sans("signature")$ without rest and body.
+
+  $ags := ags(sig(..))$
+
+With aboving constructors, we soonly get typst's type checker.
+
+- it checks array or dictionary literals by converting them with a corresponding $sig$ and $ags$.
+- it performs the getting element operation by calls a corresponding $sig$.
+- the closure is converted into a typed lambda, in $sig$ type.
+- the pattern destructing are converted to array and dictionary constrains.
