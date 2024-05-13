@@ -266,7 +266,9 @@ pub struct TypeVar {
 
 impl Ord for TypeVar {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.name.cmp(&other.name)
+        self.name
+            .cmp(&other.name)
+            .then_with(|| self.def.0.cmp(&other.def.0))
     }
 }
 
