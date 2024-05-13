@@ -186,13 +186,11 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             range: root.range(),
         };
 
-        let Some(var) = self.get_var(root.span(), ident_ref) else {
+        self.get_var(root.span(), ident_ref).or_else(|| {
             let s = root.span();
             let v = resolve_global_value(self.ctx, root, mode == InterpretMode::Math)?;
-            return Some(Ty::Value(InsTy::new_at(v, s)));
-        };
-
-        Some(var.as_type())
+            Some(Ty::Value(InsTy::new_at(v, s)))
+        })
     }
 
     fn check_array(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
@@ -377,16 +375,18 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 ast::Param::Named(e) => {
                     let exp = self.check_expr_in(e.expr().span(), root.clone());
                     let v = self.get_var(e.name().span(), to_ident_ref(&root, e.name())?)?;
-                    v.ever_be(exp);
-                    named.insert(e.name().into(), v.as_type());
+                    // todo: this is less efficient than v.lbs.push(exp), we may have some idea to
+                    // optimize it, so I put a todo here.
+                    self.constrain(&exp, &v);
+                    named.insert(e.name().into(), v);
                 }
                 // todo: spread left/right
                 ast::Param::Spread(a) => {
                     if let Some(e) = a.sink_ident() {
                         let exp = Ty::Builtin(BuiltinTy::Args);
                         let v = self.get_var(e.span(), to_ident_ref(&root, e)?)?;
-                        v.ever_be(exp);
-                        rest = Some(v.as_type());
+                        self.constrain(&exp, &v);
+                        rest = Some(v);
                     }
                     // todo: ..(args)
                 }
@@ -424,7 +424,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     .unwrap_or_else(|| Ty::Infer);
 
                 let v = self.get_var(c.span(), to_ident_ref(&root, c)?)?;
-                v.ever_be(value);
+                self.constrain(&value, &v);
                 // todo lbs is the lexical signature.
             }
             ast::LetBindingKind::Normal(pattern) => {
@@ -560,8 +560,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         Some(match pattern {
             ast::Pattern::Normal(ast::Expr::Ident(ident)) => {
                 let v = self.get_var(ident.span(), to_ident_ref(&root, ident)?)?;
-                v.ever_be(value);
-                v.as_type()
+                self.constrain(&value, &v);
+                v
             }
             ast::Pattern::Normal(_) => Ty::Any,
             ast::Pattern::Placeholder(_) => Ty::Any,

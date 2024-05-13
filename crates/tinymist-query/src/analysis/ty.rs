@@ -81,7 +81,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         w
     }
 
-    fn get_var(&mut self, s: Span, r: IdentRef) -> Option<&mut TypeVarBounds> {
+    fn get_var(&mut self, s: Span, r: IdentRef) -> Option<Ty> {
         let def_id = self
             .def_use_info
             .get_ref(&r)
@@ -107,7 +107,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let var = self.info.vars.get_mut(&def_id).unwrap();
         TypeCheckInfo::witness_(s, var.as_type(), &mut self.info.mapping);
-        Some(var)
+        Some(var.as_type())
     }
 
     fn import_ty(&mut self, def_id: DefId) -> Option<Ty> {
@@ -147,6 +147,10 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 Ty::Value(val) => matches!(val.val, Value::Type(..)),
                 _ => false,
             }
+        }
+
+        if lhs == rhs {
+            return;
         }
 
         match (lhs, rhs) {
