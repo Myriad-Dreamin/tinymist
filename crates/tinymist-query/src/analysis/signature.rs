@@ -58,7 +58,7 @@ pub struct ParamSpec {
 impl ParamSpec {
     fn from_static(f: &Func, p: &ParamInfo) -> Arc<Self> {
         Arc::new(Self {
-            name: Interned::new_str(p.name),
+            name: p.name.into(),
             docs: Cow::Borrowed(p.docs),
             input: p.input.clone(),
             base_type: Ty::from_param_site(f, p, &p.input),
@@ -366,7 +366,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
                 }
                 _ => {}
             }
-            named.insert(Interned::new_str(param.name.as_ref()), param.clone());
+            named.insert(param.name.clone(), param.clone());
         }
 
         if param.variadic {
@@ -400,7 +400,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         rest,
         ret_ty,
         has_fill_or_size_or_stroke: has_fill || has_stroke || has_size,
-        sig_ty: Interned::new(sig_ty),
+        sig_ty: sig_ty.into(),
         _broken: broken,
     })
 }
@@ -420,7 +420,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
         match param {
             ast::Param::Pos(ast::Pattern::Placeholder(..)) => {
                 params.push(Arc::new(ParamSpec {
-                    name: Interned::new_str("_"),
+                    name: "_".into(),
                     input: CastInfo::Any,
                     base_type: None,
                     type_repr: None,
@@ -442,7 +442,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 let name = name[0].as_str();
 
                 params.push(Arc::new(ParamSpec {
-                    name: Interned::new_str(name),
+                    name: name.into(),
                     input: CastInfo::Any,
                     base_type: None,
                     type_repr: None,
@@ -459,7 +459,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
             ast::Param::Named(n) => {
                 let expr = unwrap_expr(n.expr()).to_untyped().clone().into_text();
                 params.push(Arc::new(ParamSpec {
-                    name: Interned::new_str(n.name().as_str()),
+                    name: n.name().into(),
                     input: CastInfo::Any,
                     base_type: None,
                     type_repr: Some(expr.clone()),
@@ -475,7 +475,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
             ast::Param::Spread(n) => {
                 let ident = n.sink_ident().map(|e| e.as_str());
                 params.push(Arc::new(ParamSpec {
-                    name: Interned::new_str(ident.unwrap_or_default()),
+                    name: ident.unwrap_or_default().into(),
                     input: CastInfo::Any,
                     base_type: None,
                     type_repr: None,

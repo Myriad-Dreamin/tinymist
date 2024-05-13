@@ -196,50 +196,44 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 let mut f = f.as_ref().clone();
                 f.types = self.transform_seq(&f.types, pol);
 
-                Ty::Dict(Interned::new(f))
+                Ty::Dict(f.into())
             }
             Ty::Tuple(e) => Ty::Tuple(self.transform_seq(e, pol)),
-            Ty::Array(e) => Ty::Array(Interned::new(self.transform(e, pol))),
+            Ty::Array(e) => Ty::Array(self.transform(e, pol).into()),
             Ty::With(w) => {
-                let sig = Interned::new(self.transform(&w.sig, pol));
+                let sig = self.transform(&w.sig, pol).into();
                 // Negate the pol to make correct covariance
                 let with = self.transform_sig(&w.with, !pol);
 
-                Ty::With(Interned::new(SigWithTy { sig, with }))
+                Ty::With(SigWithTy::new(sig, with))
             }
             // Negate the pol to make correct covariance
             Ty::Args(args) => Ty::Args(self.transform_sig(args, !pol)),
-            Ty::Unary(u) => Ty::Unary(Interned::new(TypeUnary {
-                op: u.op,
-                lhs: Interned::new(self.transform(&u.lhs, pol)),
-            })),
+            Ty::Unary(u) => Ty::Unary(TypeUnary::new(u.op, self.transform(&u.lhs, pol).into())),
             Ty::Binary(b) => {
                 let (lhs, rhs) = b.repr();
                 let lhs = self.transform(lhs, pol);
                 let rhs = self.transform(rhs, pol);
 
-                Ty::Binary(Interned::new(TypeBinary {
-                    op: b.op,
-                    operands: Interned::new((lhs, rhs)),
-                }))
+                Ty::Binary(TypeBinary::new(b.op, lhs.into(), rhs.into()))
             }
-            Ty::If(i) => Ty::If(Interned::new(IfTy {
-                cond: Interned::new(self.transform(&i.cond, pol)),
-                then: Interned::new(self.transform(&i.then, pol)),
-                else_: Interned::new(self.transform(&i.else_, pol)),
-            })),
+            Ty::If(i) => Ty::If(IfTy::new(
+                self.transform(&i.cond, pol).into(),
+                self.transform(&i.then, pol).into(),
+                self.transform(&i.else_, pol).into(),
+            )),
             Ty::Union(v) => Ty::Union(self.transform_seq(v, pol)),
             Ty::Field(ty) => {
                 let mut ty = ty.as_ref().clone();
                 ty.field = self.transform(&ty.field, pol);
 
-                Ty::Field(Interned::new(ty))
+                Ty::Field(ty.into())
             }
             Ty::Select(sel) => {
                 let mut sel = sel.as_ref().clone();
-                sel.ty = Interned::new(self.transform(&sel.ty, pol));
+                sel.ty = self.transform(&sel.ty, pol).into();
 
-                Ty::Select(Interned::new(sel))
+                Ty::Select(sel.into())
             }
 
             Ty::Value(v) => Ty::Value(v.clone()),
@@ -258,7 +252,8 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
     }
 
     fn transform_seq(&mut self, seq: &[Ty], pol: bool) -> Interned<Vec<Ty>> {
-        Interned::new(seq.iter().map(|ty| self.transform(ty, pol)).collect())
+        let seq = seq.iter().map(|ty| self.transform(ty, pol));
+        seq.collect::<Vec<_>>().into()
     }
 
     // todo: reduce duplication
@@ -288,7 +283,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             }
         }
 
-        Ty::Let(Interned::new(TypeBounds { lbs, ubs }))
+        Ty::Let(TypeBounds { lbs, ubs }.into())
     }
 
     fn transform_sig(&mut self, sig: &SigTy, pol: bool) -> Interned<SigTy> {
@@ -299,6 +294,6 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
         }
 
         // todo: we can reduce one clone by early compare on sig.types
-        Interned::new(sig)
+        sig.into()
     }
 }

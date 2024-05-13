@@ -45,10 +45,8 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
         if let Sig::TypeCons { val, .. } = sig {
             if *val == typst::foundations::Type::of::<typst::foundations::Type>() {
                 if let Some(p0) = args.pos(0) {
-                    self.resultant.push(Ty::Unary(Interned::new(TypeUnary {
-                        op: UnaryOp::TypeOf,
-                        lhs: Interned::new(p0.clone()),
-                    })));
+                    self.resultant
+                        .push(Ty::Unary(TypeUnary::new(UnaryOp::TypeOf, p0.into())));
                 }
             }
         }
@@ -80,10 +78,8 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
                 log::warn!("Partialize is not implemented yet {sig:?}");
                 return;
             };
-            self.resultant.push(Ty::With(Interned::new(SigWithTy {
-                sig: Interned::new(sig),
-                with: args.clone(),
-            })));
+            self.resultant
+                .push(Ty::With(SigWithTy::new(sig.into(), args.clone())));
         }
 
         //            let f = v.as_ref();

@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use core::fmt;
-use ecow::{EcoString, EcoVec};
+use ecow::EcoVec;
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
 use reflexo::vector::ir::DefId;
@@ -99,10 +99,10 @@ impl TypeSource {
             .get_or_init(|| {
                 let name = self.name_node.text();
                 if !name.is_empty() {
-                    return Interned::new_str(name.as_str());
+                    return name.into();
                 }
                 let name = self.name_node.clone().into_text();
-                Interned::new_str(name.as_str())
+                name.into()
             })
             .clone()
     }
@@ -136,7 +136,7 @@ impl Eq for InsTy {}
 
 impl InsTy {
     pub fn new(val: Value) -> Interned<Self> {
-        Interned::new(Self { val, syntax: None })
+        Self { val, syntax: None }.into()
     }
     pub fn new_at(val: Value, s: Span) -> Interned<Self> {
         Interned::new(Self {
@@ -145,7 +145,7 @@ impl InsTy {
                 name_node: SyntaxNode::default(),
                 name_repr: OnceCell::new(),
                 span: s,
-                doc: Interned::new_str(""),
+                doc: "".into(),
             })),
         })
     }
@@ -156,7 +156,7 @@ impl InsTy {
                 name_node: SyntaxNode::default(),
                 name_repr: OnceCell::new(),
                 span: Span::detached(),
-                doc: Interned::new_str(doc),
+                doc: doc.into(),
             })),
         })
     }
@@ -637,6 +637,12 @@ pub struct SigWithTy {
     pub with: Interned<ArgsTy>,
 }
 
+impl SigWithTy {
+    pub fn new(sig: TyRef, with: Interned<ArgsTy>) -> Interned<Self> {
+        Interned::new(Self { sig, with })
+    }
+}
+
 impl fmt::Debug for SigWithTy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}.with({:?})", self.sig, self.with)
@@ -647,6 +653,12 @@ impl fmt::Debug for SigWithTy {
 pub struct SelectTy {
     pub ty: Interned<Ty>,
     pub select: Interned<str>,
+}
+
+impl SelectTy {
+    pub fn new(ty: Interned<Ty>, select: Interned<str>) -> Interned<Self> {
+        Interned::new(Self { ty, select })
+    }
 }
 
 impl fmt::Debug for SelectTy {
@@ -672,15 +684,28 @@ pub struct TypeUnary {
     pub op: UnaryOp,
 }
 
+impl TypeUnary {
+    pub fn new(op: UnaryOp, lhs: Interned<Ty>) -> Interned<Self> {
+        Interned::new(Self { lhs, op })
+    }
+}
+
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct TypeBinary {
-    pub operands: Interned<(Ty, Ty)>,
+    pub operands: (Interned<Ty>, Interned<Ty>),
     pub op: ast::BinOp,
 }
 
 impl TypeBinary {
-    pub fn repr(&self) -> &(Ty, Ty) {
-        &self.operands
+    pub fn new(op: ast::BinOp, lhs: Interned<Ty>, rhs: Interned<Ty>) -> Interned<Self> {
+        Interned::new(Self {
+            operands: (lhs, rhs),
+            op,
+        })
+    }
+
+    pub fn repr(&self) -> (&Interned<Ty>, &Interned<Ty>) {
+        (&self.operands.0, &self.operands.1)
     }
 }
 
@@ -689,6 +714,12 @@ pub(crate) struct IfTy {
     pub cond: Interned<Ty>,
     pub then: Interned<Ty>,
     pub else_: Interned<Ty>,
+}
+
+impl IfTy {
+    pub fn new(cond: Interned<Ty>, then: Interned<Ty>, else_: Interned<Ty>) -> Interned<Self> {
+        Interned::new(Self { cond, then, else_ })
+    }
 }
 
 #[derive(Hash, Clone, PartialEq, Eq)]
@@ -790,8 +821,12 @@ impl Ty {
             let mut e = e;
             e.next().unwrap()
         } else {
-            Ty::Union(Interned::new(e.collect()))
+            Self::iter_union(e)
         }
+    }
+
+    pub(crate) fn iter_union(e: impl IntoIterator<Item = Ty>) -> Self {
+        Ty::Union(Interned::new(e.into_iter().collect()))
     }
 }
 
@@ -831,6 +866,8 @@ fn interpersed<T: fmt::Debug>(
 #[cfg(test)]
 mod tests {
     use insta::{assert_debug_snapshot, assert_snapshot};
+
+    use crate::ty::tests::*;
     #[test]
     fn test_ty() {
         use super::*;
@@ -843,25 +880,6 @@ mod tests {
     fn test_sig_matches() {
         use super::*;
 
-        fn str_ins(s: &str) -> Ty {
-            Ty::Value(InsTy::new(Value::Str(s.into())))
-        }
-
-        fn str_sig(
-            pos: &[&str],
-            named: &[(&str, &str)],
-            rest: Option<&str>,
-            ret: Option<&str>,
-        ) -> Interned<SigTy> {
-            let pos = pos.iter().map(|s| str_ins(s));
-            let named = named
-                .iter()
-                .map(|(n, t)| (Interned::new_str(n), str_ins(t)));
-            let rest = rest.map(str_ins);
-            let ret = ret.map(str_ins);
-            Interned::new(SigTy::new(pos, named, rest, ret))
-        }
-
         fn matches(
             sig: Interned<SigTy>,
             args: Interned<SigTy>,
@@ -869,22 +887,6 @@ mod tests {
         ) -> String {
             let res = sig.matches(&args, withs.as_ref()).collect::<Vec<_>>();
             format!("{res:?}")
-        }
-
-        // args*, (keys: values)*, ...rest -> ret
-        macro_rules! literal_sig {
-            ($($pos:ident),* $(!$named:ident: $named_ty:ident),* $(,)? ...$rest:ident -> $ret:ident) => {
-                str_sig(&[$(stringify!($pos)),*], &[$((stringify!($named), stringify!($named_ty))),*], Some(stringify!($rest)), Some(stringify!($ret)))
-            };
-            ($($pos:ident),* $(!$named:ident: $named_ty:ident),* $(,)? -> $ret:ident) => {
-                str_sig(&[$(stringify!($pos)),*], &[$((stringify!($named), stringify!($named_ty))),*], None, Some(stringify!($ret)))
-            };
-            ($($pos:ident),* $(!$named:ident: $named_ty:ident),* $(,)? ...$rest:ident) => {
-                str_sig(&[$(stringify!($pos)),*], &[$((stringify!($named), stringify!($named_ty))),*], Some(stringify!($rest)), None)
-            };
-            ($($pos:ident),* $(!$named:ident: $named_ty:ident),* $(,)?) => {
-                str_sig(&[$(stringify!($pos)),*], &[$((stringify!($named), stringify!($named_ty))),*], None, None)
-            };
         }
 
         assert_snapshot!(matches(literal_sig!(p1), literal_sig!(q1), None), @r###"[("p1", "q1")]"###);

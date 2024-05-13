@@ -208,7 +208,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             elements.push(ty);
         }
 
-        Some(Ty::Tuple(Interned::new(elements)))
+        Some(Ty::Tuple(elements.into()))
     }
 
     fn check_dict(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
@@ -219,7 +219,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         for field in dict.items() {
             match field {
                 ast::DictItem::Named(n) => {
-                    let name = Interned::new_str(n.name().get());
+                    let name = n.name().into();
                     let value = self.check_expr_in(n.expr().span(), root.clone());
                     fields.push((name, value, n.span()));
                 }
@@ -227,7 +227,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     let key = self.ctx.const_eval(k.key());
                     if let Some(Value::Str(key)) = key {
                         let value = self.check_expr_in(k.expr().span(), root.clone());
-                        fields.push((Interned::new_str(&key), value, k.span()));
+                        fields.push((key.into(), value, k.span()));
                     }
                 }
                 // todo: var dict union
@@ -247,14 +247,14 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let op = unary.op();
 
-        let lhs = Interned::new(self.check_expr_in(unary.expr().span(), root));
+        let lhs = self.check_expr_in(unary.expr().span(), root).into();
         let op = match op {
             ast::UnOp::Pos => UnaryOp::Pos,
             ast::UnOp::Neg => UnaryOp::Neg,
             ast::UnOp::Not => UnaryOp::Not,
         };
 
-        Some(Ty::Unary(Interned::new(TypeUnary { op, lhs })))
+        Some(Ty::Unary(TypeUnary::new(op, lhs)))
     }
 
     fn check_binary(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
@@ -299,10 +299,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
         }
 
-        let res = Ty::Binary(Interned::new(TypeBinary {
-            op,
-            operands: Interned::new((lhs, rhs)),
-        }));
+        let res = Ty::Binary(TypeBinary::new(op, lhs.into(), rhs.into()));
 
         Some(res)
     }
@@ -313,10 +310,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let ty = self.check_expr_in(field_access.target().span(), root.clone());
         let field = field_access.field().get().clone();
 
-        Some(Ty::Select(Interned::new(SelectTy {
-            ty: Interned::new(ty),
-            select: Interned::new_str(&field),
-        })))
+        Some(Ty::Select(SelectTy::new(ty.into(), field.into())))
     }
 
     fn check_func_call(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
@@ -353,9 +347,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     args_res.push(self.check_expr_in(e.span(), root.clone()));
                 }
                 ast::Arg::Named(n) => {
-                    let name = Interned::new_str(n.name().get());
                     let value = self.check_expr_in(n.expr().span(), root.clone());
-                    named.push((name, value));
+                    named.push((n.name().into(), value));
                 }
                 // todo
                 ast::Arg::Spread(_w) => {}
@@ -364,7 +357,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let args = ArgsTy::new(args_res.into_iter(), named.into_iter(), None, None);
 
-        Some(Ty::Args(Interned::new(args)))
+        Some(Ty::Args(args.into()))
     }
 
     fn check_closure(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
@@ -385,7 +378,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     let exp = self.check_expr_in(e.expr().span(), root.clone());
                     let v = self.get_var(e.name().span(), to_ident_ref(&root, e.name())?)?;
                     v.ever_be(exp);
-                    named.insert(Interned::new_str(e.name().get()), v.as_type());
+                    named.insert(e.name().into(), v.as_type());
                 }
                 // todo: spread left/right
                 ast::Param::Spread(a) => {
@@ -416,7 +409,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         }
 
         let sig = SigTy::new(pos.into_iter(), named.into_iter(), rest, Some(body));
-        Some(Ty::Func(Interned::new(sig)))
+        Some(Ty::Func(sig.into()))
     }
 
     fn check_let(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
@@ -493,10 +486,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let body = self.check_expr_in(contextual.body().span(), root);
 
-        Some(Ty::Unary(Interned::new(TypeUnary {
-            op: UnaryOp::Context,
-            lhs: Interned::new(body),
-        })))
+        Some(Ty::Unary(TypeUnary::new(UnaryOp::Context, body.into())))
     }
 
     fn check_conditional(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
@@ -509,10 +499,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             .map(|else_body| self.check_expr_in(else_body.span(), root.clone()))
             .unwrap_or(Ty::None);
 
-        let cond = Interned::new(cond);
-        let then = Interned::new(then);
-        let else_ = Interned::new(else_);
-        Some(Ty::If(Interned::new(IfTy { cond, then, else_ })))
+        Some(Ty::If(IfTy::new(cond.into(), then.into(), else_.into())))
     }
 
     fn check_while_loop(&mut self, root: LinkedNode<'_>) -> Option<Ty> {

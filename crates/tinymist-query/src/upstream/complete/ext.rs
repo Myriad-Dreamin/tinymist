@@ -588,7 +588,7 @@ pub fn param_completions<'a>(
 
     for arg in args.items() {
         if let ast::Arg::Named(named) = arg {
-            ctx.seen_field(named.name().get().into());
+            ctx.seen_field(named.name().into());
         }
     }
 
@@ -1034,7 +1034,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
             if let Some(container) = container.cast::<ast::Dict>() {
                 for named in container.items() {
                     if let ast::DictItem::Named(named) = named {
-                        ctx.seen_field(named.name().get().into());
+                        ctx.seen_field(named.name().into());
                     }
                 }
             };
@@ -1043,7 +1043,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
             let args = args.cast::<ast::Args>()?;
             for arg in args.items() {
                 if let ast::Arg::Named(named) = arg {
-                    ctx.seen_field(named.name().get().into());
+                    ctx.seen_field(named.name().into());
                 }
             }
         }

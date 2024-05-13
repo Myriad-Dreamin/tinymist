@@ -10,7 +10,7 @@
 mod adt;
 pub mod analysis;
 pub mod syntax;
-mod ty;
+pub mod ty;
 mod upstream;
 
 pub(crate) mod diagnostics;

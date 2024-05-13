@@ -1,3 +1,5 @@
+use once_cell::sync::Lazy;
+
 use crate::{adt::interner::Interned, ty::def::*};
 
 use super::{Sig, SigChecker, SigSurfaceKind};
@@ -15,12 +17,12 @@ impl Ty {
         self.apply(SigSurfaceKind::Call, args, pol, checker)
     }
 
-    // pub fn element_of(&self, pol: bool, checker: &mut impl ApplyChecker) {
-    //     static EMPTY_ARGS: Lazy<Interned<ArgsTy>> =
-    //       Lazy::new(|| Interned::new(ArgsTy::default()));
+    #[allow(dead_code)]
+    pub fn element_of(&self, pol: bool, checker: &mut impl ApplyChecker) {
+        static EMPTY_ARGS: Lazy<Interned<ArgsTy>> = Lazy::new(|| ArgsTy::default().into());
 
-    //     self.apply(SigSurfaceKind::ArrayOrDict, &EMPTY_ARGS, pol, checker)
-    // }
+        self.apply(SigSurfaceKind::ArrayOrDict, &EMPTY_ARGS, pol, checker)
+    }
 
     fn apply(
         &self,
