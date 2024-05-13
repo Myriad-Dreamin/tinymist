@@ -292,10 +292,7 @@ pub struct TypeVarBounds {
 
 impl fmt::Debug for TypeVarBounds {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.var)?;
-        match &self.bounds {
-            FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => write!(f, "{w:?}"),
-        }
+        write!(f, "{:?}", self.var)
     }
 }
 
@@ -316,16 +313,6 @@ impl TypeVarBounds {
         Self {
             var: Interned::new(var),
             bounds: FlowVarKind::Strong(Arc::new(RwLock::new(init))),
-        }
-    }
-
-    pub fn ever_be(&self, exp: Ty) {
-        match &self.bounds {
-            // FlowVarKind::Strong(_t) => {}
-            FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
-                let mut w = w.write();
-                w.lbs.push(exp.clone());
-            }
         }
     }
 
@@ -793,7 +780,7 @@ impl fmt::Debug for Ty {
             }
             Ty::Let(v) => write!(f, "({v:?})"),
             Ty::Field(ff) => write!(f, "{:?}: {:?}", ff.name, ff.field),
-            Ty::Var(v) => write!(f, "@{}", v.name()),
+            Ty::Var(v) => v.fmt(f),
             Ty::Unary(u) => write!(f, "{u:?}"),
             Ty::Binary(b) => write!(f, "{b:?}"),
             Ty::If(i) => write!(f, "{i:?}"),
