@@ -497,12 +497,12 @@ impl LexicalHierarchyWorker {
                     self.get_symbols_in_first_expr(node.children(), None)?;
                 }
                 SyntaxKind::Named => {
+                    self.get_symbols_in_first_expr(node.children().rev(), None)?;
+
                     if self.ident_context == IdentContext::Params {
                         let ident = node.children().find(|n| n.kind() == SyntaxKind::Ident);
                         self.get_symbols_in_opt_with(ident, IdentContext::Var)?;
                     }
-
-                    self.get_symbols_in_first_expr(node.children().rev(), None)?;
                 }
                 k if k.is_trivia() || k.is_keyword() || k.is_error() => {}
                 _ => {
