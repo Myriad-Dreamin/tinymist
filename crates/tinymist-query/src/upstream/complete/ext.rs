@@ -740,7 +740,7 @@ fn type_completion(
                 let source = ctx.ctx.source_by_id(ctx.root.span().id()?).ok()?;
 
                 ctx.completions2.extend(
-                    complete_path(ctx.ctx, None, &source, ctx.cursor, p)
+                    complete_path(ctx.ctx, Some(ctx.leaf.clone()), &source, ctx.cursor, p)
                         .into_iter()
                         .flatten(),
                 );
@@ -1084,6 +1084,7 @@ pub fn complete_path(
     let is_in_text;
     let text;
     let rng;
+    let v = v.filter(|v| v.kind() == SyntaxKind::Str);
     if let Some(v) = v {
         // todo: the non-str case
         v.cast::<ast::Str>()?;
@@ -1109,6 +1110,7 @@ pub fn complete_path(
         rng = cursor..cursor;
         is_in_text = false;
     }
+    log::info!("complete_path: is_in_text: {is_in_text:?}");
     let path = Path::new(text.as_str());
     let has_root = path.has_root();
 
