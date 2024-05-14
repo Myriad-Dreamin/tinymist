@@ -305,7 +305,7 @@ pub fn get_check_target_by_context<'a>(
             };
             let args = parent.find(args.span())?;
 
-            let is_set = parent.kind() == SyntaxKind::Set;
+            let is_set = parent.kind() == SyntaxKind::SetRule;
             let target = get_param_target(args.clone(), node, ParamKind::Call)?;
             Some(CheckTarget::Param {
                 callee,
@@ -336,7 +336,7 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
             };
             let args = parent.find(args.span())?;
 
-            let is_set = parent.kind() == SyntaxKind::Set;
+            let is_set = parent.kind() == SyntaxKind::SetRule;
             let target = get_param_target(args.clone(), node, ParamKind::Call)?;
             return Some(CheckTarget::Param {
                 callee,
