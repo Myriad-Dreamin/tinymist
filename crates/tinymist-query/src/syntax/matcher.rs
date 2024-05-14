@@ -133,7 +133,7 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'
     /// Skips trivia nodes that are on the same line as the cursor.
     fn can_skip_trivia(node: &LinkedNode, cursor: usize) -> bool {
         // A non-trivia node is our target so we stop at it.
-        if !node.kind().is_trivia() {
+        if !node.kind().is_trivia() || !node.parent_kind().is_some_and(possible_in_code_trivia) {
             return false;
         }
 
@@ -369,19 +369,22 @@ pub fn get_check_target_by_context<'a>(
     }
 }
 
+fn possible_in_code_trivia(sk: SyntaxKind) -> bool {
+    !matches!(
+        interpret_mode_at(sk),
+        Some(InterpretMode::Markup | InterpretMode::Math | InterpretMode::Comment)
+    )
+}
+
 pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
-    let parent_kind = node.parent_kind();
     let mut node = node;
-    if node.kind().is_trivia()
-        && !matches!(
-            parent_kind.and_then(interpret_mode_at),
-            Some(InterpretMode::Markup | InterpretMode::Math | InterpretMode::Comment)
-        )
-    {
+    if node.kind().is_trivia() && node.parent_kind().is_some_and(possible_in_code_trivia) {
         loop {
             node = node.prev_sibling()?;
 
-            if node.kind().is_trivia() {}
+            if !node.kind().is_trivia() {
+                break;
+            }
         }
     }
 
@@ -412,9 +415,17 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
         deref_target => deref_target.node().clone(),
     };
 
-    let Some(node_parent) = node.parent() else {
+    let Some(mut node_parent) = node.parent() else {
         return Some(CheckTarget::Normal(node));
     };
+
+    while let SyntaxKind::Named | SyntaxKind::Colon = node_parent.kind() {
+        let Some(p) = node_parent.parent() else {
+            return Some(CheckTarget::Normal(node));
+        };
+        node_parent = p;
+    }
+
     match node_parent.kind() {
         SyntaxKind::Array | SyntaxKind::Dict => {
             let target = get_param_target(
@@ -585,7 +596,6 @@ mod tests {
 
         let mut cursor = 0;
         for ch in source.text().chars() {
-            println!("ch: {ch}");
             cursor += ch.len_utf8();
             if is_newline(ch) {
                 output_mapping.push(ch);
@@ -641,7 +651,7 @@ Text
 = Heading #let y = 2;  
 == Heading"#).trim(), @r###"
         #let x = 1  
-         nnnnvvnnnnn
+         nnnnvvnnn  
         Text
             
         = Heading #let y = 2;  
@@ -661,7 +671,7 @@ Text
 = Heading #let y = 2;  
 == Heading"#).trim(), @r###"
         #let x = 1  
-         nnnnnnnnnnn
+         nnnnnnnnn  
         Text
             
         = Heading #let y = 2;  
@@ -674,23 +684,29 @@ Text
         "###);
         assert_snapshot!(map_check(r#"#f(1, 2)   Test"#).trim(), @r###"
         #f(1, 2)   Test
-         npnppnpppp
+         npnppnp
         "###);
         assert_snapshot!(map_check(r#"#()   Test"#).trim(), @r###"
         #()   Test
-         eennn
+         ee
         "###);
         assert_snapshot!(map_check(r#"#(1)   Test"#).trim(), @r###"
         #(1)   Test
-         PPPnnn
+         PPP
         "###);
         assert_snapshot!(map_check(r#"#(a: 1)   Test"#).trim(), @r###"
         #(a: 1)   Test
-         ennnnennn
+         eeeeee
         "###);
         assert_snapshot!(map_check(r#"#(1, 2)   Test"#).trim(), @r###"
         #(1, 2)   Test
-         eeeeeennn
+         eeeeee
+        "###);
+        assert_snapshot!(map_check(r#"#(1, 2)  
+  Test"#).trim(), @r###"
+        #(1, 2)  
+         eeeeee  
+          Test
         "###);
     }
 }
