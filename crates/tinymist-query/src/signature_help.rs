@@ -1,4 +1,7 @@
+use once_cell::sync::OnceCell;
+
 use crate::{
+    adt::interner::Interned,
     analysis::{analyze_dyn_signature, find_definition, Ty},
     prelude::*,
     syntax::{get_check_target, get_deref_target, CheckTarget, ParamTarget},
@@ -25,7 +28,13 @@ impl SemanticRequest for SignatureHelpRequest {
         let cursor = ctx.to_typst_pos(self.position, &source)? + 1;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
-        let CheckTarget::Param { callee, target, .. } = get_check_target(ast_node)? else {
+        let CheckTarget::Param {
+            callee,
+            target,
+            is_set,
+            ..
+        } = get_check_target(ast_node)?
+        else {
             return None;
         };
 
@@ -63,16 +72,7 @@ impl SemanticRequest for SignatureHelpRequest {
 
         named.sort_by_key(|x| &x.name);
 
-        let active_parameter = match &target {
-            ParamTarget::Positional { positional, .. } => Some((*positional) + param_shift),
-            ParamTarget::Named(name) => {
-                let name = name.get().clone().into_text();
-                named
-                    .iter()
-                    .position(|x| x.name.as_ref() == name.as_ref())
-                    .map(|i| pos.len() + i)
-            }
-        };
+        let mut active_parameter = None;
 
         let mut label = def_link.name.clone();
         let mut params = Vec::new();
@@ -88,7 +88,32 @@ impl SemanticRequest for SignatureHelpRequest {
         let rest = rest
             .iter()
             .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.rest_param())));
-        for (param, ty) in pos.chain(named).chain(rest) {
+
+        let mut real_offset = 0;
+        let focus_name = OnceCell::new();
+        for (i, (param, ty)) in pos.chain(named).chain(rest).enumerate() {
+            if is_set && !param.settable {
+                continue;
+            }
+
+            match &target {
+                ParamTarget::Positional { .. } if is_set => {}
+                ParamTarget::Positional { positional, .. } => {
+                    if (*positional) + param_shift == i {
+                        active_parameter = Some(real_offset);
+                    }
+                }
+                ParamTarget::Named(name) => {
+                    let focus_name = focus_name
+                        .get_or_init(|| Interned::new_str(&name.get().clone().into_text()));
+                    if focus_name == &param.name {
+                        active_parameter = Some(real_offset);
+                    }
+                }
+            }
+
+            real_offset += 1;
+
             if !params.is_empty() {
                 label.push_str(", ");
             }
@@ -123,6 +148,11 @@ impl SemanticRequest for SignatureHelpRequest {
         if let Some(ret_ty) = ret {
             label.push_str(" -> ");
             label.push_str(ret_ty.describe().as_deref().unwrap_or("any"));
+        }
+
+        if matches!(target, ParamTarget::Positional { .. }) {
+            active_parameter =
+                active_parameter.map(|x| x.min(sig.primary().pos.len().saturating_sub(1)));
         }
 
         trace!("got signature info {label} {params:?}");
