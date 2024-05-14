@@ -510,3 +510,69 @@ fn find_param_index(deciding: &LinkedNode, params: &[ParamInfo], args: ast::Args
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use insta::assert_snapshot;
+    use typst::syntax::{is_newline, Source};
+
+    fn do_mapping(source: &str) -> String {
+        let source = Source::detached(source.to_owned());
+        let root = LinkedNode::new(source.root());
+        let mut output_mapping = String::new();
+
+        let mut sz = 0;
+        for ch in source.text().chars() {
+            println!("ch: {ch}");
+            sz += ch.len_utf8();
+            if is_newline(ch) {
+                output_mapping.push(ch);
+                continue;
+            }
+
+            let kind = root.leaf_at(sz).and_then(|node| get_deref_target(node, sz));
+            let target = match kind {
+                Some(DerefTarget::VarAccess(..)) => 'v',
+                Some(DerefTarget::Normal(..)) => 'n',
+                Some(DerefTarget::Label(..)) => 'l',
+                Some(DerefTarget::Ref(..)) => 'r',
+                Some(DerefTarget::Callee(..)) => 'c',
+                Some(DerefTarget::ImportPath(..)) => 'i',
+                Some(DerefTarget::IncludePath(..)) => 'I',
+                None => ' ',
+            };
+
+            output_mapping.push(target);
+        }
+
+        println!("output_mapping: {output_mapping}");
+
+        source
+            .text()
+            .lines()
+            .zip(output_mapping.lines())
+            .flat_map(|(a, b)| [a, "\n", b, "\n"])
+            .collect::<String>()
+    }
+
+    #[test]
+    fn test_get_deref_target() {
+        assert_snapshot!(do_mapping(r#"#let x = 1  
+Text
+= Heading #let y = 2;  
+== Heading"#).trim(), @r###"
+        #let x = 1  
+         nnnnvvnnnnn
+        Text
+            
+        = Heading #let y = 2;  
+                   nnnnvvnnn   
+        == Heading
+        "###);
+        assert_snapshot!(do_mapping(r#"#let f(x);"#).trim(), @r###"
+        #let f(x);
+         nnnnv v
+        "###);
+    }
+}
