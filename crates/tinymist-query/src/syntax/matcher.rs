@@ -578,36 +578,22 @@ mod tests {
     use insta::assert_snapshot;
     use typst::syntax::{is_newline, Source};
 
-    fn do_mapping(source: &str) -> String {
+    fn map_base(source: &str, mapper: impl Fn(&LinkedNode, usize) -> char) -> String {
         let source = Source::detached(source.to_owned());
         let root = LinkedNode::new(source.root());
         let mut output_mapping = String::new();
 
-        let mut sz = 0;
+        let mut cursor = 0;
         for ch in source.text().chars() {
             println!("ch: {ch}");
-            sz += ch.len_utf8();
+            cursor += ch.len_utf8();
             if is_newline(ch) {
                 output_mapping.push(ch);
                 continue;
             }
 
-            let kind = root.leaf_at(sz).and_then(|node| get_deref_target(node, sz));
-            let target = match kind {
-                Some(DerefTarget::VarAccess(..)) => 'v',
-                Some(DerefTarget::Normal(..)) => 'n',
-                Some(DerefTarget::Label(..)) => 'l',
-                Some(DerefTarget::Ref(..)) => 'r',
-                Some(DerefTarget::Callee(..)) => 'c',
-                Some(DerefTarget::ImportPath(..)) => 'i',
-                Some(DerefTarget::IncludePath(..)) => 'I',
-                None => ' ',
-            };
-
-            output_mapping.push(target);
+            output_mapping.push(mapper(&root, cursor));
         }
-
-        println!("output_mapping: {output_mapping}");
 
         source
             .text()
@@ -617,9 +603,40 @@ mod tests {
             .collect::<String>()
     }
 
+    fn map_deref(source: &str) -> String {
+        map_base(source, |root, cursor| {
+            let node = root.leaf_at(cursor);
+            let kind = node.and_then(|node| get_deref_target(node, cursor));
+            match kind {
+                Some(DerefTarget::VarAccess(..)) => 'v',
+                Some(DerefTarget::Normal(..)) => 'n',
+                Some(DerefTarget::Label(..)) => 'l',
+                Some(DerefTarget::Ref(..)) => 'r',
+                Some(DerefTarget::Callee(..)) => 'c',
+                Some(DerefTarget::ImportPath(..)) => 'i',
+                Some(DerefTarget::IncludePath(..)) => 'I',
+                None => ' ',
+            }
+        })
+    }
+
+    fn map_check(source: &str) -> String {
+        map_base(source, |root, cursor| {
+            let node = root.leaf_at(cursor);
+            let kind = node.and_then(|node| get_check_target(node));
+            match kind {
+                Some(CheckTarget::Param { .. }) => 'p',
+                Some(CheckTarget::Element { .. }) => 'e',
+                Some(CheckTarget::Paren { .. }) => 'P',
+                Some(CheckTarget::Normal(..)) => 'n',
+                None => ' ',
+            }
+        })
+    }
+
     #[test]
     fn test_get_deref_target() {
-        assert_snapshot!(do_mapping(r#"#let x = 1  
+        assert_snapshot!(map_deref(r#"#let x = 1  
 Text
 = Heading #let y = 2;  
 == Heading"#).trim(), @r###"
@@ -631,9 +648,49 @@ Text
                    nnnnvvnnn   
         == Heading
         "###);
-        assert_snapshot!(do_mapping(r#"#let f(x);"#).trim(), @r###"
+        assert_snapshot!(map_deref(r#"#let f(x);"#).trim(), @r###"
         #let f(x);
          nnnnv v
+        "###);
+    }
+
+    #[test]
+    fn test_get_check_target() {
+        assert_snapshot!(map_check(r#"#let x = 1  
+Text
+= Heading #let y = 2;  
+== Heading"#).trim(), @r###"
+        #let x = 1  
+         nnnnnnnnnnn
+        Text
+            
+        = Heading #let y = 2;  
+                   nnnnnnnnn   
+        == Heading
+        "###);
+        assert_snapshot!(map_check(r#"#let f(x);"#).trim(), @r###"
+        #let f(x);
+         nnnnn n
+        "###);
+        assert_snapshot!(map_check(r#"#f(1, 2)   Test"#).trim(), @r###"
+        #f(1, 2)   Test
+         npnppnpppp
+        "###);
+        assert_snapshot!(map_check(r#"#()   Test"#).trim(), @r###"
+        #()   Test
+         eennn
+        "###);
+        assert_snapshot!(map_check(r#"#(1)   Test"#).trim(), @r###"
+        #(1)   Test
+         PPPnnn
+        "###);
+        assert_snapshot!(map_check(r#"#(a: 1)   Test"#).trim(), @r###"
+        #(a: 1)   Test
+         ennnnennn
+        "###);
+        assert_snapshot!(map_check(r#"#(1, 2)   Test"#).trim(), @r###"
+        #(1, 2)   Test
+         eeeeeennn
         "###);
     }
 }
