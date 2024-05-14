@@ -1,4 +1,5 @@
 use ecow::EcoVec;
+use serde::Serialize;
 use typst::{
     foundations::{Func, ParamInfo},
     syntax::{
@@ -53,6 +54,56 @@ fn is_mark(sk: SyntaxKind) -> bool {
     )
 }
 
+/// A mode in which a text document is interpreted.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum InterpretMode {
+    /// The position is in a comment.
+    Comment,
+    /// The position is in a string.
+    String,
+    /// The position is in a raw.
+    Raw,
+    /// The position is in a markup block.
+    Markup,
+    /// The position is in a code block.
+    Code,
+    /// The position is in a math equation.
+    Math,
+}
+
+pub(crate) fn interpret_mode_at(k: SyntaxKind) -> Option<InterpretMode> {
+    use SyntaxKind::*;
+    Some(match k {
+        LineComment | BlockComment => InterpretMode::Comment,
+        Raw => InterpretMode::Raw,
+        Str => InterpretMode::String,
+        CodeBlock | Code => InterpretMode::Code,
+        ContentBlock | Markup => InterpretMode::Markup,
+        Equation | Math => InterpretMode::Math,
+        Ident | FieldAccess | Bool | Int | Float | Numeric | Space | Linebreak | Parbreak
+        | Escape | Shorthand | SmartQuote | RawLang | RawDelim | RawTrimmed | Hash | LeftBrace
+        | RightBrace | LeftBracket | RightBracket | LeftParen | RightParen | Comma | Semicolon
+        | Colon | Star | Underscore | Dollar | Plus | Minus | Slash | Hat | Prime | Dot | Eq
+        | EqEq | ExclEq | Lt | LtEq | Gt | GtEq | PlusEq | HyphEq | StarEq | SlashEq | Dots
+        | Arrow | Root | Not | And | Or | None | Auto | As | Named | Keyed | Error | Eof => {
+            return Option::None
+        }
+        Text | Strong | Emph | Link | Label | Ref | RefMarker | Heading | HeadingMarker
+        | ListItem | ListMarker | EnumItem | EnumMarker | TermItem | TermMarker => {
+            InterpretMode::Markup
+        }
+        MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes | MathFrac
+        | MathRoot => InterpretMode::Math,
+        Let | Set | Show | Context | If | Else | For | In | While | Break | Continue | Return
+        | Import | Include | Args | Spread | Closure | Params | LetBinding | SetRule | ShowRule
+        | Contextual | Conditional | WhileLoop | ForLoop | LoopBreak | ModuleImport
+        | ImportItems | RenamedImportItem | ModuleInclude | LoopContinue | FuncReturn
+        | FuncCall | Unary | Binary | Parenthesized | Dict | Array | Destructuring
+        | DestructAssignment => InterpretMode::Code,
+    })
+}
+
 #[derive(Debug, Clone)]
 pub enum DerefTarget<'a> {
     Label(LinkedNode<'a>),
@@ -82,7 +133,7 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'
     /// Skips trivia nodes that are on the same line as the cursor.
     fn can_skip_trivia(node: &LinkedNode, cursor: usize) -> bool {
         // A non-trivia node is our target so we stop at it.
-        if !node.kind().is_trivia() {
+        if !node.kind().is_trivia() || !node.parent_kind().is_some_and(possible_in_code_trivia) {
             return false;
         }
 
@@ -318,10 +369,23 @@ pub fn get_check_target_by_context<'a>(
     }
 }
 
+fn possible_in_code_trivia(sk: SyntaxKind) -> bool {
+    !matches!(
+        interpret_mode_at(sk),
+        Some(InterpretMode::Markup | InterpretMode::Math | InterpretMode::Comment)
+    )
+}
+
 pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
     let mut node = node;
-    while node.kind().is_trivia() {
-        node = node.prev_sibling()?;
+    if node.kind().is_trivia() && node.parent_kind().is_some_and(possible_in_code_trivia) {
+        loop {
+            node = node.prev_sibling()?;
+
+            if !node.kind().is_trivia() {
+                break;
+            }
+        }
     }
 
     let deref_target = get_deref_target(node.clone(), node.offset())?;
@@ -351,9 +415,17 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
         deref_target => deref_target.node().clone(),
     };
 
-    let Some(node_parent) = node.parent() else {
+    let Some(mut node_parent) = node.parent() else {
         return Some(CheckTarget::Normal(node));
     };
+
+    while let SyntaxKind::Named | SyntaxKind::Colon = node_parent.kind() {
+        let Some(p) = node_parent.parent() else {
+            return Some(CheckTarget::Normal(node));
+        };
+        node_parent = p;
+    }
+
     match node_parent.kind() {
         SyntaxKind::Array | SyntaxKind::Dict => {
             let target = get_param_target(
@@ -508,5 +580,133 @@ fn find_param_index(deciding: &LinkedNode, params: &[ParamInfo], args: ast::Args
             }
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use insta::assert_snapshot;
+    use typst::syntax::{is_newline, Source};
+
+    fn map_base(source: &str, mapper: impl Fn(&LinkedNode, usize) -> char) -> String {
+        let source = Source::detached(source.to_owned());
+        let root = LinkedNode::new(source.root());
+        let mut output_mapping = String::new();
+
+        let mut cursor = 0;
+        for ch in source.text().chars() {
+            cursor += ch.len_utf8();
+            if is_newline(ch) {
+                output_mapping.push(ch);
+                continue;
+            }
+
+            output_mapping.push(mapper(&root, cursor));
+        }
+
+        source
+            .text()
+            .lines()
+            .zip(output_mapping.lines())
+            .flat_map(|(a, b)| [a, "\n", b, "\n"])
+            .collect::<String>()
+    }
+
+    fn map_deref(source: &str) -> String {
+        map_base(source, |root, cursor| {
+            let node = root.leaf_at(cursor);
+            let kind = node.and_then(|node| get_deref_target(node, cursor));
+            match kind {
+                Some(DerefTarget::VarAccess(..)) => 'v',
+                Some(DerefTarget::Normal(..)) => 'n',
+                Some(DerefTarget::Label(..)) => 'l',
+                Some(DerefTarget::Ref(..)) => 'r',
+                Some(DerefTarget::Callee(..)) => 'c',
+                Some(DerefTarget::ImportPath(..)) => 'i',
+                Some(DerefTarget::IncludePath(..)) => 'I',
+                None => ' ',
+            }
+        })
+    }
+
+    fn map_check(source: &str) -> String {
+        map_base(source, |root, cursor| {
+            let node = root.leaf_at(cursor);
+            let kind = node.and_then(|node| get_check_target(node));
+            match kind {
+                Some(CheckTarget::Param { .. }) => 'p',
+                Some(CheckTarget::Element { .. }) => 'e',
+                Some(CheckTarget::Paren { .. }) => 'P',
+                Some(CheckTarget::Normal(..)) => 'n',
+                None => ' ',
+            }
+        })
+    }
+
+    #[test]
+    fn test_get_deref_target() {
+        assert_snapshot!(map_deref(r#"#let x = 1  
+Text
+= Heading #let y = 2;  
+== Heading"#).trim(), @r###"
+        #let x = 1  
+         nnnnvvnnn  
+        Text
+            
+        = Heading #let y = 2;  
+                   nnnnvvnnn   
+        == Heading
+        "###);
+        assert_snapshot!(map_deref(r#"#let f(x);"#).trim(), @r###"
+        #let f(x);
+         nnnnv v
+        "###);
+    }
+
+    #[test]
+    fn test_get_check_target() {
+        assert_snapshot!(map_check(r#"#let x = 1  
+Text
+= Heading #let y = 2;  
+== Heading"#).trim(), @r###"
+        #let x = 1  
+         nnnnnnnnn  
+        Text
+            
+        = Heading #let y = 2;  
+                   nnnnnnnnn   
+        == Heading
+        "###);
+        assert_snapshot!(map_check(r#"#let f(x);"#).trim(), @r###"
+        #let f(x);
+         nnnnn n
+        "###);
+        assert_snapshot!(map_check(r#"#f(1, 2)   Test"#).trim(), @r###"
+        #f(1, 2)   Test
+         npnppnp
+        "###);
+        assert_snapshot!(map_check(r#"#()   Test"#).trim(), @r###"
+        #()   Test
+         ee
+        "###);
+        assert_snapshot!(map_check(r#"#(1)   Test"#).trim(), @r###"
+        #(1)   Test
+         PPP
+        "###);
+        assert_snapshot!(map_check(r#"#(a: 1)   Test"#).trim(), @r###"
+        #(a: 1)   Test
+         eeeeee
+        "###);
+        assert_snapshot!(map_check(r#"#(1, 2)   Test"#).trim(), @r###"
+        #(1, 2)   Test
+         eeeeee
+        "###);
+        assert_snapshot!(map_check(r#"#(1, 2)  
+  Test"#).trim(), @r###"
+        #(1, 2)  
+         eeeeee  
+          Test
+        "###);
     }
 }
