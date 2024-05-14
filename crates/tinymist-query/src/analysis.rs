@@ -63,7 +63,7 @@ mod type_check_tests {
                 .map(|e| (e.1.name(), e.1))
                 .collect::<Vec<_>>();
 
-            vars.sort_by(|x, y| x.0.cmp(&y.0));
+            vars.sort_by(|x, y| x.1.var.cmp(&y.1.var));
 
             for (name, var) in vars {
                 writeln!(f, "{:?} = {:?}", name, info.simplify(var.as_type(), true))?;

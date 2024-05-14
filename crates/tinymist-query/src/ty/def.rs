@@ -264,6 +264,20 @@ pub struct TypeVar {
     pub syntax: Option<Interned<TypeSource>>,
 }
 
+impl Ord for TypeVar {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.name
+            .cmp(&other.name)
+            .then_with(|| self.def.0.cmp(&other.def.0))
+    }
+}
+
+impl PartialOrd for TypeVar {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl fmt::Debug for TypeVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "@{}", self.name)
