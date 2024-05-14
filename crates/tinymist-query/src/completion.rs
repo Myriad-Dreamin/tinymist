@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 
 use crate::{
-    analysis::{BuiltinTy, Ty},
+    analysis::{BuiltinTy, InsTy, Ty},
     prelude::*,
     syntax::DerefTarget,
     upstream::{autocomplete, complete_path, CompletionContext},
@@ -132,7 +132,19 @@ impl StatefulRequest for CompletionRequest {
         let is_incomplete = false;
 
         let mut items = completion_result.or_else(|| {
-            let cc_ctx = CompletionContext::new(ctx, doc, &source, cursor, explicit)?;
+            let mut cc_ctx = CompletionContext::new(ctx, doc, &source, cursor, explicit)?;
+
+            // Exclude it self from auto completion
+            // e.g. `#let x = (1.);`
+            let self_ty = cc_ctx.leaf.cast::<ast::Expr>().and_then(|exp| {
+                let v = cc_ctx.ctx.mini_eval(exp)?;
+                Some(Ty::Value(InsTy::new(v)))
+            });
+
+            if let Some(self_ty) = self_ty {
+                cc_ctx.seen_types.insert(self_ty);
+            };
+
             let (offset, ic, mut completions, completions_items2) = autocomplete(cc_ctx)?;
             if !completions_items2.is_empty() {
                 completion_items_rest = Some(completions_items2);

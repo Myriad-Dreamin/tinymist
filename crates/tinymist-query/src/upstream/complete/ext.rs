@@ -692,8 +692,10 @@ fn type_completion(
     docs: Option<&str>,
 ) -> Option<()> {
     // Prevent duplicate completions from appearing.
-    if !ctx.seen_casts.insert(typst::util::hash128(&infer_type)) {
-        return Some(());
+    if let Some(infer_type) = infer_type {
+        if !ctx.seen_types.insert(infer_type.clone()) {
+            return Some(());
+        }
     }
 
     log::info!("type_completion: {:?}", infer_type);
