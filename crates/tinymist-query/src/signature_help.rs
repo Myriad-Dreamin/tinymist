@@ -129,7 +129,7 @@ impl SemanticRequest for SignatureHelpRequest {
             ));
 
             params.push(LspParamInfo {
-                label: lsp_types::ParameterLabel::Simple(param.name.as_ref().into()),
+                label: lsp_types::ParameterLabel::Simple(format!("{}:", param.name)),
                 documentation: if !param.docs.is_empty() {
                     Some(Documentation::MarkupContent(MarkupContent {
                         value: param.docs.clone().into(),
