@@ -71,18 +71,7 @@ impl MutateDriver for SubstituteChecker {
                     return None;
                 }
             }
-            Ty::Value(..)
-            | Ty::Clause
-            | Ty::Undef
-            | Ty::Content
-            | Ty::Any
-            | Ty::None
-            | Ty::Infer
-            | Ty::FlowNone
-            | Ty::Space
-            | Ty::Auto
-            | Ty::Boolean(..)
-            | Ty::Builtin(..) => return None,
+            Ty::Value(..) | Ty::Any | Ty::Boolean(..) | Ty::Builtin(..) => return None,
             _ => return None,
         })
     }
@@ -98,7 +87,7 @@ mod tests {
     #[test]
     fn test_ty() {
         use super::*;
-        let ty = Ty::Clause;
+        let ty = Ty::Builtin(BuiltinTy::Clause);
         let ty_ref = TyRef::new(ty.clone());
         assert_debug_snapshot!(ty_ref, @"Clause");
     }

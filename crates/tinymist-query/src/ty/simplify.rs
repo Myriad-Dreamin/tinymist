@@ -153,15 +153,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 self.analyze(&v.field, pol);
             }
             Ty::Value(_v) => {}
-            Ty::Clause => {}
-            Ty::Undef => {}
-            Ty::Content => {}
             Ty::Any => {}
-            Ty::None => {}
-            Ty::Infer => {}
-            Ty::FlowNone => {}
-            Ty::Space => {}
-            Ty::Auto => {}
             Ty::Boolean(_) => {}
             Ty::Builtin(_) => {}
         }
@@ -237,15 +229,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             }
 
             Ty::Value(v) => Ty::Value(v.clone()),
-            Ty::Clause => Ty::Clause,
-            Ty::Undef => Ty::Undef,
-            Ty::Content => Ty::Content,
             Ty::Any => Ty::Any,
-            Ty::None => Ty::None,
-            Ty::Infer => Ty::Infer,
-            Ty::FlowNone => Ty::FlowNone,
-            Ty::Space => Ty::Space,
-            Ty::Auto => Ty::Auto,
             Ty::Boolean(b) => Ty::Boolean(*b),
             Ty::Builtin(b) => Ty::Builtin(b.clone()),
         }

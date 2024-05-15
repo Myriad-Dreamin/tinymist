@@ -160,6 +160,15 @@ impl<'a> Iterator for UnionIter<'a> {
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub(crate) enum BuiltinTy {
+    Clause,
+    Undef,
+    Content,
+    Space,
+    None,
+    Infer,
+    FlowNone,
+    Auto,
+
     Args,
     Color,
     TextSize,
@@ -185,6 +194,15 @@ pub(crate) enum BuiltinTy {
 impl fmt::Debug for BuiltinTy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            BuiltinTy::Clause => f.write_str("Clause"),
+            BuiltinTy::Undef => f.write_str("Undef"),
+            BuiltinTy::Content => f.write_str("Content"),
+            BuiltinTy::Space => f.write_str("Space"),
+            BuiltinTy::None => f.write_str("None"),
+            BuiltinTy::Infer => f.write_str("Infer"),
+            BuiltinTy::FlowNone => f.write_str("FlowNone"),
+            BuiltinTy::Auto => f.write_str("Auto"),
+
             BuiltinTy::Args => write!(f, "Args"),
             BuiltinTy::Color => write!(f, "Color"),
             BuiltinTy::TextSize => write!(f, "TextSize"),
@@ -217,16 +235,16 @@ impl BuiltinTy {
 
     pub fn from_builtin(builtin: Type) -> Ty {
         if builtin == Type::of::<AutoValue>() {
-            return Ty::Auto;
+            return Ty::Builtin(BuiltinTy::Auto);
         }
         if builtin == Type::of::<NoneValue>() {
-            return Ty::None;
+            return Ty::Builtin(BuiltinTy::None);
         }
         if builtin == Type::of::<typst::visualize::Color>() {
             return Color.literally();
         }
         if builtin == Type::of::<bool>() {
-            return Ty::None;
+            return Ty::Builtin(BuiltinTy::None);
         }
         if builtin == Type::of::<f64>() {
             return Float.literally();
@@ -235,7 +253,7 @@ impl BuiltinTy {
             return Length.literally();
         }
         if builtin == Type::of::<Content>() {
-            return Ty::Content;
+            return Ty::Builtin(BuiltinTy::Content);
         }
 
         BuiltinTy::Type(builtin).literally()
@@ -243,6 +261,15 @@ impl BuiltinTy {
 
     pub(crate) fn describe(&self) -> &'static str {
         match self {
+            BuiltinTy::Clause => "any",
+            BuiltinTy::Undef => "any",
+            BuiltinTy::Content => "content",
+            BuiltinTy::Space => "content",
+            BuiltinTy::None => "none",
+            BuiltinTy::Infer => "any",
+            BuiltinTy::FlowNone => "none",
+            BuiltinTy::Auto => "auto",
+
             BuiltinTy::Args => "args",
             BuiltinTy::Color => "color",
             BuiltinTy::TextSize => "text.size",
@@ -406,7 +433,7 @@ pub(super) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<Ty> {
             "stroke",
         ) => Some(Ty::Builtin(Stroke)),
         ("page", "margin") => Some(Ty::Builtin(Margin)),
-        _ => None,
+        _ => Option::None,
     }
 }
 
@@ -521,8 +548,9 @@ mod tests {
     fn test_map() {
         let u = Ty::Var(TypeVar::new("u".into(), DefId(0)));
         let v = Ty::Var(TypeVar::new("v".into(), DefId(1)));
-        let mapper_fn = Ty::Func(SigTy::new([u], None, None, Some(v.clone())).into());
-        let map_fn = Ty::Func(SigTy::new([mapper_fn], None, None, Some(v)).into());
+        let mapper_fn =
+            Ty::Func(SigTy::new([u], Option::None, Option::None, Some(v.clone())).into());
+        let map_fn = Ty::Func(SigTy::new([mapper_fn], Option::None, Option::None, Some(v)).into());
         let _ = map_fn;
         // println!("{map_fn:?}");
     }

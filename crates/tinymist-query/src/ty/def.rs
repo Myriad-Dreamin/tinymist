@@ -768,15 +768,7 @@ impl IfTy {
 
 #[derive(Hash, Clone, PartialEq, Eq)]
 pub(crate) enum Ty {
-    Clause,
-    Undef,
-    Content,
     Any,
-    Space,
-    None,
-    Infer,
-    FlowNone,
-    Auto,
     Boolean(Option<bool>),
     Builtin(BuiltinTy),
     Value(Interned<InsTy>),
@@ -802,15 +794,7 @@ pub(crate) enum Ty {
 impl fmt::Debug for Ty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Ty::Clause => f.write_str("Clause"),
-            Ty::Undef => f.write_str("Undef"),
-            Ty::Content => f.write_str("Content"),
             Ty::Any => f.write_str("Any"),
-            Ty::Space => f.write_str("Space"),
-            Ty::None => f.write_str("None"),
-            Ty::Infer => f.write_str("Infer"),
-            Ty::FlowNone => f.write_str("FlowNone"),
-            Ty::Auto => f.write_str("Auto"),
             Ty::Builtin(t) => write!(f, "{t:?}"),
             Ty::Args(a) => write!(f, "&({a:?})"),
             Ty::Func(s) => write!(f, "{s:?}"),
@@ -872,6 +856,10 @@ impl Ty {
     pub(crate) fn iter_union(e: impl IntoIterator<Item = Ty>) -> Self {
         Ty::Union(Interned::new(e.into_iter().collect()))
     }
+
+    pub const fn undef() -> Self {
+        Ty::Builtin(BuiltinTy::Undef)
+    }
 }
 
 impl_internable!(Ty,);
@@ -915,7 +903,7 @@ mod tests {
     #[test]
     fn test_ty() {
         use super::*;
-        let ty = Ty::Clause;
+        let ty = Ty::Builtin(BuiltinTy::Clause);
         let ty_ref = TyRef::new(ty.clone());
         assert_debug_snapshot!(ty_ref, @"Clause");
     }

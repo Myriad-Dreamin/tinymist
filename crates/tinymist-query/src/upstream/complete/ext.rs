@@ -701,22 +701,12 @@ fn type_completion(
     log::info!("type_completion: {:?}", infer_type);
 
     match infer_type? {
-        Ty::Clause => return None,
-        Ty::Undef => return None,
-        Ty::Space => return None,
-        Ty::Content => return None,
         Ty::Any => return None,
         Ty::Tuple(..) | Ty::Array(..) => {
             ctx.snippet_completion("()", "(${})", "An array.");
         }
         Ty::Dict(..) => {
             ctx.snippet_completion("()", "(${})", "A dictionary.");
-        }
-        Ty::None => ctx.snippet_completion("none", "none", "Nothing."),
-        Ty::Infer => return None,
-        Ty::FlowNone => return None,
-        Ty::Auto => {
-            ctx.snippet_completion("auto", "auto", "A smart default.");
         }
         Ty::Boolean(_b) => {
             ctx.snippet_completion("false", "false", "No / Disabled.");
@@ -738,6 +728,17 @@ fn type_completion(
             });
         }
         Ty::Builtin(v) => match v {
+            BuiltinTy::None => ctx.snippet_completion("none", "none", "Nothing."),
+            BuiltinTy::Auto => {
+                ctx.snippet_completion("auto", "auto", "A smart default.");
+            }
+            BuiltinTy::Clause => return None,
+            BuiltinTy::Undef => return None,
+            BuiltinTy::Space => return None,
+            BuiltinTy::Content => return None,
+            BuiltinTy::Infer => return None,
+            BuiltinTy::FlowNone => return None,
+
             BuiltinTy::Path(p) => {
                 let source = ctx.ctx.source_by_id(ctx.root.span().id()?).ok()?;
 
@@ -852,16 +853,16 @@ fn type_completion(
                 ctx.snippet_completion("em", "${1}em", "Em length unit.");
                 let length_ty = Type::of::<Length>();
                 ctx.strict_scope_completions(false, |value| value.ty() == length_ty);
-                type_completion(ctx, Some(&Ty::Auto), docs);
+                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Auto)), docs);
             }
             BuiltinTy::Float => {
                 ctx.snippet_completion("exponential notation", "${1}e${0}", "Exponential notation");
             }
             BuiltinTy::Type(ty) => {
                 if *ty == Type::of::<NoneValue>() {
-                    type_completion(ctx, Some(&Ty::None), docs);
+                    type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::None)), docs);
                 } else if *ty == Type::of::<AutoValue>() {
-                    type_completion(ctx, Some(&Ty::Auto), docs);
+                    type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Auto)), docs);
                 } else if *ty == Type::of::<bool>() {
                     ctx.snippet_completion("false", "false", "No / Disabled.");
                     ctx.snippet_completion("true", "true", "Yes / Enabled.");
@@ -922,9 +923,9 @@ fn type_completion(
             if let Value::Type(ty) = &v.val {
                 type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Type(*ty))), docs);
             } else if v.val.ty() == Type::of::<NoneValue>() {
-                type_completion(ctx, Some(&Ty::None), docs);
+                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::None)), docs);
             } else if v.val.ty() == Type::of::<AutoValue>() {
-                type_completion(ctx, Some(&Ty::Auto), docs);
+                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Auto)), docs);
             } else {
                 ctx.value_completion(None, &v.val, true, docs);
             }
