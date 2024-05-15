@@ -18,7 +18,7 @@ use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
 use crate::adt::interner::Interned;
-use crate::analysis::{analyze_expr, analyze_import, analyze_labels, DynLabel};
+use crate::analysis::{analyze_expr, analyze_import, analyze_labels, DynLabel, Ty};
 use crate::AnalysisContext;
 
 mod ext;
@@ -964,6 +964,7 @@ pub struct CompletionContext<'a, 'w> {
     pub completions2: Vec<lsp_types::CompletionItem>,
     pub incomplete: bool,
     pub seen_casts: HashSet<u128>,
+    pub seen_types: HashSet<Ty>,
     pub seen_fields: HashSet<Interned<str>>,
 }
 
@@ -994,6 +995,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             completions: vec![],
             completions2: vec![],
             seen_casts: HashSet::new(),
+            seen_types: HashSet::new(),
             seen_fields: HashSet::new(),
         })
     }

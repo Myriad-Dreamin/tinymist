@@ -197,6 +197,8 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
                 log::debug!("post check paren target: {container_ty:?}::{is_before:?}");
 
                 let mut resp = SignatureReceiver::default();
+                // todo: this is legal, but it makes it sometimes complete itself.
+                // e.g. completing `""` on `let x = ("|")`
                 resp.bounds.lbs.push(container_ty.clone());
 
                 let target = ParamTarget::positional_from_before(true);
