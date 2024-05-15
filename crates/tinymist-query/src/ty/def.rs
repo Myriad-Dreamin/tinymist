@@ -517,19 +517,20 @@ impl SigTy {
     }
 
     pub(crate) fn new(
-        pos: impl Iterator<Item = Ty>,
-        named: impl Iterator<Item = (Interned<str>, Ty)>,
+        pos: impl IntoIterator<Item = Ty>,
+        named: impl IntoIterator<Item = (Interned<str>, Ty)>,
         rest: Option<Ty>,
         ret_ty: Option<Ty>,
     ) -> Self {
         let named = named
+            .into_iter()
             .map(|(name, ty)| (name, ty, Span::detached()))
             .collect::<Vec<_>>();
         let (names, types) = RecordTy::shape_fields(named);
         let spread_right = rest.is_some();
 
         let name_started = if spread_right { 1 } else { 0 } + types.len();
-        let types = pos.chain(types).chain(rest).collect::<Vec<_>>();
+        let types = pos.into_iter().chain(types).chain(rest).collect::<Vec<_>>();
 
         let name_started = (types.len() - name_started) as u32;
 
@@ -633,7 +634,7 @@ impl SigTy {
 
         let arg_pos = withs
             .into_iter()
-            .flat_map(|w| w.iter().map(|w| w.positional_params()))
+            .flat_map(|w| w.iter().rev().map(|w| w.positional_params()))
             .flatten()
             .chain(arg_pos);
 
@@ -642,6 +643,7 @@ impl SigTy {
 
         let mut pos = sig_stream.zip(arg_stream);
         let common_ifaces = withs
+            .map(|e| e.iter().rev())
             .into_iter()
             .flatten()
             .flat_map(|w| self.common_iface_fields(w))
@@ -971,5 +973,20 @@ mod tests {
         assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w3), literal_sig!(!u2: w2, !u1: w4), None), @"[(@w1, @w4), (@w3, @w2)]");
         assert_snapshot!(matches(literal_sig!(!u2: w1), literal_sig!(!u1: w2, !u2: w4), None), @"[(@w1, @w4)]");
         assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w2), literal_sig!(!u2: w4), None), @"[(@w2, @w4)]");
+
+        assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w2), literal_sig!(), Some(vec![
+            literal_sig!(!u2: w6),
+        ])), @"[(@w2, @w6)]");
+        assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w2), literal_sig!(!u2: w4), Some(vec![
+            literal_sig!(!u2: w5),
+        ])), @"[(@w2, @w5), (@w2, @w4)]");
+        assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w2), literal_sig!(), Some(vec![
+            literal_sig!(!u2: w7),
+            literal_sig!(!u2: w8),
+        ])), @"[(@w2, @w8), (@w2, @w7)]");
+        assert_snapshot!(matches(literal_sig!(p1, p2, p3), literal_sig!(q1), Some(vec![
+            literal_sig!(q2),
+            literal_sig!(q3),
+        ])), @"[(@p1, @q3), (@p2, @q2), (@p3, @q1)]");
     }
 }

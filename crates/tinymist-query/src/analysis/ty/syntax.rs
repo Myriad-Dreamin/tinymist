@@ -353,7 +353,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
         }
 
-        let args = ArgsTy::new(args_res.into_iter(), named.into_iter(), None, None);
+        let args = ArgsTy::new(args_res, named, None, None);
 
         Some(Ty::Args(args.into()))
     }
@@ -408,7 +408,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             self.weaken(rest);
         }
 
-        let sig = SigTy::new(pos.into_iter(), named.into_iter(), rest, Some(body));
+        let sig = SigTy::new(pos, named, rest, Some(body));
         Some(Ty::Func(sig.into()))
     }
 
