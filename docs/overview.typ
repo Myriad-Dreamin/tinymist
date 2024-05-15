@@ -23,7 +23,7 @@
   it.lines.at(0).body.children.slice(0, -2).join()
 }
 
-This document gives an overview of tinymist service, which provides a single integrated language service for Typst. This document doesn't dive in details but doesn't avoid showing code if necessary.
+This document gives an overview of tinymist service, which provides a single integrated language service for Typst. This document doesn't dive in details unless necessary.
 
 == Principles
 
@@ -61,13 +61,13 @@ Four principles are followed:
 
   A _Hover_ request is taken as example of that events.
 
-  A global unique `LspActor` takes the event and mutates a global server state. If the event requires some additional code analysis, it is converted into an analysis request, #link("https://github.com/search?q=repo%3AMyriad-Dreamin/tinymist%20CompilerQueryRequest&type=code")[```rs struct CompilerQueryRequest```], and pushed to the actors owning compiler resources. Otherwise, `LspActor` responds to the event according to its state. Obviously, the _Hover_ on code request requires code analysis.
+  A global unique `LspActor` takes the event and _mutates_ a global server state by the event. If the event requires some additional code analysis, it is converted into an analysis request, #link("https://github.com/search?q=repo%3AMyriad-Dreamin/tinymist%20CompilerQueryRequest&type=code")[```rs struct CompilerQueryRequest```], and pushed to the actors owning compiler resources. Otherwise, `LspActor` responds to the event directly. Obviously, the _Hover_ on code request requires code analysis.
 
-  The `CompileServerActor`s are created for each workspace and main entries (files/documents) in workspaces. When a compiler query is coming, a subset of that actors will take it and give project-specific responses, combining into a final concluded LSP response. Some analysis requests even require rendering features, and those requests will be pushed to the actors owning rendering resources. If you enable the periscope feature, a `Hover` on content request requires rendering on documents.
+  The `CompileServerActor`s are created for workspaces and main entries (files/documents) in workspaces. When a compiler query is coming, a subset of that actors will take it and give project-specific responses, combining into a final concluded LSP response. Some analysis requests even require rendering features, and those requests will be pushed to the actors owning rendering resources. If you enable the periscope feature, a `Hover` on content request requires rendering on documents.
 
-  The `RenderActor`s don't do compilations, but own project-specific rendering cache. They are designed for rendering docuemnt in _low latency_. This is the last sink of `Hover` requests. A `RenderActor` will receive an additional compiled `Document` object, and render the compiled frames in needed. After finishing rendering, a response attached with the rendered picture is sent to the LSP response channel intermediately.
+  The `RenderActor`s don't do compilations, but own project-specific rendering cache. They are designed for rendering documents in _low latency_. This is the last sink of `Hover` requests. A `RenderActor` will receive an additional compiled `Document` object, and render the compiled frames in needed. After finishing rendering, a response attached with the rendered picture is sent to the LSP response channel intermediately.
 
-/ Multi-level Analysis: The most critical features are lsp functions, built on the #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query")[tinymist-query] crate. To achieve low latency, functions are classified into different levels of analysis.
+/ Multi-level Analysis: The most critical features are lsp functions, built on the #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query")[tinymist-query] crate. To achieve higher concurrency, functions are classified into different levels of analysis.
   // + `query_token_cache` – `TokenRequest` – locks and accesses token cache.
   + `query_source` – `SyntaxRequest` – locks and accesses a single source unit.
   + `query_world` – `SemanticRequest` – locks and accesses multiple source units.
