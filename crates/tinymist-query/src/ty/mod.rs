@@ -5,6 +5,7 @@ mod bound;
 mod builtin;
 mod def;
 mod describe;
+mod mutate;
 mod sig;
 mod simplify;
 mod subst;
@@ -13,16 +14,18 @@ pub(crate) use apply::*;
 pub(crate) use bound::*;
 pub(crate) use builtin::*;
 pub(crate) use def::*;
+pub(crate) use mutate::*;
 pub(crate) use sig::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::adt::interner::Interned;
-    use typst::foundations::Value;
+    use fxhash::hash64;
+    use reflexo::vector::ir::DefId;
 
-    pub fn str_ins(s: &str) -> Ty {
-        Ty::Value(InsTy::new(Value::Str(s.into())))
+    pub fn var_ins(s: &str) -> Ty {
+        Ty::Var(TypeVar::new(s.into(), DefId(hash64(s))))
     }
 
     pub fn str_sig(
@@ -31,10 +34,10 @@ mod tests {
         rest: Option<&str>,
         ret: Option<&str>,
     ) -> Interned<SigTy> {
-        let pos = pos.iter().map(|s| str_ins(s));
-        let named = named.iter().map(|(n, t)| ((*n).into(), str_ins(t)));
-        let rest = rest.map(str_ins);
-        let ret = ret.map(str_ins);
+        let pos = pos.iter().map(|s| var_ins(s));
+        let named = named.iter().map(|(n, t)| ((*n).into(), var_ins(t)));
+        let rest = rest.map(var_ins);
+        let ret = ret.map(var_ins);
         SigTy::new(pos, named, rest, ret).into()
     }
 
@@ -55,4 +58,5 @@ mod tests {
     }
 
     pub(crate) use literal_sig;
+    pub(crate) use literal_sig as literal_args;
 }

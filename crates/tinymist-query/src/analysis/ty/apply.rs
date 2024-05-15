@@ -37,8 +37,10 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
             sig => (sig, false),
         };
 
-        if let Some(ty) = sig.call(args, pol, Some(self.base.ctx)) {
-            self.resultant.push(ty);
+        if !is_partialize {
+            if let Some(ty) = sig.call(args, pol, Some(self.base.ctx)) {
+                self.resultant.push(ty);
+            }
         }
 
         // todo: remove this after we implemented dependent types
