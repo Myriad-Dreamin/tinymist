@@ -4,8 +4,9 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/with.typ
 ---
 "f" = (Any) => Any
-"g" = (Any | ((Any) => Any).with(..(1) => any))
-"x" = ( ⪰ Any | Type(integer))
+"g" = ((Any) => Any).with(..(1) => any)
+"x" = ( ⪰ Any | Type(integer) | Type(integer))
+"x" = 1
 ---
 5..6 -> @f
 7..8 -> @x
@@ -13,4 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/with.typ
 20..21 -> @g
 24..25 -> @f
 24..30 -> (@x) => @x
-24..33 -> (@x | ((@x) => @x).with(..(1) => any))
+24..33 -> ((@x) => @x).with(..(1) => any)
+40..41 -> @x
+44..45 -> (@g | Any)
+44..47 -> 1

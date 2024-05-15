@@ -15,8 +15,11 @@ impl<'a> Sig<'a> {
             return body;
         }
 
+        let body = body?;
+
+        // Substitute the bound variables in the body or just body
         let mut checker = SubstituteChecker { bound_variables };
-        checker.ty(&body?, pol)
+        Some(checker.ty(&body, pol).unwrap_or(body))
     }
 
     pub fn check_bind(
@@ -26,11 +29,13 @@ impl<'a> Sig<'a> {
     ) -> Option<(HashMap<DefId, Ty>, Option<Ty>)> {
         let SigShape { sig, withs } = self.shape(ctx)?;
 
-        let has_free_vars = sig.has_free_variables;
+        // todo: check if the signature has free variables
+        // let has_free_vars = sig.has_free_variables;
+        let has_free_vars = true;
 
         let mut arguments = HashMap::new();
-        for (arg_recv, arg_ins) in sig.matches(args, withs) {
-            if has_free_vars {
+        if has_free_vars {
+            for (arg_recv, arg_ins) in sig.matches(args, withs) {
                 if let Ty::Var(arg_recv) = arg_recv {
                     arguments.insert(arg_recv.def, arg_ins.clone());
                 }
@@ -41,15 +46,100 @@ impl<'a> Sig<'a> {
     }
 }
 
-// todo
 struct SubstituteChecker {
     bound_variables: HashMap<DefId, Ty>,
 }
+
 impl SubstituteChecker {
     fn ty(&mut self, body: &Ty, pol: bool) -> Option<Ty> {
-        let _ = self.bound_variables;
+        body.mutate(pol, self)
+    }
+}
+
+impl MutateDriver for SubstituteChecker {
+    fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
+        // todo: extrude the type into a polarized type
         let _ = pol;
 
-        Some(body.clone())
+        Some(match ty {
+            // todo: substitute the bound in the type
+            Ty::Let(..) => return None,
+            Ty::Var(v) => {
+                if let Some(ty) = self.bound_variables.get(&v.def) {
+                    ty.clone()
+                } else {
+                    return None;
+                }
+            }
+            Ty::Value(..)
+            | Ty::Clause
+            | Ty::Undef
+            | Ty::Content
+            | Ty::Any
+            | Ty::None
+            | Ty::Infer
+            | Ty::FlowNone
+            | Ty::Space
+            | Ty::Auto
+            | Ty::Boolean(..)
+            | Ty::Builtin(..) => return None,
+            _ => return None,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use insta::{assert_debug_snapshot, assert_snapshot};
+
+    use crate::ty::tests::*;
+
+    use super::{ApplyChecker, Ty};
+    #[test]
+    fn test_ty() {
+        use super::*;
+        let ty = Ty::Clause;
+        let ty_ref = TyRef::new(ty.clone());
+        assert_debug_snapshot!(ty_ref, @"Clause");
+    }
+
+    #[derive(Default)]
+    struct CallCollector(Vec<Ty>);
+
+    impl ApplyChecker for CallCollector {
+        fn call(
+            &mut self,
+            sig: super::Sig,
+            arguments: &crate::adt::interner::Interned<super::ArgsTy>,
+            pol: bool,
+        ) {
+            let ty = sig.call(arguments, pol, None);
+            if let Some(ty) = ty {
+                self.0.push(ty);
+            }
+        }
+    }
+
+    #[test]
+    fn test_sig_call() {
+        use super::*;
+
+        fn call(sig: Interned<SigTy>, args: Interned<SigTy>) -> String {
+            let sig_ty = Ty::Func(sig);
+            let mut collector = CallCollector::default();
+            sig_ty.call(&args, false, &mut collector);
+
+            collector.0.iter().fold(String::new(), |mut acc, ty| {
+                if !acc.is_empty() {
+                    acc.push_str(", ");
+                }
+
+                acc.push_str(&format!("{ty:?}"));
+                acc
+            })
+        }
+
+        assert_snapshot!(call(literal_sig!(p1 -> p1), literal_args!(q1)), @"@q1");
+        assert_snapshot!(call(literal_sig!(!u1: w1 -> w1), literal_args!(!u1: w2)), @"@w2");
     }
 }

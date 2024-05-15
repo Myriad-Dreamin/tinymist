@@ -111,6 +111,23 @@ impl TypeSource {
 pub trait TypeInterace {
     fn bone(&self) -> &Interned<NameBone>;
     fn interface(&self) -> impl Iterator<Item = (&Interned<str>, &Ty)>;
+    fn field_by_bone_offset(&self, i: usize) -> Option<&Ty>;
+
+    fn common_iface_fields<'a>(
+        &'a self,
+        rhs: &'a Self,
+    ) -> impl Iterator<Item = (&'a Interned<str>, &'a Ty, &'a Ty)> {
+        let lhs_names = self.bone();
+        let rhs_names = rhs.bone();
+
+        lhs_names
+            .intersect_keys_enumerate(rhs_names)
+            .filter_map(move |(i, j)| {
+                let lhs = self.field_by_bone_offset(i)?;
+                let rhs = rhs.field_by_bone_offset(j)?;
+                Some((&lhs_names.names[i], lhs, rhs))
+            })
+    }
 }
 
 struct RefDebug<'a>(&'a Ty);
@@ -404,6 +421,10 @@ impl TypeInterace for RecordTy {
         &self.names
     }
 
+    fn field_by_bone_offset(&self, i: usize) -> Option<&Ty> {
+        self.types.get(i)
+    }
+
     fn interface(&self) -> impl Iterator<Item = (&Interned<str>, &Ty)> {
         self.names.names.iter().zip(self.types.iter())
     }
@@ -496,19 +517,20 @@ impl SigTy {
     }
 
     pub(crate) fn new(
-        pos: impl Iterator<Item = Ty>,
-        named: impl Iterator<Item = (Interned<str>, Ty)>,
+        pos: impl IntoIterator<Item = Ty>,
+        named: impl IntoIterator<Item = (Interned<str>, Ty)>,
         rest: Option<Ty>,
         ret_ty: Option<Ty>,
     ) -> Self {
         let named = named
+            .into_iter()
             .map(|(name, ty)| (name, ty, Span::detached()))
             .collect::<Vec<_>>();
         let (names, types) = RecordTy::shape_fields(named);
         let spread_right = rest.is_some();
 
         let name_started = if spread_right { 1 } else { 0 } + types.len();
-        let types = pos.chain(types).chain(rest).collect::<Vec<_>>();
+        let types = pos.into_iter().chain(types).chain(rest).collect::<Vec<_>>();
 
         let name_started = (types.len() - name_started) as u32;
 
@@ -538,6 +560,22 @@ impl Default for SigTy {
             has_free_variables: false,
             syntax: None,
         }
+    }
+}
+
+impl TypeInterace for SigTy {
+    fn bone(&self) -> &Interned<NameBone> {
+        &self.names
+    }
+
+    fn interface(&self) -> impl Iterator<Item = (&Interned<str>, &Ty)> {
+        let names = self.names.names.iter();
+        let types = self.types.iter().skip(self.name_started as usize);
+        names.zip(types)
+    }
+
+    fn field_by_bone_offset(&self, i: usize) -> Option<&Ty> {
+        self.types.get(i + self.name_started as usize)
     }
 }
 
@@ -575,37 +613,42 @@ impl SigTy {
     pub(crate) fn matches<'a>(
         &'a self,
         args: &'a SigTy,
-        withs: Option<&Vec<Interned<crate::analysis::SigTy>>>,
+        withs: Option<&'a Vec<Interned<crate::analysis::SigTy>>>,
     ) -> impl Iterator<Item = (&'a Ty, &'a Ty)> + 'a {
         let with_len = withs
             .map(|w| w.iter().map(|w| w.positional_params().len()).sum::<usize>())
             .unwrap_or(0);
 
-        let sig_pos = self.positional_params().skip(with_len);
+        let sig_pos = self.positional_params();
         let arg_pos = args.positional_params();
 
         let sig_rest = self.rest_param();
         let arg_rest = args.rest_param();
 
-        let max_len = sig_pos.len().max(arg_pos.len())
+        let max_len = sig_pos.len().max(with_len + arg_pos.len())
             + if sig_rest.is_some() && arg_rest.is_some() {
                 1
             } else {
                 0
             };
 
+        let arg_pos = withs
+            .into_iter()
+            .flat_map(|w| w.iter().rev().map(|w| w.positional_params()))
+            .flatten()
+            .chain(arg_pos);
+
         let sig_stream = sig_pos.chain(sig_rest.into_iter().cycle()).take(max_len);
         let arg_stream = arg_pos.chain(arg_rest.into_iter().cycle()).take(max_len);
 
         let mut pos = sig_stream.zip(arg_stream);
-        let mut named =
-            self.names
-                .intersect_keys_enumerate(&args.names)
-                .filter_map(move |(i, j)| {
-                    let lhs = self.types.get(i + self.name_started as usize)?;
-                    let rhs = args.types.get(j + args.name_started as usize)?;
-                    Some((lhs, rhs))
-                });
+        let common_ifaces = withs
+            .map(|e| e.iter().rev())
+            .into_iter()
+            .flatten()
+            .flat_map(|w| self.common_iface_fields(w))
+            .chain(self.common_iface_fields(args));
+        let mut named = common_ifaces.map(|(n, l, r)| (l, r));
 
         pos.chain(named)
     }
@@ -890,45 +933,60 @@ mod tests {
             format!("{res:?}")
         }
 
-        assert_snapshot!(matches(literal_sig!(p1), literal_sig!(q1), None), @r###"[("p1", "q1")]"###);
-        assert_snapshot!(matches(literal_sig!(p1, p2), literal_sig!(q1), None), @r###"[("p1", "q1")]"###);
-        assert_snapshot!(matches(literal_sig!(p1, p2), literal_sig!(q1, q2), None), @r###"[("p1", "q1"), ("p2", "q2")]"###);
-        assert_snapshot!(matches(literal_sig!(p1), literal_sig!(q1, q2), None), @r###"[("p1", "q1")]"###);
+        assert_snapshot!(matches(literal_sig!(p1), literal_sig!(q1), None), @"[(@p1, @q1)]");
+        assert_snapshot!(matches(literal_sig!(p1, p2), literal_sig!(q1), None), @"[(@p1, @q1)]");
+        assert_snapshot!(matches(literal_sig!(p1, p2), literal_sig!(q1, q2), None), @"[(@p1, @q1), (@p2, @q2)]");
+        assert_snapshot!(matches(literal_sig!(p1), literal_sig!(q1, q2), None), @"[(@p1, @q1)]");
 
-        assert_snapshot!(matches(literal_sig!(p1, ...r1), literal_sig!(q1), None), @r###"[("p1", "q1")]"###);
-        assert_snapshot!(matches(literal_sig!(p1, ...r1), literal_sig!(q1, q2), None), @r###"[("p1", "q1"), ("r1", "q2")]"###);
-        assert_snapshot!(matches(literal_sig!(p1, ...r1), literal_sig!(q1, q2, q3), None), @r###"[("p1", "q1"), ("r1", "q2"), ("r1", "q3")]"###);
-        assert_snapshot!(matches(literal_sig!(...r1), literal_sig!(q1, q2), None), @r###"[("r1", "q1"), ("r1", "q2")]"###);
+        assert_snapshot!(matches(literal_sig!(p1, ...r1), literal_sig!(q1), None), @"[(@p1, @q1)]");
+        assert_snapshot!(matches(literal_sig!(p1, ...r1), literal_sig!(q1, q2), None), @"[(@p1, @q1), (@r1, @q2)]");
+        assert_snapshot!(matches(literal_sig!(p1, ...r1), literal_sig!(q1, q2, q3), None), @"[(@p1, @q1), (@r1, @q2), (@r1, @q3)]");
+        assert_snapshot!(matches(literal_sig!(...r1), literal_sig!(q1, q2), None), @"[(@r1, @q1), (@r1, @q2)]");
 
-        assert_snapshot!(matches(literal_sig!(p1), literal_sig!(q1, ...s2), None), @r###"[("p1", "q1")]"###);
-        assert_snapshot!(matches(literal_sig!(p1, p2), literal_sig!(q1, ...s2), None), @r###"[("p1", "q1"), ("p2", "s2")]"###);
-        assert_snapshot!(matches(literal_sig!(p1, p2, p3), literal_sig!(q1, ...s2), None), @r###"[("p1", "q1"), ("p2", "s2"), ("p3", "s2")]"###);
-        assert_snapshot!(matches(literal_sig!(p1, p2), literal_sig!(...s2), None), @r###"[("p1", "s2"), ("p2", "s2")]"###);
+        assert_snapshot!(matches(literal_sig!(p1), literal_sig!(q1, ...s2), None), @"[(@p1, @q1)]");
+        assert_snapshot!(matches(literal_sig!(p1, p2), literal_sig!(q1, ...s2), None), @"[(@p1, @q1), (@p2, @s2)]");
+        assert_snapshot!(matches(literal_sig!(p1, p2, p3), literal_sig!(q1, ...s2), None), @"[(@p1, @q1), (@p2, @s2), (@p3, @s2)]");
+        assert_snapshot!(matches(literal_sig!(p1, p2), literal_sig!(...s2), None), @"[(@p1, @s2), (@p2, @s2)]");
 
-        assert_snapshot!(matches(literal_sig!(p1, ...r1), literal_sig!(q1, ...s2), None), @r###"[("p1", "q1"), ("r1", "s2")]"###);
-        assert_snapshot!(matches(literal_sig!(...r1), literal_sig!(q1, ...s2), None), @r###"[("r1", "q1"), ("r1", "s2")]"###);
-        assert_snapshot!(matches(literal_sig!(p1, ...r1), literal_sig!(...s2), None), @r###"[("p1", "s2"), ("r1", "s2")]"###);
-        assert_snapshot!(matches(literal_sig!(...r1), literal_sig!(...s2), None), @r###"[("r1", "s2")]"###);
+        assert_snapshot!(matches(literal_sig!(p1, ...r1), literal_sig!(q1, ...s2), None), @"[(@p1, @q1), (@r1, @s2)]");
+        assert_snapshot!(matches(literal_sig!(...r1), literal_sig!(q1, ...s2), None), @"[(@r1, @q1), (@r1, @s2)]");
+        assert_snapshot!(matches(literal_sig!(p1, ...r1), literal_sig!(...s2), None), @"[(@p1, @s2), (@r1, @s2)]");
+        assert_snapshot!(matches(literal_sig!(...r1), literal_sig!(...s2), None), @"[(@r1, @s2)]");
 
-        assert_snapshot!(matches(literal_sig!(p0, p1, ...r1), literal_sig!(q1, ...s2), None), @r###"[("p0", "q1"), ("p1", "s2"), ("r1", "s2")]"###);
-        assert_snapshot!(matches(literal_sig!(p0, p1, ...r1), literal_sig!(...s2), None), @r###"[("p0", "s2"), ("p1", "s2"), ("r1", "s2")]"###);
+        assert_snapshot!(matches(literal_sig!(p0, p1, ...r1), literal_sig!(q1, ...s2), None), @"[(@p0, @q1), (@p1, @s2), (@r1, @s2)]");
+        assert_snapshot!(matches(literal_sig!(p0, p1, ...r1), literal_sig!(...s2), None), @"[(@p0, @s2), (@p1, @s2), (@r1, @s2)]");
 
-        assert_snapshot!(matches(literal_sig!(p1, ...r1), literal_sig!(q0, q1, ...s2), None), @r###"[("p1", "q0"), ("r1", "q1"), ("r1", "s2")]"###);
-        assert_snapshot!(matches(literal_sig!(...r1), literal_sig!(q0, q1, ...s2), None), @r###"[("r1", "q0"), ("r1", "q1"), ("r1", "s2")]"###);
+        assert_snapshot!(matches(literal_sig!(p1, ...r1), literal_sig!(q0, q1, ...s2), None), @"[(@p1, @q0), (@r1, @q1), (@r1, @s2)]");
+        assert_snapshot!(matches(literal_sig!(...r1), literal_sig!(q0, q1, ...s2), None), @"[(@r1, @q0), (@r1, @q1), (@r1, @s2)]");
 
-        assert_snapshot!(matches(literal_sig!(p1 !u1: w1), literal_sig!(q1 !u1: w2), None), @r###"[("p1", "q1"), ("w1", "w2")]"###);
-        assert_snapshot!(matches(literal_sig!(p1 !u1: w1, ...r1), literal_sig!(q1 !u1: w2), None), @r###"[("p1", "q1"), ("w1", "w2")]"###);
-        assert_snapshot!(matches(literal_sig!(p1 !u1: w1), literal_sig!(q1 !u1: w2, ...s2), None), @r###"[("p1", "q1"), ("w1", "w2")]"###);
-        assert_snapshot!(matches(literal_sig!(p1 !u1: w1, ...r1), literal_sig!(q1 !u1: w2, ...s2), None), @r###"[("p1", "q1"), ("r1", "s2"), ("w1", "w2")]"###);
+        assert_snapshot!(matches(literal_sig!(p1 !u1: w1), literal_sig!(q1 !u1: w2), None), @"[(@p1, @q1), (@w1, @w2)]");
+        assert_snapshot!(matches(literal_sig!(p1 !u1: w1, ...r1), literal_sig!(q1 !u1: w2), None), @"[(@p1, @q1), (@w1, @w2)]");
+        assert_snapshot!(matches(literal_sig!(p1 !u1: w1), literal_sig!(q1 !u1: w2, ...s2), None), @"[(@p1, @q1), (@w1, @w2)]");
+        assert_snapshot!(matches(literal_sig!(p1 !u1: w1, ...r1), literal_sig!(q1 !u1: w2, ...s2), None), @"[(@p1, @q1), (@r1, @s2), (@w1, @w2)]");
 
         assert_snapshot!(matches(literal_sig!(), literal_sig!(!u1: w2), None), @"[]");
         assert_snapshot!(matches(literal_sig!(!u1: w1), literal_sig!(), None), @"[]");
-        assert_snapshot!(matches(literal_sig!(!u1: w1), literal_sig!(!u1: w2), None), @r###"[("w1", "w2")]"###);
+        assert_snapshot!(matches(literal_sig!(!u1: w1), literal_sig!(!u1: w2), None), @"[(@w1, @w2)]");
         assert_snapshot!(matches(literal_sig!(!u1: w1), literal_sig!(!u2: w2), None), @"[]");
         assert_snapshot!(matches(literal_sig!(!u2: w1), literal_sig!(!u1: w2), None), @"[]");
-        assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w3), literal_sig!(!u1: w2, !u2: w4), None), @r###"[("w1", "w2"), ("w3", "w4")]"###);
-        assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w3), literal_sig!(!u2: w2, !u1: w4), None), @r###"[("w1", "w4"), ("w3", "w2")]"###);
-        assert_snapshot!(matches(literal_sig!(!u2: w1), literal_sig!(!u1: w2, !u2: w4), None), @r###"[("w1", "w4")]"###);
-        assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w2), literal_sig!(!u2: w4), None), @r###"[("w2", "w4")]"###);
+        assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w3), literal_sig!(!u1: w2, !u2: w4), None), @"[(@w1, @w2), (@w3, @w4)]");
+        assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w3), literal_sig!(!u2: w2, !u1: w4), None), @"[(@w1, @w4), (@w3, @w2)]");
+        assert_snapshot!(matches(literal_sig!(!u2: w1), literal_sig!(!u1: w2, !u2: w4), None), @"[(@w1, @w4)]");
+        assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w2), literal_sig!(!u2: w4), None), @"[(@w2, @w4)]");
+
+        assert_snapshot!(matches(literal_sig!(p1 !u1: w1, !u2: w2), literal_sig!(q1), Some(vec![
+            literal_sig!(!u2: w6),
+        ])), @"[(@p1, @q1), (@w2, @w6)]");
+        assert_snapshot!(matches(literal_sig!(p1 !u1: w1, !u2: w2), literal_sig!(q1 !u2: w4), Some(vec![
+            literal_sig!(!u2: w5),
+        ])), @"[(@p1, @q1), (@w2, @w5), (@w2, @w4)]");
+        assert_snapshot!(matches(literal_sig!(p1 !u1: w1, !u2: w2), literal_sig!(q1 ), Some(vec![
+            literal_sig!(!u2: w7),
+            literal_sig!(!u2: w8),
+        ])), @"[(@p1, @q1), (@w2, @w8), (@w2, @w7)]");
+        assert_snapshot!(matches(literal_sig!(p1, p2, p3), literal_sig!(q1), Some(vec![
+            literal_sig!(q2),
+            literal_sig!(q3),
+        ])), @"[(@p1, @q3), (@p2, @q2), (@p3, @q1)]");
     }
 }
