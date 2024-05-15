@@ -974,16 +974,16 @@ mod tests {
         assert_snapshot!(matches(literal_sig!(!u2: w1), literal_sig!(!u1: w2, !u2: w4), None), @"[(@w1, @w4)]");
         assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w2), literal_sig!(!u2: w4), None), @"[(@w2, @w4)]");
 
-        assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w2), literal_sig!(), Some(vec![
+        assert_snapshot!(matches(literal_sig!(p1 !u1: w1, !u2: w2), literal_sig!(q1), Some(vec![
             literal_sig!(!u2: w6),
-        ])), @"[(@w2, @w6)]");
-        assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w2), literal_sig!(!u2: w4), Some(vec![
+        ])), @"[(@p1, @q1), (@w2, @w6)]");
+        assert_snapshot!(matches(literal_sig!(p1 !u1: w1, !u2: w2), literal_sig!(q1 !u2: w4), Some(vec![
             literal_sig!(!u2: w5),
-        ])), @"[(@w2, @w5), (@w2, @w4)]");
-        assert_snapshot!(matches(literal_sig!(!u1: w1, !u2: w2), literal_sig!(), Some(vec![
+        ])), @"[(@p1, @q1), (@w2, @w5), (@w2, @w4)]");
+        assert_snapshot!(matches(literal_sig!(p1 !u1: w1, !u2: w2), literal_sig!(q1 ), Some(vec![
             literal_sig!(!u2: w7),
             literal_sig!(!u2: w8),
-        ])), @"[(@w2, @w8), (@w2, @w7)]");
+        ])), @"[(@p1, @q1), (@w2, @w8), (@w2, @w7)]");
         assert_snapshot!(matches(literal_sig!(p1, p2, p3), literal_sig!(q1), Some(vec![
             literal_sig!(q2),
             literal_sig!(q3),
