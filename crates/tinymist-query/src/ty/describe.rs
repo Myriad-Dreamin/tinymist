@@ -137,22 +137,15 @@ impl TypeDescriber {
             Ty::With(w) => {
                 return self.describe(&w.sig);
             }
-            Ty::Clause => {}
-            Ty::Undef => {}
-            Ty::Content => {
+            Ty::Builtin(BuiltinTy::Content | BuiltinTy::Space) => {
                 return "content".to_string();
             }
             // Doesn't provide any information, hence we doesn't describe it intermediately here.
-            Ty::Any => {}
-            Ty::Space => {}
-            Ty::None => {
+            Ty::Any | Ty::Builtin(BuiltinTy::Clause | BuiltinTy::Undef | BuiltinTy::Infer) => {}
+            Ty::Builtin(BuiltinTy::FlowNone | BuiltinTy::None) => {
                 return "none".to_string();
             }
-            Ty::Infer => {}
-            Ty::FlowNone => {
-                return "none".to_string();
-            }
-            Ty::Auto => {
+            Ty::Builtin(BuiltinTy::Auto) => {
                 return "auto".to_string();
             }
             Ty::Boolean(None) => {

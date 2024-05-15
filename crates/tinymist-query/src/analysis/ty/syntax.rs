@@ -23,28 +23,28 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::ContentBlock => return self.check_in_mode(root, InterpretMode::Markup),
 
             // todo: space effect
-            SyntaxKind::Space => Ty::Space,
-            SyntaxKind::Parbreak => Ty::Space,
+            SyntaxKind::Space => Ty::Builtin(BuiltinTy::Space),
+            SyntaxKind::Parbreak => Ty::Builtin(BuiltinTy::Space),
 
-            SyntaxKind::Text => Ty::Content,
-            SyntaxKind::Linebreak => Ty::Content,
-            SyntaxKind::Escape => Ty::Content,
-            SyntaxKind::Shorthand => Ty::Content,
-            SyntaxKind::SmartQuote => Ty::Content,
-            SyntaxKind::Raw => Ty::Content,
-            SyntaxKind::RawLang => Ty::Content,
-            SyntaxKind::RawDelim => Ty::Content,
-            SyntaxKind::RawTrimmed => Ty::Content,
-            SyntaxKind::Link => Ty::Content,
-            SyntaxKind::Label => Ty::Content,
-            SyntaxKind::Ref => Ty::Content,
-            SyntaxKind::RefMarker => Ty::Content,
-            SyntaxKind::HeadingMarker => Ty::Content,
-            SyntaxKind::EnumMarker => Ty::Content,
-            SyntaxKind::ListMarker => Ty::Content,
-            SyntaxKind::TermMarker => Ty::Content,
-            SyntaxKind::MathAlignPoint => Ty::Content,
-            SyntaxKind::MathPrimes => Ty::Content,
+            SyntaxKind::Text => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::Linebreak => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::Escape => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::Shorthand => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::SmartQuote => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::Raw => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::RawLang => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::RawDelim => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::RawTrimmed => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::Link => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::Label => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::Ref => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::RefMarker => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::HeadingMarker => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::EnumMarker => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::ListMarker => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::TermMarker => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::MathAlignPoint => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::MathPrimes => Ty::Builtin(BuiltinTy::Content),
 
             SyntaxKind::Strong => return self.check_children(root),
             SyntaxKind::Emph => return self.check_children(root),
@@ -58,17 +58,17 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::MathFrac => return self.check_children(root),
             SyntaxKind::MathRoot => return self.check_children(root),
 
-            SyntaxKind::LoopBreak => Ty::None,
-            SyntaxKind::LoopContinue => Ty::None,
-            SyntaxKind::FuncReturn => Ty::None,
-            SyntaxKind::Error => Ty::None,
-            SyntaxKind::Eof => Ty::None,
+            SyntaxKind::LoopBreak => Ty::Builtin(BuiltinTy::None),
+            SyntaxKind::LoopContinue => Ty::Builtin(BuiltinTy::None),
+            SyntaxKind::FuncReturn => Ty::Builtin(BuiltinTy::None),
+            SyntaxKind::Error => Ty::Builtin(BuiltinTy::None),
+            SyntaxKind::Eof => Ty::Builtin(BuiltinTy::None),
 
-            SyntaxKind::None => Ty::None,
-            SyntaxKind::Auto => Ty::Auto,
-            SyntaxKind::Break => Ty::FlowNone,
-            SyntaxKind::Continue => Ty::FlowNone,
-            SyntaxKind::Return => Ty::FlowNone,
+            SyntaxKind::None => Ty::Builtin(BuiltinTy::None),
+            SyntaxKind::Auto => Ty::Builtin(BuiltinTy::Auto),
+            SyntaxKind::Break => Ty::Builtin(BuiltinTy::FlowNone),
+            SyntaxKind::Continue => Ty::Builtin(BuiltinTy::FlowNone),
+            SyntaxKind::Return => Ty::Builtin(BuiltinTy::FlowNone),
             SyntaxKind::Ident => return self.check_ident(root, InterpretMode::Code),
             SyntaxKind::MathIdent => return self.check_ident(root, InterpretMode::Math),
             SyntaxKind::Bool
@@ -103,62 +103,62 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::DestructAssignment => return self.check_destruct_assign(root),
 
             // Rest all are clauses
-            SyntaxKind::LineComment => Ty::Clause,
-            SyntaxKind::BlockComment => Ty::Clause,
-            SyntaxKind::Named => Ty::Clause,
-            SyntaxKind::Keyed => Ty::Clause,
-            SyntaxKind::Spread => Ty::Clause,
-            SyntaxKind::Params => Ty::Clause,
-            SyntaxKind::ImportItems => Ty::Clause,
-            SyntaxKind::RenamedImportItem => Ty::Clause,
-            SyntaxKind::Hash => Ty::Clause,
-            SyntaxKind::LeftBrace => Ty::Clause,
-            SyntaxKind::RightBrace => Ty::Clause,
-            SyntaxKind::LeftBracket => Ty::Clause,
-            SyntaxKind::RightBracket => Ty::Clause,
-            SyntaxKind::LeftParen => Ty::Clause,
-            SyntaxKind::RightParen => Ty::Clause,
-            SyntaxKind::Comma => Ty::Clause,
-            SyntaxKind::Semicolon => Ty::Clause,
-            SyntaxKind::Colon => Ty::Clause,
-            SyntaxKind::Star => Ty::Clause,
-            SyntaxKind::Underscore => Ty::Clause,
-            SyntaxKind::Dollar => Ty::Clause,
-            SyntaxKind::Plus => Ty::Clause,
-            SyntaxKind::Minus => Ty::Clause,
-            SyntaxKind::Slash => Ty::Clause,
-            SyntaxKind::Hat => Ty::Clause,
-            SyntaxKind::Prime => Ty::Clause,
-            SyntaxKind::Dot => Ty::Clause,
-            SyntaxKind::Eq => Ty::Clause,
-            SyntaxKind::EqEq => Ty::Clause,
-            SyntaxKind::ExclEq => Ty::Clause,
-            SyntaxKind::Lt => Ty::Clause,
-            SyntaxKind::LtEq => Ty::Clause,
-            SyntaxKind::Gt => Ty::Clause,
-            SyntaxKind::GtEq => Ty::Clause,
-            SyntaxKind::PlusEq => Ty::Clause,
-            SyntaxKind::HyphEq => Ty::Clause,
-            SyntaxKind::StarEq => Ty::Clause,
-            SyntaxKind::SlashEq => Ty::Clause,
-            SyntaxKind::Dots => Ty::Clause,
-            SyntaxKind::Arrow => Ty::Clause,
-            SyntaxKind::Root => Ty::Clause,
-            SyntaxKind::Not => Ty::Clause,
-            SyntaxKind::And => Ty::Clause,
-            SyntaxKind::Or => Ty::Clause,
-            SyntaxKind::Let => Ty::Clause,
-            SyntaxKind::Set => Ty::Clause,
-            SyntaxKind::Show => Ty::Clause,
-            SyntaxKind::Context => Ty::Clause,
-            SyntaxKind::If => Ty::Clause,
-            SyntaxKind::Else => Ty::Clause,
-            SyntaxKind::For => Ty::Clause,
-            SyntaxKind::In => Ty::Clause,
-            SyntaxKind::While => Ty::Clause,
-            SyntaxKind::Import => Ty::Clause,
-            SyntaxKind::Include => Ty::Clause,
-            SyntaxKind::As => Ty::Clause,
+            SyntaxKind::LineComment => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::BlockComment => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Named => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Keyed => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Spread => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Params => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::ImportItems => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::RenamedImportItem => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Hash => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::LeftBrace => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::RightBrace => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::LeftBracket => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::RightBracket => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::LeftParen => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::RightParen => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Comma => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Semicolon => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Colon => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Star => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Underscore => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Dollar => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Plus => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Minus => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Slash => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Hat => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Prime => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Dot => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Eq => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::EqEq => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::ExclEq => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Lt => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::LtEq => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Gt => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::GtEq => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::PlusEq => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::HyphEq => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::StarEq => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::SlashEq => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Dots => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Arrow => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Root => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Not => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::And => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Or => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Let => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Set => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Show => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Context => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::If => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Else => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::For => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::In => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::While => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Import => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::Include => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::As => Ty::Builtin(BuiltinTy::Clause),
         })
     }
 
@@ -200,7 +200,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         for elem in root.children() {
             let ty = self.check(elem);
-            if matches!(ty, Ty::Clause | Ty::Space) {
+            if matches!(ty, Ty::Builtin(BuiltinTy::Clause | BuiltinTy::Space)) {
                 continue;
             }
             elements.push(ty);
@@ -421,7 +421,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 let value = let_binding
                     .init()
                     .map(|init| self.check_expr_in(init.span(), root.clone()))
-                    .unwrap_or_else(|| Ty::Infer);
+                    .unwrap_or_else(|| Ty::Builtin(BuiltinTy::Infer));
 
                 let v = self.get_var(c.span(), to_ident_ref(&root, c)?)?;
                 self.constrain(&value, &v);
@@ -432,7 +432,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 let value = let_binding
                     .init()
                     .map(|init| self.check_expr_in(init.span(), root.clone()))
-                    .unwrap_or_else(|| Ty::Infer);
+                    .unwrap_or_else(|| Ty::Builtin(BuiltinTy::Infer));
 
                 self.check_pattern(pattern, value, root.clone());
             }
@@ -497,7 +497,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let else_ = conditional
             .else_body()
             .map(|else_body| self.check_expr_in(else_body.span(), root.clone()))
-            .unwrap_or(Ty::None);
+            .unwrap_or(Ty::Builtin(BuiltinTy::None));
 
         Some(Ty::If(IfTy::new(cond.into(), then.into(), else_.into())))
     }
@@ -526,11 +526,11 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         // check all import items
 
-        Some(Ty::None)
+        Some(Ty::Builtin(BuiltinTy::None))
     }
 
     fn check_module_include(&mut self, _root: LinkedNode<'_>) -> Option<Ty> {
-        Some(Ty::Content)
+        Some(Ty::Builtin(BuiltinTy::Content))
     }
 
     fn check_destructuring(&mut self, _root: LinkedNode<'_>) -> Option<Ty> {
@@ -538,17 +538,17 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     }
 
     fn check_destruct_assign(&mut self, _root: LinkedNode<'_>) -> Option<Ty> {
-        Some(Ty::None)
+        Some(Ty::Builtin(BuiltinTy::None))
     }
     fn check_expr_in(&mut self, span: Span, root: LinkedNode<'_>) -> Ty {
         root.find(span)
             .map(|node| self.check(node))
-            .unwrap_or(Ty::Undef)
+            .unwrap_or(Ty::Builtin(BuiltinTy::Undef))
     }
 
     fn check_pattern(&mut self, pattern: ast::Pattern<'_>, value: Ty, root: LinkedNode<'_>) -> Ty {
         self.check_pattern_(pattern, value, root)
-            .unwrap_or(Ty::Undef)
+            .unwrap_or(Ty::Builtin(BuiltinTy::Undef))
     }
 
     fn check_pattern_(

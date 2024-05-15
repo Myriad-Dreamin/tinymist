@@ -35,6 +35,8 @@ type Guard<T> = dashmap::RwLockWriteGuard<
     HashMap<Arc<T>, SharedValue<()>, BuildHasherDefault<FxHasher>>,
 >;
 
+// https://news.ycombinator.com/item?id=22220342
+
 pub struct Interned<T: Internable + ?Sized> {
     arc: Arc<T>,
 }

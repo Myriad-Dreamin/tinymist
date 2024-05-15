@@ -191,15 +191,7 @@ impl Mutator {
             Ty::Var(..)
             | Ty::Let(..)
             | Ty::Value(..)
-            | Ty::Clause
-            | Ty::Undef
-            | Ty::Content
             | Ty::Any
-            | Ty::None
-            | Ty::Infer
-            | Ty::FlowNone
-            | Ty::Space
-            | Ty::Auto
             | Ty::Boolean(..)
             | Ty::Builtin(..) => mutator.mutate(ty, pol),
         }
