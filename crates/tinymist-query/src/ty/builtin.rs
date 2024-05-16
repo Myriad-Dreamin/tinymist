@@ -11,7 +11,7 @@ use typst::{
 use crate::{adt::interner::Interned, ty::*};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub(crate) enum PathPreference {
+pub enum PathPreference {
     None,
     Special,
     Source,
@@ -84,7 +84,7 @@ impl PathPreference {
 }
 
 impl Ty {
-    pub fn from_return_site(f: &Func, c: &'_ CastInfo) -> Option<Self> {
+    pub(crate) fn from_return_site(f: &Func, c: &'_ CastInfo) -> Option<Self> {
         use typst::foundations::func::Repr;
         match f.inner() {
             Repr::Element(e) => return Some(Ty::Builtin(BuiltinTy::Element(*e))),
@@ -95,7 +95,7 @@ impl Ty {
 
         let ty = match c {
             CastInfo::Any => Ty::Any,
-            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), doc)),
+            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), *doc)),
             CastInfo::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
             CastInfo::Union(e) => {
                 // flat union
@@ -122,7 +122,7 @@ impl Ty {
 
         let ty = match &s {
             CastInfo::Any => Ty::Any,
-            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), doc)),
+            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), *doc)),
             CastInfo::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
             CastInfo::Union(e) => {
                 // flat union
@@ -159,7 +159,7 @@ impl<'a> Iterator for UnionIter<'a> {
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
-pub(crate) enum BuiltinTy {
+pub enum BuiltinTy {
     Clause,
     Undef,
     Content,

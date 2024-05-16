@@ -5,7 +5,8 @@ use typst::foundations::Repr;
 
 use crate::{adt::interner::Interned, analysis::*, ty::def::*};
 
-impl TypeCheckInfo {
+impl TypeScheme {
+    /// Describe the given type with the given type scheme.
     pub fn describe(&self, ty: &Ty) -> Option<String> {
         let mut worker = TypeDescriber::default();
         worker.describe_root(ty)
@@ -13,6 +14,7 @@ impl TypeCheckInfo {
 }
 
 impl Ty {
+    /// Describe the given type.
     pub fn describe(&self) -> Option<String> {
         let mut worker = TypeDescriber::default();
         worker.describe_root(self)
@@ -80,7 +82,7 @@ impl TypeDescriber {
             }
             res.push_str(") => ");
             res.push_str(
-                f.ret
+                f.body
                     .as_ref()
                     .and_then(|ret| self.describe_root(ret))
                     .as_deref()

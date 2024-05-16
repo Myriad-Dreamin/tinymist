@@ -143,7 +143,7 @@ impl SemanticRequest for SignatureHelpRequest {
         label.push(')');
         let ret = type_sig
             .as_ref()
-            .and_then(|sig| sig.ret.as_ref())
+            .and_then(|sig| sig.body.as_ref())
             .or_else(|| sig.primary().ret_ty.as_ref());
         if let Some(ret_ty) = ret {
             label.push_str(" -> ");

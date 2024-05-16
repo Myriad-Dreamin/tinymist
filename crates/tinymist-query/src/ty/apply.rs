@@ -5,7 +5,7 @@ use crate::{adt::interner::Interned, ty::def::*};
 use super::{Sig, SigChecker, SigSurfaceKind};
 
 pub trait ApplyChecker {
-    fn call(&mut self, sig: Sig, arguments: &Interned<ArgsTy>, pol: bool);
+    fn apply(&mut self, sig: Sig, arguments: &Interned<ArgsTy>, pol: bool);
 
     fn bound_of_var(&mut self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
         None
@@ -13,11 +13,12 @@ pub trait ApplyChecker {
 }
 
 impl Ty {
+    /// Call the given type with the given arguments.
     pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, checker: &mut impl ApplyChecker) {
         self.apply(SigSurfaceKind::Call, args, pol, checker)
     }
 
-    #[allow(dead_code)]
+    /// Get the element type of the given type.
     pub fn element_of(&self, pol: bool, checker: &mut impl ApplyChecker) {
         static EMPTY_ARGS: Lazy<Interned<ArgsTy>> = Lazy::new(|| ArgsTy::default().into());
 
@@ -46,18 +47,17 @@ impl<'a, T: ApplyChecker> ApplySigChecker<'a, T> {
 
 impl<'a, T: ApplyChecker> SigChecker for ApplySigChecker<'a, T> {
     fn check(&mut self, cano_sig: Sig, ctx: &mut super::SigCheckContext, pol: bool) -> Option<()> {
-        let args = &ctx.args;
-        let partial_sig = if args.is_empty() {
+        // Bind the arguments to the canonical signature.
+        let partial_sig = if ctx.args.is_empty() {
             cano_sig
         } else {
             Sig::With {
                 sig: &cano_sig,
-                withs: args,
+                withs: &ctx.args,
                 at: &ctx.at,
             }
         };
-
-        self.0.call(partial_sig, self.1, pol);
+        self.0.apply(partial_sig, self.1, pol);
         Some(())
     }
 

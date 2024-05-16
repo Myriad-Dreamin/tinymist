@@ -13,7 +13,7 @@ mod subst;
 pub(crate) use apply::*;
 pub(crate) use bound::*;
 pub(crate) use builtin::*;
-pub(crate) use def::*;
+pub use def::*;
 pub(crate) use mutate::*;
 pub(crate) use sig::*;
 

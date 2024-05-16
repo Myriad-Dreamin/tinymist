@@ -42,7 +42,7 @@ impl<'a> Sig<'a> {
             }
         }
 
-        Some((arguments, sig.ret.clone()))
+        Some((arguments, sig.body.clone()))
     }
 }
 
@@ -96,7 +96,7 @@ mod tests {
     struct CallCollector(Vec<Ty>);
 
     impl ApplyChecker for CallCollector {
-        fn call(
+        fn apply(
             &mut self,
             sig: super::Sig,
             arguments: &crate::adt::interner::Interned<super::ArgsTy>,

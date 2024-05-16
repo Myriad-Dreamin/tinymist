@@ -90,6 +90,7 @@ where
 }
 
 impl Ty {
+    /// Iterate over the signatures of the given type.
     pub fn sig_surface(&self, pol: bool, sig_kind: SigSurfaceKind, checker: &mut impl SigChecker) {
         let context = SigCheckContext {
             sig_kind,
@@ -104,6 +105,7 @@ impl Ty {
         worker.ty(self, pol);
     }
 
+    /// Get the signature representation of the given type.
     pub fn sig_repr(&self, pol: bool) -> Option<Interned<SigTy>> {
         // todo: union sig
         // let mut pos = vec![];
@@ -248,7 +250,7 @@ impl BoundChecker for SigCheckDriver<'_> {
     }
 }
 
-struct MethodDriver<'a, 'b>(&'a mut SigCheckDriver<'b>, &'a Interned<str>);
+struct MethodDriver<'a, 'b>(&'a mut SigCheckDriver<'b>, &'a StrRef);
 
 impl<'a, 'b> MethodDriver<'a, 'b> {
     fn is_binder(&self) -> bool {

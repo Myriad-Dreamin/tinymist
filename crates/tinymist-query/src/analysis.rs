@@ -34,7 +34,7 @@ mod type_check_tests {
     use crate::analysis::ty;
     use crate::tests::*;
 
-    use super::{Ty, TypeCheckInfo};
+    use super::{Ty, TypeScheme};
 
     #[test]
     fn test() {
@@ -51,7 +51,7 @@ mod type_check_tests {
         });
     }
 
-    struct TypeCheckSnapshot<'a>(&'a Source, &'a TypeCheckInfo);
+    struct TypeCheckSnapshot<'a>(&'a Source, &'a TypeScheme);
 
     impl fmt::Debug for TypeCheckSnapshot<'_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

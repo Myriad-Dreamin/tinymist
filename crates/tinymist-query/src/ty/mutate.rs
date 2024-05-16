@@ -32,17 +32,21 @@ pub trait MutateDriver {
     }
 
     fn mutate_func(&mut self, ty: &Interned<SigTy>, pol: bool) -> Option<SigTy> {
-        let types = self.mutate_vec(&ty.types, pol);
-        let ret = self.mutate_option(ty.ret.as_ref(), pol);
+        let types = self.mutate_vec(&ty.inputs, pol);
+        let ret = self.mutate_option(ty.body.as_ref(), pol);
 
         if types.is_none() && ret.is_none() {
             return None;
         }
 
         let sig = ty.as_ref().clone();
-        let types = types.unwrap_or_else(|| ty.types.clone());
-        let ret = ret.unwrap_or_else(|| ty.ret.clone());
-        Some(SigTy { types, ret, ..sig })
+        let types = types.unwrap_or_else(|| ty.inputs.clone());
+        let ret = ret.unwrap_or_else(|| ty.body.clone());
+        Some(SigTy {
+            inputs: types,
+            body: ret,
+            ..sig
+        })
     }
 
     fn mutate_record(&mut self, ty: &Interned<RecordTy>, pol: bool) -> Option<RecordTy> {
@@ -127,6 +131,7 @@ where
 }
 
 impl Ty {
+    /// Mutate the given type.
     pub fn mutate(&self, pol: bool, checker: &mut impl MutateDriver) -> Option<Ty> {
         let mut worker = Mutator;
         worker.ty(self, pol, checker)

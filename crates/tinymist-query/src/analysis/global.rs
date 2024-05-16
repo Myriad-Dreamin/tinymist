@@ -26,7 +26,7 @@ use typst::{layout::Position, syntax::FileId as TypstFileId};
 
 use super::{
     analyze_bib, post_type_check, BibInfo, DefUseInfo, DefinitionLink, IdentRef, ImportInfo,
-    PathPreference, SigTy, Signature, SignatureTarget, Ty, TypeCheckInfo,
+    PathPreference, SigTy, Signature, SignatureTarget, Ty, TypeScheme,
 };
 use crate::adt::interner::Interned;
 use crate::analysis::analyze_dyn_signature;
@@ -49,7 +49,7 @@ pub struct ModuleAnalysisCache {
     source: OnceCell<FileResult<Source>>,
     import_info: OnceCell<Option<Arc<ImportInfo>>>,
     def_use: OnceCell<Option<Arc<DefUseInfo>>>,
-    type_check: OnceCell<Option<Arc<TypeCheckInfo>>>,
+    type_check: OnceCell<Option<Arc<TypeScheme>>>,
     bibliography: OnceCell<Option<Arc<BibInfo>>>,
 }
 
@@ -93,15 +93,15 @@ impl ModuleAnalysisCache {
     }
 
     /// Try to get the type check information of a file.
-    pub(crate) fn type_check(&self) -> Option<Arc<TypeCheckInfo>> {
+    pub(crate) fn type_check(&self) -> Option<Arc<TypeScheme>> {
         self.type_check.get().cloned().flatten()
     }
 
     /// Compute the type check information of a file.
     pub(crate) fn compute_type_check(
         &self,
-        f: impl FnOnce() -> Option<Arc<TypeCheckInfo>>,
-    ) -> Option<Arc<TypeCheckInfo>> {
+        f: impl FnOnce() -> Option<Arc<TypeScheme>>,
+    ) -> Option<Arc<TypeScheme>> {
         self.type_check.get_or_init(f).clone()
     }
 
@@ -308,7 +308,7 @@ impl<Inputs, Output> ComputingNode<Inputs, Output> {
 #[allow(clippy::type_complexity)]
 pub struct ModuleAnalysisGlobalCache {
     def_use_lexical_hierarchy: ComputingNode<Source, EcoVec<LexicalHierarchy>>,
-    type_check: Arc<ComputingNode<Source, Arc<TypeCheckInfo>>>,
+    type_check: Arc<ComputingNode<Source, Arc<TypeScheme>>>,
     def_use: Arc<ComputingNode<(EcoVec<LexicalHierarchy>, Arc<ImportInfo>), Arc<DefUseInfo>>>,
 
     bibliography: Arc<ComputingNode<EcoVec<(TypstFileId, Bytes)>, Arc<BibInfo>>>,
@@ -670,7 +670,7 @@ impl<'w> AnalysisContext<'w> {
     }
 
     /// Get the type check information of a source file.
-    pub(crate) fn type_check(&mut self, source: Source) -> Option<Arc<TypeCheckInfo>> {
+    pub(crate) fn type_check(&mut self, source: Source) -> Option<Arc<TypeScheme>> {
         let fid = source.id();
 
         if let Some(res) = self.caches.modules.entry(fid).or_default().type_check() {

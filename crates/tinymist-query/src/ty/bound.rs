@@ -17,10 +17,12 @@ where
 }
 
 impl Ty {
+    /// Check if the given type has bounds (is combinated).
     pub fn has_bounds(&self) -> bool {
         matches!(self, Ty::Union(_) | Ty::Let(_) | Ty::Var(_))
     }
 
+    /// Profile the bounds of the given type.
     pub fn bounds(&self, pol: bool, checker: &mut impl BoundChecker) {
         let mut worker = BoundCheckContext;
         worker.ty(self, pol, checker);
