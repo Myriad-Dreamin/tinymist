@@ -96,7 +96,7 @@ mod tests {
     struct CallCollector(Vec<Ty>);
 
     impl ApplyChecker for CallCollector {
-        fn call(
+        fn apply(
             &mut self,
             sig: super::Sig,
             arguments: &crate::adt::interner::Interned<super::ArgsTy>,

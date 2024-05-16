@@ -1,6 +1,6 @@
 //! Name Convention:
-//! - TypeXXX: abstracted types or clauses
-//! - XXTy: concrete types
+//! - `TypeXXX`: abstracted types or clauses
+//! - `XXTy`: concrete types
 
 use core::fmt;
 use std::{
@@ -657,7 +657,7 @@ impl SigTy {
         }
     }
 
-    /// Matches the function type with the given arguments
+    /// Match the function type with the given arguments
     pub fn matches<'a>(
         &'a self,
         args: &'a SigTy,

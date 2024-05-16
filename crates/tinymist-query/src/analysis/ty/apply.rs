@@ -29,7 +29,7 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
             .map(|v| v.bounds.bounds().read().clone())
     }
 
-    fn call(&mut self, sig: Sig, args: &Interned<ArgsTy>, pol: bool) {
+    fn apply(&mut self, sig: Sig, args: &Interned<ArgsTy>, pol: bool) {
         let _ = self.args;
 
         let (sig, is_partialize) = match sig {
