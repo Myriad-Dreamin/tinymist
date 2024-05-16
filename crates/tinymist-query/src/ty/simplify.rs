@@ -17,7 +17,8 @@ struct CompactTy {
     is_final: bool,
 }
 
-impl TypeCheckInfo {
+impl TypeScheme {
+    /// Simplify (Canonicalize) the given type with the given type scheme.
     pub fn simplify(&self, ty: Ty, principal: bool) -> Ty {
         let mut c = self.cano_cache.lock();
         let c = &mut *c;
@@ -94,7 +95,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 for p in f.inputs() {
                     self.analyze(p, !pol);
                 }
-                if let Some(ret) = &f.ret {
+                if let Some(ret) = &f.body {
                     self.analyze(ret, pol);
                 }
             }
@@ -124,7 +125,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             }
             Ty::Unary(u) => self.analyze(&u.lhs, pol),
             Ty::Binary(b) => {
-                let (lhs, rhs) = b.repr();
+                let [lhs, rhs] = b.operands();
                 self.analyze(lhs, pol);
                 self.analyze(rhs, pol);
             }
@@ -203,7 +204,7 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
             Ty::Args(args) => Ty::Args(self.transform_sig(args, !pol)),
             Ty::Unary(u) => Ty::Unary(TypeUnary::new(u.op, self.transform(&u.lhs, pol).into())),
             Ty::Binary(b) => {
-                let (lhs, rhs) = b.repr();
+                let [lhs, rhs] = b.operands();
                 let lhs = self.transform(lhs, pol);
                 let rhs = self.transform(rhs, pol);
 
@@ -272,9 +273,9 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
 
     fn transform_sig(&mut self, sig: &SigTy, pol: bool) -> Interned<SigTy> {
         let mut sig = sig.clone();
-        sig.types = self.transform_seq(&sig.types, !pol);
-        if let Some(ret) = &sig.ret {
-            sig.ret = Some(self.transform(ret, pol));
+        sig.inputs = self.transform_seq(&sig.inputs, !pol);
+        if let Some(ret) = &sig.body {
+            sig.body = Some(self.transform(ret, pol));
         }
 
         // todo: we can reduce one clone by early compare on sig.types

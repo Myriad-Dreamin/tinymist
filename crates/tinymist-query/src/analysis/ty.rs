@@ -13,7 +13,7 @@ use typst::{
 };
 
 use crate::analysis::{Ty, *};
-use crate::{analysis::TypeCheckInfo, ty::TypeInterace, AnalysisContext};
+use crate::{analysis::TypeScheme, ty::TypeInterface, AnalysisContext};
 
 use super::{
     resolve_global_value, BuiltinTy, DefUseInfo, FlowVarKind, IdentRef, TypeBounds, TypeVar,
@@ -28,8 +28,8 @@ pub(crate) use apply::*;
 pub(crate) use post_check::*;
 
 /// Type checking at the source unit level.
-pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Arc<TypeCheckInfo>> {
-    let mut info = TypeCheckInfo::default();
+pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Arc<TypeScheme>> {
+    let mut info = TypeScheme::default();
 
     // Retrieve def-use information for the source.
     let def_use_info = ctx.def_use(source.clone())?;
@@ -64,7 +64,7 @@ struct TypeChecker<'a, 'w> {
     source: Source,
     def_use_info: Arc<DefUseInfo>,
 
-    info: &'a mut TypeCheckInfo,
+    info: &'a mut TypeScheme,
     externals: HashMap<DefId, Option<Ty>>,
     mode: InterpretMode,
 }
@@ -98,7 +98,6 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     TypeVar {
                         name: r.name.as_str().into(),
                         def: def_id,
-                        syntax: None,
                     },
                     init_expr,
                 ),
@@ -106,7 +105,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         }
 
         let var = self.info.vars.get_mut(&def_id).unwrap();
-        TypeCheckInfo::witness_(s, var.as_type(), &mut self.info.mapping);
+        TypeScheme::witness_(s, var.as_type(), &mut self.info.mapping);
         Some(var.as_type())
     }
 
@@ -250,7 +249,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 }
             }
             (Ty::Dict(lhs), Ty::Dict(rhs)) => {
-                for (key, lhs, rhs) in lhs.intersect_keys(rhs) {
+                for (key, lhs, rhs) in lhs.common_iface_fields(rhs) {
                     log::debug!("constrain record item {key} {lhs:?} ⪯ {rhs:?}");
                     self.constrain(lhs, rhs);
                     // if !sl.is_detached() {
@@ -280,7 +279,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
             (Ty::Value(lhs), rhs) => {
                 log::debug!("constrain value {lhs:?} ⪯ {rhs:?}");
-                let _ = TypeCheckInfo::witness_at_most;
+                let _ = TypeScheme::witness_at_most;
                 // if !lhs.1.is_detached() {
                 //     self.info.witness_at_most(lhs.1, rhs.clone());
                 // }
@@ -402,7 +401,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 self.weaken(&v.lhs);
             }
             Ty::Binary(v) => {
-                let (lhs, rhs) = v.repr();
+                let [lhs, rhs] = v.operands();
                 self.weaken(lhs);
                 self.weaken(rhs);
             }

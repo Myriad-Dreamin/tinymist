@@ -13,11 +13,12 @@ pub trait ApplyChecker {
 }
 
 impl Ty {
+    /// Call the given type with the given arguments.
     pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, checker: &mut impl ApplyChecker) {
         self.apply(SigSurfaceKind::Call, args, pol, checker)
     }
 
-    #[allow(dead_code)]
+    /// Get the element type of the given type.
     pub fn element_of(&self, pol: bool, checker: &mut impl ApplyChecker) {
         static EMPTY_ARGS: Lazy<Interned<ArgsTy>> = Lazy::new(|| ArgsTy::default().into());
 

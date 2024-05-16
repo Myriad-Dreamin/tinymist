@@ -42,7 +42,7 @@ impl<'a> Sig<'a> {
             }
         }
 
-        Some((arguments, sig.ret.clone()))
+        Some((arguments, sig.body.clone()))
     }
 }
 

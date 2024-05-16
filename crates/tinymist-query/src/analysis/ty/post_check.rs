@@ -15,13 +15,13 @@ use crate::{
     AnalysisContext,
 };
 
-use super::{FieldTy, SigShape, Ty, TypeCheckInfo};
+use super::{FieldTy, SigShape, Ty, TypeScheme};
 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.
 pub(crate) fn post_type_check(
     _ctx: &mut AnalysisContext,
-    info: &TypeCheckInfo,
+    info: &TypeScheme,
     node: LinkedNode,
 ) -> Option<Ty> {
     let mut worker = PostTypeCheckWorker {
@@ -108,7 +108,7 @@ fn check_signature<'a>(
 struct PostTypeCheckWorker<'a, 'w> {
     ctx: &'a mut AnalysisContext<'w>,
     checked: HashMap<Span, Option<Ty>>,
-    info: &'a TypeCheckInfo,
+    info: &'a TypeScheme,
 }
 
 impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
