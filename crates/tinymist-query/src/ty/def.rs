@@ -1,17 +1,18 @@
 //! Name Convention:
-//! TypeXXX: abstracted types or clauses
-//! XXTy: concrete types
+//! - TypeXXX: abstracted types or clauses
+//! - XXTy: concrete types
 
 use core::fmt;
-use ecow::EcoVec;
-use once_cell::sync::OnceCell;
-use parking_lot::{Mutex, RwLock};
-use reflexo::vector::ir::DefId;
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     hash::{Hash, Hasher},
     sync::Arc,
 };
+
+use ecow::EcoVec;
+use once_cell::sync::OnceCell;
+use parking_lot::{Mutex, RwLock};
+use reflexo::vector::ir::DefId;
 use typst::{
     foundations::Value,
     syntax::{ast, Span, SyntaxKind, SyntaxNode},
@@ -723,7 +724,7 @@ impl fmt::Debug for SigTy {
 /// A function argument type
 pub type ArgsTy = SigTy;
 
-/// A type with applied arguments
+/// A type with partially applied arguments
 #[derive(Hash, Clone, PartialEq, Eq)]
 pub struct SigWithTy {
     /// The signature of the function
@@ -776,15 +777,20 @@ pub enum UnaryOp {
     /// The (arithmetic) negate operation
     /// `-t`
     Neg,
-    /// The not operation
+    /// The (logical) not operation
+    /// `not t`
     Not,
     /// The typst context operation
+    /// `context t`
     Context,
     /// The not element of operation
+    /// `not in t`
     NotElementOf,
     /// The element of operation
+    /// `in t`
     ElementOf,
     /// The type of operation
+    /// `type(t)`
     TypeOf,
 }
 
@@ -837,6 +843,7 @@ impl TypeBinary {
 }
 
 /// A conditional type
+/// `if t1 then t2 else t3`
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct IfTy {
     /// The condition
