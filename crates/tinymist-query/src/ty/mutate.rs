@@ -142,63 +142,27 @@ struct Mutator;
 
 impl Mutator {
     fn ty(&mut self, ty: &Ty, pol: bool, mutator: &mut impl MutateDriver) -> Option<Ty> {
+        use Ty::*;
         match ty {
-            Ty::Func(f) => {
-                let f = mutator.mutate_func(f, pol)?;
-                Some(Ty::Func(f.into()))
-            }
-            Ty::Dict(r) => {
-                let r = mutator.mutate_record(r, pol)?;
-                Some(Ty::Dict(r.into()))
-            }
-            Ty::Tuple(e) => {
-                let e = mutator.mutate_vec(e, pol)?;
-                Some(Ty::Tuple(e))
-            }
-            Ty::Array(e) => {
-                let ty = mutator.mutate(e, pol)?;
-                Some(Ty::Array(ty.into()))
-            }
-            Ty::With(w) => {
-                let w = mutator.mutate_with_sig(w, pol)?;
-                Some(Ty::With(w.into()))
-            }
-            Ty::Args(args) => {
-                let args = mutator.mutate_func(args, pol)?;
-                Some(Ty::Args(args.into()))
-            }
-            Ty::Unary(u) => {
-                let u = mutator.mutate_unary(u, pol)?;
-                Some(Ty::Unary(u.into()))
-            }
-            Ty::Binary(b) => {
-                let b = mutator.mutate_binary(b, pol)?;
-                Some(Ty::Binary(b.into()))
-            }
-            Ty::If(i) => {
-                let i = mutator.mutate_if(i, pol)?;
-                Some(Ty::If(i.into()))
-            }
-            Ty::Union(v) => {
-                let v = mutator.mutate_vec(v, pol)?;
-                Some(Ty::Union(v))
-            }
-            Ty::Field(f) => {
+            Value(..) | Any | Boolean(..) | Builtin(..) => mutator.mutate(ty, pol),
+            Union(v) => Some(Union(mutator.mutate_vec(v, pol)?)),
+            Var(..) | Let(..) => mutator.mutate(ty, pol),
+            Array(e) => Some(Array(mutator.mutate(e, pol)?.into())),
+            Dict(r) => Some(Dict(mutator.mutate_record(r, pol)?.into())),
+            Tuple(e) => Some(Tuple(mutator.mutate_vec(e, pol)?)),
+            Func(f) => Some(Func(mutator.mutate_func(f, pol)?.into())),
+            Args(args) => Some(Args(mutator.mutate_func(args, pol)?.into())),
+            Field(f) => {
                 let field = f.field.mutate(pol, mutator)?;
                 let mut f = f.as_ref().clone();
                 f.field = field;
-                Some(Ty::Field(f.into()))
+                Some(Field(f.into()))
             }
-            Ty::Select(s) => {
-                let s = mutator.mutate_select(s, pol)?;
-                Some(Ty::Select(s.into()))
-            }
-            Ty::Var(..)
-            | Ty::Let(..)
-            | Ty::Value(..)
-            | Ty::Any
-            | Ty::Boolean(..)
-            | Ty::Builtin(..) => mutator.mutate(ty, pol),
+            Select(s) => Some(Select(mutator.mutate_select(s, pol)?.into())),
+            With(w) => Some(With(mutator.mutate_with_sig(w, pol)?.into())),
+            Unary(u) => Some(Unary(mutator.mutate_unary(u, pol)?.into())),
+            Binary(b) => Some(Binary(mutator.mutate_binary(b, pol)?.into())),
+            If(i) => Some(If(mutator.mutate_if(i, pol)?.into())),
         }
     }
 }
