@@ -14,4 +14,11 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    esbuildOptions: {
+      loader: {
+        ".onnx": "dataurl",
+      },
+    }
+  }
 });
