@@ -138,7 +138,7 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'
         }
 
         // Get the trivia text before the cursor.
-        let pref = node.text();
+        let pref = node.text().as_bytes();
         let pref = if node.range().contains(&cursor) {
             &pref[..cursor - node.offset()]
         } else {
@@ -146,8 +146,10 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'
         };
 
         // The deref target should be on the same line as the cursor.
+        // Assuming the underlying text is utf-8 encoded, we can check for newlines by
+        // looking for b'\n'.
         // todo: if we are in markup mode, we should check if we are at start of node
-        !pref.contains('\n')
+        !pref.contains(&b'\n')
     }
 
     // Move to the first non-trivia node before the cursor.
