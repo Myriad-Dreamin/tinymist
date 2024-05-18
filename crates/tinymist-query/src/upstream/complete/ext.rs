@@ -698,7 +698,7 @@ fn type_completion(
         }
     }
 
-    log::info!("type_completion: {:?}", infer_type);
+    log::debug!("type_completion: {:?}", infer_type);
 
     match infer_type? {
         Ty::Any => return None,
@@ -1113,7 +1113,7 @@ pub fn complete_path(
         rng = cursor..cursor;
         is_in_text = false;
     }
-    log::info!("complete_path: is_in_text: {is_in_text:?}");
+    log::debug!("complete_path: is_in_text: {is_in_text:?}");
     let path = Path::new(text.as_str());
     let has_root = path.has_root();
 
