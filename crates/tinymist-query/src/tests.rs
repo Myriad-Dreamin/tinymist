@@ -8,9 +8,12 @@ use std::{
 use once_cell::sync::Lazy;
 pub use serde::Serialize;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
-use typst::syntax::{
-    ast::{self, AstNode},
-    FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath,
+use typst::{
+    diag::FileResult,
+    syntax::{
+        ast::{self, AstNode},
+        FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath,
+    },
 };
 use typst::{diag::PackageError, foundations::Bytes};
 use typst_ts_compiler::{
@@ -43,7 +46,10 @@ impl<'a> AnalysisResources for WrapWorld<'a> {
         self.0.registry.resolve(spec)
     }
 
-    fn iter_dependencies(&self, f: &mut dyn FnMut(&reflexo::ImmutPath, typst_ts_compiler::Time)) {
+    fn iter_dependencies<'b>(
+        &'b self,
+        f: &mut dyn FnMut(&'b reflexo::ImmutPath, FileResult<&typst_ts_compiler::Time>),
+    ) {
         self.0.iter_dependencies(f)
     }
 }
