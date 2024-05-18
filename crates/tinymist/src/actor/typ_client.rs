@@ -42,7 +42,7 @@ use tinymist_query::{
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{mpsc, oneshot, watch};
 use typst::{
-    diag::{PackageError, SourceDiagnostic, SourceResult},
+    diag::{FileResult, PackageError, SourceDiagnostic, SourceResult},
     layout::Position,
     model::Document as TypstDocument,
     syntax::package::PackageSpec,
@@ -242,7 +242,10 @@ impl CompileDriver {
                 self.0.registry.resolve(spec)
             }
 
-            fn iter_dependencies(&self, f: &mut dyn FnMut(&ImmutPath, Time)) {
+            fn iter_dependencies<'b>(
+                &'b self,
+                f: &mut dyn FnMut(&'b ImmutPath, FileResult<&Time>),
+            ) {
                 use typst_ts_compiler::NotifyApi;
                 self.0.iter_dependencies(f)
             }
