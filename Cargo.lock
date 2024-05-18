@@ -3743,7 +3743,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.11.8"
+version = "0.11.9"
 dependencies = [
  "insta",
  "lsp-server",
@@ -3840,7 +3840,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.11.8"
+version = "0.11.9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3891,7 +3891,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.11.8"
+version = "0.11.9"
 dependencies = [
  "anyhow",
  "biblatex",
@@ -3935,7 +3935,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.11.8"
+version = "0.11.9"
 dependencies = [
  "base64 0.22.1",
  "log",
