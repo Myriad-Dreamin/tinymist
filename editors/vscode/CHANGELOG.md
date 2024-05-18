@@ -4,6 +4,62 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.9 - [2024-05-18]
+
+* Bumped typst to 0.11.1 in https://github.com/Myriad-Dreamin/tinymist/pull/301
+* Bumped to typstyle v0.11.21 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/303
+* Upgraded rust and set MSRV to 1.75 in https://github.com/Myriad-Dreamin/tinymist/pull/261
+
+* Documented overview of tinymist in https://github.com/Myriad-Dreamin/tinymist/pull/274, https://github.com/Myriad-Dreamin/tinymist/pull/276, and https://github.com/Myriad-Dreamin/tinymist/pull/295
+
+### Editor
+
+* (Fix) Implicitly focusing entry on no focus request sent in https://github.com/Myriad-Dreamin/tinymist/pull/262
+* Linking documentation to typst.zed for zed users in https://github.com/Myriad-Dreamin/tinymist/pull/268
+
+### Compiler
+
+* (Fix) Corrected order of def-and-use for named params in https://github.com/Myriad-Dreamin/tinymist/pull/281
+
+### AST Matchers
+
+* (Fix) Searching newline character in utf-8 bytes sequence with tolerating unaligned access in https://github.com/Myriad-Dreamin/tinymist/pull/299
+* (Fix) Gets targets to check or deref without skip trivia node in non-code context in https://github.com/Myriad-Dreamin/tinymist/pull/289
+* (Fix) Determining `is_set` for checking targets in https://github.com/Myriad-Dreamin/tinymist/pull/286
+
+### Commands/Tools
+
+* Resolved symbols for Symbol View Tool in compile-based approach in https://github.com/Myriad-Dreamin/tinymist/pull/269
+  * It is more robust and flexible than the previous approach.
+
+### Completion
+
+* (Fix) properly stops call expressions in https://github.com/Myriad-Dreamin/tinymist/pull/273
+* (Fix) completion path with ctx.leaf in https://github.com/Myriad-Dreamin/tinymist/pull/282
+* (Fix) filter unsettable params when making a set rule in https://github.com/Myriad-Dreamin/tinymist/pull/287
+* Removed literal themselves for completion in https://github.com/Myriad-Dreamin/tinymist/pull/291
+  - e.g. `#let x = (1.);`. it was completing `1.0`, which is funny.
+* Completing both open and closed labels in https://github.com/Myriad-Dreamin/tinymist/pull/302
+
+### Signature Help
+
+* (Fix) Matching labels in signature help correctly in https://github.com/Myriad-Dreamin/tinymist/pull/288
+
+### Code Action
+
+* Added simple code actions to manipulate equations in https://github.com/Myriad-Dreamin/tinymist/pull/258
+
+### Formatting
+
+* Fixed suffix computation by @QuarticCat in https://github.com/Myriad-Dreamin/tinymist/pull/263
+
+### Misc
+
+* Installing detypify service from npm in https://github.com/Myriad-Dreamin/tinymist/pull/275 and https://github.com/Myriad-Dreamin/tinymist/pull/277
+* Implemented naive substitution for types (β-reduction) in https://github.com/Myriad-Dreamin/tinymist/pull/292
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.8...v0.11.9
+
 ## v0.11.8 - [2024-05-07]
 
 ### Hover
