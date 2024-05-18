@@ -40,10 +40,10 @@ pub fn autocomplete(
     mut ctx: CompletionContext,
 ) -> Option<(usize, bool, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
     let _ = complete_comments(&mut ctx)
+        || complete_labels(&mut ctx)
         || complete_type(&mut ctx).is_none() && {
             log::info!("continue after completing type");
             complete_field_accesses(&mut ctx)
-                || complete_open_labels(&mut ctx)
                 || complete_imports(&mut ctx)
                 || complete_rules(&mut ctx)
                 || complete_params(&mut ctx)
@@ -480,10 +480,12 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
     }
 }
 
-/// Complete half-finished labels.
-fn complete_open_labels(ctx: &mut CompletionContext) -> bool {
+/// Complete labels.
+fn complete_labels(ctx: &mut CompletionContext) -> bool {
     // A label anywhere in code: "(<la|".
-    if ctx.leaf.kind().is_error() && ctx.leaf.text().starts_with('<') {
+    if (ctx.leaf.kind().is_error() && ctx.leaf.text().starts_with('<'))
+        || ctx.leaf.kind() == SyntaxKind::Label
+    {
         ctx.from = ctx.leaf.offset() + 1;
         ctx.label_completions();
         return true;
