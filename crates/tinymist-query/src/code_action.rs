@@ -1,5 +1,6 @@
 use lsp_types::TextEdit;
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
+use regex::Regex;
 
 use crate::{prelude::*, SemanticRequest};
 
@@ -167,6 +168,7 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
 
         let body = node.find(body.span())?;
         let body_range = body.range();
+        let node_end = node.range().end;
 
         let mut chs = node.children();
         let chs = chs.by_ref();
@@ -186,20 +188,66 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
             .ctx
             .to_lsp_range(body_range.end..last_dollar.range().start, &self.current);
 
+        // Retrive punctuation to move
+        let mark_after_equation = self
+            .current
+            .text()
+            .get(node_end..)
+            .and_then(|text| {
+                let mut ch = text.chars();
+                let nx = ch.next()?;
+                Some((nx, ch.next()))
+            })
+            .filter(|(ch, ch_next)| {
+                static IS_PUNCTUATION: Lazy<Regex> =
+                    Lazy::new(|| Regex::new(r"\p{Punctuation}").unwrap());
+                (ch.is_ascii_punctuation()
+                    && ch_next.map_or(true, |ch_next| !ch_next.is_ascii_punctuation()))
+                    || (!ch.is_ascii_punctuation() && IS_PUNCTUATION.is_match(&ch.to_string()))
+            });
+        let punc_modify = if let Some((nx, _)) = mark_after_equation {
+            let ch_range = self
+                .ctx
+                .to_lsp_range(node_end..node_end + nx.len_utf8(), &self.current);
+            let remove_edit = TextEdit {
+                range: ch_range,
+                new_text: "".to_owned(),
+            };
+            Some((nx, remove_edit))
+        } else {
+            None
+        };
+
         let rewrite_action = |title: &str, new_text: &str| {
+            let mut edits = vec![
+                TextEdit {
+                    range: front_range,
+                    new_text: new_text.to_owned(),
+                },
+                TextEdit {
+                    range: back_range,
+                    new_text: if !new_text.is_empty() {
+                        if let Some((ch, _)) = &punc_modify {
+                            ch.to_string() + new_text
+                        } else {
+                            new_text.to_owned()
+                        }
+                    } else {
+                        "".to_owned()
+                    },
+                },
+            ];
+
+            if !new_text.is_empty() {
+                if let Some((_, edit)) = &punc_modify {
+                    edits.push(edit.clone());
+                }
+            }
+
             Some(CodeActionOrCommand::CodeAction(CodeAction {
                 title: title.to_owned(),
                 kind: Some(CodeActionKind::REFACTOR_REWRITE),
-                edit: Some(self.local_edits(vec![
-                    TextEdit {
-                        range: front_range,
-                        new_text: new_text.to_owned(),
-                    },
-                    TextEdit {
-                        range: back_range,
-                        new_text: new_text.to_owned(),
-                    },
-                ])?),
+                edit: Some(self.local_edits(edits)?),
                 ..CodeAction::default()
             }))
         };
