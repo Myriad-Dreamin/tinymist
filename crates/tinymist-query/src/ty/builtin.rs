@@ -21,6 +21,7 @@ pub enum PathPreference {
     Yaml,
     Xml,
     Toml,
+    Csl,
     Bibliography,
     RawTheme,
     RawSyntax,
@@ -45,6 +46,7 @@ impl PathPreference {
         static CSV_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^csv$"]).unwrap());
         static BIB_REGSET: Lazy<RegexSet> =
             Lazy::new(|| RegexSet::new([r"^yaml$", r"^yml$", r"^bib$"]).unwrap());
+        static CSL_REGSET: Lazy<RegexSet> = Lazy::new(|| RegexSet::new([r"^csl$"]).unwrap());
         static RAW_THEME_REGSET: Lazy<RegexSet> =
             Lazy::new(|| RegexSet::new([r"^tmTheme$", r"^xml$"]).unwrap());
         static RAW_SYNTAX_REGSET: Lazy<RegexSet> =
@@ -60,6 +62,7 @@ impl PathPreference {
                 let patterns = patterns.chain(TOML_REGSET.patterns());
                 let patterns = patterns.chain(CSV_REGSET.patterns());
                 let patterns = patterns.chain(BIB_REGSET.patterns());
+                let patterns = patterns.chain(CSL_REGSET.patterns());
                 let patterns = patterns.chain(RAW_THEME_REGSET.patterns());
                 patterns.chain(RAW_SYNTAX_REGSET.patterns())
             })
@@ -76,6 +79,7 @@ impl PathPreference {
             PathPreference::Yaml => &YAML_REGSET,
             PathPreference::Xml => &XML_REGSET,
             PathPreference::Toml => &TOML_REGSET,
+            PathPreference::Csl => &CSL_REGSET,
             PathPreference::Bibliography => &BIB_REGSET,
             PathPreference::RawTheme => &RAW_THEME_REGSET,
             PathPreference::RawSyntax => &RAW_SYNTAX_REGSET,
@@ -84,6 +88,32 @@ impl PathPreference {
 }
 
 impl Ty {
+    pub(crate) fn from_cast_info(s: &CastInfo) -> Ty {
+        match &s {
+            CastInfo::Any => Ty::Any,
+            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), *doc)),
+            CastInfo::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
+            CastInfo::Union(e) => {
+                Ty::iter_union(UnionIter(vec![e.as_slice().iter()]).map(Self::from_cast_info))
+            }
+        }
+    }
+
+    pub(crate) fn from_param_site(f: &Func, p: &ParamInfo) -> Option<Ty> {
+        use typst::foundations::func::Repr;
+        match f.inner() {
+            Repr::Element(..) | Repr::Native(..) => {
+                if let Some(ty) = param_mapping(f, p) {
+                    return Some(ty);
+                }
+            }
+            Repr::Closure(_) => {}
+            Repr::With(w) => return Ty::from_param_site(&w.0, p),
+        };
+
+        Some(Self::from_cast_info(&p.input))
+    }
+
     pub(crate) fn from_return_site(f: &Func, c: &'_ CastInfo) -> Option<Self> {
         use typst::foundations::func::Repr;
         match f.inner() {
@@ -93,46 +123,7 @@ impl Ty {
             Repr::Native(_) => {}
         };
 
-        let ty = match c {
-            CastInfo::Any => Ty::Any,
-            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), *doc)),
-            CastInfo::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
-            CastInfo::Union(e) => {
-                // flat union
-                let e = UnionIter(vec![e.as_slice().iter()]);
-
-                Ty::iter_union(e.flat_map(|e| Self::from_return_site(f, e)))
-            }
-        };
-
-        Some(ty)
-    }
-
-    pub(crate) fn from_param_site(f: &Func, p: &ParamInfo, s: &CastInfo) -> Option<Ty> {
-        use typst::foundations::func::Repr;
-        match f.inner() {
-            Repr::Element(..) | Repr::Native(..) => {
-                if let Some(ty) = param_mapping(f, p) {
-                    return Some(ty);
-                }
-            }
-            Repr::Closure(_) => {}
-            Repr::With(w) => return Ty::from_param_site(&w.0, p, s),
-        };
-
-        let ty = match &s {
-            CastInfo::Any => Ty::Any,
-            CastInfo::Value(v, doc) => Ty::Value(InsTy::new_doc(v.clone(), *doc)),
-            CastInfo::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
-            CastInfo::Union(e) => {
-                // flat union
-                let e = UnionIter(vec![e.as_slice().iter()]);
-
-                Ty::iter_union(e.flat_map(|e| Self::from_param_site(f, p, e)))
-            }
-        };
-
-        Some(ty)
+        Some(Self::from_cast_info(c))
     }
 }
 
@@ -296,6 +287,7 @@ impl BuiltinTy {
                 PathPreference::Yaml => "[yaml]",
                 PathPreference::Xml => "[xml]",
                 PathPreference::Toml => "[toml]",
+                PathPreference::Csl => "[csl]",
                 PathPreference::Bibliography => "[bib]",
                 PathPreference::RawTheme => "[theme]",
                 PathPreference::RawSyntax => "[syntax]",
@@ -378,6 +370,10 @@ pub(super) fn param_mapping(f: &Func, p: &ParamInfo) -> Option<Ty> {
         ("toml", "path") => Some(literally(Path(PathPreference::Toml))),
         ("raw", "theme") => Some(literally(Path(PathPreference::RawTheme))),
         ("raw", "syntaxes") => Some(literally(Path(PathPreference::RawSyntax))),
+        ("bibliography" | "cite", "style") => Some(Ty::iter_union([
+            literally(Path(PathPreference::Csl)),
+            Ty::from_cast_info(&p.input),
+        ])),
         ("bibliography", "path") => Some(literally(Path(PathPreference::Bibliography))),
         ("text", "size") => Some(literally(TextSize)),
         ("text", "font") => {
