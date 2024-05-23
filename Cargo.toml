@@ -99,6 +99,9 @@ tinymist = { path = "./crates/tinymist/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
 tinymist-render = { path = "./crates/tinymist-render/" }
 
+[profile.dev]
+debug = true
+
 [profile.dev.package.insta]
 opt-level = 3
 
@@ -106,7 +109,7 @@ opt-level = 3
 opt-level = 3
 
 [profile.release]
-debug = true
+strip = true  # Automatically strip symbols from the binary.
 
 [profile.gh-release]
 inherits = "release"
