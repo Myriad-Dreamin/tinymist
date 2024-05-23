@@ -23,7 +23,6 @@ use tinymist_query::{
 use tokio::sync::mpsc;
 use typst::diag::StrResult;
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
-use typst::util::Deferred;
 use typst_ts_compiler::service::Compiler;
 use typst_ts_core::path::PathClean;
 use typst_ts_core::{error::prelude::*, ImmutPath};
@@ -37,7 +36,6 @@ use crate::compiler::CompileServer;
 use crate::compiler_init::CompilerConstConfig;
 use crate::harness::{InitializedLspDriver, LspHost};
 use crate::tools::package::InitTask;
-use crate::world::SharedFontResolver;
 use crate::{run_query, LspResult};
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
@@ -200,7 +198,6 @@ impl TypstLanguageServer {
         client: LspHost<TypstLanguageServer>,
         const_config: ConstConfig,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
-        font: Deferred<SharedFontResolver>,
         handle: tokio::runtime::Handle,
     ) -> Self {
         let tokens_ctx = SemanticTokenContext::new(
@@ -217,7 +214,6 @@ impl TypstLanguageServer {
                     position_encoding: const_config.position_encoding,
                 },
                 editor_tx,
-                font,
                 handle,
             ),
             dedicates: Vec::new(),

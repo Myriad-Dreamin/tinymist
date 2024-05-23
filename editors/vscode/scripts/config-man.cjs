@@ -38,16 +38,24 @@ const describeType = (typeOrTypeArray) => {
     }
 };
 
-const configMd = (prefix) =>
+const configMd = (editor, prefix) =>
     Object.keys(config)
         .map((key) => {
             const {
                 description,
-                default: defaultValue,
+                default: dv,
                 type: itemType,
                 enum: enumBase,
                 enumDescriptions: enumBaseDescription,
             } = config[key];
+
+            let defaultValue = dv;
+            if (editor !== 'vscode') {
+                if (key === 'tinymist.compileStatus') {
+                    defaultValue = 'disable';
+                }
+            }
+
             const keyWithoutPrefix = key.replace("tinymist.", "");
             const name = prefix ? `tinymist.${keyWithoutPrefix}` : keyWithoutPrefix;
             const typeSection = itemType ? `\n- **Type**: ${describeType(itemType)}` : "";
@@ -83,7 +91,7 @@ fs.writeFileSync(
     configMdPath,
     `# Tinymist Server Configuration
 
-${configMd(true)}`
+${configMd('vscode', true)}`
 );
 
 const configMdPathNeovim = path.join(__dirname, "../../../editors/neovim/Configuration.md");
@@ -92,5 +100,5 @@ fs.writeFileSync(
     configMdPathNeovim,
     `# Tinymist Server Configuration
 
-${configMd(false)}`
+${configMd('neovim', false)}`
 );

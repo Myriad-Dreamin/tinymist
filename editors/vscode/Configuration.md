@@ -37,20 +37,20 @@ Enable or disable semantic tokens (LSP syntax highlighting)
 
 ## `tinymist.systemFonts`
 
-A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler.
+A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options. 
 
 - **Type**: `boolean`
 - **Default**: `"true"`
 
 ## `tinymist.fontPaths`
 
-Font paths, which doesn't allow for dynamic configuration. Note: you can use vscode variables in the path, e.g. `${workspaceFolder}/fonts`.
+A list of file or directory path to fonts. Note: The configuration source in higher priority will **override** the configuration source in lower priority. The order of precedence is: Configuration `tinymist.fontPaths` > Configuration `tinymist.typstExtraArgs.fontPaths` > LSP's CLI Argument `--font-path` > The environment variable `TYPST_FONT_PATHS` (a path list separated by `;` (on Windows) or `:` (Otherwise)). Note: If the path to fonts is a relative path, it will be resolved based on the root directory. Note: In VSCode, you can use VSCode variables in the path, e.g. `${workspaceFolder}/fonts`.
 
 - **Type**: `array` or `null`
 
 ## `tinymist.compileStatus`
 
-In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since neovim and helix don't have a such feature, it is disabled by default at the language server lebel.
+In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since Neovim and Helix don't have a such feature, it is disabled by default at the language server label.
 
 - **Type**: `string`
 - **Enum**:
