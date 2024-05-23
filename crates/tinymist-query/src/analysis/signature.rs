@@ -61,7 +61,7 @@ impl ParamSpec {
             name: p.name.into(),
             docs: Cow::Borrowed(p.docs),
             input: p.input.clone(),
-            base_type: Ty::from_param_site(f, p, &p.input),
+            base_type: Ty::from_param_site(f, p),
             type_repr: Some(eco_format!("{}", TypeExpr(&p.input))),
             expr: None,
             default: p.default,
