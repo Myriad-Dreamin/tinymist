@@ -82,6 +82,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "formatterMode",
     "formatterPrintWidth",
     "fontPaths",
+    "systemFonts",
     "typstExtraArgs",
     "compileStatus",
     "preferredTheme",

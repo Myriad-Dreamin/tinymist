@@ -107,9 +107,11 @@ pub struct CompileConfig {
     pub root_path: Option<PathBuf>,
     /// Specifies the cli font options
     pub font_opts: CompileFontOpts,
+    /// Whether to ignore system fonts
+    pub system_fonts: Option<bool>,
     /// Specifies the font paths
     pub font_paths: Vec<PathBuf>,
-    /// Specifies the fonts
+    /// Computed fonts based on configuration.
     pub fonts: OnceCell<Derived<Deferred<SharedFontResolver>>>,
     /// Notify the compile status to the editor.
     pub notify_compile_status: bool,
@@ -203,6 +205,7 @@ impl CompileConfig {
         }
 
         self.font_paths = try_or_default(|| Vec::<_>::deserialize(update.get("fontPaths")?).ok());
+        self.system_fonts = try_(|| update.get("systemFonts")?.as_bool());
 
         self.has_default_entry_path = self.determine_default_entry_path().is_some();
         self.validate()
@@ -289,6 +292,11 @@ impl CompileConfig {
         // todo: on font resolving failure, downgrade to a fake font book
         let font = || {
             let mut opts = self.font_opts.clone();
+
+            if let Some(system_fonts) = self.system_fonts {
+                opts.no_system_fonts = !system_fonts;
+            }
+
             let font_paths = (!self.font_paths.is_empty()).then_some(&self.font_paths);
             let font_paths =
                 font_paths.or_else(|| self.typst_extra_args.as_ref().map(|x| &x.font_paths));
@@ -324,8 +332,17 @@ impl CompileConfig {
         EMPTY.clone()
     }
 
-    pub fn primary_opts(&self) -> (&Vec<PathBuf>, Option<&Vec<PathBuf>>, Option<Arc<Path>>) {
+    #[allow(clippy::type_complexity)]
+    pub fn primary_opts(
+        &self,
+    ) -> (
+        Option<bool>,
+        &Vec<PathBuf>,
+        Option<&Vec<PathBuf>>,
+        Option<Arc<Path>>,
+    ) {
         (
+            self.system_fonts,
             &self.font_paths,
             self.typst_extra_args.as_ref().map(|e| &e.font_paths),
             self.determine_root(self.determine_default_entry_path().as_ref()),
