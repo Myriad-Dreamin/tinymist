@@ -50,7 +50,6 @@ async function startClient(context: ExtensionContext): Promise<void> {
     }
 
     const serverCommand = getServer(config);
-    const withSystemFonts = (config.systemFonts as boolean | null) !== false;
     const run = {
         command: serverCommand,
         args: [
@@ -59,7 +58,6 @@ async function startClient(context: ExtensionContext): Promise<void> {
             ...(context.extensionMode != ExtensionMode.Production
                 ? ["--mirror", "tinymist-lsp.log"]
                 : []),
-            ...(withSystemFonts ? [] : ["--no-system-fonts"]),
         ],
         options: { env: Object.assign({}, process.env, { RUST_BACKTRACE: "1" }) },
     };
