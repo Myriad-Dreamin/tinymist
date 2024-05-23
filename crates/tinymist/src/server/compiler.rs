@@ -5,11 +5,12 @@ use crossbeam_channel::{select, Receiver};
 use log::{error, info, warn};
 use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response, ResponseError};
 use lsp_types::{notification::Notification as _, ExecuteCommandParams};
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
-use typst::{diag::FileResult, syntax::Source, util::Deferred};
+use typst::{diag::FileResult, syntax::Source};
 use typst_ts_compiler::vfs::notify::FileChangeSet;
 use typst_ts_core::{config::compiler::DETACHED_ENTRY, ImmutPath};
 
@@ -19,7 +20,6 @@ use crate::{
     harness::InitializedLspDriver,
     internal_error, invalid_params, method_not_found, run_query,
     state::MemoryFileMeta,
-    world::SharedFontResolver,
     LspHost, LspResult,
 };
 
@@ -93,8 +93,6 @@ pub struct CompileServer {
     // Resources
     /// The runtime handle to spawn tasks.
     pub handle: tokio::runtime::Handle,
-    /// The font resolver to use.
-    pub font: Deferred<SharedFontResolver>,
     /// Source synchronized with client
     pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
     /// The diagnostics sender to send diagnostics to `crate::actor::cluster`.
@@ -109,7 +107,6 @@ impl CompileServer {
         compile_config: CompileConfig,
         const_config: CompilerConstConfig,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
-        font: Deferred<SharedFontResolver>,
         handle: tokio::runtime::Handle,
     ) -> Self {
         CompileServer {
@@ -118,7 +115,6 @@ impl CompileServer {
             shutdown_requested: false,
             config: compile_config,
             const_config,
-            font,
             compiler: None,
             handle,
             memory_changes: HashMap::new(),
@@ -336,8 +332,6 @@ impl CompileServer {
             e.sync_config(self.config.clone());
         }
 
-        // todo: watch changes of the root path
-
         if config.output_path != self.config.output_path
             || config.export_pdf != self.config.export_pdf
         {
@@ -351,6 +345,11 @@ impl CompileServer {
                 .as_mut()
                 .unwrap()
                 .change_export_pdf(config.clone());
+        }
+
+        if config.primary_opts() != self.config.primary_opts() {
+            self.config.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
+            self.restart_server("primary");
         }
 
         info!("new settings applied");

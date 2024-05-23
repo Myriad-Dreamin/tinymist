@@ -8,14 +8,13 @@ use serde::Deserialize;
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
-use typst::util::Deferred;
 use typst_ts_core::ImmutPath;
 
 use crate::actor::editor::EditorActor;
 use crate::compiler_init::CompileConfig;
 use crate::harness::LspHost;
 use crate::utils::{try_, try_or};
-use crate::world::{ImmutDict, SharedFontResolver};
+use crate::world::ImmutDict;
 use crate::{invalid_params, CompileFontOpts, LspResult, TypstLanguageServer};
 
 // todo: svelte-language-server responds to a Goto Definition request with
@@ -82,6 +81,8 @@ const CONFIG_ITEMS: &[&str] = &[
     "semanticTokens",
     "formatterMode",
     "formatterPrintWidth",
+    "fontPaths",
+    "systemFonts",
     "typstExtraArgs",
     "compileStatus",
     "preferredTheme",
@@ -262,6 +263,7 @@ impl Init {
                         .into_iter()
                         .collect(),
                 },
+                font_opts: std::mem::take(&mut self.compile_opts),
                 ..CompileConfig::default()
             },
             ..Config::default()
@@ -274,24 +276,6 @@ impl Init {
             None => Ok(()),
         };
 
-        // prepare fonts
-        // todo: on font resolving failure, downgrade to a fake font book
-        let font = {
-            let mut opts = std::mem::take(&mut self.compile_opts);
-            if opts.font_paths.is_empty() {
-                if let Some(font_paths) = config
-                    .compile
-                    .typst_extra_args
-                    .as_ref()
-                    .map(|x| &x.font_paths)
-                {
-                    opts.font_paths.clone_from(font_paths);
-                }
-            }
-
-            Deferred::new(|| SharedFontResolver::new(opts).expect("failed to create font book"))
-        };
-
         // Bootstrap server
         let (editor_tx, editor_rx) = mpsc::unbounded_channel();
 
@@ -299,7 +283,6 @@ impl Init {
             self.host.clone(),
             cc.clone(),
             editor_tx,
-            font,
             self.handle.clone(),
         );
 
@@ -320,16 +303,7 @@ impl Init {
             service.config.compile.notify_compile_status,
         );
 
-        let fallback = service.config.compile.determine_default_entry_path();
-        let primary = service.server(
-            "primary".to_owned(),
-            service.config.compile.determine_entry(fallback),
-            service.config.compile.determine_inputs(),
-        );
-        if service.primary.compiler.is_some() {
-            panic!("primary already initialized");
-        }
-        service.primary.compiler = Some(primary);
+        service.primary.restart_server("primary");
 
         // Run the cluster in the background after we referencing it
         self.handle.spawn(editor_actor.run());

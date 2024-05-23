@@ -36,6 +36,19 @@ use crate::{
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
 
 impl CompileServer {
+    pub fn restart_server(&mut self, group: &str) {
+        let server = self.server(
+            group.to_owned(),
+            self.config
+                .determine_entry(self.config.determine_default_entry_path()),
+            self.config.determine_inputs(),
+            self.vfs_snapshot(),
+        );
+        if let Some(mut previous_server) = self.compiler.replace(server) {
+            std::thread::spawn(move || previous_server.settle());
+        }
+    }
+
     pub fn server(
         &self,
         editor_group: String,
@@ -81,7 +94,7 @@ impl CompileServer {
             let periscope_args = self.config.periscope_args.clone();
             let diag_group = editor_group.clone();
             let entry = entry.clone();
-            let font_resolver = self.font.clone();
+            let font_resolver = self.config.determine_fonts();
             move || {
                 log::info!("TypstActor: creating server for {diag_group}, entry: {entry:?}, inputs: {inputs:?}");
 

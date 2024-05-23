@@ -1,3 +1,4 @@
+use core::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -5,7 +6,7 @@ use anyhow::bail;
 use clap::builder::ValueParser;
 use clap::{ArgAction, Parser};
 use comemo::Prehashed;
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 use serde::Deserialize;
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::PositionEncoding;
@@ -27,10 +28,19 @@ use crate::{CompileExtraOpts, CompileFontOpts, ExportMode, LspHost};
 #[cfg(feature = "clap")]
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
+#[derive(Clone)]
+pub struct Derived<T>(T);
+
+impl<T> fmt::Debug for Derived<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("..")
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct FontArgs {
-    /// Font paths, which doesn't allow for dynamic configuration
+    /// Font paths
     #[cfg_attr(feature = "clap", clap(
         long = "font-path",
         value_name = "DIR",
@@ -95,6 +105,14 @@ pub struct CompileConfig {
     pub export_pdf: ExportMode,
     /// Specifies the root path of the project manually.
     pub root_path: Option<PathBuf>,
+    /// Specifies the cli font options
+    pub font_opts: CompileFontOpts,
+    /// Whether to ignore system fonts
+    pub system_fonts: Option<bool>,
+    /// Specifies the font paths
+    pub font_paths: Vec<PathBuf>,
+    /// Computed fonts based on configuration.
+    pub fonts: OnceCell<Derived<Deferred<SharedFontResolver>>>,
     /// Notify the compile status to the editor.
     pub notify_compile_status: bool,
     /// Enable periscope document in hover.
@@ -186,6 +204,9 @@ impl CompileConfig {
             }
         }
 
+        self.font_paths = try_or_default(|| Vec::<_>::deserialize(update.get("fontPaths")?).ok());
+        self.system_fonts = try_(|| update.get("systemFonts")?.as_bool());
+
         self.has_default_entry_path = self.determine_default_entry_path().is_some();
         self.validate()
     }
@@ -267,6 +288,40 @@ impl CompileConfig {
         })
     }
 
+    pub fn determine_fonts(&self) -> Deferred<SharedFontResolver> {
+        // todo: on font resolving failure, downgrade to a fake font book
+        let font = || {
+            let mut opts = self.font_opts.clone();
+
+            if let Some(system_fonts) = self.system_fonts {
+                opts.no_system_fonts = !system_fonts;
+            }
+
+            let font_paths = (!self.font_paths.is_empty()).then_some(&self.font_paths);
+            let font_paths =
+                font_paths.or_else(|| self.typst_extra_args.as_ref().map(|x| &x.font_paths));
+            if let Some(paths) = font_paths {
+                opts.font_paths.clone_from(paths);
+            }
+
+            let root = OnceCell::new();
+            for path in opts.font_paths.iter_mut() {
+                if path.is_relative() {
+                    if let Some(root) = root.get_or_init(|| self.determine_root(None)) {
+                        let p = std::mem::take(path);
+                        *path = root.join(p);
+                    }
+                }
+            }
+
+            log::info!("creating SharedFontResolver with {opts:?}");
+            Derived(Deferred::new(|| {
+                SharedFontResolver::new(opts).expect("failed to create font book")
+            }))
+        };
+        self.fonts.get_or_init(font).clone().0
+    }
+
     pub fn determine_inputs(&self) -> ImmutDict {
         static EMPTY: Lazy<ImmutDict> = Lazy::new(ImmutDict::default);
 
@@ -275,6 +330,23 @@ impl CompileConfig {
         }
 
         EMPTY.clone()
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn primary_opts(
+        &self,
+    ) -> (
+        Option<bool>,
+        &Vec<PathBuf>,
+        Option<&Vec<PathBuf>>,
+        Option<Arc<Path>>,
+    ) {
+        (
+            self.system_fonts,
+            &self.font_paths,
+            self.typst_extra_args.as_ref().map(|e| &e.font_paths),
+            self.determine_root(self.determine_default_entry_path().as_ref()),
+        )
     }
 
     pub fn validate(&self) -> anyhow::Result<()> {
@@ -338,23 +410,11 @@ impl LspDriver for CompileInit {
         Self::InitializedSelf,
         Result<Self::InitResult, lsp_server::ResponseError>,
     ) {
-        let mut compile_config = CompileConfig::default();
-        compile_config.update(&params.config).unwrap();
-
-        // prepare fonts
-        // todo: on font resolving failure, downgrade to a fake font book
-        let font = {
-            let mut opts = self.font;
-            if let Some(font_paths) = compile_config
-                .typst_extra_args
-                .as_ref()
-                .map(|x| &x.font_paths)
-            {
-                opts.font_paths.clone_from(font_paths);
-            }
-
-            Deferred::new(|| SharedFontResolver::new(opts).expect("failed to create font book"))
+        let mut compile_config = CompileConfig {
+            font_opts: self.font,
+            ..CompileConfig::default()
         };
+        compile_config.update(&params.config).unwrap();
 
         let mut service = CompileServer::new(
             client,
@@ -369,19 +429,10 @@ impl LspDriver for CompileInit {
                     .unwrap_or_default(),
             },
             self.editor_tx,
-            font,
             self.handle,
         );
 
-        let primary = service.server(
-            "primary".to_owned(),
-            service.config.determine_entry(None),
-            service.config.determine_inputs(),
-            service.vfs_snapshot(),
-        );
-        if service.compiler.replace(primary).is_some() {
-            panic!("primary already initialized");
-        }
+        service.restart_server("primary");
 
         (service, Ok(()))
     }
