@@ -291,9 +291,9 @@ impl TypstLanguageServer {
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
         match query {
-            OnExport(OnExportRequest { kind, path }) => Ok(
-                CompilerQueryResponse::OnExport(client.on_export(kind, path)?),
-            ),
+            OnExport(OnExportRequest { kind, path }) => Ok(CompilerQueryResponse::OnExport(
+                client.on_export(kind, path)?,
+            )),
             OnSaveExport(OnSaveExportRequest { path }) => {
                 client.on_save_export(path)?;
                 Ok(CompilerQueryResponse::OnSaveExport(()))
@@ -303,6 +303,7 @@ impl TypstLanguageServer {
             GotoDeclaration(req) => query_world!(client, GotoDeclaration, req),
             References(req) => query_world!(client, References, req),
             InlayHint(req) => query_world!(client, InlayHint, req),
+            DocumentHighlight(req) => query_world!(client, DocumentHighlight, req),
             DocumentColor(req) => query_world!(client, DocumentColor, req),
             CodeAction(req) => query_world!(client, CodeAction, req),
             CodeLens(req) => query_world!(client, CodeLens, req),
