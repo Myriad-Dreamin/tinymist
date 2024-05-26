@@ -130,7 +130,7 @@ impl<'a, 'w> DocumentHighlightWorker<'a, 'w> {
         self.check_children(loop_node);
         self.check(Self::check_loop);
 
-        log::info!("highlights: {:?}", self.highlights);
+        log::debug!("highlights: {:?}", self.highlights);
         self.finish()
     }
 }
