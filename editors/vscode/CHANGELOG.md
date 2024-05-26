@@ -10,7 +10,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Editor
 
-* Made the typst icon's transparent background in https://github.com/Myriad-Dreamin/tinymist/pull/313
+* Transparentized the background of typst icon in https://github.com/Myriad-Dreamin/tinymist/pull/313
 * Made more consistent font configuration in https://github.com/Myriad-Dreamin/tinymist/pull/312
 
 ### Completion
