@@ -4,6 +4,24 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.10 - [2024-05-26]
+
+* Bumped typstyle to v0.11.23 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/315
+
+### Editor
+
+* Transparentized the background of typst icon in https://github.com/Myriad-Dreamin/tinymist/pull/313
+* Made more consistent font configuration in https://github.com/Myriad-Dreamin/tinymist/pull/312
+
+### Completion
+
+* Completing CSL paths in https://github.com/Myriad-Dreamin/tinymist/pull/310
+
+### Code Action
+* Checking and moving the exactly single punctuation after the math equation to refactor in https://github.com/Myriad-Dreamin/tinymist/pull/306
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.9...v0.11.10
+
 ## v0.11.9 - [2024-05-18]
 
 * Bumped typst to 0.11.1 in https://github.com/Myriad-Dreamin/tinymist/pull/301
