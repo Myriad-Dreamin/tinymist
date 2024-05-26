@@ -373,6 +373,7 @@ impl Init {
                     },
                 }),
                 color_provider: Some(ColorProviderCapability::Simple(true)),
+                document_highlight_provider: Some(OneOf::Left(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
                 workspace_symbol_provider: Some(OneOf::Left(true)),
                 selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),

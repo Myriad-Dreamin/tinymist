@@ -16,6 +16,11 @@ Language service (LSP) features:
   - Also known as "syntax highlighting".
 - [Diagnostics](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#provide-diagnostics)
   - Also known as "error checking" or "error reporting".
+- [Document highlight](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#highlight-all-occurrences-of-a-symbol-in-a-document)
+  - Highlight all break points in a loop context.
+  - (Todo) Highlight all exit points in a function context.
+  - (Todo) Highlight all captures in a closure context.
+  - (Todo) Highlight all occurrences of a symbol in a document.
 - [Document symbols](https://code.visualstudio.com/docs/getstarted/userinterface#_outline-view)
   - Also known as "document outline" or "table of contents" **in Typst**.
 - [Folding ranges](https://burkeholland.gitbook.io/vs-code-can-do-that/exercise-3-navigation-and-refactoring/folding-sections)

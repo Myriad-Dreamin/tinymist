@@ -189,7 +189,15 @@ pub fn find_test_range(s: &Source) -> Range<usize> {
     start as usize..end as usize
 }
 
+pub fn find_test_position_after(s: &Source) -> LspPosition {
+    find_test_position_(s, 1)
+}
+
 pub fn find_test_position(s: &Source) -> LspPosition {
+    find_test_position_(s, 0)
+}
+
+pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
     enum AstMatcher {
         MatchAny { prev: bool },
         MatchIdent { prev: bool },
@@ -271,7 +279,7 @@ pub fn find_test_position(s: &Source) -> LspPosition {
         break;
     }
 
-    typst_to_lsp::offset_to_position(n.offset(), PositionEncoding::Utf16, s)
+    typst_to_lsp::offset_to_position(n.offset() + offset, PositionEncoding::Utf16, s)
 }
 
 // pub static REDACT_URI: Lazy<RedactFields> = Lazy::new(||

@@ -11,11 +11,12 @@ pub use log::{error, trace};
 pub use lsp_types::{
     request::GotoDeclarationResponse, CodeAction, CodeActionKind, CodeActionOrCommand, CodeLens,
     ColorInformation, ColorPresentation, CompletionResponse, DiagnosticRelatedInformation,
-    DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange, GotoDefinitionResponse,
-    Hover, InlayHint, LanguageString, Location as LspLocation, LocationLink, MarkedString,
-    MarkupContent, MarkupKind, Position as LspPosition, PrepareRenameResponse, SelectionRange,
-    SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult,
-    SignatureHelp, SignatureInformation, SymbolInformation, TextEdit, Url, WorkspaceEdit,
+    DocumentHighlight, DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange,
+    GotoDefinitionResponse, Hover, InlayHint, LanguageString, Location as LspLocation,
+    LocationLink, MarkedString, MarkupContent, MarkupKind, Position as LspPosition,
+    PrepareRenameResponse, SelectionRange, SemanticTokens, SemanticTokensDelta,
+    SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp, SignatureInformation,
+    SymbolInformation, TextEdit, Url, WorkspaceEdit,
 };
 pub use reflexo::vector::ir::DefId;
 pub use serde_json::Value as JsonValue;

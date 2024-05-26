@@ -33,6 +33,8 @@ pub(crate) mod color_presentation;
 pub use color_presentation::*;
 pub(crate) mod document_color;
 pub use document_color::*;
+pub(crate) mod document_highlight;
+pub use document_highlight::*;
 pub(crate) mod document_symbol;
 pub use document_symbol::*;
 pub(crate) mod document_metrics;
@@ -203,6 +205,7 @@ mod polymorphic {
         References(ReferencesRequest),
         InlayHint(InlayHintRequest),
         DocumentColor(DocumentColorRequest),
+        DocumentHighlight(DocumentHighlightRequest),
         ColorPresentation(ColorPresentationRequest),
         CodeAction(CodeActionRequest),
         CodeLens(CodeLensRequest),
@@ -235,6 +238,7 @@ mod polymorphic {
                 CompilerQueryRequest::References(..) => PinnedFirst,
                 CompilerQueryRequest::InlayHint(..) => Unique,
                 CompilerQueryRequest::DocumentColor(..) => PinnedFirst,
+                CompilerQueryRequest::DocumentHighlight(..) => PinnedFirst,
                 CompilerQueryRequest::ColorPresentation(..) => ContextFreeUnique,
                 CompilerQueryRequest::CodeAction(..) => Unique,
                 CompilerQueryRequest::CodeLens(..) => Unique,
@@ -266,6 +270,7 @@ mod polymorphic {
                 CompilerQueryRequest::References(req) => &req.path,
                 CompilerQueryRequest::InlayHint(req) => &req.path,
                 CompilerQueryRequest::DocumentColor(req) => &req.path,
+                CompilerQueryRequest::DocumentHighlight(req) => &req.path,
                 CompilerQueryRequest::ColorPresentation(req) => &req.path,
                 CompilerQueryRequest::CodeAction(req) => &req.path,
                 CompilerQueryRequest::CodeLens(req) => &req.path,
@@ -298,6 +303,7 @@ mod polymorphic {
         References(Option<Vec<LspLocation>>),
         InlayHint(Option<Vec<InlayHint>>),
         DocumentColor(Option<Vec<ColorInformation>>),
+        DocumentHighlight(Option<Vec<DocumentHighlight>>),
         ColorPresentation(Option<Vec<ColorPresentation>>),
         CodeAction(Option<Vec<CodeActionOrCommand>>),
         CodeLens(Option<Vec<CodeLens>>),

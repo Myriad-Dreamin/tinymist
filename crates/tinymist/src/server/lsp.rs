@@ -257,6 +257,7 @@ impl TypstLanguageServer {
             request_fn!(Completion, Self::completion),
             request_fn!(SemanticTokensFullRequest, Self::semantic_tokens_full),
             request_fn!(SemanticTokensFullDeltaRequest, Self::semantic_tokens_full_delta),
+            request_fn!(DocumentHighlightRequest, Self::document_highlight),
             request_fn!(DocumentSymbolRequest, Self::document_symbol),
             // Sync for low latency
             request_fn_!(Formatting, Self::formatting),
@@ -1048,6 +1049,14 @@ impl TypstLanguageServer {
         let path = as_path(params.text_document);
         let positions = params.positions;
         run_query!(self.SelectionRange(path, positions))
+    }
+
+    fn document_highlight(
+        &mut self,
+        params: DocumentHighlightParams,
+    ) -> LspResult<Option<Vec<DocumentHighlight>>> {
+        let (path, position) = as_path_pos(params.text_document_position_params);
+        run_query!(self.DocumentHighlight(path, position))
     }
 
     fn document_symbol(
