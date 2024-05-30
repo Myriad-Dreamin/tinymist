@@ -46,12 +46,11 @@ use typst::{
     layout::Position,
     model::Document as TypstDocument,
     syntax::package::PackageSpec,
-    util::Deferred,
     World as TypstWorld,
 };
 use typst_ts_compiler::{
     service::{CompileDriverImpl, CompileEnv, CompileMiddleware, Compiler, EntryManager, EnvWorld},
-    vfs::notify::{FileChangeSet, MemoryEvent},
+    vfs::notify::MemoryEvent,
     Time,
 };
 use typst_ts_core::{
@@ -62,11 +61,10 @@ use typst_ts_core::{
 use super::{
     editor::{EditorRequest, TinymistCompileStatusEnum},
     export::ExportConfig,
-    typ_server::{CompileClient as TsCompileClient, CompileServerActor},
+    typ_server::{is_inactive, CompileServerActor, Interrupt},
 };
 use crate::{
     actor::export::ExportRequest,
-    actor::typ_server::EntryStateExt,
     compiler_init::CompileConfig,
     tools::preview::{CompilationHandle, CompileStatus},
     utils,
@@ -75,7 +73,6 @@ use crate::{
 
 type CompileDriverInner = CompileDriverImpl<LspWorld>;
 type CompileService = CompileServerActor<CompileDriver>;
-type CompileClient = TsCompileClient<CompileService>;
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
@@ -196,7 +193,7 @@ impl CompileDriver {
             Ok(diagnostics) => {
                 // todo: better way to remove diagnostics
                 // todo: check all errors in this file
-                let detached = self.inner.world().entry.is_inactive();
+                let detached = is_inactive(&self.inner.world().entry);
                 let valid = !detached;
                 self.handler.push_diagnostics(valid.then_some(diagnostics));
             }
@@ -277,7 +274,7 @@ pub struct CompileClientActor {
     pub diag_group: String,
     pub config: CompileConfig,
     entry: EntryState,
-    inner: Deferred<CompileClient>,
+    intr_tx: mpsc::UnboundedSender<Interrupt<CompileService>>,
     export_tx: mpsc::UnboundedSender<ExportRequest>,
 }
 
@@ -286,20 +283,37 @@ impl CompileClientActor {
         diag_group: String,
         config: CompileConfig,
         entry: EntryState,
-        inner: Deferred<CompileClient>,
+        intr_tx: mpsc::UnboundedSender<Interrupt<CompileService>>,
         export_tx: mpsc::UnboundedSender<ExportRequest>,
     ) -> Self {
         Self {
             diag_group,
             config,
             entry,
-            inner,
+            intr_tx,
             export_tx,
         }
     }
 
-    pub fn inner(&self) -> &CompileClient {
-        self.inner.wait()
+    fn steal_inner<Ret: Send + 'static>(
+        &self,
+        f: impl FnOnce(&mut CompileService) -> Ret + Send + 'static,
+    ) -> ZResult<oneshot::Receiver<Ret>> {
+        let (tx, rx) = oneshot::channel();
+
+        let task = Box::new(move |this: &mut CompileService| {
+            if tx.send(f(this)).is_err() {
+                // Receiver was dropped. The main thread may have exited, or the request may
+                // have been cancelled.
+                log::warn!("could not send back return value from Typst thread");
+            }
+        });
+
+        self.intr_tx
+            .send(Interrupt::Task(task))
+            .map_err(map_string_err("failed to send steal request"))?;
+
+        Ok(rx)
     }
 
     /// Steal the compiler thread and run the given function.
@@ -307,7 +321,7 @@ impl CompileClientActor {
         &self,
         f: impl FnOnce(&mut CompileService) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
-        self.inner().steal(f)
+        utils::threaded_receive(self.steal_inner(f)?)
     }
 
     /// Steal the compiler thread and run the given function.
@@ -315,13 +329,35 @@ impl CompileClientActor {
         &self,
         f: impl FnOnce(&mut CompileService) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
-        self.inner().steal_async(f).await
+        self.steal_inner(f)?
+            .await
+            .map_err(map_string_err("failed to call steal_async"))
+    }
+
+    pub fn steal_state<T: Send + Sync + 'static>(
+        &self,
+        f: impl FnOnce(&mut AnalysisContext, Option<VersionedDocument>) -> T + Send + Sync + 'static,
+    ) -> anyhow::Result<T> {
+        self.steal(move |compiler| {
+            let doc = compiler.success_doc();
+            let c = &mut compiler.compiler.compiler;
+            c.run_analysis(move |ctx| f(ctx, doc))
+        })?
+    }
+
+    pub fn steal_world<T: Send + Sync + 'static>(
+        &self,
+        f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
+    ) -> anyhow::Result<T> {
+        self.steal(move |compiler| compiler.compiler.compiler.run_analysis(f))?
     }
 
     pub fn settle(&mut self) {
         let _ = self.change_entry(None);
         info!("TypstActor({}): settle requested", self.diag_group);
-        match self.inner().settle() {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.intr_tx.send(Interrupt::Settle(tx));
+        match utils::threaded_receive(rx) {
             Ok(()) => info!("TypstActor({}): settled", self.diag_group),
             Err(err) => error!("TypstActor({}): failed to settle: {err:#}", self.diag_group),
         }
@@ -352,7 +388,7 @@ impl CompileClientActor {
         self.steal(move |compiler| {
             compiler.change_entry(next.clone());
 
-            let next_is_inactive = next.is_inactive();
+            let next_is_inactive = is_inactive(&next);
             let res = compiler.compiler.world_mut().mutate_entry(next);
 
             if next_is_inactive {
@@ -364,13 +400,8 @@ impl CompileClientActor {
                 .map_err(|err| error_once!("failed to change entry", err: format!("{err:?}")))
         })??;
 
-        let entry = next_entry.clone();
-        let req = ExportRequest::ChangeExportPath(entry);
-        let _ = self.export_tx.send(req);
-
-        // todo: better way to trigger recompile
-        let files = FileChangeSet::new_inserts(vec![]);
-        self.inner().add_memory_changes(MemoryEvent::Update(files));
+        let next = next_entry.clone();
+        let _ = self.export_tx.send(ExportRequest::ChangeExportPath(next));
 
         self.entry = next_entry;
 
@@ -378,17 +409,11 @@ impl CompileClientActor {
     }
 
     pub fn add_memory_changes(&self, event: MemoryEvent) {
-        self.inner.wait().add_memory_changes(event);
+        let _ = self.intr_tx.send(Interrupt::Memory(event));
     }
 
     pub(crate) fn change_export_pdf(&mut self, config: ExportConfig) {
-        let entry = self.entry.clone();
-        let _ = self
-            .export_tx
-            .send(ExportRequest::ChangeConfig(ExportConfig {
-                entry,
-                ..config
-            }));
+        let _ = self.export_tx.send(ExportRequest::ChangeConfig(config));
     }
 
     pub fn clear_cache(&self) {
@@ -434,23 +459,5 @@ impl CompileClientActor {
         let _ = self.export_tx.send(ExportRequest::OnSaved(path));
 
         Ok(())
-    }
-
-    pub fn steal_state<T: Send + Sync + 'static>(
-        &self,
-        f: impl FnOnce(&mut AnalysisContext, Option<VersionedDocument>) -> T + Send + Sync + 'static,
-    ) -> anyhow::Result<T> {
-        self.steal(move |compiler| {
-            let doc = compiler.success_doc();
-            let c = &mut compiler.compiler.compiler;
-            c.run_analysis(move |ctx| f(ctx, doc))
-        })?
-    }
-
-    pub fn steal_world<T: Send + Sync + 'static>(
-        &self,
-        f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
-    ) -> anyhow::Result<T> {
-        self.steal(move |compiler| compiler.compiler.compiler.run_analysis(f))?
     }
 }

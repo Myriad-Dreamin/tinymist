@@ -21,7 +21,6 @@ use super::editor::EditorRequest;
 #[derive(Debug, Clone, Default)]
 pub struct ExportConfig {
     pub substitute_pattern: String,
-    pub entry: EntryState,
     pub mode: ExportMode,
 }
 
@@ -35,40 +34,21 @@ pub enum ExportRequest {
 }
 
 pub struct ExportActor {
-    group: String,
-    editor_tx: mpsc::UnboundedSender<EditorRequest>,
-    export_rx: mpsc::UnboundedReceiver<ExportRequest>,
-    document: watch::Receiver<Option<Arc<TypstDocument>>>,
+    pub group: String,
+    pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
+    pub export_rx: mpsc::UnboundedReceiver<ExportRequest>,
+    pub doc_rx: watch::Receiver<Option<Arc<TypstDocument>>>,
 
-    config: ExportConfig,
-    kind: ExportKind,
-    count_words: bool,
+    pub entry: EntryState,
+    pub config: ExportConfig,
+    pub kind: ExportKind,
+    pub count_words: bool,
 }
 
 impl ExportActor {
-    pub fn new(
-        group: String,
-        document: watch::Receiver<Option<Arc<TypstDocument>>>,
-        editor_tx: mpsc::UnboundedSender<EditorRequest>,
-        export_rx: mpsc::UnboundedReceiver<ExportRequest>,
-        config: ExportConfig,
-        kind: ExportKind,
-        count_words: bool,
-    ) -> Self {
-        Self {
-            group,
-            editor_tx,
-            export_rx,
-            document,
-            config,
-            kind,
-            count_words,
-        }
-    }
-
     pub async fn run(mut self) {
         while let Some(mut req) = self.export_rx.recv().await {
-            let Some(doc) = self.document.borrow().clone() else {
+            let Some(doc) = self.doc_rx.borrow().clone() else {
                 info!("RenderActor: document is not ready");
                 continue;
             };
@@ -78,8 +58,8 @@ impl ExportActor {
             'accumulate: loop {
                 log::debug!("RenderActor: received request: {req:?}");
                 match req {
-                    ExportRequest::ChangeConfig(cfg) => self.config = cfg,
-                    ExportRequest::ChangeExportPath(entry) => self.config.entry = entry,
+                    ExportRequest::ChangeConfig(config) => self.config = config,
+                    ExportRequest::ChangeExportPath(entry) => self.entry = entry,
                     ExportRequest::OnTyped => need_export |= self.config.mode == ExportMode::OnType,
                     ExportRequest::OnSaved(..) => match self.config.mode {
                         ExportMode::OnSave => need_export = true,
@@ -124,8 +104,8 @@ impl ExportActor {
         doc: &TypstDocument,
     ) -> Option<PathBuf> {
         // pub entry: EntryState,
-        let root = self.config.entry.root();
-        let main = self.config.entry.main();
+        let root = self.entry.root();
+        let main = self.entry.main();
 
         info!(
             "RenderActor: check path {:?} and root {:?} with output directory {}",

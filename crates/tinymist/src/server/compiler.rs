@@ -338,7 +338,6 @@ impl CompileServer {
             let config = ExportConfig {
                 substitute_pattern: self.config.output_path.clone(),
                 mode: self.config.export_pdf,
-                ..ExportConfig::default()
             };
 
             self.compiler

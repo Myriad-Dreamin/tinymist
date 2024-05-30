@@ -32,7 +32,6 @@ pub mod harness;
 mod resource;
 mod server;
 mod state;
-mod task;
 mod tools;
 pub mod transport;
 mod utils;
