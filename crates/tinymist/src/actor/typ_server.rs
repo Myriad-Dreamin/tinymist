@@ -77,8 +77,9 @@ pub struct CompileServerActor<C: Compiler> {
     /// Shared feature set for watch mode.
     watch_feature_set: Arc<FeatureSet>,
 
-    /// Channels for sending interrupts to the compiler thread.
+    /// Channel for sending interrupts to the compiler thread.
     intr_tx: mpsc::UnboundedSender<Interrupt<Self>>,
+    /// Channel for receiving interrupts from the compiler thread.
     intr_rx: mpsc::UnboundedReceiver<Interrupt<Self>>,
 
     suspend_state: SuspendState,
