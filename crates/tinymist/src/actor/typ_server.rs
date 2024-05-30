@@ -2,55 +2,20 @@
 //!
 //! Please check `tinymist::actor::typ_client` for architecture details.
 
-use std::{
-    collections::HashSet,
-    num::NonZeroUsize,
-    path::{Path, PathBuf},
-    sync::Arc,
-    thread::JoinHandle,
-};
+use std::{collections::HashSet, path::Path, sync::Arc, thread::JoinHandle};
 
-use serde::Serialize;
 use tinymist_query::VersionedDocument;
 use tokio::sync::{mpsc, oneshot};
-use typst::{
-    layout::{Frame, FrameItem, Point, Position},
-    syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath},
-    World,
+
+use typst_ts_compiler::service::{
+    features::{FeatureSet, WITH_COMPILING_STATUS_FEATURE},
+    watch_deps, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter,
 };
+use typst_ts_compiler::vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage};
+use typst_ts_compiler::ShadowApi;
+use typst_ts_core::{config::compiler::EntryState, TypstDocument, TypstFileId};
 
-use typst_ts_compiler::{
-    service::{
-        features::{FeatureSet, WITH_COMPILING_STATUS_FEATURE},
-        watch_deps, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter, EntryManager,
-    },
-    vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage},
-    world::{CompilerFeat, CompilerWorld},
-    ShadowApi,
-};
-use typst_ts_core::{
-    config::compiler::EntryState,
-    debug_loc::{SourceLocation, SourceSpanOffset},
-    error::prelude::{map_string_err, ZResult},
-    TypstDocument, TypstFileId,
-};
-
-use crate::{task::BorrowTask, utils};
-
-pub trait EntryStateExt {
-    fn is_inactive(&self) -> bool;
-}
-
-impl EntryStateExt for EntryState {
-    fn is_inactive(&self) -> bool {
-        matches!(
-            self,
-            EntryState::Detached | EntryState::Workspace { main: None, .. }
-        )
-    }
-}
-
-enum Interrupt<Ctx> {
+pub enum Interrupt<Ctx> {
     /// Compile anyway.
     Compile,
     /// Borrow the compiler thread and run the task.
@@ -64,6 +29,11 @@ enum Interrupt<Ctx> {
     /// Request compiler to stop.
     Settle(oneshot::Sender<()>),
 }
+
+/// A task that can be sent to the context (compiler/render thread)
+///
+/// The internal function will be dereferenced and called on the context.
+pub type BorrowTask<Ctx> = Box<dyn FnOnce(&mut Ctx) + Send + 'static>;
 
 /// Responses from the compiler thread.
 enum CompilerResponse {
@@ -99,7 +69,7 @@ pub struct CompileServerActor<C: Compiler> {
     /// Estimated latest set of shadow files.
     estimated_shadow_files: HashSet<Arc<Path>>,
     /// The latest compiled document.
-    latest_doc: Option<Arc<TypstDocument>>,
+    pub(crate) latest_doc: Option<Arc<TypstDocument>>,
     /// The latest successly compiled document.
     latest_success_doc: Option<Arc<TypstDocument>>,
     /// feature set for compile_once mode.
@@ -107,9 +77,9 @@ pub struct CompileServerActor<C: Compiler> {
     /// Shared feature set for watch mode.
     watch_feature_set: Arc<FeatureSet>,
 
-    /// Internal channel for stealing the compiler thread.
-    steal_tx: mpsc::UnboundedSender<Interrupt<Self>>,
-    steal_rx: mpsc::UnboundedReceiver<Interrupt<Self>>,
+    /// Channels for sending interrupts to the compiler thread.
+    intr_tx: mpsc::UnboundedSender<Interrupt<Self>>,
+    intr_rx: mpsc::UnboundedReceiver<Interrupt<Self>>,
 
     suspend_state: SuspendState,
 }
@@ -118,9 +88,13 @@ impl<C: Compiler + ShadowApi + Send + 'static> CompileServerActor<C>
 where
     C::World: for<'files> codespan_reporting::files::Files<'files, FileId = TypstFileId>,
 {
-    pub fn new_with_features(compiler: C, entry: EntryState, feature_set: FeatureSet) -> Self {
-        let (steal_tx, steal_rx) = mpsc::unbounded_channel();
-
+    pub fn new_with_features(
+        compiler: C,
+        entry: EntryState,
+        feature_set: FeatureSet,
+        intr_tx: mpsc::UnboundedSender<Interrupt<Self>>,
+        intr_rx: mpsc::UnboundedReceiver<Interrupt<Self>>,
+    ) -> Self {
         Self {
             compiler: CompileReporter::new(compiler)
                 .with_generic_reporter(ConsoleDiagReporter::default()),
@@ -137,19 +111,29 @@ where
                 feature_set.configure(&WITH_COMPILING_STATUS_FEATURE, true),
             ),
 
-            steal_tx,
-            steal_rx,
+            intr_tx,
+            intr_rx,
 
             suspend_state: SuspendState {
-                suspended: entry.is_inactive(),
+                suspended: is_inactive(&entry),
                 dirty: false,
             },
         }
     }
 
     /// Create a new compiler thread.
-    pub fn new(compiler: C, entry: EntryState) -> Self {
-        Self::new_with_features(compiler, entry, FeatureSet::default())
+    pub fn new(
+        compiler: C,
+        entry: EntryState,
+        intr_tx: mpsc::UnboundedSender<Interrupt<Self>>,
+        intr_rx: mpsc::UnboundedReceiver<Interrupt<Self>>,
+    ) -> Self {
+        Self::new_with_features(compiler, entry, FeatureSet::default(), intr_tx, intr_rx)
+    }
+
+    pub fn with_watch(mut self, enable_watch: bool) -> Self {
+        self.enable_watch = enable_watch;
+        self
     }
 
     pub fn success_doc(&self) -> Option<VersionedDocument> {
@@ -230,7 +214,7 @@ where
 
         // Spawn file system watcher.
         // todo: don't compile if no entry
-        let fs_tx = self.steal_tx.clone();
+        let fs_tx = self.intr_tx.clone();
         tokio::spawn(watch_deps(dep_rx, move |event| {
             log_send_error("fs_event", fs_tx.send(Interrupt::Fs(event)));
         }));
@@ -241,7 +225,7 @@ where
             log::debug!("CompileServerActor: initialized");
 
             // Wait for first events.
-            'event_loop: while let Some(mut event) = self.steal_rx.blocking_recv() {
+            'event_loop: while let Some(mut event) = self.intr_rx.blocking_recv() {
                 let mut need_compile = false;
 
                 'accumulate: loop {
@@ -264,7 +248,7 @@ where
                     need_compile |= self.process(event, &compiler_ack);
 
                     // Try to accumulate more events.
-                    match self.steal_rx.try_recv() {
+                    match self.intr_rx.try_recv() {
                         Ok(new_event) => event = new_event,
                         _ => break 'accumulate,
                     }
@@ -284,9 +268,9 @@ where
     }
 
     pub(crate) fn change_entry(&mut self, entry: EntryState) {
-        self.suspend_state.suspended = entry.is_inactive();
+        self.suspend_state.suspended = is_inactive(&entry);
         if !self.suspend_state.suspended && self.suspend_state.dirty {
-            self.steal_tx.send(Interrupt::Compile).ok();
+            self.intr_tx.send(Interrupt::Compile).ok();
         }
 
         // Reset the document state.
@@ -442,254 +426,9 @@ where
     }
 }
 
-impl<C: Compiler> CompileServerActor<C> {
-    pub fn with_watch(mut self, enable_watch: bool) -> Self {
-        self.enable_watch = enable_watch;
-        self
-    }
-
-    pub fn client(&self) -> CompileClient<Self> {
-        let intr_tx = self.steal_tx.clone();
-        CompileClient { intr_tx }
-    }
-
-    pub fn document(&self) -> Option<Arc<TypstDocument>> {
-        self.latest_doc.clone()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CompileClient<Ctx> {
-    intr_tx: mpsc::UnboundedSender<Interrupt<Ctx>>,
-}
-
-impl<Ctx> CompileClient<Ctx> {
-    pub fn faked() -> Self {
-        let (intr_tx, _) = mpsc::unbounded_channel();
-        Self { intr_tx }
-    }
-
-    fn steal_inner<Ret: Send + 'static>(
-        &self,
-        f: impl FnOnce(&mut Ctx) -> Ret + Send + 'static,
-    ) -> ZResult<oneshot::Receiver<Ret>> {
-        let (tx, rx) = oneshot::channel();
-
-        let task = Box::new(move |this: &mut Ctx| {
-            if tx.send(f(this)).is_err() {
-                // Receiver was dropped. The main thread may have exited, or the request may
-                // have been cancelled.
-                log::warn!("could not send back return value from Typst thread");
-            }
-        });
-
-        self.intr_tx
-            .send(Interrupt::Task(task))
-            .map_err(map_string_err("failed to send steal request"))?;
-        Ok(rx)
-    }
-
-    /// Steal the compiler thread and run the given function.
-    pub fn steal<Ret: Send + 'static>(
-        &self,
-        f: impl FnOnce(&mut Ctx) -> Ret + Send + 'static,
-    ) -> ZResult<Ret> {
-        utils::threaded_receive(self.steal_inner(f)?)
-    }
-
-    /// Steal the compiler thread and run the given function.
-    pub async fn steal_async<Ret: Send + 'static>(
-        &self,
-        f: impl FnOnce(&mut Ctx) -> Ret + Send + 'static,
-    ) -> ZResult<Ret> {
-        self.steal_inner(f)?
-            .await
-            .map_err(map_string_err("failed to call steal_async"))
-    }
-
-    pub fn settle(&self) -> ZResult<()> {
-        let (tx, rx) = oneshot::channel();
-        self.intr_tx
-            .send(Interrupt::Settle(tx))
-            .map_err(map_string_err("failed to send settle request"))?;
-        utils::threaded_receive(rx)
-    }
-
-    pub fn add_memory_changes(&self, event: MemoryEvent) {
-        log_send_error("mem_event", self.intr_tx.send(Interrupt::Memory(event)));
-    }
-}
-
-#[derive(Debug, Serialize)]
-pub struct DocToSrcJumpInfo {
-    pub filepath: String,
-    pub start: Option<(usize, usize)>, // row, column
-    pub end: Option<(usize, usize)>,
-}
-
-// todo: remove constraint to CompilerWorld
-impl<F: CompilerFeat, Ctx: Compiler<World = CompilerWorld<F>>>
-    CompileClient<CompileServerActor<Ctx>>
-where
-    Ctx::World: EntryManager,
-{
-    /// fixme: character is 0-based, UTF-16 code unit.
-    /// We treat it as UTF-8 now.
-    pub async fn resolve_src_to_doc_jump(
-        &self,
-        filepath: PathBuf,
-        line: usize,
-        character: usize,
-    ) -> ZResult<Option<Position>> {
-        self.steal_async(move |this| {
-            let doc = this.document()?;
-
-            let world = this.compiler.world();
-
-            let relative_path = filepath
-                .strip_prefix(&this.compiler.world().workspace_root()?)
-                .ok()?;
-
-            let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
-            let source = world.source(source_id).ok()?;
-            let cursor = source.line_column_to_byte(line, character)?;
-
-            jump_from_cursor(&doc, &source, cursor)
-        })
-        .await
-    }
-
-    /// fixme: character is 0-based, UTF-16 code unit.
-    /// We treat it as UTF-8 now.
-    pub async fn resolve_src_location(
-        &self,
-        loc: SourceLocation,
-    ) -> ZResult<Option<SourceSpanOffset>> {
-        self.steal_async(move |this| {
-            let world = this.compiler.world();
-
-            let filepath = Path::new(&loc.filepath);
-            let relative_path = filepath
-                .strip_prefix(&this.compiler.world().workspace_root()?)
-                .ok()?;
-
-            let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
-            let source = world.source(source_id).ok()?;
-            let cursor = source.line_column_to_byte(loc.pos.line, loc.pos.column)?;
-
-            let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
-            if node.kind() != SyntaxKind::Text {
-                return None;
-            }
-            let span = node.span();
-            // todo: unicode char
-            let offset = cursor.saturating_sub(node.offset());
-
-            Some(SourceSpanOffset { span, offset })
-        })
-        .await
-    }
-
-    pub async fn resolve_span(&self, span: Span) -> ZResult<Option<DocToSrcJumpInfo>> {
-        self.resolve_span_and_offset(span, None).await
-    }
-
-    pub async fn resolve_span_and_offset(
-        &self,
-        span: Span,
-        offset: Option<usize>,
-    ) -> ZResult<Option<DocToSrcJumpInfo>> {
-        let resolve_off =
-            |src: &Source, off: usize| src.byte_to_line(off).zip(src.byte_to_column(off));
-
-        self.steal_async(move |this| {
-            let world = this.compiler.world();
-            let src_id = span.id()?;
-            let source = world.source(src_id).ok()?;
-            let mut range = source.find(span)?.range();
-            if let Some(off) = offset {
-                if off < range.len() {
-                    range.start += off;
-                }
-            }
-            let filepath = world.path_for_id(src_id).ok()?;
-            Some(DocToSrcJumpInfo {
-                filepath: filepath.to_string_lossy().to_string(),
-                start: resolve_off(&source, range.start),
-                end: resolve_off(&source, range.end),
-            })
-        })
-        .await
-    }
-}
-
-/// Find the output location in the document for a cursor position.
-pub fn jump_from_cursor(
-    document: &TypstDocument,
-    source: &Source,
-    cursor: usize,
-) -> Option<Position> {
-    let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
-    if node.kind() != SyntaxKind::Text {
-        return None;
-    }
-
-    let mut min_dis = u64::MAX;
-    let mut p = Point::default();
-    let mut ppage = 0usize;
-
-    let span = node.span();
-    for (i, page) in document.pages.iter().enumerate() {
-        let t_dis = min_dis;
-        if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
-            return Some(Position {
-                page: NonZeroUsize::new(i + 1)?,
-                point: pos,
-            });
-        }
-        if t_dis != min_dis {
-            ppage = i;
-        }
-    }
-
-    if min_dis == u64::MAX {
-        return None;
-    }
-
-    Some(Position {
-        page: NonZeroUsize::new(ppage + 1)?,
-        point: p,
-    })
-}
-
-/// Find the position of a span in a frame.
-fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) -> Option<Point> {
-    for (mut pos, item) in frame.items() {
-        if let FrameItem::Group(group) = item {
-            // TODO: Handle transformation.
-            if let Some(point) = find_in_frame(&group.frame, span, min_dis, p) {
-                return Some(point + pos);
-            }
-        }
-
-        if let FrameItem::Text(text) = item {
-            for glyph in &text.glyphs {
-                if glyph.span.0 == span {
-                    return Some(pos);
-                }
-                if glyph.span.0.id() == span.id() {
-                    let dis = glyph.span.0.number().abs_diff(span.number());
-                    if dis < *min_dis {
-                        *min_dis = dis;
-                        *p = pos;
-                    }
-                }
-                pos.x += glyph.x_advance.at(text.size);
-            }
-        }
-    }
-
-    None
+pub fn is_inactive(entry: &EntryState) -> bool {
+    use EntryState::*;
+    matches!(entry, Detached | Workspace { main: None, .. })
 }
 
 #[inline]
