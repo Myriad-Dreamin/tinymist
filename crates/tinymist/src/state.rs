@@ -30,14 +30,11 @@ impl CompileServer {
 impl TypstLanguageServer {
     /// Pin the entry to the given path
     pub fn pin_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
-        let entry = if new_entry.is_some() {
-            new_entry
-        } else {
-            let fallback = self.config.compile.determine_default_entry_path();
-            fallback.or_else(|| self.focusing.clone())
-        };
-        self.primary.do_change_entry(entry)?;
-        Ok(())
+        self.pinning = new_entry.is_some();
+        let entry = new_entry
+            .or_else(|| self.config.compile.determine_default_entry_path())
+            .or_else(|| self.focusing.clone());
+        self.primary.do_change_entry(entry).map(|_| ())
     }
 
     /// Updates the primary (focusing) entry
