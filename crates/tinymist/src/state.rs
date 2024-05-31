@@ -31,17 +31,10 @@ impl TypstLanguageServer {
     /// Pin the entry to the given path
     pub fn pin_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
         self.pinning = new_entry.is_some();
-        self.primary.do_change_entry(new_entry)?;
-
-        if !self.pinning {
-            let fallback = self.config.compile.determine_default_entry_path();
-            let fallback = fallback.or_else(|| self.focusing.clone());
-            if let Some(e) = fallback {
-                self.primary.do_change_entry(Some(e))?;
-            }
-        }
-
-        Ok(())
+        let entry = new_entry
+            .or_else(|| self.config.compile.determine_default_entry_path())
+            .or_else(|| self.focusing.clone());
+        self.primary.do_change_entry(entry).map(|_| ())
     }
 
     /// Updates the primary (focusing) entry
