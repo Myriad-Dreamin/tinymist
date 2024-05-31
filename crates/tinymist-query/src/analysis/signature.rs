@@ -418,31 +418,11 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
 
     for param in closure_ast.params().children() {
         match param {
-            ast::Param::Pos(ast::Pattern::Placeholder(..)) => {
-                params.push(Arc::new(ParamSpec {
-                    name: "_".into(),
-                    input: CastInfo::Any,
-                    base_type: None,
-                    type_repr: None,
-                    expr: None,
-                    default: None,
-                    positional: true,
-                    named: false,
-                    variadic: false,
-                    settable: false,
-                    docs: Cow::Borrowed(""),
-                }));
-            }
             ast::Param::Pos(e) => {
-                // todo: destructing
-                let name = e.bindings();
-                if name.len() != 1 {
-                    continue;
-                }
-                let name = name[0].as_str();
+                let name = format!("{}", PatternDisplay(&e));
 
                 params.push(Arc::new(ParamSpec {
-                    name: name.into(),
+                    name: name.as_str().into(),
                     input: CastInfo::Any,
                     base_type: None,
                     type_repr: None,
@@ -492,6 +472,48 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
     }
 
     params
+}
+
+struct PatternDisplay<'a>(&'a ast::Pattern<'a>);
+
+impl<'a> fmt::Display for PatternDisplay<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            ast::Pattern::Normal(ast::Expr::Ident(ident)) => f.write_str(ident.as_str()),
+            ast::Pattern::Normal(_) => f.write_str("?"), // unreachable?
+            ast::Pattern::Placeholder(_) => f.write_str("_"),
+            ast::Pattern::Parenthesized(p) => {
+                write!(f, "{}", PatternDisplay(&p.pattern()))
+            }
+            ast::Pattern::Destructuring(d) => {
+                write!(f, "(")?;
+                let mut first = true;
+                for item in d.items() {
+                    if first {
+                        first = false;
+                    } else {
+                        write!(f, ", ")?;
+                    }
+                    match item {
+                        ast::DestructuringItem::Pattern(p) => write!(f, "{}", PatternDisplay(&p))?,
+                        ast::DestructuringItem::Named(n) => write!(
+                            f,
+                            "{}: {}",
+                            n.name().as_str(),
+                            unwrap_expr(n.expr()).to_untyped().text()
+                        )?,
+                        ast::DestructuringItem::Spread(s) => write!(
+                            f,
+                            "..{}",
+                            s.sink_ident().map(|i| i.as_str()).unwrap_or_default()
+                        )?,
+                    }
+                }
+                write!(f, ")")?;
+                Ok(())
+            }
+        }
+    }
 }
 
 fn unwrap_expr(mut e: ast::Expr) -> ast::Expr {
