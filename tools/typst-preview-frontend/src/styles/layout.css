@@ -1,0 +1,80 @@
+#typst-top-toolbar {
+  align-items: center;
+  background-color: var(--typst-preview-toolbar-bg-color);
+  color: var(--typst-preview-toolbar-fg-color);
+  border-bottom: 0.5px solid var(--typst-preview-toolbar-border-color);
+  display: flex;
+  /* 35px is height of toolbar in vscode, alternative it could be 
+    2.625rem (height of the pdf viewer's toolbar in chrome ) */
+  height: 35px;
+  padding: 0 0.75rem;
+}
+
+#typst-top-toolbar-start,
+#typst-top-toolbar-end {
+  overflow: hidden;
+}
+
+#typst-container {
+  --main-margin: 0px;
+  cursor: grab;
+}
+
+#typst-container.mode-doc {
+  width: fit-content;
+  height: fit-content;
+  margin: 0 auto;
+  margin-top: -1px;
+}
+
+#typst-container.content-preview {
+  /* --main-margin: 20px;
+  margin-top: calc(var(--main-margin) / 2); */
+  margin-top: 5px;
+}
+
+#typst-container.content-preview .typst-outline-title,
+#typst-container.content-preview .typst-page.canvas-mode {
+  width: calc(100% - (2 * 5px));
+  margin: 0 5px;
+}
+
+#typst-container.content-preview svg {
+  image-rendering: optimizeSpeed;
+  shape-rendering: optimizeSpeed;
+  text-rendering: optimizeSpeed;
+}
+
+#typst-container.mode-doc #typst-top-toolbar {
+  display: none;
+}
+
+#typst-container.mode-doc #typst-app,
+#typst-container.mode-doc #typst-container-main {
+  height: fit-content;
+}
+
+#typst-container.mode-doc #typst-container-main {
+  width: calc(100% - (2 * var(--main-margin)));
+  margin: 0 calc(var(--main-margin));
+}
+
+#typst-container.mode-slide {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+
+#typst-container.mode-slide #typst-container-main {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  max-height: calc(100vh - 35px);
+}
+
+#typst-container.mode-slide #typst-container-top {
+  flex: 0 0 35px;
+  display: flex;
+}

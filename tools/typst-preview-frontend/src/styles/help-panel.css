@@ -1,0 +1,54 @@
+#typst-help-panel {
+  position: absolute;
+  float: left;
+  top: 55px;
+  left: 5vw;
+  width: 90vw;
+  height: calc(95vh - 55px);
+  z-index: 2;
+  overflow: hidden;
+  background-color: rgb(17, 17, 17);
+  border: 1px solid #b3b3b3;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: rgb(241, 245, 249);
+  font-size: 0.6rem;
+}
+
+.typst-panel .panel-title {
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.typst-panel {
+  overflow: scroll;
+}
+
+#typst-help-panel .key-binding-desc {
+  flex: 0 0 auto;
+  width: fit-content;
+  padding: 0.1rem;
+  white-space: nowrap;
+  line-height: 0.6rem;
+  margin: 1px 0;
+}
+
+#typst-help-panel .key-binding-row {
+  flex: 0 0 auto;
+  display: flex;
+}
+
+#typst-help-panel .key-binding-box {
+  width: fit-content;
+  padding: 0.1rem;
+  line-height: 0.6rem;
+
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid hsla(0, 0%, 100%, 0.1);
+  border-radius: 0.25rem;
+  transition: border-color 0.2s;
+  color: #e5e5e5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    Liberation Mono, Courier New, monospace;
+}

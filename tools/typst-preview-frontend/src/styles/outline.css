@@ -1,0 +1,64 @@
+.typst-outline {
+  transition: background-color 0.2s;
+}
+
+.typst-outline:hover {
+  background-color: var(--vscode-editor-selectionHighlightBackground, #7db9de6c);
+}
+
+.typst-outline.collapsed > .typst-outline {
+  display: none;
+}
+
+.typst-outline.collapsed > .typst-page {
+  display: none;
+}
+
+.typst-outline-title.level-1 {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.typst-outline-title.level-2 {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.typst-outline-title.level-3 {
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
+.typst-outline-title.level-4 {
+  font-weight: 400;
+  font-size: 0.7rem;
+}
+
+.typst-outline-title.level-5 {
+  font-weight: 400;
+  font-size: 0.65rem;
+}
+
+.typst-outline-title,
+.typst-preview-canvas-page-number {
+  color: var(--typst-preview-foreground-color);
+  font-family: sans-serif;
+  width: 100%;
+}
+
+.typst-outline-title {
+  text-align: left;
+}
+
+.typst-preview-canvas-page-number {
+  text-align: center;
+}
+
+.typst-preview-svg-page-number {
+  fill: var(--typst-preview-foreground-color);
+  font-family: sans-serif;
+  /* set to alignment center */
+  text-anchor: middle;
+  /* set to alignment center */
+  dominant-baseline: central;
+}

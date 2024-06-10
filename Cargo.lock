@@ -3875,7 +3875,7 @@ dependencies = [
  "typst",
  "typst-assets",
  "typst-pdf",
- "typst-preview",
+ "typst-preview 0.11.4",
  "typst-render",
  "typst-svg",
  "typst-timing",
@@ -4309,6 +4309,39 @@ name = "typst-preview"
 version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "193407d42cff6e7fa4b5e0b634b9ead7ccc5393cfb708ed2bd60d930d9f1d9de"
+dependencies = [
+ "anyhow",
+ "await-tree",
+ "clap",
+ "clap_complete",
+ "clap_mangen",
+ "comemo 0.4.0",
+ "elsa",
+ "env_logger",
+ "futures",
+ "hyper",
+ "indexmap 2.2.6",
+ "log",
+ "memmap2",
+ "notify",
+ "once_cell",
+ "open",
+ "serde",
+ "serde_json",
+ "tiny-skia",
+ "tokio",
+ "tokio-tungstenite",
+ "typst",
+ "typst-assets",
+ "typst-ts-compiler",
+ "typst-ts-core",
+ "typst-ts-svg-exporter",
+ "vergen",
+]
+
+[[package]]
+name = "typst-preview"
+version = "0.11.7"
 dependencies = [
  "anyhow",
  "await-tree",
