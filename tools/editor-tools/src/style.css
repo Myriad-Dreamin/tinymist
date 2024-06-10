@@ -96,6 +96,10 @@ body {
   transition: color 0.05s;
 }
 
+.tinymist-code {
+  font-family: Cascadia Code, Consolas, SF Mono, DejaVu Sans Mono, monospace;
+}
+
 #tinymist-app, .tinymist-main-window {
   margin: 24px 28px;
 }
@@ -167,11 +171,11 @@ body.typst-preview-light .tinymist-button.warning.activated {
   background: rgba(243, 202, 99, 0.9);
 }
 
-.tinymist-icon path {
+.tinymist-icon :is(path, rect) {
   fill: currentColor;
 }
 
-.tinymist-icon path.stroke-based {
+.tinymist-icon :is(path, rect).stroke-based {
   fill: none;
   stroke: currentColor;
 }

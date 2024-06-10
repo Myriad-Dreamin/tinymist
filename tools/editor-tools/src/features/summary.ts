@@ -1,6 +1,8 @@
 import van, { ChildDom } from "vanjs-core";
 import { requestRevealPath } from "../vscode";
-const { div, a, span, code, br } = van.tags;
+import { CopyIcon } from "../icons";
+import { startModal } from "../components/modal";
+const { div, a, span, code, br, button, textarea, label, input } = van.tags;
 
 interface ServerInfo {
   root: string;
@@ -169,6 +171,24 @@ export const Summary = () => {
     div(
       { class: `tinymist-card`, style: "flex: 1; width: 100%; padding: 10px" },
       div(
+        { style: "position: relative; width: 100%; height: 0px" },
+        button(
+          {
+            class: "tinymist-button",
+            style: "position: absolute; top: 0px; right: 0px",
+            onclick: () => {
+              startModal(
+                div(
+                  { style: "height: calc(100% - 20px); box-sizing: border-box; padding-top: 4px" },
+                  fontsExportPannel({ fonts: docMetrics.val.fontInfo, sources: docMetrics.val.spanInfo.sources }),
+                ),
+              );
+            },
+          },
+          CopyIcon(),
+        ),
+      ),
+      div(
         van.derive(
           () => `This document uses ${docMetrics.val.fontInfo.length} fonts.`
         )
@@ -265,6 +285,103 @@ export const Summary = () => {
     )
   );
 };
+
+interface fontsExportPannelProps {
+  fonts: FontInfo[],
+  sources: FontSource[],
+}
+
+const fontsExportPannel = ({ fonts, sources }: fontsExportPannelProps) => {
+  const fsOnly = van.state(true);
+  const needName = van.state(false);
+  const needDetail = van.state(false);
+  const needPath = van.state(true);
+  const fieldSep = van.state("; ");
+
+  const data = fonts.map(font => {
+    let kindIsFs = false
+    let path = "none";
+    if (typeof font.source === "number") {
+      let w = sources[font.source];
+      if (w.kind == "fs") {
+        path = w.path;
+        kindIsFs = true;
+      } else {
+        path = `memory://${font.fullName ?? font.name}`;
+      }
+    }
+    return {
+      kindIsFs: kindIsFs,
+      name: `${font.fullName ?? font.name}`,
+      detail: [`style: ${font.style}`, `weight: ${font.weight}`, `stretch: ${font.stretch}`],
+      path,
+    }
+  });
+
+  type dataType = typeof data extends (infer ElementType)[] ? ElementType : never;
+
+  const exportText = van.derive<string>(() => {
+    const exportLine = (d: dataType) => [
+      ...(needName.val ? [d.name] : []),
+      ...(needName.val && needDetail.val ? d.detail : []), // detail without name seems meaningless
+      ...(needPath.val ? [d.path] : []),
+    ].join(fieldSep.val);
+
+    if (needName.val || needPath.val) {
+      let lines = data.filter(d => fsOnly.val ? d.kindIsFs : true).map(exportLine);
+
+      // If only font path, do a deduplication
+      if (!needName.val) {
+        lines = [...new Set(lines)];
+      }
+
+      return lines.join("\n")
+    } else {
+      return "";
+    }
+  });
+
+  return div(
+    { style: "display: flex; flex-direction: column; gap: 4px; width: 100%; height: 100%" },
+    div(
+      { style: "flex: 0" },
+      label({ for: "fs-only", }, "FS Only:"),
+      input({ id: "fs-only", type: "checkbox", checked: fsOnly, 
+        onchange: e => fsOnly.val = e.target.checked }),
+      label({ for: "font-name", style: "margin-left: 16px" }, "Name:"),
+      input({ id: "font-name", type: "checkbox", checked: needName, 
+        onchange: e => needName.val = e.target.checked }),
+      label({ for: "font-detail", style: "margin-left: 16px" }, "Detail:"),
+      input({ id: "font-detail", type: "checkbox", disabled: van.derive(() => !needName.val), checked: needDetail, 
+        onchange: e => needDetail.val = e.target.checked }),
+      label({ for: "path", style: "margin-left: 16px" }, "Path:"),
+      input({ id: "path", type: "checkbox", checked: needPath, 
+        onchange: e => needPath.val = e.target.checked }),
+      label({ for: "sep", style: "margin-left: 16px" }, "Sep:"),
+      input({
+        id: "sep", type: "input", style: "width: 40px", value: fieldSep,
+        oninput: e => fieldSep.val = e.target.value,
+        onkeydown: e => e.stopPropagation(), // prevent modal window closed by space when input
+      }),
+    ),
+    textarea(
+      {
+        class: "tinymist-code",
+        style: "resize: none; width: 100%; flex: 1; white-space: pre; overflow-wrap: normal; overflow-x: scroll;",
+        readOnly: true, onkeydown: e => e.stopPropagation(),
+      },
+      exportText,
+    ),
+    button(
+      {
+        class: "tinymist-button",
+        style: "flex: 0",
+        onclick: () => navigator.clipboard.writeText(exportText.val),
+      },
+      "Copy",
+    ),
+  );
+}
 
 interface SpanInfo {
   sources: FontSource[];
