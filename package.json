@@ -6,6 +6,7 @@
   "license": "Apache-2.0",
   "workspaces": [
     "editors/vscode",
+    "contrib/typst-preview/editors/vscode",
     "tools/editor-tools",
     "tools/typst-dom",
     "tools/typst-preview-frontend"

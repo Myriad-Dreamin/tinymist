@@ -12,6 +12,7 @@ repository.workspace = true
 
 [dependencies]
 
+tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
 tinymist-render.workspace = true
 
@@ -68,7 +69,7 @@ base64.workspace = true
 [features]
 default = ["cli", "preview"]
 cli = ["clap"]
-preview = ["typst-preview"]
+preview = ["typst-preview", "tinymist-assets/typst-preview"]
 dhat-heap = ["dhat"]
 
 [build-dependencies]
