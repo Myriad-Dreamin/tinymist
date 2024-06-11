@@ -481,11 +481,6 @@
   resolved "https://registry.yarnpkg.com/@types/semver/-/semver-7.5.8.tgz#8268a8c57a3e4abd25c165ecd36237db7948a55e"
   integrity sha512-I8EUhyrgfLrcTkzV3TSsGyl1tSuPrEDzr0yd5m90UgNxQkyDXULk3b6MlQqTCpZpNtWe1K0hzclnZkTcLBe2UQ==
 
-"@types/vscode@1.77.0":
-  version "1.77.0"
-  resolved "https://registry.yarnpkg.com/@types/vscode/-/vscode-1.77.0.tgz#f92f15a636abc9ef562f44dd8af6766aefedb445"
-  integrity sha512-MWFN5R7a33n8eJZJmdVlifjig3LWUNRrPeO1xemIcZ0ae0TEQuRc7G2xV0LUX78RZFECY1plYBn+dP/Acc3L0Q==
-
 "@types/vscode@^1.77.0":
   version "1.90.0"
   resolved "https://registry.yarnpkg.com/@types/vscode/-/vscode-1.90.0.tgz#c122384d51bd774cec4aa86ca443858adc9edef2"
@@ -3651,7 +3646,7 @@ typescript@^5.2.2, typescript@^5.3.3:
     "@myriaddreamin/typst-ts-renderer" "0.5.0-rc4"
     "@myriaddreamin/typst.ts" "0.5.0-rc4"
     rxjs "^7.8.1"
-    typst-dom "link:../../../AppData/Local/Yarn/Cache/v6/npm-typst-preview-frontend-0.0.0-a013c1b2-091b-4a2b-ae70-8d9391e0b8be-1718090222995/node_modules/typst-dom"
+    typst-dom "link:../../../AppData/Local/Yarn/Cache/v6/npm-typst-preview-frontend-0.0.0-ba569980-6f57-4306-b152-c2ff71ff6d1a-1718090360050/node_modules/typst-dom"
 
 uc.micro@^1.0.1, uc.micro@^1.0.5:
   version "1.0.6"
