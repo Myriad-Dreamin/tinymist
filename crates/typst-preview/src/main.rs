@@ -16,18 +16,13 @@ use hyper::{
     Error,
 };
 
+use tinymist_assets::TYPST_PREVIEW_HTML;
 use typst_preview::{
     await_tree::{get_await_tree_async, REGISTRY},
     preview, CliArguments, PreviewMode, Previewer,
 };
 
 mod compiler;
-
-/// If this file is not found, please refer to https://enter-tainer.github.io/typst-preview/dev.html to build the frontend.
-#[cfg(feature = "embed-html")]
-const HTML: &str = include_str!("index.html");
-#[cfg(not(feature = "embed-html"))]
-const HTML: &str = "<html><body>Typst Preview needs to be built with the `embed-html` feature to work!</body></html>";
 
 pub fn make_static_host(
     previewer: &Previewer,
@@ -145,7 +140,7 @@ async fn main() {
 
             compile_server.spawn().unwrap()
         },
-        HTML,
+        TYPST_PREVIEW_HTML,
     );
     let previewer = async_root
         .instrument(previewer)
