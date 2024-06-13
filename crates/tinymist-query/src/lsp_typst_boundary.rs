@@ -213,6 +213,10 @@ pub mod typst_to_lsp {
         lsp_position_encoding: LspPositionEncoding,
         typst_source: &Source,
     ) -> LspPosition {
+        if typst_offset >= typst_source.len_bytes() {
+            return LspPosition::new(typst_source.len_lines() as u32, 0);
+        }
+
         let line_index = typst_source.byte_to_line(typst_offset).unwrap();
         let column_index = typst_source.byte_to_column(typst_offset).unwrap();
 
