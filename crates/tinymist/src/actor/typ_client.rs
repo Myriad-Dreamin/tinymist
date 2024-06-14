@@ -456,7 +456,7 @@ impl CompileClientActor {
 
     pub fn on_save_export(&self, path: PathBuf) -> anyhow::Result<()> {
         info!("CompileActor: on save export: {}", path.display());
-        let _ = self.export_tx.send(ExportRequest::OnSaved(path));
+        let _ = self.export_tx.send(ExportRequest::OnSaved);
 
         Ok(())
     }
