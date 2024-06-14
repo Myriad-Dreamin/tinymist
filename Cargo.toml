@@ -55,7 +55,7 @@ typst-ts-core = { version = "0.5.0-rc4", default-features = false }
 typst-ts-compiler = { version = "0.5.0-rc4" }
 typst-ts-svg-exporter = { version = "0.5.0-rc4" }
 typst-preview = { version = "0.11.3" }
-typstyle = "0.11.23"
+typstyle = "0.11.26"
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
 
 lsp-server = "0.7.6"
