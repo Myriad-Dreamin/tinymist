@@ -27,7 +27,7 @@ pub struct ExportConfig {
 #[derive(Debug)]
 pub enum ExportRequest {
     OnTyped,
-    OnSaved(PathBuf),
+    OnSaved,
     Oneshot(Option<ExportKind>, oneshot::Sender<Option<PathBuf>>),
     ChangeConfig(ExportConfig),
     ChangeExportPath(EntryState),
@@ -61,7 +61,7 @@ impl ExportActor {
                     ExportRequest::ChangeConfig(config) => self.config = config,
                     ExportRequest::ChangeExportPath(entry) => self.entry = entry,
                     ExportRequest::OnTyped => need_export |= self.config.mode == ExportMode::OnType,
-                    ExportRequest::OnSaved(..) => match self.config.mode {
+                    ExportRequest::OnSaved => match self.config.mode {
                         ExportMode::OnSave => need_export = true,
                         ExportMode::OnDocumentHasTitle => need_export |= doc.title.is_some(),
                         _ => {}

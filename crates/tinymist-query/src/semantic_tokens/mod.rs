@@ -181,7 +181,10 @@ impl Tokenizer {
                 token_modifiers_bitset: token.modifiers.bitset(),
             });
         } else {
-            let final_line = self.source.byte_to_line(utf8_end).unwrap() as u32;
+            let final_line = self
+                .source
+                .byte_to_line(utf8_end)
+                .unwrap_or_else(|| self.source.len_lines()) as u32;
             let next_offset = self
                 .source
                 .line_to_byte((self.curr_pos.line + 1) as usize)

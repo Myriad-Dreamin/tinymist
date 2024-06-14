@@ -32,7 +32,7 @@ pub mod harness;
 mod resource;
 mod server;
 mod state;
-mod tools;
+pub mod tools;
 pub mod transport;
 mod utils;
 mod world;
