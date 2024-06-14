@@ -213,7 +213,7 @@ pub mod typst_to_lsp {
         lsp_position_encoding: LspPositionEncoding,
         typst_source: &Source,
     ) -> LspPosition {
-        if typst_offset >= typst_source.len_bytes() {
+        if typst_offset > typst_source.len_bytes() {
             return LspPosition::new(typst_source.len_lines() as u32, 0);
         }
 
@@ -364,6 +364,31 @@ mod test {
                 assert!(off.is_some(), "line: {line}, character: {character}");
             }
         }
+    }
+
+    #[test]
+    fn overflow_offset_to_position() {
+        let source = Source::detached("test");
+
+        let offset = source.len_bytes();
+        let position = typst_to_lsp::offset_to_position(offset, PositionEncoding::Utf16, &source);
+        assert_eq!(
+            position,
+            LspPosition {
+                line: 0,
+                character: 4
+            }
+        );
+
+        let offset = source.len_bytes() + 1;
+        let position = typst_to_lsp::offset_to_position(offset, PositionEncoding::Utf16, &source);
+        assert_eq!(
+            position,
+            LspPosition {
+                line: 1,
+                character: 0
+            }
+        );
     }
 
     #[test]
