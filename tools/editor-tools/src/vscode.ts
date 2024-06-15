@@ -1,4 +1,5 @@
 import van from "vanjs-core";
+import type { fontsExportConfigure } from "./features/summary";
 
 const vscodeAPI = typeof acquireVsCodeApi !== "undefined" && acquireVsCodeApi();
 
@@ -69,6 +70,12 @@ export function requestSavePackageData(data: any) {
   }
 }
 
+export function requestSaveFontsExportConfigure(data: fontsExportConfigure) {
+  if (vscodeAPI?.postMessage) {
+    vscodeAPI.postMessage({ type: "saveFontsExportConfigure", data });
+  }
+}
+
 export function requestInitTemplate(packageSpec: string) {
   if (vscodeAPI?.postMessage) {
     vscodeAPI.postMessage({ type: "initTemplate", packageSpec });
@@ -104,5 +111,11 @@ export function requestTextEdit(edit: TextEdit) {
         ? edit.newText
         : edit.newText.code || edit.newText.rest || ""
     );
+  }
+}
+
+export function saveDataToFile({data, path, option}: { data: string, path?: string, option?: any}) {
+  if (vscodeAPI?.postMessage) {
+    vscodeAPI.postMessage({ type: "saveDataToFile", data, path, option});
   }
 }

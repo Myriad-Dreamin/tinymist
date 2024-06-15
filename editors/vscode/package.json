@@ -506,7 +506,8 @@
     },
     "dependencies": {
         "vscode-languageclient": "^9.0.1",
-        "vscode-variables": "^0.1.3"
+        "vscode-variables": "^0.1.3",
+        "editor-tools": "file:../../tools/editor-tools"
     },
     "devDependencies": {
         "@types/node": "^20.8.10",

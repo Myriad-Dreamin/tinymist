@@ -1,7 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { readFile } from "fs/promises";
+import { readFile, writeFile } from "fs/promises";
 import { getFocusingFile, getLastFocusingDoc } from "./extension";
+import { fontsExportConfigure, fontsExportDefaultConfigure } from "editor-tools/src/features/summary";
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
     const filePath = path.resolve(context.extensionPath, relativePath);
@@ -36,6 +37,22 @@ export function getUserPackageData(context: vscode.ExtensionContext) {
     }
 
     return userPackageData;
+}
+
+const FONTS_EXPORT_CONFIGURE_VERSION = "0.0.1";
+
+export function getFontsExportConfigure(context: vscode.ExtensionContext) {
+    const defaultConfigure: Versioned<fontsExportConfigure> = {
+        version: FONTS_EXPORT_CONFIGURE_VERSION,
+        data: fontsExportDefaultConfigure,
+    };
+
+    const configure = context.globalState.get("fontsExportConfigure", defaultConfigure);
+    if (configure?.version !== FONTS_EXPORT_CONFIGURE_VERSION) {
+        return defaultConfigure;
+    }
+
+    return configure;
 }
 
 export async function activateEditorTool(
@@ -106,6 +123,14 @@ async function activateEditorToolAt(
                 const data = message.data;
                 context.globalState.update("userPackageData", {
                     version: USER_PACKAGE_VERSION,
+                    data,
+                });
+                break;
+            }
+            case "saveFontsExportConfigure": {
+                const data = message.data;
+                context.globalState.update("fontsExportConfigure", {
+                    version: FONTS_EXPORT_CONFIGURE_VERSION,
                     data,
                 });
                 break;
@@ -220,6 +245,18 @@ async function activateEditorToolAt(
 
                 break;
             }
+            case "saveDataToFile": {
+                let { data, path, option } = message;
+                if (typeof path !== "string") {
+                    const uri = await vscode.window.showSaveDialog(option);
+                    path = uri?.fsPath;
+                }
+                if (typeof path !== "string") {
+                    return;
+                }
+                await writeFile(path, data);
+                break;
+            }
             default: {
                 console.error("Unknown message type", message.type);
                 break;
@@ -270,6 +307,8 @@ async function activateEditorToolAt(
             break;
         }
         case "summary": {
+            const fontsExportConfigure = getFontsExportConfigure(context);
+            const fontsExportConfigureData = JSON.stringify(fontsExportConfigure.data);
             const [docMetrics, serverInfo] = await fetchSummaryInfo();
 
             if (!docMetrics || !serverInfo) {
@@ -284,6 +323,7 @@ async function activateEditorToolAt(
                 return;
             }
 
+            html = html.replace(":[[preview:FontsExportConfigure]]:", btoa(fontsExportConfigureData));
             html = html.replace(":[[preview:DocumentMetrics]]:", btoa(docMetrics));
             html = html.replace(":[[preview:ServerInfo]]:", btoa(serverInfo));
             break;
