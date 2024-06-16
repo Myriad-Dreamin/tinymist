@@ -36,10 +36,14 @@ export function activate(context: ExtensionContext): Promise<void> {
     });
 }
 
+let enableOnEnter = false;
+
 async function startClient(context: ExtensionContext): Promise<void> {
     let config: Record<string, any> = JSON.parse(
         JSON.stringify(workspace.getConfiguration("tinymist"))
     );
+
+    enableOnEnter = !!config.onEnterEvent;
 
     {
         const keys = Object.keys(config);
@@ -264,6 +268,8 @@ export const onEnter = new lc.RequestType<lc.TextDocumentPositionParams, lc.Text
 
 export function onEnterHandler() {
     async function handleKeypress() {
+        if (!enableOnEnter) return false;
+
         const editor = activeTypstEditor();
 
         if (!editor || !client) return false;
