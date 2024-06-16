@@ -277,6 +277,7 @@ impl TypstLanguageServer {
             request_fn!(GotoDeclaration, Self::goto_declaration),
             request_fn!(References, Self::references),
             request_fn!(WorkspaceSymbolRequest, Self::symbol),
+            request_fn!(OnEnter, Self::on_enter),
             request_fn_!(ExecuteCommand, Self::on_execute_command),
         ])
     }
@@ -1182,6 +1183,11 @@ impl TypstLanguageServer {
         let pattern = (!params.query.is_empty()).then_some(params.query);
         run_query!(self.Symbol(pattern))
     }
+
+    fn on_enter(&mut self, params: TextDocumentPositionParams) -> LspResult<Option<Vec<TextEdit>>> {
+        let (path, position) = as_path_pos(params);
+        run_query!(self.OnEnter(path, position))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1253,6 +1259,13 @@ pub(crate) fn result_to_response<T: Serialize>(
         },
         Err(e) => Response::new_err(id, e.code, e.message),
     }
+}
+
+struct OnEnter;
+impl lsp_types::request::Request for OnEnter {
+    type Params = TextDocumentPositionParams;
+    type Result = Option<Vec<TextEdit>>;
+    const METHOD: &'static str = "experimental/onEnter";
 }
 
 #[test]

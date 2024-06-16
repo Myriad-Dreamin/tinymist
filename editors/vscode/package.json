@@ -96,6 +96,12 @@
                         "Do not use semantic tokens for syntax highlighting"
                     ]
                 },
+                "tinymist.onEnterEvent": {
+                    "title": "Handling on enter events",
+                    "description": "Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter) (LSP onEnter feature) to allow automatic insertion of characters on enter, such as `///` for comments. Note: restarting the editor is required to change this setting.",
+                    "type": "boolean",
+                    "default": true
+                },
                 "tinymist.systemFonts": {
                     "title": "Whether to load system fonts for Typst compiler",
                     "description": "A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options. ",
@@ -462,6 +468,13 @@
                 "command": "tinymist.profileCurrentFile",
                 "title": "Profile and visualize execution of the current Typst file",
                 "category": "Typst"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "tinymist.onEnter",
+                "key": "enter",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == typst && !suggestWidgetVisible && !editorHasMultipleSelections && vim.mode != 'Normal' && vim.mode != 'Visual' && vim.mode != 'VisualBlock' && vim.mode != 'VisualLine' && vim.mode != 'SearchInProgressMode' && vim.mode != 'CommandlineInProgress' && vim.mode != 'Replace' && vim.mode != 'EasyMotionMode' && vim.mode != 'EasyMotionInputMode' && vim.mode != 'SurroundInputMode'"
             }
         ],
         "menus": {

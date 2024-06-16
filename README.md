@@ -45,6 +45,10 @@ Language service (LSP) features:
 - [Workspace Symbols](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-all-symbol-definitions-in-folder)
 - [Code Action](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-code-actions)
   - Increasing/Decreasing heading levels.
+- [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter)
+  - <kbd>Enter</kbd> inside triple-slash comments automatically inserts `///`
+  - <kbd>Enter</kbd> in the middle or after a trailing space in `//` inserts `//`
+  - <kbd>Enter</kbd> inside `//!` doc comments automatically inserts `//!`
 
 Extra features:
 

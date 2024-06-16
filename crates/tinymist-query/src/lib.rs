@@ -65,6 +65,8 @@ pub(crate) mod signature_help;
 pub use signature_help::*;
 pub(crate) mod symbol;
 pub use symbol::*;
+pub(crate) mod on_enter;
+pub use on_enter::*;
 pub(crate) mod prepare_rename;
 pub use prepare_rename::*;
 pub(crate) mod references;
@@ -222,6 +224,8 @@ mod polymorphic {
         SelectionRange(SelectionRangeRequest),
         InteractCodeContext(InteractCodeContextRequest),
 
+        OnEnter(OnEnterRequest),
+
         DocumentMetrics(DocumentMetricsRequest),
         ServerInfo(ServerInfoRequest),
     }
@@ -255,6 +259,8 @@ mod polymorphic {
                 CompilerQueryRequest::SelectionRange(..) => ContextFreeUnique,
                 CompilerQueryRequest::InteractCodeContext(..) => PinnedFirst,
 
+                CompilerQueryRequest::OnEnter(..) => ContextFreeUnique,
+
                 CompilerQueryRequest::DocumentMetrics(..) => PinnedFirst,
                 CompilerQueryRequest::ServerInfo(..) => Mergeable,
             }
@@ -286,6 +292,7 @@ mod polymorphic {
                 CompilerQueryRequest::FoldingRange(req) => &req.path,
                 CompilerQueryRequest::SelectionRange(req) => &req.path,
                 CompilerQueryRequest::InteractCodeContext(req) => &req.path,
+                CompilerQueryRequest::OnEnter(req) => &req.path,
 
                 CompilerQueryRequest::DocumentMetrics(req) => &req.path,
                 CompilerQueryRequest::ServerInfo(..) => return None,
@@ -319,6 +326,8 @@ mod polymorphic {
         FoldingRange(Option<Vec<FoldingRange>>),
         SelectionRange(Option<Vec<SelectionRange>>),
         InteractCodeContext(Option<Vec<InteractCodeContextResponse>>),
+
+        OnEnter(Option<Vec<TextEdit>>),
 
         DocumentMetrics(Option<DocumentMetricsResponse>),
         ServerInfo(Option<HashMap<String, ServerInfoResponse>>),

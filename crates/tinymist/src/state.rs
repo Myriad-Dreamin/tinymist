@@ -262,6 +262,7 @@ impl TypstLanguageServer {
             FoldingRange(req) => query_source!(self, FoldingRange, req),
             SelectionRange(req) => query_source!(self, SelectionRange, req),
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
+            OnEnter(req) => query_source!(self, OnEnter, req),
             ColorPresentation(req) => Ok(CompilerQueryResponse::ColorPresentation(req.request())),
             _ => {
                 let client = &mut self.primary;
