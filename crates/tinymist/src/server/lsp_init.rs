@@ -5,7 +5,7 @@ use itertools::Itertools;
 use log::info;
 use lsp_types::*;
 use serde::Deserialize;
-use serde_json::{Map, Value as JsonValue};
+use serde_json::{json, Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
 use typst_ts_core::ImmutPath;
@@ -397,6 +397,10 @@ impl Init {
                 code_lens_provider: Some(CodeLensOptions {
                     resolve_provider: Some(false),
                 }),
+
+                experimental: Some(json!({
+                  "onEnter": true,
+                })),
                 ..Default::default()
             },
             ..Default::default()

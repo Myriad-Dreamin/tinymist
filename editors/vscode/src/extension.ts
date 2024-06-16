@@ -11,6 +11,7 @@ import {
 import * as vscode from "vscode";
 import * as path from "path";
 import * as child_process from "child_process";
+import * as lc from "vscode-languageclient";
 
 import {
     LanguageClient,
@@ -24,6 +25,7 @@ import {
     getUserPackageData,
 } from "./editor-tools";
 import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
+import { applySnippetTextEdits } from "./snippets";
 
 let client: LanguageClient | undefined = undefined;
 
@@ -130,6 +132,8 @@ async function startClient(context: ExtensionContext): Promise<void> {
     });
 
     context.subscriptions.push(
+        commands.registerCommand("tinymist.onEnter", onEnterHandler()),
+
         commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
         commands.registerCommand("tinymist.getCurrentDocumentMetrics", () =>
             commandGetCurrentDocumentMetrics()
@@ -244,6 +248,53 @@ function validateServer(path: string): { valid: true } | { valid: false; message
             return { valid: false, message: `Failed to launch '${path}': ${JSON.stringify(e)}` };
         }
     }
+}
+
+function activeTypstEditor() {
+    const editor = window.activeTextEditor;
+    if (!editor || editor.document.languageId !== "typst") {
+        return;
+    }
+    return editor;
+}
+
+export const onEnter = new lc.RequestType<lc.TextDocumentPositionParams, lc.TextEdit[], void>(
+    "experimental/onEnter"
+);
+
+export function onEnterHandler() {
+    async function handleKeypress() {
+        const editor = activeTypstEditor();
+
+        if (!editor || !client) return false;
+
+        const lcEdits = await client
+            .sendRequest(onEnter, {
+                textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(
+                    editor.document
+                ),
+                position: client.code2ProtocolConverter.asPosition(editor.selection.active),
+            })
+            .catch((_error: any) => {
+                // client.handleFailedRequest(OnEnterRequest.type, error, null);
+                return null;
+            });
+        if (!lcEdits) return false;
+
+        const edits = await client.protocol2CodeConverter.asTextEdits(lcEdits);
+        await applySnippetTextEdits(editor, edits);
+        return true;
+    }
+
+    return async () => {
+        try {
+            if (await handleKeypress()) return;
+        } catch (e) {
+            console.error("onEnter failed", e);
+        }
+
+        await vscode.commands.executeCommand("default:type", { text: "\n" });
+    };
 }
 
 async function commandExport(mode: string, extraOpts?: any): Promise<string | undefined> {
