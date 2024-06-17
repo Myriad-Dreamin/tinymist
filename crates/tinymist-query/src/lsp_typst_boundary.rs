@@ -113,6 +113,8 @@ pub fn url_to_path(uri: Url) -> PathBuf {
 }
 
 pub mod lsp_to_typst {
+    use std::cmp::Ordering;
+
     use typst::syntax::Source;
 
     use super::*;
@@ -123,20 +125,31 @@ pub mod lsp_to_typst {
         typst_source: &Source,
     ) -> Option<TypstOffset> {
         let lines = typst_source.len_lines() as u32;
-        if lsp_position.line >= lines
-            || (lsp_position.line + 1 == lines && {
-                let last_line_offset = typst_source.line_to_byte(lines as usize - 1)?;
-                let last_line_chars = &typst_source.text()[last_line_offset..];
-                let len = match lsp_position_encoding {
-                    LspPositionEncoding::Utf8 => last_line_chars.len(),
-                    LspPositionEncoding::Utf16 => {
-                        last_line_chars.chars().map(char::len_utf16).sum::<usize>()
+
+        'bound_checking: {
+            let should_warning = match lsp_position.line.cmp(&lines) {
+                Ordering::Greater => true,
+                Ordering::Equal => lsp_position.character > 0,
+                Ordering::Less if lsp_position.line + 1 == lines => {
+                    let last_line_offset = typst_source.line_to_byte(lines as usize - 1)?;
+                    let last_line_chars = &typst_source.text()[last_line_offset..];
+                    let len = match lsp_position_encoding {
+                        LspPositionEncoding::Utf8 => last_line_chars.len(),
+                        LspPositionEncoding::Utf16 => {
+                            last_line_chars.chars().map(char::len_utf16).sum::<usize>()
+                        }
+                    };
+
+                    match lsp_position.character.cmp(&(len as u32)) {
+                        Ordering::Less => break 'bound_checking,
+                        Ordering::Greater => true,
+                        Ordering::Equal => false,
                     }
-                };
-                lsp_position.character as usize >= len
-            })
-        {
-            if lsp_position.line > lines || lsp_position.character > 0 {
+                }
+                Ordering::Less => break 'bound_checking,
+            };
+
+            if should_warning {
                 log::warn!(
                     "LSP position is out of bounds: {:?}, while only {:?} lines and {:?} characters at the end.",
                     lsp_position, typst_source.len_lines(), typst_source.line_to_range(typst_source.len_lines() - 1),
