@@ -47,3 +47,20 @@ export const AddIcon = (sz: number = 16) =>
   <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"></path>
 </svg>`,
   });
+
+export const CopyIcon = (sz: number = 16) =>
+  div({
+    class: "tinymist-icon",
+    style: `height: ${sz}px; width: ${sz}px;`,
+    innerHTML: `<svg width="${sz}px" height="${sz}px" viewBox="0 0 16 16" version="1.1"
+  xmlns="http://www.w3.org/2000/svg"
+  xmlns:xlink="http://www.w3.org/1999/xlink">
+  <g stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect class="stroke-based" width="9.8202543" height="11.792212" x="1.742749" y="3.4055943" ry="0.49967012" />
+    <path class="stroke-based" d="m 5.1841347,0.82574918 9.0495613,0.0341483 V 12.129165" />
+    <path class="stroke-based" d="M 3.6542046,6.2680732 H 9.3239071" />
+    <path class="stroke-based" d="M 3.6542046,12.48578 H 7.7302609" />
+    <path class="stroke-based" d="M 3.6542046,9.3769264 H 7.7302609" />
+  </g>
+</svg>`,
+  });
