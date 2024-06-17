@@ -15,7 +15,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Document Highlighting (New)
 
-* highlighting all break points for that loop context in https://github.com/Myriad-Dreamin/tinymist/pull/317
+* Highlighting all break points for that loop context in https://github.com/Myriad-Dreamin/tinymist/pull/317
 
 ## On Enter (New)
 
