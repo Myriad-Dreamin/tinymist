@@ -48,28 +48,32 @@ pub struct ExportActor {
 impl ExportActor {
     pub async fn run(mut self) {
         while let Some(mut req) = self.export_rx.recv().await {
-            let Some(doc) = self.doc_rx.borrow().clone() else {
-                info!("RenderActor: document is not ready");
-                continue;
-            };
-
-            let mut need_export = false;
+            let mut typed = false;
+            let mut saved = false;
+            let read_doc = || self.doc_rx.borrow().clone();
 
             'accumulate: loop {
                 log::debug!("RenderActor: received request: {req:?}");
                 match req {
                     ExportRequest::ChangeConfig(config) => self.config = config,
-                    ExportRequest::ChangeExportPath(entry) => self.entry = entry,
-                    ExportRequest::OnTyped => need_export |= self.config.mode == ExportMode::OnType,
-                    ExportRequest::OnSaved => match self.config.mode {
-                        ExportMode::OnSave => need_export = true,
-                        ExportMode::OnDocumentHasTitle => need_export |= doc.title.is_some(),
-                        _ => {}
-                    },
+                    ExportRequest::ChangeExportPath(entry) => {
+                        self.entry = entry;
+
+                        // Account for an outdated signal.
+                        // todo: we do need to export the old document here but we cannot achieve it
+                        // currently.
+                        typed = false;
+                        saved = false;
+                    }
+                    ExportRequest::OnTyped => typed = true,
+                    ExportRequest::OnSaved => saved = true,
                     ExportRequest::Oneshot(kind, callback) => {
                         // Do oneshot export instantly without accumulation.
                         let kind = kind.as_ref().unwrap_or(&self.kind);
-                        let resp = self.check_mode_and_export(kind, &doc).await;
+                        let resp = match &read_doc() {
+                            Some(doc) => self.check_mode_and_export(kind, doc).await,
+                            None => None,
+                        };
                         if let Err(err) = callback.send(resp) {
                             error!("RenderActor(@{kind:?}): failed to send response: {err:?}");
                         }
@@ -82,6 +86,18 @@ impl ExportActor {
                     _ => break 'accumulate,
                 }
             }
+
+            let Some(doc) = read_doc() else {
+                info!("RenderActor: document is not ready");
+                continue;
+            };
+
+            // We do only check the latest signal and determine whether to export by the
+            // latest state. This is not a TOCTOU issue, as examined by typst-preview.
+            let mode = self.config.mode;
+            let need_export = (typed && mode == ExportMode::OnType)
+                || (saved && mode == ExportMode::OnSave)
+                || (saved && (mode == ExportMode::OnDocumentHasTitle && doc.title.is_some()));
 
             if need_export {
                 self.check_mode_and_export(&self.kind, &doc).await;
