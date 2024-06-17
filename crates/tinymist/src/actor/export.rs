@@ -97,14 +97,11 @@ impl ExportActor {
 
             // We do only check the latest signal and determine whether to export by the
             // latest state. This is not a TOCTOU issue, as examined by typst-preview.
-            let need_export = match signal {
-                Some(ExportSignal::OnType) => self.config.mode == ExportMode::OnType,
-                Some(ExportSignal::OnSave) => match self.config.mode {
-                    ExportMode::OnSave => true,
-                    ExportMode::OnDocumentHasTitle => doc.title.is_some(),
-                    _ => continue,
-                },
-                None => continue,
+            let need_export = match (signal, self.config.mode) {
+                (Some(ExportSignal::OnType), ExportMode::OnType) => true,
+                (Some(ExportSignal::OnSave), ExportMode::OnSave) => true,
+                (Some(ExportSignal::OnSave), ExportMode::OnDocumentHasTitle) => doc.title.is_some(),
+                _ => false,
             };
 
             if need_export {
