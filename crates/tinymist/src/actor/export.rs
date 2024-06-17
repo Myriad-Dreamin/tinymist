@@ -48,12 +48,8 @@ pub struct ExportActor {
 impl ExportActor {
     pub async fn run(mut self) {
         while let Some(mut req) = self.export_rx.recv().await {
-            enum ExportSignal {
-                OnType,
-                OnSave,
-            }
-
-            let mut signal = None;
+            let mut typed = false;
+            let mut saved = false;
             let read_doc = || self.doc_rx.borrow().clone();
 
             'accumulate: loop {
@@ -66,10 +62,11 @@ impl ExportActor {
                         // Account for an outdated signal.
                         // todo: we do need to export the old document here but we cannot achieve it
                         // currently.
-                        signal = None;
+                        typed = false;
+                        saved = false;
                     }
-                    ExportRequest::OnTyped => signal = Some(ExportSignal::OnType),
-                    ExportRequest::OnSaved => signal = Some(ExportSignal::OnSave),
+                    ExportRequest::OnTyped => typed = true,
+                    ExportRequest::OnSaved => saved = true,
                     ExportRequest::Oneshot(kind, callback) => {
                         // Do oneshot export instantly without accumulation.
                         let kind = kind.as_ref().unwrap_or(&self.kind);
@@ -97,12 +94,10 @@ impl ExportActor {
 
             // We do only check the latest signal and determine whether to export by the
             // latest state. This is not a TOCTOU issue, as examined by typst-preview.
-            let need_export = match (signal, self.config.mode) {
-                (Some(ExportSignal::OnType), ExportMode::OnType) => true,
-                (Some(ExportSignal::OnSave), ExportMode::OnSave) => true,
-                (Some(ExportSignal::OnSave), ExportMode::OnDocumentHasTitle) => doc.title.is_some(),
-                _ => false,
-            };
+            let mode = self.config.mode;
+            let need_export = (typed && mode == ExportMode::OnType)
+                || (saved && mode == ExportMode::OnSave)
+                || (saved && (mode == ExportMode::OnDocumentHasTitle && doc.title.is_some()));
 
             if need_export {
                 self.check_mode_and_export(&self.kind, &doc).await;
