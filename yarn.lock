@@ -1168,6 +1168,11 @@ css-what@^6.1.0:
   resolved "https://registry.yarnpkg.com/css-what/-/css-what-6.1.0.tgz#fb5effcf76f1ddea2c81bdfaa4de44e79bac70f4"
   integrity sha512-HTUrgRJ7r4dsZKU6GjmpfRK1O76h97Z8MfS1G0FozR+oF2kG6Vfe8JE6zwrkbxigziPHinCJ+gCPjA9EaBDtRw==
 
+csv-stringify@^6.5.0:
+  version "6.5.0"
+  resolved "https://registry.yarnpkg.com/csv-stringify/-/csv-stringify-6.5.0.tgz#7b1491893c917e018a97de9bf9604e23b88647c2"
+  integrity sha512-edlXFVKcUx7r8Vx5zQucsuMg4wb/xT6qyz+Sr1vnLrdXqlLD1+UKyWNyZ9zn6mUW1ewmGxrpVwAcChGF0HQ/2Q==
+
 data-uri-to-buffer@^4.0.0:
   version "4.0.1"
   resolved "https://registry.yarnpkg.com/data-uri-to-buffer/-/data-uri-to-buffer-4.0.1.tgz#d8feb2b2881e6a4f58c2e08acfd0e2834e26222e"
@@ -1318,6 +1323,14 @@ eastasianwidth@^0.2.0:
   version "0.2.0"
   resolved "https://registry.yarnpkg.com/eastasianwidth/-/eastasianwidth-0.2.0.tgz#696ce2ec0aa0e6ea93a397ffcf24aa7840c827cb"
   integrity sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==
+
+"editor-tools@file:tools/editor-tools":
+  version "0.0.0"
+  dependencies:
+    csv-stringify "^6.5.0"
+    detypify-service "0.2.4"
+    minisearch "^6.3.0"
+    vanjs-core "^1.5.0"
 
 emoji-regex@^10.2.1:
   version "10.3.0"
@@ -3646,7 +3659,7 @@ typescript@^5.2.2, typescript@^5.3.3:
     "@myriaddreamin/typst-ts-renderer" "0.5.0-rc4"
     "@myriaddreamin/typst.ts" "0.5.0-rc4"
     rxjs "^7.8.1"
-    typst-dom "link:../../../AppData/Local/Yarn/Cache/v6/npm-typst-preview-frontend-0.0.0-ba569980-6f57-4306-b152-c2ff71ff6d1a-1718090360050/node_modules/typst-dom"
+    typst-dom "link:../../../AppData/Local/Yarn/Cache/v6/npm-typst-preview-frontend-0.0.0-d9cba72e-dca7-4823-b60e-8055f0c6a705-1718616065893/node_modules/typst-dom"
 
 uc.micro@^1.0.1, uc.micro@^1.0.5:
   version "1.0.6"
