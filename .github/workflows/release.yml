@@ -82,7 +82,13 @@ jobs:
       - name: Install deps
         run: yarn install
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
-      - name: Build vscode extension
+      - name: Build typst-preview vscode extension
+        run: |
+          yarn
+          yarn run compile
+        working-directory: ./contrib/typst-preview/editors/vscode
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+      - name: Build tinymist vscode extension
         run: |
           yarn
           yarn run compile
@@ -167,11 +173,22 @@ jobs:
         with:
           name: tinymist-${{ env.target }}
           path: tinymist-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
-      - name: Package extension
+      - name: Package typst-preview extension
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        shell: pwsh
+        run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
+        working-directory: ./contrib/typst-preview/editors/vscode
+      - name: Package tinymist extension
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
         working-directory: ./editors/vscode
+      - name: Upload typst-preview VSIX artifact
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}.vsix
+          path: contrib/typst-preview/editors/vscode/typst-preview-${{ env.target }}.vsix
       - name: Upload VSIX artifact
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
         uses: actions/upload-artifact@v4
@@ -202,7 +219,13 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Install deps
         run: yarn install
-      - name: Build vscode extension
+      - name: Build typst-preview vscode extension
+        run: |
+          yarn
+          yarn run compile
+        working-directory: ./contrib/typst-preview/editors/vscode
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+      - name: Build tinymist vscode extension
         run: |
           yarn
           yarn run compile
@@ -230,10 +253,18 @@ jobs:
         with:
           name: tinymist-${{ env.target }}
           path: tinymist-${{ env.target }}
+      - name: Package typst-preview extension
+        run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
+        working-directory: ./contrib/typst-preview/editors/vscode
       - name: Package extension
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
         working-directory: ./editors/vscode
-      - name: Upload VSIX artifact
+      - name: Upload typst-preview VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-preview-${{ env.target }}.vsix
+          path: contrib/typst-preview/editors/vscode/typst-preview-${{ env.target }}.vsix
+      - name: Upload tinymist VSIX artifact
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.vsix

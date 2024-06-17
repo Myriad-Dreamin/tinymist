@@ -1,0 +1,289 @@
+{
+  "name": "typst-preview",
+  "displayName": "Typst Preview",
+  "description": "preview your typst document in instant",
+  "publisher": "mgt19937",
+  "license": "MIT",
+  "icon": "./preview-logo.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Enter-tainer/typst-preview"
+  },
+  "version": "0.11.7",
+  "engines": {
+    "vscode": "^1.77.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/src/extension.js",
+  "contributes": {
+    "icons": {
+      "typst-guy": {
+        "description": "typst guy",
+        "default": {
+          "fontPath": "./preview.woff",
+          "fontCharacter": "A"
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "typst",
+        "extensions": [
+          ".typ"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "typst-preview.preview",
+        "title": "Typst Preview: Preview current file",
+        "description": "Launch typst-preview server",
+        "icon": "$(open-preview)",
+        "when": "resourceLangId == typst && editorTextFocus"
+      },
+      {
+        "command": "typst-preview.browser",
+        "title": "Typst Preview: Preview current file in browser",
+        "description": "Launch typst-preview server and open the preview in your browser",
+        "icon": "$(open-preview)",
+        "when": "resourceLangId == typst && editorTextFocus"
+      },
+      {
+        "command": "typst-preview.preview-slide",
+        "title": "Typst Preview: Preview current file in slide mode",
+        "description": "Launch typst-preview server in slide mode",
+        "icon": "$(open-preview)",
+        "when": "resourceLangId == typst && editorTextFocus"
+      },
+      {
+        "command": "typst-preview.browser-slide",
+        "title": "Typst Preview: Preview current file in browser and slide mode",
+        "description": "Launch typst-preview server in slide mode and open the preview in your browser",
+        "icon": "$(open-preview)",
+        "when": "resourceLangId == typst && editorTextFocus"
+      },
+      {
+        "command": "typst-preview.sync",
+        "title": "Typst Preview: Sync preview with current cursor",
+        "description": "Scroll preview to current cursor position",
+        "icon": "$(sync)",
+        "when": "resourceLangId == typst && editorTextFocus"
+      },
+      {
+        "command": "typst-preview.showLog",
+        "title": "Typst Preview: Show Log",
+        "description": "Show typst-preview log",
+        "icon": "$(list-flat)",
+        "when": "resourceLangId == typst"
+      },
+      {
+        "command": "typst-preview.noteOutline",
+        "title": "Note: Jumping to source location of the outline item doesn't work well if its body doesn't have source location, e.g.\n```\n#let my-heading(h) = heading(h) // will jump to here\n#my-heading(\"Title\") // will not jump to here\n```.\nHence, you may want to use `my-heading[Title]` instead to gain better experience of outline jumping.",
+        "description": "...",
+        "icon": "$(extensions-info-message)"
+      },
+      {
+        "command": "typst-preview.showAwaitTree",
+        "title": "Typst Preview: [debug] Show Await Tree",
+        "description": "Show await tree of typst-preview. This is used for debugging."
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "typst-preview.preview",
+          "when": "resourceLangId == typst && editorTextFocus",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "typst-preview.noteOutline",
+          "when": "view == typst-preview.outline",
+          "group": "navigation"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "typst-preview-activitybar",
+          "title": "Typst Preview",
+          "icon": "./icons/activity-bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "typst-preview-activitybar": [
+        {
+          "id": "typst-preview.content-preview",
+          "type": "webview",
+          "name": "Content",
+          "when": "config.typst-preview.showInActivityBar && resourceLangId == typst"
+        },
+        {
+          "id": "typst-preview.outline",
+          "name": "Outline",
+          "when": "config.typst-preview.showInActivityBar && resourceLangId == typst"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Typst Preview",
+      "properties": {
+        "typst-preview.executable": {
+          "type": "string",
+          "default": "",
+          "description": "Path to typst-preview executable. If not set, the extension will use bundled typst-preview. If bundled binary is not found, it will use typst-preview installed in PATH"
+        },
+        "typst-preview.sysInputs": {
+          "type": "object",
+          "items": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "key-value pairs visible through `sys.inputs`, corresponds to `--input` argument of typst cli"
+        },
+        "typst-preview.systemFonts": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to load system fonts. If disabled, only fonts in `typst-preview.fontPaths` is loaded"
+        },
+        "typst-preview.fontPaths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "title": "Font path",
+            "description": "Absolute path to a directory or file containing font assets."
+          },
+          "default": [],
+          "description": "List of *additional* paths to font assets used by typst-preview."
+        },
+        "typst-preview.refresh": {
+          "title": "Refresh preview",
+          "description": "Refresh preview when the document is saved or when the document is changed",
+          "type": "string",
+          "enum": [
+            "onSave",
+            "onType"
+          ],
+          "default": "onType",
+          "enumDescriptions": [
+            "Refresh preview on save",
+            "Refresh preview on type"
+          ]
+        },
+        "typst-preview.scrollSync": {
+          "description": "Configure scroll sync mode.",
+          "type": "string",
+          "enum": [
+            "never",
+            "onSelectionChangeByMouse",
+            "onSelectionChange"
+          ],
+          "default": "onSelectionChangeByMouse",
+          "enumDescriptions": [
+            "Disable automatic scroll sync",
+            "Scroll preview to current cursor position when selection changes by mouse",
+            "Scroll preview to current cursor position when selection changes by mouse or keyboard (any source)"
+          ]
+        },
+        "typst-preview.partialRendering": {
+          "description": "Only render visible part of the document. This can improve performance but still being experimental.",
+          "type": "boolean",
+          "default": true
+        },
+        "typst-preview.invertColors": {
+          "description": "Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview.",
+          "type": "string",
+          "enum": [
+            "never",
+            "auto",
+            "always"
+          ],
+          "default": "never",
+          "enumDescriptions": [
+            "Disable color inversion of the preview",
+            "Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document",
+            "Always invert colors of the preview"
+          ]
+        },
+        "typst-preview.cursorIndicator": {
+          "description": "(Experimental) Show typst cursor indicator in preview.",
+          "type": "boolean",
+          "default": false
+        },
+        "typst-preview.showInActivityBar": {
+          "description": "(Experimental) Show a preview panel in activity bar.",
+          "type": "boolean",
+          "default": false
+        },
+        "typst-preview.statusBarIndicator": {
+          "description": "Style of status bar indicator for typst-preview.",
+          "type": "string",
+          "enum": [
+            "full",
+            "compact"
+          ],
+          "default": "compact",
+          "enumDescriptions": [
+            "Show full status bar indicator (ICON Compile Success)",
+            "Show compact status bar indicator (ICON)"
+          ]
+        },
+        "typst-preview.pinPreviewFile": {
+          "description": "Declare current previewing file as entrypoint for typst-lsp. This will make typst-lsp to use this file as entrypoint instead of the file opened in vscode. This can improve diagnostics messages and auto completion but still being experimental.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "typst-preview.preview",
+        "key": "ctrl+k v",
+        "mac": "cmd+k v",
+        "when": "editorLangId == typst"
+      }
+    ]
+  },
+  "scripts": {
+    "build:frontend": "cd ../../../../tools/typst-preview-frontend && yarn run build && cd ../../contrib/typst-preview/editors/vscode && rimraf ./out/frontend/ && cpr ../../../../tools/typst-preview-frontend/dist/ ./out/frontend/ && rimraf ../../../../crates/tinymist-assets/src/typst-preview.html && cpr ./out/frontend/index.html ../../../../crates/tinymist-assets/src/typst-preview.html",
+    "vscode:prepublish": "yarn run compile",
+    "compile": "tsc -p ./ && yarn run build:frontend",
+    "build": "yarn run compile",
+    "watch": "tsc -watch -p ./",
+    "pretest": "yarn run compile && yarn run lint",
+    "package": "vsce package",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "^6.0.2",
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.77.0",
+    "@types/ws": "^8.5.5",
+    "@typescript-eslint/eslint-plugin": "^6.9.1",
+    "@typescript-eslint/parser": "^6.9.1",
+    "@vscode/test-electron": "^2.3.0",
+    "@vscode/vsce": "^2.22.0",
+    "eslint": "^8.52.0",
+    "glob": "^8.1.0",
+    "mocha": "^10.2.0",
+    "rimraf": "^5.0.1",
+    "typescript": "^5.0.2",
+    "typst-preview-frontend": "file:../../../../tools/typst-preview-frontend"
+  },
+  "dependencies": {
+    "cpr": "^3.0.1",
+    "cross-spawn": "^7.0.3",
+    "node-fetch": "^3.3.2",
+    "vscode-variables": "^0.1.3",
+    "ws": "^8.13.0"
+  }
+}

@@ -6,9 +6,14 @@
   "license": "Apache-2.0",
   "workspaces": [
     "editors/vscode",
-    "tools/editor-tools"
+    "contrib/typst-preview/editors/vscode",
+    "tools/editor-tools",
+    "tools/typst-dom",
+    "tools/typst-preview-frontend"
   ],
-  "scripts": {},
+  "scripts": {
+    "build:preview": "cd contrib/typst-preview/editors/vscode && yarn build"
+  },
   "dependencies": {},
   "devDependencies": {}
 }

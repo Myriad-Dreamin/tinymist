@@ -3867,6 +3867,7 @@ dependencies = [
  "paste",
  "serde",
  "serde_json",
+ "tinymist-assets",
  "tinymist-query",
  "tinymist-render",
  "tokio",
@@ -3888,6 +3889,10 @@ dependencies = [
  "vergen",
  "walkdir",
 ]
+
+[[package]]
+name = "tinymist-assets"
+version = "0.11.11"
 
 [[package]]
 name = "tinymist-query"
@@ -4306,9 +4311,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.11.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "193407d42cff6e7fa4b5e0b634b9ead7ccc5393cfb708ed2bd60d930d9f1d9de"
+version = "0.11.7"
 dependencies = [
  "anyhow",
  "await-tree",
@@ -4316,19 +4319,16 @@ dependencies = [
  "clap_complete",
  "clap_mangen",
  "comemo 0.4.0",
- "elsa",
  "env_logger",
  "futures",
  "hyper",
  "indexmap 2.2.6",
  "log",
- "memmap2",
- "notify",
  "once_cell",
  "open",
  "serde",
  "serde_json",
- "tiny-skia",
+ "tinymist-assets",
  "tokio",
  "tokio-tungstenite",
  "typst",

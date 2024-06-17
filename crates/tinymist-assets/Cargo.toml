@@ -1,0 +1,15 @@
+[package]
+name = "tinymist-assets"
+description = "Provides assets for tinymist."
+categories = ["compilers"]
+keywords = ["asset", "typst"]
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+
+[features]
+typst-preview = []
