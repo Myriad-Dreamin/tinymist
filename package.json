@@ -11,7 +11,9 @@
     "tools/typst-dom",
     "tools/typst-preview-frontend"
   ],
-  "scripts": {},
+  "scripts": {
+    "build:preview": "cd contrib/typst-preview/editors/vscode && yarn build"
+  },
   "dependencies": {},
   "devDependencies": {}
 }
