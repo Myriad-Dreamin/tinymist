@@ -53,7 +53,7 @@ impl ExportActor {
                 OnSave,
             }
 
-            let mut to_check = None;
+            let mut signal = None;
             let read_doc = || self.doc_rx.borrow().clone();
 
             'accumulate: loop {
@@ -66,10 +66,10 @@ impl ExportActor {
                         // Account for an outdated signal.
                         // todo: we do need to export the old document here but we cannot achieve it
                         // currently.
-                        to_check = None;
+                        signal = None;
                     }
-                    ExportRequest::OnTyped => to_check = Some(ExportSignal::OnType),
-                    ExportRequest::OnSaved => to_check = Some(ExportSignal::OnSave),
+                    ExportRequest::OnTyped => signal = Some(ExportSignal::OnType),
+                    ExportRequest::OnSaved => signal = Some(ExportSignal::OnSave),
                     ExportRequest::Oneshot(kind, callback) => {
                         // Do oneshot export instantly without accumulation.
                         let kind = kind.as_ref().unwrap_or(&self.kind);
@@ -97,7 +97,7 @@ impl ExportActor {
 
             // We do only check the latest signal and determine whether to export by the
             // latest state. This is not a TOCTOU issue, as examined by typst-preview.
-            let need_export = match to_check {
+            let need_export = match signal {
                 Some(ExportSignal::OnType) => self.config.mode == ExportMode::OnType,
                 Some(ExportSignal::OnSave) => match self.config.mode {
                     ExportMode::OnSave => true,
