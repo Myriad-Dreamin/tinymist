@@ -4,6 +4,34 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.11 - [2024-06-17]
+
+* Bumped typstyle to v0.11.26 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/326
+
+## Compiler
+
+* (Fix): Handling the conversion of offset at the EOF in https://github.com/Myriad-Dreamin/tinymist/pull/325
+* (Fix) Accumulating export events correctly in https://github.com/Myriad-Dreamin/tinymist/pull/330
+
+## Document Highlighting (New)
+
+* highlighting all break points for that loop context in https://github.com/Myriad-Dreamin/tinymist/pull/317
+
+## On Enter (New)
+
+* Implemented `experimental/onEnter` in https://github.com/Myriad-Dreamin/tinymist/pull/328
+
+## Completion
+
+* Generating names for destructuring closure params by @wrenger in https://github.com/Myriad-Dreamin/tinymist/pull/319
+
+## Misc
+
+* Combined CompileClient and CompileClientActor by @QuarticCat in https://github.com/Myriad-Dreamin/tinymist/pull/318
+* Simplified pin_entry by @QuarticCat in https://github.com/Myriad-Dreamin/tinymist/pull/320
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.10...v0.11.11
+
 ## v0.11.10 - [2024-05-26]
 
 * Bumped typstyle to v0.11.23 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/315
