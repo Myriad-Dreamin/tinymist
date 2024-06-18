@@ -92,6 +92,10 @@ function setupVscodeChannel(nextWs) {
     if (vscodeAPI?.postMessage) {
         vscodeAPI.postMessage({ type: 'started' });
     }
+    if (vscodeAPI?.setState && window.vscode_state) {
+        vscodeAPI.setState(window.vscode_state);
+    }
+
 
     // Handle messages sent from the extension to the webview
     window.addEventListener('message', event => {

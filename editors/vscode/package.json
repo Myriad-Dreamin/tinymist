@@ -675,9 +675,7 @@
         }
     },
     "activationEvents": [
-        "onLanguage:typst",
-        "onCommand:tinymist.exportCurrentPdf",
-        "onCommand:tinymist.clearCache"
+        "onWebviewPanel:typst-preview"
     ],
     "scripts": {
         "build:frontend": "cd ../../ && yarn build:preview && yarn build:editor-tools",

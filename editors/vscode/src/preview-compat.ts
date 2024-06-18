@@ -335,6 +335,7 @@ interface LaunchTask {
     activeEditor: vscode.TextEditor;
     bindDocument: vscode.TextDocument;
     mode: "doc" | "slide";
+    webviewPanel?: vscode.WebviewPanel;
 }
 
 export interface LaunchInBrowserTask extends LaunchTask {
@@ -348,7 +349,7 @@ export interface LaunchInWebViewTask extends LaunchTask {
 export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
     let shadowDispose: vscode.Disposable | undefined = undefined;
     let shadowDisposeClose: vscode.Disposable | undefined = undefined;
-    const { context, activeEditor, bindDocument } = task;
+    const { context, activeEditor, bindDocument, webviewPanel } = task;
     const filePath = bindDocument.uri.fsPath;
 
     const refreshStyle =
