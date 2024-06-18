@@ -49,9 +49,11 @@ pub struct FontArgs {
         value_delimiter = ENV_PATH_SEP
     ))]
     pub font_paths: Vec<PathBuf>,
-    /// Exclude system fonts
+
+    /// Ensures system fonts won't be searched, unless explicitly included via
+    /// `--font-path`
     #[cfg_attr(feature = "clap", clap(long, default_value = "false"))]
-    pub no_system_fonts: bool,
+    pub ignore_system_fonts: bool,
 }
 
 /// Common arguments of compile, watch, and query.
@@ -294,7 +296,7 @@ impl CompileConfig {
             let mut opts = self.font_opts.clone();
 
             if let Some(system_fonts) = self.system_fonts {
-                opts.no_system_fonts = !system_fonts;
+                opts.ignore_system_fonts = !system_fonts;
             }
 
             let font_paths = (!self.font_paths.is_empty()).then_some(&self.font_paths);

@@ -42,7 +42,7 @@ typst-svg.workspace = true
 typst-pdf.workspace = true
 typst-render.workspace = true
 typst-timing.workspace = true
-typst-assets = { workspace = true, features = ["fonts"] }
+typst-assets.workspace = true
 
 typstyle.workspace = true
 typstfmt_lib.workspace = true
@@ -50,7 +50,6 @@ typstfmt_lib.workspace = true
 typst-ts-core = { workspace = true, default-features = false, features = [
     "flat-vector",
     "vector-bbox",
-    "no-content-hint",
 ] }
 typst-ts-svg-exporter.workspace = true
 codespan-reporting.workspace = true
@@ -64,13 +63,37 @@ lsp-types.workspace = true
 dhat = { version = "0.3.3", optional = true }
 chrono = { version = "0.4" }
 unicode-script = "0.5"
+await-tree = "0.1.2"
+hyper = { version = "0.14", features = ["full"], optional = true }
+open = { version = "5.1.3", optional = true }
 base64.workspace = true
 
 [features]
-default = ["cli", "preview"]
+default = ["cli", "embed-fonts", "no-content-hint", "preview"]
+
 cli = ["clap"]
-preview = ["typst-preview", "tinymist-assets/typst-preview"]
+
 dhat-heap = ["dhat"]
+
+# Embeds Typst's default fonts for
+# - text (Linux Libertine),
+# - math (New Computer Modern Math), and
+# - code (Deja Vu Sans Mono)
+# and additionally New Computer Modern for text
+# into the binary.
+embed-fonts = ["typst-assets/fonts"]
+
+# Disable the default content hint.
+# This requires modifying typst.
+no-content-hint = ["typst-ts-core/no-content-hint"]
+
+preview = [
+    "typst-preview",
+    "typst-preview/clap",
+    "tinymist-assets/typst-preview",
+    "hyper",
+    "open",
+]
 
 [build-dependencies]
 anyhow.workspace = true

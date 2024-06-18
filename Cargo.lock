@@ -3844,6 +3844,7 @@ version = "0.11.11"
 dependencies = [
  "anyhow",
  "async-trait",
+ "await-tree",
  "base64 0.22.1",
  "cargo_metadata",
  "chrono",
@@ -3858,11 +3859,13 @@ dependencies = [
  "dhat",
  "env_logger",
  "futures",
+ "hyper",
  "itertools 0.12.1",
  "log",
  "lsp-server",
  "lsp-types",
  "once_cell",
+ "open",
  "parking_lot",
  "paste",
  "serde",
@@ -4311,21 +4314,16 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.11.7"
+version = "0.11.11"
 dependencies = [
- "anyhow",
  "await-tree",
  "clap",
- "clap_complete",
- "clap_mangen",
  "comemo 0.4.0",
  "env_logger",
  "futures",
- "hyper",
  "indexmap 2.2.6",
  "log",
  "once_cell",
- "open",
  "serde",
  "serde_json",
  "tinymist-assets",
@@ -4336,7 +4334,6 @@ dependencies = [
  "typst-ts-compiler",
  "typst-ts-core",
  "typst-ts-svg-exporter",
- "vergen",
 ]
 
 [[package]]

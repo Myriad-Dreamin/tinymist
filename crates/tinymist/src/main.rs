@@ -19,6 +19,7 @@ use crate::args::{CliArguments, Commands, CompileArgs, LspArgs};
 use tinymist::{
     compiler_init::{CompileInit, CompileInitializeParams},
     harness::{lsp_harness, InitializedLspDriver, LspDriver, LspHost},
+    preview::preview_main,
     transport::with_stdio_transport,
     CompileFontOpts, Init, LspWorld, TypstLanguageServer,
 };
@@ -67,6 +68,7 @@ fn main() -> anyhow::Result<()> {
     match args.command.unwrap_or_default() {
         Commands::Lsp(args) => lsp_main(args),
         Commands::Compile(args) => compiler_main(args),
+        Commands::Preview(args) => RUNTIMES.tokio_runtime.block_on(preview_main(args)),
         Commands::Probe => Ok(()),
     }
 }
@@ -102,7 +104,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
                 handle: RUNTIMES.tokio_runtime.handle().clone(),
                 compile_opts: CompileFontOpts {
                     font_paths: self.args.font.font_paths.clone(),
-                    no_system_fonts: self.args.font.no_system_fonts,
+                    ignore_system_fonts: self.args.font.ignore_system_fonts,
                     ..Default::default()
                 },
             }
@@ -142,7 +144,7 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
         handle: RUNTIMES.tokio_runtime.handle().clone(),
         font: CompileFontOpts {
             font_paths: args.compile.font.font_paths.clone(),
-            no_system_fonts: args.compile.font.no_system_fonts,
+            ignore_system_fonts: args.compile.font.ignore_system_fonts,
             ..Default::default()
         },
         editor_tx,
