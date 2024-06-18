@@ -95,7 +95,8 @@ divan = "0.1.14"
 insta = { version = "1.36", features = ["glob"] }
 
 typst-preview = { path = "./crates/typst-preview/" }
-tinymist-assets = { path = "./crates/tinymist-assets/" }
+tinymist-assets = { version = "0.11.11" }
+# tinymist-assets = { path = "./crates/tinymist-assets/" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
 tinymist-render = { path = "./crates/tinymist-render/" }
