@@ -96,7 +96,6 @@ insta = { version = "1.36", features = ["glob"] }
 
 typst-preview = { path = "./crates/typst-preview/" }
 tinymist-assets = { version = "0.11.11" }
-# tinymist-assets = { path = "./crates/tinymist-assets/" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
 tinymist-render = { path = "./crates/tinymist-render/" }
@@ -128,6 +127,7 @@ undocumented_unsafe_blocks = "warn"
 
 [patch.crates-io]
 
+tinymist-assets = { path = "./crates/tinymist-assets/" }
 
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
 typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
