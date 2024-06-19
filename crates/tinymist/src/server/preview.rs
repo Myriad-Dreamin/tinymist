@@ -56,7 +56,7 @@ pub struct PreviewCliArgs {
 mod compiler;
 use compiler::CompileServer;
 
-use crate::compiler_init::CompileOnceArgs;
+use crate::compile_init::CompileOnceArgs;
 
 pub fn make_static_host(
     previewer: &Previewer,

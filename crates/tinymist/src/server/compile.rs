@@ -4,39 +4,29 @@ use std::{collections::HashMap, path::Path, sync::Arc, time::Instant};
 use crossbeam_channel::{select, Receiver};
 use log::{error, info, warn};
 use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response, ResponseError};
-use lsp_types::{notification::Notification as _, ExecuteCommandParams};
+use lsp_types::notification::Notification as _;
 use once_cell::sync::OnceCell;
-use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
-use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typst::{diag::FileResult, syntax::Source};
 use typst_ts_compiler::vfs::notify::FileChangeSet;
-use typst_ts_core::{config::compiler::DETACHED_ENTRY, ImmutPath};
+use typst_ts_core::config::compiler::DETACHED_ENTRY;
 
 use crate::{
     actor::{editor::EditorRequest, export::ExportConfig, typ_client::CompileClientActor},
-    compiler_init::{CompileConfig, CompilerConstConfig},
+    compile_init::{CompileConfig, ConstCompileConfig},
     harness::InitializedLspDriver,
-    internal_error, invalid_params, method_not_found, run_query,
+    invalid_params,
     state::MemoryFileMeta,
     LspHost, LspResult,
 };
 
-type LspMethod<Res> = fn(srv: &mut CompileServer, args: JsonValue) -> LspResult<Res>;
-type LspHandler<Req, Res> = fn(srv: &mut CompileServer, args: Req) -> LspResult<Res>;
+type LspMethod<Res> = fn(srv: &mut CompileState, args: JsonValue) -> LspResult<Res>;
+pub(crate) type LspHandler<Req, Res> = fn(srv: &mut CompileState, args: Req) -> LspResult<Res>;
 
 type ExecuteCmdMap = HashMap<&'static str, LspHandler<Vec<JsonValue>, JsonValue>>;
 type NotifyCmdMap = HashMap<&'static str, LspMethod<()>>;
 type RegularCmdMap = HashMap<&'static str, LspMethod<JsonValue>>;
-
-#[macro_export]
-macro_rules! exec_fn {
-    ($ty: ty, Self::$method: ident, $($arg_key:ident),+ $(,)?) => {{
-        const E: $ty = |this, $($arg_key),+| this.$method($($arg_key),+);
-        E
-    }};
-}
 
 #[macro_export]
 macro_rules! request_fn {
@@ -67,9 +57,9 @@ macro_rules! notify_fn {
 }
 
 /// The object providing the language server functionality.
-pub struct CompileServer {
+pub struct CompileState {
     /// The language server client.
-    pub client: LspHost<CompileServer>,
+    pub client: LspHost<CompileState>,
 
     // State to synchronize with the client.
     /// Whether the server is shutting down.
@@ -80,7 +70,7 @@ pub struct CompileServer {
     pub config: CompileConfig,
     /// Const configuration initialized at the start of the session.
     /// For example, the position encoding.
-    pub const_config: CompilerConstConfig,
+    pub const_config: ConstCompileConfig,
 
     // Command maps
     /// Extra commands provided with `textDocument/executeCommand`.
@@ -101,15 +91,15 @@ pub struct CompileServer {
     pub compiler: Option<CompileClientActor>,
 }
 
-impl CompileServer {
+impl CompileState {
     pub fn new(
-        client: LspHost<CompileServer>,
+        client: LspHost<CompileState>,
         compile_config: CompileConfig,
-        const_config: CompilerConstConfig,
+        const_config: ConstCompileConfig,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
         handle: tokio::runtime::Handle,
     ) -> Self {
-        CompileServer {
+        CompileState {
             client,
             editor_tx,
             shutdown_requested: false,
@@ -125,7 +115,7 @@ impl CompileServer {
         }
     }
 
-    pub fn const_config(&self) -> &CompilerConstConfig {
+    pub fn const_config(&self) -> &ConstCompileConfig {
         &self.const_config
     }
 
@@ -203,7 +193,7 @@ impl fmt::Display for Event {
     }
 }
 
-impl InitializedLspDriver for CompileServer {
+impl InitializedLspDriver for CompileState {
     fn initialized(&mut self, _params: lsp_types::InitializedParams) {}
 
     fn main_loop(&mut self, inbox: crossbeam_channel::Receiver<Message>) -> anyhow::Result<()> {
@@ -223,7 +213,7 @@ impl InitializedLspDriver for CompileServer {
     }
 }
 
-impl CompileServer {
+impl CompileState {
     fn next_event(&self, inbox: &Receiver<Message>) -> Option<Event> {
         select! {
             recv(inbox) -> msg =>
@@ -314,7 +304,7 @@ impl CompileServer {
     }
 }
 
-impl CompileServer {
+impl CompileState {
     pub fn on_changed_configuration(&mut self, values: Map<String, JsonValue>) -> LspResult<()> {
         let config = self.config.clone();
         match self.config.update_by_map(&values) {
@@ -357,121 +347,3 @@ impl CompileServer {
 }
 
 struct Cancelled;
-
-impl CompileServer {
-    fn get_exec_commands() -> ExecuteCmdMap {
-        macro_rules! redirected_command {
-            ($key: expr, Self::$method: ident) => {
-                (
-                    $key,
-                    exec_fn!(LspHandler<Vec<JsonValue>, JsonValue>, Self::$method, inputs),
-                )
-            };
-        }
-
-        ExecuteCmdMap::from_iter([
-            redirected_command!("tinymist.exportPdf", Self::export_pdf),
-            redirected_command!("tinymist.exportSvg", Self::export_svg),
-            redirected_command!("tinymist.exportPng", Self::export_png),
-            redirected_command!("tinymist.doClearCache", Self::clear_cache),
-            redirected_command!("tinymist.changeEntry", Self::change_entry),
-        ])
-    }
-
-    /// The entry point for the `workspace/executeCommand` request.
-    fn execute_command(&mut self, params: ExecuteCommandParams) -> LspResult<JsonValue> {
-        let ExecuteCommandParams {
-            command,
-            arguments,
-            work_done_progress_params: _,
-        } = params;
-        let Some(handler) = self.exec_cmds.get(command.as_str()) else {
-            error!("asked to execute unknown command");
-            return Err(method_not_found());
-        };
-        handler(self, arguments)
-    }
-
-    /// Export the current document as a PDF file.
-    pub fn export_pdf(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
-        self.export(ExportKind::Pdf, arguments)
-    }
-
-    /// Export the current document as a Svg file.
-    pub fn export_svg(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
-        let opts = parse_opts(arguments.get(1))?;
-        self.export(ExportKind::Svg { page: opts.page }, arguments)
-    }
-
-    /// Export the current document as a Png file.
-    pub fn export_png(&self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
-        let opts = parse_opts(arguments.get(1))?;
-        self.export(ExportKind::Png { page: opts.page }, arguments)
-    }
-
-    /// Export the current document as some format. The client is responsible
-    /// for passing the correct absolute path of typst document.
-    pub fn export(&self, kind: ExportKind, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
-        let path = parse_path(arguments.first())?.as_ref().to_owned();
-
-        let res = run_query!(self.OnExport(path, kind))?;
-        let res = serde_json::to_value(res).map_err(|_| internal_error("Cannot serialize path"))?;
-
-        Ok(res)
-    }
-
-    /// Clear all cached resources.
-    ///
-    /// # Errors
-    /// Errors if the cache could not be cleared.
-    pub fn clear_cache(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
-        comemo::evict(0);
-        Ok(JsonValue::Null)
-    }
-
-    /// Focus main file to some path.
-    pub fn change_entry(&mut self, arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
-        let new_entry = parse_path_or_null(arguments.first())?;
-
-        let update_result = self.do_change_entry(new_entry.clone());
-        update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
-
-        info!("entry changed: {entry:?}", entry = new_entry);
-        Ok(JsonValue::Null)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ExportOpts {
-    page: PageSelection,
-}
-
-fn parse_opts(v: Option<&JsonValue>) -> LspResult<ExportOpts> {
-    Ok(match v {
-        Some(opts) => serde_json::from_value::<ExportOpts>(opts.clone())
-            .map_err(|_| invalid_params("The third argument is not a valid object"))?,
-        _ => ExportOpts {
-            page: PageSelection::First,
-        },
-    })
-}
-
-fn parse_path(v: Option<&JsonValue>) -> LspResult<ImmutPath> {
-    let new_entry = match v {
-        Some(JsonValue::String(s)) => Path::new(s).into(),
-        _ => {
-            return Err(invalid_params(
-                "The first parameter is not a valid path or null",
-            ))
-        }
-    };
-
-    Ok(new_entry)
-}
-
-fn parse_path_or_null(v: Option<&JsonValue>) -> LspResult<Option<ImmutPath>> {
-    match v {
-        Some(JsonValue::Null) => Ok(None),
-        v => Ok(Some(parse_path(v)?)),
-    }
-}

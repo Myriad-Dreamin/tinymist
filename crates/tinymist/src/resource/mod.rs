@@ -14,7 +14,7 @@ mod prelude {
     pub use typst_ts_svg_exporter::ir::{GlyphItem, GlyphRef};
     pub use typst_ts_svg_exporter::{DefaultExportFeature, SvgTask, SvgText};
 
-    pub use crate::TypstLanguageServer;
+    pub use crate::LanguageState;
 
     pub type Svg<'a> = SvgTask<'a, DefaultExportFeature>;
 }

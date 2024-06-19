@@ -37,8 +37,8 @@ pub mod transport;
 mod utils;
 mod world;
 pub use crate::harness::LspHost;
-pub use server::compiler;
-pub use server::compiler_init;
+pub use server::compile;
+pub use server::compile_init;
 pub use server::lsp::*;
 pub use server::lsp_init::*;
 pub use server::preview;
@@ -46,6 +46,7 @@ pub use world::{
     CompileFontOpts, CompileOnceOpts, CompileOpts, LspUniverse, LspWorld, LspWorldBuilder,
 };
 
+// use async_lsp::ClientSocket;
 use lsp_server::ResponseError;
 
 type LspResult<Res> = Result<Res, ResponseError>;
