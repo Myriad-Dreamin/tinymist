@@ -15,8 +15,10 @@
     <style id="preview-theme-styles"></style>
     <!-- before all of code to avoid rerender by style replacement -->
     <script>
-      // The right side of the equation will be string-replaced later and set in the main.js
-      window.vscode_state = VSCODE_STATE;
+      try {
+        // The right side of the equation will be string-replaced later and set in the main.js
+        window.vscode_state = JSON.parse(`VSCODE_STATE`);
+      } catch (ignored) {}
 
       /// https://stackoverflow.com/questions/13586999/color-difference-similarity-between-two-values-with-js
       function deltaE(rgbA, rgbB) {
