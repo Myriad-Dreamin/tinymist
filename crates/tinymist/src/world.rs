@@ -81,7 +81,6 @@ pub type LspWorld = TypstSystemWorld;
 pub type ImmutDict = Arc<Prehashed<TypstDict>>;
 
 pub struct LspWorldBuilder;
-// Self::resolve_fonts(opts)?,
 
 impl LspWorldBuilder {
     /// Create [`LspWorld`] with the given options.
@@ -92,14 +91,13 @@ impl LspWorldBuilder {
         font_resolver: SharedFontResolver,
         inputs: ImmutDict,
     ) -> ZResult<LspUniverse> {
-        let mut res = LspUniverse::new_raw(
+        Ok(LspUniverse::new_raw(
             entry,
             Some(inputs),
             Arc::new(RwLock::new(Vfs::new(SystemAccessModel {}))),
             HttpRegistry::default(),
             font_resolver.inner,
-        );
-        Ok(res)
+        ))
     }
 
     /// Resolve fonts from given options.
