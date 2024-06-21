@@ -5,8 +5,7 @@ use await_tree::InstrumentAwait;
 use log::{error, info};
 
 use typst::foundations::{Str, Value};
-use typst_ts_compiler::service::CompileDriver;
-use typst_ts_compiler::TypstSystemWorld;
+use typst_ts_compiler::{service::CompileDriver, TypstSystemUniverse};
 use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
 
 use hyper::{
@@ -139,7 +138,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     }
 
     let compiler_driver = {
-        let world = TypstSystemWorld::new(CompileOpts {
+        let world = TypstSystemUniverse::new(CompileOpts {
             entry: EntryOpts::new_rooted(root.clone(), Some(entry.clone())),
             inputs,
             no_system_fonts: args.compile.font.ignore_system_fonts,
@@ -149,7 +148,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         })
         .expect("incorrect options");
 
-        CompileDriver::new(world).with_entry_file(entry)
+        CompileDriver::new(std::marker::PhantomData, world.with_entry_file(entry))
     };
 
     tokio::spawn(async move {

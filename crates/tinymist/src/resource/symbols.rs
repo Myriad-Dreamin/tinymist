@@ -188,16 +188,19 @@ impl TypstLanguageServer {
         let font = self
             .primary()
             .steal(move |e| {
+                let verse = &mut e.verse;
                 let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
 
                 let new_entry = EntryState::new_rootless(entry_path.clone())?;
-                let old_entry = e.compiler.world_mut().mutate_entry(new_entry).ok()?;
-                let prepared = e
-                    .compiler
+                let old_entry = verse.mutate_entry(new_entry).ok()?;
+                let prepared = verse
                     .map_shadow(&entry_path, math_shaping_text.into_bytes().into())
                     .is_ok();
-                let sym_doc = prepared.then(|| e.compiler.pure_compile(&mut Default::default()));
-                e.compiler.world_mut().mutate_entry(old_entry).ok()?;
+
+                let w = verse.spawn();
+                let sym_doc =
+                    prepared.then(|| e.compiler.pure_compile(&w, &mut Default::default()));
+                verse.mutate_entry(old_entry).ok()?;
 
                 log::debug!(
                     "sym doc: {doc:?}",

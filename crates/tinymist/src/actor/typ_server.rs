@@ -7,20 +7,28 @@ use std::{collections::HashSet, path::Path, sync::Arc, thread::JoinHandle};
 use tinymist_query::VersionedDocument;
 use tokio::sync::{mpsc, oneshot};
 
-use typst_ts_compiler::service::{
-    features::{FeatureSet, WITH_COMPILING_STATUS_FEATURE},
-    watch_deps, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter,
+use typst_ts_compiler::{
+    service::{
+        features::{FeatureSet, WITH_COMPILING_STATUS_FEATURE},
+        watch_deps, CompileEnv, CompileReporter, Compiler, ConsoleDiagReporter,
+    },
+    vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage},
+    world::{CompilerFeat, CompilerUniverse, CompilerWorld},
+    ShadowApi, WorldDeps,
 };
-use typst_ts_compiler::vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage};
-use typst_ts_compiler::ShadowApi;
-use typst_ts_core::{config::compiler::EntryState, TypstDocument, TypstFileId};
+use typst_ts_core::{config::compiler::EntryState, TypstDocument};
+
+/// A task that can be sent to the context (compiler thread)
+///
+/// The internal function will be dereferenced and called on the context.
+type BorrowTask<Ctx> = Box<dyn FnOnce(&mut Ctx) + Send + 'static>;
 
 pub enum Interrupt<Ctx> {
     /// Compile anyway.
     Compile,
     /// Borrow the compiler thread and run the task.
     ///
-    /// See [`CompileClient<Ctx>::steal`] for more information.
+    /// See [`CompileClient<Ctx>::steal_async`] for more information.
     Task(BorrowTask<Ctx>),
     /// Memory file changes.
     Memory(MemoryEvent),
@@ -29,11 +37,6 @@ pub enum Interrupt<Ctx> {
     /// Request compiler to stop.
     Settle(oneshot::Sender<()>),
 }
-
-/// A task that can be sent to the context (compiler/render thread)
-///
-/// The internal function will be dereferenced and called on the context.
-pub type BorrowTask<Ctx> = Box<dyn FnOnce(&mut Ctx) + Send + 'static>;
 
 /// Responses from the compiler thread.
 enum CompilerResponse {
@@ -55,9 +58,11 @@ struct SuspendState {
 }
 
 /// The compiler thread.
-pub struct CompileServerActor<C: Compiler> {
+pub struct CompileServerActor<C: Compiler, F: CompilerFeat> {
+    /// The underlying universe.
+    pub verse: CompilerUniverse<F>,
     /// The underlying compiler.
-    pub compiler: CompileReporter<C>,
+    pub compiler: CompileReporter<C, CompilerWorld<F>>,
     /// Whether to enable file system watching.
     pub enable_watch: bool,
 
@@ -85,12 +90,12 @@ pub struct CompileServerActor<C: Compiler> {
     suspend_state: SuspendState,
 }
 
-impl<C: Compiler + ShadowApi + Send + 'static> CompileServerActor<C>
-where
-    C::World: for<'files> codespan_reporting::files::Files<'files, FileId = TypstFileId>,
+impl<F: CompilerFeat + Send + 'static, C: Compiler<W = CompilerWorld<F>> + Send + 'static>
+    CompileServerActor<C, F>
 {
     pub fn new_with_features(
         compiler: C,
+        world: CompilerUniverse<F>,
         entry: EntryState,
         feature_set: FeatureSet,
         intr_tx: mpsc::UnboundedSender<Interrupt<Self>>,
@@ -99,6 +104,7 @@ where
         Self {
             compiler: CompileReporter::new(compiler)
                 .with_generic_reporter(ConsoleDiagReporter::default()),
+            verse: world,
 
             logical_tick: 1,
             enable_watch: false,
@@ -116,7 +122,7 @@ where
             intr_rx,
 
             suspend_state: SuspendState {
-                suspended: is_inactive(&entry),
+                suspended: entry.is_inactive(),
                 dirty: false,
             },
         }
@@ -125,16 +131,19 @@ where
     /// Create a new compiler thread.
     pub fn new(
         compiler: C,
+        world: CompilerUniverse<F>,
         entry: EntryState,
         intr_tx: mpsc::UnboundedSender<Interrupt<Self>>,
         intr_rx: mpsc::UnboundedReceiver<Interrupt<Self>>,
     ) -> Self {
-        Self::new_with_features(compiler, entry, FeatureSet::default(), intr_tx, intr_rx)
-    }
-
-    pub fn with_watch(mut self, enable_watch: bool) -> Self {
-        self.enable_watch = enable_watch;
-        self
+        Self::new_with_features(
+            compiler,
+            world,
+            entry,
+            FeatureSet::default(),
+            intr_tx,
+            intr_rx,
+        )
     }
 
     pub fn success_doc(&self) -> Option<VersionedDocument> {
@@ -174,7 +183,8 @@ where
     async fn block_run_inner(mut self) -> bool {
         if !self.enable_watch {
             let mut env = self.make_env(self.once_feature_set.clone());
-            let compiled = self.compiler.compile(&mut env);
+            let w = self.verse.spawn();
+            let compiled = self.compiler.compile(&w, &mut env);
             return compiled.is_ok();
         }
 
@@ -191,7 +201,8 @@ where
     pub async fn spawn(mut self) -> Option<JoinHandle<()>> {
         if !self.enable_watch {
             let mut env = self.make_env(self.once_feature_set.clone());
-            self.compiler.compile(&mut env).ok();
+            let w = self.verse.spawn();
+            self.compiler.compile(&w, &mut env).ok();
             return None;
         }
 
@@ -268,8 +279,8 @@ where
         Some(compile_thread.unwrap())
     }
 
-    pub(crate) fn change_entry(&mut self, entry: EntryState) {
-        self.suspend_state.suspended = is_inactive(&entry);
+    pub fn change_entry(&mut self, entry: EntryState) {
+        self.suspend_state.suspended = entry.is_inactive();
         if !self.suspend_state.suspended && self.suspend_state.dirty {
             self.intr_tx.send(Interrupt::Compile).ok();
         }
@@ -288,9 +299,11 @@ where
             return;
         }
 
+        let w = self.verse.spawn();
+
         // Compile the document.
         let mut env = self.make_env(self.watch_feature_set.clone());
-        self.latest_doc = self.compiler.compile(&mut env).ok();
+        self.latest_doc = self.compiler.compile(&w, &mut env).ok();
         if self.latest_doc.is_some() {
             self.latest_success_doc.clone_from(&self.latest_doc);
         }
@@ -303,8 +316,7 @@ where
 
         // Notify the new file dependencies.
         let mut deps = vec![];
-        self.compiler
-            .iter_dependencies(&mut |dep, _| deps.push(dep.clone()));
+        w.iter_dependencies(&mut |dep| deps.push(dep.clone()));
         send(Notify(NotifyMessage::SyncDependency(deps)));
     }
 
@@ -368,7 +380,7 @@ where
                 }
 
                 // Apply file system changes.
-                self.compiler.notify_fs_event(event);
+                self.verse.notify_fs_event(event);
 
                 true
             }
@@ -400,12 +412,12 @@ where
     /// Apply memory changes to underlying compiler.
     fn apply_memory_changes(&mut self, event: MemoryEvent) {
         if matches!(event, MemoryEvent::Sync(..)) {
-            self.compiler.reset_shadow();
+            self.verse.reset_shadow();
         }
         match event {
             MemoryEvent::Update(event) | MemoryEvent::Sync(event) => {
                 for removes in event.removes {
-                    let _ = self.compiler.unmap_shadow(&removes);
+                    let _ = self.verse.unmap_shadow(&removes);
                 }
                 for (p, t) in event.inserts {
                     let insert_file = match t.content().cloned() {
@@ -420,16 +432,26 @@ where
                         }
                     };
 
-                    let _ = self.compiler.map_shadow(&p, insert_file);
+                    let _ = self.verse.map_shadow(&p, insert_file);
                 }
             }
         }
     }
 }
 
-pub fn is_inactive(entry: &EntryState) -> bool {
-    use EntryState::*;
-    matches!(entry, Detached | Workspace { main: None, .. })
+impl<C: Compiler, F: CompilerFeat> CompileServerActor<C, F> {
+    pub fn with_watch(mut self, enable_watch: bool) -> Self {
+        self.enable_watch = enable_watch;
+        self
+    }
+
+    pub fn intr_tx(&self) -> mpsc::UnboundedSender<Interrupt<Self>> {
+        self.intr_tx.clone()
+    }
+
+    pub fn document(&self) -> Option<Arc<TypstDocument>> {
+        self.latest_doc.clone()
+    }
 }
 
 #[inline]

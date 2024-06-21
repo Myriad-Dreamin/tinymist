@@ -11,6 +11,7 @@ use lsp_types::{InitializeParams, InitializedParams};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use tokio::sync::mpsc;
+use typst::World;
 use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
 use typst_ts_compiler::service::{CompileEnv, Compiler, EntryManager};
 use typst_ts_core::{typst::prelude::EcoVec, TypstDict};
@@ -183,8 +184,10 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
             let (timings, _doc, diagnostics) = service
                 .compiler()
                 .steal(|c| {
-                    c.compiler.world_mut().mutate_entry(entry).unwrap();
-                    c.compiler.world_mut().inputs = inputs;
+                    c.verse.mutate_entry(entry).unwrap();
+                    c.verse.inputs = inputs;
+
+                    let w = c.verse.spawn();
 
                     let mut env = CompileEnv {
                         tracer: Some(Tracer::default()),
@@ -192,24 +195,23 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
                     };
                     typst_timing::enable();
                     let mut errors = EcoVec::new();
-                    let res = match c.compiler.pure_compile(&mut env) {
+                    let res = match c.compiler.pure_compile(&w, &mut env) {
                         Ok(doc) => Some(doc),
                         Err(e) => {
                             errors = e;
                             None
                         }
                     };
-                    let world = c.compiler.world();
                     let mut writer = std::io::BufWriter::new(Vec::new());
                     let _ = typst_timing::export_json(&mut writer, |span| {
-                        resolve_span(world, span).unwrap_or_else(|| ("unknown".to_string(), 0))
+                        resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
                     });
 
                     let s = String::from_utf8(writer.into_inner().unwrap()).unwrap();
 
                     let warnings = env.tracer.map(|e| e.warnings());
 
-                    let diagnostics = c.compiler.compiler.run_analysis(|ctx| {
+                    let diagnostics = c.compiler.compiler.run_analysis(&w, |ctx| {
                         tinymist_query::convert_diagnostics(
                             ctx,
                             warnings.iter().flatten().chain(errors.iter()),
@@ -261,7 +263,6 @@ impl<T> Drop for ForceDrop<T> {
 
 /// Turns a span into a (file, line) pair.
 fn resolve_span(world: &LspWorld, span: Span) -> Option<(String, u32)> {
-    use typst::World;
     let id = span.id()?;
     let source = world.source(id).ok()?;
     let range = source.range(span)?;

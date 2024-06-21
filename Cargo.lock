@@ -2889,8 +2889,6 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.0-rc4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "803cbdda7d5beefc048966f342ba9a13dab586f136a8fe7f6d915b2f073a9151"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -2898,16 +2896,49 @@ dependencies = [
  "dashmap",
  "ecow 0.2.2",
  "fxhash",
+ "instant",
  "once_cell",
  "parking_lot",
  "path-clean",
  "rkyv",
+ "rustc-hash",
  "serde",
  "serde_json",
  "serde_repr",
  "serde_with",
  "siphasher 1.0.1",
  "tiny-skia-path",
+]
+
+[[package]]
+name = "reflexo-vfs"
+version = "0.5.0-rc4"
+dependencies = [
+ "append-only-vec",
+ "indexmap 2.2.6",
+ "nohash-hasher",
+ "once_cell",
+ "parking_lot",
+ "reflexo",
+ "rustc-hash",
+ "typst",
+]
+
+[[package]]
+name = "reflexo-world"
+version = "0.5.0-rc4"
+dependencies = [
+ "append-only-vec",
+ "dashmap",
+ "indexmap 2.2.6",
+ "log",
+ "nohash-hasher",
+ "once_cell",
+ "parking_lot",
+ "reflexo",
+ "reflexo-vfs",
+ "rustc-hash",
+ "typst",
 ]
 
 [[package]]
@@ -4425,8 +4456,6 @@ dependencies = [
 [[package]]
 name = "typst-ts-compiler"
 version = "0.5.0-rc4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b5d68fc30324347a294155cc4691defa4e01aaff23d7e3c1c40a3c8e5d22e3f"
 dependencies = [
  "append-only-vec",
  "base64 0.22.1",
@@ -4446,6 +4475,8 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "pathdiff",
+ "reflexo-vfs",
+ "reflexo-world",
  "reqwest",
  "rustc-hash",
  "serde",
@@ -4463,8 +4494,6 @@ dependencies = [
 [[package]]
 name = "typst-ts-core"
 version = "0.5.0-rc4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b9355a7f3b2f687088524fa1d5c0d0cbe45878e9672d7a321aec491ae10b1dd"
 dependencies = [
  "base64 0.22.1",
  "base64-serde",
@@ -4491,6 +4520,7 @@ dependencies = [
  "serde_with",
  "sha2",
  "siphasher 1.0.1",
+ "svgtypes",
  "tiny-skia",
  "tiny-skia-path",
  "ttf-parser",
@@ -4501,8 +4531,6 @@ dependencies = [
 [[package]]
 name = "typst-ts-svg-exporter"
 version = "0.5.0-rc4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13b1e7baba2453d072cbc1e97a43d5a8ecfe36299fc103e9156bb9470abd35e0"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",

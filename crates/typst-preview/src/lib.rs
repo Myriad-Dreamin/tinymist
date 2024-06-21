@@ -13,7 +13,7 @@ use ::await_tree::InstrumentAwait;
 use debug_loc::SpanInterner;
 use futures::SinkExt;
 use log::info;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
@@ -22,7 +22,12 @@ use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_core::Error;
 use typst_ts_core::{ImmutStr, TypstDocument as Document};
 
-pub use typst_ts_compiler::service::DocToSrcJumpInfo;
+#[derive(Debug, Serialize)]
+pub struct DocToSrcJumpInfo {
+    pub filepath: String,
+    pub start: Option<(usize, usize)>, // row, column
+    pub end: Option<(usize, usize)>,
+}
 
 use actor::editor::EditorActor;
 use actor::typst::TypstActor;

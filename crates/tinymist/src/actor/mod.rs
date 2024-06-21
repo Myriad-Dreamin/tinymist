@@ -13,10 +13,7 @@ use tinymist_query::analysis::Analysis;
 use tinymist_query::ExportKind;
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{mpsc, watch};
-use typst_ts_compiler::{
-    service::CompileDriverImpl,
-    vfs::notify::{FileChangeSet, MemoryEvent},
-};
+use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 use typst_ts_core::config::compiler::EntryState;
 
 use self::{
@@ -28,11 +25,9 @@ use self::{
 };
 use crate::{
     compiler::CompileServer,
-    world::{ImmutDict, LspWorld, LspWorldBuilder},
+    world::{ImmutDict, LspWorldBuilder},
     TypstLanguageServer,
 };
-
-type CompileDriverInner = CompileDriverImpl<LspWorld>;
 
 impl CompileServer {
     pub fn restart_server(&mut self, group: &str) {
@@ -102,13 +97,12 @@ impl CompileServer {
         self.handle.spawn_blocking(move || {
             // Create the world
             let font_resolver = font_resolver.wait().clone();
-            let world = LspWorldBuilder::build(entry_.clone(), font_resolver, inputs)
+            let verse = LspWorldBuilder::build(entry_.clone(), font_resolver, inputs)
                 .expect("incorrect options");
 
             // Create the compiler
-            let driver = CompileDriverInner::new(world);
             let driver = CompileDriver {
-                inner: driver,
+                inner: std::marker::PhantomData,
                 handler,
                 analysis: Analysis {
                     position_encoding,
@@ -121,7 +115,7 @@ impl CompileServer {
 
             // Create the actor
             tokio::spawn(
-                CompileServerActor::new(driver, entry_, intr_tx, intr_rx)
+                CompileServerActor::new(driver, verse, entry_, intr_tx, intr_rx)
                     .with_watch(true)
                     .spawn(),
             );

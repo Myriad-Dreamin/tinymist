@@ -23,7 +23,6 @@ use tinymist_query::{
 use tokio::sync::mpsc;
 use typst::diag::StrResult;
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
-use typst_ts_compiler::service::Compiler;
 use typst_ts_core::path::PathClean;
 use typst_ts_core::{error::prelude::*, ImmutPath};
 
@@ -646,7 +645,7 @@ impl TypstLanguageServer {
         let res = self
             .primary()
             .steal(move |c| {
-                let cc = &c.compiler;
+                let verse = &c.verse;
 
                 // todo: rootless file
                 // todo: memory dirty file
@@ -665,8 +664,8 @@ impl TypstLanguageServer {
                             compiler_program: self_path,
                             root: root.as_ref().to_owned(),
                             main,
-                            inputs: cc.world().inputs.as_ref().deref().clone(),
-                            font_paths: cc.world().font_resolver.font_paths().to_owned(),
+                            inputs: verse.inputs.as_ref().deref().clone(),
+                            font_paths: verse.font_resolver.font_paths().to_owned(),
                         },
                     ))
                     .context("cannot send trace request")?;
@@ -770,6 +769,7 @@ impl TypstLanguageServer {
         let res = self
             .primary()
             .steal(move |c| {
+                let world = c.verse.spawn();
                 // Parse the package specification. If the user didn't specify the version,
                 // we try to figure it out automatically by downloading the package index
                 // or searching the disk.
@@ -779,7 +779,7 @@ impl TypstLanguageServer {
                         // Try to parse without version, but prefer the error message of the
                         // normal package spec parsing if it fails.
                         let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                        let version = determine_latest_version(c.compiler.world(), &spec)?;
+                        let version = determine_latest_version(&c.verse, &spec)?;
                         StrResult::Ok(spec.at(version))
                     })
                     .map_err(map_string_err("failed to parse package spec"))?;
@@ -787,7 +787,7 @@ impl TypstLanguageServer {
                 let from_source = TemplateSource::Package(spec);
 
                 let entry_path = package::init(
-                    c.compiler.world(),
+                    &world,
                     InitTask {
                         tmpl: from_source.clone(),
                         dir: to_path.clone(),
@@ -827,14 +827,14 @@ impl TypstLanguageServer {
                         // Try to parse without version, but prefer the error message of the
                         // normal package spec parsing if it fails.
                         let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                        let version = determine_latest_version(c.compiler.world(), &spec)?;
+                        let version = determine_latest_version(&c.verse, &spec)?;
                         StrResult::Ok(spec.at(version))
                     })
                     .map_err(map_string_err("failed to parse package spec"))?;
 
                 let from_source = TemplateSource::Package(spec);
 
-                let entry = package::get_entry(c.compiler.world(), from_source)
+                let entry = package::get_entry(&c.verse, from_source)
                     .map_err(map_string_err("failed to get template entry"))?;
 
                 ZResult::Ok(entry)

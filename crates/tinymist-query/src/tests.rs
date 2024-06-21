@@ -8,17 +8,14 @@ use std::{
 use once_cell::sync::Lazy;
 pub use serde::Serialize;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
-use typst::{
-    diag::FileResult,
-    syntax::{
-        ast::{self, AstNode},
-        FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath,
-    },
+use typst::syntax::{
+    ast::{self, AstNode},
+    FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath,
 };
 use typst::{diag::PackageError, foundations::Bytes};
 use typst_ts_compiler::{
-    service::{CompileDriver, Compiler, EntryManager},
-    NotifyApi, ShadowApi,
+    service::{CompileDriver, EntryManager, EntryReader},
+    ShadowApi, TypstSystemUniverse, WorldDeps,
 };
 use typst_ts_core::{
     config::compiler::{EntryOpts, EntryState},
@@ -46,10 +43,7 @@ impl<'a> AnalysisResources for WrapWorld<'a> {
         self.0.registry.resolve(spec)
     }
 
-    fn iter_dependencies<'b>(
-        &'b self,
-        f: &mut dyn FnMut(&'b reflexo::ImmutPath, FileResult<&typst_ts_compiler::Time>),
-    ) {
+    fn iter_dependencies(&self, f: &mut dyn FnMut(reflexo::ImmutPath)) {
         self.0.iter_dependencies(f)
     }
 }
@@ -65,7 +59,7 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
             #[cfg(windows)]
             let contents = contents.replace("\r\n", "\n");
 
-            run_with_sources(&contents, |w: &mut TypstSystemWorld, p| {
+            run_with_sources(&contents, |w: &mut TypstSystemUniverse, p| {
                 let root = w.workspace_root().unwrap();
                 let paths = w
                     .shadow_paths()
@@ -74,7 +68,8 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
                         TypstFileId::new(None, VirtualPath::new(p.strip_prefix(&root).unwrap()))
                     })
                     .collect::<Vec<_>>();
-                let w = WrapWorld(w);
+                let mut w = w.spawn();
+                let w = WrapWorld(&mut w);
                 let mut ctx = AnalysisContext::new(
                     &w,
                     Analysis {
@@ -103,13 +98,16 @@ pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
     props
 }
 
-pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut TypstSystemWorld, PathBuf) -> T) -> T {
+pub fn run_with_sources<T>(
+    source: &str,
+    f: impl FnOnce(&mut TypstSystemUniverse, PathBuf) -> T,
+) -> T {
     let root = if cfg!(windows) {
         PathBuf::from("C:\\")
     } else {
         PathBuf::from("/")
     };
-    let mut world = TypstSystemWorld::new(CompileOpts {
+    let mut world = TypstSystemUniverse::new(CompileOpts {
         entry: EntryOpts::new_rooted(root.as_path().into(), None),
         ..Default::default()
     })
@@ -145,12 +143,12 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut TypstSystemWorld, P
     }
 
     world.mutate_entry(EntryState::new_detached()).unwrap();
-    let mut driver = CompileDriver::new(world);
+    let mut driver = CompileDriver::new(std::marker::PhantomData, world);
     let _ = driver.compile(&mut Default::default());
 
     let pw = last_pw.unwrap();
     driver
-        .world_mut()
+        .universe_mut()
         .mutate_entry(EntryState::new_rooted(
             root.as_path().into(),
             Some(TypstFileId::new(
@@ -159,7 +157,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut TypstSystemWorld, P
             )),
         ))
         .unwrap();
-    f(driver.world_mut(), pw)
+    f(driver.universe_mut(), pw)
 }
 
 pub fn find_test_range(s: &Source) -> Range<usize> {

@@ -420,10 +420,7 @@ pub trait AnalysisResources {
     fn resolve(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError>;
 
     /// Get all the files in the workspace.
-    fn iter_dependencies<'a>(
-        &'a self,
-        f: &mut dyn FnMut(&'a ImmutPath, FileResult<&std::time::SystemTime>),
-    );
+    fn iter_dependencies(&self, f: &mut dyn FnMut(ImmutPath));
 
     /// Resolve extra font information.
     fn font_info(&self, _font: Font) -> Option<Arc<DataSource>> {
