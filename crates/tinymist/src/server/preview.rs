@@ -1,15 +1,13 @@
-use std::{borrow::Cow, net::SocketAddr};
+use std::{borrow::Cow, net::SocketAddr, path::Path};
 
+use anyhow::Context;
 use await_tree::InstrumentAwait;
-use clap::Parser;
 use log::{error, info};
 
 use typst::foundations::{Str, Value};
 use typst_ts_compiler::service::CompileDriver;
 use typst_ts_compiler::TypstSystemWorld;
 use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
-
-use crate::compiler::CompileServer;
 
 use hyper::{
     service::{make_service_fn, service_fn},
@@ -19,10 +17,47 @@ use hyper::{
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use typst_preview::{
     await_tree::{get_await_tree_async, REGISTRY},
-    preview, CliArguments, PreviewMode, Previewer,
+    preview, PreviewArgs, PreviewMode, Previewer,
 };
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
+pub struct PreviewCliArgs {
+    #[cfg_attr(feature = "clap", clap(flatten))]
+    pub preview: PreviewArgs,
+
+    #[cfg_attr(feature = "clap", clap(flatten))]
+    pub compile: CompileOnceArgs,
+
+    /// Preview mode
+    #[cfg_attr(
+        feature = "clap",
+        clap(long = "preview-mode", default_value = "document", value_name = "MODE")
+    )]
+    pub preview_mode: PreviewMode,
+
+    /// Host for the preview server
+    #[cfg_attr(
+        feature = "clap",
+        clap(
+            long = "host",
+            value_name = "HOST",
+            default_value = "127.0.0.1:23627",
+            alias = "static-file-host"
+        )
+    )]
+    pub static_file_host: String,
+
+    /// Don't open the preview in the browser after compilation.
+    #[cfg_attr(feature = "clap", clap(long = "no-open"))]
+    pub dont_open_in_browser: bool,
+}
+
+#[path = "preview_compiler.rs"]
 mod compiler;
+use compiler::CompileServer;
+
+use crate::compiler_init::CompileOnceArgs;
 
 pub fn make_static_host(
     previewer: &Previewer,
@@ -70,36 +105,26 @@ pub fn make_static_host(
 }
 
 /// Entry point.
-#[tokio::main]
-async fn main() {
-    let _ = env_logger::builder()
-        // TODO: set this back to Info
-        .filter_module("typst_preview", log::LevelFilter::Debug)
-        .filter_module("typst_ts", log::LevelFilter::Info)
-        // TODO: set this back to Info
-        .filter_module(
-            "typst_ts_compiler::service::compile",
-            log::LevelFilter::Debug,
-        )
-        .filter_module("typst_ts_compiler::service::watch", log::LevelFilter::Debug)
-        .try_init();
+pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let async_root = REGISTRY
         .lock()
         .await
         .register("root".into(), "typst-preview");
-    let arguments = CliArguments::parse();
-    info!("Arguments: {:#?}", arguments);
-    let entry = if arguments.input.is_absolute() {
-        arguments.input.clone()
+    info!("Arguments: {:#?}", args);
+    let input = args.compile.input.context("entry file must be provided")?;
+    let input = Path::new(&input);
+    let entry = if input.is_absolute() {
+        input.to_owned()
     } else {
-        std::env::current_dir().unwrap().join(&arguments.input)
+        std::env::current_dir().unwrap().join(input)
     };
-    let inputs = arguments
+    let inputs = args
+        .compile
         .inputs
         .iter()
         .map(|(k, v)| (Str::from(k.as_str()), Value::Str(Str::from(v.as_str()))))
         .collect();
-    let root = if let Some(root) = &arguments.root {
+    let root = if let Some(root) = &args.compile.root {
         if root.is_absolute() {
             root.clone()
         } else {
@@ -117,8 +142,8 @@ async fn main() {
         let world = TypstSystemWorld::new(CompileOpts {
             entry: EntryOpts::new_rooted(root.clone(), Some(entry.clone())),
             inputs,
-            no_system_fonts: arguments.ignore_system_fonts,
-            font_paths: arguments.font_paths.clone(),
+            no_system_fonts: args.compile.font.ignore_system_fonts,
+            font_paths: args.compile.font.font_paths.clone(),
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
             ..CompileOpts::default()
         })
@@ -134,7 +159,7 @@ async fn main() {
     });
 
     let previewer = preview(
-        arguments.preview,
+        args.preview,
         move |handle| {
             let compile_server = CompileServer::new(compiler_driver, handle);
 
@@ -147,15 +172,17 @@ async fn main() {
         .instrument_await("preview")
         .await;
 
-    let static_file_addr = arguments.static_file_host;
-    let mode = arguments.preview_mode;
+    let static_file_addr = args.static_file_host;
+    let mode = args.preview_mode;
     let (static_server_addr, static_server_handle) =
         make_static_host(&previewer, static_file_addr, mode);
     info!("Static file server listening on: {}", static_server_addr);
-    if !arguments.dont_open_in_browser {
+    if !args.dont_open_in_browser {
         if let Err(e) = open::that_detached(format!("http://{}", static_server_addr)) {
             error!("failed to open browser: {}", e);
         };
     }
     let _ = tokio::join!(previewer.join(), static_server_handle);
+
+    Ok(())
 }

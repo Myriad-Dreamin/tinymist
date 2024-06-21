@@ -143,6 +143,7 @@ jobs:
         shell: pwsh
         run: |
           cp "target/${{ matrix.rust-target }}/gh-release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "editors/vscode/out/"
+          cp "target/${{ matrix.rust-target }}/gh-release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "contrib/typst-preview/editors/vscode/out/"
           cp "target/${{ matrix.rust-target }}/gh-release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "tinymist-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       - name: Test tinymist
         run: |
@@ -247,6 +248,7 @@ jobs:
         run: |
           mkdir -p editors/vscode/out
           cp "target/${{ env.RUST_TARGET }}/gh-release/tinymist" "editors/vscode/out/"
+          cp "target/${{ env.RUST_TARGET }}/gh-release/tinymist" "contrib/typst-preview/editors/vscode/out/"
           cp "target/${{ env.RUST_TARGET }}/gh-release/tinymist" "tinymist-${{ env.target }}"
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4

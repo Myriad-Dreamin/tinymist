@@ -3,21 +3,11 @@ name = "typst-preview"
 description = "A previewer for the Typst typesetting system."
 license = "MIT"
 repository = "https://github.com/Enter-tainer/typst-preview"
-version = "0.11.7"
+version.workspace = true
 authors = ["The Typst Project Developers"]
-edition = "2021"
-build = "build.rs"
+edition.workspace = true
 keywords = ["typst"]
-include = ["src/**/*", "/LICENSE", "/README.md", "build.rs"]
-
-[[bin]]
-name = "typst-preview"
-required-features = ["cli"]
-path = "src/main.rs"
-test = false
-doctest = false
-bench = false
-doc = false
+include = ["src/**/*", "/LICENSE", "/README.md"]
 
 [dependencies]
 typst.workspace = true
@@ -25,68 +15,29 @@ tinymist-assets.workspace = true
 typst-assets.workspace = true
 comemo.workspace = true
 
-typst-ts-svg-exporter = { version = "0.5.0-rc4" }
-typst-ts-core = { version = "0.5.0-rc4", default-features = false, features = [
+typst-ts-svg-exporter.workspace = true
+typst-ts-core = { workspace = true, default-features = false, features = [
   "flat-vector",
   "vector-bbox",
 ] }
-typst-ts-compiler = { version = "0.5.0-rc4", optional = true }
-once_cell = "1"
+typst-ts-compiler.workspace = true
+once_cell.workspace = true
 tokio.workspace = true
 tokio-tungstenite = "0.21.0"
 env_logger.workspace = true
 log.workspace = true
 serde_json.workspace = true
-futures = "0.3.30"
-indexmap = "2"
+futures.workspace = true
+indexmap.workspace = true
 serde.workspace = true
 await-tree = "0.1.2"
 
-clap = { version = "4.5.4", features = ["derive", "env"], optional = true }
-open = { version = "5.1.3", optional = true }
-hyper = { version = "0.14", features = ["full"], optional = true }
-
-[build-dependencies]
-clap.workspace = true
-clap_complete.workspace = true
-clap_mangen.workspace = true
-vergen.workspace = true
-anyhow.workspace = true
+clap = { workspace = true, optional = true }
 
 [features]
 
-default = ["embed-fonts", "cli"]
+default = ["no-content-hint"]
 
-# Embeds Typst's default fonts for
-# - text (Linux Libertine),
-# - math (New Computer Modern Math), and
-# - code (Deja Vu Sans Mono)
-# and additionally New Computer Modern for text
-# into the binary.
-embed-fonts = ["typst-assets/fonts"]
 # Disable the default content hint.
 # This requires modifying typst.
 no-content-hint = ["typst-ts-core/no-content-hint"]
-
-embed-html = []
-
-cli = [
-  "hyper",
-  "clap",
-  "open",
-  "typst-ts-compiler",
-  "no-content-hint",
-  "tinymist-assets/typst-preview",
-]
-
-# [patch.crates-io]
-
-# typst = { path = "../../../typst/crates/typst" }
-# typst-syntax = { path = "../../../typst/crates/typst-syntax" }
-# hayagriva = { path = "../../rust/hayagriva" }
-# typst-ts-svg-exporter = { path = "../../exporter/svg" }
-# typst-ts-compiler = { path = "../../compiler" }
-# typst-ts-core = { path = "../../core" }
-
-# [profile.release]
-# debug = true

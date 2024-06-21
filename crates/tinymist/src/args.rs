@@ -2,6 +2,7 @@ use once_cell::sync::Lazy;
 use tinymist::transport::MirrorArgs;
 
 use tinymist::compiler_init::{CompileOnceArgs, FontArgs};
+use tinymist::preview::PreviewCliArgs;
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
@@ -19,6 +20,8 @@ pub enum Commands {
     Lsp(LspArgs),
     /// Run Compile Server
     Compile(CompileArgs),
+    /// Run Preview Server
+    Preview(PreviewCliArgs),
     /// Probe
     Probe,
 }

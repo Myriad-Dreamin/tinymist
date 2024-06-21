@@ -72,7 +72,7 @@ function statusBarItemProcess(event: "Compiling" | "CompileSuccess" | "CompileEr
 
 export async function getCliPath(extensionPath?: string): Promise<string> {
 	const state = getCliPath as unknown as any;
-	(!state.BINARY_NAME) && (state.BINARY_NAME = "typst-preview");
+	(!state.BINARY_NAME) && (state.BINARY_NAME = "tinymist");
 	(!state.getConfig) && (state.getConfig = (
 		() => vscode.workspace.getConfiguration().get<string>('typst-preview.executable')));
 
@@ -543,6 +543,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
 		const invertColorsArgs = ivArgs ? ["--invert-colors", ivArgs] : [];
 		const previewInSlideModeArgs = task.mode === 'slide' ? ["--preview-mode=slide"] : [];
 		const { dataPlanePort, controlPlanePort, staticFilePort, serverProcess } = await runServer(serverPath, projectRoot, [
+			"preview",
 			"--data-plane-host", "127.0.0.1:0",
 			"--control-plane-host", "127.0.0.1:0",
 			"--static-file-host", "127.0.0.1:0",

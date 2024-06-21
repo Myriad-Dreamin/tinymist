@@ -43,8 +43,8 @@ pub struct CompileFontOpts {
     pub font_profile_cache_path: PathBuf,
     /// will remove later
     pub font_paths: Vec<PathBuf>,
-    /// Exclude system font paths
-    pub no_system_fonts: bool,
+    /// Ensures system fonts won't be searched
+    pub ignore_system_fonts: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -141,7 +141,7 @@ impl LspWorldBuilder {
         searcher.resolve_opts(FontOptsInner {
             font_profile_cache_path: opts.font_profile_cache_path,
             font_paths: opts.font_paths,
-            no_system_fonts: opts.no_system_fonts,
+            no_system_fonts: opts.ignore_system_fonts,
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
         })?;
         Ok(searcher.into())
