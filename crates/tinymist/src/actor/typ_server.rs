@@ -145,6 +145,14 @@ impl<F: CompilerFeat + Send + 'static, C: Compiler<W = CompilerWorld<F>> + Send 
             intr_rx,
         )
     }
+    pub fn with_watch(mut self, enable_watch: bool) -> Self {
+        self.enable_watch = enable_watch;
+        self
+    }
+
+    pub fn intr_tx(&self) -> mpsc::UnboundedSender<Interrupt<Self>> {
+        self.intr_tx.clone()
+    }
 
     pub fn success_doc(&self) -> Option<VersionedDocument> {
         self.latest_success_doc
@@ -436,21 +444,6 @@ impl<F: CompilerFeat + Send + 'static, C: Compiler<W = CompilerWorld<F>> + Send 
                 }
             }
         }
-    }
-}
-
-impl<C: Compiler, F: CompilerFeat> CompileServerActor<C, F> {
-    pub fn with_watch(mut self, enable_watch: bool) -> Self {
-        self.enable_watch = enable_watch;
-        self
-    }
-
-    pub fn intr_tx(&self) -> mpsc::UnboundedSender<Interrupt<Self>> {
-        self.intr_tx.clone()
-    }
-
-    pub fn document(&self) -> Option<Arc<TypstDocument>> {
-        self.latest_doc.clone()
     }
 }
 

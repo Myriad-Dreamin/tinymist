@@ -97,7 +97,7 @@ impl<H: CompilationHandle> CompileServer<H> {
         let entry = self.inner.verse.entry_state();
         tokio::spawn(self.inner.spawn().instrument_await("spawn typst server"));
         // drop all export events
-        tokio::spawn(async move { while let Some(_) = export_rx.recv().await {} });
+        tokio::spawn(async move { while export_rx.recv().await.is_some() {} });
         Ok(CompileClient::new(
             "main".to_owned(),
             CompileConfig::default(),

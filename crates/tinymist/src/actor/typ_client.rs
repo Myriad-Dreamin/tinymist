@@ -161,7 +161,10 @@ impl CompileMiddleware for CompileDriver {
             ))
             .unwrap();
         self.handler.status(CompileStatus::Compiling);
-        match self.inner_mut().compile(world, env) {
+        match self
+            .ensure_main(world)
+            .and_then(|_| self.inner_mut().compile(world, env))
+        {
             Ok(doc) => {
                 self.handler.notify_compile(Ok(doc.clone()));
                 self.notify_diagnostics(
@@ -265,7 +268,7 @@ impl CompileDriver {
             }
         }
 
-        let w = WrapWorld(&w, &self.periscope);
+        let w = WrapWorld(w, &self.periscope);
 
         self.analysis.root = root;
         Ok(f(&mut AnalysisContext::new_borrow(&w, &mut self.analysis)))
