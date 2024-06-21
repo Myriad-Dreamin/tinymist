@@ -15,10 +15,14 @@
     <style id="preview-theme-styles"></style>
     <!-- before all of code to avoid rerender by style replacement -->
     <script>
-      try {
-        // The right side of the equation will be string-replaced later and set in the main.js
-        window.vscode_state = JSON.parse(`VSCODE_STATE`);
-      } catch (ignored) {}
+      if (typeof acquireVsCodeApi !== "undefined") {
+        /// The string here is a placeholder
+        /// It will be replaced by the actual preview mode.
+        let state = `preview-arg:state:{}`;
+        state = state.replace("preview-arg:state:", "");
+        /// Set it later when acquiring the VSCode API
+        window.vscode_state = JSON.parse(state);
+      }
 
       /// https://stackoverflow.com/questions/13586999/color-difference-similarity-between-two-values-with-js
       function deltaE(rgbA, rgbB) {
