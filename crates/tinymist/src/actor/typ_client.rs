@@ -42,16 +42,16 @@ use tinymist_query::{
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{mpsc, oneshot, watch};
 use typst::{
-    diag::{FileResult, PackageError, SourceDiagnostic, SourceResult},
+    diag::{PackageError, SourceDiagnostic, SourceResult},
     layout::Position,
     model::Document as TypstDocument,
     syntax::package::PackageSpec,
     World as TypstWorld,
 };
 use typst_ts_compiler::{
-    service::{CompileDriverImpl, CompileEnv, CompileMiddleware, Compiler, EntryManager, EnvWorld},
+    service::{CompileEnv, CompileMiddleware, Compiler, PureCompiler},
     vfs::notify::MemoryEvent,
-    Time,
+    EntryManager, EntryReader,
 };
 use typst_ts_core::{
     config::compiler::EntryState, debug_loc::DataSource, error::prelude::*, typst::prelude::EcoVec,
@@ -61,18 +61,18 @@ use typst_ts_core::{
 use super::{
     editor::{EditorRequest, TinymistCompileStatusEnum},
     export::ExportConfig,
-    typ_server::{is_inactive, CompileServerActor, Interrupt},
+    typ_server::{CompileServerActor, Interrupt},
 };
 use crate::{
     actor::export::ExportRequest,
     compiler_init::CompileConfig,
     tools::preview::{CompilationHandle, CompileStatus},
     utils,
-    world::LspWorld,
+    world::{LspCompilerFeat, LspWorld},
 };
 
-type CompileDriverInner = CompileDriverImpl<LspWorld>;
-type CompileService = CompileServerActor<CompileDriver>;
+type CompileService<C> = CompileServerActor<C, LspCompilerFeat>;
+pub type CompileClientActor = CompileClientActorImpl<CompileDriver>;
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
@@ -131,7 +131,7 @@ impl CompileHandler {
 }
 
 pub struct CompileDriver {
-    pub(super) inner: CompileDriverInner,
+    pub(super) inner: PureCompiler<LspWorld>,
     #[allow(unused)]
     pub(super) handler: CompileHandler,
     pub(super) analysis: Analysis,
@@ -139,7 +139,7 @@ pub struct CompileDriver {
 }
 
 impl CompileMiddleware for CompileDriver {
-    type Compiler = CompileDriverInner;
+    type Compiler = PureCompiler<LspWorld>;
 
     fn inner(&self) -> &Self::Compiler {
         &self.inner
@@ -149,7 +149,11 @@ impl CompileMiddleware for CompileDriver {
         &mut self.inner
     }
 
-    fn wrap_compile(&mut self, env: &mut CompileEnv) -> SourceResult<Arc<typst::model::Document>> {
+    fn wrap_compile(
+        &mut self,
+        world: &LspWorld,
+        env: &mut CompileEnv,
+    ) -> SourceResult<Arc<typst::model::Document>> {
         self.handler
             .editor_tx
             .send(EditorRequest::Status(
@@ -158,10 +162,14 @@ impl CompileMiddleware for CompileDriver {
             ))
             .unwrap();
         self.handler.status(CompileStatus::Compiling);
-        match self.inner_mut().compile(env) {
+        match self
+            .ensure_main(world)
+            .and_then(|_| self.inner_mut().compile(world, env))
+        {
             Ok(doc) => {
                 self.handler.notify_compile(Ok(doc.clone()));
                 self.notify_diagnostics(
+                    world,
                     EcoVec::new(),
                     env.tracer.as_ref().map(|e| e.clone().warnings()),
                 );
@@ -170,7 +178,11 @@ impl CompileMiddleware for CompileDriver {
             Err(err) => {
                 self.handler
                     .notify_compile(Err(CompileStatus::CompileError));
-                self.notify_diagnostics(err, env.tracer.as_ref().map(|e| e.clone().warnings()));
+                self.notify_diagnostics(
+                    world,
+                    err,
+                    env.tracer.as_ref().map(|e| e.clone().warnings()),
+                );
                 Err(EcoVec::new())
             }
         }
@@ -180,20 +192,22 @@ impl CompileMiddleware for CompileDriver {
 impl CompileDriver {
     fn notify_diagnostics(
         &mut self,
+        world: &LspWorld,
         errors: EcoVec<SourceDiagnostic>,
         warnings: Option<EcoVec<SourceDiagnostic>>,
     ) {
         trace!("notify diagnostics: {errors:#?} {warnings:#?}");
 
-        let diagnostics = self.run_analysis(|ctx| {
+        let diagnostics = self.run_analysis(world, |ctx| {
             tinymist_query::convert_diagnostics(ctx, errors.iter().chain(warnings.iter().flatten()))
         });
 
         match diagnostics {
             Ok(diagnostics) => {
+                let entry = world.entry_state();
                 // todo: better way to remove diagnostics
                 // todo: check all errors in this file
-                let detached = is_inactive(&self.inner.world().entry);
+                let detached = entry.is_inactive();
                 let valid = !detached;
                 self.handler.push_diagnostics(valid.then_some(diagnostics));
             }
@@ -206,15 +220,14 @@ impl CompileDriver {
 
     pub fn run_analysis<T>(
         &mut self,
+        w: &LspWorld,
         f: impl FnOnce(&mut AnalysisContext<'_>) -> T,
     ) -> anyhow::Result<T> {
-        let w = self.inner.world_mut();
-
         let Some(main) = w.main_id() else {
             error!("TypstActor: main file is not set");
             bail!("main file is not set");
         };
-        let Some(root) = w.entry.root() else {
+        let Some(root) = w.entry_state().root() else {
             error!("TypstActor: root is not set");
             bail!("root is not set");
         };
@@ -222,12 +235,8 @@ impl CompileDriver {
             info!("TypstActor: failed to prepare main file: {err:?}");
             anyhow!("failed to get source: {err}")
         })?;
-        w.prepare_env(&mut Default::default()).map_err(|err| {
-            error!("TypstActor: failed to prepare env: {err:?}");
-            anyhow!("failed to prepare env")
-        })?;
 
-        struct WrapWorld<'a>(&'a mut LspWorld, &'a PeriscopeRenderer);
+        struct WrapWorld<'a>(&'a LspWorld, &'a PeriscopeRenderer);
 
         impl<'a> AnalysisResources for WrapWorld<'a> {
             fn world(&self) -> &dyn typst::World {
@@ -239,17 +248,14 @@ impl CompileDriver {
                 self.0.registry.resolve(spec)
             }
 
-            fn iter_dependencies<'b>(
-                &'b self,
-                f: &mut dyn FnMut(&'b ImmutPath, FileResult<&Time>),
-            ) {
-                use typst_ts_compiler::NotifyApi;
+            fn iter_dependencies(&self, f: &mut dyn FnMut(ImmutPath)) {
+                use typst_ts_compiler::WorldDeps;
                 self.0.iter_dependencies(f)
             }
 
             /// Resolve extra font information.
             fn font_info(&self, font: TypstFont) -> Option<Arc<DataSource>> {
-                self.0.font_resolver.inner.describe_font(&font)
+                self.0.font_resolver.describe_font(&font)
             }
 
             /// Resolve periscope image at the given position.
@@ -270,20 +276,20 @@ impl CompileDriver {
     }
 }
 
-pub struct CompileClientActor {
+pub struct CompileClientActorImpl<C: Compiler> {
     pub diag_group: String,
     pub config: CompileConfig,
     entry: EntryState,
-    intr_tx: mpsc::UnboundedSender<Interrupt<CompileService>>,
+    intr_tx: mpsc::UnboundedSender<Interrupt<CompileService<C>>>,
     export_tx: mpsc::UnboundedSender<ExportRequest>,
 }
 
-impl CompileClientActor {
+impl<C: Compiler<W = LspWorld> + Send> CompileClientActorImpl<C> {
     pub(crate) fn new(
         diag_group: String,
         config: CompileConfig,
         entry: EntryState,
-        intr_tx: mpsc::UnboundedSender<Interrupt<CompileService>>,
+        intr_tx: mpsc::UnboundedSender<Interrupt<CompileService<C>>>,
         export_tx: mpsc::UnboundedSender<ExportRequest>,
     ) -> Self {
         Self {
@@ -297,11 +303,11 @@ impl CompileClientActor {
 
     fn steal_inner<Ret: Send + 'static>(
         &self,
-        f: impl FnOnce(&mut CompileService) -> Ret + Send + 'static,
+        f: impl FnOnce(&mut CompileService<C>) -> Ret + Send + 'static,
     ) -> ZResult<oneshot::Receiver<Ret>> {
         let (tx, rx) = oneshot::channel();
 
-        let task = Box::new(move |this: &mut CompileService| {
+        let task = Box::new(move |this: &mut CompileService<C>| {
             if tx.send(f(this)).is_err() {
                 // Receiver was dropped. The main thread may have exited, or the request may
                 // have been cancelled.
@@ -319,7 +325,7 @@ impl CompileClientActor {
     /// Steal the compiler thread and run the given function.
     pub fn steal<Ret: Send + 'static>(
         &self,
-        f: impl FnOnce(&mut CompileService) -> Ret + Send + 'static,
+        f: impl FnOnce(&mut CompileService<C>) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
         utils::threaded_receive(self.steal_inner(f)?)
     }
@@ -327,31 +333,46 @@ impl CompileClientActor {
     /// Steal the compiler thread and run the given function.
     pub async fn steal_async<Ret: Send + 'static>(
         &self,
-        f: impl FnOnce(&mut CompileService) -> Ret + Send + 'static,
+        f: impl FnOnce(&mut CompileService<C>) -> Ret + Send + 'static,
     ) -> ZResult<Ret> {
         self.steal_inner(f)?
             .await
             .map_err(map_string_err("failed to call steal_async"))
     }
 
-    pub fn steal_state<T: Send + Sync + 'static>(
-        &self,
-        f: impl FnOnce(&mut AnalysisContext, Option<VersionedDocument>) -> T + Send + Sync + 'static,
-    ) -> anyhow::Result<T> {
-        self.steal(move |compiler| {
-            let doc = compiler.success_doc();
-            let c = &mut compiler.compiler.compiler;
-            c.run_analysis(move |ctx| f(ctx, doc))
-        })?
+    pub fn sync_config(&mut self, config: CompileConfig) {
+        self.config = config;
     }
 
-    pub fn steal_world<T: Send + Sync + 'static>(
-        &self,
-        f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
-    ) -> anyhow::Result<T> {
-        self.steal(move |compiler| compiler.compiler.compiler.run_analysis(f))?
+    pub fn add_memory_changes(&self, event: MemoryEvent) {
+        let _ = self.intr_tx.send(Interrupt::Memory(event));
     }
 
+    pub(crate) fn change_export_pdf(&mut self, config: ExportConfig) {
+        let _ = self.export_tx.send(ExportRequest::ChangeConfig(config));
+    }
+
+    pub fn on_export(&self, kind: ExportKind, path: PathBuf) -> anyhow::Result<Option<PathBuf>> {
+        // todo: we currently doesn't respect the path argument...
+        info!("CompileActor: on export: {}", path.display());
+
+        let (tx, rx) = oneshot::channel();
+        let _ = self.export_tx.send(ExportRequest::Oneshot(Some(kind), tx));
+        let res: Option<PathBuf> = utils::threaded_receive(rx)?;
+
+        info!("CompileActor: on export end: {path:?} as {res:?}");
+        Ok(res)
+    }
+
+    pub fn on_save_export(&self, path: PathBuf) -> anyhow::Result<()> {
+        info!("CompileActor: on save export: {}", path.display());
+        let _ = self.export_tx.send(ExportRequest::OnSaved);
+
+        Ok(())
+    }
+}
+
+impl CompileClientActorImpl<CompileDriver> {
     pub fn settle(&mut self) {
         let _ = self.change_entry(None);
         info!("TypstActor({}): settle requested", self.diag_group);
@@ -361,10 +382,6 @@ impl CompileClientActor {
             Ok(()) => info!("TypstActor({}): settled", self.diag_group),
             Err(err) => error!("TypstActor({}): failed to settle: {err:#}", self.diag_group),
         }
-    }
-
-    pub fn sync_config(&mut self, config: CompileConfig) {
-        self.config = config;
     }
 
     pub fn change_entry(&mut self, path: Option<ImmutPath>) -> Result<bool, Error> {
@@ -388,8 +405,8 @@ impl CompileClientActor {
         self.steal(move |compiler| {
             compiler.change_entry(next.clone());
 
-            let next_is_inactive = is_inactive(&next);
-            let res = compiler.compiler.world_mut().mutate_entry(next);
+            let next_is_inactive = next.is_inactive();
+            let res = compiler.verse.mutate_entry(next);
 
             if next_is_inactive {
                 info!("TypstActor: removing diag");
@@ -408,12 +425,26 @@ impl CompileClientActor {
         Ok(true)
     }
 
-    pub fn add_memory_changes(&self, event: MemoryEvent) {
-        let _ = self.intr_tx.send(Interrupt::Memory(event));
+    pub fn steal_state<T: Send + Sync + 'static>(
+        &self,
+        f: impl FnOnce(&mut AnalysisContext, Option<VersionedDocument>) -> T + Send + Sync + 'static,
+    ) -> anyhow::Result<T> {
+        self.steal(move |compiler| {
+            let doc = compiler.success_doc();
+            let w = compiler.verse.spawn();
+            let c = &mut compiler.compiler.compiler;
+            c.run_analysis(&w, move |ctx| f(ctx, doc))
+        })?
     }
 
-    pub(crate) fn change_export_pdf(&mut self, config: ExportConfig) {
-        let _ = self.export_tx.send(ExportRequest::ChangeConfig(config));
+    pub fn steal_world<T: Send + Sync + 'static>(
+        &self,
+        f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
+    ) -> anyhow::Result<T> {
+        self.steal(move |compiler| {
+            let w = compiler.verse.spawn();
+            compiler.compiler.compiler.run_analysis(&w, f)
+        })?
     }
 
     pub fn clear_cache(&self) {
@@ -426,13 +457,15 @@ impl CompileClientActor {
         let dg = self.diag_group.clone();
         self.steal(move |c| {
             let cc = &c.compiler.compiler;
+            let w = c.verse.spawn();
 
             let info = ServerInfoResponse {
-                root: cc.world().entry.root().map(|e| e.as_ref().to_owned()),
-                font_paths: cc.world().font_resolver.font_paths().to_owned(),
-                inputs: cc.world().inputs.as_ref().deref().clone(),
+                root: w.entry_state().root().map(|e| e.as_ref().to_owned()),
+                font_paths: w.font_resolver.font_paths().to_owned(),
+                inputs: c.verse.inputs().as_ref().deref().clone(),
                 estimated_memory_usage: HashMap::from_iter([
-                    ("vfs".to_owned(), cc.world().vfs.memory_usage()),
+                    // todo: vfs memory usage
+                    // ("vfs".to_owned(), w.vfs.read().memory_usage()),
                     ("analysis".to_owned(), cc.analysis.estimated_memory()),
                 ]),
             };
@@ -440,24 +473,5 @@ impl CompileClientActor {
             HashMap::from_iter([(dg, info)])
         })
         .map_err(|e| e.into())
-    }
-
-    pub fn on_export(&self, kind: ExportKind, path: PathBuf) -> anyhow::Result<Option<PathBuf>> {
-        // todo: we currently doesn't respect the path argument...
-        info!("CompileActor: on export: {}", path.display());
-
-        let (tx, rx) = oneshot::channel();
-        let _ = self.export_tx.send(ExportRequest::Oneshot(Some(kind), tx));
-        let res: Option<PathBuf> = utils::threaded_receive(rx)?;
-
-        info!("CompileActor: on export end: {path:?} as {res:?}");
-        Ok(res)
-    }
-
-    pub fn on_save_export(&self, path: PathBuf) -> anyhow::Result<()> {
-        info!("CompileActor: on save export: {}", path.display());
-        let _ = self.export_tx.send(ExportRequest::OnSaved);
-
-        Ok(())
     }
 }

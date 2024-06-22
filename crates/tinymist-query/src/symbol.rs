@@ -36,11 +36,11 @@ impl SemanticRequest for SymbolRequest {
 
         let mut symbols = vec![];
 
-        ctx.resources.iter_dependencies(&mut |path, _| {
-            let Ok(source) = ctx.source_by_path(path) else {
+        ctx.resources.iter_dependencies(&mut |path| {
+            let Ok(source) = ctx.source_by_path(&path) else {
                 return;
             };
-            let uri = path_to_url(path).unwrap();
+            let uri = path_to_url(&path).unwrap();
             let res = get_lexical_hierarchy(source.clone(), LexicalScopeKind::Symbol).and_then(
                 |symbols| {
                     self.pattern.as_ref().map(|pattern| {

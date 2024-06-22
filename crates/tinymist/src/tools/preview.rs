@@ -9,14 +9,15 @@ use typst_preview::{
     CompileHost, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
     SourceFileServer,
 };
-use typst_ts_compiler::service::{Compiler, EntryManager};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
+use typst_ts_compiler::{service::Compiler, EntryReader};
 use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_core::{Error, TypstDocument, TypstFileId};
 
-use crate::actor::typ_client::CompileClientActor;
+use crate::actor::typ_client::CompileClientActorImpl;
+use crate::world::LspWorld;
 
-impl SourceFileServer for CompileClientActor {
+impl<C: Compiler<W = LspWorld> + Send> SourceFileServer for CompileClientActorImpl<C> {
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
     async fn resolve_source_span(
@@ -25,12 +26,10 @@ impl SourceFileServer for CompileClientActor {
     ) -> Result<Option<SourceSpanOffset>, Error> {
         let Location::Src(loc) = loc;
         self.steal_async(move |this| {
-            let world = this.compiler.world();
+            let world = this.verse.spawn();
 
             let filepath = Path::new(&loc.filepath);
-            let relative_path = filepath
-                .strip_prefix(&this.compiler.world().workspace_root()?)
-                .ok()?;
+            let relative_path = filepath.strip_prefix(&world.workspace_root()?).ok()?;
 
             let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
             let source = world.source(source_id).ok()?;
@@ -64,11 +63,9 @@ impl SourceFileServer for CompileClientActor {
         self.steal_async(move |this| {
             let doc = this.latest_doc.as_deref()?;
 
-            let world = this.compiler.world();
+            let world = this.verse.spawn();
 
-            let relative_path = path
-                .strip_prefix(&this.compiler.world().workspace_root()?)
-                .ok()?;
+            let relative_path = path.strip_prefix(&world.workspace_root()?).ok()?;
 
             let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
             let source = world.source(source_id).ok()?;
@@ -89,7 +86,7 @@ impl SourceFileServer for CompileClientActor {
 
         let ret = self
             .steal_async(move |this| {
-                let world = this.compiler.world();
+                let world = this.verse.spawn();
                 let src_id = span.id()?;
                 let source = world.source(src_id).ok()?;
                 let mut range = source.find(span)?.range();
@@ -181,7 +178,7 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
     None
 }
 
-impl EditorServer for CompileClientActor {
+impl<C: Compiler<W = LspWorld> + Send> EditorServer for CompileClientActorImpl<C> {
     async fn update_memory_files(
         &mut self,
         files: MemoryFiles,
@@ -218,4 +215,4 @@ impl EditorServer for CompileClientActor {
     }
 }
 
-impl CompileHost for CompileClientActor {}
+impl<C: Compiler<W = LspWorld> + Send> CompileHost for CompileClientActorImpl<C> {}

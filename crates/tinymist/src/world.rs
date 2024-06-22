@@ -13,7 +13,7 @@ use typst_ts_compiler::{
     font::system::SystemFontSearcher,
     package::http::HttpRegistry,
     vfs::{system::SystemAccessModel, Vfs},
-    world::CompilerWorld,
+    SystemCompilerFeat, TypstSystemUniverse, TypstSystemWorld,
 };
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -49,7 +49,6 @@ pub struct CompileFontOpts {
 
 #[derive(Debug, Clone)]
 pub struct SharedFontResolver {
-    font_paths: Vec<PathBuf>,
     pub inner: Arc<FontResolverImpl>,
 }
 
@@ -63,58 +62,24 @@ impl FontResolver for SharedFontResolver {
 }
 
 impl SharedFontResolver {
-    pub fn new(mut opts: CompileFontOpts) -> ZResult<Self> {
-        // todo: relative paths?
-        let mut has_relative_path = false;
-        for p in &opts.font_paths {
-            if p.is_relative() {
-                has_relative_path = true;
-                break;
-            }
-        }
-        if has_relative_path {
-            let current_dir = std::env::current_dir()
-                .context("failed to get current directory for relative font paths")?;
-            for p in &mut opts.font_paths {
-                if p.is_relative() {
-                    *p = current_dir.join(&p);
-                }
-            }
-        }
-
-        let font_paths = opts.font_paths.clone();
-        let res = crate::world::LspWorldBuilder::resolve_fonts(opts)?;
+    pub fn new(opts: CompileFontOpts) -> ZResult<Self> {
         Ok(Self {
-            font_paths,
-            inner: Arc::new(res),
+            inner: Arc::new(crate::world::LspWorldBuilder::resolve_fonts(opts)?),
         })
     }
 
     pub fn font_paths(&self) -> &[PathBuf] {
-        &self.font_paths
+        self.inner.font_paths()
     }
 }
 
-/// type trait of [`LspWorld`].
-#[derive(Debug, Clone, Copy)]
-pub struct SystemCompilerFeat;
-
-impl typst_ts_compiler::world::CompilerFeat for SystemCompilerFeat {
-    /// Uses [`SharedFontResolver`] directly.
-    type FontResolver = SharedFontResolver;
-    /// It accesses a physical file system.
-    type AccessModel = SystemAccessModel;
-    /// It performs native HTTP requests for fetching package data.
-    type Registry = HttpRegistry;
-}
-
-/// The compiler world in system environment.
-pub type LspWorld = CompilerWorld<SystemCompilerFeat>;
+pub type LspCompilerFeat = SystemCompilerFeat;
+pub type LspUniverse = TypstSystemUniverse;
+pub type LspWorld = TypstSystemWorld;
 
 pub type ImmutDict = Arc<Prehashed<TypstDict>>;
 
 pub struct LspWorldBuilder;
-// Self::resolve_fonts(opts)?,
 
 impl LspWorldBuilder {
     /// Create [`LspWorld`] with the given options.
@@ -124,15 +89,14 @@ impl LspWorldBuilder {
         entry: EntryState,
         font_resolver: SharedFontResolver,
         inputs: ImmutDict,
-    ) -> ZResult<LspWorld> {
-        let mut res = CompilerWorld::new_raw(
+    ) -> ZResult<LspUniverse> {
+        Ok(LspUniverse::new_raw(
             entry,
+            Some(inputs),
             Vfs::new(SystemAccessModel {}),
             HttpRegistry::default(),
-            font_resolver,
-        );
-        res.inputs = inputs;
-        Ok(res)
+            font_resolver.inner,
+        ))
     }
 
     /// Resolve fonts from given options.

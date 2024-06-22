@@ -51,6 +51,7 @@ typst-assets = "0.11.1"
 reflexo = { version = "0.5.0-rc4", default-features = false, features = [
     "flat-vector",
 ] }
+reflexo-world = { version = "0.5.0-rc4", features = ["system"] }
 typst-ts-core = { version = "0.5.0-rc4", default-features = false }
 typst-ts-compiler = { version = "0.5.0-rc4" }
 typst-ts-svg-exporter = { version = "0.5.0-rc4" }
@@ -143,13 +144,15 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "
 # typst-render = { path = "../typst/crates/typst-render" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-# typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9cced415e29e5e341ad4bdcc32ab3e67ffad74db" }
-# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9cced415e29e5e341ad4bdcc32ab3e67ffad74db" }
-# typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9cced415e29e5e341ad4bdcc32ab3e67ffad74db" }
-# typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "9cced415e29e5e341ad4bdcc32ab3e67ffad74db" }
+typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "36b969e2d5743544dca8679c53c89129b989ec80" }
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "36b969e2d5743544dca8679c53c89129b989ec80" }
+reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "36b969e2d5743544dca8679c53c89129b989ec80" }
+typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "36b969e2d5743544dca8679c53c89129b989ec80" }
+typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "36b969e2d5743544dca8679c53c89129b989ec80" }
 
 # typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
+# reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
 # typst-ts-core = { path = "../typst.ts/core" }
 # typst-ts-compiler = { path = "../typst.ts/compiler" }
 # typstyle = { path = "../typstyle" }

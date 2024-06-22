@@ -7,7 +7,7 @@ use typst::syntax::VirtualPath;
 use typst::World;
 use typst_ts_core::{Bytes, ImmutPath, TypstFileId};
 
-use crate::world::LspWorld;
+use crate::world::{LspUniverse, LspWorld};
 
 #[derive(Debug, Clone)]
 pub enum TemplateSource {
@@ -20,13 +20,15 @@ pub struct InitTask {
 }
 
 /// Execute an initialization command.
-pub fn get_entry(world: &LspWorld, tmpl: TemplateSource) -> StrResult<Bytes> {
+pub fn get_entry(verse: &LspUniverse, tmpl: TemplateSource) -> StrResult<Bytes> {
     let TemplateSource::Package(spec) = tmpl;
 
     let toml_id = TypstFileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
 
+    let world = verse.spawn();
+
     // Parse the manifest.
-    let manifest = parse_manifest(world, toml_id)?;
+    let manifest = parse_manifest(&world, toml_id)?;
     manifest.validate(&spec)?;
 
     // Ensure that it is indeed a template.

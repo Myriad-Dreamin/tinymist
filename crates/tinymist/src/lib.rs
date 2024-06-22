@@ -42,7 +42,9 @@ pub use server::compiler_init;
 pub use server::lsp::*;
 pub use server::lsp_init::*;
 pub use server::preview;
-pub use world::{CompileFontOpts, CompileOnceOpts, CompileOpts, LspWorld, LspWorldBuilder};
+pub use world::{
+    CompileFontOpts, CompileOnceOpts, CompileOpts, LspUniverse, LspWorld, LspWorldBuilder,
+};
 
 use lsp_server::ResponseError;
 

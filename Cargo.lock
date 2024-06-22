@@ -141,6 +141,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "archery"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8967cd1cc9e9e1954f644e14fbd6042fe9a37da96c52a67e44a2ac18261f8561"
+dependencies = [
+ "static_assertions",
+ "triomphe",
+]
+
+[[package]]
 name = "arraydeque"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2889,8 +2899,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.0-rc4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "803cbdda7d5beefc048966f342ba9a13dab586f136a8fe7f6d915b2f073a9151"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=36b969e2d5743544dca8679c53c89129b989ec80#36b969e2d5743544dca8679c53c89129b989ec80"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -2898,16 +2907,67 @@ dependencies = [
  "dashmap",
  "ecow 0.2.2",
  "fxhash",
+ "instant",
  "once_cell",
  "parking_lot",
  "path-clean",
  "rkyv",
+ "rustc-hash",
  "serde",
  "serde_json",
  "serde_repr",
  "serde_with",
  "siphasher 1.0.1",
  "tiny-skia-path",
+]
+
+[[package]]
+name = "reflexo-vfs"
+version = "0.5.0-rc4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=36b969e2d5743544dca8679c53c89129b989ec80#36b969e2d5743544dca8679c53c89129b989ec80"
+dependencies = [
+ "append-only-vec",
+ "indexmap 2.2.6",
+ "log",
+ "nohash-hasher",
+ "once_cell",
+ "parking_lot",
+ "reflexo",
+ "rpds",
+ "rustc-hash",
+ "typst",
+]
+
+[[package]]
+name = "reflexo-world"
+version = "0.5.0-rc4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=36b969e2d5743544dca8679c53c89129b989ec80#36b969e2d5743544dca8679c53c89129b989ec80"
+dependencies = [
+ "append-only-vec",
+ "chrono",
+ "codespan-reporting",
+ "comemo 0.4.0",
+ "dashmap",
+ "dirs",
+ "flate2",
+ "fontdb",
+ "hex",
+ "indexmap 2.2.6",
+ "log",
+ "nohash-hasher",
+ "once_cell",
+ "parking_lot",
+ "reflexo",
+ "reflexo-vfs",
+ "reqwest",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "sha2",
+ "strum 0.25.0",
+ "tar",
+ "typst",
+ "typst-ts-core",
 ]
 
 [[package]]
@@ -3074,6 +3134,15 @@ name = "roxmltree"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cd14fd5e3b777a7422cca79358c57a8f6e3a703d9ac187448d0daf220c2407f"
+
+[[package]]
+name = "rpds"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0e15515d3ce3313324d842629ea4905c25a13f81953eadb88f85516f59290a4"
+dependencies = [
+ "archery",
+]
 
 [[package]]
 name = "rust_iso3166"
@@ -4425,12 +4494,10 @@ dependencies = [
 [[package]]
 name = "typst-ts-compiler"
 version = "0.5.0-rc4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b5d68fc30324347a294155cc4691defa4e01aaff23d7e3c1c40a3c8e5d22e3f"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=36b969e2d5743544dca8679c53c89129b989ec80#36b969e2d5743544dca8679c53c89129b989ec80"
 dependencies = [
  "append-only-vec",
  "base64 0.22.1",
- "chrono",
  "codespan-reporting",
  "comemo 0.4.0",
  "dirs",
@@ -4446,7 +4513,8 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "pathdiff",
- "reqwest",
+ "reflexo-vfs",
+ "reflexo-world",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -4463,8 +4531,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-core"
 version = "0.5.0-rc4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b9355a7f3b2f687088524fa1d5c0d0cbe45878e9672d7a321aec491ae10b1dd"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=36b969e2d5743544dca8679c53c89129b989ec80#36b969e2d5743544dca8679c53c89129b989ec80"
 dependencies = [
  "base64 0.22.1",
  "base64-serde",
@@ -4491,6 +4558,7 @@ dependencies = [
  "serde_with",
  "sha2",
  "siphasher 1.0.1",
+ "svgtypes",
  "tiny-skia",
  "tiny-skia-path",
  "ttf-parser",
@@ -4501,8 +4569,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-svg-exporter"
 version = "0.5.0-rc4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13b1e7baba2453d072cbc1e97a43d5a8ecfe36299fc103e9156bb9470abd35e0"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=36b969e2d5743544dca8679c53c89129b989ec80#36b969e2d5743544dca8679c53c89129b989ec80"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
