@@ -14,8 +14,7 @@ use typst::syntax::{
 };
 use typst::{diag::PackageError, foundations::Bytes};
 use typst_ts_compiler::{
-    service::{CompileDriver, EntryManager, EntryReader},
-    ShadowApi, TypstSystemUniverse, WorldDeps,
+    service::CompileDriver, EntryManager, EntryReader, ShadowApi, TypstSystemUniverse, WorldDeps,
 };
 use typst_ts_core::{
     config::compiler::{EntryOpts, EntryState},

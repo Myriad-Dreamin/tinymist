@@ -49,8 +49,9 @@ use typst::{
     World as TypstWorld,
 };
 use typst_ts_compiler::{
-    service::{CompileEnv, CompileMiddleware, Compiler, EntryManager, EntryReader, PureCompiler},
+    service::{CompileEnv, CompileMiddleware, Compiler, PureCompiler},
     vfs::notify::MemoryEvent,
+    EntryManager, EntryReader,
 };
 use typst_ts_core::{
     config::compiler::EntryState, debug_loc::DataSource, error::prelude::*, typst::prelude::EcoVec,
@@ -226,7 +227,7 @@ impl CompileDriver {
             error!("TypstActor: main file is not set");
             bail!("main file is not set");
         };
-        let Some(root) = w.entry.root() else {
+        let Some(root) = w.entry_state().root() else {
             error!("TypstActor: root is not set");
             bail!("root is not set");
         };
@@ -459,11 +460,12 @@ impl CompileClientActorImpl<CompileDriver> {
             let w = c.verse.spawn();
 
             let info = ServerInfoResponse {
-                root: w.entry.root().map(|e| e.as_ref().to_owned()),
+                root: w.entry_state().root().map(|e| e.as_ref().to_owned()),
                 font_paths: w.font_resolver.font_paths().to_owned(),
-                inputs: c.verse.inputs.as_ref().deref().clone(),
+                inputs: c.verse.inputs().as_ref().deref().clone(),
                 estimated_memory_usage: HashMap::from_iter([
-                    ("vfs".to_owned(), w.vfs.read().memory_usage()),
+                    // todo: vfs memory usage
+                    // ("vfs".to_owned(), w.vfs.read().memory_usage()),
                     ("analysis".to_owned(), cc.analysis.estimated_memory()),
                 ]),
             };

@@ -10,13 +10,6 @@ use comemo::Prehashed;
 use lsp_types::{InitializeParams, InitializedParams};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use tokio::sync::mpsc;
-use typst::World;
-use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
-use typst_ts_compiler::service::{CompileEnv, Compiler, EntryManager};
-use typst_ts_core::{typst::prelude::EcoVec, TypstDict};
-
-use crate::args::{CliArguments, Commands, CompileArgs, LspArgs};
 use tinymist::{
     compiler_init::{CompileInit, CompileInitializeParams},
     harness::{lsp_harness, InitializedLspDriver, LspDriver, LspHost},
@@ -24,6 +17,13 @@ use tinymist::{
     transport::with_stdio_transport,
     CompileFontOpts, Init, LspWorld, TypstLanguageServer,
 };
+use tokio::sync::mpsc;
+use typst::World;
+use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
+use typst_ts_compiler::service::{CompileEnv, Compiler};
+use typst_ts_core::{typst::prelude::EcoVec, TypstDict};
+
+use crate::args::{CliArguments, Commands, CompileArgs, LspArgs};
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -184,8 +184,10 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
             let (timings, _doc, diagnostics) = service
                 .compiler()
                 .steal(|c| {
-                    c.verse.mutate_entry(entry).unwrap();
-                    c.verse.inputs = inputs;
+                    c.verse.increment_revision(|verse| {
+                        verse.mutate_entry(entry).unwrap();
+                        verse.set_inputs(inputs);
+                    });
 
                     let w = c.verse.spawn();
 

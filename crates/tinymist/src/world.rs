@@ -1,7 +1,6 @@
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
 
 use comemo::Prehashed;
-use parking_lot::lock_api::RwLock;
 use serde::{Deserialize, Serialize};
 use typst_ts_core::{
     config::{compiler::EntryState, CompileFontOpts as FontOptsInner},
@@ -94,7 +93,7 @@ impl LspWorldBuilder {
         Ok(LspUniverse::new_raw(
             entry,
             Some(inputs),
-            Arc::new(RwLock::new(Vfs::new(SystemAccessModel {}))),
+            Vfs::new(SystemAccessModel {}),
             HttpRegistry::default(),
             font_resolver.inner,
         ))

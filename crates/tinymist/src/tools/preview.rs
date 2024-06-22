@@ -9,8 +9,8 @@ use typst_preview::{
     CompileHost, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
     SourceFileServer,
 };
-use typst_ts_compiler::service::{Compiler, EntryReader};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
+use typst_ts_compiler::{service::Compiler, EntryReader};
 use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_core::{Error, TypstDocument, TypstFileId};
 

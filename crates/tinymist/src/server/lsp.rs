@@ -664,7 +664,7 @@ impl TypstLanguageServer {
                             compiler_program: self_path,
                             root: root.as_ref().to_owned(),
                             main,
-                            inputs: verse.inputs.as_ref().deref().clone(),
+                            inputs: verse.inputs().as_ref().deref().clone(),
                             font_paths: verse.font_resolver.font_paths().to_owned(),
                         },
                     ))

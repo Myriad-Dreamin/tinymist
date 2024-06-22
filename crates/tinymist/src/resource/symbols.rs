@@ -1,6 +1,5 @@
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
-use typst_ts_compiler::{service::EntryManager, ShadowApi};
 use typst_ts_core::{config::compiler::EntryState, font::GlyphId, TypstDocument, TypstFont};
 
 pub use super::prelude::*;
@@ -192,15 +191,19 @@ impl TypstLanguageServer {
                 let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
 
                 let new_entry = EntryState::new_rootless(entry_path.clone())?;
-                let old_entry = verse.mutate_entry(new_entry).ok()?;
-                let prepared = verse
-                    .map_shadow(&entry_path, math_shaping_text.into_bytes().into())
-                    .is_ok();
+                let (old_entry, prepared) = verse.increment_revision(|verse| {
+                    let old_entry = verse.mutate_entry(new_entry).ok()?;
+                    let prepared = verse
+                        .map_shadow(&entry_path, math_shaping_text.into_bytes().into())
+                        .is_ok();
+
+                    Some((old_entry, prepared))
+                })?;
 
                 let w = verse.spawn();
                 let sym_doc =
                     prepared.then(|| e.compiler.pure_compile(&w, &mut Default::default()));
-                verse.mutate_entry(old_entry).ok()?;
+                verse.increment_revision(|verse| verse.mutate_entry(old_entry).ok())?;
 
                 log::debug!(
                     "sym doc: {doc:?}",

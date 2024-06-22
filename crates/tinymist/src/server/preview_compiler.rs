@@ -8,10 +8,8 @@ use typst::model::Document;
 
 use typst::World;
 use typst_ts_compiler::service::{CompileDriver, CompileMiddleware};
-use typst_ts_compiler::service::{
-    CompileExporter, Compiler, EntryReader, PureCompiler, WorldExporter,
-};
-use typst_ts_compiler::TypstSystemWorld;
+use typst_ts_compiler::service::{CompileExporter, Compiler, PureCompiler, WorldExporter};
+use typst_ts_compiler::{EntryReader, TypstSystemWorld};
 use typst_ts_core::Error;
 
 use typst_preview::{CompilationHandle, CompileStatus};
