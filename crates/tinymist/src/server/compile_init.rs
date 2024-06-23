@@ -19,7 +19,7 @@ use typst_ts_core::config::compiler::EntryState;
 use typst_ts_core::{ImmutPath, TypstDict};
 
 use crate::actor::editor::EditorRequest;
-use crate::compiler::CompileServer;
+use crate::compile::CompileState;
 use crate::harness::LspDriver;
 use crate::utils::{try_, try_or_default};
 use crate::world::{ImmutDict, SharedFontResolver};
@@ -372,19 +372,11 @@ impl CompileConfig {
 
 /// Configuration set at initialization that won't change within a single
 /// session.
-#[derive(Debug, Clone)]
-pub struct CompilerConstConfig {
+#[derive(Default, Debug, Clone)]
+pub struct ConstCompileConfig {
     /// Determined position encoding, either UTF-8 or UTF-16.
     /// Defaults to UTF-16 if not specified.
     pub position_encoding: PositionEncoding,
-}
-
-impl Default for CompilerConstConfig {
-    fn default() -> Self {
-        Self {
-            position_encoding: PositionEncoding::Utf16,
-        }
-    }
 }
 
 pub struct CompileInit {
@@ -402,7 +394,7 @@ pub struct CompileInitializeParams {
 impl LspDriver for CompileInit {
     type InitParams = CompileInitializeParams;
     type InitResult = ();
-    type InitializedSelf = CompileServer;
+    type InitializedSelf = CompileState;
 
     fn initialize(
         self,
@@ -418,10 +410,10 @@ impl LspDriver for CompileInit {
         };
         compile_config.update(&params.config).unwrap();
 
-        let mut service = CompileServer::new(
+        let mut service = CompileState::new(
             client,
             compile_config,
-            CompilerConstConfig {
+            ConstCompileConfig {
                 position_encoding: params
                     .position_encoding
                     .map(|x| match x.as_str() {

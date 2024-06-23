@@ -13,68 +13,67 @@ pub mod syntax;
 pub mod ty;
 mod upstream;
 
-pub(crate) mod diagnostics;
-
 use std::sync::Arc;
 
 pub use analysis::AnalysisContext;
 use typst::{model::Document as TypstDocument, syntax::Source};
 
+mod diagnostics;
 pub use diagnostics::*;
-pub(crate) mod code_action;
+mod code_action;
 pub use code_action::*;
-pub(crate) mod code_context;
+mod code_context;
 pub use code_context::*;
-pub(crate) mod code_lens;
+mod code_lens;
 pub use code_lens::*;
-pub(crate) mod completion;
+mod completion;
 pub use completion::*;
-pub(crate) mod color_presentation;
+mod color_presentation;
 pub use color_presentation::*;
-pub(crate) mod document_color;
+mod document_color;
 pub use document_color::*;
-pub(crate) mod document_highlight;
+mod document_highlight;
 pub use document_highlight::*;
-pub(crate) mod document_symbol;
+mod document_symbol;
 pub use document_symbol::*;
-pub(crate) mod document_metrics;
+mod document_metrics;
 pub use document_metrics::*;
-pub(crate) mod folding_range;
+mod folding_range;
 pub use folding_range::*;
-pub(crate) mod goto_declaration;
+mod goto_declaration;
 pub use goto_declaration::*;
-pub(crate) mod goto_definition;
+mod goto_definition;
 pub use goto_definition::*;
-pub(crate) mod hover;
+mod hover;
 pub use hover::*;
-pub(crate) mod inlay_hint;
+mod inlay_hint;
 pub use inlay_hint::*;
-pub(crate) mod jump;
+mod jump;
 pub use jump::*;
-pub(crate) mod rename;
+mod rename;
 pub use rename::*;
-pub(crate) mod selection_range;
+mod selection_range;
 pub use selection_range::*;
-pub(crate) mod semantic_tokens;
+mod semantic_tokens;
 pub use semantic_tokens::*;
-pub(crate) mod semantic_tokens_full;
+mod semantic_tokens_full;
 pub use semantic_tokens_full::*;
-pub(crate) mod semantic_tokens_delta;
+mod semantic_tokens_delta;
 pub use semantic_tokens_delta::*;
-pub(crate) mod signature_help;
+mod signature_help;
 pub use signature_help::*;
-pub(crate) mod symbol;
+mod symbol;
 pub use symbol::*;
-pub(crate) mod on_enter;
+mod on_enter;
 pub use on_enter::*;
-pub(crate) mod prepare_rename;
+mod prepare_rename;
 pub use prepare_rename::*;
-pub(crate) mod references;
+mod references;
 pub use references::*;
 
-pub mod lsp_typst_boundary;
+mod lsp_typst_boundary;
 pub use lsp_typst_boundary::*;
-pub(crate) mod lsp_features;
+mod lsp_features;
 pub use lsp_features::*;
 
 mod prelude;
@@ -136,9 +135,10 @@ mod polymorphic {
     use super::prelude::*;
     use super::*;
 
-    #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+    #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub enum PageSelection {
+        #[default]
         First,
         Merged,
     }
@@ -234,68 +234,69 @@ mod polymorphic {
         pub fn fold_feature(&self) -> FoldRequestFeature {
             use FoldRequestFeature::*;
             match self {
-                CompilerQueryRequest::OnExport(..) => Mergeable,
-                CompilerQueryRequest::OnSaveExport(..) => Mergeable,
-                CompilerQueryRequest::Hover(..) => PinnedFirst,
-                CompilerQueryRequest::GotoDefinition(..) => PinnedFirst,
-                CompilerQueryRequest::GotoDeclaration(..) => PinnedFirst,
-                CompilerQueryRequest::References(..) => PinnedFirst,
-                CompilerQueryRequest::InlayHint(..) => Unique,
-                CompilerQueryRequest::DocumentColor(..) => PinnedFirst,
-                CompilerQueryRequest::DocumentHighlight(..) => PinnedFirst,
-                CompilerQueryRequest::ColorPresentation(..) => ContextFreeUnique,
-                CompilerQueryRequest::CodeAction(..) => Unique,
-                CompilerQueryRequest::CodeLens(..) => Unique,
-                CompilerQueryRequest::Completion(..) => Mergeable,
-                CompilerQueryRequest::SignatureHelp(..) => PinnedFirst,
-                CompilerQueryRequest::Rename(..) => Mergeable,
-                CompilerQueryRequest::PrepareRename(..) => Mergeable,
-                CompilerQueryRequest::DocumentSymbol(..) => ContextFreeUnique,
-                CompilerQueryRequest::Symbol(..) => Mergeable,
-                CompilerQueryRequest::SemanticTokensFull(..) => ContextFreeUnique,
-                CompilerQueryRequest::SemanticTokensDelta(..) => ContextFreeUnique,
-                CompilerQueryRequest::Formatting(..) => ContextFreeUnique,
-                CompilerQueryRequest::FoldingRange(..) => ContextFreeUnique,
-                CompilerQueryRequest::SelectionRange(..) => ContextFreeUnique,
-                CompilerQueryRequest::InteractCodeContext(..) => PinnedFirst,
+                Self::OnExport(..) => Mergeable,
+                Self::OnSaveExport(..) => Mergeable,
+                Self::Hover(..) => PinnedFirst,
+                Self::GotoDefinition(..) => PinnedFirst,
+                Self::GotoDeclaration(..) => PinnedFirst,
+                Self::References(..) => PinnedFirst,
+                Self::InlayHint(..) => Unique,
+                Self::DocumentColor(..) => PinnedFirst,
+                Self::DocumentHighlight(..) => PinnedFirst,
+                Self::ColorPresentation(..) => ContextFreeUnique,
+                Self::CodeAction(..) => Unique,
+                Self::CodeLens(..) => Unique,
+                Self::Completion(..) => Mergeable,
+                Self::SignatureHelp(..) => PinnedFirst,
+                Self::Rename(..) => Mergeable,
+                Self::PrepareRename(..) => Mergeable,
+                Self::DocumentSymbol(..) => ContextFreeUnique,
+                Self::Symbol(..) => Mergeable,
+                Self::SemanticTokensFull(..) => ContextFreeUnique,
+                Self::SemanticTokensDelta(..) => ContextFreeUnique,
+                Self::Formatting(..) => ContextFreeUnique,
+                Self::FoldingRange(..) => ContextFreeUnique,
+                Self::SelectionRange(..) => ContextFreeUnique,
+                Self::InteractCodeContext(..) => PinnedFirst,
 
-                CompilerQueryRequest::OnEnter(..) => ContextFreeUnique,
+                Self::OnEnter(..) => ContextFreeUnique,
 
-                CompilerQueryRequest::DocumentMetrics(..) => PinnedFirst,
-                CompilerQueryRequest::ServerInfo(..) => Mergeable,
+                Self::DocumentMetrics(..) => PinnedFirst,
+                Self::ServerInfo(..) => Mergeable,
             }
         }
 
         pub fn associated_path(&self) -> Option<&Path> {
             Some(match self {
-                CompilerQueryRequest::OnExport(..) => return None,
-                CompilerQueryRequest::OnSaveExport(req) => &req.path,
-                CompilerQueryRequest::Hover(req) => &req.path,
-                CompilerQueryRequest::GotoDefinition(req) => &req.path,
-                CompilerQueryRequest::GotoDeclaration(req) => &req.path,
-                CompilerQueryRequest::References(req) => &req.path,
-                CompilerQueryRequest::InlayHint(req) => &req.path,
-                CompilerQueryRequest::DocumentColor(req) => &req.path,
-                CompilerQueryRequest::DocumentHighlight(req) => &req.path,
-                CompilerQueryRequest::ColorPresentation(req) => &req.path,
-                CompilerQueryRequest::CodeAction(req) => &req.path,
-                CompilerQueryRequest::CodeLens(req) => &req.path,
-                CompilerQueryRequest::Completion(req) => &req.path,
-                CompilerQueryRequest::SignatureHelp(req) => &req.path,
-                CompilerQueryRequest::Rename(req) => &req.path,
-                CompilerQueryRequest::PrepareRename(req) => &req.path,
-                CompilerQueryRequest::DocumentSymbol(req) => &req.path,
-                CompilerQueryRequest::Symbol(..) => return None,
-                CompilerQueryRequest::SemanticTokensFull(req) => &req.path,
-                CompilerQueryRequest::SemanticTokensDelta(req) => &req.path,
-                CompilerQueryRequest::Formatting(req) => &req.path,
-                CompilerQueryRequest::FoldingRange(req) => &req.path,
-                CompilerQueryRequest::SelectionRange(req) => &req.path,
-                CompilerQueryRequest::InteractCodeContext(req) => &req.path,
-                CompilerQueryRequest::OnEnter(req) => &req.path,
+                Self::OnExport(..) => return None,
+                Self::OnSaveExport(req) => &req.path,
+                Self::Hover(req) => &req.path,
+                Self::GotoDefinition(req) => &req.path,
+                Self::GotoDeclaration(req) => &req.path,
+                Self::References(req) => &req.path,
+                Self::InlayHint(req) => &req.path,
+                Self::DocumentColor(req) => &req.path,
+                Self::DocumentHighlight(req) => &req.path,
+                Self::ColorPresentation(req) => &req.path,
+                Self::CodeAction(req) => &req.path,
+                Self::CodeLens(req) => &req.path,
+                Self::Completion(req) => &req.path,
+                Self::SignatureHelp(req) => &req.path,
+                Self::Rename(req) => &req.path,
+                Self::PrepareRename(req) => &req.path,
+                Self::DocumentSymbol(req) => &req.path,
+                Self::Symbol(..) => return None,
+                Self::SemanticTokensFull(req) => &req.path,
+                Self::SemanticTokensDelta(req) => &req.path,
+                Self::Formatting(req) => &req.path,
+                Self::FoldingRange(req) => &req.path,
+                Self::SelectionRange(req) => &req.path,
+                Self::InteractCodeContext(req) => &req.path,
 
-                CompilerQueryRequest::DocumentMetrics(req) => &req.path,
-                CompilerQueryRequest::ServerInfo(..) => return None,
+                Self::OnEnter(req) => &req.path,
+
+                Self::DocumentMetrics(req) => &req.path,
+                Self::ServerInfo(..) => return None,
             })
         }
     }

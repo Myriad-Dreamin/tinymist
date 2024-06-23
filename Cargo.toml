@@ -58,6 +58,7 @@ typst-ts-svg-exporter = { version = "0.5.0-rc4" }
 typstyle = "0.11.26"
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
 
+async-lsp = { version = "0.2.0", features = ["tokio"] }
 lsp-server = "0.7.6"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
 crossbeam-channel = "0.5.12"
@@ -79,7 +80,7 @@ tokio = { version = "1.36.0", features = [
     "rt-multi-thread",
     "io-std",
 ] }
-tokio-util = "0.7.10"
+tokio-util = { version = "0.7.10", features = ["compat"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"

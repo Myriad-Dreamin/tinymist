@@ -11,11 +11,11 @@ use lsp_types::{InitializeParams, InitializedParams};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use tinymist::{
-    compiler_init::{CompileInit, CompileInitializeParams},
+    compile_init::{CompileInit, CompileInitializeParams},
     harness::{lsp_harness, InitializedLspDriver, LspDriver, LspHost},
     preview::preview_main,
     transport::with_stdio_transport,
-    CompileFontOpts, Init, LspWorld, TypstLanguageServer,
+    CompileFontOpts, Init, LspWorld, LanguageState,
 };
 use tokio::sync::mpsc;
 use typst::World;
@@ -90,7 +90,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
     impl LspDriver for Lsp {
         type InitParams = InitializeParams;
         type InitResult = lsp_types::InitializeResult;
-        type InitializedSelf = TypstLanguageServer;
+        type InitializedSelf = LanguageState;
 
         fn initialize(
             self,

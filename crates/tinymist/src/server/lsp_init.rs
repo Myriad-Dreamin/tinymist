@@ -11,11 +11,11 @@ use tokio::sync::mpsc;
 use typst_ts_core::ImmutPath;
 
 use crate::actor::editor::EditorActor;
-use crate::compiler_init::CompileConfig;
+use crate::compile_init::CompileConfig;
 use crate::harness::LspHost;
 use crate::utils::{try_, try_or};
 use crate::world::ImmutDict;
-use crate::{invalid_params, CompileFontOpts, LspResult, TypstLanguageServer};
+use crate::{invalid_params, CompileFontOpts, LanguageState, LspResult};
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
@@ -217,7 +217,7 @@ impl From<&InitializeParams> for ConstConfig {
 }
 
 pub struct Init {
-    pub host: LspHost<TypstLanguageServer>,
+    pub host: LspHost<LanguageState>,
     pub handle: tokio::runtime::Handle,
     pub compile_opts: CompileFontOpts,
 }
@@ -241,7 +241,7 @@ impl Init {
     pub fn initialize(
         mut self,
         params: InitializeParams,
-    ) -> (TypstLanguageServer, LspResult<InitializeResult>) {
+    ) -> (LanguageState, LspResult<InitializeResult>) {
         // self.tracing_init();
 
         // Initialize configurations
@@ -279,7 +279,7 @@ impl Init {
         // Bootstrap server
         let (editor_tx, editor_rx) = mpsc::unbounded_channel();
 
-        let mut service = TypstLanguageServer::new(
+        let mut service = LanguageState::new(
             self.host.clone(),
             cc.clone(),
             editor_tx,

@@ -16,7 +16,7 @@ use typst_preview::{CompilationHandle, CompileStatus};
 
 use crate::actor::typ_client::CompileClientActorImpl;
 use crate::actor::typ_server::CompileServerActor;
-use crate::compiler_init::CompileConfig;
+use crate::compile_init::CompileConfig;
 use crate::world::{LspCompilerFeat, LspWorld};
 
 pub type CompileService<H> =

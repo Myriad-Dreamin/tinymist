@@ -156,7 +156,7 @@ static CAT_MAP: Lazy<HashMap<&str, SymCategory>> = Lazy::new(|| {
     ])
 });
 
-impl TypstLanguageServer {
+impl LanguageState {
     /// Get the all valid symbols
     pub fn get_symbol_resources(&self) -> ZResult<JsonValue> {
         let mut symbols = ResourceSymbolMap::new();

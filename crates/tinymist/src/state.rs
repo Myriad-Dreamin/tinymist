@@ -15,9 +15,9 @@ use typst_ts_compiler::{
 };
 use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
-use crate::{actor::typ_client::CompileClientActor, compiler::CompileServer, TypstLanguageServer};
+use crate::{actor::typ_client::CompileClientActor, compile::CompileState, LanguageState};
 
-impl CompileServer {
+impl CompileState {
     /// Focus main file to some path.
     pub fn do_change_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<bool, Error> {
         self.compiler
@@ -27,7 +27,7 @@ impl CompileServer {
     }
 }
 
-impl TypstLanguageServer {
+impl LanguageState {
     /// Pin the entry to the given path
     pub fn pin_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
         self.pinning = new_entry.is_some();
@@ -98,11 +98,11 @@ pub struct MemoryFileMeta {
     pub content: Source,
 }
 
-impl TypstLanguageServer {
+impl LanguageState {
     fn update_source(&self, files: FileChangeSet) -> Result<(), Error> {
         let primary = Some(self.primary());
         let clients_to_notify =
-            (primary.into_iter()).chain(self.dedicates.iter().map(CompileServer::compiler));
+            (primary.into_iter()).chain(self.dedicates.iter().map(CompileState::compiler));
 
         for client in clients_to_notify {
             client.add_memory_changes(MemoryEvent::Update(files.clone()));
@@ -240,7 +240,7 @@ macro_rules! query_world {
     }};
 }
 
-impl TypstLanguageServer {
+impl LanguageState {
     pub fn query_source<T>(
         &self,
         path: ImmutPath,
@@ -316,9 +316,9 @@ impl TypstLanguageServer {
     }
 }
 
-impl CompileServer {
+impl CompileState {
     pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
         let client = self.compiler.as_ref().unwrap();
-        TypstLanguageServer::query_on(client, query)
+        LanguageState::query_on(client, query)
     }
 }

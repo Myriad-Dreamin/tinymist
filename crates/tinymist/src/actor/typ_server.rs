@@ -75,7 +75,7 @@ pub struct CompileServerActor<C: Compiler, F: CompilerFeat> {
     estimated_shadow_files: HashSet<Arc<Path>>,
     /// The latest compiled document.
     pub(crate) latest_doc: Option<Arc<TypstDocument>>,
-    /// The latest successly compiled document.
+    /// The latest successfully compiled document.
     latest_success_doc: Option<Arc<TypstDocument>>,
     /// feature set for compile_once mode.
     once_feature_set: Arc<FeatureSet>,

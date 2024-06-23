@@ -24,12 +24,12 @@ use self::{
     user_action::run_user_action_thread,
 };
 use crate::{
-    compiler::CompileServer,
+    compile::CompileState,
     world::{ImmutDict, LspWorldBuilder},
-    TypstLanguageServer,
+    LanguageState,
 };
 
-impl CompileServer {
+impl CompileState {
     pub fn restart_server(&mut self, group: &str) {
         let server = self.server(
             group.to_owned(),
@@ -132,7 +132,7 @@ impl CompileServer {
     }
 }
 
-impl TypstLanguageServer {
+impl LanguageState {
     pub fn server(
         &self,
         diag_group: String,
