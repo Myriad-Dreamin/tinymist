@@ -22,6 +22,7 @@
         state = state.replace("preview-arg:state:", "");
         /// Set it later when acquiring the VSCode API
         window.vscode_state = JSON.parse(state);
+        window.vscode_state.fsPath = atob(window.vscode_state.fsPath);
       }
 
       /// https://stackoverflow.com/questions/13586999/color-difference-similarity-between-two-values-with-js
