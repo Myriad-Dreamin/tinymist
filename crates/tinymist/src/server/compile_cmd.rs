@@ -60,25 +60,25 @@ impl CompileState {
     }
 
     /// Export the current document as a PDF file.
-    pub fn export_pdf(&self, args: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn export_pdf(&self, args: Vec<JsonValue>) -> AnySchedulableResponse {
         self.export(ExportKind::Pdf, args)
     }
 
     /// Export the current document as a Svg file.
-    pub fn export_svg(&self, mut args: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn export_svg(&self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
         self.export(ExportKind::Svg { page: opts.page }, args)
     }
 
     /// Export the current document as a Png file.
-    pub fn export_png(&self, mut args: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn export_png(&self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
         self.export(ExportKind::Png { page: opts.page }, args)
     }
 
     /// Export the current document as some format. The client is responsible
     /// for passing the correct absolute path of typst document.
-    pub fn export(&self, kind: ExportKind, mut args: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn export(&self, kind: ExportKind, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let path = get_arg!(args[0] as PathBuf);
 
         let res = run_query!(self.OnExport(path, kind))?;

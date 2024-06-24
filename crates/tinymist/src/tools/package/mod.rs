@@ -2,14 +2,14 @@ use typst::diag::{eco_format, StrResult};
 use typst::syntax::package::{PackageVersion, VersionlessPackageSpec};
 use typst_ts_compiler::package::Registry;
 
-use crate::world::LspUniverse;
+use crate::LspWorld;
 
 mod init;
 pub use init::*;
 
 /// Try to determine the latest version of a package.
 pub fn determine_latest_version(
-    world: &LspUniverse,
+    world: &LspWorld,
     spec: &VersionlessPackageSpec,
 ) -> StrResult<PackageVersion> {
     if spec.namespace == "preview" {

@@ -80,6 +80,7 @@ tokio = { version = "1.36.0", features = [
     "rt-multi-thread",
     "io-std",
 ] }
+rayon = "1.10.0"
 tokio-util = { version = "0.7.10", features = ["compat"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -145,11 +146,11 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "
 # typst-render = { path = "../typst/crates/typst-render" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "36b969e2d5743544dca8679c53c89129b989ec80" }
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "36b969e2d5743544dca8679c53c89129b989ec80" }
-reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "36b969e2d5743544dca8679c53c89129b989ec80" }
-typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "36b969e2d5743544dca8679c53c89129b989ec80" }
-typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "36b969e2d5743544dca8679c53c89129b989ec80" }
+typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
+reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
+typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
+typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
 
 # typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
 # reflexo = { path = "../typst.ts/crates/reflexo/" }

@@ -141,6 +141,8 @@ pub struct LanguageState {
     pub resource_routes: ResourceMap,
 
     // Resources
+    /// The tokio handle.
+    pub handle: tokio::runtime::Handle,
     /// The semantic token context.
     pub tokens_ctx: SemanticTokenContext,
     /// The compiler for general purpose.
@@ -178,8 +180,9 @@ impl LanguageState {
                     position_encoding: const_config.position_encoding,
                 },
                 editor_tx,
-                handle,
+                handle.clone(),
             ),
+            handle,
             dedicates: Vec::new(),
             shutdown_requested: false,
             ever_focusing_by_activities: false,
@@ -834,6 +837,14 @@ pub fn internal_error(msg: impl Into<String>) -> ResponseError {
     ResponseError {
         code: ErrorCode::InternalError as i32,
         message: msg.into(),
+        data: None,
+    }
+}
+
+pub fn z_internal_error(msg: typst_ts_core::Error) -> ResponseError {
+    ResponseError {
+        code: ErrorCode::InternalError as i32,
+        message: format!("internal: {msg:?}"),
         data: None,
     }
 }

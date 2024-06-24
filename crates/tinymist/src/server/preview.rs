@@ -5,7 +5,7 @@ use await_tree::InstrumentAwait;
 use log::{error, info};
 
 use typst::foundations::{Str, Value};
-use typst_ts_compiler::{service::CompileDriver, TypstSystemUniverse};
+use typst_ts_compiler::{CompileDriver, TypstSystemUniverse};
 use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
 
 use hyper::{

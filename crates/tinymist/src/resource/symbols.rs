@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
+use typst_ts_compiler::{ShadowApi, TaskInputs};
 use typst_ts_core::{config::compiler::EntryState, font::GlyphId, TypstDocument, TypstFont};
 
 pub use super::prelude::*;
@@ -184,36 +185,29 @@ impl LanguageState {
         log::debug!("math shaping text: {text}", text = math_shaping_text);
 
         let symbols_ref = symbols.keys().cloned().collect::<Vec<_>>();
-        let font = self
-            .primary()
-            .steal(move |e| {
-                let verse = &mut e.verse;
-                let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
 
-                let new_entry = EntryState::new_rootless(entry_path.clone())?;
-                let (old_entry, prepared) = verse.increment_revision(|verse| {
-                    let old_entry = verse.mutate_entry(new_entry).ok()?;
-                    let prepared = verse
-                        .map_shadow(&entry_path, math_shaping_text.into_bytes().into())
-                        .is_ok();
+        let snapshot = self.primary().sync_snapshot()?;
+        let font = {
+            let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
 
-                    Some((old_entry, prepared))
-                })?;
+            let new_entry = EntryState::new_rootless(entry_path.clone())
+                .ok_or_else(|| error_once!("cannot change entry"))?;
 
-                let w = verse.spawn();
-                let sym_doc =
-                    prepared.then(|| e.compiler.pure_compile(&w, &mut Default::default()));
-                verse.increment_revision(|verse| verse.mutate_entry(old_entry).ok())?;
+            let mut forked = snapshot.world.task(TaskInputs {
+                entry: Some(new_entry),
+                ..Default::default()
+            });
+            forked
+                .map_shadow(&entry_path, math_shaping_text.into_bytes().into())
+                .map_err(|e| error_once!("cannot map shadow", err: e))?;
 
-                log::debug!(
-                    "sym doc: {doc:?}",
-                    doc = sym_doc.as_ref().map(|e| e.as_ref().map(|_| ()))
-                );
-                let doc = sym_doc.transpose().ok()??;
-                Some(trait_symbol_fonts(&doc, &symbols_ref))
-            })
-            .ok()
-            .flatten();
+            let sym_doc = std::marker::PhantomData
+                .compile(&forked, &mut Default::default())
+                .map_err(|e| error_once!("cannot compile symbols", err: format!("{e:?}")))?;
+
+            log::debug!("sym doc: {sym_doc:?}");
+            Some(trait_symbol_fonts(&sym_doc, &symbols_ref))
+        };
 
         let mut glyph_def = String::new();
 

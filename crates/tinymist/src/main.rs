@@ -15,12 +15,12 @@ use tinymist::{
     harness::{lsp_harness, InitializedLspDriver, LspDriver, LspHost},
     preview::preview_main,
     transport::with_stdio_transport,
-    CompileFontOpts, Init, LspWorld, LanguageState,
+    CompileFontOpts, Init, LanguageState, LspWorld,
 };
 use tokio::sync::mpsc;
 use typst::World;
 use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
-use typst_ts_compiler::service::{CompileEnv, Compiler};
+use typst_ts_compiler::{CompileEnv, Compiler, TaskInputs};
 use typst_ts_core::{typst::prelude::EcoVec, TypstDict};
 
 use crate::args::{CliArguments, Commands, CompileArgs, LspArgs};
@@ -181,50 +181,39 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
             service.initialized(InitializedParams {});
 
             let entry = service.config.determine_entry(Some(input.as_path().into()));
-            let (timings, _doc, diagnostics) = service
-                .compiler()
-                .steal(|c| {
-                    c.verse.increment_revision(|verse| {
-                        verse.mutate_entry(entry).unwrap();
-                        verse.set_inputs(inputs);
-                    });
 
-                    let w = c.verse.spawn();
+            let snap = service.compiler().sync_snapshot().unwrap();
+            let w = snap.world.task(TaskInputs {
+                entry: Some(entry),
+                inputs: Some(inputs),
+            });
 
-                    let mut env = CompileEnv {
-                        tracer: Some(Tracer::default()),
-                        ..Default::default()
-                    };
-                    typst_timing::enable();
-                    let mut errors = EcoVec::new();
-                    let res = match c.compiler.pure_compile(&w, &mut env) {
-                        Ok(doc) => Some(doc),
-                        Err(e) => {
-                            errors = e;
-                            None
-                        }
-                    };
-                    let mut writer = std::io::BufWriter::new(Vec::new());
-                    let _ = typst_timing::export_json(&mut writer, |span| {
-                        resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
-                    });
+            let mut env = CompileEnv {
+                tracer: Some(Tracer::default()),
+                ..Default::default()
+            };
+            typst_timing::enable();
+            let mut errors = EcoVec::new();
+            if let Err(e) = std::marker::PhantomData.compile(&w, &mut env) {
+                errors = e;
+            }
+            let mut writer = std::io::BufWriter::new(Vec::new());
+            let _ = typst_timing::export_json(&mut writer, |span| {
+                resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
+            });
 
-                    let s = String::from_utf8(writer.into_inner().unwrap()).unwrap();
+            let timings = String::from_utf8(writer.into_inner().unwrap()).unwrap();
 
-                    let warnings = env.tracer.map(|e| e.warnings());
+            let warnings = env.tracer.map(|e| e.warnings());
 
-                    let diagnostics = c.compiler.compiler.run_analysis(&w, |ctx| {
-                        tinymist_query::convert_diagnostics(
-                            ctx,
-                            warnings.iter().flatten().chain(errors.iter()),
-                        )
-                    });
+            let diagnostics = service.compiler().run_analysis(&w, |ctx| {
+                tinymist_query::convert_diagnostics(
+                    ctx,
+                    warnings.iter().flatten().chain(errors.iter()),
+                )
+            });
 
-                    let diagnostics = diagnostics.unwrap_or_default();
-
-                    (s, res, diagnostics)
-                })
-                .unwrap();
+            let diagnostics = diagnostics.unwrap_or_default();
 
             lsp_server::Message::Notification(lsp_server::Notification {
                 method: "tinymistExt/diagnostics".to_owned(),

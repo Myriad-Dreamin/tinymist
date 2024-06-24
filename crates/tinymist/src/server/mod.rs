@@ -8,7 +8,11 @@ pub mod compile_init;
 
 pub mod preview;
 
-use serde_json::from_value;
+use serde_json::{from_value, Value as JsonValue};
+
+// type AnySchedulableResponse = LspResult<Pin<Box<dyn
+// std::future::Future<Output = LspResult<JsonValue>> + Send>>>;
+type AnySchedulableResponse = LspResult<JsonValue>;
 
 /// Get a parsed command argument.
 /// Return `INVALID_PARAMS` when no arg or parse failed.
@@ -39,3 +43,5 @@ macro_rules! get_arg_or_default {
     }};
 }
 use get_arg_or_default;
+
+use crate::LspResult;

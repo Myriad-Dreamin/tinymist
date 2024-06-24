@@ -14,7 +14,7 @@ use typst::syntax::{
 };
 use typst::{diag::PackageError, foundations::Bytes};
 use typst_ts_compiler::{
-    service::CompileDriver, EntryManager, EntryReader, ShadowApi, TypstSystemUniverse, WorldDeps,
+    CompileDriver, EntryManager, EntryReader, ShadowApi, TypstSystemUniverse, WorldDeps,
 };
 use typst_ts_core::{
     config::compiler::{EntryOpts, EntryState},
@@ -67,7 +67,7 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
                         TypstFileId::new(None, VirtualPath::new(p.strip_prefix(&root).unwrap()))
                     })
                     .collect::<Vec<_>>();
-                let mut w = w.spawn();
+                let mut w = w.snapshot();
                 let w = WrapWorld(&mut w);
                 let mut ctx = AnalysisContext::new(
                     &w,

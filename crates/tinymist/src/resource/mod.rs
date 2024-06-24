@@ -9,7 +9,7 @@ mod prelude {
     pub use serde_json::Value as JsonValue;
     pub use typst::foundations::{Scope, Value};
     pub use typst::symbols::Symbol;
-    pub use typst_ts_compiler::service::Compiler;
+    pub use typst_ts_compiler::Compiler;
     pub use typst_ts_core::error::prelude::*;
     pub use typst_ts_svg_exporter::ir::{GlyphItem, GlyphRef};
     pub use typst_ts_svg_exporter::{DefaultExportFeature, SvgTask, SvgText};

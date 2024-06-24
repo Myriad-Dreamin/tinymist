@@ -7,8 +7,8 @@ use typst::diag::SourceResult;
 use typst::model::Document;
 
 use typst::World;
-use typst_ts_compiler::service::{CompileDriver, CompileMiddleware};
-use typst_ts_compiler::service::{CompileExporter, Compiler, PureCompiler, WorldExporter};
+use typst_ts_compiler::{CompileDriver, CompileMiddleware};
+use typst_ts_compiler::{CompileExporter, Compiler, PureCompiler};
 use typst_ts_compiler::{EntryReader, TypstSystemWorld};
 use typst_ts_core::Error;
 
@@ -17,15 +17,13 @@ use typst_preview::{CompilationHandle, CompileStatus};
 use crate::actor::typ_client::CompileClientActorImpl;
 use crate::actor::typ_server::CompileServerActor;
 use crate::compile_init::CompileConfig;
-use crate::world::{LspCompilerFeat, LspWorld};
+use crate::world::LspCompilerFeat;
 
-pub type CompileService<H> =
-    CompileServerActor<Reporter<CompileExporter<PureCompiler<LspWorld>>, H>, LspCompilerFeat>;
-pub type CompileClient<H> =
-    CompileClientActorImpl<Reporter<CompileExporter<PureCompiler<LspWorld>>, H>>;
+pub type CompileService = CompileServerActor<LspCompilerFeat>;
+pub type CompileClient = CompileClientActorImpl;
 
-pub struct CompileServer<H: CompilationHandle> {
-    inner: CompileService<H>,
+pub struct CompileServer {
+    inner: CompileService,
 }
 
 pub struct Reporter<C, H> {
@@ -46,8 +44,8 @@ impl<C: Compiler, H: CompilationHandle> CompileMiddleware for Reporter<C, H> {
 
     fn wrap_compile(
         &mut self,
-        world: &<C as typst_ts_compiler::service::Compiler>::W,
-        env: &mut typst_ts_compiler::service::CompileEnv,
+        world: &<C as typst_ts_compiler::Compiler>::W,
+        env: &mut typst_ts_compiler::CompileEnv,
     ) -> SourceResult<Arc<Document>> {
         self.cb.status(CompileStatus::Compiling);
         match self.inner_mut().compile(world, env) {
@@ -63,35 +61,32 @@ impl<C: Compiler, H: CompilationHandle> CompileMiddleware for Reporter<C, H> {
     }
 }
 
-impl<W: World, C: Compiler<W = W> + WorldExporter<W>, H> WorldExporter<W> for Reporter<C, H> {
-    fn export(&mut self, world: &W, output: Arc<typst::model::Document>) -> SourceResult<()> {
-        self.inner.export(world, output)
-    }
-}
-
-impl<H: CompilationHandle> CompileServer<H> {
-    pub fn new(
+impl CompileServer {
+    pub fn new<H: CompilationHandle>(
         compiler_driver: CompileDriver<PureCompiler<TypstSystemWorld>>,
         cb: H,
         // renderer_sender: broadcast::Sender<RenderActorRequest>,
         // editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
     ) -> Self {
-        let (intr_tx, intr_rx) = mpsc::unbounded_channel();
-        let CompileDriver { compiler, universe } = compiler_driver;
-        let entry = universe.entry_state();
+        // let (intr_tx, intr_rx) = mpsc::unbounded_channel();
+        // let CompileDriver { compiler, universe } = compiler_driver;
+        // let entry = universe.entry_state();
 
-        // CompileExporter + DynamicLayoutCompiler + WatchDriver
-        let driver = CompileExporter::new(compiler);
-        let driver = Reporter { inner: driver, cb };
-        let inner =
-            CompileServerActor::new(driver, universe, entry, intr_tx, intr_rx).with_watch(true);
+        // // CompileExporter + DynamicLayoutCompiler + WatchDriver
+        // let driver = CompileExporter::new(compiler);
+        // let driver = Reporter { inner: driver, cb };
+        // let inner =
+        //     CompileServerActor::new(driver, universe, entry, intr_tx,
+        // intr_rx).with_watch(true);
 
-        Self { inner }
+        // Self { inner }
+
+        todo!()
     }
 
-    pub fn spawn(self) -> Result<CompileClient<H>, Error> {
+    pub fn spawn(self) -> Result<CompileClient, Error> {
         let (export_tx, mut export_rx) = mpsc::unbounded_channel();
-        let intr_tx = self.inner.intr_tx();
+        let intr_tx = self.inner.intr_tx.clone();
         let entry = self.inner.verse.entry_state();
         tokio::spawn(self.inner.spawn().instrument_await("spawn typst server"));
         // drop all export events

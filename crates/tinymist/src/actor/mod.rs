@@ -14,7 +14,7 @@ use tinymist_query::ExportKind;
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{mpsc, watch};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
-use typst_ts_core::config::compiler::EntryState;
+use typst_ts_core::{config::compiler::EntryState, exporter_builtins::GroupExporter};
 
 use self::{
     export::{ExportActor, ExportConfig},
@@ -101,21 +101,25 @@ impl CompileState {
                 .expect("incorrect options");
 
             // Create the compiler
-            let driver = CompileDriver {
-                inner: std::marker::PhantomData,
-                handler,
-                analysis: Analysis {
-                    position_encoding,
-                    root: Path::new("").into(),
-                    enable_periscope,
-                    caches: Default::default(),
-                },
-                periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
-            };
+            // todo
+            // let driver = CompileDriver {
+            //     inner: std::marker::PhantomData,
+            //     handler,
+            //     analysis: Analysis {
+            //         position_encoding,
+            //         root: Path::new("").into(),
+            //         enable_periscope,
+            //         caches: Default::default(),
+            //     },
+            //     periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
+            // };
+
+            // todo
+            let exporter = GroupExporter::new(vec![]);
 
             // Create the actor
             tokio::spawn(
-                CompileServerActor::new(driver, verse, entry_, intr_tx, intr_rx)
+                CompileServerActor::new(exporter, verse, entry_, intr_tx, intr_rx)
                     .with_watch(true)
                     .spawn(),
             );

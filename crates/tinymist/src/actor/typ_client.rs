@@ -49,9 +49,8 @@ use typst::{
     World as TypstWorld,
 };
 use typst_ts_compiler::{
-    service::{CompileEnv, CompileMiddleware, Compiler, PureCompiler},
-    vfs::notify::MemoryEvent,
-    EntryManager, EntryReader,
+    vfs::notify::MemoryEvent, CompileEnv, CompileMiddleware, Compiler, EntryReader, PureCompiler,
+    TaskInputs,
 };
 use typst_ts_core::{
     config::compiler::EntryState, debug_loc::DataSource, error::prelude::*, typst::prelude::EcoVec,
@@ -61,18 +60,17 @@ use typst_ts_core::{
 use super::{
     editor::{EditorRequest, TinymistCompileStatusEnum},
     export::ExportConfig,
-    typ_server::{CompileServerActor, Interrupt},
+    typ_server::{CompileSnapshot, Interrupt},
 };
 use crate::{
     actor::export::ExportRequest,
     compile_init::CompileConfig,
     tools::preview::{CompilationHandle, CompileStatus},
-    utils,
+    utils::{self, threaded_receive},
     world::{LspCompilerFeat, LspWorld},
 };
 
-type CompileService<C> = CompileServerActor<C, LspCompilerFeat>;
-pub type CompileClientActor = CompileClientActorImpl<CompileDriver>;
+pub type CompileClientActor = CompileClientActorImpl;
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
@@ -276,20 +274,20 @@ impl CompileDriver {
     }
 }
 
-pub struct CompileClientActorImpl<C: Compiler> {
+pub struct CompileClientActorImpl {
     pub diag_group: String,
     pub config: CompileConfig,
     entry: EntryState,
-    intr_tx: mpsc::UnboundedSender<Interrupt<CompileService<C>>>,
+    intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
     export_tx: mpsc::UnboundedSender<ExportRequest>,
 }
 
-impl<C: Compiler<W = LspWorld> + Send> CompileClientActorImpl<C> {
+impl CompileClientActorImpl {
     pub(crate) fn new(
         diag_group: String,
         config: CompileConfig,
         entry: EntryState,
-        intr_tx: mpsc::UnboundedSender<Interrupt<CompileService<C>>>,
+        intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
         export_tx: mpsc::UnboundedSender<ExportRequest>,
     ) -> Self {
         Self {
@@ -301,43 +299,25 @@ impl<C: Compiler<W = LspWorld> + Send> CompileClientActorImpl<C> {
         }
     }
 
-    fn steal_inner<Ret: Send + 'static>(
-        &self,
-        f: impl FnOnce(&mut CompileService<C>) -> Ret + Send + 'static,
-    ) -> ZResult<oneshot::Receiver<Ret>> {
+    /// Snapshot the compiler thread for tasks
+    pub async fn snapshot(&self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
         let (tx, rx) = oneshot::channel();
 
-        let task = Box::new(move |this: &mut CompileService<C>| {
-            if tx.send(f(this)).is_err() {
-                // Receiver was dropped. The main thread may have exited, or the request may
-                // have been cancelled.
-                log::warn!("could not send back return value from Typst thread");
-            }
-        });
+        self.intr_tx
+            .send(Interrupt::Snapshot(tx))
+            .map_err(map_string_err("failed to send snapshot request"))?;
+        rx.await.map_err(map_string_err("failed to get snapshot"))
+    }
+
+    /// Snapshot the compiler thread for tasks
+    pub fn sync_snapshot(&self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
+        let (tx, rx) = oneshot::channel();
 
         self.intr_tx
-            .send(Interrupt::Task(task))
-            .map_err(map_string_err("failed to send steal request"))?;
+            .send(Interrupt::Snapshot(tx))
+            .map_err(map_string_err("failed to send snapshot request"))?;
 
-        Ok(rx)
-    }
-
-    /// Steal the compiler thread and run the given function.
-    pub fn steal<Ret: Send + 'static>(
-        &self,
-        f: impl FnOnce(&mut CompileService<C>) -> Ret + Send + 'static,
-    ) -> ZResult<Ret> {
-        utils::threaded_receive(self.steal_inner(f)?)
-    }
-
-    /// Steal the compiler thread and run the given function.
-    pub async fn steal_async<Ret: Send + 'static>(
-        &self,
-        f: impl FnOnce(&mut CompileService<C>) -> Ret + Send + 'static,
-    ) -> ZResult<Ret> {
-        self.steal_inner(f)?
-            .await
-            .map_err(map_string_err("failed to call steal_async"))
+        threaded_receive(rx).map_err(map_string_err("failed to get snapshot"))
     }
 
     pub fn sync_config(&mut self, config: CompileConfig) {
@@ -346,6 +326,10 @@ impl<C: Compiler<W = LspWorld> + Send> CompileClientActorImpl<C> {
 
     pub fn add_memory_changes(&self, event: MemoryEvent) {
         let _ = self.intr_tx.send(Interrupt::Memory(event));
+    }
+
+    pub fn change_task(&self, task_inputs: TaskInputs) {
+        let _ = self.intr_tx.send(Interrupt::ChangeTask(task_inputs));
     }
 
     pub(crate) fn change_export_pdf(&mut self, config: ExportConfig) {
@@ -372,7 +356,17 @@ impl<C: Compiler<W = LspWorld> + Send> CompileClientActorImpl<C> {
     }
 }
 
-impl CompileClientActorImpl<CompileDriver> {
+impl CompileClientActorImpl {
+    pub fn run_analysis<T>(
+        &self,
+        w: &LspWorld,
+        f: impl FnOnce(&mut AnalysisContext<'_>) -> T,
+    ) -> anyhow::Result<T> {
+        let _ = w;
+        let _ = f;
+        todo!()
+    }
+
     pub fn settle(&mut self) {
         let _ = self.change_entry(None);
         info!("TypstActor({}): settle requested", self.diag_group);
@@ -400,22 +394,14 @@ impl CompileClientActorImpl<CompileDriver> {
         let diag_group = &self.diag_group;
         info!("the entry file of TypstActor({diag_group}) is changing to {next_entry:?}");
 
-        // todo
         let next = next_entry.clone();
-        self.steal(move |compiler| {
-            compiler.change_entry(next.clone());
+        // todo: remove diags at typ_server.rs
+        // let next_is_inactive = next.is_inactive();
 
-            let next_is_inactive = next.is_inactive();
-            let res = compiler.verse.mutate_entry(next);
-
-            if next_is_inactive {
-                info!("TypstActor: removing diag");
-                compiler.compiler.compiler.handler.push_diagnostics(None);
-            }
-
-            res.map(|_| ())
-                .map_err(|err| error_once!("failed to change entry", err: format!("{err:?}")))
-        })??;
+        self.change_task(TaskInputs {
+            entry: Some(next.clone()),
+            ..Default::default()
+        });
 
         let next = next_entry.clone();
         let _ = self.export_tx.send(ExportRequest::ChangeExportPath(next));
@@ -429,49 +415,51 @@ impl CompileClientActorImpl<CompileDriver> {
         &self,
         f: impl FnOnce(&mut AnalysisContext, Option<VersionedDocument>) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
-        self.steal(move |compiler| {
-            let doc = compiler.success_doc();
-            let w = compiler.verse.spawn();
-            let c = &mut compiler.compiler.compiler;
-            c.run_analysis(&w, move |ctx| f(ctx, doc))
-        })?
+        let snap = self.sync_snapshot()?;
+        self.run_analysis(&snap.world, |ctx| {
+            f(
+                ctx,
+                snap.success_doc.map(|doc| VersionedDocument {
+                    version: snap.world.revision().get(),
+                    document: doc,
+                }),
+            )
+        })
     }
 
     pub fn steal_world<T: Send + Sync + 'static>(
         &self,
         f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
-        self.steal(move |compiler| {
-            let w = compiler.verse.spawn();
-            compiler.compiler.compiler.run_analysis(&w, f)
-        })?
+        let snap = self.sync_snapshot()?;
+        self.run_analysis(&snap.world, f)
     }
 
     pub fn clear_cache(&self) {
-        let _ = self.steal(|c| {
-            c.compiler.compiler.analysis.caches = Default::default();
-        });
+        // let _ = self.steal(|c| {
+        //     c.compiler.compiler.analysis.caches = Default::default();
+        // });
+        todo!()
     }
 
     pub fn collect_server_info(&self) -> anyhow::Result<HashMap<String, ServerInfoResponse>> {
         let dg = self.diag_group.clone();
-        self.steal(move |c| {
-            let cc = &c.compiler.compiler;
-            let w = c.verse.spawn();
 
-            let info = ServerInfoResponse {
-                root: w.entry_state().root().map(|e| e.as_ref().to_owned()),
-                font_paths: w.font_resolver.font_paths().to_owned(),
-                inputs: c.verse.inputs().as_ref().deref().clone(),
-                estimated_memory_usage: HashMap::from_iter([
-                    // todo: vfs memory usage
-                    // ("vfs".to_owned(), w.vfs.read().memory_usage()),
-                    ("analysis".to_owned(), cc.analysis.estimated_memory()),
-                ]),
-            };
+        let snap = self.sync_snapshot()?;
+        let w = &snap.world;
 
-            HashMap::from_iter([(dg, info)])
-        })
-        .map_err(|e| e.into())
+        let info = ServerInfoResponse {
+            root: w.entry_state().root().map(|e| e.as_ref().to_owned()),
+            font_paths: w.font_resolver.font_paths().to_owned(),
+            inputs: w.inputs().as_ref().deref().clone(),
+            estimated_memory_usage: HashMap::from_iter([
+                // todo: vfs memory usage
+                // ("vfs".to_owned(), w.vfs.read().memory_usage()),
+                // todo: analysis memory usage
+                // ("analysis".to_owned(), cc.analysis.estimated_memory()),
+            ]),
+        };
+
+        Ok(HashMap::from_iter([(dg, info)]))
     }
 }
