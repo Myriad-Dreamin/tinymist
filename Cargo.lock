@@ -2919,6 +2919,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.0-rc4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=11b1ef0909ee6ded49eb84db999af14276125a62#11b1ef0909ee6ded49eb84db999af14276125a62"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -2943,6 +2944,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vfs"
 version = "0.5.0-rc4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=11b1ef0909ee6ded49eb84db999af14276125a62#11b1ef0909ee6ded49eb84db999af14276125a62"
 dependencies = [
  "append-only-vec",
  "indexmap 2.2.6",
@@ -2959,6 +2961,7 @@ dependencies = [
 [[package]]
 name = "reflexo-world"
 version = "0.5.0-rc4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=11b1ef0909ee6ded49eb84db999af14276125a62#11b1ef0909ee6ded49eb84db999af14276125a62"
 dependencies = [
  "append-only-vec",
  "chrono",
@@ -4527,6 +4530,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-compiler"
 version = "0.5.0-rc4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=11b1ef0909ee6ded49eb84db999af14276125a62#11b1ef0909ee6ded49eb84db999af14276125a62"
 dependencies = [
  "base64 0.22.1",
  "codespan-reporting",
@@ -4557,6 +4561,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-core"
 version = "0.5.0-rc4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=11b1ef0909ee6ded49eb84db999af14276125a62#11b1ef0909ee6ded49eb84db999af14276125a62"
 dependencies = [
  "base64 0.22.1",
  "base64-serde",
@@ -4594,6 +4599,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-svg-exporter"
 version = "0.5.0-rc4"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=11b1ef0909ee6ded49eb84db999af14276125a62#11b1ef0909ee6ded49eb84db999af14276125a62"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
