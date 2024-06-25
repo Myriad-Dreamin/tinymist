@@ -284,13 +284,13 @@ impl CompileClientActor {
             .map_err(map_string_err("failed to send snapshot request"))?;
 
         Ok(QuerySnap {
-            #[cfg(feature = "stable_server")]
+            #[cfg(feature = "stable-server")]
             rx: Arc::new(Mutex::new(None)),
-            #[cfg(not(feature = "stable_server"))]
+            #[cfg(not(feature = "stable-server"))]
             rx: Arc::new(Mutex::new(Some(rx))),
-            #[cfg(feature = "stable_server")]
+            #[cfg(feature = "stable-server")]
             snap: tokio::sync::OnceCell::new_with(Some(threaded_receive(rx))),
-            #[cfg(not(feature = "stable_server"))]
+            #[cfg(not(feature = "stable-server"))]
             snap: tokio::sync::OnceCell::new(),
             handle: self.handle.clone(),
         })
