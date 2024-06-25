@@ -77,6 +77,8 @@ rayon.workspace = true
 [features]
 default = ["cli", "embed-fonts", "no-content-hint", "preview"]
 
+stable_server = []
+
 cli = ["clap"]
 
 dhat-heap = ["dhat"]

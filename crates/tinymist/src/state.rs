@@ -273,23 +273,41 @@ macro_rules! query_tokens_cache {
 
 macro_rules! query_state {
     ($self:ident, $method:ident, $req:expr) => {{
-        let snap = $self.snapshot();
-        Ok(Box::pin(async move {
-            snap.stateful($req)
-                .await
-                .map(CompilerQueryResponse::$method)
-        }))
+        let snap = $self.snapshot()?;
+        #[cfg(feature = "stable_server")]
+        {
+            Ok(Box::pin(ready(
+                snap.stateful_sync($req).map(CompilerQueryResponse::$method),
+            )))
+        }
+        #[cfg(not(feature = "stable_server"))]
+        {
+            Ok(Box::pin(async move {
+                snap.stateful($req)
+                    .await
+                    .map(CompilerQueryResponse::$method)
+            }))
+        }
     }};
 }
 
 macro_rules! query_world {
     ($self:ident, $method:ident, $req:expr) => {{
-        let snap = $self.snapshot();
-        Ok(Box::pin(async move {
-            snap.semantic($req)
-                .await
-                .map(CompilerQueryResponse::$method)
-        }))
+        let snap = $self.snapshot()?;
+        #[cfg(feature = "stable_server")]
+        {
+            Ok(Box::pin(ready(
+                snap.semantic_sync($req).map(CompilerQueryResponse::$method),
+            )))
+        }
+        #[cfg(not(feature = "stable_server"))]
+        {
+            Ok(Box::pin(async move {
+                snap.semantic($req)
+                    .await
+                    .map(CompilerQueryResponse::$method)
+            }))
+        }
     }};
 }
 

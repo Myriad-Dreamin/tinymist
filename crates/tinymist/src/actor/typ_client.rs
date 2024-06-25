@@ -34,6 +34,7 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use log::{error, info, trace};
+use parking_lot::Mutex;
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnalysisResources},
     DiagnosticsMap, ExportKind, ServerInfoResponse, VersionedDocument,
@@ -276,11 +277,23 @@ impl CompileClientActor {
     }
 
     /// Snapshot the compiler thread for tasks
-    pub fn snapshot(&self) -> QuerySnap {
-        QuerySnap {
-            intr_tx: self.intr_tx.clone(),
+    pub fn snapshot(&self) -> ZResult<QuerySnap> {
+        let (tx, rx) = oneshot::channel();
+        self.intr_tx
+            .send(Interrupt::Snapshot(tx))
+            .map_err(map_string_err("failed to send snapshot request"))?;
+
+        Ok(QuerySnap {
+            #[cfg(feature = "stable_server")]
+            rx: Arc::new(Mutex::new(None)),
+            #[cfg(not(feature = "stable_server"))]
+            rx: Arc::new(Mutex::new(Some(rx))),
+            #[cfg(feature = "stable_server")]
+            snap: tokio::sync::OnceCell::new_with(Some(threaded_receive(rx))),
+            #[cfg(not(feature = "stable_server"))]
+            snap: tokio::sync::OnceCell::new(),
             handle: self.handle.clone(),
-        }
+        })
     }
 
     /// Snapshot the compiler thread for tasks
@@ -367,16 +380,15 @@ impl CompileClientActor {
         let diag_group = &self.handle.diag_group;
         info!("the entry file of TypstActor({diag_group}) is changing to {next_entry:?}");
 
-        let next = next_entry.clone();
         self.change_task(TaskInputs {
-            entry: Some(next.clone()),
+            entry: Some(next_entry.clone()),
             ..Default::default()
         });
         // todo: let export request accept compiled artifact
         let _ = self
             .handle
             .export_tx
-            .send(ExportRequest::ChangeExportPath(next));
+            .send(ExportRequest::ChangeExportPath(next_entry.clone()));
 
         self.entry = next_entry;
 
@@ -410,19 +422,49 @@ impl CompileClientActor {
 }
 
 pub struct QuerySnap {
-    intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
+    rx: Arc<Mutex<Option<oneshot::Receiver<CompileSnapshot<LspCompilerFeat>>>>>,
+    snap: tokio::sync::OnceCell<ZResult<CompileSnapshot<LspCompilerFeat>>>,
     handle: Arc<CompileHandler>,
 }
 
 impl QuerySnap {
     /// Snapshot the compiler thread for tasks
     pub async fn snapshot(&self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
-        let (tx, rx) = oneshot::channel();
+        self.snap
+            .get_or_init(|| async move {
+                let rx = self.rx.lock().take().unwrap();
+                rx.await.map_err(map_string_err("failed to get snapshot"))
+            })
+            .await
+            .clone()
+    }
 
-        self.intr_tx
-            .send(Interrupt::Snapshot(tx))
-            .map_err(map_string_err("failed to send snapshot request"))?;
-        rx.await.map_err(map_string_err("failed to get snapshot"))
+    /// Snapshot the compiler thread for tasks
+    pub fn snapshot_sync(&self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
+        if let Some(snap) = self.snap.get() {
+            return snap.clone();
+        }
+
+        let rx = self.rx.lock().take().unwrap();
+        threaded_receive(rx).map_err(map_string_err("failed to get snapshot"))
+    }
+
+    pub fn stateful_sync<T: tinymist_query::StatefulRequest>(
+        &self,
+        req: T,
+    ) -> anyhow::Result<Option<T::Response>> {
+        let snap = self.snapshot_sync()?;
+        let w = &snap.world;
+
+        self.handle.run_analysis(w, |ctx| {
+            req.request(
+                ctx,
+                snap.success_doc.map(|doc| VersionedDocument {
+                    version: w.revision().get(),
+                    document: doc,
+                }),
+            )
+        })
     }
 
     pub async fn stateful<T: tinymist_query::StatefulRequest>(
@@ -441,6 +483,15 @@ impl QuerySnap {
                 }),
             )
         })
+    }
+
+    pub fn semantic_sync<T: tinymist_query::SemanticRequest>(
+        &self,
+        req: T,
+    ) -> anyhow::Result<Option<T::Response>> {
+        let snap = self.snapshot_sync()?;
+        let w = &snap.world;
+        self.handle.run_analysis(w, |ctx| req.request(ctx))
     }
 
     pub async fn semantic<T: tinymist_query::SemanticRequest>(

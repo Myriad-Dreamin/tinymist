@@ -95,6 +95,11 @@ pub struct CompiledArtifact<F: CompilerFeat> {
 
 // pub type NopCompilationHandle<T> = std::marker::PhantomData<fn(T)>;
 
+#[cfg(feature = "stable_server")]
+const COMPILE_CONCURRENCY: usize = 0;
+#[cfg(not(feature = "stable_server"))]
+const COMPILE_CONCURRENCY: usize = 1;
+
 pub trait CompilationHandle<F: CompilerFeat>: Send + Sync + 'static {
     fn status(&self, rep: CompileReport);
     fn notify_compile(&self, res: &CompiledArtifact<F>, rep: CompileReport);
@@ -147,7 +152,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
         Self {
             exporter: GroupExporter::new(vec![]),
             feature_set: FeatureSet::default(),
-            compile_concurrency: 1,
+            compile_concurrency: COMPILE_CONCURRENCY,
         }
     }
 }
@@ -301,7 +306,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         };
 
         // Trigger the first compilation (if active)
-        self.watch_compile();
+        self.watch_compile(&compiler_ack);
 
         // Spawn file system watcher.
         let fs_tx = self.intr_tx.clone();
@@ -331,8 +336,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
                     // Ensure complied before executing tasks.
                     if matches!(event, Interrupt::Snapshot(_)) && need_compile {
-                        self.watch_compile();
-                        need_compile = false;
+                        need_compile = self.watch_compile(&compiler_ack);
                     }
 
                     need_compile |= self.process(event, &compiler_ack);
@@ -345,7 +349,13 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                 }
 
                 if need_compile {
-                    self.watch_compile();
+                    need_compile = self.watch_compile(&compiler_ack);
+                }
+                if need_compile {
+                    need_compile = self.watch_compile(&compiler_ack);
+                    if need_compile {
+                        log::warn!("CompileServerActor: watch_compile infinite loop?");
+                    }
                 }
             }
 
@@ -390,9 +400,9 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     }
 
     /// Watch and compile the document once.
-    fn watch_compile(&mut self) {
+    fn watch_compile(&mut self, send: impl Fn(CompilerResponse)) -> bool {
         if self.suspended {
-            return;
+            return false;
         }
 
         let start = reflexo::time::now();
@@ -429,14 +439,59 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
             h.notify_compile(&compiled, rep);
 
-            log_send_error("compiled", intr_tx.send(Interrupt::Compiled(compiled)));
+            compiled
         };
 
         if self.compile_concurrency == 0 {
-            compile();
+            self.processs_compile(compile(), send)
         } else {
-            rayon::spawn(compile);
+            rayon::spawn(move || {
+                log_send_error("compiled", intr_tx.send(Interrupt::Compiled(compile())));
+            });
+            false
         }
+    }
+
+    fn processs_compile(
+        &mut self,
+        artifact: CompiledArtifact<F>,
+        send: impl Fn(CompilerResponse),
+    ) -> bool {
+        let w = &artifact.world;
+
+        let compiled_revision = w.revision().get();
+        if self.committed_revision >= compiled_revision {
+            return false;
+        }
+
+        let doc = artifact.doc.ok();
+
+        // Update state.
+        self.committed_revision = compiled_revision;
+        self.latest_doc.clone_from(&doc);
+        if doc.is_some() {
+            self.latest_success_doc.clone_from(&self.latest_doc);
+        }
+
+        // Notify the new file dependencies.
+        let mut deps = vec![];
+        artifact
+            .world
+            .iter_dependencies(&mut |dep| deps.push(dep.clone()));
+        send(CompilerResponse::Notify(NotifyMessage::SyncDependency(
+            deps,
+        )));
+
+        // Trigger an evict task.
+        rayon::spawn(move || {
+            // Evict compilation cache.
+            let evict_start = std::time::Instant::now();
+            comemo::evict(30);
+            let elapsed = evict_start.elapsed();
+            log::info!("CompileServerActor: evict compilation cache in {elapsed:?}");
+        });
+
+        self.process_may_laggy_compile()
     }
 
     fn process_may_laggy_compile(&mut self) -> bool {
@@ -474,41 +529,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
                 true
             }
-            Interrupt::Compiled(artifact) => {
-                let w = &artifact.world;
-
-                let compiled_revision = w.revision().get();
-                if self.committed_revision >= compiled_revision {
-                    return false;
-                }
-
-                let doc = artifact.doc.ok();
-
-                // Update state.
-                self.committed_revision = compiled_revision;
-                self.latest_doc.clone_from(&doc);
-                if doc.is_some() {
-                    self.latest_success_doc.clone_from(&self.latest_doc);
-                }
-
-                // Notify the new file dependencies.
-                let mut deps = vec![];
-                artifact
-                    .world
-                    .iter_dependencies(&mut |dep| deps.push(dep.clone()));
-                send(Notify(NotifyMessage::SyncDependency(deps)));
-
-                // Trigger an evict task.
-                rayon::spawn(move || {
-                    // Evict compilation cache.
-                    let evict_start = std::time::Instant::now();
-                    comemo::evict(30);
-                    let elapsed = evict_start.elapsed();
-                    log::info!("CompileServerActor: evict compilation cache in {elapsed:?}");
-                });
-
-                self.process_may_laggy_compile()
-            }
+            Interrupt::Compiled(artifact) => self.processs_compile(artifact, send),
             Interrupt::Memory(event) => {
                 log::debug!("CompileServerActor: memory event incoming");
 
