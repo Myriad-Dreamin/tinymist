@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use log::{error, info};
 use lsp_types::ExecuteCommandParams;
@@ -6,47 +6,35 @@ use serde::Deserialize;
 use serde_json::Value as JsonValue;
 use tinymist_query::{ExportKind, PageSelection};
 
-use crate::{internal_error, invalid_params, method_not_found, run_query, LspResult};
+use crate::{internal_error, invalid_params, method_not_found, run_query};
 
 use super::compile::*;
 use super::*;
-
-macro_rules! exec_fn {
-    ($ty: ty, Self::$method: ident, $($arg_key:ident),+ $(,)?) => {{
-        const E: $ty = |this, $($arg_key),+| this.$method($($arg_key),+);
-        E
-    }};
-}
 
 #[derive(Debug, Clone, Default, Deserialize)]
 struct ExportOpts {
     page: PageSelection,
 }
 
-type ExecuteCmdMap = HashMap<&'static str, LspHandler<Vec<JsonValue>, JsonValue>>;
-
 impl CompileState {
-    pub fn get_exec_commands() -> ExecuteCmdMap {
-        macro_rules! redirected_command {
-            ($key: expr, Self::$method: ident) => {
-                (
-                    $key,
-                    exec_fn!(LspHandler<Vec<JsonValue>, JsonValue>, Self::$method, inputs),
-                )
-            };
-        }
+    pub fn get_exec_commands() -> ExecuteCmdMap<Self> {
+        type State = CompileState;
 
         ExecuteCmdMap::from_iter([
-            redirected_command!("tinymist.exportPdf", Self::export_pdf),
-            redirected_command!("tinymist.exportSvg", Self::export_svg),
-            redirected_command!("tinymist.exportPng", Self::export_png),
-            redirected_command!("tinymist.doClearCache", Self::clear_cache),
-            redirected_command!("tinymist.changeEntry", Self::change_entry),
+            exec_fn_!("tinymist.exportPdf", State::export_pdf),
+            exec_fn_!("tinymist.exportSvg", State::export_svg),
+            exec_fn_!("tinymist.exportPng", State::export_png),
+            exec_fn!("tinymist.doClearCache", State::clear_cache),
+            exec_fn!("tinymist.changeEntry", State::change_entry),
         ])
     }
 
     /// The entry point for the `workspace/executeCommand` request.
-    pub fn execute_command(&mut self, params: ExecuteCommandParams) -> LspResult<JsonValue> {
+    pub fn execute_command(
+        &mut self,
+        req_id: RequestId,
+        params: ExecuteCommandParams,
+    ) -> ScheduledResult {
         let ExecuteCommandParams {
             command,
             arguments: args,
@@ -56,55 +44,57 @@ impl CompileState {
             error!("asked to execute unknown command");
             return Err(method_not_found());
         };
-        handler(self, args)
+        handler(self, req_id, args)
     }
 
     /// Export the current document as a PDF file.
-    pub fn export_pdf(&self, args: Vec<JsonValue>) -> AnySchedulableResponse {
-        self.export(ExportKind::Pdf, args)
+    pub fn export_pdf(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.export(req_id, ExportKind::Pdf, args)
     }
 
     /// Export the current document as a Svg file.
-    pub fn export_svg(&self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn export_svg(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
-        self.export(ExportKind::Svg { page: opts.page }, args)
+        self.export(req_id, ExportKind::Svg { page: opts.page }, args)
     }
 
     /// Export the current document as a Png file.
-    pub fn export_png(&self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn export_png(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
-        self.export(ExportKind::Png { page: opts.page }, args)
+        self.export(req_id, ExportKind::Png { page: opts.page }, args)
     }
 
     /// Export the current document as some format. The client is responsible
     /// for passing the correct absolute path of typst document.
-    pub fn export(&self, kind: ExportKind, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn export(
+        &mut self,
+        req_id: RequestId,
+        kind: ExportKind,
+        mut args: Vec<JsonValue>,
+    ) -> ScheduledResult {
         let path = get_arg!(args[0] as PathBuf);
 
-        let res = run_query!(self.OnExport(path, kind))?;
-        let res = serde_json::to_value(res).map_err(|_| internal_error("Cannot serialize path"))?;
-
-        Ok(res)
+        run_query!(req_id, self.OnExport(path, kind))
     }
 
     /// Clear all cached resources.
     ///
     /// # Errors
     /// Errors if the cache could not be cleared.
-    pub fn clear_cache(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn clear_cache(&self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         comemo::evict(0);
         self.compiler().clear_cache();
-        Ok(JsonValue::Null)
+        just_result!(JsonValue::Null)
     }
 
     /// Focus main file to some path.
-    pub fn change_entry(&mut self, mut args: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn change_entry(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
 
         let update_result = self.do_change_entry(entry.clone());
         update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
 
         info!("entry changed: {entry:?}");
-        Ok(JsonValue::Null)
+        just_result!(JsonValue::Null)
     }
 }

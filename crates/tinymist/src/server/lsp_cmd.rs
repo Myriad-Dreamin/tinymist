@@ -2,7 +2,7 @@
 
 use std::ops::Deref;
 use std::path::Path;
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use log::{error, info};
 use lsp_server::RequestId;
@@ -12,8 +12,8 @@ use serde_json::Value as JsonValue;
 use tinymist_query::ExportKind;
 use typst::diag::StrResult;
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
+use typst_ts_core::error::prelude::*;
 use typst_ts_core::path::PathClean;
-use typst_ts_core::{error::prelude::*, ImmutPath};
 
 use crate::actor::user_action::{TraceParams, UserActionRequest};
 use crate::tools::package::InitTask;
@@ -22,86 +22,52 @@ use crate::{run_query, LspResult};
 use super::lsp::*;
 use super::*;
 
-macro_rules! exec_fn_ {
-    ($key: expr, Self::$method: ident) => {
-        ($key, {
-            const E: LspRawHandler<Vec<JsonValue>> = |this, req_id, req| this.$method(req_id, req);
-            E
-        })
-    };
-}
-
-macro_rules! exec_fn {
-    ($key: expr, Self::$method: ident) => {
-        ($key, {
-            const E: LspRawHandler<Vec<JsonValue>> = |this, req_id, args| {
-                let res = this.$method(args);
-                this.client.respond(result_to_response(req_id, res));
-                Ok(Some(()))
-            };
-            E
-        })
-    };
-}
-
-macro_rules! resource_fn {
-    ($ty: ty, Self::$method: ident, $($arg_key:ident),+ $(,)?) => {{
-        const E: $ty = |this, $($arg_key),+| this.$method($($arg_key),+);
-        E
-    }};
-}
-
-type LspHandler<Req, Res> = fn(srv: &mut LanguageState, args: Req) -> LspResult<Res>;
-
-/// Returns Ok(Some()) -> Already responded
-/// Returns Ok(None) -> Need to respond none
-/// Returns Err(..) -> Need to respond error
-type LspRawHandler<T> =
-    fn(srv: &mut LanguageState, req_id: RequestId, args: T) -> LspResult<Option<()>>;
-
-type ExecuteCmdMap = HashMap<&'static str, LspRawHandler<Vec<JsonValue>>>;
-type ResourceMap = HashMap<ImmutPath, LspHandler<Vec<JsonValue>, JsonValue>>;
-
 /// Here are implemented the handlers for each command.
 impl LanguageState {
-    pub fn get_exec_commands() -> ExecuteCmdMap {
+    pub fn get_exec_commands() -> ExecuteCmdMap<Self> {
+        type State = LanguageState;
         ExecuteCmdMap::from_iter([
-            exec_fn!("tinymist.exportPdf", Self::export_pdf),
-            exec_fn!("tinymist.exportSvg", Self::export_svg),
-            exec_fn!("tinymist.exportPng", Self::export_png),
-            exec_fn!("tinymist.doClearCache", Self::clear_cache),
-            exec_fn!("tinymist.pinMain", Self::pin_document),
-            exec_fn!("tinymist.focusMain", Self::focus_document),
-            exec_fn!("tinymist.doInitTemplate", Self::init_template),
-            exec_fn!("tinymist.doGetTemplateEntry", Self::do_get_template_entry),
-            exec_fn!("tinymist.interactCodeContext", Self::interact_code_context),
-            exec_fn_!("tinymist.getDocumentTrace", Self::get_document_trace),
-            exec_fn!("tinymist.getDocumentMetrics", Self::get_document_metrics),
-            exec_fn!("tinymist.getServerInfo", Self::get_server_info),
+            exec_fn_!("tinymist.exportPdf", State::export_pdf),
+            exec_fn_!("tinymist.exportSvg", State::export_svg),
+            exec_fn_!("tinymist.exportPng", State::export_png),
+            exec_fn!("tinymist.doClearCache", State::clear_cache),
+            exec_fn!("tinymist.pinMain", State::pin_document),
+            exec_fn!("tinymist.focusMain", State::focus_document),
+            exec_fn!("tinymist.doInitTemplate", State::init_template),
+            exec_fn!("tinymist.doGetTemplateEntry", State::do_get_template_entry),
+            exec_fn_!("tinymist.interactCodeContext", State::interact_code_context),
+            exec_fn_!("tinymist.getDocumentTrace", State::get_document_trace),
+            exec_fn_!("tinymist.getDocumentMetrics", State::get_document_metrics),
+            exec_fn_!("tinymist.getServerInfo", State::get_server_info),
             // For Documentations
-            exec_fn!("tinymist.getResources", Self::get_resources),
+            exec_fn_!("tinymist.getResources", State::get_resources),
         ])
     }
 
     /// Export the current document as a PDF file.
-    pub fn export_pdf(&mut self, args: Vec<JsonValue>) -> AnySchedulableResponse {
-        self.primary.export_pdf(args)
+    pub fn export_pdf(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.primary.export_pdf(req_id, args)
     }
 
     /// Export the current document as a Svg file.
-    pub fn export_svg(&mut self, args: Vec<JsonValue>) -> AnySchedulableResponse {
-        self.primary.export_svg(args)
+    pub fn export_svg(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.primary.export_svg(req_id, args)
     }
 
     /// Export the current document as a Png file.
-    pub fn export_png(&mut self, args: Vec<JsonValue>) -> AnySchedulableResponse {
-        self.primary.export_png(args)
+    pub fn export_png(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.primary.export_png(req_id, args)
     }
 
     /// Export the current document as some format. The client is responsible
     /// for passing the correct absolute path of typst document.
-    pub fn export(&mut self, kind: ExportKind, args: Vec<JsonValue>) -> AnySchedulableResponse {
-        self.primary.export(kind, args)
+    pub fn export(
+        &mut self,
+        req_id: RequestId,
+        kind: ExportKind,
+        args: Vec<JsonValue>,
+    ) -> ScheduledResult {
+        self.primary.export(req_id, kind, args)
     }
 
     /// Clear all cached resources.
@@ -116,7 +82,7 @@ impl LanguageState {
         {
             v.clear_cache();
         }
-        Ok(JsonValue::Null)
+        just_result!(JsonValue::Null)
     }
 
     /// Pin main file to some path.
@@ -127,7 +93,7 @@ impl LanguageState {
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
 
         info!("file pinned: {entry:?}");
-        Ok(JsonValue::Null)
+        just_result!(JsonValue::Null)
     }
 
     /// Focus main file to some path.
@@ -145,7 +111,7 @@ impl LanguageState {
         if ok {
             info!("file focused: {entry:?}");
         }
-        Ok(JsonValue::Null)
+        just_result!(JsonValue::Null)
     }
 
     /// Initialize a new template.
@@ -192,8 +158,9 @@ impl LanguageState {
 
         info!("template initialized: {from_source:?} to {to_path:?}");
 
-        serde_json::to_value(InitResult { entry_path })
-            .map_err(|_| internal_error("Cannot serialize path"))
+        let res = serde_json::to_value(InitResult { entry_path })
+            .map_err(|_| internal_error("Cannot serialize path"));
+        Ok(Box::pin(ready(res)))
     }
 
     /// Get the entry of a template.
@@ -228,11 +195,15 @@ impl LanguageState {
         let entry = String::from_utf8(entry.to_vec())
             .map_err(|_| invalid_params("template entry is not a valid UTF-8 string"))?;
 
-        Ok(JsonValue::String(entry))
+        just_result!(JsonValue::String(entry))
     }
 
     /// Interact with the code context at the source file.
-    pub fn interact_code_context(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn interact_code_context(
+        &mut self,
+        req_id: RequestId,
+        _arguments: Vec<JsonValue>,
+    ) -> ScheduledResult {
         let queries = _arguments.into_iter().next().ok_or_else(|| {
             invalid_params("The first parameter is not a valid code context query array")
         })?;
@@ -249,11 +220,7 @@ impl LanguageState {
         let path = as_path(params.text_document);
         let query = params.query;
 
-        let res = run_query!(self.InteractCodeContext(path, query))?;
-        let res =
-            serde_json::to_value(res).map_err(|_| internal_error("Cannot serialize responses"))?;
-
-        Ok(res)
+        run_query!(req_id, self.InteractCodeContext(path, query))
     }
 
     /// Get the trace data of the document.
@@ -305,29 +272,31 @@ impl LanguageState {
     }
 
     /// Get the metrics of the document.
-    pub fn get_document_metrics(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn get_document_metrics(
+        &mut self,
+        req_id: RequestId,
+        mut args: Vec<JsonValue>,
+    ) -> ScheduledResult {
         let path = get_arg!(args[0] as PathBuf);
-
-        let res = run_query!(self.DocumentMetrics(path))?;
-        let res = serde_json::to_value(res)
-            .map_err(|e| internal_error(format!("Cannot serialize response {e}")))?;
-
-        Ok(res)
+        run_query!(req_id, self.DocumentMetrics(path))
     }
 
     /// Get the server info.
-    pub fn get_server_info(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
-        let res = run_query!(self.ServerInfo())?;
-
-        let res = serde_json::to_value(res)
-            .map_err(|e| internal_error(format!("Cannot serialize response {e}")))?;
-
-        Ok(res)
+    pub fn get_server_info(
+        &mut self,
+        req_id: RequestId,
+        _arguments: Vec<JsonValue>,
+    ) -> ScheduledResult {
+        run_query!(req_id, self.ServerInfo())
     }
 
     /// Get static resources with help of tinymist service, for example, a
     /// static help pages for some typst function.
-    pub fn get_resources(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn get_resources(
+        &mut self,
+        req_id: RequestId,
+        mut args: Vec<JsonValue>,
+    ) -> ScheduledResult {
         let path = get_arg!(args[0] as PathBuf);
 
         let Some(handler) = self.resource_routes.get(path.as_path()) else {
@@ -336,35 +305,36 @@ impl LanguageState {
         };
 
         // Note our redirection will keep the first path argument in the args vec.
-        handler(self, args)
+        handler(self, req_id, args)
     }
 }
 
 impl LanguageState {
-    pub fn get_resource_routes() -> ResourceMap {
+    pub fn get_resource_routes() -> ResourceMap<Self> {
+        // LspHandler<Vec<JsonValue>, JsonValue>,
         macro_rules! resources_at {
-            ($key: expr, Self::$method: ident) => {
+            ($key: expr, LanguageState::$method: ident) => {
                 (
                     Path::new($key).clean().as_path().into(),
-                    resource_fn!(LspHandler<Vec<JsonValue>, JsonValue>, Self::$method, inputs),
+                    resource_fn!(LanguageState::$method),
                 )
             };
         }
 
         ResourceMap::from_iter([
-            resources_at!("/symbols", Self::resource_symbols),
-            resources_at!("/tutorial", Self::resource_tutoral),
+            resources_at!("/symbols", LanguageState::resource_symbols),
+            resources_at!("/tutorial", LanguageState::resource_tutoral),
         ])
     }
 
     /// Get the all valid symbols
-    pub fn resource_symbols(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn resource_symbols(&self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let resp = self.get_symbol_resources();
-        resp.map_err(|e| internal_error(e.to_string()))
+        just_result!(resp.map_err(|e| internal_error(e.to_string()))?)
     }
 
     /// Get tutorial web page
-    pub fn resource_tutoral(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn resource_tutoral(&self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         Err(method_not_found())
     }
 }

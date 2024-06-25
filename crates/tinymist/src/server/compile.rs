@@ -3,9 +3,10 @@ use std::{collections::HashMap, path::Path, sync::Arc, time::Instant};
 
 use crossbeam_channel::{select, Receiver};
 use log::{error, info, warn};
-use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response, ResponseError};
+use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response};
 use lsp_types::notification::Notification as _;
 use once_cell::sync::OnceCell;
+use serde::Serialize;
 use serde_json::{Map, Value as JsonValue};
 use tokio::sync::mpsc;
 use typst::{diag::FileResult, syntax::Source};
@@ -15,46 +16,13 @@ use typst_ts_core::config::compiler::DETACHED_ENTRY;
 use crate::{
     actor::{editor::EditorRequest, export::ExportConfig, typ_client::CompileClientActor},
     compile_init::{CompileConfig, ConstCompileConfig},
-    harness::InitializedLspDriver,
-    invalid_params,
+    harness::{AnyLspHost, InitializedLspDriver},
+    invalid_params, result_to_response,
     state::MemoryFileMeta,
     LspHost, LspResult,
 };
 
-type LspMethod<Res> = fn(srv: &mut CompileState, args: JsonValue) -> LspResult<Res>;
-pub(crate) type LspHandler<Req, Res> = fn(srv: &mut CompileState, args: Req) -> LspResult<Res>;
-
-type ExecuteCmdMap = HashMap<&'static str, LspHandler<Vec<JsonValue>, JsonValue>>;
-type NotifyCmdMap = HashMap<&'static str, LspMethod<()>>;
-type RegularCmdMap = HashMap<&'static str, LspMethod<JsonValue>>;
-
-#[macro_export]
-macro_rules! request_fn {
-    ($desc: ty, Self::$method: ident) => {
-        (<$desc>::METHOD, {
-            const E: LspMethod<JsonValue> = |this, req| {
-                let req: <$desc as lsp_types::request::Request>::Params =
-                    serde_json::from_value(req).unwrap(); // todo: soft unwrap
-                this.$method(req)
-            };
-            E
-        })
-    };
-}
-
-#[macro_export]
-macro_rules! notify_fn {
-    ($desc: ty, Self::$method: ident) => {
-        (<$desc>::METHOD, {
-            const E: LspMethod<()> = |this, input| {
-                let input: <$desc as lsp_types::notification::Notification>::Params =
-                    serde_json::from_value(input).unwrap(); // todo: soft unwrap
-                this.$method(input)
-            };
-            E
-        })
-    };
-}
+use super::*;
 
 /// The object providing the language server functionality.
 pub struct CompileState {
@@ -74,11 +42,11 @@ pub struct CompileState {
 
     // Command maps
     /// Extra commands provided with `textDocument/executeCommand`.
-    pub exec_cmds: ExecuteCmdMap,
+    pub exec_cmds: ExecuteCmdMap<Self>,
     /// Regular notifications for dispatching.
-    pub notify_cmds: NotifyCmdMap,
+    pub notify_cmds: NotifyCmdMap<Self>,
     /// Regular commands for dispatching.
-    pub regular_cmds: RegularCmdMap,
+    pub regular_cmds: RegularCmdMap<Self>,
 
     // Resources
     /// The runtime handle to spawn tasks.
@@ -89,6 +57,7 @@ pub struct CompileState {
     pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
     /// The compiler actor.
     pub compiler: Option<CompileClientActor>,
+    pub lsp_tx: AnyLspHost,
 }
 
 impl CompileState {
@@ -98,10 +67,12 @@ impl CompileState {
         const_config: ConstCompileConfig,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
         handle: tokio::runtime::Handle,
+        lsp_tx: AnyLspHost,
     ) -> Self {
         CompileState {
             client,
             editor_tx,
+            lsp_tx,
             shutdown_requested: false,
             config: compile_config,
             const_config,
@@ -161,14 +132,15 @@ impl CompileState {
     }
 
     #[rustfmt::skip]
-    fn get_regular_cmds() -> RegularCmdMap {
+    fn get_regular_cmds() -> RegularCmdMap<Self> {
+        type State = CompileState;
         use lsp_types::request::*;
         RegularCmdMap::from_iter([
-            request_fn!(ExecuteCommand, Self::execute_command),
+            request_fn_!(ExecuteCommand, State::execute_command),
         ])
     }
 
-    fn get_notify_cmds() -> NotifyCmdMap {
+    fn get_notify_cmds() -> NotifyCmdMap<Self> {
         // use lsp_types::notification::*;
         NotifyCmdMap::from_iter([
             // notify_fn!(DidOpenTextDocument, Self::did_open),
@@ -177,6 +149,19 @@ impl CompileState {
             // notify_fn!(DidSaveTextDocument, Self::did_save),
             // notify_fn!(DidChangeConfiguration, Self::did_change_configuration),
         ])
+    }
+
+    pub fn schedule<T: Serialize + 'static>(
+        &mut self,
+        req_id: RequestId,
+        resp: SchedulableResponse<T>,
+    ) -> ScheduledResult {
+        let resp = resp?;
+        let client = self.client.clone();
+        self.handle.spawn(async move {
+            client.respond(result_to_response(req_id, resp.await));
+        });
+        Ok(Some(()))
     }
 }
 
@@ -254,21 +239,10 @@ impl CompileState {
             return;
         };
 
-        let result = handler(self, req.params);
-
-        if let Ok(response) = result_to_response(req.id, result) {
-            self.client.respond(response);
-        }
-
-        fn result_to_response(
-            id: RequestId,
-            result: Result<JsonValue, ResponseError>,
-        ) -> Result<Response, Cancelled> {
-            let res = match result {
-                Ok(resp) => Response::new_ok(id, resp),
-                Err(e) => Response::new_err(id, e.code, e.message),
-            };
-            Ok(res)
+        let result = handler(self, req.id.clone(), req.params);
+        match result {
+            Ok(Some(())) => {}
+            _ => self.client.respond(result_to_response(req.id, result)),
         }
     }
 
@@ -345,5 +319,3 @@ impl CompileState {
         Ok(())
     }
 }
-
-struct Cancelled;

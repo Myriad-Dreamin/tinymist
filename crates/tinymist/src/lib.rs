@@ -36,6 +36,8 @@ pub mod tools;
 pub mod transport;
 mod utils;
 mod world;
+use std::pin::Pin;
+
 pub use crate::harness::LspHost;
 pub use server::compile;
 pub use server::compile_init;
@@ -43,6 +45,7 @@ pub use server::lsp::*;
 pub use server::lsp_init::*;
 #[cfg(feature = "preview")]
 pub use server::preview;
+use tinymist_query::CompilerQueryResponse;
 pub use world::{
     CompileFontOpts, CompileOnceOpts, CompileOpts, LspUniverse, LspWorld, LspWorldBuilder,
 };
@@ -51,3 +54,16 @@ pub use world::{
 use lsp_server::ResponseError;
 
 type LspResult<Res> = Result<Res, ResponseError>;
+
+type ScheduledResult = LspResult<Option<()>>;
+type ScheduledQueryResult = anyhow::Result<Option<()>>;
+type ResponseFuture<T> = Pin<Box<dyn std::future::Future<Output = T> + Send>>;
+type LspResponseFuture<T> = LspResult<ResponseFuture<T>>;
+type QueryFuture = anyhow::Result<ResponseFuture<anyhow::Result<CompilerQueryResponse>>>;
+
+macro_rules! just_result {
+    ($expr:expr) => {
+        Ok(Box::pin(ready(Ok($expr))))
+    };
+}
+use just_result;

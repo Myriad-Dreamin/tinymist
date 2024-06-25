@@ -1,3 +1,4 @@
+use core::fmt;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -19,6 +20,31 @@ pub struct Handle<H, C> {
 pub type ReqHandler<S> = for<'a> fn(&'a mut S, lsp_server::Response);
 type ReqQueue<S> = lsp_server::ReqQueue<(String, Instant), ReqHandler<S>>;
 
+#[derive(Clone)]
+pub struct AnyLspHost {
+    respond: Arc<dyn Fn(lsp_server::Response) + Send + Sync>,
+}
+
+impl fmt::Debug for AnyLspHost {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AnyLspHost").finish()
+    }
+}
+
+impl Default for AnyLspHost {
+    fn default() -> Self {
+        Self {
+            respond: Arc::new(|_| {}),
+        }
+    }
+}
+
+impl AnyLspHost {
+    pub fn respond(&self, response: lsp_server::Response) {
+        (self.respond)(response)
+    }
+}
+
 /// The host for the language server, or known as the LSP client.
 #[derive(Debug)]
 pub struct LspHost<S> {
@@ -31,6 +57,15 @@ impl<S> Clone for LspHost<S> {
         Self {
             sender: self.sender.clone(),
             req_queue: self.req_queue.clone(),
+        }
+    }
+}
+
+impl<S: 'static> LspHost<S> {
+    pub fn to_untyped(self) -> AnyLspHost {
+        let this = self.clone();
+        AnyLspHost {
+            respond: Arc::new(move |msg| this.respond(msg)),
         }
     }
 }

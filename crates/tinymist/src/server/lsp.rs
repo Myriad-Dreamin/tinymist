@@ -1,15 +1,15 @@
 //! tinymist LSP mode
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
-use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{bail, Context};
 use futures::future::BoxFuture;
 use log::{error, info, trace, warn};
 use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response, ResponseError};
 use lsp_types::notification::Notification as NotificationTrait;
-use lsp_types::request::{GotoDeclarationParams, GotoDeclarationResponse, WorkspaceConfiguration};
+use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ use tinymist_query::{
 use tokio::sync::mpsc;
 use typst_ts_core::ImmutPath;
 
-use super::lsp_init::*;
+use super::{lsp_init::*, *};
 use crate::actor::editor::EditorRequest;
 use crate::actor::format::{FormatConfig, FormatRequest};
 use crate::actor::typ_client::CompileClientActor;
@@ -29,66 +29,9 @@ use crate::actor::user_action::UserActionRequest;
 use crate::compile::CompileState;
 use crate::compile_init::ConstCompileConfig;
 use crate::harness::{InitializedLspDriver, LspHost};
-use crate::{run_query, LspResult};
+use crate::{run_query, run_query_tail, LspResult};
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
-
-type LspMethod<Res> = fn(srv: &mut LanguageState, args: JsonValue) -> LspResult<Res>;
-type LspHandler<Req, Res> = fn(srv: &mut LanguageState, args: Req) -> LspResult<Res>;
-
-/// Returns Ok(Some()) -> Already responded
-/// Returns Ok(None) -> Need to respond none
-/// Returns Err(..) -> Need to respond error
-type LspRawHandler<T> =
-    fn(srv: &mut LanguageState, req_id: RequestId, args: T) -> LspResult<Option<()>>;
-
-type ExecuteCmdMap = HashMap<&'static str, LspRawHandler<Vec<JsonValue>>>;
-type NotifyCmdMap = HashMap<&'static str, LspMethod<()>>;
-type RegularCmdMap = HashMap<&'static str, LspRawHandler<JsonValue>>;
-type ResourceMap = HashMap<ImmutPath, LspHandler<Vec<JsonValue>, JsonValue>>;
-
-macro_rules! request_fn_ {
-    ($desc: ty, Self::$method: ident) => {
-        (<$desc>::METHOD, {
-            const E: LspRawHandler<JsonValue> = |this, req_id, req| {
-                let req: <$desc as lsp_types::request::Request>::Params =
-                    serde_json::from_value(req).unwrap(); // todo: soft unwrap
-                this.$method(req_id, req)
-            };
-            E
-        })
-    };
-}
-
-macro_rules! request_fn {
-    ($desc: ty, Self::$method: ident) => {
-        (<$desc>::METHOD, {
-            const E: LspRawHandler<JsonValue> = |this, req_id, req| {
-                let req: <$desc as lsp_types::request::Request>::Params =
-                    serde_json::from_value(req).unwrap(); // todo: soft unwrap
-                let res = this.$method(req);
-
-                this.client.respond(result_to_response(req_id, res));
-
-                Ok(Some(()))
-            };
-            E
-        })
-    };
-}
-
-macro_rules! notify_fn {
-    ($desc: ty, Self::$method: ident) => {
-        (<$desc>::METHOD, {
-            const E: LspMethod<()> = |this, input| {
-                let input: <$desc as lsp_types::notification::Notification>::Params =
-                    serde_json::from_value(input).unwrap(); // todo: soft unwrap
-                this.$method(input)
-            };
-            E
-        })
-    };
-}
 
 pub(super) fn as_path(inp: TextDocumentIdentifier) -> PathBuf {
     as_path_(inp.uri)
@@ -132,13 +75,13 @@ pub struct LanguageState {
 
     // Command maps
     /// Extra commands provided with `textDocument/executeCommand`.
-    pub exec_cmds: ExecuteCmdMap,
+    pub exec_cmds: ExecuteCmdMap<Self>,
     /// Regular notifications for dispatching.
-    pub notify_cmds: NotifyCmdMap,
+    pub notify_cmds: NotifyCmdMap<Self>,
     /// Regular commands for dispatching.
-    pub regular_cmds: RegularCmdMap,
+    pub regular_cmds: RegularCmdMap<Self>,
     /// Regular commands for dispatching.
-    pub resource_routes: ResourceMap,
+    pub resource_routes: ResourceMap<Self>,
 
     // Resources
     /// The tokio handle.
@@ -172,7 +115,7 @@ impl LanguageState {
             const_config.tokens_multiline_token_support,
         );
         Self {
-            client,
+            client: client.clone(),
             primary: CompileState::new(
                 LspHost::new(Arc::new(RwLock::new(None))),
                 Default::default(),
@@ -181,6 +124,7 @@ impl LanguageState {
                 },
                 editor_tx,
                 handle.clone(),
+                client.to_untyped(),
             ),
             handle,
             dedicates: Vec::new(),
@@ -216,49 +160,65 @@ impl LanguageState {
     }
 
     #[rustfmt::skip]
-    fn get_regular_cmds() -> RegularCmdMap {
+    fn get_regular_cmds() -> RegularCmdMap<Self> {
         use lsp_types::request::*;
         RegularCmdMap::from_iter([
-            request_fn!(Shutdown, Self::shutdown),
+            request_fn!(Shutdown, LanguageState::shutdown),
             // lantency sensitive
-            request_fn!(Completion, Self::completion),
-            request_fn!(SemanticTokensFullRequest, Self::semantic_tokens_full),
-            request_fn!(SemanticTokensFullDeltaRequest, Self::semantic_tokens_full_delta),
-            request_fn!(DocumentHighlightRequest, Self::document_highlight),
-            request_fn!(DocumentSymbolRequest, Self::document_symbol),
+            request_fn_!(Completion, LanguageState::completion),
+            request_fn_!(SemanticTokensFullRequest, LanguageState::semantic_tokens_full),
+            request_fn_!(SemanticTokensFullDeltaRequest, LanguageState::semantic_tokens_full_delta),
+            request_fn_!(DocumentHighlightRequest, LanguageState::document_highlight),
+            request_fn_!(DocumentSymbolRequest, LanguageState::document_symbol),
             // Sync for low latency
-            request_fn_!(Formatting, Self::formatting),
-            request_fn!(SelectionRangeRequest, Self::selection_range),
+            request_fn_!(Formatting, LanguageState::formatting),
+            request_fn_!(SelectionRangeRequest, LanguageState::selection_range),
             // latency insensitive
-            request_fn!(InlayHintRequest, Self::inlay_hint),
-            request_fn!(DocumentColor, Self::document_color),
-            request_fn!(ColorPresentationRequest, Self::color_presentation),
-            request_fn!(HoverRequest, Self::hover),
-            request_fn!(CodeActionRequest, Self::code_action),
-            request_fn!(CodeLensRequest, Self::code_lens),
-            request_fn!(FoldingRangeRequest, Self::folding_range),
-            request_fn!(SignatureHelpRequest, Self::signature_help),
-            request_fn!(PrepareRenameRequest, Self::prepare_rename),
-            request_fn!(Rename, Self::rename),
-            request_fn!(GotoDefinition, Self::goto_definition),
-            request_fn!(GotoDeclaration, Self::goto_declaration),
-            request_fn!(References, Self::references),
-            request_fn!(WorkspaceSymbolRequest, Self::symbol),
-            request_fn!(OnEnter, Self::on_enter),
-            request_fn_!(ExecuteCommand, Self::on_execute_command),
+            request_fn_!(InlayHintRequest, LanguageState::inlay_hint),
+            request_fn_!(DocumentColor, LanguageState::document_color),
+            request_fn_!(ColorPresentationRequest, LanguageState::color_presentation),
+            request_fn_!(HoverRequest, LanguageState::hover),
+            request_fn_!(CodeActionRequest, LanguageState::code_action),
+            request_fn_!(CodeLensRequest, LanguageState::code_lens),
+            request_fn_!(FoldingRangeRequest, LanguageState::folding_range),
+            request_fn_!(SignatureHelpRequest, LanguageState::signature_help),
+            request_fn_!(PrepareRenameRequest, LanguageState::prepare_rename),
+            request_fn_!(Rename, LanguageState::rename),
+            request_fn_!(GotoDefinition, LanguageState::goto_definition),
+            request_fn_!(GotoDeclaration, LanguageState::goto_declaration),
+            request_fn_!(References, LanguageState::references),
+            request_fn_!(WorkspaceSymbolRequest, LanguageState::symbol),
+            request_fn_!(OnEnter, LanguageState::on_enter),
+            request_fn_!(ExecuteCommand, LanguageState::on_execute_command),
         ])
     }
 
-    fn get_notify_cmds() -> NotifyCmdMap {
+    fn get_notify_cmds() -> NotifyCmdMap<Self> {
         // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
         use lsp_types::notification::*;
         NotifyCmdMap::from_iter([
-            notify_fn!(DidOpenTextDocument, Self::did_open),
-            notify_fn!(DidCloseTextDocument, Self::did_close),
-            notify_fn!(DidChangeTextDocument, Self::did_change),
-            notify_fn!(DidSaveTextDocument, Self::did_save),
-            notify_fn!(DidChangeConfiguration, Self::did_change_configuration),
+            notify_fn!(DidOpenTextDocument, LanguageState::did_open),
+            notify_fn!(DidCloseTextDocument, LanguageState::did_close),
+            notify_fn!(DidChangeTextDocument, LanguageState::did_change),
+            notify_fn!(DidSaveTextDocument, LanguageState::did_save),
+            notify_fn!(
+                DidChangeConfiguration,
+                LanguageState::did_change_configuration
+            ),
         ])
+    }
+
+    pub fn schedule<T: Serialize + 'static>(
+        &mut self,
+        req_id: RequestId,
+        resp: SchedulableResponse<T>,
+    ) -> ScheduledResult {
+        let resp = resp?;
+        let client = self.client.clone();
+        self.handle.spawn(async move {
+            client.respond(result_to_response(req_id, resp.await));
+        });
+        Ok(Some(()))
     }
 }
 
@@ -371,7 +331,11 @@ impl LanguageState {
             return;
         };
 
-        let _ = handler(self, req.id.clone(), req.params);
+        let result = handler(self, req.id.clone(), req.params);
+        match result {
+            Ok(Some(())) => {}
+            _ => self.client.respond(result_to_response(req.id, result)),
+        }
     }
 
     /// The entry point for the `workspace/executeCommand` request.
@@ -515,9 +479,9 @@ impl LanguageState {
     /// This method is guaranteed to only execute once. If the client sends this
     /// request to the server again, the server will respond with JSON-RPC
     /// error code `-32600` (invalid request).
-    fn shutdown(&mut self, _params: ()) -> LspResult<()> {
+    fn shutdown(&mut self, _params: ()) -> SchedulableResponse<()> {
         self.shutdown_requested = true;
-        Ok(())
+        just_result!(())
     }
 }
 
@@ -554,7 +518,7 @@ impl LanguageState {
     fn did_save(&mut self, params: DidSaveTextDocumentParams) -> LspResult<()> {
         let path = as_path(params.text_document);
 
-        let _ = run_query!(self.OnSaveExport(path));
+        run_query_tail!(self.OnSaveExport(path))?;
         Ok(())
     }
 
@@ -638,96 +602,96 @@ impl LanguageState {
 impl LanguageState {
     fn goto_definition(
         &mut self,
+        req_id: RequestId,
         params: GotoDefinitionParams,
-    ) -> LspResult<Option<GotoDefinitionResponse>> {
+    ) -> ScheduledResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
-        run_query!(self.GotoDefinition(path, position))
+        run_query!(req_id, self.GotoDefinition(path, position))
     }
 
     fn goto_declaration(
         &mut self,
+        req_id: RequestId,
         params: GotoDeclarationParams,
-    ) -> LspResult<Option<GotoDeclarationResponse>> {
+    ) -> ScheduledResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
-        run_query!(self.GotoDeclaration(path, position))
+        run_query!(req_id, self.GotoDeclaration(path, position))
     }
 
-    fn references(&mut self, params: ReferenceParams) -> LspResult<Option<Vec<Location>>> {
+    fn references(&mut self, req_id: RequestId, params: ReferenceParams) -> ScheduledResult {
         let (path, position) = as_path_pos(params.text_document_position);
-        run_query!(self.References(path, position))
+        run_query!(req_id, self.References(path, position))
     }
 
-    fn hover(&mut self, params: HoverParams) -> LspResult<Option<Hover>> {
+    fn hover(&mut self, req_id: RequestId, params: HoverParams) -> ScheduledResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
         self.implicit_focus_entry(|| Some(path.as_path().into()), 'h');
-        run_query!(self.Hover(path, position))
+        run_query!(req_id, self.Hover(path, position))
     }
 
-    fn folding_range(
-        &mut self,
-        params: FoldingRangeParams,
-    ) -> LspResult<Option<Vec<FoldingRange>>> {
+    fn folding_range(&mut self, req_id: RequestId, params: FoldingRangeParams) -> ScheduledResult {
         let path = as_path(params.text_document);
         let line_folding_only = self.const_config().doc_line_folding_only;
         self.implicit_focus_entry(|| Some(path.as_path().into()), 'f');
-        run_query!(self.FoldingRange(path, line_folding_only))
+        run_query!(req_id, self.FoldingRange(path, line_folding_only))
     }
 
     fn selection_range(
         &mut self,
+        req_id: RequestId,
         params: SelectionRangeParams,
-    ) -> LspResult<Option<Vec<SelectionRange>>> {
+    ) -> ScheduledResult {
         let path = as_path(params.text_document);
         let positions = params.positions;
-        run_query!(self.SelectionRange(path, positions))
+        run_query!(req_id, self.SelectionRange(path, positions))
     }
 
     fn document_highlight(
         &mut self,
+        req_id: RequestId,
         params: DocumentHighlightParams,
-    ) -> LspResult<Option<Vec<DocumentHighlight>>> {
+    ) -> ScheduledResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
-        run_query!(self.DocumentHighlight(path, position))
+        run_query!(req_id, self.DocumentHighlight(path, position))
     }
 
     fn document_symbol(
         &mut self,
+        req_id: RequestId,
         params: DocumentSymbolParams,
-    ) -> LspResult<Option<DocumentSymbolResponse>> {
+    ) -> ScheduledResult {
         let path = as_path(params.text_document);
-        run_query!(self.DocumentSymbol(path))
+        run_query!(req_id, self.DocumentSymbol(path))
     }
 
     fn semantic_tokens_full(
         &mut self,
+        req_id: RequestId,
         params: SemanticTokensParams,
-    ) -> LspResult<Option<SemanticTokensResult>> {
+    ) -> ScheduledResult {
         let path = as_path(params.text_document);
         self.implicit_focus_entry(|| Some(path.as_path().into()), 't');
-        run_query!(self.SemanticTokensFull(path))
+        run_query!(req_id, self.SemanticTokensFull(path))
     }
 
     fn semantic_tokens_full_delta(
         &mut self,
+        req_id: RequestId,
         params: SemanticTokensDeltaParams,
-    ) -> LspResult<Option<SemanticTokensFullDeltaResult>> {
+    ) -> ScheduledResult {
         let path = as_path(params.text_document);
         let previous_result_id = params.previous_result_id;
         self.implicit_focus_entry(|| Some(path.as_path().into()), 't');
-        run_query!(self.SemanticTokensDelta(path, previous_result_id))
+        run_query!(req_id, self.SemanticTokensDelta(path, previous_result_id))
     }
 
-    fn formatting(
-        &self,
-        req_id: RequestId,
-        params: DocumentFormattingParams,
-    ) -> LspResult<Option<()>> {
+    fn formatting(&self, req_id: RequestId, params: DocumentFormattingParams) -> ScheduledResult {
         if matches!(self.config.formatter, FormatterMode::Disable) {
             return Ok(None);
         }
 
-        let path = as_path(params.text_document).as_path().into();
-        self.query_source(path, |source| {
+        let path: ImmutPath = as_path(params.text_document).as_path().into();
+        self.query_source(path, |source: typst::syntax::Source| {
             if let Some(f) = &self.format_thread {
                 f.send(FormatRequest::Format(req_id, source.clone()))?;
             } else {
@@ -739,84 +703,89 @@ impl LanguageState {
         .map_err(|e| internal_error(format!("could not format document: {e}")))
     }
 
-    fn inlay_hint(&mut self, params: InlayHintParams) -> LspResult<Option<Vec<InlayHint>>> {
+    fn inlay_hint(&mut self, req_id: RequestId, params: InlayHintParams) -> ScheduledResult {
         let path = as_path(params.text_document);
         let range = params.range;
-        run_query!(self.InlayHint(path, range))
+        run_query!(req_id, self.InlayHint(path, range))
     }
 
     fn document_color(
         &mut self,
+        req_id: RequestId,
         params: DocumentColorParams,
-    ) -> LspResult<Option<Vec<ColorInformation>>> {
+    ) -> ScheduledResult {
         let path = as_path(params.text_document);
-        run_query!(self.DocumentColor(path))
+        run_query!(req_id, self.DocumentColor(path))
     }
 
     fn color_presentation(
         &mut self,
+        req_id: RequestId,
         params: ColorPresentationParams,
-    ) -> LspResult<Option<Vec<ColorPresentation>>> {
+    ) -> ScheduledResult {
         let path = as_path(params.text_document);
         let color = params.color;
         let range = params.range;
-        run_query!(self.ColorPresentation(path, color, range))
+        run_query!(req_id, self.ColorPresentation(path, color, range))
     }
 
-    fn code_action(
-        &mut self,
-        params: CodeActionParams,
-    ) -> LspResult<Option<Vec<CodeActionOrCommand>>> {
+    fn code_action(&mut self, req_id: RequestId, params: CodeActionParams) -> ScheduledResult {
         let path = as_path(params.text_document);
         let range = params.range;
-        run_query!(self.CodeAction(path, range))
+        run_query!(req_id, self.CodeAction(path, range))
     }
 
-    fn code_lens(&mut self, params: CodeLensParams) -> LspResult<Option<Vec<CodeLens>>> {
+    fn code_lens(&mut self, req_id: RequestId, params: CodeLensParams) -> ScheduledResult {
         let path = as_path(params.text_document);
-        run_query!(self.CodeLens(path))
+        run_query!(req_id, self.CodeLens(path))
     }
 
-    fn completion(&mut self, params: CompletionParams) -> LspResult<Option<CompletionResponse>> {
+    fn completion(&mut self, req_id: RequestId, params: CompletionParams) -> ScheduledResult {
         let (path, position) = as_path_pos(params.text_document_position);
         let explicit = params
             .context
             .map(|context| context.trigger_kind == CompletionTriggerKind::INVOKED)
             .unwrap_or(false);
 
-        run_query!(self.Completion(path, position, explicit))
+        run_query!(req_id, self.Completion(path, position, explicit))
     }
 
-    fn signature_help(&mut self, params: SignatureHelpParams) -> LspResult<Option<SignatureHelp>> {
+    fn signature_help(
+        &mut self,
+        req_id: RequestId,
+        params: SignatureHelpParams,
+    ) -> ScheduledResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
-        run_query!(self.SignatureHelp(path, position))
+        run_query!(req_id, self.SignatureHelp(path, position))
     }
 
-    fn rename(&mut self, params: RenameParams) -> LspResult<Option<WorkspaceEdit>> {
+    fn rename(&mut self, req_id: RequestId, params: RenameParams) -> ScheduledResult {
         let (path, position) = as_path_pos(params.text_document_position);
         let new_name = params.new_name;
-        run_query!(self.Rename(path, position, new_name))
+        run_query!(req_id, self.Rename(path, position, new_name))
     }
 
     fn prepare_rename(
         &mut self,
+        req_id: RequestId,
         params: TextDocumentPositionParams,
-    ) -> LspResult<Option<PrepareRenameResponse>> {
+    ) -> ScheduledResult {
         let (path, position) = as_path_pos(params);
-        run_query!(self.PrepareRename(path, position))
+        run_query!(req_id, self.PrepareRename(path, position))
     }
 
-    fn symbol(
-        &mut self,
-        params: WorkspaceSymbolParams,
-    ) -> LspResult<Option<Vec<SymbolInformation>>> {
+    fn symbol(&mut self, req_id: RequestId, params: WorkspaceSymbolParams) -> ScheduledResult {
         let pattern = (!params.query.is_empty()).then_some(params.query);
-        run_query!(self.Symbol(pattern))
+        run_query!(req_id, self.Symbol(pattern))
     }
 
-    fn on_enter(&mut self, params: TextDocumentPositionParams) -> LspResult<Option<Vec<TextEdit>>> {
+    fn on_enter(
+        &mut self,
+        req_id: RequestId,
+        params: TextDocumentPositionParams,
+    ) -> ScheduledResult {
         let (path, position) = as_path_pos(params);
-        run_query!(self.OnEnter(path, position))
+        run_query!(req_id, self.OnEnter(path, position))
     }
 }
 
