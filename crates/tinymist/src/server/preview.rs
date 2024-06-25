@@ -5,7 +5,6 @@ use await_tree::InstrumentAwait;
 use log::{error, info};
 
 use typst::foundations::{Str, Value};
-use typst_ts_compiler::{CompileDriver, TypstSystemUniverse};
 use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
 
 use hyper::{
@@ -56,7 +55,7 @@ pub struct PreviewCliArgs {
 mod compiler;
 use compiler::CompileServer;
 
-use crate::compile_init::CompileOnceArgs;
+use crate::{compile_init::CompileOnceArgs, LspUniverse};
 
 pub fn make_static_host(
     previewer: &Previewer,
@@ -137,8 +136,8 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
-    let compiler_driver = {
-        let world = TypstSystemUniverse::new(CompileOpts {
+    let world = {
+        let world = LspUniverse::new(CompileOpts {
             entry: EntryOpts::new_rooted(root.clone(), Some(entry.clone())),
             inputs,
             no_system_fonts: args.compile.font.ignore_system_fonts,
@@ -148,7 +147,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         })
         .expect("incorrect options");
 
-        CompileDriver::new(std::marker::PhantomData, world.with_entry_file(entry))
+        world.with_entry_file(entry)
     };
 
     tokio::spawn(async move {
@@ -160,7 +159,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let previewer = preview(
         args.preview,
         move |handle| {
-            let compile_server = CompileServer::new(compiler_driver, handle);
+            let compile_server = CompileServer::new(world, handle);
 
             compile_server.spawn().unwrap()
         },

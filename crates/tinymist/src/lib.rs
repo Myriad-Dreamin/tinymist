@@ -41,6 +41,7 @@ pub use server::compile;
 pub use server::compile_init;
 pub use server::lsp::*;
 pub use server::lsp_init::*;
+#[cfg(feature = "preview")]
 pub use server::preview;
 pub use world::{
     CompileFontOpts, CompileOnceOpts, CompileOpts, LspUniverse, LspWorld, LspWorldBuilder,

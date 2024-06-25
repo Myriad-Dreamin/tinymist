@@ -6,6 +6,7 @@ pub mod compile;
 pub mod compile_cmd;
 pub mod compile_init;
 
+#[cfg(feature = "preview")]
 pub mod preview;
 
 use serde_json::{from_value, Value as JsonValue};

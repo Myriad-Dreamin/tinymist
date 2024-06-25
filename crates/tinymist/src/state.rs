@@ -269,6 +269,7 @@ impl LanguageState {
                 if !self.pinning && !self.config.compile.has_default_entry_path {
                     // todo: race condition, we need atomic primary query
                     if let Some(path) = query.associated_path() {
+                        // todo!!!!!!!!!!!!!!
                         client.do_change_entry(Some(path.into()))?;
                     }
                 }

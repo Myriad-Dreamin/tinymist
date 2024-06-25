@@ -13,7 +13,6 @@ use parking_lot::RwLock;
 use tinymist::{
     compile_init::{CompileInit, CompileInitializeParams},
     harness::{lsp_harness, InitializedLspDriver, LspDriver, LspHost},
-    preview::preview_main,
     transport::with_stdio_transport,
     CompileFontOpts, Init, LanguageState, LspWorld,
 };
@@ -69,7 +68,13 @@ fn main() -> anyhow::Result<()> {
     match args.command.unwrap_or_default() {
         Commands::Lsp(args) => lsp_main(args),
         Commands::Compile(args) => compiler_main(args),
-        Commands::Preview(args) => RUNTIMES.tokio_runtime.block_on(preview_main(args)),
+        #[cfg(feature = "preview")]
+        Commands::Preview(args) => {
+            #[cfg(feature = "preview")]
+            use tinymist::preview::preview_main;
+
+            RUNTIMES.tokio_runtime.block_on(preview_main(args))
+        }
         Commands::Probe => Ok(()),
     }
 }
@@ -206,7 +211,7 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
 
             let warnings = env.tracer.map(|e| e.warnings());
 
-            let diagnostics = service.compiler().run_analysis(&w, |ctx| {
+            let diagnostics = service.compiler().handle.run_analysis(&w, |ctx| {
                 tinymist_query::convert_diagnostics(
                     ctx,
                     warnings.iter().flatten().chain(errors.iter()),

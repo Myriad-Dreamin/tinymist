@@ -47,6 +47,7 @@ typst-assets.workspace = true
 typstyle.workspace = true
 typstfmt_lib.workspace = true
 
+reflexo.workspace = true
 typst-ts-core = { workspace = true, default-features = false, features = [
     "flat-vector",
     "vector-bbox",

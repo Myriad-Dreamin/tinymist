@@ -1,5 +1,4 @@
 use once_cell::sync::Lazy;
-use tinymist::preview::PreviewCliArgs;
 use tinymist::transport::MirrorArgs;
 
 use tinymist::compile_init::{CompileOnceArgs, FontArgs};
@@ -21,7 +20,8 @@ pub enum Commands {
     /// Run Compile Server
     Compile(CompileArgs),
     /// Run Preview Server
-    Preview(PreviewCliArgs),
+    #[cfg(feature = "preview")]
+    Preview(tinymist::preview::PreviewCliArgs),
     /// Probe
     Probe,
 }

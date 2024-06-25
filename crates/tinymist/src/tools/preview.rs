@@ -14,11 +14,11 @@ use typst_ts_compiler::EntryReader;
 use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_core::{Error, TypstDocument, TypstFileId};
 
-use crate::actor::typ_client::CompileClientActorImpl;
+use crate::actor::typ_client::CompileClientActor;
 use crate::actor::typ_server::CompileSnapshot;
 use crate::world::{LspCompilerFeat, LspWorld};
 
-impl CompileClientActorImpl {
+impl CompileClientActor {
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
     fn resolve_source_span(world: &LspWorld, loc: Location) -> Option<SourceSpanOffset> {
@@ -90,7 +90,7 @@ impl CompileClientActorImpl {
     }
 }
 
-impl SourceFileServer for CompileClientActorImpl {
+impl SourceFileServer for CompileClientActor {
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
     async fn resolve_source_span(
@@ -186,7 +186,7 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
     None
 }
 
-impl EditorServer for CompileClientActorImpl {
+impl EditorServer for CompileClientActor {
     async fn update_memory_files(
         &mut self,
         files: MemoryFiles,
@@ -223,4 +223,4 @@ impl EditorServer for CompileClientActorImpl {
     }
 }
 
-impl CompileHost for CompileClientActorImpl {}
+impl CompileHost for CompileClientActor {}

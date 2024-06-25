@@ -170,35 +170,29 @@ pub struct PartialSignature {
 /// The language object that the signature is being analyzed for.
 pub enum SignatureTarget<'a> {
     /// A static node without knowing the function at runtime.
-    Syntax(LinkedNode<'a>),
+    Syntax(Source, LinkedNode<'a>),
     /// A function that is known at runtime.
     Runtime(Func),
 }
 
 pub(crate) fn analyze_dyn_signature(ctx: &mut AnalysisContext, func: Func) -> Signature {
-    ctx.analysis
-        .caches
-        .compute_signature(None, SignatureTarget::Runtime(func.clone()), || {
-            Signature::Primary(analyze_dyn_signature_inner(func))
-        })
+    ctx.compute_signature(SignatureTarget::Runtime(func.clone()), || {
+        Signature::Primary(analyze_dyn_signature_inner(func))
+    })
 }
 
 pub(crate) fn analyze_signature(
     ctx: &mut AnalysisContext,
-    source: Source,
     callee_node: SignatureTarget,
 ) -> Option<Signature> {
-    if let Some(sig) = ctx
-        .analysis
-        .caches
-        .signature(Some(source.clone()), &callee_node)
-    {
+    if let Some(sig) = ctx.signature(&callee_node) {
         return Some(sig);
     }
 
     let func = match callee_node {
-        SignatureTarget::Syntax(node) => {
+        SignatureTarget::Syntax(source, node) => {
             let _ = resolve_callee_v2;
+            let _ = source;
 
             // let res = resolve_callee_v2(ctx, node)?;
 
@@ -239,9 +233,7 @@ pub(crate) fn analyze_signature(
     }
 
     let signature = ctx
-        .analysis
-        .caches
-        .compute_signature(None, SignatureTarget::Runtime(func.clone()), || {
+        .compute_signature(SignatureTarget::Runtime(func.clone()), || {
             Signature::Primary(analyze_dyn_signature_inner(func))
         })
         .primary()

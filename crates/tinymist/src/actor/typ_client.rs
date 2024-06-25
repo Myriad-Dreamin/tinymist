@@ -34,7 +34,6 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use log::{error, info, trace};
-use parking_lot::Mutex;
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnalysisResources},
     DiagnosticsMap, ExportKind, ServerInfoResponse, VersionedDocument,
@@ -42,16 +41,13 @@ use tinymist_query::{
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{mpsc, oneshot, watch};
 use typst::{
-    diag::{PackageError, SourceDiagnostic, SourceResult},
+    diag::{PackageError, SourceDiagnostic},
     layout::Position,
     model::Document as TypstDocument,
     syntax::package::PackageSpec,
     World as TypstWorld,
 };
-use typst_ts_compiler::{
-    vfs::notify::MemoryEvent, CompileEnv, CompileMiddleware, Compiler, EntryReader, PureCompiler,
-    TaskInputs,
-};
+use typst_ts_compiler::{vfs::notify::MemoryEvent, CompileReport, EntryReader, TaskInputs};
 use typst_ts_core::{
     config::compiler::EntryState, debug_loc::DataSource, error::prelude::*, typst::prelude::EcoVec,
     Error, ImmutPath, TypstFont,
@@ -60,35 +56,44 @@ use typst_ts_core::{
 use super::{
     editor::{EditorRequest, TinymistCompileStatusEnum},
     export::ExportConfig,
-    typ_server::{CompileSnapshot, Interrupt},
+    typ_server::{CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt},
 };
 use crate::{
     actor::export::ExportRequest,
     compile_init::CompileConfig,
-    tools::preview::{CompilationHandle, CompileStatus},
+    tools::preview::CompileStatus,
     utils::{self, threaded_receive},
     world::{LspCompilerFeat, LspWorld},
 };
 
-pub type CompileClientActor = CompileClientActorImpl;
-
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
+use crate::tools::preview::CompilationHandle as PreviewCompilationHandle;
+
 pub struct CompileHandler {
-    pub(super) diag_group: String,
+    pub(crate) diag_group: String,
+    pub(crate) analysis: Analysis,
+    pub(crate) periscope: PeriscopeRenderer,
 
     #[cfg(feature = "preview")]
-    pub(super) inner: Arc<Mutex<Option<typst_preview::CompilationHandleImpl>>>,
+    pub(crate) inner: Arc<Option<typst_preview::CompilationHandleImpl>>,
 
-    pub(super) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
-    pub(super) export_tx: mpsc::UnboundedSender<ExportRequest>,
-    pub(super) editor_tx: EditorSender,
+    pub(crate) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
+    pub(crate) export_tx: mpsc::UnboundedSender<ExportRequest>,
+    pub(crate) editor_tx: EditorSender,
 }
 
-impl CompilationHandle for CompileHandler {
+impl PreviewCompilationHandle for CompileHandler {
     fn status(&self, _status: CompileStatus) {
+        self.editor_tx
+            .send(EditorRequest::Status(
+                self.diag_group.clone(),
+                TinymistCompileStatusEnum::Compiling,
+            ))
+            .unwrap();
+
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.inner.lock().as_ref() {
+        if let Some(inner) = self.inner.as_ref() {
             inner.status(_status);
         }
     }
@@ -111,14 +116,48 @@ impl CompilationHandle for CompileHandler {
             .unwrap();
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.inner.lock().as_ref() {
+        if let Some(inner) = self.inner.as_ref() {
             inner.notify_compile(res);
         }
     }
 }
 
+impl CompilationHandle<LspCompilerFeat> for CompileHandler {
+    fn status(&self, rep: CompileReport) {
+        let status = match rep {
+            CompileReport::Suspend => {
+                self.push_diagnostics(None);
+                CompileStatus::CompileError
+            }
+            CompileReport::Stage(_, _, _) => CompileStatus::Compiling,
+            CompileReport::CompileSuccess(_, _, _) | CompileReport::CompileWarning(_, _, _) => {
+                CompileStatus::CompileSuccess
+            }
+            CompileReport::CompileError(_, _, _) | CompileReport::ExportError(_, _, _) => {
+                CompileStatus::CompileError
+            }
+        };
+
+        <Self as PreviewCompilationHandle>::status(self, status);
+    }
+
+    fn notify_compile(&self, snap: &CompiledArtifact<LspCompilerFeat>, _rep: CompileReport) {
+        let (res, err) = match snap.doc.clone() {
+            Ok(doc) => (Ok(doc), EcoVec::new()),
+            Err(err) => (Err(CompileStatus::CompileError), err),
+        };
+        self.notify_diagnostics(
+            &snap.world,
+            err,
+            snap.env.tracer.as_ref().map(|e| e.clone().warnings()),
+        );
+
+        <Self as PreviewCompilationHandle>::notify_compile(self, res);
+    }
+}
+
 impl CompileHandler {
-    fn push_diagnostics(&mut self, diagnostics: Option<DiagnosticsMap>) {
+    fn push_diagnostics(&self, diagnostics: Option<DiagnosticsMap>) {
         let res = self
             .editor_tx
             .send(EditorRequest::Diag(self.diag_group.clone(), diagnostics));
@@ -126,70 +165,9 @@ impl CompileHandler {
             error!("failed to send diagnostics: {err:#}");
         }
     }
-}
 
-pub struct CompileDriver {
-    pub(super) inner: PureCompiler<LspWorld>,
-    #[allow(unused)]
-    pub(super) handler: CompileHandler,
-    pub(super) analysis: Analysis,
-    pub(super) periscope: PeriscopeRenderer,
-}
-
-impl CompileMiddleware for CompileDriver {
-    type Compiler = PureCompiler<LspWorld>;
-
-    fn inner(&self) -> &Self::Compiler {
-        &self.inner
-    }
-
-    fn inner_mut(&mut self) -> &mut Self::Compiler {
-        &mut self.inner
-    }
-
-    fn wrap_compile(
-        &mut self,
-        world: &LspWorld,
-        env: &mut CompileEnv,
-    ) -> SourceResult<Arc<typst::model::Document>> {
-        self.handler
-            .editor_tx
-            .send(EditorRequest::Status(
-                self.handler.diag_group.clone(),
-                TinymistCompileStatusEnum::Compiling,
-            ))
-            .unwrap();
-        self.handler.status(CompileStatus::Compiling);
-        match self
-            .ensure_main(world)
-            .and_then(|_| self.inner_mut().compile(world, env))
-        {
-            Ok(doc) => {
-                self.handler.notify_compile(Ok(doc.clone()));
-                self.notify_diagnostics(
-                    world,
-                    EcoVec::new(),
-                    env.tracer.as_ref().map(|e| e.clone().warnings()),
-                );
-                Ok(doc)
-            }
-            Err(err) => {
-                self.handler
-                    .notify_compile(Err(CompileStatus::CompileError));
-                self.notify_diagnostics(
-                    world,
-                    err,
-                    env.tracer.as_ref().map(|e| e.clone().warnings()),
-                );
-                Err(EcoVec::new())
-            }
-        }
-    }
-}
-
-impl CompileDriver {
     fn notify_diagnostics(
-        &mut self,
+        &self,
         world: &LspWorld,
         errors: EcoVec<SourceDiagnostic>,
         warnings: Option<EcoVec<SourceDiagnostic>>,
@@ -207,17 +185,17 @@ impl CompileDriver {
                 // todo: check all errors in this file
                 let detached = entry.is_inactive();
                 let valid = !detached;
-                self.handler.push_diagnostics(valid.then_some(diagnostics));
+                self.push_diagnostics(valid.then_some(diagnostics));
             }
             Err(err) => {
                 error!("TypstActor: failed to convert diagnostics: {:#}", err);
-                self.handler.push_diagnostics(None);
+                self.push_diagnostics(None);
             }
         }
     }
 
     pub fn run_analysis<T>(
-        &mut self,
+        &self,
         w: &LspWorld,
         f: impl FnOnce(&mut AnalysisContext<'_>) -> T,
     ) -> anyhow::Result<T> {
@@ -269,33 +247,31 @@ impl CompileDriver {
 
         let w = WrapWorld(w, &self.periscope);
 
-        self.analysis.root = root;
-        Ok(f(&mut AnalysisContext::new_borrow(&w, &mut self.analysis)))
+        let mut analysis = self.analysis.snapshot(root, &w);
+        Ok(f(&mut analysis))
     }
 }
 
-pub struct CompileClientActorImpl {
-    pub diag_group: String,
+pub struct CompileClientActor {
+    pub handle: Arc<CompileHandler>,
+
     pub config: CompileConfig,
     entry: EntryState,
     intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
-    export_tx: mpsc::UnboundedSender<ExportRequest>,
 }
 
-impl CompileClientActorImpl {
+impl CompileClientActor {
     pub(crate) fn new(
-        diag_group: String,
+        handle: Arc<CompileHandler>,
         config: CompileConfig,
         entry: EntryState,
         intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
-        export_tx: mpsc::UnboundedSender<ExportRequest>,
     ) -> Self {
         Self {
-            diag_group,
+            handle,
             config,
             entry,
             intr_tx,
-            export_tx,
         }
     }
 
@@ -333,7 +309,10 @@ impl CompileClientActorImpl {
     }
 
     pub(crate) fn change_export_pdf(&mut self, config: ExportConfig) {
-        let _ = self.export_tx.send(ExportRequest::ChangeConfig(config));
+        let _ = self
+            .handle
+            .export_tx
+            .send(ExportRequest::ChangeConfig(config));
     }
 
     pub fn on_export(&self, kind: ExportKind, path: PathBuf) -> anyhow::Result<Option<PathBuf>> {
@@ -341,7 +320,10 @@ impl CompileClientActorImpl {
         info!("CompileActor: on export: {}", path.display());
 
         let (tx, rx) = oneshot::channel();
-        let _ = self.export_tx.send(ExportRequest::Oneshot(Some(kind), tx));
+        let _ = self
+            .handle
+            .export_tx
+            .send(ExportRequest::Oneshot(Some(kind), tx));
         let res: Option<PathBuf> = utils::threaded_receive(rx)?;
 
         info!("CompileActor: on export end: {path:?} as {res:?}");
@@ -350,31 +332,24 @@ impl CompileClientActorImpl {
 
     pub fn on_save_export(&self, path: PathBuf) -> anyhow::Result<()> {
         info!("CompileActor: on save export: {}", path.display());
-        let _ = self.export_tx.send(ExportRequest::OnSaved);
+        let _ = self.handle.export_tx.send(ExportRequest::OnSaved);
 
         Ok(())
     }
 }
 
-impl CompileClientActorImpl {
-    pub fn run_analysis<T>(
-        &self,
-        w: &LspWorld,
-        f: impl FnOnce(&mut AnalysisContext<'_>) -> T,
-    ) -> anyhow::Result<T> {
-        let _ = w;
-        let _ = f;
-        todo!()
-    }
-
+impl CompileClientActor {
     pub fn settle(&mut self) {
         let _ = self.change_entry(None);
-        info!("TypstActor({}): settle requested", self.diag_group);
+        info!("TypstActor({}): settle requested", self.handle.diag_group);
         let (tx, rx) = oneshot::channel();
         let _ = self.intr_tx.send(Interrupt::Settle(tx));
         match utils::threaded_receive(rx) {
-            Ok(()) => info!("TypstActor({}): settled", self.diag_group),
-            Err(err) => error!("TypstActor({}): failed to settle: {err:#}", self.diag_group),
+            Ok(()) => info!("TypstActor({}): settled", self.handle.diag_group),
+            Err(err) => error!(
+                "TypstActor({}): failed to settle: {err:#}",
+                self.handle.diag_group
+            ),
         }
     }
 
@@ -391,20 +366,19 @@ impl CompileClientActorImpl {
             return Ok(false);
         }
 
-        let diag_group = &self.diag_group;
+        let diag_group = &self.handle.diag_group;
         info!("the entry file of TypstActor({diag_group}) is changing to {next_entry:?}");
 
         let next = next_entry.clone();
-        // todo: remove diags at typ_server.rs
-        // let next_is_inactive = next.is_inactive();
-
         self.change_task(TaskInputs {
             entry: Some(next.clone()),
             ..Default::default()
         });
-
-        let next = next_entry.clone();
-        let _ = self.export_tx.send(ExportRequest::ChangeExportPath(next));
+        // todo: let export request accept compiled artifact
+        let _ = self
+            .handle
+            .export_tx
+            .send(ExportRequest::ChangeExportPath(next));
 
         self.entry = next_entry;
 
@@ -416,7 +390,7 @@ impl CompileClientActorImpl {
         f: impl FnOnce(&mut AnalysisContext, Option<VersionedDocument>) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
         let snap = self.sync_snapshot()?;
-        self.run_analysis(&snap.world, |ctx| {
+        self.handle.run_analysis(&snap.world, |ctx| {
             f(
                 ctx,
                 snap.success_doc.map(|doc| VersionedDocument {
@@ -432,18 +406,15 @@ impl CompileClientActorImpl {
         f: impl FnOnce(&mut AnalysisContext) -> T + Send + Sync + 'static,
     ) -> anyhow::Result<T> {
         let snap = self.sync_snapshot()?;
-        self.run_analysis(&snap.world, f)
+        self.handle.run_analysis(&snap.world, f)
     }
 
     pub fn clear_cache(&self) {
-        // let _ = self.steal(|c| {
-        //     c.compiler.compiler.analysis.caches = Default::default();
-        // });
-        todo!()
+        self.handle.analysis.clear_cache();
     }
 
     pub fn collect_server_info(&self) -> anyhow::Result<HashMap<String, ServerInfoResponse>> {
-        let dg = self.diag_group.clone();
+        let dg = self.handle.diag_group.clone();
 
         let snap = self.sync_snapshot()?;
         let w = &snap.world;

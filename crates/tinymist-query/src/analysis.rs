@@ -403,8 +403,7 @@ mod signature_tests {
 
             let result = analyze_signature(
                 ctx,
-                source.clone(),
-                SignatureTarget::Syntax(callee_node.clone()),
+                SignatureTarget::Syntax(source.clone(), callee_node.clone()),
             );
 
             assert_snapshot!(SignatureSnapshot(result.as_ref()));

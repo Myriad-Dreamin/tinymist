@@ -69,15 +69,12 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
                     .collect::<Vec<_>>();
                 let mut w = w.snapshot();
                 let w = WrapWorld(&mut w);
-                let mut ctx = AnalysisContext::new(
-                    &w,
-                    Analysis {
-                        root,
-                        position_encoding: PositionEncoding::Utf16,
-                        enable_periscope: false,
-                        caches: Default::default(),
-                    },
-                );
+                let a = Analysis {
+                    position_encoding: PositionEncoding::Utf16,
+                    enable_periscope: false,
+                    caches: Default::default(),
+                };
+                let mut ctx = AnalysisContext::new(root, &w, &a);
                 ctx.test_completion_files(Vec::new);
                 ctx.test_files(|| paths);
                 f(&mut ctx, p);

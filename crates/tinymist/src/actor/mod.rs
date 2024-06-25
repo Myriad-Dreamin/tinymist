@@ -7,19 +7,19 @@ pub mod typ_client;
 pub mod typ_server;
 pub mod user_action;
 
-use std::path::Path;
+use std::sync::Arc;
 
 use tinymist_query::analysis::Analysis;
 use tinymist_query::ExportKind;
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{mpsc, watch};
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
-use typst_ts_core::{config::compiler::EntryState, exporter_builtins::GroupExporter};
+use typst_ts_core::config::compiler::EntryState;
 
 use self::{
     export::{ExportActor, ExportConfig},
     format::run_format_thread,
-    typ_client::{CompileClientActor, CompileDriver, CompileHandler},
+    typ_client::{CompileClientActor, CompileHandler},
     typ_server::CompileServerActor,
     user_action::run_user_action_thread,
 };
@@ -73,26 +73,32 @@ impl CompileState {
             .run(),
         );
 
-        // Create the server
-        let handler = CompileHandler {
+        log::info!(
+            "TypstActor: creating server for {editor_group}, entry: {entry:?}, inputs: {inputs:?}"
+        );
+
+        // Create the compile handler for client consuming results.
+        let position_encoding = self.const_config().position_encoding;
+        let enable_periscope = self.config.periscope_args.is_some();
+        let periscope_args = self.config.periscope_args.clone();
+        let handle = Arc::new(CompileHandler {
             #[cfg(feature = "preview")]
-            inner: std::sync::Arc::new(parking_lot::Mutex::new(None)),
+            inner: std::sync::Arc::new(None),
             diag_group: editor_group.clone(),
             doc_tx,
             export_tx: export_tx.clone(),
             editor_tx: self.editor_tx.clone(),
-        };
+            analysis: Analysis {
+                position_encoding,
+                enable_periscope,
+                caches: Default::default(),
+            },
+            periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
+        });
 
-        let position_encoding = self.const_config().position_encoding;
-        let enable_periscope = self.config.periscope_args.is_some();
-        let periscope_args = self.config.periscope_args.clone();
-        let diag_group = editor_group.clone();
         let font_resolver = self.config.determine_fonts();
         let entry_ = entry.clone();
-
-        log::info!(
-            "TypstActor: creating server for {diag_group}, entry: {entry:?}, inputs: {inputs:?}"
-        );
+        let handle_ = handle.clone();
 
         self.handle.spawn_blocking(move || {
             // Create the world
@@ -100,34 +106,14 @@ impl CompileState {
             let verse = LspWorldBuilder::build(entry_.clone(), font_resolver, inputs)
                 .expect("incorrect options");
 
-            // Create the compiler
-            // todo
-            // let driver = CompileDriver {
-            //     inner: std::marker::PhantomData,
-            //     handler,
-            //     analysis: Analysis {
-            //         position_encoding,
-            //         root: Path::new("").into(),
-            //         enable_periscope,
-            //         caches: Default::default(),
-            //     },
-            //     periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
-            // };
-
-            // todo
-            let exporter = GroupExporter::new(vec![]);
-
             // Create the actor
-            tokio::spawn(
-                CompileServerActor::new(exporter, verse, entry_, intr_tx, intr_rx)
-                    .with_watch(true)
-                    .spawn(),
-            );
+            let server = CompileServerActor::new(verse, intr_tx, intr_rx).with_watch(Some(handle_));
+            tokio::spawn(server.spawn());
         });
 
         // Create the client
         let config = self.config.clone();
-        let client = CompileClientActor::new(editor_group, config, entry, intr_tx_, export_tx);
+        let client = CompileClientActor::new(handle, config, entry, intr_tx_);
         // We do send memory changes instead of initializing compiler with them.
         // This is because there are state recorded inside of the compiler actor, and we
         // must update them.
