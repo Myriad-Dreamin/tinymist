@@ -2919,7 +2919,6 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.0-rc4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=e05469e4ad3cb27030d125d58a59b21b1a99b09f#e05469e4ad3cb27030d125d58a59b21b1a99b09f"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -2944,7 +2943,6 @@ dependencies = [
 [[package]]
 name = "reflexo-vfs"
 version = "0.5.0-rc4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=e05469e4ad3cb27030d125d58a59b21b1a99b09f#e05469e4ad3cb27030d125d58a59b21b1a99b09f"
 dependencies = [
  "append-only-vec",
  "indexmap 2.2.6",
@@ -2961,7 +2959,6 @@ dependencies = [
 [[package]]
 name = "reflexo-world"
 version = "0.5.0-rc4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=e05469e4ad3cb27030d125d58a59b21b1a99b09f#e05469e4ad3cb27030d125d58a59b21b1a99b09f"
 dependencies = [
  "append-only-vec",
  "chrono",
@@ -3962,6 +3959,7 @@ dependencies = [
  "paste",
  "pin-project-lite",
  "rayon",
+ "reflexo",
  "serde",
  "serde_json",
  "tinymist-assets 0.11.11 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4026,6 +4024,7 @@ dependencies = [
  "regex",
  "rust_iso3166",
  "rust_iso639",
+ "rustc-hash",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -4528,7 +4527,6 @@ dependencies = [
 [[package]]
 name = "typst-ts-compiler"
 version = "0.5.0-rc4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=e05469e4ad3cb27030d125d58a59b21b1a99b09f#e05469e4ad3cb27030d125d58a59b21b1a99b09f"
 dependencies = [
  "base64 0.22.1",
  "codespan-reporting",
@@ -4559,7 +4557,6 @@ dependencies = [
 [[package]]
 name = "typst-ts-core"
 version = "0.5.0-rc4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=e05469e4ad3cb27030d125d58a59b21b1a99b09f#e05469e4ad3cb27030d125d58a59b21b1a99b09f"
 dependencies = [
  "base64 0.22.1",
  "base64-serde",
@@ -4597,7 +4594,6 @@ dependencies = [
 [[package]]
 name = "typst-ts-svg-exporter"
 version = "0.5.0-rc4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=e05469e4ad3cb27030d125d58a59b21b1a99b09f#e05469e4ad3cb27030d125d58a59b21b1a99b09f"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",

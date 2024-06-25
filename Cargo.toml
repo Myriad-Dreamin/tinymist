@@ -147,15 +147,15 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "
 # typst-render = { path = "../typst/crates/typst-render" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
-reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
-typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
-typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
+# typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
+# reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
+# typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
+# typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "e05469e4ad3cb27030d125d58a59b21b1a99b09f" }
 
-# typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
-# reflexo = { path = "../typst.ts/crates/reflexo/" }
-# reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
-# typst-ts-core = { path = "../typst.ts/core" }
-# typst-ts-compiler = { path = "../typst.ts/compiler" }
+typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
+reflexo = { path = "../typst.ts/crates/reflexo/" }
+reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
+typst-ts-core = { path = "../typst.ts/core" }
+typst-ts-compiler = { path = "../typst.ts/compiler" }
 # typstyle = { path = "../typstyle" }
