@@ -88,7 +88,6 @@ impl CompileState {
             doc_tx,
             export_tx: export_tx.clone(),
             editor_tx: self.editor_tx.clone(),
-            lsp_tx: self.lsp_tx.clone(),
             analysis: Analysis {
                 position_encoding,
                 enable_periscope,

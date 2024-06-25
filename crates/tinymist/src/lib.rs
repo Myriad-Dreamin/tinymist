@@ -56,7 +56,6 @@ use lsp_server::ResponseError;
 type LspResult<Res> = Result<Res, ResponseError>;
 
 type ScheduledResult = LspResult<Option<()>>;
-type ScheduledQueryResult = anyhow::Result<Option<()>>;
 type ResponseFuture<T> = Pin<Box<dyn std::future::Future<Output = T> + Send>>;
 type LspResponseFuture<T> = LspResult<ResponseFuture<T>>;
 type QueryFuture = anyhow::Result<ResponseFuture<anyhow::Result<CompilerQueryResponse>>>;

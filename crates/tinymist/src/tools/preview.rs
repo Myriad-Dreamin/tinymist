@@ -97,7 +97,7 @@ impl SourceFileServer for CompileClientActor {
         &mut self,
         loc: Location,
     ) -> Result<Option<SourceSpanOffset>, Error> {
-        let snap = self.snapshot().await?;
+        let snap = self.snapshot().snapshot().await?;
         Ok(Self::resolve_source_span(&snap.world, loc))
     }
 
@@ -107,7 +107,7 @@ impl SourceFileServer for CompileClientActor {
         &mut self,
         loc: Location,
     ) -> Result<Option<Position>, Error> {
-        let snap = self.snapshot().await?;
+        let snap = self.snapshot().snapshot().await?;
         Ok(Self::resolve_document_position(&snap, loc))
     }
 
@@ -116,7 +116,7 @@ impl SourceFileServer for CompileClientActor {
         span: Span,
         offset: Option<usize>,
     ) -> Result<Option<DocToSrcJumpInfo>, Error> {
-        let snap = self.snapshot().await?;
+        let snap = self.snapshot().snapshot().await?;
         Ok(Self::resolve_source_location(&snap.world, span, offset))
     }
 }

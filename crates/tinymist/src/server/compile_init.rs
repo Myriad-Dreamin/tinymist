@@ -411,7 +411,7 @@ impl LspDriver for CompileInit {
         compile_config.update(&params.config).unwrap();
 
         let mut service = CompileState::new(
-            client.clone(),
+            client,
             compile_config,
             ConstCompileConfig {
                 position_encoding: params
@@ -424,7 +424,6 @@ impl LspDriver for CompileInit {
             },
             self.editor_tx,
             self.handle,
-            client.to_untyped(),
         );
 
         service.restart_server("primary");

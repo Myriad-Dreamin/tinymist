@@ -16,7 +16,7 @@ use typst_ts_core::config::compiler::DETACHED_ENTRY;
 use crate::{
     actor::{editor::EditorRequest, export::ExportConfig, typ_client::CompileClientActor},
     compile_init::{CompileConfig, ConstCompileConfig},
-    harness::{AnyLspHost, InitializedLspDriver},
+    harness::InitializedLspDriver,
     invalid_params, result_to_response,
     state::MemoryFileMeta,
     LspHost, LspResult,
@@ -57,7 +57,6 @@ pub struct CompileState {
     pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
     /// The compiler actor.
     pub compiler: Option<CompileClientActor>,
-    pub lsp_tx: AnyLspHost,
 }
 
 impl CompileState {
@@ -67,12 +66,10 @@ impl CompileState {
         const_config: ConstCompileConfig,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
         handle: tokio::runtime::Handle,
-        lsp_tx: AnyLspHost,
     ) -> Self {
         CompileState {
             client,
             editor_tx,
-            lsp_tx,
             shutdown_requested: false,
             config: compile_config,
             const_config,

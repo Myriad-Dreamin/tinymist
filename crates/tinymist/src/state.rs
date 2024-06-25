@@ -1,5 +1,6 @@
 //! Bootstrap actors for Tinymist.
 
+use std::future::ready;
 use std::path::PathBuf;
 
 use anyhow::anyhow;
@@ -7,7 +8,7 @@ use lsp_server::RequestId;
 use lsp_types::TextDocumentContentChangeEvent;
 use tinymist_query::{
     lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, OnExportRequest,
-    OnSaveExportRequest, PositionEncoding, SyntaxRequest, VersionedDocument,
+    OnSaveExportRequest, PositionEncoding, SyntaxRequest,
 };
 use typst::{diag::FileResult, syntax::Source};
 use typst_ts_compiler::{
@@ -17,14 +18,8 @@ use typst_ts_compiler::{
 use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
 use crate::{
-    actor::{
-        typ_client::{CompileClientActor, CompileHandler},
-        typ_server::CompileSnapshot,
-    },
-    compile::CompileState,
-    internal_error, result_to_response,
-    world::LspCompilerFeat,
-    LanguageState, QueryFuture, ScheduledQueryResult, ScheduledResult,
+    actor::typ_client::CompileClientActor, compile::CompileState, internal_error, just_result,
+    LanguageState, QueryFuture, ScheduledResult,
 };
 
 impl CompileState {
@@ -227,9 +222,8 @@ macro_rules! run_query_tail {
     ($self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
         use tinymist_query::*;
         let req = paste::paste! { [<$query Request>] { $($arg_key),* } };
-        $self.query_tail(None, CompilerQueryRequest::$query(req.clone()))
-            .map_err(|err| internal_error(err.to_string()))
-        // $self.handle.spawn(query_fut.map_err(|e| internal_error(e.to_string()))?)
+        let query_fut = $self.query(CompilerQueryRequest::$query(req.clone()));
+        $self.handle.spawn(query_fut.map_err(|e| internal_error(e.to_string()))?)
     }};
 }
 
@@ -238,9 +232,8 @@ macro_rules! run_query {
     ($req_id: ident, $self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
         use tinymist_query::*;
         let req = paste::paste! { [<$query Request>] { $($arg_key),* } };
-        $self.query_tail(Some($req_id), CompilerQueryRequest::$query(req.clone()))
-            .map_err(|err| internal_error(err.to_string()))
-        // $self.schedule_query($req_id, query_fut)
+        let query_fut = $self.query(CompilerQueryRequest::$query(req.clone()));
+        $self.schedule_query($req_id, query_fut)
     }};
 }
 // query_result
@@ -278,15 +271,33 @@ macro_rules! query_tokens_cache {
     }};
 }
 
+macro_rules! query_state {
+    ($self:ident, $method:ident, $req:expr) => {{
+        let snap = $self.snapshot();
+        Ok(Box::pin(async move {
+            snap.stateful($req)
+                .await
+                .map(CompilerQueryResponse::$method)
+        }))
+    }};
+}
+
+macro_rules! query_world {
+    ($self:ident, $method:ident, $req:expr) => {{
+        let snap = $self.snapshot();
+        Ok(Box::pin(async move {
+            snap.semantic($req)
+                .await
+                .map(CompilerQueryResponse::$method)
+        }))
+    }};
+}
+
 impl LanguageState {
-    pub fn query_tail(
-        &mut self,
-        req_id: Option<RequestId>,
-        query: CompilerQueryRequest,
-    ) -> ScheduledQueryResult {
+    pub fn query(&mut self, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
 
-        let resp = match query {
+        let query = match query {
             InteractCodeContext(req) => query_source!(self, InteractCodeContext, req)?,
             SemanticTokensFull(req) => query_tokens_cache!(self, SemanticTokensFull, req)?,
             SemanticTokensDelta(req) => query_tokens_cache!(self, SemanticTokensDelta, req)?,
@@ -305,65 +316,53 @@ impl LanguageState {
                     }
                 }
 
-                return Self::query_on(client.compiler(), req_id, query);
+                return Self::query_on(client.compiler(), query);
             }
         };
 
-        let resp = resp.to_untyped();
-        if let Some(req_id) = req_id {
-            self.client.respond(result_to_response(
-                req_id,
-                resp.map_err(|err| internal_error(err.to_string())),
-            ));
-        } else {
-            resp?;
-        }
-        Ok(Some(()))
+        just_result!(query)
     }
 
-    fn query_on(
-        client: &CompileClientActor,
-        req_id: Option<RequestId>,
-        query: CompilerQueryRequest,
-    ) -> ScheduledQueryResult {
+    fn query_on(client: &CompileClientActor, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
-        let resp = match query {
-            OnExport(OnExportRequest { kind, path }) => {
-                CompilerQueryResponse::OnExport(client.on_export(kind, path)?)
-            }
+        match query {
+            OnExport(OnExportRequest { kind, path }) => just_result!(
+                CompilerQueryResponse::OnExport(client.on_export(kind, path)?,)
+            ),
             OnSaveExport(OnSaveExportRequest { path }) => {
                 client.on_save_export(path)?;
-                CompilerQueryResponse::OnSaveExport(())
+                just_result!(CompilerQueryResponse::OnSaveExport(()))
             }
+            Hover(req) => query_state!(client, Hover, req),
+            GotoDefinition(req) => query_state!(client, GotoDefinition, req),
+            GotoDeclaration(req) => query_world!(client, GotoDeclaration, req),
+            References(req) => query_world!(client, References, req),
+            InlayHint(req) => query_world!(client, InlayHint, req),
+            DocumentHighlight(req) => query_world!(client, DocumentHighlight, req),
+            DocumentColor(req) => query_world!(client, DocumentColor, req),
+            CodeAction(req) => query_world!(client, CodeAction, req),
+            CodeLens(req) => query_world!(client, CodeLens, req),
+            Completion(req) => query_state!(client, Completion, req),
+            SignatureHelp(req) => query_world!(client, SignatureHelp, req),
+            Rename(req) => query_state!(client, Rename, req),
+            PrepareRename(req) => query_state!(client, PrepareRename, req),
+            Symbol(req) => query_world!(client, Symbol, req),
+            DocumentMetrics(req) => query_state!(client, DocumentMetrics, req),
             ServerInfo(_) => {
                 let res = client.collect_server_info()?;
-                CompilerQueryResponse::ServerInfo(Some(res))
+                just_result!(CompilerQueryResponse::ServerInfo(Some(res)))
             }
-            req => return client.lsp_request(req_id, req),
-        };
-
-        if let Some(req_id) = req_id {
-            let resp = resp.to_untyped()?;
-            client
-                .handle
-                .lsp_tx
-                .respond(result_to_response(req_id, Ok(resp)));
+            _ => unreachable!(),
         }
-
-        Ok(Some(()))
     }
 }
 
 impl CompileState {
-    pub fn query_tail(
-        &mut self,
-        req_id: Option<RequestId>,
-        query: CompilerQueryRequest,
-    ) -> ScheduledQueryResult {
+    pub fn query(&self, query: CompilerQueryRequest) -> QueryFuture {
         let client = self.compiler.as_ref().unwrap();
-        LanguageState::query_on(client, req_id, query)
+        LanguageState::query_on(client, query)
     }
 
     pub fn schedule_query(&mut self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
@@ -376,101 +375,5 @@ impl CompileState {
                     .map_err(|err| internal_error(err.to_string()))
             })),
         )
-    }
-}
-
-impl CompileHandler {
-    pub fn serve_lsp_tail_impl(
-        &self,
-        snap: CompileSnapshot<LspCompilerFeat>,
-        query: CompilerQueryRequest,
-        req_id: Option<RequestId>,
-    ) {
-        use CompilerQueryRequest::*;
-        assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
-        // let snap = self.snapshot().await?;
-        // let w = &snap.world;
-
-        // self.handle.run_analysis(w, |ctx| {
-        //     req.request(
-        //         ctx,
-        //         snap.success_doc.map(|doc| VersionedDocument {
-        //             version: w.revision().get(),
-        //             document: doc,
-        //         }),
-        //     )
-        // })
-
-        macro_rules! query_state {
-            ($self:ident, $snap:ident, $method:ident, $req:expr) => {{
-                $self
-                    .stateful($snap, $req)
-                    .map(|res| CompilerQueryResponse::$method(res))
-            }};
-        }
-
-        macro_rules! query_world {
-            ($self:ident, $snap:ident, $method:ident, $req:expr) => {{
-                $self
-                    .semantic($snap, $req)
-                    .map(|res| CompilerQueryResponse::$method(res))
-            }};
-        }
-
-        let resp = match query {
-            Hover(req) => query_state!(self, snap, Hover, req),
-            GotoDefinition(req) => query_state!(self, snap, GotoDefinition, req),
-            GotoDeclaration(req) => query_world!(self, snap, GotoDeclaration, req),
-            References(req) => query_world!(self, snap, References, req),
-            InlayHint(req) => query_world!(self, snap, InlayHint, req),
-            DocumentHighlight(req) => query_world!(self, snap, DocumentHighlight, req),
-            DocumentColor(req) => query_world!(self, snap, DocumentColor, req),
-            CodeAction(req) => query_world!(self, snap, CodeAction, req),
-            CodeLens(req) => query_world!(self, snap, CodeLens, req),
-            Completion(req) => query_state!(self, snap, Completion, req),
-            SignatureHelp(req) => query_world!(self, snap, SignatureHelp, req),
-            Rename(req) => query_state!(self, snap, Rename, req),
-            PrepareRename(req) => query_state!(self, snap, PrepareRename, req),
-            Symbol(req) => query_world!(self, snap, Symbol, req),
-            DocumentMetrics(req) => query_state!(self, snap, DocumentMetrics, req),
-            _ => unreachable!(),
-        };
-
-        if let Some(req_id) = req_id {
-            let resp = resp
-                .and_then(|res| Ok(res.to_untyped()?))
-                .map_err(|err| internal_error(err.to_string()));
-            self.lsp_tx.respond(result_to_response(req_id, resp));
-        } else if let Err(err) = resp {
-            log::error!("error getting: {err}");
-        }
-    }
-
-    fn stateful<T: tinymist_query::StatefulRequest>(
-        &self,
-        snap: CompileSnapshot<LspCompilerFeat>,
-        req: T,
-    ) -> anyhow::Result<Option<T::Response>> {
-        let w = &snap.world;
-
-        self.run_analysis(w, |ctx| {
-            req.request(
-                ctx,
-                snap.success_doc.map(|doc| VersionedDocument {
-                    version: w.revision().get(),
-                    document: doc,
-                }),
-            )
-        })
-    }
-
-    fn semantic<T: tinymist_query::SemanticRequest>(
-        &self,
-        snap: CompileSnapshot<LspCompilerFeat>,
-        req: T,
-    ) -> anyhow::Result<Option<T::Response>> {
-        let w = &snap.world;
-
-        self.run_analysis(w, |ctx| req.request(ctx))
     }
 }

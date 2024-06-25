@@ -10,8 +10,6 @@ use std::{
     thread::JoinHandle,
 };
 
-use lsp_server::RequestId;
-use tinymist_query::CompilerQueryRequest;
 use tokio::sync::{mpsc, oneshot};
 
 use typst::{diag::SourceResult, util::Deferred};
@@ -100,12 +98,6 @@ pub struct CompiledArtifact<F: CompilerFeat> {
 pub trait CompilationHandle<F: CompilerFeat>: Send + Sync + 'static {
     fn status(&self, rep: CompileReport);
     fn notify_compile(&self, res: &CompiledArtifact<F>, rep: CompileReport);
-    fn serve_lsp_tail(
-        &self,
-        snap: CompileSnapshot<F>,
-        query: CompilerQueryRequest,
-        req_id: Option<RequestId>,
-    );
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static> CompilationHandle<F>
@@ -113,8 +105,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompilationHandle<F>
 {
     fn status(&self, _: CompileReport) {}
     fn notify_compile(&self, _: &CompiledArtifact<F>, _: CompileReport) {}
-    fn serve_lsp_tail(&self, _: CompileSnapshot<F>, _: CompilerQueryRequest, _: Option<RequestId>) {
-    }
 }
 
 pub enum Interrupt<F: CompilerFeat> {
@@ -128,8 +118,6 @@ pub enum Interrupt<F: CompilerFeat> {
     Memory(MemoryEvent),
     /// File system event.
     Fs(FilesystemEvent),
-    /// Request compiler to serve a lsp query.
-    Lsp(Option<RequestId>, CompilerQueryRequest),
     /// Request compiler to stop.
     Settle(oneshot::Sender<()>),
 }
@@ -461,12 +449,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         use CompilerResponse::*;
 
         match event {
-            Interrupt::Lsp(req_id, query) => {
-                let snap = self.watch_snap.get_or_init(|| self.snapshot(false)).clone();
-                let h = self.watch_handle.clone();
-                rayon::spawn(move || h.serve_lsp_tail(snap, query, req_id));
-                false
-            }
             Interrupt::Snapshot(task) => {
                 log::debug!("CompileServerActor: take snapshot");
                 let _ = task.send(self.watch_snap.get_or_init(|| self.snapshot(false)).clone());

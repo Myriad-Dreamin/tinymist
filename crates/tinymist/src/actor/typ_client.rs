@@ -34,10 +34,9 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use log::{error, info, trace};
-use lsp_server::RequestId;
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnalysisResources},
-    CompilerQueryRequest, DiagnosticsMap, ExportKind, ServerInfoResponse, VersionedDocument,
+    DiagnosticsMap, ExportKind, ServerInfoResponse, VersionedDocument,
 };
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{mpsc, oneshot, watch};
@@ -62,11 +61,9 @@ use super::{
 use crate::{
     actor::export::ExportRequest,
     compile_init::CompileConfig,
-    harness::AnyLspHost,
     tools::preview::CompileStatus,
     utils::{self, threaded_receive},
     world::{LspCompilerFeat, LspWorld},
-    ScheduledQueryResult,
 };
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
@@ -84,7 +81,6 @@ pub struct CompileHandler {
     pub(crate) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
     pub(crate) export_tx: mpsc::UnboundedSender<ExportRequest>,
     pub(crate) editor_tx: EditorSender,
-    pub(crate) lsp_tx: AnyLspHost,
 }
 
 impl PreviewCompilationHandle for CompileHandler {
@@ -157,15 +153,6 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
         );
 
         <Self as PreviewCompilationHandle>::notify_compile(self, res);
-    }
-
-    fn serve_lsp_tail(
-        &self,
-        snap: CompileSnapshot<LspCompilerFeat>,
-        query: CompilerQueryRequest,
-        req_id: Option<RequestId>,
-    ) {
-        self.serve_lsp_tail_impl(snap, query, req_id);
     }
 }
 
@@ -289,25 +276,11 @@ impl CompileClientActor {
     }
 
     /// Snapshot the compiler thread for tasks
-    pub async fn snapshot(&self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
-        let (tx, rx) = oneshot::channel();
-
-        self.intr_tx
-            .send(Interrupt::Snapshot(tx))
-            .map_err(map_string_err("failed to send snapshot request"))?;
-        rx.await.map_err(map_string_err("failed to get snapshot"))
-    }
-
-    /// Schedule a lsp request
-    pub fn lsp_request(
-        &self,
-        req_id: Option<RequestId>,
-        req: tinymist_query::CompilerQueryRequest,
-    ) -> ScheduledQueryResult {
-        self.intr_tx
-            .send(Interrupt::Lsp(req_id, req))
-            .map_err(|_| anyhow!("failed to send lsp request to compiler"))?;
-        Ok(Some(()))
+    pub fn snapshot(&self) -> QuerySnap {
+        QuerySnap {
+            intr_tx: self.intr_tx.clone(),
+            handle: self.handle.clone(),
+        }
     }
 
     /// Snapshot the compiler thread for tasks
@@ -433,5 +406,50 @@ impl CompileClientActor {
         };
 
         Ok(HashMap::from_iter([(dg, info)]))
+    }
+}
+
+pub struct QuerySnap {
+    intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
+    handle: Arc<CompileHandler>,
+}
+
+impl QuerySnap {
+    /// Snapshot the compiler thread for tasks
+    pub async fn snapshot(&self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
+        let (tx, rx) = oneshot::channel();
+
+        self.intr_tx
+            .send(Interrupt::Snapshot(tx))
+            .map_err(map_string_err("failed to send snapshot request"))?;
+        rx.await.map_err(map_string_err("failed to get snapshot"))
+    }
+
+    pub async fn stateful<T: tinymist_query::StatefulRequest>(
+        &self,
+        req: T,
+    ) -> anyhow::Result<Option<T::Response>> {
+        let snap = self.snapshot().await?;
+        let w = &snap.world;
+
+        self.handle.run_analysis(w, |ctx| {
+            req.request(
+                ctx,
+                snap.success_doc.map(|doc| VersionedDocument {
+                    version: w.revision().get(),
+                    document: doc,
+                }),
+            )
+        })
+    }
+
+    pub async fn semantic<T: tinymist_query::SemanticRequest>(
+        &self,
+        req: T,
+    ) -> anyhow::Result<Option<T::Response>> {
+        let snap = self.snapshot().await?;
+        let w = &snap.world;
+
+        self.handle.run_analysis(w, |ctx| req.request(ctx))
     }
 }

@@ -12,7 +12,6 @@ use typst_ts_core::Error;
 use crate::actor::typ_client::{CompileClientActor, CompileHandler};
 use crate::actor::typ_server::CompileServerActor;
 use crate::compile_init::CompileConfig;
-use crate::harness::AnyLspHost;
 use crate::world::LspCompilerFeat;
 use crate::LspUniverse;
 
@@ -43,7 +42,6 @@ impl CompileServer {
                 caches: Default::default(),
             },
             periscope: tinymist_render::PeriscopeRenderer::default(),
-            lsp_tx: AnyLspHost::default(),
         });
 
         // Consume export_tx and editor_rx

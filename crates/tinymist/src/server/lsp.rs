@@ -115,7 +115,7 @@ impl LanguageState {
             const_config.tokens_multiline_token_support,
         );
         Self {
-            client: client.clone(),
+            client,
             primary: CompileState::new(
                 LspHost::new(Arc::new(RwLock::new(None))),
                 Default::default(),
@@ -124,7 +124,6 @@ impl LanguageState {
                 },
                 editor_tx,
                 handle.clone(),
-                client.to_untyped(),
             ),
             handle,
             dedicates: Vec::new(),
@@ -518,7 +517,7 @@ impl LanguageState {
     fn did_save(&mut self, params: DidSaveTextDocumentParams) -> LspResult<()> {
         let path = as_path(params.text_document);
 
-        run_query_tail!(self.OnSaveExport(path))?;
+        run_query_tail!(self.OnSaveExport(path));
         Ok(())
     }
 
