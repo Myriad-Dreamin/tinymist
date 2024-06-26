@@ -1,0 +1,21 @@
+>#let xxx = n => $#n$
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^^^ source.typst meta.expr.let.typst variable.other.readwrite.typst
+#        ^ source.typst meta.expr.let.typst
+#         ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#           ^ source.typst meta.expr.let.typst variable.parameter.typst
+#            ^ source.typst meta.expr.let.typst
+#             ^^ source.typst meta.expr.let.typst storage.type.function.arrow.typst
+#               ^ source.typst meta.expr.let.typst
+#                ^ source.typst meta.expr.let.typst markup.math.typst punctuation.definition.string.math.typst
+#                 ^ source.typst meta.expr.let.typst markup.math.typst variable.other.readwrite.hash.typst
+#                  ^ source.typst meta.expr.let.typst markup.math.typst variable.other.readwrite.typst
+#                   ^ source.typst meta.expr.let.typst markup.math.typst punctuation.definition.string.math.typst
+>#xxx(1)
+#^ source.typst entity.name.function.hash.typst
+# ^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#    ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#     ^ source.typst meta.expr.call.typst constant.numeric.integer.typst
+#      ^ source.typst meta.expr.call.typst meta.brace.round.typst
