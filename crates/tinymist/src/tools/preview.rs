@@ -10,42 +10,95 @@ use typst_preview::{
     SourceFileServer,
 };
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
-use typst_ts_compiler::{service::Compiler, EntryReader};
+use typst_ts_compiler::EntryReader;
 use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_core::{Error, TypstDocument, TypstFileId};
 
-use crate::actor::typ_client::CompileClientActorImpl;
-use crate::world::LspWorld;
+use crate::actor::typ_client::CompileClientActor;
+use crate::actor::typ_server::CompileSnapshot;
+use crate::world::{LspCompilerFeat, LspWorld};
 
-impl<C: Compiler<W = LspWorld> + Send> SourceFileServer for CompileClientActorImpl<C> {
+impl CompileClientActor {
+    /// fixme: character is 0-based, UTF-16 code unit.
+    /// We treat it as UTF-8 now.
+    fn resolve_source_span(world: &LspWorld, loc: Location) -> Option<SourceSpanOffset> {
+        let Location::Src(loc) = loc;
+
+        let filepath = Path::new(&loc.filepath);
+        let relative_path = filepath.strip_prefix(&world.workspace_root()?).ok()?;
+
+        let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
+        let source = world.source(source_id).ok()?;
+        let cursor = source.line_column_to_byte(loc.pos.line, loc.pos.column)?;
+
+        let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
+        if node.kind() != SyntaxKind::Text {
+            return None;
+        }
+        let span = node.span();
+        // todo: unicode char
+        let offset = cursor.saturating_sub(node.offset());
+
+        Some(SourceSpanOffset { span, offset })
+    }
+
+    // resolve_document_position
+    fn resolve_document_position(
+        snap: &CompileSnapshot<LspCompilerFeat>,
+        loc: Location,
+    ) -> Option<Position> {
+        let Location::Src(src_loc) = loc;
+
+        let path = Path::new(&src_loc.filepath).to_owned();
+        let line = src_loc.pos.line;
+        let column = src_loc.pos.column;
+
+        let doc = snap.doc().ok();
+        let doc = doc.as_deref()?;
+        let world = &snap.world;
+
+        let relative_path = path.strip_prefix(&world.workspace_root()?).ok()?;
+
+        let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
+        let source = world.source(source_id).ok()?;
+        let cursor = source.line_column_to_byte(line, column)?;
+
+        jump_from_cursor(doc, &source, cursor)
+    }
+
+    fn resolve_source_location(
+        world: &LspWorld,
+        span: Span,
+        offset: Option<usize>,
+    ) -> Option<DocToSrcJumpInfo> {
+        let resolve_off =
+            |src: &Source, off: usize| src.byte_to_line(off).zip(src.byte_to_column(off));
+
+        let source = world.source(span.id()?).ok()?;
+        let mut range = source.find(span)?.range();
+        if let Some(off) = offset {
+            if off < range.len() {
+                range.start += off;
+            }
+        }
+        let filepath = world.path_for_id(span.id()?).ok()?;
+        Some(DocToSrcJumpInfo {
+            filepath: filepath.to_string_lossy().to_string(),
+            start: resolve_off(&source, range.start),
+            end: resolve_off(&source, range.end),
+        })
+    }
+}
+
+impl SourceFileServer for CompileClientActor {
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
     async fn resolve_source_span(
         &mut self,
         loc: Location,
     ) -> Result<Option<SourceSpanOffset>, Error> {
-        let Location::Src(loc) = loc;
-        self.steal_async(move |this| {
-            let world = this.verse.spawn();
-
-            let filepath = Path::new(&loc.filepath);
-            let relative_path = filepath.strip_prefix(&world.workspace_root()?).ok()?;
-
-            let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
-            let source = world.source(source_id).ok()?;
-            let cursor = source.line_column_to_byte(loc.pos.line, loc.pos.column)?;
-
-            let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
-            if node.kind() != SyntaxKind::Text {
-                return None;
-            }
-            let span = node.span();
-            // todo: unicode char
-            let offset = cursor.saturating_sub(node.offset());
-
-            Some(SourceSpanOffset { span, offset })
-        })
-        .await
+        let snap = self.snapshot()?.snapshot().await?;
+        Ok(Self::resolve_source_span(&snap.world, loc))
     }
 
     /// fixme: character is 0-based, UTF-16 code unit.
@@ -54,26 +107,8 @@ impl<C: Compiler<W = LspWorld> + Send> SourceFileServer for CompileClientActorIm
         &mut self,
         loc: Location,
     ) -> Result<Option<Position>, Error> {
-        let Location::Src(src_loc) = loc;
-
-        let path = Path::new(&src_loc.filepath).to_owned();
-        let line = src_loc.pos.line;
-        let column = src_loc.pos.column;
-
-        self.steal_async(move |this| {
-            let doc = this.latest_doc.as_deref()?;
-
-            let world = this.verse.spawn();
-
-            let relative_path = path.strip_prefix(&world.workspace_root()?).ok()?;
-
-            let source_id = TypstFileId::new(None, VirtualPath::new(relative_path));
-            let source = world.source(source_id).ok()?;
-            let cursor = source.line_column_to_byte(line, column)?;
-
-            jump_from_cursor(doc, &source, cursor)
-        })
-        .await
+        let snap = self.snapshot()?.snapshot().await?;
+        Ok(Self::resolve_document_position(&snap, loc))
     }
 
     async fn resolve_source_location(
@@ -81,35 +116,8 @@ impl<C: Compiler<W = LspWorld> + Send> SourceFileServer for CompileClientActorIm
         span: Span,
         offset: Option<usize>,
     ) -> Result<Option<DocToSrcJumpInfo>, Error> {
-        let resolve_off =
-            |src: &Source, off: usize| src.byte_to_line(off).zip(src.byte_to_column(off));
-
-        let ret = self
-            .steal_async(move |this| {
-                let world = this.verse.spawn();
-                let src_id = span.id()?;
-                let source = world.source(src_id).ok()?;
-                let mut range = source.find(span)?.range();
-                if let Some(off) = offset {
-                    if off < range.len() {
-                        range.start += off;
-                    }
-                }
-                let filepath = world.path_for_id(src_id).ok()?;
-                Some(DocToSrcJumpInfo {
-                    filepath: filepath.to_string_lossy().to_string(),
-                    start: resolve_off(&source, range.start),
-                    end: resolve_off(&source, range.end),
-                })
-            })
-            .await
-            .map_err(|err| {
-                log::error!("TypstActor: failed to resolve span and offset: {:#}", err);
-            })
-            .ok()
-            .flatten();
-
-        Ok(ret)
+        let snap = self.snapshot()?.snapshot().await?;
+        Ok(Self::resolve_source_location(&snap.world, span, offset))
     }
 }
 
@@ -178,7 +186,7 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
     None
 }
 
-impl<C: Compiler<W = LspWorld> + Send> EditorServer for CompileClientActorImpl<C> {
+impl EditorServer for CompileClientActor {
     async fn update_memory_files(
         &mut self,
         files: MemoryFiles,
@@ -215,4 +223,4 @@ impl<C: Compiler<W = LspWorld> + Send> EditorServer for CompileClientActorImpl<C
     }
 }
 
-impl<C: Compiler<W = LspWorld> + Send> CompileHost for CompileClientActorImpl<C> {}
+impl CompileHost for CompileClientActor {}

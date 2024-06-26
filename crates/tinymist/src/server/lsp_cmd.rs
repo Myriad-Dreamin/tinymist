@@ -2,9 +2,8 @@
 
 use std::ops::Deref;
 use std::path::Path;
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
-use anyhow::{bail, Context};
 use log::{error, info};
 use lsp_server::RequestId;
 use lsp_types::*;
@@ -13,8 +12,8 @@ use serde_json::Value as JsonValue;
 use tinymist_query::ExportKind;
 use typst::diag::StrResult;
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
+use typst_ts_core::error::prelude::*;
 use typst_ts_core::path::PathClean;
-use typst_ts_core::{error::prelude::*, ImmutPath};
 
 use crate::actor::user_action::{TraceParams, UserActionRequest};
 use crate::tools::package::InitTask;
@@ -23,93 +22,59 @@ use crate::{run_query, LspResult};
 use super::lsp::*;
 use super::*;
 
-macro_rules! exec_fn_ {
-    ($key: expr, Self::$method: ident) => {
-        ($key, {
-            const E: LspRawHandler<Vec<JsonValue>> = |this, req_id, req| this.$method(req_id, req);
-            E
-        })
-    };
-}
-
-macro_rules! exec_fn {
-    ($key: expr, Self::$method: ident) => {
-        ($key, {
-            const E: LspRawHandler<Vec<JsonValue>> = |this, req_id, args| {
-                let res = this.$method(args);
-                this.client.respond(result_to_response(req_id, res));
-                Ok(Some(()))
-            };
-            E
-        })
-    };
-}
-
-macro_rules! resource_fn {
-    ($ty: ty, Self::$method: ident, $($arg_key:ident),+ $(,)?) => {{
-        const E: $ty = |this, $($arg_key),+| this.$method($($arg_key),+);
-        E
-    }};
-}
-
-type LspHandler<Req, Res> = fn(srv: &mut LanguageState, args: Req) -> LspResult<Res>;
-
-/// Returns Ok(Some()) -> Already responded
-/// Returns Ok(None) -> Need to respond none
-/// Returns Err(..) -> Need to respond error
-type LspRawHandler<T> =
-    fn(srv: &mut LanguageState, req_id: RequestId, args: T) -> LspResult<Option<()>>;
-
-type ExecuteCmdMap = HashMap<&'static str, LspRawHandler<Vec<JsonValue>>>;
-type ResourceMap = HashMap<ImmutPath, LspHandler<Vec<JsonValue>, JsonValue>>;
-
 /// Here are implemented the handlers for each command.
 impl LanguageState {
-    pub fn get_exec_commands() -> ExecuteCmdMap {
+    pub fn get_exec_commands() -> ExecuteCmdMap<Self> {
+        type State = LanguageState;
         ExecuteCmdMap::from_iter([
-            exec_fn!("tinymist.exportPdf", Self::export_pdf),
-            exec_fn!("tinymist.exportSvg", Self::export_svg),
-            exec_fn!("tinymist.exportPng", Self::export_png),
-            exec_fn!("tinymist.doClearCache", Self::clear_cache),
-            exec_fn!("tinymist.pinMain", Self::pin_document),
-            exec_fn!("tinymist.focusMain", Self::focus_document),
-            exec_fn!("tinymist.doInitTemplate", Self::init_template),
-            exec_fn!("tinymist.doGetTemplateEntry", Self::do_get_template_entry),
-            exec_fn!("tinymist.interactCodeContext", Self::interact_code_context),
-            exec_fn_!("tinymist.getDocumentTrace", Self::get_document_trace),
-            exec_fn!("tinymist.getDocumentMetrics", Self::get_document_metrics),
-            exec_fn!("tinymist.getServerInfo", Self::get_server_info),
+            exec_fn_!("tinymist.exportPdf", State::export_pdf),
+            exec_fn_!("tinymist.exportSvg", State::export_svg),
+            exec_fn_!("tinymist.exportPng", State::export_png),
+            exec_fn!("tinymist.doClearCache", State::clear_cache),
+            exec_fn!("tinymist.pinMain", State::pin_document),
+            exec_fn!("tinymist.focusMain", State::focus_document),
+            exec_fn!("tinymist.doInitTemplate", State::init_template),
+            exec_fn!("tinymist.doGetTemplateEntry", State::do_get_template_entry),
+            exec_fn_!("tinymist.interactCodeContext", State::interact_code_context),
+            exec_fn_!("tinymist.getDocumentTrace", State::get_document_trace),
+            exec_fn_!("tinymist.getDocumentMetrics", State::get_document_metrics),
+            exec_fn_!("tinymist.getServerInfo", State::get_server_info),
             // For Documentations
-            exec_fn!("tinymist.getResources", Self::get_resources),
+            exec_fn_!("tinymist.getResources", State::get_resources),
         ])
     }
 
     /// Export the current document as a PDF file.
-    pub fn export_pdf(&mut self, args: Vec<JsonValue>) -> LspResult<JsonValue> {
-        self.primary.export_pdf(args)
+    pub fn export_pdf(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.primary.export_pdf(req_id, args)
     }
 
     /// Export the current document as a Svg file.
-    pub fn export_svg(&mut self, args: Vec<JsonValue>) -> LspResult<JsonValue> {
-        self.primary.export_svg(args)
+    pub fn export_svg(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.primary.export_svg(req_id, args)
     }
 
     /// Export the current document as a Png file.
-    pub fn export_png(&mut self, args: Vec<JsonValue>) -> LspResult<JsonValue> {
-        self.primary.export_png(args)
+    pub fn export_png(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.primary.export_png(req_id, args)
     }
 
     /// Export the current document as some format. The client is responsible
     /// for passing the correct absolute path of typst document.
-    pub fn export(&mut self, kind: ExportKind, args: Vec<JsonValue>) -> LspResult<JsonValue> {
-        self.primary.export(kind, args)
+    pub fn export(
+        &mut self,
+        req_id: RequestId,
+        kind: ExportKind,
+        args: Vec<JsonValue>,
+    ) -> ScheduledResult {
+        self.primary.export(req_id, kind, args)
     }
 
     /// Clear all cached resources.
     ///
     /// # Errors
     /// Errors if the cache could not be cleared.
-    pub fn clear_cache(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn clear_cache(&self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         comemo::evict(0);
         for v in Some(self.primary())
             .into_iter()
@@ -117,22 +82,22 @@ impl LanguageState {
         {
             v.clear_cache();
         }
-        Ok(JsonValue::Null)
+        just_ok!(JsonValue::Null)
     }
 
     /// Pin main file to some path.
-    pub fn pin_document(&mut self, mut args: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn pin_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
 
         let update_result = self.pin_entry(entry.clone());
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
 
         info!("file pinned: {entry:?}");
-        Ok(JsonValue::Null)
+        just_ok!(JsonValue::Null)
     }
 
     /// Focus main file to some path.
-    pub fn focus_document(&mut self, mut args: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn focus_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
 
         if !self.ever_manual_focusing {
@@ -146,11 +111,11 @@ impl LanguageState {
         if ok {
             info!("file focused: {entry:?}");
         }
-        Ok(JsonValue::Null)
+        just_ok!(JsonValue::Null)
     }
 
     /// Initialize a new template.
-    pub fn init_template(&self, mut args: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn init_template(&self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use crate::tools::package::{self, determine_latest_version, TemplateSource};
 
         #[derive(Debug, Serialize)]
@@ -161,85 +126,84 @@ impl LanguageState {
 
         let from_source = get_arg!(args[0] as String);
         let to_path = get_arg!(args[1] as Option<PathBuf>).map(From::from);
-        let res = self
-            .primary()
-            .steal(move |c| {
-                let world = c.verse.spawn();
-                // Parse the package specification. If the user didn't specify the version,
-                // we try to figure it out automatically by downloading the package index
-                // or searching the disk.
-                let spec: PackageSpec = from_source
-                    .parse()
-                    .or_else(|err| {
-                        // Try to parse without version, but prefer the error message of the
-                        // normal package spec parsing if it fails.
-                        let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                        let version = determine_latest_version(&c.verse, &spec)?;
-                        StrResult::Ok(spec.at(version))
-                    })
-                    .map_err(map_string_err("failed to parse package spec"))?;
 
-                let from_source = TemplateSource::Package(spec);
+        let snap = self.primary().sync_snapshot().map_err(z_internal_error)?;
 
-                let entry_path = package::init(
-                    &world,
-                    InitTask {
-                        tmpl: from_source.clone(),
-                        dir: to_path.clone(),
-                    },
-                )
-                .map_err(map_string_err("failed to initialize template"))?;
-
-                info!("template initialized: {from_source:?} to {to_path:?}");
-
-                ZResult::Ok(InitResult { entry_path })
+        // Parse the package specification. If the user didn't specify the version,
+        // we try to figure it out automatically by downloading the package index
+        // or searching the disk.
+        let spec: PackageSpec = from_source
+            .parse()
+            .or_else(|err| {
+                // Try to parse without version, but prefer the error message of the
+                // normal package spec parsing if it fails.
+                let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
+                let version = determine_latest_version(&snap.world, &spec)?;
+                StrResult::Ok(spec.at(version))
             })
-            .and_then(|e| e)
-            .map_err(|e| invalid_params(format!("failed to determine template source: {e}")))?;
+            .map_err(map_string_err("failed to parse package spec"))
+            .map_err(z_internal_error)?;
 
-        serde_json::to_value(res).map_err(|_| internal_error("Cannot serialize path"))
+        let from_source = TemplateSource::Package(spec);
+
+        let entry_path = package::init(
+            &snap.world,
+            InitTask {
+                tmpl: from_source.clone(),
+                dir: to_path.clone(),
+            },
+        )
+        .map_err(map_string_err("failed to initialize template"))
+        .map_err(z_internal_error)?;
+
+        info!("template initialized: {from_source:?} to {to_path:?}");
+
+        let res = serde_json::to_value(InitResult { entry_path })
+            .map_err(|_| internal_error("Cannot serialize path"));
+        just_result!(res)
     }
 
     /// Get the entry of a template.
-    pub fn do_get_template_entry(&self, mut args: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn do_get_template_entry(&self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use crate::tools::package::{self, determine_latest_version, TemplateSource};
 
         let from_source = get_arg!(args[0] as String);
-        let entry = self
-            .primary()
-            .steal(move |c| {
-                // Parse the package specification. If the user didn't specify the version,
-                // we try to figure it out automatically by downloading the package index
-                // or searching the disk.
-                let spec: PackageSpec = from_source
-                    .parse()
-                    .or_else(|err| {
-                        // Try to parse without version, but prefer the error message of the
-                        // normal package spec parsing if it fails.
-                        let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                        let version = determine_latest_version(&c.verse, &spec)?;
-                        StrResult::Ok(spec.at(version))
-                    })
-                    .map_err(map_string_err("failed to parse package spec"))?;
 
-                let from_source = TemplateSource::Package(spec);
+        let snap = self.primary().sync_snapshot().map_err(z_internal_error)?;
 
-                let entry = package::get_entry(&c.verse, from_source)
-                    .map_err(map_string_err("failed to get template entry"))?;
-
-                ZResult::Ok(entry)
+        // Parse the package specification. If the user didn't specify the version,
+        // we try to figure it out automatically by downloading the package index
+        // or searching the disk.
+        let spec: PackageSpec = from_source
+            .parse()
+            .or_else(|err| {
+                // Try to parse without version, but prefer the error message of the
+                // normal package spec parsing if it fails.
+                let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
+                let version = determine_latest_version(&snap.world, &spec)?;
+                StrResult::Ok(spec.at(version))
             })
-            .and_then(|e| e)
-            .map_err(|e| invalid_params(format!("failed to determine template entry: {e}")))?;
+            .map_err(map_string_err("failed to parse package spec"))
+            .map_err(z_internal_error)?;
+
+        let from_source = TemplateSource::Package(spec);
+
+        let entry = package::get_entry(&snap.world, from_source)
+            .map_err(map_string_err("failed to get template entry"))
+            .map_err(z_internal_error)?;
 
         let entry = String::from_utf8(entry.to_vec())
             .map_err(|_| invalid_params("template entry is not a valid UTF-8 string"))?;
 
-        Ok(JsonValue::String(entry))
+        just_ok!(JsonValue::String(entry))
     }
 
     /// Interact with the code context at the source file.
-    pub fn interact_code_context(&mut self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn interact_code_context(
+        &mut self,
+        req_id: RequestId,
+        _arguments: Vec<JsonValue>,
+    ) -> ScheduledResult {
         let queries = _arguments.into_iter().next().ok_or_else(|| {
             invalid_params("The first parameter is not a valid code context query array")
         })?;
@@ -256,11 +220,7 @@ impl LanguageState {
         let path = as_path(params.text_document);
         let query = params.query;
 
-        let res = run_query!(self.InteractCodeContext(path, query))?;
-        let res =
-            serde_json::to_value(res).map_err(|_| internal_error("Cannot serialize responses"))?;
-
-        Ok(res)
+        run_query!(req_id, self.InteractCodeContext(path, query))
     }
 
     /// Get the trace data of the document.
@@ -278,73 +238,65 @@ impl LanguageState {
         let thread = self.user_action_thread.clone();
         let entry = self.config.compile.determine_entry(Some(path));
 
-        let res = self
-            .primary()
-            .steal(move |c| {
-                let verse = &c.verse;
+        let snap = self.primary().sync_snapshot().map_err(z_internal_error)?;
 
-                // todo: rootless file
-                // todo: memory dirty file
-                let root = entry.root().ok_or_else(|| {
-                    anyhow::anyhow!("root must be determined for trace, got {entry:?}")
-                })?;
-                let main = entry
-                    .main()
-                    .and_then(|e| e.vpath().resolve(&root))
-                    .ok_or_else(|| anyhow::anyhow!("main file must be resolved, got {entry:?}"))?;
+        // todo: rootless file
+        // todo: memory dirty file
+        let root = entry.root().ok_or_else(
+            || error_once!("root must be determined for trace, got", entry: format!("{entry:?}")),
+        ).map_err(z_internal_error)?;
+        let main = entry
+            .main()
+            .and_then(|e| e.vpath().resolve(&root))
+            .ok_or_else(
+                || error_once!("main file must be resolved, got", entry: format!("{entry:?}")),
+            )
+            .map_err(z_internal_error)?;
 
-                if let Some(f) = thread {
-                    f.send(UserActionRequest::Trace(
-                        req_id,
-                        TraceParams {
-                            compiler_program: self_path,
-                            root: root.as_ref().to_owned(),
-                            main,
-                            inputs: verse.inputs().as_ref().deref().clone(),
-                            font_paths: verse.font_resolver.font_paths().to_owned(),
-                        },
-                    ))
-                    .context("cannot send trace request")?;
-                } else {
-                    bail!("user action thread is not available");
-                }
-
-                Ok(Some(()))
-            })
-            .context("cannot steal primary compiler");
-
-        let res = match res {
-            Ok(res) => res,
-            Err(res) => Err(res),
+        let Some(f) = thread else {
+            return Err(internal_error("user action thread is not available"))?;
         };
 
-        res.map_err(|e| internal_error(format!("could not get document trace: {e}")))
+        f.send(UserActionRequest::Trace(
+            req_id,
+            TraceParams {
+                compiler_program: self_path,
+                root: root.as_ref().to_owned(),
+                main,
+                inputs: snap.world.inputs().as_ref().deref().clone(),
+                font_paths: snap.world.font_resolver.font_paths().to_owned(),
+            },
+        ))
+        .map_err(|_| internal_error("cannot send trace request"))
+        .map(Some)
     }
 
     /// Get the metrics of the document.
-    pub fn get_document_metrics(&mut self, mut args: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn get_document_metrics(
+        &mut self,
+        req_id: RequestId,
+        mut args: Vec<JsonValue>,
+    ) -> ScheduledResult {
         let path = get_arg!(args[0] as PathBuf);
-
-        let res = run_query!(self.DocumentMetrics(path))?;
-        let res = serde_json::to_value(res)
-            .map_err(|e| internal_error(format!("Cannot serialize response {e}")))?;
-
-        Ok(res)
+        run_query!(req_id, self.DocumentMetrics(path))
     }
 
     /// Get the server info.
-    pub fn get_server_info(&mut self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
-        let res = run_query!(self.ServerInfo())?;
-
-        let res = serde_json::to_value(res)
-            .map_err(|e| internal_error(format!("Cannot serialize response {e}")))?;
-
-        Ok(res)
+    pub fn get_server_info(
+        &mut self,
+        req_id: RequestId,
+        _arguments: Vec<JsonValue>,
+    ) -> ScheduledResult {
+        run_query!(req_id, self.ServerInfo())
     }
 
     /// Get static resources with help of tinymist service, for example, a
     /// static help pages for some typst function.
-    pub fn get_resources(&mut self, mut args: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn get_resources(
+        &mut self,
+        req_id: RequestId,
+        mut args: Vec<JsonValue>,
+    ) -> ScheduledResult {
         let path = get_arg!(args[0] as PathBuf);
 
         let Some(handler) = self.resource_routes.get(path.as_path()) else {
@@ -353,35 +305,36 @@ impl LanguageState {
         };
 
         // Note our redirection will keep the first path argument in the args vec.
-        handler(self, args)
+        handler(self, req_id, args)
     }
 }
 
 impl LanguageState {
-    pub fn get_resource_routes() -> ResourceMap {
+    pub fn get_resource_routes() -> ResourceMap<Self> {
+        // LspHandler<Vec<JsonValue>, JsonValue>,
         macro_rules! resources_at {
-            ($key: expr, Self::$method: ident) => {
+            ($key: expr, LanguageState::$method: ident) => {
                 (
                     Path::new($key).clean().as_path().into(),
-                    resource_fn!(LspHandler<Vec<JsonValue>, JsonValue>, Self::$method, inputs),
+                    resource_fn!(LanguageState::$method),
                 )
             };
         }
 
         ResourceMap::from_iter([
-            resources_at!("/symbols", Self::resource_symbols),
-            resources_at!("/tutorial", Self::resource_tutoral),
+            resources_at!("/symbols", LanguageState::resource_symbols),
+            resources_at!("/tutorial", LanguageState::resource_tutoral),
         ])
     }
 
     /// Get the all valid symbols
-    pub fn resource_symbols(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn resource_symbols(&self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let resp = self.get_symbol_resources();
-        resp.map_err(|e| internal_error(e.to_string()))
+        just_ok!(resp.map_err(|e| internal_error(e.to_string()))?)
     }
 
     /// Get tutorial web page
-    pub fn resource_tutoral(&self, _arguments: Vec<JsonValue>) -> LspResult<JsonValue> {
+    pub fn resource_tutoral(&self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         Err(method_not_found())
     }
 }

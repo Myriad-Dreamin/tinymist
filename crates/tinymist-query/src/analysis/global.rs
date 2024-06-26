@@ -1,4 +1,4 @@
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -10,8 +10,8 @@ use ecow::{EcoString, EcoVec};
 use lsp_types::Url;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
-use reflexo::hash::hash128;
-use reflexo::{cow_mut::CowMut, debug_loc::DataSource, ImmutPath};
+use reflexo::hash::{hash128, FxDashMap};
+use reflexo::{debug_loc::DataSource, ImmutPath};
 use typst::eval::Eval;
 use typst::foundations::{self, Func};
 use typst::syntax::{LinkedNode, SyntaxNode};
@@ -121,10 +121,6 @@ impl ModuleAnalysisCache {
 
 /// The analysis data holds globally.
 pub struct Analysis {
-    /// The root of the workspace.
-    /// This means that the analysis result won't be valid if the root directory
-    /// changes.
-    pub root: ImmutPath,
     /// The position encoding for the workspace.
     pub position_encoding: PositionEncoding,
     /// The position encoding for the workspace.
@@ -136,25 +132,28 @@ pub struct Analysis {
 impl Analysis {
     /// Get estimated memory usage of the analysis data.
     pub fn estimated_memory(&self) -> usize {
-        self.caches.modules.capacity() * 32
-            + self
-                .caches
-                .modules
-                .values()
-                .map(|v| {
-                    v.def_use_lexical_hierarchy
-                        .output
-                        .read()
-                        .as_ref()
-                        .map_or(0, |e| e.iter().map(|e| e.estimated_memory()).sum())
-                })
-                .sum::<usize>()
+        let _ = LexicalHierarchy::estimated_memory;
+        // todo: implement
+        // self.caches.modules.capacity() * 32
+        //     + self .caches .modules .values() .map(|v| { v.def_use_lexical_hierarchy
+        //       .output .read() .as_ref() .map_or(0, |e| e.iter().map(|e|
+        //       e.estimated_memory()).sum()) }) .sum::<usize>()
+        0
     }
 
-    fn gc(&mut self) {
-        self.caches
-            .signatures
-            .retain(|_, (l, _, _)| (self.caches.lifetime - *l) < 30);
+    /// Get a snapshot of the analysis data.
+    pub fn snapshot<'a>(
+        &'a self,
+        root: ImmutPath,
+        resources: &'a dyn AnalysisResources,
+    ) -> AnalysisContext<'a> {
+        AnalysisContext::new(root, resources, self)
+    }
+
+    /// Clear all cached resources.
+    pub fn clear_cache(&self) {
+        self.caches.signatures.clear();
+        self.caches.modules.clear();
     }
 }
 
@@ -248,10 +247,7 @@ impl<Inputs, Output> ComputingNode<Inputs, Output> {
         Inputs: ComputeDebug + Hash + Clone,
         Output: Clone,
     {
-        if self
-            .computing
-            .swap(true, std::sync::atomic::Ordering::SeqCst)
-        {
+        if self.computing.swap(true, Ordering::SeqCst) {
             return Err(());
         }
         let input_cmp = self.inputs.read();
@@ -279,8 +275,7 @@ impl<Inputs, Output> ComputingNode<Inputs, Output> {
             }
         });
 
-        self.computing
-            .store(false, std::sync::atomic::Ordering::SeqCst);
+        self.computing.store(false, Ordering::SeqCst);
         res
     }
 
@@ -313,8 +308,6 @@ pub struct ModuleAnalysisGlobalCache {
 
     bibliography: Arc<ComputingNode<EcoVec<(TypstFileId, Bytes)>, Arc<BibInfo>>>,
     import: Arc<ComputingNode<EcoVec<LexicalHierarchy>, Arc<ImportInfo>>>,
-    signature_source: Option<Source>,
-    signatures: HashMap<usize, Signature>,
 }
 
 impl Default for ModuleAnalysisGlobalCache {
@@ -325,9 +318,6 @@ impl Default for ModuleAnalysisGlobalCache {
             import: Arc::new(ComputingNode::new("import")),
             def_use: Arc::new(ComputingNode::new("def_use")),
             bibliography: Arc::new(ComputingNode::new("bibliography")),
-
-            signature_source: None,
-            signatures: Default::default(),
         }
     }
 }
@@ -336,70 +326,11 @@ impl Default for ModuleAnalysisGlobalCache {
 /// of a module.
 #[derive(Default)]
 pub struct AnalysisGlobalCaches {
-    lifetime: u64,
-    modules: HashMap<TypstFileId, ModuleAnalysisGlobalCache>,
-    signatures: HashMap<u128, (u64, foundations::Func, Signature)>,
-}
-
-impl AnalysisGlobalCaches {
-    /// Get the signature of a function.
-    pub fn signature(&self, source: Option<Source>, func: &SignatureTarget) -> Option<Signature> {
-        match func {
-            SignatureTarget::Syntax(node) => {
-                // todo: check performance on peeking signature source frequently
-                let cache = self.modules.get(&node.span().id()?)?;
-                if cache
-                    .signature_source
-                    .as_ref()
-                    .zip(source)
-                    .map_or(true, |(s, t)| hash128(s) != hash128(&t))
-                {
-                    return None;
-                }
-
-                cache.signatures.get(&node.offset()).cloned()
-            }
-            SignatureTarget::Runtime(rt) => self
-                .signatures
-                .get(&hash128(rt))
-                .and_then(|(_, cached_func, s)| (rt == cached_func).then_some(s.clone())),
-        }
-    }
-
-    /// Compute the signature of a function.
-    pub fn compute_signature(
-        &mut self,
-        source: Option<Source>,
-        func: SignatureTarget,
-        compute: impl FnOnce() -> Signature,
-    ) -> Signature {
-        match func {
-            SignatureTarget::Syntax(node) => {
-                let cache = self.modules.entry(node.span().id().unwrap()).or_default();
-                // todo: check performance on peeking signature source frequently
-                if cache
-                    .signature_source
-                    .as_ref()
-                    .zip(source.as_ref())
-                    .map_or(true, |(s, t)| hash128(s) != hash128(t))
-                {
-                    cache.signature_source = source;
-                    cache.signatures.clear();
-                }
-
-                let key = node.offset();
-                cache.signatures.entry(key).or_insert_with(compute).clone()
-            }
-            SignatureTarget::Runtime(rt) => {
-                let key = hash128(&rt);
-                self.signatures
-                    .entry(key)
-                    .or_insert_with(|| (self.lifetime, rt, compute()))
-                    .2
-                    .clone()
-            }
-        }
-    }
+    lifetime: AtomicU64,
+    clear_lifetime: AtomicU64,
+    modules: FxDashMap<TypstFileId, Arc<ModuleAnalysisGlobalCache>>,
+    static_signatures: FxDashMap<u128, (u64, Source, usize, Signature)>,
+    signatures: FxDashMap<u128, (u64, foundations::Func, Signature)>,
 }
 
 /// A cache for all level of analysis results of a module.
@@ -440,31 +371,37 @@ pub trait AnalysisResources {
 
 /// The context for analyzers.
 pub struct AnalysisContext<'a> {
+    /// The root of the workspace.
+    /// This means that the analysis result won't be valid if the root directory
+    /// changes.
+    pub root: ImmutPath,
     /// The world surface for Typst compiler
     pub resources: &'a dyn AnalysisResources,
     /// The analysis data
-    pub analysis: CowMut<'a, Analysis>,
+    pub analysis: &'a Analysis,
+    /// The caches for analysis.
+    lifetime: u64,
+    /// Local caches for analysis.
     caches: AnalysisCaches,
+}
+
+// todo: gc in new thread
+impl<'w> Drop for AnalysisContext<'w> {
+    fn drop(&mut self) {
+        self.gc();
+    }
 }
 
 impl<'w> AnalysisContext<'w> {
     /// Create a new analysis context.
-    pub fn new(resources: &'w dyn AnalysisResources, a: Analysis) -> Self {
+    pub fn new(root: ImmutPath, resources: &'w dyn AnalysisResources, a: &'w Analysis) -> Self {
+        // self.caches.lifetime += 1;
+        let lifetime = a.caches.lifetime.fetch_add(1, Ordering::SeqCst);
         Self {
+            root,
             resources,
-            analysis: CowMut::Owned(a),
-            caches: AnalysisCaches::default(),
-        }
-    }
-
-    /// Create a new analysis context with borrowing the analysis data.
-    pub fn new_borrow(resources: &'w dyn AnalysisResources, a: &'w mut Analysis) -> Self {
-        a.caches.lifetime += 1;
-        a.gc();
-
-        Self {
-            resources,
-            analysis: CowMut::Borrowed(a),
+            analysis: a,
+            lifetime,
             caches: AnalysisCaches::default(),
         }
     }
@@ -491,7 +428,7 @@ impl<'w> AnalysisContext<'w> {
             .completion_files
             .get_or_init(|| {
                 scan_workspace_files(
-                    &self.analysis.root,
+                    &self.root,
                     PathPreference::Special.ext_matcher(),
                     |relative_path| relative_path.to_owned(),
                 )
@@ -535,7 +472,7 @@ impl<'w> AnalysisContext<'w> {
         // will be resolved.
         let root = match id.package() {
             Some(spec) => self.resources.resolve(spec)?,
-            None => self.analysis.root.clone(),
+            None => self.root.clone(),
         };
 
         // Join the path to the root. If it tries to escape, deny
@@ -566,10 +503,10 @@ impl<'w> AnalysisContext<'w> {
     /// Get the source of a file by file path.
     pub fn source_by_path(&mut self, p: &Path) -> FileResult<Source> {
         // todo: source in packages
-        let relative_path = p.strip_prefix(&self.analysis.root).map_err(|_| {
+        let relative_path = p.strip_prefix(&self.root).map_err(|_| {
             FileError::Other(Some(eco_format!(
                 "not in root, path is {p:?}, root is {:?}",
-                self.analysis.root
+                self.root
             )))
         })?;
 
@@ -668,6 +605,56 @@ impl<'w> AnalysisContext<'w> {
 
         Some(self.to_lsp_range(position, &source))
     }
+    /// Get the signature of a function.
+    pub fn signature(&self, func: &SignatureTarget) -> Option<Signature> {
+        match func {
+            SignatureTarget::Syntax(source, node) => {
+                // todo: check performance on peeking signature source frequently
+                let cache_key = (source, node.offset());
+                self.analysis
+                    .caches
+                    .static_signatures
+                    .get(&hash128(&cache_key))
+                    .and_then(|slot| (cache_key.1 == slot.2).then_some(slot.3.clone()))
+            }
+            SignatureTarget::Runtime(rt) => self
+                .analysis
+                .caches
+                .signatures
+                .get(&hash128(rt))
+                .and_then(|slot| (rt == &slot.1).then_some(slot.2.clone())),
+        }
+    }
+
+    /// Compute the signature of a function.
+    pub fn compute_signature(
+        &self,
+        func: SignatureTarget,
+        compute: impl FnOnce() -> Signature,
+    ) -> Signature {
+        match func {
+            SignatureTarget::Syntax(source, node) => {
+                let cache_key = (source, node.offset());
+                self.analysis
+                    .caches
+                    .static_signatures
+                    .entry(hash128(&cache_key))
+                    .or_insert_with(|| (self.lifetime, cache_key.0, cache_key.1, compute()))
+                    .3
+                    .clone()
+            }
+            SignatureTarget::Runtime(rt) => {
+                let key = hash128(&rt);
+                self.analysis
+                    .caches
+                    .signatures
+                    .entry(key)
+                    .or_insert_with(|| (self.lifetime, rt, compute()))
+                    .2
+                    .clone()
+            }
+        }
+    }
 
     /// Get the type check information of a source file.
     pub(crate) fn type_check(&mut self, source: Source) -> Option<Arc<TypeScheme>> {
@@ -714,7 +701,6 @@ impl<'w> AnalysisContext<'w> {
         let l = cache
             .def_use_lexical_hierarchy
             .compute(source.clone(), |_before, after| {
-                cache.signatures.clear();
                 crate::syntax::get_lexical_hierarchy(after, crate::syntax::LexicalScopeKind::DefUse)
             })
             .ok()
@@ -749,7 +735,6 @@ impl<'w> AnalysisContext<'w> {
         let l = cache
             .def_use_lexical_hierarchy
             .compute(source.clone(), |_before, after| {
-                cache.signatures.clear();
                 crate::syntax::get_lexical_hierarchy(after, crate::syntax::LexicalScopeKind::DefUse)
             })
             .ok()
@@ -810,8 +795,8 @@ impl<'w> AnalysisContext<'w> {
         res
     }
 
-    fn at_module(&mut self, fid: TypstFileId) -> &mut ModuleAnalysisGlobalCache {
-        self.analysis.caches.modules.entry(fid).or_default()
+    fn at_module(&self, fid: TypstFileId) -> Arc<ModuleAnalysisGlobalCache> {
+        self.analysis.caches.modules.entry(fid).or_default().clone()
     }
 
     pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
@@ -896,6 +881,37 @@ impl<'w> AnalysisContext<'w> {
         let ty_chk = self.type_check(source.clone())?;
 
         post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.type_of_span(k.span()))
+    }
+
+    fn gc(&self) {
+        let lifetime = self.lifetime;
+        loop {
+            let latest_clear_lifetime = self.analysis.caches.clear_lifetime.load(Ordering::Relaxed);
+            if latest_clear_lifetime >= lifetime {
+                return;
+            }
+
+            if self.analysis.caches.clear_lifetime.compare_exchange(
+                latest_clear_lifetime,
+                lifetime,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) != Ok(latest_clear_lifetime)
+            {
+                continue;
+            }
+
+            break;
+        }
+
+        self.analysis
+            .caches
+            .static_signatures
+            .retain(|_, (l, _, _, _)| lifetime - *l < 60);
+        self.analysis
+            .caches
+            .signatures
+            .retain(|_, (l, _, _)| lifetime - *l < 60);
     }
 }
 

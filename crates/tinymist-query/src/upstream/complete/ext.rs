@@ -1118,7 +1118,7 @@ pub fn complete_path(
     let has_root = path.has_root();
 
     let src_path = id.vpath();
-    let base = src_path.resolve(&ctx.analysis.root)?;
+    let base = src_path.resolve(&ctx.root)?;
     let dst_path = src_path.join(path);
     let mut compl_path = dst_path.as_rootless_path();
     if !compl_path.is_dir() {
@@ -1131,7 +1131,7 @@ pub fn complete_path(
         return None;
     }
 
-    let dirs = ctx.analysis.root.clone();
+    let dirs = ctx.root.clone();
     log::debug!("compl_dirs: {dirs:?}");
     // find directory or files in the path
     let mut folder_completions = vec![];
@@ -1150,7 +1150,7 @@ pub fn complete_path(
 
         let label = if has_root {
             // diff with root
-            let w = path.strip_prefix(&ctx.analysis.root).ok()?;
+            let w = path.strip_prefix(&ctx.root).ok()?;
             eco_format!("/{}", unix_slash(w))
         } else {
             let base = base.parent()?;

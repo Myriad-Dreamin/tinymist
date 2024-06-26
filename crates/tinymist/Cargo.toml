@@ -47,6 +47,7 @@ typst-assets.workspace = true
 typstyle.workspace = true
 typstfmt_lib.workspace = true
 
+reflexo.workspace = true
 typst-ts-core = { workspace = true, default-features = false, features = [
     "flat-vector",
     "vector-bbox",
@@ -71,9 +72,12 @@ tower-layer = "0.3.2"
 tower-service = "0.3.2"
 pin-project-lite = "0.2.13"
 base64.workspace = true
+rayon.workspace = true
 
 [features]
-default = ["cli", "embed-fonts", "no-content-hint", "preview"]
+default = ["cli", "embed-fonts", "no-content-hint", "preview", "stable-server"]
+
+stable-server = []
 
 cli = ["clap"]
 

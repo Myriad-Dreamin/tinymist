@@ -147,7 +147,7 @@ jobs:
           cp "target/${{ matrix.rust-target }}/gh-release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "tinymist-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       - name: Test tinymist
         run: |
-          cargo test --profile=gh-release --workspace --target ${{ matrix.rust-target }}
+          cargo test --profile=gh-release --workspace --target ${{ matrix.rust-target }} --features stable-server
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && (matrix.platform == 'linux') && (matrix.arch == 'x64')
       - name: Upload split debug symbols for windows
         if: matrix.platform == 'win32' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')

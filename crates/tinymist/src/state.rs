@@ -3,10 +3,12 @@
 use std::path::PathBuf;
 
 use anyhow::anyhow;
+use futures::future::MaybeDone;
+use lsp_server::RequestId;
 use lsp_types::TextDocumentContentChangeEvent;
 use tinymist_query::{
     lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, OnExportRequest,
-    OnSaveExportRequest, PositionEncoding, SemanticRequest, StatefulRequest, SyntaxRequest,
+    OnSaveExportRequest, PositionEncoding, SyntaxRequest,
 };
 use typst::{diag::FileResult, syntax::Source};
 use typst_ts_compiler::{
@@ -15,7 +17,7 @@ use typst_ts_compiler::{
 };
 use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
-use crate::{actor::typ_client::CompileClientActor, compile::CompileState, LanguageState};
+use crate::{actor::typ_client::CompileClientActor, compile::CompileState, *};
 
 impl CompileState {
     /// Focus main file to some path.
@@ -181,25 +183,59 @@ impl LanguageState {
 
         self.update_source(files)
     }
+
+    pub fn query_source<T>(
+        &self,
+        path: ImmutPath,
+        f: impl FnOnce(Source) -> anyhow::Result<T>,
+    ) -> anyhow::Result<T> {
+        let snapshot = self.primary.memory_changes.get(&path);
+        let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {path:?}"))?;
+        let source = snapshot.content.clone();
+        f(source)
+    }
+
+    pub fn snapshot(&self) -> LanguageStateSnapshot {
+        LanguageStateSnapshot {}
+    }
+
+    pub fn schedule_query(&mut self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
+        let fut = query_fut.map_err(|e| internal_error(e.to_string()))?;
+        let fut: AnySchedulableResponse = Ok(match fut {
+            MaybeDone::Done(res) => MaybeDone::Done(
+                res.and_then(|res| Ok(res.to_untyped()?))
+                    .map_err(|err| internal_error(err.to_string())),
+            ),
+            MaybeDone::Future(fut) => MaybeDone::Future(Box::pin(async move {
+                let res = fut.await;
+                res.and_then(|res| Ok(res.to_untyped()?))
+                    .map_err(|err| internal_error(err.to_string()))
+            })),
+            MaybeDone::Gone => MaybeDone::Gone,
+        });
+        self.schedule(req_id, fut)
+    }
+}
+
+pub struct LanguageStateSnapshot {}
+
+#[macro_export]
+macro_rules! run_query_tail {
+    ($self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
+        use tinymist_query::*;
+        let req = paste::paste! { [<$query Request>] { $($arg_key),* } };
+        let query_fut = $self.query(CompilerQueryRequest::$query(req.clone()));
+        $self.handle.spawn(query_fut.map_err(|e| internal_error(e.to_string()))?)
+    }};
 }
 
 #[macro_export]
 macro_rules! run_query {
-    ($self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
+    ($req_id: ident, $self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
         use tinymist_query::*;
         let req = paste::paste! { [<$query Request>] { $($arg_key),* } };
-        $self
-            .query(CompilerQueryRequest::$query(req.clone()))
-            .map_err(|err| {
-                error!("error getting $query: {err} with request {req:?}");
-                internal_error("Internal error")
-            })
-            .map(|resp| {
-                let CompilerQueryResponse::$query(resp) = resp else {
-                    unreachable!()
-                };
-                resp
-            })
+        let query_fut = $self.query(CompilerQueryRequest::$query(req.clone()));
+        $self.schedule_query($req_id, query_fut)
     }};
 }
 
@@ -228,69 +264,81 @@ macro_rules! query_tokens_cache {
 
 macro_rules! query_state {
     ($self:ident, $method:ident, $req:expr) => {{
-        let res = $self.steal_state(move |w, doc| $req.request(w, doc));
-        res.map(CompilerQueryResponse::$method)
+        let snap = $self.snapshot()?;
+        #[cfg(feature = "stable-server")]
+        {
+            just_result!(snap.stateful_sync($req).map(CompilerQueryResponse::$method))
+        }
+        #[cfg(not(feature = "stable-server"))]
+        {
+            just_future!(async move {
+                snap.stateful($req)
+                    .await
+                    .map(CompilerQueryResponse::$method)
+            })
+        }
     }};
 }
 
 macro_rules! query_world {
     ($self:ident, $method:ident, $req:expr) => {{
-        let res = $self.steal_world(move |w| $req.request(w));
-        res.map(CompilerQueryResponse::$method)
+        let snap = $self.snapshot()?;
+        #[cfg(feature = "stable-server")]
+        {
+            just_result!(snap.semantic_sync($req).map(CompilerQueryResponse::$method))
+        }
+        #[cfg(not(feature = "stable-server"))]
+        {
+            just_future!(async move {
+                snap.semantic($req)
+                    .await
+                    .map(CompilerQueryResponse::$method)
+            })
+        }
     }};
 }
 
 impl LanguageState {
-    pub fn query_source<T>(
-        &self,
-        path: ImmutPath,
-        f: impl FnOnce(Source) -> anyhow::Result<T>,
-    ) -> anyhow::Result<T> {
-        let snapshot = self.primary.memory_changes.get(&path);
-        let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {path:?}"))?;
-        let source = snapshot.content.clone();
-        f(source)
-    }
-
-    pub fn query(&mut self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
+    pub fn query(&mut self, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
 
-        match query {
-            InteractCodeContext(req) => query_source!(self, InteractCodeContext, req),
-            SemanticTokensFull(req) => query_tokens_cache!(self, SemanticTokensFull, req),
-            SemanticTokensDelta(req) => query_tokens_cache!(self, SemanticTokensDelta, req),
-            FoldingRange(req) => query_source!(self, FoldingRange, req),
-            SelectionRange(req) => query_source!(self, SelectionRange, req),
-            DocumentSymbol(req) => query_source!(self, DocumentSymbol, req),
-            OnEnter(req) => query_source!(self, OnEnter, req),
-            ColorPresentation(req) => Ok(CompilerQueryResponse::ColorPresentation(req.request())),
+        let query = match query {
+            InteractCodeContext(req) => query_source!(self, InteractCodeContext, req)?,
+            SemanticTokensFull(req) => query_tokens_cache!(self, SemanticTokensFull, req)?,
+            SemanticTokensDelta(req) => query_tokens_cache!(self, SemanticTokensDelta, req)?,
+            FoldingRange(req) => query_source!(self, FoldingRange, req)?,
+            SelectionRange(req) => query_source!(self, SelectionRange, req)?,
+            DocumentSymbol(req) => query_source!(self, DocumentSymbol, req)?,
+            OnEnter(req) => query_source!(self, OnEnter, req)?,
+            ColorPresentation(req) => CompilerQueryResponse::ColorPresentation(req.request()),
             _ => {
                 let client = &mut self.primary;
                 if !self.pinning && !self.config.compile.has_default_entry_path {
                     // todo: race condition, we need atomic primary query
                     if let Some(path) = query.associated_path() {
+                        // todo!!!!!!!!!!!!!!
                         client.do_change_entry(Some(path.into()))?;
                     }
                 }
-                Self::query_on(client.compiler(), query)
+
+                return Self::query_on(client.compiler(), query);
             }
-        }
+        };
+
+        just_ok!(query)
     }
 
-    fn query_on(
-        client: &CompileClientActor,
-        query: CompilerQueryRequest,
-    ) -> anyhow::Result<CompilerQueryResponse> {
+    fn query_on(client: &CompileClientActor, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
         match query {
-            OnExport(OnExportRequest { kind, path }) => Ok(CompilerQueryResponse::OnExport(
+            OnExport(OnExportRequest { kind, path }) => just_ok!(CompilerQueryResponse::OnExport(
                 client.on_export(kind, path)?,
             )),
             OnSaveExport(OnSaveExportRequest { path }) => {
                 client.on_save_export(path)?;
-                Ok(CompilerQueryResponse::OnSaveExport(()))
+                just_ok!(CompilerQueryResponse::OnSaveExport(()))
             }
             Hover(req) => query_state!(client, Hover, req),
             GotoDefinition(req) => query_state!(client, GotoDefinition, req),
@@ -309,7 +357,7 @@ impl LanguageState {
             DocumentMetrics(req) => query_state!(client, DocumentMetrics, req),
             ServerInfo(_) => {
                 let res = client.collect_server_info()?;
-                Ok(CompilerQueryResponse::ServerInfo(Some(res)))
+                just_ok!(CompilerQueryResponse::ServerInfo(Some(res)))
             }
             _ => unreachable!(),
         }
@@ -317,8 +365,25 @@ impl LanguageState {
 }
 
 impl CompileState {
-    pub fn query(&self, query: CompilerQueryRequest) -> anyhow::Result<CompilerQueryResponse> {
+    pub fn query(&self, query: CompilerQueryRequest) -> QueryFuture {
         let client = self.compiler.as_ref().unwrap();
         LanguageState::query_on(client, query)
+    }
+
+    pub fn schedule_query(&mut self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
+        let fut = query_fut.map_err(|e| internal_error(e.to_string()))?;
+        let fut: AnySchedulableResponse = Ok(match fut {
+            MaybeDone::Done(res) => MaybeDone::Done(
+                res.and_then(|res| Ok(res.to_untyped()?))
+                    .map_err(|err| internal_error(err.to_string())),
+            ),
+            MaybeDone::Future(fut) => MaybeDone::Future(Box::pin(async move {
+                let res = fut.await;
+                res.and_then(|res| Ok(res.to_untyped()?))
+                    .map_err(|err| internal_error(err.to_string()))
+            })),
+            MaybeDone::Gone => MaybeDone::Gone,
+        });
+        self.schedule(req_id, fut)
     }
 }

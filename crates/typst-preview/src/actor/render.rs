@@ -172,7 +172,6 @@ impl RenderActor {
             } else {
                 self.renderer.pack_delta(document)
             };
-            comemo::evict(30);
             let Ok(_) = self.svg_sender.send(data) else {
                 info!("RenderActor: svg_sender is dropped");
                 break;
@@ -248,7 +247,6 @@ impl OutlineRenderActor {
                 continue;
             };
             let data = self.outline(&document).instrument_await("outline").await;
-            comemo::evict(30);
             debug!("OutlineRenderActor: sending outline");
             let Ok(_) = self.editor_tx.send(EditorActorRequest::Outline(data)) else {
                 info!("OutlineRenderActor: outline_sender is dropped");

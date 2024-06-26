@@ -2919,7 +2919,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.0-rc4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=36b969e2d5743544dca8679c53c89129b989ec80#36b969e2d5743544dca8679c53c89129b989ec80"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=11b1ef0909ee6ded49eb84db999af14276125a62#11b1ef0909ee6ded49eb84db999af14276125a62"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -2944,7 +2944,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vfs"
 version = "0.5.0-rc4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=36b969e2d5743544dca8679c53c89129b989ec80#36b969e2d5743544dca8679c53c89129b989ec80"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=11b1ef0909ee6ded49eb84db999af14276125a62#11b1ef0909ee6ded49eb84db999af14276125a62"
 dependencies = [
  "append-only-vec",
  "indexmap 2.2.6",
@@ -2961,7 +2961,7 @@ dependencies = [
 [[package]]
 name = "reflexo-world"
 version = "0.5.0-rc4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=36b969e2d5743544dca8679c53c89129b989ec80#36b969e2d5743544dca8679c53c89129b989ec80"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=11b1ef0909ee6ded49eb84db999af14276125a62#11b1ef0909ee6ded49eb84db999af14276125a62"
 dependencies = [
  "append-only-vec",
  "chrono",
@@ -2975,6 +2975,7 @@ dependencies = [
  "indexmap 2.2.6",
  "log",
  "nohash-hasher",
+ "notify",
  "once_cell",
  "parking_lot",
  "reflexo",
@@ -2988,6 +2989,7 @@ dependencies = [
  "tar",
  "typst",
  "typst-ts-core",
+ "walkdir",
 ]
 
 [[package]]
@@ -3959,6 +3961,8 @@ dependencies = [
  "parking_lot",
  "paste",
  "pin-project-lite",
+ "rayon",
+ "reflexo",
  "serde",
  "serde_json",
  "tinymist-assets 0.11.11 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4023,6 +4027,7 @@ dependencies = [
  "regex",
  "rust_iso3166",
  "rust_iso639",
+ "rustc-hash",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -4525,44 +4530,38 @@ dependencies = [
 [[package]]
 name = "typst-ts-compiler"
 version = "0.5.0-rc4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=36b969e2d5743544dca8679c53c89129b989ec80#36b969e2d5743544dca8679c53c89129b989ec80"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=11b1ef0909ee6ded49eb84db999af14276125a62#11b1ef0909ee6ded49eb84db999af14276125a62"
 dependencies = [
- "append-only-vec",
  "base64 0.22.1",
  "codespan-reporting",
  "comemo 0.4.0",
- "dirs",
  "flate2",
- "fontdb",
  "fst",
- "hex",
  "indexmap 2.2.6",
- "instant",
  "log",
  "nohash-hasher",
  "notify",
  "once_cell",
  "parking_lot",
  "pathdiff",
+ "rayon",
+ "reflexo",
  "reflexo-vfs",
  "reflexo-world",
  "rustc-hash",
  "serde",
  "serde_json",
- "sha2",
- "strum 0.25.0",
  "tar",
  "tokio",
  "typst",
  "typst-ts-core",
  "typst-ts-svg-exporter",
- "walkdir",
 ]
 
 [[package]]
 name = "typst-ts-core"
 version = "0.5.0-rc4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=36b969e2d5743544dca8679c53c89129b989ec80#36b969e2d5743544dca8679c53c89129b989ec80"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=11b1ef0909ee6ded49eb84db999af14276125a62#11b1ef0909ee6ded49eb84db999af14276125a62"
 dependencies = [
  "base64 0.22.1",
  "base64-serde",
@@ -4600,7 +4599,7 @@ dependencies = [
 [[package]]
 name = "typst-ts-svg-exporter"
 version = "0.5.0-rc4"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=36b969e2d5743544dca8679c53c89129b989ec80#36b969e2d5743544dca8679c53c89129b989ec80"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=11b1ef0909ee6ded49eb84db999af14276125a62#11b1ef0909ee6ded49eb84db999af14276125a62"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
