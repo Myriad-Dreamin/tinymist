@@ -605,15 +605,15 @@ where
         let ExecuteCommandParams {
             command, arguments, ..
         } = params;
-        let Some(handler) = self.commands.get(command.as_str()) else {
-            log::error!("asked to execute unknown command");
-            return Err(method_not_found());
-        };
 
         // todo: generalize this
         if command == "tinymist.getResources" {
             self.get_resources(req.id, arguments)
         } else {
+            let Some(handler) = self.commands.get(command.as_str()) else {
+                log::error!("asked to execute unknown command");
+                return Err(method_not_found());
+            };
             handler(s, &self.client, req.id, arguments)
         }
     }

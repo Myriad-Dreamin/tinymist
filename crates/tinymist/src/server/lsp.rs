@@ -197,9 +197,9 @@ impl LanguageState {
             .with_resource("/tutorial", State::resource_tutoral);
 
         provider.args.exec_cmds.get_or_init(|| {
-            provider
-                .exec_cmds
-                .keys()
+            Some("tinymist.getResources")
+                .iter()
+                .chain(provider.exec_cmds.keys())
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
         });
