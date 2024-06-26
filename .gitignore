@@ -8,3 +8,4 @@ node_modules/
 /editors/vscode/out/
 /editors/lapce/out/
 /external/typst-preview
+/dist

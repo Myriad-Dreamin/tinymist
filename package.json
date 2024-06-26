@@ -12,7 +12,8 @@
     "tools/typst-preview-frontend"
   ],
   "scripts": {
-    "build:preview": "cd contrib/typst-preview/editors/vscode && yarn build"
+    "build:preview": "cd contrib/typst-preview/editors/vscode && yarn build",
+    "docs": "shiroa serve -w . docs/tinymist"
   },
   "dependencies": {},
   "devDependencies": {}

@@ -1,0 +1,51 @@
+name: tinymist::gh_pages
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    
+permissions:
+  pages: write
+  id-token: write
+  contents: read
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: 'pages'
+  cancel-in-progress: false
+
+jobs:
+  build-gh-pages:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - run: git submodule update --init --recursive
+      - name: Download font assets
+        # use fonts in stable releases
+        run: |
+          mkdir -p assets/fonts/
+          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.2/font-assets.tar.gz | tar -xvz -C assets/fonts
+      - name: Download & install shiroa
+        run: |
+          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.2.0-nightly1/shiroa-x86_64-unknown-linux-gnu.tar.gz | tar -xvz
+          chmod +x shiroa-x86_64-unknown-linux-gnu/bin/shiroa
+          sudo cp shiroa-x86_64-unknown-linux-gnu/bin/shiroa /usr/bin/shiroa
+      - name: Build Book
+        run: |
+          shiroa build --font-path ./assets/typst-fonts/ --font-path ./assets/fonts/ --path-to-root /tinymist/ -w . docs/tinymist
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          # Upload `/github-pages` sub directory
+          path: './dist/tinymist'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
