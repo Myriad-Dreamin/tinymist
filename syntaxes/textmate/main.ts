@@ -302,7 +302,7 @@ const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
   return {
     /// name: 'markup.expr.typst'
     begin: new RegExp("#" + seek.source),
-    end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[])|(?=[\s\]\}\)]|$)|(;)/,
+    end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[\$])|(?=[\s\}\]\)\$]|$)|(;)/,
     beginCaptures: {
       "0": {
         name: kind,
