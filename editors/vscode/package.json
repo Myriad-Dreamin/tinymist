@@ -133,7 +133,8 @@
                     "type": "array",
                     "items": {
                         "type": "string",
-                        "title": "arguments in order"
+                        "title": "arguments in order",
+                        "description": "The arguments for Typst as same as typst-cli."
                     },
                     "default": []
                 },
