@@ -653,13 +653,12 @@ where
         not: Notification,
     ) -> anyhow::Result<()> {
         log::info!("notifying {} - at {:0.2?}", not.method, request_received);
-
-        let Some(handler) = self.notifications.get(not.method.as_str()) else {
-            log::warn!("unhandled notification: {}", not.method);
-            return Ok(());
-        };
-
         let handle = |s, not: Notification| {
+            let Some(handler) = self.notifications.get(not.method.as_str()) else {
+                log::warn!("unhandled notification: {}", not.method);
+                return Ok(());
+            };
+
             let result = handler(s, not.params);
 
             let request_duration = request_received.elapsed();
