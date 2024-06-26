@@ -39,6 +39,8 @@ mod world;
 use std::pin::Pin;
 
 pub use crate::harness::LspHost;
+use futures::future::MaybeDone;
+use serde_json::Value as JsonValue;
 pub use server::compile;
 pub use server::compile_init;
 pub use server::lsp::*;
@@ -56,13 +58,31 @@ use lsp_server::ResponseError;
 type LspResult<Res> = Result<Res, ResponseError>;
 
 type ScheduledResult = LspResult<Option<()>>;
-type ResponseFuture<T> = Pin<Box<dyn std::future::Future<Output = T> + Send>>;
+type ResponseFuture<T> = MaybeDone<Pin<Box<dyn std::future::Future<Output = T> + Send>>>;
 type LspResponseFuture<T> = LspResult<ResponseFuture<T>>;
 type QueryFuture = anyhow::Result<ResponseFuture<anyhow::Result<CompilerQueryResponse>>>;
+type SchedulableResponse<T> = LspResponseFuture<LspResult<T>>;
+type AnySchedulableResponse = SchedulableResponse<JsonValue>;
+
+macro_rules! just_ok {
+    ($expr:expr) => {
+        Ok(futures::future::MaybeDone::Done(Ok($expr)))
+    };
+}
+use just_ok;
 
 macro_rules! just_result {
     ($expr:expr) => {
-        Ok(Box::pin(ready(Ok($expr))))
+        Ok(futures::future::MaybeDone::Done($expr))
     };
 }
 use just_result;
+
+#[allow(unused)]
+macro_rules! just_future {
+    ($expr:expr) => {
+        Ok(futures::future::MaybeDone::Future(Box::pin($expr)))
+    };
+}
+#[allow(unused_imports)]
+use just_future;

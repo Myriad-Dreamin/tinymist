@@ -1,9 +1,9 @@
 //! Bootstrap actors for Tinymist.
 
-use std::future::ready;
 use std::path::PathBuf;
 
 use anyhow::anyhow;
+use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use lsp_types::TextDocumentContentChangeEvent;
 use tinymist_query::{
@@ -17,10 +17,7 @@ use typst_ts_compiler::{
 };
 use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
-use crate::{
-    actor::typ_client::CompileClientActor, compile::CompileState, internal_error, just_result,
-    LanguageState, QueryFuture, ScheduledResult,
-};
+use crate::{actor::typ_client::CompileClientActor, compile::CompileState, *};
 
 impl CompileState {
     /// Focus main file to some path.
@@ -204,14 +201,19 @@ impl LanguageState {
 
     pub fn schedule_query(&mut self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
         let fut = query_fut.map_err(|e| internal_error(e.to_string()))?;
-        self.schedule(
-            req_id,
-            Ok(Box::pin(async move {
+        let fut: AnySchedulableResponse = Ok(match fut {
+            MaybeDone::Done(res) => MaybeDone::Done(
+                res.and_then(|res| Ok(res.to_untyped()?))
+                    .map_err(|err| internal_error(err.to_string())),
+            ),
+            MaybeDone::Future(fut) => MaybeDone::Future(Box::pin(async move {
                 let res = fut.await;
                 res.and_then(|res| Ok(res.to_untyped()?))
                     .map_err(|err| internal_error(err.to_string()))
             })),
-        )
+            MaybeDone::Gone => MaybeDone::Gone,
+        });
+        self.schedule(req_id, fut)
     }
 }
 
@@ -236,17 +238,6 @@ macro_rules! run_query {
         $self.schedule_query($req_id, query_fut)
     }};
 }
-// query_result
-//     .map_err(|err| {
-//         error!("error getting $query: {err} with request {req:?}");
-//         internal_error("Internal error")
-//     })
-//     .map(|resp| {
-//         let CompilerQueryResponse::$query(resp) = resp else {
-//             unreachable!()
-//         };
-//         resp
-//     })
 
 macro_rules! query_source {
     ($self:ident, $method:ident, $req:expr) => {{
@@ -276,17 +267,15 @@ macro_rules! query_state {
         let snap = $self.snapshot()?;
         #[cfg(feature = "stable-server")]
         {
-            Ok(Box::pin(ready(
-                snap.stateful_sync($req).map(CompilerQueryResponse::$method),
-            )))
+            just_result!(snap.stateful_sync($req).map(CompilerQueryResponse::$method))
         }
         #[cfg(not(feature = "stable-server"))]
         {
-            Ok(Box::pin(async move {
+            just_future!(async move {
                 snap.stateful($req)
                     .await
                     .map(CompilerQueryResponse::$method)
-            }))
+            })
         }
     }};
 }
@@ -296,17 +285,15 @@ macro_rules! query_world {
         let snap = $self.snapshot()?;
         #[cfg(feature = "stable-server")]
         {
-            Ok(Box::pin(ready(
-                snap.semantic_sync($req).map(CompilerQueryResponse::$method),
-            )))
+            just_result!(snap.semantic_sync($req).map(CompilerQueryResponse::$method))
         }
         #[cfg(not(feature = "stable-server"))]
         {
-            Ok(Box::pin(async move {
+            just_future!(async move {
                 snap.semantic($req)
                     .await
                     .map(CompilerQueryResponse::$method)
-            }))
+            })
         }
     }};
 }
@@ -338,7 +325,7 @@ impl LanguageState {
             }
         };
 
-        just_result!(query)
+        just_ok!(query)
     }
 
     fn query_on(client: &CompileClientActor, query: CompilerQueryRequest) -> QueryFuture {
@@ -346,12 +333,12 @@ impl LanguageState {
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
         match query {
-            OnExport(OnExportRequest { kind, path }) => just_result!(
-                CompilerQueryResponse::OnExport(client.on_export(kind, path)?,)
-            ),
+            OnExport(OnExportRequest { kind, path }) => just_ok!(CompilerQueryResponse::OnExport(
+                client.on_export(kind, path)?,
+            )),
             OnSaveExport(OnSaveExportRequest { path }) => {
                 client.on_save_export(path)?;
-                just_result!(CompilerQueryResponse::OnSaveExport(()))
+                just_ok!(CompilerQueryResponse::OnSaveExport(()))
             }
             Hover(req) => query_state!(client, Hover, req),
             GotoDefinition(req) => query_state!(client, GotoDefinition, req),
@@ -370,7 +357,7 @@ impl LanguageState {
             DocumentMetrics(req) => query_state!(client, DocumentMetrics, req),
             ServerInfo(_) => {
                 let res = client.collect_server_info()?;
-                just_result!(CompilerQueryResponse::ServerInfo(Some(res)))
+                just_ok!(CompilerQueryResponse::ServerInfo(Some(res)))
             }
             _ => unreachable!(),
         }
@@ -385,13 +372,18 @@ impl CompileState {
 
     pub fn schedule_query(&mut self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
         let fut = query_fut.map_err(|e| internal_error(e.to_string()))?;
-        self.schedule(
-            req_id,
-            Ok(Box::pin(async move {
+        let fut: AnySchedulableResponse = Ok(match fut {
+            MaybeDone::Done(res) => MaybeDone::Done(
+                res.and_then(|res| Ok(res.to_untyped()?))
+                    .map_err(|err| internal_error(err.to_string())),
+            ),
+            MaybeDone::Future(fut) => MaybeDone::Future(Box::pin(async move {
                 let res = fut.await;
                 res.and_then(|res| Ok(res.to_untyped()?))
                     .map_err(|err| internal_error(err.to_string()))
             })),
-        )
+            MaybeDone::Gone => MaybeDone::Gone,
+        });
+        self.schedule(req_id, fut)
     }
 }

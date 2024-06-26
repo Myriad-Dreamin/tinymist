@@ -84,7 +84,7 @@ impl CompileState {
     pub fn clear_cache(&self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         comemo::evict(0);
         self.compiler().clear_cache();
-        just_result!(JsonValue::Null)
+        just_ok!(JsonValue::Null)
     }
 
     /// Focus main file to some path.
@@ -95,6 +95,6 @@ impl CompileState {
         update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
 
         info!("entry changed: {entry:?}");
-        just_result!(JsonValue::Null)
+        just_ok!(JsonValue::Null)
     }
 }

@@ -9,7 +9,7 @@ pub mod compile_init;
 #[cfg(feature = "preview")]
 pub mod preview;
 
-use std::{collections::HashMap, future::ready};
+use std::collections::HashMap;
 
 use lsp_server::RequestId;
 use reflexo::ImmutPath;
@@ -147,7 +147,7 @@ use notify_fn;
 //     };
 // }
 
-use crate::just_result;
+use crate::{just_ok, just_result};
 
 /// Get a parsed command argument.
 /// Return `INVALID_PARAMS` when no arg or parse failed.

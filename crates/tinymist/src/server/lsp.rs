@@ -213,10 +213,24 @@ impl LanguageState {
         resp: SchedulableResponse<T>,
     ) -> ScheduledResult {
         let resp = resp?;
-        let client = self.client.clone();
-        self.handle.spawn(async move {
-            client.respond(result_to_response(req_id, resp.await));
-        });
+
+        use futures::future::MaybeDone::*;
+        match resp {
+            Done(output) => {
+                self.client.respond(result_to_response(req_id, output));
+            }
+            Future(fut) => {
+                let client = self.client.clone();
+                let req_id = req_id.clone();
+                self.handle.spawn(async move {
+                    client.respond(result_to_response(req_id, fut.await));
+                });
+            }
+            Gone => {
+                log::warn!("response for request({req_id:?}) already taken");
+            }
+        };
+
         Ok(Some(()))
     }
 }
@@ -480,7 +494,7 @@ impl LanguageState {
     /// error code `-32600` (invalid request).
     fn shutdown(&mut self, _params: ()) -> SchedulableResponse<()> {
         self.shutdown_requested = true;
-        just_result!(())
+        just_ok!(())
     }
 }
 

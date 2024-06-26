@@ -82,7 +82,7 @@ impl LanguageState {
         {
             v.clear_cache();
         }
-        just_result!(JsonValue::Null)
+        just_ok!(JsonValue::Null)
     }
 
     /// Pin main file to some path.
@@ -93,7 +93,7 @@ impl LanguageState {
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
 
         info!("file pinned: {entry:?}");
-        just_result!(JsonValue::Null)
+        just_ok!(JsonValue::Null)
     }
 
     /// Focus main file to some path.
@@ -111,7 +111,7 @@ impl LanguageState {
         if ok {
             info!("file focused: {entry:?}");
         }
-        just_result!(JsonValue::Null)
+        just_ok!(JsonValue::Null)
     }
 
     /// Initialize a new template.
@@ -160,7 +160,7 @@ impl LanguageState {
 
         let res = serde_json::to_value(InitResult { entry_path })
             .map_err(|_| internal_error("Cannot serialize path"));
-        Ok(Box::pin(ready(res)))
+        just_result!(res)
     }
 
     /// Get the entry of a template.
@@ -195,7 +195,7 @@ impl LanguageState {
         let entry = String::from_utf8(entry.to_vec())
             .map_err(|_| invalid_params("template entry is not a valid UTF-8 string"))?;
 
-        just_result!(JsonValue::String(entry))
+        just_ok!(JsonValue::String(entry))
     }
 
     /// Interact with the code context at the source file.
@@ -330,7 +330,7 @@ impl LanguageState {
     /// Get the all valid symbols
     pub fn resource_symbols(&self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let resp = self.get_symbol_resources();
-        just_result!(resp.map_err(|e| internal_error(e.to_string()))?)
+        just_ok!(resp.map_err(|e| internal_error(e.to_string()))?)
     }
 
     /// Get tutorial web page

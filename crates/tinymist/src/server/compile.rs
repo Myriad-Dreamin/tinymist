@@ -28,6 +28,8 @@ use super::*;
 pub struct CompileState {
     /// The language server client.
     pub client: LspHost<CompileState>,
+    /// The runtime handle to spawn tasks.
+    pub handle: tokio::runtime::Handle,
 
     // State to synchronize with the client.
     /// Whether the server is shutting down.
@@ -49,8 +51,6 @@ pub struct CompileState {
     pub regular_cmds: RegularCmdMap<Self>,
 
     // Resources
-    /// The runtime handle to spawn tasks.
-    pub handle: tokio::runtime::Handle,
     /// Source synchronized with client
     pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
     /// The diagnostics sender to send diagnostics to `crate::actor::cluster`.
@@ -154,10 +154,24 @@ impl CompileState {
         resp: SchedulableResponse<T>,
     ) -> ScheduledResult {
         let resp = resp?;
-        let client = self.client.clone();
-        self.handle.spawn(async move {
-            client.respond(result_to_response(req_id, resp.await));
-        });
+
+        use futures::future::MaybeDone::*;
+        match resp {
+            Done(output) => {
+                self.client.respond(result_to_response(req_id, output));
+            }
+            Future(fut) => {
+                let client = self.client.clone();
+                let req_id = req_id.clone();
+                self.handle.spawn(async move {
+                    client.respond(result_to_response(req_id, fut.await));
+                });
+            }
+            Gone => {
+                log::warn!("response for request({req_id:?}) already taken");
+            }
+        };
+
         Ok(Some(()))
     }
 }
