@@ -7,7 +7,7 @@ use lsp_types::TextEdit;
 use tinymist_query::{typst_to_lsp, PositionEncoding};
 use typst::syntax::Source;
 
-use crate::{result_to_response, FormatterMode, LspHost, LspResult, LanguageState};
+use crate::{result_to_response, sync_lsp::LspResult, FormatterMode, LanguageState, LspClient};
 
 #[derive(Debug, Clone)]
 pub struct FormatConfig {
@@ -23,7 +23,7 @@ pub enum FormatRequest {
 pub fn run_format_thread(
     config: FormatConfig,
     format_rx: crossbeam_channel::Receiver<FormatRequest>,
-    client: LspHost<LanguageState>,
+    client: LspClient<LanguageState>,
     position_encoding: PositionEncoding,
 ) {
     type FmtFn = Box<dyn Fn(Source) -> LspResult<Option<Vec<TextEdit>>>>;

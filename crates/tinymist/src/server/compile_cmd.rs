@@ -1,12 +1,8 @@
 use std::path::PathBuf;
 
-use log::{error, info};
-use lsp_types::ExecuteCommandParams;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
 use tinymist_query::{ExportKind, PageSelection};
-
-use crate::{internal_error, invalid_params, method_not_found, run_query};
 
 use super::compile::*;
 use super::*;
@@ -17,36 +13,6 @@ struct ExportOpts {
 }
 
 impl CompileState {
-    pub fn get_exec_commands() -> ExecuteCmdMap<Self> {
-        type State = CompileState;
-
-        ExecuteCmdMap::from_iter([
-            exec_fn_!("tinymist.exportPdf", State::export_pdf),
-            exec_fn_!("tinymist.exportSvg", State::export_svg),
-            exec_fn_!("tinymist.exportPng", State::export_png),
-            exec_fn!("tinymist.doClearCache", State::clear_cache),
-            exec_fn!("tinymist.changeEntry", State::change_entry),
-        ])
-    }
-
-    /// The entry point for the `workspace/executeCommand` request.
-    pub fn execute_command(
-        &mut self,
-        req_id: RequestId,
-        params: ExecuteCommandParams,
-    ) -> ScheduledResult {
-        let ExecuteCommandParams {
-            command,
-            arguments: args,
-            work_done_progress_params: _,
-        } = params;
-        let Some(handler) = self.exec_cmds.get(command.as_str()) else {
-            error!("asked to execute unknown command");
-            return Err(method_not_found());
-        };
-        handler(self, req_id, args)
-    }
-
     /// Export the current document as a PDF file.
     pub fn export_pdf(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
         self.export(req_id, ExportKind::Pdf, args)
@@ -81,7 +47,7 @@ impl CompileState {
     ///
     /// # Errors
     /// Errors if the cache could not be cleared.
-    pub fn clear_cache(&self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn clear_cache(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         comemo::evict(0);
         self.compiler().clear_cache();
         just_ok!(JsonValue::Null)
@@ -94,7 +60,7 @@ impl CompileState {
         let update_result = self.do_change_entry(entry.clone());
         update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
 
-        info!("entry changed: {entry:?}");
+        log::info!("entry changed: {entry:?}");
         just_ok!(JsonValue::Null)
     }
 }

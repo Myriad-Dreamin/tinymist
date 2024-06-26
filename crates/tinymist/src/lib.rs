@@ -28,61 +28,54 @@
 
 // pub mod formatting;
 mod actor;
-pub mod harness;
 mod resource;
 mod server;
 mod state;
+pub mod sync_lsp;
 pub mod tools;
 pub mod transport;
 mod utils;
 mod world;
-use std::pin::Pin;
 
-pub use crate::harness::LspHost;
-use futures::future::MaybeDone;
-use serde_json::Value as JsonValue;
+pub use crate::sync_lsp::LspClient;
 pub use server::compile;
 pub use server::compile_init;
 pub use server::lsp::*;
 pub use server::lsp_init::*;
 #[cfg(feature = "preview")]
 pub use server::preview;
-use tinymist_query::CompilerQueryResponse;
 pub use world::{
     CompileFontOpts, CompileOnceOpts, CompileOpts, LspUniverse, LspWorld, LspWorldBuilder,
 };
 
-// use async_lsp::ClientSocket;
-use lsp_server::ResponseError;
+use crate::sync_lsp::*;
 
-type LspResult<Res> = Result<Res, ResponseError>;
-
-type ScheduledResult = LspResult<Option<()>>;
-type ResponseFuture<T> = MaybeDone<Pin<Box<dyn std::future::Future<Output = T> + Send>>>;
-type LspResponseFuture<T> = LspResult<ResponseFuture<T>>;
-type QueryFuture = anyhow::Result<ResponseFuture<anyhow::Result<CompilerQueryResponse>>>;
-type SchedulableResponse<T> = LspResponseFuture<LspResult<T>>;
-type AnySchedulableResponse = SchedulableResponse<JsonValue>;
-
-macro_rules! just_ok {
-    ($expr:expr) => {
-        Ok(futures::future::MaybeDone::Done(Ok($expr)))
-    };
+/// Get a parsed command argument.
+/// Return `INVALID_PARAMS` when no arg or parse failed.
+macro_rules! get_arg {
+    ($args:ident[$idx:expr] as $ty:ty) => {{
+        let arg = $args.get_mut($idx);
+        let arg = arg.and_then(|x| from_value::<$ty>(x.take()).ok());
+        match arg {
+            Some(v) => v,
+            None => {
+                let msg = concat!("expect ", stringify!($ty), "at args[", $idx, "]");
+                return Err(invalid_params(msg));
+            }
+        }
+    }};
 }
-use just_ok;
+use get_arg;
 
-macro_rules! just_result {
-    ($expr:expr) => {
-        Ok(futures::future::MaybeDone::Done($expr))
-    };
+/// Get a parsed command argument or default if no arg.
+/// Return `INVALID_PARAMS` when parse failed.
+macro_rules! get_arg_or_default {
+    ($args:ident[$idx:expr] as $ty:ty) => {{
+        if $idx >= $args.len() {
+            Default::default()
+        } else {
+            get_arg!($args[$idx] as $ty)
+        }
+    }};
 }
-use just_result;
-
-#[allow(unused)]
-macro_rules! just_future {
-    ($expr:expr) => {
-        Ok(futures::future::MaybeDone::Future(Box::pin($expr)))
-    };
-}
-#[allow(unused_imports)]
-use just_future;
+use get_arg_or_default;

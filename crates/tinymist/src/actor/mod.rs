@@ -56,7 +56,7 @@ impl CompileState {
         let intr_tx_ = intr_tx.clone();
 
         // Run Export actors before preparing cluster to avoid loss of events
-        self.handle.spawn(
+        self.client.handle.spawn(
             ExportActor {
                 group: editor_group.clone(),
                 editor_tx: self.editor_tx.clone(),
@@ -100,7 +100,7 @@ impl CompileState {
         let entry_ = entry.clone();
         let handle_ = handle.clone();
 
-        self.handle.spawn_blocking(move || {
+        self.client.handle.spawn_blocking(move || {
             // Create the world
             let font_resolver = font_resolver.wait().clone();
             let verse = LspWorldBuilder::build(entry_.clone(), font_resolver, inputs)

@@ -7,7 +7,7 @@ use lsp_types::{Diagnostic, Url};
 use tinymist_query::{DiagnosticsMap, LspDiagnostic};
 use tokio::sync::mpsc;
 
-use crate::{tools::word_count::WordsCount, LspHost, LanguageState};
+use crate::{tools::word_count::WordsCount, LanguageState, LspClient};
 
 pub enum EditorRequest {
     Diag(String, Option<DiagnosticsMap>),
@@ -16,7 +16,7 @@ pub enum EditorRequest {
 }
 
 pub struct EditorActor {
-    host: LspHost<LanguageState>,
+    client: LspClient<LanguageState>,
     editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
 
     diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
@@ -27,12 +27,12 @@ pub struct EditorActor {
 
 impl EditorActor {
     pub fn new(
-        host: LspHost<LanguageState>,
+        client: LspClient<LanguageState>,
         editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
         notify_compile_status: bool,
     ) -> Self {
         Self {
-            host,
+            client,
             editor_rx,
             diagnostics: HashMap::new(),
             affect_map: HashMap::new(),
@@ -71,7 +71,7 @@ impl EditorActor {
                     log::debug!("received status request");
                     if self.notify_compile_status && group == "primary" {
                         compile_status = status;
-                        self.host.send_notification::<TinymistCompileStatus>(
+                        self.client.send_notification::<TinymistCompileStatus>(
                             TinymistCompileStatus {
                                 status: compile_status.clone(),
                                 words_count: words_count.clone(),
@@ -83,7 +83,7 @@ impl EditorActor {
                     log::debug!("received word count request");
                     if self.notify_compile_status && group == "primary" {
                         words_count = Some(wc);
-                        self.host.send_notification::<TinymistCompileStatus>(
+                        self.client.send_notification::<TinymistCompileStatus>(
                             TinymistCompileStatus {
                                 status: compile_status.clone(),
                                 words_count: words_count.clone(),
@@ -106,7 +106,8 @@ impl EditorActor {
             let diags = diags.filter_map(|(g, diags)| (g != "primary" || enable).then_some(diags));
             let to_publish = diags.flatten().cloned().collect();
 
-            self.host.publish_diagnostics(url.clone(), to_publish, None);
+            self.client
+                .publish_diagnostics(url.clone(), to_publish, None);
         }
     }
 
@@ -170,7 +171,7 @@ impl EditorActor {
         };
 
         if group != "primary" || with_primary {
-            self.host.publish_diagnostics(url, to_publish, None)
+            self.client.publish_diagnostics(url, to_publish, None)
         }
     }
 }
