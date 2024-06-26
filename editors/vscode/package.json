@@ -229,7 +229,6 @@
                 "scopeName": "source.typst",
                 "path": "./out/typst.tmLanguage.json",
                 "balancedBracketScopes": [
-                    "*",
                     "meta.expr",
                     "meta.brace"
                 ],
@@ -248,7 +247,6 @@
                 "scopeName": "source.typst-code",
                 "path": "./out/typst-code.tmLanguage.json",
                 "balancedBracketScopes": [
-                    "*",
                     "meta.expr",
                     "meta.brace"
                 ],
