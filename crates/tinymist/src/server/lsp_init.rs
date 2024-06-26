@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
 use anyhow::bail;
 use itertools::Itertools;
@@ -10,12 +11,12 @@ use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tokio::sync::mpsc;
 use typst_ts_core::ImmutPath;
 
+pub use super::lsp::LanguageState;
+use super::*;
 use crate::actor::editor::EditorActor;
 use crate::compile_init::CompileConfig;
-use crate::harness::LspHost;
 use crate::utils::{try_, try_or};
 use crate::world::ImmutDict;
-use crate::{invalid_params, CompileFontOpts, LanguageState, LspResult};
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
@@ -217,12 +218,14 @@ impl From<&InitializeParams> for ConstConfig {
 }
 
 pub struct Init {
-    pub host: LspHost<LanguageState>,
-    pub handle: tokio::runtime::Handle,
+    pub client: LspClient<LanguageState>,
     pub compile_opts: CompileFontOpts,
+    pub exec_cmds: OnceLock<Vec<String>>,
 }
 
-impl Init {
+impl Initializer for Init {
+    type I = InitializeParams;
+    type S = LanguageState;
     /// The [`initialize`] request is the first request sent from the client to
     /// the server.
     ///
@@ -238,10 +241,7 @@ impl Init {
     ///
     /// # Errors
     /// Errors if the configuration could not be updated.
-    pub fn initialize(
-        mut self,
-        params: InitializeParams,
-    ) -> (LanguageState, LspResult<InitializeResult>) {
+    fn initialize(mut self, params: InitializeParams) -> (LanguageState, AnySchedulableResponse) {
         // self.tracing_init();
 
         // Initialize configurations
@@ -279,12 +279,7 @@ impl Init {
         // Bootstrap server
         let (editor_tx, editor_rx) = mpsc::unbounded_channel();
 
-        let mut service = LanguageState::new(
-            self.host.clone(),
-            cc.clone(),
-            editor_tx,
-            self.handle.clone(),
-        );
+        let mut service = LanguageState::new(self.client.clone(), cc.clone(), editor_tx);
 
         if let Err(err) = res {
             return (service, Err(err));
@@ -298,7 +293,7 @@ impl Init {
         service.run_user_action_thread();
 
         let editor_actor = EditorActor::new(
-            self.host.clone(),
+            self.client.clone(),
             editor_rx,
             service.config.compile.notify_compile_status,
         );
@@ -306,7 +301,7 @@ impl Init {
         service.primary.restart_server("primary");
 
         // Run the cluster in the background after we referencing it
-        self.handle.spawn(editor_actor.run());
+        self.client.handle.spawn(editor_actor.run());
 
         // Respond to the host (LSP client)
 
@@ -367,7 +362,7 @@ impl Init {
                 )),
                 semantic_tokens_provider,
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: service.exec_cmds.keys().map(ToString::to_string).collect(),
+                    commands: self.exec_cmds.get().unwrap().clone(),
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: None,
                     },
@@ -406,7 +401,8 @@ impl Init {
             ..Default::default()
         };
 
-        (service, Ok(res))
+        let res = serde_json::to_value(res).map_err(|e| invalid_params(e.to_string()));
+        (service, just_result!(res))
     }
 }
 

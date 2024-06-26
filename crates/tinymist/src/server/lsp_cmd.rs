@@ -1,10 +1,8 @@
 //! tinymist LSP mode
 
 use std::ops::Deref;
-use std::path::Path;
 use std::path::PathBuf;
 
-use log::{error, info};
 use lsp_server::RequestId;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};
@@ -13,37 +11,14 @@ use tinymist_query::ExportKind;
 use typst::diag::StrResult;
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use typst_ts_core::error::prelude::*;
-use typst_ts_core::path::PathClean;
-
-use crate::actor::user_action::{TraceParams, UserActionRequest};
-use crate::tools::package::InitTask;
-use crate::{run_query, LspResult};
 
 use super::lsp::*;
 use super::*;
+use crate::actor::user_action::{TraceParams, UserActionRequest};
+use crate::tools::package::InitTask;
 
 /// Here are implemented the handlers for each command.
 impl LanguageState {
-    pub fn get_exec_commands() -> ExecuteCmdMap<Self> {
-        type State = LanguageState;
-        ExecuteCmdMap::from_iter([
-            exec_fn_!("tinymist.exportPdf", State::export_pdf),
-            exec_fn_!("tinymist.exportSvg", State::export_svg),
-            exec_fn_!("tinymist.exportPng", State::export_png),
-            exec_fn!("tinymist.doClearCache", State::clear_cache),
-            exec_fn!("tinymist.pinMain", State::pin_document),
-            exec_fn!("tinymist.focusMain", State::focus_document),
-            exec_fn!("tinymist.doInitTemplate", State::init_template),
-            exec_fn!("tinymist.doGetTemplateEntry", State::do_get_template_entry),
-            exec_fn_!("tinymist.interactCodeContext", State::interact_code_context),
-            exec_fn_!("tinymist.getDocumentTrace", State::get_document_trace),
-            exec_fn_!("tinymist.getDocumentMetrics", State::get_document_metrics),
-            exec_fn_!("tinymist.getServerInfo", State::get_server_info),
-            // For Documentations
-            exec_fn_!("tinymist.getResources", State::get_resources),
-        ])
-    }
-
     /// Export the current document as a PDF file.
     pub fn export_pdf(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
         self.primary.export_pdf(req_id, args)
@@ -74,7 +49,7 @@ impl LanguageState {
     ///
     /// # Errors
     /// Errors if the cache could not be cleared.
-    pub fn clear_cache(&self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn clear_cache(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         comemo::evict(0);
         for v in Some(self.primary())
             .into_iter()
@@ -92,7 +67,7 @@ impl LanguageState {
         let update_result = self.pin_entry(entry.clone());
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
 
-        info!("file pinned: {entry:?}");
+        log::info!("file pinned: {entry:?}");
         just_ok!(JsonValue::Null)
     }
 
@@ -109,13 +84,13 @@ impl LanguageState {
         let ok = ok.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
 
         if ok {
-            info!("file focused: {entry:?}");
+            log::info!("file focused: {entry:?}");
         }
         just_ok!(JsonValue::Null)
     }
 
     /// Initialize a new template.
-    pub fn init_template(&self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn init_template(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use crate::tools::package::{self, determine_latest_version, TemplateSource};
 
         #[derive(Debug, Serialize)]
@@ -156,7 +131,7 @@ impl LanguageState {
         .map_err(map_string_err("failed to initialize template"))
         .map_err(z_internal_error)?;
 
-        info!("template initialized: {from_source:?} to {to_path:?}");
+        log::info!("template initialized: {from_source:?} to {to_path:?}");
 
         let res = serde_json::to_value(InitResult { entry_path })
             .map_err(|_| internal_error("Cannot serialize path"));
@@ -164,7 +139,7 @@ impl LanguageState {
     }
 
     /// Get the entry of a template.
-    pub fn do_get_template_entry(&self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn do_get_template_entry(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use crate::tools::package::{self, determine_latest_version, TemplateSource};
 
         let from_source = get_arg!(args[0] as String);
@@ -289,52 +264,17 @@ impl LanguageState {
     ) -> ScheduledResult {
         run_query!(req_id, self.ServerInfo())
     }
-
-    /// Get static resources with help of tinymist service, for example, a
-    /// static help pages for some typst function.
-    pub fn get_resources(
-        &mut self,
-        req_id: RequestId,
-        mut args: Vec<JsonValue>,
-    ) -> ScheduledResult {
-        let path = get_arg!(args[0] as PathBuf);
-
-        let Some(handler) = self.resource_routes.get(path.as_path()) else {
-            error!("asked for unknown resource: {path:?}");
-            return Err(method_not_found());
-        };
-
-        // Note our redirection will keep the first path argument in the args vec.
-        handler(self, req_id, args)
-    }
 }
 
 impl LanguageState {
-    pub fn get_resource_routes() -> ResourceMap<Self> {
-        // LspHandler<Vec<JsonValue>, JsonValue>,
-        macro_rules! resources_at {
-            ($key: expr, LanguageState::$method: ident) => {
-                (
-                    Path::new($key).clean().as_path().into(),
-                    resource_fn!(LanguageState::$method),
-                )
-            };
-        }
-
-        ResourceMap::from_iter([
-            resources_at!("/symbols", LanguageState::resource_symbols),
-            resources_at!("/tutorial", LanguageState::resource_tutoral),
-        ])
-    }
-
     /// Get the all valid symbols
-    pub fn resource_symbols(&self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn resource_symbols(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let resp = self.get_symbol_resources();
         just_ok!(resp.map_err(|e| internal_error(e.to_string()))?)
     }
 
     /// Get tutorial web page
-    pub fn resource_tutoral(&self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn resource_tutoral(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         Err(method_not_found())
     }
 }

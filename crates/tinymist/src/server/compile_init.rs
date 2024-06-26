@@ -18,12 +18,11 @@ use typst::util::Deferred;
 use typst_ts_core::config::compiler::EntryState;
 use typst_ts_core::{ImmutPath, TypstDict};
 
+use super::*;
 use crate::actor::editor::EditorRequest;
 use crate::compile::CompileState;
-use crate::harness::LspDriver;
 use crate::utils::{try_, try_or_default};
 use crate::world::{ImmutDict, SharedFontResolver};
-use crate::{CompileExtraOpts, CompileFontOpts, ExportMode, LspHost};
 
 #[cfg(feature = "clap")]
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
@@ -380,7 +379,7 @@ pub struct ConstCompileConfig {
 }
 
 pub struct CompileInit {
-    pub handle: tokio::runtime::Handle,
+    pub client: LspClient<CompileState>,
     pub font: CompileFontOpts,
     pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
 }
@@ -391,19 +390,11 @@ pub struct CompileInitializeParams {
     pub position_encoding: Option<lsp_types::PositionEncodingKind>,
 }
 
-impl LspDriver for CompileInit {
-    type InitParams = CompileInitializeParams;
-    type InitResult = ();
-    type InitializedSelf = CompileState;
+impl Initializer for CompileInit {
+    type I = CompileInitializeParams;
+    type S = CompileState;
 
-    fn initialize(
-        self,
-        client: LspHost<Self::InitializedSelf>,
-        params: Self::InitParams,
-    ) -> (
-        Self::InitializedSelf,
-        Result<Self::InitResult, lsp_server::ResponseError>,
-    ) {
+    fn initialize(self, params: Self::I) -> (Self::S, AnySchedulableResponse) {
         let mut compile_config = CompileConfig {
             font_opts: self.font,
             ..CompileConfig::default()
@@ -411,7 +402,7 @@ impl LspDriver for CompileInit {
         compile_config.update(&params.config).unwrap();
 
         let mut service = CompileState::new(
-            client,
+            self.client.clone(),
             compile_config,
             ConstCompileConfig {
                 position_encoding: params
@@ -423,11 +414,10 @@ impl LspDriver for CompileInit {
                     .unwrap_or_default(),
             },
             self.editor_tx,
-            self.handle,
         );
 
         service.restart_server("primary");
 
-        (service, Ok(()))
+        (service, just_ok!(JsonValue::Null))
     }
 }

@@ -8,7 +8,7 @@ use lsp_server::RequestId;
 use serde::{Deserialize, Serialize};
 use typst_ts_core::TypstDict;
 
-use crate::{internal_error, result_to_response, LspHost, LanguageState};
+use crate::{internal_error, result_to_response, LanguageState, LspClient};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,7 +26,7 @@ pub enum UserActionRequest {
 
 pub fn run_user_action_thread(
     user_action_rx: crossbeam_channel::Receiver<UserActionRequest>,
-    client: LspHost<LanguageState>,
+    client: LspClient<LanguageState>,
 ) {
     while let Ok(req) = user_action_rx.recv() {
         match req {

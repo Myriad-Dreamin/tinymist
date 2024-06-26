@@ -2,17 +2,21 @@
 
 mod args;
 
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::PathBuf,
+    sync::{Arc, OnceLock},
+};
 
 use anyhow::bail;
 use clap::Parser;
 use comemo::Prehashed;
-use lsp_types::{InitializeParams, InitializedParams};
+use lsp_types::InitializedParams;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use tinymist::{
+    compile::CompileState,
     compile_init::{CompileInit, CompileInitializeParams},
-    harness::{lsp_harness, InitializedLspDriver, LspDriver, LspHost},
+    sync_lsp::{Initializer, LspBuilder, LspClient},
     transport::with_stdio_transport,
     CompileFontOpts, Init, LanguageState, LspWorld,
 };
@@ -80,44 +84,28 @@ fn main() -> anyhow::Result<()> {
 }
 
 pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
-    log::info!("starting generic LSP server: {:#?}", args);
+    log::info!("starting LSP server: {:#?}", args);
 
-    with_stdio_transport(args.mirror.clone(), |conn, force_exit| {
-        lsp_harness(Lsp { args }, conn, force_exit)
+    with_stdio_transport(args.mirror.clone(), |conn| {
+        let sender = Arc::new(RwLock::new(Some(conn.sender)));
+        let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender);
+        LanguageState::install(LspBuilder::new(
+            Init {
+                client: client.clone(),
+                compile_opts: CompileFontOpts {
+                    font_paths: args.font.font_paths.clone(),
+                    ignore_system_fonts: args.font.ignore_system_fonts,
+                    ..Default::default()
+                },
+                exec_cmds: OnceLock::new(),
+            },
+            client,
+        ))
+        .build()
+        .start(conn.receiver)
     })?;
 
     log::info!("LSP server did shut down");
-
-    struct Lsp {
-        args: LspArgs,
-    }
-
-    impl LspDriver for Lsp {
-        type InitParams = InitializeParams;
-        type InitResult = lsp_types::InitializeResult;
-        type InitializedSelf = LanguageState;
-
-        fn initialize(
-            self,
-            host: LspHost<Self::InitializedSelf>,
-            params: Self::InitParams,
-        ) -> (
-            Self::InitializedSelf,
-            Result<Self::InitResult, lsp_server::ResponseError>,
-        ) {
-            Init {
-                host,
-                handle: RUNTIMES.tokio_runtime.handle().clone(),
-                compile_opts: CompileFontOpts {
-                    font_paths: self.args.font.font_paths.clone(),
-                    ignore_system_fonts: self.args.font.ignore_system_fonts,
-                    ..Default::default()
-                },
-            }
-            .initialize(params)
-        }
-    }
-
     Ok(())
 }
 
@@ -146,8 +134,8 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
         pairs.collect()
     }));
 
-    let init = CompileInit {
-        handle: RUNTIMES.tokio_runtime.handle().clone(),
+    let init = |host| CompileInit {
+        client: host,
         font: CompileFontOpts {
             font_paths: args.compile.font.font_paths.clone(),
             ignore_system_fonts: args.compile.font.ignore_system_fonts,
@@ -158,8 +146,12 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
     if args.persist {
         log::info!("starting compile server");
 
-        with_stdio_transport(args.mirror.clone(), |conn, force_exit| {
-            lsp_harness(init, conn, force_exit)
+        with_stdio_transport(args.mirror.clone(), |conn| {
+            let sender = Arc::new(RwLock::new(Some(conn.sender)));
+            let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender);
+            CompileState::install(LspBuilder::new(init(client.clone()), client))
+                .build()
+                .start(conn.receiver)
         })?;
 
         log::info!("compile server did shut down");
@@ -167,23 +159,20 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
         {
             let (s, _) = crossbeam_channel::unbounded();
             let sender = Arc::new(RwLock::new(Some(s)));
-            let host = LspHost::new(sender.clone());
+            let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender.clone());
 
             let _drop_guard = ForceDrop(sender);
 
-            let (mut service, res) = init.initialize(
-                host,
-                CompileInitializeParams {
-                    config: serde_json::json!({
-                        "rootPath": root_path,
-                    }),
-                    position_encoding: None,
-                },
-            );
+            let (mut service, res) = init(client).initialize(CompileInitializeParams {
+                config: serde_json::json!({
+                    "rootPath": root_path,
+                }),
+                position_encoding: None,
+            });
 
             res.unwrap();
 
-            service.initialized(InitializedParams {});
+            let _ = service.initialized(InitializedParams {});
 
             let entry = service.config.determine_entry(Some(input.as_path().into()));
 

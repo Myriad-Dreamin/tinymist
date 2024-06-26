@@ -3,8 +3,6 @@
 use std::path::PathBuf;
 
 use anyhow::anyhow;
-use futures::future::MaybeDone;
-use lsp_server::RequestId;
 use lsp_types::TextDocumentContentChangeEvent;
 use tinymist_query::{
     lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, OnExportRequest,
@@ -17,7 +15,9 @@ use typst_ts_compiler::{
 };
 use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
-use crate::{actor::typ_client::CompileClientActor, compile::CompileState, *};
+use crate::{
+    actor::typ_client::CompileClientActor, compile::CompileState, sync_lsp::*, LanguageState,
+};
 
 impl CompileState {
     /// Focus main file to some path.
@@ -198,23 +198,6 @@ impl LanguageState {
     pub fn snapshot(&self) -> LanguageStateSnapshot {
         LanguageStateSnapshot {}
     }
-
-    pub fn schedule_query(&mut self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
-        let fut = query_fut.map_err(|e| internal_error(e.to_string()))?;
-        let fut: AnySchedulableResponse = Ok(match fut {
-            MaybeDone::Done(res) => MaybeDone::Done(
-                res.and_then(|res| Ok(res.to_untyped()?))
-                    .map_err(|err| internal_error(err.to_string())),
-            ),
-            MaybeDone::Future(fut) => MaybeDone::Future(Box::pin(async move {
-                let res = fut.await;
-                res.and_then(|res| Ok(res.to_untyped()?))
-                    .map_err(|err| internal_error(err.to_string()))
-            })),
-            MaybeDone::Gone => MaybeDone::Gone,
-        });
-        self.schedule(req_id, fut)
-    }
 }
 
 pub struct LanguageStateSnapshot {}
@@ -225,7 +208,7 @@ macro_rules! run_query_tail {
         use tinymist_query::*;
         let req = paste::paste! { [<$query Request>] { $($arg_key),* } };
         let query_fut = $self.query(CompilerQueryRequest::$query(req.clone()));
-        $self.handle.spawn(query_fut.map_err(|e| internal_error(e.to_string()))?)
+        $self.client.handle.spawn(query_fut.map_err(|e| internal_error(e.to_string()))?)
     }};
 }
 
@@ -235,7 +218,7 @@ macro_rules! run_query {
         use tinymist_query::*;
         let req = paste::paste! { [<$query Request>] { $($arg_key),* } };
         let query_fut = $self.query(CompilerQueryRequest::$query(req.clone()));
-        $self.schedule_query($req_id, query_fut)
+        $self.client.schedule_query($req_id, query_fut)
     }};
 }
 
@@ -368,22 +351,5 @@ impl CompileState {
     pub fn query(&self, query: CompilerQueryRequest) -> QueryFuture {
         let client = self.compiler.as_ref().unwrap();
         LanguageState::query_on(client, query)
-    }
-
-    pub fn schedule_query(&mut self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
-        let fut = query_fut.map_err(|e| internal_error(e.to_string()))?;
-        let fut: AnySchedulableResponse = Ok(match fut {
-            MaybeDone::Done(res) => MaybeDone::Done(
-                res.and_then(|res| Ok(res.to_untyped()?))
-                    .map_err(|err| internal_error(err.to_string())),
-            ),
-            MaybeDone::Future(fut) => MaybeDone::Future(Box::pin(async move {
-                let res = fut.await;
-                res.and_then(|res| Ok(res.to_untyped()?))
-                    .map_err(|err| internal_error(err.to_string()))
-            })),
-            MaybeDone::Gone => MaybeDone::Gone,
-        });
-        self.schedule(req_id, fut)
     }
 }

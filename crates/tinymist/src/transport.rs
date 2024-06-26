@@ -20,7 +20,7 @@ pub struct MirrorArgs {
 /// Note that we must have our logging only write out to stderr.
 pub fn with_stdio_transport(
     args: MirrorArgs,
-    f: impl FnOnce(Connection, &mut bool) -> anyhow::Result<()>,
+    f: impl FnOnce(Connection) -> anyhow::Result<()>,
 ) -> anyhow::Result<()> {
     // Set up input and output
     let replay = args.replay.clone();
@@ -48,14 +48,9 @@ pub fn with_stdio_transport(
     let (sender, receiver, io_threads) = io_transport(i, o);
     let connection = Connection { sender, receiver };
 
-    // Start the LSP server
-    let mut force_exit = false;
+    f(connection)?;
 
-    f(connection, &mut force_exit)?;
-
-    if !force_exit {
-        io_threads.join()?;
-    }
+    io_threads.join_write()?;
 
     Ok(())
 }
@@ -126,6 +121,17 @@ impl IoThreads {
                 std::panic::panic_any(err)
             }
         }
+        match self.writer.join() {
+            Ok(r) => r,
+            Err(err) => {
+                eprintln!("writer panicked!");
+                std::panic::panic_any(err);
+            }
+        }
+    }
+
+    /// Waits for the writer threads to finish.
+    pub fn join_write(self) -> io::Result<()> {
         match self.writer.join() {
             Ok(r) => r,
             Err(err) => {
