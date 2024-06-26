@@ -1,4 +1,5 @@
 #import "mod.typ": *
+#import "@preview/cmarker:0.1.0": render as md
 
 #show: book-page.with(title: "Tinymist Configurations")
 
@@ -15,12 +16,12 @@
     - Type: #config-type(cfg.type)
       #if cfg.type == "array" [
         - Items: #raw(cfg.items.type)
-        - Description: #eval(cfg.items.description, mode: "markup")
+        - Description: #md(cfg.items.description)
       ]
-    - Description: #eval(cfg.description, mode: "markup")
+    - Description: #md(cfg.description)
     #if cfg.at("enum", default: none) != none [
       - Valid values: #for (i, item) in cfg.enum.enumerate() [
-            - #raw(item): #if "enumDescriptions" in cfg { eval(cfg.enumDescriptions.at(i), mode: "markup") }
+            - #raw(item): #if "enumDescriptions" in cfg { md(cfg.enumDescriptions.at(i)) }
          ]
     ]
     #if type(cfg.default) == str {

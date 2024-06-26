@@ -69,11 +69,15 @@ Follow the instructions to enable tinymist in your favorite editor.
 + [VSCode](./editors/vscode/README.md)
 + [Zed](editors/zed/README.md)
 
+## Documentation
+
+See [Online Documentation](https://myriad-dreamin.github.io/tinymist/).
+
 ## Packaging
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/tinymist.svg)](https://repology.org/project/tinymist/versions)
 
-### Roadmap
+## Roadmap
 
 After development for two months, most of the features are implemented. There are still some features to be implemented, but I would like to leave them in typst v0.12.0. I'll also pick some of them to implement on my weekends. Also please feel free to contribute if you are interested in the following features.
 
@@ -87,7 +91,7 @@ After development for two months, most of the features are implemented. There ar
 - Autocompletion for raw language tags.
 - Improve symbol view's appearance.
 
-### Contributing
+## Contributing
 
 Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for contribution guidelines.
 
