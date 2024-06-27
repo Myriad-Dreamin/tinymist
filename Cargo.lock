@@ -4038,6 +4038,7 @@ dependencies = [
  "triomphe",
  "ttf-parser",
  "typst",
+ "typst-assets",
  "typst-ts-compiler",
  "typst-ts-core",
  "unscanny",

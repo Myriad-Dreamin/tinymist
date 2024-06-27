@@ -1,5 +1,6 @@
 use core::fmt;
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     ops::Range,
     path::{Path, PathBuf},
@@ -105,6 +106,7 @@ pub fn run_with_sources<T>(
     };
     let mut world = TypstSystemUniverse::new(CompileOpts {
         entry: EntryOpts::new_rooted(root.as_path().into(), None),
+        with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
         ..Default::default()
     })
     .unwrap();
