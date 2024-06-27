@@ -4,6 +4,38 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.12 - [2024-06-27]
+
+* Bumped typstyle to v0.11.28
+* Added base documentation website in https://github.com/Myriad-Dreamin/tinymist/pull/344 and https://github.com/Myriad-Dreamin/tinymist/pull/345
+
+### Compiler
+
+* Preparing for parallelizing lsp requests in https://github.com/Myriad-Dreamin/tinymist/pull/342
+
+### Commands/Tools
+
+* Added font list export panel in summary tool by @7sDream in https://github.com/Myriad-Dreamin/tinymist/pull/322
+
+### Syntax/Semantic Highlighting
+
+* Disabling bracket colorization in markup mode in https://github.com/Myriad-Dreamin/tinymist/pull/346
+* (Fix) Terminating expression before math blocks in https://github.com/Myriad-Dreamin/tinymist/pull/347
+
+### Completion
+
+* (Fix) Avoided duplicated method completion in https://github.com/Myriad-Dreamin/tinymist/pull/349
+* Fixed a bad early return in param_completions in https://github.com/Myriad-Dreamin/tinymist/pull/350
+* Fixed completion in string context a bit in https://github.com/Myriad-Dreamin/tinymist/pull/351
+  * It can handle empty string literals correctly now.
+  * The half-completed string literals still have a problem though.
+
+### Misc
+
+* Moved typst-preview to tinymist and combined the binary and compiler in https://github.com/Myriad-Dreamin/tinymist/pull/323, https://github.com/Myriad-Dreamin/tinymist/pull/332, and https://github.com/Myriad-Dreamin/tinymist/pull/337
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.11...v0.11.12
+
 ## v0.11.11 - [2024-06-17]
 
 * Bumped typstyle to v0.11.26 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/326
