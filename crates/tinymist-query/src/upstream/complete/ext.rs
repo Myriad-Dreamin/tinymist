@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use ecow::{eco_format, EcoString};
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
+use once_cell::sync::OnceCell;
 use reflexo::path::{unix_slash, PathClean};
 use typst::foundations::{AutoValue, Func, Label, NoneValue, Repr, Type, Value};
 use typst::layout::{Dir, Length};
@@ -608,16 +609,14 @@ pub fn param_completions<'a>(
 
             doc = Some(plain_docs_sentence(&pos.docs));
 
-            if pos.positional
-                && type_completion(ctx, pos.base_type.as_ref(), doc.as_deref()).is_none()
-            {
-                ctx.cast_completions(&pos.input);
+            if pos.positional {
+                type_completion(ctx, &pos.base_type, doc.as_deref());
             }
         }
     }
 
     if let Some(leaf_type) = leaf_type {
-        type_completion(ctx, Some(&leaf_type), doc.as_deref());
+        type_completion(ctx, &leaf_type, doc.as_deref());
     }
 
     for (name, param) in &primary_sig.named {
@@ -629,18 +628,21 @@ pub fn param_completions<'a>(
             continue;
         }
 
+        let _d = OnceCell::new();
+        let docs = || Some(_d.get_or_init(|| plain_docs_sentence(&param.docs)).clone());
+
         if param.named {
             let compl = Completion {
                 kind: CompletionKind::Field,
                 label: param.name.as_ref().into(),
                 apply: Some(eco_format!("{}: ${{}}", param.name)),
-                detail: Some(plain_docs_sentence(&param.docs)),
+                detail: docs(),
                 label_detail: None,
                 command: Some("tinymist.triggerNamedCompletion"),
                 ..Completion::default()
             };
             match param.base_type {
-                Some(Ty::Builtin(BuiltinTy::TextSize)) => {
+                Ty::Builtin(BuiltinTy::TextSize) => {
                     for size_template in &[
                         "10.5pt", "12pt", "9pt", "14pt", "8pt", "16pt", "18pt", "20pt", "22pt",
                         "24pt", "28pt",
@@ -653,7 +655,7 @@ pub fn param_completions<'a>(
                         });
                     }
                 }
-                Some(Ty::Builtin(BuiltinTy::Dir)) => {
+                Ty::Builtin(BuiltinTy::Dir) => {
                     for dir_template in &["ltr", "rtl", "ttb", "btt"] {
                         let compl = compl.clone();
                         ctx.completions.push(Completion {
@@ -668,15 +670,8 @@ pub fn param_completions<'a>(
             ctx.completions.push(compl);
         }
 
-        if param.positional
-            && type_completion(
-                ctx,
-                param.base_type.as_ref(),
-                Some(&plain_docs_sentence(&param.docs)),
-            )
-            .is_none()
-        {
-            ctx.cast_completions(&param.input);
+        if param.positional {
+            type_completion(ctx, &param.base_type, docs().as_deref());
         }
     }
 
@@ -688,19 +683,17 @@ pub fn param_completions<'a>(
 
 fn type_completion(
     ctx: &mut CompletionContext<'_, '_>,
-    infer_type: Option<&Ty>,
+    infer_type: &Ty,
     docs: Option<&str>,
 ) -> Option<()> {
     // Prevent duplicate completions from appearing.
-    if let Some(infer_type) = infer_type {
-        if !ctx.seen_types.insert(infer_type.clone()) {
-            return Some(());
-        }
+    if !ctx.seen_types.insert(infer_type.clone()) {
+        return Some(());
     }
 
     log::debug!("type_completion: {:?}", infer_type);
 
-    match infer_type? {
+    match infer_type {
         Ty::Any => return None,
         Ty::Tuple(..) | Ty::Array(..) => {
             ctx.snippet_completion("()", "(${})", "An array.");
@@ -752,8 +745,8 @@ fn type_completion(
             BuiltinTy::Stroke => {
                 ctx.snippet_completion("stroke()", "stroke(${})", "Stroke type.");
                 ctx.snippet_completion("()", "(${})", "Stroke dictionary.");
-                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Color)), docs);
-                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Length)), docs);
+                type_completion(ctx, &Ty::Builtin(BuiltinTy::Color), docs);
+                type_completion(ctx, &Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Color => {
                 ctx.snippet_completion("luma()", "luma(${v})", "A custom grayscale color.");
@@ -831,19 +824,19 @@ fn type_completion(
             }
             BuiltinTy::Margin => {
                 ctx.snippet_completion("()", "(${})", "Margin dictionary.");
-                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Length)), docs);
+                type_completion(ctx, &Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Inset => {
                 ctx.snippet_completion("()", "(${})", "Inset dictionary.");
-                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Length)), docs);
+                type_completion(ctx, &Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Outset => {
                 ctx.snippet_completion("()", "(${})", "Outset dictionary.");
-                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Length)), docs);
+                type_completion(ctx, &Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Radius => {
                 ctx.snippet_completion("()", "(${})", "Radius dictionary.");
-                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Length)), docs);
+                type_completion(ctx, &Ty::Builtin(BuiltinTy::Length), docs);
             }
             BuiltinTy::Length => {
                 ctx.snippet_completion("pt", "${1}pt", "Point length unit.");
@@ -853,21 +846,23 @@ fn type_completion(
                 ctx.snippet_completion("em", "${1}em", "Em length unit.");
                 let length_ty = Type::of::<Length>();
                 ctx.strict_scope_completions(false, |value| value.ty() == length_ty);
-                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Auto)), docs);
+                type_completion(ctx, &Ty::Builtin(BuiltinTy::Auto), docs);
             }
             BuiltinTy::Float => {
                 ctx.snippet_completion("exponential notation", "${1}e${0}", "Exponential notation");
             }
             BuiltinTy::Type(ty) => {
                 if *ty == Type::of::<NoneValue>() {
-                    type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::None)), docs);
+                    let docs = docs.or(Some("Nothing."));
+                    type_completion(ctx, &Ty::Builtin(BuiltinTy::None), docs);
                 } else if *ty == Type::of::<AutoValue>() {
-                    type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Auto)), docs);
+                    let docs = docs.or(Some("A smart default."));
+                    type_completion(ctx, &Ty::Builtin(BuiltinTy::Auto), docs);
                 } else if *ty == Type::of::<bool>() {
                     ctx.snippet_completion("false", "false", "No / Disabled.");
                     ctx.snippet_completion("true", "true", "Yes / Enabled.");
                 } else if *ty == Type::of::<Color>() {
-                    type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Color)), None);
+                    type_completion(ctx, &Ty::Builtin(BuiltinTy::Color), docs);
                 } else if *ty == Type::of::<Label>() {
                     ctx.label_completions()
                 } else if *ty == Type::of::<Func>() {
@@ -897,15 +892,15 @@ fn type_completion(
         Ty::Select(_) => return None,
         Ty::Union(u) => {
             for info in u.as_ref() {
-                type_completion(ctx, Some(info), docs);
+                type_completion(ctx, info, docs);
             }
         }
         Ty::Let(e) => {
             for ut in e.ubs.iter() {
-                type_completion(ctx, Some(ut), docs);
+                type_completion(ctx, ut, docs);
             }
             for lt in e.lbs.iter() {
-                type_completion(ctx, Some(lt), docs);
+                type_completion(ctx, lt, docs);
             }
         }
         Ty::Var(_) => return None,
@@ -915,17 +910,12 @@ fn type_completion(
         Ty::Value(v) => {
             let docs = v.syntax.as_ref().map(|s| s.doc.as_ref()).or(docs);
 
-            // Prevent duplicate completions from appearing.
-            if !ctx.seen_casts.insert(typst::util::hash128(&v.val)) {
-                return Some(());
-            }
-
             if let Value::Type(ty) = &v.val {
-                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Type(*ty))), docs);
+                type_completion(ctx, &Ty::Builtin(BuiltinTy::Type(*ty)), docs);
             } else if v.val.ty() == Type::of::<NoneValue>() {
-                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::None)), docs);
+                type_completion(ctx, &Ty::Builtin(BuiltinTy::None), docs);
             } else if v.val.ty() == Type::of::<AutoValue>() {
-                type_completion(ctx, Some(&Ty::Builtin(BuiltinTy::Auto)), docs);
+                type_completion(ctx, &Ty::Builtin(BuiltinTy::Auto), docs);
             } else {
                 ctx.value_completion(None, &v.val, true, docs);
             }
@@ -949,7 +939,7 @@ pub fn named_param_value_completions<'a>(
     else {
         // static analysis
         if let Some(ty) = ty {
-            type_completion(ctx, Some(ty), None);
+            type_completion(ctx, ty, None);
         }
 
         return;
@@ -987,13 +977,18 @@ pub fn named_param_value_completions<'a>(
 
     // static analysis
     if let Some(ty) = ty {
-        type_completion(ctx, Some(ty), doc.as_deref());
+        type_completion(ctx, ty, doc.as_deref());
     }
 
     let mut completed = false;
     if let Some(type_sig) = leaf_type {
         log::debug!("named_param_completion by type: {:?}", param);
-        type_completion(ctx, Some(&type_sig), doc.as_deref());
+        type_completion(ctx, &type_sig, doc.as_deref());
+        completed = true;
+    }
+
+    if !matches!(param.base_type, Ty::Any) {
+        type_completion(ctx, &param.base_type, doc.as_deref());
         completed = true;
     }
 
@@ -1007,16 +1002,6 @@ pub fn named_param_value_completions<'a>(
                 ..Completion::default()
             });
         }
-    }
-
-    if type_completion(
-        ctx,
-        param.base_type.as_ref(),
-        Some(&plain_docs_sentence(&param.docs)),
-    )
-    .is_none()
-    {
-        ctx.cast_completions(&param.input);
     }
 
     sort_and_explicit_code_completion(ctx);
@@ -1063,7 +1048,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     log::debug!("complete_type: ty  {:?} -> {:#?}", ctx.leaf, ty);
     // log::debug!("complete_type: before {:?}", ctx.before.chars().last());
 
-    type_completion(ctx, Some(&ty), None);
+    type_completion(ctx, &ty, None);
     if ctx.before.ends_with(',') || ctx.before.ends_with(':') {
         ctx.enrich(" ", "");
     }

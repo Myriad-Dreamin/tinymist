@@ -6,14 +6,12 @@ use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use serde::{Deserialize, Serialize};
 use typst::foundations::{
-    fields_on, format_str, mutable_methods_on, repr, AutoValue, CastInfo, Func, Label, NoneValue,
-    Repr, StyleChain, Styles, Type, Value,
+    fields_on, format_str, mutable_methods_on, repr, Repr, StyleChain, Styles, Value,
 };
 use typst::model::Document;
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
-use typst::visualize::Color;
 use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
@@ -1173,6 +1171,11 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         label_detail: Option<EcoString>,
         docs: Option<&str>,
     ) {
+        // Prevent duplicate completions from appearing.
+        if !self.seen_casts.insert(typst::util::hash128(value)) {
+            return;
+        }
+
         let at = label.as_deref().is_some_and(|field| !is_ident(field));
         let label = label.unwrap_or_else(|| value.repr());
 
@@ -1217,91 +1220,6 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             command,
             ..Completion::default()
         });
-    }
-
-    /// Add completions for a castable.
-    fn cast_completions(&mut self, cast: &CastInfo) {
-        // Prevent duplicate completions from appearing.
-        if !self.seen_casts.insert(typst::util::hash128(cast)) {
-            return;
-        }
-
-        match cast {
-            CastInfo::Any => {}
-            CastInfo::Value(value, docs) => {
-                self.value_completion(None, value, true, Some(docs));
-            }
-            CastInfo::Type(ty) => {
-                if *ty == Type::of::<NoneValue>() {
-                    self.snippet_completion("none", "none", "Nothing.")
-                } else if *ty == Type::of::<AutoValue>() {
-                    self.snippet_completion("auto", "auto", "A smart default.");
-                } else if *ty == Type::of::<bool>() {
-                    self.snippet_completion("false", "false", "No / Disabled.");
-                    self.snippet_completion("true", "true", "Yes / Enabled.");
-                } else if *ty == Type::of::<Color>() {
-                    self.snippet_completion("luma()", "luma(${v})", "A custom grayscale color.");
-                    self.snippet_completion(
-                        "rgb()",
-                        "rgb(${r}, ${g}, ${b}, ${a})",
-                        "A custom RGBA color.",
-                    );
-                    self.snippet_completion(
-                        "cmyk()",
-                        "cmyk(${c}, ${m}, ${y}, ${k})",
-                        "A custom CMYK color.",
-                    );
-                    self.snippet_completion(
-                        "oklab()",
-                        "oklab(${l}, ${a}, ${b}, ${alpha})",
-                        "A custom Oklab color.",
-                    );
-                    self.snippet_completion(
-                        "oklch()",
-                        "oklch(${l}, ${chroma}, ${hue}, ${alpha})",
-                        "A custom Oklch color.",
-                    );
-                    self.snippet_completion(
-                        "color.linear-rgb()",
-                        "color.linear-rgb(${r}, ${g}, ${b}, ${a})",
-                        "A custom linear RGBA color.",
-                    );
-                    self.snippet_completion(
-                        "color.hsv()",
-                        "color.hsv(${h}, ${s}, ${v}, ${a})",
-                        "A custom HSVA color.",
-                    );
-                    self.snippet_completion(
-                        "color.hsl()",
-                        "color.hsl(${h}, ${s}, ${l}, ${a})",
-                        "A custom HSLA color.",
-                    );
-                    self.scope_completions(false, |value| value.ty() == *ty);
-                } else if *ty == Type::of::<Label>() {
-                    self.label_completions()
-                } else if *ty == Type::of::<Func>() {
-                    self.snippet_completion(
-                        "function",
-                        "(${params}) => ${output}",
-                        "A custom function.",
-                    );
-                } else {
-                    self.completions.push(Completion {
-                        kind: CompletionKind::Syntax,
-                        label: ty.long_name().into(),
-                        apply: Some(eco_format!("${{{ty}}}")),
-                        detail: Some(eco_format!("A value of type {ty}.")),
-                        ..Completion::default()
-                    });
-                    self.scope_completions(false, |value| value.ty() == *ty);
-                }
-            }
-            CastInfo::Union(union) => {
-                for info in union {
-                    self.cast_completions(info);
-                }
-            }
-        }
     }
 }
 

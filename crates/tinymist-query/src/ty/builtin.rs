@@ -99,31 +99,31 @@ impl Ty {
         }
     }
 
-    pub(crate) fn from_param_site(f: &Func, p: &ParamInfo) -> Option<Ty> {
+    pub(crate) fn from_param_site(f: &Func, p: &ParamInfo) -> Ty {
         use typst::foundations::func::Repr;
         match f.inner() {
             Repr::Element(..) | Repr::Native(..) => {
                 if let Some(ty) = param_mapping(f, p) {
-                    return Some(ty);
+                    return ty;
                 }
             }
             Repr::Closure(_) => {}
             Repr::With(w) => return Ty::from_param_site(&w.0, p),
         };
 
-        Some(Self::from_cast_info(&p.input))
+        Self::from_cast_info(&p.input)
     }
 
-    pub(crate) fn from_return_site(f: &Func, c: &'_ CastInfo) -> Option<Self> {
+    pub(crate) fn from_return_site(f: &Func, c: &'_ CastInfo) -> Self {
         use typst::foundations::func::Repr;
         match f.inner() {
-            Repr::Element(e) => return Some(Ty::Builtin(BuiltinTy::Element(*e))),
+            Repr::Element(e) => return Ty::Builtin(BuiltinTy::Element(*e)),
             Repr::Closure(_) => {}
             Repr::With(w) => return Ty::from_return_site(&w.0, c),
             Repr::Native(_) => {}
         };
 
-        Some(Self::from_cast_info(c))
+        Self::from_cast_info(c)
     }
 }
 

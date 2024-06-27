@@ -32,10 +32,8 @@ pub struct ParamSpec {
     pub name: Interned<str>,
     /// Documentation for the parameter.
     pub docs: Cow<'static, str>,
-    /// Describe what values this parameter accepts.
-    pub input: CastInfo,
     /// Inferred type of the parameter.
-    pub(crate) base_type: Option<Ty>,
+    pub(crate) base_type: Ty,
     /// The parameter's default name as type.
     pub type_repr: Option<EcoString>,
     /// The parameter's default name as value.
@@ -60,7 +58,6 @@ impl ParamSpec {
         Arc::new(Self {
             name: p.name.into(),
             docs: Cow::Borrowed(p.docs),
-            input: p.input.clone(),
             base_type: Ty::from_param_site(f, p),
             type_repr: Some(eco_format!("{}", TypeExpr(&p.input))),
             expr: None,
@@ -324,7 +321,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         Repr::With(..) => unreachable!(),
         Repr::Closure(c) => (analyze_closure_signature(c.clone()), None),
         Repr::Element(..) | Repr::Native(..) => {
-            let ret_ty = func.returns().and_then(|r| Ty::from_return_site(&func, r));
+            let ret_ty = func.returns().map(|r| Ty::from_return_site(&func, r));
             let params = func.params().unwrap();
             (
                 params
@@ -374,16 +371,16 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
 
     let mut named_vec: Vec<(Interned<str>, Ty)> = named
         .iter()
-        .map(|e| (e.0.clone(), e.1.base_type.clone().unwrap_or(Ty::Any)))
+        .map(|e| (e.0.clone(), e.1.base_type.clone()))
         .collect::<Vec<_>>();
 
     named_vec.sort_by(|a, b| a.0.cmp(&b.0));
 
     let sig_ty = SigTy::new(
-        pos.iter().map(|e| e.base_type.clone().unwrap_or(Ty::Any)),
+        pos.iter().map(|e| e.base_type.clone()),
         named_vec,
         rest.as_ref()
-            .map(|e| e.base_type.clone().unwrap_or(Ty::Any)),
+            .map(|e| e.base_type.clone()),
         ret_ty.clone(),
     );
     Arc::new(PrimarySignature {
@@ -415,8 +412,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
 
                 params.push(Arc::new(ParamSpec {
                     name: name.as_str().into(),
-                    input: CastInfo::Any,
-                    base_type: None,
+                    base_type: Ty::Any,
                     type_repr: None,
                     expr: None,
                     default: None,
@@ -432,8 +428,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 let expr = unwrap_expr(n.expr()).to_untyped().clone().into_text();
                 params.push(Arc::new(ParamSpec {
                     name: n.name().into(),
-                    input: CastInfo::Any,
-                    base_type: None,
+                    base_type: Ty::Any,
                     type_repr: Some(expr.clone()),
                     expr: Some(expr.clone()),
                     default: None,
@@ -448,8 +443,7 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 let ident = n.sink_ident().map(|e| e.as_str());
                 params.push(Arc::new(ParamSpec {
                     name: ident.unwrap_or_default().into(),
-                    input: CastInfo::Any,
-                    base_type: None,
+                    base_type: Ty::Any,
                     type_repr: None,
                     expr: None,
                     default: None,
