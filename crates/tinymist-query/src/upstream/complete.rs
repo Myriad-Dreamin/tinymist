@@ -5,9 +5,7 @@ use std::ops::Range;
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use serde::{Deserialize, Serialize};
-use typst::foundations::{
-    fields_on, format_str, mutable_methods_on, repr, Repr, StyleChain, Styles, Value,
-};
+use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::model::Document;
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
@@ -400,19 +398,6 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
         for (name, value) in scope.iter() {
             ctx.value_completion(Some(name.clone()), value, true, None);
         }
-    }
-
-    for &(method, args) in mutable_methods_on(value.ty()) {
-        ctx.completions.push(Completion {
-            kind: CompletionKind::Func,
-            label: method.into(),
-            apply: Some(if args {
-                eco_format!("{method}(${{}})")
-            } else {
-                eco_format!("{method}()${{}}")
-            }),
-            ..Completion::default()
-        })
     }
 
     for &field in fields_on(value.ty()) {
