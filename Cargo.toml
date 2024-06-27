@@ -48,14 +48,14 @@ typst-pdf = "0.11.1"
 typst-svg = "0.11.1"
 typst-render = "0.11.1"
 typst-assets = "0.11.1"
-reflexo = { version = "0.5.0-rc4", default-features = false, features = [
+reflexo = { version = "0.5.0-rc5", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-world = { version = "0.5.0-rc4", features = ["system"] }
-typst-ts-core = { version = "0.5.0-rc4", default-features = false }
-typst-ts-compiler = { version = "0.5.0-rc4" }
-typst-ts-svg-exporter = { version = "0.5.0-rc4" }
-typstyle = "0.11.26"
+reflexo-world = { version = "0.5.0-rc5", features = ["system"] }
+typst-ts-core = { version = "0.5.0-rc5", default-features = false }
+typst-ts-compiler = { version = "0.5.0-rc5" }
+typst-ts-svg-exporter = { version = "0.5.0-rc5" }
+typstyle = "0.11.28"
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
 
 async-lsp = { version = "0.2.0", features = ["tokio"] }
@@ -147,15 +147,15 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "
 # typst-render = { path = "../typst/crates/typst-render" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "11b1ef0909ee6ded49eb84db999af14276125a62" }
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "11b1ef0909ee6ded49eb84db999af14276125a62" }
-reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "11b1ef0909ee6ded49eb84db999af14276125a62" }
-typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "11b1ef0909ee6ded49eb84db999af14276125a62" }
-typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "11b1ef0909ee6ded49eb84db999af14276125a62" }
+# typst-ts-svg-exporter = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "11b1ef0909ee6ded49eb84db999af14276125a62" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "11b1ef0909ee6ded49eb84db999af14276125a62" }
+# reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "11b1ef0909ee6ded49eb84db999af14276125a62" }
+# typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "11b1ef0909ee6ded49eb84db999af14276125a62" }
+# typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "11b1ef0909ee6ded49eb84db999af14276125a62" }
 
-# typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
-# reflexo = { path = "../typst.ts/crates/reflexo/" }
-# reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
-# typst-ts-core = { path = "../typst.ts/core" }
-# typst-ts-compiler = { path = "../typst.ts/compiler" }
+typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
+reflexo = { path = "../typst.ts/crates/reflexo/" }
+reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
+typst-ts-core = { path = "../typst.ts/core" }
+typst-ts-compiler = { path = "../typst.ts/compiler" }
 # typstyle = { path = "../typstyle" }
