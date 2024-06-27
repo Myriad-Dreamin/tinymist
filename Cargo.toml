@@ -153,9 +153,9 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "
 # typst-ts-core = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "11b1ef0909ee6ded49eb84db999af14276125a62" }
 # typst-ts-compiler = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "11b1ef0909ee6ded49eb84db999af14276125a62" }
 
-typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
-reflexo = { path = "../typst.ts/crates/reflexo/" }
-reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
-typst-ts-core = { path = "../typst.ts/core" }
-typst-ts-compiler = { path = "../typst.ts/compiler" }
+# typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
+# reflexo = { path = "../typst.ts/crates/reflexo/" }
+# reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
+# typst-ts-core = { path = "../typst.ts/core" }
+# typst-ts-compiler = { path = "../typst.ts/compiler" }
 # typstyle = { path = "../typstyle" }
