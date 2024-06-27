@@ -585,7 +585,7 @@ pub fn param_completions<'a>(
     let signature = analyze_dyn_signature(ctx.ctx, func.clone());
 
     let leaf_type = ctx.ctx.literal_type_of_node(ctx.leaf.clone());
-    log::info!("pos_param_completion_by_type: {:?}", leaf_type);
+    log::debug!("pos_param_completion_by_type: {:?}", leaf_type);
 
     for arg in args.items() {
         if let ast::Arg::Named(named) = arg {
@@ -595,34 +595,39 @@ pub fn param_completions<'a>(
 
     let primary_sig = signature.primary();
 
-    log::debug!("pos_param_completion: {:?}", pos_index);
+    'pos_check: {
+        let mut doc = None;
 
-    let mut doc = None;
-    if let Some(pos_index) = pos_index {
-        let pos = primary_sig.pos.get(pos_index);
-        log::debug!("pos_param_completion_to: {:?}", pos);
+        if let Some(pos_index) = pos_index {
+            let pos = primary_sig.pos.get(pos_index);
+            log::debug!("pos_param_completion_to: {:?}", pos);
 
-        if let Some(pos) = pos {
-            if set && !pos.settable {
-                return;
-            }
+            if let Some(pos) = pos {
+                if set && !pos.settable {
+                    break 'pos_check;
+                }
 
-            doc = Some(plain_docs_sentence(&pos.docs));
+                doc = Some(plain_docs_sentence(&pos.docs));
 
-            if pos.positional {
-                type_completion(ctx, &pos.base_type, doc.as_deref());
+                if pos.positional {
+                    type_completion(ctx, &pos.base_type, doc.as_deref());
+                }
             }
         }
-    }
 
-    if let Some(leaf_type) = leaf_type {
-        type_completion(ctx, &leaf_type, doc.as_deref());
+        if let Some(leaf_type) = leaf_type {
+            type_completion(ctx, &leaf_type, doc.as_deref());
+        }
     }
 
     for (name, param) in &primary_sig.named {
         if ctx.seen_field(name.as_ref().into()) {
             continue;
         }
+        log::debug!(
+            "pos_named_param_completion_to({set:?}): {name:?} {:?}",
+            param.settable
+        );
 
         if set && !param.settable {
             continue;

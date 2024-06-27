@@ -1,0 +1,54 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on o  (30..32)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/half_completion.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 5,
+    "label": "font",
+    "sortText": "013",
+    "textEdit": {
+     "newText": "font: ${1:}, ",
+     "range": {
+      "end": {
+       "character": 11,
+       "line": 2
+      },
+      "start": {
+       "character": 10,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 5,
+    "label": "font",
+    "sortText": "013",
+    "textEdit": {
+     "newText": "font: ${1:}",
+     "range": {
+      "end": {
+       "character": 12,
+       "line": 2
+      },
+      "start": {
+       "character": 10,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
