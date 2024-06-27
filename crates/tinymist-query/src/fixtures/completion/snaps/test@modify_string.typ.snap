@@ -11,7 +11,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/modify_string.typ
    {
     "kind": 21,
     "label": "\"New Computer Modern\"",
-    "sortText": "143",
+    "sortText": "003",
     "textEdit": {
      "newText": "\"New Computer Modern",
      "range": {
@@ -34,7 +34,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/modify_string.typ
    {
     "kind": 21,
     "label": "\"New Computer Modern\"",
-    "sortText": "143",
+    "sortText": "003",
     "textEdit": {
      "newText": "New Computer Modern",
      "range": {
