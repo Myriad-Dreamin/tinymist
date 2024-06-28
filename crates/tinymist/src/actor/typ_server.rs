@@ -18,15 +18,15 @@ use typst_ts_compiler::{
     vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
     watch_deps,
     world::{CompilerFeat, CompilerUniverse, CompilerWorld},
-    CompileEnv, CompileReport, CompileReporter, Compiler, ConsoleDiagReporter, EntryReader,
-    PureCompiler, Revising, TaskInputs, WorldDeps,
+    CompileEnv, CompileReport, Compiler, ConsoleDiagReporter, EntryReader, PureCompiler, Revising,
+    TaskInputs, WorldDeps,
 };
 use typst_ts_core::{
-    config::compiler::EntryState, exporter_builtins::GroupExporter, Exporter, QueryRef,
-    TypstDocument,
+    config::compiler::EntryState, exporter_builtins::GroupExporter, Exporter, GenericExporter,
+    QueryRef, TypstDocument,
 };
 
-type UsingCompiler<F> = CompileReporter<PureCompiler<CompilerWorld<F>>, CompilerWorld<F>>;
+type UsingCompiler<F> = PureCompiler<CompilerWorld<F>>;
 type CompileRawResult = Deferred<(SourceResult<Arc<TypstDocument>>, CompileEnv)>;
 type DocState<F> = QueryRef<CompileRawResult, (), (UsingCompiler<F>, CompileEnv)>;
 
@@ -162,7 +162,7 @@ pub struct CompileServerActor<F: CompilerFeat> {
     /// The underlying universe.
     pub verse: CompilerUniverse<F>,
     /// The underlying compiler.
-    pub compiler: CompileReporter<PureCompiler<CompilerWorld<F>>, CompilerWorld<F>>,
+    pub compiler: PureCompiler<CompilerWorld<F>>,
     /// The exporter for the compiled document.
     pub exporter: GroupExporter<CompileSnapshot<F>>,
     /// The compilation handle.
@@ -213,8 +213,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         let entry = verse.entry_state();
 
         Self {
-            compiler: CompileReporter::new(std::marker::PhantomData)
-                .with_generic_reporter(ConsoleDiagReporter::default()),
+            compiler: std::marker::PhantomData,
             exporter,
             verse,
 
@@ -369,7 +368,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
     fn snapshot(&self, is_once: bool) -> CompileSnapshot<F> {
         let world = self.verse.snapshot();
-        let c = self.compiler.clone();
+        let c = self.compiler;
         let mut env = self.make_env(if is_once {
             self.once_feature_set.clone()
         } else {
@@ -436,6 +435,11 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     rep = CompileReport::CompileError(id, err.clone(), elapsed);
                 }
             };
+
+            let _ = ConsoleDiagReporter::default().export(
+                compiled.world.deref(),
+                Arc::new((compiled.env.features.clone(), rep.clone())),
+            );
 
             h.notify_compile(&compiled, rep);
 
