@@ -39,6 +39,10 @@ jobs:
       - name: Build Book
         run: |
           shiroa build --font-path ./assets/typst-fonts/ --font-path ./assets/fonts/ --path-to-root /tinymist/ -w . docs/tinymist
+      - name: Build Cargo Docs
+        run: |
+          cargo doc --workspace --no-deps
+          cp -r target/doc dist/tinymist/rs
       - name: Setup Pages
         uses: actions/configure-pages@v3
       - name: Upload artifact

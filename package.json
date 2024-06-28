@@ -13,7 +13,8 @@
   ],
   "scripts": {
     "build:preview": "cd contrib/typst-preview/editors/vscode && yarn build",
-    "docs": "shiroa serve -w . docs/tinymist"
+    "docs": "shiroa serve -w . docs/tinymist",
+    "docs:rs": "cargo doc --workspace --no-deps"
   },
   "dependencies": {},
   "devDependencies": {}

@@ -10,7 +10,8 @@
   repository-edit: "https://github.com/Myriad-Dreamin/tinymist/edit/main/{path}",
   language: "en",
   summary: [
-    #prefix-chapter("overview.typ")[Overview]
+    #prefix-chapter("introduction.typ")[Introduction]
+    #prefix-chapter("overview.typ")[Overview of Service]
     - #chapter("principles.typ")[Principles]
     - #chapter("commands.typ")[Commands System]
     - #chapter("inputs.typ")[LSP Inputs]
@@ -18,7 +19,7 @@
     - #chapter("language-features.typ")[Language Features]
     #prefix-chapter("configurations.typ")[Common Configurations]
     #prefix-chapter("frontend/main.typ")[Editor Frontends]
-    - #chapter("frontend/vscode.typ")[VS Cod(e,ium)]
+    - #chapter("frontend/vscode.typ", section: "6.1")[VS Cod(e,ium)]
     - #chapter("frontend/neovim.typ")[NeoVim]
     - #chapter("frontend/helix.typ")[Helix]
     - #chapter("frontend/zed.typ")[Zed]
