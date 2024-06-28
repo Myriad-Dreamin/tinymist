@@ -305,11 +305,11 @@ jobs:
       - uses: actions/download-artifact@v4
 
       - name: Deploy to VS Code Marketplace
-        run: npx vsce publish --packagePath $(find . -type f -iname '*.vsix')
+        run: npx vsce publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate 
         env:
           VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
 
       - name: Deploy to OpenVSX
-        run: npx ovsx publish --packagePath $(find . -type f -iname '*.vsix')
+        run: npx ovsx publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate 
         env:
           OVSX_PAT: ${{ secrets.OPENVSX_ACCESS_TOKEN }}
