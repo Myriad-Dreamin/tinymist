@@ -307,15 +307,15 @@
   resolved "https://registry.yarnpkg.com/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.4.15.tgz#d7c6e6755c78567a951e04ab52ef0fd26de59f32"
   integrity sha512-eF2rxCRulEKXHTRiDrDy6erMYWqNw4LPdQ8UQA4huuxaQsVeRPFl2oM8oDGxMFhJUWZf9McpLtJasDDZb/Bpeg==
 
-"@myriaddreamin/typst-ts-renderer@0.5.0-rc4":
-  version "0.5.0-rc4"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.5.0-rc4.tgz#0ac15fc0f3246eacf58ca2b9615d40e70c249448"
-  integrity sha512-sXpWky3QwjVMOGqDFb50JKe5iYGbj9s5dHJx3Mxs+VwQxkPY640flahhx301uF7RmIyyZ8rTkAnK0H0ZuCSq4A==
+"@myriaddreamin/typst-ts-renderer@0.5.0-rc5":
+  version "0.5.0-rc5"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.5.0-rc5.tgz#7168340613b2b0f0b7f11622f8d3dcacc0e175e5"
+  integrity sha512-aGll5OgHdZhBqhnOMPvGP0Ewevl9IzycdnKUj0W7bDzTL7eEmzphtlAbkm8e4vKxIvvwu6oos8gZhB7Iwl/3Xw==
 
-"@myriaddreamin/typst.ts@0.5.0-rc4":
-  version "0.5.0-rc4"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.5.0-rc4.tgz#8f9c9b50fe1af4d6f257c9e033e4bb5495517e2b"
-  integrity sha512-r+d2E3khYyU/SW9Sy+Q4YF6WpY6J+Iy4fMFcxTEs86zT4K4r+gKXfnMkk5CK4nUVhPhLZWJDvqrqFDnQ/Ii6fA==
+"@myriaddreamin/typst.ts@0.5.0-rc5":
+  version "0.5.0-rc5"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.5.0-rc5.tgz#947e283c1af11df16a84d2543852e419d97f040b"
+  integrity sha512-uBVa6uIUBIT31szTNn8IMPQQPc9dDMx4SxmCjTNwdMkpRhpQay9PLlBs07ynZslC37pucN/WSPSzBuPlaKRe4g==
   dependencies:
     idb "^7.1.1"
 
@@ -3656,10 +3656,10 @@ typescript@^5.2.2, typescript@^5.3.3:
 "typst-preview-frontend@file:tools/typst-preview-frontend":
   version "0.0.0"
   dependencies:
-    "@myriaddreamin/typst-ts-renderer" "0.5.0-rc4"
-    "@myriaddreamin/typst.ts" "0.5.0-rc4"
+    "@myriaddreamin/typst-ts-renderer" "0.5.0-rc5"
+    "@myriaddreamin/typst.ts" "0.5.0-rc5"
     rxjs "^7.8.1"
-    typst-dom "link:../../../AppData/Local/Yarn/Cache/v6/npm-typst-preview-frontend-0.0.0-d9cba72e-dca7-4823-b60e-8055f0c6a705-1718616065893/node_modules/typst-dom"
+    typst-dom "link:../../../AppData/Local/Yarn/Cache/v6/npm-typst-preview-frontend-0.0.0-e4b78602-ab80-42c0-9a76-2c66cb729491-1719528135321/node_modules/typst-dom"
 
 uc.micro@^1.0.1, uc.micro@^1.0.5:
   version "1.0.6"
