@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist")
+#show: book-page.with(title: "Overview of Service")
 
 This document gives an overview of tinymist service, which provides a single integrated language service for Typst. This document doesn't dive in details unless necessary.
 
