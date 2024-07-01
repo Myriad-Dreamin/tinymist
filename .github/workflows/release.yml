@@ -56,11 +56,11 @@ jobs:
             rust-target: arm-unknown-linux-gnueabihf
             platform: linux
             arch: armhf
-          - os: macos-11
+          - os: macos-13
             rust-target: x86_64-apple-darwin
             platform: darwin
             arch: x64
-          - os: macos-11
+          - os: macos-13
             rust-target: aarch64-apple-darwin
             platform: darwin
             arch: arm64
