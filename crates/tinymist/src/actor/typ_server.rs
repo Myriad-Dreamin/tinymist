@@ -48,7 +48,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
         let res = self.doc_state.compute_with_context(|(mut c, mut env)| {
             let w = self.world.clone();
             Ok(Deferred::new(move || {
-                let res = c.compile(&w, &mut env);
+                let res = c.ensure_main(&w).and_then(|_| c.compile(&w, &mut env));
                 (res, env)
             }))
         });
