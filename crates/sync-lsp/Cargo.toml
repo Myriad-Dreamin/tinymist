@@ -1,0 +1,35 @@
+[package]
+name = "sync-lsp"
+description = "Sync LSP server inspired by async-lsp, primarily for tinymist."
+categories = ["compilers"]
+keywords = ["lsp", "language", "language-server"]
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+
+parking_lot.workspace = true
+log.workspace = true
+futures.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+crossbeam-channel.workspace = true
+
+lsp-server.workspace = true
+lsp-types.workspace = true
+reflexo.workspace = true
+
+serde.workspace = true
+serde_json.workspace = true
+clap = { workspace = true, optional = true }
+
+tinymist-query.workspace = true
+
+
+# [lints]
+# workspace = true
