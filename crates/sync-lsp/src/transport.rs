@@ -61,7 +61,7 @@ pub fn with_stdio_transport(
 ///
 /// ```
 /// use std::io::{stdin, stdout};
-/// use tinymist::transport::{io_transport, IoThreads};
+/// use sync_lsp::transport::{io_transport, IoThreads};
 /// use lsp_server::Message;
 /// use crossbeam_channel::{bounded, Receiver, Sender};
 /// pub fn stdio_transport() -> (Sender<Message>, Receiver<Message>, IoThreads) {
