@@ -303,7 +303,8 @@ jobs:
     if: success() && startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/download-artifact@v4
-
+      - name: Install deps
+        run: yarn install
       - name: Deploy to VS Code Marketplace
         run: npx vsce publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate 
         env:
