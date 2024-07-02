@@ -143,21 +143,21 @@ pub enum Location {
 
 pub trait SourceFileServer {
     fn resolve_source_span(
-        &mut self,
+        &self,
         _by: Location,
     ) -> impl Future<Output = Result<Option<SourceSpanOffset>, Error>> + Send {
         async { Ok(None) }
     }
 
     fn resolve_document_position(
-        &mut self,
+        &self,
         _by: Location,
     ) -> impl Future<Output = Result<Option<Position>, Error>> + Send {
         async { Ok(None) }
     }
 
     fn resolve_source_location(
-        &mut self,
+        &self,
         _s: Span,
         _offset: Option<usize>,
     ) -> impl Future<Output = Result<Option<DocToSrcJumpInfo>, Error>> + Send {
@@ -167,7 +167,7 @@ pub trait SourceFileServer {
 
 pub trait EditorServer {
     fn update_memory_files(
-        &mut self,
+        &self,
         _files: MemoryFiles,
         _reset_shadow: bool,
     ) -> impl Future<Output = Result<(), Error>> + Send {
@@ -175,7 +175,7 @@ pub trait EditorServer {
     }
 
     fn remove_shadow_files(
-        &mut self,
+        &self,
         _files: MemoryFilesShort,
     ) -> impl Future<Output = Result<(), Error>> + Send {
         async { Ok(()) }
@@ -185,9 +185,9 @@ pub trait EditorServer {
 pub trait CompileHost: SourceFileServer + EditorServer {}
 
 // todo: replace CompileDriver by CompileHost
-pub async fn preview<T: CompileHost + Send + 'static>(
+pub async fn preview<T: CompileHost + Send + Sync + 'static>(
     arguments: PreviewArgs,
-    client: impl FnOnce(CompilationHandleImpl) -> T,
+    client: impl FnOnce(CompilationHandleImpl) -> Arc<T>,
     html: &str,
 ) -> Previewer {
     let enable_partial_rendering = arguments.enable_partial_rendering;

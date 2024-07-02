@@ -26,19 +26,19 @@ import {
 } from "./editor-tools";
 import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
 import { applySnippetTextEdits } from "./snippets";
+import { setIsTinymist } from "./preview-compat";
+import { previewActive, previewDeactivate } from "./preview";
 
 let client: LanguageClient | undefined = undefined;
 
 export function activate(context: ExtensionContext): Promise<void> {
-    return startClient(context).catch((e) => {
-        void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
-        throw e;
-    });
-}
+    const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
+    if (typstPreviewExtension) {
+        void vscode.window.showWarningMessage(
+            "Tinymist Says:\n\nTypst Preview extension is already integrated into Tinymist. Please disable Typst Preview extension to avoid conflicts."
+        );
+    }
 
-let enableOnEnter = false;
-
-async function startClient(context: ExtensionContext): Promise<void> {
     let config: Record<string, any> = JSON.parse(
         JSON.stringify(workspace.getConfiguration("tinymist"))
     );
@@ -55,7 +55,18 @@ async function startClient(context: ExtensionContext): Promise<void> {
         }
     }
 
-    const serverCommand = getServer(config);
+    setIsTinymist(config);
+    previewActive(context, false);
+    return startClient(context, config).catch((e) => {
+        void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
+        throw e;
+    });
+}
+
+let enableOnEnter = false;
+
+async function startClient(context: ExtensionContext, config: Record<string, any>): Promise<void> {
+    const serverCommand = getServer(config.serverPath);
     const run = {
         command: serverCommand,
         args: [
@@ -194,19 +205,19 @@ async function startClient(context: ExtensionContext): Promise<void> {
 }
 
 export function deactivate(): Promise<void> | undefined {
+    previewDeactivate();
     return client?.stop();
 }
 
-function getServer(conf: Record<string, any>): string {
-    const pathInConfig = conf.serverPath;
-    if (pathInConfig) {
-        const validation = validateServer(pathInConfig);
+export function getServer(serverPath: string): string {
+    if (serverPath) {
+        const validation = validateServer(serverPath);
         if (!validation.valid) {
             throw new Error(
-                `\`tinymist.serverPath\` (${pathInConfig}) does not point to a valid tinymist binary:\n${validation.message}`
+                `\`tinymist.serverPath\` (${serverPath}) does not point to a valid tinymist binary:\n${validation.message}`
             );
         }
-        return pathInConfig;
+        return serverPath;
     }
     const windows = process.platform === "win32";
     const suffix = windows ? ".exe" : "";
@@ -229,12 +240,14 @@ function getServer(conf: Record<string, any>): string {
     );
 }
 
-function validateServer(path: string): { valid: true } | { valid: false; message: string } {
+function validateServer(
+    path: string
+): { valid: true; message: string } | { valid: false; message: string } {
     try {
         console.log("validate", path, "args", ["probe"]);
         const result = child_process.spawnSync(path, ["probe"]);
         if (result.status === 0) {
-            return { valid: true };
+            return { valid: true, message: "" };
         } else {
             const statusMessage = result.status !== null ? [`return status: ${result.status}`] : [];
             const errorMessage =
