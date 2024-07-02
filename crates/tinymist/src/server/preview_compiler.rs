@@ -6,17 +6,14 @@ use tinymist_query::analysis::Analysis;
 use tinymist_query::PositionEncoding;
 use tokio::sync::{mpsc, watch};
 use typst_preview::CompilationHandleImpl;
-use typst_ts_compiler::EntryReader;
 use typst_ts_core::Error;
 
-use crate::actor::typ_client::{CompileClientActor, CompileHandler};
+use crate::actor::typ_client::CompileHandler;
 use crate::actor::typ_server::CompileServerActor;
-use crate::compile_init::CompileConfig;
 use crate::world::LspCompilerFeat;
 use crate::LspUniverse;
 
 pub type CompileService = CompileServerActor<LspCompilerFeat>;
-pub type CompileClient = CompileClientActor;
 
 pub struct CompileServer {
     inner: CompileService,
@@ -29,10 +26,12 @@ impl CompileServer {
         let (doc_tx, _) = watch::channel(None);
         let (export_tx, mut export_rx) = mpsc::unbounded_channel();
         let (editor_tx, mut editor_rx) = mpsc::unbounded_channel();
+        let (intr_tx, intr_rx) = mpsc::unbounded_channel();
 
         let handle = Arc::new(CompileHandler {
             inner: std::sync::Arc::new(Some(cb)),
             diag_group: "main".to_owned(),
+            intr_tx: intr_tx.clone(),
             doc_tx,
             export_tx,
             editor_tx,
@@ -48,23 +47,14 @@ impl CompileServer {
         tokio::spawn(async move { while export_rx.recv().await.is_some() {} });
         tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
 
-        let (intr_tx, intr_rx) = mpsc::unbounded_channel();
-
         let inner =
             CompileServerActor::new(verse, intr_tx, intr_rx).with_watch(Some(handle.clone()));
 
         Self { inner, handle }
     }
 
-    pub fn spawn(self) -> Result<CompileClient, Error> {
-        let intr_tx = self.inner.intr_tx.clone();
-        let entry = self.inner.verse.entry_state();
+    pub fn spawn(self) -> Result<Arc<CompileHandler>, Error> {
         tokio::spawn(self.inner.spawn().instrument_await("spawn typst server"));
-        Ok(CompileClient::new(
-            self.handle,
-            CompileConfig::default(),
-            entry,
-            intr_tx,
-        ))
+        Ok(self.handle.clone())
     }
 }

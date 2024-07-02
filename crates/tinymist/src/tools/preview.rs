@@ -14,11 +14,11 @@ use typst_ts_compiler::EntryReader;
 use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_core::{Error, TypstDocument, TypstFileId};
 
-use crate::actor::typ_client::CompileClientActor;
+use crate::actor::typ_client::CompileHandler;
 use crate::actor::typ_server::CompileSnapshot;
 use crate::world::{LspCompilerFeat, LspWorld};
 
-impl CompileClientActor {
+impl CompileHandler {
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
     fn resolve_source_span(world: &LspWorld, loc: Location) -> Option<SourceSpanOffset> {
@@ -90,29 +90,23 @@ impl CompileClientActor {
     }
 }
 
-impl SourceFileServer for CompileClientActor {
+impl SourceFileServer for CompileHandler {
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
-    async fn resolve_source_span(
-        &mut self,
-        loc: Location,
-    ) -> Result<Option<SourceSpanOffset>, Error> {
+    async fn resolve_source_span(&self, loc: Location) -> Result<Option<SourceSpanOffset>, Error> {
         let snap = self.snapshot()?.snapshot().await?;
         Ok(Self::resolve_source_span(&snap.world, loc))
     }
 
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
-    async fn resolve_document_position(
-        &mut self,
-        loc: Location,
-    ) -> Result<Option<Position>, Error> {
+    async fn resolve_document_position(&self, loc: Location) -> Result<Option<Position>, Error> {
         let snap = self.snapshot()?.snapshot().await?;
         Ok(Self::resolve_document_position(&snap, loc))
     }
 
     async fn resolve_source_location(
-        &mut self,
+        &self,
         span: Span,
         offset: Option<usize>,
     ) -> Result<Option<DocToSrcJumpInfo>, Error> {
@@ -186,9 +180,9 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
     None
 }
 
-impl EditorServer for CompileClientActor {
+impl EditorServer for CompileHandler {
     async fn update_memory_files(
-        &mut self,
+        &self,
         files: MemoryFiles,
         reset_shadow: bool,
     ) -> Result<(), Error> {
@@ -214,7 +208,7 @@ impl EditorServer for CompileClientActor {
         Ok(())
     }
 
-    async fn remove_shadow_files(&mut self, files: MemoryFilesShort) -> Result<(), Error> {
+    async fn remove_shadow_files(&self, files: MemoryFilesShort) -> Result<(), Error> {
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_removes(files.files.into_iter().map(From::from).collect());
         self.add_memory_changes(MemoryEvent::Update(files));
@@ -223,4 +217,4 @@ impl EditorServer for CompileClientActor {
     }
 }
 
-impl CompileHost for CompileClientActor {}
+impl CompileHost for CompileHandler {}

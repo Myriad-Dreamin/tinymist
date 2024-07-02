@@ -6,7 +6,8 @@ use anyhow::anyhow;
 use lsp_types::TextDocumentContentChangeEvent;
 use tinymist_query::{
     lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, OnExportRequest,
-    OnSaveExportRequest, PositionEncoding, SyntaxRequest,
+    OnSaveExportRequest, PositionEncoding, SemanticRequest, StatefulRequest, SyntaxRequest,
+    VersionedDocument,
 };
 use typst::{diag::FileResult, syntax::Source};
 use typst_ts_compiler::{
@@ -247,26 +248,32 @@ macro_rules! query_tokens_cache {
 macro_rules! query_state {
     ($self:ident, $method:ident, $req:expr) => {{
         let snap = $self.snapshot()?;
-        {
-            just_future!(async move {
-                snap.stateful($req)
-                    .await
-                    .map(CompilerQueryResponse::$method)
-            })
-        }
+        let handle = $self.handle.clone();
+        just_future!(async move {
+            let snap = snap.snapshot().await?;
+            let w = &snap.world;
+            let doc = snap.success_doc.map(|doc| VersionedDocument {
+                version: w.revision().get(),
+                document: doc,
+            });
+            handle
+                .run_analysis(w, |ctx| $req.request(ctx, doc))
+                .map(CompilerQueryResponse::$method)
+        })
     }};
 }
 
 macro_rules! query_world {
     ($self:ident, $method:ident, $req:expr) => {{
         let snap = $self.snapshot()?;
-        {
-            just_future!(async move {
-                snap.semantic($req)
-                    .await
-                    .map(CompilerQueryResponse::$method)
-            })
-        }
+        let handle = $self.handle.clone();
+        just_future!(async move {
+            let snap = snap.snapshot().await?;
+            let w = &snap.world;
+            handle
+                .run_analysis(w, |ctx| $req.request(ctx))
+                .map(CompilerQueryResponse::$method)
+        })
     }};
 }
 
