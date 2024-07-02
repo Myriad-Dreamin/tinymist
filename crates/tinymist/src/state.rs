@@ -247,11 +247,6 @@ macro_rules! query_tokens_cache {
 macro_rules! query_state {
     ($self:ident, $method:ident, $req:expr) => {{
         let snap = $self.snapshot()?;
-        #[cfg(feature = "stable-server")]
-        {
-            just_result!(snap.stateful_sync($req).map(CompilerQueryResponse::$method))
-        }
-        #[cfg(not(feature = "stable-server"))]
         {
             just_future!(async move {
                 snap.stateful($req)
@@ -265,11 +260,6 @@ macro_rules! query_state {
 macro_rules! query_world {
     ($self:ident, $method:ident, $req:expr) => {{
         let snap = $self.snapshot()?;
-        #[cfg(feature = "stable-server")]
-        {
-            just_result!(snap.semantic_sync($req).map(CompilerQueryResponse::$method))
-        }
-        #[cfg(not(feature = "stable-server"))]
         {
             just_future!(async move {
                 snap.semantic($req)

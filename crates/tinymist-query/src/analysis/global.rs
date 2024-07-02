@@ -534,7 +534,7 @@ impl<'w> AnalysisContext<'w> {
             .map(|e| Self::def_use_(ctx, e.clone()))
             .collect::<Vec<_>>();
 
-        let key = (&l, &m, dep_hash);
+        let key = (&source, &l, &m, dep_hash);
         let h = hash128(&key);
 
         let res = if let Some(res) = ctx.ctx.analysis.caches.def_use.get(&h) {
