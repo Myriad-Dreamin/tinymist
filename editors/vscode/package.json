@@ -1,724 +1,724 @@
 {
-  "name": "tinymist",
-  "version": "0.11.13",
-  "description": "An integrated language service for Typst",
-  "categories": [
-    "Programming Languages",
-    "Formatters"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Myriad-Dreamin/tinymist"
-  },
-  "displayName": "Tinymist Typst",
-  "author": "Myriad-Dreamin",
-  "contributors": [
-    "Myriad-Dreamin",
-    "Nathan Varner"
-  ],
-  "publisher": "myriad-dreamin",
-  "license": "Apache-2.0",
-  "engines": {
-    "vscode": "^1.77.0"
-  },
-  "main": "./out/extension.js",
-  "icon": "./icons/ti-white.png",
-  "contributes": {
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "tinymist-activitybar",
-          "title": "Tinymist",
-          "icon": "./icons/ti.png"
-        }
-      ]
+    "name": "tinymist",
+    "version": "0.11.13",
+    "description": "An integrated language service for Typst",
+    "categories": [
+        "Programming Languages",
+        "Formatters"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Myriad-Dreamin/tinymist"
     },
-    "views": {
-      "tinymist-activitybar": [
-        {
-          "id": "tinymist.side-symbol-view",
-          "type": "webview",
-          "name": "Symbol View",
-          "when": "resourceLangId == typst"
-        },
-        {
-          "id": "typst-preview.content-preview",
-          "type": "webview",
-          "name": "Content",
-          "when": "config.typst-preview.showInActivityBar && resourceLangId == typst"
-        },
-        {
-          "id": "typst-preview.outline",
-          "name": "Outline",
-          "when": "config.typst-preview.showInActivityBar && resourceLangId == typst"
-        }
-      ]
+    "displayName": "Tinymist Typst",
+    "author": "Myriad-Dreamin",
+    "contributors": [
+        "Myriad-Dreamin",
+        "Nathan Varner"
+    ],
+    "publisher": "myriad-dreamin",
+    "license": "Apache-2.0",
+    "engines": {
+        "vscode": "^1.77.0"
     },
-    "configuration": {
-      "type": "object",
-      "title": "Tinymist Typst LSP",
-      "properties": {
-        "tinymist.outputPath": {
-          "title": "Output path",
-          "description": "The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration, e.g. `$dir/$name` (default) and `$root/target/$dir/$name`.",
-          "type": "string",
-          "default": ""
+    "main": "./out/extension.js",
+    "icon": "./icons/ti-white.png",
+    "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "tinymist-activitybar",
+                    "title": "Tinymist",
+                    "icon": "./icons/ti.png"
+                }
+            ]
         },
-        "tinymist.exportPdf": {
-          "title": "Export PDF",
-          "description": "The extension can export PDFs of your Typst files. This setting controls whether this feature is enabled and how often it runs.",
-          "type": "string",
-          "default": "auto",
-          "enum": [
-            "auto",
-            "never",
-            "onSave",
-            "onType",
-            "onDocumentHasTitle"
-          ],
-          "enumDescriptions": [
-            "Select best solution automatically. (Recommended)",
-            "Never export PDFs, you will manually run typst.",
-            "Export PDFs when you save a file.",
-            "Export PDFs as you type in a file.",
-            "Export PDFs when a document has a title (and save a file), which is useful to filter out template files."
-          ]
+        "views": {
+            "tinymist-activitybar": [
+                {
+                    "id": "tinymist.side-symbol-view",
+                    "type": "webview",
+                    "name": "Symbol View",
+                    "when": "resourceLangId == typst"
+                },
+                {
+                    "id": "typst-preview.content-preview",
+                    "type": "webview",
+                    "name": "Content",
+                    "when": "config.typst-preview.showInActivityBar && resourceLangId == typst"
+                },
+                {
+                    "id": "typst-preview.outline",
+                    "name": "Outline",
+                    "when": "config.typst-preview.showInActivityBar && resourceLangId == typst"
+                }
+            ]
         },
-        "tinymist.rootPath": {
-          "title": "Root path",
-          "description": "Configure the root for absolute paths in typst",
-          "type": [
-            "string",
-            "null"
-          ],
-          "default": null
+        "configuration": {
+            "type": "object",
+            "title": "Tinymist Typst LSP",
+            "properties": {
+                "tinymist.outputPath": {
+                    "title": "Output path",
+                    "description": "The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration, e.g. `$dir/$name` (default) and `$root/target/$dir/$name`.",
+                    "type": "string",
+                    "default": ""
+                },
+                "tinymist.exportPdf": {
+                    "title": "Export PDF",
+                    "description": "The extension can export PDFs of your Typst files. This setting controls whether this feature is enabled and how often it runs.",
+                    "type": "string",
+                    "default": "auto",
+                    "enum": [
+                        "auto",
+                        "never",
+                        "onSave",
+                        "onType",
+                        "onDocumentHasTitle"
+                    ],
+                    "enumDescriptions": [
+                        "Select best solution automatically. (Recommended)",
+                        "Never export PDFs, you will manually run typst.",
+                        "Export PDFs when you save a file.",
+                        "Export PDFs as you type in a file.",
+                        "Export PDFs when a document has a title (and save a file), which is useful to filter out template files."
+                    ]
+                },
+                "tinymist.rootPath": {
+                    "title": "Root path",
+                    "description": "Configure the root for absolute paths in typst",
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "tinymist.semanticTokens": {
+                    "title": "Semantic tokens mode",
+                    "description": "Enable or disable semantic tokens (LSP syntax highlighting)",
+                    "type": "string",
+                    "default": "enable",
+                    "enum": [
+                        "enable",
+                        "disable"
+                    ],
+                    "enumDescriptions": [
+                        "Use semantic tokens for syntax highlighting",
+                        "Do not use semantic tokens for syntax highlighting"
+                    ]
+                },
+                "tinymist.onEnterEvent": {
+                    "title": "Handling on enter events",
+                    "description": "Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter) (LSP onEnter feature) to allow automatic insertion of characters on enter, such as `///` for comments. Note: restarting the editor is required to change this setting.",
+                    "type": "boolean",
+                    "default": true
+                },
+                "tinymist.systemFonts": {
+                    "title": "Whether to load system fonts for Typst compiler",
+                    "description": "A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options. ",
+                    "type": "boolean",
+                    "default": true
+                },
+                "tinymist.fontPaths": {
+                    "title": "Font paths for Typst compiler",
+                    "description": "A list of file or directory path to fonts. Note: The configuration source in higher priority will **override** the configuration source in lower priority. The order of precedence is: Configuration `tinymist.fontPaths` > Configuration `tinymist.typstExtraArgs.fontPaths` > LSP's CLI Argument `--font-path` > The environment variable `TYPST_FONT_PATHS` (a path list separated by `;` (on Windows) or `:` (Otherwise)). Note: If the path to fonts is a relative path, it will be resolved based on the root directory. Note: In VSCode, you can use VSCode variables in the path, e.g. `${workspaceFolder}/fonts`.",
+                    "type": [
+                        "array",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "tinymist.compileStatus": {
+                    "title": "Show/Report compilation status",
+                    "description": "In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since Neovim and Helix don't have a such feature, it is disabled by default at the language server label.",
+                    "type": "string",
+                    "default": "enable",
+                    "enum": [
+                        "enable",
+                        "disable"
+                    ]
+                },
+                "tinymist.typstExtraArgs": {
+                    "title": "Specifies the arguments for Typst as same as typst-cli",
+                    "description": "You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`.",
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "title": "arguments in order",
+                        "description": "The arguments for Typst as same as typst-cli."
+                    },
+                    "default": []
+                },
+                "tinymist.serverPath": {
+                    "title": "Path to server executable",
+                    "description": "The extension can use a local tinymist executable instead of the one bundled with the extension. This setting controls the path to the executable.",
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "tinymist.trace.server": {
+                    "scope": "window",
+                    "type": "string",
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
+                    "default": "off",
+                    "description": "Traces the communication between VS Code and the language server."
+                },
+                "tinymist.formatterMode": {
+                    "title": "Enable Experimental Formatter",
+                    "description": "The extension can format Typst files using typstfmt or typstyle.",
+                    "type": "string",
+                    "default": "disable",
+                    "enum": [
+                        "disable",
+                        "typstyle",
+                        "typstfmt"
+                    ],
+                    "enumDescriptions": [
+                        "Formatter is not activated.",
+                        "Use typstyle formatter.",
+                        "Use typstfmt formatter."
+                    ]
+                },
+                "tinymist.formatterPrintWidth": {
+                    "title": "Set formatter's (unsigned) print width",
+                    "description": "Set the print width for the formatter, which is a **soft limit** of characters per line. See [the definition of *Print Width*](https://prettier.io/docs/en/options.html#print-width). Note: this has lower priority than the formatter's specific configurations.",
+                    "type": "number",
+                    "default": 120
+                },
+                "typst-preview.sysInputs": {
+                    "type": "object",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": {},
+                    "description": "key-value pairs visible through `sys.inputs`, corresponds to `--input` argument of typst cli"
+                },
+                "typst-preview.systemFonts": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether to load system fonts. If disabled, only fonts in `typst-preview.fontPaths` is loaded"
+                },
+                "typst-preview.fontPaths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "title": "Font path",
+                        "description": "Absolute path to a directory or file containing font assets."
+                    },
+                    "default": [],
+                    "description": "List of *additional* paths to font assets used by typst-preview."
+                },
+                "typst-preview.refresh": {
+                    "title": "Refresh preview",
+                    "description": "Refresh preview when the document is saved or when the document is changed",
+                    "type": "string",
+                    "enum": [
+                        "onSave",
+                        "onType"
+                    ],
+                    "default": "onType",
+                    "enumDescriptions": [
+                        "Refresh preview on save",
+                        "Refresh preview on type"
+                    ]
+                },
+                "typst-preview.scrollSync": {
+                    "description": "Configure scroll sync mode.",
+                    "type": "string",
+                    "enum": [
+                        "never",
+                        "onSelectionChangeByMouse",
+                        "onSelectionChange"
+                    ],
+                    "default": "onSelectionChangeByMouse",
+                    "enumDescriptions": [
+                        "Disable automatic scroll sync",
+                        "Scroll preview to current cursor position when selection changes by mouse",
+                        "Scroll preview to current cursor position when selection changes by mouse or keyboard (any source)"
+                    ]
+                },
+                "typst-preview.partialRendering": {
+                    "description": "Only render visible part of the document. This can improve performance but still being experimental.",
+                    "type": "boolean",
+                    "default": true
+                },
+                "typst-preview.invertColors": {
+                    "description": "Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview.",
+                    "type": "string",
+                    "enum": [
+                        "never",
+                        "auto",
+                        "always"
+                    ],
+                    "default": "never",
+                    "enumDescriptions": [
+                        "Disable color inversion of the preview",
+                        "Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document",
+                        "Always invert colors of the preview"
+                    ]
+                },
+                "typst-preview.cursorIndicator": {
+                    "description": "(Experimental) Show typst cursor indicator in preview.",
+                    "type": "boolean",
+                    "default": false
+                },
+                "typst-preview.showInActivityBar": {
+                    "description": "(Experimental) Show a preview panel in activity bar.",
+                    "type": "boolean",
+                    "default": false
+                },
+                "typst-preview.statusBarIndicator": {
+                    "description": "Style of status bar indicator for typst-preview.",
+                    "type": "string",
+                    "enum": [
+                        "full",
+                        "compact"
+                    ],
+                    "default": "compact",
+                    "enumDescriptions": [
+                        "Show full status bar indicator (ICON Compile Success)",
+                        "Show compact status bar indicator (ICON)"
+                    ]
+                },
+                "typst-preview.pinPreviewFile": {
+                    "description": "Declare current previewing file as entrypoint for typst-lsp. This will make typst-lsp to use this file as entrypoint instead of the file opened in vscode. This can improve diagnostics messages and auto completion but still being experimental.",
+                    "type": "boolean",
+                    "default": false
+                }
+            }
         },
-        "tinymist.semanticTokens": {
-          "title": "Semantic tokens mode",
-          "description": "Enable or disable semantic tokens (LSP syntax highlighting)",
-          "type": "string",
-          "default": "enable",
-          "enum": [
-            "enable",
-            "disable"
-          ],
-          "enumDescriptions": [
-            "Use semantic tokens for syntax highlighting",
-            "Do not use semantic tokens for syntax highlighting"
-          ]
+        "configurationDefaults": {
+            "[typst]": {
+                "editor.wordWrap": "on",
+                "editor.semanticHighlighting.enabled": true,
+                "editor.tabSize": 2,
+                "editor.inlayHints.enabled": "off"
+            }
         },
-        "tinymist.onEnterEvent": {
-          "title": "Handling on enter events",
-          "description": "Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter) (LSP onEnter feature) to allow automatic insertion of characters on enter, such as `///` for comments. Note: restarting the editor is required to change this setting.",
-          "type": "boolean",
-          "default": true
-        },
-        "tinymist.systemFonts": {
-          "title": "Whether to load system fonts for Typst compiler",
-          "description": "A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options. ",
-          "type": "boolean",
-          "default": true
-        },
-        "tinymist.fontPaths": {
-          "title": "Font paths for Typst compiler",
-          "description": "A list of file or directory path to fonts. Note: The configuration source in higher priority will **override** the configuration source in lower priority. The order of precedence is: Configuration `tinymist.fontPaths` > Configuration `tinymist.typstExtraArgs.fontPaths` > LSP's CLI Argument `--font-path` > The environment variable `TYPST_FONT_PATHS` (a path list separated by `;` (on Windows) or `:` (Otherwise)). Note: If the path to fonts is a relative path, it will be resolved based on the root directory. Note: In VSCode, you can use VSCode variables in the path, e.g. `${workspaceFolder}/fonts`.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "default": null
-        },
-        "tinymist.compileStatus": {
-          "title": "Show/Report compilation status",
-          "description": "In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since Neovim and Helix don't have a such feature, it is disabled by default at the language server label.",
-          "type": "string",
-          "default": "enable",
-          "enum": [
-            "enable",
-            "disable"
-          ]
-        },
-        "tinymist.typstExtraArgs": {
-          "title": "Specifies the arguments for Typst as same as typst-cli",
-          "description": "You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`.",
-          "type": "array",
-          "items": {
-            "type": "string",
-            "title": "arguments in order",
-            "description": "The arguments for Typst as same as typst-cli."
-          },
-          "default": []
-        },
-        "tinymist.serverPath": {
-          "title": "Path to server executable",
-          "description": "The extension can use a local tinymist executable instead of the one bundled with the extension. This setting controls the path to the executable.",
-          "type": [
-            "string",
-            "null"
-          ],
-          "default": null
-        },
-        "tinymist.trace.server": {
-          "scope": "window",
-          "type": "string",
-          "enum": [
-            "off",
-            "messages",
-            "verbose"
-          ],
-          "default": "off",
-          "description": "Traces the communication between VS Code and the language server."
-        },
-        "tinymist.formatterMode": {
-          "title": "Enable Experimental Formatter",
-          "description": "The extension can format Typst files using typstfmt or typstyle.",
-          "type": "string",
-          "default": "disable",
-          "enum": [
-            "disable",
-            "typstyle",
-            "typstfmt"
-          ],
-          "enumDescriptions": [
-            "Formatter is not activated.",
-            "Use typstyle formatter.",
-            "Use typstfmt formatter."
-          ]
-        },
-        "tinymist.formatterPrintWidth": {
-          "title": "Set formatter's (unsigned) print width",
-          "description": "Set the print width for the formatter, which is a **soft limit** of characters per line. See [the definition of *Print Width*](https://prettier.io/docs/en/options.html#print-width). Note: this has lower priority than the formatter's specific configurations.",
-          "type": "number",
-          "default": 120
-        },
-        "typst-preview.sysInputs": {
-          "type": "object",
-          "items": {
-            "type": "string"
-          },
-          "default": {},
-          "description": "key-value pairs visible through `sys.inputs`, corresponds to `--input` argument of typst cli"
-        },
-        "typst-preview.systemFonts": {
-          "type": "boolean",
-          "default": true,
-          "description": "Whether to load system fonts. If disabled, only fonts in `typst-preview.fontPaths` is loaded"
-        },
-        "typst-preview.fontPaths": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "title": "Font path",
-            "description": "Absolute path to a directory or file containing font assets."
-          },
-          "default": [],
-          "description": "List of *additional* paths to font assets used by typst-preview."
-        },
-        "typst-preview.refresh": {
-          "title": "Refresh preview",
-          "description": "Refresh preview when the document is saved or when the document is changed",
-          "type": "string",
-          "enum": [
-            "onSave",
-            "onType"
-          ],
-          "default": "onType",
-          "enumDescriptions": [
-            "Refresh preview on save",
-            "Refresh preview on type"
-          ]
-        },
-        "typst-preview.scrollSync": {
-          "description": "Configure scroll sync mode.",
-          "type": "string",
-          "enum": [
-            "never",
-            "onSelectionChangeByMouse",
-            "onSelectionChange"
-          ],
-          "default": "onSelectionChangeByMouse",
-          "enumDescriptions": [
-            "Disable automatic scroll sync",
-            "Scroll preview to current cursor position when selection changes by mouse",
-            "Scroll preview to current cursor position when selection changes by mouse or keyboard (any source)"
-          ]
-        },
-        "typst-preview.partialRendering": {
-          "description": "Only render visible part of the document. This can improve performance but still being experimental.",
-          "type": "boolean",
-          "default": true
-        },
-        "typst-preview.invertColors": {
-          "description": "Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview.",
-          "type": "string",
-          "enum": [
-            "never",
-            "auto",
-            "always"
-          ],
-          "default": "never",
-          "enumDescriptions": [
-            "Disable color inversion of the preview",
-            "Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document",
-            "Always invert colors of the preview"
-          ]
-        },
-        "typst-preview.cursorIndicator": {
-          "description": "(Experimental) Show typst cursor indicator in preview.",
-          "type": "boolean",
-          "default": false
-        },
-        "typst-preview.showInActivityBar": {
-          "description": "(Experimental) Show a preview panel in activity bar.",
-          "type": "boolean",
-          "default": false
-        },
-        "typst-preview.statusBarIndicator": {
-          "description": "Style of status bar indicator for typst-preview.",
-          "type": "string",
-          "enum": [
-            "full",
-            "compact"
-          ],
-          "default": "compact",
-          "enumDescriptions": [
-            "Show full status bar indicator (ICON Compile Success)",
-            "Show compact status bar indicator (ICON)"
-          ]
-        },
-        "typst-preview.pinPreviewFile": {
-          "description": "Declare current previewing file as entrypoint for typst-lsp. This will make typst-lsp to use this file as entrypoint instead of the file opened in vscode. This can improve diagnostics messages and auto completion but still being experimental.",
-          "type": "boolean",
-          "default": false
+        "languages": [
+            {
+                "id": "typst",
+                "configuration": "./language-configuration.json",
+                "extensions": [
+                    ".typ"
+                ],
+                "aliases": [
+                    "Typst",
+                    "typst",
+                    "typ"
+                ],
+                "icon": {
+                    "light": "./icons/typst-small.png",
+                    "dark": "./icons/typst-small.png"
+                }
+            },
+            {
+                "id": "typst-code",
+                "configuration": "./language-configuration.json",
+                "extensions": [
+                    ".typc"
+                ],
+                "aliases": [
+                    "Typst (Code Mode)",
+                    "typc"
+                ],
+                "icon": {
+                    "light": "./icons/typst-small.png",
+                    "dark": "./icons/typst-small.png"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "typst",
+                "scopeName": "source.typst",
+                "path": "./out/typst.tmLanguage.json",
+                "balancedBracketScopes": [
+                    "meta.expr",
+                    "meta.brace"
+                ],
+                "unbalancedBracketScopes": [
+                    "markup.raw.block.typst",
+                    "markup.raw.inline.typst",
+                    "string.other.label.typst",
+                    "string.quoted.double.typst",
+                    "constant.character.escape",
+                    "comment.block.typst",
+                    "comment.line.double-slash.typst"
+                ]
+            },
+            {
+                "language": "typst-code",
+                "scopeName": "source.typst-code",
+                "path": "./out/typst-code.tmLanguage.json",
+                "balancedBracketScopes": [
+                    "meta.expr",
+                    "meta.brace"
+                ],
+                "unbalancedBracketScopes": [
+                    "markup.raw.block.typst",
+                    "markup.raw.inline.typst",
+                    "string.other.label.typst",
+                    "string.quoted.double.typst",
+                    "constant.character.escape",
+                    "comment.block.typst",
+                    "comment.line.double-slash.typst"
+                ]
+            }
+        ],
+        "semanticTokenTypes": [
+            {
+                "id": "bool",
+                "description": "A boolean literal"
+            },
+            {
+                "id": "punct",
+                "description": "Punctuation in code"
+            },
+            {
+                "id": "escape",
+                "description": "Escape sequence"
+            },
+            {
+                "id": "link",
+                "description": "Hyperlink"
+            },
+            {
+                "id": "raw",
+                "description": "Raw text"
+            },
+            {
+                "id": "label",
+                "description": "Label"
+            },
+            {
+                "id": "ref",
+                "description": "Reference to a label"
+            },
+            {
+                "id": "heading",
+                "description": "Heading"
+            },
+            {
+                "id": "marker",
+                "description": "List, enum, or term list marker"
+            },
+            {
+                "id": "term",
+                "description": "Term in a term list"
+            },
+            {
+                "id": "delim",
+                "description": "Delimiter of a different type of markup"
+            },
+            {
+                "id": "pol",
+                "description": "Interpolated variable"
+            },
+            {
+                "id": "error",
+                "description": "Syntax error"
+            },
+            {
+                "id": "text",
+                "description": "Text"
+            }
+        ],
+        "semanticTokenModifiers": [
+            {
+                "id": "math",
+                "description": "Math mode markup"
+            },
+            {
+                "id": "strong",
+                "description": "Strong (usually bolded) text"
+            },
+            {
+                "id": "emph",
+                "description": "Emphasized (usually italicized) text"
+            }
+        ],
+        "semanticTokenScopes": [
+            {
+                "language": "typst",
+                "scopes": {
+                    "*.strong.emph": [
+                        "markup.bold.typst markup.italic.typst"
+                    ],
+                    "*.strong": [
+                        "markup.bold.typst"
+                    ],
+                    "*.emph": [
+                        "markup.italic.typst"
+                    ],
+                    "*.math": [
+                        "markup.math.typst"
+                    ],
+                    "bool": [
+                        "constant.language.boolean.typst"
+                    ],
+                    "punct": [
+                        "punctuation.typst",
+                        "punctuation.definition.typst"
+                    ],
+                    "escape": [
+                        "constant.character.escape.typst",
+                        "keyword.operator.typst",
+                        "punctuation.definition.typst"
+                    ],
+                    "link": [
+                        "markup.underline.link.typst"
+                    ],
+                    "raw": [
+                        "markup.inline.raw.typst",
+                        "markup.raw.inline.typst"
+                    ],
+                    "delim.math": [
+                        "punctuation.definition.math.typst",
+                        "punctuation.definition.string.end.math.typst",
+                        "string.quoted.other.typst"
+                    ],
+                    "operator.math": [
+                        "keyword.operator.math.typst"
+                    ],
+                    "heading": [
+                        "markup.heading.typst"
+                    ],
+                    "marker": [
+                        "markup.list.typst punctuation.definition.list.begin.typst",
+                        "markup.list.typst",
+                        "punctuation.definition.list.begin.typst"
+                    ],
+                    "term": [
+                        "markup.list.term.typst",
+                        "markup.bold.term.typst"
+                    ],
+                    "label": [
+                        "string.other.link.title.typst",
+                        "entity.name.label.typst",
+                        "meta.link.inline.typst",
+                        "markup.underline.link.typst"
+                    ],
+                    "ref": [
+                        "string.other.link.typst",
+                        "markup.other.reference.typst",
+                        "entity.name.label.typst",
+                        "meta.link.inline.typst",
+                        "markup.underline.link.typst"
+                    ],
+                    "pol": [
+                        "meta.interpolation.typst",
+                        "variable.typst"
+                    ],
+                    "error": [
+                        "invalid.typst"
+                    ]
+                }
+            }
+        ],
+        "commands": [
+            {
+                "command": "tinymist.exportCurrentPdf",
+                "title": "Export the currently open file as PDF",
+                "category": "Typst"
+            },
+            {
+                "command": "tinymist.pinMainToCurrent",
+                "title": "Pin the main file to the currently opened document",
+                "category": "Typst"
+            },
+            {
+                "command": "tinymist.unpinMain",
+                "title": "Unpin the main file",
+                "category": "Typst"
+            },
+            {
+                "command": "tinymist.showPdf",
+                "title": "Show the compiled PDF of the currently opened typst file",
+                "category": "Typst",
+                "icon": "$(open-preview)"
+            },
+            {
+                "command": "tinymist.clearCache",
+                "title": "Clear all cached resources",
+                "category": "Typst"
+            },
+            {
+                "command": "tinymist.initTemplate",
+                "title": "Initialize a new Typst project based on a template",
+                "category": "Typst"
+            },
+            {
+                "command": "tinymist.initTemplateInPlace",
+                "title": "Insert the content of template entry in place",
+                "category": "Typst"
+            },
+            {
+                "command": "tinymist.showTemplateGallery",
+                "title": "Show available Typst templates (gallery) for picking up a template to initialize",
+                "category": "Typst"
+            },
+            {
+                "command": "tinymist.showSummary",
+                "title": "Show current document summary",
+                "category": "Typst"
+            },
+            {
+                "command": "tinymist.showSymbolView",
+                "title": "Show symbol view",
+                "category": "Typst"
+            },
+            {
+                "command": "tinymist.profileCurrentFile",
+                "title": "Profile and visualize execution of the current Typst file",
+                "category": "Typst"
+            },
+            {
+                "command": "typst-preview.preview",
+                "title": "Typst Preview: Preview current file",
+                "description": "Launch typst-preview server",
+                "icon": "$(open-preview)",
+                "when": "resourceLangId == typst && editorTextFocus"
+            },
+            {
+                "command": "typst-preview.browser",
+                "title": "Typst Preview: Preview current file in browser",
+                "description": "Launch typst-preview server and open the preview in your browser",
+                "icon": "$(open-preview)",
+                "when": "resourceLangId == typst && editorTextFocus"
+            },
+            {
+                "command": "typst-preview.preview-slide",
+                "title": "Typst Preview: Preview current file in slide mode",
+                "description": "Launch typst-preview server in slide mode",
+                "icon": "$(open-preview)",
+                "when": "resourceLangId == typst && editorTextFocus"
+            },
+            {
+                "command": "typst-preview.browser-slide",
+                "title": "Typst Preview: Preview current file in browser and slide mode",
+                "description": "Launch typst-preview server in slide mode and open the preview in your browser",
+                "icon": "$(open-preview)",
+                "when": "resourceLangId == typst && editorTextFocus"
+            },
+            {
+                "command": "typst-preview.sync",
+                "title": "Typst Preview: Sync preview with current cursor",
+                "description": "Scroll preview to current cursor position",
+                "icon": "$(sync)",
+                "when": "resourceLangId == typst && editorTextFocus"
+            },
+            {
+                "command": "typst-preview.showLog",
+                "title": "Typst Preview: Show Log",
+                "description": "Show typst-preview log",
+                "icon": "$(list-flat)",
+                "when": "resourceLangId == typst"
+            },
+            {
+                "command": "typst-preview.noteOutline",
+                "title": "Note: Jumping to source location of the outline item doesn't work well if its body doesn't have source location, e.g.\n```\n#let my-heading(h) = heading(h) // will jump to here\n#my-heading(\"Title\") // will not jump to here\n```.\nHence, you may want to use `my-heading[Title]` instead to gain better experience of outline jumping.",
+                "description": "...",
+                "icon": "$(extensions-info-message)"
+            },
+            {
+                "command": "typst-preview.showAwaitTree",
+                "title": "Typst Preview: [debug] Show Await Tree",
+                "description": "Show await tree of typst-preview. This is used for debugging."
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "tinymist.onEnter",
+                "key": "enter",
+                "when": "editorTextFocus && !editorReadonly && editorLangId == typst && !suggestWidgetVisible && !editorHasMultipleSelections && vim.mode != 'Normal' && vim.mode != 'Visual' && vim.mode != 'VisualBlock' && vim.mode != 'VisualLine' && vim.mode != 'SearchInProgressMode' && vim.mode != 'CommandlineInProgress' && vim.mode != 'Replace' && vim.mode != 'EasyMotionMode' && vim.mode != 'EasyMotionInputMode' && vim.mode != 'SurroundInputMode'"
+            },
+            {
+                "command": "typst-preview.preview",
+                "key": "ctrl+k v",
+                "mac": "cmd+k v",
+                "when": "editorLangId == typst"
+            }
+        ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "tinymist.exportCurrentPdf",
+                    "when": "editorLangId == typst"
+                },
+                {
+                    "command": "tinymist.clearCache",
+                    "when": "editorLangId == typst"
+                }
+            ],
+            "editor/title": [
+                {
+                    "command": "typst-preview.preview",
+                    "when": "resourceLangId == typst && editorTextFocus",
+                    "group": "navigation"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "typst-preview.noteOutline",
+                    "when": "view == typst-preview.outline",
+                    "group": "navigation"
+                }
+            ]
         }
-      }
     },
-    "configurationDefaults": {
-      "[typst]": {
-        "editor.wordWrap": "on",
-        "editor.semanticHighlighting.enabled": true,
-        "editor.tabSize": 2,
-        "editor.inlayHints.enabled": "off"
-      }
+    "activationEvents": [
+        "onLanguage:typst",
+        "onCommand:tinymist.exportCurrentPdf",
+        "onCommand:tinymist.clearCache"
+    ],
+    "scripts": {
+        "build:preview-frontend": "cd ../../tools/typst-preview-frontend && yarn run build && cd ../../editors/vscode && rimraf ./out/frontend/ && cpr ../../tools/typst-preview-frontend/dist/ ./out/frontend/ && rimraf ../../crates/tinymist-assets/src/typst-preview.html && cpr ./out/frontend/index.html ../../crates/tinymist-assets/src/typst-preview.html",
+        "build:frontend": "yarn build:preview-frontend && cd ../../tools/editor-tools/ && yarn run build",
+        "build:syntax": "cd ../../syntaxes/textmate && yarn run compile && yarn run bundle",
+        "build-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node16",
+        "vscode:prepublish": "yarn run build-base -- --minify && yarn run build:frontend && node scripts/postinstall.cjs && node scripts/config-man.cjs",
+        "package": "vsce package --yarn",
+        "compile": "yarn run build-base -- --sourcemap && yarn run build:syntax && yarn run build:frontend && node scripts/postinstall.cjs",
+        "watch": "yarn run build-base -- --sourcemap --watch",
+        "check": "tsc --noEmit",
+        "lint": "eslint ./src --ext .ts",
+        "lint-fix": "eslint ./src --ext .ts --fix",
+        "format-check": "prettier --check .",
+        "format": "prettier --write .",
+        "test": ""
     },
-    "languages": [
-      {
-        "id": "typst",
-        "configuration": "./language-configuration.json",
-        "extensions": [
-          ".typ"
-        ],
-        "aliases": [
-          "Typst",
-          "typst",
-          "typ"
-        ],
-        "icon": {
-          "light": "./icons/typst-small.png",
-          "dark": "./icons/typst-small.png"
-        }
-      },
-      {
-        "id": "typst-code",
-        "configuration": "./language-configuration.json",
-        "extensions": [
-          ".typc"
-        ],
-        "aliases": [
-          "Typst (Code Mode)",
-          "typc"
-        ],
-        "icon": {
-          "light": "./icons/typst-small.png",
-          "dark": "./icons/typst-small.png"
-        }
-      }
-    ],
-    "grammars": [
-      {
-        "language": "typst",
-        "scopeName": "source.typst",
-        "path": "./out/typst.tmLanguage.json",
-        "balancedBracketScopes": [
-          "meta.expr",
-          "meta.brace"
-        ],
-        "unbalancedBracketScopes": [
-          "markup.raw.block.typst",
-          "markup.raw.inline.typst",
-          "string.other.label.typst",
-          "string.quoted.double.typst",
-          "constant.character.escape",
-          "comment.block.typst",
-          "comment.line.double-slash.typst"
-        ]
-      },
-      {
-        "language": "typst-code",
-        "scopeName": "source.typst-code",
-        "path": "./out/typst-code.tmLanguage.json",
-        "balancedBracketScopes": [
-          "meta.expr",
-          "meta.brace"
-        ],
-        "unbalancedBracketScopes": [
-          "markup.raw.block.typst",
-          "markup.raw.inline.typst",
-          "string.other.label.typst",
-          "string.quoted.double.typst",
-          "constant.character.escape",
-          "comment.block.typst",
-          "comment.line.double-slash.typst"
-        ]
-      }
-    ],
-    "semanticTokenTypes": [
-      {
-        "id": "bool",
-        "description": "A boolean literal"
-      },
-      {
-        "id": "punct",
-        "description": "Punctuation in code"
-      },
-      {
-        "id": "escape",
-        "description": "Escape sequence"
-      },
-      {
-        "id": "link",
-        "description": "Hyperlink"
-      },
-      {
-        "id": "raw",
-        "description": "Raw text"
-      },
-      {
-        "id": "label",
-        "description": "Label"
-      },
-      {
-        "id": "ref",
-        "description": "Reference to a label"
-      },
-      {
-        "id": "heading",
-        "description": "Heading"
-      },
-      {
-        "id": "marker",
-        "description": "List, enum, or term list marker"
-      },
-      {
-        "id": "term",
-        "description": "Term in a term list"
-      },
-      {
-        "id": "delim",
-        "description": "Delimiter of a different type of markup"
-      },
-      {
-        "id": "pol",
-        "description": "Interpolated variable"
-      },
-      {
-        "id": "error",
-        "description": "Syntax error"
-      },
-      {
-        "id": "text",
-        "description": "Text"
-      }
-    ],
-    "semanticTokenModifiers": [
-      {
-        "id": "math",
-        "description": "Math mode markup"
-      },
-      {
-        "id": "strong",
-        "description": "Strong (usually bolded) text"
-      },
-      {
-        "id": "emph",
-        "description": "Emphasized (usually italicized) text"
-      }
-    ],
-    "semanticTokenScopes": [
-      {
-        "language": "typst",
-        "scopes": {
-          "*.strong.emph": [
-            "markup.bold.typst markup.italic.typst"
-          ],
-          "*.strong": [
-            "markup.bold.typst"
-          ],
-          "*.emph": [
-            "markup.italic.typst"
-          ],
-          "*.math": [
-            "markup.math.typst"
-          ],
-          "bool": [
-            "constant.language.boolean.typst"
-          ],
-          "punct": [
-            "punctuation.typst",
-            "punctuation.definition.typst"
-          ],
-          "escape": [
-            "constant.character.escape.typst",
-            "keyword.operator.typst",
-            "punctuation.definition.typst"
-          ],
-          "link": [
-            "markup.underline.link.typst"
-          ],
-          "raw": [
-            "markup.inline.raw.typst",
-            "markup.raw.inline.typst"
-          ],
-          "delim.math": [
-            "punctuation.definition.math.typst",
-            "punctuation.definition.string.end.math.typst",
-            "string.quoted.other.typst"
-          ],
-          "operator.math": [
-            "keyword.operator.math.typst"
-          ],
-          "heading": [
-            "markup.heading.typst"
-          ],
-          "marker": [
-            "markup.list.typst punctuation.definition.list.begin.typst",
-            "markup.list.typst",
-            "punctuation.definition.list.begin.typst"
-          ],
-          "term": [
-            "markup.list.term.typst",
-            "markup.bold.term.typst"
-          ],
-          "label": [
-            "string.other.link.title.typst",
-            "entity.name.label.typst",
-            "meta.link.inline.typst",
-            "markup.underline.link.typst"
-          ],
-          "ref": [
-            "string.other.link.typst",
-            "markup.other.reference.typst",
-            "entity.name.label.typst",
-            "meta.link.inline.typst",
-            "markup.underline.link.typst"
-          ],
-          "pol": [
-            "meta.interpolation.typst",
-            "variable.typst"
-          ],
-          "error": [
-            "invalid.typst"
-          ]
-        }
-      }
-    ],
-    "commands": [
-      {
-        "command": "tinymist.exportCurrentPdf",
-        "title": "Export the currently open file as PDF",
-        "category": "Typst"
-      },
-      {
-        "command": "tinymist.pinMainToCurrent",
-        "title": "Pin the main file to the currently opened document",
-        "category": "Typst"
-      },
-      {
-        "command": "tinymist.unpinMain",
-        "title": "Unpin the main file",
-        "category": "Typst"
-      },
-      {
-        "command": "tinymist.showPdf",
-        "title": "Show the compiled PDF of the currently opened typst file",
-        "category": "Typst",
-        "icon": "$(open-preview)"
-      },
-      {
-        "command": "tinymist.clearCache",
-        "title": "Clear all cached resources",
-        "category": "Typst"
-      },
-      {
-        "command": "tinymist.initTemplate",
-        "title": "Initialize a new Typst project based on a template",
-        "category": "Typst"
-      },
-      {
-        "command": "tinymist.initTemplateInPlace",
-        "title": "Insert the content of template entry in place",
-        "category": "Typst"
-      },
-      {
-        "command": "tinymist.showTemplateGallery",
-        "title": "Show available Typst templates (gallery) for picking up a template to initialize",
-        "category": "Typst"
-      },
-      {
-        "command": "tinymist.showSummary",
-        "title": "Show current document summary",
-        "category": "Typst"
-      },
-      {
-        "command": "tinymist.showSymbolView",
-        "title": "Show symbol view",
-        "category": "Typst"
-      },
-      {
-        "command": "tinymist.profileCurrentFile",
-        "title": "Profile and visualize execution of the current Typst file",
-        "category": "Typst"
-      },
-      {
-        "command": "typst-preview.preview",
-        "title": "Typst Preview: Preview current file",
-        "description": "Launch typst-preview server",
-        "icon": "$(open-preview)",
-        "when": "resourceLangId == typst && editorTextFocus"
-      },
-      {
-        "command": "typst-preview.browser",
-        "title": "Typst Preview: Preview current file in browser",
-        "description": "Launch typst-preview server and open the preview in your browser",
-        "icon": "$(open-preview)",
-        "when": "resourceLangId == typst && editorTextFocus"
-      },
-      {
-        "command": "typst-preview.preview-slide",
-        "title": "Typst Preview: Preview current file in slide mode",
-        "description": "Launch typst-preview server in slide mode",
-        "icon": "$(open-preview)",
-        "when": "resourceLangId == typst && editorTextFocus"
-      },
-      {
-        "command": "typst-preview.browser-slide",
-        "title": "Typst Preview: Preview current file in browser and slide mode",
-        "description": "Launch typst-preview server in slide mode and open the preview in your browser",
-        "icon": "$(open-preview)",
-        "when": "resourceLangId == typst && editorTextFocus"
-      },
-      {
-        "command": "typst-preview.sync",
-        "title": "Typst Preview: Sync preview with current cursor",
-        "description": "Scroll preview to current cursor position",
-        "icon": "$(sync)",
-        "when": "resourceLangId == typst && editorTextFocus"
-      },
-      {
-        "command": "typst-preview.showLog",
-        "title": "Typst Preview: Show Log",
-        "description": "Show typst-preview log",
-        "icon": "$(list-flat)",
-        "when": "resourceLangId == typst"
-      },
-      {
-        "command": "typst-preview.noteOutline",
-        "title": "Note: Jumping to source location of the outline item doesn't work well if its body doesn't have source location, e.g.\n```\n#let my-heading(h) = heading(h) // will jump to here\n#my-heading(\"Title\") // will not jump to here\n```.\nHence, you may want to use `my-heading[Title]` instead to gain better experience of outline jumping.",
-        "description": "...",
-        "icon": "$(extensions-info-message)"
-      },
-      {
-        "command": "typst-preview.showAwaitTree",
-        "title": "Typst Preview: [debug] Show Await Tree",
-        "description": "Show await tree of typst-preview. This is used for debugging."
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "tinymist.onEnter",
-        "key": "enter",
-        "when": "editorTextFocus && !editorReadonly && editorLangId == typst && !suggestWidgetVisible && !editorHasMultipleSelections && vim.mode != 'Normal' && vim.mode != 'Visual' && vim.mode != 'VisualBlock' && vim.mode != 'VisualLine' && vim.mode != 'SearchInProgressMode' && vim.mode != 'CommandlineInProgress' && vim.mode != 'Replace' && vim.mode != 'EasyMotionMode' && vim.mode != 'EasyMotionInputMode' && vim.mode != 'SurroundInputMode'"
-      },
-      {
-        "command": "typst-preview.preview",
-        "key": "ctrl+k v",
-        "mac": "cmd+k v",
-        "when": "editorLangId == typst"
-      }
-    ],
-    "menus": {
-      "commandPalette": [
-        {
-          "command": "tinymist.exportCurrentPdf",
-          "when": "editorLangId == typst"
-        },
-        {
-          "command": "tinymist.clearCache",
-          "when": "editorLangId == typst"
-        }
-      ],
-      "editor/title": [
-        {
-          "command": "typst-preview.preview",
-          "when": "resourceLangId == typst && editorTextFocus",
-          "group": "navigation"
-        }
-      ],
-      "view/title": [
-        {
-          "command": "typst-preview.noteOutline",
-          "when": "view == typst-preview.outline",
-          "group": "navigation"
-        }
-      ]
+    "dependencies": {
+        "vscode-languageclient": "^9.0.1",
+        "vscode-variables": "^0.1.3",
+        "typst-preview-frontend": "link:../../tools/typst-preview-frontend",
+        "editor-tools": "link:../../tools/editor-tools",
+        "cpr": "^3.0.1",
+        "node-fetch": "^3.3.2",
+        "ws": "^8.13.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.8.10",
+        "@types/vscode": "^1.77.0",
+        "@typescript-eslint/eslint-plugin": "^6.9.1",
+        "@typescript-eslint/parser": "^6.9.1",
+        "@types/ws": "^8.5.5",
+        "@vscode/vsce": "^2.22.0",
+        "esbuild": "^0.19.5",
+        "eslint": "^8.52.0",
+        "eslint-config-prettier": "^9.0.0",
+        "eslint-plugin-import": "^2.29.0",
+        "eslint-plugin-n": "^16.2.0",
+        "eslint-plugin-promise": "^6.1.1",
+        "ovsx": "^0.8.3",
+        "prettier": "^3.0.3",
+        "rimraf": "^5.0.5",
+        "typescript": "^5.2.2"
     }
-  },
-  "activationEvents": [
-    "onLanguage:typst",
-    "onCommand:tinymist.exportCurrentPdf",
-    "onCommand:tinymist.clearCache"
-  ],
-  "scripts": {
-    "build:preview-frontend": "cd ../../tools/typst-preview-frontend && yarn run build && cd ../../editors/vscode && rimraf ./out/frontend/ && cpr ../../tools/typst-preview-frontend/dist/ ./out/frontend/ && rimraf ../../crates/tinymist-assets/src/typst-preview.html && cpr ./out/frontend/index.html ../../crates/tinymist-assets/src/typst-preview.html",
-    "build:frontend": "yarn build:preview-frontend && cd ../../tools/editor-tools/ && yarn run build",
-    "build:syntax": "cd ../../syntaxes/textmate && yarn run compile && yarn run bundle",
-    "build-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node16",
-    "vscode:prepublish": "yarn run build-base -- --minify && yarn run build:frontend && node scripts/postinstall.cjs && node scripts/config-man.cjs",
-    "package": "vsce package --yarn",
-    "compile": "yarn run build-base -- --sourcemap && yarn run build:syntax && yarn run build:frontend && node scripts/postinstall.cjs",
-    "watch": "yarn run build-base -- --sourcemap --watch",
-    "check": "tsc --noEmit",
-    "lint": "eslint ./src --ext .ts",
-    "lint-fix": "eslint ./src --ext .ts --fix",
-    "format-check": "prettier --check .",
-    "format": "prettier --write .",
-    "test": ""
-  },
-  "dependencies": {
-    "vscode-languageclient": "^9.0.1",
-    "vscode-variables": "^0.1.3",
-    "typst-preview-frontend": "link:../../tools/typst-preview-frontend",
-    "editor-tools": "link:../../tools/editor-tools",
-    "cpr": "^3.0.1",
-    "node-fetch": "^3.3.2",
-    "ws": "^8.13.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.8.10",
-    "@types/vscode": "^1.77.0",
-    "@typescript-eslint/eslint-plugin": "^6.9.1",
-    "@typescript-eslint/parser": "^6.9.1",
-    "@types/ws": "^8.5.5",
-    "@vscode/vsce": "^2.22.0",
-    "esbuild": "^0.19.5",
-    "eslint": "^8.52.0",
-    "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-import": "^2.29.0",
-    "eslint-plugin-n": "^16.2.0",
-    "eslint-plugin-promise": "^6.1.1",
-    "ovsx": "^0.8.3",
-    "prettier": "^3.0.3",
-    "rimraf": "^5.0.5",
-    "typescript": "^5.2.2"
-  }
 }

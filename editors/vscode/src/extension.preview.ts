@@ -6,10 +6,10 @@ import { previewActive, previewDeactivate } from "./preview";
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-  return previewActive(context, true);
+    return previewActive(context, true);
 }
 
 // This method is called when your extension is deactivated
 export function deactivate() {
-  return previewDeactivate();
+    return previewDeactivate();
 }
