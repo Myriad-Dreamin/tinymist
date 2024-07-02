@@ -95,8 +95,8 @@ pub struct CompiledArtifact<F: CompilerFeat> {
 
 // pub type NopCompilationHandle<T> = std::marker::PhantomData<fn(T)>;
 
-// const COMPILE_CONCURRENCY: usize = 0;
-const COMPILE_CONCURRENCY: usize = 1;
+const COMPILE_CONCURRENCY: usize = 0;
+// const COMPILE_CONCURRENCY: usize = 1;
 
 pub trait CompilationHandle<F: CompilerFeat>: Send + Sync + 'static {
     fn status(&self, rep: CompileReport);
