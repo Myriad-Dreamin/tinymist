@@ -21,7 +21,12 @@ To build tinymist LSP:
 
 ```bash
 git clone https://github.com/Myriad-Dreamin/tinymist.git
+# Debug
 cargo build
+# Release
+cargo build --release
+# RelWithDebInfo (GitHub Release)
+cargo build --profile=gh-release
 ```
 
 To run VS Code extension locally, open the repository in VS Code and press `F5` to start a debug session to extension.
