@@ -2,15 +2,194 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import { ChildProcessWithoutNullStreams } from "child_process";
-import { spawn, sync as spawnSync } from "cross-spawn";
+import { spawn } from "cross-spawn";
 import { readFile } from "fs/promises";
 import * as path from "path";
 import { WebSocket } from "ws";
 import type fetchFunc from "node-fetch";
 import { getTargetViewColumn } from "./util";
-import { getPreviewCliPath as getPreviewCliPathCompat } from "./preview-compat";
+import { getPreviewCliPath, previewStatusBarItemProcess, statusBarInit } from "./preview-compat";
 
 const vscodeVariables = require("vscode-variables");
+
+interface TaskControlBlock {
+    /// related panel
+    panel?: vscode.WebviewPanel;
+    /// channel to communicate with typst-preview
+    addonΠserver: WebSocket;
+    /// static file server port
+    staticFilePort?: string;
+}
+
+const serverProcesses: Array<any> = [];
+const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
+
+export function previewActive(context: vscode.ExtensionContext, isCompat: boolean) {
+    // https://github.com/microsoft/vscode-extension-samples/blob/4721ef0c450f36b5bce2ecd5be4f0352ed9e28ab/webview-view-sample/src/extension.ts#L3
+    let contentPreviewHtml = loadHTMLFile(context, "./out/frontend/index.html");
+    contentPreviewHtml.then((html) => {
+        const provider = new ContentPreviewProvider(context, context.extensionUri, html);
+        resolveContentPreviewProvider(provider);
+        context.subscriptions.push(
+            vscode.window.registerWebviewViewProvider("typst-preview.content-preview", provider)
+        );
+    });
+    {
+        const outlineProvider = new OutlineProvider(context.extensionUri);
+        resolveOutlineProvider(outlineProvider);
+        context.subscriptions.push(
+            vscode.window.registerTreeDataProvider("typst-preview.outline", outlineProvider)
+        );
+    }
+    let webviewDisposable = vscode.commands.registerCommand(
+        "typst-preview.preview",
+        launchPrologue("webview", "doc")
+    );
+    let browserDisposable = vscode.commands.registerCommand(
+        "typst-preview.browser",
+        launchPrologue("browser", "doc")
+    );
+    let webviewSlideDisposable = vscode.commands.registerCommand(
+        "typst-preview.preview-slide",
+        launchPrologue("webview", "slide")
+    );
+    let browserSlideDisposable = vscode.commands.registerCommand(
+        "typst-preview.browser-slide",
+        launchPrologue("browser", "slide")
+    );
+    let syncDisposable = vscode.commands.registerCommand("typst-preview.sync", async () => {
+        const activeEditor = vscode.window.activeTextEditor;
+        if (!activeEditor) {
+            vscode.window.showWarningMessage("No active editor");
+            return;
+        }
+
+        reportPosition(activeEditor.document, activeEditor, "panelScrollTo");
+    });
+    let revealDocumentDisposable = vscode.commands.registerCommand(
+        "typst-preview.revealDocument",
+        async (args) => {
+            console.log(args);
+            // That's very unfortunate that sourceScrollBySpan doesn't work well.
+            if (args.span) {
+                sendDocRequest(undefined, {
+                    event: "sourceScrollBySpan",
+                    span: args.span,
+                });
+            }
+            if (args.position) {
+                // todo: tagging document
+                sendDocRequest(undefined, {
+                    event: "panelScrollByPosition",
+                    position: args.position,
+                });
+            }
+        }
+    );
+
+    context.subscriptions.push(
+        webviewDisposable,
+        browserDisposable,
+        webviewSlideDisposable,
+        browserSlideDisposable,
+        syncDisposable,
+        revealDocumentDisposable
+    );
+
+    let outputChannel: vscode.OutputChannel | undefined = undefined;
+
+    // Use the console to output diagnostic information (console.log) and errors (console.error)
+    // This line of code will only be executed once when your extension is activated
+    // The command has been defined in the package.json file
+    // Now provide the implementation of the command with registerCommand
+    // The commandId parameter must match the command field in package.json
+    outputChannel = vscode.window.createOutputChannel("typst-preview");
+
+    context.subscriptions.push(
+        statusBarInit(),
+        vscode.commands.registerCommand("typst-preview.showLog", async () => {
+            outputChannel?.show();
+        })
+    );
+    process.on("SIGINT", () => {
+        for (const serverProcess of serverProcesses) {
+            serverProcess.kill();
+        }
+    });
+
+    if (isCompat) {
+        let fetch: typeof fetchFunc | undefined = undefined;
+        context.subscriptions.push(
+            vscode.commands.registerCommand("typst-preview.showAwaitTree", async () => {
+                if (activeTask.size === 0) {
+                    vscode.window.showWarningMessage("No active preview");
+                    return;
+                }
+                const showAwaitTree = async (tcb: TaskControlBlock) => {
+                    fetch = fetch || (await import("node-fetch")).default;
+
+                    const url = `http://127.0.0.1:${tcb.staticFilePort}/await_tree`;
+                    // fetch await tree
+                    const awaitTree = await (await fetch(`${url}`)).text();
+                    console.log(awaitTree);
+                    const input = await vscode.window.showInformationMessage(
+                        "Click to copy the await tree to clipboard",
+                        "Copy"
+                    );
+                    if (input === "Copy") {
+                        vscode.env.clipboard.writeText(awaitTree);
+                    }
+                };
+                if (activeTask.size === 1) {
+                    await showAwaitTree(Array.from(activeTask.values())[0]);
+                }
+                const activeDocument = vscode.window.activeTextEditor?.document;
+                if (activeDocument) {
+                    const task = activeTask.get(activeDocument);
+                    if (task) {
+                        await showAwaitTree(task);
+                    }
+                }
+            })
+        );
+    }
+
+    function launchPrologue(kind: "browser" | "webview", mode: "doc" | "slide") {
+        // todo: remove compat
+        return launchPrologueCompat(kind, mode);
+    }
+
+    function launchPrologueCompat(kind: "browser" | "webview", mode: "doc" | "slide") {
+        return async () => {
+            const activeEditor = vscode.window.activeTextEditor;
+            if (!activeEditor) {
+                vscode.window.showWarningMessage("No active editor");
+                return;
+            }
+            const bindDocument = activeEditor.document;
+            launchPreview({
+                kind,
+                context,
+                outputChannel: outputChannel!,
+                activeEditor,
+                bindDocument,
+                mode,
+            });
+        };
+    }
+}
+
+// This method is called when your extension is deactivated
+export function previewDeactivate() {
+    console.log(activeTask);
+    for (const [_, task] of activeTask) {
+        task.panel?.dispose();
+    }
+    console.log("killing preview services");
+    for (const serverProcess of serverProcesses) {
+        serverProcess.kill();
+    }
+}
 
 let resolveContentPreviewProvider: (value: ContentPreviewProvider) => void = () => {};
 let contentPreviewProvider = new Promise<ContentPreviewProvider>((resolve) => {
@@ -34,43 +213,6 @@ async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: stri
     const filePath = path.resolve(context.extensionPath, relativePath);
     const fileContents = await readFile(filePath, "utf8");
     return fileContents;
-}
-
-function statusBarItemProcess(event: "Compiling" | "CompileSuccess" | "CompileError") {
-    const style =
-        vscode.workspace.getConfiguration().get<string>("typst-preview.statusBarIndicator") ||
-        "compact";
-    if (statusBarItem) {
-        if (event === "Compiling") {
-            if (style === "compact") {
-                statusBarItem.text = "$(sync~spin)";
-            } else if (style === "full") {
-                statusBarItem.text = "$(sync~spin) Compiling";
-            }
-            statusBarItem.backgroundColor = new vscode.ThemeColor(
-                "statusBarItem.prominentBackground"
-            );
-            statusBarItem.show();
-        } else if (event === "CompileSuccess") {
-            if (style === "compact") {
-                statusBarItem.text = "$(typst-guy)";
-            } else if (style === "full") {
-                statusBarItem.text = "$(typst-guy) Compile Success";
-            }
-            statusBarItem.backgroundColor = new vscode.ThemeColor(
-                "statusBarItem.prominentBackground"
-            );
-            statusBarItem.show();
-        } else if (event === "CompileError") {
-            if (style === "compact") {
-                statusBarItem.text = "$(typst-guy)";
-            } else if (style === "full") {
-                statusBarItem.text = "$(typst-guy) Compile Error";
-            }
-            statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
-            statusBarItem.show();
-        }
-    }
 }
 
 function getCliInputArgs(inputs?: { [key: string]: string }): string[] {
@@ -117,9 +259,6 @@ function getProjectRoot(currentPath: string): string {
         return paths[0];
     }
 }
-
-const serverProcesses: Array<any> = [];
-const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
 interface SourceScrollBySpanRequest {
     event: "sourceScrollBySpan";
@@ -184,15 +323,6 @@ const reportPosition = async (
     // console.log(scrollRequest);
     sendDocRequest(bindDocument, scrollRequest);
 };
-
-interface TaskControlBlock {
-    /// related panel
-    panel?: vscode.WebviewPanel;
-    /// channel to communicate with typst-preview
-    addonΠserver: WebSocket;
-    /// static file server port
-    staticFilePort?: string;
-}
 
 interface JumpInfo {
     filepath: string;
@@ -362,7 +492,7 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
             case "syncEditorChanges":
                 return syncEditorChanges(addonΠserver);
             case "compileStatus": {
-                statusBarItemProcess(data.kind);
+                previewStatusBarItemProcess(data.kind);
                 break;
             }
             case "outline": {
@@ -534,8 +664,8 @@ const launchPreview = async (task: LaunchInBrowserTask | LaunchInWebViewTask) =>
     }
 
     async function launchCli(openInBrowser: boolean) {
-        const serverPath = await getPreviewCliPathCompat(context.extensionPath);
-        console.log(`Watching ${filePath} for changes`);
+        const serverPath = await getPreviewCliPath(context.extensionPath);
+        console.log(`Watching ${filePath} for changes, using ${serverPath} as server`);
         const projectRoot = getProjectRoot(filePath);
         const rootArgs = ["--root", projectRoot];
         const partialRenderingArgs = vscode.workspace
@@ -782,171 +912,4 @@ export class OutlineItem extends vscode.TreeItem {
     // };
 
     contextValue = "outline-item";
-}
-
-let statusBarItem: vscode.StatusBarItem;
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-// todo: is global state safe?
-export function activate(context: vscode.ExtensionContext) {
-    // import fetch from 'node-fetch';
-
-    // Use the console to output diagnostic information (console.log) and errors (console.error)
-    // This line of code will only be executed once when your extension is activated
-    // The command has been defined in the package.json file
-    // Now provide the implementation of the command with registerCommand
-    // The commandId parameter must match the command field in package.json
-    const outputChannel = vscode.window.createOutputChannel("typst-preview");
-    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
-    statusBarItem.name = "typst-preview";
-    statusBarItem.command = "typst-preview.showLog";
-    statusBarItem.tooltip = "Typst Preview Status: Click to show logs";
-
-    // https://github.com/microsoft/vscode-extension-samples/blob/4721ef0c450f36b5bce2ecd5be4f0352ed9e28ab/webview-view-sample/src/extension.ts#L3
-    let contentPreviewHtml = loadHTMLFile(context, "./out/frontend/index.html");
-    contentPreviewHtml.then((html) => {
-        const provider = new ContentPreviewProvider(context, context.extensionUri, html);
-        resolveContentPreviewProvider(provider);
-        context.subscriptions.push(
-            vscode.window.registerWebviewViewProvider("typst-preview.content-preview", provider)
-        );
-    });
-    {
-        const outlineProvider = new OutlineProvider(context.extensionUri);
-        resolveOutlineProvider(outlineProvider);
-        context.subscriptions.push(
-            vscode.window.registerTreeDataProvider("typst-preview.outline", outlineProvider)
-        );
-    }
-    let fetch: typeof fetchFunc | undefined = undefined;
-    let awaitTreeDisposable = vscode.commands.registerCommand(
-        "typst-preview.showAwaitTree",
-        async () => {
-            if (activeTask.size === 0) {
-                vscode.window.showWarningMessage("No active preview");
-                return;
-            }
-            const showAwaitTree = async (tcb: TaskControlBlock) => {
-                fetch = fetch || (await import("node-fetch")).default;
-
-                const url = `http://127.0.0.1:${tcb.staticFilePort}/await_tree`;
-                // fetch await tree
-                const awaitTree = await (await fetch(`${url}`)).text();
-                console.log(awaitTree);
-                const input = await vscode.window.showInformationMessage(
-                    "Click to copy the await tree to clipboard",
-                    "Copy"
-                );
-                if (input === "Copy") {
-                    vscode.env.clipboard.writeText(awaitTree);
-                }
-            };
-            if (activeTask.size === 1) {
-                await showAwaitTree(Array.from(activeTask.values())[0]);
-            }
-            const activeDocument = vscode.window.activeTextEditor?.document;
-            if (activeDocument) {
-                const task = activeTask.get(activeDocument);
-                if (task) {
-                    await showAwaitTree(task);
-                }
-            }
-        }
-    );
-    let webviewDisposable = vscode.commands.registerCommand(
-        "typst-preview.preview",
-        launchPrologue("webview", "doc")
-    );
-    let browserDisposable = vscode.commands.registerCommand(
-        "typst-preview.browser",
-        launchPrologue("browser", "doc")
-    );
-    let webviewSlideDisposable = vscode.commands.registerCommand(
-        "typst-preview.preview-slide",
-        launchPrologue("webview", "slide")
-    );
-    let browserSlideDisposable = vscode.commands.registerCommand(
-        "typst-preview.browser-slide",
-        launchPrologue("browser", "slide")
-    );
-    let syncDisposable = vscode.commands.registerCommand("typst-preview.sync", async () => {
-        const activeEditor = vscode.window.activeTextEditor;
-        if (!activeEditor) {
-            vscode.window.showWarningMessage("No active editor");
-            return;
-        }
-
-        reportPosition(activeEditor.document, activeEditor, "panelScrollTo");
-    });
-    let revealDocumentDisposable = vscode.commands.registerCommand(
-        "typst-preview.revealDocument",
-        async (args) => {
-            console.log(args);
-            // That's very unfortunate that sourceScrollBySpan doesn't work well.
-            if (args.span) {
-                sendDocRequest(undefined, {
-                    event: "sourceScrollBySpan",
-                    span: args.span,
-                });
-            }
-            if (args.position) {
-                // todo: tagging document
-                sendDocRequest(undefined, {
-                    event: "panelScrollByPosition",
-                    position: args.position,
-                });
-            }
-        }
-    );
-    let showLogDisposable = vscode.commands.registerCommand("typst-preview.showLog", async () => {
-        outputChannel.show();
-    });
-
-    context.subscriptions.push(
-        webviewDisposable,
-        browserDisposable,
-        webviewSlideDisposable,
-        browserSlideDisposable,
-        syncDisposable,
-        showLogDisposable,
-        statusBarItem,
-        revealDocumentDisposable,
-        awaitTreeDisposable
-    );
-    process.on("SIGINT", () => {
-        for (const serverProcess of serverProcesses) {
-            serverProcess.kill();
-        }
-    });
-
-    function launchPrologue(kind: "browser" | "webview", mode: "doc" | "slide") {
-        return async () => {
-            const activeEditor = vscode.window.activeTextEditor;
-            if (!activeEditor) {
-                vscode.window.showWarningMessage("No active editor");
-                return;
-            }
-            const bindDocument = activeEditor.document;
-            launchPreview({
-                kind,
-                context,
-                outputChannel,
-                activeEditor,
-                bindDocument,
-                mode,
-            });
-        };
-    }
-}
-
-// This method is called when your extension is deactivated
-export async function deactivate() {
-    console.log(activeTask);
-    for (const [_, task] of activeTask) {
-        task.panel?.dispose();
-    }
-    console.log("killing preview services");
-    for (const serverProcess of serverProcesses) {
-        serverProcess.kill();
-    }
 }

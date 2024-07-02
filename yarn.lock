@@ -1324,7 +1324,7 @@ eastasianwidth@^0.2.0:
   resolved "https://registry.yarnpkg.com/eastasianwidth/-/eastasianwidth-0.2.0.tgz#696ce2ec0aa0e6ea93a397ffcf24aa7840c827cb"
   integrity sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==
 
-"editor-tools@file:tools/editor-tools":
+"editor-tools@link:tools/editor-tools":
   version "0.0.0"
   dependencies:
     csv-stringify "^6.5.0"
@@ -3653,13 +3653,13 @@ typescript@^5.2.2, typescript@^5.3.3:
 "typst-dom@link:tools/typst-dom":
   version "0.0.0"
 
-"typst-preview-frontend@file:tools/typst-preview-frontend":
+"typst-preview-frontend@link:tools/typst-preview-frontend":
   version "0.0.0"
   dependencies:
     "@myriaddreamin/typst-ts-renderer" "0.5.0-rc5"
     "@myriaddreamin/typst.ts" "0.5.0-rc5"
     rxjs "^7.8.1"
-    typst-dom "link:../../../AppData/Local/Yarn/Cache/v6/npm-typst-preview-frontend-0.0.0-e4b78602-ab80-42c0-9a76-2c66cb729491-1719528135321/node_modules/typst-dom"
+    typst-dom "link:tools/typst-dom"
 
 uc.micro@^1.0.1, uc.micro@^1.0.5:
   version "1.0.6"
