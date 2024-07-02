@@ -7,11 +7,11 @@ import { ChildProcessWithoutNullStreams } from "child_process";
 import { spawn } from "cross-spawn";
 import { WebSocket } from "ws";
 import type fetchFunc from "node-fetch";
-import { getTargetViewColumn, loadHTMLFile } from "./util";
 import {
     ScrollSyncMode,
     ScrollSyncModeEnum,
     contentPreviewProvider,
+    launchPreviewInWebView,
     previewProcessOutline,
 } from "./preview";
 
@@ -316,7 +316,7 @@ interface LaunchTask {
     mode: "doc" | "slide";
 }
 
-interface LaunchInBrowserTask extends LaunchTask {
+export interface LaunchInBrowserTask extends LaunchTask {
     kind: "browser";
 }
 
@@ -502,7 +502,7 @@ function getCliInputArgs(inputs?: { [key: string]: string }): string[] {
         .flat();
 }
 
-function codeGetCliInputArgs(): string[] {
+export function codeGetCliInputArgs(): string[] {
     return getCliInputArgs(
         vscode.workspace
             .getConfiguration()
@@ -735,12 +735,3 @@ export const revealDocumentCompat = async (args: any) => {
         });
     }
 };
-function launchPreviewInWebView(arg0: {
-    context: vscode.ExtensionContext;
-    task: LaunchInWebViewTask;
-    activeEditor: vscode.TextEditor;
-    dataPlanePort: string;
-    panelDispose(): void;
-}): vscode.WebviewPanel | PromiseLike<vscode.WebviewPanel | undefined> | undefined {
-    throw new Error("Function not implemented.");
-}

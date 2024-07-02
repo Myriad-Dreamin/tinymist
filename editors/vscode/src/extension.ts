@@ -27,7 +27,8 @@ import {
 import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
 import { applySnippetTextEdits } from "./snippets";
 import { setIsTinymist as previewSetIsTinymist } from "./preview-compat";
-import { previewActivate, previewDeactivate } from "./preview";
+import { previewActivate, previewDeactivate, previewProcessOutline } from "./preview";
+import { DisposeList } from "./util";
 
 let client: LanguageClient | undefined = undefined;
 
@@ -55,8 +56,13 @@ export function activate(context: ExtensionContext): Promise<void> {
         }
     }
 
+    // test compat-mode preview extension
+    // previewActivate(context, true);
+
+    // integrated preview extension
     previewSetIsTinymist(config);
     previewActivate(context, false);
+
     return startClient(context, config).catch((e) => {
         void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
         throw e;
@@ -113,6 +119,44 @@ async function startClient(context: ExtensionContext, config: Record<string, any
 
     client.onNotification("tinymist/compileStatus", (params) => {
         wordCountItemProcess(params);
+    });
+
+    interface JumpInfo {
+        filepath: string;
+        start: [number, number] | null;
+        end: [number, number] | null;
+    }
+    client.onNotification("tinymist/clientScrollTo", async (jump: JumpInfo) => {
+        const activeEditor = window.activeTextEditor;
+        if (!activeEditor) {
+            return;
+        }
+
+        console.log("recv editorScrollTo request", jump);
+        if (jump.start === null || jump.end === null) {
+            return;
+        }
+
+        // open this file and show in editor
+        const doc = await vscode.workspace.openTextDocument(jump.filepath);
+        const editor = await vscode.window.showTextDocument(doc, activeEditor.viewColumn);
+        const startPosition = new vscode.Position(jump.start[0], jump.start[1]);
+        const endPosition = new vscode.Position(jump.end[0], jump.end[1]);
+        const range = new vscode.Range(startPosition, endPosition);
+        editor.selection = new vscode.Selection(range.start, range.end);
+        editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+    });
+
+    client.onNotification("tinymist/documentOutline", async (data: any) => {
+        previewProcessOutline(data);
+    });
+
+    client.onNotification("tinymist/previewTaskDispose", (data: any) => {
+        const dispose = previewDisposes[data.taskId];
+        if (dispose) {
+            dispose();
+            delete previewDisposes[data.taskId];
+        }
     });
 
     window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
@@ -392,6 +436,49 @@ async function commandShow(kind: string, extraOpts?: any): Promise<void> {
         viewColumn: ViewColumn.Beside,
         preserveFocus: true,
     } as vscode.TextDocumentShowOptions);
+}
+
+export interface PreviewResult {
+    dataPlanePort?: string;
+}
+
+const previewDisposes: Record<string, () => void> = {};
+export function registerPreviewTaskDispose(taskId: string, dl: DisposeList): void {
+    if (previewDisposes[taskId]) {
+        throw new Error(`Task ${taskId} already exists`);
+    }
+    dl.add(() => {
+        delete previewDisposes[taskId];
+    });
+    previewDisposes[taskId] = () => dl.dispose();
+}
+
+export async function commandStartPreview(
+    filePath: string,
+    previewArgs?: string[]
+): Promise<PreviewResult> {
+    const res = await client?.sendRequest<PreviewResult>("workspace/executeCommand", {
+        command: `tinymist.doStartPreview`,
+        arguments: [filePath, previewArgs || []],
+    });
+    if (res === null || !res) {
+        return {};
+    }
+    return res;
+}
+
+export async function commandKillPreview(taskId: string): Promise<void> {
+    await client?.sendRequest("workspace/executeCommand", {
+        command: `tinymist.doKillPreview`,
+        arguments: [taskId],
+    });
+}
+
+export async function commandScrollPreview(req: any): Promise<void> {
+    await client?.sendRequest("workspace/executeCommand", {
+        command: `tinymist.scrollPreview`,
+        arguments: [req],
+    });
 }
 
 async function commandClearCache(): Promise<void> {

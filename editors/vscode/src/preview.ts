@@ -2,7 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import * as path from "path";
-import { getTargetViewColumn, loadHTMLFile } from "./util";
+import { DisposeList, getTargetViewColumn, loadHTMLFile } from "./util";
 import {
     launchPreviewCompat,
     previewActiveCompat as previewPostActivateCompat,
@@ -10,7 +10,16 @@ import {
     revealDocumentCompat,
     panelSyncScrollCompat,
     LaunchInWebViewTask,
+    LaunchInBrowserTask,
+    codeGetCliInputArgs,
+    codeGetCliFontArgs,
 } from "./preview-compat";
+import {
+    commandKillPreview,
+    commandScrollPreview,
+    commandStartPreview,
+    registerPreviewTaskDispose,
+} from "./extension";
 
 export function previewActivate(context: vscode.ExtensionContext, isCompat: boolean) {
     // https://github.com/microsoft/vscode-extension-samples/blob/4721ef0c450f36b5bce2ecd5be4f0352ed9e28ab/webview-view-sample/src/extension.ts#L3
@@ -30,7 +39,6 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         );
     }
 
-    const lp = isCompat ? launchPrologueCompat : launchPrologueLsp;
     context.subscriptions.push(
         vscode.commands.registerCommand("typst-preview.preview", lp("webview", "doc")),
         vscode.commands.registerCommand("typst-preview.browser", lp("browser", "doc")),
@@ -54,7 +62,8 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         previewPostActivateCompat(context);
     }
 
-    function launchPrologueCompat(kind: "browser" | "webview", mode: "doc" | "slide") {
+    const launchImpl = isCompat ? launchPreviewCompat : launchPreviewLsp;
+    function lp(kind: "browser" | "webview", mode: "doc" | "slide") {
         return async () => {
             const activeEditor = vscode.window.activeTextEditor;
             if (!activeEditor) {
@@ -62,7 +71,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
                 return;
             }
             const bindDocument = activeEditor.document;
-            launchPreviewCompat({
+            return launchImpl({
                 kind,
                 context,
                 activeEditor,
@@ -78,7 +87,7 @@ export function previewDeactivate() {
     previewDeactivateCompat();
 }
 
-async function launchPreviewInWebView({
+export async function launchPreviewInWebView({
     context,
     task,
     activeEditor,
@@ -128,40 +137,184 @@ async function launchPreviewInWebView({
     return panel;
 }
 
-function launchPrologueLsp(kind: "browser" | "webview", mode: "doc" | "slide") {
-    return async () => {
-        const activeEditor = vscode.window.activeTextEditor;
-        if (!activeEditor) {
-            vscode.window.showWarningMessage("No active editor");
-            return;
+interface TaskControlBlock {
+    /// related panel
+    panel?: vscode.WebviewPanel;
+    /// random task id
+    taskId: string;
+}
+const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
+
+async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask) {
+    const { kind, context, activeEditor, bindDocument } = task;
+    if (activeTask.has(bindDocument)) {
+        const { panel } = activeTask.get(bindDocument)!;
+        if (panel) {
+            panel.reveal();
         }
-        const bindDocument = activeEditor.document;
-        // launchPreviewCompat({
-        //     kind,
-        //     context,
-        //     activeEditor,
-        //     bindDocument,
-        //     mode,
-        // });
-    };
+        return;
+    }
+
+    const taskId = Math.random().toString(36).substring(7);
+    const filePath = bindDocument.uri.fsPath;
+
+    const refreshStyle =
+        vscode.workspace.getConfiguration().get<string>("typst-preview.refresh") || "onSave";
+    const scrollSyncMode =
+        ScrollSyncModeEnum[
+            vscode.workspace.getConfiguration().get<ScrollSyncMode>("typst-preview.scrollSync") ||
+                "never"
+        ];
+    const enableCursor =
+        vscode.workspace.getConfiguration().get<boolean>("typst-preview.cursorIndicator") || false;
+    const { dataPlanePort } = await launchCommand();
+    if (!dataPlanePort) {
+        throw new Error(`Failed to launch preview ${filePath}`);
+    }
+    const disposes = new DisposeList();
+    registerPreviewTaskDispose(taskId, disposes);
+
+    let connectUrl = `ws://127.0.0.1:${dataPlanePort}`;
+    contentPreviewProvider.then((p) => p.postActivate(connectUrl));
+    disposes.add(() => {
+        contentPreviewProvider.then((p) => p.postDeactivate(connectUrl));
+    });
+
+    let panel: vscode.WebviewPanel | undefined = undefined;
+    switch (kind) {
+        case "webview": {
+            panel = await launchPreviewInWebView({
+                context,
+                task,
+                activeEditor,
+                dataPlanePort,
+                panelDispose() {
+                    disposes.dispose();
+                    commandKillPreview(taskId);
+                },
+            });
+            break;
+        }
+        case "browser": {
+            vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${dataPlanePort}`));
+            break;
+        }
+    }
+
+    // todo: may override the same file
+    // todo: atomic update
+    activeTask.set(bindDocument, {
+        panel,
+        taskId,
+    });
+    disposes.add(() => {
+        if (activeTask.get(bindDocument)?.taskId === taskId) {
+            activeTask.delete(bindDocument);
+        }
+    });
+
+    async function launchCommand() {
+        console.log(`Preview Command ${filePath}`);
+        const partialRenderingArgs = vscode.workspace
+            .getConfiguration()
+            .get<boolean>("typst-preview.partialRendering")
+            ? ["--partial-rendering"]
+            : [];
+        const ivArgs = vscode.workspace
+            .getConfiguration()
+            .get<string>("typst-preview.invertColors");
+        const invertColorsArgs = ivArgs ? ["--invert-colors", ivArgs] : [];
+        const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
+        const { dataPlanePort } = await commandStartPreview(filePath, [
+            "preview",
+            "--task-id",
+            taskId,
+            "--refresh-style",
+            refreshStyle,
+            "--static-file-host",
+            "127.0.0.1:0",
+            ...partialRenderingArgs,
+            ...invertColorsArgs,
+            ...previewInSlideModeArgs,
+            // todo: respect tinymist configurations
+            ...codeGetCliInputArgs(),
+            ...codeGetCliFontArgs(),
+            filePath,
+        ]);
+        console.log(`Launched preview, static file port:${dataPlanePort}`);
+
+        if (enableCursor) {
+            reportPosition(activeEditor, "changeCursorPosition");
+        }
+
+        if (scrollSyncMode !== ScrollSyncModeEnum.never) {
+            // See comment of reportPosition function to get context about multi-file project related logic.
+            const src2docHandler = (e: vscode.TextEditorSelectionChangeEvent) => {
+                const editor = e.textEditor;
+                const kind = e.kind;
+
+                console.log(
+                    `selection changed, kind: ${kind && vscode.TextEditorSelectionChangeKind[kind]}`
+                );
+                const shouldScrollPanel =
+                    // scroll by mouse
+                    kind === vscode.TextEditorSelectionChangeKind.Mouse ||
+                    // scroll by keyboard typing
+                    (scrollSyncMode === ScrollSyncModeEnum.onSelectionChange &&
+                        kind === vscode.TextEditorSelectionChangeKind.Keyboard);
+                if (shouldScrollPanel) {
+                    console.log(`selection changed, sending src2doc jump request`);
+                    reportPosition(editor, "panelScrollTo");
+                }
+
+                if (enableCursor) {
+                    reportPosition(editor, "changeCursorPosition");
+                }
+            };
+
+            disposes.add(vscode.window.onDidChangeTextEditorSelection(src2docHandler, 500));
+        }
+
+        return { dataPlanePort };
+    }
+
+    async function reportPosition(editorToReport: vscode.TextEditor, event: string) {
+        const scrollRequest: ScrollRequest = {
+            event,
+            taskId,
+            filepath: editorToReport.document.uri.fsPath,
+            line: editorToReport.selection.active.line,
+            character: editorToReport.selection.active.character,
+        };
+        scrollPreviewPanel(scrollRequest);
+    }
 }
 
 async function revealDocumentLsp(args: any) {
-    console.log(args);
-    // That's very unfortunate that sourceScrollBySpan doesn't work well.
-    // if (args.span) {
-    //     sendDocRequest(undefined, {
-    //         event: "sourceScrollBySpan",
-    //         span: args.span,
-    //     });
-    // }
-    // if (args.position) {
-    //     // todo: tagging document
-    //     sendDocRequest(undefined, {
-    //         event: "panelScrollByPosition",
-    //         position: args.position,
-    //     });
-    // }
+    console.log("revealDocumentLsp", args);
+
+    for (const t of activeTask.values()) {
+        if (args.taskId && t.taskId !== args.taskId) {
+            return;
+        }
+
+        if (args.span) {
+            // That's very unfortunate that sourceScrollBySpan doesn't work well.
+            scrollPreviewPanel({
+                event: "sourceScrollBySpan",
+                taskId: t.taskId,
+                span: args.span,
+            });
+        }
+        if (args.position) {
+            // todo: tagging document
+            scrollPreviewPanel({
+                event: "panelScrollByPosition",
+                taskId: t.taskId,
+                position: args.position,
+            });
+        }
+    }
 }
 
 async function panelSyncScrollLsp(args: any) {
@@ -171,7 +324,55 @@ async function panelSyncScrollLsp(args: any) {
         return;
     }
 
-    // reportPosition(activeEditor.document, activeEditor, "panelScrollTo");
+    for (const t of activeTask.values()) {
+        if (args.taskId && t.taskId !== args.taskId) {
+            return;
+        }
+
+        const scrollRequest: ScrollRequest = {
+            event: "panelScrollTo",
+            taskId: t.taskId,
+            filepath: activeEditor.document.uri.fsPath,
+            line: activeEditor.selection.active.line,
+            character: activeEditor.selection.active.character,
+        };
+        scrollPreviewPanel(scrollRequest);
+    }
+}
+
+// That's very unfortunate that sourceScrollBySpan doesn't work well.
+interface SourceScrollBySpanRequest {
+    taskId: string;
+    event: "sourceScrollBySpan";
+    span: string;
+}
+
+interface ScrollByPositionRequest {
+    taskId: string;
+    event: "panelScrollByPosition" | "sourceScrollByPosition";
+    position: any;
+}
+
+interface ScrollRequest {
+    taskId: string;
+    event: string;
+    filepath: string;
+    line: any;
+    character: any;
+}
+
+type DocRequests = SourceScrollBySpanRequest | ScrollByPositionRequest | ScrollRequest;
+
+async function scrollPreviewPanel(scrollRequest: DocRequests) {
+    if ("filepath" in scrollRequest) {
+        const filepath = scrollRequest.filepath;
+        if (filepath.includes("extension-output")) {
+            console.log("skip extension-output file", filepath);
+            return;
+        }
+    }
+
+    commandScrollPreview(scrollRequest);
 }
 
 let resolveContentPreviewProvider: (value: ContentPreviewProvider) => void = () => {};

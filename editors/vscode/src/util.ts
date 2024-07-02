@@ -18,3 +18,31 @@ export async function loadHTMLFile(context: vscode.ExtensionContext, relativePat
     const fileContents = await readFile(filePath, "utf8");
     return fileContents;
 }
+
+export class DisposeList {
+    disposes: (() => void)[] = [];
+    disposed = false;
+    constructor() {}
+    add(d: (() => void) | vscode.Disposable) {
+        if (this.disposed) {
+            // console.error("disposed", this.taskId, "for", this.filePath);
+            return;
+        }
+
+        if (typeof d === "function") {
+            this.disposes.push(d);
+        } else {
+            this.disposes.push(() => d.dispose());
+        }
+    }
+    dispose() {
+        if (this.disposed) {
+            return;
+        }
+        this.disposed = true;
+
+        for (const d of this.disposes) {
+            d();
+        }
+    }
+}
