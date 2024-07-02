@@ -85,6 +85,8 @@ fn main() -> anyhow::Result<()> {
 pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
     log::info!("starting LSP server: {:#?}", args);
 
+    let is_replay = !args.mirror.replay.is_empty();
+
     with_stdio_transport(args.mirror.clone(), |conn| {
         let sender = Arc::new(RwLock::new(Some(conn.sender)));
         let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender);
@@ -98,10 +100,10 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
                 },
                 exec_cmds: OnceLock::new(),
             },
-            client,
+            client.clone(),
         ))
         .build()
-        .start(conn.receiver)
+        .start(conn.receiver, is_replay)
     })?;
 
     log::info!("LSP server did shut down");
@@ -150,7 +152,7 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
             let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender);
             CompileState::install(LspBuilder::new(init(client.clone()), client))
                 .build()
-                .start(conn.receiver)
+                .start(conn.receiver, false)
         })?;
 
         log::info!("compile server did shut down");

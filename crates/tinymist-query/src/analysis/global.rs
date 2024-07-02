@@ -1,15 +1,15 @@
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::{
     collections::{HashMap, HashSet},
-    hash::Hash,
+    ops::Deref,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
+use comemo::Tracked;
 use ecow::{EcoString, EcoVec};
 use lsp_types::Url;
 use once_cell::sync::OnceCell;
-use parking_lot::RwLock;
 use reflexo::hash::{hash128, FxDashMap};
 use reflexo::{debug_loc::DataSource, ImmutPath};
 use typst::eval::Eval;
@@ -47,10 +47,8 @@ use crate::{
 pub struct ModuleAnalysisCache {
     file: OnceCell<FileResult<Bytes>>,
     source: OnceCell<FileResult<Source>>,
-    import_info: OnceCell<Option<Arc<ImportInfo>>>,
     def_use: OnceCell<Option<Arc<DefUseInfo>>>,
     type_check: OnceCell<Option<Arc<TypeScheme>>>,
-    bibliography: OnceCell<Option<Arc<BibInfo>>>,
 }
 
 impl ModuleAnalysisCache {
@@ -64,19 +62,6 @@ impl ModuleAnalysisCache {
         self.source
             .get_or_init(|| ctx.world().source(file_id))
             .clone()
-    }
-
-    /// Try to get the import information of a file.
-    pub fn import_info(&self) -> Option<Arc<ImportInfo>> {
-        self.import_info.get().cloned().flatten()
-    }
-
-    /// Compute the import information of a file.
-    pub(crate) fn compute_import(
-        &self,
-        f: impl FnOnce() -> Option<Arc<ImportInfo>>,
-    ) -> Option<Arc<ImportInfo>> {
-        self.import_info.get_or_init(f).clone()
     }
 
     /// Try to get the def-use information of a file.
@@ -103,19 +88,6 @@ impl ModuleAnalysisCache {
         f: impl FnOnce() -> Option<Arc<TypeScheme>>,
     ) -> Option<Arc<TypeScheme>> {
         self.type_check.get_or_init(f).clone()
-    }
-
-    /// Try to get the bibliography information of a file.
-    pub fn bibliography(&self) -> Option<Arc<BibInfo>> {
-        self.bibliography.get().cloned().flatten()
-    }
-
-    /// Compute the bibliography information of a file.
-    pub(crate) fn compute_bibliography(
-        &self,
-        f: impl FnOnce() -> Option<Arc<BibInfo>>,
-    ) -> Option<Arc<BibInfo>> {
-        self.bibliography.get_or_init(f).clone()
     }
 }
 
@@ -153,172 +125,9 @@ impl Analysis {
     /// Clear all cached resources.
     pub fn clear_cache(&self) {
         self.caches.signatures.clear();
-        self.caches.modules.clear();
-    }
-}
-
-struct ComputingNode<Inputs, Output> {
-    name: &'static str,
-    computing: AtomicBool,
-    inputs: RwLock<Option<Inputs>>,
-    slow_validate: RwLock<Option<u128>>,
-    output: RwLock<Option<Output>>,
-}
-
-pub(crate) trait ComputeDebug {
-    fn compute_debug_repr(&self) -> impl std::fmt::Debug;
-}
-
-impl ComputeDebug for Source {
-    fn compute_debug_repr(&self) -> impl std::fmt::Debug {
-        self.id()
-    }
-}
-impl ComputeDebug for EcoVec<LexicalHierarchy> {
-    fn compute_debug_repr(&self) -> impl std::fmt::Debug {
-        self.len()
-    }
-}
-impl ComputeDebug for EcoVec<(TypstFileId, Bytes)> {
-    fn compute_debug_repr(&self) -> impl std::fmt::Debug {
-        self.len()
-    }
-}
-
-impl ComputeDebug for Arc<ImportInfo> {
-    fn compute_debug_repr(&self) -> impl std::fmt::Debug {
-        self.imports.len()
-    }
-}
-
-impl<A, B> ComputeDebug for (A, B)
-where
-    A: ComputeDebug,
-    B: ComputeDebug,
-{
-    fn compute_debug_repr(&self) -> impl std::fmt::Debug {
-        (self.0.compute_debug_repr(), self.1.compute_debug_repr())
-    }
-}
-
-impl<Inputs, Output> ComputingNode<Inputs, Output> {
-    fn new(name: &'static str) -> Self {
-        Self {
-            name,
-            computing: AtomicBool::new(false),
-            inputs: RwLock::new(None),
-            slow_validate: RwLock::new(None),
-            output: RwLock::new(None),
-        }
-    }
-
-    fn compute(
-        &self,
-        inputs: Inputs,
-        compute: impl FnOnce(Option<Inputs>, Inputs) -> Option<Output>,
-    ) -> Result<Option<Output>, ()>
-    where
-        Inputs: ComputeDebug + Hash + Clone,
-        Output: Clone,
-    {
-        self.compute_(inputs, Option::<fn() -> u128>::None, compute)
-    }
-
-    fn compute_with_validate(
-        &self,
-        inputs: Inputs,
-        slow_validate: impl FnOnce() -> u128,
-        compute: impl FnOnce(Option<Inputs>, Inputs) -> Option<Output>,
-    ) -> Result<Option<Output>, ()>
-    where
-        Inputs: ComputeDebug + Hash + Clone,
-        Output: Clone,
-    {
-        self.compute_(inputs, Some(slow_validate), compute)
-    }
-
-    fn compute_(
-        &self,
-        inputs: Inputs,
-        slow_validate: Option<impl FnOnce() -> u128>,
-        compute: impl FnOnce(Option<Inputs>, Inputs) -> Option<Output>,
-    ) -> Result<Option<Output>, ()>
-    where
-        Inputs: ComputeDebug + Hash + Clone,
-        Output: Clone,
-    {
-        if self.computing.swap(true, Ordering::SeqCst) {
-            return Err(());
-        }
-        let input_cmp = self.inputs.read();
-        let res = Ok(match input_cmp.as_ref() {
-            Some(s)
-                if reflexo::hash::hash128(&inputs) == reflexo::hash::hash128(&s)
-                    && self.is_slow_validated(slow_validate) =>
-            {
-                log::debug!(
-                    "{}({:?}): hit cache",
-                    self.name,
-                    inputs.compute_debug_repr()
-                );
-
-                self.output.read().clone()
-            }
-            s => {
-                let s = s.cloned();
-                drop(input_cmp);
-                log::info!("{}({:?}): compute", self.name, inputs.compute_debug_repr());
-                let output = compute(s, inputs.clone());
-                self.output.write().clone_from(&output);
-                *self.inputs.write() = Some(inputs);
-                output
-            }
-        });
-
-        self.computing.store(false, Ordering::SeqCst);
-        res
-    }
-
-    fn is_slow_validated(&self, slow_validate: Option<impl FnOnce() -> u128>) -> bool {
-        if let Some(slow_validate) = slow_validate {
-            let res = slow_validate();
-            if self
-                .slow_validate
-                .read()
-                .as_ref()
-                .map_or(true, |e| *e != res)
-            {
-                *self.slow_validate.write() = Some(res);
-                return false;
-            }
-        }
-
-        true
-    }
-}
-
-/// A cache for module-level analysis results of a module.
-///
-/// You should not holds across requests, because source code may change.
-#[allow(clippy::type_complexity)]
-pub struct ModuleAnalysisGlobalCache {
-    def_use_lexical_hierarchy: ComputingNode<Source, EcoVec<LexicalHierarchy>>,
-    type_check: Arc<ComputingNode<Source, Arc<TypeScheme>>>,
-    def_use: Arc<ComputingNode<(EcoVec<LexicalHierarchy>, Arc<ImportInfo>), Arc<DefUseInfo>>>,
-
-    bibliography: Arc<ComputingNode<EcoVec<(TypstFileId, Bytes)>, Arc<BibInfo>>>,
-    import: Arc<ComputingNode<EcoVec<LexicalHierarchy>, Arc<ImportInfo>>>,
-}
-
-impl Default for ModuleAnalysisGlobalCache {
-    fn default() -> Self {
-        Self {
-            def_use_lexical_hierarchy: ComputingNode::new("def_use_lexical_hierarchy"),
-            type_check: Arc::new(ComputingNode::new("type_check")),
-            import: Arc::new(ComputingNode::new("import")),
-            def_use: Arc::new(ComputingNode::new("def_use")),
-            bibliography: Arc::new(ComputingNode::new("bibliography")),
-        }
+        self.caches.static_signatures.clear();
+        self.caches.def_use.clear();
+        self.caches.type_ck.clear();
     }
 }
 
@@ -328,7 +137,8 @@ impl Default for ModuleAnalysisGlobalCache {
 pub struct AnalysisGlobalCaches {
     lifetime: AtomicU64,
     clear_lifetime: AtomicU64,
-    modules: FxDashMap<TypstFileId, Arc<ModuleAnalysisGlobalCache>>,
+    def_use: FxDashMap<u128, (u64, Option<Arc<DefUseInfo>>)>,
+    type_ck: FxDashMap<u128, (u64, Option<Arc<TypeScheme>>)>,
     static_signatures: FxDashMap<u128, (u64, Source, usize, Signature)>,
     signatures: FxDashMap<u128, (u64, foundations::Func, Signature)>,
 }
@@ -663,22 +473,21 @@ impl<'w> AnalysisContext<'w> {
         if let Some(res) = self.caches.modules.entry(fid).or_default().type_check() {
             return Some(res);
         }
-        let def_use = self.def_use(source.clone());
 
-        let cache = self.at_module(fid);
+        let def_use = self.def_use(source.clone())?;
 
-        let tl = cache.type_check.clone();
-        let res = tl
-            .compute_with_validate(
-                source,
-                || def_use.map(|s| s.dep_hash(fid)).unwrap_or_default(),
-                |_before, after| {
-                    let next = crate::analysis::ty::type_check(self, after);
-                    next.or_else(|| tl.output.read().clone())
-                },
-            )
-            .ok()
-            .flatten();
+        let h = hash128(&(&source, &def_use));
+
+        let res = if let Some(res) = self.analysis.caches.type_ck.get(&h) {
+            res.1.clone()
+        } else {
+            let res = crate::analysis::ty::type_check(self, source);
+            self.analysis
+                .caches
+                .type_ck
+                .insert(h, (self.lifetime, res.clone()));
+            res
+        };
 
         self.caches
             .modules
@@ -691,68 +500,57 @@ impl<'w> AnalysisContext<'w> {
 
     /// Get the import information of a source file.
     pub fn import_info(&mut self, source: Source) -> Option<Arc<ImportInfo>> {
-        let fid = source.id();
+        use comemo::Track;
+        let w = self.resources.world();
+        let w = w.track();
 
-        if let Some(res) = self.caches.modules.entry(fid).or_default().import_info() {
-            return Some(res);
-        }
-
-        let cache = self.at_module(fid);
-        let l = cache
-            .def_use_lexical_hierarchy
-            .compute(source.clone(), |_before, after| {
-                crate::syntax::get_lexical_hierarchy(after, crate::syntax::LexicalScopeKind::DefUse)
-            })
-            .ok()
-            .flatten()?;
-
-        let res = cache
-            .import
-            .clone()
-            .compute(l.clone(), |_before, after| {
-                crate::analysis::get_import_info(self, source, after)
-            })
-            .ok()
-            .flatten();
-
-        self.caches
-            .modules
-            .entry(fid)
-            .or_default()
-            .compute_import(|| res.clone());
-        res
+        import_info(w, source)
     }
 
     /// Get the def-use information of a source file.
     pub fn def_use(&mut self, source: Source) -> Option<Arc<DefUseInfo>> {
+        let mut search_ctx = self.fork_for_search();
+        Self::def_use_(&mut search_ctx, source)
+    }
+
+    /// Get the def-use information of a source file.
+    pub fn def_use_(ctx: &mut SearchCtx<'_, 'w>, source: Source) -> Option<Arc<DefUseInfo>> {
         let fid = source.id();
 
-        if let Some(res) = self.caches.modules.entry(fid).or_default().def_use() {
+        if let Some(res) = ctx.ctx.caches.modules.entry(fid).or_default().def_use() {
             return Some(res);
         }
 
-        let cache = self.at_module(fid);
-        let l = cache
-            .def_use_lexical_hierarchy
-            .compute(source.clone(), |_before, after| {
-                crate::syntax::get_lexical_hierarchy(after, crate::syntax::LexicalScopeKind::DefUse)
-            })
-            .ok()
-            .flatten()?;
+        if !ctx.searched.insert(fid) {
+            return None;
+        }
 
-        let m = self.import_info(source.clone())?;
+        let l = def_use_lexical_hierarchy(source.clone())?;
+        let m = ctx.ctx.import_info(source.clone())?;
+        let dep_hash = m
+            .imports
+            .iter()
+            .flat_map(|e| e.1)
+            .map(|e| Self::def_use_(ctx, e.clone()))
+            .collect::<Vec<_>>();
 
-        let cache = self.at_module(fid);
-        let res = cache
-            .def_use
-            .clone()
-            .compute((l, m), |_before, after| {
-                crate::analysis::get_def_use_inner(self, source, after.0, after.1)
-            })
-            .ok()
-            .flatten();
+        let key = (&source, &l, &m, dep_hash);
+        let h = hash128(&key);
 
-        self.caches
+        let res = if let Some(res) = ctx.ctx.analysis.caches.def_use.get(&h) {
+            res.1.clone()
+        } else {
+            let res = crate::analysis::get_def_use_inner(ctx.ctx, source, l, m);
+            ctx.ctx
+                .analysis
+                .caches
+                .def_use
+                .insert(h, (ctx.ctx.lifetime, res.clone()));
+            res
+        };
+
+        ctx.ctx
+            .caches
             .modules
             .entry(fid)
             .or_default()
@@ -760,43 +558,17 @@ impl<'w> AnalysisContext<'w> {
         res
     }
 
-    pub(crate) fn analyze_bib(
+    /// Get bib info of a source file.
+    pub fn analyze_bib(
         &mut self,
         span: Span,
         bib_paths: impl Iterator<Item = EcoString>,
     ) -> Option<Arc<BibInfo>> {
-        let id = span.id()?;
+        use comemo::Track;
+        let w = self.resources.world();
+        let w = w.track();
 
-        if let Some(res) = self.caches.modules.entry(id).or_default().bibliography() {
-            return Some(res);
-        }
-
-        // the order are important
-        let paths = bib_paths
-            .flat_map(|s| {
-                let id = resolve_id_by_path(self.world(), id, &s)?;
-                Some((id, self.file_by_id(id).ok()?))
-            })
-            .collect::<EcoVec<_>>();
-
-        let cache = self.at_module(id);
-        let res = cache
-            .bibliography
-            .clone()
-            .compute(paths, |_, after| analyze_bib(after))
-            .ok()
-            .flatten();
-
-        self.caches
-            .modules
-            .entry(id)
-            .or_default()
-            .compute_bibliography(|| res.clone());
-        res
-    }
-
-    fn at_module(&self, fid: TypstFileId) -> Arc<ModuleAnalysisGlobalCache> {
-        self.analysis.caches.modules.entry(fid).or_default().clone()
+        bib_info(w, span, bib_paths.collect())
     }
 
     pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
@@ -912,6 +684,14 @@ impl<'w> AnalysisContext<'w> {
             .caches
             .signatures
             .retain(|_, (l, _, _)| lifetime - *l < 60);
+        self.analysis
+            .caches
+            .def_use
+            .retain(|_, (l, _)| lifetime - *l < 60);
+        self.analysis
+            .caches
+            .type_ck
+            .retain(|_, (l, _)| lifetime - *l < 60);
     }
 }
 
@@ -922,6 +702,35 @@ fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
     }
 
     cursor.min(text.len())
+}
+
+#[comemo::memoize]
+fn def_use_lexical_hierarchy(source: Source) -> Option<EcoVec<LexicalHierarchy>> {
+    crate::syntax::get_lexical_hierarchy(source, crate::syntax::LexicalScopeKind::DefUse)
+}
+
+#[comemo::memoize]
+fn import_info(w: Tracked<dyn World + '_>, source: Source) -> Option<Arc<ImportInfo>> {
+    let l = def_use_lexical_hierarchy(source.clone())?;
+    crate::analysis::get_import_info(w, source, l)
+}
+
+#[comemo::memoize]
+fn bib_info(
+    w: Tracked<dyn World + '_>,
+    span: Span,
+    bib_paths: EcoVec<EcoString>,
+) -> Option<Arc<BibInfo>> {
+    let id = span.id()?;
+
+    let files = bib_paths
+        .iter()
+        .flat_map(|s| {
+            let id = resolve_id_by_path(w.deref(), id, s)?;
+            Some((id, w.file(id).ok()?))
+        })
+        .collect::<EcoVec<_>>();
+    analyze_bib(files)
 }
 
 #[comemo::memoize]

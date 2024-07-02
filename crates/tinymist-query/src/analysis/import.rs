@@ -4,6 +4,7 @@ use ecow::EcoVec;
 use typst::{
     foundations::Value,
     syntax::{LinkedNode, SyntaxKind},
+    World,
 };
 
 use crate::syntax::resolve_id_by_path;
@@ -23,6 +24,7 @@ pub struct ImportInfo {
 impl Hash for ImportInfo {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write_usize(self.imports.len());
+        // todo: import star is stateful
         for item in &self.imports {
             item.hash(state);
         }
@@ -30,7 +32,7 @@ impl Hash for ImportInfo {
 }
 
 pub(super) fn get_import_info(
-    ctx: &mut AnalysisContext,
+    ctx: comemo::Tracked<dyn World + '_>,
     source: Source,
     e: EcoVec<LexicalHierarchy>,
 ) -> Option<Arc<ImportInfo>> {
@@ -61,7 +63,7 @@ pub(super) fn get_import_info(
 }
 
 struct ImportCollector<'a, 'w> {
-    ctx: &'a mut AnalysisContext<'w>,
+    ctx: comemo::Tracked<'w, dyn World + 'w>,
     info: ImportInfo,
 
     current_id: TypstFileId,
@@ -93,7 +95,7 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
                             let exp = find_import_expr(self.root.leaf_at(exp.range.end));
                             let val = exp
                                 .as_ref()
-                                .and_then(|exp| analyze_import(self.ctx.world(), exp));
+                                .and_then(|exp| analyze_import(self.ctx.deref(), exp));
 
                             match val {
                                 Some(Value::Module(m)) => {
@@ -106,7 +108,7 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
                                     m.file_id()
                                 }
                                 Some(Value::Str(m)) => resolve_id_by_path(
-                                    self.ctx.world(),
+                                    self.ctx.deref(),
                                     self.current_id,
                                     m.as_str(),
                                 ),
@@ -114,7 +116,7 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
                             }
                         }
                         ModSrc::Path(p) => {
-                            resolve_id_by_path(self.ctx.world(), self.current_id, p.deref())
+                            resolve_id_by_path(self.ctx.deref(), self.current_id, p.deref())
                         }
                     };
                     log::debug!(
@@ -123,7 +125,7 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
                         e.info.range,
                         id
                     );
-                    let source = id.and_then(|id| self.ctx.source_by_id(id).ok());
+                    let source = id.and_then(|id| self.ctx.source(id).ok());
                     self.info.imports.insert(e.info.range.clone(), source);
                 }
             }

@@ -14,10 +14,11 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{from_value, Value as JsonValue};
 use tinymist_query::CompilerQueryResponse;
 
+pub mod req_queue;
 pub mod transport;
 
 pub type ReqHandler<S> = for<'a> fn(&'a mut S, lsp_server::Response);
-type ReqQueue<S> = lsp_server::ReqQueue<(String, Instant), ReqHandler<S>>;
+type ReqQueue<S> = req_queue::ReqQueue<(String, Instant), ReqHandler<S>>;
 
 pub type LspResult<Res> = Result<Res, ResponseError>;
 
@@ -102,6 +103,10 @@ impl<S> LspClient<S> {
 
     fn force_drop(&self) -> ForceDrop<crossbeam_channel::Sender<Message>> {
         ForceDrop(self.sender.clone())
+    }
+
+    pub fn has_pending_requests(&self) -> bool {
+        self.req_queue.lock().incoming.has_pending()
     }
 
     pub fn send_request<R: lsp_types::request::Request>(
@@ -465,9 +470,29 @@ impl<Args: Initializer> LspDriver<Args>
 where
     Args::S: 'static,
 {
-    pub fn start(&mut self, inbox: crossbeam_channel::Receiver<Message>) -> anyhow::Result<()> {
+    pub fn start(
+        &mut self,
+        inbox: crossbeam_channel::Receiver<Message>,
+        is_replay: bool,
+    ) -> anyhow::Result<()> {
         let _drop_guard = self.client.force_drop();
+        let res = self.start_(inbox);
 
+        if is_replay {
+            let client = self.client.clone();
+            let _ = std::thread::spawn(move || {
+                client.handle.block_on(async {
+                    while client.has_pending_requests() {
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    }
+                })
+            })
+            .join();
+        }
+
+        res
+    }
+    pub fn start_(&mut self, inbox: crossbeam_channel::Receiver<Message>) -> anyhow::Result<()> {
         // todo: follow what rust analyzer does
         // Windows scheduler implements priority boosts: if thread waits for an
         // event (like a condvar), and event fires, priority of the thread is

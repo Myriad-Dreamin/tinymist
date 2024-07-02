@@ -75,9 +75,7 @@ base64.workspace = true
 rayon.workspace = true
 
 [features]
-default = ["cli", "embed-fonts", "no-content-hint", "preview", "stable-server"]
-
-stable-server = []
+default = ["cli", "embed-fonts", "no-content-hint", "preview"]
 
 cli = ["clap", "sync-lsp/clap"]
 

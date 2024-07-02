@@ -3,6 +3,7 @@
 use std::{collections::HashMap, ops::Range, sync::Arc};
 
 use ecow::EcoVec;
+use reflexo::hash::hash128;
 
 use super::{prelude::*, ImportInfo};
 use crate::adt::snapshot_map::SnapshotMap;
@@ -31,6 +32,16 @@ pub struct DefUseInfo {
     pub undefined_refs: Vec<IdentRef>,
     exports_refs: Vec<DefId>,
     exports_defs: HashMap<String, DefId>,
+
+    self_id: Option<TypstFileId>,
+    self_hash: u128,
+    all_hash: once_cell::sync::OnceCell<u128>,
+}
+
+impl Hash for DefUseInfo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.dep_hash(self.self_id.unwrap()).hash(state);
+    }
 }
 
 impl DefUseInfo {
@@ -94,17 +105,20 @@ impl DefUseInfo {
 
     /// Get the definition id of an exported symbol by its name.
     pub fn dep_hash(&self, fid: TypstFileId) -> u128 {
-        use siphasher::sip128::Hasher128;
-        let mut hasher = reflexo::hash::FingerprintSipHasherBase::default();
-        for (dep_fid, def) in self.ident_defs.keys() {
-            if fid != *dep_fid {
-                continue;
+        *self.all_hash.get_or_init(|| {
+            use siphasher::sip128::Hasher128;
+            let mut hasher = reflexo::hash::FingerprintSipHasherBase::default();
+            self.self_hash.hash(&mut hasher);
+            for (dep_fid, def) in self.ident_defs.keys() {
+                if fid == *dep_fid {
+                    continue;
+                }
+                fid.hash(&mut hasher);
+                def.hash(&mut hasher);
             }
-            fid.hash(&mut hasher);
-            def.hash(&mut hasher);
-        }
 
-        hasher.finish128().into()
+            hasher.finish128().into()
+        })
     }
 }
 
@@ -116,9 +130,16 @@ pub(super) fn get_def_use_inner(
 ) -> Option<Arc<DefUseInfo>> {
     let current_id = source.id();
 
+    let info = DefUseInfo {
+        self_hash: hash128(&source),
+        self_id: Some(current_id),
+
+        ..Default::default()
+    };
+
     let mut collector = DefUseCollector {
         ctx,
-        info: DefUseInfo::default(),
+        info,
         id_scope: SnapshotMap::default(),
         label_scope: SnapshotMap::default(),
         import,
