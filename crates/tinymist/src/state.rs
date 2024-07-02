@@ -15,9 +15,8 @@ use typst_ts_compiler::{
 };
 use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
-use crate::{
-    actor::typ_client::CompileClientActor, compile::CompileState, sync_lsp::*, LanguageState,
-};
+use crate::{actor::typ_client::CompileClientActor, compile::CompileState, LanguageState};
+use sync_lsp::*;
 
 impl CompileState {
     /// Focus main file to some path.

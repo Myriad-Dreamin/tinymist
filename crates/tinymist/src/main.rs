@@ -13,11 +13,10 @@ use comemo::Prehashed;
 use lsp_types::InitializedParams;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
+use sync_lsp::{transport::with_stdio_transport, Initializer, LspBuilder, LspClient};
 use tinymist::{
     compile::CompileState,
     compile_init::{CompileInit, CompileInitializeParams},
-    sync_lsp::{Initializer, LspBuilder, LspClient},
-    transport::with_stdio_transport,
     CompileFontOpts, Init, LanguageState, LspWorld,
 };
 use tokio::sync::mpsc;

@@ -31,13 +31,12 @@ mod actor;
 mod resource;
 mod server;
 mod state;
-pub mod sync_lsp;
 pub mod tools;
-pub mod transport;
 mod utils;
 mod world;
 
-pub use crate::sync_lsp::LspClient;
+use lsp_server::ErrorCode;
+use lsp_server::ResponseError;
 pub use server::compile;
 pub use server::compile_init;
 pub use server::lsp::*;
@@ -48,7 +47,8 @@ pub use world::{
     CompileFontOpts, CompileOnceOpts, CompileOpts, LspUniverse, LspWorld, LspWorldBuilder,
 };
 
-use crate::sync_lsp::*;
+pub use sync_lsp::LspClient;
+use sync_lsp::*;
 
 /// Get a parsed command argument.
 /// Return `INVALID_PARAMS` when no arg or parse failed.
@@ -79,3 +79,11 @@ macro_rules! get_arg_or_default {
     }};
 }
 use get_arg_or_default;
+
+pub fn z_internal_error(msg: typst_ts_core::Error) -> ResponseError {
+    ResponseError {
+        code: ErrorCode::InternalError as i32,
+        message: format!("internal: {msg:?}"),
+        data: None,
+    }
+}

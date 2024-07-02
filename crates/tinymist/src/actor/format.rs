@@ -7,7 +7,7 @@ use lsp_types::TextEdit;
 use tinymist_query::{typst_to_lsp, PositionEncoding};
 use typst::syntax::Source;
 
-use crate::{result_to_response, sync_lsp::LspResult, FormatterMode, LanguageState, LspClient};
+use crate::{result_to_response, FormatterMode, LanguageState, LspClient, LspResult};
 
 #[derive(Debug, Clone)]
 pub struct FormatConfig {

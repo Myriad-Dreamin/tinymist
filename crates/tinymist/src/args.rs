@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use tinymist::transport::MirrorArgs;
+use sync_lsp::transport::MirrorArgs;
 
 use tinymist::compile_init::{CompileOnceArgs, FontArgs};
 

@@ -1,34 +1,23 @@
 use std::path::Path;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
 
 use futures::future::MaybeDone;
 use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response, ResponseError};
-use lsp_types::request::{self, Request as Req};
-use lsp_types::{notification::Notification as Notif, ExecuteCommandParams};
-use reflexo::{time::Instant, ImmutPath};
-use serde_json::from_value;
-use serde_json::Value as JsonValue;
-use std::sync::Arc;
-use tinymist_query::CompilerQueryResponse;
-
-use log::{error, info, warn};
-use lsp_types::notification::PublishDiagnostics;
-use lsp_types::request::{RegisterCapability, UnregisterCapability};
+use lsp_types::notification::{Notification as Notif, PublishDiagnostics};
+use lsp_types::request::{self, RegisterCapability, Request as Req, UnregisterCapability};
 use lsp_types::*;
 use parking_lot::{Mutex, RwLock};
+use reflexo::{time::Instant, ImmutPath};
 use serde::{de::DeserializeOwned, Serialize};
+use serde_json::{from_value, Value as JsonValue};
+use tinymist_query::CompilerQueryResponse;
 
-// Enforces drop order
-pub struct Handle<H, C> {
-    pub handle: H,
-    pub receiver: C,
-}
+pub mod transport;
 
 pub type ReqHandler<S> = for<'a> fn(&'a mut S, lsp_server::Response);
 type ReqQueue<S> = lsp_server::ReqQueue<(String, Instant), ReqHandler<S>>;
-
-use crate::get_arg;
 
 pub type LspResult<Res> = Result<Res, ResponseError>;
 
@@ -44,22 +33,12 @@ pub type QueryFuture = anyhow::Result<ResponseFuture<anyhow::Result<CompilerQuer
 pub type SchedulableResponse<T> = LspResponseFuture<LspResult<T>>;
 pub type AnySchedulableResponse = SchedulableResponse<JsonValue>;
 
-pub type LspRawPureHandler<S, T> = fn(srv: &mut S, args: T) -> LspResult<()>;
-pub type LspRawHandler<S, T> = fn(srv: &mut S, req_id: RequestId, args: T) -> ScheduledResult;
-pub type LspBoxPureHandler<S, T> = Box<dyn Fn(&mut S, T) -> LspResult<()>>;
-pub type LspBoxHandler<S, T> = Box<dyn Fn(&mut S, &LspClient<S>, RequestId, T) -> ScheduledResult>;
-pub type ExecuteCmdMap<S> = HashMap<&'static str, LspBoxHandler<S, Vec<JsonValue>>>;
-pub type RegularCmdMap<S> = HashMap<&'static str, LspBoxHandler<S, JsonValue>>;
-pub type NotifyCmdMap<S> = HashMap<&'static str, LspBoxPureHandler<S, JsonValue>>;
-pub type ResourceMap<S> = HashMap<ImmutPath, LspBoxHandler<S, Vec<JsonValue>>>;
-
 #[macro_export]
 macro_rules! just_ok {
     ($expr:expr) => {
         Ok(futures::future::MaybeDone::Done(Ok($expr)))
     };
 }
-pub use just_ok;
 
 #[macro_export]
 macro_rules! just_result {
@@ -67,7 +46,6 @@ macro_rules! just_result {
         Ok(futures::future::MaybeDone::Done($expr))
     };
 }
-pub use just_result;
 
 #[macro_export]
 macro_rules! just_future {
@@ -75,7 +53,6 @@ macro_rules! just_future {
         Ok(futures::future::MaybeDone::Future(Box::pin($expr)))
     };
 }
-pub use just_future;
 
 #[macro_export]
 macro_rules! reschedule {
@@ -89,7 +66,6 @@ macro_rules! reschedule {
         }
     };
 }
-pub use reschedule;
 
 /// The host for the language server, or known as the LSP client.
 #[derive(Debug)]
@@ -136,7 +112,7 @@ impl<S> LspClient<S> {
         let mut req_queue = self.req_queue.lock();
         let sender = self.sender.read();
         let Some(sender) = sender.as_ref() else {
-            warn!("failed to send request: connection closed");
+            log::warn!("failed to send request: connection closed");
             return;
         };
         let request = req_queue
@@ -145,13 +121,13 @@ impl<S> LspClient<S> {
         let Err(res) = sender.send(request.into()) else {
             return;
         };
-        warn!("failed to send request: {res:?}");
+        log::warn!("failed to send request: {res:?}");
     }
 
     pub fn complete_request(&self, service: &mut S, response: lsp_server::Response) {
         let mut req_queue = self.req_queue.lock();
         let Some(handler) = req_queue.outgoing.complete(response.id.clone()) else {
-            warn!("received response for unknown request");
+            log::warn!("received response for unknown request");
             return;
         };
         drop(req_queue);
@@ -163,20 +139,22 @@ impl<S> LspClient<S> {
 
         let sender = self.sender.read();
         let Some(sender) = sender.as_ref() else {
-            warn!("failed to send notification: connection closed");
+            log::warn!("failed to send notification: connection closed");
             return;
         };
         let Err(res) = sender.send(not.into()) else {
             return;
         };
-        warn!("failed to send notification: {res:?}");
+        log::warn!("failed to send notification: {res:?}");
     }
 
     pub fn register_request(&self, request: &lsp_server::Request, request_received: Instant) {
         let mut req_queue = self.req_queue.lock();
-        info!(
+        log::info!(
             "handling {} - ({}) at {:0.2?}",
-            request.method, request.id, request_received
+            request.method,
+            request.id,
+            request_received
         );
         req_queue.incoming.register(
             request.id.clone(),
@@ -189,7 +167,7 @@ impl<S> LspClient<S> {
         if let Some((method, start)) = req_queue.incoming.complete(response.id.clone()) {
             let sender = self.sender.read();
             let Some(sender) = sender.as_ref() else {
-                warn!("failed to send response: connection closed");
+                log::warn!("failed to send response: connection closed");
                 return;
             };
 
@@ -200,14 +178,16 @@ impl<S> LspClient<S> {
             // }
 
             let duration = start.elapsed();
-            info!(
+            log::info!(
                 "handled  {} - ({}) in {:0.2?}",
-                method, response.id, duration
+                method,
+                response.id,
+                duration
             );
             let Err(res) = sender.send(response.into()) else {
                 return;
             };
-            warn!("failed to send response: {res:?}");
+            log::warn!("failed to send response: {res:?}");
         }
     }
 
@@ -228,7 +208,7 @@ impl<S> LspClient<S> {
     pub fn register_capability(&self, registrations: Vec<Registration>) -> anyhow::Result<()> {
         self.send_request::<RegisterCapability>(RegistrationParams { registrations }, |_, resp| {
             if let Some(err) = resp.error {
-                error!("failed to register capability: {err:?}");
+                log::error!("failed to register capability: {err:?}");
             }
         });
         Ok(())
@@ -242,7 +222,7 @@ impl<S> LspClient<S> {
             UnregistrationParams { unregisterations },
             |_, resp| {
                 if let Some(err) = resp.error {
-                    error!("failed to unregister capability: {err:?}");
+                    log::error!("failed to unregister capability: {err:?}");
                 }
             },
         );
@@ -294,6 +274,22 @@ impl<S: 'static> LspClient<S> {
 
         Ok(Some(()))
     }
+}
+
+type LspRawPureHandler<S, T> = fn(srv: &mut S, args: T) -> LspResult<()>;
+type LspRawHandler<S, T> = fn(srv: &mut S, req_id: RequestId, args: T) -> ScheduledResult;
+type LspBoxPureHandler<S, T> = Box<dyn Fn(&mut S, T) -> LspResult<()>>;
+type LspBoxHandler<S, T> = Box<dyn Fn(&mut S, &LspClient<S>, RequestId, T) -> ScheduledResult>;
+type ExecuteCmdMap<S> = HashMap<&'static str, LspBoxHandler<S, Vec<JsonValue>>>;
+type RegularCmdMap<S> = HashMap<&'static str, LspBoxHandler<S, JsonValue>>;
+type NotifyCmdMap<S> = HashMap<&'static str, LspBoxPureHandler<S, JsonValue>>;
+type ResourceMap<S> = HashMap<ImmutPath, LspBoxHandler<S, Vec<JsonValue>>>;
+
+pub trait Initializer {
+    type I: for<'de> serde::Deserialize<'de>;
+    type S;
+
+    fn initialize(self, req: Self::I) -> (Self::S, AnySchedulableResponse);
 }
 
 pub struct LspBuilder<Args: Initializer> {
@@ -446,13 +442,6 @@ enum State<Args, S> {
     Initializing(S),
     Ready(S),
     ShuttingDown,
-}
-
-pub trait Initializer {
-    type I: for<'de> serde::Deserialize<'de>;
-    type S;
-
-    fn initialize(self, req: Self::I) -> (Self::S, AnySchedulableResponse);
 }
 
 pub struct LspDriver<Args: Initializer> {
@@ -620,11 +609,7 @@ where
 
     /// Get static resources with help of tinymist service, for example, a
     /// static help pages for some typst function.
-    pub fn get_resources(
-        &mut self,
-        req_id: RequestId,
-        mut args: Vec<JsonValue>,
-    ) -> ScheduledResult {
+    pub fn get_resources(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
         let s = match &mut self.state {
             State::Ready(s) => s,
             _ => {
@@ -635,7 +620,8 @@ where
             }
         };
 
-        let path = get_arg!(args[0] as PathBuf);
+        let path =
+            from_value::<PathBuf>(args[0].clone()).map_err(|e| invalid_params(e.to_string()))?;
 
         let Some(handler) = self.resources.get(path.as_path()) else {
             log::error!("asked for unknown resource: {path:?}");
@@ -755,14 +741,6 @@ pub fn internal_error(msg: impl Into<String>) -> ResponseError {
     }
 }
 
-pub fn z_internal_error(msg: typst_ts_core::Error) -> ResponseError {
-    ResponseError {
-        code: ErrorCode::InternalError as i32,
-        message: format!("internal: {msg:?}"),
-        data: None,
-    }
-}
-
 pub fn method_not_found() -> ResponseError {
     ResponseError {
         code: ErrorCode::MethodNotFound as i32,
@@ -771,7 +749,7 @@ pub fn method_not_found() -> ResponseError {
     }
 }
 
-pub(crate) fn result_to_response<T: Serialize>(
+pub fn result_to_response<T: Serialize>(
     id: RequestId,
     result: Result<T, ResponseError>,
 ) -> Response {
