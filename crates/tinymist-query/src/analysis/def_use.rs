@@ -97,7 +97,7 @@ impl DefUseInfo {
         use siphasher::sip128::Hasher128;
         let mut hasher = reflexo::hash::FingerprintSipHasherBase::default();
         for (dep_fid, def) in self.ident_defs.keys() {
-            if fid != *dep_fid {
+            if fid == *dep_fid {
                 continue;
             }
             fid.hash(&mut hasher);
