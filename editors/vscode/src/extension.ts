@@ -26,8 +26,8 @@ import {
 } from "./editor-tools";
 import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
 import { applySnippetTextEdits } from "./snippets";
-import { setIsTinymist } from "./preview-compat";
-import { previewActive, previewDeactivate } from "./preview";
+import { setIsTinymist as previewSetIsTinymist } from "./preview-compat";
+import { previewActivate, previewDeactivate } from "./preview";
 
 let client: LanguageClient | undefined = undefined;
 
@@ -55,8 +55,8 @@ export function activate(context: ExtensionContext): Promise<void> {
         }
     }
 
-    setIsTinymist(config);
-    previewActive(context, false);
+    previewSetIsTinymist(config);
+    previewActivate(context, false);
     return startClient(context, config).catch((e) => {
         void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
         throw e;
