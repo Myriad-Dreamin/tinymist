@@ -4,6 +4,20 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.13 - [2024-07-02]
+
+## Compiler
+
+These bugs are introduced by [Preparing for parallelizing lsp requests](https://github.com/Myriad-Dreamin/tinymist/pull/342).
+
+* (Fix) diagnostics is back in https://github.com/Myriad-Dreamin/tinymist/pull/354
+* (Fix) Checking main before compilation in https://github.com/Myriad-Dreamin/tinymist/pull/361
+
+## Misc
+* Optimized release profile in https://github.com/Myriad-Dreamin/tinymist/pull/359
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.12...v0.11.13
+
 ## v0.11.12 - [2024-06-27]
 
 * Bumped typstyle to v0.11.28
