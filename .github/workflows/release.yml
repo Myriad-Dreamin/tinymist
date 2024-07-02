@@ -306,7 +306,7 @@ jobs:
       - name: Install deps
         run: yarn install
       - name: Deploy to VS Code Marketplace
-        run: npx vsce publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate 
+        run: npx @vscode/vsce publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate 
         env:
           VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
 
