@@ -165,6 +165,7 @@ fn label_tooltip(document: &Document, leaf: &LinkedNode) -> Option<Tooltip> {
         label,
         label_desc: _,
         detail,
+        ..
     } in analyze_labels(document).0
     {
         if label.as_str() == target {

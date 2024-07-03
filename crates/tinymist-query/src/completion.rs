@@ -215,6 +215,7 @@ impl StatefulRequest for CompletionRequest {
                     kind: Some(completion_kind(typst_completion.kind.clone())),
                     detail: typst_completion.detail.as_ref().map(String::from),
                     sort_text: typst_completion.sort_text.as_ref().map(String::from),
+                    filter_text: typst_completion.filter_text.as_ref().map(String::from),
                     label_details: typst_completion.label_detail.as_ref().map(|e| {
                         CompletionItemLabelDetails {
                             detail: None,

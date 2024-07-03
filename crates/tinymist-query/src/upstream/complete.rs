@@ -62,6 +62,8 @@ pub struct Completion {
     pub label_detail: Option<EcoString>,
     /// The label the completion is shown with.
     pub sort_text: Option<EcoString>,
+    /// The composed text used for filtering.
+    pub filter_text: Option<EcoString>,
     /// The completed version of the input, possibly described with snippet
     /// syntax like `${lhs} + ${rhs}`.
     ///
@@ -1107,9 +1109,11 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             label,
             label_desc,
             detail,
+            bib_title,
         } in labels.into_iter().skip(skip).take(take)
         {
-            self.completions.push(Completion {
+            let label: EcoString = label.as_str().into();
+            let completion = Completion {
                 kind: CompletionKind::Constant,
                 apply: (open || close).then(|| {
                     eco_format!(
@@ -1119,11 +1123,25 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                         if close { ">" } else { "" }
                     )
                 }),
-                label_detail: label_desc,
-                label: label.as_str().into(),
-                detail,
+                label: label.clone(),
+                label_detail: label_desc.clone(),
+                filter_text: Some(label.clone()),
+                detail: detail.clone(),
                 ..Completion::default()
-            });
+            };
+
+            if let Some(bib_title) = bib_title {
+                self.completions.push(Completion {
+                    kind: CompletionKind::Constant,
+                    label: bib_title.clone(),
+                    label_detail: Some(label),
+                    filter_text: Some(bib_title),
+                    detail,
+                    ..completion.clone()
+                });
+            }
+
+            self.completions.push(completion);
         }
     }
 
