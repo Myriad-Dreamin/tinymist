@@ -40,10 +40,10 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     }
 
     context.subscriptions.push(
-        vscode.commands.registerCommand("typst-preview.preview", lp("webview", "doc")),
-        vscode.commands.registerCommand("typst-preview.browser", lp("browser", "doc")),
-        vscode.commands.registerCommand("typst-preview.preview-slide", lp("webview", "slide")),
-        vscode.commands.registerCommand("typst-preview.browser-slide", lp("browser", "slide"))
+        vscode.commands.registerCommand("typst-preview.preview", launch("webview", "doc")),
+        vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
+        vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
+        vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide"))
     );
     context.subscriptions.push(
         vscode.commands.registerCommand(
@@ -63,7 +63,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     }
 
     const launchImpl = isCompat ? launchPreviewCompat : launchPreviewLsp;
-    function lp(kind: "browser" | "webview", mode: "doc" | "slide") {
+    function launch(kind: "browser" | "webview", mode: "doc" | "slide") {
         return async () => {
             const activeEditor = vscode.window.activeTextEditor;
             if (!activeEditor) {
@@ -278,7 +278,10 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         return { dataPlanePort };
     }
 
-    async function reportPosition(editorToReport: vscode.TextEditor, event: string) {
+    async function reportPosition(
+        editorToReport: vscode.TextEditor,
+        event: "changeCursorPosition" | "panelScrollTo"
+    ) {
         const scrollRequest: ScrollRequest = {
             event,
             taskId,
@@ -355,7 +358,7 @@ interface ScrollByPositionRequest {
 
 interface ScrollRequest {
     taskId: string;
-    event: string;
+    event: "panelScrollTo" | "changeCursorPosition";
     filepath: string;
     line: any;
     character: any;

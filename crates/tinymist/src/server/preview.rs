@@ -2,53 +2,92 @@ use std::{borrow::Cow, net::SocketAddr, path::Path};
 
 use anyhow::Context;
 use await_tree::InstrumentAwait;
-use log::{error, info};
-
-use typst::foundations::{Str, Value};
-use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
-
 use hyper::{
     service::{make_service_fn, service_fn},
     Error,
 };
-
+use log::{error, info};
+use serde_json::Value as JsonValue;
+use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
+use typst::foundations::{Str, Value};
 use typst_preview::{
     await_tree::{get_await_tree_async, REGISTRY},
     preview, PreviewArgs, PreviewMode, Previewer,
 };
+use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
 
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "clap", derive(clap::Parser))]
+use super::*;
+
+#[derive(Debug, Clone, clap::Parser)]
 pub struct PreviewCliArgs {
-    #[cfg_attr(feature = "clap", clap(flatten))]
+    #[clap(flatten)]
     pub preview: PreviewArgs,
 
-    #[cfg_attr(feature = "clap", clap(flatten))]
+    #[clap(flatten)]
     pub compile: CompileOnceArgs,
 
     /// Preview mode
-    #[cfg_attr(
-        feature = "clap",
-        clap(long = "preview-mode", default_value = "document", value_name = "MODE")
-    )]
+    #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
     pub preview_mode: PreviewMode,
 
     /// Host for the preview server
-    #[cfg_attr(
-        feature = "clap",
-        clap(
-            long = "host",
-            value_name = "HOST",
-            default_value = "127.0.0.1:23627",
-            alias = "static-file-host"
-        )
+    #[clap(
+        long = "host",
+        value_name = "HOST",
+        default_value = "127.0.0.1:23627",
+        alias = "static-file-host"
     )]
     pub static_file_host: String,
 
     /// Don't open the preview in the browser after compilation.
-    #[cfg_attr(feature = "clap", clap(long = "no-open"))]
+    #[clap(long = "no-open")]
     pub dont_open_in_browser: bool,
+}
+
+#[derive(Default)]
+pub struct PreviewState {}
+impl PreviewState {
+    pub fn start(
+        &self,
+        path: std::path::PathBuf,
+        cli_args: PreviewCliArgs,
+    ) -> AnySchedulableResponse {
+        just_ok!(JsonValue::Null)
+    }
+
+    pub fn kill(&self, task_id: String) -> AnySchedulableResponse {
+        just_ok!(JsonValue::Null)
+    }
+
+    pub fn scroll(&self, req: JsonValue) -> AnySchedulableResponse {
+        // That's very unfortunate that sourceScrollBySpan doesn't work well.
+        // interface SourceScrollBySpanRequest {
+        //     taskId: string;
+        //     event: "sourceScrollBySpan";
+        //     span: string;
+        // }
+
+        // interface ScrollByPositionRequest {
+        //     taskId: string;
+        //     event: "panelScrollByPosition" | "sourceScrollByPosition";
+        //     position: any;
+        // }
+
+        // interface ScrollRequest {
+        //     taskId: string;
+        //     event: "panelScrollTo" | "changeCursorPosition";
+        //     filepath: string;
+        //     line: any;
+        //     character: any;
+        // }
+
+        // export async function commandScrollPreview(req: any): Promise<void> {
+        //         arguments: [req],
+        // }
+
+        just_ok!(JsonValue::Null)
+    }
 }
 
 #[path = "preview_compiler.rs"]

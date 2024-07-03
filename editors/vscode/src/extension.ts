@@ -126,7 +126,7 @@ async function startClient(context: ExtensionContext, config: Record<string, any
         start: [number, number] | null;
         end: [number, number] | null;
     }
-    client.onNotification("tinymist/clientScrollTo", async (jump: JumpInfo) => {
+    client.onNotification("tinymist/preview/scrollSource", async (jump: JumpInfo) => {
         const activeEditor = window.activeTextEditor;
         if (!activeEditor) {
             return;
@@ -151,11 +151,11 @@ async function startClient(context: ExtensionContext, config: Record<string, any
         previewProcessOutline(data);
     });
 
-    client.onNotification("tinymist/previewTaskDispose", (data: any) => {
-        const dispose = previewDisposes[data.taskId];
+    client.onNotification("tinymist/preview/dispose", ({ taskId }) => {
+        const dispose = previewDisposes[taskId];
         if (dispose) {
             dispose();
-            delete previewDisposes[data.taskId];
+            delete previewDisposes[taskId];
         }
     });
 
@@ -461,21 +461,18 @@ export async function commandStartPreview(
         command: `tinymist.doStartPreview`,
         arguments: [filePath, previewArgs || []],
     });
-    if (res === null || !res) {
-        return {};
-    }
-    return res;
+    return res || {};
 }
 
 export async function commandKillPreview(taskId: string): Promise<void> {
-    await client?.sendRequest("workspace/executeCommand", {
+    return await client?.sendRequest("workspace/executeCommand", {
         command: `tinymist.doKillPreview`,
         arguments: [taskId],
     });
 }
 
 export async function commandScrollPreview(req: any): Promise<void> {
-    await client?.sendRequest("workspace/executeCommand", {
+    return await client?.sendRequest("workspace/executeCommand", {
         command: `tinymist.scrollPreview`,
         arguments: [req],
     });

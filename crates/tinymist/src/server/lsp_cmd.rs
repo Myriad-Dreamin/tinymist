@@ -89,6 +89,37 @@ impl LanguageState {
         just_ok!(JsonValue::Null)
     }
 
+    #[cfg(feature = "preview")]
+    pub fn start_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        use clap::Parser;
+        use preview::PreviewCliArgs;
+
+        let path = get_arg!(args[0] as PathBuf);
+        let cli_args = get_arg_or_default!(args[1] as Vec<String>);
+        // clap parse
+        let cli_args = ["preview"]
+            .into_iter()
+            .chain(cli_args.iter().map(|e| e.as_str()));
+        let cli_args =
+            PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
+
+        self.preview.start(path, cli_args)
+    }
+
+    #[cfg(feature = "preview")]
+    pub fn kill_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let task_id = get_arg!(args[0] as String);
+
+        self.preview.kill(task_id)
+    }
+
+    #[cfg(feature = "preview")]
+    pub fn scroll_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let req = get_arg!(args[0] as JsonValue);
+
+        self.preview.scroll(req)
+    }
+
     /// Initialize a new template.
     pub fn init_template(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use crate::tools::package::{self, determine_latest_version, TemplateSource};

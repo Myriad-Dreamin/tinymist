@@ -24,7 +24,6 @@ use crate::compile::CompileState;
 use crate::utils::{try_, try_or_default};
 use crate::world::{ImmutDict, SharedFontResolver};
 
-#[cfg(feature = "clap")]
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
 #[derive(Clone)]
@@ -36,22 +35,21 @@ impl<T> fmt::Debug for Derived<T> {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "clap", derive(clap::Parser))]
+#[derive(Debug, Clone, Default, clap::Parser)]
 pub struct FontArgs {
     /// Font paths
-    #[cfg_attr(feature = "clap", clap(
+    #[clap(
         long = "font-path",
         value_name = "DIR",
         action = clap::ArgAction::Append,
         env = "TYPST_FONT_PATHS",
         value_delimiter = ENV_PATH_SEP
-    ))]
+    )]
     pub font_paths: Vec<PathBuf>,
 
     /// Ensures system fonts won't be searched, unless explicitly included via
     /// `--font-path`
-    #[cfg_attr(feature = "clap", clap(long, default_value = "false"))]
+    #[clap(long, default_value = "false")]
     pub ignore_system_fonts: bool,
 }
 
@@ -75,7 +73,7 @@ pub struct CompileOnceArgs {
     )]
     pub inputs: Vec<(String, String)>,
 
-    #[cfg_attr(feature = "clap", clap(flatten))]
+    #[clap(flatten)]
     pub font: FontArgs,
 }
 

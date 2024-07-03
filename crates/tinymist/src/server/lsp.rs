@@ -8,6 +8,7 @@ use log::{error, info, trace};
 use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
+use preview::PreviewState;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{
@@ -74,6 +75,8 @@ pub struct LanguageState {
     pub tokens_ctx: SemanticTokenContext,
     /// The compiler for general purpose.
     pub primary: CompileState,
+    /// The preview state.
+    pub preview: PreviewState,
     /// The compilers for tasks
     pub dedicates: Vec<CompileState>,
     /// The formatter thread running in backend.
@@ -109,6 +112,7 @@ impl LanguageState {
                 },
                 editor_tx,
             ),
+            preview: PreviewState::default(),
             dedicates: Vec::new(),
             shutdown_requested: false,
             ever_focusing_by_activities: false,
@@ -183,6 +187,9 @@ impl LanguageState {
             .with_command("tinymist.doClearCache", State::clear_cache)
             .with_command("tinymist.pinMain", State::pin_document)
             .with_command("tinymist.focusMain", State::focus_document)
+            .with_command("tinymist.doStartPreview", State::start_preview)
+            .with_command("tinymist.doKillPreview", State::kill_preview)
+            .with_command("tinymist.scrollPreview", State::scroll_preview)
             .with_command("tinymist.doInitTemplate", State::init_template)
             .with_command("tinymist.doGetTemplateEntry", State::do_get_template_entry)
             .with_command_("tinymist.interactCodeContext", State::interact_code_context)

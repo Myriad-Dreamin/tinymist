@@ -194,13 +194,18 @@ impl LanguageState {
         let source = snapshot.content.clone();
         f(source)
     }
-
-    pub fn snapshot(&self) -> LanguageStateSnapshot {
-        LanguageStateSnapshot {}
-    }
 }
 
-pub struct LanguageStateSnapshot {}
+#[cfg(feature = "preview")]
+impl LanguageState {
+    // #[derive(Debug, Serialize)]
+    // #[serde(rename_all = "camelCase")]
+    // struct StartPreviewResponse {
+    //     data_plane_port: Option<String>,
+    // }
+
+    // PreviewCliArgs
+}
 
 #[macro_export]
 macro_rules! run_query_tail {

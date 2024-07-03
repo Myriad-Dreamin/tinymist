@@ -3,17 +3,15 @@ use sync_lsp::transport::MirrorArgs;
 
 use tinymist::compile_init::{CompileOnceArgs, FontArgs};
 
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "clap", derive(clap::Parser))]
-#[cfg_attr(feature = "clap", clap(name = "tinymist", author, version, about, long_version(LONG_VERSION.as_str())))]
+#[derive(Debug, Clone, clap::Parser)]
+#[clap(name = "tinymist", author, version, about, long_version(LONG_VERSION.as_str()))]
 pub struct CliArguments {
     /// Mode of the binary
-    #[cfg_attr(feature = "clap", clap(subcommand))]
+    #[clap(subcommand)]
     pub command: Option<Commands>,
 }
 
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "clap", derive(clap::Subcommand))]
+#[derive(Debug, Clone, clap::Subcommand)]
 pub enum Commands {
     /// Run Language Server
     Lsp(LspArgs),
@@ -32,23 +30,21 @@ impl Default for Commands {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "clap", derive(clap::Parser))]
+#[derive(Debug, Clone, Default, clap::Parser)]
 pub struct CompileArgs {
-    #[cfg_attr(feature = "clap", clap(long, default_value = "false"))]
+    #[clap(long, default_value = "false")]
     pub persist: bool,
-    #[cfg_attr(feature = "clap", clap(flatten))]
+    #[clap(flatten)]
     pub mirror: MirrorArgs,
-    #[cfg_attr(feature = "clap", clap(flatten))]
+    #[clap(flatten)]
     pub compile: CompileOnceArgs,
 }
 
-#[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "clap", derive(clap::Parser))]
+#[derive(Debug, Clone, Default, clap::Parser)]
 pub struct LspArgs {
-    #[cfg_attr(feature = "clap", clap(flatten))]
+    #[clap(flatten)]
     pub mirror: MirrorArgs,
-    #[cfg_attr(feature = "clap", clap(flatten))]
+    #[clap(flatten)]
     pub font: FontArgs,
 }
 
