@@ -60,6 +60,7 @@ fn main() -> anyhow::Result<()> {
             .filter_module("tinymist", Info)
             .filter_module("typst_preview", Debug)
             .filter_module("typst_ts", Info)
+            .filter_module("sync_lsp", Info)
             .filter_module("typst_ts_compiler::service::compile", Info)
             .filter_module("typst_ts_compiler::service::watch", Info)
             .try_init()
