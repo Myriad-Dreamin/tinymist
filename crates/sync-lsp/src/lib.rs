@@ -340,6 +340,13 @@ impl LspClient {
 
         Ok(Some(()))
     }
+
+    fn schedule_tail(&self, req_id: RequestId, resp: ScheduledResult) {
+        match resp {
+            Ok(Some(())) => {}
+            _ => self.respond(result_to_response(req_id, resp)),
+        }
+    }
 }
 
 type LspRawPureHandler<S, T> = fn(srv: &mut S, args: T) -> LspResult<()>;
@@ -641,10 +648,7 @@ where
                 };
 
                 let result = handler(s, &self.client, req.id.clone(), req.params);
-                match result {
-                    Ok(Some(())) => {}
-                    _ => self.client.respond(result_to_response(req.id, result)),
-                }
+                self.client.schedule_tail(req.id, result);
 
                 if is_shutdown {
                     self.state = State::ShuttingDown;
@@ -658,8 +662,8 @@ where
             ))),
         };
 
-        // todo: ignoring it
-        let _ = self.client.schedule(req_id, resp);
+        let result = self.client.schedule(req_id.clone(), resp);
+        self.client.schedule_tail(req_id, result);
     }
 
     /// The entry point for the `workspace/executeCommand` request.
@@ -686,7 +690,7 @@ where
             self.get_resources(req.id, arguments)
         } else {
             let Some(handler) = self.commands.get(command.as_str()) else {
-                log::error!("asked to execute unknown command");
+                log::error!("asked to execute unknown command: {command}");
                 return Err(method_not_found());
             };
             handler(s, &self.client, req.id, arguments)
