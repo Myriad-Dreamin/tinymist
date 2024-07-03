@@ -53,7 +53,6 @@ impl CompileState {
         let (doc_tx, doc_rx) = watch::channel(None);
         let (export_tx, export_rx) = mpsc::unbounded_channel();
         let (intr_tx, intr_rx) = mpsc::unbounded_channel();
-        let intr_tx_ = intr_tx.clone();
 
         // Run Export actors before preparing cluster to avoid loss of events
         self.client.handle.spawn(
@@ -85,6 +84,7 @@ impl CompileState {
             #[cfg(feature = "preview")]
             inner: std::sync::Arc::new(None),
             diag_group: editor_group.clone(),
+            intr_tx: intr_tx.clone(),
             doc_tx,
             export_tx: export_tx.clone(),
             editor_tx: self.editor_tx.clone(),
@@ -113,7 +113,7 @@ impl CompileState {
 
         // Create the client
         let config = self.config.clone();
-        let client = CompileClientActor::new(handle, config, entry, intr_tx_);
+        let client = CompileClientActor::new(handle, config, entry);
         // We do send memory changes instead of initializing compiler with them.
         // This is because there are state recorded inside of the compiler actor, and we
         // must update them.

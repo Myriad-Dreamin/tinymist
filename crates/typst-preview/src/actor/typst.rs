@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use await_tree::InstrumentAwait;
 
 use log::{debug, error, info};
@@ -27,7 +29,7 @@ pub enum TypstActorRequest {
 }
 
 pub struct TypstActor<T> {
-    client: T,
+    client: Arc<T>,
 
     mailbox: mpsc::UnboundedReceiver<TypstActorRequest>,
 
@@ -61,7 +63,7 @@ impl<T> TypstActor<T> {
     }
 
     pub fn new(
-        client: T,
+        client: Arc<T>,
         mailbox: mpsc::UnboundedReceiver<TypstActorRequest>,
         renderer_sender: broadcast::Sender<RenderActorRequest>,
         editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
