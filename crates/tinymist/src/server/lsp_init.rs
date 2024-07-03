@@ -218,7 +218,7 @@ impl From<&InitializeParams> for ConstConfig {
 }
 
 pub struct Init {
-    pub client: LspClient<LanguageState>,
+    pub client: TypedLspClient<LanguageState>,
     pub compile_opts: CompileFontOpts,
     pub exec_cmds: OnceLock<Vec<String>>,
 }
@@ -293,7 +293,7 @@ impl Initializer for Init {
         service.run_user_action_thread();
 
         let editor_actor = EditorActor::new(
-            self.client.clone(),
+            self.client.clone().to_untyped(),
             editor_rx,
             service.config.compile.notify_compile_status,
         );

@@ -1,7 +1,6 @@
 //! tinymist LSP mode
 
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use anyhow::{bail, Context};
 use futures::future::BoxFuture;
@@ -9,7 +8,6 @@ use log::{error, info, trace};
 use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
-use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::{
@@ -44,7 +42,7 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 /// The object providing the language server functionality.
 pub struct LanguageState {
     /// The lsp client
-    pub client: LspClient<Self>,
+    pub client: TypedLspClient<Self>,
 
     // State to synchronize with the client.
     /// Whether the server is shutting down.
@@ -90,7 +88,7 @@ pub struct LanguageState {
 impl LanguageState {
     /// Create a new language server.
     pub fn new(
-        client: LspClient<LanguageState>,
+        client: TypedLspClient<LanguageState>,
         const_config: ConstConfig,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
     ) -> Self {
@@ -100,12 +98,11 @@ impl LanguageState {
             const_config.tokens_multiline_token_support,
         );
 
-        let client2 = LspClient::new(client.handle.clone(), Arc::new(RwLock::new(None)));
         Self {
-            client,
+            client: client.clone(),
 
             primary: CompileState::new(
-                client2,
+                client.cast(|s| &mut s.primary),
                 Default::default(),
                 ConstCompileConfig {
                     position_encoding: const_config.position_encoding,

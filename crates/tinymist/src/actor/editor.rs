@@ -7,7 +7,7 @@ use lsp_types::{Diagnostic, Url};
 use tinymist_query::{DiagnosticsMap, LspDiagnostic};
 use tokio::sync::mpsc;
 
-use crate::{tools::word_count::WordsCount, LanguageState, LspClient};
+use crate::{tools::word_count::WordsCount, LspClient};
 
 pub enum EditorRequest {
     Diag(String, Option<DiagnosticsMap>),
@@ -16,7 +16,7 @@ pub enum EditorRequest {
 }
 
 pub struct EditorActor {
-    client: LspClient<LanguageState>,
+    client: LspClient,
     editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
 
     diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
@@ -27,7 +27,7 @@ pub struct EditorActor {
 
 impl EditorActor {
     pub fn new(
-        client: LspClient<LanguageState>,
+        client: LspClient,
         editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
         notify_compile_status: bool,
     ) -> Self {

@@ -92,7 +92,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
         let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender);
         LanguageState::install(LspBuilder::new(
             Init {
-                client: client.clone(),
+                client: client.to_typed(),
                 compile_opts: CompileFontOpts {
                     font_paths: args.font.font_paths.clone(),
                     ignore_system_fonts: args.font.ignore_system_fonts,
@@ -150,7 +150,7 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
         with_stdio_transport(args.mirror.clone(), |conn| {
             let sender = Arc::new(RwLock::new(Some(conn.sender)));
             let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender);
-            CompileState::install(LspBuilder::new(init(client.clone()), client))
+            CompileState::install(LspBuilder::new(init(client.to_typed()), client))
                 .build()
                 .start(conn.receiver, false)
         })?;
@@ -164,7 +164,7 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
 
             let _drop_guard = ForceDrop(sender);
 
-            let (mut service, res) = init(client).initialize(CompileInitializeParams {
+            let (mut service, res) = init(client.to_typed()).initialize(CompileInitializeParams {
                 config: serde_json::json!({
                     "rootPath": root_path,
                 }),

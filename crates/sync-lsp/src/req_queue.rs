@@ -1,3 +1,4 @@
+use core::fmt;
 use std::collections::HashMap;
 
 use serde::Serialize;
@@ -5,7 +6,6 @@ use serde::Serialize;
 use lsp_server::{ErrorCode, Request, RequestId, Response, ResponseError};
 
 /// Manages the set of pending requests, both incoming and outgoing.
-#[derive(Debug)]
 pub struct ReqQueue<I, O> {
     pub incoming: Incoming<I>,
     pub outgoing: Outgoing<O>,
@@ -22,6 +22,12 @@ impl<I, O> Default for ReqQueue<I, O> {
                 pending: HashMap::default(),
             },
         }
+    }
+}
+
+impl<I, O> fmt::Debug for ReqQueue<I, O> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ReqQueue").finish()
     }
 }
 
