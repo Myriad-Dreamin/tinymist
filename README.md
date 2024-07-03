@@ -99,3 +99,4 @@ Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for contribution guideli
 
 - Partially code is inherited from [typst-lsp](https://github.com/nvarner/typst-lsp)
 - The service [integrating](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#symbol-view) *offline* handwritten-stroke recognizer is powered by [Detypify](https://detypify.quarticcat.com/).
+- The service [integrating](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#preview) preview service is powered by [typst-preview](https://github.com/Enter-tainer/typst-preview).

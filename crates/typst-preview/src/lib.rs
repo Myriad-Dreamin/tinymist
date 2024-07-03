@@ -4,7 +4,10 @@ pub mod await_tree;
 mod debug_loc;
 mod outline;
 
-pub use actor::editor::CompileStatus;
+pub use actor::editor::{
+    CompileStatus, ControlPlaneMessage, ControlPlaneResponse, LspEditorConnection,
+};
+pub use outline::Outline;
 use tokio::sync::{broadcast, mpsc, watch};
 
 use std::{collections::HashMap, future::Future, path::PathBuf, sync::Arc};
@@ -22,14 +25,14 @@ use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_core::Error;
 use typst_ts_core::{ImmutStr, TypstDocument as Document};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DocToSrcJumpInfo {
     pub filepath: String,
     pub start: Option<(usize, usize)>, // row, column
     pub end: Option<(usize, usize)>,
 }
 
-use actor::editor::EditorActor;
+use actor::editor::{EditorActor, EditorConnection};
 use actor::typst::TypstActor;
 pub use args::*;
 
@@ -83,9 +86,16 @@ pub trait CompilationHandle: Send + 'static {
 }
 
 pub struct CompilationHandleImpl {
+    task_id: String,
     doc_sender: watch::Sender<Option<Arc<Document>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
     render_tx: broadcast::Sender<RenderActorRequest>,
+}
+
+impl CompilationHandleImpl {
+    pub fn task_id(&self) -> &str {
+        &self.task_id
+    }
 }
 
 impl CompilationHandle for CompilationHandleImpl {
@@ -117,9 +127,10 @@ impl CompilationHandle for CompilationHandleImpl {
 }
 
 pub struct Previewer {
-    frontend_html_factory: Box<dyn Fn(PreviewMode) -> ImmutStr>,
+    frontend_html_factory: Box<dyn Fn(PreviewMode) -> ImmutStr + Send + Sync>,
     data_plane_handle: tokio::task::JoinHandle<()>,
     control_plane_handle: tokio::task::JoinHandle<()>,
+    data_plane_port: u16,
 }
 
 impl Previewer {
@@ -128,11 +139,17 @@ impl Previewer {
         (self.frontend_html_factory)(mode)
     }
 
+    pub fn data_plane_port(&self) -> u16 {
+        self.data_plane_port
+    }
+
     /// Join the previewer actors.
-    // todo: close the actors
     pub async fn join(self) {
         let _ = tokio::join!(self.data_plane_handle, self.control_plane_handle);
     }
+
+    // todo: close the actors
+    pub async fn stop(&self) {}
 }
 
 pub type SourceLocation = typst_ts_core::debug_loc::SourceLocation;
@@ -188,6 +205,7 @@ pub trait CompileHost: SourceFileServer + EditorServer {}
 pub async fn preview<T: CompileHost + Send + Sync + 'static>(
     arguments: PreviewArgs,
     client: impl FnOnce(CompilationHandleImpl) -> Arc<T>,
+    lsp_connection: Option<LspEditorConnection>,
     html: &str,
 ) -> Previewer {
     let enable_partial_rendering = arguments.enable_partial_rendering;
@@ -207,6 +225,7 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
     // Set callback
     let doc_watcher = watch::channel::<Option<Arc<Document>>>(None);
     let client = client(CompilationHandleImpl {
+        task_id: "preview".to_owned(),
         doc_sender: doc_watcher.0,
         editor_tx: editor_conn.0.clone(),
         render_tx: renderer_mailbox.0.clone(),
@@ -307,22 +326,30 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
         let typst_tx = typst_mailbox.0.clone();
         let editor_rx = editor_conn.1;
         tokio::spawn(async move {
-            let try_socket = TcpListener::bind(&control_plane_addr)
-                .instrument_await("bind control plane server")
-                .await;
-            let listener = try_socket.expect("Failed to bind");
-            info!(
-                "Control plane server listening on: {}",
-                listener.local_addr().unwrap()
-            );
-            let (stream, _) = listener
-                .accept()
-                .instrument_await("accept control plane connection")
-                .await
-                .unwrap();
-            let conn = accept_connection(stream)
-                .instrument_await("accept control plane websocket connection")
-                .await;
+            let conn = if !control_plane_addr.is_empty() {
+                let try_socket = TcpListener::bind(&control_plane_addr)
+                    .instrument_await("bind control plane server")
+                    .await;
+                let listener = try_socket.expect("Failed to bind");
+                info!(
+                    "Control plane server listening on: {}",
+                    listener.local_addr().unwrap()
+                );
+                let (stream, _) = listener
+                    .accept()
+                    .instrument_await("accept control plane connection")
+                    .await
+                    .unwrap();
+
+                let conn = accept_connection(stream)
+                    .instrument_await("accept control plane websocket connection")
+                    .await;
+
+                EditorConnection::WebSocket(conn)
+            } else {
+                EditorConnection::Lsp(lsp_connection.unwrap())
+            };
+
             let editor_actor =
                 EditorActor::new(editor_rx, conn, typst_tx, webview_tx, span_interner);
             editor_actor
@@ -353,6 +380,7 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
         frontend_html_factory,
         data_plane_handle,
         control_plane_handle,
+        data_plane_port,
     }
 }
 

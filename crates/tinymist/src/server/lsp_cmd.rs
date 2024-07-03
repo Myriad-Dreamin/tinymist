@@ -91,11 +91,12 @@ impl LanguageState {
 
     #[cfg(feature = "preview")]
     pub fn start_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        use std::path::Path;
+
         use clap::Parser;
         use preview::PreviewCliArgs;
 
-        let path = get_arg!(args[0] as PathBuf);
-        let cli_args = get_arg_or_default!(args[1] as Vec<String>);
+        let cli_args = get_arg_or_default!(args[0] as Vec<String>);
         // clap parse
         let cli_args = ["preview"]
             .into_iter()
@@ -103,7 +104,31 @@ impl LanguageState {
         let cli_args =
             PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
 
-        self.preview.start(path, cli_args)
+        // todo: preview specific arguments are not used
+        let input = cli_args
+            .compile
+            .input
+            .clone()
+            .ok_or_else(|| internal_error("entry file must be provided"))?;
+        let input = Path::new(&input);
+        let entry = if input.is_absolute() {
+            input.into()
+        } else {
+            // std::env::current_dir().unwrap().join(input)
+            return Err(invalid_params("entry file must be absolute path"));
+        };
+
+        // todo: race condition
+        let handle = self.primary.compiler().handle.clone();
+        if handle.registered_preview() {
+            return Err(internal_error("preview is already running"));
+        }
+
+        // todo: recover pin status reliably
+        self.pin_entry(Some(entry))
+            .map_err(|e| internal_error(format!("could not pin file: {e}")))?;
+
+        self.preview.start(cli_args, handle)
     }
 
     #[cfg(feature = "preview")]
@@ -115,9 +140,10 @@ impl LanguageState {
 
     #[cfg(feature = "preview")]
     pub fn scroll_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        let req = get_arg!(args[0] as JsonValue);
+        let task_id = get_arg!(args[0] as String);
+        let req = get_arg!(args[1] as JsonValue);
 
-        self.preview.scroll(req)
+        self.preview.scroll(task_id, req)
     }
 
     /// Initialize a new template.

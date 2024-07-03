@@ -1,5 +1,6 @@
-use std::{borrow::Cow, net::SocketAddr, path::Path};
+use std::{borrow::Cow, collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
+use actor::typ_client::CompileHandler;
 use anyhow::Context;
 use await_tree::InstrumentAwait;
 use hyper::{
@@ -7,13 +8,17 @@ use hyper::{
     Error,
 };
 use log::{error, info};
+use lsp_types::notification::Notification;
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
+use tokio::sync::{mpsc, oneshot};
 use typst::foundations::{Str, Value};
 use typst_preview::{
     await_tree::{get_await_tree_async, REGISTRY},
-    preview, PreviewArgs, PreviewMode, Previewer,
+    preview, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo, LspEditorConnection,
+    PreviewArgs, PreviewMode, Previewer,
 };
 use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
 
@@ -26,6 +31,10 @@ pub struct PreviewCliArgs {
 
     #[clap(flatten)]
     pub compile: CompileOnceArgs,
+
+    /// Used by lsp for identifying the task.
+    #[clap(long = "task-id", value_name = "TASK_ID", hide(true))]
+    pub task_id: String,
 
     /// Preview mode
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
@@ -45,46 +54,190 @@ pub struct PreviewCliArgs {
     pub dont_open_in_browser: bool,
 }
 
-#[derive(Default)]
-pub struct PreviewState {}
+pub struct PreviewActor {
+    client: TypedLspClient<PreviewState>,
+    tabs: HashMap<String, PreviewTab>,
+    preview_rx: mpsc::UnboundedReceiver<PreviewRequest>,
+}
+
+impl PreviewActor {
+    pub async fn run(mut self) {
+        while let Some(req) = self.preview_rx.recv().await {
+            match req {
+                PreviewRequest::Started(tab) => {
+                    self.tabs.insert(tab.task_id.clone(), tab);
+                }
+                PreviewRequest::Kill(task_id, tx) => {
+                    if let Some(tab) = self.tabs.remove(&task_id) {
+                        tab.previewer.stop().await;
+                        let _ = tab.static_server_killer.send(());
+                        let client = self.client.clone();
+                        self.client.handle.spawn(async move {
+                            // Wait for previewer to stop
+                            tab.previewer.join().await;
+                            let _ = tab.static_server_handle.await;
+
+                            tab.cc.unregister_preview(tab.task_id);
+
+                            // Send response
+                            let _ = tx.send(Ok(JsonValue::Null));
+
+                            // Send global notification
+                            client.send_notification::<DisposePreview>(DisposePreview { task_id });
+                        });
+                    } else {
+                        let _ = tx.send(Err(internal_error("task not found")));
+                    }
+                }
+                PreviewRequest::Scroll(task_id, req) => {
+                    self.scroll(task_id, req).await;
+                }
+            }
+        }
+    }
+
+    async fn scroll(&mut self, task_id: String, req: ControlPlaneMessage) -> Option<()> {
+        let task = self.tabs.get(&task_id)?;
+
+        task.ctl_tx.send(req).ok()
+    }
+}
+
+pub struct PreviewState {
+    client: TypedLspClient<PreviewState>,
+
+    preview_tx: mpsc::UnboundedSender<PreviewRequest>,
+}
+
+impl PreviewState {
+    pub fn new(client: TypedLspClient<PreviewState>) -> Self {
+        let (preview_tx, preview_rx) = mpsc::unbounded_channel();
+
+        client.handle.spawn(
+            PreviewActor {
+                client: client.clone(),
+                tabs: HashMap::default(),
+                preview_rx,
+            }
+            .run(),
+        );
+
+        Self { client, preview_tx }
+    }
+}
+
+struct PreviewTab {
+    task_id: String,
+    previewer: Previewer,
+    static_server_killer: oneshot::Sender<()>,
+    static_server_handle: tokio::task::JoinHandle<()>,
+
+    ctl_tx: mpsc::UnboundedSender<ControlPlaneMessage>,
+
+    cc: Arc<CompileHandler>,
+}
+
+enum PreviewRequest {
+    Started(PreviewTab),
+    Kill(String, oneshot::Sender<LspResult<JsonValue>>),
+    Scroll(String, ControlPlaneMessage),
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StartPreviewResponse {
+    static_server_port: Option<u16>,
+    static_server_addr: Option<String>,
+    data_plane_port: Option<u16>,
+}
+
 impl PreviewState {
     pub fn start(
         &self,
-        path: std::path::PathBuf,
-        cli_args: PreviewCliArgs,
+        mut args: PreviewCliArgs,
+        cc: Arc<CompileHandler>,
     ) -> AnySchedulableResponse {
-        just_ok!(JsonValue::Null)
+        info!("Preview Arguments: {args:#?}");
+
+        args.preview.control_plane_host = String::default();
+
+        let (resp_tx, resp_rx) = mpsc::unbounded_channel();
+        let (ctl_tx, ctl_rx) = mpsc::unbounded_channel();
+        let editor_conn = LspEditorConnection { ctl_rx, resp_tx };
+
+        let chandle = cc.clone();
+        let previewer = preview(
+            args.preview,
+            move |handle| {
+                chandle.register_preview(handle);
+                chandle
+            },
+            Some(editor_conn),
+            TYPST_PREVIEW_HTML,
+        );
+
+        let client = self.client.clone();
+        self.client.handle.spawn(async move {
+            let mut resp_rx = resp_rx;
+            while let Some(resp) = resp_rx.recv().await {
+                use ControlPlaneResponse::*;
+
+                match resp {
+                    // ignoring compile status per task.
+                    CompileStatus(..) => {}
+                    SyncEditorChanges(..) => {
+                        log::warn!("preview is sending SyncEditorChanges in lsp mode");
+                    }
+                    EditorScrollTo(s) => client.send_notification::<ScrollSource>(s),
+                    Outline(s) => client.send_notification::<NotifDocumentOutline>(s),
+                }
+            }
+
+            info!("PreviewState: Response channel closed");
+        });
+
+        let preview_tx = self.preview_tx.clone();
+        just_future!(async move {
+            let previewer = previewer.await;
+
+            let (static_server_addr, static_server_killer, static_server_handle) =
+                make_static_host(&previewer, args.static_file_host, args.preview_mode);
+            info!("Static file server listening on: {}", static_server_addr);
+
+            let resp = StartPreviewResponse {
+                static_server_port: Some(static_server_addr.port()),
+                static_server_addr: Some(static_server_addr.to_string()),
+                data_plane_port: Some(previewer.data_plane_port()),
+            };
+
+            let sent = preview_tx.send(PreviewRequest::Started(PreviewTab {
+                task_id: args.task_id.clone(),
+                previewer,
+                static_server_killer,
+                static_server_handle,
+                ctl_tx,
+                cc,
+            }));
+            sent.map_err(|_| internal_error("failed to register preview tab"))?;
+
+            Ok(serde_json::to_value(resp).unwrap())
+        })
     }
 
     pub fn kill(&self, task_id: String) -> AnySchedulableResponse {
-        just_ok!(JsonValue::Null)
+        let (tx, rx) = oneshot::channel();
+
+        let sent = self.preview_tx.send(PreviewRequest::Kill(task_id, tx));
+        sent.map_err(|_| internal_error("failed to send kill request"))?;
+
+        just_future!(async move { rx.await.map_err(|_| internal_error("cancelled"))? })
     }
 
-    pub fn scroll(&self, req: JsonValue) -> AnySchedulableResponse {
-        // That's very unfortunate that sourceScrollBySpan doesn't work well.
-        // interface SourceScrollBySpanRequest {
-        //     taskId: string;
-        //     event: "sourceScrollBySpan";
-        //     span: string;
-        // }
+    pub fn scroll(&self, task_id: String, req: JsonValue) -> AnySchedulableResponse {
+        let req = serde_json::from_value(req).map_err(|e| internal_error(e.to_string()))?;
 
-        // interface ScrollByPositionRequest {
-        //     taskId: string;
-        //     event: "panelScrollByPosition" | "sourceScrollByPosition";
-        //     position: any;
-        // }
-
-        // interface ScrollRequest {
-        //     taskId: string;
-        //     event: "panelScrollTo" | "changeCursorPosition";
-        //     filepath: string;
-        //     line: any;
-        //     character: any;
-        // }
-
-        // export async function commandScrollPreview(req: any): Promise<void> {
-        //         arguments: [req],
-        // }
+        let sent = self.preview_tx.send(PreviewRequest::Scroll(task_id, req));
+        sent.map_err(|_| internal_error("failed to send scroll request"))?;
 
         just_ok!(JsonValue::Null)
     }
@@ -100,7 +253,7 @@ pub fn make_static_host(
     previewer: &Previewer,
     static_file_addr: String,
     mode: PreviewMode,
-) -> (SocketAddr, tokio::task::JoinHandle<()>) {
+) -> (SocketAddr, oneshot::Sender<()>, tokio::task::JoinHandle<()>) {
     let frontend_html = previewer.frontend_html(mode);
     let make_service = make_service_fn(move |_| {
         let html = frontend_html.clone();
@@ -131,14 +284,19 @@ pub fn make_static_host(
         }
     });
     let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
-
     let addr = server.local_addr();
+
+    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    let graceful = server.with_graceful_shutdown(async {
+        rx.await.ok();
+    });
+
     let join_handle = tokio::spawn(async move {
-        if let Err(e) = server.await {
+        if let Err(e) = graceful.await {
             error!("Static file server error: {}", e);
         }
     });
-    (addr, join_handle)
+    (addr, tx, join_handle)
 }
 
 /// Entry point.
@@ -202,6 +360,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
 
             compile_server.spawn().unwrap()
         },
+        None,
         TYPST_PREVIEW_HTML,
     );
     let previewer = async_root
@@ -211,7 +370,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
 
     let static_file_addr = args.static_file_host;
     let mode = args.preview_mode;
-    let (static_server_addr, static_server_handle) =
+    let (static_server_addr, _, static_server_handle) =
         make_static_host(&previewer, static_file_addr, mode);
     info!("Static file server listening on: {}", static_server_addr);
     if !args.dont_open_in_browser {
@@ -222,4 +381,28 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let _ = tokio::join!(previewer.join(), static_server_handle);
 
     Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+struct DisposePreview {
+    task_id: String,
+}
+
+impl Notification for DisposePreview {
+    type Params = Self;
+    const METHOD: &'static str = "tinymist/preview/dispose";
+}
+
+struct ScrollSource;
+
+impl Notification for ScrollSource {
+    type Params = DocToSrcJumpInfo;
+    const METHOD: &'static str = "tinymist/preview/scrollSource";
+}
+
+struct NotifDocumentOutline;
+
+impl Notification for NotifDocumentOutline {
+    type Params = typst_preview::Outline;
+    const METHOD: &'static str = "tinymist/documentOutline";
 }

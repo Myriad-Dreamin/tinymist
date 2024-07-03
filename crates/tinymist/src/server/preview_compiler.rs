@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use await_tree::InstrumentAwait;
 
+use parking_lot::lock_api::RwLock;
 use tinymist_query::analysis::Analysis;
 use tinymist_query::PositionEncoding;
 use tokio::sync::{mpsc, watch};
@@ -29,7 +30,7 @@ impl CompileServer {
         let (intr_tx, intr_rx) = mpsc::unbounded_channel();
 
         let handle = Arc::new(CompileHandler {
-            inner: std::sync::Arc::new(Some(cb)),
+            inner: std::sync::Arc::new(RwLock::new(Some(cb))),
             diag_group: "main".to_owned(),
             intr_tx: intr_tx.clone(),
             doc_tx,

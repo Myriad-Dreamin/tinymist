@@ -34,7 +34,7 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use log::{error, info, trace};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnalysisResources},
     DiagnosticsMap, ExportKind, ServerInfoResponse, VersionedDocument,
@@ -77,7 +77,7 @@ pub struct CompileHandler {
     pub(crate) periscope: PeriscopeRenderer,
 
     #[cfg(feature = "preview")]
-    pub(crate) inner: Arc<Option<typst_preview::CompilationHandleImpl>>,
+    pub(crate) inner: Arc<RwLock<Option<typst_preview::CompilationHandleImpl>>>,
 
     pub(crate) intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
     pub(crate) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
@@ -211,6 +211,26 @@ impl CompileHandler {
         let mut analysis = self.analysis.snapshot(root, &w);
         Ok(f(&mut analysis))
     }
+
+    #[cfg(feature = "preview")]
+    pub fn register_preview(&self, handle: typst_preview::CompilationHandleImpl) {
+        // todo: conflict detection
+        *self.inner.write() = Some(handle);
+    }
+
+    #[cfg(feature = "preview")]
+    pub fn unregister_preview(&self, task_id: String) {
+        let mut p = self.inner.write();
+        if p.as_ref().is_some_and(|p| p.task_id() == task_id) {
+            *p = None;
+        }
+    }
+
+    // todo: multiple preview support
+    #[cfg(feature = "preview")]
+    pub fn registered_preview(&self) -> bool {
+        self.inner.read().is_some()
+    }
 }
 
 impl PreviewCompilationHandle for CompileHandler {
@@ -223,7 +243,7 @@ impl PreviewCompilationHandle for CompileHandler {
             .unwrap();
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.inner.as_ref() {
+        if let Some(inner) = self.inner.read().as_ref() {
             inner.status(_status);
         }
     }
@@ -246,7 +266,7 @@ impl PreviewCompilationHandle for CompileHandler {
             .unwrap();
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.inner.as_ref() {
+        if let Some(inner) = self.inner.read().as_ref() {
             inner.notify_compile(res);
         }
     }

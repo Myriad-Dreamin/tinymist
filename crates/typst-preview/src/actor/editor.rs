@@ -43,9 +43,81 @@ pub enum EditorActorRequest {
     CompileStatus(CompileStatus),
 }
 
+pub struct LspEditorConnection {
+    pub resp_tx: mpsc::UnboundedSender<ControlPlaneResponse>,
+    pub ctl_rx: mpsc::UnboundedReceiver<ControlPlaneMessage>,
+}
+
+pub enum EditorConnection {
+    WebSocket(WebSocketStream<TcpStream>),
+    Lsp(LspEditorConnection),
+}
+
+impl EditorConnection {
+    fn need_sync_files(&self) -> bool {
+        matches!(self, EditorConnection::WebSocket(_))
+    }
+
+    async fn sync_editor_changes(&mut self) {
+        let EditorConnection::WebSocket(ws) = self else {
+            return;
+        };
+
+        let Ok(_) = ws
+            .send(Message::Text(
+                serde_json::to_string(&ControlPlaneResponse::SyncEditorChanges(())).unwrap(),
+            ))
+            .instrument_await("sync editor changes")
+            .await
+        else {
+            warn!("failed to send sync editor changes to editor");
+            return;
+        };
+    }
+
+    async fn resp_ctl_plane(&mut self, loc: &str, resp: ControlPlaneResponse) -> bool {
+        let sent = match self {
+            EditorConnection::WebSocket(ws) => ws
+                .send(Message::Text(serde_json::to_string(&resp).unwrap()))
+                .instrument_await("send response to editor")
+                .await
+                .is_ok(),
+            EditorConnection::Lsp(LspEditorConnection { resp_tx, .. }) => {
+                resp_tx.send(resp).is_ok()
+            }
+        };
+
+        if !sent {
+            warn!("failed to send {loc} response to editor");
+        }
+
+        sent
+    }
+
+    async fn next(&mut self) -> Option<ControlPlaneMessage> {
+        match self {
+            EditorConnection::Lsp(LspEditorConnection { ctl_rx, .. }) => ctl_rx.recv().await,
+            EditorConnection::WebSocket(ws) => {
+                let Some(Ok(Message::Text(msg))) =
+                    ws.next().instrument_await("waiting for websocket").await
+                else {
+                    return None;
+                };
+
+                let Ok(msg) = serde_json::from_str::<ControlPlaneMessage>(&msg) else {
+                    warn!("failed to parse control plane request: {msg:?}");
+                    return None;
+                };
+
+                Some(msg)
+            }
+        }
+    }
+}
+
 pub struct EditorActor {
     mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
-    editor_websocket_conn: WebSocketStream<TcpStream>,
+    editor_conn: EditorConnection,
 
     world_sender: mpsc::UnboundedSender<TypstActorRequest>,
     webview_sender: broadcast::Sender<WebviewActorRequest>,
@@ -55,7 +127,7 @@ pub struct EditorActor {
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "event")]
-enum ControlPlaneMessage {
+pub enum ControlPlaneMessage {
     #[serde(rename = "changeCursorPosition")]
     ChangeCursorPosition(ChangeCursorPositionRequest),
     #[serde(rename = "panelScrollTo")]
@@ -74,7 +146,7 @@ enum ControlPlaneMessage {
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "event")]
-enum ControlPlaneResponse {
+pub enum ControlPlaneResponse {
     #[serde(rename = "editorScrollTo")]
     EditorScrollTo(DocToSrcJumpInfo),
     #[serde(rename = "syncEditorChanges")]
@@ -88,14 +160,14 @@ enum ControlPlaneResponse {
 impl EditorActor {
     pub fn new(
         mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
-        editor_websocket_conn: WebSocketStream<TcpStream>,
+        editor_websocket_conn: EditorConnection,
         world_sender: mpsc::UnboundedSender<TypstActorRequest>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
         span_interner: SpanInterner,
     ) -> Self {
         Self {
             mailbox,
-            editor_websocket_conn,
+            editor_conn: editor_websocket_conn,
             world_sender,
             webview_sender,
 
@@ -112,60 +184,38 @@ impl EditorActor {
     }
 
     async fn run_instrumented(mut self) {
-        self.editor_websocket_conn
-            .send(Message::Text(
-                serde_json::to_string(&ControlPlaneResponse::SyncEditorChanges(())).unwrap(),
-            ))
-            .instrument_await("sync editor changes")
-            .await
-            .unwrap();
+        if self.editor_conn.need_sync_files() {
+            self.editor_conn.sync_editor_changes().await;
+        }
+
         loop {
             tokio::select! {
                 Some(msg) = self.mailbox.recv().instrument_await("waiting for mailbox") => {
                     trace!("EditorActor: received message from mailbox: {:?}", msg);
-                    match msg {
+                   let sent = match msg {
                         EditorActorRequest::DocToSrcJump(jump_info) => {
-                            let Ok(_) = self.editor_websocket_conn.send(Message::Text(
-                                serde_json::to_string(&ControlPlaneResponse::EditorScrollTo(jump_info)).unwrap(),
-                            ))
-                            .instrument_await("send DocToSrcJump message to editor")
-                            .await else {
-                                warn!("EditorActor: failed to send DocToSrcJump message to editor");
-                                break;
-                            };
+                            self.editor_conn.resp_ctl_plane("DocToSrcJump", ControlPlaneResponse::EditorScrollTo(jump_info)).await
                         },
                         EditorActorRequest::DocToSrcJumpResolve(req) => {
                             self.source_scroll_by_span(req.span)
                                 .instrument_await("source scroll by span")
                                 .await;
+
+                            false
                         },
                         EditorActorRequest::CompileStatus(status) => {
-                            let Ok(_) = self.editor_websocket_conn.send(Message::Text(
-                                serde_json::to_string(&ControlPlaneResponse::CompileStatus(status)).unwrap(),
-                            ))
-                                .instrument_await("send CompileStatus message to editor")
-                                .await else {
-                                warn!("EditorActor: failed to send CompileStatus message to editor");
-                                break;
-                            };
+                            self.editor_conn.resp_ctl_plane("CompileStatus", ControlPlaneResponse::CompileStatus(status)).await
                         },
                         EditorActorRequest::Outline(outline) => {
-                            let Ok(_) = self.editor_websocket_conn.send(Message::Text(
-                                serde_json::to_string(&ControlPlaneResponse::Outline(outline)).unwrap(),
-                            ))
-                                .instrument_await("send Outline message to editor")
-                                .await else {
-                                warn!("EditorActor: failed to send Outline message to editor");
-                                break;
-                            };
+                            self.editor_conn.resp_ctl_plane("Outline", ControlPlaneResponse::Outline(outline)).await
                         }
+                    };
+
+                    if !sent {
+                        break;
                     }
                 }
-                Some(Ok(Message::Text(msg))) = self.editor_websocket_conn.next().instrument_await("waiting for websocket") => {
-                    let Ok(msg) = serde_json::from_str::<ControlPlaneMessage>(&msg) else {
-                        warn!("failed to parse jump request: {:?}", msg);
-                        continue;
-                    };
+                Some(msg) = self.editor_conn.next().instrument_await("waiting for websocket") => {
                     match msg {
                         ControlPlaneMessage::ChangeCursorPosition(cursor_info) => {
                             debug!("EditorActor: received message from editor: {:?}", cursor_info);
@@ -202,8 +252,13 @@ impl EditorActor {
                 }
             }
         }
-        info!("EditorActor: ws disconnected, shutting down whole program");
-        std::process::exit(0);
+
+        info!("EditorActor: editor disconnected");
+
+        if !matches!(self.editor_conn, EditorConnection::Lsp(_)) {
+            info!("EditorActor: shutting down whole program");
+            std::process::exit(0);
+        }
     }
 
     async fn source_scroll_by_span(&mut self, span: String) {

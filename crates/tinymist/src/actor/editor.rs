@@ -196,7 +196,3 @@ impl lsp_types::notification::Notification for TinymistCompileStatus {
     type Params = Self;
     const METHOD: &'static str = "tinymist/compileStatus";
 }
-
-// tinymist/documentOutline
-// tinymist/preview/scrollSource
-// tinymist/preview/dispose

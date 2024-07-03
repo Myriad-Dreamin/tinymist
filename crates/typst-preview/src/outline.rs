@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use typst::foundations::{Content, NativeElement, Packed, StyleChain};
 use typst::introspection::Introspector;
 use typst::model::HeadingElem;
@@ -122,12 +122,12 @@ impl HeadingNode {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Outline {
     items: Vec<OutlineItem>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct OutlineItem {
     /// Plain text title.
     title: String,

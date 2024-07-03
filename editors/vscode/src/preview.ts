@@ -97,7 +97,7 @@ export async function launchPreviewInWebView({
     context: vscode.ExtensionContext;
     task: LaunchInWebViewTask;
     activeEditor: vscode.TextEditor;
-    dataPlanePort: string;
+    dataPlanePort: string | number;
     panelDispose: () => void;
 }) {
     const basename = path.basename(activeEditor.document.fileName);
@@ -167,8 +167,8 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         ];
     const enableCursor =
         vscode.workspace.getConfiguration().get<boolean>("typst-preview.cursorIndicator") || false;
-    const { dataPlanePort } = await launchCommand();
-    if (!dataPlanePort) {
+    const { dataPlanePort, staticServerPort } = await launchCommand();
+    if (!dataPlanePort || !staticServerPort) {
         throw new Error(`Failed to launch preview ${filePath}`);
     }
     const disposes = new DisposeList();
@@ -196,7 +196,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             break;
         }
         case "browser": {
-            vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${dataPlanePort}`));
+            vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${staticServerPort}`));
             break;
         }
     }
@@ -211,6 +211,9 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         if (activeTask.get(bindDocument)?.taskId === taskId) {
             activeTask.delete(bindDocument);
         }
+
+        // todo: better way to unpin main
+        vscode.commands.executeCommand("tinymist.unpinMain");
     });
 
     async function launchCommand() {
@@ -225,12 +228,14 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             .get<string>("typst-preview.invertColors");
         const invertColorsArgs = ivArgs ? ["--invert-colors", ivArgs] : [];
         const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
-        const { dataPlanePort } = await commandStartPreview(filePath, [
+        const { dataPlanePort, staticServerPort } = await commandStartPreview([
             "preview",
             "--task-id",
             taskId,
             "--refresh-style",
             refreshStyle,
+            "--data-plane-host",
+            "127.0.0.1:0",
             "--static-file-host",
             "127.0.0.1:0",
             ...partialRenderingArgs,
@@ -241,7 +246,9 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             ...codeGetCliFontArgs(),
             filePath,
         ]);
-        console.log(`Launched preview, static file port:${dataPlanePort}`);
+        console.log(
+            `Launched preview, data plane port:${dataPlanePort}, static server port:${staticServerPort}`
+        );
 
         if (enableCursor) {
             reportPosition(activeEditor, "changeCursorPosition");
@@ -275,7 +282,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             disposes.add(vscode.window.onDidChangeTextEditorSelection(src2docHandler, 500));
         }
 
-        return { dataPlanePort };
+        return { staticServerPort, dataPlanePort };
     }
 
     async function reportPosition(
@@ -284,12 +291,11 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     ) {
         const scrollRequest: ScrollRequest = {
             event,
-            taskId,
             filepath: editorToReport.document.uri.fsPath,
             line: editorToReport.selection.active.line,
             character: editorToReport.selection.active.character,
         };
-        scrollPreviewPanel(scrollRequest);
+        scrollPreviewPanel(taskId, scrollRequest);
     }
 }
 
@@ -303,17 +309,15 @@ async function revealDocumentLsp(args: any) {
 
         if (args.span) {
             // That's very unfortunate that sourceScrollBySpan doesn't work well.
-            scrollPreviewPanel({
+            scrollPreviewPanel(t.taskId, {
                 event: "sourceScrollBySpan",
-                taskId: t.taskId,
                 span: args.span,
             });
         }
         if (args.position) {
             // todo: tagging document
-            scrollPreviewPanel({
+            scrollPreviewPanel(t.taskId, {
                 event: "panelScrollByPosition",
-                taskId: t.taskId,
                 position: args.position,
             });
         }
@@ -334,30 +338,26 @@ async function panelSyncScrollLsp(args: any) {
 
         const scrollRequest: ScrollRequest = {
             event: "panelScrollTo",
-            taskId: t.taskId,
             filepath: activeEditor.document.uri.fsPath,
             line: activeEditor.selection.active.line,
             character: activeEditor.selection.active.character,
         };
-        scrollPreviewPanel(scrollRequest);
+        scrollPreviewPanel(t.taskId, scrollRequest);
     }
 }
 
 // That's very unfortunate that sourceScrollBySpan doesn't work well.
 interface SourceScrollBySpanRequest {
-    taskId: string;
     event: "sourceScrollBySpan";
     span: string;
 }
 
 interface ScrollByPositionRequest {
-    taskId: string;
-    event: "panelScrollByPosition" | "sourceScrollByPosition";
+    event: "panelScrollByPosition";
     position: any;
 }
 
 interface ScrollRequest {
-    taskId: string;
     event: "panelScrollTo" | "changeCursorPosition";
     filepath: string;
     line: any;
@@ -366,7 +366,7 @@ interface ScrollRequest {
 
 type DocRequests = SourceScrollBySpanRequest | ScrollByPositionRequest | ScrollRequest;
 
-async function scrollPreviewPanel(scrollRequest: DocRequests) {
+async function scrollPreviewPanel(taskId: string, scrollRequest: DocRequests) {
     if ("filepath" in scrollRequest) {
         const filepath = scrollRequest.filepath;
         if (filepath.includes("extension-output")) {
@@ -375,7 +375,7 @@ async function scrollPreviewPanel(scrollRequest: DocRequests) {
         }
     }
 
-    commandScrollPreview(scrollRequest);
+    commandScrollPreview(taskId, scrollRequest);
 }
 
 let resolveContentPreviewProvider: (value: ContentPreviewProvider) => void = () => {};

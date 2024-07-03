@@ -650,7 +650,7 @@ interface SourceScrollBySpanRequest {
 }
 
 interface ScrollByPositionRequest {
-    event: "panelScrollByPosition" | "sourceScrollByPosition";
+    event: "panelScrollByPosition";
     position: any;
 }
 

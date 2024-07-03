@@ -287,7 +287,7 @@
                     ]
                 },
                 "typst-preview.pinPreviewFile": {
-                    "description": "Declare current previewing file as entrypoint for typst-lsp. This will make typst-lsp to use this file as entrypoint instead of the file opened in vscode. This can improve diagnostics messages and auto completion but still being experimental.",
+                    "description": "Declare current previewing file as entrypoint for typst-lsp or tinymist. This will make typst-lsp or tinymist to use this file as entrypoint instead of the file opened in vscode. This can improve diagnostics messages and auto completion but still being experimental.",
                     "type": "boolean",
                     "default": false
                 }

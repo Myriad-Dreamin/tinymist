@@ -439,7 +439,9 @@ async function commandShow(kind: string, extraOpts?: any): Promise<void> {
 }
 
 export interface PreviewResult {
-    dataPlanePort?: string;
+    staticServerPort?: number;
+    staticServerAddr?: string;
+    dataPlanePort?: number;
 }
 
 const previewDisposes: Record<string, () => void> = {};
@@ -453,13 +455,10 @@ export function registerPreviewTaskDispose(taskId: string, dl: DisposeList): voi
     previewDisposes[taskId] = () => dl.dispose();
 }
 
-export async function commandStartPreview(
-    filePath: string,
-    previewArgs?: string[]
-): Promise<PreviewResult> {
+export async function commandStartPreview(previewArgs: string[]): Promise<PreviewResult> {
     const res = await client?.sendRequest<PreviewResult>("workspace/executeCommand", {
         command: `tinymist.doStartPreview`,
-        arguments: [filePath, previewArgs || []],
+        arguments: [previewArgs],
     });
     return res || {};
 }
@@ -471,10 +470,10 @@ export async function commandKillPreview(taskId: string): Promise<void> {
     });
 }
 
-export async function commandScrollPreview(req: any): Promise<void> {
+export async function commandScrollPreview(taskId: string, req: any): Promise<void> {
     return await client?.sendRequest("workspace/executeCommand", {
         command: `tinymist.scrollPreview`,
-        arguments: [req],
+        arguments: [taskId, req],
     });
 }
 

@@ -112,7 +112,7 @@ impl LanguageState {
                 },
                 editor_tx,
             ),
-            preview: PreviewState::default(),
+            preview: PreviewState::new(client.cast(|s| &mut s.preview)),
             dedicates: Vec::new(),
             shutdown_requested: false,
             ever_focusing_by_activities: false,
