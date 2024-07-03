@@ -143,7 +143,7 @@ impl LanguageState {
         let (tx_req, rx_req) = crossbeam_channel::unbounded();
         self.format_thread = Some(tx_req);
 
-        let client = self.client.clone();
+        let client = self.client.clone().to_untyped();
         let mode = self.config.formatter;
         let enc = self.const_config.position_encoding;
         let config = format::FormatConfig { mode, width: 120 };
@@ -159,7 +159,7 @@ impl LanguageState {
         let (tx_req, rx_req) = crossbeam_channel::unbounded();
         self.user_action_thread = Some(tx_req);
 
-        let client = self.client.clone();
+        let client = self.client.clone().to_untyped();
         std::thread::spawn(move || run_user_action_thread(rx_req, client));
     }
 }

@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -17,7 +18,7 @@ use tinymist_query::CompilerQueryResponse;
 pub mod req_queue;
 pub mod transport;
 
-pub type ReqHandler<S> = for<'a> fn(&'a mut S, lsp_server::Response);
+pub type ReqHandler<S> = Box<dyn for<'a> FnOnce(&'a mut S, lsp_server::Response) + Send + Sync>;
 type ReqQueue<S> = req_queue::ReqQueue<(String, Instant), ReqHandler<S>>;
 
 pub type LspResult<Res> = Result<Res, ResponseError>;
@@ -68,17 +69,67 @@ macro_rules! reschedule {
     };
 }
 
+type AnyCaster<S> = Arc<dyn Fn(&mut dyn Any) -> &mut S + Send + Sync>;
+
+pub struct TypedLspClient<S> {
+    client: LspClient,
+    caster: AnyCaster<S>,
+}
+
+impl<S> Clone for TypedLspClient<S> {
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            caster: self.caster.clone(),
+        }
+    }
+}
+
+impl<S> std::ops::Deref for TypedLspClient<S> {
+    type Target = LspClient;
+
+    fn deref(&self) -> &Self::Target {
+        &self.client
+    }
+}
+
+impl<S> TypedLspClient<S> {
+    pub fn to_untyped(self) -> LspClient {
+        self.client
+    }
+}
+
+impl<S: 'static> TypedLspClient<S> {
+    pub fn cast<T: 'static>(&self, f: fn(&mut S) -> &mut T) -> TypedLspClient<T> {
+        let caster = self.caster.clone();
+        TypedLspClient {
+            client: self.client.clone(),
+            caster: Arc::new(move |s| f(caster(s))),
+        }
+    }
+
+    pub fn send_request<R: lsp_types::request::Request>(
+        &self,
+        params: R::Params,
+        handler: impl FnOnce(&mut S, lsp_server::Response) + Send + Sync + 'static,
+    ) {
+        let caster = self.caster.clone();
+        self.client
+            .send_request_::<R>(params, move |s, resp| handler(caster(s), resp))
+    }
+}
+
 /// The host for the language server, or known as the LSP client.
 #[derive(Debug)]
-pub struct LspClient<S> {
+pub struct LspClient {
     /// The tokio handle.
     pub handle: tokio::runtime::Handle,
 
     sender: Arc<RwLock<Option<crossbeam_channel::Sender<Message>>>>,
-    req_queue: Arc<Mutex<ReqQueue<S>>>,
+    req_queue: Arc<Mutex<ReqQueue<dyn Any>>>,
 }
 
-impl<S> Clone for LspClient<S> {
+impl Clone for LspClient {
     fn clone(&self) -> Self {
         Self {
             handle: self.handle.clone(),
@@ -88,7 +139,7 @@ impl<S> Clone for LspClient<S> {
     }
 }
 
-impl<S> LspClient<S> {
+impl LspClient {
     /// Creates a new language server host.
     pub fn new(
         handle: tokio::runtime::Handle,
@@ -101,6 +152,13 @@ impl<S> LspClient<S> {
         }
     }
 
+    pub fn to_typed<S: Any>(&self) -> TypedLspClient<S> {
+        TypedLspClient {
+            client: self.clone(),
+            caster: Arc::new(|s| s.downcast_mut().unwrap()),
+        }
+    }
+
     fn force_drop(&self) -> ForceDrop<crossbeam_channel::Sender<Message>> {
         ForceDrop(self.sender.clone())
     }
@@ -109,10 +167,10 @@ impl<S> LspClient<S> {
         self.req_queue.lock().incoming.has_pending()
     }
 
-    pub fn send_request<R: lsp_types::request::Request>(
+    pub fn send_request_<R: lsp_types::request::Request>(
         &self,
         params: R::Params,
-        handler: ReqHandler<S>,
+        handler: impl FnOnce(&mut dyn Any, lsp_server::Response) + Send + Sync + 'static,
     ) {
         let mut req_queue = self.req_queue.lock();
         let sender = self.sender.read();
@@ -122,14 +180,14 @@ impl<S> LspClient<S> {
         };
         let request = req_queue
             .outgoing
-            .register(R::METHOD.to_owned(), params, handler);
+            .register(R::METHOD.to_owned(), params, Box::new(handler));
         let Err(res) = sender.send(request.into()) else {
             return;
         };
         log::warn!("failed to send request: {res:?}");
     }
 
-    pub fn complete_request(&self, service: &mut S, response: lsp_server::Response) {
+    pub fn complete_request<S: Any>(&self, service: &mut S, response: lsp_server::Response) {
         let mut req_queue = self.req_queue.lock();
         let Some(handler) = req_queue.outgoing.complete(response.id.clone()) else {
             log::warn!("received response for unknown request");
@@ -211,11 +269,14 @@ impl<S> LspClient<S> {
 
     // todo: handle error
     pub fn register_capability(&self, registrations: Vec<Registration>) -> anyhow::Result<()> {
-        self.send_request::<RegisterCapability>(RegistrationParams { registrations }, |_, resp| {
-            if let Some(err) = resp.error {
-                log::error!("failed to register capability: {err:?}");
-            }
-        });
+        self.send_request_::<RegisterCapability>(
+            RegistrationParams { registrations },
+            |_, resp| {
+                if let Some(err) = resp.error {
+                    log::error!("failed to register capability: {err:?}");
+                }
+            },
+        );
         Ok(())
     }
 
@@ -223,7 +284,7 @@ impl<S> LspClient<S> {
         &self,
         unregisterations: Vec<Unregistration>,
     ) -> anyhow::Result<()> {
-        self.send_request::<UnregisterCapability>(
+        self.send_request_::<UnregisterCapability>(
             UnregistrationParams { unregisterations },
             |_, resp| {
                 if let Some(err) = resp.error {
@@ -235,8 +296,8 @@ impl<S> LspClient<S> {
     }
 }
 
-impl<S: 'static> LspClient<S> {
-    pub fn schedule_query(&mut self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
+impl LspClient {
+    pub fn schedule_query(&self, req_id: RequestId, query_fut: QueryFuture) -> ScheduledResult {
         let fut = query_fut.map_err(|e| internal_error(e.to_string()))?;
         let fut: AnySchedulableResponse = Ok(match fut {
             MaybeDone::Done(res) => MaybeDone::Done(
@@ -284,7 +345,7 @@ impl<S: 'static> LspClient<S> {
 type LspRawPureHandler<S, T> = fn(srv: &mut S, args: T) -> LspResult<()>;
 type LspRawHandler<S, T> = fn(srv: &mut S, req_id: RequestId, args: T) -> ScheduledResult;
 type LspBoxPureHandler<S, T> = Box<dyn Fn(&mut S, T) -> LspResult<()>>;
-type LspBoxHandler<S, T> = Box<dyn Fn(&mut S, &LspClient<S>, RequestId, T) -> ScheduledResult>;
+type LspBoxHandler<S, T> = Box<dyn Fn(&mut S, &LspClient, RequestId, T) -> ScheduledResult>;
 type ExecuteCmdMap<S> = HashMap<&'static str, LspBoxHandler<S, Vec<JsonValue>>>;
 type RegularCmdMap<S> = HashMap<&'static str, LspBoxHandler<S, JsonValue>>;
 type NotifyCmdMap<S> = HashMap<&'static str, LspBoxPureHandler<S, JsonValue>>;
@@ -299,7 +360,7 @@ pub trait Initializer {
 
 pub struct LspBuilder<Args: Initializer> {
     pub args: Args,
-    pub client: LspClient<Args::S>,
+    pub client: LspClient,
     pub exec_cmds: ExecuteCmdMap<Args::S>,
     pub notify_cmds: NotifyCmdMap<Args::S>,
     pub regular_cmds: RegularCmdMap<Args::S>,
@@ -310,7 +371,7 @@ impl<Args: Initializer> LspBuilder<Args>
 where
     Args::S: 'static,
 {
-    pub fn new(args: Args, client: LspClient<Args::S>) -> Self {
+    pub fn new(args: Args, client: LspClient) -> Self {
         Self {
             args,
             client,
@@ -453,7 +514,7 @@ pub struct LspDriver<Args: Initializer> {
     /// State to synchronize with the client.
     state: State<Args, Args::S>,
     /// The language server client.
-    pub client: LspClient<Args::S>,
+    pub client: LspClient,
 
     // Handle maps
     /// Extra commands provided with `textDocument/executeCommand`.

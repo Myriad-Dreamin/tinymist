@@ -379,7 +379,7 @@ pub struct ConstCompileConfig {
 }
 
 pub struct CompileInit {
-    pub client: LspClient<CompileState>,
+    pub client: TypedLspClient<CompileState>,
     pub font: CompileFontOpts,
     pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
 }

@@ -19,7 +19,7 @@ use crate::{
 /// The object providing the language server functionality.
 pub struct CompileState {
     /// The lsp client
-    pub client: LspClient<Self>,
+    pub client: TypedLspClient<Self>,
 
     // State to synchronize with the client.
     /// Whether the server is shutting down.
@@ -43,7 +43,7 @@ pub struct CompileState {
 
 impl CompileState {
     pub fn new(
-        client: LspClient<CompileState>,
+        client: TypedLspClient<CompileState>,
         compile_config: CompileConfig,
         const_config: ConstCompileConfig,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
