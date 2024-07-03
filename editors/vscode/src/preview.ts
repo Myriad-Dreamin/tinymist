@@ -167,12 +167,13 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         ];
     const enableCursor =
         vscode.workspace.getConfiguration().get<boolean>("typst-preview.cursorIndicator") || false;
-    const { dataPlanePort, staticServerPort } = await launchCommand();
-    if (!dataPlanePort || !staticServerPort) {
-        throw new Error(`Failed to launch preview ${filePath}`);
-    }
     const disposes = new DisposeList();
     registerPreviewTaskDispose(taskId, disposes);
+    const { dataPlanePort, staticServerPort } = await launchCommand();
+    if (!dataPlanePort || !staticServerPort) {
+        disposes.dispose();
+        throw new Error(`Failed to launch preview ${filePath}`);
+    }
 
     let connectUrl = `ws://127.0.0.1:${dataPlanePort}`;
     contentPreviewProvider.then((p) => p.postActivate(connectUrl));
@@ -229,7 +230,6 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         const invertColorsArgs = ivArgs ? ["--invert-colors", ivArgs] : [];
         const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
         const { dataPlanePort, staticServerPort } = await commandStartPreview([
-            "preview",
             "--task-id",
             taskId,
             "--refresh-style",

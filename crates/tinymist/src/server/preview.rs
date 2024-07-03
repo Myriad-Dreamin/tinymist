@@ -33,8 +33,17 @@ pub struct PreviewCliArgs {
     pub compile: CompileOnceArgs,
 
     /// Used by lsp for identifying the task.
-    #[clap(long = "task-id", value_name = "TASK_ID", hide(true))]
+    #[clap(
+        long = "task-id",
+        default_value = "",
+        value_name = "TASK_ID",
+        hide(true)
+    )]
     pub task_id: String,
+
+    /// Used by lsp for controlling the preview refresh style.
+    #[clap(long = "refresh-style", default_value = None, hide(true))]
+    pub refresh_style: Option<String>,
 
     /// Preview mode
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
