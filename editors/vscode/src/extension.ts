@@ -159,36 +159,42 @@ async function startClient(context: ExtensionContext, config: Record<string, any
         }
     });
 
-    window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
-        if (editor?.document.isUntitled) {
-            return;
-        }
-        const langId = editor?.document.languageId;
-        // todo: plaintext detection
-        // if (langId === "plaintext") {
-        //     console.log("plaintext", langId, editor?.document.uri.fsPath);
-        // }
-        if (langId !== "typst") {
-            // console.log("not typst", langId, editor?.document.uri.fsPath);
-            return commandActivateDoc(undefined);
-        }
-        return commandActivateDoc(editor?.document);
-    });
-    vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
-        if (doc.isUntitled && window.activeTextEditor?.document === doc) {
-            if (doc.languageId === "typst") {
-                return commandActivateDocPath(doc, "/untitled/" + doc.uri.fsPath);
-            } else {
+    context.subscriptions.push(
+        window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
+            if (editor?.document.isUntitled) {
+                return;
+            }
+            const langId = editor?.document.languageId;
+            // todo: plaintext detection
+            // if (langId === "plaintext") {
+            //     console.log("plaintext", langId, editor?.document.uri.fsPath);
+            // }
+            if (langId !== "typst") {
+                // console.log("not typst", langId, editor?.document.uri.fsPath);
                 return commandActivateDoc(undefined);
             }
-        }
-    });
-    vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
-        if (focusingDoc === doc) {
-            focusingDoc = undefined;
-            commandActivateDoc(undefined);
-        }
-    });
+            return commandActivateDoc(editor?.document);
+        })
+    );
+    context.subscriptions.push(
+        vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
+            if (doc.isUntitled && window.activeTextEditor?.document === doc) {
+                if (doc.languageId === "typst") {
+                    return commandActivateDocPath(doc, "/untitled/" + doc.uri.fsPath);
+                } else {
+                    return commandActivateDoc(undefined);
+                }
+            }
+        })
+    );
+    context.subscriptions.push(
+        vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
+            if (focusingDoc === doc) {
+                focusingDoc = undefined;
+                commandActivateDoc(undefined);
+            }
+        })
+    );
 
     context.subscriptions.push(
         commands.registerCommand("tinymist.onEnter", onEnterHandler()),
@@ -232,6 +238,60 @@ async function startClient(context: ExtensionContext, config: Record<string, any
     );
 
     await client.start();
+
+    // Watch all non typst files.
+    // todo: more general ways to do this.
+    const isInterestingNonTypst = (doc: vscode.TextDocument) => {
+        return (
+            doc.languageId !== "typst" &&
+            (doc.uri.scheme === "file" || doc.uri.scheme === "untitled")
+        );
+    };
+    context.subscriptions.push(
+        vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
+            if (!isInterestingNonTypst(doc)) {
+                return;
+            }
+            client?.sendNotification("textDocument/didOpen", {
+                textDocument: client.code2ProtocolConverter.asTextDocumentItem(doc),
+            });
+        }),
+        vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
+            const doc = e.document;
+            if (!isInterestingNonTypst(doc) || !client) {
+                return;
+            }
+            const contentChanges = [];
+            for (const change of e.contentChanges) {
+                contentChanges.push({
+                    range: client.code2ProtocolConverter.asRange(change.range),
+                    rangeLength: change.rangeLength,
+                    text: change.text,
+                });
+            }
+            client.sendNotification("textDocument/didChange", {
+                textDocument: client.code2ProtocolConverter.asVersionedTextDocumentIdentifier(doc),
+                contentChanges,
+            });
+        }),
+        vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
+            if (!isInterestingNonTypst(doc)) {
+                return;
+            }
+            client?.sendNotification("textDocument/didClose", {
+                textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(doc),
+            });
+        })
+    );
+    for (const doc of vscode.workspace.textDocuments) {
+        if (!isInterestingNonTypst(doc)) {
+            continue;
+        }
+
+        client.sendNotification("textDocument/didOpen", {
+            textDocument: client.code2ProtocolConverter.asTextDocumentItem(doc),
+        });
+    }
 
     // Find first document to focus
     const editor = window.activeTextEditor;
