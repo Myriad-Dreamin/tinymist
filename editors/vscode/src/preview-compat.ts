@@ -183,9 +183,9 @@ export function previewDeactivateCompat() {
 }
 
 function statusBarItemProcess(event: "Compiling" | "CompileSuccess" | "CompileError") {
-    // if (isTinymist) {
-    //     return;
-    // }
+    if (isTinymist) {
+        return;
+    }
 
     const style =
         vscode.workspace.getConfiguration().get<string>("typst-preview.statusBarIndicator") ||
