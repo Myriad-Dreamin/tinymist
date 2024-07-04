@@ -41,10 +41,6 @@ pub struct PreviewCliArgs {
     )]
     pub task_id: String,
 
-    /// Used by lsp for controlling the preview refresh style.
-    #[clap(long = "refresh-style", default_value = None, hide(true))]
-    pub refresh_style: Option<String>,
-
     /// Preview mode
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
     pub preview_mode: PreviewMode,

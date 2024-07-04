@@ -248,7 +248,7 @@ impl PreviewCompilationHandle for CompileHandler {
         }
     }
 
-    fn notify_compile(&self, res: Result<Arc<TypstDocument>, CompileStatus>) {
+    fn notify_compile(&self, res: Result<Arc<TypstDocument>, CompileStatus>, is_on_saved: bool) {
         if let Ok(doc) = res.clone() {
             let _ = self.doc_tx.send(Some(doc.clone()));
             let _ = self.export_tx.send(ExportRequest::OnTyped);
@@ -267,7 +267,7 @@ impl PreviewCompilationHandle for CompileHandler {
 
         #[cfg(feature = "preview")]
         if let Some(inner) = self.inner.read().as_ref() {
-            inner.notify_compile(res);
+            inner.notify_compile(res, is_on_saved);
         }
     }
 }
@@ -302,7 +302,11 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             snap.env.tracer.as_ref().map(|e| e.clone().warnings()),
         );
 
-        <Self as PreviewCompilationHandle>::notify_compile(self, res);
+        <Self as PreviewCompilationHandle>::notify_compile(
+            self,
+            res,
+            snap.flags.triggered_by_fs_events,
+        );
     }
 }
 

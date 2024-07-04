@@ -82,11 +82,12 @@ pub struct MemoryFilesShort {
 
 pub trait CompilationHandle: Send + 'static {
     fn status(&self, status: CompileStatus);
-    fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>);
+    fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>, is_on_saved: bool);
 }
 
 pub struct CompilationHandleImpl {
     task_id: String,
+    refresh_style: RefreshStyle,
     doc_sender: watch::Sender<Option<Arc<Document>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
     render_tx: broadcast::Sender<RenderActorRequest>,
@@ -100,27 +101,31 @@ impl CompilationHandleImpl {
 
 impl CompilationHandle for CompilationHandleImpl {
     fn status(&self, status: CompileStatus) {
-        self.editor_tx
-            .send(EditorActorRequest::CompileStatus(status))
-            .unwrap();
+        let _ = self
+            .editor_tx
+            .send(EditorActorRequest::CompileStatus(status));
     }
 
-    fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>) {
+    fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>, is_on_saved: bool) {
+        if self.refresh_style == RefreshStyle::OnSave && !is_on_saved {
+            return;
+        }
+
         match res {
             Ok(doc) => {
-                let _ = self.doc_sender.send(Some(doc)); // it is ok to ignore the error here
-                                                         // todo: is it right that ignore zero broadcast receiver?
+                // it is ok to ignore the error here
+                let _ = self.doc_sender.send(Some(doc));
+
+                // todo: is it right that ignore zero broadcast receiver?
                 let _ = self.render_tx.send(RenderActorRequest::RenderIncremental);
-                self.editor_tx
-                    .send(EditorActorRequest::CompileStatus(
-                        CompileStatus::CompileSuccess,
-                    ))
-                    .unwrap();
+                let _ = self.editor_tx.send(EditorActorRequest::CompileStatus(
+                    CompileStatus::CompileSuccess,
+                ));
             }
             Err(status) => {
-                self.editor_tx
-                    .send(EditorActorRequest::CompileStatus(status))
-                    .unwrap();
+                let _ = self
+                    .editor_tx
+                    .send(EditorActorRequest::CompileStatus(status));
             }
         }
     }
@@ -201,7 +206,6 @@ pub trait EditorServer {
 
 pub trait CompileHost: SourceFileServer + EditorServer {}
 
-// todo: replace CompileDriver by CompileHost
 pub async fn preview<T: CompileHost + Send + Sync + 'static>(
     arguments: PreviewArgs,
     client: impl FnOnce(CompilationHandleImpl) -> Arc<T>,
@@ -226,6 +230,7 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
     let doc_watcher = watch::channel::<Option<Arc<Document>>>(None);
     let client = client(CompilationHandleImpl {
         task_id: "preview".to_owned(),
+        refresh_style: arguments.refresh_style,
         doc_sender: doc_watcher.0,
         editor_tx: editor_conn.0.clone(),
         render_tx: renderer_mailbox.0.clone(),
