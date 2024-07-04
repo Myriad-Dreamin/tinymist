@@ -73,6 +73,7 @@ impl PreviewActor {
                     self.tabs.insert(tab.task_id.clone(), tab);
                 }
                 PreviewRequest::Kill(task_id, tx) => {
+                    info!("Preview Killing: {task_id}");
                     if let Some(tab) = self.tabs.remove(&task_id) {
                         tab.previewer.stop().await;
                         let _ = tab.static_server_killer.send(());
@@ -83,6 +84,8 @@ impl PreviewActor {
                             let _ = tab.static_server_handle.await;
 
                             tab.cc.unregister_preview(tab.task_id);
+
+                            info!("Preview killed: {task_id}");
 
                             // Send response
                             let _ = tx.send(Ok(JsonValue::Null));
