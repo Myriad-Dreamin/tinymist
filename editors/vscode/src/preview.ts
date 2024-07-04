@@ -11,8 +11,6 @@ import {
     panelSyncScrollCompat,
     LaunchInWebViewTask,
     LaunchInBrowserTask,
-    codeGetCliInputArgs,
-    codeGetCliFontArgs,
 } from "./preview-compat";
 import {
     commandKillPreview,
@@ -243,9 +241,6 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             ...partialRenderingArgs,
             ...invertColorsArgs,
             ...previewInSlideModeArgs,
-            // todo: respect tinymist configurations
-            ...codeGetCliInputArgs(),
-            ...codeGetCliFontArgs(),
             filePath,
         ]);
         console.log(
