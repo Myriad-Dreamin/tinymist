@@ -64,6 +64,6 @@ pub struct PreviewArgs {
     pub invert_colors: String,
 
     /// Used by lsp for controlling the preview refresh style.
-    #[cfg_attr(feature = "clap", clap(default_value = "onType", hide(true)))]
+    #[cfg_attr(feature = "clap", clap(long, default_value = "onType", hide(true)))]
     pub refresh_style: RefreshStyle,
 }
