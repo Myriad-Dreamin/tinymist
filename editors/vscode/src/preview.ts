@@ -115,7 +115,7 @@ export async function launchPreviewInWebView({
 
     // todo: bindDocument.onDidDispose, but we did not find a similar way.
     panel.onDidDispose(async () => {
-        panelDispose;
+        panelDispose();
         console.log("killed preview services");
         panel.dispose();
     });

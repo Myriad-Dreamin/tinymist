@@ -63,6 +63,15 @@ pub struct PreviewArgs {
     #[cfg_attr(feature = "clap", clap(long, default_value = "never"))]
     pub invert_colors: String,
 
+    /// Used by lsp for identifying the task.
+    #[clap(
+        long = "task-id",
+        default_value = "default_preview",
+        value_name = "TASK_ID",
+        hide(true)
+    )]
+    pub task_id: String,
+
     /// Used by lsp for controlling the preview refresh style.
     #[cfg_attr(feature = "clap", clap(long, default_value = "onType", hide(true)))]
     pub refresh_style: RefreshStyle,

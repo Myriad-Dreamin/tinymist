@@ -37,6 +37,7 @@ pub enum CompileStatus {
 
 #[derive(Debug)]
 pub enum EditorActorRequest {
+    Shutdown,
     DocToSrcJumpResolve(DocToSrcJumpResolveRequest),
     DocToSrcJump(DocToSrcJumpInfo),
     Outline(Outline),
@@ -193,6 +194,10 @@ impl EditorActor {
                 Some(msg) = self.mailbox.recv().instrument_await("waiting for mailbox") => {
                     trace!("EditorActor: received message from mailbox: {:?}", msg);
                    let sent = match msg {
+                        EditorActorRequest::Shutdown => {
+                            info!("EditorActor: received exit message");
+                            break;
+                        },
                         EditorActorRequest::DocToSrcJump(jump_info) => {
                             self.editor_conn.resp_ctl_plane("DocToSrcJump", ControlPlaneResponse::EditorScrollTo(jump_info)).await
                         },

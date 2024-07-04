@@ -17,8 +17,8 @@ use tokio::sync::{mpsc, oneshot};
 use typst::foundations::{Str, Value};
 use typst_preview::{
     await_tree::{get_await_tree_async, REGISTRY},
-    preview, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo, LspEditorConnection,
-    PreviewArgs, PreviewMode, Previewer,
+    preview, CompilationHandle, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo,
+    LspEditorConnection, PreviewArgs, PreviewMode, Previewer,
 };
 use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
 
@@ -31,15 +31,6 @@ pub struct PreviewCliArgs {
 
     #[clap(flatten)]
     pub compile: CompileOnceArgs,
-
-    /// Used by lsp for identifying the task.
-    #[clap(
-        long = "task-id",
-        default_value = "",
-        value_name = "TASK_ID",
-        hide(true)
-    )]
-    pub task_id: String,
 
     /// Preview mode
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
@@ -74,7 +65,7 @@ impl PreviewActor {
                 }
                 PreviewRequest::Kill(task_id, tx) => {
                     info!("Preview Killing: {task_id}");
-                    if let Some(tab) = self.tabs.remove(&task_id) {
+                    if let Some(mut tab) = self.tabs.remove(&task_id) {
                         tab.previewer.stop().await;
                         let _ = tab.static_server_killer.send(());
                         let client = self.client.clone();
@@ -173,6 +164,32 @@ impl PreviewState {
         let (ctl_tx, ctl_rx) = mpsc::unbounded_channel();
         let editor_conn = LspEditorConnection { ctl_rx, resp_tx };
 
+        // Ensure the preview can receives a first compilation.
+        let snap = cc.snapshot();
+        let chandle = cc.clone();
+        let task_id = args.preview.task_id.clone();
+        let doc_rx = cc.doc_tx.subscribe();
+        let compile_fence = async move {
+            let now = reflexo::time::now();
+            // The fence
+            snap.ok()?.snapshot().await.ok()?.compile();
+
+            let w = chandle.inner.read();
+            let w = w.as_ref()?;
+            if w.task_id() != task_id {
+                return None;
+            }
+
+            let latest_doc = doc_rx.borrow().clone();
+            let has_doc = latest_doc.is_some();
+            let elapsed = now.elapsed().unwrap_or_default();
+            log::info!("PreviewActor({task_id}): put fence in {elapsed:?}? {has_doc}");
+            w.notify_compile(Ok(latest_doc?), true);
+
+            Some(())
+        };
+
+        let task_id = args.preview.task_id.clone();
         let chandle = cc.clone();
         let previewer = preview(
             args.preview,
@@ -205,12 +222,17 @@ impl PreviewState {
         });
 
         let preview_tx = self.preview_tx.clone();
+        let handle = self.client.handle.clone();
         just_future!(async move {
             let previewer = previewer.await;
 
+            // Put a fence to ensure the previewer can receive the first compilation.   z
+            // The fence must be put after the previewer is initialized.
+            handle.spawn(compile_fence);
+
             let (static_server_addr, static_server_killer, static_server_handle) =
                 make_static_host(&previewer, args.static_file_host, args.preview_mode);
-            info!("Static file server listening on: {}", static_server_addr);
+            info!("Static file server listening on: {static_server_addr}");
 
             let resp = StartPreviewResponse {
                 static_server_port: Some(static_server_addr.port()),
@@ -219,7 +241,7 @@ impl PreviewState {
             };
 
             let sent = preview_tx.send(PreviewRequest::Started(PreviewTab {
-                task_id: args.task_id.clone(),
+                task_id,
                 previewer,
                 static_server_killer,
                 static_server_handle,

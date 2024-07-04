@@ -8,8 +8,9 @@ pub use actor::editor::{
     CompileStatus, ControlPlaneMessage, ControlPlaneResponse, LspEditorConnection,
 };
 pub use outline::Outline;
-use tokio::sync::{broadcast, mpsc, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
+use std::pin::Pin;
 use std::{collections::HashMap, future::Future, path::PathBuf, sync::Arc};
 
 use ::await_tree::InstrumentAwait;
@@ -131,8 +132,11 @@ impl CompilationHandle for CompilationHandleImpl {
     }
 }
 
+type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
+
 pub struct Previewer {
     frontend_html_factory: Box<dyn Fn(PreviewMode) -> ImmutStr + Send + Sync>,
+    stop: Option<Box<dyn FnOnce() -> StopFuture + Send + Sync>>,
     data_plane_handle: tokio::task::JoinHandle<()>,
     control_plane_handle: tokio::task::JoinHandle<()>,
     data_plane_port: u16,
@@ -154,7 +158,11 @@ impl Previewer {
     }
 
     // todo: close the actors
-    pub async fn stop(&self) {}
+    pub async fn stop(&mut self) {
+        if let Some(stop) = self.stop.take() {
+            stop().await;
+        }
+    }
 }
 
 pub type SourceLocation = typst_ts_core::debug_loc::SourceLocation;
@@ -229,7 +237,7 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
     // Set callback
     let doc_watcher = watch::channel::<Option<Arc<Document>>>(None);
     let client = client(CompilationHandleImpl {
-        task_id: "preview".to_owned(),
+        task_id: arguments.task_id,
         refresh_style: arguments.refresh_style,
         doc_sender: doc_watcher.0,
         editor_tx: editor_conn.0.clone(),
@@ -248,13 +256,15 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
 
     log::info!("Previewer: typst actor spawned");
 
-    let (data_plane_port_tx, data_plane_port_rx) = tokio::sync::oneshot::channel();
+    let (data_plane_port_tx, data_plane_port_rx) = oneshot::channel();
     let data_plane_addr = arguments.data_plane_host;
+    let (shutdown_data_plane_tx, mut shutdown_data_plane_rx) = mpsc::channel(1);
     let data_plane_handle = {
         let span_interner = span_interner.clone();
         let typst_tx = typst_mailbox.0.clone();
         let webview_tx = webview_tx.clone();
         let renderer_tx = renderer_mailbox.0.clone();
+        let editor_tx = editor_conn.0.clone();
         tokio::spawn(async move {
             // Create the event loop and TCP listener we'll accept connections on.
             let try_socket = TcpListener::bind(&data_plane_addr)
@@ -266,11 +276,8 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
                 listener.local_addr().unwrap()
             );
             let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
-            while let Ok((stream, _)) = listener
-                .accept()
-                .instrument_await("accept data plane connection")
-                .await
-            {
+
+            let recv = |stream: TcpStream| async {
                 let span_interner = span_interner.clone();
                 let webview_tx = webview_tx.clone();
                 let webview_rx = webview_tx.subscribe();
@@ -302,7 +309,7 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
                     svg.1,
                     webview_tx.clone(),
                     webview_rx,
-                    editor_conn.0.clone(),
+                    editor_tx.clone(),
                     renderer_tx.clone(),
                 );
                 tokio::spawn(webview_actor.run(peer_addr.clone()));
@@ -317,10 +324,20 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
                 let outline_render_actor = actor::render::OutlineRenderActor::new(
                     renderer_tx.subscribe(),
                     doc_watcher.1.clone(),
-                    editor_conn.0.clone(),
+                    editor_tx.clone(),
                     span_interner,
                 );
                 outline_render_actor.spawn(peer_addr);
+            };
+
+            loop {
+                tokio::select! {
+                    Some(()) = shutdown_data_plane_rx.recv().instrument_await("data plane exit signal") => {
+                        info!("Data plane server shutdown");
+                        return;
+                    }
+                    Ok((stream, _)) = listener.accept().instrument_await("accept data plane connection") => recv(stream).await,
+                }
             }
         })
     };
@@ -381,11 +398,23 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
         .into()
     });
 
+    let editor_tx = editor_conn.0;
+    let stop = move || -> StopFuture {
+        Box::pin(async move {
+            let _ = shutdown_data_plane_tx
+                .send(())
+                .instrument_await("wait data plane")
+                .await;
+            let _ = editor_tx.send(EditorActorRequest::Shutdown);
+        })
+    };
+
     Previewer {
         frontend_html_factory,
         data_plane_handle,
         control_plane_handle,
         data_plane_port,
+        stop: Some(Box::new(stop)),
     }
 }
 
