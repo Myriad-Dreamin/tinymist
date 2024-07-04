@@ -77,6 +77,8 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
                 activeEditor,
                 bindDocument,
                 mode,
+            }).catch((e) => {
+                vscode.window.showErrorMessage(`failed to launch preview: ${e}`);
             });
         };
     }
