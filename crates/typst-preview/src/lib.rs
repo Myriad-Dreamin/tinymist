@@ -157,7 +157,6 @@ impl Previewer {
         let _ = tokio::join!(self.data_plane_handle, self.control_plane_handle);
     }
 
-    // todo: close the actors
     pub async fn stop(&mut self) {
         if let Some(stop) = self.stop.take() {
             stop().await;

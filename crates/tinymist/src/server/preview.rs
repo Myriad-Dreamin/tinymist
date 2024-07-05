@@ -7,7 +7,6 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Error,
 };
-use log::{error, info};
 use lsp_types::notification::Notification;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -64,29 +63,28 @@ impl PreviewActor {
                     self.tabs.insert(tab.task_id.clone(), tab);
                 }
                 PreviewRequest::Kill(task_id, tx) => {
-                    info!("Preview Killing: {task_id}");
-                    if let Some(mut tab) = self.tabs.remove(&task_id) {
-                        tab.previewer.stop().await;
-                        let _ = tab.static_server_killer.send(());
-                        let client = self.client.clone();
-                        self.client.handle.spawn(async move {
-                            // Wait for previewer to stop
-                            tab.previewer.join().await;
-                            let _ = tab.static_server_handle.await;
-
-                            tab.cc.unregister_preview(tab.task_id);
-
-                            info!("Preview killed: {task_id}");
-
-                            // Send response
-                            let _ = tx.send(Ok(JsonValue::Null));
-
-                            // Send global notification
-                            client.send_notification::<DisposePreview>(DisposePreview { task_id });
-                        });
-                    } else {
+                    log::info!("PreviewTask({task_id}): killing");
+                    let Some(mut tab) = self.tabs.remove(&task_id) else {
                         let _ = tx.send(Err(internal_error("task not found")));
-                    }
+                        continue;
+                    };
+
+                    tab.previewer.stop().await;
+                    let _ = tab.ss_killer.send(());
+                    let client = self.client.clone();
+                    self.client.handle.spawn(async move {
+                        // Wait for previewer to stop
+                        tab.previewer.join().await;
+                        let _ = tab.ss_handle.await;
+
+                        log::info!("PreviewTask({task_id}): killed");
+                        // Unregister preview
+                        tab.compile_handler.unregister_preview(tab.task_id);
+                        // Send response
+                        let _ = tx.send(Ok(JsonValue::Null));
+                        // Send global notification
+                        client.send_notification::<DisposePreview>(DisposePreview { task_id });
+                    });
                 }
                 PreviewRequest::Scroll(task_id, req) => {
                     self.scroll(task_id, req).await;
@@ -96,9 +94,7 @@ impl PreviewActor {
     }
 
     async fn scroll(&mut self, task_id: String, req: ControlPlaneMessage) -> Option<()> {
-        let task = self.tabs.get(&task_id)?;
-
-        task.ctl_tx.send(req).ok()
+        self.tabs.get(&task_id)?.ctl_tx.send(req).ok()
     }
 }
 
@@ -126,14 +122,18 @@ impl PreviewState {
 }
 
 struct PreviewTab {
+    /// Task ID
     task_id: String,
+    /// Previewer
     previewer: Previewer,
-    static_server_killer: oneshot::Sender<()>,
-    static_server_handle: tokio::task::JoinHandle<()>,
-
+    /// Static server killer
+    ss_killer: oneshot::Sender<()>,
+    /// Static server handle
+    ss_handle: tokio::task::JoinHandle<()>,
+    /// Control plane message sender
     ctl_tx: mpsc::UnboundedSender<ControlPlaneMessage>,
-
-    cc: Arc<CompileHandler>,
+    /// Compile handler
+    compile_handler: Arc<CompileHandler>,
 }
 
 enum PreviewRequest {
@@ -154,53 +154,59 @@ impl PreviewState {
     pub fn start(
         &self,
         mut args: PreviewCliArgs,
-        cc: Arc<CompileHandler>,
+        compile_handler: Arc<CompileHandler>,
     ) -> AnySchedulableResponse {
-        info!("Preview Arguments: {args:#?}");
+        let task_id = args.preview.task_id.clone();
 
+        log::info!("PreviewTask({task_id}): arguments: {args:#?}");
+
+        // Disble control plane host
         args.preview.control_plane_host = String::default();
 
         let (resp_tx, resp_rx) = mpsc::unbounded_channel();
         let (ctl_tx, ctl_rx) = mpsc::unbounded_channel();
         let editor_conn = LspEditorConnection { ctl_rx, resp_tx };
 
-        // Ensure the preview can receives a first compilation.
-        let snap = cc.snapshot();
-        let chandle = cc.clone();
-        let task_id = args.preview.task_id.clone();
-        let doc_rx = cc.doc_tx.subscribe();
+        // Ensure the preview can receive a first compilation.
+        let tid = task_id.clone();
+        let cc = compile_handler.clone();
+        let snap = compile_handler.snapshot();
+        let doc_rx = compile_handler.doc_tx.subscribe();
         let compile_fence = async move {
             let now = reflexo::time::now();
             // The fence
             snap.ok()?.snapshot().await.ok()?.compile();
 
-            let w = chandle.inner.read();
+            let w = cc.inner.read();
             let w = w.as_ref()?;
-            if w.task_id() != task_id {
+            if w.task_id() != tid {
                 return None;
             }
 
+            // But we just send a latest document to the previewer.
             let latest_doc = doc_rx.borrow().clone();
             let has_doc = latest_doc.is_some();
             let elapsed = now.elapsed().unwrap_or_default();
-            log::info!("PreviewActor({task_id}): put fence in {elapsed:?}? {has_doc}");
+            log::info!("PreviewTask({tid}): put fence in {elapsed:?}? {has_doc}");
             w.notify_compile(Ok(latest_doc?), true);
 
             Some(())
         };
 
-        let task_id = args.preview.task_id.clone();
-        let chandle = cc.clone();
+        // Create a previewer
+        let cc = compile_handler.clone();
         let previewer = preview(
             args.preview,
             move |handle| {
-                chandle.register_preview(handle);
-                chandle
+                cc.register_preview(handle);
+                cc
             },
             Some(editor_conn),
             TYPST_PREVIEW_HTML,
         );
 
+        // Forward responses to the client
+        let tid = task_id.clone();
         let client = self.client.clone();
         self.client.handle.spawn(async move {
             let mut resp_rx = resp_rx;
@@ -211,14 +217,14 @@ impl PreviewState {
                     // ignoring compile status per task.
                     CompileStatus(..) => {}
                     SyncEditorChanges(..) => {
-                        log::warn!("preview is sending SyncEditorChanges in lsp mode");
+                        log::warn!("PreviewTask({tid}): is sending SyncEditorChanges in lsp mode");
                     }
                     EditorScrollTo(s) => client.send_notification::<ScrollSource>(s),
                     Outline(s) => client.send_notification::<NotifDocumentOutline>(s),
                 }
             }
 
-            info!("PreviewState: Response channel closed");
+            log::info!("PreviewTask({tid}): response channel closed");
         });
 
         let preview_tx = self.preview_tx.clone();
@@ -230,23 +236,23 @@ impl PreviewState {
             // The fence must be put after the previewer is initialized.
             handle.spawn(compile_fence);
 
-            let (static_server_addr, static_server_killer, static_server_handle) =
+            let (ss_addr, ss_killer, ss_handle) =
                 make_static_host(&previewer, args.static_file_host, args.preview_mode);
-            info!("Static file server listening on: {static_server_addr}");
+            log::info!("PreviewTask({task_id}): static file server listening on: {ss_addr}");
 
             let resp = StartPreviewResponse {
-                static_server_port: Some(static_server_addr.port()),
-                static_server_addr: Some(static_server_addr.to_string()),
+                static_server_port: Some(ss_addr.port()),
+                static_server_addr: Some(ss_addr.to_string()),
                 data_plane_port: Some(previewer.data_plane_port()),
             };
 
             let sent = preview_tx.send(PreviewRequest::Started(PreviewTab {
                 task_id,
                 previewer,
-                static_server_killer,
-                static_server_handle,
+                ss_killer,
+                ss_handle,
                 ctl_tx,
-                cc,
+                compile_handler,
             }));
             sent.map_err(|_| internal_error("failed to register preview tab"))?;
 
@@ -323,7 +329,7 @@ pub fn make_static_host(
 
     let join_handle = tokio::spawn(async move {
         if let Err(e) = graceful.await {
-            error!("Static file server error: {}", e);
+            log::error!("Static file server error: {}", e);
         }
     });
     (addr, tx, join_handle)
@@ -335,7 +341,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         .lock()
         .await
         .register("root".into(), "typst-preview");
-    info!("Arguments: {:#?}", args);
+    log::info!("Arguments: {:#?}", args);
     let input = args.compile.input.context("entry file must be provided")?;
     let input = Path::new(&input);
     let entry = if input.is_absolute() {
@@ -359,7 +365,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         std::env::current_dir().unwrap()
     };
     if !entry.starts_with(&root) {
-        error!("entry file must be in the root directory");
+        log::error!("entry file must be in the root directory");
         std::process::exit(1);
     }
 
@@ -379,7 +385,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
 
     tokio::spawn(async move {
         let _ = tokio::signal::ctrl_c().await;
-        info!("Ctrl-C received, exiting");
+        log::info!("Ctrl-C received, exiting");
         std::process::exit(0);
     });
 
@@ -402,10 +408,10 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let mode = args.preview_mode;
     let (static_server_addr, _, static_server_handle) =
         make_static_host(&previewer, static_file_addr, mode);
-    info!("Static file server listening on: {}", static_server_addr);
+    log::info!("Static file server listening on: {}", static_server_addr);
     if !args.dont_open_in_browser {
         if let Err(e) = open::that_detached(format!("http://{}", static_server_addr)) {
-            error!("failed to open browser: {}", e);
+            log::error!("failed to open browser: {}", e);
         };
     }
     let _ = tokio::join!(previewer.join(), static_server_handle);
