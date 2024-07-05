@@ -157,7 +157,6 @@ impl PreviewState {
         compile_handler: Arc<CompileHandler>,
     ) -> AnySchedulableResponse {
         let task_id = args.preview.task_id.clone();
-
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
 
         // Disble control plane host
@@ -269,9 +268,7 @@ impl PreviewState {
         just_future!(async move { rx.await.map_err(|_| internal_error("cancelled"))? })
     }
 
-    pub fn scroll(&self, task_id: String, req: JsonValue) -> AnySchedulableResponse {
-        let req = serde_json::from_value(req).map_err(|e| internal_error(e.to_string()))?;
-
+    pub fn scroll(&self, task_id: String, req: ControlPlaneMessage) -> AnySchedulableResponse {
         let sent = self.preview_tx.send(PreviewRequest::Scroll(task_id, req));
         sent.map_err(|_| internal_error("failed to send scroll request"))?;
 

@@ -140,8 +140,10 @@ impl LanguageState {
 
     #[cfg(feature = "preview")]
     pub fn scroll_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        use typst_preview::ControlPlaneMessage;
+
         let task_id = get_arg!(args[0] as String);
-        let req = get_arg!(args[1] as JsonValue);
+        let req = get_arg!(args[1] as ControlPlaneMessage);
 
         self.preview.scroll(task_id, req)
     }
