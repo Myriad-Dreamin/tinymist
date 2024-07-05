@@ -44,14 +44,42 @@ pub enum EditorActorRequest {
     CompileStatus(CompileStatus),
 }
 
-pub struct LspEditorConnection {
+pub struct LspControlPlaneTx {
     pub resp_tx: mpsc::UnboundedSender<ControlPlaneResponse>,
     pub ctl_rx: mpsc::UnboundedReceiver<ControlPlaneMessage>,
+    pub shutdown_tx: mpsc::Sender<()>,
+}
+
+pub struct LspControlPlaneRx {
+    pub resp_rx: mpsc::UnboundedReceiver<ControlPlaneResponse>,
+    pub ctl_tx: mpsc::UnboundedSender<ControlPlaneMessage>,
+    pub shutdown_rx: mpsc::Receiver<()>,
+}
+
+impl LspControlPlaneTx {
+    pub fn new() -> (LspControlPlaneTx, LspControlPlaneRx) {
+        let (resp_tx, resp_rx) = mpsc::unbounded_channel();
+        let (ctl_tx, ctl_rx) = mpsc::unbounded_channel();
+        let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
+
+        (
+            Self {
+                resp_tx,
+                ctl_rx,
+                shutdown_tx,
+            },
+            LspControlPlaneRx {
+                resp_rx,
+                ctl_tx,
+                shutdown_rx,
+            },
+        )
+    }
 }
 
 pub enum EditorConnection {
     WebSocket(WebSocketStream<TcpStream>),
-    Lsp(LspEditorConnection),
+    Lsp(LspControlPlaneTx),
 }
 
 impl EditorConnection {
@@ -83,9 +111,7 @@ impl EditorConnection {
                 .instrument_await("send response to editor")
                 .await
                 .is_ok(),
-            EditorConnection::Lsp(LspEditorConnection { resp_tx, .. }) => {
-                resp_tx.send(resp).is_ok()
-            }
+            EditorConnection::Lsp(LspControlPlaneTx { resp_tx, .. }) => resp_tx.send(resp).is_ok(),
         };
 
         if !sent {
@@ -97,7 +123,7 @@ impl EditorConnection {
 
     async fn next(&mut self) -> Option<ControlPlaneMessage> {
         match self {
-            EditorConnection::Lsp(LspEditorConnection { ctl_rx, .. }) => ctl_rx.recv().await,
+            EditorConnection::Lsp(LspControlPlaneTx { ctl_rx, .. }) => ctl_rx.recv().await,
             EditorConnection::WebSocket(ws) => {
                 let Some(Ok(Message::Text(msg))) =
                     ws.next().instrument_await("waiting for websocket").await
@@ -220,7 +246,7 @@ impl EditorActor {
                         break;
                     }
                 }
-                Some(msg) = self.editor_conn.next().instrument_await("waiting for websocket") => {
+                Some(msg) = self.editor_conn.next().instrument_await("waiting for editor message") => {
                     match msg {
                         ControlPlaneMessage::ChangeCursorPosition(cursor_info) => {
                             debug!("EditorActor: received message from editor: {:?}", cursor_info);

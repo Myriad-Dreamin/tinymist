@@ -217,7 +217,7 @@ impl CompileHandler {
     }
 
     #[cfg(feature = "preview")]
-    pub fn unregister_preview(&self, task_id: String) {
+    pub fn unregister_preview(&self, task_id: &str) {
         let mut p = self.inner.write();
         if p.as_ref().is_some_and(|p| p.task_id() == task_id) {
             *p = None;

@@ -16,8 +16,8 @@ use tokio::sync::{mpsc, oneshot, watch};
 use typst::foundations::{Str, Value};
 use typst_preview::{
     await_tree::{get_await_tree_async, REGISTRY},
-    preview, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo, LspEditorConnection,
-    PreviewArgs, PreviewMode, Previewer,
+    preview, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo, LspControlPlaneRx,
+    LspControlPlaneTx, PreviewArgs, PreviewMode, Previewer,
 };
 use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
 
@@ -71,17 +71,20 @@ impl PreviewActor {
                         continue;
                     };
 
-                    tab.previewer.stop().await;
-                    let _ = tab.ss_killer.send(());
                     let client = self.client.clone();
                     self.client.handle.spawn(async move {
+                        tab.previewer.stop().await;
+                        let _ = tab.ss_killer.send(());
+
                         // Wait for previewer to stop
+                        log::info!("PreviewTask({task_id}): wait for previewer to stop");
                         tab.previewer.join().await;
+                        log::info!("PreviewTask({task_id}): wait for static server to stop");
                         let _ = tab.ss_handle.await;
 
                         log::info!("PreviewTask({task_id}): killed");
                         // Unregister preview
-                        tab.compile_handler.unregister_preview(tab.task_id);
+                        tab.compile_handler.unregister_preview(&tab.task_id);
                         // Send response
                         let _ = tx.send(Ok(JsonValue::Null));
                         // Send global notification
@@ -164,9 +167,12 @@ impl PreviewState {
         // Disble control plane host
         args.preview.control_plane_host = String::default();
 
-        let (resp_tx, resp_rx) = mpsc::unbounded_channel();
-        let (ctl_tx, ctl_rx) = mpsc::unbounded_channel();
-        let editor_conn = LspEditorConnection { ctl_rx, resp_tx };
+        let (lsp_tx, lsp_rx) = LspControlPlaneTx::new();
+        let LspControlPlaneRx {
+            resp_rx,
+            ctl_tx,
+            mut shutdown_rx,
+        } = lsp_rx;
 
         // Ensure the preview can receive a first compilation.
         let tid = task_id.clone();
@@ -198,11 +204,11 @@ impl PreviewState {
         let previewer = preview(
             args.preview,
             compile_handler.clone(),
-            Some(editor_conn),
+            Some(lsp_tx),
             TYPST_PREVIEW_HTML,
         );
 
-        // Forward responses to the client
+        // Forward preview responses to lsp client
         let tid = task_id.clone();
         let client = self.client.clone();
         self.client.handle.spawn(async move {
@@ -222,6 +228,22 @@ impl PreviewState {
             }
 
             log::info!("PreviewTask({tid}): response channel closed");
+        });
+
+        // Process preview shutdown
+        let tid = task_id.clone();
+        let preview_tx = self.preview_tx.clone();
+        self.client.handle.spawn(async move {
+            // shutdown_rx
+            let Some(()) = shutdown_rx.recv().await else {
+                return;
+            };
+
+            log::info!("PreviewTask({tid}): internal killing");
+            let (tx, rx) = oneshot::channel();
+            preview_tx.send(PreviewRequest::Kill(tid.clone(), tx)).ok();
+            rx.await.ok();
+            log::info!("PreviewTask({tid}): internal killed");
         });
 
         let preview_tx = self.preview_tx.clone();
@@ -312,15 +334,23 @@ pub fn make_static_host(
     let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
     let addr = server.local_addr();
 
-    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let (final_tx, final_rx) = tokio::sync::oneshot::channel();
     let graceful = server.with_graceful_shutdown(async {
-        rx.await.ok();
+        final_rx.await.ok();
+        log::info!("Static file server stop requested");
     });
 
     let join_handle = tokio::spawn(async move {
-        if let Err(e) = graceful.await {
-            log::error!("Static file server error: {}", e);
+        tokio::select! {
+            Err(err) = graceful => {
+                log::error!("Static file server error: {err:?}");
+            }
+            _ = rx => {
+                final_tx.send(()).ok();
+            }
         }
+        log::info!("Static file server joined");
     });
     (addr, tx, join_handle)
 }
