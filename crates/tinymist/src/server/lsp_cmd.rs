@@ -7,6 +7,7 @@ use lsp_server::RequestId;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::ExportKind;
 use typst::diag::StrResult;
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
@@ -329,7 +330,13 @@ impl LanguageState {
     /// Get the all valid symbols
     pub fn resource_symbols(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let resp = self.get_symbol_resources();
-        just_ok!(resp.map_err(|e| internal_error(e.to_string()))?)
+        just_result!(resp.map_err(|e| internal_error(e.to_string())))
+    }
+
+    /// Get resource preview html
+    pub fn resource_preview_html(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
+        let resp = serde_json::to_value(TYPST_PREVIEW_HTML);
+        just_result!(resp.map_err(|e| internal_error(e.to_string())))
     }
 
     /// Get tutorial web page

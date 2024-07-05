@@ -11,6 +11,7 @@ import {
     panelSyncScrollCompat,
     LaunchInWebViewTask,
     LaunchInBrowserTask,
+    getPreviewHtml as getPreviewHtmlCompat,
 } from "./preview-compat";
 import {
     commandKillPreview,
@@ -19,10 +20,17 @@ import {
     registerPreviewTaskDispose,
 } from "./extension";
 
+export function previewPreload(context: vscode.ExtensionContext) {
+    getPreviewHtmlCompat(context);
+}
+
 export function previewActivate(context: vscode.ExtensionContext, isCompat: boolean) {
     // https://github.com/microsoft/vscode-extension-samples/blob/4721ef0c450f36b5bce2ecd5be4f0352ed9e28ab/webview-view-sample/src/extension.ts#L3
-    let contentPreviewHtml = loadHTMLFile(context, "./out/frontend/index.html");
-    contentPreviewHtml.then((html) => {
+    getPreviewHtmlCompat(context).then((html) => {
+        if (!html) {
+            vscode.window.showErrorMessage("Failed to load content preview content");
+            return;
+        }
         const provider = new ContentPreviewProvider(context, context.extensionUri, html);
         resolveContentPreviewProvider(provider);
         context.subscriptions.push(
@@ -121,7 +129,7 @@ export async function launchPreviewInWebView({
     });
 
     // 将已经准备好的 HTML 设置为 Webview 内容
-    let html = await loadHTMLFile(context, "./out/frontend/index.html");
+    let html = await getPreviewHtmlCompat(context);
     html = html.replace(
         /\/typst-webview-assets/g,
         `${panel.webview

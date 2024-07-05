@@ -12,10 +12,14 @@
     "tools/typst-preview-frontend"
   ],
   "scripts": {
-    "build:preview": "cd contrib/typst-preview/editors/vscode && yarn build",
+    "build:editor-tools": "cd tools/editor-tools/ && yarn run build",
+    "build:preview": "cd tools/typst-preview-frontend && yarn run build && rimraf ../../crates/tinymist-assets/src/typst-preview.html && cpr ./dist/index.html ../../crates/tinymist-assets/src/typst-preview.html",
     "docs": "shiroa serve -w . docs/tinymist",
     "docs:rs": "cargo doc --workspace --no-deps"
   },
   "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {
+    "cpr": "^3.0.1",
+    "rimraf": "^5.0.1"
+  }
 }

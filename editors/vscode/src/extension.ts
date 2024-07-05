@@ -27,10 +27,14 @@ import {
 import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
 import { applySnippetTextEdits } from "./snippets";
 import { setIsTinymist as previewSetIsTinymist } from "./preview-compat";
-import { previewActivate, previewDeactivate, previewProcessOutline } from "./preview";
+import {
+    previewActivate,
+    previewDeactivate,
+    previewPreload,
+    previewProcessOutline,
+} from "./preview";
 import { DisposeList } from "./util";
-
-let client: LanguageClient | undefined = undefined;
+import { client, setClient } from "./lsp";
 
 export function activate(context: ExtensionContext): Promise<void> {
     const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
@@ -110,12 +114,13 @@ async function startClient(context: ExtensionContext, config: Record<string, any
         },
     };
 
-    client = new LanguageClient(
+    const client = new LanguageClient(
         "tinymist",
         "Tinymist Typst Language Server",
         serverOptions,
         clientOptions
     );
+    setClient(client);
 
     client.onNotification("tinymist/compileStatus", (params) => {
         wordCountItemProcess(params);
@@ -238,6 +243,7 @@ async function startClient(context: ExtensionContext, config: Record<string, any
     );
 
     await client.start();
+    previewPreload(context);
 
     // Watch all non typst files.
     // todo: more general ways to do this.

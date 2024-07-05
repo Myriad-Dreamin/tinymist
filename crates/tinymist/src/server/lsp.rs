@@ -198,6 +198,7 @@ impl LanguageState {
             .with_command_("tinymist.getServerInfo", State::get_server_info)
             // resources
             .with_resource("/symbols", State::resource_symbols)
+            .with_resource("/preview/index.html", State::resource_preview_html)
             .with_resource("/tutorial", State::resource_tutoral);
 
         provider.args.exec_cmds.get_or_init(|| {

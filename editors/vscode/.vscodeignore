@@ -7,7 +7,6 @@
 !out/typst.tmLanguage.json
 !out/typst-code.tmLanguage.json
 !out/editor-tools/**
-!out/frontend/**
 !package.json
 !package-lock.json
 !icons/**

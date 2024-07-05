@@ -2,7 +2,11 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { readFile, writeFile } from "fs/promises";
 import { getFocusingFile, getLastFocusingDoc } from "./extension";
-import { fontsExportConfigure, fontsExportDefaultConfigure } from "editor-tools/src/features/summary";
+import {
+    fontsExportConfigure,
+    fontsExportDefaultConfigure,
+} from "editor-tools/src/features/summary";
+import { tinymist } from "./lsp";
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
     const filePath = path.resolve(context.extensionPath, relativePath);
@@ -222,7 +226,7 @@ async function activateEditorToolAt(
                             );
                             const before =
                                 selectionStart.character > 0 ? activeDocument.getText(range) : "";
-                            if (before.match(/[\p{xid_start}\p{XID_Continue}_]/)) {
+                            if (before.match(/[\p{XID_Start}\p{XID_Continue}_]/u)) {
                                 replaceText = " " + math;
                             }
 
@@ -323,17 +327,17 @@ async function activateEditorToolAt(
                 return;
             }
 
-            html = html.replace(":[[preview:FontsExportConfigure]]:", btoa(fontsExportConfigureData));
+            html = html.replace(
+                ":[[preview:FontsExportConfigure]]:",
+                btoa(fontsExportConfigureData)
+            );
             html = html.replace(":[[preview:DocumentMetrics]]:", btoa(docMetrics));
             html = html.replace(":[[preview:ServerInfo]]:", btoa(serverInfo));
             break;
         }
         case "symbol-view": {
             // tinymist.getCurrentDocumentMetrics
-            const result = await vscode.commands.executeCommand(
-                "tinymist.getResources",
-                "/symbols"
-            );
+            const result = await tinymist.getResource("/symbols");
 
             if (!result) {
                 vscode.window.showErrorMessage("No resource");

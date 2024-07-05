@@ -14,6 +14,8 @@ import {
     launchPreviewInWebView,
     previewProcessOutline,
 } from "./preview";
+import { tinymist } from "./lsp";
+import { loadHTMLFile } from "./util";
 
 const vscodeVariables = require("vscode-variables");
 
@@ -105,14 +107,6 @@ async function getCliPath(extensionPath?: string): Promise<string> {
     return (state.resolved = await resolvePath());
 }
 
-export function statusBarInit() {
-    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
-    statusBarItem.name = "typst-preview";
-    statusBarItem.command = "typst-preview.showLog";
-    statusBarItem.tooltip = "Typst Preview Status: Click to show logs";
-    return statusBarItem;
-}
-
 let outputChannel: vscode.OutputChannel | undefined = undefined;
 export function previewActiveCompat(context: vscode.ExtensionContext) {
     // Use the console to output diagnostic information (console.log) and errors (console.error)
@@ -182,6 +176,36 @@ export function previewDeactivateCompat() {
     }
 }
 
+let _previewHtml: string | undefined = undefined;
+export async function getPreviewHtml(context: vscode.ExtensionContext) {
+    if (_previewHtml) {
+        return _previewHtml;
+    }
+
+    let html;
+    if (isTinymist) {
+        html = await tinymist.getResource("/preview/index.html");
+    } else {
+        html = await loadHTMLFile(context, "./out/frontend/index.html");
+    }
+
+    if (typeof html === "string") {
+        _previewHtml = html;
+    }
+
+    return html;
+}
+
+let statusBarItem: vscode.StatusBarItem;
+
+export function statusBarInit() {
+    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+    statusBarItem.name = "typst-preview";
+    statusBarItem.command = "typst-preview.showLog";
+    statusBarItem.tooltip = "Typst Preview Status: Click to show logs";
+    return statusBarItem;
+}
+
 function statusBarItemProcess(event: "Compiling" | "CompileSuccess" | "CompileError") {
     if (isTinymist) {
         return;
@@ -222,8 +246,6 @@ function statusBarItemProcess(event: "Compiling" | "CompileSuccess" | "CompileEr
         }
     }
 }
-
-let statusBarItem: vscode.StatusBarItem;
 
 const serverProcesses: Array<any> = [];
 
