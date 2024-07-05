@@ -1,6 +1,5 @@
 use std::{borrow::Cow, collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
-use actor::typ_client::CompileHandler;
 use anyhow::Context;
 use await_tree::InstrumentAwait;
 use hyper::{
@@ -12,16 +11,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tokio::sync::{mpsc, oneshot};
+use tinymist_query::{analysis::Analysis, PositionEncoding};
+use tokio::sync::{mpsc, oneshot, watch};
 use typst::foundations::{Str, Value};
 use typst_preview::{
     await_tree::{get_await_tree_async, REGISTRY},
-    preview, CompilationHandle, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo,
-    LspEditorConnection, PreviewArgs, PreviewMode, Previewer,
+    preview, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo, LspEditorConnection,
+    PreviewArgs, PreviewMode, Previewer,
 };
 use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
 
 use super::*;
+use crate::{compile_init::CompileOnceArgs, LspUniverse};
+use actor::{typ_client::CompileHandler, typ_server::CompileServerActor};
 
 #[derive(Debug, Clone, clap::Parser)]
 pub struct PreviewCliArgs {
@@ -193,13 +195,9 @@ impl PreviewState {
         };
 
         // Create a previewer
-        let cc = compile_handler.clone();
         let previewer = preview(
             args.preview,
-            move |handle| {
-                cc.register_preview(handle);
-                cc
-            },
+            compile_handler.clone(),
             Some(editor_conn),
             TYPST_PREVIEW_HTML,
         );
@@ -230,6 +228,7 @@ impl PreviewState {
         let handle = self.client.handle.clone();
         just_future!(async move {
             let previewer = previewer.await;
+            compile_handler.register_preview(previewer.compile_watcher().clone());
 
             // Put a fence to ensure the previewer can receive the first compilation.   z
             // The fence must be put after the previewer is initialized.
@@ -275,12 +274,6 @@ impl PreviewState {
         just_ok!(JsonValue::Null)
     }
 }
-
-#[path = "preview_compiler.rs"]
-mod compiler;
-use compiler::CompileServer;
-
-use crate::{compile_init::CompileOnceArgs, LspUniverse};
 
 pub fn make_static_host(
     previewer: &Previewer,
@@ -338,47 +331,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         .lock()
         .await
         .register("root".into(), "typst-preview");
-    log::info!("Arguments: {:#?}", args);
-    let input = args.compile.input.context("entry file must be provided")?;
-    let input = Path::new(&input);
-    let entry = if input.is_absolute() {
-        input.to_owned()
-    } else {
-        std::env::current_dir().unwrap().join(input)
-    };
-    let inputs = args
-        .compile
-        .inputs
-        .iter()
-        .map(|(k, v)| (Str::from(k.as_str()), Value::Str(Str::from(v.as_str()))))
-        .collect();
-    let root = if let Some(root) = &args.compile.root {
-        if root.is_absolute() {
-            root.clone()
-        } else {
-            std::env::current_dir().unwrap().join(root)
-        }
-    } else {
-        std::env::current_dir().unwrap()
-    };
-    if !entry.starts_with(&root) {
-        log::error!("entry file must be in the root directory");
-        std::process::exit(1);
-    }
-
-    let world = {
-        let world = LspUniverse::new(CompileOpts {
-            entry: EntryOpts::new_rooted(root.clone(), Some(entry.clone())),
-            inputs,
-            no_system_fonts: args.compile.font.ignore_system_fonts,
-            font_paths: args.compile.font.font_paths.clone(),
-            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
-            ..CompileOpts::default()
-        })
-        .expect("incorrect options");
-
-        world.with_entry_file(entry)
-    };
+    log::info!("Arguments: {args:#?}");
 
     tokio::spawn(async move {
         let _ = tokio::signal::ctrl_c().await;
@@ -386,31 +339,102 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         std::process::exit(0);
     });
 
-    let previewer = preview(
-        args.preview,
-        move |handle| {
-            let compile_server = CompileServer::new(world, handle);
+    let entry = {
+        let input = args.compile.input.context("entry file must be provided")?;
+        let input = Path::new(&input);
+        let entry = if input.is_absolute() {
+            input.to_owned()
+        } else {
+            std::env::current_dir().unwrap().join(input)
+        };
 
-            compile_server.spawn().unwrap()
-        },
-        None,
-        TYPST_PREVIEW_HTML,
-    );
+        let root = if let Some(root) = &args.compile.root {
+            if root.is_absolute() {
+                root.clone()
+            } else {
+                std::env::current_dir().unwrap().join(root)
+            }
+        } else {
+            std::env::current_dir().unwrap()
+        };
+
+        if !entry.starts_with(&root) {
+            log::error!("entry file must be in the root directory");
+            std::process::exit(1);
+        }
+
+        EntryOpts::new_rooted(root.clone(), Some(entry.clone()))
+    };
+
+    let inputs = args
+        .compile
+        .inputs
+        .iter()
+        .map(|(k, v)| (Str::from(k.as_str()), Value::Str(Str::from(v.as_str()))))
+        .collect();
+
+    let world = LspUniverse::new(CompileOpts {
+        entry,
+        inputs,
+        no_system_fonts: args.compile.font.ignore_system_fonts,
+        font_paths: args.compile.font.font_paths.clone(),
+        with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+        ..CompileOpts::default()
+    })
+    .expect("incorrect options");
+
+    let (service, handle) = {
+        // type EditorSender = mpsc::UnboundedSender<EditorRequest>;
+        let (doc_tx, _) = watch::channel(None);
+        let (export_tx, mut export_rx) = mpsc::unbounded_channel();
+        let (editor_tx, mut editor_rx) = mpsc::unbounded_channel();
+        let (intr_tx, intr_rx) = mpsc::unbounded_channel();
+
+        let handle = Arc::new(CompileHandler {
+            inner: Default::default(),
+            diag_group: "main".to_owned(),
+            intr_tx: intr_tx.clone(),
+            doc_tx,
+            export_tx,
+            editor_tx,
+            analysis: Analysis {
+                position_encoding: PositionEncoding::Utf16,
+                enable_periscope: false,
+                caches: Default::default(),
+            },
+            periscope: tinymist_render::PeriscopeRenderer::default(),
+        });
+
+        // Consume export_tx and editor_rx
+        tokio::spawn(async move { while export_rx.recv().await.is_some() {} });
+        tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
+
+        let service =
+            CompileServerActor::new(world, intr_tx, intr_rx).with_watch(Some(handle.clone()));
+
+        (service, handle)
+    };
+
+    let previewer = preview(args.preview, handle.clone(), None, TYPST_PREVIEW_HTML);
+
     let previewer = async_root
         .instrument(previewer)
         .instrument_await("preview")
         .await;
 
-    let static_file_addr = args.static_file_host;
-    let mode = args.preview_mode;
+    handle.register_preview(previewer.compile_watcher().clone());
+    tokio::spawn(service.spawn().instrument_await("spawn typst server"));
+
     let (static_server_addr, _, static_server_handle) =
-        make_static_host(&previewer, static_file_addr, mode);
+        make_static_host(&previewer, args.static_file_host, args.preview_mode);
     log::info!("Static file server listening on: {}", static_server_addr);
+
     if !args.dont_open_in_browser {
         if let Err(e) = open::that_detached(format!("http://{}", static_server_addr)) {
             log::error!("failed to open browser: {}", e);
         };
     }
+
     let _ = tokio::join!(previewer.join(), static_server_handle);
 
     Ok(())

@@ -166,11 +166,10 @@ export function previewActiveCompat(context: vscode.ExtensionContext) {
 
 // This method is called when your extension is deactivated
 export function previewDeactivateCompat() {
-    console.log(activeTask);
+    console.log("killing preview services, count", activeTask.size);
     for (const [_, task] of activeTask) {
         task.panel?.dispose();
     }
-    console.log("killing preview services");
     for (const serverProcess of serverProcesses) {
         serverProcess.kill();
     }

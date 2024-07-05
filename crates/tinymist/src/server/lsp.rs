@@ -46,10 +46,6 @@ pub struct LanguageState {
     pub client: TypedLspClient<Self>,
 
     // State to synchronize with the client.
-    /// Whether the server is shutting down.
-    pub shutdown_requested: bool,
-
-    // State to synchronize with the client.
     /// Whether the server has registered semantic tokens capabilities.
     pub sema_tokens_registered: bool,
     /// Whether the server has registered document formatter capabilities.
@@ -114,7 +110,6 @@ impl LanguageState {
             ),
             preview: PreviewState::new(client.cast(|s| &mut s.preview)),
             dedicates: Vec::new(),
-            shutdown_requested: false,
             ever_focusing_by_activities: false,
             ever_manual_focusing: false,
             sema_tokens_registered: false,
@@ -361,7 +356,6 @@ impl LanguageState {
     /// request to the server again, the server will respond with JSON-RPC
     /// error code `-32600` (invalid request).
     fn shutdown(&mut self, _params: ()) -> SchedulableResponse<()> {
-        self.shutdown_requested = true;
         just_ok!(())
     }
 }

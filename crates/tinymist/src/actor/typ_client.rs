@@ -69,15 +69,13 @@ use crate::{
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
-use crate::tools::preview::CompilationHandle as PreviewCompilationHandle;
-
 pub struct CompileHandler {
     pub(crate) diag_group: String,
     pub(crate) analysis: Analysis,
     pub(crate) periscope: PeriscopeRenderer,
 
     #[cfg(feature = "preview")]
-    pub(crate) inner: Arc<RwLock<Option<typst_preview::CompilationHandleImpl>>>,
+    pub(crate) inner: Arc<RwLock<Option<Arc<typst_preview::CompileWatcher>>>>,
 
     pub(crate) intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
     pub(crate) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
@@ -213,7 +211,7 @@ impl CompileHandler {
     }
 
     #[cfg(feature = "preview")]
-    pub fn register_preview(&self, handle: typst_preview::CompilationHandleImpl) {
+    pub fn register_preview(&self, handle: Arc<typst_preview::CompileWatcher>) {
         // todo: conflict detection
         *self.inner.write() = Some(handle);
     }
@@ -233,8 +231,8 @@ impl CompileHandler {
     }
 }
 
-impl PreviewCompilationHandle for CompileHandler {
-    fn status(&self, _status: CompileStatus) {
+impl CompileHandler {
+    pub fn preview_status(&self, _status: CompileStatus) {
         self.editor_tx
             .send(EditorRequest::Status(
                 self.diag_group.clone(),
@@ -248,7 +246,11 @@ impl PreviewCompilationHandle for CompileHandler {
         }
     }
 
-    fn notify_compile(&self, res: Result<Arc<TypstDocument>, CompileStatus>, is_on_saved: bool) {
+    pub fn preview_notify_compile(
+        &self,
+        res: Result<Arc<TypstDocument>, CompileStatus>,
+        is_on_saved: bool,
+    ) {
         if let Ok(doc) = res.clone() {
             let _ = self.doc_tx.send(Some(doc.clone()));
             let _ = self.export_tx.send(ExportRequest::OnTyped);
@@ -288,7 +290,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             }
         };
 
-        <Self as PreviewCompilationHandle>::status(self, status);
+        self.preview_status(status);
     }
 
     fn notify_compile(&self, snap: &CompiledArtifact<LspCompilerFeat>, _rep: CompileReport) {
@@ -302,11 +304,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             snap.env.tracer.as_ref().map(|e| e.clone().warnings()),
         );
 
-        <Self as PreviewCompilationHandle>::notify_compile(
-            self,
-            res,
-            snap.flags.triggered_by_fs_events,
-        );
+        self.preview_notify_compile(res, snap.flags.triggered_by_fs_events);
     }
 }
 

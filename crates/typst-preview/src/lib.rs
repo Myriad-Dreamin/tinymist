@@ -7,8 +7,8 @@ mod outline;
 pub use actor::editor::{
     CompileStatus, ControlPlaneMessage, ControlPlaneResponse, LspEditorConnection,
 };
+pub use args::*;
 pub use outline::Outline;
-use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
 use std::pin::Pin;
 use std::{collections::HashMap, future::Future, path::PathBuf, sync::Arc};
@@ -19,6 +19,7 @@ use futures::SinkExt;
 use log::info;
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::{layout::Position, syntax::Span};
@@ -26,19 +27,17 @@ use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_core::Error;
 use typst_ts_core::{ImmutStr, TypstDocument as Document};
 
+use crate::actor::editor::EditorActorRequest;
+use crate::actor::render::RenderActorRequest;
+use actor::editor::{EditorActor, EditorConnection};
+use actor::typst::TypstActor;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DocToSrcJumpInfo {
     pub filepath: String,
     pub start: Option<(usize, usize)>, // row, column
     pub end: Option<(usize, usize)>,
 }
-
-use actor::editor::{EditorActor, EditorConnection};
-use actor::typst::TypstActor;
-pub use args::*;
-
-use crate::actor::editor::EditorActorRequest;
-use crate::actor::render::RenderActorRequest;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChangeCursorPositionRequest {
@@ -49,12 +48,6 @@ pub struct ChangeCursorPositionRequest {
     character: usize,
 }
 
-// JSON.stringify({
-// 		'event': 'panelScrollTo',
-// 		'filepath': bindDocument.uri.fsPath,
-// 		'line': activeEditor.selection.active.line,
-// 		'character': activeEditor.selection.active.character,
-// 	})
 #[derive(Debug, Deserialize)]
 pub struct SrcToDocJumpRequest {
     filepath: PathBuf,
@@ -81,12 +74,7 @@ pub struct MemoryFilesShort {
     // mtime: Option<u64>,
 }
 
-pub trait CompilationHandle: Send + 'static {
-    fn status(&self, status: CompileStatus);
-    fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>, is_on_saved: bool);
-}
-
-pub struct CompilationHandleImpl {
+pub struct CompileWatcher {
     task_id: String,
     refresh_style: RefreshStyle,
     doc_sender: watch::Sender<Option<Arc<Document>>>,
@@ -94,20 +82,18 @@ pub struct CompilationHandleImpl {
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
 
-impl CompilationHandleImpl {
+impl CompileWatcher {
     pub fn task_id(&self) -> &str {
         &self.task_id
     }
-}
 
-impl CompilationHandle for CompilationHandleImpl {
-    fn status(&self, status: CompileStatus) {
+    pub fn status(&self, status: CompileStatus) {
         let _ = self
             .editor_tx
             .send(EditorActorRequest::CompileStatus(status));
     }
 
-    fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>, is_on_saved: bool) {
+    pub fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>, is_on_saved: bool) {
         if self.refresh_style == RefreshStyle::OnSave && !is_on_saved {
             return;
         }
@@ -140,6 +126,7 @@ pub struct Previewer {
     data_plane_handle: tokio::task::JoinHandle<()>,
     control_plane_handle: tokio::task::JoinHandle<()>,
     data_plane_port: u16,
+    compile_watcher: Arc<CompileWatcher>,
 }
 
 impl Previewer {
@@ -150,6 +137,10 @@ impl Previewer {
 
     pub fn data_plane_port(&self) -> u16 {
         self.data_plane_port
+    }
+
+    pub fn compile_watcher(&self) -> &Arc<CompileWatcher> {
+        &self.compile_watcher
     }
 
     /// Join the previewer actors.
@@ -215,7 +206,7 @@ pub trait CompileHost: SourceFileServer + EditorServer {}
 
 pub async fn preview<T: CompileHost + Send + Sync + 'static>(
     arguments: PreviewArgs,
-    client: impl FnOnce(CompilationHandleImpl) -> Arc<T>,
+    client: Arc<T>,
     lsp_connection: Option<LspEditorConnection>,
     html: &str,
 ) -> Previewer {
@@ -235,13 +226,13 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
 
     // Set callback
     let doc_watcher = watch::channel::<Option<Arc<Document>>>(None);
-    let client = client(CompilationHandleImpl {
+    let compile_watcher = CompileWatcher {
         task_id: arguments.task_id,
         refresh_style: arguments.refresh_style,
         doc_sender: doc_watcher.0,
         editor_tx: editor_conn.0.clone(),
         render_tx: renderer_mailbox.0.clone(),
-    });
+    };
 
     // Spawns the typst actor
     let typst_actor = TypstActor::new(
@@ -414,6 +405,7 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
         control_plane_handle,
         data_plane_port,
         stop: Some(Box::new(stop)),
+        compile_watcher: Arc::new(compile_watcher),
     }
 }
 

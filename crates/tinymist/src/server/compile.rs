@@ -21,10 +21,6 @@ pub struct CompileState {
     /// The lsp client
     pub client: TypedLspClient<Self>,
 
-    // State to synchronize with the client.
-    /// Whether the server is shutting down.
-    pub shutdown_requested: bool,
-
     // Configurations
     /// User configuration from the editor.
     pub config: CompileConfig,
@@ -51,7 +47,6 @@ impl CompileState {
         CompileState {
             client,
             editor_tx,
-            shutdown_requested: false,
             config: compile_config,
             const_config,
             compiler: None,

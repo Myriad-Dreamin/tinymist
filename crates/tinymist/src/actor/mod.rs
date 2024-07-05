@@ -124,17 +124,6 @@ impl CompileState {
 }
 
 impl LanguageState {
-    pub fn server(
-        &self,
-        diag_group: String,
-        entry: EntryState,
-        inputs: ImmutDict,
-    ) -> CompileClientActor {
-        // Take all dirty files in memory as the initial snapshot
-        self.primary
-            .server(diag_group, entry, inputs, self.primary.vfs_snapshot())
-    }
-
     pub fn run_format_thread(&mut self) {
         if self.format_thread.is_some() {
             log::error!("formatting thread is already started");
