@@ -393,7 +393,15 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             std::process::exit(1);
         }
 
-        EntryOpts::new_rooted(root.clone(), Some(entry.clone()))
+        let relative_entry = match entry.strip_prefix(&root) {
+            Ok(e) => e,
+            Err(_) => {
+                log::error!("entry path must be inside the root: {}", entry.display());
+                std::process::exit(1);
+            }
+        };
+
+        EntryOpts::new_rooted(root.clone(), Some(relative_entry.to_owned()))
     };
 
     let inputs = args
@@ -455,7 +463,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     handle.register_preview(previewer.compile_watcher().clone());
     tokio::spawn(service.spawn().instrument_await("spawn typst server"));
 
-    let (static_server_addr, _, static_server_handle) =
+    let (static_server_addr, _tx, static_server_handle) =
         make_static_host(&previewer, args.static_file_host, args.preview_mode);
     log::info!("Static file server listening on: {}", static_server_addr);
 
