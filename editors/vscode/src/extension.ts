@@ -36,19 +36,24 @@ import {
 import { DisposeList } from "./util";
 import { client, setClient } from "./lsp";
 
-export function activate(context: ExtensionContext): Promise<void> {
-    const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
-    if (typstPreviewExtension) {
-        void vscode.window.showWarningMessage(
-            "Tinymist Says:\n\nTypst Preview extension is already integrated into Tinymist. Please disable Typst Preview extension to avoid conflicts."
-        );
-    }
+let previewIsEnabled = false;
 
+export function activate(context: ExtensionContext): Promise<void> {
     let config: Record<string, any> = JSON.parse(
         JSON.stringify(workspace.getConfiguration("tinymist"))
     );
 
+    previewIsEnabled = config.preview === "enable";
     enableOnEnter = !!config.onEnterEvent;
+
+    if (previewIsEnabled) {
+        const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
+        if (typstPreviewExtension) {
+            void vscode.window.showWarningMessage(
+                "Tinymist Says:\n\nTypst Preview extension is already integrated into Tinymist. Please disable Typst Preview extension to avoid conflicts."
+            );
+        }
+    }
 
     {
         const keys = Object.keys(config);
@@ -60,12 +65,14 @@ export function activate(context: ExtensionContext): Promise<void> {
         }
     }
 
-    // test compat-mode preview extension
-    // previewActivate(context, true);
+    if (previewIsEnabled) {
+        // test compat-mode preview extension
+        // previewActivate(context, true);
 
-    // integrated preview extension
-    previewSetIsTinymist(config);
-    previewActivate(context, false);
+        // integrated preview extension
+        previewSetIsTinymist(config);
+        previewActivate(context, false);
+    }
 
     return startClient(context, config).catch((e) => {
         void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
@@ -243,7 +250,10 @@ async function startClient(context: ExtensionContext, config: Record<string, any
     );
 
     await client.start();
-    previewPreload(context);
+
+    if (previewIsEnabled) {
+        previewPreload(context);
+    }
 
     // Watch all non typst files.
     // todo: more general ways to do this.

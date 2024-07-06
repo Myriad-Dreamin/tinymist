@@ -106,3 +106,64 @@ Set the print width for the formatter, which is a **soft limit** of characters p
 
 - **Type**: `number`
 - **Default**: `120`
+
+## `preview`
+
+Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Enum**:
+  - `enable`
+  - `disable`
+- **Default**: `"enable"`
+
+## `preview.refresh`
+
+Refresh preview when the document is saved or when the document is changed
+
+- **Type**: `string`
+- **Enum**:
+  - `onSave`: Refresh preview on save
+  - `onType`: Refresh preview on type
+- **Default**: `"onType"`
+
+## `preview.scrollSync`
+
+Configure scroll sync mode.
+
+- **Type**: `string`
+- **Enum**:
+  - `never`: Disable automatic scroll sync
+  - `onSelectionChangeByMouse`: Scroll preview to current cursor position when selection changes by mouse
+  - `onSelectionChange`: Scroll preview to current cursor position when selection changes by mouse or keyboard (any source)
+- **Default**: `"onSelectionChangeByMouse"`
+
+## `preview.partialRendering`
+
+Only render visible part of the document. This can improve performance but still being experimental.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `preview.invertColors`
+
+Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview.
+
+- **Type**: `string`
+- **Enum**:
+  - `never`: Disable color inversion of the preview
+  - `auto`: Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document
+  - `always`: Always invert colors of the preview
+- **Default**: `"never"`
+
+## `preview.cursorIndicator`
+
+(Experimental) Show typst cursor indicator in preview.
+
+- **Type**: `boolean`
+
+## `preview.showInActivityBar`
+
+(Experimental) Show a preview panel in activity bar.
+
+- **Type**: `boolean`

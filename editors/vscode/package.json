@@ -42,15 +42,15 @@
                     "when": "resourceLangId == typst"
                 },
                 {
-                    "id": "typst-preview.content-preview",
+                    "id": "tinymist.preview.content-preview",
                     "type": "webview",
                     "name": "Content",
-                    "when": "config.typst-preview.showInActivityBar && resourceLangId == typst"
+                    "when": "(config.tinymist.preview.showInActivityBar || config.typst-preview.showInActivityBar) && resourceLangId == typst"
                 },
                 {
-                    "id": "typst-preview.outline",
+                    "id": "tinymist.preview.outline",
                     "name": "Outline",
-                    "when": "config.typst-preview.showInActivityBar && resourceLangId == typst"
+                    "when": "(config.tinymist.preview.showInActivityBar || config.typst-preview.showInActivityBar) && resourceLangId == typst"
                 }
             ]
         },
@@ -191,7 +191,17 @@
                     "type": "number",
                     "default": 120
                 },
-                "typst-preview.sysInputs": {
+                "tinymist.preview": {
+                    "title": "Enable preview features",
+                    "description": "Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.",
+                    "type": "string",
+                    "default": "enable",
+                    "enum": [
+                        "enable",
+                        "disable"
+                    ]
+                },
+                "tinymist.preview.sysInputs": {
                     "type": "object",
                     "items": {
                         "type": "string"
@@ -200,13 +210,13 @@
                     "description": "key-value pairs visible through `sys.inputs`, corresponds to `--input` argument of typst cli",
                     "markdownDeprecationMessage": "The configuration item is ignored. Please see `tinymist.typstExtraArgs` for inputs."
                 },
-                "typst-preview.systemFonts": {
+                "tinymist.preview.systemFonts": {
                     "type": "boolean",
                     "default": true,
                     "description": "Whether to load system fonts. If disabled, only fonts in `typst-preview.fontPaths` is loaded",
                     "markdownDeprecationMessage": "The configuration item is ignored. Please use `tinymist.systemFonts` instead."
                 },
-                "typst-preview.fontPaths": {
+                "tinymist.preview.fontPaths": {
                     "type": "array",
                     "items": {
                         "type": "string",
@@ -217,7 +227,7 @@
                     "description": "List of *additional* paths to font assets used by typst-preview.",
                     "markdownDeprecationMessage": "The configuration item is ignored. Please use `tinymist.fontPaths` instead."
                 },
-                "typst-preview.refresh": {
+                "tinymist.preview.refresh": {
                     "title": "Refresh preview",
                     "description": "Refresh preview when the document is saved or when the document is changed",
                     "type": "string",
@@ -231,7 +241,7 @@
                         "Refresh preview on type"
                     ]
                 },
-                "typst-preview.scrollSync": {
+                "tinymist.preview.scrollSync": {
                     "description": "Configure scroll sync mode.",
                     "type": "string",
                     "enum": [
@@ -246,12 +256,12 @@
                         "Scroll preview to current cursor position when selection changes by mouse or keyboard (any source)"
                     ]
                 },
-                "typst-preview.partialRendering": {
+                "tinymist.preview.partialRendering": {
                     "description": "Only render visible part of the document. This can improve performance but still being experimental.",
                     "type": "boolean",
                     "default": true
                 },
-                "typst-preview.invertColors": {
+                "tinymist.preview.invertColors": {
                     "description": "Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview.",
                     "type": "string",
                     "enum": [
@@ -266,17 +276,17 @@
                         "Always invert colors of the preview"
                     ]
                 },
-                "typst-preview.cursorIndicator": {
+                "tinymist.preview.cursorIndicator": {
                     "description": "(Experimental) Show typst cursor indicator in preview.",
                     "type": "boolean",
                     "default": false
                 },
-                "typst-preview.showInActivityBar": {
+                "tinymist.preview.showInActivityBar": {
                     "description": "(Experimental) Show a preview panel in activity bar.",
                     "type": "boolean",
                     "default": false
                 },
-                "typst-preview.pinPreviewFile": {
+                "tinymist.preview.pinPreviewFile": {
                     "description": "Declare current previewing file as entrypoint for typst-lsp or tinymist. This will make typst-lsp or tinymist to use this file as entrypoint instead of the file opened in vscode. This can improve diagnostics messages and auto completion but still being experimental.",
                     "type": "boolean",
                     "default": false,
@@ -658,7 +668,7 @@
             "view/title": [
                 {
                     "command": "typst-preview.noteOutline",
-                    "when": "view == typst-preview.outline",
+                    "when": "view == tinymist.preview.outline",
                     "group": "navigation"
                 }
             ]
