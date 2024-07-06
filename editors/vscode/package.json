@@ -197,12 +197,14 @@
                         "type": "string"
                     },
                     "default": {},
-                    "description": "key-value pairs visible through `sys.inputs`, corresponds to `--input` argument of typst cli"
+                    "description": "key-value pairs visible through `sys.inputs`, corresponds to `--input` argument of typst cli",
+                    "markdownDeprecationMessage": "The configuration item is ignored. Please see `tinymist.typstExtraArgs` for inputs."
                 },
                 "typst-preview.systemFonts": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Whether to load system fonts. If disabled, only fonts in `typst-preview.fontPaths` is loaded"
+                    "description": "Whether to load system fonts. If disabled, only fonts in `typst-preview.fontPaths` is loaded",
+                    "markdownDeprecationMessage": "The configuration item is ignored. Please use `tinymist.systemFonts` instead."
                 },
                 "typst-preview.fontPaths": {
                     "type": "array",
@@ -212,7 +214,8 @@
                         "description": "Absolute path to a directory or file containing font assets."
                     },
                     "default": [],
-                    "description": "List of *additional* paths to font assets used by typst-preview."
+                    "description": "List of *additional* paths to font assets used by typst-preview.",
+                    "markdownDeprecationMessage": "The configuration item is ignored. Please use `tinymist.fontPaths` instead."
                 },
                 "typst-preview.refresh": {
                     "title": "Refresh preview",
@@ -273,23 +276,11 @@
                     "type": "boolean",
                     "default": false
                 },
-                "typst-preview.statusBarIndicator": {
-                    "description": "Style of status bar indicator for typst-preview.",
-                    "type": "string",
-                    "enum": [
-                        "full",
-                        "compact"
-                    ],
-                    "default": "compact",
-                    "enumDescriptions": [
-                        "Show full status bar indicator (ICON Compile Success)",
-                        "Show compact status bar indicator (ICON)"
-                    ]
-                },
                 "typst-preview.pinPreviewFile": {
-                    "description": "Declare current previewing file as entrypoint for typst-lsp. This will make typst-lsp to use this file as entrypoint instead of the file opened in vscode. This can improve diagnostics messages and auto completion but still being experimental.",
+                    "description": "Declare current previewing file as entrypoint for typst-lsp or tinymist. This will make typst-lsp or tinymist to use this file as entrypoint instead of the file opened in vscode. This can improve diagnostics messages and auto completion but still being experimental.",
                     "type": "boolean",
-                    "default": false
+                    "default": false,
+                    "markdownDeprecationMessage": "This setting is deprecated and no longer needed. The extension will always pin the previewed file as the entrypoint for the language server."
                 }
             }
         },
@@ -679,8 +670,7 @@
         "onCommand:tinymist.clearCache"
     ],
     "scripts": {
-        "build:preview-frontend": "cd ../../tools/typst-preview-frontend && yarn run build && cd ../../editors/vscode && rimraf ./out/frontend/ && cpr ../../tools/typst-preview-frontend/dist/ ./out/frontend/ && rimraf ../../crates/tinymist-assets/src/typst-preview.html && cpr ./out/frontend/index.html ../../crates/tinymist-assets/src/typst-preview.html",
-        "build:frontend": "yarn build:preview-frontend && cd ../../tools/editor-tools/ && yarn run build",
+        "build:frontend": "cd ../../ && yarn build:preview && yarn build:editor-tools",
         "build:syntax": "cd ../../syntaxes/textmate && yarn run compile && yarn run bundle",
         "build-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node16",
         "vscode:prepublish": "yarn run build-base -- --minify && yarn run build:frontend && node scripts/postinstall.cjs && node scripts/config-man.cjs",
@@ -697,7 +687,6 @@
     "dependencies": {
         "vscode-languageclient": "^9.0.1",
         "vscode-variables": "^0.1.3",
-        "typst-preview-frontend": "link:../../tools/typst-preview-frontend",
         "editor-tools": "link:../../tools/editor-tools",
         "cpr": "^3.0.1",
         "node-fetch": "^3.3.2",
@@ -718,7 +707,6 @@
         "eslint-plugin-promise": "^6.1.1",
         "ovsx": "^0.8.3",
         "prettier": "^3.0.3",
-        "rimraf": "^5.0.5",
         "typescript": "^5.2.2"
     }
 }

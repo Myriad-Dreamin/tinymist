@@ -26,10 +26,15 @@ import {
 } from "./editor-tools";
 import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
 import { applySnippetTextEdits } from "./snippets";
-import { setIsTinymist } from "./preview-compat";
-import { previewActive, previewDeactivate } from "./preview";
-
-let client: LanguageClient | undefined = undefined;
+import { setIsTinymist as previewSetIsTinymist } from "./preview-compat";
+import {
+    previewActivate,
+    previewDeactivate,
+    previewPreload,
+    previewProcessOutline,
+} from "./preview";
+import { DisposeList } from "./util";
+import { client, setClient } from "./lsp";
 
 export function activate(context: ExtensionContext): Promise<void> {
     const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
@@ -55,8 +60,13 @@ export function activate(context: ExtensionContext): Promise<void> {
         }
     }
 
-    setIsTinymist(config);
-    previewActive(context, false);
+    // test compat-mode preview extension
+    // previewActivate(context, true);
+
+    // integrated preview extension
+    previewSetIsTinymist(config);
+    previewActivate(context, false);
+
     return startClient(context, config).catch((e) => {
         void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
         throw e;
@@ -104,47 +114,92 @@ async function startClient(context: ExtensionContext, config: Record<string, any
         },
     };
 
-    client = new LanguageClient(
+    const client = new LanguageClient(
         "tinymist",
         "Tinymist Typst Language Server",
         serverOptions,
         clientOptions
     );
+    setClient(client);
 
     client.onNotification("tinymist/compileStatus", (params) => {
         wordCountItemProcess(params);
     });
 
-    window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
-        if (editor?.document.isUntitled) {
+    interface JumpInfo {
+        filepath: string;
+        start: [number, number] | null;
+        end: [number, number] | null;
+    }
+    client.onNotification("tinymist/preview/scrollSource", async (jump: JumpInfo) => {
+        const activeEditor = window.activeTextEditor;
+        if (!activeEditor) {
             return;
         }
-        const langId = editor?.document.languageId;
-        // todo: plaintext detection
-        // if (langId === "plaintext") {
-        //     console.log("plaintext", langId, editor?.document.uri.fsPath);
-        // }
-        if (langId !== "typst") {
-            // console.log("not typst", langId, editor?.document.uri.fsPath);
-            return commandActivateDoc(undefined);
+
+        console.log("recv editorScrollTo request", jump);
+        if (jump.start === null || jump.end === null) {
+            return;
         }
-        return commandActivateDoc(editor?.document);
+
+        // open this file and show in editor
+        const doc = await vscode.workspace.openTextDocument(jump.filepath);
+        const editor = await vscode.window.showTextDocument(doc, activeEditor.viewColumn);
+        const startPosition = new vscode.Position(jump.start[0], jump.start[1]);
+        const endPosition = new vscode.Position(jump.end[0], jump.end[1]);
+        const range = new vscode.Range(startPosition, endPosition);
+        editor.selection = new vscode.Selection(range.start, range.end);
+        editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
     });
-    vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
-        if (doc.isUntitled && window.activeTextEditor?.document === doc) {
-            if (doc.languageId === "typst") {
-                return commandActivateDocPath(doc, "/untitled/" + doc.uri.fsPath);
-            } else {
+
+    client.onNotification("tinymist/documentOutline", async (data: any) => {
+        previewProcessOutline(data);
+    });
+
+    client.onNotification("tinymist/preview/dispose", ({ taskId }) => {
+        const dispose = previewDisposes[taskId];
+        if (dispose) {
+            dispose();
+            delete previewDisposes[taskId];
+        }
+    });
+
+    context.subscriptions.push(
+        window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
+            if (editor?.document.isUntitled) {
+                return;
+            }
+            const langId = editor?.document.languageId;
+            // todo: plaintext detection
+            // if (langId === "plaintext") {
+            //     console.log("plaintext", langId, editor?.document.uri.fsPath);
+            // }
+            if (langId !== "typst") {
+                // console.log("not typst", langId, editor?.document.uri.fsPath);
                 return commandActivateDoc(undefined);
             }
-        }
-    });
-    vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
-        if (focusingDoc === doc) {
-            focusingDoc = undefined;
-            commandActivateDoc(undefined);
-        }
-    });
+            return commandActivateDoc(editor?.document);
+        })
+    );
+    context.subscriptions.push(
+        vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
+            if (doc.isUntitled && window.activeTextEditor?.document === doc) {
+                if (doc.languageId === "typst") {
+                    return commandActivateDocPath(doc, "/untitled/" + doc.uri.fsPath);
+                } else {
+                    return commandActivateDoc(undefined);
+                }
+            }
+        })
+    );
+    context.subscriptions.push(
+        vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
+            if (focusingDoc === doc) {
+                focusingDoc = undefined;
+                commandActivateDoc(undefined);
+            }
+        })
+    );
 
     context.subscriptions.push(
         commands.registerCommand("tinymist.onEnter", onEnterHandler()),
@@ -188,6 +243,61 @@ async function startClient(context: ExtensionContext, config: Record<string, any
     );
 
     await client.start();
+    previewPreload(context);
+
+    // Watch all non typst files.
+    // todo: more general ways to do this.
+    const isInterestingNonTypst = (doc: vscode.TextDocument) => {
+        return (
+            doc.languageId !== "typst" &&
+            (doc.uri.scheme === "file" || doc.uri.scheme === "untitled")
+        );
+    };
+    context.subscriptions.push(
+        vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
+            if (!isInterestingNonTypst(doc)) {
+                return;
+            }
+            client?.sendNotification("textDocument/didOpen", {
+                textDocument: client.code2ProtocolConverter.asTextDocumentItem(doc),
+            });
+        }),
+        vscode.workspace.onDidChangeTextDocument((e: vscode.TextDocumentChangeEvent) => {
+            const doc = e.document;
+            if (!isInterestingNonTypst(doc) || !client) {
+                return;
+            }
+            const contentChanges = [];
+            for (const change of e.contentChanges) {
+                contentChanges.push({
+                    range: client.code2ProtocolConverter.asRange(change.range),
+                    rangeLength: change.rangeLength,
+                    text: change.text,
+                });
+            }
+            client.sendNotification("textDocument/didChange", {
+                textDocument: client.code2ProtocolConverter.asVersionedTextDocumentIdentifier(doc),
+                contentChanges,
+            });
+        }),
+        vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
+            if (!isInterestingNonTypst(doc)) {
+                return;
+            }
+            client?.sendNotification("textDocument/didClose", {
+                textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(doc),
+            });
+        })
+    );
+    for (const doc of vscode.workspace.textDocuments) {
+        if (!isInterestingNonTypst(doc)) {
+            continue;
+        }
+
+        client.sendNotification("textDocument/didOpen", {
+            textDocument: client.code2ProtocolConverter.asTextDocumentItem(doc),
+        });
+    }
 
     // Find first document to focus
     const editor = window.activeTextEditor;
@@ -392,6 +502,45 @@ async function commandShow(kind: string, extraOpts?: any): Promise<void> {
         viewColumn: ViewColumn.Beside,
         preserveFocus: true,
     } as vscode.TextDocumentShowOptions);
+}
+
+export interface PreviewResult {
+    staticServerPort?: number;
+    staticServerAddr?: string;
+    dataPlanePort?: number;
+}
+
+const previewDisposes: Record<string, () => void> = {};
+export function registerPreviewTaskDispose(taskId: string, dl: DisposeList): void {
+    if (previewDisposes[taskId]) {
+        throw new Error(`Task ${taskId} already exists`);
+    }
+    dl.add(() => {
+        delete previewDisposes[taskId];
+    });
+    previewDisposes[taskId] = () => dl.dispose();
+}
+
+export async function commandStartPreview(previewArgs: string[]): Promise<PreviewResult> {
+    const res = await client?.sendRequest<PreviewResult>("workspace/executeCommand", {
+        command: `tinymist.doStartPreview`,
+        arguments: [previewArgs],
+    });
+    return res || {};
+}
+
+export async function commandKillPreview(taskId: string): Promise<void> {
+    return await client?.sendRequest("workspace/executeCommand", {
+        command: `tinymist.doKillPreview`,
+        arguments: [taskId],
+    });
+}
+
+export async function commandScrollPreview(taskId: string, req: any): Promise<void> {
+    return await client?.sendRequest("workspace/executeCommand", {
+        command: `tinymist.scrollPreview`,
+        arguments: [taskId, req],
+    });
 }
 
 async function commandClearCache(): Promise<void> {

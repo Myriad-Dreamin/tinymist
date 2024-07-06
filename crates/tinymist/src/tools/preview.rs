@@ -4,7 +4,7 @@ use std::path::Path;
 use typst::layout::{Frame, FrameItem, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
-pub use typst_preview::{CompilationHandle, CompileStatus};
+pub use typst_preview::CompileStatus;
 use typst_preview::{
     CompileHost, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
     SourceFileServer,

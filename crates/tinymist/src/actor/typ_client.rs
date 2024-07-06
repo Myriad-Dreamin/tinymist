@@ -34,7 +34,7 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use log::{error, info, trace};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnalysisResources},
     DiagnosticsMap, ExportKind, ServerInfoResponse, VersionedDocument,
@@ -69,15 +69,13 @@ use crate::{
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
-use crate::tools::preview::CompilationHandle as PreviewCompilationHandle;
-
 pub struct CompileHandler {
     pub(crate) diag_group: String,
     pub(crate) analysis: Analysis,
     pub(crate) periscope: PeriscopeRenderer,
 
     #[cfg(feature = "preview")]
-    pub(crate) inner: Arc<Option<typst_preview::CompilationHandleImpl>>,
+    pub(crate) inner: Arc<RwLock<Option<Arc<typst_preview::CompileWatcher>>>>,
 
     pub(crate) intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
     pub(crate) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
@@ -211,10 +209,30 @@ impl CompileHandler {
         let mut analysis = self.analysis.snapshot(root, &w);
         Ok(f(&mut analysis))
     }
+
+    #[cfg(feature = "preview")]
+    pub fn register_preview(&self, handle: Arc<typst_preview::CompileWatcher>) {
+        // todo: conflict detection
+        *self.inner.write() = Some(handle);
+    }
+
+    #[cfg(feature = "preview")]
+    pub fn unregister_preview(&self, task_id: &str) {
+        let mut p = self.inner.write();
+        if p.as_ref().is_some_and(|p| p.task_id() == task_id) {
+            *p = None;
+        }
+    }
+
+    // todo: multiple preview support
+    #[cfg(feature = "preview")]
+    pub fn registered_preview(&self) -> bool {
+        self.inner.read().is_some()
+    }
 }
 
-impl PreviewCompilationHandle for CompileHandler {
-    fn status(&self, _status: CompileStatus) {
+impl CompileHandler {
+    pub fn preview_status(&self, _status: CompileStatus) {
         self.editor_tx
             .send(EditorRequest::Status(
                 self.diag_group.clone(),
@@ -223,12 +241,16 @@ impl PreviewCompilationHandle for CompileHandler {
             .unwrap();
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.inner.as_ref() {
+        if let Some(inner) = self.inner.read().as_ref() {
             inner.status(_status);
         }
     }
 
-    fn notify_compile(&self, res: Result<Arc<TypstDocument>, CompileStatus>) {
+    pub fn preview_notify_compile(
+        &self,
+        res: Result<Arc<TypstDocument>, CompileStatus>,
+        is_on_saved: bool,
+    ) {
         if let Ok(doc) = res.clone() {
             let _ = self.doc_tx.send(Some(doc.clone()));
             let _ = self.export_tx.send(ExportRequest::OnTyped);
@@ -246,8 +268,8 @@ impl PreviewCompilationHandle for CompileHandler {
             .unwrap();
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.inner.as_ref() {
-            inner.notify_compile(res);
+        if let Some(inner) = self.inner.read().as_ref() {
+            inner.notify_compile(res, is_on_saved);
         }
     }
 }
@@ -268,7 +290,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             }
         };
 
-        <Self as PreviewCompilationHandle>::status(self, status);
+        self.preview_status(status);
     }
 
     fn notify_compile(&self, snap: &CompiledArtifact<LspCompilerFeat>, _rep: CompileReport) {
@@ -282,7 +304,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             snap.env.tracer.as_ref().map(|e| e.clone().warnings()),
         );
 
-        <Self as PreviewCompilationHandle>::notify_compile(self, res);
+        self.preview_notify_compile(res, snap.flags.triggered_by_fs_events);
     }
 }
 

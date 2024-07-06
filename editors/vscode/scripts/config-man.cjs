@@ -47,17 +47,29 @@ const configMd = (editor, prefix) =>
                 type: itemType,
                 enum: enumBase,
                 enumDescriptions: enumBaseDescription,
+                markdownDeprecationMessage,
             } = config[key];
 
+            if (markdownDeprecationMessage) {
+                return;
+            }
+
             let defaultValue = dv;
-            if (editor !== 'vscode') {
-                if (key === 'tinymist.compileStatus') {
-                    defaultValue = 'disable';
+            if (editor !== "vscode") {
+                if (key === "tinymist.compileStatus") {
+                    defaultValue = "disable";
+                }
+
+                if (key.startsWith("typst-preview.")) {
+                    return;
                 }
             }
 
             const keyWithoutPrefix = key.replace("tinymist.", "");
-            const name = prefix ? `tinymist.${keyWithoutPrefix}` : keyWithoutPrefix;
+            const name =
+                prefix && !key.startsWith("typst-preview.")
+                    ? `tinymist.${keyWithoutPrefix}`
+                    : keyWithoutPrefix;
             const typeSection = itemType ? `\n- **Type**: ${describeType(itemType)}` : "";
             const defaultSection = defaultValue
                 ? `\n- **Default**: \`${JSON.stringify(defaultValue)}\``
@@ -83,6 +95,7 @@ ${description}
 ${typeSection}${enumSection}${defaultSection}
 `;
         })
+        .filter((x) => x)
         .join("\n");
 
 const configMdPath = path.join(__dirname, "..", "Configuration.md");
@@ -91,7 +104,7 @@ fs.writeFileSync(
     configMdPath,
     `# Tinymist Server Configuration
 
-${configMd('vscode', true)}`
+${configMd("vscode", true)}`
 );
 
 const configMdPathNeovim = path.join(__dirname, "../../../editors/neovim/Configuration.md");
@@ -100,5 +113,5 @@ fs.writeFileSync(
     configMdPathNeovim,
     `# Tinymist Server Configuration
 
-${configMd('neovim', false)}`
+${configMd("neovim", false)}`
 );

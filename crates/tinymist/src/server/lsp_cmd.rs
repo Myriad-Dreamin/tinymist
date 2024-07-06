@@ -7,6 +7,7 @@ use lsp_server::RequestId;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::ExportKind;
 use typst::diag::StrResult;
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
@@ -87,6 +88,65 @@ impl LanguageState {
             log::info!("file focused: {entry:?}");
         }
         just_ok!(JsonValue::Null)
+    }
+
+    #[cfg(feature = "preview")]
+    pub fn start_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        use std::path::Path;
+
+        use clap::Parser;
+        use preview::PreviewCliArgs;
+
+        let cli_args = get_arg_or_default!(args[0] as Vec<String>);
+        // clap parse
+        let cli_args = ["preview"]
+            .into_iter()
+            .chain(cli_args.iter().map(|e| e.as_str()));
+        let cli_args =
+            PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
+
+        // todo: preview specific arguments are not used
+        let input = cli_args
+            .compile
+            .input
+            .clone()
+            .ok_or_else(|| internal_error("entry file must be provided"))?;
+        let input = Path::new(&input);
+        let entry = if input.is_absolute() {
+            input.into()
+        } else {
+            // std::env::current_dir().unwrap().join(input)
+            return Err(invalid_params("entry file must be absolute path"));
+        };
+
+        // todo: race condition
+        let handle = self.primary.compiler().handle.clone();
+        if handle.registered_preview() {
+            return Err(internal_error("preview is already running"));
+        }
+
+        // todo: recover pin status reliably
+        self.pin_entry(Some(entry))
+            .map_err(|e| internal_error(format!("could not pin file: {e}")))?;
+
+        self.preview.start(cli_args, handle)
+    }
+
+    #[cfg(feature = "preview")]
+    pub fn kill_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let task_id = get_arg!(args[0] as String);
+
+        self.preview.kill(task_id)
+    }
+
+    #[cfg(feature = "preview")]
+    pub fn scroll_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        use typst_preview::ControlPlaneMessage;
+
+        let task_id = get_arg!(args[0] as String);
+        let req = get_arg!(args[1] as ControlPlaneMessage);
+
+        self.preview.scroll(task_id, req)
     }
 
     /// Initialize a new template.
@@ -270,7 +330,13 @@ impl LanguageState {
     /// Get the all valid symbols
     pub fn resource_symbols(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let resp = self.get_symbol_resources();
-        just_ok!(resp.map_err(|e| internal_error(e.to_string()))?)
+        just_result!(resp.map_err(|e| internal_error(e.to_string())))
+    }
+
+    /// Get resource preview html
+    pub fn resource_preview_html(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
+        let resp = serde_json::to_value(TYPST_PREVIEW_HTML);
+        just_result!(resp.map_err(|e| internal_error(e.to_string())))
     }
 
     /// Get tutorial web page

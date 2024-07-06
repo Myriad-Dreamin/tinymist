@@ -11,6 +11,20 @@ pub enum PreviewMode {
     Slide,
 }
 
+// Refresh Style
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+pub enum RefreshStyle {
+    /// Refresh preview on save
+    #[cfg_attr(feature = "clap", clap(name = "onSave"))]
+    OnSave,
+
+    /// Refresh preview on type
+    #[cfg_attr(feature = "clap", clap(name = "onType"))]
+    #[default]
+    OnType,
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct PreviewArgs {
@@ -48,4 +62,17 @@ pub struct PreviewArgs {
     /// the preview.
     #[cfg_attr(feature = "clap", clap(long, default_value = "never"))]
     pub invert_colors: String,
+
+    /// Used by lsp for identifying the task.
+    #[clap(
+        long = "task-id",
+        default_value = "default_preview",
+        value_name = "TASK_ID",
+        hide(true)
+    )]
+    pub task_id: String,
+
+    /// Used by lsp for controlling the preview refresh style.
+    #[cfg_attr(feature = "clap", clap(long, default_value = "onType", hide(true)))]
+    pub refresh_style: RefreshStyle,
 }

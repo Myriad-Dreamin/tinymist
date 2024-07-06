@@ -35,6 +35,13 @@ Enable or disable semantic tokens (LSP syntax highlighting)
   - `disable`: Do not use semantic tokens for syntax highlighting
 - **Default**: `"enable"`
 
+## `tinymist.onEnterEvent`
+
+Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter) (LSP onEnter feature) to allow automatic insertion of characters on enter, such as `///` for comments. Note: restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
 ## `tinymist.systemFonts`
 
 A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options. 
@@ -99,3 +106,54 @@ Set the print width for the formatter, which is a **soft limit** of characters p
 
 - **Type**: `number`
 - **Default**: `120`
+
+## `typst-preview.refresh`
+
+Refresh preview when the document is saved or when the document is changed
+
+- **Type**: `string`
+- **Enum**:
+  - `onSave`: Refresh preview on save
+  - `onType`: Refresh preview on type
+- **Default**: `"onType"`
+
+## `typst-preview.scrollSync`
+
+Configure scroll sync mode.
+
+- **Type**: `string`
+- **Enum**:
+  - `never`: Disable automatic scroll sync
+  - `onSelectionChangeByMouse`: Scroll preview to current cursor position when selection changes by mouse
+  - `onSelectionChange`: Scroll preview to current cursor position when selection changes by mouse or keyboard (any source)
+- **Default**: `"onSelectionChangeByMouse"`
+
+## `typst-preview.partialRendering`
+
+Only render visible part of the document. This can improve performance but still being experimental.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `typst-preview.invertColors`
+
+Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview.
+
+- **Type**: `string`
+- **Enum**:
+  - `never`: Disable color inversion of the preview
+  - `auto`: Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document
+  - `always`: Always invert colors of the preview
+- **Default**: `"never"`
+
+## `typst-preview.cursorIndicator`
+
+(Experimental) Show typst cursor indicator in preview.
+
+- **Type**: `boolean`
+
+## `typst-preview.showInActivityBar`
+
+(Experimental) Show a preview panel in activity bar.
+
+- **Type**: `boolean`

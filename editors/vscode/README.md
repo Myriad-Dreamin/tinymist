@@ -48,6 +48,12 @@ If you don't like the activity bar, you can right-click on the activity bar and 
 - See symbols grouped by categories.
 - Click on a symbol, then it will be inserted into the editor.
 
+#### Preview Command
+
+Open command palette (Ctrl+Shift+P), and type `>Typst Preview:`.
+
+You can also use the shortcut (Ctrl+K V).
+
 ### Configuring path to search fonts
 
 To configure path to search fonts:

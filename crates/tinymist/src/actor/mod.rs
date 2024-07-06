@@ -9,6 +9,7 @@ pub mod user_action;
 
 use std::sync::Arc;
 
+use parking_lot::lock_api::RwLock;
 use tinymist_query::analysis::Analysis;
 use tinymist_query::ExportKind;
 use tinymist_render::PeriscopeRenderer;
@@ -82,7 +83,7 @@ impl CompileState {
         let periscope_args = self.config.periscope_args.clone();
         let handle = Arc::new(CompileHandler {
             #[cfg(feature = "preview")]
-            inner: std::sync::Arc::new(None),
+            inner: std::sync::Arc::new(RwLock::new(None)),
             diag_group: editor_group.clone(),
             intr_tx: intr_tx.clone(),
             doc_tx,
@@ -123,17 +124,6 @@ impl CompileState {
 }
 
 impl LanguageState {
-    pub fn server(
-        &self,
-        diag_group: String,
-        entry: EntryState,
-        inputs: ImmutDict,
-    ) -> CompileClientActor {
-        // Take all dirty files in memory as the initial snapshot
-        self.primary
-            .server(diag_group, entry, inputs, self.primary.vfs_snapshot())
-    }
-
     pub fn run_format_thread(&mut self) {
         if self.format_thread.is_some() {
             log::error!("formatting thread is already started");

@@ -253,7 +253,8 @@
     ]
   },
   "scripts": {
-    "build:frontend": "cd ../../../../tools/typst-preview-frontend && yarn run build && cd ../../contrib/typst-preview/editors/vscode && rimraf ./out/frontend/ && cpr ../../../../tools/typst-preview-frontend/dist/ ./out/frontend/ && rimraf ../../../../crates/tinymist-assets/src/typst-preview.html && cpr ./out/frontend/index.html ../../../../crates/tinymist-assets/src/typst-preview.html",
+    "build:frontend": "cd ../../../../ && yarn build:preview && cd contrib/typst-preview/editors/vscode && yarn install:frontend",
+    "install:frontend": "rimraf ./out/frontend/ && cpr ../../../../tools/typst-preview-frontend/dist/ ./out/frontend/",
     "build-base": "esbuild ../../../../editors/vscode/src/extension.preview.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --target=node16",
     "vscode:prepublish": "yarn run build-base -- --minify && yarn run build:frontend",
     "compile": "yarn run build-base -- --sourcemap && yarn run build:frontend",
@@ -278,12 +279,9 @@
     "eslint": "^8.52.0",
     "glob": "^8.1.0",
     "mocha": "^10.2.0",
-    "rimraf": "^5.0.1",
-    "typescript": "^5.2.2",
-    "typst-preview-frontend": "link:../../../../tools/typst-preview-frontend"
+    "typescript": "^5.2.2"
   },
   "dependencies": {
-    "cpr": "^3.0.1",
     "cross-spawn": "^7.0.3",
     "node-fetch": "^3.3.2",
     "vscode-variables": "^0.1.3",

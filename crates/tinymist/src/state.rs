@@ -194,13 +194,7 @@ impl LanguageState {
         let source = snapshot.content.clone();
         f(source)
     }
-
-    pub fn snapshot(&self) -> LanguageStateSnapshot {
-        LanguageStateSnapshot {}
-    }
 }
-
-pub struct LanguageStateSnapshot {}
 
 #[macro_export]
 macro_rules! run_query_tail {

@@ -30,9 +30,19 @@ type UsingCompiler<F> = PureCompiler<CompilerWorld<F>>;
 type CompileRawResult = Deferred<(SourceResult<Arc<TypstDocument>>, CompileEnv)>;
 type DocState<F> = QueryRef<CompileRawResult, (), (UsingCompiler<F>, CompileEnv)>;
 
-pub struct CompileSnapshot<F: CompilerFeat> {
+#[derive(Clone, Copy)]
+pub struct CompileFlags {
     /// The compiler-thread local logical tick when the snapshot is taken.
     pub compile_tick: usize,
+    /// Whether the revision is annotated by memory events.
+    pub triggered_by_mem_events: bool,
+    /// Whether the revision is annotated by file system events.
+    pub triggered_by_fs_events: bool,
+}
+
+pub struct CompileSnapshot<F: CompilerFeat> {
+    /// All the flags for the document.
+    pub flags: CompileFlags,
     /// Using env
     pub env: CompileEnv,
     /// Using world
@@ -62,10 +72,10 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
     pub fn compile(&self) -> CompiledArtifact<F> {
         let (doc, env) = self.start().wait().clone();
         CompiledArtifact {
+            flags: self.flags,
             world: self.world.clone(),
-            compile_tick: self.compile_tick,
-            doc,
             env,
+            doc,
             success_doc: self.success_doc.clone(),
         }
     }
@@ -74,7 +84,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
 impl<F: CompilerFeat> Clone for CompileSnapshot<F> {
     fn clone(&self) -> Self {
         Self {
-            compile_tick: self.compile_tick,
+            flags: self.flags,
             env: self.env.clone(),
             world: self.world.clone(),
             doc_state: self.doc_state.clone(),
@@ -85,11 +95,13 @@ impl<F: CompilerFeat> Clone for CompileSnapshot<F> {
 
 #[derive(Clone)]
 pub struct CompiledArtifact<F: CompilerFeat> {
+    /// All the flags for the document.
+    pub flags: CompileFlags,
+    /// Used world
     pub world: Arc<CompilerWorld<F>>,
-    pub compile_tick: usize,
-    pub doc: SourceResult<Arc<TypstDocument>>,
     /// Used env
     pub env: CompileEnv,
+    pub doc: SourceResult<Arc<TypstDocument>>,
     pub success_doc: Option<Arc<TypstDocument>>,
 }
 
@@ -129,6 +141,46 @@ pub enum Interrupt<F: CompilerFeat> {
 enum CompilerResponse {
     /// Response to the file watcher
     Notify(NotifyMessage),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+struct CompileReasons {
+    /// The snapshot is taken by the memory editing events.
+    by_memory_events: bool,
+    /// The snapshot is taken by the file system events.
+    by_fs_events: bool,
+}
+
+impl CompileReasons {
+    fn see(&mut self, reason: CompileReasons) {
+        self.by_memory_events |= reason.by_memory_events;
+        self.by_fs_events |= reason.by_fs_events;
+    }
+
+    fn any(&self) -> bool {
+        self.by_memory_events || self.by_fs_events
+    }
+}
+
+fn no_reason() -> CompileReasons {
+    CompileReasons {
+        by_memory_events: false,
+        by_fs_events: false,
+    }
+}
+
+fn reason_by_mem() -> CompileReasons {
+    CompileReasons {
+        by_memory_events: true,
+        by_fs_events: false,
+    }
+}
+
+fn reason_by_fs() -> CompileReasons {
+    CompileReasons {
+        by_memory_events: false,
+        by_fs_events: true,
+    }
 }
 
 /// A tagged memory event with logical tick.
@@ -192,6 +244,7 @@ pub struct CompileServerActor<F: CompilerFeat> {
 
     watch_snap: OnceLock<CompileSnapshot<F>>,
     suspended: bool,
+    suspended_reason: CompileReasons,
     committed_revision: usize,
     compile_concurrency: usize,
 }
@@ -233,6 +286,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
             watch_snap: OnceLock::new(),
             suspended: entry.is_inactive(),
+            suspended_reason: no_reason(),
             committed_revision: 0,
             compile_concurrency,
         }
@@ -296,14 +350,14 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         };
 
         // Wrap sender to send compiler response.
-        let compiler_ack = move |res: CompilerResponse| match res {
+        let ack = move |res: CompilerResponse| match res {
             CompilerResponse::Notify(msg) => {
                 log_send_error("compile_deps", dep_tx.send(msg));
             }
         };
 
         // Trigger the first compilation (if active)
-        self.watch_compile(&compiler_ack);
+        self.watch_compile(reason_by_fs(), &ack);
 
         // Spawn file system watcher.
         let fs_tx = self.intr_tx.clone();
@@ -318,7 +372,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
             // Wait for first events.
             'event_loop: while let Some(mut event) = self.intr_rx.blocking_recv() {
-                let mut need_compile = false;
+                let mut comp_reason = no_reason();
 
                 'accumulate: loop {
                     // Warp the logical clock by one.
@@ -332,11 +386,11 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     }
 
                     // Ensure complied before executing tasks.
-                    if matches!(event, Interrupt::Snapshot(_)) && need_compile {
-                        need_compile = self.watch_compile(&compiler_ack);
+                    if matches!(event, Interrupt::Snapshot(_)) && comp_reason.any() {
+                        comp_reason = self.watch_compile(comp_reason, &ack);
                     }
 
-                    need_compile |= self.process(event, &compiler_ack);
+                    comp_reason.see(self.process(event, &ack));
 
                     // Try to accumulate more events.
                     match self.intr_rx.try_recv() {
@@ -345,12 +399,12 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     }
                 }
 
-                if need_compile {
-                    need_compile = self.watch_compile(&compiler_ack);
+                if comp_reason.any() {
+                    comp_reason = self.watch_compile(comp_reason, &ack);
                 }
-                if need_compile {
-                    need_compile = self.watch_compile(&compiler_ack);
-                    if need_compile {
+                if comp_reason.any() {
+                    comp_reason = self.watch_compile(comp_reason, &ack);
+                    if comp_reason.any() {
                         log::warn!("CompileServerActor: watch_compile infinite loop?");
                     }
                 }
@@ -364,7 +418,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         Some(compile_thread.unwrap())
     }
 
-    fn snapshot(&self, is_once: bool) -> CompileSnapshot<F> {
+    fn snapshot(&self, is_once: bool, reason: CompileReasons) -> CompileSnapshot<F> {
         let world = self.verse.snapshot();
         let c = self.compiler;
         let mut env = self.make_env(if is_once {
@@ -378,7 +432,11 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         CompileSnapshot {
             world: Arc::new(world.clone()),
             env: env.clone(),
-            compile_tick: self.logical_tick,
+            flags: CompileFlags {
+                compile_tick: self.logical_tick,
+                triggered_by_mem_events: reason.by_memory_events,
+                triggered_by_fs_events: reason.by_fs_events,
+            },
             doc_state: Arc::new(QueryRef::with_context((c, env))),
             success_doc: self.latest_success_doc.clone(),
         }
@@ -386,7 +444,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
     /// Compile the document once.
     pub fn compile_once(&mut self) -> CompiledArtifact<F> {
-        let e = Arc::new(self.snapshot(true));
+        let e = Arc::new(self.snapshot(true, reason_by_fs()));
         let err = self.exporter.export(e.world.deref(), e.clone());
         if let Err(err) = err {
             // todo: ExportError
@@ -397,14 +455,20 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     }
 
     /// Watch and compile the document once.
-    fn watch_compile(&mut self, send: impl Fn(CompilerResponse)) -> bool {
+    fn watch_compile(
+        &mut self,
+        reason: CompileReasons,
+        send: impl Fn(CompilerResponse),
+    ) -> CompileReasons {
+        self.suspended_reason.see(reason);
         if self.suspended {
-            return false;
+            return no_reason();
         }
+        let reason = std::mem::take(&mut self.suspended_reason);
 
         let start = reflexo::time::now();
 
-        let compiling = self.snapshot(false);
+        let compiling = self.snapshot(false, reason);
         self.watch_snap = OnceLock::new();
         self.watch_snap.get_or_init(|| compiling.clone());
 
@@ -445,25 +509,25 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         };
 
         if self.compile_concurrency == 0 {
-            self.processs_compile(compile(), send)
+            self.process_compile(compile(), send)
         } else {
             rayon::spawn(move || {
                 log_send_error("compiled", intr_tx.send(Interrupt::Compiled(compile())));
             });
-            false
+            no_reason()
         }
     }
 
-    fn processs_compile(
+    fn process_compile(
         &mut self,
         artifact: CompiledArtifact<F>,
         send: impl Fn(CompilerResponse),
-    ) -> bool {
+    ) -> CompileReasons {
         let w = &artifact.world;
 
         let compiled_revision = w.revision().get();
         if self.committed_revision >= compiled_revision {
-            return false;
+            return no_reason();
         }
 
         let doc = artifact.doc.ok();
@@ -496,20 +560,24 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         self.process_may_laggy_compile()
     }
 
-    fn process_may_laggy_compile(&mut self) -> bool {
+    fn process_may_laggy_compile(&mut self) -> CompileReasons {
         // todo: rate limit
-        false
+        no_reason()
     }
 
     /// Process some interrupt. Return whether it needs compilation.
-    fn process(&mut self, event: Interrupt<F>, send: impl Fn(CompilerResponse)) -> bool {
+    fn process(&mut self, event: Interrupt<F>, send: impl Fn(CompilerResponse)) -> CompileReasons {
         use CompilerResponse::*;
 
         match event {
             Interrupt::Snapshot(task) => {
                 log::debug!("CompileServerActor: take snapshot");
-                let _ = task.send(self.watch_snap.get_or_init(|| self.snapshot(false)).clone());
-                false
+                let _ = task.send(
+                    self.watch_snap
+                        .get_or_init(|| self.snapshot(false, no_reason()))
+                        .clone(),
+                );
+                no_reason()
             }
             Interrupt::ChangeTask(change) => {
                 if let Some(entry) = change.entry.clone() {
@@ -529,9 +597,9 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     }
                 });
 
-                true
+                reason_by_fs()
             }
-            Interrupt::Compiled(artifact) => self.processs_compile(artifact, send),
+            Interrupt::Compiled(artifact) => self.process_compile(artifact, send),
             Interrupt::Memory(event) => {
                 log::debug!("CompileServerActor: memory event incoming");
 
@@ -555,7 +623,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                 if files.is_empty() && self.dirty_shadow_logical_tick == 0 {
                     self.verse
                         .increment_revision(|verse| Self::apply_memory_changes(verse, event));
-                    return true;
+                    return reason_by_mem();
                 }
 
                 // Otherwise, send upstream update event.
@@ -569,10 +637,12 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     }),
                 })));
 
-                false
+                reason_by_fs()
             }
             Interrupt::Fs(mut event) => {
                 log::debug!("CompileServerActor: fs event incoming {event:?}");
+
+                let mut reason = reason_by_fs();
 
                 // Apply file system changes.
                 let dirty_tick = &mut self.dirty_shadow_logical_tick;
@@ -580,11 +650,14 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     // Handle delayed upstream update event before applying file system changes
                     if Self::apply_delayed_memory_changes(verse, dirty_tick, &mut event).is_none() {
                         log::warn!("CompileServerActor: unknown upstream update event");
+
+                        // Actual a delayed memory event.
+                        reason = reason_by_mem();
                     }
                     verse.notify_fs_event(event)
                 });
 
-                true
+                reason
             }
             Interrupt::Settle(_) => unreachable!(),
         }
