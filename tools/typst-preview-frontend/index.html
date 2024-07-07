@@ -16,13 +16,21 @@
     <!-- before all of code to avoid rerender by style replacement -->
     <script>
       if (typeof acquireVsCodeApi !== "undefined") {
+        function base64ToString(base64) {
+          const binString = atob(base64);
+          const arr = Uint8Array.from(binString, (m) => m.codePointAt(0));
+          return new TextDecoder().decode(arr);
+        }
         /// The string here is a placeholder
         /// It will be replaced by the actual preview mode.
-        let state = `preview-arg:state:{}`;
+        let state = `preview-arg:state:`;
         state = state.replace("preview-arg:state:", "");
-        /// Set it later when acquiring the VSCode API
-        window.vscode_state = JSON.parse(state);
-        window.vscode_state.fsPath = atob(window.vscode_state.fsPath);
+        console.log("state", state);
+        if (state !== "") {
+          /// Set it later when acquiring the VSCode API
+          window.vscode_state = JSON.parse(base64ToString(state));
+          console.log("vscode_state", window.vscode_state);
+        }
       }
 
       /// https://stackoverflow.com/questions/13586999/color-difference-similarity-between-two-values-with-js
