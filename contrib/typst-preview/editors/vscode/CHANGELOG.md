@@ -1,6 +1,6 @@
 # Change Log
 
-This is the change log mirror of the [tinymist changelog](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
+Mirroring from [Tinymist Changelog](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 
 ## v0.11.14 - [2024-07-07]
 
