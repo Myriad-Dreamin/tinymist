@@ -34,14 +34,20 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         const provider = new ContentPreviewProvider(context, context.extensionUri, html);
         resolveContentPreviewProvider(provider);
         context.subscriptions.push(
-            vscode.window.registerWebviewViewProvider("typst-preview.content-preview", provider)
+            vscode.window.registerWebviewViewProvider(
+                isCompat ? "typst-preview.content-preview" : "tinymist.preview.content-preview",
+                provider
+            )
         );
     });
     {
         const outlineProvider = new OutlineProvider(context.extensionUri);
         resolveOutlineProvider(outlineProvider);
         context.subscriptions.push(
-            vscode.window.registerTreeDataProvider("typst-preview.outline", outlineProvider)
+            vscode.window.registerTreeDataProvider(
+                isCompat ? "typst-preview.outline" : "tinymist.preview.outline",
+                outlineProvider
+            )
         );
     }
 
@@ -93,6 +99,15 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
 // This method is called when your extension is deactivated
 export function previewDeactivate() {
     previewDeactivateCompat();
+}
+
+function getPreviewConfCompat<T>(s: string) {
+    const t = vscode.workspace.getConfiguration().get<T>(`tinymist.preview.${s}`);
+    if (t !== undefined) {
+        return t;
+    }
+
+    return vscode.workspace.getConfiguration().get<T>(`typst-preview.${s}`);
 }
 
 export async function launchPreviewInWebView({
@@ -166,15 +181,10 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     const taskId = Math.random().toString(36).substring(7);
     const filePath = bindDocument.uri.fsPath;
 
-    const refreshStyle =
-        vscode.workspace.getConfiguration().get<string>("typst-preview.refresh") || "onSave";
+    const refreshStyle = getPreviewConfCompat<string>("refresh") || "onSave";
     const scrollSyncMode =
-        ScrollSyncModeEnum[
-            vscode.workspace.getConfiguration().get<ScrollSyncMode>("typst-preview.scrollSync") ||
-                "never"
-        ];
-    const enableCursor =
-        vscode.workspace.getConfiguration().get<boolean>("typst-preview.cursorIndicator") || false;
+        ScrollSyncModeEnum[getPreviewConfCompat<ScrollSyncMode>("scrollSync") || "never"];
+    const enableCursor = getPreviewConfCompat<boolean>("cursorIndicator") || false;
     const disposes = new DisposeList();
     registerPreviewTaskDispose(taskId, disposes);
     const { dataPlanePort, staticServerPort } = await launchCommand();
@@ -227,14 +237,10 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
 
     async function launchCommand() {
         console.log(`Preview Command ${filePath}`);
-        const partialRenderingArgs = vscode.workspace
-            .getConfiguration()
-            .get<boolean>("typst-preview.partialRendering")
+        const partialRenderingArgs = getPreviewConfCompat<boolean>("partialRendering")
             ? ["--partial-rendering"]
             : [];
-        const ivArgs = vscode.workspace
-            .getConfiguration()
-            .get<string>("typst-preview.invertColors");
+        const ivArgs = getPreviewConfCompat<string>("invertColors");
         const invertColorsArgs = ivArgs ? ["--invert-colors", ivArgs] : [];
         const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
         const { dataPlanePort, staticServerPort } = await commandStartPreview([

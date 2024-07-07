@@ -107,7 +107,17 @@ Set the print width for the formatter, which is a **soft limit** of characters p
 - **Type**: `number`
 - **Default**: `120`
 
-## `typst-preview.refresh`
+## `tinymist.preview`
+
+Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Enum**:
+  - `enable`
+  - `disable`
+- **Default**: `"enable"`
+
+## `tinymist.preview.refresh`
 
 Refresh preview when the document is saved or when the document is changed
 
@@ -117,7 +127,7 @@ Refresh preview when the document is saved or when the document is changed
   - `onType`: Refresh preview on type
 - **Default**: `"onType"`
 
-## `typst-preview.scrollSync`
+## `tinymist.preview.scrollSync`
 
 Configure scroll sync mode.
 
@@ -128,14 +138,14 @@ Configure scroll sync mode.
   - `onSelectionChange`: Scroll preview to current cursor position when selection changes by mouse or keyboard (any source)
 - **Default**: `"onSelectionChangeByMouse"`
 
-## `typst-preview.partialRendering`
+## `tinymist.preview.partialRendering`
 
 Only render visible part of the document. This can improve performance but still being experimental.
 
 - **Type**: `boolean`
 - **Default**: `true`
 
-## `typst-preview.invertColors`
+## `tinymist.preview.invertColors`
 
 Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview.
 
@@ -146,13 +156,13 @@ Invert colors of the preview (useful for dark themes without cost). Please note 
   - `always`: Always invert colors of the preview
 - **Default**: `"never"`
 
-## `typst-preview.cursorIndicator`
+## `tinymist.preview.cursorIndicator`
 
 (Experimental) Show typst cursor indicator in preview.
 
 - **Type**: `boolean`
 
-## `typst-preview.showInActivityBar`
+## `tinymist.preview.showInActivityBar`
 
 (Experimental) Show a preview panel in activity bar.
 
