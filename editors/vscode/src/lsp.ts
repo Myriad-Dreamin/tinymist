@@ -12,7 +12,13 @@ interface ResourceRoutes {
 }
 
 export const tinymist = {
+    async executeCommand<R>(command: string, args: any[]) {
+        return await client!.sendRequest<R>("workspace/executeCommand", {
+            command,
+            arguments: args,
+        });
+    },
     getResource<T extends keyof ResourceRoutes>(path: T) {
-        return vscode.commands.executeCommand<ResourceRoutes[T]>("tinymist.getResources", path);
+        return this.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path]);
     },
 };

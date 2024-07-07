@@ -191,7 +191,7 @@
                     "type": "number",
                     "default": 120
                 },
-                "tinymist.preview": {
+                "tinymist.previewFeature": {
                     "title": "Enable preview features",
                     "description": "Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.",
                     "type": "string",
