@@ -109,12 +109,15 @@ export function previewDeactivate() {
 }
 
 function getPreviewConfCompat<T>(s: string) {
-    const t = vscode.workspace.getConfiguration().get<T>(`tinymist.preview.${s}`);
-    if (t !== undefined) {
-        return t;
+    const conf = vscode.workspace.getConfiguration();
+    const t = conf.get<T>(`tinymist.preview.${s}`);
+    const tAuto = conf.inspect<T>(`tinymist.preview.${s}`);
+    const t2 = conf.get<T>(`typst-preview.${s}`);
+    if (t === tAuto?.defaultValue && t2 !== undefined) {
+        return t2;
     }
 
-    return vscode.workspace.getConfiguration().get<T>(`typst-preview.${s}`);
+    return t;
 }
 
 export async function launchPreviewInWebView({
