@@ -1,5 +1,29 @@
 # Change Log
 
+This is the change log mirror of the [tinymist changelog](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
+
+## v0.11.14 - [2024-07-07]
+
+## Compiler
+
+This bug is introduced by [Preparing for parallelizing lsp requests](https://github.com/Myriad-Dreamin/tinymist/pull/342).
+
+* (Fix) Lsp should respond errors at tail in https://github.com/Myriad-Dreamin/tinymist/pull/367
+
+### Commands/Tools
+
+* Supported single-task preview commands in https://github.com/Myriad-Dreamin/tinymist/pull/364, https://github.com/Myriad-Dreamin/tinymist/pull/368, https://github.com/Myriad-Dreamin/tinymist/pull/370, and https://github.com/Myriad-Dreamin/tinymist/pull/371
+  * Typst Preview extension is already integrated into Tinymist. It . Please disable Typst Preview extension to avoid conflicts.
+  * Otherwise, you should disable the tinymist's embedded preview feature by `"tinymist.preview": "disable"` in your settings.json.
+
+### Preview
+
+* Persisting webview preview through vscode restarts by @Myriad-Dreamin and @noamzaks in https://github.com/Myriad-Dreamin/tinymist/pull/373
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.13...v0.11.14
+
+# Change Log (v0.1.0 - v0.11.7)
+
 All notable changes to the "typst-preview" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
