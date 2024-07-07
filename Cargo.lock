@@ -3697,7 +3697,7 @@ dependencies = [
 
 [[package]]
 name = "sync-lsp"
-version = "0.11.13"
+version = "0.11.14"
 dependencies = [
  "anyhow",
  "clap",
@@ -3836,7 +3836,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.11.13"
+version = "0.11.14"
 dependencies = [
  "insta",
  "lsp-server",
@@ -3933,7 +3933,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.11.13"
+version = "0.11.14"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3994,11 +3994,11 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.11.13"
+version = "0.11.14"
 
 [[package]]
 name = "tinymist-query"
-version = "0.11.13"
+version = "0.11.14"
 dependencies = [
  "anyhow",
  "biblatex",
@@ -4044,7 +4044,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.11.13"
+version = "0.11.14"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -4422,7 +4422,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.11.13"
+version = "0.11.14"
 dependencies = [
  "await-tree",
  "clap",
