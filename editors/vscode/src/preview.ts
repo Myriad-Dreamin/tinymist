@@ -2,7 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import * as path from "path";
-import { DisposeList, getTargetViewColumn, loadHTMLFile } from "./util";
+import { DisposeList, getTargetViewColumn } from "./util";
 import {
     launchPreviewCompat,
     previewActiveCompat as previewPostActivateCompat,
@@ -24,6 +24,7 @@ export function previewPreload(context: vscode.ExtensionContext) {
     getPreviewHtmlCompat(context);
 }
 
+let launchImpl: typeof launchPreviewLsp;
 export function previewActivate(context: vscode.ExtensionContext, isCompat: boolean) {
     // https://github.com/microsoft/vscode-extension-samples/blob/4721ef0c450f36b5bce2ecd5be4f0352ed9e28ab/webview-view-sample/src/extension.ts#L3
     getPreviewHtmlCompat(context).then((html) => {
@@ -50,6 +51,12 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
             )
         );
     }
+    context.subscriptions.push(
+        vscode.window.registerWebviewPanelSerializer(
+            "typst-preview",
+            new TypstPreviewSerializer(context)
+        )
+    );
 
     context.subscriptions.push(
         vscode.commands.registerCommand("typst-preview.preview", launch("webview", "doc")),
@@ -74,7 +81,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         previewPostActivateCompat(context);
     }
 
-    const launchImpl = isCompat ? launchPreviewCompat : launchPreviewLsp;
+    launchImpl = isCompat ? launchPreviewCompat : launchPreviewLsp;
     function launch(kind: "browser" | "webview", mode: "doc" | "slide") {
         return async () => {
             const activeEditor = vscode.window.activeTextEditor;
@@ -102,12 +109,15 @@ export function previewDeactivate() {
 }
 
 function getPreviewConfCompat<T>(s: string) {
-    const t = vscode.workspace.getConfiguration().get<T>(`tinymist.preview.${s}`);
-    if (t !== undefined) {
-        return t;
+    const conf = vscode.workspace.getConfiguration();
+    const t = conf.get<T>(`tinymist.preview.${s}`);
+    const tAuto = conf.inspect<T>(`tinymist.preview.${s}`);
+    const t2 = conf.get<T>(`typst-preview.${s}`);
+    if (t === tAuto?.defaultValue && t2 !== undefined) {
+        return t2;
     }
 
-    return vscode.workspace.getConfiguration().get<T>(`typst-preview.${s}`);
+    return t;
 }
 
 export async function launchPreviewInWebView({
@@ -115,32 +125,36 @@ export async function launchPreviewInWebView({
     task,
     activeEditor,
     dataPlanePort,
+    webviewPanel,
     panelDispose,
 }: {
     context: vscode.ExtensionContext;
     task: LaunchInWebViewTask;
     activeEditor: vscode.TextEditor;
     dataPlanePort: string | number;
+    webviewPanel?: vscode.WebviewPanel;
     panelDispose: () => void;
 }) {
     const basename = path.basename(activeEditor.document.fileName);
     const fontendPath = path.resolve(context.extensionPath, "out/frontend");
     // Create and show a new WebView
-    const panel = vscode.window.createWebviewPanel(
-        "typst-preview", // 标识符
-        `${basename} (Preview)`, // 面板标题
-        getTargetViewColumn(activeEditor.viewColumn),
-        {
-            enableScripts: true, // 启用 JS
-            retainContextWhenHidden: true,
-        }
-    );
+    const panel =
+        webviewPanel !== undefined
+            ? webviewPanel
+            : vscode.window.createWebviewPanel(
+                  "typst-preview", // 标识符
+                  `${basename} (Preview)`, // 面板标题
+                  getTargetViewColumn(activeEditor.viewColumn),
+                  {
+                      enableScripts: true, // 启用 JS
+                      retainContextWhenHidden: true,
+                  }
+              );
 
     // todo: bindDocument.onDidDispose, but we did not find a similar way.
     panel.onDidDispose(async () => {
         panelDispose();
         console.log("killed preview services");
-        panel.dispose();
     });
 
     // 将已经准备好的 HTML 设置为 Webview 内容
@@ -152,8 +166,15 @@ export async function launchPreviewInWebView({
             .toString()}/typst-webview-assets`
     );
     const previewMode = task.mode === "doc" ? "Doc" : "Slide";
+    const previewState = { mode: task.mode, fsPath: activeEditor.document.uri.fsPath };
+    const previewStateEncoded = Buffer.from(JSON.stringify(previewState), "utf-8").toString(
+        "base64"
+    );
     html = html.replace("preview-arg:previewMode:Doc", `preview-arg:previewMode:${previewMode}`);
-    panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${dataPlanePort}`);
+    html = html.replace("preview-arg:state:", `preview-arg:state:${previewStateEncoded}`);
+    html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${dataPlanePort}`);
+
+    panel.webview.html = html;
     // 虽然配置的是 http，但是如果是桌面客户端，任何 tcp 连接都支持，这也就包括了 ws
     // https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
     await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${dataPlanePort}`));
@@ -169,7 +190,7 @@ interface TaskControlBlock {
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
 async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask) {
-    const { kind, context, activeEditor, bindDocument } = task;
+    const { kind, context, activeEditor, bindDocument, webviewPanel } = task;
     if (activeTask.has(bindDocument)) {
         const { panel } = activeTask.get(bindDocument)!;
         if (panel) {
@@ -207,6 +228,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
                 task,
                 activeEditor,
                 dataPlanePort,
+                webviewPanel,
                 panelDispose() {
                     disposes.dispose();
                     commandKillPreview(taskId);
@@ -607,4 +629,38 @@ export class OutlineItem extends vscode.TreeItem {
     // };
 
     contextValue = "outline-item";
+}
+
+class TypstPreviewSerializer implements vscode.WebviewPanelSerializer {
+    context: vscode.ExtensionContext;
+
+    constructor(context: vscode.ExtensionContext) {
+        this.context = context;
+    }
+
+    async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
+        if (!state) {
+            return;
+        }
+
+        const activeEditor = vscode.window.visibleTextEditors.find(
+            (editor) => editor.document.uri.fsPath === state.fsPath
+        );
+
+        if (!activeEditor) {
+            return;
+        }
+
+        const bindDocument = activeEditor.document;
+        const mode = state.mode;
+
+        await launchImpl({
+            kind: "webview",
+            context: this.context,
+            activeEditor,
+            bindDocument,
+            mode,
+            webviewPanel,
+        });
+    }
 }

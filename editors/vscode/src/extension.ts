@@ -43,7 +43,7 @@ export function activate(context: ExtensionContext): Promise<void> {
         JSON.stringify(workspace.getConfiguration("tinymist"))
     );
 
-    previewIsEnabled = config.preview === "enable";
+    previewIsEnabled = config.previewFeature === "enable";
     enableOnEnter = !!config.onEnterEvent;
 
     if (previewIsEnabled) {
@@ -65,6 +65,8 @@ export function activate(context: ExtensionContext): Promise<void> {
         }
     }
 
+    setClient(initClient(context, config));
+
     if (previewIsEnabled) {
         // test compat-mode preview extension
         // previewActivate(context, true);
@@ -74,7 +76,7 @@ export function activate(context: ExtensionContext): Promise<void> {
         previewActivate(context, false);
     }
 
-    return startClient(context, config).catch((e) => {
+    return startClient(context).catch((e) => {
         void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
         throw e;
     });
@@ -82,7 +84,7 @@ export function activate(context: ExtensionContext): Promise<void> {
 
 let enableOnEnter = false;
 
-async function startClient(context: ExtensionContext, config: Record<string, any>): Promise<void> {
+function initClient(context: ExtensionContext, config: Record<string, any>) {
     const serverCommand = getServer(config.serverPath);
     const run = {
         command: serverCommand,
@@ -121,13 +123,18 @@ async function startClient(context: ExtensionContext, config: Record<string, any
         },
     };
 
-    const client = new LanguageClient(
+    return new LanguageClient(
         "tinymist",
         "Tinymist Typst Language Server",
         serverOptions,
         clientOptions
     );
-    setClient(client);
+}
+
+async function startClient(context: ExtensionContext): Promise<void> {
+    if (!client) {
+        throw new Error("Language client is not set");
+    }
 
     client.onNotification("tinymist/compileStatus", (params) => {
         wordCountItemProcess(params);
