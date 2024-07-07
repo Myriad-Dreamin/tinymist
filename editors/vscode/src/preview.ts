@@ -2,7 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import * as path from "path";
-import { DisposeList, getTargetViewColumn, loadHTMLFile } from "./util";
+import { DisposeList, getTargetViewColumn } from "./util";
 import {
     launchPreviewCompat,
     previewActiveCompat as previewPostActivateCompat,
@@ -152,7 +152,6 @@ export async function launchPreviewInWebView({
     panel.onDidDispose(async () => {
         panelDispose();
         console.log("killed preview services");
-        panel.dispose();
     });
 
     // 将已经准备好的 HTML 设置为 Webview 内容
@@ -170,8 +169,9 @@ export async function launchPreviewInWebView({
     );
     html = html.replace("preview-arg:previewMode:Doc", `preview-arg:previewMode:${previewMode}`);
     html = html.replace("preview-arg:state:", `preview-arg:state:${previewStateEncoded}`);
+    html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${dataPlanePort}`);
 
-    panel.webview.html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${dataPlanePort}`);
+    panel.webview.html = html;
     // 虽然配置的是 http，但是如果是桌面客户端，任何 tcp 连接都支持，这也就包括了 ws
     // https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
     await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${dataPlanePort}`));
@@ -635,6 +635,10 @@ class TypstPreviewSerializer implements vscode.WebviewPanelSerializer {
     }
 
     async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
+        if (!state) {
+            return;
+        }
+
         const activeEditor = vscode.window.visibleTextEditors.find(
             (editor) => editor.document.uri.fsPath === state.fsPath
         );
@@ -646,7 +650,7 @@ class TypstPreviewSerializer implements vscode.WebviewPanelSerializer {
         const bindDocument = activeEditor.document;
         const mode = state.mode;
 
-        launchImpl({
+        await launchImpl({
             kind: "webview",
             context: this.context,
             activeEditor,

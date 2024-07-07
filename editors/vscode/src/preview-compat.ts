@@ -403,6 +403,7 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
             task,
             activeEditor,
             dataPlanePort,
+            webviewPanel,
             panelDispose() {
                 activeTask.delete(bindDocument);
                 serverProcess.kill();
