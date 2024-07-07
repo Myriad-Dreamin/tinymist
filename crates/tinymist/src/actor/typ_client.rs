@@ -62,7 +62,7 @@ use super::{
 use crate::{
     actor::export::ExportRequest,
     compile_init::CompileConfig,
-    tools::preview::CompileStatus,
+    tool::preview::CompileStatus,
     utils::{self, threaded_receive},
     world::{LspCompilerFeat, LspWorld},
 };

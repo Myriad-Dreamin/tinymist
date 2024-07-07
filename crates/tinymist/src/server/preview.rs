@@ -126,19 +126,19 @@ impl PreviewState {
     }
 }
 
-struct PreviewTab {
+pub struct PreviewTab {
     /// Task ID
-    task_id: String,
+    pub task_id: String,
     /// Previewer
-    previewer: Previewer,
+    pub previewer: Previewer,
     /// Static server killer
-    ss_killer: oneshot::Sender<()>,
+    pub ss_killer: oneshot::Sender<()>,
     /// Static server handle
-    ss_handle: tokio::task::JoinHandle<()>,
+    pub ss_handle: tokio::task::JoinHandle<()>,
     /// Control plane message sender
-    ctl_tx: mpsc::UnboundedSender<ControlPlaneMessage>,
+    pub ctl_tx: mpsc::UnboundedSender<ControlPlaneMessage>,
     /// Compile handler
-    compile_handler: Arc<CompileHandler>,
+    pub compile_handler: Arc<CompileHandler>,
 }
 
 enum PreviewRequest {

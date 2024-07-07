@@ -11,13 +11,10 @@
   language: "en",
   summary: [
     #prefix-chapter("introduction.typ")[Introduction]
-    = LSP
-    #prefix-chapter("overview.typ")[Overview of Service]
-    - #chapter("principles.typ")[Principles]
-    - #chapter("commands.typ")[Commands System]
-    - #chapter("inputs.typ")[LSP Inputs]
-    - #chapter("type-system.typ")[Type System]
-    - #chapter("language-features.typ")[Language Features]
+    = Features
+    - #chapter("feature/cli.typ")[Command line interface]
+    - #chapter("feature/language.typ")[Language and Editor Features]
+    - #chapter("feature/preview.typ")[Document Preview]
     = Editor Integration
     #prefix-chapter("configurations.typ")[Common Configurations]
     - #chapter("frontend/main.typ")[Editor Frontends]
@@ -25,6 +22,17 @@
       - #chapter("frontend/neovim.typ")[NeoVim]
       - #chapter("frontend/helix.typ")[Helix]
       - #chapter("frontend/zed.typ")[Zed]
+    = Service Overview
+    #prefix-chapter("overview.typ")[Overview of Service]
+    - #chapter("principles.typ")[Principles]
+    - #chapter("commands.typ")[Commands System]
+    - #chapter("inputs.typ")[LSP Inputs]
+    - #chapter("type-system.typ")[Type System]
+    = Service Development
+    - #chapter("crate-docs.typ")[Crate Docs]
+    - #chapter("module/lsp.typ")[LSP and CLI]
+    - #chapter("module/query.typ")[Language Queries]
+    - #chapter("module/preview.typ")[Document Preview]
   ],
 )
 

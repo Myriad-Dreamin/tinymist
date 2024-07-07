@@ -16,7 +16,7 @@ use typst_ts_core::error::prelude::*;
 use super::lsp::*;
 use super::*;
 use crate::actor::user_action::{TraceParams, UserActionRequest};
-use crate::tools::package::InitTask;
+use crate::tool::package::InitTask;
 
 /// Here are implemented the handlers for each command.
 impl LanguageState {
@@ -151,7 +151,7 @@ impl LanguageState {
 
     /// Initialize a new template.
     pub fn init_template(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        use crate::tools::package::{self, determine_latest_version, TemplateSource};
+        use crate::tool::package::{self, determine_latest_version, TemplateSource};
 
         #[derive(Debug, Serialize)]
         #[serde(rename_all = "camelCase")]
@@ -200,7 +200,7 @@ impl LanguageState {
 
     /// Get the entry of a template.
     pub fn do_get_template_entry(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        use crate::tools::package::{self, determine_latest_version, TemplateSource};
+        use crate::tool::package::{self, determine_latest_version, TemplateSource};
 
         let from_source = get_arg!(args[0] as String);
 

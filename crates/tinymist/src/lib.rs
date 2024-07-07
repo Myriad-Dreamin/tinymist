@@ -31,7 +31,7 @@ mod actor;
 mod resource;
 mod server;
 mod state;
-pub mod tools;
+pub mod tool;
 mod utils;
 mod world;
 

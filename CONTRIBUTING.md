@@ -15,7 +15,7 @@ Tinymist provides a single integrated language service for Typst.
 
 **Editor Frontends** – Leveraging the interface of LSP, tinymist provides frontends to each editor, located in the [editor folder](./editors).
 
-## Build and run
+## Building and Running
 
 To build tinymist LSP:
 
@@ -31,7 +31,13 @@ cargo build --profile=gh-release
 
 To run VS Code extension locally, open the repository in VS Code and press `F5` to start a debug session to extension.
 
-## Run analyzer tests
+## Server Entries
+
+- `tinymist probe` – do nothing, which just probes that the binary is working.
+- `tinymist lsp` – starts the language server.
+- `tinymist preview` – starts a standalone preview server.
+
+## Running Analyzer Tests
 
 This is required if you have changed any code in `crates/tinymist-query`.
 
@@ -41,7 +47,7 @@ To run analyzer tests for tinymist:
 cargo insta test -p tinymist-query --accept
 ```
 
-## Run e2e tests
+## Running E2E Tests
 
 This is required if you have changed any code in `crates/tinymist` or `crates/tinymist-query`.
 
