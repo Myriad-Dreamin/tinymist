@@ -187,7 +187,7 @@ interface TaskControlBlock {
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
 async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask) {
-    const { kind, context, activeEditor, bindDocument } = task;
+    const { kind, context, activeEditor, bindDocument, webviewPanel } = task;
     if (activeTask.has(bindDocument)) {
         const { panel } = activeTask.get(bindDocument)!;
         if (panel) {
@@ -225,6 +225,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
                 task,
                 activeEditor,
                 dataPlanePort,
+                webviewPanel,
                 panelDispose() {
                     disposes.dispose();
                     commandKillPreview(taskId);
