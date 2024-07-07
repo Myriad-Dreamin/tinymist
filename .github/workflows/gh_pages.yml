@@ -36,6 +36,15 @@ jobs:
           curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.2.0-nightly1/shiroa-x86_64-unknown-linux-gnu.tar.gz | tar -xvz
           chmod +x shiroa-x86_64-unknown-linux-gnu/bin/shiroa
           sudo cp shiroa-x86_64-unknown-linux-gnu/bin/shiroa /usr/bin/shiroa
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 16
+      - name: Install deps
+        run: yarn install
+      - name: Build Preview Html
+        run: |
+          yarn build:preview
       - name: Build Book
         run: |
           shiroa build --font-path ./assets/typst-fonts/ --font-path ./assets/fonts/ --path-to-root /tinymist/ -w . docs/tinymist
