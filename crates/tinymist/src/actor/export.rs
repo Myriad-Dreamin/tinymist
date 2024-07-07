@@ -14,7 +14,7 @@ use tokio::sync::{mpsc, oneshot, watch};
 use typst::{foundations::Smart, layout::Abs, layout::Frame, visualize::Color};
 use typst_ts_core::{config::compiler::EntryState, path::PathClean, ImmutPath, TypstDocument};
 
-use crate::{tools::word_count, ExportMode};
+use crate::{tool::word_count, ExportMode};
 
 use super::editor::EditorRequest;
 

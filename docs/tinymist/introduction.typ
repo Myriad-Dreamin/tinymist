@@ -8,7 +8,8 @@ Tinymist [ˈtaɪni mɪst] is an integrated language service for #link("https://t
 It contains:
 - an analyzing library for Typst, see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query")[tinymist-query].
 - a CLI for Typst, see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist/")[tinymist].
-  - which provides a language server for Typst.
+  - which provides a language server for Typst, see #cross-link("/language-features.typ")[Langauge Features].
+  - which provides a preview server for Typst, see #cross-link("/preview-feature.typ")[Preview Feature].
 - a VSCode extension for Typst, see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/")[Tinymist VSCode Extension].
 
 Further Reading:

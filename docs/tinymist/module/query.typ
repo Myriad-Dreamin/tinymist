@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist Language Features")
+#show: book-page.with(title: "Tinymist Languague Queries")
 
 == Base Analyses
 
@@ -32,3 +32,7 @@ Language features are implemented based on basic analysis APIs:
 - The `textDocument/prepareRename` _finds definition_ and determines whether it can be renamed.
 
 - The `textDocument/rename` _finds defintion and references_ and renamed them all.
+
+== Contributing
+
+See #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/CONTRIBUTING.md")[CONTRIBUTING.md].

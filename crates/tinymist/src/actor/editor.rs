@@ -7,7 +7,7 @@ use lsp_types::{Diagnostic, Url};
 use tinymist_query::{DiagnosticsMap, LspDiagnostic};
 use tokio::sync::mpsc;
 
-use crate::{tools::word_count::WordsCount, LspClient};
+use crate::{tool::word_count::WordsCount, LspClient};
 
 pub enum EditorRequest {
     Diag(String, Option<DiagnosticsMap>),
