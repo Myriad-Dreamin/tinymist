@@ -6,7 +6,9 @@
 			"dependsOn": [
 				"Compile VS Code Extension",
 				"Build Debug LSP Binary",
-				"Copy Debug LSP Binary to VS Code Extension"
+				"Copy Debug LSP Binary to VS Code Extension",
+				"Compile Typst Preview Extension",
+				"Copy Debug LSP Binary to Typst Preview Extension"
 			],
 			"dependsOrder": "sequence",
 		},
@@ -16,7 +18,10 @@
 				"Compile VS Code Extension",
 				"Build Release LSP Binary",
 				"Copy Release LSP Binary to VS Code Extension",
-				"Generate VS Code Extension Bundle"
+				"Generate VS Code Extension Bundle",
+				"Compile Typst Preview Extension",
+				"Copy Release LSP Binary to Typst Preview Extension",
+				"Generate Typst Preview Extension Bundle"
 			],
 			"dependsOrder": "sequence",
 		},
@@ -35,10 +40,27 @@
 			"group": "build",
 		},
 		{
+			"label": "Compile Typst Preview Extension",
+			"type": "npm",
+			"script": "compile",
+			"path": "contrib/typst-preview/editors/vscode",
+			"group": "build",
+		},
+		{
+			"label": "Generate Typst Preview Extension Bundle",
+			"type": "npm",
+			"script": "package",
+			"path": "contrib/typst-preview/editors/vscode",
+			"group": "build",
+		},
+		{
 			"label": "Build Debug LSP Binary",
 			"type": "cargo",
 			"command": "build",
-			"args": [ "--bin", "tinymist" ],
+			"args": [
+				"--bin",
+				"tinymist"
+			],
 			"problemMatcher": [
 				"$rustc"
 			],
@@ -48,7 +70,11 @@
 			"label": "Build Release LSP Binary",
 			"type": "cargo",
 			"command": "build",
-			"args": [ "--release", "--bin", "tinymist" ],
+			"args": [
+				"--release",
+				"--bin",
+				"tinymist"
+			],
 			"problemMatcher": [
 				"$rustc"
 			],
@@ -101,6 +127,56 @@
 				"args": [
 					"${workspaceFolder}/target/release/tinymist",
 					"${workspaceFolder}/editors/vscode/out/"
+				]
+			}
+		},
+		{
+			"label": "Copy Debug LSP Binary to Typst Preview Extension",
+			"type": "shell",
+			"windows": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}\\target\\debug\\tinymist.exe",
+					"${workspaceFolder}\\contrib\\typst-preview\\editors\\vscode\\out\\"
+				]
+			},
+			"linux": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}/target/debug/tinymist",
+					"${workspaceFolder}/contrib/typst-preview/editors/vscode/out/"
+				]
+			},
+			"osx": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}/target/debug/tinymist",
+					"${workspaceFolder}/contrib/typst-preview/editors/vscode/out/"
+				]
+			}
+		},
+		{
+			"label": "Copy Release LSP Binary to Typst Preview Extension",
+			"type": "shell",
+			"windows": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}\\target\\release\\tinymist.exe",
+					"${workspaceFolder}\\contrib\\typst-preview\\editors\\vscode\\out\\"
+				]
+			},
+			"linux": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}/target/release/tinymist",
+					"${workspaceFolder}/contrib/typst-preview/editors/vscode/out/"
+				]
+			},
+			"osx": {
+				"command": "cp",
+				"args": [
+					"${workspaceFolder}/target/release/tinymist",
+					"${workspaceFolder}/contrib/typst-preview/editors/vscode/out/"
 				]
 			}
 		}

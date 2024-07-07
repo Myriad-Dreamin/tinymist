@@ -28,6 +28,19 @@
             "preLaunchTask": "VS Code Extension Prelaunch [Jaeger]"
         },
         {
+            "name": "Run Extension [Typst Preview]",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/contrib/typst-preview/editors/vscode"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/contrib/typst-preview/editors/vscode/out/**/*.js"
+            ],
+            "preLaunchTask": "VS Code Extension Prelaunch"
+        },
+        {
             "type": "lldb",
             "request": "launch",
             "name": "Debug unit tests in executable 'tinymist'",
