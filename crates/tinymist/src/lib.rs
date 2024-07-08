@@ -37,7 +37,6 @@ mod world;
 
 use lsp_server::ErrorCode;
 use lsp_server::ResponseError;
-pub use server::compile;
 pub use server::compile_init;
 pub use server::lsp::*;
 pub use server::lsp_init::*;

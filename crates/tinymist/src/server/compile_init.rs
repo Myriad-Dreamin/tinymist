@@ -20,7 +20,6 @@ use typst_ts_core::{ImmutPath, TypstDict};
 
 use super::*;
 use crate::actor::editor::EditorRequest;
-use crate::compile::CompileState;
 use crate::utils::{try_, try_or_default};
 use crate::world::{ImmutDict, SharedFontResolver};
 
@@ -377,7 +376,7 @@ pub struct ConstCompileConfig {
 }
 
 pub struct CompileInit {
-    pub client: TypedLspClient<CompileState>,
+    pub client: TypedLspClient<LanguageState>,
     pub font: CompileFontOpts,
     pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
 }
@@ -390,32 +389,33 @@ pub struct CompileInitializeParams {
 
 impl Initializer for CompileInit {
     type I = CompileInitializeParams;
-    type S = CompileState;
+    type S = LanguageState;
 
     fn initialize(self, params: Self::I) -> (Self::S, AnySchedulableResponse) {
-        let mut compile_config = CompileConfig {
-            font_opts: self.font,
-            ..CompileConfig::default()
-        };
-        compile_config.update(&params.config).unwrap();
+        // let mut compile_config = CompileConfig {
+        //     font_opts: self.font,
+        //     ..CompileConfig::default()
+        // };
+        // compile_config.update(&params.config).unwrap();
 
-        let mut service = CompileState::new(
-            self.client.clone(),
-            compile_config,
-            ConstCompileConfig {
-                position_encoding: params
-                    .position_encoding
-                    .map(|x| match x.as_str() {
-                        "utf-16" => PositionEncoding::Utf16,
-                        _ => PositionEncoding::Utf8,
-                    })
-                    .unwrap_or_default(),
-            },
-            self.editor_tx,
-        );
+        // let mut service = CompileState::new(
+        //     self.client.clone(),
+        //     compile_config,
+        //     ConstCompileConfig {
+        //         position_encoding: params
+        //             .position_encoding
+        //             .map(|x| match x.as_str() {
+        //                 "utf-16" => PositionEncoding::Utf16,
+        //                 _ => PositionEncoding::Utf8,
+        //             })
+        //             .unwrap_or_default(),
+        //     },
+        //     self.editor_tx,
+        // );
 
-        service.restart_server("primary");
+        // service.restart_server("primary");
 
-        (service, just_ok!(JsonValue::Null))
+        // (service, just_ok!(JsonValue::Null))
+        todo!()
     }
 }

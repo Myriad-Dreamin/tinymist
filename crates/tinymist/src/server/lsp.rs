@@ -1,21 +1,31 @@
 //! tinymist LSP mode
 
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
+use actor::export::ExportConfig;
 use anyhow::{bail, Context};
+use compile_init::CompileConfig;
 use futures::future::BoxFuture;
 use log::{error, info, trace};
 use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
+use once_cell::sync::OnceCell;
 use preview::PreviewState;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
+use state::MemoryFileMeta;
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
     get_semantic_tokens_unregistration, PageSelection, SemanticTokenContext,
 };
 use tokio::sync::mpsc;
+use typst::diag::FileResult;
+use typst::syntax::Source;
+use typst_ts_compiler::vfs::notify::FileChangeSet;
+use typst_ts_compiler::DETACHED_ENTRY;
 use typst_ts_core::ImmutPath;
 
 use super::{lsp_init::*, *};
@@ -23,8 +33,6 @@ use crate::actor::editor::EditorRequest;
 use crate::actor::format::{FormatConfig, FormatRequest};
 use crate::actor::typ_client::CompileClientActor;
 use crate::actor::user_action::UserActionRequest;
-use crate::compile::CompileState;
-use crate::compile_init::ConstCompileConfig;
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
 
@@ -69,10 +77,16 @@ pub struct LanguageState {
     // Resources
     /// The semantic token context.
     pub tokens_ctx: SemanticTokenContext,
-    /// The compiler for general purpose.
-    pub primary: CompileState,
+    /// Source synchronized with client
+    pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
     /// The preview state.
     pub preview: PreviewState,
+    /// The diagnostics sender to send diagnostics to `crate::actor::cluster`.
+    pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
+    /// The primary compiler actor.
+    pub primary: Option<CompileClientActor>,
+    /// The compiler actors for tasks
+    // pub dedicates: Vec<CompileClientActor>,
     /// The formatter thread running in backend.
     /// Note: The thread will exit if you drop the sender.
     pub format_thread: Option<crossbeam_channel::Sender<FormatRequest>>,
@@ -97,15 +111,9 @@ impl LanguageState {
 
         Self {
             client: client.clone(),
-
-            primary: CompileState::new(
-                client.cast(|s| &mut s.primary),
-                Default::default(),
-                ConstCompileConfig {
-                    position_encoding: const_config.position_encoding,
-                },
-                editor_tx,
-            ),
+            editor_tx,
+            primary: None,
+            memory_changes: HashMap::new(),
             preview: PreviewState::new(client.cast(|s| &mut s.preview)),
             ever_focusing_by_activities: false,
             ever_manual_focusing: false,
@@ -122,14 +130,31 @@ impl LanguageState {
         }
     }
 
+    // pub fn install(provider: LspBuilder<CompileInit>) -> LspBuilder<CompileInit>
+    // {     type S = CompileState;
+    //     use lsp_types::notification::*;
+    //     provider
+    //         .with_command_("tinymist.exportPdf", S::export_pdf)
+    //         .with_command_("tinymist.exportSvg", S::export_svg)
+    //         .with_command_("tinymist.exportPng", S::export_png)
+    //         .with_command("tinymist.doClearCache", S::clear_cache)
+    //         .with_command("tinymist.changeEntry", S::change_entry)
+    //         .with_notification::<Initialized>(S::initialized)
+    // }
+
     /// Get the const configuration.
     pub fn const_config(&self) -> &ConstConfig {
         &self.const_config
     }
 
+    /// Get the compile configuration.
+    pub fn compile_config(&self) -> &CompileConfig {
+        &self.config.compile
+    }
+
     /// Get the primary compiler for those commands without task context.
     pub fn primary(&self) -> &CompileClientActor {
-        self.primary.compiler.as_ref().expect("primary")
+        self.primary.as_ref().expect("primary")
     }
 
     pub fn install(provider: LspBuilder<Init>) -> LspBuilder<Init> {
@@ -203,6 +228,43 @@ impl LanguageState {
         });
 
         provider
+    }
+
+    pub fn vfs_snapshot(&self) -> FileChangeSet {
+        FileChangeSet::new_inserts(
+            self.memory_changes
+                .iter()
+                .map(|(path, meta)| {
+                    let content = meta.content.clone().text().as_bytes().into();
+                    (path.clone(), FileResult::Ok((meta.mt, content)).into())
+                })
+                .collect(),
+        )
+    }
+
+    pub fn apply_vfs_snapshot(&mut self, changeset: FileChangeSet) {
+        for path in changeset.removes {
+            self.memory_changes.remove(&path);
+        }
+
+        for (path, file) in changeset.inserts {
+            let Ok(content) = file.content() else {
+                continue;
+            };
+            let Ok(mtime) = file.mtime() else {
+                continue;
+            };
+            let Ok(content) = std::str::from_utf8(content) else {
+                log::error!("invalid utf8 content in snapshot file: {path:?}");
+                continue;
+            };
+
+            let meta = MemoryFileMeta {
+                mt: *mtime,
+                content: Source::new(*DETACHED_ENTRY, content.to_owned()),
+            };
+            self.memory_changes.insert(path, meta);
+        }
     }
 }
 
@@ -333,9 +395,7 @@ impl LanguageState {
             }
         }
 
-        self.primary.initialized(params)?;
         info!("server initialized");
-
         Ok(())
     }
 
@@ -406,9 +466,29 @@ impl LanguageState {
                 )));
             }
         }
-        self.primary.on_changed_configuration(values)?;
 
-        info!("new settings applied");
+        if let Some(e) = self.primary.as_mut() {
+            e.sync_config(self.config.compile.clone());
+        }
+
+        if config.compile.output_path != self.config.compile.output_path
+            || config.compile.export_pdf != self.config.compile.export_pdf
+        {
+            let config = ExportConfig {
+                substitute_pattern: self.config.compile.output_path.clone(),
+                mode: self.config.compile.export_pdf,
+            };
+
+            self.primary
+                .as_mut()
+                .unwrap()
+                .change_export_pdf(config.clone());
+        }
+
+        if config.compile.primary_opts() != self.config.compile.primary_opts() {
+            self.config.compile.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
+            self.restart_server("primary");
+        }
 
         if config.semantic_tokens != self.config.semantic_tokens {
             let err = self
@@ -434,6 +514,7 @@ impl LanguageState {
             }
         }
 
+        info!("new settings applied");
         Ok(())
     }
 

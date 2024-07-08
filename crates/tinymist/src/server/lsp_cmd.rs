@@ -8,7 +8,7 @@ use lsp_types::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_query::ExportKind;
+use tinymist_query::{ExportKind, PageSelection};
 use typst::diag::StrResult;
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use typst_ts_core::error::prelude::*;
@@ -18,21 +18,28 @@ use super::*;
 use crate::actor::user_action::{TraceParams, UserActionRequest};
 use crate::tool::package::InitTask;
 
+#[derive(Debug, Clone, Default, Deserialize)]
+struct ExportOpts {
+    page: PageSelection,
+}
+
 /// Here are implemented the handlers for each command.
 impl LanguageState {
     /// Export the current document as a PDF file.
     pub fn export_pdf(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
-        self.primary.export_pdf(req_id, args)
+        self.export(req_id, ExportKind::Pdf, args)
     }
 
     /// Export the current document as a Svg file.
-    pub fn export_svg(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
-        self.primary.export_svg(req_id, args)
+    pub fn export_svg(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+        let opts = get_arg_or_default!(args[1] as ExportOpts);
+        self.export(req_id, ExportKind::Svg { page: opts.page }, args)
     }
 
     /// Export the current document as a Png file.
-    pub fn export_png(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
-        self.primary.export_png(req_id, args)
+    pub fn export_png(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+        let opts = get_arg_or_default!(args[1] as ExportOpts);
+        self.export(req_id, ExportKind::Png { page: opts.page }, args)
     }
 
     /// Export the current document as some format. The client is responsible
@@ -41,17 +48,29 @@ impl LanguageState {
         &mut self,
         req_id: RequestId,
         kind: ExportKind,
-        args: Vec<JsonValue>,
+        mut args: Vec<JsonValue>,
     ) -> ScheduledResult {
-        self.primary.export(req_id, kind, args)
+        let path = get_arg!(args[0] as PathBuf);
+
+        run_query!(req_id, self.OnExport(path, kind))
     }
 
     /// Clear all cached resources.
-    ///
-    /// # Errors
-    /// Errors if the cache could not be cleared.
     pub fn clear_cache(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
-        self.primary.clear_cache(_arguments)
+        comemo::evict(0);
+        self.primary().clear_cache();
+        just_ok!(JsonValue::Null)
+    }
+
+    /// Focus main file to some path.
+    pub fn change_entry(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
+
+        let update_result = self.do_change_entry(entry.clone());
+        update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
+
+        log::info!("entry changed: {entry:?}");
+        just_ok!(JsonValue::Null)
     }
 
     /// Pin main file to some path.
@@ -113,7 +132,7 @@ impl LanguageState {
         };
 
         // todo: race condition
-        let handle = self.primary.compiler().handle.clone();
+        let handle = self.primary().handle.clone();
         if handle.registered_preview() {
             return Err(internal_error("preview is already running"));
         }

@@ -15,7 +15,6 @@ use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use sync_lsp::{transport::with_stdio_transport, Initializer, LspBuilder, LspClient};
 use tinymist::{
-    compile::CompileState,
     compile_init::{CompileInit, CompileInitializeParams},
     CompileFontOpts, Init, LanguageState, LspWorld,
 };
@@ -145,97 +144,101 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
         },
         editor_tx,
     };
-    if args.persist {
-        log::info!("starting compile server");
+    // if args.persist {
+    //     log::info!("starting compile server");
 
-        with_stdio_transport(args.mirror.clone(), |conn| {
-            let sender = Arc::new(RwLock::new(Some(conn.sender)));
-            let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender);
-            CompileState::install(LspBuilder::new(init(client.to_typed()), client))
-                .build()
-                .start(conn.receiver, false)
-        })?;
+    //     with_stdio_transport(args.mirror.clone(), |conn| {
+    //         let sender = Arc::new(RwLock::new(Some(conn.sender)));
+    //         let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(),
+    // sender);         CompileState::install(LspBuilder::new(init(client.
+    // to_typed()), client))             .build()
+    //             .start(conn.receiver, false)
+    //     })?;
 
-        log::info!("compile server did shut down");
-    } else {
-        {
-            let (s, _) = crossbeam_channel::unbounded();
-            let sender = Arc::new(RwLock::new(Some(s)));
-            let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender.clone());
+    //     log::info!("compile server did shut down");
+    // } else {
+    //     {
+    //         let (s, _) = crossbeam_channel::unbounded();
+    //         let sender = Arc::new(RwLock::new(Some(s)));
+    //         let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(),
+    // sender.clone());
 
-            let _drop_guard = ForceDrop(sender);
+    //         let _drop_guard = ForceDrop(sender);
 
-            let (mut service, res) = init(client.to_typed()).initialize(CompileInitializeParams {
-                config: serde_json::json!({
-                    "rootPath": root_path,
-                }),
-                position_encoding: None,
-            });
+    //         let (mut service, res) =
+    // init(client.to_typed()).initialize(CompileInitializeParams {             
+    // config: serde_json::json!({                 "rootPath": root_path,
+    //             }),
+    //             position_encoding: None,
+    //         });
 
-            res.unwrap();
+    //         res.unwrap();
 
-            let _ = service.initialized(InitializedParams {});
+    //         let _ = service.initialized(InitializedParams {});
 
-            let entry = service.config.determine_entry(Some(input.as_path().into()));
+    //         let entry =
+    // service.config.determine_entry(Some(input.as_path().into()));
 
-            let snap = service.compiler().sync_snapshot().unwrap();
-            let w = snap.world.task(TaskInputs {
-                entry: Some(entry),
-                inputs: Some(inputs),
-            });
+    //         let snap = service.compiler().sync_snapshot().unwrap();
+    //         let w = snap.world.task(TaskInputs {
+    //             entry: Some(entry),
+    //             inputs: Some(inputs),
+    //         });
 
-            let mut env = CompileEnv {
-                tracer: Some(Tracer::default()),
-                ..Default::default()
-            };
-            typst_timing::enable();
-            let mut errors = EcoVec::new();
-            if let Err(e) = std::marker::PhantomData.compile(&w, &mut env) {
-                errors = e;
-            }
-            let mut writer = std::io::BufWriter::new(Vec::new());
-            let _ = typst_timing::export_json(&mut writer, |span| {
-                resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
-            });
+    //         let mut env = CompileEnv {
+    //             tracer: Some(Tracer::default()),
+    //             ..Default::default()
+    //         };
+    //         typst_timing::enable();
+    //         let mut errors = EcoVec::new();
+    //         if let Err(e) = std::marker::PhantomData.compile(&w, &mut env) {
+    //             errors = e;
+    //         }
+    //         let mut writer = std::io::BufWriter::new(Vec::new());
+    //         let _ = typst_timing::export_json(&mut writer, |span| {
+    //             resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(),
+    // 0))         });
 
-            let timings = String::from_utf8(writer.into_inner().unwrap()).unwrap();
+    //         let timings =
+    // String::from_utf8(writer.into_inner().unwrap()).unwrap();
 
-            let warnings = env.tracer.map(|e| e.warnings());
+    //         let warnings = env.tracer.map(|e| e.warnings());
 
-            let diagnostics = service.compiler().handle.run_analysis(&w, |ctx| {
-                tinymist_query::convert_diagnostics(
-                    ctx,
-                    warnings.iter().flatten().chain(errors.iter()),
-                )
-            });
+    //         let diagnostics = service.compiler().handle.run_analysis(&w, |ctx| {
+    //             tinymist_query::convert_diagnostics(
+    //                 ctx,
+    //                 warnings.iter().flatten().chain(errors.iter()),
+    //             )
+    //         });
 
-            let diagnostics = diagnostics.unwrap_or_default();
+    //         let diagnostics = diagnostics.unwrap_or_default();
 
-            lsp_server::Message::Notification(lsp_server::Notification {
-                method: "tinymistExt/diagnostics".to_owned(),
-                params: serde_json::json!(diagnostics),
-            })
-            .write(&mut std::io::stdout().lock())
-            .unwrap();
+    //         lsp_server::Message::Notification(lsp_server::Notification {
+    //             method: "tinymistExt/diagnostics".to_owned(),
+    //             params: serde_json::json!(diagnostics),
+    //         })
+    //         .write(&mut std::io::stdout().lock())
+    //         .unwrap();
 
-            // if let Some(_doc) = doc {
-            // let p = typst_pdf::pdf(&_doc,
-            // typst::foundations::Smart::Auto, None);
-            // let output: PathBuf = input.with_extension("pdf");
-            // tokio::fs::write(output, p).await.unwrap();
-            // }
+    //         // if let Some(_doc) = doc {
+    //         // let p = typst_pdf::pdf(&_doc,
+    //         // typst::foundations::Smart::Auto, None);
+    //         // let output: PathBuf = input.with_extension("pdf");
+    //         // tokio::fs::write(output, p).await.unwrap();
+    //         // }
 
-            lsp_server::Message::Response(lsp_server::Response {
-                id: 0.into(),
-                result: Some(serde_json::json!({
-                    "tracingData": timings,
-                })),
-                error: None,
-            })
-            .write(&mut std::io::stdout().lock())
-            .unwrap();
-        }
-    }
+    //         lsp_server::Message::Response(lsp_server::Response {
+    //             id: 0.into(),
+    //             result: Some(serde_json::json!({
+    //                 "tracingData": timings,
+    //             })),
+    //             error: None,
+    //         })
+    //         .write(&mut std::io::stdout().lock())
+    //         .unwrap();
+    //     }
+    // }
+    todo!();
 
     Ok(())
 }

@@ -286,7 +286,6 @@ impl Initializer for Init {
         }
 
         info!("initialized with config {config:?}", config = config);
-        service.primary.config = config.compile.clone();
         service.config = config;
 
         service.run_format_thread();
@@ -298,7 +297,7 @@ impl Initializer for Init {
             service.config.compile.notify_compile_status,
         );
 
-        service.primary.restart_server("primary");
+        service.restart_server("primary");
 
         // Run the cluster in the background after we referencing it
         self.client.handle.spawn(editor_actor.run());
