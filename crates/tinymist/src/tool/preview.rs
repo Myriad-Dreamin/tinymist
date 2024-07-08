@@ -563,7 +563,6 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let (service, handle) = {
         // type EditorSender = mpsc::UnboundedSender<EditorRequest>;
         let (doc_tx, _) = watch::channel(None);
-        // let (export_tx, mut export_rx) = mpsc::unbounded_channel();
         let (editor_tx, mut editor_rx) = mpsc::unbounded_channel();
         let (intr_tx, intr_rx) = mpsc::unbounded_channel();
 
@@ -583,8 +582,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             periscope: tinymist_render::PeriscopeRenderer::default(),
         });
 
-        // Consume export_tx and editor_rx
-        // tokio::spawn(async move { while export_rx.recv().await.is_some() {} });
+        // Consume editor_rx
         tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
 
         let service =
