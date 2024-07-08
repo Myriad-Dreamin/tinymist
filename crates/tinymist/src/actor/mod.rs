@@ -3,6 +3,7 @@
 pub mod editor;
 pub mod export;
 pub mod format;
+pub mod preview;
 pub mod typ_client;
 pub mod typ_server;
 pub mod user_action;
