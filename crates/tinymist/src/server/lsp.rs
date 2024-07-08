@@ -73,8 +73,6 @@ pub struct LanguageState {
     pub primary: CompileState,
     /// The preview state.
     pub preview: PreviewState,
-    /// The compilers for tasks
-    pub dedicates: Vec<CompileState>,
     /// The formatter thread running in backend.
     /// Note: The thread will exit if you drop the sender.
     pub format_thread: Option<crossbeam_channel::Sender<FormatRequest>>,
@@ -109,7 +107,6 @@ impl LanguageState {
                 editor_tx,
             ),
             preview: PreviewState::new(client.cast(|s| &mut s.preview)),
-            dedicates: Vec::new(),
             ever_focusing_by_activities: false,
             ever_manual_focusing: false,
             sema_tokens_registered: false,

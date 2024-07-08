@@ -33,6 +33,8 @@ pub struct CompileState {
     pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
     /// The diagnostics sender to send diagnostics to `crate::actor::cluster`.
     pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
+    /// The compilers for tasks
+    // pub dedicates: Vec<CompileState>,
     /// The compiler actor.
     pub compiler: Option<CompileClientActor>,
 }

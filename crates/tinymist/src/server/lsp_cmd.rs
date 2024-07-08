@@ -51,14 +51,7 @@ impl LanguageState {
     /// # Errors
     /// Errors if the cache could not be cleared.
     pub fn clear_cache(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
-        comemo::evict(0);
-        for v in Some(self.primary())
-            .into_iter()
-            .chain(self.dedicates.iter().map(|v| v.compiler()))
-        {
-            v.clear_cache();
-        }
-        just_ok!(JsonValue::Null)
+        self.primary.clear_cache(_arguments)
     }
 
     /// Pin main file to some path.

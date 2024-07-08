@@ -102,13 +102,8 @@ pub struct MemoryFileMeta {
 
 impl LanguageState {
     fn update_source(&self, files: FileChangeSet) -> Result<(), Error> {
-        let primary = Some(self.primary());
-        let clients_to_notify =
-            (primary.into_iter()).chain(self.dedicates.iter().map(CompileState::compiler));
-
-        for client in clients_to_notify {
-            client.add_memory_changes(MemoryEvent::Update(files.clone()));
-        }
+        self.primary()
+            .add_memory_changes(MemoryEvent::Update(files.clone()));
 
         Ok(())
     }
