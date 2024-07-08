@@ -3,6 +3,7 @@
 pub mod editor;
 pub mod export;
 pub mod format;
+#[cfg(feature = "preview")]
 pub mod preview;
 pub mod typ_client;
 pub mod typ_server;
@@ -10,7 +11,6 @@ pub mod user_action;
 
 use std::sync::Arc;
 
-use parking_lot::lock_api::RwLock;
 use tinymist_query::analysis::Analysis;
 use tinymist_query::ExportKind;
 use tinymist_render::PeriscopeRenderer;
@@ -83,7 +83,7 @@ impl LanguageState {
         let periscope_args = self.compile_config().periscope_args.clone();
         let handle = Arc::new(CompileHandler {
             #[cfg(feature = "preview")]
-            inner: std::sync::Arc::new(RwLock::new(None)),
+            inner: std::sync::Arc::new(parking_lot::RwLock::new(None)),
             diag_group: editor_group.clone(),
             intr_tx: intr_tx.clone(),
             doc_tx,
