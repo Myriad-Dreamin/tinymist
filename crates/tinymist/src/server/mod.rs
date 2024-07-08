@@ -8,5 +8,4 @@ pub mod compile_init;
 pub mod preview;
 
 use crate::*;
-use lsp_server::RequestId;
 use serde_json::from_value;

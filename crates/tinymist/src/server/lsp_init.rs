@@ -1,19 +1,15 @@
 use std::path::PathBuf;
-use std::sync::OnceLock;
 
 use anyhow::bail;
 use itertools::Itertools;
-use log::info;
 use lsp_types::*;
 use serde::Deserialize;
 use serde_json::{json, Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
-use tokio::sync::mpsc;
 use typst_ts_core::ImmutPath;
 
 pub use super::lsp::LanguageState;
 use super::*;
-use crate::actor::editor::EditorActor;
 use crate::compile_init::CompileConfig;
 use crate::utils::{try_, try_or};
 use crate::world::ImmutDict;
@@ -183,6 +179,12 @@ pub struct ConstConfig {
     pub doc_fmt_dynamic_registration: bool,
 }
 
+impl Default for ConstConfig {
+    fn default() -> Self {
+        Self::from(&InitializeParams::default())
+    }
+}
+
 impl From<&InitializeParams> for ConstConfig {
     fn from(params: &InitializeParams) -> Self {
         const DEFAULT_ENCODING: &[PositionEncodingKind] = &[PositionEncodingKind::UTF16];
@@ -217,93 +219,48 @@ impl From<&InitializeParams> for ConstConfig {
     }
 }
 
-pub struct Init {
-    pub client: TypedLspClient<LanguageState>,
-    pub compile_opts: CompileFontOpts,
-    pub exec_cmds: OnceLock<Vec<String>>,
+pub trait AddCommands {
+    fn add_commands(&mut self, cmds: &[String]);
 }
 
-impl Initializer for Init {
-    type I = InitializeParams;
+pub struct CanonicalInitializeParams {
+    pub config: Config,
+    pub cc: ConstConfig,
+}
+
+pub struct SuperInit {
+    pub client: TypedLspClient<LanguageState>,
+    pub exec_cmds: Vec<String>,
+    pub config: Config,
+    pub cc: ConstConfig,
+    pub err: Option<ResponseError>,
+}
+
+impl AddCommands for SuperInit {
+    fn add_commands(&mut self, cmds: &[String]) {
+        self.exec_cmds.extend(cmds.iter().cloned());
+    }
+}
+
+impl Initializer for SuperInit {
+    type I = ();
     type S = LanguageState;
-    /// The [`initialize`] request is the first request sent from the client to
-    /// the server.
-    ///
-    /// [`initialize`]: https://microsoft.github.io/language-server-protocol/specification#initialize
-    ///
-    /// This method is guaranteed to only execute once. If the client sends this
-    /// request to the server again, the server will respond with JSON-RPC
-    /// error code `-32600` (invalid request).
-    ///
-    /// # Panics
-    /// Panics if the const configuration is already initialized.
-    /// Panics if the cluster is already initialized.
-    ///
-    /// # Errors
-    /// Errors if the configuration could not be updated.
-    fn initialize(mut self, params: InitializeParams) -> (LanguageState, AnySchedulableResponse) {
-        // self.tracing_init();
-
-        // Initialize configurations
-        let cc = ConstConfig::from(&params);
-        info!("initialized with const_config {cc:?}");
-        let mut config = Config {
-            compile: CompileConfig {
-                roots: match params.workspace_folders.as_ref() {
-                    Some(roots) => roots
-                        .iter()
-                        .filter_map(|root| root.uri.to_file_path().ok())
-                        .collect::<Vec<_>>(),
-                    #[allow(deprecated)] // `params.root_path` is marked as deprecated
-                    None => params
-                        .root_uri
-                        .as_ref()
-                        .map(|uri| uri.to_file_path().unwrap())
-                        .or_else(|| params.root_path.clone().map(PathBuf::from))
-                        .into_iter()
-                        .collect(),
-                },
-                font_opts: std::mem::take(&mut self.compile_opts),
-                ..CompileConfig::default()
-            },
-            ..Config::default()
-        };
-        let res = match &params.initialization_options {
-            Some(init) => config
-                .update(init)
-                .map_err(|e| e.to_string())
-                .map_err(invalid_params),
-            None => Ok(()),
-        };
-
+    fn initialize(self, _params: ()) -> (LanguageState, AnySchedulableResponse) {
+        let SuperInit {
+            client,
+            exec_cmds,
+            config,
+            cc,
+            err,
+        } = self;
         // Bootstrap server
-        let (editor_tx, editor_rx) = mpsc::unbounded_channel();
+        let service = LanguageState::main(client, config, cc.clone(), err.is_none());
 
-        let mut service = LanguageState::new(self.client.clone(), cc.clone(), editor_tx);
-
-        if let Err(err) = res {
+        if let Some(err) = err {
             return (service, Err(err));
         }
 
-        info!("initialized with config {config:?}", config = config);
-        service.config = config;
-
-        service.run_format_thread();
-        service.run_user_action_thread();
-
-        let editor_actor = EditorActor::new(
-            self.client.clone().to_untyped(),
-            editor_rx,
-            service.config.compile.notify_compile_status,
-        );
-
-        service.restart_server("primary");
-
-        // Run the cluster in the background after we referencing it
-        self.client.handle.spawn(editor_actor.run());
-
         // Respond to the host (LSP client)
-
         // Register these capabilities statically if the client does not support dynamic
         // registration
         let semantic_tokens_provider = match service.config.semantic_tokens {
@@ -361,7 +318,7 @@ impl Initializer for Init {
                 )),
                 semantic_tokens_provider,
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: self.exec_cmds.get().unwrap().clone(),
+                    commands: exec_cmds,
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: None,
                     },
@@ -405,10 +362,90 @@ impl Initializer for Init {
     }
 }
 
+pub struct Init {
+    pub client: TypedLspClient<LanguageState>,
+    pub compile_opts: CompileFontOpts,
+    pub exec_cmds: Vec<String>,
+}
+
+impl AddCommands for Init {
+    fn add_commands(&mut self, cmds: &[String]) {
+        self.exec_cmds.extend(cmds.iter().cloned());
+    }
+}
+
+impl Initializer for Init {
+    type I = InitializeParams;
+    type S = LanguageState;
+    /// The [`initialize`] request is the first request sent from the client to
+    /// the server.
+    ///
+    /// [`initialize`]: https://microsoft.github.io/language-server-protocol/specification#initialize
+    ///
+    /// This method is guaranteed to only execute once. If the client sends this
+    /// request to the server again, the server will respond with JSON-RPC
+    /// error code `-32600` (invalid request).
+    ///
+    /// # Panics
+    /// Panics if the const configuration is already initialized.
+    /// Panics if the cluster is already initialized.
+    ///
+    /// # Errors
+    /// Errors if the configuration could not be updated.
+    fn initialize(mut self, params: InitializeParams) -> (LanguageState, AnySchedulableResponse) {
+        // Initialize configurations
+        let cc = ConstConfig::from(&params);
+        let mut config = Config {
+            compile: CompileConfig {
+                roots: match params.workspace_folders.as_ref() {
+                    Some(roots) => roots
+                        .iter()
+                        .filter_map(|root| root.uri.to_file_path().ok())
+                        .collect::<Vec<_>>(),
+                    #[allow(deprecated)] // `params.root_path` is marked as deprecated
+                    None => params
+                        .root_uri
+                        .as_ref()
+                        .map(|uri| uri.to_file_path().unwrap())
+                        .or_else(|| params.root_path.clone().map(PathBuf::from))
+                        .into_iter()
+                        .collect(),
+                },
+                font_opts: std::mem::take(&mut self.compile_opts),
+                ..CompileConfig::default()
+            },
+            ..Config::default()
+        };
+        let err = params.initialization_options.and_then(|init| {
+            config
+                .update(&init)
+                .map_err(|e| e.to_string())
+                .map_err(invalid_params)
+                .err()
+        });
+
+        let super_init = SuperInit {
+            client: self.client,
+            exec_cmds: self.exec_cmds,
+            config,
+            cc,
+            err,
+        };
+
+        super_init.initialize(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn test_default_encoding() {
+        let cc = ConstConfig::default();
+        assert_eq!(cc.position_encoding, PositionEncoding::Utf16);
+    }
 
     #[test]
     fn test_config_update() {

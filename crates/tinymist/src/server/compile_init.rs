@@ -11,7 +11,6 @@ use serde::Deserialize;
 use serde_json::{Map, Value as JsonValue};
 use tinymist_query::PositionEncoding;
 use tinymist_render::PeriscopeArgs;
-use tokio::sync::mpsc;
 use typst::foundations::IntoValue;
 use typst::syntax::{FileId, VirtualPath};
 use typst::util::Deferred;
@@ -19,7 +18,6 @@ use typst_ts_core::config::compiler::EntryState;
 use typst_ts_core::{ImmutPath, TypstDict};
 
 use super::*;
-use crate::actor::editor::EditorRequest;
 use crate::utils::{try_, try_or_default};
 use crate::world::{ImmutDict, SharedFontResolver};
 
@@ -373,49 +371,4 @@ pub struct ConstCompileConfig {
     /// Determined position encoding, either UTF-8 or UTF-16.
     /// Defaults to UTF-16 if not specified.
     pub position_encoding: PositionEncoding,
-}
-
-pub struct CompileInit {
-    pub client: TypedLspClient<LanguageState>,
-    pub font: CompileFontOpts,
-    pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CompileInitializeParams {
-    pub config: serde_json::Value,
-    pub position_encoding: Option<lsp_types::PositionEncodingKind>,
-}
-
-impl Initializer for CompileInit {
-    type I = CompileInitializeParams;
-    type S = LanguageState;
-
-    fn initialize(self, params: Self::I) -> (Self::S, AnySchedulableResponse) {
-        // let mut compile_config = CompileConfig {
-        //     font_opts: self.font,
-        //     ..CompileConfig::default()
-        // };
-        // compile_config.update(&params.config).unwrap();
-
-        // let mut service = CompileState::new(
-        //     self.client.clone(),
-        //     compile_config,
-        //     ConstCompileConfig {
-        //         position_encoding: params
-        //             .position_encoding
-        //             .map(|x| match x.as_str() {
-        //                 "utf-16" => PositionEncoding::Utf16,
-        //                 _ => PositionEncoding::Utf8,
-        //             })
-        //             .unwrap_or_default(),
-        //     },
-        //     self.editor_tx,
-        // );
-
-        // service.restart_server("primary");
-
-        // (service, just_ok!(JsonValue::Null))
-        todo!()
-    }
 }

@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use actor::editor::EditorActor;
 use actor::export::ExportConfig;
 use anyhow::{bail, Context};
 use compile_init::CompileConfig;
@@ -100,6 +101,7 @@ impl LanguageState {
     /// Create a new language server.
     pub fn new(
         client: TypedLspClient<LanguageState>,
+        config: Config,
         const_config: ConstConfig,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
     ) -> Self {
@@ -119,7 +121,7 @@ impl LanguageState {
             ever_manual_focusing: false,
             sema_tokens_registered: false,
             formatter_registered: false,
-            config: Default::default(),
+            config,
             const_config,
 
             pinning: false,
@@ -130,17 +132,38 @@ impl LanguageState {
         }
     }
 
-    // pub fn install(provider: LspBuilder<CompileInit>) -> LspBuilder<CompileInit>
-    // {     type S = CompileState;
-    //     use lsp_types::notification::*;
-    //     provider
-    //         .with_command_("tinymist.exportPdf", S::export_pdf)
-    //         .with_command_("tinymist.exportSvg", S::export_svg)
-    //         .with_command_("tinymist.exportPng", S::export_png)
-    //         .with_command("tinymist.doClearCache", S::clear_cache)
-    //         .with_command("tinymist.changeEntry", S::change_entry)
-    //         .with_notification::<Initialized>(S::initialized)
-    // }
+    pub fn main(
+        client: TypedLspClient<Self>,
+        config: Config,
+        cc: ConstConfig,
+        start: bool,
+    ) -> Self {
+        info!("LanguageState: initialized with config {config:?}");
+        info!("LanguageState: initialized with const_config {cc:?}");
+
+        // Bootstrap server
+        let (editor_tx, editor_rx) = mpsc::unbounded_channel();
+
+        let mut service = LanguageState::new(client.clone(), config, cc.clone(), editor_tx);
+
+        if start {
+            service.run_format_thread();
+            service.run_user_action_thread();
+
+            let editor_actor = EditorActor::new(
+                client.clone().to_untyped(),
+                editor_rx,
+                service.config.compile.notify_compile_status,
+            );
+
+            service.restart_server("primary");
+
+            // Run the cluster in the background after we referencing it
+            client.handle.spawn(editor_actor.run());
+        }
+
+        service
+    }
 
     /// Get the const configuration.
     pub fn const_config(&self) -> &ConstConfig {
@@ -157,13 +180,15 @@ impl LanguageState {
         self.primary.as_ref().expect("primary")
     }
 
-    pub fn install(provider: LspBuilder<Init>) -> LspBuilder<Init> {
+    pub fn install<T: Initializer<S = Self> + AddCommands>(
+        provider: LspBuilder<T>,
+    ) -> LspBuilder<T> {
         type State = LanguageState;
         use lsp_types::notification::*;
         use lsp_types::request::*;
 
         // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
-        let provider = provider
+        let mut provider = provider
             .with_request::<Shutdown>(State::shutdown)
             // lantency sensitive
             .with_request_::<Completion>(State::completion)
@@ -218,14 +243,14 @@ impl LanguageState {
             .with_resource("/preview/index.html", State::resource_preview_html)
             .with_resource("/tutorial", State::resource_tutoral);
 
-        provider.args.exec_cmds.get_or_init(|| {
-            // todo: generalize me
-            Some("tinymist.getResources")
+        // todo: generalize me
+        provider.args.add_commands(
+            &Some("tinymist.getResources")
                 .iter()
                 .chain(provider.exec_cmds.keys())
                 .map(ToString::to_string)
-                .collect::<Vec<_>>()
-        });
+                .collect::<Vec<_>>(),
+        );
 
         provider
     }
@@ -357,7 +382,7 @@ impl LanguageState {
     ///
     /// The server can use the `initialized` notification, for example, to
     /// dynamically register capabilities with the client.
-    fn initialized(&mut self, params: InitializedParams) -> LspResult<()> {
+    fn initialized(&mut self, _params: InitializedParams) -> LspResult<()> {
         if self.const_config().tokens_dynamic_registration
             && self.config.semantic_tokens == SemanticTokensMode::Enable
         {

@@ -197,18 +197,20 @@ impl LspClient {
         handler(service, response)
     }
 
-    pub fn send_notification<N: lsp_types::notification::Notification>(&self, params: N::Params) {
-        let not = lsp_server::Notification::new(N::METHOD.to_owned(), params);
-
+    pub fn send_notification_(&self, notif: lsp_server::Notification) {
         let sender = self.sender.read();
         let Some(sender) = sender.as_ref() else {
             log::warn!("failed to send notification: connection closed");
             return;
         };
-        let Err(res) = sender.send(not.into()) else {
+        let Err(res) = sender.send(notif.into()) else {
             return;
         };
         log::warn!("failed to send notification: {res:?}");
+    }
+
+    pub fn send_notification<N: lsp_types::notification::Notification>(&self, params: N::Params) {
+        self.send_notification_(lsp_server::Notification::new(N::METHOD.to_owned(), params));
     }
 
     pub fn register_request(&self, request: &lsp_server::Request, request_received: Instant) {
@@ -534,6 +536,39 @@ pub struct LspDriver<Args: Initializer> {
     pub resources: ResourceMap<Args::S>,
 }
 
+impl<Args: Initializer> LspDriver<Args> {
+    pub fn state(&self) -> Option<&Args::S> {
+        match &self.state {
+            State::Ready(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn state_mut(&mut self) -> Option<&mut Args::S> {
+        match &mut self.state {
+            State::Ready(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn ready(&mut self, params: Args::I) -> AnySchedulableResponse {
+        let args = match &mut self.state {
+            State::Uninitialized(args) => args,
+            _ => {
+                return just_result!(Err(resp_err(
+                    ErrorCode::InvalidRequest,
+                    "Server is already initialized"
+                )))
+            }
+        };
+
+        let (s, res) = args.take().unwrap().initialize(params);
+        self.state = State::Ready(s);
+
+        res
+    }
+}
+
 impl<Args: Initializer> LspDriver<Args>
 where
     Args::S: 'static,
@@ -560,6 +595,7 @@ where
 
         res
     }
+
     pub fn start_(&mut self, inbox: crossbeam_channel::Receiver<Message>) -> anyhow::Result<()> {
         // todo: follow what rust analyzer does
         // Windows scheduler implements priority boosts: if thread waits for an
