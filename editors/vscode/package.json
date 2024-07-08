@@ -68,9 +68,8 @@
                     "title": "Export PDF",
                     "description": "The extension can export PDFs of your Typst files. This setting controls whether this feature is enabled and how often it runs.",
                     "type": "string",
-                    "default": "auto",
+                    "default": "never",
                     "enum": [
-                        "auto",
                         "never",
                         "onSave",
                         "onType",

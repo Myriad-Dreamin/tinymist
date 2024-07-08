@@ -120,7 +120,7 @@ impl ExportTaskConf {
         // latest state. This is not a TOCTOU issue, as examined by typst-preview.
         let mode = self.config.mode;
         let need_export = match mode {
-            ExportMode::Auto | ExportMode::Never => false,
+            ExportMode::Never => false,
             ExportMode::OnType => s.is_typed(),
             ExportMode::OnSave => s.is_saved(),
             ExportMode::OnDocumentHasTitle => s.is_saved() && doc.title.is_some(),
