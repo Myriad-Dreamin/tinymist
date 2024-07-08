@@ -188,47 +188,55 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
             .compile_config()
             .determine_entry(Some(input.as_path().into()));
 
-        let snap = state.primary().sync_snapshot().unwrap();
-        let w = snap.world.task(TaskInputs {
-            entry: Some(entry),
-            inputs: Some(inputs),
-        });
+        let snap = state.primary().snapshot().unwrap();
 
-        let mut env = CompileEnv {
-            tracer: Some(Tracer::default()),
-            ..Default::default()
-        };
-        typst_timing::enable();
-        let mut errors = EcoVec::new();
-        if let Err(e) = std::marker::PhantomData.compile(&w, &mut env) {
-            errors = e;
-        }
-        let mut writer = std::io::BufWriter::new(Vec::new());
-        let _ = typst_timing::export_json(&mut writer, |span| {
-            resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
-        });
+        RUNTIMES.tokio_runtime.block_on(async {
+            let snap = snap.snapshot().await.unwrap();
 
-        let timings = String::from_utf8(writer.into_inner().unwrap()).unwrap();
+            let w = snap.world.task(TaskInputs {
+                entry: Some(entry),
+                inputs: Some(inputs),
+            });
 
-        let warnings = env.tracer.map(|e| e.warnings());
+            let mut env = CompileEnv {
+                tracer: Some(Tracer::default()),
+                ..Default::default()
+            };
+            typst_timing::enable();
+            let mut errors = EcoVec::new();
+            if let Err(e) = std::marker::PhantomData.compile(&w, &mut env) {
+                errors = e;
+            }
+            let mut writer = std::io::BufWriter::new(Vec::new());
+            let _ = typst_timing::export_json(&mut writer, |span| {
+                resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
+            });
 
-        let diagnostics = state.primary().handle.run_analysis(&w, |ctx| {
-            tinymist_query::convert_diagnostics(ctx, warnings.iter().flatten().chain(errors.iter()))
-        });
+            let timings = String::from_utf8(writer.into_inner().unwrap()).unwrap();
 
-        let diagnostics = diagnostics.unwrap_or_default();
+            let warnings = env.tracer.map(|e| e.warnings());
 
-        client.send_notification_(lsp_server::Notification {
-            method: "tinymistExt/diagnostics".to_owned(),
-            params: serde_json::json!(diagnostics),
-        });
+            let diagnostics = state.primary().handle.run_analysis(&w, |ctx| {
+                tinymist_query::convert_diagnostics(
+                    ctx,
+                    warnings.iter().flatten().chain(errors.iter()),
+                )
+            });
 
-        client.respond(lsp_server::Response {
-            id: req_id,
-            result: Some(serde_json::json!({
-                "tracingData": timings,
-            })),
-            error: None,
+            let diagnostics = diagnostics.unwrap_or_default();
+
+            client.send_notification_(lsp_server::Notification {
+                method: "tinymistExt/diagnostics".to_owned(),
+                params: serde_json::json!(diagnostics),
+            });
+
+            client.respond(lsp_server::Response {
+                id: req_id,
+                result: Some(serde_json::json!({
+                    "tracingData": timings,
+                })),
+                error: None,
+            });
         });
 
         Ok(())

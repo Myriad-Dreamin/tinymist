@@ -1,7 +1,10 @@
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
+use sync_lsp::LspResult;
 use typst_ts_compiler::{ShadowApi, TaskInputs};
 use typst_ts_core::{config::compiler::EntryState, font::GlyphId, TypstDocument, TypstFont};
+
+use crate::{actor::typ_client::QuerySnap, z_internal_error};
 
 pub use super::prelude::*;
 
@@ -159,7 +162,9 @@ static CAT_MAP: Lazy<HashMap<&str, SymCategory>> = Lazy::new(|| {
 
 impl LanguageState {
     /// Get the all valid symbols
-    pub fn get_symbol_resources(&self) -> ZResult<JsonValue> {
+    pub async fn get_symbol_resources(snap: QuerySnap) -> LspResult<JsonValue> {
+        let snap = snap.snapshot().await.map_err(z_internal_error)?;
+
         let mut symbols = ResourceSymbolMap::new();
         use typst::symbols::{emoji, sym};
         populate_scope(sym().scope(), "sym", SymCategory::Misc, &mut symbols);
@@ -186,24 +191,26 @@ impl LanguageState {
 
         let symbols_ref = symbols.keys().cloned().collect::<Vec<_>>();
 
-        let snapshot = self.primary().sync_snapshot()?;
         let font = {
             let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
 
             let new_entry = EntryState::new_rootless(entry_path.clone())
-                .ok_or_else(|| error_once!("cannot change entry"))?;
+                .ok_or_else(|| error_once!("cannot change entry"))
+                .map_err(z_internal_error)?;
 
-            let mut forked = snapshot.world.task(TaskInputs {
+            let mut forked = snap.world.task(TaskInputs {
                 entry: Some(new_entry),
                 ..Default::default()
             });
             forked
                 .map_shadow(&entry_path, math_shaping_text.into_bytes().into())
-                .map_err(|e| error_once!("cannot map shadow", err: e))?;
+                .map_err(|e| error_once!("cannot map shadow", err: e))
+                .map_err(z_internal_error)?;
 
             let sym_doc = std::marker::PhantomData
                 .compile(&forked, &mut Default::default())
-                .map_err(|e| error_once!("cannot compile symbols", err: format!("{e:?}")))?;
+                .map_err(|e| error_once!("cannot compile symbols", err: format!("{e:?}")))
+                .map_err(z_internal_error)?;
 
             log::debug!("sym doc: {sym_doc:?}");
             Some(trait_symbol_fonts(&sym_doc, &symbols_ref))
@@ -295,7 +302,9 @@ impl LanguageState {
             glyph_defs: glyph_def,
         };
 
-        serde_json::to_value(resp).context("cannot serialize response")
+        serde_json::to_value(resp)
+            .context("cannot serialize response")
+            .map_err(z_internal_error)
     }
 }
 

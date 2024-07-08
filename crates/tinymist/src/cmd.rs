@@ -166,40 +166,43 @@ impl LanguageState {
         let from_source = get_arg!(args[0] as String);
         let to_path = get_arg!(args[1] as Option<PathBuf>).map(From::from);
 
-        let snap = self.primary().sync_snapshot().map_err(z_internal_error)?;
+        let snap = self.primary().snapshot().map_err(z_internal_error)?;
 
-        // Parse the package specification. If the user didn't specify the version,
-        // we try to figure it out automatically by downloading the package index
-        // or searching the disk.
-        let spec: PackageSpec = from_source
-            .parse()
-            .or_else(|err| {
-                // Try to parse without version, but prefer the error message of the
-                // normal package spec parsing if it fails.
-                let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                let version = determine_latest_version(&snap.world, &spec)?;
-                StrResult::Ok(spec.at(version))
-            })
-            .map_err(map_string_err("failed to parse package spec"))
+        just_future!(async move {
+            let snap = snap.snapshot().await.map_err(z_internal_error)?;
+
+            // Parse the package specification. If the user didn't specify the version,
+            // we try to figure it out automatically by downloading the package index
+            // or searching the disk.
+            let spec: PackageSpec = from_source
+                .parse()
+                .or_else(|err| {
+                    // Try to parse without version, but prefer the error message of the
+                    // normal package spec parsing if it fails.
+                    let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
+                    let version = determine_latest_version(&snap.world, &spec)?;
+                    StrResult::Ok(spec.at(version))
+                })
+                .map_err(map_string_err("failed to parse package spec"))
+                .map_err(z_internal_error)?;
+
+            let from_source = TemplateSource::Package(spec);
+
+            let entry_path = package::init(
+                &snap.world,
+                InitTask {
+                    tmpl: from_source.clone(),
+                    dir: to_path.clone(),
+                },
+            )
+            .map_err(map_string_err("failed to initialize template"))
             .map_err(z_internal_error)?;
 
-        let from_source = TemplateSource::Package(spec);
+            log::info!("template initialized: {from_source:?} to {to_path:?}");
 
-        let entry_path = package::init(
-            &snap.world,
-            InitTask {
-                tmpl: from_source.clone(),
-                dir: to_path.clone(),
-            },
-        )
-        .map_err(map_string_err("failed to initialize template"))
-        .map_err(z_internal_error)?;
-
-        log::info!("template initialized: {from_source:?} to {to_path:?}");
-
-        let res = serde_json::to_value(InitResult { entry_path })
-            .map_err(|_| internal_error("Cannot serialize path"));
-        just_result!(res)
+            serde_json::to_value(InitResult { entry_path })
+                .map_err(|_| internal_error("Cannot serialize path"))
+        })
     }
 
     /// Get the entry of a template.
@@ -208,33 +211,37 @@ impl LanguageState {
 
         let from_source = get_arg!(args[0] as String);
 
-        let snap = self.primary().sync_snapshot().map_err(z_internal_error)?;
+        let snap = self.primary().snapshot().map_err(z_internal_error)?;
 
-        // Parse the package specification. If the user didn't specify the version,
-        // we try to figure it out automatically by downloading the package index
-        // or searching the disk.
-        let spec: PackageSpec = from_source
-            .parse()
-            .or_else(|err| {
-                // Try to parse without version, but prefer the error message of the
-                // normal package spec parsing if it fails.
-                let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                let version = determine_latest_version(&snap.world, &spec)?;
-                StrResult::Ok(spec.at(version))
-            })
-            .map_err(map_string_err("failed to parse package spec"))
-            .map_err(z_internal_error)?;
+        just_future!(async move {
+            let snap = snap.snapshot().await.map_err(z_internal_error)?;
 
-        let from_source = TemplateSource::Package(spec);
+            // Parse the package specification. If the user didn't specify the version,
+            // we try to figure it out automatically by downloading the package index
+            // or searching the disk.
+            let spec: PackageSpec = from_source
+                .parse()
+                .or_else(|err| {
+                    // Try to parse without version, but prefer the error message of the
+                    // normal package spec parsing if it fails.
+                    let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
+                    let version = determine_latest_version(&snap.world, &spec)?;
+                    StrResult::Ok(spec.at(version))
+                })
+                .map_err(map_string_err("failed to parse package spec"))
+                .map_err(z_internal_error)?;
 
-        let entry = package::get_entry(&snap.world, from_source)
-            .map_err(map_string_err("failed to get template entry"))
-            .map_err(z_internal_error)?;
+            let from_source = TemplateSource::Package(spec);
 
-        let entry = String::from_utf8(entry.to_vec())
-            .map_err(|_| invalid_params("template entry is not a valid UTF-8 string"))?;
+            let entry = package::get_entry(&snap.world, from_source)
+                .map_err(map_string_err("failed to get template entry"))
+                .map_err(z_internal_error)?;
 
-        just_ok!(JsonValue::String(entry))
+            let entry = String::from_utf8(entry.to_vec())
+                .map_err(|_| invalid_params("template entry is not a valid UTF-8 string"))?;
+
+            Ok(JsonValue::String(entry))
+        })
     }
 
     /// Interact with the code context at the source file.
@@ -263,11 +270,7 @@ impl LanguageState {
     }
 
     /// Get the trace data of the document.
-    pub fn get_document_trace(
-        &mut self,
-        req_id: RequestId,
-        mut args: Vec<JsonValue>,
-    ) -> LspResult<Option<()>> {
+    pub fn get_document_trace(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let path = get_arg!(args[0] as PathBuf).into();
 
         // get path to self program
@@ -276,31 +279,39 @@ impl LanguageState {
 
         let entry = self.config.compile.determine_entry(Some(path));
 
-        let snap = self.primary().sync_snapshot().map_err(z_internal_error)?;
+        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        let user_action = self.user_action;
 
-        // todo: rootless file
-        // todo: memory dirty file
-        let root = entry.root().ok_or_else(
+        just_future!(async move {
+            let snap = snap.snapshot().await.map_err(z_internal_error)?;
+
+            // todo: rootless file
+            // todo: memory dirty file
+            let root = entry.root().ok_or_else(
             || error_once!("root must be determined for trace, got", entry: format!("{entry:?}")),
         ).map_err(z_internal_error)?;
-        let main = entry
-            .main()
-            .and_then(|e| e.vpath().resolve(&root))
-            .ok_or_else(
-                || error_once!("main file must be resolved, got", entry: format!("{entry:?}")),
-            )
-            .map_err(z_internal_error)?;
+            let main = entry
+                .main()
+                .and_then(|e| e.vpath().resolve(&root))
+                .ok_or_else(
+                    || error_once!("main file must be resolved, got", entry: format!("{entry:?}")),
+                )
+                .map_err(z_internal_error)?;
 
-        self.client.schedule(
-            req_id,
-            self.user_action.trace(TraceParams {
+            let task = user_action.trace(TraceParams {
                 compiler_program: self_path,
                 root: root.as_ref().to_owned(),
                 main,
                 inputs: snap.world.inputs().as_ref().deref().clone(),
                 font_paths: snap.world.font_resolver.font_paths().to_owned(),
-            }),
-        )
+            })?;
+
+            tokio::pin!(task);
+            task.as_mut().await;
+            let resp = task.take_output().unwrap()?;
+
+            serde_json::to_value(resp).map_err(|e| internal_error(e.to_string()))
+        })
     }
 
     /// Get the metrics of the document.
@@ -326,8 +337,8 @@ impl LanguageState {
 impl LanguageState {
     /// Get the all valid symbols
     pub fn resource_symbols(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
-        let resp = self.get_symbol_resources();
-        just_result!(resp.map_err(|e| internal_error(e.to_string())))
+        let snapshot = self.primary().snapshot().map_err(z_internal_error)?;
+        just_future!(Self::get_symbol_resources(snapshot))
     }
 
     /// Get resource preview html

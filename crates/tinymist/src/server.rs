@@ -243,7 +243,7 @@ impl LanguageState {
             .with_command("tinymist.doInitTemplate", State::init_template)
             .with_command("tinymist.doGetTemplateEntry", State::get_template_entry)
             .with_command_("tinymist.interactCodeContext", State::interact_code_context)
-            .with_command_("tinymist.getDocumentTrace", State::get_document_trace)
+            .with_command("tinymist.getDocumentTrace", State::get_document_trace)
             .with_command_("tinymist.getDocumentMetrics", State::get_document_metrics)
             .with_command_("tinymist.getServerInfo", State::get_server_info)
             // resources
@@ -1030,10 +1030,7 @@ impl LanguageState {
             PrepareRename(req) => query_state!(client, PrepareRename, req),
             Symbol(req) => query_world!(client, Symbol, req),
             DocumentMetrics(req) => query_state!(client, DocumentMetrics, req),
-            ServerInfo(_) => {
-                let res = client.collect_server_info()?;
-                just_ok!(CompilerQueryResponse::ServerInfo(Some(res)))
-            }
+            ServerInfo(_) => client.collect_server_info(),
             _ => unreachable!(),
         }
     }
