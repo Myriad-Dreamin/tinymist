@@ -61,10 +61,10 @@ use super::{
 };
 use crate::{
     actor::export::ExportRequest,
-    compile_init::CompileConfig,
     tool::preview::CompileStatus,
     utils::{self, threaded_receive},
     world::{LspCompilerFeat, LspWorld},
+    CompileConfig,
 };
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;

@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use sync_lsp::transport::MirrorArgs;
 
-use tinymist::compile_init::{CompileOnceArgs, FontArgs};
+use tinymist::{CompileOnceArgs, FontArgs};
 
 #[derive(Debug, Clone, clap::Parser)]
 #[clap(name = "tinymist", author, version, about, long_version(LONG_VERSION.as_str()))]

@@ -14,8 +14,7 @@ use parking_lot::RwLock;
 use serde_json::Value as JsonValue;
 use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClient};
 use tinymist::{
-    compile_init::CompileConfig, CompileFontOpts, Config, ConstConfig, Init, LanguageState,
-    LspWorld, SuperInit,
+    CompileConfig, CompileFontOpts, Config, ConstConfig, Init, LanguageState, LspWorld, SuperInit,
 };
 use typst::World;
 use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};

@@ -7,7 +7,6 @@ use std::sync::Arc;
 use actor::editor::EditorActor;
 use actor::export::ExportConfig;
 use anyhow::{bail, Context};
-use compile_init::CompileConfig;
 use futures::future::BoxFuture;
 use log::{error, info, trace};
 use lsp_server::RequestId;
