@@ -71,7 +71,7 @@ fn main() -> anyhow::Result<()> {
         #[cfg(feature = "preview")]
         Commands::Preview(args) => {
             #[cfg(feature = "preview")]
-            use tinymist::preview::preview_main;
+            use tinymist::tool::preview::preview_main;
 
             RUNTIMES.tokio_runtime.block_on(preview_main(args))
         }

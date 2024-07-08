@@ -1,4 +1,4 @@
-//! tinymist LSP mode
+//! tinymist LSP commands
 
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -13,7 +13,7 @@ use typst::diag::StrResult;
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use typst_ts_core::error::prelude::*;
 
-use super::lsp::*;
+use super::server::*;
 use super::*;
 use crate::actor::user_action::{TraceParams, UserActionRequest};
 use crate::tool::package::InitTask;
@@ -106,8 +106,8 @@ impl LanguageState {
     pub fn start_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use std::path::Path;
 
+        use crate::tool::preview::PreviewCliArgs;
         use clap::Parser;
-        use preview::PreviewCliArgs;
 
         let cli_args = get_arg_or_default!(args[0] as Vec<String>);
         // clap parse
