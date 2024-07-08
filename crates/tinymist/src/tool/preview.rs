@@ -321,7 +321,7 @@ impl PreviewState {
         let compile_fence = async move {
             let now = reflexo::time::now();
             // The fence
-            snap.ok()?.snapshot().await.ok()?.compile().await;
+            let artifact = snap.ok()?.snapshot().await.ok()?.compile().await;
 
             let w = cc.inner.read();
             let w = w.as_ref()?;
@@ -330,11 +330,18 @@ impl PreviewState {
             }
 
             // But we just send a latest document to the previewer.
-            let latest_doc = doc_rx.borrow().clone();
-            let has_doc = latest_doc.is_some();
+            let latest_doc = match doc_rx.borrow().clone() {
+                Some(doc) => Ok(doc),
+                None => artifact
+                    .doc
+                    .clone()
+                    .map_err(|_| CompileStatus::CompileError),
+            };
+
+            let has_doc = latest_doc.is_ok();
             let elapsed = now.elapsed().unwrap_or_default();
             log::info!("PreviewTask({tid}): put fence in {elapsed:?}? {has_doc}");
-            w.notify_compile(Ok(latest_doc?), true);
+            w.notify_compile(latest_doc, true);
 
             Some(())
         };

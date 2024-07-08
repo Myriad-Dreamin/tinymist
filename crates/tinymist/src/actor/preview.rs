@@ -50,6 +50,9 @@ impl PreviewActor {
                         continue;
                     };
 
+                    // Unregister preview early
+                    tab.compile_handler.unregister_preview(&tab.task_id);
+
                     let client = self.client.clone();
                     self.client.handle.spawn(async move {
                         tab.previewer.stop().await;
@@ -62,8 +65,6 @@ impl PreviewActor {
                         let _ = tab.ss_handle.await;
 
                         log::info!("PreviewTask({task_id}): killed");
-                        // Unregister preview
-                        tab.compile_handler.unregister_preview(&tab.task_id);
                         // Send response
                         let _ = tx.send(Ok(JsonValue::Null));
                         // Send global notification

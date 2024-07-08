@@ -40,6 +40,8 @@ pub struct CompileFlags {
     pub triggered_by_mem_events: bool,
     /// Whether the revision is annotated by file system events.
     pub triggered_by_fs_events: bool,
+    /// Whether the revision is annotated by entry update.
+    pub triggered_by_entry_update: bool,
 }
 
 pub struct CompileSnapshot<F: CompilerFeat> {
@@ -175,37 +177,44 @@ struct CompileReasons {
     by_memory_events: bool,
     /// The snapshot is taken by the file system events.
     by_fs_events: bool,
+    /// The snapshot is taken by the entry change.
+    by_entry_update: bool,
 }
 
 impl CompileReasons {
     fn see(&mut self, reason: CompileReasons) {
         self.by_memory_events |= reason.by_memory_events;
         self.by_fs_events |= reason.by_fs_events;
+        self.by_entry_update |= reason.by_entry_update;
     }
 
     fn any(&self) -> bool {
-        self.by_memory_events || self.by_fs_events
+        self.by_memory_events || self.by_fs_events || self.by_entry_update
     }
 }
 
 fn no_reason() -> CompileReasons {
-    CompileReasons {
-        by_memory_events: false,
-        by_fs_events: false,
-    }
+    CompileReasons::default()
 }
 
 fn reason_by_mem() -> CompileReasons {
     CompileReasons {
         by_memory_events: true,
-        by_fs_events: false,
+        ..CompileReasons::default()
     }
 }
 
 fn reason_by_fs() -> CompileReasons {
     CompileReasons {
-        by_memory_events: false,
         by_fs_events: true,
+        ..CompileReasons::default()
+    }
+}
+
+fn reason_by_entry_change() -> CompileReasons {
+    CompileReasons {
+        by_entry_update: true,
+        ..CompileReasons::default()
     }
 }
 
@@ -455,6 +464,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             env: env.clone(),
             flags: CompileFlags {
                 compile_tick: self.logical_tick,
+                triggered_by_entry_update: reason.by_entry_update,
                 triggered_by_mem_events: reason.by_memory_events,
                 triggered_by_fs_events: reason.by_fs_events,
             },
@@ -621,7 +631,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     }
                 });
 
-                reason_by_fs()
+                reason_by_entry_change()
             }
             Interrupt::Compiled(artifact) => self.process_compile(artifact, send),
             Interrupt::Memory(event) => {
@@ -661,7 +671,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     }),
                 })));
 
-                reason_by_fs()
+                no_reason()
             }
             Interrupt::Fs(mut event) => {
                 log::debug!("CompileServerActor: fs event incoming {event:?}");

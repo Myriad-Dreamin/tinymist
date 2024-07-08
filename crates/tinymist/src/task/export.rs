@@ -10,7 +10,7 @@ use anyhow::Context;
 use log::{error, info};
 use once_cell::sync::Lazy;
 use tinymist_query::{ExportKind, PageSelection};
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, task::spawn_blocking};
 use typst::{foundations::Smart, layout::Abs, layout::Frame, visualize::Color};
 use typst_ts_compiler::EntryReader;
 use typst_ts_core::{path::PathClean, ImmutPath};
@@ -35,6 +35,7 @@ pub enum ExportSignal {
     Typed,
     Saved,
     TypedAndSaved,
+    EntryChanged,
 }
 
 impl ExportSignal {
@@ -44,6 +45,10 @@ impl ExportSignal {
 
     pub fn is_saved(&self) -> bool {
         matches!(self, ExportSignal::Saved | ExportSignal::TypedAndSaved)
+    }
+
+    fn is_entry_change(&self) -> bool {
+        matches!(self, ExportSignal::EntryChanged)
     }
 }
 
@@ -103,7 +108,7 @@ impl ExportTaskConf {
         t: &ExportTask,
     ) {
         self.signal_export(snap, s, t);
-        if s.is_typed() {
+        if s.is_typed() || s.is_entry_change() {
             self.signal_count_word(snap, t);
         }
     }
@@ -119,12 +124,13 @@ impl ExportTaskConf {
         // We do only check the latest signal and determine whether to export by the
         // latest state. This is not a TOCTOU issue, as examined by typst-preview.
         let mode = self.config.mode;
-        let need_export = match mode {
-            ExportMode::Never => false,
-            ExportMode::OnType => s.is_typed(),
-            ExportMode::OnSave => s.is_saved(),
-            ExportMode::OnDocumentHasTitle => s.is_saved() && doc.title.is_some(),
-        };
+        let need_export = (!matches!(mode, ExportMode::Never) && s.is_entry_change())
+            || match mode {
+                ExportMode::Never => false,
+                ExportMode::OnType => s.is_typed(),
+                ExportMode::OnSave => s.is_saved(),
+                ExportMode::OnDocumentHasTitle => s.is_saved() && doc.title.is_some(),
+            };
 
         if !need_export {
             return None;
@@ -212,7 +218,8 @@ impl ExportTaskConf {
         let doc = doc
             .doc
             .as_ref()
-            .map_err(|_| anyhow::anyhow!("no document"))?;
+            .map_err(|_| anyhow::anyhow!("no document"))?
+            .clone();
 
         let Some(to) = substitute_path(&self.config.substitute_pattern, root, path) else {
             bail!("RenderActor({kind:?}): failed to substitute path");
@@ -235,27 +242,38 @@ impl ExportTaskConf {
             }
         }
 
-        static BLANK: Lazy<Frame> = Lazy::new(Frame::default);
-        let first_frame = || doc.pages.first().map(|f| &f.frame).unwrap_or(&*BLANK);
-        let data = match kind {
-            Pdf => {
-                // todo: Some(pdf_uri.as_str())
-                // todo: timestamp world.now()
-                typst_pdf::pdf(doc, Smart::Auto, None)
-            }
-            Svg { page: First } => typst_svg::svg(first_frame()).into_bytes(),
-            Svg { page: Merged } => typst_svg::svg_merged(doc, Abs::zero()).into_bytes(),
-            Png { page: First } => typst_render::render(first_frame(), 3., Color::WHITE)
-                .encode_png()
-                .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?,
-            Png { page: Merged } => {
-                typst_render::render_merged(doc, 3., Color::WHITE, Abs::zero(), Color::WHITE)
-                    .encode_png()
-                    .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
-            }
-        };
+        let kind2 = kind.clone();
+        let data = spawn_blocking(move || -> anyhow::Result<Vec<u8>> {
+            rayon::in_place_scope(|_| {
+                let doc = &doc;
 
-        tokio::fs::write(&to, data)
+                static BLANK: Lazy<Frame> = Lazy::new(Frame::default);
+                let first_frame = || doc.pages.first().map(|f| &f.frame).unwrap_or(&*BLANK);
+                Ok(match kind2 {
+                    Pdf => {
+                        // todo: Some(pdf_uri.as_str())
+                        // todo: timestamp world.now()
+                        typst_pdf::pdf(doc, Smart::Auto, None)
+                    }
+                    Svg { page: First } => typst_svg::svg(first_frame()).into_bytes(),
+                    Svg { page: Merged } => typst_svg::svg_merged(doc, Abs::zero()).into_bytes(),
+                    Png { page: First } => typst_render::render(first_frame(), 3., Color::WHITE)
+                        .encode_png()
+                        .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?,
+                    Png { page: Merged } => typst_render::render_merged(
+                        doc,
+                        3.,
+                        Color::WHITE,
+                        Abs::zero(),
+                        Color::WHITE,
+                    )
+                    .encode_png()
+                    .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?,
+                })
+            })
+        });
+
+        tokio::fs::write(&to, data.await??)
             .await
             .with_context(|| format!("RenderActor({kind:?}): failed to export"))?;
 
