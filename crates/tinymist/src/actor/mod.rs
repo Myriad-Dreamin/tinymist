@@ -26,21 +26,20 @@ use self::{
     user_action::run_user_action_thread,
 };
 use crate::{
-    compile::CompileState,
     world::{ImmutDict, LspWorldBuilder},
     LanguageState,
 };
 
-impl CompileState {
+impl LanguageState {
     pub fn restart_server(&mut self, group: &str) {
         let server = self.server(
             group.to_owned(),
-            self.config
-                .determine_entry(self.config.determine_default_entry_path()),
-            self.config.determine_inputs(),
+            self.compile_config()
+                .determine_entry(self.compile_config().determine_default_entry_path()),
+            self.compile_config().determine_inputs(),
             self.vfs_snapshot(),
         );
-        if let Some(mut previous_server) = self.compiler.replace(server) {
+        if let Some(mut previous_server) = self.primary.replace(server) {
             std::thread::spawn(move || previous_server.settle());
         }
     }
@@ -65,8 +64,8 @@ impl CompileState {
                 doc_rx,
                 entry: entry.clone(),
                 config: ExportConfig {
-                    substitute_pattern: self.config.output_path.clone(),
-                    mode: self.config.export_pdf,
+                    substitute_pattern: self.compile_config().output_path.clone(),
+                    mode: self.compile_config().export_pdf,
                 },
                 kind: ExportKind::Pdf,
                 count_words: self.config.notify_compile_status,
@@ -80,8 +79,8 @@ impl CompileState {
 
         // Create the compile handler for client consuming results.
         let position_encoding = self.const_config().position_encoding;
-        let enable_periscope = self.config.periscope_args.is_some();
-        let periscope_args = self.config.periscope_args.clone();
+        let enable_periscope = self.compile_config().periscope_args.is_some();
+        let periscope_args = self.compile_config().periscope_args.clone();
         let handle = Arc::new(CompileHandler {
             #[cfg(feature = "preview")]
             inner: std::sync::Arc::new(RwLock::new(None)),
@@ -98,7 +97,7 @@ impl CompileState {
             periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
         });
 
-        let font_resolver = self.config.determine_fonts();
+        let font_resolver = self.compile_config().determine_fonts();
         let entry_ = entry.clone();
         let handle_ = handle.clone();
 
@@ -114,7 +113,7 @@ impl CompileState {
         });
 
         // Create the client
-        let config = self.config.clone();
+        let config = self.compile_config().clone();
         let client = CompileClientActor::new(handle, config, entry);
         // We do send memory changes instead of initializing compiler with them.
         // This is because there are state recorded inside of the compiler actor, and we
@@ -122,9 +121,6 @@ impl CompileState {
         client.add_memory_changes(MemoryEvent::Update(snapshot));
         client
     }
-}
-
-impl LanguageState {
     pub fn run_format_thread(&mut self) {
         if self.format_thread.is_some() {
             log::error!("formatting thread is already started");

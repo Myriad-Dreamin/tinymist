@@ -16,27 +16,25 @@ use typst_ts_compiler::{
 };
 use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
-use crate::{actor::typ_client::CompileClientActor, compile::CompileState, LanguageState};
+use crate::{actor::typ_client::CompileClientActor, LanguageState};
 use sync_lsp::*;
 
-impl CompileState {
+impl LanguageState {
     /// Focus main file to some path.
     pub fn do_change_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<bool, Error> {
-        self.compiler
+        self.primary
             .as_mut()
             .unwrap()
             .change_entry(new_entry.clone())
     }
-}
 
-impl LanguageState {
     /// Pin the entry to the given path
     pub fn pin_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
         self.pinning = new_entry.is_some();
         let entry = new_entry
             .or_else(|| self.config.compile.determine_default_entry_path())
             .or_else(|| self.focusing.clone());
-        self.primary.do_change_entry(entry).map(|_| ())
+        self.do_change_entry(entry).map(|_| ())
     }
 
     /// Updates the primary (focusing) entry
@@ -46,7 +44,7 @@ impl LanguageState {
             return Ok(false);
         }
 
-        self.primary.do_change_entry(new_entry.clone())
+        self.do_change_entry(new_entry.clone())
     }
 
     /// This is used for tracking activating document status if a client is not
@@ -102,13 +100,8 @@ pub struct MemoryFileMeta {
 
 impl LanguageState {
     fn update_source(&self, files: FileChangeSet) -> Result<(), Error> {
-        let primary = Some(self.primary());
-        let clients_to_notify =
-            (primary.into_iter()).chain(self.dedicates.iter().map(CompileState::compiler));
-
-        for client in clients_to_notify {
-            client.add_memory_changes(MemoryEvent::Update(files.clone()));
-        }
+        self.primary()
+            .add_memory_changes(MemoryEvent::Update(files.clone()));
 
         Ok(())
     }
@@ -117,7 +110,7 @@ impl LanguageState {
         let now = Time::now();
         let path: ImmutPath = path.into();
 
-        self.primary.memory_changes.insert(
+        self.memory_changes.insert(
             path.clone(),
             MemoryFileMeta {
                 mt: now,
@@ -137,7 +130,7 @@ impl LanguageState {
     pub fn remove_source(&mut self, path: PathBuf) -> Result<(), Error> {
         let path: ImmutPath = path.into();
 
-        self.primary.memory_changes.remove(&path);
+        self.memory_changes.remove(&path);
         log::info!("remove source: {:?}", path);
 
         // todo: is it safe to believe that the path is normalized?
@@ -156,7 +149,6 @@ impl LanguageState {
         let path: ImmutPath = path.into();
 
         let meta = self
-            .primary
             .memory_changes
             .get_mut(&path)
             .ok_or_else(|| error_once!("file missing", path: path.display()))?;
@@ -189,7 +181,7 @@ impl LanguageState {
         path: ImmutPath,
         f: impl FnOnce(Source) -> anyhow::Result<T>,
     ) -> anyhow::Result<T> {
-        let snapshot = self.primary.memory_changes.get(&path);
+        let snapshot = self.memory_changes.get(&path);
         let snapshot = snapshot.ok_or_else(|| anyhow!("file missing {path:?}"))?;
         let source = snapshot.content.clone();
         f(source)
@@ -285,16 +277,16 @@ impl LanguageState {
             OnEnter(req) => query_source!(self, OnEnter, req)?,
             ColorPresentation(req) => CompilerQueryResponse::ColorPresentation(req.request()),
             _ => {
-                let client = &mut self.primary;
+                let client = self.primary.as_mut().unwrap();
                 if !self.pinning && !self.config.compile.has_default_entry_path {
                     // todo: race condition, we need atomic primary query
                     if let Some(path) = query.associated_path() {
                         // todo!!!!!!!!!!!!!!
-                        client.do_change_entry(Some(path.into()))?;
+                        client.change_entry(Some(path.into()))?;
                     }
                 }
 
-                return Self::query_on(client.compiler(), query);
+                return Self::query_on(client, query);
             }
         };
 
@@ -337,9 +329,9 @@ impl LanguageState {
     }
 }
 
-impl CompileState {
-    pub fn query(&self, query: CompilerQueryRequest) -> QueryFuture {
-        let client = self.compiler.as_ref().unwrap();
-        LanguageState::query_on(client, query)
-    }
-}
+// impl CompileState {
+//     pub fn query(&self, query: CompilerQueryRequest) -> QueryFuture {
+//         let client = self.compiler.as_ref().unwrap();
+//         LanguageState::query_on(client, query)
+//     }
+// }

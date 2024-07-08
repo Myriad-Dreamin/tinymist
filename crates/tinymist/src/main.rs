@@ -2,24 +2,20 @@
 
 mod args;
 
-use std::{
-    path::PathBuf,
-    sync::{Arc, OnceLock},
-};
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::bail;
 use clap::Parser;
 use comemo::Prehashed;
-use lsp_types::InitializedParams;
+use futures::future::MaybeDone;
+use lsp_server::RequestId;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use sync_lsp::{transport::with_stdio_transport, Initializer, LspBuilder, LspClient};
+use serde_json::Value as JsonValue;
+use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClient};
 use tinymist::{
-    compile::CompileState,
-    compile_init::{CompileInit, CompileInitializeParams},
-    CompileFontOpts, Init, LanguageState, LspWorld,
+    CompileConfig, CompileFontOpts, Config, ConstConfig, Init, LanguageState, LspWorld, SuperInit,
 };
-use tokio::sync::mpsc;
 use typst::World;
 use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
 use typst_ts_compiler::{CompileEnv, Compiler, TaskInputs};
@@ -99,7 +95,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
                     ignore_system_fonts: args.font.ignore_system_fonts,
                     ..Default::default()
                 },
-                exec_cmds: OnceLock::new(),
+                exec_cmds: Vec::new(),
             },
             client.clone(),
         ))
@@ -112,8 +108,6 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
 }
 
 pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
-    let (editor_tx, _editor_rx) = mpsc::unbounded_channel();
-
     let mut input = PathBuf::from(args.compile.input.unwrap());
 
     let mut root_path = args.compile.root.unwrap_or(PathBuf::from("."));
@@ -136,116 +130,108 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
         pairs.collect()
     }));
 
-    let init = |host| CompileInit {
-        client: host,
-        font: CompileFontOpts {
-            font_paths: args.compile.font.font_paths.clone(),
-            ignore_system_fonts: args.compile.font.ignore_system_fonts,
+    with_stdio_transport(args.mirror.clone(), |conn| {
+        let sender = Arc::new(RwLock::new(Some(conn.sender)));
+        let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender);
+
+        let cc = ConstConfig::default();
+        let config = Config {
+            compile: CompileConfig {
+                roots: vec![root_path],
+                font_opts: CompileFontOpts {
+                    font_paths: args.compile.font.font_paths.clone(),
+                    ignore_system_fonts: args.compile.font.ignore_system_fonts,
+                    ..Default::default()
+                },
+                ..CompileConfig::default()
+            },
+            ..Config::default()
+        };
+
+        let mut service = LanguageState::install(LspBuilder::new(
+            SuperInit {
+                client: client.to_typed(),
+                exec_cmds: Vec::new(),
+                config,
+                cc,
+                err: None,
+            },
+            client.clone(),
+        ))
+        .build();
+
+        let resp = service.ready(()).unwrap();
+        let MaybeDone::Done(resp) = resp else {
+            bail!("internal error: not sync init")
+        };
+        resp.unwrap();
+
+        // todo: persist
+        let request_received = reflexo::time::Instant::now();
+
+        let req_id: RequestId = 0.into();
+        client.register_request(
+            &lsp_server::Request {
+                id: req_id.clone(),
+                method: "tinymistExt/documentProfiling".to_owned(),
+                params: JsonValue::Null,
+            },
+            request_received,
+        );
+
+        let state = service.state_mut().unwrap();
+
+        let entry = state
+            .compile_config()
+            .determine_entry(Some(input.as_path().into()));
+
+        let snap = state.primary().sync_snapshot().unwrap();
+        let w = snap.world.task(TaskInputs {
+            entry: Some(entry),
+            inputs: Some(inputs),
+        });
+
+        let mut env = CompileEnv {
+            tracer: Some(Tracer::default()),
             ..Default::default()
-        },
-        editor_tx,
-    };
-    if args.persist {
-        log::info!("starting compile server");
-
-        with_stdio_transport(args.mirror.clone(), |conn| {
-            let sender = Arc::new(RwLock::new(Some(conn.sender)));
-            let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender);
-            CompileState::install(LspBuilder::new(init(client.to_typed()), client))
-                .build()
-                .start(conn.receiver, false)
-        })?;
-
-        log::info!("compile server did shut down");
-    } else {
-        {
-            let (s, _) = crossbeam_channel::unbounded();
-            let sender = Arc::new(RwLock::new(Some(s)));
-            let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender.clone());
-
-            let _drop_guard = ForceDrop(sender);
-
-            let (mut service, res) = init(client.to_typed()).initialize(CompileInitializeParams {
-                config: serde_json::json!({
-                    "rootPath": root_path,
-                }),
-                position_encoding: None,
-            });
-
-            res.unwrap();
-
-            let _ = service.initialized(InitializedParams {});
-
-            let entry = service.config.determine_entry(Some(input.as_path().into()));
-
-            let snap = service.compiler().sync_snapshot().unwrap();
-            let w = snap.world.task(TaskInputs {
-                entry: Some(entry),
-                inputs: Some(inputs),
-            });
-
-            let mut env = CompileEnv {
-                tracer: Some(Tracer::default()),
-                ..Default::default()
-            };
-            typst_timing::enable();
-            let mut errors = EcoVec::new();
-            if let Err(e) = std::marker::PhantomData.compile(&w, &mut env) {
-                errors = e;
-            }
-            let mut writer = std::io::BufWriter::new(Vec::new());
-            let _ = typst_timing::export_json(&mut writer, |span| {
-                resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
-            });
-
-            let timings = String::from_utf8(writer.into_inner().unwrap()).unwrap();
-
-            let warnings = env.tracer.map(|e| e.warnings());
-
-            let diagnostics = service.compiler().handle.run_analysis(&w, |ctx| {
-                tinymist_query::convert_diagnostics(
-                    ctx,
-                    warnings.iter().flatten().chain(errors.iter()),
-                )
-            });
-
-            let diagnostics = diagnostics.unwrap_or_default();
-
-            lsp_server::Message::Notification(lsp_server::Notification {
-                method: "tinymistExt/diagnostics".to_owned(),
-                params: serde_json::json!(diagnostics),
-            })
-            .write(&mut std::io::stdout().lock())
-            .unwrap();
-
-            // if let Some(_doc) = doc {
-            // let p = typst_pdf::pdf(&_doc,
-            // typst::foundations::Smart::Auto, None);
-            // let output: PathBuf = input.with_extension("pdf");
-            // tokio::fs::write(output, p).await.unwrap();
-            // }
-
-            lsp_server::Message::Response(lsp_server::Response {
-                id: 0.into(),
-                result: Some(serde_json::json!({
-                    "tracingData": timings,
-                })),
-                error: None,
-            })
-            .write(&mut std::io::stdout().lock())
-            .unwrap();
+        };
+        typst_timing::enable();
+        let mut errors = EcoVec::new();
+        if let Err(e) = std::marker::PhantomData.compile(&w, &mut env) {
+            errors = e;
         }
-    }
+        let mut writer = std::io::BufWriter::new(Vec::new());
+        let _ = typst_timing::export_json(&mut writer, |span| {
+            resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
+        });
+
+        let timings = String::from_utf8(writer.into_inner().unwrap()).unwrap();
+
+        let warnings = env.tracer.map(|e| e.warnings());
+
+        let diagnostics = state.primary().handle.run_analysis(&w, |ctx| {
+            tinymist_query::convert_diagnostics(ctx, warnings.iter().flatten().chain(errors.iter()))
+        });
+
+        let diagnostics = diagnostics.unwrap_or_default();
+
+        client.send_notification_(lsp_server::Notification {
+            method: "tinymistExt/diagnostics".to_owned(),
+            params: serde_json::json!(diagnostics),
+        });
+
+        client.respond(lsp_server::Response {
+            id: req_id,
+            result: Some(serde_json::json!({
+                "tracingData": timings,
+            })),
+            error: None,
+        });
+
+        Ok(())
+    })?;
 
     Ok(())
-}
-
-struct ForceDrop<T>(Arc<RwLock<Option<T>>>);
-
-impl<T> Drop for ForceDrop<T> {
-    fn drop(&mut self) {
-        *self.0.write() = None;
-    }
 }
 
 /// Turns a span into a (file, line) pair.

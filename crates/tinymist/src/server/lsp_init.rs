@@ -1,22 +1,380 @@
-use std::path::PathBuf;
-use std::sync::OnceLock;
+use core::fmt;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::bail;
+use clap::builder::ValueParser;
+use clap::{ArgAction, Parser};
+use comemo::Prehashed;
 use itertools::Itertools;
-use log::info;
 use lsp_types::*;
+use once_cell::sync::{Lazy, OnceCell};
 use serde::Deserialize;
 use serde_json::{json, Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
-use tokio::sync::mpsc;
-use typst_ts_core::ImmutPath;
+use tinymist_render::PeriscopeArgs;
+use typst::foundations::IntoValue;
+use typst::syntax::{FileId, VirtualPath};
+use typst::util::Deferred;
+use typst_ts_core::config::compiler::EntryState;
+use typst_ts_core::{ImmutPath, TypstDict};
 
 pub use super::lsp::LanguageState;
 use super::*;
-use crate::actor::editor::EditorActor;
-use crate::compile_init::CompileConfig;
-use crate::utils::{try_, try_or};
-use crate::world::ImmutDict;
+use crate::utils::{try_, try_or, try_or_default};
+use crate::world::{ImmutDict, SharedFontResolver};
+
+const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
+
+#[derive(Clone)]
+pub struct Derived<T>(T);
+
+impl<T> fmt::Debug for Derived<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("..")
+    }
+}
+
+#[derive(Debug, Clone, Default, clap::Parser)]
+pub struct FontArgs {
+    /// Font paths
+    #[clap(
+        long = "font-path",
+        value_name = "DIR",
+        action = clap::ArgAction::Append,
+        env = "TYPST_FONT_PATHS",
+        value_delimiter = ENV_PATH_SEP
+    )]
+    pub font_paths: Vec<PathBuf>,
+
+    /// Ensures system fonts won't be searched, unless explicitly included via
+    /// `--font-path`
+    #[clap(long, default_value = "false")]
+    pub ignore_system_fonts: bool,
+}
+
+/// Common arguments of compile, watch, and query.
+#[derive(Debug, Clone, Parser, Default)]
+pub struct CompileOnceArgs {
+    /// Path to input Typst file, use `-` to read input from stdin
+    #[clap(value_name = "INPUT")]
+    pub input: Option<String>,
+
+    /// Configures the project root (for absolute paths)
+    #[clap(long = "root", value_name = "DIR")]
+    pub root: Option<PathBuf>,
+
+    /// Add a string key-value pair visible through `sys.inputs`
+    #[clap(
+        long = "input",
+        value_name = "key=value",
+        action = ArgAction::Append,
+        value_parser = ValueParser::new(parse_input_pair),
+    )]
+    pub inputs: Vec<(String, String)>,
+
+    #[clap(flatten)]
+    pub font: FontArgs,
+}
+
+/// Parses key/value pairs split by the first equal sign.
+///
+/// This function will return an error if the argument contains no equals sign
+/// or contains the key (before the equals sign) is empty.
+fn parse_input_pair(raw: &str) -> Result<(String, String), String> {
+    let (key, val) = raw
+        .split_once('=')
+        .ok_or("input must be a key and a value separated by an equal sign")?;
+    let key = key.trim().to_owned();
+    if key.is_empty() {
+        return Err("the key was missing or empty".to_owned());
+    }
+    let val = val.trim().to_owned();
+    Ok((key, val))
+}
+
+/// The user configuration read from the editor.
+#[derive(Debug, Default, Clone)]
+pub struct CompileConfig {
+    /// The workspace roots from initialization.
+    pub roots: Vec<PathBuf>,
+    /// The output directory for PDF export.
+    pub output_path: String,
+    /// The mode of PDF export.
+    pub export_pdf: ExportMode,
+    /// Specifies the root path of the project manually.
+    pub root_path: Option<PathBuf>,
+    /// Specifies the cli font options
+    pub font_opts: CompileFontOpts,
+    /// Whether to ignore system fonts
+    pub system_fonts: Option<bool>,
+    /// Specifies the font paths
+    pub font_paths: Vec<PathBuf>,
+    /// Computed fonts based on configuration.
+    pub fonts: OnceCell<Derived<Deferred<SharedFontResolver>>>,
+    /// Notify the compile status to the editor.
+    pub notify_compile_status: bool,
+    /// Enable periscope document in hover.
+    pub periscope_args: Option<PeriscopeArgs>,
+    /// Typst extra arguments.
+    pub typst_extra_args: Option<CompileExtraOpts>,
+    /// The preferred theme for the document.
+    pub preferred_theme: Option<String>,
+    pub has_default_entry_path: bool,
+}
+
+impl CompileConfig {
+    /// Updates the configuration with a JSON object.
+    ///
+    /// # Errors
+    /// Errors if the update is invalid.
+    pub fn update(&mut self, update: &JsonValue) -> anyhow::Result<()> {
+        if let JsonValue::Object(update) = update {
+            self.update_by_map(update)
+        } else {
+            bail!("got invalid configuration object {update}")
+        }
+    }
+
+    /// Updates the configuration with a map.
+    ///
+    /// # Errors
+    /// Errors if the update is invalid.
+    pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
+        self.output_path = try_or_default(|| Some(update.get("outputPath")?.as_str()?.to_owned()));
+        self.export_pdf = try_or_default(|| ExportMode::deserialize(update.get("exportPdf")?).ok());
+        self.root_path = try_(|| Some(update.get("rootPath")?.as_str()?.into()));
+        self.notify_compile_status = match try_(|| update.get("compileStatus")?.as_str()) {
+            Some("enable") => true,
+            Some("disable") | None => false,
+            _ => bail!("compileStatus must be either 'enable' or 'disable'"),
+        };
+        self.preferred_theme = try_(|| Some(update.get("preferredTheme")?.as_str()?.to_owned()));
+
+        // periscope_args
+        self.periscope_args = match update.get("hoverPeriscope") {
+            Some(serde_json::Value::String(e)) if e == "enable" => Some(PeriscopeArgs::default()),
+            Some(serde_json::Value::Null | serde_json::Value::String(..)) | None => None,
+            Some(periscope_args) => match serde_json::from_value(periscope_args.clone()) {
+                Ok(e) => Some(e),
+                Err(e) => bail!("failed to parse hoverPeriscope: {e}"),
+            },
+        };
+        if let Some(args) = self.periscope_args.as_mut() {
+            if args.invert_color == "auto" && self.preferred_theme.as_deref() == Some("dark") {
+                "always".clone_into(&mut args.invert_color);
+            }
+        }
+
+        'parse_extra_args: {
+            if let Some(typst_extra_args) = update.get("typstExtraArgs") {
+                let typst_args: Vec<String> = match serde_json::from_value(typst_extra_args.clone())
+                {
+                    Ok(e) => e,
+                    Err(e) => bail!("failed to parse typstExtraArgs: {e}"),
+                };
+
+                let command = match CompileOnceArgs::try_parse_from(
+                    Some("typst-cli".to_owned()).into_iter().chain(typst_args),
+                ) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        log::error!("failed to parse typstExtraArgs: {e}");
+                        break 'parse_extra_args;
+                    }
+                };
+
+                // Convert the input pairs to a dictionary.
+                let inputs: TypstDict = if command.inputs.is_empty() {
+                    TypstDict::default()
+                } else {
+                    let pairs = command.inputs.iter();
+                    let pairs = pairs.map(|(k, v)| (k.as_str().into(), v.as_str().into_value()));
+                    pairs.collect()
+                };
+
+                // todo: the command.root may be not absolute
+                self.typst_extra_args = Some(CompileExtraOpts {
+                    entry: command.input.map(|e| Path::new(&e).into()),
+                    root_dir: command.root,
+                    inputs: Arc::new(Prehashed::new(inputs)),
+                    font_paths: command.font.font_paths,
+                });
+            }
+        }
+
+        self.font_paths = try_or_default(|| Vec::<_>::deserialize(update.get("fontPaths")?).ok());
+        self.system_fonts = try_(|| update.get("systemFonts")?.as_bool());
+
+        self.has_default_entry_path = self.determine_default_entry_path().is_some();
+        self.validate()
+    }
+
+    pub fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
+        if let Some(path) = &self.root_path {
+            return Some(path.as_path().into());
+        }
+
+        if let Some(root) = try_(|| self.typst_extra_args.as_ref()?.root_dir.as_ref()) {
+            return Some(root.as_path().into());
+        }
+
+        if let Some(entry) = entry {
+            for root in self.roots.iter() {
+                if entry.starts_with(root) {
+                    return Some(root.as_path().into());
+                }
+            }
+
+            if !self.roots.is_empty() {
+                log::warn!("entry is not in any set root directory");
+            }
+
+            if let Some(parent) = entry.parent() {
+                return Some(parent.into());
+            }
+        }
+
+        if !self.roots.is_empty() {
+            return Some(self.roots[0].as_path().into());
+        }
+
+        None
+    }
+
+    pub fn determine_default_entry_path(&self) -> Option<ImmutPath> {
+        let extras = self.typst_extra_args.as_ref()?;
+        // todo: pre-compute this when updating config
+        if let Some(entry) = &extras.entry {
+            if entry.is_relative() {
+                let root = self.determine_root(None)?;
+                return Some(root.join(entry).as_path().into());
+            }
+        }
+        extras.entry.clone()
+    }
+
+    pub fn determine_entry(&self, entry: Option<ImmutPath>) -> EntryState {
+        // todo: formalize untitled path
+        // let is_untitled = entry.as_ref().is_some_and(|p| p.starts_with("/untitled"));
+        // let root_dir = self.determine_root(if is_untitled { None } else {
+        // entry.as_ref() });
+        let root_dir = self.determine_root(entry.as_ref());
+
+        let entry = match (entry, root_dir) {
+            // (Some(entry), Some(root)) if is_untitled => Some(EntryState::new_rooted(
+            //     root,
+            //     Some(FileId::new(None, VirtualPath::new(entry))),
+            // )),
+            (Some(entry), Some(root)) => match entry.strip_prefix(&root) {
+                Ok(stripped) => Some(EntryState::new_rooted(
+                    root,
+                    Some(FileId::new(None, VirtualPath::new(stripped))),
+                )),
+                Err(err) => {
+                    log::info!("Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}");
+                    EntryState::new_rootless(entry)
+                }
+            },
+            (Some(entry), None) => EntryState::new_rootless(entry),
+            (None, Some(root)) => Some(EntryState::new_workspace(root)),
+            (None, None) => None,
+        };
+
+        entry.unwrap_or_else(|| match self.determine_root(None) {
+            Some(root) => EntryState::new_workspace(root),
+            None => EntryState::new_detached(),
+        })
+    }
+
+    pub fn determine_fonts(&self) -> Deferred<SharedFontResolver> {
+        // todo: on font resolving failure, downgrade to a fake font book
+        let font = || {
+            let mut opts = self.font_opts.clone();
+
+            if let Some(system_fonts) = self.system_fonts {
+                opts.ignore_system_fonts = !system_fonts;
+            }
+
+            let font_paths = (!self.font_paths.is_empty()).then_some(&self.font_paths);
+            let font_paths =
+                font_paths.or_else(|| self.typst_extra_args.as_ref().map(|x| &x.font_paths));
+            if let Some(paths) = font_paths {
+                opts.font_paths.clone_from(paths);
+            }
+
+            let root = OnceCell::new();
+            for path in opts.font_paths.iter_mut() {
+                if path.is_relative() {
+                    if let Some(root) = root.get_or_init(|| self.determine_root(None)) {
+                        let p = std::mem::take(path);
+                        *path = root.join(p);
+                    }
+                }
+            }
+
+            log::info!("creating SharedFontResolver with {opts:?}");
+            Derived(Deferred::new(|| {
+                SharedFontResolver::new(opts).expect("failed to create font book")
+            }))
+        };
+        self.fonts.get_or_init(font).clone().0
+    }
+
+    pub fn determine_inputs(&self) -> ImmutDict {
+        static EMPTY: Lazy<ImmutDict> = Lazy::new(ImmutDict::default);
+
+        if let Some(extras) = &self.typst_extra_args {
+            return extras.inputs.clone();
+        }
+
+        EMPTY.clone()
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn primary_opts(
+        &self,
+    ) -> (
+        Option<bool>,
+        &Vec<PathBuf>,
+        Option<&Vec<PathBuf>>,
+        Option<Arc<Path>>,
+    ) {
+        (
+            self.system_fonts,
+            &self.font_paths,
+            self.typst_extra_args.as_ref().map(|e| &e.font_paths),
+            self.determine_root(self.determine_default_entry_path().as_ref()),
+        )
+    }
+
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if let Some(root) = &self.root_path {
+            if !root.is_absolute() {
+                bail!("rootPath must be an absolute path: {root:?}");
+            }
+        }
+
+        if let Some(extra_args) = &self.typst_extra_args {
+            if let Some(root) = &extra_args.root_dir {
+                if !root.is_absolute() {
+                    bail!("typstExtraArgs.root must be an absolute path: {root:?}");
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Configuration set at initialization that won't change within a single
+/// session.
+#[derive(Default, Debug, Clone)]
+pub struct ConstCompileConfig {
+    /// Determined position encoding, either UTF-8 or UTF-16.
+    /// Defaults to UTF-16 if not specified.
+    pub position_encoding: PositionEncoding,
+}
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
@@ -183,6 +541,12 @@ pub struct ConstConfig {
     pub doc_fmt_dynamic_registration: bool,
 }
 
+impl Default for ConstConfig {
+    fn default() -> Self {
+        Self::from(&InitializeParams::default())
+    }
+}
+
 impl From<&InitializeParams> for ConstConfig {
     fn from(params: &InitializeParams) -> Self {
         const DEFAULT_ENCODING: &[PositionEncodingKind] = &[PositionEncodingKind::UTF16];
@@ -217,94 +581,48 @@ impl From<&InitializeParams> for ConstConfig {
     }
 }
 
-pub struct Init {
-    pub client: TypedLspClient<LanguageState>,
-    pub compile_opts: CompileFontOpts,
-    pub exec_cmds: OnceLock<Vec<String>>,
+pub trait AddCommands {
+    fn add_commands(&mut self, cmds: &[String]);
 }
 
-impl Initializer for Init {
-    type I = InitializeParams;
+pub struct CanonicalInitializeParams {
+    pub config: Config,
+    pub cc: ConstConfig,
+}
+
+pub struct SuperInit {
+    pub client: TypedLspClient<LanguageState>,
+    pub exec_cmds: Vec<String>,
+    pub config: Config,
+    pub cc: ConstConfig,
+    pub err: Option<ResponseError>,
+}
+
+impl AddCommands for SuperInit {
+    fn add_commands(&mut self, cmds: &[String]) {
+        self.exec_cmds.extend(cmds.iter().cloned());
+    }
+}
+
+impl Initializer for SuperInit {
+    type I = ();
     type S = LanguageState;
-    /// The [`initialize`] request is the first request sent from the client to
-    /// the server.
-    ///
-    /// [`initialize`]: https://microsoft.github.io/language-server-protocol/specification#initialize
-    ///
-    /// This method is guaranteed to only execute once. If the client sends this
-    /// request to the server again, the server will respond with JSON-RPC
-    /// error code `-32600` (invalid request).
-    ///
-    /// # Panics
-    /// Panics if the const configuration is already initialized.
-    /// Panics if the cluster is already initialized.
-    ///
-    /// # Errors
-    /// Errors if the configuration could not be updated.
-    fn initialize(mut self, params: InitializeParams) -> (LanguageState, AnySchedulableResponse) {
-        // self.tracing_init();
-
-        // Initialize configurations
-        let cc = ConstConfig::from(&params);
-        info!("initialized with const_config {cc:?}");
-        let mut config = Config {
-            compile: CompileConfig {
-                roots: match params.workspace_folders.as_ref() {
-                    Some(roots) => roots
-                        .iter()
-                        .filter_map(|root| root.uri.to_file_path().ok())
-                        .collect::<Vec<_>>(),
-                    #[allow(deprecated)] // `params.root_path` is marked as deprecated
-                    None => params
-                        .root_uri
-                        .as_ref()
-                        .map(|uri| uri.to_file_path().unwrap())
-                        .or_else(|| params.root_path.clone().map(PathBuf::from))
-                        .into_iter()
-                        .collect(),
-                },
-                font_opts: std::mem::take(&mut self.compile_opts),
-                ..CompileConfig::default()
-            },
-            ..Config::default()
-        };
-        let res = match &params.initialization_options {
-            Some(init) => config
-                .update(init)
-                .map_err(|e| e.to_string())
-                .map_err(invalid_params),
-            None => Ok(()),
-        };
-
+    fn initialize(self, _params: ()) -> (LanguageState, AnySchedulableResponse) {
+        let SuperInit {
+            client,
+            exec_cmds,
+            config,
+            cc,
+            err,
+        } = self;
         // Bootstrap server
-        let (editor_tx, editor_rx) = mpsc::unbounded_channel();
+        let service = LanguageState::main(client, config, cc.clone(), err.is_none());
 
-        let mut service = LanguageState::new(self.client.clone(), cc.clone(), editor_tx);
-
-        if let Err(err) = res {
+        if let Some(err) = err {
             return (service, Err(err));
         }
 
-        info!("initialized with config {config:?}", config = config);
-        service.primary.config = config.compile.clone();
-        service.config = config;
-
-        service.run_format_thread();
-        service.run_user_action_thread();
-
-        let editor_actor = EditorActor::new(
-            self.client.clone().to_untyped(),
-            editor_rx,
-            service.config.compile.notify_compile_status,
-        );
-
-        service.primary.restart_server("primary");
-
-        // Run the cluster in the background after we referencing it
-        self.client.handle.spawn(editor_actor.run());
-
         // Respond to the host (LSP client)
-
         // Register these capabilities statically if the client does not support dynamic
         // registration
         let semantic_tokens_provider = match service.config.semantic_tokens {
@@ -362,7 +680,7 @@ impl Initializer for Init {
                 )),
                 semantic_tokens_provider,
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: self.exec_cmds.get().unwrap().clone(),
+                    commands: exec_cmds,
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: None,
                     },
@@ -406,10 +724,90 @@ impl Initializer for Init {
     }
 }
 
+pub struct Init {
+    pub client: TypedLspClient<LanguageState>,
+    pub compile_opts: CompileFontOpts,
+    pub exec_cmds: Vec<String>,
+}
+
+impl AddCommands for Init {
+    fn add_commands(&mut self, cmds: &[String]) {
+        self.exec_cmds.extend(cmds.iter().cloned());
+    }
+}
+
+impl Initializer for Init {
+    type I = InitializeParams;
+    type S = LanguageState;
+    /// The [`initialize`] request is the first request sent from the client to
+    /// the server.
+    ///
+    /// [`initialize`]: https://microsoft.github.io/language-server-protocol/specification#initialize
+    ///
+    /// This method is guaranteed to only execute once. If the client sends this
+    /// request to the server again, the server will respond with JSON-RPC
+    /// error code `-32600` (invalid request).
+    ///
+    /// # Panics
+    /// Panics if the const configuration is already initialized.
+    /// Panics if the cluster is already initialized.
+    ///
+    /// # Errors
+    /// Errors if the configuration could not be updated.
+    fn initialize(mut self, params: InitializeParams) -> (LanguageState, AnySchedulableResponse) {
+        // Initialize configurations
+        let cc = ConstConfig::from(&params);
+        let mut config = Config {
+            compile: CompileConfig {
+                roots: match params.workspace_folders.as_ref() {
+                    Some(roots) => roots
+                        .iter()
+                        .filter_map(|root| root.uri.to_file_path().ok())
+                        .collect::<Vec<_>>(),
+                    #[allow(deprecated)] // `params.root_path` is marked as deprecated
+                    None => params
+                        .root_uri
+                        .as_ref()
+                        .map(|uri| uri.to_file_path().unwrap())
+                        .or_else(|| params.root_path.clone().map(PathBuf::from))
+                        .into_iter()
+                        .collect(),
+                },
+                font_opts: std::mem::take(&mut self.compile_opts),
+                ..CompileConfig::default()
+            },
+            ..Config::default()
+        };
+        let err = params.initialization_options.and_then(|init| {
+            config
+                .update(&init)
+                .map_err(|e| e.to_string())
+                .map_err(invalid_params)
+                .err()
+        });
+
+        let super_init = SuperInit {
+            client: self.client,
+            exec_cmds: self.exec_cmds,
+            config,
+            cc,
+            err,
+        };
+
+        super_init.initialize(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn test_default_encoding() {
+        let cc = ConstConfig::default();
+        assert_eq!(cc.position_encoding, PositionEncoding::Utf16);
+    }
 
     #[test]
     fn test_config_update() {

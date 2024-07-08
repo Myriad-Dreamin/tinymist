@@ -22,7 +22,7 @@ use typst_preview::{
 use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
 
 use super::*;
-use crate::{compile_init::CompileOnceArgs, LspUniverse};
+use crate::{CompileOnceArgs, LspUniverse};
 use actor::{
     preview::{PreviewActor, PreviewRequest, PreviewTab},
     typ_client::CompileHandler,
