@@ -87,6 +87,7 @@ pub struct LanguageState {
     /// Source synchronized with client
     pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
     /// The preview state.
+    #[cfg(feature = "preview")]
     pub preview: tool::preview::PreviewState,
     /// The diagnostics sender to send diagnostics to `crate::actor::cluster`.
     pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
@@ -122,6 +123,7 @@ impl LanguageState {
             editor_tx,
             primary: None,
             memory_changes: HashMap::new(),
+            #[cfg(feature = "preview")]
             preview: tool::preview::PreviewState::new(client.cast(|s| &mut s.preview)),
             ever_focusing_by_activities: false,
             ever_manual_focusing: false,
@@ -193,6 +195,12 @@ impl LanguageState {
         use lsp_types::notification::*;
         use lsp_types::request::*;
 
+        #[cfg(feature = "preview")]
+        let provider = provider
+            .with_command("tinymist.doStartPreview", State::start_preview)
+            .with_command("tinymist.doKillPreview", State::kill_preview)
+            .with_command("tinymist.scrollPreview", State::scroll_preview);
+
         // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
         let mut provider = provider
             .with_request::<Shutdown>(State::shutdown)
@@ -235,9 +243,6 @@ impl LanguageState {
             .with_command("tinymist.doClearCache", State::clear_cache)
             .with_command("tinymist.pinMain", State::pin_document)
             .with_command("tinymist.focusMain", State::focus_document)
-            .with_command("tinymist.doStartPreview", State::start_preview)
-            .with_command("tinymist.doKillPreview", State::kill_preview)
-            .with_command("tinymist.scrollPreview", State::scroll_preview)
             .with_command("tinymist.doInitTemplate", State::init_template)
             .with_command("tinymist.doGetTemplateEntry", State::do_get_template_entry)
             .with_command_("tinymist.interactCodeContext", State::interact_code_context)

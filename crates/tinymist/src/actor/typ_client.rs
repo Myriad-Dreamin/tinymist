@@ -34,7 +34,7 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use log::{error, info, trace};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnalysisResources},
     DiagnosticsMap, ExportKind, ServerInfoResponse, VersionedDocument,
@@ -75,7 +75,7 @@ pub struct CompileHandler {
     pub(crate) periscope: PeriscopeRenderer,
 
     #[cfg(feature = "preview")]
-    pub(crate) inner: Arc<RwLock<Option<Arc<typst_preview::CompileWatcher>>>>,
+    pub(crate) inner: Arc<parking_lot::RwLock<Option<Arc<typst_preview::CompileWatcher>>>>,
 
     pub(crate) intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
     pub(crate) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
@@ -267,6 +267,8 @@ impl CompileHandler {
             ))
             .unwrap();
 
+        #[cfg(not(feature = "preview"))]
+        let _ = is_on_saved;
         #[cfg(feature = "preview")]
         if let Some(inner) = self.inner.read().as_ref() {
             inner.notify_compile(res, is_on_saved);

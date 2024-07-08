@@ -64,11 +64,14 @@ pub struct PreviewArgs {
     pub invert_colors: String,
 
     /// Used by lsp for identifying the task.
-    #[clap(
-        long = "task-id",
-        default_value = "default_preview",
-        value_name = "TASK_ID",
-        hide(true)
+    #[cfg_attr(
+        feature = "clap",
+        clap(
+            long = "task-id",
+            default_value = "default_preview",
+            value_name = "TASK_ID",
+            hide(true)
+        )
     )]
     pub task_id: String,
 
