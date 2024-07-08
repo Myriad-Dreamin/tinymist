@@ -396,9 +396,8 @@ pub enum FormatterMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ExportMode {
-    #[default]
-    Auto,
     /// Select best solution automatically. (Recommended)
+    #[default]
     Never,
     /// Export on saving the document, i.e. on `textDocument/didSave` events.
     OnSave,

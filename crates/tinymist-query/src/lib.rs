@@ -143,11 +143,16 @@ mod polymorphic {
         Merged,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Default)]
     pub enum ExportKind {
+        #[default]
         Pdf,
-        Svg { page: PageSelection },
-        Png { page: PageSelection },
+        Svg {
+            page: PageSelection,
+        },
+        Png {
+            page: PageSelection,
+        },
     }
 
     impl ExportKind {
@@ -164,11 +169,6 @@ mod polymorphic {
     pub struct OnExportRequest {
         pub path: PathBuf,
         pub kind: ExportKind,
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct OnSaveExportRequest {
-        pub path: PathBuf,
     }
 
     #[derive(Debug, Clone)]
@@ -200,7 +200,6 @@ mod polymorphic {
     #[derive(Debug, Clone)]
     pub enum CompilerQueryRequest {
         OnExport(OnExportRequest),
-        OnSaveExport(OnSaveExportRequest),
         Hover(HoverRequest),
         GotoDefinition(GotoDefinitionRequest),
         GotoDeclaration(GotoDeclarationRequest),
@@ -235,7 +234,6 @@ mod polymorphic {
             use FoldRequestFeature::*;
             match self {
                 Self::OnExport(..) => Mergeable,
-                Self::OnSaveExport(..) => Mergeable,
                 Self::Hover(..) => PinnedFirst,
                 Self::GotoDefinition(..) => PinnedFirst,
                 Self::GotoDeclaration(..) => PinnedFirst,
@@ -269,7 +267,6 @@ mod polymorphic {
         pub fn associated_path(&self) -> Option<&Path> {
             Some(match self {
                 Self::OnExport(..) => return None,
-                Self::OnSaveExport(req) => &req.path,
                 Self::Hover(req) => &req.path,
                 Self::GotoDefinition(req) => &req.path,
                 Self::GotoDeclaration(req) => &req.path,
@@ -304,7 +301,6 @@ mod polymorphic {
     #[derive(Debug, Clone)]
     pub enum CompilerQueryResponse {
         OnExport(Option<PathBuf>),
-        OnSaveExport(()),
         Hover(Option<Hover>),
         GotoDefinition(Option<GotoDefinitionResponse>),
         GotoDeclaration(Option<GotoDeclarationResponse>),
@@ -338,7 +334,6 @@ mod polymorphic {
         pub fn to_untyped(self) -> serde_json::Result<JsonValue> {
             match self {
                 Self::OnExport(res) => serde_json::to_value(res),
-                Self::OnSaveExport(res) => serde_json::to_value(res),
                 Self::Hover(res) => serde_json::to_value(res),
                 Self::GotoDefinition(res) => serde_json::to_value(res),
                 Self::GotoDeclaration(res) => serde_json::to_value(res),

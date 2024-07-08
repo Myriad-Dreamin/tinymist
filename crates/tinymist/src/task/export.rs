@@ -1,4 +1,4 @@
-//! The actor that handles PDF export.
+//! The actor that handles PDF/SVG/PNG export.
 
 use std::{
     path::{Path, PathBuf},
@@ -10,13 +10,19 @@ use anyhow::Context;
 use log::{error, info};
 use once_cell::sync::Lazy;
 use tinymist_query::{ExportKind, PageSelection};
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::mpsc;
 use typst::{foundations::Smart, layout::Abs, layout::Frame, visualize::Color};
-use typst_ts_core::{config::compiler::EntryState, path::PathClean, ImmutPath, TypstDocument};
+use typst_ts_compiler::EntryReader;
+use typst_ts_core::{path::PathClean, ImmutPath};
 
-use crate::{tool::word_count, ExportMode};
+use crate::{
+    actor::{editor::EditorRequest, typ_server::CompiledArtifact},
+    tool::word_count,
+    world::LspCompilerFeat,
+    ExportMode,
+};
 
-use super::editor::EditorRequest;
+use super::*;
 
 #[derive(Debug, Clone, Default)]
 pub struct ExportConfig {
@@ -24,104 +30,150 @@ pub struct ExportConfig {
     pub mode: ExportMode,
 }
 
-#[derive(Debug)]
-pub enum ExportRequest {
-    OnTyped,
-    OnSaved,
-    Oneshot(Option<ExportKind>, oneshot::Sender<Option<PathBuf>>),
-    ChangeConfig(ExportConfig),
-    ChangeExportPath(EntryState),
+#[derive(Debug, Clone, Copy)]
+pub enum ExportSignal {
+    Typed,
+    Saved,
+    TypedAndSaved,
 }
 
-pub struct ExportActor {
-    pub group: String,
-    pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
-    pub export_rx: mpsc::UnboundedReceiver<ExportRequest>,
-    pub doc_rx: watch::Receiver<Option<Arc<TypstDocument>>>,
+impl ExportSignal {
+    pub fn is_typed(&self) -> bool {
+        matches!(self, ExportSignal::Typed | ExportSignal::TypedAndSaved)
+    }
 
-    pub entry: EntryState,
+    pub fn is_saved(&self) -> bool {
+        matches!(self, ExportSignal::Saved | ExportSignal::TypedAndSaved)
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct ExportTask {
+    factory: SyncTaskFactory<ExportTaskConf>,
+    export_folder: FutureFolder,
+    count_word_folder: FutureFolder,
+}
+
+impl ExportTask {
+    pub fn new(data: ExportTaskConf) -> Self {
+        Self {
+            factory: SyncTaskFactory(Arc::new(std::sync::RwLock::new(Arc::new(data)))),
+            export_folder: FutureFolder::default(),
+            count_word_folder: FutureFolder::default(),
+        }
+    }
+
+    pub fn task(&self) -> Arc<ExportTaskConf> {
+        self.factory.task()
+    }
+
+    pub fn signal(&self, snap: &CompiledArtifact<LspCompilerFeat>, s: ExportSignal) {
+        let task = self.factory.task();
+        task.signal(snap, s, self);
+    }
+
+    pub fn change_config(&self, config: ExportConfig) {
+        self.factory.mutate(|data| data.config = config);
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct ExportTaskConf {
+    pub group: String,
+    pub editor_tx: Option<mpsc::UnboundedSender<EditorRequest>>,
     pub config: ExportConfig,
     pub kind: ExportKind,
     pub count_words: bool,
 }
 
-impl ExportActor {
-    pub async fn run(mut self) {
-        while let Some(mut req) = self.export_rx.recv().await {
-            let mut typed = false;
-            let mut saved = false;
-            let read_doc = || self.doc_rx.borrow().clone();
+impl ExportTaskConf {
+    pub async fn oneshot(
+        &self,
+        snap: &CompiledArtifact<LspCompilerFeat>,
+        kind: ExportKind,
+    ) -> Option<PathBuf> {
+        let snap = snap.clone();
+        self.check_mode_and_export(&kind, &snap).await
+    }
 
-            'accumulate: loop {
-                log::debug!("RenderActor: received request: {req:?}");
-                match req {
-                    ExportRequest::ChangeConfig(config) => self.config = config,
-                    ExportRequest::ChangeExportPath(entry) => {
-                        self.entry = entry;
-
-                        // Account for an outdated signal.
-                        // todo: we do need to export the old document here but we cannot achieve it
-                        // currently.
-                        typed = false;
-                        saved = false;
-                    }
-                    ExportRequest::OnTyped => typed = true,
-                    ExportRequest::OnSaved => saved = true,
-                    ExportRequest::Oneshot(kind, callback) => {
-                        // Do oneshot export instantly without accumulation.
-                        let kind = kind.as_ref().unwrap_or(&self.kind);
-                        let resp = match &read_doc() {
-                            Some(doc) => self.check_mode_and_export(kind, doc).await,
-                            None => None,
-                        };
-                        if let Err(err) = callback.send(resp) {
-                            error!("RenderActor(@{kind:?}): failed to send response: {err:?}");
-                        }
-                    }
-                }
-
-                // Try to accumulate more requests.
-                match self.export_rx.try_recv() {
-                    Ok(new_req) => req = new_req,
-                    _ => break 'accumulate,
-                }
-            }
-
-            let Some(doc) = read_doc() else {
-                info!("RenderActor: document is not ready");
-                continue;
-            };
-
-            // We do only check the latest signal and determine whether to export by the
-            // latest state. This is not a TOCTOU issue, as examined by typst-preview.
-            let mode = self.config.mode;
-            let need_export = (typed && mode == ExportMode::OnType)
-                || (saved && mode == ExportMode::OnSave)
-                || (saved && (mode == ExportMode::OnDocumentHasTitle && doc.title.is_some()));
-
-            if need_export {
-                self.check_mode_and_export(&self.kind, &doc).await;
-            }
-
-            if self.count_words {
-                let wc = word_count::word_count(&doc);
-                log::debug!("word count: {wc:?}");
-                let _ = self
-                    .editor_tx
-                    .send(EditorRequest::WordCount(self.group.clone(), wc));
-            }
+    fn signal(
+        self: Arc<Self>,
+        snap: &CompiledArtifact<LspCompilerFeat>,
+        s: ExportSignal,
+        t: &ExportTask,
+    ) {
+        self.signal_export(snap, s, t);
+        if s.is_typed() {
+            self.signal_count_word(snap, t);
         }
-        info!("RenderActor(@{:?}): stopped", &self.kind);
+    }
+
+    fn signal_export(
+        self: &Arc<Self>,
+        artifact: &CompiledArtifact<LspCompilerFeat>,
+        s: ExportSignal,
+        t: &ExportTask,
+    ) -> Option<()> {
+        let doc = artifact.doc.as_ref().ok()?;
+
+        // We do only check the latest signal and determine whether to export by the
+        // latest state. This is not a TOCTOU issue, as examined by typst-preview.
+        let mode = self.config.mode;
+        let need_export = match mode {
+            ExportMode::Never => false,
+            ExportMode::OnType => s.is_typed(),
+            ExportMode::OnSave => s.is_saved(),
+            ExportMode::OnDocumentHasTitle => s.is_saved() && doc.title.is_some(),
+        };
+
+        if !need_export {
+            return None;
+        }
+
+        let this = self.clone();
+        let artifact = artifact.clone();
+        t.export_folder.spawn(
+            artifact.world.revision().get(),
+            Box::pin(async move {
+                this.check_mode_and_export(&this.kind, &artifact).await;
+                Some(())
+            }),
+        );
+
+        Some(())
+    }
+
+    fn signal_count_word(&self, artifact: &CompiledArtifact<LspCompilerFeat>, t: &ExportTask) {
+        let Some(editor_tx) = self.editor_tx.clone() else {
+            return;
+        };
+        if self.count_words {
+            let artifact = artifact.clone();
+            let group = self.group.clone();
+            t.count_word_folder.spawn(
+                artifact.world.revision().get(),
+                Box::pin(async move {
+                    let doc = artifact.doc.ok()?;
+
+                    let wc = word_count::word_count(&doc);
+                    log::debug!("word count: {wc:?}");
+                    let _ = editor_tx.send(EditorRequest::WordCount(group, wc));
+
+                    Some(())
+                }),
+            );
+        }
     }
 
     async fn check_mode_and_export(
         &self,
         kind: &ExportKind,
-        doc: &TypstDocument,
+        doc: &CompiledArtifact<LspCompilerFeat>,
     ) -> Option<PathBuf> {
-        // pub entry: EntryState,
-        let root = self.entry.root();
-        let main = self.entry.main();
+        let entry = doc.world.entry_state();
+
+        let root = entry.root();
+        let main = entry.main();
 
         info!(
             "RenderActor: check path {:?} and root {:?} with output directory {}",
@@ -138,7 +190,7 @@ impl ExportActor {
 
         let path = main.vpath().resolve(&root)?;
 
-        match self.export(kind, doc, &root, &path).await {
+        match self.do_export(kind, doc, &root, &path).await {
             Ok(pdf) => Some(pdf),
             Err(err) => {
                 error!("RenderActor({kind:?}): failed to export {err}");
@@ -147,15 +199,20 @@ impl ExportActor {
         }
     }
 
-    async fn export(
+    async fn do_export(
         &self,
         kind: &ExportKind,
-        doc: &TypstDocument,
+        doc: &CompiledArtifact<LspCompilerFeat>,
         root: &Path,
         path: &Path,
     ) -> anyhow::Result<PathBuf> {
         use ExportKind::*;
         use PageSelection::*;
+
+        let doc = doc
+            .doc
+            .as_ref()
+            .map_err(|_| anyhow::anyhow!("no document"))?;
 
         let Some(to) = substitute_path(&self.config.substitute_pattern, root, path) else {
             bail!("RenderActor({kind:?}): failed to substitute path");
@@ -198,7 +255,8 @@ impl ExportActor {
             }
         };
 
-        std::fs::write(&to, data)
+        tokio::fs::write(&to, data)
+            .await
             .with_context(|| format!("RenderActor({kind:?}): failed to export"))?;
 
         info!("RenderActor({kind:?}): export complete");
@@ -239,6 +297,13 @@ fn substitute_path(substitute_pattern: &str, root: &Path, path: &Path) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_default_never() {
+        let conf = ExportTaskConf::default();
+        assert!(!conf.count_words);
+        assert_eq!(conf.config.mode, ExportMode::Never);
+    }
 
     #[test]
     fn test_substitute_path() {

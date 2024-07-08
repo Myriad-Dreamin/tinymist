@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use actor::editor::EditorActor;
-use actor::export::ExportConfig;
 use anyhow::anyhow;
 use anyhow::{bail, Context};
 use futures::future::BoxFuture;
@@ -17,14 +16,14 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
+use task::ExportConfig;
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
     get_semantic_tokens_unregistration, PageSelection, SemanticTokenContext,
 };
 use tinymist_query::{
     lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, OnExportRequest,
-    OnSaveExportRequest, PositionEncoding, SemanticRequest, StatefulRequest, SyntaxRequest,
-    VersionedDocument,
+    PositionEncoding, SemanticRequest, StatefulRequest, SyntaxRequest, VersionedDocument,
 };
 use tokio::sync::mpsc;
 use typst::{diag::FileResult, syntax::Source};
@@ -483,10 +482,7 @@ impl LanguageState {
         Ok(())
     }
 
-    fn did_save(&mut self, params: DidSaveTextDocumentParams) -> LspResult<()> {
-        let path = as_path(params.text_document);
-
-        run_query_tail!(self.OnSaveExport(path));
+    fn did_save(&mut self, _params: DidSaveTextDocumentParams) -> LspResult<()> {
         Ok(())
     }
 
@@ -518,7 +514,7 @@ impl LanguageState {
             self.primary
                 .as_mut()
                 .unwrap()
-                .change_export_pdf(config.clone());
+                .change_export_config(config.clone());
         }
 
         if config.compile.primary_opts() != self.config.compile.primary_opts() {
@@ -1055,13 +1051,8 @@ impl LanguageState {
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
         match query {
-            OnExport(OnExportRequest { kind, path }) => just_ok!(CompilerQueryResponse::OnExport(
-                client.on_export(kind, path)?,
-            )),
-            OnSaveExport(OnSaveExportRequest { path }) => {
-                client.on_save_export(path)?;
-                just_ok!(CompilerQueryResponse::OnSaveExport(()))
-            }
+            OnExport(OnExportRequest { kind, path }) => client.on_export(kind, path),
+
             Hover(req) => query_state!(client, Hover, req),
             GotoDefinition(req) => query_state!(client, GotoDefinition, req),
             GotoDeclaration(req) => query_world!(client, GotoDeclaration, req),
