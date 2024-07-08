@@ -63,7 +63,7 @@ impl CompileHandler {
     }
 
     // resolve_document_position
-    fn resolve_document_position(
+    async fn resolve_document_position(
         snap: &CompileSnapshot<LspCompilerFeat>,
         loc: Location,
     ) -> Option<Position> {
@@ -73,7 +73,7 @@ impl CompileHandler {
         let line = src_loc.pos.line;
         let column = src_loc.pos.column;
 
-        let doc = snap.doc().ok();
+        let doc = snap.doc().await.ok();
         let doc = doc.as_deref()?;
         let world = &snap.world;
 
@@ -122,7 +122,7 @@ impl SourceFileServer for CompileHandler {
     /// We treat it as UTF-8 now.
     async fn resolve_document_position(&self, loc: Location) -> Result<Option<Position>, Error> {
         let snap = self.snapshot()?.snapshot().await?;
-        Ok(Self::resolve_document_position(&snap, loc))
+        Ok(Self::resolve_document_position(&snap, loc).await)
     }
 
     async fn resolve_source_location(
@@ -321,7 +321,7 @@ impl PreviewState {
         let compile_fence = async move {
             let now = reflexo::time::now();
             // The fence
-            snap.ok()?.snapshot().await.ok()?.compile();
+            snap.ok()?.snapshot().await.ok()?.compile().await;
 
             let w = cc.inner.read();
             let w = w.as_ref()?;
@@ -563,7 +563,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let (service, handle) = {
         // type EditorSender = mpsc::UnboundedSender<EditorRequest>;
         let (doc_tx, _) = watch::channel(None);
-        let (export_tx, mut export_rx) = mpsc::unbounded_channel();
+        // let (export_tx, mut export_rx) = mpsc::unbounded_channel();
         let (editor_tx, mut editor_rx) = mpsc::unbounded_channel();
         let (intr_tx, intr_rx) = mpsc::unbounded_channel();
 
@@ -572,7 +572,8 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             diag_group: "main".to_owned(),
             intr_tx: intr_tx.clone(),
             doc_tx,
-            export_tx,
+            // export_tx,
+            export: Default::default(),
             editor_tx,
             analysis: Analysis {
                 position_encoding: PositionEncoding::Utf16,
@@ -583,7 +584,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         });
 
         // Consume export_tx and editor_rx
-        tokio::spawn(async move { while export_rx.recv().await.is_some() {} });
+        // tokio::spawn(async move { while export_rx.recv().await.is_some() {} });
         tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
 
         let service =

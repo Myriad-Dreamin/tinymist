@@ -32,6 +32,7 @@ mod cmd;
 mod init;
 mod resource;
 mod server;
+mod task;
 pub mod tool;
 mod utils;
 mod world;

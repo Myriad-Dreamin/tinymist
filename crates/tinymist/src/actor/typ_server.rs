@@ -7,10 +7,13 @@ use std::{
     ops::Deref,
     path::Path,
     sync::{Arc, OnceLock},
-    thread::JoinHandle,
 };
 
-use tokio::sync::{mpsc, oneshot};
+use once_cell::sync::OnceCell;
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
 
 use typst::{diag::SourceResult, util::Deferred};
 use typst_ts_compiler::{
@@ -18,17 +21,16 @@ use typst_ts_compiler::{
     vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
     watch_deps,
     world::{CompilerFeat, CompilerUniverse, CompilerWorld},
-    CompileEnv, CompileReport, Compiler, ConsoleDiagReporter, EntryReader, PureCompiler, Revising,
-    TaskInputs, WorldDeps,
+    CompileEnv, CompileReport, Compiler, ConsoleDiagReporter, EntryReader, Revising, TaskInputs,
+    WorldDeps,
 };
 use typst_ts_core::{
     config::compiler::EntryState, exporter_builtins::GroupExporter, Exporter, GenericExporter,
-    QueryRef, TypstDocument,
+    TypstDocument,
 };
 
-type UsingCompiler<F> = PureCompiler<CompilerWorld<F>>;
 type CompileRawResult = Deferred<(SourceResult<Arc<TypstDocument>>, CompileEnv)>;
-type DocState<F> = QueryRef<CompileRawResult, (), (UsingCompiler<F>, CompileEnv)>;
+type DocState = once_cell::sync::OnceCell<CompileRawResult>;
 
 #[derive(Clone, Copy)]
 pub struct CompileFlags {
@@ -48,28 +50,52 @@ pub struct CompileSnapshot<F: CompilerFeat> {
     /// Using world
     pub world: Arc<CompilerWorld<F>>,
     /// Compiling the document.
-    doc_state: Arc<DocState<F>>,
+    doc_state: Arc<DocState>,
     /// The last successfully compiled document.
     pub success_doc: Option<Arc<TypstDocument>>,
 }
 
 impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
     pub fn start(&self) -> &CompileRawResult {
-        let res = self.doc_state.compute_with_context(|(mut c, mut env)| {
+        self.doc_state.get_or_init(|| {
             let w = self.world.clone();
-            Ok(Deferred::new(move || {
-                let res = c.ensure_main(&w).and_then(|_| c.compile(&w, &mut env));
+            let mut env = self.env.clone();
+            Deferred::new(move || {
+                let w = w.as_ref();
+                let mut c = std::marker::PhantomData;
+                let res = c.ensure_main(w).and_then(|_| c.compile(w, &mut env));
                 (res, env)
-            }))
-        });
-        res.ok().unwrap()
+            })
+        })
     }
 
-    pub fn doc(&self) -> SourceResult<Arc<TypstDocument>> {
+    pub fn task(mut self, inputs: TaskInputs) -> Self {
+        'check_changed: {
+            if let Some(entry) = &inputs.entry {
+                if *entry != self.world.entry_state() {
+                    break 'check_changed;
+                }
+            }
+            if let Some(inputs) = &inputs.inputs {
+                if inputs.clone() != self.world.inputs() {
+                    break 'check_changed;
+                }
+            }
+
+            return self;
+        };
+
+        self.world = Arc::new(self.world.task(inputs));
+        self.doc_state = Arc::new(OnceCell::new());
+
+        self
+    }
+
+    pub async fn doc(&self) -> SourceResult<Arc<TypstDocument>> {
         self.start().wait().0.clone()
     }
 
-    pub fn compile(&self) -> CompiledArtifact<F> {
+    pub async fn compile(&self) -> CompiledArtifact<F> {
         let (doc, env) = self.start().wait().clone();
         CompiledArtifact {
             flags: self.flags,
@@ -211,8 +237,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
 pub struct CompileServerActor<F: CompilerFeat> {
     /// The underlying universe.
     pub verse: CompilerUniverse<F>,
-    /// The underlying compiler.
-    pub compiler: PureCompiler<CompilerWorld<F>>,
     /// The exporter for the compiled document.
     pub exporter: GroupExporter<CompileSnapshot<F>>,
     /// The compilation handle.
@@ -264,7 +288,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         let entry = verse.entry_state();
 
         Self {
-            compiler: std::marker::PhantomData,
             exporter,
             verse,
 
@@ -318,14 +341,14 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     #[allow(unused)]
     pub async fn run_and_wait(mut self) -> bool {
         if !self.enable_watch {
-            let artifact = self.compile_once();
+            let artifact = self.compile_once().await;
             return artifact.doc.is_ok();
         }
 
         if let Some(h) = self.spawn().await {
             // Note: this is blocking the current thread.
             // Note: the block safety is ensured by `run` function.
-            h.join().unwrap();
+            h.await.unwrap();
         }
 
         true
@@ -334,7 +357,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     /// Spawn the compiler thread.
     pub async fn spawn(mut self) -> Option<JoinHandle<()>> {
         if !self.enable_watch {
-            self.compile_once();
+            self.compile_once().await;
             return None;
         }
 
@@ -357,7 +380,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         };
 
         // Trigger the first compilation (if active)
-        self.watch_compile(reason_by_fs(), &ack);
+        self.watch_compile(reason_by_fs(), &ack).await;
 
         // Spawn file system watcher.
         let fs_tx = self.intr_tx.clone();
@@ -365,13 +388,12 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             log_send_error("fs_event", fs_tx.send(Interrupt::Fs(event)));
         }));
 
-        // Spawn compiler thread.
-        let thread_builder = std::thread::Builder::new().name("typst-compiler".to_owned());
-        let compile_thread = thread_builder.spawn(move || {
+        // Spawn compiler task.
+        let compile_task = tokio::spawn(async move {
             log::debug!("CompileServerActor: initialized");
 
             // Wait for first events.
-            'event_loop: while let Some(mut event) = self.intr_rx.blocking_recv() {
+            'event_loop: while let Some(mut event) = self.intr_rx.recv().await {
                 let mut comp_reason = no_reason();
 
                 'accumulate: loop {
@@ -387,7 +409,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
                     // Ensure complied before executing tasks.
                     if matches!(event, Interrupt::Snapshot(_)) && comp_reason.any() {
-                        comp_reason = self.watch_compile(comp_reason, &ack);
+                        comp_reason = self.watch_compile(comp_reason, &ack).await;
                     }
 
                     comp_reason.see(self.process(event, &ack));
@@ -400,10 +422,10 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                 }
 
                 if comp_reason.any() {
-                    comp_reason = self.watch_compile(comp_reason, &ack);
+                    comp_reason = self.watch_compile(comp_reason, &ack).await;
                 }
                 if comp_reason.any() {
-                    comp_reason = self.watch_compile(comp_reason, &ack);
+                    comp_reason = self.watch_compile(comp_reason, &ack).await;
                     if comp_reason.any() {
                         log::warn!("CompileServerActor: watch_compile infinite loop?");
                     }
@@ -415,12 +437,11 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         });
 
         // Return the thread handle.
-        Some(compile_thread.unwrap())
+        Some(compile_task)
     }
 
     fn snapshot(&self, is_once: bool, reason: CompileReasons) -> CompileSnapshot<F> {
         let world = self.verse.snapshot();
-        let c = self.compiler;
         let mut env = self.make_env(if is_once {
             self.once_feature_set.clone()
         } else {
@@ -437,13 +458,13 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                 triggered_by_mem_events: reason.by_memory_events,
                 triggered_by_fs_events: reason.by_fs_events,
             },
-            doc_state: Arc::new(QueryRef::with_context((c, env))),
+            doc_state: Arc::new(OnceCell::new()),
             success_doc: self.latest_success_doc.clone(),
         }
     }
 
     /// Compile the document once.
-    pub fn compile_once(&mut self) -> CompiledArtifact<F> {
+    pub async fn compile_once(&mut self) -> CompiledArtifact<F> {
         let e = Arc::new(self.snapshot(true, reason_by_fs()));
         let err = self.exporter.export(e.world.deref(), e.clone());
         if let Err(err) = err {
@@ -451,11 +472,11 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             log::error!("CompileServerActor: export error: {err:?}");
         }
 
-        e.compile()
+        e.compile().await
     }
 
     /// Watch and compile the document once.
-    fn watch_compile(
+    async fn watch_compile(
         &mut self,
         reason: CompileReasons,
         send: impl Fn(CompilerResponse),
@@ -480,8 +501,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         self.watch_handle
             .status(CompileReport::Stage(id, "compiling", start));
 
-        let compile = move || {
-            let compiled = compiling.compile();
+        let compile = move || async move {
+            let compiled = compiling.compile().await;
             let elapsed = start.elapsed().unwrap_or_default();
             let rep;
             match &compiled.doc {
@@ -509,10 +530,13 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         };
 
         if self.compile_concurrency == 0 {
-            self.process_compile(compile(), send)
+            self.process_compile(compile().await, send)
         } else {
-            rayon::spawn(move || {
-                log_send_error("compiled", intr_tx.send(Interrupt::Compiled(compile())));
+            tokio::spawn(async move {
+                log_send_error(
+                    "compiled",
+                    intr_tx.send(Interrupt::Compiled(compile().await)),
+                );
             });
             no_reason()
         }

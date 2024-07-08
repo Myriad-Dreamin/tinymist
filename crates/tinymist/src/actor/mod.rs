@@ -1,7 +1,6 @@
 //! Bootstrap actors for Tinymist.
 
 pub mod editor;
-pub mod export;
 pub mod format;
 #[cfg(feature = "preview")]
 pub mod preview;
@@ -19,13 +18,13 @@ use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 use typst_ts_core::config::compiler::EntryState;
 
 use self::{
-    export::{ExportActor, ExportConfig},
     format::run_format_thread,
     typ_client::{CompileClientActor, CompileHandler},
     typ_server::CompileServerActor,
     user_action::run_user_action_thread,
 };
 use crate::{
+    task::{ExportConfig, ExportTask, ExportTaskConf},
     world::{ImmutDict, LspWorldBuilder},
     LanguageState,
 };
@@ -51,27 +50,20 @@ impl LanguageState {
         inputs: ImmutDict,
         snapshot: FileChangeSet,
     ) -> CompileClientActor {
-        let (doc_tx, doc_rx) = watch::channel(None);
-        let (export_tx, export_rx) = mpsc::unbounded_channel();
+        let (doc_tx, _) = watch::channel(None);
         let (intr_tx, intr_rx) = mpsc::unbounded_channel();
 
         // Run Export actors before preparing cluster to avoid loss of events
-        self.client.handle.spawn(
-            ExportActor {
-                group: editor_group.clone(),
-                editor_tx: self.editor_tx.clone(),
-                export_rx,
-                doc_rx,
-                entry: entry.clone(),
-                config: ExportConfig {
-                    substitute_pattern: self.compile_config().output_path.clone(),
-                    mode: self.compile_config().export_pdf,
-                },
-                kind: ExportKind::Pdf,
-                count_words: self.config.notify_compile_status,
-            }
-            .run(),
-        );
+        let export = ExportTask::new(ExportTaskConf {
+            group: editor_group.clone(),
+            editor_tx: Some(self.editor_tx.clone()),
+            config: ExportConfig {
+                substitute_pattern: self.compile_config().output_path.clone(),
+                mode: self.compile_config().export_pdf,
+            },
+            kind: ExportKind::Pdf,
+            count_words: self.config.notify_compile_status,
+        });
 
         log::info!(
             "TypstActor: creating server for {editor_group}, entry: {entry:?}, inputs: {inputs:?}"
@@ -87,7 +79,7 @@ impl LanguageState {
             diag_group: editor_group.clone(),
             intr_tx: intr_tx.clone(),
             doc_tx,
-            export_tx: export_tx.clone(),
+            export: export.clone(),
             editor_tx: self.editor_tx.clone(),
             analysis: Analysis {
                 position_encoding,

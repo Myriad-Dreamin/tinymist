@@ -35,6 +35,7 @@ use std::{
 use anyhow::{anyhow, bail};
 use log::{error, info, trace};
 use parking_lot::Mutex;
+use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnalysisResources},
     DiagnosticsMap, ExportKind, ServerInfoResponse, VersionedDocument,
@@ -56,11 +57,10 @@ use typst_ts_core::{
 
 use super::{
     editor::{EditorRequest, TinymistCompileStatusEnum},
-    export::ExportConfig,
     typ_server::{CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt},
 };
 use crate::{
-    actor::export::ExportRequest,
+    task::{ExportConfig, ExportSignal, ExportTask},
     tool::preview::CompileStatus,
     utils::{self, threaded_receive},
     world::{LspCompilerFeat, LspWorld},
@@ -79,7 +79,7 @@ pub struct CompileHandler {
 
     pub(crate) intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
     pub(crate) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
-    pub(crate) export_tx: mpsc::UnboundedSender<ExportRequest>,
+    pub(crate) export: ExportTask,
     pub(crate) editor_tx: EditorSender,
 }
 
@@ -253,7 +253,6 @@ impl CompileHandler {
     ) {
         if let Ok(doc) = res.clone() {
             let _ = self.doc_tx.send(Some(doc.clone()));
-            let _ = self.export_tx.send(ExportRequest::OnTyped);
         }
 
         self.editor_tx
@@ -306,6 +305,14 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             snap.env.tracer.as_ref().map(|e| e.clone().warnings()),
         );
 
+        if snap.flags.triggered_by_mem_events && snap.flags.triggered_by_fs_events {
+            self.export.signal(snap, ExportSignal::TypedAndSaved);
+        } else if snap.flags.triggered_by_mem_events {
+            self.export.signal(snap, ExportSignal::Typed);
+        } else if snap.flags.triggered_by_fs_events {
+            self.export.signal(snap, ExportSignal::Saved);
+        }
+
         self.preview_notify_compile(res, snap.flags.triggered_by_fs_events);
     }
 }
@@ -352,33 +359,29 @@ impl CompileClientActor {
         self.config = config;
     }
 
-    pub(crate) fn change_export_pdf(&mut self, config: ExportConfig) {
-        let _ = self
-            .handle
-            .export_tx
-            .send(ExportRequest::ChangeConfig(config));
+    pub(crate) fn change_export_config(&mut self, config: ExportConfig) {
+        self.handle.export.change_config(config);
     }
 
-    pub fn on_export(&self, kind: ExportKind, path: PathBuf) -> anyhow::Result<Option<PathBuf>> {
-        // todo: we currently doesn't respect the path argument...
-        info!("CompileActor: on export: {}", path.display());
+    pub fn on_export(&self, kind: ExportKind, path: PathBuf) -> QueryFuture {
+        let snap = self.snapshot()?;
+        let export = self.handle.export.task();
 
-        let (tx, rx) = oneshot::channel();
-        let _ = self
-            .handle
-            .export_tx
-            .send(ExportRequest::Oneshot(Some(kind), tx));
-        let res: Option<PathBuf> = utils::threaded_receive(rx)?;
+        let entry = self.config.determine_entry(Some(path.as_path().into()));
 
-        info!("CompileActor: on export end: {path:?} as {res:?}");
-        Ok(res)
-    }
+        just_future!(async move {
+            let snap = snap.snapshot().await?;
+            let snap = snap.task(TaskInputs {
+                entry: Some(entry),
+                ..Default::default()
+            });
 
-    pub fn on_save_export(&self, path: PathBuf) -> anyhow::Result<()> {
-        info!("CompileActor: on save export: {}", path.display());
-        let _ = self.handle.export_tx.send(ExportRequest::OnSaved);
+            let artifact = snap.compile().await;
+            let res = export.oneshot(&artifact, kind).await;
 
-        Ok(())
+            log::info!("CompileActor: on export end: {path:?} as {res:?}");
+            Ok(tinymist_query::CompilerQueryResponse::OnExport(res))
+        })
     }
 }
 
@@ -417,11 +420,6 @@ impl CompileClientActor {
             entry: Some(next_entry.clone()),
             ..Default::default()
         });
-        // todo: let export request accept compiled artifact
-        let _ = self
-            .handle
-            .export_tx
-            .send(ExportRequest::ChangeExportPath(next_entry.clone()));
 
         self.entry = next_entry;
 
