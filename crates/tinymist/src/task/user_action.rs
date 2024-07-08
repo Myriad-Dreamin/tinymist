@@ -4,11 +4,11 @@ use std::path::PathBuf;
 
 use anyhow::bail;
 use base64::Engine;
-use lsp_server::RequestId;
 use serde::{Deserialize, Serialize};
+use sync_lsp::{just_future, SchedulableResponse};
 use typst_ts_core::TypstDict;
 
-use crate::{internal_error, result_to_response, LspClient};
+use crate::internal_error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,32 +20,23 @@ pub struct TraceParams {
     pub font_paths: Vec<PathBuf>,
 }
 
-pub enum UserActionRequest {
-    Trace(RequestId, TraceParams),
-}
+#[derive(Default)]
+pub struct UserActionTask;
 
-pub fn run_user_action_thread(
-    user_action_rx: crossbeam_channel::Receiver<UserActionRequest>,
-    client: LspClient,
-) {
-    while let Ok(req) = user_action_rx.recv() {
-        match req {
-            UserActionRequest::Trace(id, params) => {
-                let res = run_trace_program(params)
-                    .map_err(|e| internal_error(format!("failed to run trace program: {:?}", e)));
-
-                client.respond(result_to_response(id, res));
-            }
-        }
+impl UserActionTask {
+    pub fn trace(&self, params: TraceParams) -> SchedulableResponse<TraceReport> {
+        just_future!(async move {
+            run_trace_program(params)
+                .await
+                .map_err(|e| internal_error(format!("failed to run trace program: {:?}", e)))
+        })
     }
-
-    log::info!("Trace thread did shut down");
 }
 
 /// Run a perf trace to some typst program
-fn run_trace_program(params: TraceParams) -> anyhow::Result<TraceReport> {
+async fn run_trace_program(params: TraceParams) -> anyhow::Result<TraceReport> {
     // Typst compile root, input, font paths, inputs
-    let mut cmd = std::process::Command::new(&params.compiler_program);
+    let mut cmd = tokio::process::Command::new(&params.compiler_program);
     let mut cmd = &mut cmd;
 
     cmd = cmd.arg("compile");
@@ -68,7 +59,8 @@ fn run_trace_program(params: TraceParams) -> anyhow::Result<TraceReport> {
 
     log::info!("running trace program: {:?}", cmd);
 
-    let output = cmd.output().expect("trace program command failed to start");
+    let output = cmd.output().await;
+    let output = output.expect("trace program command failed to start");
     let stdout = output.stdout;
     let stderr = output.stderr;
 
@@ -95,7 +87,7 @@ fn run_trace_program(params: TraceParams) -> anyhow::Result<TraceReport> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct TraceReport {
+pub struct TraceReport {
     request: TraceParams,
     messages: Vec<lsp_server::Message>,
     stderr: String,

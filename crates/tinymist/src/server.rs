@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use actor::editor::EditorActor;
 use anyhow::anyhow;
-use anyhow::{bail, Context};
+use anyhow::Context;
 use futures::future::BoxFuture;
 use log::{error, info, trace};
 use lsp_server::RequestId;
@@ -16,7 +16,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
-use task::ExportConfig;
+use task::{ExportConfig, FormatConfig, FormatTask, UserActionTask};
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
     get_semantic_tokens_unregistration, PageSelection, SemanticTokenContext,
@@ -36,9 +36,7 @@ use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
 use super::{init::*, *};
 use crate::actor::editor::EditorRequest;
-use crate::actor::format::{FormatConfig, FormatRequest};
 use crate::actor::typ_client::CompileClientActor;
-use crate::actor::user_action::UserActionRequest;
 
 pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
 
@@ -94,12 +92,12 @@ pub struct LanguageState {
     pub primary: Option<CompileClientActor>,
     /// The compiler actors for tasks
     // pub dedicates: Vec<CompileClientActor>,
-    /// The formatter thread running in backend.
-    /// Note: The thread will exit if you drop the sender.
-    pub format_thread: Option<crossbeam_channel::Sender<FormatRequest>>,
-    /// The user action thread running in backend.
-    /// Note: The thread will exit if you drop the sender.
-    pub user_action_thread: Option<crossbeam_channel::Sender<UserActionRequest>>,
+    /// The formatter tasks running in backend, which will be scheduled by async
+    /// runtime.
+    pub formatter: FormatTask,
+    /// The user action tasks running in backend, which will be scheduled by
+    /// async runtime.
+    pub user_action: UserActionTask,
 }
 
 /// Getters and the main loop.
@@ -116,6 +114,11 @@ impl LanguageState {
             const_config.tokens_overlapping_token_support,
             const_config.tokens_multiline_token_support,
         );
+        let formatter = FormatTask::new(FormatConfig {
+            mode: config.formatter,
+            width: config.formatter_print_width,
+            position_encoding: const_config.position_encoding,
+        });
 
         Self {
             client: client.clone(),
@@ -134,8 +137,8 @@ impl LanguageState {
             pinning: false,
             focusing: None,
             tokens_ctx,
-            format_thread: None,
-            user_action_thread: None,
+            formatter,
+            user_action: Default::default(),
         }
     }
 
@@ -154,9 +157,6 @@ impl LanguageState {
         let mut service = LanguageState::new(client.clone(), config, cc.clone(), editor_tx);
 
         if start {
-            service.run_format_thread();
-            service.run_user_action_thread();
-
             let editor_actor = EditorActor::new(
                 client.clone().to_untyped(),
                 editor_rx,
@@ -535,15 +535,25 @@ impl LanguageState {
             if let Err(err) = err {
                 error!("could not change formatter config: {err}");
             }
-            if let Some(f) = &self.format_thread {
-                let err = f.send(FormatRequest::ChangeConfig(FormatConfig {
-                    mode: self.config.formatter,
-                    width: self.config.formatter_print_width,
-                }));
-                if let Err(err) = err {
-                    error!("could not change formatter config: {err}");
-                }
-            }
+            // let (tx_req, rx_req) = crossbeam_channel::unbounded();
+            // self.format_thread = Some(tx_req);
+
+            // let client = self.client.clone().to_untyped();
+            // let mode = self.config.formatter;
+            // let enc = self.const_config.position_encoding;
+            // let config = format::FormatConfig { mode, width: 120 };
+            // std::thread::spawn(move || run_format_thread(config, rx_req, client, enc));
+            self.formatter.change_config(FormatConfig {
+                mode: self.config.formatter,
+                width: self.config.formatter_print_width,
+                position_encoding: self.const_config.position_encoding,
+            });
+            // if let Some(f) = &self.format_thread {
+            //     let err = f.send(FormatRequest::ChangeConfig());
+            //     if let Err(err) = err {
+            //         error!("could not change formatter config: {err}");
+            //     }
+            // }
         }
 
         info!("new settings applied");
@@ -680,16 +690,10 @@ impl LanguageState {
         }
 
         let path: ImmutPath = as_path(params.text_document).as_path().into();
-        self.query_source(path, |source: typst::syntax::Source| {
-            if let Some(f) = &self.format_thread {
-                f.send(FormatRequest::Format(req_id, source.clone()))?;
-            } else {
-                bail!("formatter thread is not available");
-            }
-
-            Ok(Some(()))
-        })
-        .map_err(|e| internal_error(format!("could not format document: {e}")))
+        let source = self
+            .query_source(path, |source: typst::syntax::Source| Ok(source))
+            .map_err(|e| internal_error(format!("could not format document: {e}")))?;
+        self.client.schedule(req_id, self.formatter.exec(source))
     }
 
     fn inlay_hint(&mut self, req_id: RequestId, params: InlayHintParams) -> ScheduledResult {
