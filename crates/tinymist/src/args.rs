@@ -19,7 +19,7 @@ pub enum Commands {
     Compile(CompileArgs),
     /// Run Preview Server
     #[cfg(feature = "preview")]
-    Preview(tinymist::preview::PreviewCliArgs),
+    Preview(tinymist::tool::preview::PreviewCliArgs),
     /// Probe
     Probe,
 }

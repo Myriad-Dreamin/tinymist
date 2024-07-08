@@ -19,7 +19,6 @@ use typst::util::Deferred;
 use typst_ts_core::config::compiler::EntryState;
 use typst_ts_core::{ImmutPath, TypstDict};
 
-pub use super::lsp::LanguageState;
 use super::*;
 use crate::utils::{try_, try_or, try_or_default};
 use crate::world::{ImmutDict, SharedFontResolver};
