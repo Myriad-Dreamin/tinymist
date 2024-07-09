@@ -21,6 +21,7 @@ tokio-util.workspace = true
 crossbeam-channel.workspace = true
 
 lsp-server.workspace = true
+async-lsp.workspace = true
 lsp-types.workspace = true
 reflexo.workspace = true
 
@@ -30,6 +31,10 @@ clap = { workspace = true, optional = true }
 
 tinymist-query.workspace = true
 
+tower = "0.4.13"
+tower-layer = "0.3.2"
+tower-service = "0.3.2"
+pin-project-lite = "0.2.13"
 
 # [lints]
 # workspace = true

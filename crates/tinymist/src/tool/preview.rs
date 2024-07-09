@@ -203,19 +203,19 @@ pub struct PreviewCliArgs {
 /// The global state of the preview tool.
 pub struct PreviewState {
     /// Connection to the LSP client.
-    client: TypedLspClient<PreviewState>,
+    client: LspClient,
     /// The backend running actor.
     preview_tx: mpsc::UnboundedSender<PreviewRequest>,
 }
 
 impl PreviewState {
     /// Create a new preview state.
-    pub fn new(client: TypedLspClient<PreviewState>) -> Self {
+    pub fn new(client: LspClient) -> Self {
         let (preview_tx, preview_rx) = mpsc::unbounded_channel();
 
         client.handle.spawn(
             PreviewActor {
-                client: client.clone().to_untyped(),
+                client: client.clone(),
                 tabs: HashMap::default(),
                 preview_rx,
             }
@@ -303,14 +303,19 @@ impl PreviewState {
             while let Some(resp) = resp_rx.recv().await {
                 use ControlPlaneResponse::*;
 
-                match resp {
+                let resp = match resp {
                     // ignoring compile status per task.
-                    CompileStatus(..) => {}
+                    CompileStatus(..) => Ok(()),
                     SyncEditorChanges(..) => {
                         log::warn!("PreviewTask({tid}): is sending SyncEditorChanges in lsp mode");
+                        Ok(())
                     }
                     EditorScrollTo(s) => client.send_notification::<ScrollSource>(s),
                     Outline(s) => client.send_notification::<NotifDocumentOutline>(s),
+                };
+
+                if let Err(e) = resp {
+                    log::error!("PreviewTask({tid}): failed to send notification: {e}");
                 }
             }
 

@@ -9,6 +9,7 @@ use lsp_types::*;
 use once_cell::sync::{Lazy, OnceCell};
 use serde::Deserialize;
 use serde_json::{json, Map, Value as JsonValue};
+use sync_lsp::router::Router;
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use typst::foundations::IntoValue;
@@ -34,22 +35,14 @@ pub trait AddCommands {
 /// The regular initializer.
 pub struct RegularInit {
     /// The connection to the client.
-    pub client: TypedLspClient<LanguageState>,
+    pub client: LspClient,
     /// The font options for the compiler.
     pub font_opts: CompileFontArgs,
-    /// The commands to execute.
-    pub exec_cmds: Vec<String>,
-}
-
-impl AddCommands for RegularInit {
-    fn add_commands(&mut self, cmds: &[String]) {
-        self.exec_cmds.extend(cmds.iter().cloned());
-    }
 }
 
 impl Initializer for RegularInit {
     type I = InitializeParams;
-    type S = LanguageState;
+    type S = Router<LanguageState>;
     /// The [`initialize`] request is the first request sent from the client to
     /// the server.
     ///
@@ -65,7 +58,10 @@ impl Initializer for RegularInit {
     ///
     /// # Errors
     /// Errors if the configuration could not be updated.
-    fn initialize(mut self, params: InitializeParams) -> (LanguageState, AnySchedulableResponse) {
+    fn initialize(
+        mut self,
+        params: InitializeParams,
+    ) -> (Router<LanguageState>, AnySchedulableResponse) {
         // Initialize configurations
         let cc = ConstConfig::from(&params);
         let mut config = Config {
@@ -99,7 +95,6 @@ impl Initializer for RegularInit {
 
         let super_init = SuperInit {
             client: self.client,
-            exec_cmds: self.exec_cmds,
             config,
             cc,
             err,
@@ -112,9 +107,7 @@ impl Initializer for RegularInit {
 /// The super LSP initializer.
 pub struct SuperInit {
     /// Using the connection to the client.
-    pub client: TypedLspClient<LanguageState>,
-    /// The valid commands for `workspace/executeCommand` requests.
-    pub exec_cmds: Vec<String>,
+    pub client: LspClient,
     /// The configuration for the server.
     pub config: Config,
     /// The constant configuration for the server.
@@ -123,19 +116,12 @@ pub struct SuperInit {
     pub err: Option<ResponseError>,
 }
 
-impl AddCommands for SuperInit {
-    fn add_commands(&mut self, cmds: &[String]) {
-        self.exec_cmds.extend(cmds.iter().cloned());
-    }
-}
-
 impl Initializer for SuperInit {
     type I = ();
-    type S = LanguageState;
-    fn initialize(self, _params: ()) -> (LanguageState, AnySchedulableResponse) {
+    type S = Router<LanguageState>;
+    fn initialize(self, _params: ()) -> (Router<LanguageState>, AnySchedulableResponse) {
         let SuperInit {
             client,
-            exec_cmds,
             config,
             cc,
             err,
@@ -144,7 +130,7 @@ impl Initializer for SuperInit {
         let service = LanguageState::main(client, config, cc.clone(), err.is_none());
 
         if let Some(err) = err {
-            return (service, Err(err));
+            return (Router::new(service), Err(err));
         }
 
         // Respond to the host (LSP client)
@@ -164,6 +150,9 @@ impl Initializer for SuperInit {
             }
             _ => None,
         };
+
+        let service = Router::new(service);
+        let (service, commands) = LanguageState::install(service);
 
         let res = InitializeResult {
             capabilities: ServerCapabilities {
@@ -205,7 +194,7 @@ impl Initializer for SuperInit {
                 )),
                 semantic_tokens_provider,
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: exec_cmds,
+                    commands,
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: None,
                     },

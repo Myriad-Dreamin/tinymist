@@ -2,23 +2,19 @@
 
 mod args;
 
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
+use std::time::Duration;
 
 use anyhow::bail;
+use async_lsp::LspService;
 use clap::Parser;
-use comemo::Prehashed;
-use futures::future::MaybeDone;
 use lsp_server::RequestId;
-use once_cell::sync::Lazy;
+use lsp_types::request::Request;
 use serde_json::Value as JsonValue;
-use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClientRoot};
-use tinymist::{
-    CompileConfig, Config, ConstConfig, LanguageState, LspWorld, RegularInit, SuperInit,
-};
-use typst::World;
-use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
-use typst_ts_compiler::{CompileEnv, Compiler, TaskInputs};
-use typst_ts_core::{typst::prelude::EcoVec, TypstDict};
+use sync_lsp::lifecycle::Initializer;
+use sync_lsp::transport::with_memory_transport;
+use sync_lsp::{transport::with_stdio_transport, LspClient};
+use tinymist::{CompileConfig, Config, ConstConfig, RegularInit, SuperInit};
 
 use crate::args::{CliArguments, Commands, CompileArgs, LspArgs};
 
@@ -43,10 +39,9 @@ impl Default for Runtimes {
     }
 }
 
-static RUNTIMES: Lazy<Runtimes> = Lazy::new(Default::default);
-
 /// The main entry point.
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
@@ -67,45 +62,60 @@ fn main() -> anyhow::Result<()> {
     let args = CliArguments::parse();
 
     match args.command.unwrap_or_default() {
-        Commands::Lsp(args) => lsp_main(args),
-        Commands::Compile(args) => compiler_main(args),
+        Commands::Lsp(args) => lsp_main(args).await,
+        Commands::Compile(args) => compiler_main(args).await,
         #[cfg(feature = "preview")]
         Commands::Preview(args) => {
             #[cfg(feature = "preview")]
             use tinymist::tool::preview::preview_main;
 
-            RUNTIMES.tokio_runtime.block_on(preview_main(args))
+            preview_main(args).await
         }
         Commands::Probe => Ok(()),
     }
 }
 
+fn lsp_harness<D: Initializer>(
+    driver: D,
+) -> impl LspService<Response = JsonValue, Error = async_lsp::ResponseError> {
+    // todo: the follow code is gone.
+    // // Start the LSP server
+    // let mut force_exit = false;
+
+    // f(connection, &mut force_exit)?;
+
+    // if !force_exit {
+    //     io_threads.join()?;
+    // }
+    tower::ServiceBuilder::new()
+        .layer(sync_lsp::lifecycle::StagedLifecycleLayer::default())
+        // .layer(LifecycleLayer::default())
+        // TODO: Use `CatchUnwindLayer`.
+        // .layer(ConcurrencyLayer::new(concurrency))
+        // .layer(ClientProcessMonitorLayer::new(client.clone()))
+        .service(driver)
+}
+
 /// The main entry point for the LSP server.
-pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
+pub async fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
     log::info!("starting LSP server: {:#?}", args);
 
-    let is_replay = !args.mirror.replay.is_empty();
-
+    let handle = tokio::runtime::Handle::current();
     with_stdio_transport(args.mirror.clone(), |conn| {
-        let client = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
-        LanguageState::install(LspBuilder::new(
-            RegularInit {
-                client: client.weak().to_typed(),
-                font_opts: args.font,
-                exec_cmds: Vec::new(),
-            },
-            client.weak(),
-        ))
-        .build()
-        .start(conn.receiver, is_replay)
-    })?;
+        let client = LspClient::new(handle, conn);
+        lsp_harness(RegularInit {
+            client,
+            font_opts: args.font,
+        })
+    })
+    .await?;
 
     log::info!("LSP server did shut down");
     Ok(())
 }
 
 /// The main entry point for the compiler.
-pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
+pub async fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
     let mut input = PathBuf::from(args.compile.input.unwrap());
 
     let mut root_path = args.compile.root.unwrap_or(PathBuf::from("."));
@@ -120,18 +130,11 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
         bail!("input file is not within the root path: {input:?} not in {root_path:?}");
     }
 
-    let inputs = Arc::new(Prehashed::new(if args.compile.inputs.is_empty() {
-        TypstDict::default()
-    } else {
-        let pairs = args.compile.inputs.iter();
-        let pairs = pairs.map(|(k, v)| (k.as_str().into(), v.as_str().into_value()));
-        pairs.collect()
-    }));
+    let inputs = args.compile.inputs;
 
-    with_stdio_transport(args.mirror.clone(), |conn| {
-        let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
-        let client = client_root.weak();
-
+    let handle = tokio::runtime::Handle::current();
+    with_memory_transport(args.mirror.clone(), |w, conn| {
+        let client = LspClient::new(handle.clone(), conn);
         let cc = ConstConfig::default();
         let config = Config {
             compile: CompileConfig {
@@ -142,105 +145,90 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
             ..Config::default()
         };
 
-        let mut service = LanguageState::install(LspBuilder::new(
-            SuperInit {
-                client: client.to_typed(),
-                exec_cmds: Vec::new(),
-                config,
-                cc,
-                err: None,
-            },
-            client.clone(),
-        ))
-        .build();
-
-        let resp = service.ready(()).unwrap();
-        let MaybeDone::Done(resp) = resp else {
-            bail!("internal error: not sync init")
-        };
-        resp.unwrap();
-
         // todo: persist
-        let request_received = reflexo::time::Instant::now();
+        handle.spawn_blocking(move || {
+            let mut w = tokio_util::io::SyncIoBridge::new(w);
 
-        let req_id: RequestId = 0.into();
-        client.register_request(
-            &lsp_server::Request {
-                id: req_id.clone(),
-                method: "tinymistExt/documentProfiling".to_owned(),
-                params: JsonValue::Null,
-            },
-            request_received,
-        );
+            use lsp_types::notification::Exit;
+            use lsp_types::notification::Initialized;
+            use lsp_types::notification::Notification;
+            use lsp_types::request::Initialize;
+            use lsp_types::request::Shutdown;
+            use lsp_types::InitializedParams;
 
-        let state = service.state_mut().unwrap();
+            let req_id: RequestId = 0.into();
+            lsp_server::Message::write(
+                lsp_server::Message::Request(lsp_server::Request {
+                    id: req_id.clone(),
+                    method: Initialize::METHOD.to_owned(),
+                    params: serde_json::json!(()),
+                }),
+                &mut w,
+            )
+            .unwrap();
 
-        let entry = state
-            .compile_config()
-            .determine_entry(Some(input.as_path().into()));
+            lsp_server::Message::write(
+                lsp_server::Message::Notification(lsp_server::Notification {
+                    method: Initialized::METHOD.to_owned(),
+                    params: serde_json::json!(InitializedParams {}),
+                }),
+                &mut w,
+            )
+            .unwrap();
 
-        let snap = state.primary().snapshot().unwrap();
+            let req_id: RequestId = 1.into();
+            lsp_server::Message::write(
+                lsp_server::Message::Request(lsp_server::Request {
+                    id: req_id.clone(),
+                    method: "tinymistExt/documentProfiling".to_owned(),
+                    params: serde_json::json!((input, inputs)),
+                }),
+                &mut w,
+            )
+            .unwrap();
 
-        RUNTIMES.tokio_runtime.block_on(async {
-            let snap = snap.snapshot().await.unwrap();
+            std::thread::sleep(Duration::from_secs(10));
 
-            let w = snap.world.task(TaskInputs {
-                entry: Some(entry),
-                inputs: Some(inputs),
-            });
+            let req_id: RequestId = 2.into();
+            lsp_server::Message::write(
+                lsp_server::Message::Request(lsp_server::Request {
+                    id: req_id.clone(),
+                    method: Shutdown::METHOD.to_owned(),
+                    params: serde_json::json!(()),
+                }),
+                &mut w,
+            )
+            .unwrap();
 
-            let mut env = CompileEnv {
-                tracer: Some(Tracer::default()),
-                ..Default::default()
-            };
-            typst_timing::enable();
-            let mut errors = EcoVec::new();
-            if let Err(e) = std::marker::PhantomData.compile(&w, &mut env) {
-                errors = e;
-            }
-            let mut writer = std::io::BufWriter::new(Vec::new());
-            let _ = typst_timing::export_json(&mut writer, |span| {
-                resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
-            });
-
-            let timings = String::from_utf8(writer.into_inner().unwrap()).unwrap();
-
-            let warnings = env.tracer.map(|e| e.warnings());
-
-            let diagnostics = state.primary().handle.run_analysis(&w, |ctx| {
-                tinymist_query::convert_diagnostics(
-                    ctx,
-                    warnings.iter().flatten().chain(errors.iter()),
-                )
-            });
-
-            let diagnostics = diagnostics.unwrap_or_default();
-
-            client.send_notification_(lsp_server::Notification {
-                method: "tinymistExt/diagnostics".to_owned(),
-                params: serde_json::json!(diagnostics),
-            });
-
-            client.respond(lsp_server::Response {
-                id: req_id,
-                result: Some(serde_json::json!({
-                    "tracingData": timings,
-                })),
-                error: None,
-            });
+            lsp_server::Message::write(
+                lsp_server::Message::Notification(lsp_server::Notification {
+                    method: Exit::METHOD.to_owned(),
+                    params: serde_json::json!(()),
+                }),
+                &mut w,
+            )
+            .unwrap();
         });
 
-        Ok(())
-    })?;
+        lsp_harness(SuperInit {
+            client: client.clone(),
+            config,
+            cc,
+            err: None,
+        })
+    })
+    .await?;
+
+    // Ok(mainloop.run_buffered(i, o).await?)
+
+    // let client_root = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(),
+    // conn.sender); let client = client_root.weak();
+
+    // let mut service = LanguageState::install(LspBuilder::new(
+    //     ,
+    //     client.clone(),
+    // ))
+    // .build();
 
     Ok(())
-}
-
-/// Turns a span into a (file, line) pair.
-fn resolve_span(world: &LspWorld, span: Span) -> Option<(String, u32)> {
-    let id = span.id()?;
-    let source = world.source(id).ok()?;
-    let range = source.range(span)?;
-    let line = source.byte_to_line(range.start)?;
-    Some((format!("{id:?}"), line as u32 + 1))
 }

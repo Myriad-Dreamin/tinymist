@@ -1,19 +1,19 @@
 //! tinymist LSP server
 
 use std::collections::HashMap;
+use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use actor::editor::EditorActor;
 use anyhow::anyhow;
-use anyhow::Context;
 use log::{error, info, trace};
-use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
+use sync_lsp::router::Router;
 use sync_lsp::*;
 use task::{ExportConfig, FormatConfig, FormatTask, UserActionTask};
 use tinymist_query::{
@@ -51,7 +51,7 @@ fn as_path_pos(inp: TextDocumentPositionParams) -> (PathBuf, Position) {
 /// The object providing the language server functionality.
 pub struct LanguageState {
     /// The lsp client
-    pub client: TypedLspClient<Self>,
+    pub client: LspClient,
 
     // State to synchronize with the client.
     /// Whether the server has registered semantic tokens capabilities.
@@ -100,7 +100,7 @@ pub struct LanguageState {
 impl LanguageState {
     /// Create a new language server.
     pub fn new(
-        client: TypedLspClient<LanguageState>,
+        client: LspClient,
         config: Config,
         const_config: ConstConfig,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
@@ -122,7 +122,7 @@ impl LanguageState {
             primary: None,
             memory_changes: HashMap::new(),
             #[cfg(feature = "preview")]
-            preview: tool::preview::PreviewState::new(client.cast(|s| &mut s.preview)),
+            preview: tool::preview::PreviewState::new(client),
             ever_focusing_by_activities: false,
             ever_manual_focusing: false,
             sema_tokens_registered: false,
@@ -139,12 +139,7 @@ impl LanguageState {
     }
 
     /// The entry point for the language server.
-    pub fn main(
-        client: TypedLspClient<Self>,
-        config: Config,
-        cc: ConstConfig,
-        start: bool,
-    ) -> Self {
+    pub fn main(client: LspClient, config: Config, cc: ConstConfig, start: bool) -> Self {
         info!("LanguageState: initialized with config {config:?}");
         info!("LanguageState: initialized with const_config {cc:?}");
 
@@ -155,7 +150,7 @@ impl LanguageState {
 
         if start {
             let editor_actor = EditorActor::new(
-                client.clone().to_untyped(),
+                client.clone(),
                 editor_rx,
                 service.config.compile.notify_compile_status,
             );
@@ -185,82 +180,81 @@ impl LanguageState {
     }
 
     /// Install handlers to the language server.
-    pub fn install<T: Initializer<S = Self> + AddCommands>(
-        provider: LspBuilder<T>,
-    ) -> LspBuilder<T> {
+    pub fn install(mut provider: Router<Self>) -> (Router<Self>, Vec<String>) {
         type State = LanguageState;
         use lsp_types::notification::*;
         use lsp_types::request::*;
 
         #[cfg(feature = "preview")]
-        let provider = provider
+        provider
             .with_command("tinymist.doStartPreview", State::start_preview)
             .with_command("tinymist.doKillPreview", State::kill_preview)
             .with_command("tinymist.scrollPreview", State::scroll_preview);
 
+        // "tinymistExt/documentProfiling"
+
         // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
-        let mut provider = provider
-            .with_request::<Shutdown>(State::shutdown)
+        provider
+            .request::<Shutdown, _>(State::shutdown)
             // lantency sensitive
-            .with_request_::<Completion>(State::completion)
-            .with_request_::<SemanticTokensFullRequest>(State::semantic_tokens_full)
-            .with_request_::<SemanticTokensFullDeltaRequest>(State::semantic_tokens_full_delta)
-            .with_request_::<DocumentHighlightRequest>(State::document_highlight)
-            .with_request_::<DocumentSymbolRequest>(State::document_symbol)
+            .query::<Completion>(State::completion)
+            .query::<SemanticTokensFullRequest>(State::semantic_tokens_full)
+            .query::<SemanticTokensFullDeltaRequest>(State::semantic_tokens_full_delta)
+            .query::<DocumentHighlightRequest>(State::document_highlight)
+            .query::<DocumentSymbolRequest>(State::document_symbol)
             // Sync for low latency
-            .with_request_::<Formatting>(State::formatting)
-            .with_request_::<SelectionRangeRequest>(State::selection_range)
+            .request::<Formatting, _>(State::formatting)
+            .request::<InternalDocumentProfiling, _>(State::internal_document_profiling)
+            .query::<SelectionRangeRequest>(State::selection_range)
             // latency insensitive
-            .with_request_::<InlayHintRequest>(State::inlay_hint)
-            .with_request_::<DocumentColor>(State::document_color)
-            .with_request_::<ColorPresentationRequest>(State::color_presentation)
-            .with_request_::<HoverRequest>(State::hover)
-            .with_request_::<CodeActionRequest>(State::code_action)
-            .with_request_::<CodeLensRequest>(State::code_lens)
-            .with_request_::<FoldingRangeRequest>(State::folding_range)
-            .with_request_::<SignatureHelpRequest>(State::signature_help)
-            .with_request_::<PrepareRenameRequest>(State::prepare_rename)
-            .with_request_::<Rename>(State::rename)
-            .with_request_::<GotoDefinition>(State::goto_definition)
-            .with_request_::<GotoDeclaration>(State::goto_declaration)
-            .with_request_::<References>(State::references)
-            .with_request_::<WorkspaceSymbolRequest>(State::symbol)
-            .with_request_::<OnEnter>(State::on_enter)
+            .query::<InlayHintRequest>(State::inlay_hint)
+            .query::<DocumentColor>(State::document_color)
+            .query::<ColorPresentationRequest>(State::color_presentation)
+            .query::<HoverRequest>(State::hover)
+            .query::<CodeActionRequest>(State::code_action)
+            .query::<CodeLensRequest>(State::code_lens)
+            .query::<FoldingRangeRequest>(State::folding_range)
+            .query::<SignatureHelpRequest>(State::signature_help)
+            .query::<PrepareRenameRequest>(State::prepare_rename)
+            .query::<Rename>(State::rename)
+            .query::<GotoDefinition>(State::goto_definition)
+            .query::<GotoDeclaration>(State::goto_declaration)
+            .query::<References>(State::references)
+            .query::<WorkspaceSymbolRequest>(State::symbol)
+            .query::<OnEnter>(State::on_enter)
             // notifications
-            .with_notification::<Initialized>(State::initialized)
-            .with_notification::<DidOpenTextDocument>(State::did_open)
-            .with_notification::<DidCloseTextDocument>(State::did_close)
-            .with_notification::<DidChangeTextDocument>(State::did_change)
-            .with_notification::<DidSaveTextDocument>(State::did_save)
-            .with_notification::<DidChangeConfiguration>(State::did_change_configuration)
+            .notification::<Initialized>(State::initialized)
+            .notification::<DidOpenTextDocument>(State::did_open)
+            .notification::<DidCloseTextDocument>(State::did_close)
+            .notification::<DidChangeTextDocument>(State::did_change)
+            .notification::<DidSaveTextDocument>(State::did_save)
+            .notification::<DidChangeConfiguration>(State::did_change_configuration)
             // commands
-            .with_command_("tinymist.exportPdf", State::export_pdf)
-            .with_command_("tinymist.exportSvg", State::export_svg)
-            .with_command_("tinymist.exportPng", State::export_png)
+            .with_command("tinymist.exportPdf", State::export_pdf)
+            .with_command("tinymist.exportSvg", State::export_svg)
+            .with_command("tinymist.exportPng", State::export_png)
             .with_command("tinymist.doClearCache", State::clear_cache)
             .with_command("tinymist.pinMain", State::pin_document)
             .with_command("tinymist.focusMain", State::focus_document)
             .with_command("tinymist.doInitTemplate", State::init_template)
             .with_command("tinymist.doGetTemplateEntry", State::get_template_entry)
-            .with_command_("tinymist.interactCodeContext", State::interact_code_context)
+            .with_command("tinymist.interactCodeContext", State::interact_code_context)
             .with_command("tinymist.getDocumentTrace", State::get_document_trace)
-            .with_command_("tinymist.getDocumentMetrics", State::get_document_metrics)
-            .with_command_("tinymist.getServerInfo", State::get_server_info)
+            .with_command("tinymist.getDocumentMetrics", State::get_document_metrics)
+            .with_command("tinymist.getServerInfo", State::get_server_info)
             // resources
             .with_resource("/symbols", State::resource_symbols)
             .with_resource("/preview/index.html", State::resource_preview_html)
-            .with_resource("/tutorial", State::resource_tutoral);
+            .with_resource("/tutorial", State::resource_tutoral)
+            .event::<OnChangedConfiguration>(Self::on_changed_configuration_respond);
 
         // todo: generalize me
-        provider.args.add_commands(
-            &Some("tinymist.getResources")
-                .iter()
-                .chain(provider.exec_cmds.keys())
-                .map(ToString::to_string)
-                .collect::<Vec<_>>(),
-        );
-
-        provider
+        let commands = Some("tinymist.getResources")
+            .iter()
+            .chain(provider.command_handlers.keys())
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        (provider, commands)
     }
 
     /// Get all sources in current state.
@@ -288,21 +282,37 @@ impl LanguageState {
         match (enable, self.sema_tokens_registered) {
             (true, false) => {
                 trace!("registering semantic tokens");
+                // todo: don't change it if request failed
+                self.sema_tokens_registered = enable;
                 let options = get_semantic_tokens_options();
-                self.client
-                    .register_capability(vec![get_semantic_tokens_registration(options)])
-                    .inspect(|_| self.sema_tokens_registered = enable)
-                    .context("could not register semantic tokens")
+                let client = self.client.clone();
+                self.client.handle.spawn(async move {
+                    let resp = client
+                        .register_capability(vec![get_semantic_tokens_registration(options)])
+                        .await;
+                    if let Err(err) = resp {
+                        log::error!("could not register semantic tokens: {err}");
+                    }
+                });
             }
             (false, true) => {
                 trace!("unregistering semantic tokens");
-                self.client
-                    .unregister_capability(vec![get_semantic_tokens_unregistration()])
-                    .inspect(|_| self.sema_tokens_registered = enable)
-                    .context("could not unregister semantic tokens")
+                // todo: don't change it if request failed
+                self.sema_tokens_registered = enable;
+                let client = self.client.clone();
+                self.client.handle.spawn(async move {
+                    let resp = client
+                        .unregister_capability(vec![get_semantic_tokens_unregistration()])
+                        .await;
+                    if let Err(err) = resp {
+                        log::error!("could not unregister semantic tokens: {err}");
+                    }
+                });
             }
-            _ => Ok(()),
+            _ => {}
         }
+
+        Ok(())
     }
 
     /// Registers or unregisters document formatter.
@@ -333,20 +343,38 @@ impl LanguageState {
         match (enable, self.formatter_registered) {
             (true, false) => {
                 trace!("registering formatter");
-                self.client
-                    .register_capability(vec![get_formatting_registration()])
-                    .inspect(|_| self.formatter_registered = enable)
-                    .context("could not register formatter")
+                // todo: don't change it if request failed
+                self.formatter_registered = enable;
+
+                let client = self.client.clone();
+                self.client.handle.spawn(async move {
+                    let resp = client
+                        .register_capability(vec![get_formatting_registration()])
+                        .await;
+                    if let Err(err) = resp {
+                        log::error!("could not register formatter: {err}");
+                    }
+                });
             }
             (false, true) => {
                 trace!("unregistering formatter");
-                self.client
-                    .unregister_capability(vec![get_formatting_unregistration()])
-                    .inspect(|_| self.formatter_registered = enable)
-                    .context("could not unregister formatter")
+                // todo: don't change it if request failed
+                self.formatter_registered = enable;
+
+                let client = self.client.clone();
+                self.client.handle.spawn(async move {
+                    let resp = client
+                        .unregister_capability(vec![get_formatting_unregistration()])
+                        .await;
+                    if let Err(err) = resp {
+                        log::error!("could not unregister formatter: {err}");
+                    }
+                });
             }
-            _ => Ok(()),
+            _ => {}
         }
+
+        Ok(())
     }
 }
 
@@ -366,7 +394,7 @@ impl LanguageState {
     ///
     /// The server can use the `initialized` notification, for example, to
     /// dynamically register capabilities with the client.
-    fn initialized(&mut self, _params: InitializedParams) -> LspResult<()> {
+    fn initialized(&mut self, _params: InitializedParams) -> NotifyResult {
         if self.const_config().tokens_dynamic_registration
             && self.config.semantic_tokens == SemanticTokensMode::Enable
         {
@@ -391,21 +419,21 @@ impl LanguageState {
             const CONFIG_REGISTRATION_ID: &str = "config";
             const CONFIG_METHOD_ID: &str = "workspace/didChangeConfiguration";
 
-            let err = self
-                .client
-                .register_capability(vec![Registration {
+            let client = self.client.clone();
+            self.client.handle.spawn(async move {
+                let resp = client.register_capability(vec![Registration {
                     id: CONFIG_REGISTRATION_ID.to_owned(),
                     method: CONFIG_METHOD_ID.to_owned(),
                     register_options: None,
-                }])
-                .err();
-            if let Some(err) = err {
-                error!("could not register to watch config changes: {err}");
-            }
+                }]);
+                if let Some(err) = resp.await.err() {
+                    error!("could not register to watch config changes: {err}");
+                }
+            });
         }
 
         info!("server initialized");
-        Ok(())
+        ControlFlow::Continue(())
     }
 
     /// The [`shutdown`] request asks the server to gracefully shut down, but to
@@ -428,7 +456,7 @@ impl LanguageState {
 
 /// Document Synchronization
 impl LanguageState {
-    fn did_open(&mut self, params: DidOpenTextDocumentParams) -> LspResult<()> {
+    fn did_open(&mut self, params: DidOpenTextDocumentParams) -> NotifyResult {
         log::info!("did open {:?}", params.text_document.uri);
         let path = as_path_(params.text_document.uri);
         let text = params.text_document.text;
@@ -437,39 +465,37 @@ impl LanguageState {
 
         // Focus after opening
         self.implicit_focus_entry(|| Some(path.as_path().into()), 'o');
-        Ok(())
+        ControlFlow::Continue(())
     }
 
-    fn did_close(&mut self, params: DidCloseTextDocumentParams) -> LspResult<()> {
+    fn did_close(&mut self, params: DidCloseTextDocumentParams) -> NotifyResult {
         let path = as_path_(params.text_document.uri);
 
         self.remove_source(path.clone()).unwrap();
-        Ok(())
+        ControlFlow::Continue(())
     }
 
-    fn did_change(&mut self, params: DidChangeTextDocumentParams) -> LspResult<()> {
+    fn did_change(&mut self, params: DidChangeTextDocumentParams) -> NotifyResult {
         let path = as_path_(params.text_document.uri);
         let changes = params.content_changes;
 
         self.edit_source(path.clone(), changes, self.const_config().position_encoding)
             .unwrap();
-        Ok(())
+        ControlFlow::Continue(())
     }
 
-    fn did_save(&mut self, _params: DidSaveTextDocumentParams) -> LspResult<()> {
-        Ok(())
+    fn did_save(&mut self, _params: DidSaveTextDocumentParams) -> NotifyResult {
+        ControlFlow::Continue(())
     }
 
-    fn on_changed_configuration(&mut self, values: Map<String, JsonValue>) -> LspResult<()> {
+    fn on_changed_configuration(&mut self, values: Map<String, JsonValue>) -> NotifyResult {
         let config = self.config.clone();
         match self.config.update_by_map(&values) {
             Ok(()) => {}
             Err(err) => {
                 self.config = config;
                 error!("error applying new settings: {err}");
-                return Err(invalid_params(format!(
-                    "error applying new settings: {err}"
-                )));
+                return ControlFlow::Continue(());
             }
         }
 
@@ -520,238 +546,196 @@ impl LanguageState {
         }
 
         info!("new settings applied");
-        Ok(())
+        ControlFlow::Continue(())
     }
 
-    fn did_change_configuration(&mut self, params: DidChangeConfigurationParams) -> LspResult<()> {
+    fn did_change_configuration(&mut self, params: DidChangeConfigurationParams) -> NotifyResult {
         // For some clients, we don't get the actual changed configuration and need to
         // poll for it https://github.com/microsoft/language-server-protocol/issues/676
         match params.settings {
             JsonValue::Object(settings) => self.on_changed_configuration(settings)?,
             _ => {
-                self.client.send_request::<WorkspaceConfiguration>(
-                    ConfigurationParams {
+                let client = self.client.clone();
+
+                self.client.handle.spawn(async move {
+                    let resp = client.send_request::<WorkspaceConfiguration>(ConfigurationParams {
                         items: Config::get_items(),
-                    },
-                    |this, resp| {
-                        if let Some(err) = resp.error {
-                            log::error!("failed to request configuration: {err:?}");
+                    });
+
+                    let result = match resp.await {
+                        Ok(result) => result,
+                        Err(err) => {
+                            log::error!("failed to request configuration: {err}");
                             return;
                         }
-                        // .map(Config::values_to_map),
+                    };
 
-                        let Some(result) = resp.result else {
-                            log::error!("no configuration returned");
-                            return;
-                        };
-
-                        let resp: Vec<JsonValue> = serde_json::from_value(result).unwrap();
-                        let _ = this.on_changed_configuration(Config::values_to_map(resp));
-                    },
-                );
+                    let resp = client.sender.emit(OnChangedConfiguration(result));
+                    if let Err(err) = resp {
+                        log::error!("failed to emit configuration change: {err}");
+                    }
+                });
             }
         };
 
-        Ok(())
+        ControlFlow::Continue(())
+    }
+
+    fn on_changed_configuration_respond(&mut self, params: OnChangedConfiguration) -> NotifyResult {
+        self.on_changed_configuration(Config::values_to_map(params.0))
     }
 }
 
+/// On Changed Configuration Event
+pub struct OnChangedConfiguration(Vec<JsonValue>); // let _ = this.on_changed_configuration(Config::values_to_map(result));
+
 macro_rules! run_query {
-    ($req_id: ident, $self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
+    ($self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
         use tinymist_query::*;
         let req = paste::paste! { [<$query Request>] { $($arg_key),* } };
-        let query_fut = $self.query(CompilerQueryRequest::$query(req.clone()));
-        $self.client.schedule_query($req_id, query_fut)
+        $self.query(CompilerQueryRequest::$query(req.clone()))
     }};
 }
 pub(crate) use run_query;
 
 /// Standard Language Features
 impl LanguageState {
-    fn goto_definition(
-        &mut self,
-        req_id: RequestId,
-        params: GotoDefinitionParams,
-    ) -> ScheduledResult {
+    fn goto_definition(&mut self, params: GotoDefinitionParams) -> QueryFuture {
         let (path, position) = as_path_pos(params.text_document_position_params);
-        run_query!(req_id, self.GotoDefinition(path, position))
+        run_query!(self.GotoDefinition(path, position))
     }
 
-    fn goto_declaration(
-        &mut self,
-        req_id: RequestId,
-        params: GotoDeclarationParams,
-    ) -> ScheduledResult {
+    fn goto_declaration(&mut self, params: GotoDeclarationParams) -> QueryFuture {
         let (path, position) = as_path_pos(params.text_document_position_params);
-        run_query!(req_id, self.GotoDeclaration(path, position))
+        run_query!(self.GotoDeclaration(path, position))
     }
 
-    fn references(&mut self, req_id: RequestId, params: ReferenceParams) -> ScheduledResult {
+    fn references(&mut self, params: ReferenceParams) -> QueryFuture {
         let (path, position) = as_path_pos(params.text_document_position);
-        run_query!(req_id, self.References(path, position))
+        run_query!(self.References(path, position))
     }
 
-    fn hover(&mut self, req_id: RequestId, params: HoverParams) -> ScheduledResult {
+    fn hover(&mut self, params: HoverParams) -> QueryFuture {
         let (path, position) = as_path_pos(params.text_document_position_params);
         self.implicit_focus_entry(|| Some(path.as_path().into()), 'h');
-        run_query!(req_id, self.Hover(path, position))
+        run_query!(self.Hover(path, position))
     }
 
-    fn folding_range(&mut self, req_id: RequestId, params: FoldingRangeParams) -> ScheduledResult {
+    fn folding_range(&mut self, params: FoldingRangeParams) -> QueryFuture {
         let path = as_path(params.text_document);
         let line_folding_only = self.const_config().doc_line_folding_only;
         self.implicit_focus_entry(|| Some(path.as_path().into()), 'f');
-        run_query!(req_id, self.FoldingRange(path, line_folding_only))
+        run_query!(self.FoldingRange(path, line_folding_only))
     }
 
-    fn selection_range(
-        &mut self,
-        req_id: RequestId,
-        params: SelectionRangeParams,
-    ) -> ScheduledResult {
+    fn selection_range(&mut self, params: SelectionRangeParams) -> QueryFuture {
         let path = as_path(params.text_document);
         let positions = params.positions;
-        run_query!(req_id, self.SelectionRange(path, positions))
+        run_query!(self.SelectionRange(path, positions))
     }
 
-    fn document_highlight(
-        &mut self,
-        req_id: RequestId,
-        params: DocumentHighlightParams,
-    ) -> ScheduledResult {
+    fn document_highlight(&mut self, params: DocumentHighlightParams) -> QueryFuture {
         let (path, position) = as_path_pos(params.text_document_position_params);
-        run_query!(req_id, self.DocumentHighlight(path, position))
+        run_query!(self.DocumentHighlight(path, position))
     }
 
-    fn document_symbol(
-        &mut self,
-        req_id: RequestId,
-        params: DocumentSymbolParams,
-    ) -> ScheduledResult {
+    fn document_symbol(&mut self, params: DocumentSymbolParams) -> QueryFuture {
         let path = as_path(params.text_document);
-        run_query!(req_id, self.DocumentSymbol(path))
+        run_query!(self.DocumentSymbol(path))
     }
 
-    fn semantic_tokens_full(
-        &mut self,
-        req_id: RequestId,
-        params: SemanticTokensParams,
-    ) -> ScheduledResult {
+    fn semantic_tokens_full(&mut self, params: SemanticTokensParams) -> QueryFuture {
         let path = as_path(params.text_document);
         self.implicit_focus_entry(|| Some(path.as_path().into()), 't');
-        run_query!(req_id, self.SemanticTokensFull(path))
+        run_query!(self.SemanticTokensFull(path))
     }
 
-    fn semantic_tokens_full_delta(
-        &mut self,
-        req_id: RequestId,
-        params: SemanticTokensDeltaParams,
-    ) -> ScheduledResult {
+    fn semantic_tokens_full_delta(&mut self, params: SemanticTokensDeltaParams) -> QueryFuture {
         let path = as_path(params.text_document);
         let previous_result_id = params.previous_result_id;
         self.implicit_focus_entry(|| Some(path.as_path().into()), 't');
-        run_query!(req_id, self.SemanticTokensDelta(path, previous_result_id))
+        run_query!(self.SemanticTokensDelta(path, previous_result_id))
     }
 
     fn formatting(
         &mut self,
-        req_id: RequestId,
         params: DocumentFormattingParams,
-    ) -> ScheduledResult {
+    ) -> SchedulableResponse<Option<Vec<TextEdit>>> {
         if matches!(self.config.formatter, FormatterMode::Disable) {
-            return Ok(None);
+            return just_ok!(None);
         }
 
         let path: ImmutPath = as_path(params.text_document).as_path().into();
         let source = self
             .query_source(path, |source: typst::syntax::Source| Ok(source))
             .map_err(|e| internal_error(format!("could not format document: {e}")))?;
-        self.client.schedule(req_id, self.formatter.exec(source))
+
+        self.formatter.exec(source)
     }
 
-    fn inlay_hint(&mut self, req_id: RequestId, params: InlayHintParams) -> ScheduledResult {
+    fn inlay_hint(&mut self, params: InlayHintParams) -> QueryFuture {
         let path = as_path(params.text_document);
         let range = params.range;
-        run_query!(req_id, self.InlayHint(path, range))
+        run_query!(self.InlayHint(path, range))
     }
 
-    fn document_color(
-        &mut self,
-        req_id: RequestId,
-        params: DocumentColorParams,
-    ) -> ScheduledResult {
+    fn document_color(&mut self, params: DocumentColorParams) -> QueryFuture {
         let path = as_path(params.text_document);
-        run_query!(req_id, self.DocumentColor(path))
+        run_query!(self.DocumentColor(path))
     }
 
-    fn color_presentation(
-        &mut self,
-        req_id: RequestId,
-        params: ColorPresentationParams,
-    ) -> ScheduledResult {
+    fn color_presentation(&mut self, params: ColorPresentationParams) -> QueryFuture {
         let path = as_path(params.text_document);
         let color = params.color;
         let range = params.range;
-        run_query!(req_id, self.ColorPresentation(path, color, range))
+        run_query!(self.ColorPresentation(path, color, range))
     }
 
-    fn code_action(&mut self, req_id: RequestId, params: CodeActionParams) -> ScheduledResult {
+    fn code_action(&mut self, params: CodeActionParams) -> QueryFuture {
         let path = as_path(params.text_document);
         let range = params.range;
-        run_query!(req_id, self.CodeAction(path, range))
+        run_query!(self.CodeAction(path, range))
     }
 
-    fn code_lens(&mut self, req_id: RequestId, params: CodeLensParams) -> ScheduledResult {
+    fn code_lens(&mut self, params: CodeLensParams) -> QueryFuture {
         let path = as_path(params.text_document);
-        run_query!(req_id, self.CodeLens(path))
+        run_query!(self.CodeLens(path))
     }
 
-    fn completion(&mut self, req_id: RequestId, params: CompletionParams) -> ScheduledResult {
+    fn completion(&mut self, params: CompletionParams) -> QueryFuture {
         let (path, position) = as_path_pos(params.text_document_position);
         let explicit = params
             .context
             .map(|context| context.trigger_kind == CompletionTriggerKind::INVOKED)
             .unwrap_or(false);
 
-        run_query!(req_id, self.Completion(path, position, explicit))
+        run_query!(self.Completion(path, position, explicit))
     }
 
-    fn signature_help(
-        &mut self,
-        req_id: RequestId,
-        params: SignatureHelpParams,
-    ) -> ScheduledResult {
+    fn signature_help(&mut self, params: SignatureHelpParams) -> QueryFuture {
         let (path, position) = as_path_pos(params.text_document_position_params);
-        run_query!(req_id, self.SignatureHelp(path, position))
+        run_query!(self.SignatureHelp(path, position))
     }
 
-    fn rename(&mut self, req_id: RequestId, params: RenameParams) -> ScheduledResult {
+    fn rename(&mut self, params: RenameParams) -> QueryFuture {
         let (path, position) = as_path_pos(params.text_document_position);
         let new_name = params.new_name;
-        run_query!(req_id, self.Rename(path, position, new_name))
+        run_query!(self.Rename(path, position, new_name))
     }
 
-    fn prepare_rename(
-        &mut self,
-        req_id: RequestId,
-        params: TextDocumentPositionParams,
-    ) -> ScheduledResult {
+    fn prepare_rename(&mut self, params: TextDocumentPositionParams) -> QueryFuture {
         let (path, position) = as_path_pos(params);
-        run_query!(req_id, self.PrepareRename(path, position))
+        run_query!(self.PrepareRename(path, position))
     }
 
-    fn symbol(&mut self, req_id: RequestId, params: WorkspaceSymbolParams) -> ScheduledResult {
+    fn symbol(&mut self, params: WorkspaceSymbolParams) -> QueryFuture {
         let pattern = (!params.query.is_empty()).then_some(params.query);
-        run_query!(req_id, self.Symbol(pattern))
+        run_query!(self.Symbol(pattern))
     }
 
-    fn on_enter(
-        &mut self,
-        req_id: RequestId,
-        params: TextDocumentPositionParams,
-    ) -> ScheduledResult {
+    fn on_enter(&mut self, params: TextDocumentPositionParams) -> QueryFuture {
         let (path, position) = as_path_pos(params);
-        run_query!(req_id, self.OnEnter(path, position))
+        run_query!(self.OnEnter(path, position))
     }
 }
 
@@ -1055,6 +1039,17 @@ impl lsp_types::request::Request for OnEnter {
     type Params = TextDocumentPositionParams;
     type Result = Option<Vec<TextEdit>>;
     const METHOD: &'static str = "experimental/onEnter";
+}
+
+/// The document formatting request is sent from the server to the client to
+/// format a whole document.
+#[derive(Debug)]
+pub enum InternalDocumentProfiling {}
+
+impl lsp_types::request::Request for InternalDocumentProfiling {
+    type Params = Vec<JsonValue>;
+    type Result = JsonValue;
+    const METHOD: &'static str = "tinymistExt/documentProfiling";
 }
 
 #[test]

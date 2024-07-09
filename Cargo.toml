@@ -59,6 +59,7 @@ typstyle = "0.11.28"
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
 
 lsp-server = "0.7.6"
+async-lsp = { version = "0.2.0", features = ["tokio"] }
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
 crossbeam-channel = "0.5.12"
 
@@ -80,7 +81,7 @@ tokio = { version = "1.36.0", features = [
     "io-std",
 ] }
 rayon = "1.10.0"
-tokio-util = { version = "0.7.10", features = ["compat"] }
+tokio-util = { version = "0.7.10", features = ["compat", "io-util"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"

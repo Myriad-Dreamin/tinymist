@@ -103,7 +103,7 @@ export const Tracing = () => {
 
       // find first response
       const firstResponse = rep.messages.find<LspResponse>(
-        (msg: LspMessage): msg is LspResponse => "id" in msg && msg.id === 0
+        (msg: LspMessage): msg is LspResponse => "id" in msg && msg.id === 1
       );
 
       const diagnosticsMessage = rep.messages.find<LspNotification>(

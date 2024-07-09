@@ -28,12 +28,16 @@ pub mod tool;
 mod utils;
 mod world;
 
+use std::ops::ControlFlow;
+
 pub use init::*;
 pub use server::*;
 pub use sync_lsp::LspClient;
 pub use world::*;
 
-use lsp_server::ResponseError;
+use async_lsp::ResponseError;
 use serde_json::from_value;
 use sync_lsp::*;
 use utils::*;
+
+type NotifyResult = ControlFlow<async_lsp::Result<()>>;

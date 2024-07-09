@@ -1,6 +1,6 @@
 use core::fmt;
 
-use lsp_server::{ErrorCode, ResponseError};
+use async_lsp::{ErrorCode, ResponseError};
 
 #[derive(Clone)]
 pub struct Derived<T>(pub T);
@@ -42,11 +42,7 @@ macro_rules! get_arg_or_default {
 pub(crate) use get_arg_or_default;
 
 pub fn z_internal_error(msg: typst_ts_core::Error) -> ResponseError {
-    ResponseError {
-        code: ErrorCode::InternalError as i32,
-        message: format!("internal: {msg:?}"),
-        data: None,
-    }
+    ResponseError::new(ErrorCode::INTERNAL_ERROR, format!("internal: {msg:?}"))
 }
 
 pub fn try_<T>(f: impl FnOnce() -> Option<T>) -> Option<T> {

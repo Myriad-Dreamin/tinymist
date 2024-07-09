@@ -175,6 +175,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
 
 [[package]]
+name = "async-lsp"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "855d6246a5d31e6e469eeef718d9a098f2d99207985a00dfdd3f4b5c5003c09a"
+dependencies = [
+ "futures",
+ "lsp-types",
+ "pin-project-lite",
+ "rustix",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+ "waitpid-any",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3700,6 +3720,7 @@ name = "sync-lsp"
 version = "0.11.14"
 dependencies = [
  "anyhow",
+ "async-lsp",
  "clap",
  "crossbeam-channel",
  "futures",
@@ -3707,12 +3728,16 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "parking_lot",
+ "pin-project-lite",
  "reflexo",
  "serde",
  "serde_json",
  "tinymist-query",
  "tokio",
  "tokio-util",
+ "tower",
+ "tower-layer",
+ "tower-service",
 ]
 
 [[package]]
@@ -3936,6 +3961,7 @@ name = "tinymist"
 version = "0.11.14"
 dependencies = [
  "anyhow",
+ "async-lsp",
  "async-trait",
  "await-tree",
  "base64 0.22.1",
@@ -3973,6 +3999,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "toml 0.8.14",
+ "tower",
  "tower-layer",
  "tower-service",
  "typst",
@@ -4221,6 +4248,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tower"
+version = "0.4.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8fa9be0de6cf49e536ce1851f987bd21a43b771b09473c3549a6c853db37c1c"
+dependencies = [
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
 name = "tower-layer"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4238,6 +4276,7 @@ version = "0.1.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3523ab5a71916ccf420eebdf5521fcef02141234bbc0b8a49f2fdc4544364ef"
 dependencies = [
+ "log",
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
@@ -4889,6 +4928,16 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+
+[[package]]
+name = "waitpid-any"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0189157c93c54d86e5c61ddf0c1223baa25e5bfb2f6f9983c678985b028d7c12"
+dependencies = [
+ "rustix",
+ "windows-sys 0.52.0",
+]
 
 [[package]]
 name = "walkdir"

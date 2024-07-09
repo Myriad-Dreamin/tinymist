@@ -72,24 +72,30 @@ impl EditorActor {
                     log::debug!("received status request");
                     if self.notify_compile_status && group == "primary" {
                         compile_status = status;
-                        self.client.send_notification::<TinymistCompileStatus>(
+                        let resp = self.client.send_notification::<TinymistCompileStatus>(
                             TinymistCompileStatus {
                                 status: compile_status.clone(),
                                 words_count: words_count.clone(),
                             },
                         );
+                        if let Err(e) = resp {
+                            log::error!("failed to send compile status: {:?}", e);
+                        }
                     }
                 }
                 EditorRequest::WordCount(group, wc) => {
                     log::debug!("received word count request");
                     if self.notify_compile_status && group == "primary" {
                         words_count = Some(wc);
-                        self.client.send_notification::<TinymistCompileStatus>(
+                        let resp = self.client.send_notification::<TinymistCompileStatus>(
                             TinymistCompileStatus {
                                 status: compile_status.clone(),
                                 words_count: words_count.clone(),
                             },
                         );
+                        if let Err(e) = resp {
+                            log::error!("failed to send compile status: {:?}", e);
+                        }
                     }
                 }
             }
@@ -107,8 +113,12 @@ impl EditorActor {
             let diags = diags.filter_map(|(g, diags)| (g != "primary" || enable).then_some(diags));
             let to_publish = diags.flatten().cloned().collect();
 
-            self.client
+            let resp = self
+                .client
                 .publish_diagnostics(url.clone(), to_publish, None);
+            if let Err(e) = resp {
+                log::error!("failed to publish diagnostics: {:?}", e);
+            }
         }
     }
 
@@ -172,7 +182,10 @@ impl EditorActor {
         };
 
         if group != "primary" || with_primary {
-            self.client.publish_diagnostics(url, to_publish, None)
+            let resp = self.client.publish_diagnostics(url, to_publish, None);
+            if let Err(e) = resp {
+                log::error!("failed to publish diagnostics: {:?}", e);
+            }
         }
     }
 }

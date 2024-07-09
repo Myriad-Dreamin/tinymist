@@ -2,17 +2,24 @@
 
 use std::ops::Deref;
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use lsp_server::RequestId;
+use comemo::Prehashed;
 use lsp_types::*;
+use router::convert_query;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_query::{ExportKind, PageSelection};
+use tinymist_query::{DiagnosticsMap, ExportKind, PageSelection};
 use typst::diag::StrResult;
+use typst::eval::Tracer;
+use typst::foundations::{Str, Value};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
+use typst::syntax::Span;
+use typst_ts_compiler::{CompileEnv, Compiler, TaskInputs};
 use typst_ts_core::error::prelude::*;
+use typst_ts_core::typst::prelude::EcoVec;
 
 use super::server::*;
 use super::*;
@@ -26,33 +33,28 @@ struct ExportOpts {
 /// Here are implemented the handlers for each command.
 impl LanguageState {
     /// Export the current document as PDF file(s).
-    pub fn export_pdf(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
-        self.export(req_id, ExportKind::Pdf, args)
+    pub fn export_pdf(&mut self, args: Vec<JsonValue>) -> AnySchedulableResponse {
+        self.export(ExportKind::Pdf, args)
     }
 
     /// Export the current document as Svg file(s).
-    pub fn export_svg(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+    pub fn export_svg(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
-        self.export(req_id, ExportKind::Svg { page: opts.page }, args)
+        self.export(ExportKind::Svg { page: opts.page }, args)
     }
 
     /// Export the current document as Png file(s).
-    pub fn export_png(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+    pub fn export_png(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
-        self.export(req_id, ExportKind::Png { page: opts.page }, args)
+        self.export(ExportKind::Png { page: opts.page }, args)
     }
 
     /// Export the current document as some format. The client is responsible
     /// for passing the correct absolute path of typst document.
-    pub fn export(
-        &mut self,
-        req_id: RequestId,
-        kind: ExportKind,
-        mut args: Vec<JsonValue>,
-    ) -> ScheduledResult {
+    pub fn export(&mut self, kind: ExportKind, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let path = get_arg!(args[0] as PathBuf);
 
-        run_query!(req_id, self.OnExport(path, kind))
+        Ok(convert_query(run_query!(self.OnExport(path, kind))))
     }
 
     /// Clear all cached resources.
@@ -245,11 +247,7 @@ impl LanguageState {
     }
 
     /// Interact with the code context at the source file.
-    pub fn interact_code_context(
-        &mut self,
-        req_id: RequestId,
-        _arguments: Vec<JsonValue>,
-    ) -> ScheduledResult {
+    pub fn interact_code_context(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let queries = _arguments.into_iter().next().ok_or_else(|| {
             invalid_params("The first parameter is not a valid code context query array")
         })?;
@@ -266,7 +264,9 @@ impl LanguageState {
         let path = as_path(params.text_document);
         let query = params.query;
 
-        run_query!(req_id, self.InteractCodeContext(path, query))
+        Ok(convert_query(run_query!(
+            self.InteractCodeContext(path, query)
+        )))
     }
 
     /// Get the trace data of the document.
@@ -306,31 +306,107 @@ impl LanguageState {
                 font_paths: snap.world.font_resolver.font_paths().to_owned(),
             })?;
 
-            tokio::pin!(task);
-            task.as_mut().await;
-            let resp = task.take_output().unwrap()?;
+            serde_json::to_value(task.await?).map_err(|e| internal_error(e.to_string()))
+        })
+    }
 
-            serde_json::to_value(resp).map_err(|e| internal_error(e.to_string()))
+    /// Get the trace data of the document (internal request).
+    pub fn internal_document_profiling(
+        &mut self,
+        mut args: Vec<JsonValue>,
+    ) -> AnySchedulableResponse {
+        let input = get_arg!(args[0] as PathBuf);
+        let inputs = get_arg_or_default!(args[1] as Vec<(String, String)>);
+
+        let inputs = inputs
+            .iter()
+            .map(|(k, v)| (Str::from(k.as_str()), Value::Str(Str::from(v.as_str()))))
+            .collect();
+
+        let inputs = Arc::new(Prehashed::new(inputs));
+
+        let entry = self
+            .compile_config()
+            .determine_entry(Some(input.as_path().into()));
+
+        let snap = self.primary().snapshot().unwrap();
+        let handle = self.primary().handle.clone();
+
+        let client = self.client.clone();
+
+        just_future!(async move {
+            let snap = snap.snapshot().await.unwrap();
+
+            let w = snap.world.task(TaskInputs {
+                entry: Some(entry),
+                inputs: Some(inputs),
+            });
+
+            let mut env = CompileEnv {
+                tracer: Some(Tracer::default()),
+                ..Default::default()
+            };
+            typst_timing::enable();
+            let mut errors = EcoVec::new();
+            if let Err(e) = std::marker::PhantomData.compile(&w, &mut env) {
+                errors = e;
+            }
+            let mut writer = std::io::BufWriter::new(Vec::new());
+            let _ = typst_timing::export_json(&mut writer, |span| {
+                resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
+            });
+
+            let timings = String::from_utf8(writer.into_inner().unwrap()).unwrap();
+
+            let warnings = env.tracer.map(|e| e.warnings());
+
+            let diagnostics = handle.run_analysis(&w, |ctx| {
+                tinymist_query::convert_diagnostics(
+                    ctx,
+                    warnings.iter().flatten().chain(errors.iter()),
+                )
+            });
+
+            let diagnostics = diagnostics.unwrap_or_default();
+
+            let resp = client.send_notification::<DiagnosticsExt>(diagnostics);
+            if let Err(e) = resp {
+                log::error!("failed to send diagnostics: {e:?}");
+            }
+
+            use typst::World;
+
+            /// Turns a span into a (file, line) pair.
+            fn resolve_span(world: &LspWorld, span: Span) -> Option<(String, u32)> {
+                let id = span.id()?;
+                let source = world.source(id).ok()?;
+                let range = source.range(span)?;
+                let line = source.byte_to_line(range.start)?;
+                Some((format!("{id:?}"), line as u32 + 1))
+            }
+
+            struct DiagnosticsExt;
+
+            impl lsp_types::notification::Notification for DiagnosticsExt {
+                type Params = DiagnosticsMap;
+                const METHOD: &'static str = "tinymistExt/diagnostics";
+            }
+
+            Ok(serde_json::json!({
+                "tracingData": timings,
+            }))
         })
     }
 
     /// Get the metrics of the document.
-    pub fn get_document_metrics(
-        &mut self,
-        req_id: RequestId,
-        mut args: Vec<JsonValue>,
-    ) -> ScheduledResult {
+    pub fn get_document_metrics(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let path = get_arg!(args[0] as PathBuf);
-        run_query!(req_id, self.DocumentMetrics(path))
+        Ok(convert_query(run_query!(self.DocumentMetrics(path))))
     }
 
     /// Get the server info.
-    pub fn get_server_info(
-        &mut self,
-        req_id: RequestId,
-        _arguments: Vec<JsonValue>,
-    ) -> ScheduledResult {
-        run_query!(req_id, self.ServerInfo())
+    pub fn get_server_info(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
+        Ok(convert_query(run_query!(self.ServerInfo())))
     }
 }
 

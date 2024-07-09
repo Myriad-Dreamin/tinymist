@@ -68,11 +68,13 @@ unicode-script = "0.5"
 await-tree = "0.1.2"
 hyper = { version = "0.14", features = ["full"], optional = true }
 open = { version = "5.1.3", optional = true }
+tower = "0.4.13"
 tower-layer = "0.3.2"
 tower-service = "0.3.2"
 pin-project-lite = "0.2.13"
 base64.workspace = true
 rayon.workspace = true
+async-lsp.workspace = true
 
 [features]
 default = ["cli", "embed-fonts", "no-content-hint", "preview"]
