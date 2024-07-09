@@ -530,7 +530,9 @@ impl LanguageState {
             }
         }
 
-        if config.formatter != self.config.formatter {
+        if config.formatter != self.config.formatter
+            || config.formatter_print_width != self.config.formatter_print_width
+        {
             let err = self.enable_formatter_caps(self.config.formatter != FormatterMode::Disable);
             if let Err(err) = err {
                 error!("could not change formatter config: {err}");
