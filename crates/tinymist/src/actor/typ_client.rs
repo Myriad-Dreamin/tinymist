@@ -61,7 +61,6 @@ use super::{
 };
 use crate::{
     task::{ExportConfig, ExportSignal, ExportTask},
-    tool::preview::CompileStatus,
     world::{LspCompilerFeat, LspWorld},
     CompileConfig,
 };
@@ -219,77 +218,42 @@ impl CompileHandler {
     }
 }
 
-impl CompileHandler {
-    pub fn preview_status(&self, _status: CompileStatus) {
-        self.editor_tx
+impl CompilationHandle<LspCompilerFeat> for CompileHandler {
+    fn status(&self, _rep: CompileReport) {
+        let this = &self;
+        this.editor_tx
             .send(EditorRequest::Status(
-                self.diag_group.clone(),
+                this.diag_group.clone(),
                 TinymistCompileStatusEnum::Compiling,
             ))
             .unwrap();
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.inner.read().as_ref() {
-            inner.status(_status);
+        if let Some(inner) = this.inner.read().as_ref() {
+            use typst_preview::CompileStatus;
+
+            let status = match _rep {
+                CompileReport::Suspend => {
+                    self.push_diagnostics(None);
+                    CompileStatus::CompileError
+                }
+                CompileReport::Stage(_, _, _) => CompileStatus::Compiling,
+                CompileReport::CompileSuccess(_, _, _) | CompileReport::CompileWarning(_, _, _) => {
+                    CompileStatus::CompileSuccess
+                }
+                CompileReport::CompileError(_, _, _) | CompileReport::ExportError(_, _, _) => {
+                    CompileStatus::CompileError
+                }
+            };
+
+            inner.status(status);
         }
-    }
-
-    pub fn preview_notify_compile(
-        &self,
-        res: Result<Arc<TypstDocument>, CompileStatus>,
-        is_on_saved: bool,
-    ) {
-        if let Ok(doc) = res.clone() {
-            let _ = self.doc_tx.send(Some(doc.clone()));
-        }
-
-        self.editor_tx
-            .send(EditorRequest::Status(
-                self.diag_group.clone(),
-                if res.is_ok() {
-                    TinymistCompileStatusEnum::CompileSuccess
-                } else {
-                    TinymistCompileStatusEnum::CompileError
-                },
-            ))
-            .unwrap();
-
-        #[cfg(not(feature = "preview"))]
-        let _ = is_on_saved;
-        #[cfg(feature = "preview")]
-        if let Some(inner) = self.inner.read().as_ref() {
-            inner.notify_compile(res, is_on_saved);
-        }
-    }
-}
-
-impl CompilationHandle<LspCompilerFeat> for CompileHandler {
-    fn status(&self, rep: CompileReport) {
-        let status = match rep {
-            CompileReport::Suspend => {
-                self.push_diagnostics(None);
-                CompileStatus::CompileError
-            }
-            CompileReport::Stage(_, _, _) => CompileStatus::Compiling,
-            CompileReport::CompileSuccess(_, _, _) | CompileReport::CompileWarning(_, _, _) => {
-                CompileStatus::CompileSuccess
-            }
-            CompileReport::CompileError(_, _, _) | CompileReport::ExportError(_, _, _) => {
-                CompileStatus::CompileError
-            }
-        };
-
-        self.preview_status(status);
     }
 
     fn notify_compile(&self, snap: &CompiledArtifact<LspCompilerFeat>, _rep: CompileReport) {
-        let (res, err) = match snap.doc.clone() {
-            Ok(doc) => (Ok(doc), EcoVec::new()),
-            Err(err) => (Err(CompileStatus::CompileError), err),
-        };
         self.notify_diagnostics(
             &snap.world,
-            err,
+            snap.doc.clone().err().unwrap_or_default(),
             snap.env.tracer.as_ref().map(|e| e.clone().warnings()),
         );
 
@@ -303,7 +267,29 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             self.export.signal(snap, ExportSignal::Saved);
         }
 
-        self.preview_notify_compile(res, snap.flags.triggered_by_fs_events);
+        if let Ok(doc) = &snap.doc {
+            let _ = self.doc_tx.send(Some(doc.clone()));
+        }
+
+        self.editor_tx
+            .send(EditorRequest::Status(
+                self.diag_group.clone(),
+                if snap.doc.is_ok() {
+                    TinymistCompileStatusEnum::CompileSuccess
+                } else {
+                    TinymistCompileStatusEnum::CompileError
+                },
+            ))
+            .unwrap();
+
+        #[cfg(feature = "preview")]
+        if let Some(inner) = self.inner.read().as_ref() {
+            let res = snap
+                .doc
+                .clone()
+                .map_err(|_| typst_preview::CompileStatus::CompileError);
+            inner.notify_compile(res, snap.flags.triggered_by_fs_events);
+        }
     }
 }
 
