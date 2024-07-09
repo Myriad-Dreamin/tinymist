@@ -379,8 +379,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
     let sig_ty = SigTy::new(
         pos.iter().map(|e| e.base_type.clone()),
         named_vec,
-        rest.as_ref()
-            .map(|e| e.base_type.clone()),
+        rest.as_ref().map(|e| e.base_type.clone()),
         ret_ty.clone(),
     );
     Arc::new(PrimarySignature {

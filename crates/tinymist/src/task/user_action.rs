@@ -20,7 +20,7 @@ pub struct TraceParams {
     pub font_paths: Vec<PathBuf>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct UserActionTask;
 
 impl UserActionTask {

@@ -2,7 +2,7 @@ use once_cell::sync::OnceCell;
 
 use crate::{
     adt::interner::Interned,
-    analysis::{analyze_dyn_signature, find_definition, },
+    analysis::{analyze_dyn_signature, find_definition},
     prelude::*,
     syntax::{get_check_target, get_deref_target, CheckTarget, ParamTarget},
     DocTooltip, LspParamInfo, SemanticRequest,

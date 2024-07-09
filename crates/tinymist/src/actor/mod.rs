@@ -35,8 +35,8 @@ impl LanguageState {
             self.compile_config().determine_inputs(),
             self.vfs_snapshot(),
         );
-        if let Some(mut previous_server) = self.primary.replace(server) {
-            std::thread::spawn(move || previous_server.settle());
+        if let Some(mut prev) = self.primary.replace(server) {
+            self.client.handle.spawn(async move { prev.settle().await });
         }
     }
 

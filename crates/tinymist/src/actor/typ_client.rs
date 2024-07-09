@@ -62,7 +62,6 @@ use super::{
 use crate::{
     task::{ExportConfig, ExportSignal, ExportTask},
     tool::preview::CompileStatus,
-    utils::{self, threaded_receive},
     world::{LspCompilerFeat, LspWorld},
     CompileConfig,
 };
@@ -95,17 +94,6 @@ impl CompileHandler {
             rx: Arc::new(Mutex::new(Some(rx))),
             snap: tokio::sync::OnceCell::new(),
         })
-    }
-
-    /// Snapshot the compiler thread for tasks
-    pub fn sync_snapshot(&self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
-        let (tx, rx) = oneshot::channel();
-
-        self.intr_tx
-            .send(Interrupt::Snapshot(tx))
-            .map_err(map_string_err("failed to send snapshot request"))?;
-
-        threaded_receive(rx).map_err(map_string_err("failed to get snapshot"))
     }
 
     pub fn add_memory_changes(&self, event: MemoryEvent) {
@@ -344,11 +332,6 @@ impl CompileClientActor {
         self.handle.clone().snapshot()
     }
 
-    /// Snapshot the compiler thread for tasks
-    pub fn sync_snapshot(&self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
-        self.handle.sync_snapshot()
-    }
-
     pub fn add_memory_changes(&self, event: MemoryEvent) {
         self.handle.add_memory_changes(event);
     }
@@ -388,12 +371,12 @@ impl CompileClientActor {
 }
 
 impl CompileClientActor {
-    pub fn settle(&mut self) {
+    pub async fn settle(&mut self) {
         let _ = self.change_entry(None);
         info!("TypstActor({}): settle requested", self.handle.diag_group);
         let (tx, rx) = oneshot::channel();
         let _ = self.handle.intr_tx.send(Interrupt::Settle(tx));
-        match utils::threaded_receive(rx) {
+        match rx.await {
             Ok(()) => info!("TypstActor({}): settled", self.handle.diag_group),
             Err(err) => error!(
                 "TypstActor({}): failed to settle: {err:#}",
@@ -432,25 +415,29 @@ impl CompileClientActor {
         self.handle.analysis.clear_cache();
     }
 
-    pub fn collect_server_info(&self) -> anyhow::Result<HashMap<String, ServerInfoResponse>> {
+    pub fn collect_server_info(&self) -> QueryFuture {
         let dg = self.handle.diag_group.clone();
 
-        let snap = self.sync_snapshot()?;
-        let w = &snap.world;
+        let snap = self.snapshot()?;
+        just_future!(async move {
+            let snap = snap.snapshot().await?;
+            let w = &snap.world;
 
-        let info = ServerInfoResponse {
-            root: w.entry_state().root().map(|e| e.as_ref().to_owned()),
-            font_paths: w.font_resolver.font_paths().to_owned(),
-            inputs: w.inputs().as_ref().deref().clone(),
-            estimated_memory_usage: HashMap::from_iter([
-                // todo: vfs memory usage
-                // ("vfs".to_owned(), w.vfs.read().memory_usage()),
-                // todo: analysis memory usage
-                // ("analysis".to_owned(), cc.analysis.estimated_memory()),
-            ]),
-        };
+            let info = ServerInfoResponse {
+                root: w.entry_state().root().map(|e| e.as_ref().to_owned()),
+                font_paths: w.font_resolver.font_paths().to_owned(),
+                inputs: w.inputs().as_ref().deref().clone(),
+                estimated_memory_usage: HashMap::from_iter([
+                    // todo: vfs memory usage
+                    // ("vfs".to_owned(), w.vfs.read().memory_usage()),
+                    // todo: analysis memory usage
+                    // ("analysis".to_owned(), cc.analysis.estimated_memory()),
+                ]),
+            };
 
-        Ok(HashMap::from_iter([(dg, info)]))
+            let info = Some(HashMap::from_iter([(dg, info)]));
+            Ok(tinymist_query::CompilerQueryResponse::ServerInfo(info))
+        })
     }
 }
 
@@ -469,15 +456,5 @@ impl QuerySnap {
             })
             .await
             .clone()
-    }
-
-    /// Snapshot the compiler thread for tasks
-    pub fn snapshot_sync(&self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
-        if let Some(snap) = self.snap.get() {
-            return snap.clone();
-        }
-
-        let rx = self.rx.lock().take().unwrap();
-        threaded_receive(rx).map_err(map_string_err("failed to get snapshot"))
     }
 }
