@@ -1,12 +1,10 @@
 //! Bootstrap actors for Tinymist.
 
 pub mod editor;
-pub mod format;
 #[cfg(feature = "preview")]
 pub mod preview;
 pub mod typ_client;
 pub mod typ_server;
-pub mod user_action;
 
 use std::sync::Arc;
 
@@ -18,10 +16,8 @@ use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 use typst_ts_core::config::compiler::EntryState;
 
 use self::{
-    format::run_format_thread,
     typ_client::{CompileClientActor, CompileHandler},
     typ_server::CompileServerActor,
-    user_action::run_user_action_thread,
 };
 use crate::{
     task::{ExportConfig, ExportTask, ExportTaskConf},
@@ -112,33 +108,5 @@ impl LanguageState {
         // must update them.
         client.add_memory_changes(MemoryEvent::Update(snapshot));
         client
-    }
-    pub fn run_format_thread(&mut self) {
-        if self.format_thread.is_some() {
-            log::error!("formatting thread is already started");
-            return;
-        }
-
-        let (tx_req, rx_req) = crossbeam_channel::unbounded();
-        self.format_thread = Some(tx_req);
-
-        let client = self.client.clone().to_untyped();
-        let mode = self.config.formatter;
-        let enc = self.const_config.position_encoding;
-        let config = format::FormatConfig { mode, width: 120 };
-        std::thread::spawn(move || run_format_thread(config, rx_req, client, enc));
-    }
-
-    pub fn run_user_action_thread(&mut self) {
-        if self.user_action_thread.is_some() {
-            log::error!("user action threads are already started");
-            return;
-        }
-
-        let (tx_req, rx_req) = crossbeam_channel::unbounded();
-        self.user_action_thread = Some(tx_req);
-
-        let client = self.client.clone().to_untyped();
-        std::thread::spawn(move || run_user_action_thread(rx_req, client));
     }
 }

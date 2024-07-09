@@ -7,6 +7,7 @@ use lsp_server::RequestId;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::{ExportKind, PageSelection};
 use typst::diag::StrResult;
@@ -15,7 +16,6 @@ use typst_ts_core::error::prelude::*;
 
 use super::server::*;
 use super::*;
-use crate::actor::user_action::{TraceParams, UserActionRequest};
 use crate::tool::package::InitTask;
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -282,7 +282,6 @@ impl LanguageState {
         let self_path = std::env::current_exe()
             .map_err(|e| internal_error(format!("Cannot get typst compiler {e}")))?;
 
-        let thread = self.user_action_thread.clone();
         let entry = self.config.compile.determine_entry(Some(path));
 
         let snap = self.primary().sync_snapshot().map_err(z_internal_error)?;
@@ -300,22 +299,16 @@ impl LanguageState {
             )
             .map_err(z_internal_error)?;
 
-        let Some(f) = thread else {
-            return Err(internal_error("user action thread is not available"))?;
-        };
-
-        f.send(UserActionRequest::Trace(
+        self.client.schedule(
             req_id,
-            TraceParams {
+            self.user_action.trace(TraceParams {
                 compiler_program: self_path,
                 root: root.as_ref().to_owned(),
                 main,
                 inputs: snap.world.inputs().as_ref().deref().clone(),
                 font_paths: snap.world.font_resolver.font_paths().to_owned(),
-            },
-        ))
-        .map_err(|_| internal_error("cannot send trace request"))
-        .map(Some)
+            }),
+        )
     }
 
     /// Get the metrics of the document.
