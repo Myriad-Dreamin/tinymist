@@ -1,7 +1,7 @@
 use std::any::Any;
 use std::path::Path;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::{collections::HashMap, path::PathBuf};
 
 use futures::future::MaybeDone;
@@ -9,7 +9,7 @@ use lsp_server::{ErrorCode, Message, Notification, Request, RequestId, Response,
 use lsp_types::notification::{Notification as Notif, PublishDiagnostics};
 use lsp_types::request::{self, RegisterCapability, Request as Req, UnregisterCapability};
 use lsp_types::*;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use reflexo::{time::Instant, ImmutPath};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{from_value, Value as JsonValue};
@@ -119,48 +119,48 @@ impl<S: 'static> TypedLspClient<S> {
     }
 }
 
+/// The root of the language server host.
+/// Will close connection when dropped.
+#[derive(Debug, Clone)]
+pub struct LspClientRoot {
+    weak: LspClient,
+    _strong: Arc<crossbeam_channel::Sender<Message>>,
+}
+
+impl LspClientRoot {
+    /// Creates a new language server host.
+    pub fn new(handle: tokio::runtime::Handle, sender: crossbeam_channel::Sender<Message>) -> Self {
+        let _strong = Arc::new(sender);
+        let weak = LspClient {
+            handle,
+            sender: Arc::downgrade(&_strong),
+            req_queue: Arc::new(Mutex::new(ReqQueue::default())),
+        };
+        Self { weak, _strong }
+    }
+
+    /// Returns the weak reference to the language server host.
+    pub fn weak(&self) -> LspClient {
+        self.weak.clone()
+    }
+}
+
 /// The host for the language server, or known as the LSP client.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LspClient {
     /// The tokio handle.
     pub handle: tokio::runtime::Handle,
 
-    sender: Arc<RwLock<Option<crossbeam_channel::Sender<Message>>>>,
+    sender: Weak<crossbeam_channel::Sender<Message>>,
     req_queue: Arc<Mutex<ReqQueue<dyn Any>>>,
 }
 
-impl Clone for LspClient {
-    fn clone(&self) -> Self {
-        Self {
-            handle: self.handle.clone(),
-            sender: self.sender.clone(),
-            req_queue: self.req_queue.clone(),
-        }
-    }
-}
-
 impl LspClient {
-    /// Creates a new language server host.
-    pub fn new(
-        handle: tokio::runtime::Handle,
-        sender: Arc<RwLock<Option<crossbeam_channel::Sender<Message>>>>,
-    ) -> Self {
-        Self {
-            handle,
-            sender,
-            req_queue: Arc::new(Mutex::new(ReqQueue::default())),
-        }
-    }
-
     pub fn to_typed<S: Any>(&self) -> TypedLspClient<S> {
         TypedLspClient {
             client: self.clone(),
             caster: Arc::new(|s| s.downcast_mut().unwrap()),
         }
-    }
-
-    pub fn force_drop(&self) -> ForceDrop<crossbeam_channel::Sender<Message>> {
-        ForceDrop(self.sender.clone())
     }
 
     pub fn has_pending_requests(&self) -> bool {
@@ -173,8 +173,7 @@ impl LspClient {
         handler: impl FnOnce(&mut dyn Any, lsp_server::Response) + Send + Sync + 'static,
     ) {
         let mut req_queue = self.req_queue.lock();
-        let sender = self.sender.read();
-        let Some(sender) = sender.as_ref() else {
+        let Some(sender) = self.sender.upgrade() else {
             log::warn!("failed to send request: connection closed");
             return;
         };
@@ -198,9 +197,8 @@ impl LspClient {
     }
 
     pub fn send_notification_(&self, notif: lsp_server::Notification) {
-        let sender = self.sender.read();
-        let Some(sender) = sender.as_ref() else {
-            log::warn!("failed to send notification: connection closed");
+        let Some(sender) = self.sender.upgrade() else {
+            log::warn!("failed to send request: connection closed");
             return;
         };
         let Err(res) = sender.send(notif.into()) else {
@@ -216,10 +214,9 @@ impl LspClient {
     pub fn register_request(&self, request: &lsp_server::Request, request_received: Instant) {
         let mut req_queue = self.req_queue.lock();
         log::info!(
-            "handling {} - ({}) at {:0.2?}",
+            "handling {} - ({}) at {request_received:0.2?}",
             request.method,
             request.id,
-            request_received
         );
         req_queue.incoming.register(
             request.id.clone(),
@@ -230,25 +227,13 @@ impl LspClient {
     pub fn respond(&self, response: lsp_server::Response) {
         let mut req_queue = self.req_queue.lock();
         if let Some((method, start)) = req_queue.incoming.complete(response.id.clone()) {
-            let sender = self.sender.read();
-            let Some(sender) = sender.as_ref() else {
-                log::warn!("failed to send response: connection closed");
+            let Some(sender) = self.sender.upgrade() else {
+                log::warn!("failed to send request: connection closed");
                 return;
             };
 
-            // if let Some(err) = &response.error {
-            //     if err.message.starts_with("server panicked") {
-            //         self.poke_rust_analyzer_developer(format!("{}, check the log",
-            // err.message))     }
-            // }
-
             let duration = start.elapsed();
-            log::info!(
-                "handled  {} - ({}) in {:0.2?}",
-                method,
-                response.id,
-                duration
-            );
+            log::info!("handled  {method} - ({}) in {duration:0.2?}", response.id);
             let Err(res) = sender.send(response.into()) else {
                 return;
             };
@@ -578,7 +563,6 @@ where
         inbox: crossbeam_channel::Receiver<Message>,
         is_replay: bool,
     ) -> anyhow::Result<()> {
-        let _drop_guard = self.client.force_drop();
         let res = self.start_(inbox);
 
         if is_replay {
@@ -825,13 +809,6 @@ where
                 Ok(())
             }
         }
-    }
-}
-
-pub struct ForceDrop<T>(Arc<RwLock<Option<T>>>);
-impl<T> Drop for ForceDrop<T> {
-    fn drop(&mut self) {
-        *self.0.write() = None;
     }
 }
 

@@ -10,9 +10,8 @@ use comemo::Prehashed;
 use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;
-use parking_lot::RwLock;
 use serde_json::Value as JsonValue;
-use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClient};
+use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClientRoot};
 use tinymist::{
     CompileConfig, CompileFontOpts, Config, ConstConfig, Init, LanguageState, LspWorld, SuperInit,
 };
@@ -85,11 +84,10 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
     let is_replay = !args.mirror.replay.is_empty();
 
     with_stdio_transport(args.mirror.clone(), |conn| {
-        let sender = Arc::new(RwLock::new(Some(conn.sender)));
-        let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender);
+        let client = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
         LanguageState::install(LspBuilder::new(
             Init {
-                client: client.to_typed(),
+                client: client.weak().to_typed(),
                 compile_opts: CompileFontOpts {
                     font_paths: args.font.font_paths.clone(),
                     ignore_system_fonts: args.font.ignore_system_fonts,
@@ -97,7 +95,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
                 },
                 exec_cmds: Vec::new(),
             },
-            client.clone(),
+            client.weak(),
         ))
         .build()
         .start(conn.receiver, is_replay)
@@ -131,11 +129,8 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
     }));
 
     with_stdio_transport(args.mirror.clone(), |conn| {
-        let sender = Arc::new(RwLock::new(Some(conn.sender)));
-        let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender);
-
-        // todo: this is not elegant
-        let _force_drop = client.force_drop();
+        let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
+        let client = client_root.weak();
 
         let cc = ConstConfig::default();
         let config = Config {
