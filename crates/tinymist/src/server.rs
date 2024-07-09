@@ -7,7 +7,6 @@ use std::sync::Arc;
 use actor::editor::EditorActor;
 use anyhow::anyhow;
 use anyhow::Context;
-use futures::future::BoxFuture;
 use log::{error, info, trace};
 use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
@@ -27,7 +26,6 @@ use tinymist_query::{
 };
 use tokio::sync::mpsc;
 use typst::{diag::FileResult, syntax::Source};
-use typst_ts_compiler::DETACHED_ENTRY;
 use typst_ts_compiler::{
     vfs::notify::{FileChangeSet, MemoryEvent},
     Time,
@@ -37,8 +35,6 @@ use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 use super::{init::*, *};
 use crate::actor::editor::EditorRequest;
 use crate::actor::typ_client::CompileClientActor;
-
-pub type MaySyncResult<'a> = Result<JsonValue, BoxFuture<'a, JsonValue>>;
 
 pub(super) fn as_path(inp: TextDocumentIdentifier) -> PathBuf {
     as_path_(inp.uri)
@@ -142,6 +138,7 @@ impl LanguageState {
         }
     }
 
+    /// The entry point for the language server.
     pub fn main(
         client: TypedLspClient<Self>,
         config: Config,
@@ -187,6 +184,7 @@ impl LanguageState {
         self.primary.as_ref().expect("primary")
     }
 
+    /// Install handlers to the language server.
     pub fn install<T: Initializer<S = Self> + AddCommands>(
         provider: LspBuilder<T>,
     ) -> LspBuilder<T> {
@@ -243,7 +241,7 @@ impl LanguageState {
             .with_command("tinymist.pinMain", State::pin_document)
             .with_command("tinymist.focusMain", State::focus_document)
             .with_command("tinymist.doInitTemplate", State::init_template)
-            .with_command("tinymist.doGetTemplateEntry", State::do_get_template_entry)
+            .with_command("tinymist.doGetTemplateEntry", State::get_template_entry)
             .with_command_("tinymist.interactCodeContext", State::interact_code_context)
             .with_command_("tinymist.getDocumentTrace", State::get_document_trace)
             .with_command_("tinymist.getDocumentMetrics", State::get_document_metrics)
@@ -265,6 +263,7 @@ impl LanguageState {
         provider
     }
 
+    /// Get all sources in current state.
     pub fn vfs_snapshot(&self) -> FileChangeSet {
         FileChangeSet::new_inserts(
             self.memory_changes
@@ -275,31 +274,6 @@ impl LanguageState {
                 })
                 .collect(),
         )
-    }
-
-    pub fn apply_vfs_snapshot(&mut self, changeset: FileChangeSet) {
-        for path in changeset.removes {
-            self.memory_changes.remove(&path);
-        }
-
-        for (path, file) in changeset.inserts {
-            let Ok(content) = file.content() else {
-                continue;
-            };
-            let Ok(mtime) = file.mtime() else {
-                continue;
-            };
-            let Ok(content) = std::str::from_utf8(content) else {
-                log::error!("invalid utf8 content in snapshot file: {path:?}");
-                continue;
-            };
-
-            let meta = MemoryFileMeta {
-                mt: *mtime,
-                content: Source::new(*DETACHED_ENTRY, content.to_owned()),
-            };
-            self.memory_changes.insert(path, meta);
-        }
     }
 }
 
@@ -582,6 +556,16 @@ impl LanguageState {
     }
 }
 
+macro_rules! run_query {
+    ($req_id: ident, $self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
+        use tinymist_query::*;
+        let req = paste::paste! { [<$query Request>] { $($arg_key),* } };
+        let query_fut = $self.query(CompilerQueryRequest::$query(req.clone()));
+        $self.client.schedule_query($req_id, query_fut)
+    }};
+}
+pub(crate) use run_query;
+
 /// Standard Language Features
 impl LanguageState {
     fn goto_definition(
@@ -852,6 +836,7 @@ impl LanguageState {
         Ok(())
     }
 
+    /// Create a new source file.
     pub fn create_source(&mut self, path: PathBuf, content: String) -> Result<(), Error> {
         let now = Time::now();
         let path: ImmutPath = path.into();
@@ -873,11 +858,12 @@ impl LanguageState {
         self.update_source(files)
     }
 
+    /// Remove a source file.
     pub fn remove_source(&mut self, path: PathBuf) -> Result<(), Error> {
         let path: ImmutPath = path.into();
 
         self.memory_changes.remove(&path);
-        log::info!("remove source: {:?}", path);
+        log::info!("remove source: {path:?}");
 
         // todo: is it safe to believe that the path is normalized?
         let files = FileChangeSet::new_removes(vec![path]);
@@ -885,6 +871,7 @@ impl LanguageState {
         self.update_source(files)
     }
 
+    /// Edit a source file.
     pub fn edit_source(
         &mut self,
         path: PathBuf,
@@ -922,6 +909,7 @@ impl LanguageState {
         self.update_source(files)
     }
 
+    /// Query a source file.
     pub fn query_source<T>(
         &self,
         path: ImmutPath,
@@ -932,26 +920,6 @@ impl LanguageState {
         let source = snapshot.content.clone();
         f(source)
     }
-}
-
-#[macro_export]
-macro_rules! run_query_tail {
-    ($self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
-        use tinymist_query::*;
-        let req = paste::paste! { [<$query Request>] { $($arg_key),* } };
-        let query_fut = $self.query(CompilerQueryRequest::$query(req.clone()));
-        $self.client.handle.spawn(query_fut.map_err(|e| internal_error(e.to_string()))?)
-    }};
-}
-
-#[macro_export]
-macro_rules! run_query {
-    ($req_id: ident, $self: ident.$query: ident ($($arg_key:ident),* $(,)?)) => {{
-        use tinymist_query::*;
-        let req = paste::paste! { [<$query Request>] { $($arg_key),* } };
-        let query_fut = $self.query(CompilerQueryRequest::$query(req.clone()));
-        $self.client.schedule_query($req_id, query_fut)
-    }};
 }
 
 macro_rules! query_source {
@@ -1010,6 +978,7 @@ macro_rules! query_world {
 }
 
 impl LanguageState {
+    /// Perform a language query.
     pub fn query(&mut self, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
 
@@ -1070,9 +1039,12 @@ impl LanguageState {
     }
 }
 
+/// Metadata for a source file.
 #[derive(Debug, Clone)]
 pub struct MemoryFileMeta {
+    /// The last modified time.
     pub mt: Time,
+    /// The content of the file.
     pub content: Source,
 }
 

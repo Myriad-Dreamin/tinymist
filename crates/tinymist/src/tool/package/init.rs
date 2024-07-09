@@ -1,3 +1,5 @@
+//! Actions for initializing a new project from a template.
+
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -9,17 +11,22 @@ use typst_ts_core::{Bytes, ImmutPath, TypstFileId};
 
 use crate::world::LspWorld;
 
+/// The source of a template.
 #[derive(Debug, Clone)]
 pub enum TemplateSource {
+    /// A package from the registry.
     Package(PackageSpec),
 }
 
+/// The task to initialize a new project.
 pub struct InitTask {
+    /// The template to use.
     pub tmpl: TemplateSource,
+    /// The directory at which to create the project.
     pub dir: Option<ImmutPath>,
 }
 
-/// Execute an initialization command.
+/// Get content of the entry file of a template.
 pub fn get_entry(world: &LspWorld, tmpl: TemplateSource) -> StrResult<Bytes> {
     let TemplateSource::Package(spec) = tmpl;
 

@@ -6,7 +6,7 @@ use typst_ts_core::{
     config::{compiler::EntryState, CompileFontOpts as FontOptsInner},
     error::prelude::*,
     font::FontResolverImpl,
-    FontResolver, TypstDict,
+    TypstDict,
 };
 
 use typst_ts_compiler::{
@@ -16,15 +16,18 @@ use typst_ts_compiler::{
     SystemCompilerFeat, TypstSystemUniverse, TypstSystemWorld,
 };
 
+/// Compilation options.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct CompileOpts {
+    /// Options for each single compilation.
     #[serde(flatten)]
     pub once: CompileOnceOpts,
-
+    /// Compilation options for font.
     #[serde(flatten)]
     pub font: CompileFontOpts,
 }
 
+/// Options for a single compilation.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompileOnceOpts {
@@ -36,6 +39,7 @@ pub struct CompileOnceOpts {
     pub inputs: TypstDict,
 }
 
+/// Compilation options for font.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompileFontOpts {
@@ -47,47 +51,25 @@ pub struct CompileFontOpts {
     pub ignore_system_fonts: bool,
 }
 
-#[derive(Debug, Clone)]
-pub struct SharedFontResolver {
-    pub inner: Arc<FontResolverImpl>,
-}
-
-impl FontResolver for SharedFontResolver {
-    fn font(&self, idx: usize) -> Option<typst_ts_core::TypstFont> {
-        self.inner.font(idx)
-    }
-    fn font_book(&self) -> &Prehashed<typst::text::FontBook> {
-        self.inner.font_book()
-    }
-}
-
-impl SharedFontResolver {
-    pub fn new(opts: CompileFontOpts) -> ZResult<Self> {
-        Ok(Self {
-            inner: Arc::new(crate::world::LspWorldBuilder::resolve_fonts(opts)?),
-        })
-    }
-
-    pub fn font_paths(&self) -> &[PathBuf] {
-        self.inner.font_paths()
-    }
-}
-
+/// Compiler feature for LSP world.
 pub type LspCompilerFeat = SystemCompilerFeat;
+/// LSP universe that spawns LSP worlds.
 pub type LspUniverse = TypstSystemUniverse;
+/// LSP world.
 pub type LspWorld = TypstSystemWorld;
-
+/// Immutable prehashed reference to dictionary.
 pub type ImmutDict = Arc<Prehashed<TypstDict>>;
 
+/// Builder for LSP world.
 pub struct LspWorldBuilder;
 
 impl LspWorldBuilder {
-    /// Create [`LspWorld`] with the given options.
-    /// See SystemCompilerFeat for instantiation details.
+    /// Create [`LspUniverse`] with the given options.
+    /// See [`LspCompilerFeat`] for instantiation details.
     /// See [`CompileOpts`] for available options.
     pub fn build(
         entry: EntryState,
-        font_resolver: SharedFontResolver,
+        font_resolver: Arc<FontResolverImpl>,
         inputs: ImmutDict,
     ) -> ZResult<LspUniverse> {
         Ok(LspUniverse::new_raw(
@@ -95,7 +77,7 @@ impl LspWorldBuilder {
             Some(inputs),
             Vfs::new(SystemAccessModel {}),
             HttpRegistry::default(),
-            font_resolver.inner,
+            font_resolver,
         ))
     }
 

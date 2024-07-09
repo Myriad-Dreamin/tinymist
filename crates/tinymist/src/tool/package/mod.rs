@@ -1,3 +1,5 @@
+//! Package management tools.
+
 use typst::diag::{eco_format, StrResult};
 use typst::syntax::package::{PackageVersion, VersionlessPackageSpec};
 use typst_ts_compiler::package::Registry;
