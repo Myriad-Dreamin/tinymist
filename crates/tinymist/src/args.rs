@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use sync_lsp::transport::MirrorArgs;
 
-use tinymist::{CompileOnceArgs, FontArgs};
+use tinymist::{CompileFontArgs, CompileOnceArgs};
 
 #[derive(Debug, Clone, clap::Parser)]
 #[clap(name = "tinymist", author, version, about, long_version(LONG_VERSION.as_str()))]
@@ -45,7 +45,7 @@ pub struct LspArgs {
     #[clap(flatten)]
     pub mirror: MirrorArgs,
     #[clap(flatten)]
-    pub font: FontArgs,
+    pub font: CompileFontArgs,
 }
 
 pub static LONG_VERSION: Lazy<String> = Lazy::new(|| {

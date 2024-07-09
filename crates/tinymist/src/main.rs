@@ -13,8 +13,7 @@ use once_cell::sync::Lazy;
 use serde_json::Value as JsonValue;
 use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClientRoot};
 use tinymist::{
-    CompileConfig, CompileFontOpts, Config, ConstConfig, LanguageState, LspWorld, RegularInit,
-    SuperInit,
+    CompileConfig, Config, ConstConfig, LanguageState, LspWorld, RegularInit, SuperInit,
 };
 use typst::World;
 use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
@@ -92,11 +91,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
         LanguageState::install(LspBuilder::new(
             RegularInit {
                 client: client.weak().to_typed(),
-                font_opts: CompileFontOpts {
-                    font_paths: args.font.font_paths.clone(),
-                    ignore_system_fonts: args.font.ignore_system_fonts,
-                    ..Default::default()
-                },
+                font_opts: args.font,
                 exec_cmds: Vec::new(),
             },
             client.weak(),
@@ -141,11 +136,7 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
         let config = Config {
             compile: CompileConfig {
                 roots: vec![root_path],
-                font_opts: CompileFontOpts {
-                    font_paths: args.compile.font.font_paths.clone(),
-                    ignore_system_fonts: args.compile.font.ignore_system_fonts,
-                    ..Default::default()
-                },
+                font_opts: args.compile.font,
                 ..CompileConfig::default()
             },
             ..Config::default()
