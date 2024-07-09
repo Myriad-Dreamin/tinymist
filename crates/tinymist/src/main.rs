@@ -134,6 +134,9 @@ pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
         let sender = Arc::new(RwLock::new(Some(conn.sender)));
         let client = LspClient::new(RUNTIMES.tokio_runtime.handle().clone(), sender);
 
+        // todo: this is not elegant
+        let _force_drop = client.force_drop();
+
         let cc = ConstConfig::default();
         let config = Config {
             compile: CompileConfig {
