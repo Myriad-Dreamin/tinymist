@@ -1,4 +1,4 @@
-//! tinymist LSP commands
+//! Tinymist LSP commands
 
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -25,18 +25,18 @@ struct ExportOpts {
 
 /// Here are implemented the handlers for each command.
 impl LanguageState {
-    /// Export the current document as a PDF file.
+    /// Export the current document as PDF file(s).
     pub fn export_pdf(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
         self.export(req_id, ExportKind::Pdf, args)
     }
 
-    /// Export the current document as a Svg file.
+    /// Export the current document as Svg file(s).
     pub fn export_svg(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
         self.export(req_id, ExportKind::Svg { page: opts.page }, args)
     }
 
-    /// Export the current document as a Png file.
+    /// Export the current document as Png file(s).
     pub fn export_png(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
         self.export(req_id, ExportKind::Png { page: opts.page }, args)
@@ -59,17 +59,6 @@ impl LanguageState {
     pub fn clear_cache(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         comemo::evict(0);
         self.primary().clear_cache();
-        just_ok!(JsonValue::Null)
-    }
-
-    /// Focus main file to some path.
-    pub fn change_entry(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
-
-        let update_result = self.do_change_entry(entry.clone());
-        update_result.map_err(|err| internal_error(format!("could not focus file: {err}")))?;
-
-        log::info!("entry changed: {entry:?}");
         just_ok!(JsonValue::Null)
     }
 
@@ -102,6 +91,7 @@ impl LanguageState {
         just_ok!(JsonValue::Null)
     }
 
+    /// Start a preview instance.
     #[cfg(feature = "preview")]
     pub fn start_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use std::path::Path;
@@ -144,6 +134,7 @@ impl LanguageState {
         self.preview.start(cli_args, handle)
     }
 
+    /// Kill a preview instance.
     #[cfg(feature = "preview")]
     pub fn kill_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let task_id = get_arg!(args[0] as String);
@@ -151,6 +142,7 @@ impl LanguageState {
         self.preview.kill(task_id)
     }
 
+    /// Scroll preview instances.
     #[cfg(feature = "preview")]
     pub fn scroll_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use typst_preview::ControlPlaneMessage;
@@ -211,7 +203,7 @@ impl LanguageState {
     }
 
     /// Get the entry of a template.
-    pub fn do_get_template_entry(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn get_template_entry(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use crate::tool::package::{self, determine_latest_version, TemplateSource};
 
         let from_source = get_arg!(args[0] as String);

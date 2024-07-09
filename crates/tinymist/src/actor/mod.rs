@@ -26,6 +26,7 @@ use crate::{
 };
 
 impl LanguageState {
+    /// Restart the server with the given group.
     pub fn restart_server(&mut self, group: &str) {
         let server = self.server(
             group.to_owned(),
@@ -39,6 +40,7 @@ impl LanguageState {
         }
     }
 
+    /// Create a new server for the given group.
     pub fn server(
         &self,
         editor_group: String,

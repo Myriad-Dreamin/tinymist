@@ -13,7 +13,8 @@ use once_cell::sync::Lazy;
 use serde_json::Value as JsonValue;
 use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClientRoot};
 use tinymist::{
-    CompileConfig, CompileFontOpts, Config, ConstConfig, Init, LanguageState, LspWorld, SuperInit,
+    CompileConfig, CompileFontOpts, Config, ConstConfig, LanguageState, LspWorld, RegularInit,
+    SuperInit,
 };
 use typst::World;
 use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
@@ -26,7 +27,9 @@ use crate::args::{CliArguments, Commands, CompileArgs, LspArgs};
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
+/// The runtimes used by the application.
 pub struct Runtimes {
+    /// The tokio runtime.
     pub tokio_runtime: tokio::runtime::Runtime,
 }
 
@@ -78,6 +81,7 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
+/// The main entry point for the LSP server.
 pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
     log::info!("starting LSP server: {:#?}", args);
 
@@ -86,9 +90,9 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
     with_stdio_transport(args.mirror.clone(), |conn| {
         let client = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
         LanguageState::install(LspBuilder::new(
-            Init {
+            RegularInit {
                 client: client.weak().to_typed(),
-                compile_opts: CompileFontOpts {
+                font_opts: CompileFontOpts {
                     font_paths: args.font.font_paths.clone(),
                     ignore_system_fonts: args.font.ignore_system_fonts,
                     ..Default::default()
@@ -105,6 +109,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The main entry point for the compiler.
 pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
     let mut input = PathBuf::from(args.compile.input.unwrap());
 

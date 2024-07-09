@@ -1,3 +1,5 @@
+//! Word count tool for documents.
+
 use std::io::{self, Write};
 use std::ops::Range;
 use std::sync::Arc;
@@ -94,6 +96,7 @@ pub fn word_count(doc: &Document) -> WordsCount {
 pub struct TextExporter {}
 
 impl TextExporter {
+    /// Collect text content from a document.
     pub fn collect(&self, output: &Document) -> typst::diag::SourceResult<String> {
         let w = std::io::BufWriter::new(Vec::new());
 

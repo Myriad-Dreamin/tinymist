@@ -4,7 +4,7 @@
 
 == Starting a LSP Server
 
-To start a language server following the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
+To start a language server following the #link("https://microsoft.github.io/language-server-protocol/")[Language Server Protocol].
 
 ```
 tinymist lsp

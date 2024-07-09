@@ -1,4 +1,3 @@
-use core::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -17,23 +16,19 @@ use typst::foundations::IntoValue;
 use typst::syntax::{FileId, VirtualPath};
 use typst::util::Deferred;
 use typst_ts_core::config::compiler::EntryState;
+use typst_ts_core::font::FontResolverImpl;
 use typst_ts_core::{ImmutPath, TypstDict};
 
+// todo: svelte-language-server responds to a Goto Definition request with
+// LocationLink[] even if the client does not report the
+// textDocument.definition.linkSupport capability.
+
 use super::*;
-use crate::utils::{try_, try_or, try_or_default};
-use crate::world::{ImmutDict, SharedFontResolver};
+use crate::world::ImmutDict;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
-#[derive(Clone)]
-pub struct Derived<T>(T);
-
-impl<T> fmt::Debug for Derived<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("..")
-    }
-}
-
+/// The font arguments for the compiler.
 #[derive(Debug, Clone, Default, clap::Parser)]
 pub struct FontArgs {
     /// Font paths
@@ -72,6 +67,7 @@ pub struct CompileOnceArgs {
     )]
     pub inputs: Vec<(String, String)>,
 
+    /// Font related arguments.
     #[clap(flatten)]
     pub font: FontArgs,
 }
@@ -110,7 +106,7 @@ pub struct CompileConfig {
     /// Specifies the font paths
     pub font_paths: Vec<PathBuf>,
     /// Computed fonts based on configuration.
-    pub fonts: OnceCell<Derived<Deferred<SharedFontResolver>>>,
+    pub fonts: OnceCell<Derived<Deferred<Arc<FontResolverImpl>>>>,
     /// Notify the compile status to the editor.
     pub notify_compile_status: bool,
     /// Enable periscope document in hover.
@@ -119,14 +115,12 @@ pub struct CompileConfig {
     pub typst_extra_args: Option<CompileExtraOpts>,
     /// The preferred theme for the document.
     pub preferred_theme: Option<String>,
+    /// Whether the configuration can have a default entry path.
     pub has_default_entry_path: bool,
 }
 
 impl CompileConfig {
     /// Updates the configuration with a JSON object.
-    ///
-    /// # Errors
-    /// Errors if the update is invalid.
     pub fn update(&mut self, update: &JsonValue) -> anyhow::Result<()> {
         if let JsonValue::Object(update) = update {
             self.update_by_map(update)
@@ -136,9 +130,6 @@ impl CompileConfig {
     }
 
     /// Updates the configuration with a map.
-    ///
-    /// # Errors
-    /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
         self.output_path = try_or_default(|| Some(update.get("outputPath")?.as_str()?.to_owned()));
         self.export_pdf = try_or_default(|| ExportMode::deserialize(update.get("exportPdf")?).ok());
@@ -209,7 +200,8 @@ impl CompileConfig {
         self.validate()
     }
 
-    pub fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
+    /// Determines the root directory for the entry file.
+    fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
         if let Some(path) = &self.root_path {
             return Some(path.as_path().into());
         }
@@ -241,6 +233,7 @@ impl CompileConfig {
         None
     }
 
+    /// Determines the default entry path.
     pub fn determine_default_entry_path(&self) -> Option<ImmutPath> {
         let extras = self.typst_extra_args.as_ref()?;
         // todo: pre-compute this when updating config
@@ -253,6 +246,7 @@ impl CompileConfig {
         extras.entry.clone()
     }
 
+    /// Determines the entry state.
     pub fn determine_entry(&self, entry: Option<ImmutPath>) -> EntryState {
         // todo: formalize untitled path
         // let is_untitled = entry.as_ref().is_some_and(|p| p.starts_with("/untitled"));
@@ -286,7 +280,8 @@ impl CompileConfig {
         })
     }
 
-    pub fn determine_fonts(&self) -> Deferred<SharedFontResolver> {
+    /// Determines the font resolver.
+    pub fn determine_fonts(&self) -> Deferred<Arc<FontResolverImpl>> {
         // todo: on font resolving failure, downgrade to a fake font book
         let font = || {
             let mut opts = self.font_opts.clone();
@@ -314,12 +309,15 @@ impl CompileConfig {
 
             log::info!("creating SharedFontResolver with {opts:?}");
             Derived(Deferred::new(|| {
-                SharedFontResolver::new(opts).expect("failed to create font book")
+                crate::world::LspWorldBuilder::resolve_fonts(opts)
+                    .map(Arc::new)
+                    .expect("failed to create font book")
             }))
         };
         self.fonts.get_or_init(font).clone().0
     }
 
+    /// Determines the `sys.inputs` for the entry file.
     pub fn determine_inputs(&self) -> ImmutDict {
         static EMPTY: Lazy<ImmutDict> = Lazy::new(ImmutDict::default);
 
@@ -330,6 +328,7 @@ impl CompileConfig {
         EMPTY.clone()
     }
 
+    /// Applies the primary options related to compilation.
     #[allow(clippy::type_complexity)]
     pub fn primary_opts(
         &self,
@@ -347,6 +346,7 @@ impl CompileConfig {
         )
     }
 
+    /// Validates the configuration.
     pub fn validate(&self) -> anyhow::Result<()> {
         if let Some(root) = &self.root_path {
             if !root.is_absolute() {
@@ -366,19 +366,6 @@ impl CompileConfig {
     }
 }
 
-/// Configuration set at initialization that won't change within a single
-/// session.
-#[derive(Default, Debug, Clone)]
-pub struct ConstCompileConfig {
-    /// Determined position encoding, either UTF-8 or UTF-16.
-    /// Defaults to UTF-16 if not specified.
-    pub position_encoding: PositionEncoding,
-}
-
-// todo: svelte-language-server responds to a Goto Definition request with
-// LocationLink[] even if the client does not report the
-// textDocument.definition.linkSupport capability.
-
 /// The mode of the formatter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -396,15 +383,15 @@ pub enum FormatterMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ExportMode {
-    /// Select best solution automatically. (Recommended)
+    /// Never export.
     #[default]
     Never,
     /// Export on saving the document, i.e. on `textDocument/didSave` events.
     OnSave,
     /// Export on typing, i.e. on `textDocument/didChange` events.
     OnType,
-    /// Export when a document has a title, which is useful to filter out
-    /// template files.
+    /// Export when a document has a title and on saved, which is useful to
+    /// filter out template files.
     OnDocumentHasTitle,
 }
 
@@ -419,6 +406,7 @@ pub enum SemanticTokensMode {
     Enable,
 }
 
+/// Additional options for compilation.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CompileExtraOpts {
     /// The root directory for compilation routine.
@@ -579,20 +567,23 @@ impl From<&InitializeParams> for ConstConfig {
     }
 }
 
+/// Capability to add valid commands to the arguments.
 pub trait AddCommands {
+    /// Adds commands to the arguments.
     fn add_commands(&mut self, cmds: &[String]);
 }
 
-pub struct CanonicalInitializeParams {
-    pub config: Config,
-    pub cc: ConstConfig,
-}
-
+/// The super LSP initializer.
 pub struct SuperInit {
+    /// Using the connection to the client.
     pub client: TypedLspClient<LanguageState>,
+    /// The valid commands for `workspace/executeCommand` requests.
     pub exec_cmds: Vec<String>,
+    /// The configuration for the server.
     pub config: Config,
+    /// The constant configuration for the server.
     pub cc: ConstConfig,
+    /// Whether an error occurred before super initialization.
     pub err: Option<ResponseError>,
 }
 
@@ -722,19 +713,23 @@ impl Initializer for SuperInit {
     }
 }
 
-pub struct Init {
+/// The regular initializer.
+pub struct RegularInit {
+    /// The connection to the client.
     pub client: TypedLspClient<LanguageState>,
-    pub compile_opts: CompileFontOpts,
+    /// The font options for the compiler.
+    pub font_opts: CompileFontOpts,
+    /// The commands to execute.
     pub exec_cmds: Vec<String>,
 }
 
-impl AddCommands for Init {
+impl AddCommands for RegularInit {
     fn add_commands(&mut self, cmds: &[String]) {
         self.exec_cmds.extend(cmds.iter().cloned());
     }
 }
 
-impl Initializer for Init {
+impl Initializer for RegularInit {
     type I = InitializeParams;
     type S = LanguageState;
     /// The [`initialize`] request is the first request sent from the client to
@@ -771,7 +766,7 @@ impl Initializer for Init {
                         .into_iter()
                         .collect(),
                 },
-                font_opts: std::mem::take(&mut self.compile_opts),
+                font_opts: std::mem::take(&mut self.font_opts),
                 ..CompileConfig::default()
             },
             ..Config::default()
@@ -856,7 +851,7 @@ mod tests {
         });
 
         let err = format!("{}", config.update(&update).unwrap_err());
-        assert!(err.contains("absolute path"), "unexpected error: {}", err);
+        assert!(err.contains("absolute path"), "unexpected error: {err}");
     }
 
     #[test]
@@ -867,6 +862,6 @@ mod tests {
         });
 
         let err = format!("{}", config.update(&update).unwrap_err());
-        assert!(err.contains("absolute path"), "unexpected error: {}", err);
+        assert!(err.contains("absolute path"), "unexpected error: {err}");
     }
 }

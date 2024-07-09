@@ -1,3 +1,5 @@
+//! Document preview tool for Typst
+
 use std::num::NonZeroUsize;
 use std::{borrow::Cow, collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
@@ -39,8 +41,6 @@ use actor::{
 impl CompileHost for CompileHandler {}
 
 impl CompileHandler {
-    /// fixme: character is 0-based, UTF-16 code unit.
-    /// We treat it as UTF-8 now.
     fn resolve_source_span(world: &LspWorld, loc: Location) -> Option<SourceSpanOffset> {
         let Location::Src(loc) = loc;
 
@@ -62,7 +62,6 @@ impl CompileHandler {
         Some(SourceSpanOffset { span, offset })
     }
 
-    // resolve_document_position
     async fn resolve_document_position(
         snap: &CompileSnapshot<LspCompilerFeat>,
         loc: Location,
@@ -135,71 +134,6 @@ impl SourceFileServer for CompileHandler {
     }
 }
 
-/// Find the output location in the document for a cursor position.
-fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) -> Option<Position> {
-    let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
-    if node.kind() != SyntaxKind::Text {
-        return None;
-    }
-
-    let mut min_dis = u64::MAX;
-    let mut p = Point::default();
-    let mut ppage = 0usize;
-
-    let span = node.span();
-    for (i, page) in document.pages.iter().enumerate() {
-        let t_dis = min_dis;
-        if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
-            return Some(Position {
-                page: NonZeroUsize::new(i + 1)?,
-                point: pos,
-            });
-        }
-        if t_dis != min_dis {
-            ppage = i;
-        }
-    }
-
-    if min_dis == u64::MAX {
-        return None;
-    }
-
-    Some(Position {
-        page: NonZeroUsize::new(ppage + 1)?,
-        point: p,
-    })
-}
-
-/// Find the position of a span in a frame.
-fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) -> Option<Point> {
-    for (mut pos, item) in frame.items() {
-        if let FrameItem::Group(group) = item {
-            // TODO: Handle transformation.
-            if let Some(point) = find_in_frame(&group.frame, span, min_dis, p) {
-                return Some(point + pos);
-            }
-        }
-
-        if let FrameItem::Text(text) = item {
-            for glyph in &text.glyphs {
-                if glyph.span.0 == span {
-                    return Some(pos);
-                }
-                if glyph.span.0.id() == span.id() {
-                    let dis = glyph.span.0.number().abs_diff(span.number());
-                    if dis < *min_dis {
-                        *min_dis = dis;
-                        *p = pos;
-                    }
-                }
-                pos.x += glyph.x_advance.at(text.size);
-            }
-        }
-    }
-
-    None
-}
-
 impl EditorServer for CompileHandler {
     async fn update_memory_files(
         &self,
@@ -237,11 +171,14 @@ impl EditorServer for CompileHandler {
     }
 }
 
+/// CLI Arguments for the preview tool.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct PreviewCliArgs {
+    /// Preview arguments
     #[clap(flatten)]
     pub preview: PreviewArgs,
 
+    /// Compile arguments
     #[clap(flatten)]
     pub compile: CompileOnceArgs,
 
@@ -249,7 +186,7 @@ pub struct PreviewCliArgs {
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
     pub preview_mode: PreviewMode,
 
-    /// Host for the preview server
+    /// (File) Host for the preview server
     #[clap(
         long = "host",
         value_name = "HOST",
@@ -263,13 +200,16 @@ pub struct PreviewCliArgs {
     pub dont_open_in_browser: bool,
 }
 
+/// The global state of the preview tool.
 pub struct PreviewState {
-    pub client: TypedLspClient<PreviewState>,
-
+    /// Connection to the LSP client.
+    client: TypedLspClient<PreviewState>,
+    /// The backend running actor.
     preview_tx: mpsc::UnboundedSender<PreviewRequest>,
 }
 
 impl PreviewState {
+    /// Create a new preview state.
     pub fn new(client: TypedLspClient<PreviewState>) -> Self {
         let (preview_tx, preview_rx) = mpsc::unbounded_channel();
 
@@ -295,6 +235,7 @@ struct StartPreviewResponse {
 }
 
 impl PreviewState {
+    /// Start a preview on a given compiler.
     pub fn start(
         &self,
         mut args: PreviewCliArgs,
@@ -426,6 +367,7 @@ impl PreviewState {
         })
     }
 
+    /// Kill a preview task. Ignore if the task is not found.
     pub fn kill(&self, task_id: String) -> AnySchedulableResponse {
         let (tx, rx) = oneshot::channel();
 
@@ -435,6 +377,7 @@ impl PreviewState {
         just_future!(async move { rx.await.map_err(|_| internal_error("cancelled"))? })
     }
 
+    /// Scroll the preview to a given position.
     pub fn scroll(&self, task_id: String, req: ControlPlaneMessage) -> AnySchedulableResponse {
         let sent = self.preview_tx.send(PreviewRequest::Scroll(task_id, req));
         sent.map_err(|_| internal_error("failed to send scroll request"))?;
@@ -443,6 +386,7 @@ impl PreviewState {
     }
 }
 
+/// Create a static file server for the previewer.
 pub fn make_static_host(
     previewer: &Previewer,
     static_file_addr: String,
@@ -501,7 +445,7 @@ pub fn make_static_host(
     (addr, tx, join_handle)
 }
 
-/// Entry point.
+/// Entry point of the preview tool.
 pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let async_root = REGISTRY
         .lock()
@@ -613,7 +557,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     log::info!("Static file server listening on: {}", static_server_addr);
 
     if !args.dont_open_in_browser {
-        if let Err(e) = open::that_detached(format!("http://{}", static_server_addr)) {
+        if let Err(e) = open::that_detached(format!("http://{static_server_addr}")) {
             log::error!("failed to open browser: {}", e);
         };
     }
@@ -645,4 +589,69 @@ struct NotifDocumentOutline;
 impl Notification for NotifDocumentOutline {
     type Params = typst_preview::Outline;
     const METHOD: &'static str = "tinymist/documentOutline";
+}
+
+/// Find the output location in the document for a cursor position.
+fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) -> Option<Position> {
+    let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
+    if node.kind() != SyntaxKind::Text {
+        return None;
+    }
+
+    let mut min_dis = u64::MAX;
+    let mut p = Point::default();
+    let mut ppage = 0usize;
+
+    let span = node.span();
+    for (i, page) in document.pages.iter().enumerate() {
+        let t_dis = min_dis;
+        if let Some(pos) = find_in_frame(&page.frame, span, &mut min_dis, &mut p) {
+            return Some(Position {
+                page: NonZeroUsize::new(i + 1)?,
+                point: pos,
+            });
+        }
+        if t_dis != min_dis {
+            ppage = i;
+        }
+    }
+
+    if min_dis == u64::MAX {
+        return None;
+    }
+
+    Some(Position {
+        page: NonZeroUsize::new(ppage + 1)?,
+        point: p,
+    })
+}
+
+/// Find the position of a span in a frame.
+fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) -> Option<Point> {
+    for (mut pos, item) in frame.items() {
+        if let FrameItem::Group(group) = item {
+            // TODO: Handle transformation.
+            if let Some(point) = find_in_frame(&group.frame, span, min_dis, p) {
+                return Some(point + pos);
+            }
+        }
+
+        if let FrameItem::Text(text) = item {
+            for glyph in &text.glyphs {
+                if glyph.span.0 == span {
+                    return Some(pos);
+                }
+                if glyph.span.0.id() == span.id() {
+                    let dis = glyph.span.0.number().abs_diff(span.number());
+                    if dis < *min_dis {
+                        *min_dis = dis;
+                        *p = pos;
+                    }
+                }
+                pos.x += glyph.x_advance.at(text.size);
+            }
+        }
+    }
+
+    None
 }

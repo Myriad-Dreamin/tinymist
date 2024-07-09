@@ -1,32 +1,23 @@
 //! # tinymist
 //!
-//! This crate provides an integrated service for [Typst](https://typst.app/). It provides:
-//! + A language server following the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
+//! This crate provides a CLI that starts services for [Typst](https://typst.app/). It provides:
+//! + `tinymist lsp`: A language server following the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
+//! + `tinymist preview`: A preview server for Typst.
 //!
-//! ## Architecture
+//! ## Usage
 //!
-//! Tinymist binary has multiple modes, and it may runs multiple actors in
-//! background. The actors could run as an async task, in a single thread, or in
-//! an isolated process.
+//! See [Features: Command Line Interface](https://myriad-dreamin.github.io/tinymist/feature/cli.html).
 //!
-//! The main process of tinymist runs the program as a language server, through
-//! stdin and stdout. A main process will fork:
-//! - rendering actors to provide PDF export with watching.
-//! - compiler actors to provide language APIs.
+//! ## Documentation
 //!
-//! ## Debugging with input mirroring
+//! See [Crate Docs](https://myriad-dreamin.github.io/tinymist/rs/tinymist/index.html).
 //!
-//! You can record the input during running the editors with Tinymist. You can
-//! then replay the input to debug the language server.
+//! Also see [Developer Guide: Tinymist LSP](https://myriad-dreamin.github.io/tinymist/module/lsp.html).
 //!
-//! ```sh
-//! # Record the input
-//! tinymist lsp --mirror input.txt
-//! # Replay the input
-//! tinymist lsp --replay input.txt
-//! ```
+//! ## Contributing
+//!
+//! See [CONTRIBUTING.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CONTRIBUTING.md).
 
-// pub mod formatting;
 mod actor;
 mod cmd;
 mod init;
@@ -40,49 +31,9 @@ mod world;
 pub use init::*;
 pub use server::*;
 pub use sync_lsp::LspClient;
-pub use world::{
-    CompileFontOpts, CompileOnceOpts, CompileOpts, LspUniverse, LspWorld, LspWorldBuilder,
-};
+pub use world::*;
 
-use lsp_server::ErrorCode;
 use lsp_server::ResponseError;
 use serde_json::from_value;
 use sync_lsp::*;
-
-/// Get a parsed command argument.
-/// Return `INVALID_PARAMS` when no arg or parse failed.
-macro_rules! get_arg {
-    ($args:ident[$idx:expr] as $ty:ty) => {{
-        let arg = $args.get_mut($idx);
-        let arg = arg.and_then(|x| from_value::<$ty>(x.take()).ok());
-        match arg {
-            Some(v) => v,
-            None => {
-                let msg = concat!("expect ", stringify!($ty), "at args[", $idx, "]");
-                return Err(invalid_params(msg));
-            }
-        }
-    }};
-}
-use get_arg;
-
-/// Get a parsed command argument or default if no arg.
-/// Return `INVALID_PARAMS` when parse failed.
-macro_rules! get_arg_or_default {
-    ($args:ident[$idx:expr] as $ty:ty) => {{
-        if $idx >= $args.len() {
-            Default::default()
-        } else {
-            get_arg!($args[$idx] as $ty)
-        }
-    }};
-}
-use get_arg_or_default;
-
-pub fn z_internal_error(msg: typst_ts_core::Error) -> ResponseError {
-    ResponseError {
-        code: ErrorCode::InternalError as i32,
-        message: format!("internal: {msg:?}"),
-        data: None,
-    }
-}
+use utils::*;

@@ -1,4 +1,5 @@
-//! The actor that send notifications to the client.
+//! The actor maintain output to the editor, including diagnostics and compile
+//! status.
 
 use std::collections::HashMap;
 

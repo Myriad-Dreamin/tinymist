@@ -28,7 +28,7 @@ impl UserActionTask {
         just_future!(async move {
             run_trace_program(params)
                 .await
-                .map_err(|e| internal_error(format!("failed to run trace program: {:?}", e)))
+                .map_err(|e| internal_error(format!("failed to run trace program: {e:?}")))
         })
     }
 }
@@ -49,7 +49,7 @@ async fn run_trace_program(params: TraceParams) -> anyhow::Result<TraceReport> {
     // todo: test space in input?
     for (k, v) in params.inputs.iter() {
         let typst::foundations::Value::Str(s) = v else {
-            bail!("input value must be string, got {:?} for {:?}", v, k);
+            bail!("input value must be string, got {v:?} for {k:?}");
         };
         cmd = cmd.arg(format!("--input={k}={}", s.as_str()));
     }
@@ -57,7 +57,7 @@ async fn run_trace_program(params: TraceParams) -> anyhow::Result<TraceReport> {
         cmd = cmd.arg(format!("--font-path={}", p.as_path().display()));
     }
 
-    log::info!("running trace program: {:?}", cmd);
+    log::info!("running trace program: {cmd:?}");
 
     let output = cmd.output().await;
     let output = output.expect("trace program command failed to start");
