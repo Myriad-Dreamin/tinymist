@@ -159,7 +159,7 @@ impl LspClient {
         }
     }
 
-    fn force_drop(&self) -> ForceDrop<crossbeam_channel::Sender<Message>> {
+    pub fn force_drop(&self) -> ForceDrop<crossbeam_channel::Sender<Message>> {
         ForceDrop(self.sender.clone())
     }
 
@@ -828,7 +828,7 @@ where
     }
 }
 
-struct ForceDrop<T>(Arc<RwLock<Option<T>>>);
+pub struct ForceDrop<T>(Arc<RwLock<Option<T>>>);
 impl<T> Drop for ForceDrop<T> {
     fn drop(&mut self) {
         *self.0.write() = None;
