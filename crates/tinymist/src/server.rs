@@ -535,25 +535,12 @@ impl LanguageState {
             if let Err(err) = err {
                 error!("could not change formatter config: {err}");
             }
-            // let (tx_req, rx_req) = crossbeam_channel::unbounded();
-            // self.format_thread = Some(tx_req);
 
-            // let client = self.client.clone().to_untyped();
-            // let mode = self.config.formatter;
-            // let enc = self.const_config.position_encoding;
-            // let config = format::FormatConfig { mode, width: 120 };
-            // std::thread::spawn(move || run_format_thread(config, rx_req, client, enc));
             self.formatter.change_config(FormatConfig {
                 mode: self.config.formatter,
                 width: self.config.formatter_print_width,
                 position_encoding: self.const_config.position_encoding,
             });
-            // if let Some(f) = &self.format_thread {
-            //     let err = f.send(FormatRequest::ChangeConfig());
-            //     if let Err(err) = err {
-            //         error!("could not change formatter config: {err}");
-            //     }
-            // }
         }
 
         info!("new settings applied");
