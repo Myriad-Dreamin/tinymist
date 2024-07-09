@@ -35,28 +35,20 @@ pub type QueryFuture = anyhow::Result<ResponseFuture<anyhow::Result<CompilerQuer
 pub type SchedulableResponse<T> = LspResponseFuture<LspResult<T>>;
 pub type AnySchedulableResponse = SchedulableResponse<JsonValue>;
 
-#[macro_export]
-macro_rules! just_ok {
-    ($expr:expr) => {
-        Ok(futures::future::MaybeDone::Done(Ok($expr)))
-    };
+pub fn just_ok<T, E>(res: T) -> Result<ResponseFuture<Result<T, E>>, E> {
+    Ok(futures::future::MaybeDone::Done(Ok(res)))
 }
 
-#[macro_export]
-macro_rules! just_result {
-    ($expr:expr) => {
-        Ok(futures::future::MaybeDone::Done($expr))
-    };
+pub fn just_result<T, E>(res: Result<T, E>) -> Result<ResponseFuture<Result<T, E>>, E> {
+    Ok(futures::future::MaybeDone::Done(res))
 }
 
-#[macro_export]
-macro_rules! just_future {
-    ($expr:expr) => {
-        Ok(futures::future::MaybeDone::Future(Box::pin($expr)))
-    };
+pub fn just_future<T, E>(
+    fut: impl std::future::Future<Output = Result<T, E>> + Send + 'static,
+) -> Result<ResponseFuture<Result<T, E>>, E> {
+    Ok(futures::future::MaybeDone::Future(Box::pin(fut)))
 }
 
-#[macro_export]
 macro_rules! reschedule {
     ($expr:expr) => {
         match $expr {
@@ -540,9 +532,9 @@ impl<Args: Initializer> LspDriver<Args> {
         let args = match &mut self.state {
             State::Uninitialized(args) => args,
             _ => {
-                return just_result!(Err(resp_err(
+                return just_result(Err(resp_err(
                     ErrorCode::InvalidRequest,
-                    "Server is already initialized"
+                    "Server is already initialized",
                 )))
             }
         };
@@ -645,13 +637,11 @@ where
                 self.state = State::Initializing(s);
                 res
             }
-            (State::Uninitialized(..) | State::Initializing(..), _) => {
-                just_result!(Err(resp_err(
-                    ErrorCode::ServerNotInitialized,
-                    "Server is not initialized yet",
-                )))
-            }
-            (_, request::Initialize::METHOD) => just_result!(Err(resp_err(
+            (State::Uninitialized(..) | State::Initializing(..), _) => just_result(Err(resp_err(
+                ErrorCode::ServerNotInitialized,
+                "Server is not initialized yet",
+            ))),
+            (_, request::Initialize::METHOD) => just_result(Err(resp_err(
                 ErrorCode::InvalidRequest,
                 "Server is already initialized",
             ))),
@@ -676,7 +666,7 @@ where
 
                 return;
             }
-            (State::ShuttingDown, _) => just_result!(Err(resp_err(
+            (State::ShuttingDown, _) => just_result(Err(resp_err(
                 ErrorCode::InvalidRequest,
                 "Server is shutting down",
             ))),

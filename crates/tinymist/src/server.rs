@@ -422,7 +422,7 @@ impl LanguageState {
     /// request to the server again, the server will respond with JSON-RPC
     /// error code `-32600` (invalid request).
     fn shutdown(&mut self, _params: ()) -> SchedulableResponse<()> {
-        just_ok!(())
+        just_ok(())
     }
 }
 
@@ -949,7 +949,7 @@ macro_rules! query_state {
     ($self:ident, $method:ident, $req:expr) => {{
         let snap = $self.snapshot()?;
         let handle = $self.handle.clone();
-        just_future!(async move {
+        just_future(async move {
             let snap = snap.snapshot().await?;
             let w = &snap.world;
             let doc = snap.success_doc.map(|doc| VersionedDocument {
@@ -967,7 +967,7 @@ macro_rules! query_world {
     ($self:ident, $method:ident, $req:expr) => {{
         let snap = $self.snapshot()?;
         let handle = $self.handle.clone();
-        just_future!(async move {
+        just_future(async move {
             let snap = snap.snapshot().await?;
             let w = &snap.world;
             handle
@@ -1005,7 +1005,7 @@ impl LanguageState {
             }
         };
 
-        just_ok!(query)
+        just_ok(query)
     }
 
     fn query_on(client: &CompileClientActor, query: CompilerQueryRequest) -> QueryFuture {

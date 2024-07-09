@@ -59,7 +59,7 @@ impl LanguageState {
     pub fn clear_cache(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         comemo::evict(0);
         self.primary().clear_cache();
-        just_ok!(JsonValue::Null)
+        just_ok(JsonValue::Null)
     }
 
     /// Pin main file to some path.
@@ -70,7 +70,7 @@ impl LanguageState {
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
 
         log::info!("file pinned: {entry:?}");
-        just_ok!(JsonValue::Null)
+        just_ok(JsonValue::Null)
     }
 
     /// Focus main file to some path.
@@ -88,7 +88,7 @@ impl LanguageState {
         if ok {
             log::info!("file focused: {entry:?}");
         }
-        just_ok!(JsonValue::Null)
+        just_ok(JsonValue::Null)
     }
 
     /// Start a preview instance.
@@ -168,7 +168,7 @@ impl LanguageState {
 
         let snap = self.primary().snapshot().map_err(z_internal_error)?;
 
-        just_future!(async move {
+        just_future(async move {
             let snap = snap.snapshot().await.map_err(z_internal_error)?;
 
             // Parse the package specification. If the user didn't specify the version,
@@ -213,7 +213,7 @@ impl LanguageState {
 
         let snap = self.primary().snapshot().map_err(z_internal_error)?;
 
-        just_future!(async move {
+        just_future(async move {
             let snap = snap.snapshot().await.map_err(z_internal_error)?;
 
             // Parse the package specification. If the user didn't specify the version,
@@ -282,19 +282,21 @@ impl LanguageState {
         let snap = self.primary().snapshot().map_err(z_internal_error)?;
         let user_action = self.user_action;
 
-        just_future!(async move {
+        just_future(async move {
             let snap = snap.snapshot().await.map_err(z_internal_error)?;
+            let display_entry = || format!("{entry:?}");
 
             // todo: rootless file
             // todo: memory dirty file
-            let root = entry.root().ok_or_else(
-            || error_once!("root must be determined for trace, got", entry: format!("{entry:?}")),
-        ).map_err(z_internal_error)?;
+            let root = entry
+                .root()
+                .ok_or_else(|| error_once!("root must be determined for trace, got", entry: display_entry()))
+                .map_err(z_internal_error)?;
             let main = entry
                 .main()
                 .and_then(|e| e.vpath().resolve(&root))
                 .ok_or_else(
-                    || error_once!("main file must be resolved, got", entry: format!("{entry:?}")),
+                    || error_once!("main file must be resolved, got", entry: display_entry()),
                 )
                 .map_err(z_internal_error)?;
 
@@ -338,13 +340,13 @@ impl LanguageState {
     /// Get the all valid symbols
     pub fn resource_symbols(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let snapshot = self.primary().snapshot().map_err(z_internal_error)?;
-        just_future!(Self::get_symbol_resources(snapshot))
+        just_future(Self::get_symbol_resources(snapshot))
     }
 
     /// Get resource preview html
     pub fn resource_preview_html(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let resp = serde_json::to_value(TYPST_PREVIEW_HTML);
-        just_result!(resp.map_err(|e| internal_error(e.to_string())))
+        just_result(resp.map_err(|e| internal_error(e.to_string())))
     }
 
     /// Get tutorial web page

@@ -62,7 +62,7 @@ impl FormatTask {
 
     pub fn exec(&self, source: Source) -> SchedulableResponse<Option<Vec<TextEdit>>> {
         let data = self.factory.task();
-        just_future!(async move { (data.0)(source) })
+        just_future(async move { (data.0)(source) })
     }
 }
 
