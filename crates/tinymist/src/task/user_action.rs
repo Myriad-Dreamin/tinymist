@@ -25,7 +25,7 @@ pub struct UserActionTask;
 
 impl UserActionTask {
     pub fn trace(&self, params: TraceParams) -> SchedulableResponse<TraceReport> {
-        just_future!(async move {
+        just_future(async move {
             run_trace_program(params)
                 .await
                 .map_err(|e| internal_error(format!("failed to run trace program: {e:?}")))

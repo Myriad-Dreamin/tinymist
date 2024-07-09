@@ -245,7 +245,7 @@ impl Initializer for SuperInit {
         };
 
         let res = serde_json::to_value(res).map_err(|e| invalid_params(e.to_string()));
-        (service, just_result!(res))
+        (service, just_result(res))
     }
 }
 

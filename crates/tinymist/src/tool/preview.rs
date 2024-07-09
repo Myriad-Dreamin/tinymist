@@ -335,7 +335,7 @@ impl PreviewState {
 
         let preview_tx = self.preview_tx.clone();
         let handle = self.client.handle.clone();
-        just_future!(async move {
+        just_future(async move {
             let previewer = previewer.await;
             compile_handler.register_preview(previewer.compile_watcher().clone());
 
@@ -374,7 +374,7 @@ impl PreviewState {
         let sent = self.preview_tx.send(PreviewRequest::Kill(task_id, tx));
         sent.map_err(|_| internal_error("failed to send kill request"))?;
 
-        just_future!(async move { rx.await.map_err(|_| internal_error("cancelled"))? })
+        just_future(async move { rx.await.map_err(|_| internal_error("cancelled"))? })
     }
 
     /// Scroll the preview to a given position.
@@ -382,7 +382,7 @@ impl PreviewState {
         let sent = self.preview_tx.send(PreviewRequest::Scroll(task_id, req));
         sent.map_err(|_| internal_error("failed to send scroll request"))?;
 
-        just_ok!(JsonValue::Null)
+        just_ok(JsonValue::Null)
     }
 }
 

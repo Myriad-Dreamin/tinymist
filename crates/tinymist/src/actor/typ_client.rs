@@ -354,7 +354,7 @@ impl CompileClientActor {
 
         let entry = self.config.determine_entry(Some(path.as_path().into()));
 
-        just_future!(async move {
+        just_future(async move {
             let snap = snap.snapshot().await?;
             let snap = snap.task(TaskInputs {
                 entry: Some(entry),
@@ -419,7 +419,7 @@ impl CompileClientActor {
         let dg = self.handle.diag_group.clone();
 
         let snap = self.snapshot()?;
-        just_future!(async move {
+        just_future(async move {
             let snap = snap.snapshot().await?;
             let w = &snap.world;
 
