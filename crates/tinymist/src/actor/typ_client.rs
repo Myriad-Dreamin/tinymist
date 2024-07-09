@@ -305,7 +305,9 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             snap.env.tracer.as_ref().map(|e| e.clone().warnings()),
         );
 
-        if snap.flags.triggered_by_mem_events && snap.flags.triggered_by_fs_events {
+        if snap.flags.triggered_by_entry_update {
+            self.export.signal(snap, ExportSignal::EntryChanged);
+        } else if snap.flags.triggered_by_mem_events && snap.flags.triggered_by_fs_events {
             self.export.signal(snap, ExportSignal::TypedAndSaved);
         } else if snap.flags.triggered_by_mem_events {
             self.export.signal(snap, ExportSignal::Typed);
