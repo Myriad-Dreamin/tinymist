@@ -383,15 +383,15 @@ pub enum FormatterMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ExportMode {
-    /// Select best solution automatically. (Recommended)
+    /// Never export.
     #[default]
     Never,
     /// Export on saving the document, i.e. on `textDocument/didSave` events.
     OnSave,
     /// Export on typing, i.e. on `textDocument/didChange` events.
     OnType,
-    /// Export when a document has a title, which is useful to filter out
-    /// template files.
+    /// Export when a document has a title and on saved, which is useful to
+    /// filter out template files.
     OnDocumentHasTitle,
 }
 
