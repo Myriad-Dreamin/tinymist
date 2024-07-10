@@ -123,7 +123,7 @@ impl DefUseInfo {
 }
 
 pub(super) fn get_def_use_inner(
-    ctx: &mut AnalysisContext,
+    ctx: &mut SearchCtx,
     source: Source,
     e: EcoVec<LexicalHierarchy>,
     import: Arc<ImportInfo>,
@@ -154,8 +154,8 @@ pub(super) fn get_def_use_inner(
     Some(Arc::new(collector.info))
 }
 
-struct DefUseCollector<'a, 'w> {
-    ctx: &'a mut AnalysisContext<'w>,
+struct DefUseCollector<'a, 'b, 'w> {
+    ctx: &'a mut SearchCtx<'b, 'w>,
     info: DefUseInfo,
     label_scope: SnapshotMap<String, DefId>,
     id_scope: SnapshotMap<String, DefId>,
@@ -165,7 +165,7 @@ struct DefUseCollector<'a, 'w> {
     ext_src: Option<Source>,
 }
 
-impl<'a, 'w> DefUseCollector<'a, 'w> {
+impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
     fn enter<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let id_snap = self.id_scope.snapshot();
         let res = f(self);
@@ -186,7 +186,8 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
         let source = self.ext_src.as_ref()?;
 
         log::debug!("import for def use: {:?}, name: {name}", source.id());
-        let (_, external_info) = Some(source.id()).zip(self.ctx.def_use(source.clone()))?;
+        let (_, external_info) =
+            Some(source.id()).zip(AnalysisContext::def_use_(self.ctx, source.clone()))?;
 
         let ext_id = external_info.exports_defs.get(name)?;
         self.import_from(&external_info, *ext_id);
@@ -252,8 +253,8 @@ impl<'a, 'w> DefUseCollector<'a, 'w> {
                 LexicalKind::Mod(LexicalModKind::Star) => {
                     if let Some(source) = &self.ext_src {
                         log::debug!("diving source for def use: {:?}", source.id());
-                        let (_, external_info) =
-                            Some(source.id()).zip(self.ctx.def_use(source.clone()))?;
+                        let (_, external_info) = Some(source.id())
+                            .zip(AnalysisContext::def_use_(self.ctx, source.clone()))?;
 
                         for ext_id in &external_info.exports_refs {
                             self.import_from(&external_info, *ext_id);

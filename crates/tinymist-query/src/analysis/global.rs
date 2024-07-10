@@ -527,20 +527,20 @@ impl<'w> AnalysisContext<'w> {
 
         let l = def_use_lexical_hierarchy(source.clone())?;
         let m = ctx.ctx.import_info(source.clone())?;
-        let dep_hash = m
+        let deps = m
             .imports
             .iter()
             .flat_map(|e| e.1)
             .map(|e| Self::def_use_(ctx, e.clone()))
             .collect::<Vec<_>>();
 
-        let key = (&source, &l, &m, dep_hash);
+        let key = (&source, &l, &m, deps);
         let h = hash128(&key);
 
         let res = if let Some(res) = ctx.ctx.analysis.caches.def_use.get(&h) {
             res.1.clone()
         } else {
-            let res = crate::analysis::get_def_use_inner(ctx.ctx, source, l, m);
+            let res = crate::analysis::get_def_use_inner(ctx, source, l, m);
             ctx.ctx
                 .analysis
                 .caches
