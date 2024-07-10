@@ -13,6 +13,17 @@ export function getTargetViewColumn(viewColumn: ViewColumn | undefined): ViewCol
     return ViewColumn.Beside;
 }
 
+export function getSensibleTextEditorColumn(): ViewColumn {
+    let editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        // first visible editor
+        if (vscode.window.visibleTextEditors.length > 0) {
+            editor = vscode.window.visibleTextEditors[0];
+        }
+    }
+    return editor?.viewColumn !== undefined ? editor.viewColumn : ViewColumn.Beside;
+}
+
 export async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
     const filePath = path.resolve(context.extensionPath, relativePath);
     const fileContents = await readFile(filePath, "utf8");

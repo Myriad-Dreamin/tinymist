@@ -33,7 +33,7 @@ import {
     previewPreload,
     previewProcessOutline,
 } from "./preview";
-import { DisposeList } from "./util";
+import { DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, setClient } from "./lsp";
 
 let previewIsEnabled = false;
@@ -146,19 +146,24 @@ async function startClient(context: ExtensionContext): Promise<void> {
         end: [number, number] | null;
     }
     client.onNotification("tinymist/preview/scrollSource", async (jump: JumpInfo) => {
-        const activeEditor = window.activeTextEditor;
-        if (!activeEditor) {
-            return;
-        }
+        console.log(
+            "recv editorScrollTo request",
+            jump,
+            "active",
+            window.activeTextEditor !== undefined,
+            "documents",
+            vscode.workspace.textDocuments.map((doc) => doc.uri.fsPath)
+        );
 
-        console.log("recv editorScrollTo request", jump);
         if (jump.start === null || jump.end === null) {
             return;
         }
 
         // open this file and show in editor
-        const doc = await vscode.workspace.openTextDocument(jump.filepath);
-        const editor = await vscode.window.showTextDocument(doc, activeEditor.viewColumn);
+        const doc =
+            vscode.workspace.textDocuments.find((doc) => doc.uri.fsPath === jump.filepath) ||
+            (await vscode.workspace.openTextDocument(jump.filepath));
+        const editor = await vscode.window.showTextDocument(doc, getSensibleTextEditorColumn());
         const startPosition = new vscode.Position(jump.start[0], jump.start[1]);
         const endPosition = new vscode.Position(jump.end[0], jump.end[1]);
         const range = new vscode.Range(startPosition, endPosition);

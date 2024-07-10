@@ -293,9 +293,9 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
                 const editor = e.textEditor;
                 const kind = e.kind;
 
-                console.log(
-                    `selection changed, kind: ${kind && vscode.TextEditorSelectionChangeKind[kind]}`
-                );
+                // console.log(
+                //     `selection changed, kind: ${kind && vscode.TextEditorSelectionChangeKind[kind]}`
+                // );
                 const shouldScrollPanel =
                     // scroll by mouse
                     kind === vscode.TextEditorSelectionChangeKind.Mouse ||
@@ -303,7 +303,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
                     (scrollSyncMode === ScrollSyncModeEnum.onSelectionChange &&
                         kind === vscode.TextEditorSelectionChangeKind.Keyboard);
                 if (shouldScrollPanel) {
-                    console.log(`selection changed, sending src2doc jump request`);
+                    // console.log(`selection changed, sending src2doc jump request`);
                     reportPosition(editor, "panelScrollTo");
                 }
 
@@ -571,7 +571,7 @@ class OutlineProvider implements vscode.TreeDataProvider<OutlineItem> {
 
     outline: { items: OutlineItemData[] } | undefined = undefined;
     postOutlineItem(outline: any) {
-        console.log("postOutlineItemProvider", outline);
+        // console.log("postOutlineItemProvider", outline);
         this.outline = outline;
         this.refresh();
     }
