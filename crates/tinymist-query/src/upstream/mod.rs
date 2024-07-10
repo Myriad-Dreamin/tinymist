@@ -21,7 +21,8 @@ pub use complete::*;
 /// Removes Markdown formatting.
 pub fn plain_docs_sentence(docs: &str) -> EcoString {
     log::debug!("plain docs {docs:?}");
-    let mut s = unscanny::Scanner::new(docs);
+    let docs = docs.replace("```example", "```typ");
+    let mut s = unscanny::Scanner::new(&docs);
     let mut output = EcoString::new();
     let mut link = false;
     while let Some(c) = s.eat() {
