@@ -980,6 +980,7 @@ impl LanguageState {
 
         just_future(async move {
             let snap = snap.snapshot().await?;
+            // todo: whether it is safe to inherit success_doc with changed entry
             let snap = snap.task(TaskInputs {
                 entry,
                 ..Default::default()
