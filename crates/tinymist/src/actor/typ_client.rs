@@ -38,7 +38,8 @@ use parking_lot::Mutex;
 use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnalysisResources},
-    DiagnosticsMap, ExportKind, ServerInfoResponse, VersionedDocument,
+    CompilerQueryResponse, DiagnosticsMap, ExportKind, SemanticRequest, ServerInfoResponse,
+    StatefulRequest, VersionedDocument,
 };
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{mpsc, oneshot, watch};
@@ -141,6 +142,31 @@ impl CompileHandler {
                 self.push_diagnostics(revision, None);
             }
         }
+    }
+
+    pub fn run_stateful<T: StatefulRequest>(
+        &self,
+        snap: CompileSnapshot<LspCompilerFeat>,
+        query: T,
+        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
+    ) -> anyhow::Result<CompilerQueryResponse> {
+        let w = &snap.world;
+        let doc = snap.success_doc.map(|doc| VersionedDocument {
+            version: w.revision().get(),
+            document: doc,
+        });
+        self.run_analysis(w, |ctx| query.request(ctx, doc))
+            .map(wrapper)
+    }
+
+    pub fn run_semantic<T: SemanticRequest>(
+        &self,
+        snap: CompileSnapshot<LspCompilerFeat>,
+        query: T,
+        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
+    ) -> anyhow::Result<CompilerQueryResponse> {
+        self.run_analysis(&snap.world, |ctx| query.request(ctx))
+            .map(wrapper)
     }
 
     pub fn run_analysis<T>(

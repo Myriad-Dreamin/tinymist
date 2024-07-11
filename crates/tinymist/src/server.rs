@@ -22,10 +22,11 @@ use tinymist_query::{
 };
 use tinymist_query::{
     lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, OnExportRequest,
-    PositionEncoding, SemanticRequest, StatefulRequest, SyntaxRequest, VersionedDocument,
+    PositionEncoding, SyntaxRequest,
 };
 use tokio::sync::mpsc;
 use typst::{diag::FileResult, syntax::Source};
+use typst_ts_compiler::TaskInputs;
 use typst_ts_compiler::{
     vfs::notify::{FileChangeSet, MemoryEvent},
     Time,
@@ -945,44 +946,13 @@ macro_rules! query_tokens_cache {
     }};
 }
 
-macro_rules! query_state {
-    ($self:ident, $method:ident, $req:expr) => {{
-        let snap = $self.snapshot()?;
-        let handle = $self.handle.clone();
-        just_future(async move {
-            let snap = snap.snapshot().await?;
-            let w = &snap.world;
-            let doc = snap.success_doc.map(|doc| VersionedDocument {
-                version: w.revision().get(),
-                document: doc,
-            });
-            handle
-                .run_analysis(w, |ctx| $req.request(ctx, doc))
-                .map(CompilerQueryResponse::$method)
-        })
-    }};
-}
-
-macro_rules! query_world {
-    ($self:ident, $method:ident, $req:expr) => {{
-        let snap = $self.snapshot()?;
-        let handle = $self.handle.clone();
-        just_future(async move {
-            let snap = snap.snapshot().await?;
-            let w = &snap.world;
-            handle
-                .run_analysis(w, |ctx| $req.request(ctx))
-                .map(CompilerQueryResponse::$method)
-        })
-    }};
-}
-
 impl LanguageState {
     /// Perform a language query.
     pub fn query(&mut self, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
 
-        let query = match query {
+        let primary = || self.primary();
+        just_ok(match query {
             InteractCodeContext(req) => query_source!(self, InteractCodeContext, req)?,
             SemanticTokensFull(req) => query_tokens_cache!(self, SemanticTokensFull, req)?,
             SemanticTokensDelta(req) => query_tokens_cache!(self, SemanticTokensDelta, req)?,
@@ -991,48 +961,49 @@ impl LanguageState {
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req)?,
             OnEnter(req) => query_source!(self, OnEnter, req)?,
             ColorPresentation(req) => CompilerQueryResponse::ColorPresentation(req.request()),
-            _ => {
-                let client = self.primary.as_mut().unwrap();
-                if !self.pinning && !self.config.compile.has_default_entry_path {
-                    // todo: race condition, we need atomic primary query
-                    if let Some(path) = query.associated_path() {
-                        // todo!!!!!!!!!!!!!!
-                        client.change_entry(Some(path.into()))?;
-                    }
-                }
-
-                return Self::query_on(client, query);
-            }
-        };
-
-        just_ok(query)
+            OnExport(OnExportRequest { kind, path }) => return primary().on_export(kind, path),
+            ServerInfo(_) => return primary().collect_server_info(),
+            _ => return Self::query_on(primary(), query),
+        })
     }
 
     fn query_on(client: &CompileClientActor, query: CompilerQueryRequest) -> QueryFuture {
         use CompilerQueryRequest::*;
+        type R = CompilerQueryResponse;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
-        match query {
-            OnExport(OnExportRequest { kind, path }) => client.on_export(kind, path),
+        let snap = client.snapshot()?;
+        let handle = client.handle.clone();
+        let entry = query
+            .associated_path()
+            .map(|path| client.config.determine_entry(Some(path.into())));
 
-            Hover(req) => query_state!(client, Hover, req),
-            GotoDefinition(req) => query_state!(client, GotoDefinition, req),
-            GotoDeclaration(req) => query_world!(client, GotoDeclaration, req),
-            References(req) => query_world!(client, References, req),
-            InlayHint(req) => query_world!(client, InlayHint, req),
-            DocumentHighlight(req) => query_world!(client, DocumentHighlight, req),
-            DocumentColor(req) => query_world!(client, DocumentColor, req),
-            CodeAction(req) => query_world!(client, CodeAction, req),
-            CodeLens(req) => query_world!(client, CodeLens, req),
-            Completion(req) => query_state!(client, Completion, req),
-            SignatureHelp(req) => query_world!(client, SignatureHelp, req),
-            Rename(req) => query_state!(client, Rename, req),
-            PrepareRename(req) => query_state!(client, PrepareRename, req),
-            Symbol(req) => query_world!(client, Symbol, req),
-            DocumentMetrics(req) => query_state!(client, DocumentMetrics, req),
-            ServerInfo(_) => client.collect_server_info(),
-            _ => unreachable!(),
-        }
+        just_future(async move {
+            let snap = snap.snapshot().await?;
+            let snap = snap.task(TaskInputs {
+                entry,
+                ..Default::default()
+            });
+
+            match query {
+                Hover(req) => handle.run_stateful(snap, req, R::Hover),
+                GotoDefinition(req) => handle.run_stateful(snap, req, R::GotoDefinition),
+                GotoDeclaration(req) => handle.run_semantic(snap, req, R::GotoDeclaration),
+                References(req) => handle.run_semantic(snap, req, R::References),
+                InlayHint(req) => handle.run_semantic(snap, req, R::InlayHint),
+                DocumentHighlight(req) => handle.run_semantic(snap, req, R::DocumentHighlight),
+                DocumentColor(req) => handle.run_semantic(snap, req, R::DocumentColor),
+                CodeAction(req) => handle.run_semantic(snap, req, R::CodeAction),
+                CodeLens(req) => handle.run_semantic(snap, req, R::CodeLens),
+                Completion(req) => handle.run_stateful(snap, req, R::Completion),
+                SignatureHelp(req) => handle.run_semantic(snap, req, R::SignatureHelp),
+                Rename(req) => handle.run_stateful(snap, req, R::Rename),
+                PrepareRename(req) => handle.run_stateful(snap, req, R::PrepareRename),
+                Symbol(req) => handle.run_semantic(snap, req, R::Symbol),
+                DocumentMetrics(req) => handle.run_stateful(snap, req, R::DocumentMetrics),
+                _ => unreachable!(),
+            }
+        })
     }
 }
 
