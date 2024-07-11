@@ -267,8 +267,6 @@ const CONFIG_ITEMS: &[&str] = &[
 /// The user configuration read from the editor.
 #[derive(Debug, Default, Clone)]
 pub struct Config {
-    /// Specifies the root path of the project manually.
-    pub notify_compile_status: bool,
     /// The compile configurations
     pub compile: CompileConfig,
     /// Dynamic configuration for semantic tokens.
@@ -417,7 +415,7 @@ pub struct CompileConfig {
     /// Computed fonts based on configuration.
     pub fonts: OnceCell<Derived<Deferred<Arc<FontResolverImpl>>>>,
     /// Notify the compile status to the editor.
-    pub notify_compile_status: bool,
+    pub notify_status: bool,
     /// Enable periscope document in hover.
     pub periscope_args: Option<PeriscopeArgs>,
     /// Typst extra arguments.
@@ -443,7 +441,7 @@ impl CompileConfig {
         self.output_path = try_or_default(|| Some(update.get("outputPath")?.as_str()?.to_owned()));
         self.export_pdf = try_or_default(|| ExportMode::deserialize(update.get("exportPdf")?).ok());
         self.root_path = try_(|| Some(update.get("rootPath")?.as_str()?.into()));
-        self.notify_compile_status = match try_(|| update.get("compileStatus")?.as_str()) {
+        self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
             Some("enable") => true,
             Some("disable") | None => false,
             _ => bail!("compileStatus must be either 'enable' or 'disable'"),
