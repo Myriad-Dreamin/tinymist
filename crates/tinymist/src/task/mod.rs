@@ -30,17 +30,23 @@ impl<T: Clone> SyncTaskFactory<T> {
 
 type FoldFuture = Pin<Box<dyn Future<Output = Option<()>> + Send + Sync>>;
 
+#[derive(Default)]
+struct FoldingState {
+    running: bool,
+    task: Option<(usize, FoldFuture)>,
+}
+
 #[derive(Clone, Default)]
 struct FutureFolder {
-    next: Arc<Mutex<Option<(usize, FoldFuture)>>>,
+    state: Arc<Mutex<FoldingState>>,
 }
 
 impl FutureFolder {
     fn spawn(&self, revision: usize, fut: FoldFuture) {
-        let mut next_update = self.next.lock();
-        let next_update = next_update.deref_mut();
+        let mut state = self.state.lock();
+        let state = state.deref_mut();
 
-        match next_update {
+        match &mut state.task {
             Some((prev_revision, prev)) => {
                 if *prev_revision < revision {
                     *prev = fut;
@@ -54,11 +60,22 @@ impl FutureFolder {
             }
         }
 
-        let next = self.next.clone();
+        if state.running {
+            return;
+        }
+
+        state.running = true;
+
+        let state = self.state.clone();
         tokio::spawn(async move {
             loop {
-                let Some((_, fut)) = next.lock().take() else {
-                    return;
+                let fut = {
+                    let mut state = state.lock();
+                    let Some((_, fut)) = state.task.take() else {
+                        state.running = false;
+                        return;
+                    };
+                    fut
                 };
                 fut.await;
             }
