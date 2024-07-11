@@ -26,7 +26,6 @@ triomphe = { version = "0.1.10", default-features = false, features = ["std"] }
 
 # Asynchoronous and Multi-threading
 async-trait = "0.1.77"
-await-tree = "0.1.2"
 futures = "0.3"
 pin-project-lite = "0.2.13"
 rayon = "1.10.0"

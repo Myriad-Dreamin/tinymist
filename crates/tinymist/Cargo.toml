@@ -64,7 +64,6 @@ crossbeam-channel.workspace = true
 lsp-types.workspace = true
 dhat = { workspace = true, optional = true }
 unicode-script.workspace = true
-await-tree.workspace = true
 hyper = { workspace = true, optional = true }
 open = { workspace = true, optional = true }
 tower-layer.workspace = true
