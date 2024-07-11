@@ -10,8 +10,13 @@ use tokio::sync::mpsc;
 
 use crate::{tool::word_count::WordsCount, LspClient};
 
+pub struct DocVersion {
+    pub group: String,
+    pub revision: usize,
+}
+
 pub enum EditorRequest {
-    Diag(String, Option<DiagnosticsMap>),
+    Diag(DocVersion, Option<DiagnosticsMap>),
     Status(String, TinymistCompileStatusEnum),
     WordCount(String, WordsCount),
 }
@@ -47,9 +52,10 @@ impl EditorActor {
         let mut words_count = None;
         while let Some(req) = self.editor_rx.recv().await {
             match req {
-                EditorRequest::Diag(group, diagnostics) => {
+                EditorRequest::Diag(dv, diagnostics) => {
+                    let DocVersion { group, revision } = dv;
                     info!(
-                        "received diagnostics from {group}: diag({:?})",
+                        "received diagnostics from {group}:{revision}: diag({:?})",
                         diagnostics.as_ref().map(|e| e.len())
                     );
 

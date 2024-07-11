@@ -24,10 +24,7 @@ use typst_ts_compiler::{
     CompileEnv, CompileReport, Compiler, ConsoleDiagReporter, EntryReader, Revising, TaskInputs,
     WorldDeps,
 };
-use typst_ts_core::{
-    config::compiler::EntryState, exporter_builtins::GroupExporter, Exporter, GenericExporter,
-    TypstDocument,
-};
+use typst_ts_core::{exporter_builtins::GroupExporter, Exporter, GenericExporter, TypstDocument};
 
 type CompileRawResult = Deferred<(SourceResult<Arc<TypstDocument>>, CompileEnv)>;
 type DocState = once_cell::sync::OnceCell<CompileRawResult>;
@@ -139,14 +136,14 @@ const COMPILE_CONCURRENCY: usize = 0;
 // const COMPILE_CONCURRENCY: usize = 1;
 
 pub trait CompilationHandle<F: CompilerFeat>: Send + Sync + 'static {
-    fn status(&self, rep: CompileReport);
+    fn status(&self, revision: usize, rep: CompileReport);
     fn notify_compile(&self, res: &CompiledArtifact<F>, rep: CompileReport);
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static> CompilationHandle<F>
     for std::marker::PhantomData<fn(F)>
 {
-    fn status(&self, _: CompileReport) {}
+    fn status(&self, _revision: usize, _: CompileReport) {}
     fn notify_compile(&self, _: &CompiledArtifact<F>, _: CompileReport) {}
 }
 
@@ -508,8 +505,10 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
         // todo unwrap main id
         let id = compiling.world.main_id().unwrap();
+        let revision = compiling.world.revision().get();
+
         self.watch_handle
-            .status(CompileReport::Stage(id, "compiling", start));
+            .status(revision, CompileReport::Stage(id, "compiling", start));
 
         let compile = move || async move {
             let compiled = compiling.compile().await;
@@ -614,22 +613,32 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                 no_reason()
             }
             Interrupt::ChangeTask(change) => {
-                if let Some(entry) = change.entry.clone() {
-                    self.change_entry(entry.clone());
-                }
-
                 self.verse.increment_revision(|verse| {
                     if let Some(inputs) = change.inputs {
                         verse.set_inputs(inputs);
                     }
 
-                    if let Some(entry) = change.entry {
+                    if let Some(entry) = change.entry.clone() {
                         let res = verse.mutate_entry(entry);
                         if let Err(err) = res {
                             log::error!("CompileServerActor: change entry error: {err:?}");
                         }
                     }
                 });
+
+                // After incrementing the revision
+                if let Some(entry) = change.entry {
+                    self.suspended = entry.is_inactive();
+                    if self.suspended {
+                        log::info!("CompileServerActor: removing diag");
+                        self.watch_handle
+                            .status(self.verse.revision.get_mut().get(), CompileReport::Suspend);
+                    }
+
+                    // Reset the document state.
+                    self.latest_doc = None;
+                    self.latest_success_doc = None;
+                }
 
                 reason_by_entry_change()
             }
@@ -695,20 +704,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             }
             Interrupt::Settle(_) => unreachable!(),
         }
-    }
-
-    fn change_entry(&mut self, entry: EntryState) -> bool {
-        self.suspended = entry.is_inactive();
-        if self.suspended {
-            log::info!("CompileServerActor: removing diag");
-            self.watch_handle.status(CompileReport::Suspend);
-        }
-
-        // Reset the document state.
-        self.latest_doc = None;
-        self.latest_success_doc = None;
-
-        !self.suspended
     }
 
     /// Apply delayed memory changes to underlying compiler.

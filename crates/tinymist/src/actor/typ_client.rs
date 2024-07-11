@@ -56,7 +56,7 @@ use typst_ts_core::{
 };
 
 use super::{
-    editor::{EditorRequest, TinymistCompileStatusEnum},
+    editor::{DocVersion, EditorRequest, TinymistCompileStatusEnum},
     typ_server::{CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt},
 };
 use crate::{
@@ -103,10 +103,12 @@ impl CompileHandler {
         let _ = self.intr_tx.send(Interrupt::ChangeTask(task_inputs));
     }
 
-    fn push_diagnostics(&self, diagnostics: Option<DiagnosticsMap>) {
-        let res = self
-            .editor_tx
-            .send(EditorRequest::Diag(self.diag_group.clone(), diagnostics));
+    fn push_diagnostics(&self, revision: usize, diagnostics: Option<DiagnosticsMap>) {
+        let dv = DocVersion {
+            group: self.diag_group.clone(),
+            revision,
+        };
+        let res = self.editor_tx.send(EditorRequest::Diag(dv, diagnostics));
         if let Err(err) = res {
             error!("failed to send diagnostics: {err:#}");
         }
@@ -118,7 +120,8 @@ impl CompileHandler {
         errors: EcoVec<SourceDiagnostic>,
         warnings: Option<EcoVec<SourceDiagnostic>>,
     ) {
-        trace!("notify diagnostics: {errors:#?} {warnings:#?}");
+        let revision = world.revision().get();
+        trace!("notify diagnostics({revision}): {errors:#?} {warnings:#?}");
 
         let diagnostics = self.run_analysis(world, |ctx| {
             tinymist_query::convert_diagnostics(ctx, errors.iter().chain(warnings.iter().flatten()))
@@ -131,11 +134,11 @@ impl CompileHandler {
                 // todo: check all errors in this file
                 let detached = entry.is_inactive();
                 let valid = !detached;
-                self.push_diagnostics(valid.then_some(diagnostics));
+                self.push_diagnostics(revision, valid.then_some(diagnostics));
             }
             Err(err) => {
                 error!("TypstActor: failed to convert diagnostics: {:#}", err);
-                self.push_diagnostics(None);
+                self.push_diagnostics(revision, None);
             }
         }
     }
@@ -219,13 +222,25 @@ impl CompileHandler {
 }
 
 impl CompilationHandle<LspCompilerFeat> for CompileHandler {
-    fn status(&self, _rep: CompileReport) {
+    fn status(&self, revision: usize, _rep: CompileReport) {
+        // todo: seems to duplicate with CompileStatus
+        let status = match _rep {
+            CompileReport::Suspend => {
+                self.push_diagnostics(revision, None);
+                TinymistCompileStatusEnum::CompileSuccess
+            }
+            CompileReport::Stage(_, _, _) => TinymistCompileStatusEnum::Compiling,
+            CompileReport::CompileSuccess(_, _, _) | CompileReport::CompileWarning(_, _, _) => {
+                TinymistCompileStatusEnum::CompileSuccess
+            }
+            CompileReport::CompileError(_, _, _) | CompileReport::ExportError(_, _, _) => {
+                TinymistCompileStatusEnum::CompileError
+            }
+        };
+
         let this = &self;
         this.editor_tx
-            .send(EditorRequest::Status(
-                this.diag_group.clone(),
-                TinymistCompileStatusEnum::Compiling,
-            ))
+            .send(EditorRequest::Status(this.diag_group.clone(), status))
             .unwrap();
 
         #[cfg(feature = "preview")]
@@ -233,10 +248,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             use typst_preview::CompileStatus;
 
             let status = match _rep {
-                CompileReport::Suspend => {
-                    self.push_diagnostics(None);
-                    CompileStatus::CompileError
-                }
+                CompileReport::Suspend => CompileStatus::CompileSuccess,
                 CompileReport::Stage(_, _, _) => CompileStatus::Compiling,
                 CompileReport::CompileSuccess(_, _, _) | CompileReport::CompileWarning(_, _, _) => {
                     CompileStatus::CompileSuccess
