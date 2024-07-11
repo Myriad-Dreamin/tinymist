@@ -13,6 +13,15 @@
 			"dependsOrder": "sequence",
 		},
 		{
+			"label": "VS Code Extension Prelaunch [Release]",
+			"dependsOn": [
+				"Compile VS Code Extension",
+				"Build Release LSP Binary",
+				"Copy Release LSP Binary to VS Code Extension"
+			],
+			"dependsOrder": "sequence",
+		},
+		{
 			"label": "Build VS Code Extension Bundle",
 			"dependsOn": [
 				"Compile VS Code Extension",

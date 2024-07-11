@@ -1,4 +1,3 @@
-use await_tree::InstrumentAwait;
 use futures::{SinkExt, StreamExt};
 use log::{debug, info, trace, warn};
 use serde::{Deserialize, Serialize};
@@ -7,7 +6,6 @@ use tokio::{net::TcpStream, sync::broadcast};
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 use typst_ts_core::debug_loc::DocumentPosition;
 
-use crate::await_tree::REGISTRY;
 use crate::debug_loc::{InternQuery, SpanInterner};
 use crate::outline::Outline;
 use crate::{
@@ -96,7 +94,6 @@ impl EditorConnection {
             .send(Message::Text(
                 serde_json::to_string(&ControlPlaneResponse::SyncEditorChanges(())).unwrap(),
             ))
-            .instrument_await("sync editor changes")
             .await
         else {
             warn!("failed to send sync editor changes to editor");
@@ -108,7 +105,6 @@ impl EditorConnection {
         let sent = match self {
             EditorConnection::WebSocket(ws) => ws
                 .send(Message::Text(serde_json::to_string(&resp).unwrap()))
-                .instrument_await("send response to editor")
                 .await
                 .is_ok(),
             EditorConnection::Lsp(LspControlPlaneTx { resp_tx, .. }) => resp_tx.send(resp).is_ok(),
@@ -125,9 +121,7 @@ impl EditorConnection {
         match self {
             EditorConnection::Lsp(LspControlPlaneTx { ctl_rx, .. }) => ctl_rx.recv().await,
             EditorConnection::WebSocket(ws) => {
-                let Some(Ok(Message::Text(msg))) =
-                    ws.next().instrument_await("waiting for websocket").await
-                else {
+                let Some(Ok(Message::Text(msg))) = ws.next().await else {
                     return None;
                 };
 
@@ -202,22 +196,14 @@ impl EditorActor {
         }
     }
 
-    pub async fn run(self) {
-        let root = REGISTRY
-            .lock()
-            .await
-            .register("editor actor".into(), "editor actor");
-        root.instrument(self.run_instrumented()).await;
-    }
-
-    async fn run_instrumented(mut self) {
+    pub async fn run(mut self) {
         if self.editor_conn.need_sync_files() {
             self.editor_conn.sync_editor_changes().await;
         }
 
         loop {
             tokio::select! {
-                Some(msg) = self.mailbox.recv().instrument_await("waiting for mailbox") => {
+                Some(msg) = self.mailbox.recv() => {
                     trace!("EditorActor: received message from mailbox: {:?}", msg);
                    let sent = match msg {
                         EditorActorRequest::Shutdown => {
@@ -229,7 +215,6 @@ impl EditorActor {
                         },
                         EditorActorRequest::DocToSrcJumpResolve(req) => {
                             self.source_scroll_by_span(req.span)
-                                .instrument_await("source scroll by span")
                                 .await;
 
                             false
@@ -246,7 +231,7 @@ impl EditorActor {
                         break;
                     }
                 }
-                Some(msg) = self.editor_conn.next().instrument_await("waiting for editor message") => {
+                Some(msg) = self.editor_conn.next() => {
                     match msg {
                         ControlPlaneMessage::ChangeCursorPosition(cursor_info) => {
                             debug!("EditorActor: received message from editor: {:?}", cursor_info);
@@ -264,7 +249,6 @@ impl EditorActor {
                             debug!("EditorActor: received message from editor: {:?}", jump_info);
 
                             self.source_scroll_by_span(jump_info.span)
-                                .instrument_await("source scroll by span")
                                 .await;
                         }
                         ControlPlaneMessage::SyncMemoryFiles(memory_files) => {
@@ -294,12 +278,7 @@ impl EditorActor {
 
     async fn source_scroll_by_span(&mut self, span: String) {
         let jump_info = {
-            match self
-                .span_interner
-                .span_by_str(&span)
-                .instrument_await("get span by str")
-                .await
-            {
+            match self.span_interner.span_by_str(&span).await {
                 InternQuery::Ok(s) => s,
                 InternQuery::UseAfterFree => {
                     warn!("EditorActor: out of date span id: {}", span);

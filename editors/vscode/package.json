@@ -626,11 +626,6 @@
                 "title": "Note: Jumping to source location of the outline item doesn't work well if its body doesn't have source location, e.g.\n```\n#let my-heading(h) = heading(h) // will jump to here\n#my-heading(\"Title\") // will not jump to here\n```.\nHence, you may want to use `my-heading[Title]` instead to gain better experience of outline jumping.",
                 "description": "...",
                 "icon": "$(extensions-info-message)"
-            },
-            {
-                "command": "typst-preview.showAwaitTree",
-                "title": "Typst Preview: [debug] Show Await Tree",
-                "description": "Show await tree of typst-preview. This is used for debugging."
             }
         ],
         "keybindings": [

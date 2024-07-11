@@ -15,7 +15,7 @@
             "preLaunchTask": "VS Code Extension Prelaunch"
         },
         {
-            "name": "Run Extension [Jaeger]",
+            "name": "Run Extension [Release]",
             "type": "extensionHost",
             "request": "launch",
             "runtimeExecutable": "${execPath}",
@@ -25,7 +25,7 @@
             "outFiles": [
                 "${workspaceFolder}/editors/vscode/out/**/*.js"
             ],
-            "preLaunchTask": "VS Code Extension Prelaunch [Jaeger]"
+            "preLaunchTask": "VS Code Extension Prelaunch [Release]"
         },
         {
             "name": "Run Extension [Typst Preview]",

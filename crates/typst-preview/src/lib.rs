@@ -1,6 +1,5 @@
 mod actor;
 mod args;
-pub mod await_tree;
 mod debug_loc;
 mod outline;
 
@@ -14,7 +13,6 @@ use std::pin::Pin;
 use std::time::Duration;
 use std::{collections::HashMap, future::Future, path::PathBuf, sync::Arc};
 
-use ::await_tree::InstrumentAwait;
 use debug_loc::SpanInterner;
 use futures::SinkExt;
 use log::info;
@@ -260,9 +258,7 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
         let shutdown_tx = lsp_connection.as_ref().map(|e| e.shutdown_tx.clone());
         tokio::spawn(async move {
             // Create the event loop and TCP listener we'll accept connections on.
-            let try_socket = TcpListener::bind(&data_plane_addr)
-                .instrument_await("bind data plane server")
-                .await;
+            let try_socket = TcpListener::bind(&data_plane_addr).await;
             let listener = try_socket.expect("Failed to bind");
             info!(
                 "Data plane server listening on: {}",
@@ -275,15 +271,9 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
                 let webview_tx = webview_tx.clone();
                 let webview_rx = webview_tx.subscribe();
                 let typst_tx = typst_tx.clone();
-                let peer_addr = stream
-                    .peer_addr()
-                    .map_or("unknown".to_string(), |addr| addr.to_string());
-                let mut conn = accept_connection(stream)
-                    .instrument_await("accept data plane websocket connection")
-                    .await;
+                let mut conn = accept_connection(stream).await;
                 if enable_partial_rendering {
                     conn.send(Message::Binary("partial-rendering,true".into()))
-                        .instrument_await("send partial-rendering message to webview")
                         .await
                         .unwrap();
                 }
@@ -291,7 +281,6 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
                     conn.send(Message::Binary(
                         format!("invert-colors,{}", invert_colors).into(),
                     ))
-                    .instrument_await("send invert-colors message to webview")
                     .await
                     .unwrap();
                 }
@@ -307,7 +296,6 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
                 );
 
                 let alive_tx = alive_tx.clone();
-                let wr = webview_actor.run(peer_addr.clone());
                 tokio::spawn(async move {
                     struct FinallySend(mpsc::UnboundedSender<()>);
                     impl Drop for FinallySend {
@@ -317,7 +305,7 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
                     }
 
                     let _send = FinallySend(alive_tx);
-                    wr.await;
+                    webview_actor.run().await;
                 });
                 let render_actor = actor::render::RenderActor::new(
                     renderer_tx.subscribe(),
@@ -326,14 +314,14 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
                     svg.0,
                     webview_tx,
                 );
-                render_actor.spawn(peer_addr.clone());
+                tokio::spawn(render_actor.run());
                 let outline_render_actor = actor::render::OutlineRenderActor::new(
                     renderer_tx.subscribe(),
                     doc_watcher.1.clone(),
                     editor_tx.clone(),
                     span_interner,
                 );
-                outline_render_actor.spawn(peer_addr);
+                tokio::spawn(outline_render_actor.run());
             };
 
             let mut alive_cnt = 0;
@@ -343,18 +331,18 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
                     shutdown_bell.reset();
                 }
                 tokio::select! {
-                    Some(()) = shutdown_data_plane_rx.recv().instrument_await("data plane exit signal") => {
+                    Some(()) = shutdown_data_plane_rx.recv() => {
                         info!("Data plane server shutdown");
                         return;
                     }
-                    Ok((stream, _)) = listener.accept().instrument_await("accept data plane connection") => {
+                    Ok((stream, _)) = listener.accept() => {
                         alive_cnt += 1;
                         recv(stream).await;
                     },
-                    _ = alive_rx.recv().instrument_await("data plane alive signal") => {
+                    _ = alive_rx.recv() => {
                         alive_cnt -= 1;
                     }
-                    _ = shutdown_bell.tick().instrument_await("data plane interval"), if alive_cnt == 0 && shutdown_tx.is_some() => {
+                    _ = shutdown_bell.tick(), if alive_cnt == 0 && shutdown_tx.is_some() => {
                         let shutdown_tx = shutdown_tx.expect("scheduled shutdown without shutdown_tx");
 
                         info!("Data plane server has been idle for {idle_timeout:?}, shutting down.");
@@ -374,23 +362,15 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
         let editor_rx = editor_conn.1;
         tokio::spawn(async move {
             let conn = if !control_plane_addr.is_empty() {
-                let try_socket = TcpListener::bind(&control_plane_addr)
-                    .instrument_await("bind control plane server")
-                    .await;
+                let try_socket = TcpListener::bind(&control_plane_addr).await;
                 let listener = try_socket.expect("Failed to bind");
                 info!(
                     "Control plane server listening on: {}",
                     listener.local_addr().unwrap()
                 );
-                let (stream, _) = listener
-                    .accept()
-                    .instrument_await("accept control plane connection")
-                    .await
-                    .unwrap();
+                let (stream, _) = listener.accept().await.unwrap();
 
-                let conn = accept_connection(stream)
-                    .instrument_await("accept control plane websocket connection")
-                    .await;
+                let conn = accept_connection(stream).await;
 
                 EditorConnection::WebSocket(conn)
             } else {
@@ -399,10 +379,7 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
 
             let editor_actor =
                 EditorActor::new(editor_rx, conn, typst_tx, webview_tx, span_interner);
-            editor_actor
-                .run()
-                .instrument_await("run editor actor")
-                .await;
+            editor_actor.run().await;
             info!("Control plane client shutdown");
         })
     };
@@ -427,10 +404,7 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
     let editor_tx = editor_conn.0;
     let stop = move || -> StopFuture {
         Box::pin(async move {
-            let _ = shutdown_data_plane_tx
-                .send(())
-                .instrument_await("wait data plane")
-                .await;
+            let _ = shutdown_data_plane_tx.send(()).await;
             let _ = editor_tx.send(EditorActorRequest::Shutdown);
         })
     };
@@ -452,7 +426,6 @@ async fn accept_connection(stream: TcpStream) -> WebSocketStream<TcpStream> {
     info!("Peer address: {}", addr);
 
     let ws_stream = tokio_tungstenite::accept_async(stream)
-        .instrument_await("accept websocket connection")
         .await
         .expect("Error during the websocket handshake occurred");
 

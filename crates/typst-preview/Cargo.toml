@@ -30,7 +30,6 @@ serde_json.workspace = true
 futures.workspace = true
 indexmap.workspace = true
 serde.workspace = true
-await-tree.workspace = true
 
 clap = { workspace = true, optional = true }
 
