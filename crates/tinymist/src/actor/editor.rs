@@ -27,7 +27,6 @@ pub struct EditorActor {
 
     diagnostics: HashMap<Url, HashMap<String, Vec<LspDiagnostic>>>,
     affect_map: HashMap<String, Vec<Url>>,
-    published_primary: bool,
     notify_compile_status: bool,
 }
 
@@ -42,7 +41,6 @@ impl EditorActor {
             editor_rx,
             diagnostics: HashMap::new(),
             affect_map: HashMap::new(),
-            published_primary: false,
             notify_compile_status,
         }
     }
@@ -59,23 +57,10 @@ impl EditorActor {
                         diagnostics.as_ref().map(|e| e.len())
                     );
 
-                    let with_primary = self.affect_map.len() == 1
-                        && self.affect_map.contains_key("primary")
-                        && group == "primary";
-
-                    self.publish(group, diagnostics, with_primary).await;
-
-                    // Check with primary again after publish
-                    let again_with_primary =
-                        self.affect_map.len() == 1 && self.affect_map.contains_key("primary");
-
-                    if !with_primary && self.published_primary != again_with_primary {
-                        self.flush_primary_diagnostics(again_with_primary).await;
-                        self.published_primary = again_with_primary;
-                    }
+                    self.publish(group, diagnostics).await;
                 }
                 EditorRequest::Status(group, status) => {
-                    log::debug!("received status request");
+                    log::info!("received status request({group}) {status:?}");
                     if self.notify_compile_status && group == "primary" {
                         compile_status = status;
                         self.client.send_notification::<TinymistCompileStatus>(
@@ -103,27 +88,7 @@ impl EditorActor {
         info!("compile cluster actor is stopped");
     }
 
-    async fn flush_primary_diagnostics(&mut self, enable: bool) {
-        let affected = self.affect_map.get("primary");
-
-        for url in affected.into_iter().flatten() {
-            let path_diags = self.diagnostics.get(url);
-
-            let diags = path_diags.into_iter().flatten();
-            let diags = diags.filter_map(|(g, diags)| (g != "primary" || enable).then_some(diags));
-            let to_publish = diags.flatten().cloned().collect();
-
-            self.client
-                .publish_diagnostics(url.clone(), to_publish, None);
-        }
-    }
-
-    pub async fn publish(
-        &mut self,
-        group: String,
-        next_diag: Option<DiagnosticsMap>,
-        with_primary: bool,
-    ) {
+    pub async fn publish(&mut self, group: String, next_diag: Option<DiagnosticsMap>) {
         let affected = match next_diag.as_ref() {
             Some(e) => self
                 .affect_map
@@ -140,29 +105,23 @@ impl EditorActor {
         // Get sources that affected by this group in last round but not this time
         for url in affected.into_iter().flatten() {
             if !next_diag.as_ref().is_some_and(|e| e.contains_key(&url)) {
-                self.publish_inner(&group, with_primary, url, None)
+                self.publish_inner(&group, url, None)
             }
         }
 
         // Get touched updates
         for (url, next) in next_diag.into_iter().flatten() {
-            self.publish_inner(&group, with_primary, url, Some(next))
+            self.publish_inner(&group, url, Some(next))
         }
     }
 
-    fn publish_inner(
-        &mut self,
-        group: &str,
-        with_primary: bool,
-        url: Url,
-        next: Option<Vec<Diagnostic>>,
-    ) {
+    fn publish_inner(&mut self, group: &str, url: Url, next: Option<Vec<Diagnostic>>) {
         let mut to_publish = Vec::new();
 
         // Get the diagnostics from other groups
         let path_diags = self.diagnostics.entry(url.clone()).or_default();
         for (g, diags) in &*path_diags {
-            if (with_primary || g != "primary") && g != group {
+            if g != group {
                 to_publish.extend(diags.iter().cloned());
             }
         }
@@ -177,9 +136,7 @@ impl EditorActor {
             None => path_diags.remove(group),
         };
 
-        if group != "primary" || with_primary {
-            self.client.publish_diagnostics(url, to_publish, None)
-        }
+        self.client.publish_diagnostics(url, to_publish, None)
     }
 }
 // Notification
