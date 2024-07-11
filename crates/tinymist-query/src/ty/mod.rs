@@ -21,8 +21,17 @@ pub(crate) use sig::*;
 mod tests {
     use super::*;
     use crate::adt::interner::Interned;
-    use fxhash::hash64;
     use reflexo::vector::ir::DefId;
+    use rustc_hash::FxHasher;
+    use std::hash::{Hash, Hasher};
+
+    /// A convenience function for when you need a quick 64-bit hash.
+    #[inline]
+    pub fn hash64<T: Hash + ?Sized>(v: &T) -> u64 {
+        let mut state = FxHasher::default();
+        v.hash(&mut state);
+        state.finish()
+    }
 
     pub fn var_ins(s: &str) -> Ty {
         Ty::Var(TypeVar::new(s.into(), DefId(hash64(s))))
