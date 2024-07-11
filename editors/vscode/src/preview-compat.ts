@@ -128,38 +128,13 @@ export function previewActiveCompat(context: vscode.ExtensionContext) {
         }
     });
 
-    let fetch: typeof fetchFunc | undefined = undefined;
     context.subscriptions.push(
         vscode.commands.registerCommand("typst-preview.showAwaitTree", async () => {
             if (activeTask.size === 0) {
                 vscode.window.showWarningMessage("No active preview");
                 return;
             }
-            const showAwaitTree = async (tcb: TaskControlBlock) => {
-                fetch = fetch || (await import("node-fetch")).default;
-
-                const url = `http://127.0.0.1:${tcb.staticFilePort}/await_tree`;
-                // fetch await tree
-                const awaitTree = await (await fetch(`${url}`)).text();
-                console.log(awaitTree);
-                const input = await vscode.window.showInformationMessage(
-                    "Click to copy the await tree to clipboard",
-                    "Copy"
-                );
-                if (input === "Copy") {
-                    vscode.env.clipboard.writeText(awaitTree);
-                }
-            };
-            if (activeTask.size === 1) {
-                await showAwaitTree(Array.from(activeTask.values())[0]);
-            }
-            const activeDocument = vscode.window.activeTextEditor?.document;
-            if (activeDocument) {
-                const task = activeTask.get(activeDocument);
-                if (task) {
-                    await showAwaitTree(task);
-                }
-            }
+            vscode.window.showInformationMessage("await tree feature is deprecated...");
         })
     );
 }

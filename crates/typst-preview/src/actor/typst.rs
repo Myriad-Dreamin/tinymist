@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-use await_tree::InstrumentAwait;
-
 use log::{debug, error, info};
 use tokio::sync::{broadcast, mpsc};
 use typst::syntax::Span;
 use typst_ts_core::debug_loc::{CharPosition, DocumentPosition, SourceLocation, SourceSpanOffset};
 
-use crate::await_tree::REGISTRY;
 use crate::{
     ChangeCursorPositionRequest, EditorServer, MemoryFiles, MemoryFilesShort, SourceFileServer,
     SrcToDocJumpRequest,
@@ -80,25 +77,10 @@ impl<T> TypstActor<T> {
 }
 
 impl<T: SourceFileServer + EditorServer> TypstActor<T> {
-    pub async fn run(self) {
-        let root = REGISTRY
-            .lock()
-            .await
-            .register("typst actor".into(), "typst actor");
-        root.instrument(self.run_instrumented()).await;
-    }
-
-    pub async fn run_instrumented(mut self) {
+    pub async fn run(mut self) {
         debug!("TypstActor: waiting for message");
-        while let Some(mail) = self
-            .mailbox
-            .recv()
-            .instrument_await("waiting for message")
-            .await
-        {
-            self.process_mail(mail)
-                .instrument_await("processing mail")
-                .await;
+        while let Some(mail) = self.mailbox.recv().await {
+            self.process_mail(mail).await;
         }
         info!("TypstActor: exiting");
     }
@@ -107,10 +89,7 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
         match mail {
             TypstActorRequest::DocToSrcJumpResolve(span_range) => {
                 debug!("TypstActor: processing doc2src: {:?}", span_range);
-                let res = self
-                    .resolve_span_range(span_range)
-                    .instrument_await("resolve span range")
-                    .await;
+                let res = self.resolve_span_range(span_range).await;
 
                 if let Some(info) = res {
                     let _ = self
@@ -130,7 +109,6 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
                             column: req.character,
                         },
                     }))
-                    .instrument_await("resolve span range")
                     .await
                     .map_err(|err| {
                         error!("TypstActor: failed to resolve cursor position: {:#}", err);
@@ -157,7 +135,6 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
                             column: req.character,
                         },
                     }))
-                    .instrument_await("resolve doc position")
                     .await
                     .map_err(|err| {
                         error!("TypstActor: failed to resolve src to doc jump: {:#}", err);
@@ -191,10 +168,7 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
                 );
                 handle_error(
                     "SyncMemoryFiles",
-                    self.client
-                        .update_memory_files(m, true)
-                        .instrument_await("sync memory files")
-                        .await,
+                    self.client.update_memory_files(m, true).await,
                 );
             }
             TypstActorRequest::UpdateMemoryFiles(m) => {
@@ -204,20 +178,14 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
                 );
                 handle_error(
                     "UpdateMemoryFiles",
-                    self.client
-                        .update_memory_files(m, false)
-                        .instrument_await("update memory files")
-                        .await,
+                    self.client.update_memory_files(m, false).await,
                 );
             }
             TypstActorRequest::RemoveMemoryFiles(m) => {
                 debug!("TypstActor: processing REMOVE memory files: {:?}", m.files);
                 handle_error(
                     "RemoveMemoryFiles",
-                    self.client
-                        .remove_shadow_files(m)
-                        .instrument_await("remove memory files")
-                        .await,
+                    self.client.remove_shadow_files(m).await,
                 );
             }
         }
@@ -226,7 +194,6 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
     async fn resolve_span(&mut self, s: Span, offset: Option<usize>) -> Option<DocToSrcJumpInfo> {
         self.client
             .resolve_source_location(s, offset)
-            .instrument_await("resolve span")
             .await
             .map_err(|err| {
                 error!("TypstActor: failed to resolve doc to src jump: {:#}", err);
@@ -236,9 +203,7 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
     }
 
     async fn resolve_span_offset(&mut self, s: SourceSpanOffset) -> Option<DocToSrcJumpInfo> {
-        self.resolve_span(s.span, Some(s.offset))
-            .instrument_await("resolve span offset")
-            .await
+        self.resolve_span(s.span, Some(s.offset)).await
     }
 
     async fn resolve_span_range(
@@ -248,10 +213,7 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
         // Resolves FileLoC of start, end, and the element wide
         let st_res = self.resolve_span_offset(span_range.0).await;
         let ed_res = self.resolve_span_offset(span_range.1).await;
-        let elem_res = self
-            .resolve_span(span_range.1.span, None)
-            .instrument_await("resolve span")
-            .await;
+        let elem_res = self.resolve_span(span_range.1.span, None).await;
 
         // Combines the result of start and end
         let range_res = match (st_res, ed_res) {

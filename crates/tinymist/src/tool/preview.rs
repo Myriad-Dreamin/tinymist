@@ -4,7 +4,6 @@ use std::num::NonZeroUsize;
 use std::{borrow::Cow, collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
 use anyhow::Context;
-use await_tree::InstrumentAwait;
 use hyper::service::{make_service_fn, service_fn};
 use lsp_types::notification::Notification;
 use serde::{Deserialize, Serialize};
@@ -19,7 +18,6 @@ use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
 pub use typst_preview::CompileStatus;
 use typst_preview::{
-    await_tree::{get_await_tree_async, REGISTRY},
     preview, CompileHost, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo,
     EditorServer, Location, LspControlPlaneRx, LspControlPlaneTx, MemoryFiles, MemoryFilesShort,
     PreviewArgs, PreviewMode, Previewer, SourceFileServer,
@@ -403,10 +401,6 @@ pub fn make_static_host(
                     if req.uri().path() == "/" {
                         log::info!("Serve frontend: {:?}", mode);
                         Ok::<_, hyper::Error>(hyper::Response::new(hyper::Body::from(html)))
-                    } else if req.uri().path() == "/await_tree" {
-                        Ok::<_, hyper::Error>(hyper::Response::new(hyper::Body::from(
-                            get_await_tree_async().await,
-                        )))
                     } else {
                         // jump to /
                         let mut res = hyper::Response::new(hyper::Body::empty());
@@ -447,10 +441,6 @@ pub fn make_static_host(
 
 /// Entry point of the preview tool.
 pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
-    let async_root = REGISTRY
-        .lock()
-        .await
-        .register("root".into(), "typst-preview");
     log::info!("Arguments: {args:#?}");
 
     tokio::spawn(async move {
@@ -542,15 +532,10 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         (service, handle)
     };
 
-    let previewer = preview(args.preview, handle.clone(), None, TYPST_PREVIEW_HTML);
-
-    let previewer = async_root
-        .instrument(previewer)
-        .instrument_await("preview")
-        .await;
+    let previewer = preview(args.preview, handle.clone(), None, TYPST_PREVIEW_HTML).await;
 
     handle.register_preview(previewer.compile_watcher().clone());
-    tokio::spawn(service.spawn().instrument_await("spawn typst server"));
+    tokio::spawn(service.spawn());
 
     let (static_server_addr, _tx, static_server_handle) =
         make_static_host(&previewer, args.static_file_host, args.preview_mode);

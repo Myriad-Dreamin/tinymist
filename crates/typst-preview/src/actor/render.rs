@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use await_tree::InstrumentAwait;
 use log::{debug, info, trace};
 use tokio::sync::{broadcast, mpsc, watch};
 use typst::model::Document;
@@ -8,7 +7,6 @@ use typst_ts_core::debug_loc::{ElementPoint, SourceSpanOffset};
 use typst_ts_core::TypstDocument;
 use typst_ts_svg_exporter::IncrSvgDocServer;
 
-use crate::await_tree::REGISTRY;
 use crate::{debug_loc::SpanInterner, outline::Outline};
 
 use super::{editor::EditorActorRequest, typst::TypstActorRequest, webview::WebviewActorRequest};
@@ -64,13 +62,6 @@ impl RenderActor {
         res
     }
 
-    pub fn spawn(self, peer_addr: String) {
-        std::thread::Builder::new()
-            .name("RenderActor".to_owned())
-            .spawn(move || self.run(&peer_addr))
-            .unwrap();
-    }
-
     async fn process_message(&mut self, msg: RenderActorRequest) -> bool {
         trace!("RenderActor: received message: {:?}", msg);
 
@@ -117,28 +108,13 @@ impl RenderActor {
         res
     }
 
-    #[tokio::main(flavor = "current_thread")]
-    async fn run(self, peer_addr: &str) {
-        let span = format!("render actor<{}>", peer_addr);
-        let root = REGISTRY.lock().await.register(span.clone().into(), span);
-        root.instrument(self.run_instrumented()).await;
-    }
-
-    async fn run_instrumented(mut self) {
+    pub async fn run(mut self) {
         loop {
             let mut has_full_render = false;
             debug!("RenderActor: waiting for message");
-            match self
-                .mailbox
-                .recv()
-                .instrument_await("waiting for message")
-                .await
-            {
+            match self.mailbox.recv().await {
                 Ok(msg) => {
-                    has_full_render |= self
-                        .process_message(msg)
-                        .instrument_await("processing message")
-                        .await;
+                    has_full_render |= self.process_message(msg).await;
                 }
                 Err(broadcast::error::RecvError::Closed) => {
                     info!("RenderActor: no more messages");
@@ -150,10 +126,7 @@ impl RenderActor {
             }
             // read the queue to empty
             while let Ok(msg) = self.mailbox.try_recv() {
-                has_full_render |= self
-                    .process_message(msg)
-                    .instrument_await("processing message")
-                    .await;
+                has_full_render |= self.process_message(msg).await;
             }
             // if a full render is requested, we render the latest document
             // otherwise, we render the incremental changes for only once
@@ -204,29 +177,10 @@ impl OutlineRenderActor {
         }
     }
 
-    pub fn spawn(self, peer_addr: String) {
-        std::thread::Builder::new()
-            .name("OutlineRenderActor".to_owned())
-            .spawn(move || self.run(&peer_addr))
-            .unwrap();
-    }
-
-    #[tokio::main(flavor = "current_thread")]
-    async fn run(self, peer_addr: &str) {
-        let span = format!("outline render actor<{}>", peer_addr);
-        let root = REGISTRY.lock().await.register(span.clone().into(), span);
-        root.instrument(self.run_instrumented()).await;
-    }
-
-    async fn run_instrumented(mut self) {
+    pub async fn run(mut self) {
         loop {
             debug!("OutlineRenderActor: waiting for message");
-            match self
-                .signal
-                .recv()
-                .instrument_await("waiting for message")
-                .await
-            {
+            match self.signal.recv().await {
                 Ok(msg) => {
                     debug!("OutlineRenderActor: received message: {:?}", msg);
                 }
@@ -246,7 +200,7 @@ impl OutlineRenderActor {
                 info!("OutlineRenderActor: document is not ready");
                 continue;
             };
-            let data = self.outline(&document).instrument_await("outline").await;
+            let data = self.outline(&document).await;
             debug!("OutlineRenderActor: sending outline");
             let Ok(_) = self.editor_tx.send(EditorActorRequest::Outline(data)) else {
                 info!("OutlineRenderActor: outline_sender is dropped");
@@ -262,7 +216,6 @@ impl OutlineRenderActor {
                 interner.reset();
                 crate::outline::outline(interner, document)
             })
-            .instrument_await("generating outline with span interner")
             .await
     }
 }
