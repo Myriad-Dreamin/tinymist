@@ -24,8 +24,8 @@ use std::{
 
 use dashmap::{DashMap, SharedValue};
 use ecow::EcoString;
-use fxhash::FxHasher;
 use hashbrown::{hash_map::RawEntryMut, HashMap};
+use rustc_hash::FxHasher;
 use triomphe::Arc;
 use typst::{foundations::Str, syntax::ast::Ident};
 

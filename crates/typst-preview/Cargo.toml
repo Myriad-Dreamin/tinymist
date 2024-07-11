@@ -23,14 +23,14 @@ typst-ts-core = { workspace = true, default-features = false, features = [
 typst-ts-compiler.workspace = true
 once_cell.workspace = true
 tokio.workspace = true
-tokio-tungstenite = "0.21.0"
+tokio-tungstenite.workspace = true
 env_logger.workspace = true
 log.workspace = true
 serde_json.workspace = true
 futures.workspace = true
 indexmap.workspace = true
 serde.workspace = true
-await-tree = "0.1.2"
+await-tree.workspace = true
 
 clap = { workspace = true, optional = true }
 
