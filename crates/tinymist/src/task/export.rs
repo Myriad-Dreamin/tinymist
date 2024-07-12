@@ -156,19 +156,20 @@ impl ExportConfig {
     async fn do_export(
         &self,
         kind: &ExportKind,
-        doc: &CompiledArtifact<LspCompilerFeat>,
+        artifact: &CompiledArtifact<LspCompilerFeat>,
     ) -> anyhow::Result<Option<PathBuf>> {
         use ExportKind::*;
         use PageSelection::*;
 
-        let entry = doc.world.entry_state();
-
-        let doc = doc
+        // Prepare the document.
+        let doc = artifact
             .doc
             .as_ref()
             .map_err(|_| anyhow::anyhow!("no document"))?
             .clone();
 
+        // Prepare the output path.
+        let entry = artifact.world.entry_state();
         let Some(to) = self.config.output.substitute(&entry) else {
             return Ok(None);
         };
@@ -178,10 +179,8 @@ impl ExportConfig {
         if to.is_dir() {
             bail!("RenderActor({kind:?}): path is a directory: {to:?}");
         }
-
         let to = to.with_extension(kind.extension());
         log::info!("RenderActor({kind:?}): exporting {entry:?} to {to:?}");
-
         if let Some(e) = to.parent() {
             if !e.exists() {
                 std::fs::create_dir_all(e).with_context(|| {
@@ -190,6 +189,7 @@ impl ExportConfig {
             }
         }
 
+        // Prepare data.
         let kind2 = kind.clone();
         let data = spawn_blocking(move || -> anyhow::Result<Vec<u8>> {
             rayon::in_place_scope(|_| {
