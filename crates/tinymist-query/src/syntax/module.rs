@@ -15,8 +15,9 @@ pub struct ModuleDependency {
 
 /// Construct the module dependencies of the given context.
 ///
-/// It will scan all the files in the context, using [`AnalysisContext::files`],
-/// and find the dependencies and dependents of each file.
+/// It will scan all the files in the context, using
+/// [`AnalysisContext::source_files`], and find the dependencies and dependents
+/// of each file.
 pub fn construct_module_dependencies(
     ctx: &mut AnalysisContext,
 ) -> HashMap<TypstFileId, ModuleDependency> {

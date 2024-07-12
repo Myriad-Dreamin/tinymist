@@ -10,20 +10,17 @@
 //! └─────┬────────────────────▲─────┘         └────────────┘
 //!       │                    │
 //! ┌─────▼────────────────────┴─────┐ handler ┌────────────┐
-//! │    compiler::compile_driver    ├────────►│ rest actors│
+//! │   compiler::compile_handler    ├────────►│ rest actors│
 //! └────────────────────────────────┘         └────────────┘
 //! ```
 //!
-//! We generally use typst in two ways.
-//! + creates a [`CompileDriver`] and run compilation in fly.
-//! + creates a [`CompileServerActor`], wraps the driver, and runs
-//!   [`CompileDriver`] incrementally.
+//! We use typst by creating a
+//! [`CompileServerActor`][`crate::actor::typ_server::CompileServerActor`] and
+//! running compiler with callbacking [`CompileHandler`] incrementally. An
+//! additional [`CompileClientActor`] is also created to control the
+//! [`CompileServerActor`][`crate::actor::typ_server::CompileServerActor`].
 //!
-//! For latter case, an additional [`CompileClientActor`] is created to
-//! control the [`CompileServerActor`].
-//!
-//! The [`CompileDriver`] will also keep a [`CompileHandler`] to push
-//! information to other actors.
+//! The [`CompileHandler`] will push information to other actors.
 
 use std::{
     collections::HashMap,
