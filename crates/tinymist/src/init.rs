@@ -7,7 +7,8 @@ use comemo::Prehashed;
 use itertools::Itertools;
 use lsp_types::*;
 use once_cell::sync::{Lazy, OnceCell};
-use serde::Deserialize;
+use reflexo::path::PathClean;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
@@ -401,7 +402,7 @@ pub struct CompileConfig {
     /// The workspace roots from initialization.
     pub roots: Vec<PathBuf>,
     /// The output directory for PDF export.
-    pub output_path: String,
+    pub output_path: PathPattern,
     /// The mode of PDF export.
     pub export_pdf: ExportMode,
     /// Specifies the root path of the project manually.
@@ -438,7 +439,8 @@ impl CompileConfig {
 
     /// Updates the configuration with a map.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
-        self.output_path = try_or_default(|| Some(update.get("outputPath")?.as_str()?.to_owned()));
+        self.output_path =
+            try_or_default(|| PathPattern::deserialize(update.get("outputPath")?).ok());
         self.export_pdf = try_or_default(|| ExportMode::deserialize(update.get("exportPdf")?).ok());
         self.root_path = try_(|| Some(update.get("rootPath")?.as_str()?.into()));
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
@@ -726,6 +728,73 @@ pub struct CompileExtraOpts {
     pub font_paths: Vec<PathBuf>,
 }
 
+/// The path pattern that could be substituted.
+///
+/// # Examples
+/// - `$root` is the root of the project.
+/// - `$root/$dir` is the parent directory of the input (main) file.
+/// - `$root/main` will help store pdf file to `$root/main.pdf` constantly.
+/// - (default) `$root/$dir/$name` will help store pdf file along with the input
+///   file.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct PathPattern(pub String);
+
+impl PathPattern {
+    /// Creates a new path pattern.
+    pub fn new(pattern: &str) -> Self {
+        Self(pattern.to_owned())
+    }
+
+    /// Substitutes the path pattern with `$root`, and `$dir/$name`.
+    #[comemo::memoize]
+    pub fn substitute(&self, entry: &EntryState) -> Option<ImmutPath> {
+        let root = entry.root();
+        let main = entry.main();
+
+        log::info!(
+            "Check path {main:?} and root {root:?} with output directory {:?}",
+            self.0
+        );
+
+        let (root, main) = root.zip(main)?;
+
+        // Files in packages are not exported
+        if main.package().is_some() {
+            return None;
+        }
+        // Files without a path are not exported
+        let path = main.vpath().resolve(&root)?;
+
+        // todo: handle untitled path
+        if let Ok(path) = path.strip_prefix("/untitled") {
+            let tmp = std::env::temp_dir();
+            let path = tmp.join("typst").join(path);
+            return Some(path.as_path().into());
+        }
+
+        if self.0.is_empty() {
+            return Some(path.to_path_buf().clean().into());
+        }
+
+        let path = path.strip_prefix(&root).ok()?;
+        let dir = path.parent();
+        let file_name = path.file_name().unwrap_or_default();
+
+        let w = root.to_string_lossy();
+        let f = file_name.to_string_lossy();
+
+        // replace all $root
+        let mut path = self.0.replace("$root", &w);
+        if let Some(dir) = dir {
+            let d = dir.to_string_lossy();
+            path = path.replace("$dir", &d);
+        }
+        path = path.replace("$name", &f);
+
+        Some(PathBuf::from(path).clean().into())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -754,7 +823,7 @@ mod tests {
 
         config.update(&update).unwrap();
 
-        assert_eq!(config.compile.output_path, "out");
+        assert_eq!(config.compile.output_path, PathPattern::new("out"));
         assert_eq!(config.compile.export_pdf, ExportMode::OnSave);
         assert_eq!(config.compile.root_path, Some(PathBuf::from(root_path)));
         assert_eq!(config.semantic_tokens, SemanticTokensMode::Enable);
@@ -798,5 +867,31 @@ mod tests {
 
         let err = format!("{}", config.update(&update).unwrap_err());
         assert!(err.contains("absolute path"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn test_substitute_path() {
+        let root = Path::new("/root");
+        let entry = EntryState::new_rooted(
+            root.into(),
+            Some(FileId::new(None, VirtualPath::new("/dir1/dir2/file.txt"))),
+        );
+
+        assert_eq!(
+            PathPattern::new("/substitute/$dir/$name").substitute(&entry),
+            Some(PathBuf::from("/substitute/dir1/dir2/file.txt").into())
+        );
+        assert_eq!(
+            PathPattern::new("/substitute/$dir/../$name").substitute(&entry),
+            Some(PathBuf::from("/substitute/dir1/file.txt").into())
+        );
+        assert_eq!(
+            PathPattern::new("/substitute/$name").substitute(&entry),
+            Some(PathBuf::from("/substitute/file.txt").into())
+        );
+        assert_eq!(
+            PathPattern::new("/substitute/target/$dir/$name").substitute(&entry),
+            Some(PathBuf::from("/substitute/target/dir1/dir2/file.txt").into())
+        );
     }
 }

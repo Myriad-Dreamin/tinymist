@@ -29,21 +29,23 @@ use typst_ts_core::{exporter_builtins::GroupExporter, Exporter, GenericExporter,
 type CompileRawResult = Deferred<(SourceResult<Arc<TypstDocument>>, CompileEnv)>;
 type DocState = once_cell::sync::OnceCell<CompileRawResult>;
 
-#[derive(Clone, Copy)]
-pub struct CompileFlags {
-    /// The compiler-thread local logical tick when the snapshot is taken.
-    pub compile_tick: usize,
+/// A signal that possibly triggers an export.
+///
+/// Whether to export depends on the current state of the document and the user
+/// settings.
+#[derive(Debug, Clone, Copy)]
+pub struct ExportSignal {
     /// Whether the revision is annotated by memory events.
-    pub triggered_by_mem_events: bool,
+    pub by_mem_events: bool,
     /// Whether the revision is annotated by file system events.
-    pub triggered_by_fs_events: bool,
+    pub by_fs_events: bool,
     /// Whether the revision is annotated by entry update.
-    pub triggered_by_entry_update: bool,
+    pub by_entry_update: bool,
 }
 
 pub struct CompileSnapshot<F: CompilerFeat> {
-    /// All the flags for the document.
-    pub flags: CompileFlags,
+    /// The export signal for the document.
+    pub flags: ExportSignal,
     /// Using env
     pub env: CompileEnv,
     /// Using world
@@ -97,7 +99,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
     pub async fn compile(&self) -> CompiledArtifact<F> {
         let (doc, env) = self.start().wait().clone();
         CompiledArtifact {
-            flags: self.flags,
+            signal: self.flags,
             world: self.world.clone(),
             env,
             doc,
@@ -120,8 +122,8 @@ impl<F: CompilerFeat> Clone for CompileSnapshot<F> {
 
 #[derive(Clone)]
 pub struct CompiledArtifact<F: CompilerFeat> {
-    /// All the flags for the document.
-    pub flags: CompileFlags,
+    /// All the export signal for the document.
+    pub signal: ExportSignal,
     /// Used world
     pub world: Arc<CompilerWorld<F>>,
     /// Used env
@@ -484,11 +486,10 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         CompileSnapshot {
             world: Arc::new(world.clone()),
             env: env.clone(),
-            flags: CompileFlags {
-                compile_tick: self.logical_tick,
-                triggered_by_entry_update: reason.by_entry_update,
-                triggered_by_mem_events: reason.by_memory_events,
-                triggered_by_fs_events: reason.by_fs_events,
+            flags: ExportSignal {
+                by_entry_update: reason.by_entry_update,
+                by_mem_events: reason.by_memory_events,
+                by_fs_events: reason.by_fs_events,
             },
             doc_state: Arc::new(OnceCell::new()),
             success_doc: self.latest_success_doc.clone(),

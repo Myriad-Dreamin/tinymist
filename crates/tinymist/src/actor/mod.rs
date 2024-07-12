@@ -20,7 +20,7 @@ use self::{
     typ_server::CompileServerActor,
 };
 use crate::{
-    task::{ExportConfig, ExportTask, ExportTaskConf},
+    task::{ExportConfig, ExportTask, ExportUserConfig},
     world::{ImmutDict, LspWorldBuilder},
     LanguageState,
 };
@@ -52,11 +52,11 @@ impl LanguageState {
         let (intr_tx, intr_rx) = mpsc::unbounded_channel();
 
         // Run Export actors before preparing cluster to avoid loss of events
-        let export = ExportTask::new(ExportTaskConf {
+        let export = ExportTask::new(ExportConfig {
             group: editor_group.clone(),
             editor_tx: Some(self.editor_tx.clone()),
-            config: ExportConfig {
-                substitute_pattern: self.compile_config().output_path.clone(),
+            config: ExportUserConfig {
+                output: self.compile_config().output_path.clone(),
                 mode: self.compile_config().export_pdf,
             },
             kind: ExportKind::Pdf,

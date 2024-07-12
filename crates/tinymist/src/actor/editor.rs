@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use log::info;
-use lsp_types::{Diagnostic, Url};
+use lsp_types::Url;
 use tinymist_query::{DiagnosticsMap, LspDiagnostic};
 use tokio::sync::mpsc;
 
@@ -115,7 +115,7 @@ impl EditorActor {
         }
     }
 
-    fn publish_inner(&mut self, group: &str, url: Url, next: Option<Vec<Diagnostic>>) {
+    fn publish_inner(&mut self, group: &str, url: Url, next: Option<Vec<LspDiagnostic>>) {
         let mut to_publish = Vec::new();
 
         // Get the diagnostics from other groups

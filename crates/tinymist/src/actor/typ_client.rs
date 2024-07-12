@@ -61,7 +61,7 @@ use super::{
     typ_server::{CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt},
 };
 use crate::{
-    task::{ExportConfig, ExportSignal, ExportTask},
+    task::{ExportTask, ExportUserConfig},
     world::{LspCompilerFeat, LspWorld},
     CompileConfig,
 };
@@ -295,19 +295,11 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             snap.env.tracer.as_ref().map(|e| e.clone().warnings()),
         );
 
-        if snap.flags.triggered_by_entry_update {
-            self.export.signal(snap, ExportSignal::EntryChanged);
-        } else if snap.flags.triggered_by_mem_events && snap.flags.triggered_by_fs_events {
-            self.export.signal(snap, ExportSignal::TypedAndSaved);
-        } else if snap.flags.triggered_by_mem_events {
-            self.export.signal(snap, ExportSignal::Typed);
-        } else if snap.flags.triggered_by_fs_events {
-            self.export.signal(snap, ExportSignal::Saved);
-        }
-
         if let Ok(doc) = &snap.doc {
             let _ = self.doc_tx.send(Some(doc.clone()));
         }
+
+        self.export.signal(snap, snap.signal);
 
         self.editor_tx
             .send(EditorRequest::Status(
@@ -326,7 +318,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
                 .doc
                 .clone()
                 .map_err(|_| typst_preview::CompileStatus::CompileError);
-            inner.notify_compile(res, snap.flags.triggered_by_fs_events);
+            inner.notify_compile(res, snap.signal.by_fs_events);
         }
     }
 }
@@ -368,25 +360,17 @@ impl CompileClientActor {
         self.config = config;
     }
 
-    pub(crate) fn change_export_config(&mut self, config: ExportConfig) {
+    pub(crate) fn change_export_config(&mut self, config: ExportUserConfig) {
         self.handle.export.change_config(config);
     }
 
     pub fn on_export(&self, kind: ExportKind, path: PathBuf) -> QueryFuture {
         let snap = self.snapshot()?;
-        let export = self.handle.export.task();
 
         let entry = self.config.determine_entry(Some(path.as_path().into()));
-
+        let export = self.handle.export.oneshot(snap, Some(entry), kind);
         just_future(async move {
-            let snap = snap.snapshot().await?;
-            let snap = snap.task(TaskInputs {
-                entry: Some(entry),
-                ..Default::default()
-            });
-
-            let artifact = snap.compile().await;
-            let res = export.oneshot(&artifact, kind).await;
+            let res = export.await?;
 
             log::info!("CompileActor: on export end: {path:?} as {res:?}");
             Ok(tinymist_query::CompilerQueryResponse::OnExport(res))

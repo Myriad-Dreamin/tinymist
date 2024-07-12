@@ -15,7 +15,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
-use task::{ExportConfig, FormatConfig, FormatTask, UserActionTask};
+use task::{ExportUserConfig, FormatConfig, FormatTask, UserActionTask};
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
     get_semantic_tokens_unregistration, PageSelection, SemanticTokenContext,
@@ -481,8 +481,8 @@ impl LanguageState {
         if config.compile.output_path != self.config.compile.output_path
             || config.compile.export_pdf != self.config.compile.export_pdf
         {
-            let config = ExportConfig {
-                substitute_pattern: self.config.compile.output_path.clone(),
+            let config = ExportUserConfig {
+                output: self.config.compile.output_path.clone(),
                 mode: self.config.compile.export_pdf,
             };
 
