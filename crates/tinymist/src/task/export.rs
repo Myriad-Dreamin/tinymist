@@ -156,13 +156,14 @@ impl ExportTaskConf {
         if self.count_words {
             let artifact = artifact.clone();
             let group = self.group.clone();
+            let revision = artifact.world.revision().get();
             t.count_word_folder.spawn(
-                artifact.world.revision().get(),
+                revision,
                 Box::pin(async move {
                     let doc = artifact.doc.ok()?;
 
                     let wc = word_count::word_count(&doc);
-                    log::debug!("word count: {wc:?}");
+                    log::debug!("word count({group}:{revision}): {wc:?}");
                     let _ = editor_tx.send(EditorRequest::WordCount(group, wc));
 
                     Some(())
