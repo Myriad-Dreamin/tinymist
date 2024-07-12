@@ -60,7 +60,7 @@ impl LanguageState {
                 mode: self.compile_config().export_pdf,
             },
             kind: ExportKind::Pdf,
-            count_words: self.config.notify_compile_status,
+            count_words: self.config.compile.notify_status,
         });
 
         log::info!(

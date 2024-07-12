@@ -157,7 +157,7 @@ impl LanguageState {
             let editor_actor = EditorActor::new(
                 client.clone().to_untyped(),
                 editor_rx,
-                service.config.compile.notify_compile_status,
+                service.config.compile.notify_status,
             );
 
             service.restart_server("primary");
