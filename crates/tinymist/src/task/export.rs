@@ -129,25 +129,28 @@ impl ExportConfig {
     }
 
     fn signal_count_word(&self, artifact: &CompiledArtifact<LspCompilerFeat>, t: &ExportTask) {
+        if !self.count_words {
+            return;
+        }
+
         let Some(editor_tx) = self.editor_tx.clone() else {
             return;
         };
-        if self.count_words {
-            let revision = artifact.world.revision().get();
-            t.count_word_folder.spawn(revision, || {
-                let artifact = artifact.clone();
-                let group = self.group.clone();
-                Box::pin(async move {
-                    let doc = artifact.doc.ok()?;
-                    let wc = word_count::word_count(&doc);
-                    log::debug!("WordCount({group}:{revision}): {wc:?}");
+        let revision = artifact.world.revision().get();
 
-                    let _ = editor_tx.send(EditorRequest::WordCount(group, wc));
+        t.count_word_folder.spawn(revision, || {
+            let artifact = artifact.clone();
+            let group = self.group.clone();
+            Box::pin(async move {
+                let doc = artifact.doc.ok()?;
+                let wc = word_count::word_count(&doc);
+                log::debug!("WordCount({group}:{revision}): {wc:?}");
 
-                    Some(())
-                })
-            });
-        }
+                let _ = editor_tx.send(EditorRequest::WordCount(group, wc));
+
+                Some(())
+            })
+        });
     }
 
     async fn do_export(
