@@ -70,7 +70,7 @@ impl ExportTask {
             });
 
             let artifact = snap.compile().await;
-            export.do_export(&kind, &artifact).await
+            export.do_export(&kind, artifact).await
         }
     }
 }
@@ -120,7 +120,7 @@ impl ExportConfig {
             let this = self.clone();
             let artifact = artifact.clone();
             Box::pin(async move {
-                log_err(this.do_export(&this.kind, &artifact).await);
+                log_err(this.do_export(&this.kind, artifact).await);
                 Some(())
             })
         });
@@ -156,17 +156,10 @@ impl ExportConfig {
     async fn do_export(
         &self,
         kind: &ExportKind,
-        artifact: &CompiledArtifact<LspCompilerFeat>,
+        artifact: CompiledArtifact<LspCompilerFeat>,
     ) -> anyhow::Result<Option<PathBuf>> {
         use ExportKind::*;
         use PageSelection::*;
-
-        // Prepare the document.
-        let doc = artifact
-            .doc
-            .as_ref()
-            .map_err(|_| anyhow::anyhow!("no document"))?
-            .clone();
 
         // Prepare the output path.
         let entry = artifact.world.entry_state();
@@ -188,6 +181,9 @@ impl ExportConfig {
                 })?;
             }
         }
+
+        // Prepare the document.
+        let doc = artifact.doc.map_err(|_| anyhow::anyhow!("no document"))?;
 
         // Prepare data.
         let kind2 = kind.clone();
