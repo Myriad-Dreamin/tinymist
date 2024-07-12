@@ -28,6 +28,7 @@ pub mod tool;
 mod utils;
 mod world;
 
+pub use actor::typ_server::NO_DEFERRED_SNAPSHOT;
 pub use init::*;
 pub use server::*;
 pub use sync_lsp::LspClient;

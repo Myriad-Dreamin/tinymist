@@ -14,6 +14,7 @@ use serde_json::Value as JsonValue;
 use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClientRoot};
 use tinymist::{
     CompileConfig, Config, ConstConfig, LanguageState, LspWorld, RegularInit, SuperInit,
+    NO_DEFERRED_SNAPSHOT,
 };
 use typst::World;
 use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
@@ -85,6 +86,9 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
     log::info!("starting LSP server: {:#?}", args);
 
     let is_replay = !args.mirror.replay.is_empty();
+    if is_replay {
+        NO_DEFERRED_SNAPSHOT.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
 
     with_stdio_transport(args.mirror.clone(), |conn| {
         let client = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);

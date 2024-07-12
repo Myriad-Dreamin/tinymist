@@ -6,7 +6,7 @@ use std::{
     collections::HashSet,
     ops::Deref,
     path::Path,
-    sync::{Arc, OnceLock},
+    sync::{atomic::AtomicBool, Arc, OnceLock},
 };
 
 use once_cell::sync::OnceCell;
@@ -135,6 +135,9 @@ pub struct CompiledArtifact<F: CompilerFeat> {
 const COMPILE_CONCURRENCY: usize = 0;
 // const COMPILE_CONCURRENCY: usize = 1;
 
+/// Whether to enable deferred snapshot.
+pub static NO_DEFERRED_SNAPSHOT: AtomicBool = AtomicBool::new(false);
+
 pub trait CompilationHandle<F: CompilerFeat>: Send + Sync + 'static {
     fn status(&self, revision: usize, rep: CompileReport);
     fn notify_compile(&self, res: &CompiledArtifact<F>, rep: CompileReport);
@@ -168,7 +171,7 @@ enum CompilerResponse {
     Notify(NotifyMessage),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 struct CompileReasons {
     /// The snapshot is taken by the memory editing events.
     by_memory_events: bool,
@@ -398,6 +401,10 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         let compile_task = tokio::spawn(async move {
             log::debug!("CompileServerActor: initialized");
 
+            let allow_deferred_snapshot =
+                !NO_DEFERRED_SNAPSHOT.load(std::sync::atomic::Ordering::SeqCst);
+            let mut snapshot_events = vec![];
+
             // Wait for first events.
             'event_loop: while let Some(mut event) = self.intr_rx.recv().await {
                 let mut comp_reason = no_reason();
@@ -413,12 +420,21 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                         break 'event_loop;
                     }
 
-                    // Ensure complied before executing tasks.
-                    if matches!(event, Interrupt::Snapshot(_)) && comp_reason.any() {
-                        comp_reason = self.watch_compile(comp_reason, &ack).await;
+                    // todo: deferred snapshots introduces unstable behavior. May have approach to
+                    // achieve both.
+                    if allow_deferred_snapshot {
+                        if let Interrupt::Snapshot(event) = event {
+                            snapshot_events.push(event);
+                        } else {
+                            comp_reason.see(self.process(event, &ack));
+                        }
+                    } else {
+                        // Ensure complied before executing tasks.
+                        if matches!(event, Interrupt::Snapshot(_)) && comp_reason.any() {
+                            comp_reason = self.watch_compile(comp_reason, &ack).await;
+                        }
+                        comp_reason.see(self.process(event, &ack));
                     }
-
-                    comp_reason.see(self.process(event, &ack));
 
                     // Try to accumulate more events.
                     match self.intr_rx.try_recv() {
@@ -434,6 +450,15 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     comp_reason = self.watch_compile(comp_reason, &ack).await;
                     if comp_reason.any() {
                         log::warn!("CompileServerActor: watch_compile infinite loop?");
+                    }
+                }
+
+                if !snapshot_events.is_empty() {
+                    let snap = self
+                        .watch_snap
+                        .get_or_init(|| self.snapshot(false, no_reason()));
+                    for task in snapshot_events.drain(..) {
+                        let _ = task.send(snap.clone());
                     }
                 }
             }
