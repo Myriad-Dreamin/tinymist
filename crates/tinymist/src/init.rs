@@ -751,10 +751,7 @@ impl PathPattern {
         let root = entry.root();
         let main = entry.main();
 
-        log::info!(
-            "Check path {main:?} and root {root:?} with output directory {:?}",
-            self.0
-        );
+        log::info!("Check path {main:?} and root {root:?} with output directory {self:?}");
 
         let (root, main) = root.zip(main)?;
 
