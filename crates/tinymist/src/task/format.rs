@@ -1,77 +1,58 @@
 //! The actor that handles formatting.
 
-use std::{iter::zip, sync::Arc};
+use std::iter::zip;
 
 use lsp_types::TextEdit;
 use sync_lsp::{just_future, SchedulableResponse};
 use tinymist_query::{typst_to_lsp, PositionEncoding};
 use typst::syntax::Source;
 
-use crate::{FormatterMode, LspResult};
-
 use super::SyncTaskFactory;
+use crate::FormatterMode;
 
 #[derive(Debug, Clone)]
-pub struct FormatConfig {
+pub struct FormatUserConfig {
     pub mode: FormatterMode,
     pub width: u32,
     pub position_encoding: PositionEncoding,
 }
 
-type FmtFn = Arc<dyn Fn(Source) -> LspResult<Option<Vec<TextEdit>>> + Send + Sync>;
-
 #[derive(Clone)]
 pub struct FormatTask {
-    factory: SyncTaskFactory<FormatterTaskData>,
+    factory: SyncTaskFactory<FormatUserConfig>,
 }
 
 impl FormatTask {
-    pub fn new(c: FormatConfig) -> Self {
-        let factory = SyncTaskFactory::default();
-        let this = Self { factory };
-
-        this.change_config(c);
-        this
+    pub fn new(c: FormatUserConfig) -> Self {
+        Self {
+            factory: SyncTaskFactory::new(c),
+        }
     }
 
-    pub fn change_config(&self, c: FormatConfig) {
-        self.factory.mutate(|data| {
-            data.0 = match c.mode {
+    pub fn change_config(&self, c: FormatUserConfig) {
+        self.factory.mutate(|data| *data = c);
+    }
+
+    pub fn run(&self, src: Source) -> SchedulableResponse<Option<Vec<TextEdit>>> {
+        let c = self.factory.task();
+        just_future(async move {
+            match c.mode {
                 FormatterMode::Typstyle => {
                     let cw = c.width as usize;
-                    Arc::new(move |e: Source| {
-                        let res =
-                            typstyle_core::Typstyle::new_with_src(e.clone(), cw).pretty_print();
-                        Ok(calc_diff(e, res, c.position_encoding))
-                    })
+                    let res = typstyle_core::Typstyle::new_with_src(src.clone(), cw).pretty_print();
+                    Ok(calc_diff(src, res, c.position_encoding))
                 }
                 FormatterMode::Typstfmt => {
                     let config = typstfmt_lib::Config {
                         max_line_length: c.width as usize,
                         ..typstfmt_lib::Config::default()
                     };
-                    Arc::new(move |e: Source| {
-                        let res = typstfmt_lib::format(e.text(), config);
-                        Ok(calc_diff(e, res, c.position_encoding))
-                    })
+                    let res = typstfmt_lib::format(src.text(), config);
+                    Ok(calc_diff(src, res, c.position_encoding))
                 }
-                FormatterMode::Disable => Arc::new(|_| Ok(None)),
+                FormatterMode::Disable => Ok(None),
             }
-        });
-    }
-
-    pub fn exec(&self, source: Source) -> SchedulableResponse<Option<Vec<TextEdit>>> {
-        let data = self.factory.task();
-        just_future(async move { (data.0)(source) })
-    }
-}
-
-#[derive(Clone)]
-pub struct FormatterTaskData(FmtFn);
-
-impl Default for FormatterTaskData {
-    fn default() -> Self {
-        Self(Arc::new(|_| Ok(None)))
+        })
     }
 }
 
