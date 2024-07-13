@@ -96,7 +96,8 @@ impl Typlite {
             MathRoot => Self::str(node, s),
 
             // Punctuation
-            Hash => Self::char('#', s),
+            // Hash => Self::char('#', s),
+            Hash => Ok(()),
             LeftBrace => Self::char('{', s),
             RightBrace => Self::char('}', s),
             LeftBracket => Self::char('[', s),
