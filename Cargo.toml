@@ -10,6 +10,10 @@ repository = "https://github.com/Myriad-Dreamin/tinymist"
 rust-version = "1.75"
 default-run = "tinymist"
 
+[[bin]]
+name = "tinymist"
+path = "crates/tinymist/src/main.rs"
+
 [workspace]
 resolver = "2"
 members = ["crates/*", "tests"]
