@@ -8,6 +8,7 @@ license = "Apache-2.0"
 homepage = "https://github.com/Myriad-Dreamin/tinymist"
 repository = "https://github.com/Myriad-Dreamin/tinymist"
 rust-version = "1.75"
+default-run = "tinymist"
 
 [workspace]
 resolver = "2"
