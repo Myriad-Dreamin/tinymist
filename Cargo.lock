@@ -3498,7 +3498,7 @@ dependencies = [
 
 [[package]]
 name = "sync-lsp"
-version = "0.11.14"
+version = "0.11.15-rc2"
 dependencies = [
  "anyhow",
  "clap",
@@ -3637,7 +3637,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.11.14"
+version = "0.11.15-rc2"
 dependencies = [
  "insta",
  "lsp-server",
@@ -3734,7 +3734,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.11.14"
+version = "0.11.15-rc2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3793,11 +3793,11 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.11.14"
+version = "0.11.15-rc2"
 
 [[package]]
 name = "tinymist-query"
-version = "0.11.14"
+version = "0.11.15-rc2"
 dependencies = [
  "anyhow",
  "biblatex",
@@ -3842,7 +3842,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.11.14"
+version = "0.11.15-rc2"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -4117,7 +4117,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "typlite"
-version = "0.11.14"
+version = "0.11.15-rc2"
 dependencies = [
  "insta",
  "typst-syntax 0.11.1",
@@ -4228,7 +4228,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.11.14"
+version = "0.11.15-rc2"
 dependencies = [
  "clap",
  "comemo 0.4.0",

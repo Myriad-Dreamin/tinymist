@@ -306,11 +306,22 @@ jobs:
       - name: Install deps
         run: yarn install
       - name: Deploy to VS Code Marketplace
+        if: "!contains(github.ref, 'rc')"
         run: npx @vscode/vsce publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate 
         env:
           VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
-
       - name: Deploy to OpenVSX
+        if: "!contains(github.ref, 'rc')"
         run: npx ovsx publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate 
+        env:
+          OVSX_PAT: ${{ secrets.OPENVSX_ACCESS_TOKEN }}
+      - name: Deploy to VS Code Marketplace (Pre Release)
+        if: contains(github.ref, 'rc')
+        run: npx @vscode/vsce publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate --pre-release
+        env:
+          VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
+      - name: Deploy to OpenVSX (Pre Release)
+        if: contains(github.ref, 'rc')
+        run: npx ovsx publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate --pre-release
         env:
           OVSX_PAT: ${{ secrets.OPENVSX_ACCESS_TOKEN }}
