@@ -85,7 +85,10 @@ export function provideCanvasDoc<
 
           // do scaling early
           this.prepareCanvas(pageInfo, canvas);
-          rescale(pageInfo.container, this.isContentPreview || isFirst);
+          rescale(
+            pageInfo.container,
+            this.isContentPreview || this.renderMode !== "canvas" || isFirst
+          );
 
           if (this.isContentPreview) {
             const pageNumberIndicator = document.createElement("div");
@@ -235,7 +238,11 @@ export function provideCanvasDoc<
           this.previewMode === PreviewMode.Slide
             ? Math.min(cw / canvasWidth, ch / canvasHeight)
             : cw / canvasWidth;
-        const scale = this.currentRealScale * this.currentScaleRatio;
+        const scale =
+          // The element in svg is already scaled by svg host
+          this.renderMode === "svg"
+            ? 1
+            : this.currentRealScale * this.currentScaleRatio;
 
         // apply scale
         const appliedScale = (scale / this.pixelPerPt).toString();
