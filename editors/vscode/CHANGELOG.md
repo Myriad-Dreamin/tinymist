@@ -4,6 +4,40 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.15 - [2024-07-14]
+
+* Bumped typstyle to v0.11.29 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/410
+
+## Compiler
+
+* (Fix) Noting `formatter_print_width` change on changed configuration in https://github.com/Myriad-Dreamin/tinymist/pull/387
+* Keeping entry on language query in https://github.com/Myriad-Dreamin/tinymist/pull/406
+* Allowed deferred snapshot event processing in https://github.com/Myriad-Dreamin/tinymist/pull/408
+
+## Editor
+
+* (Fix) annoying often detached views in https://github.com/Myriad-Dreamin/tinymist/pull/414
+
+## Hover (Tooltip)
+
+* Rendering example code in typst docs as typst syntax in https://github.com/Myriad-Dreamin/tinymist/pull/397
+
+## Preview
+
+* Using `requestIdleCallback` to wait for updating canvas pages when editor is in idle in https://github.com/Myriad-Dreamin/tinymist/pull/412
+  * Improve performance when updating document quickly.
+* (Fix) Fixed some corner cases of serving preview in https://github.com/Myriad-Dreamin/tinymist/pull/385
+* (Fix) Scrolling source correctly when no text editor is active in https://github.com/Myriad-Dreamin/tinymist/pull/395
+* (Fix) Broken content preview in https://github.com/Myriad-Dreamin/tinymist/pull/413
+
+## Misc
+
+* Add typlite for typst's doc comments in https://github.com/Myriad-Dreamin/tinymist/pull/398
+* Documented tinymist crate in https://github.com/Myriad-Dreamin/tinymist/pull/390
+* (Fix) Perform cyclic loop dependence correctly when checking def-use relation across module in https://github.com/Myriad-Dreamin/tinymist/pull/396
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.14...v0.11.15
+
 ## v0.11.14 - [2024-07-07]
 
 ## Compiler
@@ -20,7 +54,7 @@ This bug is introduced by [Preparing for parallelizing lsp requests](https://git
 
 ### Preview
 
-* Persisting webview preview through vscode restarts by @Myriad-Dreamin and @noamzaks in https://github.com/Myriad-Dreamin/tinymist/pull/373
+* Persisting webview preview through vscode restarts and @noamzaks in https://github.com/Myriad-Dreamin/tinymist/pull/373
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.13...v0.11.14
 
@@ -421,7 +455,7 @@ This version is published with mostly internal optimizations.
 
 ### Hover (Tooltip)
 
-* fix: parse docstring dedents correctly in https://github.com/Myriad-Dreamin/tinymist/pull/132
+* (Fix) parse docstring dedents correctly in https://github.com/Myriad-Dreamin/tinymist/pull/132
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.1...v0.11.2
 
