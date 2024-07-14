@@ -51,7 +51,7 @@ impl PreviewActor {
                     };
 
                     // Unregister preview early
-                    tab.compile_handler.unregister_preview(&tab.task_id);
+                    tab.compile_handler.unregister_preview(&task_id);
 
                     let client = self.client.clone();
                     self.client.handle.spawn(async move {
@@ -84,6 +84,7 @@ impl PreviewActor {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DisposePreview {
     task_id: String,
 }
