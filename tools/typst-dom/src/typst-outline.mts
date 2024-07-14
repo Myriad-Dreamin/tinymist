@@ -43,7 +43,7 @@ class GenElem {
     public tag: string,
     public container: HTMLElement,
     public additions?: Record<string, any>
-  ) { }
+  ) {}
 
   push(child: GenNode) {
     this.children.push(child);
@@ -52,8 +52,9 @@ class GenElem {
 
   pushCanvas(pg: CanvasPage) {
     const stub = document.createElement("div");
-    stub.setAttribute(TypstPatchAttrs.Tid, `canvas:` + pg.index);
-    // stubCanvas.setAttribute(TypstPatchAttrs.ReuseFrom, `canvas:` + pg.index);
+    const tid = `canvas:` + pg.index;
+    stub.setAttribute(TypstPatchAttrs.Tid, tid);
+    stub.setAttribute(TypstPatchAttrs.ReuseFrom, tid);
     stub.setAttribute("data-page-number", pg.index.toString());
     pg.stub = stub;
 
@@ -266,13 +267,13 @@ function patchOutlineChildren(ctx: GenContext, prev: Element, next: Element) {
     false
   );
 
-  // console.log("interpreted origin view", targetView, toPatch);
+  // console.log("interpreted origin outline", targetView, toPatch);
 
   for (let [prevChild, nextChild] of toPatch) {
     reuseOrPatchOutlineElem(ctx, prevChild, nextChild);
   }
 
-  // console.log("interpreted target view", targetView);
+  // console.log("interpreted target outline", targetView);
 
   const originView = changeViewPerspective(
     prev.children as unknown as Element[],
@@ -328,7 +329,7 @@ export interface TypstOutlineDocument {
 }
 
 export function provideOutlineDoc<
-  TBase extends GConstructor<TypstDocumentContext>
+  TBase extends GConstructor<TypstDocumentContext>,
 >(Base: TBase): TBase & GConstructor<TypstOutlineDocument> {
   return class DebugJumpDocument extends Base {
     patchOutlineEntry(

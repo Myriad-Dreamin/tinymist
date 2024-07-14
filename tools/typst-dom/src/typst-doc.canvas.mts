@@ -52,20 +52,22 @@ export function provideCanvasDoc<
     }
 
     createCanvas(pages: CanvasPage[], opts?: CreateCanvasOptions): void {
+      // get dom state from cache, so we are free from layout reflowing
+      const docDiv = this.hookedElem.firstElementChild! as HTMLDivElement;
+      const rescale = this.rescaleOne(docDiv);
+
+      let isFirst = true;
       for (const pageInfo of pages) {
         if (!pageInfo.elem) {
           pageInfo.elem = document.createElement("div");
           pageInfo.elem.setAttribute("class", "typst-page-canvas");
           pageInfo.elem.style.transformOrigin = "0 0";
-          pageInfo.elem.style.transform = `scale(${1 / this.pixelPerPt})`;
           pageInfo.elem.setAttribute(
             "data-page-number",
             pageInfo.index.toString()
           );
 
           const canvas = document.createElement("canvas");
-          canvas.width = pageInfo.width * this.pixelPerPt;
-          canvas.height = pageInfo.height * this.pixelPerPt;
           pageInfo.elem.appendChild(canvas);
 
           pageInfo.container = document.createElement("div");
@@ -80,6 +82,10 @@ export function provideCanvasDoc<
             pageInfo.index.toString()
           );
           pageInfo.container.appendChild(pageInfo.elem);
+
+          // do scaling early
+          this.prepareCanvas(pageInfo, canvas);
+          rescale(pageInfo.container, this.isContentPreview || isFirst);
 
           if (this.isContentPreview) {
             const pageNumberIndicator = document.createElement("div");
@@ -109,7 +115,32 @@ export function provideCanvasDoc<
             throw new Error("pageInfo.inserter is not defined");
           }
         }
+
+        isFirst = false;
       }
+    }
+
+    prepareCanvas(pageInfo: CanvasPage, canvas: HTMLCanvasElement) {
+      const pw = pageInfo.width;
+      const ph = pageInfo.height;
+      const pws = pageInfo.width.toFixed(3);
+      const phs = pageInfo.height.toFixed(3);
+
+      let cached = true;
+
+      if (pageInfo.elem.getAttribute("data-page-width") !== pws) {
+        pageInfo.elem.setAttribute("data-page-width", pws);
+        cached = false;
+        canvas.width = pw * this.pixelPerPt;
+      }
+
+      if (pageInfo.elem.getAttribute("data-page-height") !== phs) {
+        pageInfo.elem.setAttribute("data-page-height", phs);
+        cached = false;
+        canvas.height = ph * this.pixelPerPt;
+      }
+
+      return cached;
     }
 
     async updateCanvas(
@@ -128,7 +159,7 @@ export function provideCanvasDoc<
           if (opts?.lazy) {
             requestIdleCallback(() => resolve(undefined), { timeout: 100 });
           } else {
-            setTimeout(() => resolve(undefined), 0);
+            resolve(undefined);
           }
         });
       };
@@ -142,24 +173,10 @@ export function provideCanvasDoc<
         const canvas = pageInfo.elem.firstElementChild as HTMLCanvasElement;
         // const tt1 = performance.now();
 
-        const pw = pageInfo.width;
-        const ph = pageInfo.height;
         const pws = pageInfo.width.toFixed(3);
         const phs = pageInfo.height.toFixed(3);
 
-        let cached = true;
-
-        if (pageInfo.elem.getAttribute("data-page-width") !== pws) {
-          pageInfo.elem.setAttribute("data-page-width", pws);
-          cached = false;
-          canvas.width = pw * this.pixelPerPt;
-        }
-
-        if (pageInfo.elem.getAttribute("data-page-height") !== phs) {
-          pageInfo.elem.setAttribute("data-page-height", phs);
-          cached = false;
-          canvas.height = ph * this.pixelPerPt;
-        }
+        let cached = this.prepareCanvas(pageInfo, canvas);
 
         const cacheKey =
           pageInfo.elem.getAttribute("data-cache-key") || undefined;
@@ -190,24 +207,15 @@ export function provideCanvasDoc<
       await tok?.consume();
     }
 
-    rescale$canvas() {
+    rescaleOne(docDiv: HTMLDivElement) {
       // get dom state from cache, so we are free from layout reflowing
       // Note: one should retrieve dom state before rescale
       const { width: cwRaw, height: ch } = this.cachedDOMState;
       const cw = this.isContentPreview ? cwRaw - 10 : cwRaw;
 
-      // get dom state from cache, so we are free from layout reflowing
-      const docDiv = this.hookedElem.firstElementChild! as HTMLDivElement;
-      if (!docDiv) {
-        return;
-      }
-
-      let isFirst = true;
-
-      const rescale = (canvasContainer: HTMLElement) => {
+      return (canvasContainer: HTMLElement, noSpacingFromTop: boolean) => {
         // console.log(ch);
-        if (isFirst) {
-          isFirst = false;
+        if (noSpacingFromTop) {
           canvasContainer.style.marginTop = `0px`;
         } else {
           canvasContainer.style.marginTop = `${
@@ -250,14 +258,24 @@ export function provideCanvasDoc<
           }
         }
       };
+    }
+
+    rescale$canvas() {
+      // get dom state from cache, so we are free from layout reflowing
+      const docDiv = this.hookedElem.firstElementChild! as HTMLDivElement;
+      if (!docDiv) {
+        return;
+      }
+
+      let isFirst = true;
+      const rescale = this.rescaleOne(docDiv);
 
       if (this.isContentPreview) {
-        isFirst = false;
         const rescaleChildren = (elem: HTMLElement) => {
           for (const ch of elem.children) {
             let canvasContainer = ch as HTMLElement;
             if (canvasContainer.classList.contains("typst-page")) {
-              rescale(canvasContainer);
+              rescale(canvasContainer, true);
             }
             if (canvasContainer.classList.contains("typst-outline")) {
               rescaleChildren(canvasContainer);
@@ -272,7 +290,8 @@ export function provideCanvasDoc<
           if (!canvasContainer.classList.contains("typst-page")) {
             continue;
           }
-          rescale(canvasContainer);
+          rescale(canvasContainer, isFirst);
+          isFirst = false;
         }
       }
     }
@@ -304,21 +323,29 @@ export function provideCanvasDoc<
       if (this.shouldMixinOutline() && this.outline) {
         console.log("render with outline", this.outline);
         this.patchOutlineEntry(docDiv as any, pages, this.outline.items);
-        for (const ch of docDiv.children) {
-          if (!ch.classList.contains("typst-page")) {
-            continue;
+
+        const checkChildren = (elem: HTMLElement) => {
+          for (const ch of elem.children) {
+            let canvasContainer = ch as HTMLElement;
+            if (canvasContainer.classList.contains("typst-outline")) {
+              checkChildren(canvasContainer);
+            }
+            if (canvasContainer.classList.contains("typst-page")) {
+              const pageNumber = Number.parseInt(
+                ch.getAttribute("data-page-number")!
+              );
+              if (pageNumber >= pages.length) {
+                // todo: cache key can shifted
+                elem.removeChild(ch);
+              } else {
+                pages[pageNumber].container = ch as HTMLDivElement;
+                pages[pageNumber].elem = ch.firstElementChild as HTMLDivElement;
+              }
+            }
           }
-          const pageNumber = Number.parseInt(
-            ch.getAttribute("data-page-number")!
-          );
-          if (pageNumber >= pages.length) {
-            // todo: cache key shifted
-            docDiv.removeChild(ch);
-            continue;
-          }
-          pages[pageNumber].container = ch as HTMLDivElement;
-          pages[pageNumber].elem = ch.firstElementChild as HTMLDivElement;
-        }
+        };
+
+        checkChildren(docDiv);
       } else {
         for (const ch of docDiv.children) {
           if (!ch.classList.contains("typst-page")) {
