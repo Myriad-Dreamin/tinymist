@@ -24,6 +24,7 @@ export interface CreateCanvasOptions {
 
 export interface UpdateCanvasOptions {
   cancel?: TypstCancellationToken;
+  lazy?: boolean;
 }
 
 export interface TypstCanvasDocument {
@@ -36,7 +37,7 @@ export interface TypstCanvasDocument {
 export function provideCanvasDoc<
   TBase extends GConstructor<
     TypstDocumentContext & Partial<TypstOutlineDocument>
-  >
+  >,
 >(Base: TBase): TBase & GConstructor<TypstCanvasDocument> {
   return class CanvasDocument extends Base {
     feat$canvas = true;
@@ -122,11 +123,13 @@ export function provideCanvasDoc<
       // await Promise.all(pagesInfo.map(async (pageInfo) => {
       this.kModule.backgroundColor = "#ffffff";
       this.kModule.pixelPerPt = this.pixelPerPt;
-      const timeout = async (ms: number) => {
+      const waitABit = async () => {
         return new Promise((resolve) => {
-          setTimeout(() => {
-            resolve(undefined);
-          }, ms);
+          if (opts?.lazy) {
+            requestIdleCallback(() => resolve(undefined), { timeout: 100 });
+          } else {
+            setTimeout(() => resolve(undefined), 0);
+          }
         });
       };
       for (const pageInfo of pages) {
@@ -180,7 +183,7 @@ export function provideCanvasDoc<
           pageInfo.elem.setAttribute("data-cache-key", result.cacheKey);
         }
 
-        await timeout(0);
+        await waitABit();
       }
 
       console.log("updateCanvas done", performance.now() - perf);
