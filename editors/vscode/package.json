@@ -38,19 +38,18 @@
                 {
                     "id": "tinymist.side-symbol-view",
                     "type": "webview",
-                    "name": "Symbol View",
-                    "when": "resourceLangId == typst"
+                    "name": "Symbol View"
                 },
                 {
                     "id": "tinymist.preview.content-preview",
                     "type": "webview",
                     "name": "Content",
-                    "when": "(config.tinymist.preview.showInActivityBar || config.typst-preview.showInActivityBar) && resourceLangId == typst"
+                    "when": "(config.tinymist.preview.showInActivityBar || config.typst-preview.showInActivityBar)"
                 },
                 {
                     "id": "tinymist.preview.outline",
                     "name": "Outline",
-                    "when": "(config.tinymist.preview.showInActivityBar || config.typst-preview.showInActivityBar) && resourceLangId == typst"
+                    "when": "(config.tinymist.preview.showInActivityBar || config.typst-preview.showInActivityBar)"
                 }
             ]
         },
