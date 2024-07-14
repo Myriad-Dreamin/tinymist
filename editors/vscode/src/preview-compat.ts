@@ -311,6 +311,7 @@ interface LaunchTask {
     bindDocument: vscode.TextDocument;
     mode: "doc" | "slide";
     webviewPanel?: vscode.WebviewPanel;
+    isDev?: boolean;
 }
 
 export interface LaunchInBrowserTask extends LaunchTask {

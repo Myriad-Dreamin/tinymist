@@ -59,10 +59,11 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand("typst-preview.preview", launch("webview", "doc")),
+        vscode.commands.registerCommand("typst-preview.preview", launch("webview", "doc", true)),
         vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
         vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
-        vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide"))
+        vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide")),
+        vscode.commands.registerCommand("tinymist.previewDev", launch("webview", "doc", true))
     );
     context.subscriptions.push(
         vscode.commands.registerCommand(
@@ -82,7 +83,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     }
 
     launchImpl = isCompat ? launchPreviewCompat : launchPreviewLsp;
-    function launch(kind: "browser" | "webview", mode: "doc" | "slide") {
+    function launch(kind: "browser" | "webview", mode: "doc" | "slide", isDev = false) {
         return async () => {
             const activeEditor = vscode.window.activeTextEditor;
             if (!activeEditor) {
@@ -96,6 +97,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
                 activeEditor,
                 bindDocument,
                 mode,
+                isDev,
             }).catch((e) => {
                 vscode.window.showErrorMessage(`failed to launch preview: ${e}`);
             });
@@ -190,7 +192,7 @@ interface TaskControlBlock {
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
 async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask) {
-    const { kind, context, activeEditor, bindDocument, webviewPanel } = task;
+    const { kind, context, activeEditor, bindDocument, webviewPanel, isDev } = task;
     if (activeTask.has(bindDocument)) {
         const { panel } = activeTask.get(bindDocument)!;
         if (panel) {
@@ -265,15 +267,15 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         const ivArgs = getPreviewConfCompat<string>("invertColors");
         const invertColorsArgs = ivArgs ? ["--invert-colors", ivArgs] : [];
         const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
+        const dataPlaneHostArgs = !isDev ? ["--data-plane-host", "127.0.0.1:0"] : [];
         const { dataPlanePort, staticServerPort } = await commandStartPreview([
             "--task-id",
             taskId,
             "--refresh-style",
             refreshStyle,
-            "--data-plane-host",
-            "127.0.0.1:0",
             "--static-file-host",
             "127.0.0.1:0",
+            ...dataPlaneHostArgs,
             ...partialRenderingArgs,
             ...invertColorsArgs,
             ...previewInSlideModeArgs,
