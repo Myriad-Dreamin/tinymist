@@ -5,9 +5,9 @@ use crate::{prelude::*, SyntaxRequest};
 /// The [`experimental/onEnter`] request is sent from client to server to handle
 /// the <kbd>Enter</kbd> key press.
 ///
-/// - kbd:[Enter] inside triple-slash comments automatically inserts `///`
-/// - kbd:[Enter] in the middle or after a trailing space in `//` inserts `//`
-/// - kbd:[Enter] inside `//!` doc comments automatically inserts `//!`
+/// - `kbd:Enter` inside triple-slash comments automatically inserts `///`
+/// - `kbd:Enter` in the middle or after a trailing space in `//` inserts `//`
+/// - `kbd:Enter` inside `//!` doc comments automatically inserts `//!`
 ///
 /// [`experimental/onEnter`]: https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter
 ///

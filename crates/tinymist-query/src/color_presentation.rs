@@ -18,8 +18,9 @@ use crate::prelude::*;
 /// This request was introduced in specification version 3.6.0.
 ///
 /// This request has no special capabilities and registration options since it
-/// is sent as a resolve request for the
-/// [`textDocument/documentColor`](Self::document_color) request.
+/// is sent as a resolve request for the [`textDocument/documentColor`] request.
+///
+/// [`textDocument/documentColor`]: https://microsoft.github.io/language-server-protocol/specification#textDocument_documentColor
 #[derive(Debug, Clone)]
 pub struct ColorPresentationRequest {
     /// The path of the document to request color presentations for.

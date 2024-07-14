@@ -15,7 +15,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
-use task::{ExportConfig, FormatConfig, FormatTask, UserActionTask};
+use task::{ExportUserConfig, FormatTask, FormatUserConfig, UserActionTask};
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
     get_semantic_tokens_unregistration, PageSelection, SemanticTokenContext,
@@ -111,7 +111,7 @@ impl LanguageState {
             const_config.tokens_overlapping_token_support,
             const_config.tokens_multiline_token_support,
         );
-        let formatter = FormatTask::new(FormatConfig {
+        let formatter = FormatTask::new(FormatUserConfig {
             mode: config.formatter,
             width: config.formatter_print_width,
             position_encoding: const_config.position_encoding,
@@ -481,8 +481,8 @@ impl LanguageState {
         if config.compile.output_path != self.config.compile.output_path
             || config.compile.export_pdf != self.config.compile.export_pdf
         {
-            let config = ExportConfig {
-                substitute_pattern: self.config.compile.output_path.clone(),
+            let config = ExportUserConfig {
+                output: self.config.compile.output_path.clone(),
                 mode: self.config.compile.export_pdf,
             };
 
@@ -513,7 +513,7 @@ impl LanguageState {
                 error!("could not change formatter config: {err}");
             }
 
-            self.formatter.change_config(FormatConfig {
+            self.formatter.change_config(FormatUserConfig {
                 mode: self.config.formatter,
                 width: self.config.formatter_print_width,
                 position_encoding: self.const_config.position_encoding,
@@ -667,7 +667,7 @@ impl LanguageState {
         let source = self
             .query_source(path, |source: typst::syntax::Source| Ok(source))
             .map_err(|e| internal_error(format!("could not format document: {e}")))?;
-        self.client.schedule(req_id, self.formatter.exec(source))
+        self.client.schedule(req_id, self.formatter.run(source))
     }
 
     fn inlay_hint(&mut self, req_id: RequestId, params: InlayHintParams) -> ScheduledResult {

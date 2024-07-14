@@ -1,3 +1,7 @@
+//! Task are stateless actors that staring computing tasks.
+//! [`SyncTaskFactory`] can hold *mutable* configuration but the mutations don't
+//! blocking the computation, i.e. the mutations are non-blocking.
+
 mod export;
 pub use export::*;
 mod format;
@@ -15,12 +19,18 @@ use reflexo::TakeAs;
 #[derive(Clone, Default)]
 struct SyncTaskFactory<T>(Arc<std::sync::RwLock<Arc<T>>>);
 
+impl<T> SyncTaskFactory<T> {
+    pub fn new(config: T) -> Self {
+        Self(Arc::new(std::sync::RwLock::new(Arc::new(config))))
+    }
+}
+
 impl<T: Clone> SyncTaskFactory<T> {
     fn mutate(&self, f: impl FnOnce(&mut T)) {
         let mut w = self.0.write().unwrap();
-        let mut data = w.clone().take();
-        f(&mut data);
-        *w = Arc::new(data);
+        let mut config = w.clone().take();
+        f(&mut config);
+        *w = Arc::new(config);
     }
 
     fn task(&self) -> Arc<T> {
@@ -42,21 +52,21 @@ struct FutureFolder {
 }
 
 impl FutureFolder {
-    fn spawn(&self, revision: usize, fut: FoldFuture) {
+    fn spawn(&self, revision: usize, fut: impl FnOnce() -> FoldFuture) {
         let mut state = self.state.lock();
         let state = state.deref_mut();
 
         match &mut state.task {
             Some((prev_revision, prev)) => {
                 if *prev_revision < revision {
-                    *prev = fut;
+                    *prev = fut();
                     *prev_revision = revision;
                 }
 
                 return;
             }
             next_update => {
-                *next_update = Some((revision, fut));
+                *next_update = Some((revision, fut()));
             }
         }
 
