@@ -620,16 +620,20 @@ export function provideSvgDoc<
         );
 
         const tok = (this.canvasRenderCToken = new TypstCancellationToken());
-        setTimeout(async () => {
-          await waitCancel;
-          this.updateCanvas(pagesInCanvasMode, {
-            cancel: tok,
-          }).finally(() => {
-            if (tok === this.canvasRenderCToken) {
-              this.canvasRenderCToken = undefined;
-            }
-          });
-        }, 100);
+        requestIdleCallback(
+          async () => {
+            await waitCancel;
+            this.updateCanvas(pagesInCanvasMode, {
+              cancel: tok,
+              lazy: true,
+            }).finally(() => {
+              if (tok === this.canvasRenderCToken) {
+                this.canvasRenderCToken = undefined;
+              }
+            });
+          },
+          { timeout: 1000 }
+        );
       }
 
       if (this.isContentPreview) {
