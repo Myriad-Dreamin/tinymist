@@ -13,7 +13,7 @@ export interface TypstSvgDocument {
 export function provideSvgDoc<
   TBase extends GConstructor<
     TypstDocumentContext & Partial<TypstCanvasDocument>
-  >
+  >,
 >(Base: TBase): TBase & GConstructor<TypstSvgDocument> {
   return class SvgDocument extends Base {
     /// canvas render ctoken
@@ -61,26 +61,26 @@ export function provideSvgDoc<
       const t3 = performance.now();
 
       if (this.cursorPaths) {
-        for (const c of document.querySelectorAll('.typst-svg-cursor')) {
+        for (const c of document.querySelectorAll(".typst-svg-cursor")) {
           c.remove();
         }
-        console.log('svg post check cursorPaths', this.cursorPaths);
+        console.log("svg post check cursorPaths", this.cursorPaths);
 
         // Draw cursors by element paths
         for (const p of this.cursorPaths) {
           const leaf = resolveSourceLeaf(this.hookedElem, p);
           if (!leaf) {
-            console.log('svg post check cursorPaths leaf not found', p);
+            console.log("svg post check cursorPaths leaf not found", p);
             continue;
           }
-          console.log('svg post check cursorPaths leaf', leaf);
+          console.log("svg post check cursorPaths leaf", leaf);
 
           // Finds glyphs in the text element
           let useIdx = 0;
           let foundUse: SVGUseElement | undefined = undefined;
           let foundUseNext: SVGUseElement | undefined = undefined;
           for (const use of leaf[0].children) {
-            if (use.tagName === 'use') {
+            if (use.tagName === "use") {
               useIdx++;
               if (useIdx == leaf[1]) {
                 foundUse = use as SVGUseElement;
@@ -101,10 +101,13 @@ export function provideSvgDoc<
             const rectNextBase = foundUseNext?.getBBox();
             const rect = {
               // Some char does not have position so they are resolved to 0
-              right: (rectBase.width !== 0) ? (rectBase.x + rectBase.width) : (rectNextBase?.x || 0),
+              right:
+                rectBase.width !== 0
+                  ? rectBase.x + rectBase.width
+                  : rectNextBase?.x || 0,
               // todo: have bug
               // top: textBase.height / 2,
-            }
+            };
 
             // Gets transform matrix
             const mat = g.getScreenCTM();
@@ -128,13 +131,16 @@ export function provideSvgDoc<
             ry = Math.abs(ry);
 
             // Creates a circle with 5px radius (but regard vertical and horizontal scale)
-            const t = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
-            t.classList.add('typst-svg-cursor');
-            t.setAttribute('cx', `${rect.right}`);
+            const t = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "ellipse"
+            );
+            t.classList.add("typst-svg-cursor");
+            t.setAttribute("cx", `${rect.right}`);
             // t.setAttribute('cy', `${rect.top}`);
-            t.setAttribute('rx', `${rx}`);
-            t.setAttribute('ry', `${ry}`);
-            t.setAttribute('fill', '#86C16688');
+            t.setAttribute("rx", `${rx}`);
+            t.setAttribute("ry", `${ry}`);
+            t.setAttribute("fill", "#86C16688");
             leaf[0].appendChild(t);
           }
         }
@@ -489,8 +495,8 @@ export function provideSvgDoc<
 
         /// Move page to the correct position
         pageElem.setAttribute("transform", translateAttr);
-        pageElem.setAttribute("data-x", `${calculatedPaddedX}`)
-        pageElem.setAttribute("data-y", `${calculatedPaddedY}`)
+        pageElem.setAttribute("data-x", `${calculatedPaddedX}`);
+        pageElem.setAttribute("data-y", `${calculatedPaddedY}`);
 
         /// Insert rectangles
         // todo: this is buggy not preserving order?
