@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tinymist_query::analysis::Analysis;
 use tinymist_query::ExportKind;
 use tinymist_render::PeriscopeRenderer;
-use tokio::sync::{mpsc, watch};
+use tokio::sync::mpsc;
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 use typst_ts_core::config::compiler::EntryState;
 
@@ -48,7 +48,6 @@ impl LanguageState {
         inputs: ImmutDict,
         snapshot: FileChangeSet,
     ) -> CompileClientActor {
-        let (doc_tx, _) = watch::channel(None);
         let (intr_tx, intr_rx) = mpsc::unbounded_channel();
 
         // Run Export actors before preparing cluster to avoid loss of events
@@ -76,7 +75,6 @@ impl LanguageState {
             inner: std::sync::Arc::new(parking_lot::RwLock::new(None)),
             diag_group: editor_group.clone(),
             intr_tx: intr_tx.clone(),
-            doc_tx,
             export: export.clone(),
             editor_tx: self.editor_tx.clone(),
             analysis: Analysis {
