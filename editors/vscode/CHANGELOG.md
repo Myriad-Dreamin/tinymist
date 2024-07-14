@@ -16,7 +16,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Editor
 
-* (Fix) annoying often detached views in https://github.com/Myriad-Dreamin/tinymist/pull/414
+* (Fix) Showing views in activity bar whenever the extension is activated in https://github.com/Myriad-Dreamin/tinymist/pull/414
 
 ## Hover (Tooltip)
 
@@ -28,13 +28,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
   * Improve performance when updating document quickly.
 * (Fix) Fixed some corner cases of serving preview in https://github.com/Myriad-Dreamin/tinymist/pull/385
 * (Fix) Scrolling source correctly when no text editor is active in https://github.com/Myriad-Dreamin/tinymist/pull/395
-* (Fix) Broken content preview in https://github.com/Myriad-Dreamin/tinymist/pull/413
+* (Fix) Updating content preview incrementally again in https://github.com/Myriad-Dreamin/tinymist/pull/413
 
 ## Misc
 
-* Add typlite for typst's doc comments in https://github.com/Myriad-Dreamin/tinymist/pull/398
+* Added typlite for typst's doc comments in https://github.com/Myriad-Dreamin/tinymist/pull/398
 * Documented tinymist crate in https://github.com/Myriad-Dreamin/tinymist/pull/390
-* (Fix) Perform cyclic loop dependence correctly when checking def-use relation across module in https://github.com/Myriad-Dreamin/tinymist/pull/396
+* (Fix) Performing cyclic loop dependence correctly when checking def-use relation across module in https://github.com/Myriad-Dreamin/tinymist/pull/396
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.14...v0.11.15
 
