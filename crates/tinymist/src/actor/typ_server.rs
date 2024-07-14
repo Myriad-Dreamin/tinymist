@@ -153,6 +153,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompilationHandle<F>
 }
 
 pub enum Interrupt<F: CompilerFeat> {
+    /// Compile anyway.
+    Compile,
     /// Compiled from computing thread.
     Compiled(CompiledArtifact<F>),
     /// Change the watching entry.
@@ -629,6 +631,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         use CompilerResponse::*;
 
         match event {
+            Interrupt::Compile => reason_by_entry_change(),
             Interrupt::Snapshot(task) => {
                 log::debug!("CompileServerActor: take snapshot");
                 let _ = task.send(

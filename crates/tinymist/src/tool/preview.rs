@@ -11,7 +11,7 @@ use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::{analysis::Analysis, PositionEncoding};
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{mpsc, oneshot};
 use typst::foundations::{Str, Value};
 use typst::layout::{Frame, FrameItem, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
@@ -252,39 +252,6 @@ impl PreviewState {
             mut shutdown_rx,
         } = lsp_rx;
 
-        // Ensure the preview can receive a first compilation.
-        let tid = task_id.clone();
-        let cc = compile_handler.clone();
-        let snap = compile_handler.snapshot();
-        let doc_rx = compile_handler.doc_tx.subscribe();
-        let compile_fence = async move {
-            let now = reflexo::time::now();
-            // The fence
-            let artifact = snap.ok()?.snapshot().await.ok()?.compile().await;
-
-            let w = cc.inner.read();
-            let w = w.as_ref()?;
-            if w.task_id() != tid {
-                return None;
-            }
-
-            // But we just send a latest document to the previewer.
-            let latest_doc = match doc_rx.borrow().clone() {
-                Some(doc) => Ok(doc),
-                None => artifact
-                    .doc
-                    .clone()
-                    .map_err(|_| CompileStatus::CompileError),
-            };
-
-            let has_doc = latest_doc.is_ok();
-            let elapsed = now.elapsed().unwrap_or_default();
-            log::info!("PreviewTask({tid}): put fence in {elapsed:?}? {has_doc}");
-            w.notify_compile(latest_doc, true);
-
-            Some(())
-        };
-
         // Create a previewer
         let previewer = preview(
             args.preview,
@@ -332,14 +299,13 @@ impl PreviewState {
         });
 
         let preview_tx = self.preview_tx.clone();
-        let handle = self.client.handle.clone();
         just_future(async move {
             let previewer = previewer.await;
             compile_handler.register_preview(previewer.compile_watcher().clone());
 
             // Put a fence to ensure the previewer can receive the first compilation.   z
             // The fence must be put after the previewer is initialized.
-            handle.spawn(compile_fence);
+            compile_handler.flush_compile();
 
             let (ss_addr, ss_killer, ss_handle) =
                 make_static_host(&previewer, args.static_file_host, args.preview_mode);
@@ -503,7 +469,6 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
 
     let (service, handle) = {
         // type EditorSender = mpsc::UnboundedSender<EditorRequest>;
-        let (doc_tx, _) = watch::channel(None);
         let (editor_tx, mut editor_rx) = mpsc::unbounded_channel();
         let (intr_tx, intr_rx) = mpsc::unbounded_channel();
 
@@ -511,7 +476,6 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             inner: Default::default(),
             diag_group: "main".to_owned(),
             intr_tx: intr_tx.clone(),
-            doc_tx,
             // export_tx,
             export: Default::default(),
             editor_tx,

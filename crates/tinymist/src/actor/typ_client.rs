@@ -39,11 +39,10 @@ use tinymist_query::{
     StatefulRequest, VersionedDocument,
 };
 use tinymist_render::PeriscopeRenderer;
-use tokio::sync::{mpsc, oneshot, watch};
+use tokio::sync::{mpsc, oneshot};
 use typst::{
     diag::{PackageError, SourceDiagnostic},
     layout::Position,
-    model::Document as TypstDocument,
     syntax::package::PackageSpec,
     World as TypstWorld,
 };
@@ -74,7 +73,6 @@ pub struct CompileHandler {
     pub(crate) inner: Arc<parking_lot::RwLock<Option<Arc<typst_preview::CompileWatcher>>>>,
 
     pub(crate) intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
-    pub(crate) doc_tx: watch::Sender<Option<Arc<TypstDocument>>>,
     pub(crate) export: ExportTask,
     pub(crate) editor_tx: EditorSender,
 }
@@ -91,6 +89,11 @@ impl CompileHandler {
             rx: Arc::new(Mutex::new(Some(rx))),
             snap: tokio::sync::OnceCell::new(),
         })
+    }
+
+    pub fn flush_compile(&self) {
+        // todo: better way to flush compile
+        let _ = self.intr_tx.send(Interrupt::Compile);
     }
 
     pub fn add_memory_changes(&self, event: MemoryEvent) {
@@ -292,10 +295,6 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             snap.env.tracer.as_ref().map(|e| e.clone().warnings()),
         );
 
-        if let Ok(doc) = &snap.doc {
-            let _ = self.doc_tx.send(Some(doc.clone()));
-        }
-
         self.export.signal(snap, snap.signal);
 
         self.editor_tx
@@ -315,7 +314,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
                 .doc
                 .clone()
                 .map_err(|_| typst_preview::CompileStatus::CompileError);
-            inner.notify_compile(res, snap.signal.by_fs_events);
+            inner.notify_compile(res, snap.signal.by_fs_events || snap.signal.by_entry_update);
         }
     }
 }
