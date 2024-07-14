@@ -180,6 +180,8 @@ async function startClient(context: ExtensionContext): Promise<void> {
         if (dispose) {
             dispose();
             delete previewDisposes[taskId];
+        } else {
+            console.warn("No dispose function found for task", taskId);
         }
     });
 

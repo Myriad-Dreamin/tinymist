@@ -6,7 +6,7 @@ use std::{borrow::Cow, collections::HashMap, net::SocketAddr, path::Path, sync::
 use anyhow::Context;
 use hyper::service::{make_service_fn, service_fn};
 use lsp_types::notification::Notification;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
@@ -514,16 +514,6 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let _ = tokio::join!(previewer.join(), static_server_handle);
 
     Ok(())
-}
-
-#[derive(Serialize, Deserialize)]
-struct DisposePreview {
-    task_id: String,
-}
-
-impl Notification for DisposePreview {
-    type Params = Self;
-    const METHOD: &'static str = "tinymist/preview/dispose";
 }
 
 struct ScrollSource;
