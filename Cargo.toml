@@ -103,7 +103,7 @@ typst-ts-core = { version = "0.5.0-rc5", default-features = false }
 typst-ts-compiler = { version = "0.5.0-rc5" }
 typst-ts-svg-exporter = { version = "0.5.0-rc5" }
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
-typstyle = { version = "0.11.29", default-features = false }
+typstyle = { version = "0.11.30", default-features = false }
 
 # LSP
 crossbeam-channel = "0.5.12"

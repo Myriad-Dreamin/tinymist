@@ -4441,9 +4441,9 @@ dependencies = [
 
 [[package]]
 name = "typstyle"
-version = "0.11.29"
+version = "0.11.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3986aeeab2d56070e7a63a86f04d1f0d4aec98abaf5cec8fb4c3616caf6fe331"
+checksum = "e9faebdb185575bc0f43a0f2af010c7cff314764c7df896a506ea1b55f0a82b8"
 dependencies = [
  "anyhow",
  "itertools 0.13.0",
