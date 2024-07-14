@@ -3799,7 +3799,7 @@ version = "0.11.15-rc3"
 name = "tinymist-assets"
 version = "0.11.15-rc3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fa20a81901061f3fba8031e4f60653ebdaf0320e78fb7c788f48a90e48cc2cd"
+checksum = "ee30d36918e2179d63c49633e4f7e742b024a318629486c19c330dfaa467d0eb"
 
 [[package]]
 name = "tinymist-query"
