@@ -4,9 +4,9 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## v0.11.15 - [2024-07-14]
+## v0.11.15 - [2024-07-15]
 
-* Bumped typstyle to v0.11.29 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/410
+* Bumped typstyle to v0.11.30 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/416
 
 ## Compiler
 
@@ -29,14 +29,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 * (Fix) Fixed some corner cases of serving preview in https://github.com/Myriad-Dreamin/tinymist/pull/385
 * (Fix) Scrolling source correctly when no text editor is active in https://github.com/Myriad-Dreamin/tinymist/pull/395
 * (Fix) Updating content preview incrementally again in https://github.com/Myriad-Dreamin/tinymist/pull/413
+* (Fix) wrong serialization of `task_id` v.s. `taskId` in https://github.com/Myriad-Dreamin/tinymist/pull/417
 
 ## Misc
 
 * Added typlite for typst's doc comments in https://github.com/Myriad-Dreamin/tinymist/pull/398
 * Documented tinymist crate in https://github.com/Myriad-Dreamin/tinymist/pull/390
 * (Fix) Performing cyclic loop dependence correctly when checking def-use relation across module in https://github.com/Myriad-Dreamin/tinymist/pull/396
-
-**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.14...v0.11.15
 
 ## v0.11.14 - [2024-07-07]
 
