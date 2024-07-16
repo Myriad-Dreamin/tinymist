@@ -39,6 +39,9 @@ import { client, setClient } from "./lsp";
 let previewIsEnabled = false;
 
 export function activate(context: ExtensionContext): Promise<void> {
+    // Set a global context key to indicate that the extension is activated
+    vscode.commands.executeCommand("setContext", "ext.tinymistActivated", true);
+
     let config: Record<string, any> = JSON.parse(
         JSON.stringify(workspace.getConfiguration("tinymist"))
     );
