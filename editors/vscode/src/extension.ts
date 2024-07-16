@@ -37,6 +37,7 @@ import { DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, setClient } from "./lsp";
 
 let previewIsEnabled = false;
+let devKitIsEnabled = false;
 
 export function activate(context: ExtensionContext): Promise<void> {
     // Set a global context key to indicate that the extension is activated
@@ -47,6 +48,8 @@ export function activate(context: ExtensionContext): Promise<void> {
     );
 
     previewIsEnabled = config.previewFeature === "enable";
+    devKitIsEnabled =
+        vscode.ExtensionMode.Development == context.extensionMode || config.devKit === "enable";
     enableOnEnter = !!config.onEnterEvent;
 
     if (previewIsEnabled) {
@@ -77,6 +80,15 @@ export function activate(context: ExtensionContext): Promise<void> {
         // integrated preview extension
         previewSetIsTinymist(config);
         previewActivate(context, false);
+    }
+
+    if (devKitIsEnabled) {
+        vscode.commands.executeCommand("setContext", "ext.tinymistDevKit", true);
+
+        const devKitProvider = new DevKitProvider();
+        context.subscriptions.push(
+            vscode.window.registerTreeDataProvider("tinymist.dev-kit", devKitProvider)
+        );
     }
 
     return startClient(context).catch((e) => {
@@ -916,6 +928,42 @@ function determineVscodeTheme(): any {
 function triggerNamedCompletion() {
     vscode.commands.executeCommand("editor.action.triggerSuggest");
     vscode.commands.executeCommand("editor.action.triggerParameterHints");
+}
+
+class DevKitProvider implements vscode.TreeDataProvider<DevKitItem> {
+    constructor() {}
+
+    refresh(): void {}
+
+    getTreeItem(element: DevKitItem): vscode.TreeItem {
+        return element;
+    }
+
+    getChildren(element?: DevKitItem): Thenable<DevKitItem[]> {
+        if (element) {
+            return Promise.resolve([]);
+        }
+
+        return Promise.resolve([
+            new DevKitItem({
+                title: "Run Preview Dev",
+                command: "tinymist.previewDev",
+                tooltip: `Run Preview in Developing Mode. It sets data plane port to the fix default value.`,
+            }),
+        ]);
+    }
+}
+
+export class DevKitItem extends vscode.TreeItem {
+    constructor(
+        public readonly command: vscode.Command,
+        public description = ""
+    ) {
+        super(command.title, vscode.TreeItemCollapsibleState.None);
+        this.tooltip = this.command.tooltip || ``;
+    }
+
+    contextValue = "devkit-item";
 }
 
 // "tinymist.hoverPeriscope": {

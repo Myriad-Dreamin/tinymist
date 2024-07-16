@@ -59,7 +59,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand("typst-preview.preview", launch("webview", "doc", true)),
+        vscode.commands.registerCommand("typst-preview.preview", launch("webview", "doc")),
         vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
         vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
         vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide")),

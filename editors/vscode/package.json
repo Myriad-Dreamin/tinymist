@@ -42,6 +42,11 @@
                     "when": "ext.tinymistActivated"
                 },
                 {
+                    "id": "tinymist.dev-kit",
+                    "name": "DevKit View",
+                    "when": "ext.tinymistActivated && ext.tinymistDevKit"
+                },
+                {
                     "id": "tinymist.preview.content-preview",
                     "type": "webview",
                     "name": "Content",
