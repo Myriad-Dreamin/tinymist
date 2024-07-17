@@ -199,8 +199,7 @@ impl StatefulRequest for CompletionRequest {
 
                 replace_range = ctx.to_lsp_range(rng, &source);
             } else {
-                let lsp_start_position = ctx.to_lsp_pos(offset, &source);
-                replace_range = LspRange::new(lsp_start_position, self.position);
+                replace_range = ctx.to_lsp_range(offset..cursor, &source);
             }
 
             let completions = completions.iter().map(|typst_completion| {
