@@ -1197,7 +1197,8 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                     *apply_label = trimmed;
                 }
             }
-            if apply_label.starts_with('"') && self.before.ends_with('"') {
+            let from_before = slice_at(self.text, 0..self.from);
+            if apply_label.starts_with('"') && from_before.ends_with('"') {
                 if let Some(trimmed) = apply_label.strip_prefix('"') {
                     *apply_label = trimmed;
                 }
