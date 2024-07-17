@@ -8,6 +8,8 @@ mod format;
 pub use format::*;
 mod user_action;
 pub use user_action::*;
+mod spell_check;
+pub use spell_check::*;
 
 use std::{ops::DerefMut, pin::Pin, sync::Arc};
 

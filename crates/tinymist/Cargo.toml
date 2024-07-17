@@ -15,6 +15,7 @@ repository.workspace = true
 tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
 tinymist-render.workspace = true
+tinymist-lint.workspace = true
 sync-lsp.workspace = true
 
 once_cell.workspace = true
@@ -73,7 +74,7 @@ base64.workspace = true
 rayon.workspace = true
 
 [features]
-default = ["cli", "embed-fonts", "no-content-hint", "preview"]
+default = ["cli", "embed-fonts", "no-content-hint", "preview", "spell-check"]
 
 cli = ["sync-lsp/clap"]
 
@@ -98,6 +99,9 @@ preview = [
     "hyper",
     "open",
 ]
+
+spell-check = ["tinymist-lint/spell-check"]
+spell-check-typos = ["tinymist-lint/spell-check-typos"]
 
 [build-dependencies]
 anyhow.workspace = true

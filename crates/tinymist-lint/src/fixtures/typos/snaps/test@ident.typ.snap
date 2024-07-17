@@ -1,0 +1,6 @@
+---
+source: crates/tinymist-lint/src/typos.rs
+expression: check_typos(&src)
+input_file: crates/tinymist-lint/src/fixtures/typos/ident.typ
+---
+

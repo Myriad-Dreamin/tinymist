@@ -1,0 +1,7 @@
+---
+source: crates/tinymist-lint/src/typos.rs
+expression: check_typos(&src)
+input_file: crates/tinymist-lint/src/fixtures/typos/ident-correct.typ
+---
+5..15 -> ["container"]
+30..40 -> ["container"]

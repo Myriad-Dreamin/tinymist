@@ -1,0 +1,37 @@
+[package]
+name = "tinymist-lint"
+description = "Typst Linting."
+categories = ["compilers"]
+keywords = ["lsp", "language", "typst"]
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+
+once_cell.workspace = true
+anyhow.workspace = true
+comemo.workspace = true
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+typst.workspace = true
+
+typos = { version = "0.10", optional = true }
+typos-cli = { version = "1.23", optional = true }
+
+[dev-dependencies]
+insta.workspace = true
+
+[features]
+default = ["spell-check"]
+
+spell-check = ["spell-check-typos"]
+spell-check-typos = ["typos", "typos-cli"]
+
+[lints]
+workspace = true

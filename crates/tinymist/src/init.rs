@@ -272,8 +272,10 @@ pub struct Config {
     pub compile: CompileConfig,
     /// Dynamic configuration for semantic tokens.
     pub semantic_tokens: SemanticTokensMode,
-    /// Dynamic configuration for the experimental formatter.
+    /// Mode of the formatter.
     pub formatter: FormatterMode,
+    /// Mode of the spell checker.
+    pub spell_check: SpellCheckerMode,
     /// Dynamic configuration for the experimental formatter.
     pub formatter_print_width: u32,
 }
@@ -328,6 +330,8 @@ impl Config {
             .inspect(|v| self.semantic_tokens = *v);
         try_(|| FormatterMode::deserialize(update.get("formatterMode")?).ok())
             .inspect(|v| self.formatter = *v);
+        try_(|| SpellCheckerMode::deserialize(update.get("spellCheckerMode")?).ok())
+            .inspect(|v| self.spell_check = *v);
         try_(|| u32::deserialize(update.get("formatterPrintWidth")?).ok())
             .inspect(|v| self.formatter_print_width = *v);
         self.compile.update_by_map(update)?;
@@ -673,6 +677,17 @@ impl CompileConfig {
 
         Ok(())
     }
+}
+
+/// The mode of spell checkers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SpellCheckerMode {
+    /// Disable the spell checker.
+    #[default]
+    Disable,
+    /// Use `typos` spell checker.
+    Typos,
 }
 
 /// The mode of the formatter.

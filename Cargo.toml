@@ -136,6 +136,7 @@ tinymist-assets = { version = "0.11.15" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
 tinymist-render = { path = "./crates/tinymist-render/" }
+tinymist-lint = { path = "./crates/tinymist-lint/" }
 
 [profile.dev.package.insta]
 opt-level = 3

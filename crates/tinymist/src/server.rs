@@ -15,7 +15,10 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
-use task::{ExportUserConfig, FormatTask, FormatUserConfig, UserActionTask};
+use task::{
+    ExportUserConfig, FormatTask, FormatUserConfig, SpellCheckTask, SpellCheckUserConfig,
+    UserActionTask,
+};
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
     get_semantic_tokens_unregistration, PageSelection, SemanticTokenContext,
@@ -89,11 +92,11 @@ pub struct LanguageState {
     pub primary: Option<CompileClientActor>,
     /// The compiler actors for tasks
     // pub dedicates: Vec<CompileClientActor>,
-    /// The formatter tasks running in backend, which will be scheduled by async
-    /// runtime.
+    /// The formatter tasks running in backend.
     pub formatter: FormatTask,
-    /// The user action tasks running in backend, which will be scheduled by
-    /// async runtime.
+    /// The spell checker tasks running in backend.
+    pub spell_checker: SpellCheckTask,
+    /// The user action tasks running in backend.
     pub user_action: UserActionTask,
 }
 
@@ -117,6 +120,14 @@ impl LanguageState {
             position_encoding: const_config.position_encoding,
         });
 
+        let spell_checker = SpellCheckTask::new(
+            client.cast(|s| &mut s.spell_checker),
+            SpellCheckUserConfig {
+                mode: config.spell_check,
+                position_encoding: const_config.position_encoding,
+            },
+        );
+
         Self {
             client: client.clone(),
             editor_tx,
@@ -135,6 +146,7 @@ impl LanguageState {
             focusing: None,
             tokens_ctx,
             formatter,
+            spell_checker,
             user_action: Default::default(),
         }
     }
@@ -842,11 +854,15 @@ impl LanguageState {
         let now = Time::now();
         let path: ImmutPath = path.into();
 
+        let src = Source::detached(content.clone());
+
+        self.spell_checker.syntax_level(src.clone());
+
         self.memory_changes.insert(
             path.clone(),
             MemoryFileMeta {
                 mt: now,
-                content: Source::detached(content.clone()),
+                content: src,
             },
         );
 
@@ -862,6 +878,8 @@ impl LanguageState {
     /// Remove a source file.
     pub fn remove_source(&mut self, path: PathBuf) -> Result<(), Error> {
         let path: ImmutPath = path.into();
+
+        self.spell_checker.remove_syntax_level(path.clone());
 
         self.memory_changes.remove(&path);
         log::info!("remove source: {path:?}");
@@ -902,6 +920,8 @@ impl LanguageState {
         }
 
         meta.mt = now;
+
+        self.spell_checker.syntax_level(meta.content.clone());
 
         let snapshot = FileResult::Ok((now, meta.content.text().as_bytes().into())).into();
 
