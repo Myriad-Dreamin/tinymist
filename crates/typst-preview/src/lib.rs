@@ -20,7 +20,7 @@ use futures::SinkExt;
 use log::info;
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{broadcast, mpsc, oneshot, watch};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::{layout::Position, syntax::Span};
@@ -172,7 +172,7 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
                 });
                 let render_actor = actor::render::RenderActor::new(
                     renderer_tx.subscribe(),
-                    doc_sender.subscribe(),
+                    doc_sender.clone(),
                     typst_tx,
                     svg.0,
                     webview_tx,
@@ -180,7 +180,7 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
                 tokio::spawn(render_actor.run());
                 let outline_render_actor = actor::render::OutlineRenderActor::new(
                     renderer_tx.subscribe(),
-                    doc_sender.subscribe(),
+                    doc_sender.clone(),
                     editor_tx.clone(),
                     span_interner,
                 );
@@ -292,7 +292,7 @@ pub struct PreviewBuilder {
     renderer_mailbox: BroadcastChannel<RenderActorRequest>,
     editor_conn: MpScChannel<EditorActorRequest>,
     webview_conn: BroadcastChannel<WebviewActorRequest>,
-    doc_sender: watch::Sender<Option<Arc<Document>>>,
+    doc_sender: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
 
     compile_watcher: OnceCell<Arc<CompileWatcher>>,
 }
@@ -306,7 +306,7 @@ impl PreviewBuilder {
             renderer_mailbox: broadcast::channel(1024),
             editor_conn: mpsc::unbounded_channel(),
             webview_conn: broadcast::channel(32),
-            doc_sender: watch::channel(None).0,
+            doc_sender: Arc::new(std::sync::RwLock::new(None)),
             compile_watcher: OnceCell::new(),
         }
     }
@@ -428,7 +428,7 @@ pub struct MemoryFilesShort {
 pub struct CompileWatcher {
     task_id: String,
     refresh_style: RefreshStyle,
-    doc_sender: watch::Sender<Option<Arc<Document>>>,
+    doc_sender: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
     render_tx: broadcast::Sender<RenderActorRequest>,
 }
@@ -457,7 +457,7 @@ impl CompileWatcher {
         match res {
             Ok(doc) => {
                 // it is ok to ignore the error here
-                let _ = self.doc_sender.send(Some(doc));
+                *self.doc_sender.write().unwrap() = Some(doc);
 
                 // todo: is it right that ignore zero broadcast receiver?
                 let _ = self.render_tx.send(RenderActorRequest::RenderIncremental);
