@@ -93,7 +93,10 @@ impl LanguageState {
 
     /// Start a preview instance.
     #[cfg(feature = "preview")]
-    pub fn start_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn start_preview(
+        &mut self,
+        mut args: Vec<JsonValue>,
+    ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
         use std::path::Path;
 
         use crate::tool::preview::PreviewCliArgs;

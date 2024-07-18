@@ -6,7 +6,9 @@ mod outline;
 pub use actor::editor::{
     CompileStatus, ControlPlaneMessage, ControlPlaneResponse, LspControlPlaneRx, LspControlPlaneTx,
 };
+use actor::webview::WebviewActorRequest;
 pub use args::*;
+use once_cell::sync::OnceCell;
 pub use outline::Outline;
 
 use std::pin::Pin;
@@ -29,93 +31,7 @@ use typst_ts_core::{ImmutStr, TypstDocument as Document};
 use crate::actor::editor::EditorActorRequest;
 use crate::actor::render::RenderActorRequest;
 use actor::editor::{EditorActor, EditorConnection};
-use actor::typst::TypstActor;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DocToSrcJumpInfo {
-    pub filepath: String,
-    pub start: Option<(usize, usize)>, // row, column
-    pub end: Option<(usize, usize)>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ChangeCursorPositionRequest {
-    filepath: PathBuf,
-    line: usize,
-    /// fixme: character is 0-based, UTF-16 code unit.
-    /// We treat it as UTF-8 now.
-    character: usize,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SrcToDocJumpRequest {
-    filepath: PathBuf,
-    line: usize,
-    /// fixme: character is 0-based, UTF-16 code unit.
-    /// We treat it as UTF-8 now.
-    character: usize,
-}
-
-impl SrcToDocJumpRequest {
-    pub fn to_byte_offset(&self, src: &typst::syntax::Source) -> Option<usize> {
-        src.line_column_to_byte(self.line, self.character)
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct MemoryFiles {
-    pub files: HashMap<PathBuf, String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct MemoryFilesShort {
-    pub files: Vec<PathBuf>,
-    // mtime: Option<u64>,
-}
-
-pub struct CompileWatcher {
-    task_id: String,
-    refresh_style: RefreshStyle,
-    doc_sender: watch::Sender<Option<Arc<Document>>>,
-    editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
-    render_tx: broadcast::Sender<RenderActorRequest>,
-}
-
-impl CompileWatcher {
-    pub fn task_id(&self) -> &str {
-        &self.task_id
-    }
-
-    pub fn status(&self, status: CompileStatus) {
-        let _ = self
-            .editor_tx
-            .send(EditorActorRequest::CompileStatus(status));
-    }
-
-    pub fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>, is_on_saved: bool) {
-        if self.refresh_style == RefreshStyle::OnSave && !is_on_saved {
-            return;
-        }
-
-        match res {
-            Ok(doc) => {
-                // it is ok to ignore the error here
-                let _ = self.doc_sender.send(Some(doc));
-
-                // todo: is it right that ignore zero broadcast receiver?
-                let _ = self.render_tx.send(RenderActorRequest::RenderIncremental);
-                let _ = self.editor_tx.send(EditorActorRequest::CompileStatus(
-                    CompileStatus::CompileSuccess,
-                ));
-            }
-            Err(status) => {
-                let _ = self
-                    .editor_tx
-                    .send(EditorActorRequest::CompileStatus(status));
-            }
-        }
-    }
-}
+use actor::typst::{TypstActor, TypstActorRequest};
 
 type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
@@ -125,7 +41,6 @@ pub struct Previewer {
     data_plane_handle: tokio::task::JoinHandle<()>,
     control_plane_handle: tokio::task::JoinHandle<()>,
     data_plane_port: u16,
-    compile_watcher: Arc<CompileWatcher>,
 }
 
 impl Previewer {
@@ -136,10 +51,6 @@ impl Previewer {
 
     pub fn data_plane_port(&self) -> u16 {
         self.data_plane_port
-    }
-
-    pub fn compile_watcher(&self) -> &Arc<CompileWatcher> {
-        &self.compile_watcher
     }
 
     /// Join the previewer actors.
@@ -154,85 +65,37 @@ impl Previewer {
     }
 }
 
-pub type SourceLocation = typst_ts_core::debug_loc::SourceLocation;
-
-pub enum Location {
-    Src(SourceLocation),
-}
-
-pub trait SourceFileServer {
-    fn resolve_source_span(
-        &self,
-        _by: Location,
-    ) -> impl Future<Output = Result<Option<SourceSpanOffset>, Error>> + Send {
-        async { Ok(None) }
-    }
-
-    fn resolve_document_position(
-        &self,
-        _by: Location,
-    ) -> impl Future<Output = Result<Option<Position>, Error>> + Send {
-        async { Ok(None) }
-    }
-
-    fn resolve_source_location(
-        &self,
-        _s: Span,
-        _offset: Option<usize>,
-    ) -> impl Future<Output = Result<Option<DocToSrcJumpInfo>, Error>> + Send {
-        async { Ok(None) }
-    }
-}
-
-pub trait EditorServer {
-    fn update_memory_files(
-        &self,
-        _files: MemoryFiles,
-        _reset_shadow: bool,
-    ) -> impl Future<Output = Result<(), Error>> + Send {
-        async { Ok(()) }
-    }
-
-    fn remove_shadow_files(
-        &self,
-        _files: MemoryFilesShort,
-    ) -> impl Future<Output = Result<(), Error>> + Send {
-        async { Ok(()) }
-    }
-}
-
 pub trait CompileHost: SourceFileServer + EditorServer {}
 
 pub async fn preview<T: CompileHost + Send + Sync + 'static>(
     arguments: PreviewArgs,
     client: Arc<T>,
-    lsp_connection: Option<LspControlPlaneTx>,
     html: &str,
 ) -> Previewer {
-    let enable_partial_rendering = arguments.enable_partial_rendering;
-    let invert_colors = arguments.invert_colors;
-    let idle_timeout = Duration::from_secs(5);
+    PreviewBuilder::new(arguments, client).start(html).await
+}
 
-    // Creates the world that serves sources, fonts and files.
-    let actor::typst::Channels {
+async fn preview_<T: CompileHost + Send + Sync + 'static>(
+    builder: PreviewBuilder<T>,
+    html: &str,
+) -> Previewer {
+    let PreviewBuilder {
+        arguments,
+        client,
+        lsp_connection,
         typst_mailbox,
         renderer_mailbox,
         editor_conn,
         webview_conn: (webview_tx, _),
-    } = TypstActor::<()>::set_up_channels();
+        doc_sender,
+        ..
+    } = builder;
+    let enable_partial_rendering = arguments.enable_partial_rendering;
+    let invert_colors = arguments.invert_colors;
+    let idle_timeout = Duration::from_secs(5);
 
     // Shared resource
     let span_interner = SpanInterner::new();
-
-    // Set callback
-    let doc_watcher = watch::channel::<Option<Arc<Document>>>(None);
-    let compile_watcher = CompileWatcher {
-        task_id: arguments.task_id,
-        refresh_style: arguments.refresh_style,
-        doc_sender: doc_watcher.0,
-        editor_tx: editor_conn.0.clone(),
-        render_tx: renderer_mailbox.0.clone(),
-    };
 
     // Spawns the typst actor
     let typst_actor = TypstActor::new(
@@ -309,7 +172,7 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
                 });
                 let render_actor = actor::render::RenderActor::new(
                     renderer_tx.subscribe(),
-                    doc_watcher.1.clone(),
+                    doc_sender.subscribe(),
                     typst_tx,
                     svg.0,
                     webview_tx,
@@ -317,7 +180,7 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
                 tokio::spawn(render_actor.run());
                 let outline_render_actor = actor::render::OutlineRenderActor::new(
                     renderer_tx.subscribe(),
-                    doc_watcher.1.clone(),
+                    doc_sender.subscribe(),
                     editor_tx.clone(),
                     span_interner,
                 );
@@ -415,7 +278,196 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
         control_plane_handle,
         data_plane_port,
         stop: Some(Box::new(stop)),
-        compile_watcher: Arc::new(compile_watcher),
+    }
+}
+
+type MpScChannel<T> = (mpsc::UnboundedSender<T>, mpsc::UnboundedReceiver<T>);
+type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
+
+pub struct PreviewBuilder<T> {
+    arguments: PreviewArgs,
+    client: Arc<T>,
+    lsp_connection: Option<LspControlPlaneTx>,
+
+    typst_mailbox: MpScChannel<TypstActorRequest>,
+    renderer_mailbox: BroadcastChannel<RenderActorRequest>,
+    editor_conn: MpScChannel<EditorActorRequest>,
+    webview_conn: BroadcastChannel<WebviewActorRequest>,
+    doc_sender: watch::Sender<Option<Arc<Document>>>,
+
+    compile_watcher: OnceCell<Arc<CompileWatcher>>,
+}
+
+impl<T> PreviewBuilder<T> {
+    pub fn new(arguments: PreviewArgs, client: Arc<T>) -> Self {
+        Self {
+            arguments,
+            client,
+            lsp_connection: None,
+            typst_mailbox: mpsc::unbounded_channel(),
+            renderer_mailbox: broadcast::channel(1024),
+            editor_conn: mpsc::unbounded_channel(),
+            webview_conn: broadcast::channel(32),
+            doc_sender: watch::channel(None).0,
+            compile_watcher: OnceCell::new(),
+        }
+    }
+
+    pub fn with_lsp_connection(mut self, lsp_connection: Option<LspControlPlaneTx>) -> Self {
+        self.lsp_connection = lsp_connection;
+        self
+    }
+
+    pub fn compile_watcher(&self) -> &Arc<CompileWatcher> {
+        self.compile_watcher.get_or_init(|| {
+            Arc::new(CompileWatcher {
+                task_id: self.arguments.task_id.clone(),
+                refresh_style: self.arguments.refresh_style,
+                doc_sender: self.doc_sender.clone(),
+                editor_tx: self.editor_conn.0.clone(),
+                render_tx: self.renderer_mailbox.0.clone(),
+            })
+        })
+    }
+
+    pub async fn start(self, html: &str) -> Previewer
+    where
+        T: CompileHost + Send + Sync + 'static,
+    {
+        preview_(self, html).await
+    }
+}
+
+pub type SourceLocation = typst_ts_core::debug_loc::SourceLocation;
+
+pub enum Location {
+    Src(SourceLocation),
+}
+
+pub trait SourceFileServer {
+    fn resolve_source_span(
+        &self,
+        _by: Location,
+    ) -> impl Future<Output = Result<Option<SourceSpanOffset>, Error>> + Send {
+        async { Ok(None) }
+    }
+
+    fn resolve_document_position(
+        &self,
+        _by: Location,
+    ) -> impl Future<Output = Result<Option<Position>, Error>> + Send {
+        async { Ok(None) }
+    }
+
+    fn resolve_source_location(
+        &self,
+        _s: Span,
+        _offset: Option<usize>,
+    ) -> impl Future<Output = Result<Option<DocToSrcJumpInfo>, Error>> + Send {
+        async { Ok(None) }
+    }
+}
+
+pub trait EditorServer {
+    fn update_memory_files(
+        &self,
+        _files: MemoryFiles,
+        _reset_shadow: bool,
+    ) -> impl Future<Output = Result<(), Error>> + Send {
+        async { Ok(()) }
+    }
+
+    fn remove_shadow_files(
+        &self,
+        _files: MemoryFilesShort,
+    ) -> impl Future<Output = Result<(), Error>> + Send {
+        async { Ok(()) }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DocToSrcJumpInfo {
+    pub filepath: String,
+    pub start: Option<(usize, usize)>, // row, column
+    pub end: Option<(usize, usize)>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChangeCursorPositionRequest {
+    filepath: PathBuf,
+    line: usize,
+    /// fixme: character is 0-based, UTF-16 code unit.
+    /// We treat it as UTF-8 now.
+    character: usize,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SrcToDocJumpRequest {
+    filepath: PathBuf,
+    line: usize,
+    /// fixme: character is 0-based, UTF-16 code unit.
+    /// We treat it as UTF-8 now.
+    character: usize,
+}
+
+impl SrcToDocJumpRequest {
+    pub fn to_byte_offset(&self, src: &typst::syntax::Source) -> Option<usize> {
+        src.line_column_to_byte(self.line, self.character)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MemoryFiles {
+    pub files: HashMap<PathBuf, String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MemoryFilesShort {
+    pub files: Vec<PathBuf>,
+    // mtime: Option<u64>,
+}
+
+pub struct CompileWatcher {
+    task_id: String,
+    refresh_style: RefreshStyle,
+    doc_sender: watch::Sender<Option<Arc<Document>>>,
+    editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
+    render_tx: broadcast::Sender<RenderActorRequest>,
+}
+
+impl CompileWatcher {
+    pub fn task_id(&self) -> &str {
+        &self.task_id
+    }
+
+    pub fn status(&self, status: CompileStatus) {
+        let _ = self
+            .editor_tx
+            .send(EditorActorRequest::CompileStatus(status));
+    }
+
+    pub fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>, is_on_saved: bool) {
+        if self.refresh_style == RefreshStyle::OnSave && !is_on_saved {
+            return;
+        }
+
+        match res {
+            Ok(doc) => {
+                // it is ok to ignore the error here
+                let _ = self.doc_sender.send(Some(doc));
+
+                // todo: is it right that ignore zero broadcast receiver?
+                let _ = self.render_tx.send(RenderActorRequest::RenderIncremental);
+                let _ = self.editor_tx.send(EditorActorRequest::CompileStatus(
+                    CompileStatus::CompileSuccess,
+                ));
+            }
+            Err(status) => {
+                let _ = self
+                    .editor_tx
+                    .send(EditorActorRequest::CompileStatus(status));
+            }
+        }
     }
 }
 

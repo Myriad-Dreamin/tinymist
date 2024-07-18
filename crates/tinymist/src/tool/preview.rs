@@ -18,9 +18,9 @@ use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
 pub use typst_preview::CompileStatus;
 use typst_preview::{
-    preview, CompileHost, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo,
-    EditorServer, Location, LspControlPlaneRx, LspControlPlaneTx, MemoryFiles, MemoryFilesShort,
-    PreviewArgs, PreviewMode, Previewer, SourceFileServer,
+    CompileHost, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo, EditorServer,
+    Location, LspControlPlaneRx, LspControlPlaneTx, MemoryFiles, MemoryFilesShort, PreviewArgs,
+    PreviewBuilder, PreviewMode, Previewer, SourceFileServer,
 };
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 use typst_ts_compiler::EntryReader;
@@ -224,9 +224,10 @@ impl PreviewState {
     }
 }
 
+/// Response for starting a preview.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct StartPreviewResponse {
+pub struct StartPreviewResponse {
     static_server_port: Option<u16>,
     static_server_addr: Option<String>,
     data_plane_port: Option<u16>,
@@ -238,7 +239,7 @@ impl PreviewState {
         &self,
         mut args: PreviewCliArgs,
         compile_handler: Arc<CompileHandler>,
-    ) -> AnySchedulableResponse {
+    ) -> SchedulableResponse<StartPreviewResponse> {
         let task_id = args.preview.task_id.clone();
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
 
@@ -253,12 +254,10 @@ impl PreviewState {
         } = lsp_rx;
 
         // Create a previewer
-        let previewer = preview(
-            args.preview,
-            compile_handler.clone(),
-            Some(lsp_tx),
-            TYPST_PREVIEW_HTML,
-        );
+        let mut previewer = PreviewBuilder::new(args.preview, compile_handler.clone());
+        previewer = previewer.with_lsp_connection(Some(lsp_tx));
+        compile_handler.register_preview(previewer.compile_watcher().clone());
+        let previewer = previewer.start(TYPST_PREVIEW_HTML);
 
         // Forward preview responses to lsp client
         let tid = task_id.clone();
@@ -301,7 +300,6 @@ impl PreviewState {
         let preview_tx = self.preview_tx.clone();
         just_future(async move {
             let previewer = previewer.await;
-            compile_handler.register_preview(previewer.compile_watcher().clone());
 
             // Put a fence to ensure the previewer can receive the first compilation.   z
             // The fence must be put after the previewer is initialized.
@@ -327,7 +325,7 @@ impl PreviewState {
             }));
             sent.map_err(|_| internal_error("failed to register preview tab"))?;
 
-            Ok(serde_json::to_value(resp).unwrap())
+            Ok(resp)
         })
     }
 
@@ -496,9 +494,9 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         (service, handle)
     };
 
-    let previewer = preview(args.preview, handle.clone(), None, TYPST_PREVIEW_HTML).await;
-
+    let previewer = PreviewBuilder::new(args.preview, handle.clone());
     handle.register_preview(previewer.compile_watcher().clone());
+    let previewer = previewer.start(TYPST_PREVIEW_HTML).await;
     tokio::spawn(service.spawn());
 
     let (static_server_addr, _tx, static_server_handle) =

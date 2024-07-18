@@ -35,30 +35,7 @@ pub struct TypstActor<T> {
     renderer_sender: broadcast::Sender<RenderActorRequest>,
 }
 
-type MpScChannel<T> = (mpsc::UnboundedSender<T>, mpsc::UnboundedReceiver<T>);
-type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
-
-pub struct Channels {
-    pub typst_mailbox: MpScChannel<TypstActorRequest>,
-    pub renderer_mailbox: BroadcastChannel<RenderActorRequest>,
-    pub editor_conn: MpScChannel<EditorActorRequest>,
-    pub webview_conn: BroadcastChannel<WebviewActorRequest>,
-}
-
 impl<T> TypstActor<T> {
-    pub fn set_up_channels() -> Channels {
-        let typst_mailbox = mpsc::unbounded_channel();
-        let renderer_mailbox = broadcast::channel(1024);
-        let editor_conn = mpsc::unbounded_channel();
-        let webview_conn = broadcast::channel(32);
-        Channels {
-            typst_mailbox,
-            renderer_mailbox,
-            editor_conn,
-            webview_conn,
-        }
-    }
-
     pub fn new(
         client: Arc<T>,
         mailbox: mpsc::UnboundedReceiver<TypstActorRequest>,
