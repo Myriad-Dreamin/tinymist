@@ -952,6 +952,7 @@ impl LanguageState {
         use CompilerQueryRequest::*;
 
         let primary = || self.primary();
+        let is_pinning = self.pinning;
         just_ok(match query {
             InteractCodeContext(req) => query_source!(self, InteractCodeContext, req)?,
             SemanticTokensFull(req) => query_tokens_cache!(self, SemanticTokensFull, req)?,
@@ -963,11 +964,15 @@ impl LanguageState {
             ColorPresentation(req) => CompilerQueryResponse::ColorPresentation(req.request()),
             OnExport(OnExportRequest { kind, path }) => return primary().on_export(kind, path),
             ServerInfo(_) => return primary().collect_server_info(),
-            _ => return Self::query_on(primary(), query),
+            _ => return Self::query_on(primary(), is_pinning, query),
         })
     }
 
-    fn query_on(client: &CompileClientActor, query: CompilerQueryRequest) -> QueryFuture {
+    fn query_on(
+        client: &CompileClientActor,
+        is_pinning: bool,
+        query: CompilerQueryRequest,
+    ) -> QueryFuture {
         use CompilerQueryRequest::*;
         type R = CompilerQueryResponse;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
@@ -979,12 +984,14 @@ impl LanguageState {
             .map(|path| client.config.determine_entry(Some(path.into())));
 
         just_future(async move {
-            let snap = snap.snapshot().await?;
+            let mut snap = snap.snapshot().await?;
             // todo: whether it is safe to inherit success_doc with changed entry
-            let snap = snap.task(TaskInputs {
-                entry,
-                ..Default::default()
-            });
+            if !is_pinning {
+                snap = snap.task(TaskInputs {
+                    entry,
+                    ..Default::default()
+                });
+            }
 
             match query {
                 Hover(req) => handle.run_stateful(snap, req, R::Hover),
