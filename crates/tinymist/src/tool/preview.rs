@@ -238,6 +238,7 @@ impl PreviewState {
     pub fn start(
         &self,
         mut args: PreviewCliArgs,
+        mut previewer: PreviewBuilder,
         compile_handler: Arc<CompileHandler>,
     ) -> SchedulableResponse<StartPreviewResponse> {
         let task_id = args.preview.task_id.clone();
@@ -254,10 +255,8 @@ impl PreviewState {
         } = lsp_rx;
 
         // Create a previewer
-        let mut previewer = PreviewBuilder::new(args.preview, compile_handler.clone());
         previewer = previewer.with_lsp_connection(Some(lsp_tx));
-        compile_handler.register_preview(previewer.compile_watcher().clone());
-        let previewer = previewer.start(TYPST_PREVIEW_HTML);
+        let previewer = previewer.start(compile_handler.clone(), TYPST_PREVIEW_HTML);
 
         // Forward preview responses to lsp client
         let tid = task_id.clone();
@@ -494,9 +493,10 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         (service, handle)
     };
 
-    let previewer = PreviewBuilder::new(args.preview, handle.clone());
-    handle.register_preview(previewer.compile_watcher().clone());
-    let previewer = previewer.start(TYPST_PREVIEW_HTML).await;
+    let previewer = PreviewBuilder::new(args.preview);
+    let registered = handle.register_preview(previewer.compile_watcher());
+    assert!(registered, "failed to register preview");
+    let previewer = previewer.start(handle.clone(), TYPST_PREVIEW_HTML).await;
     tokio::spawn(service.spawn());
 
     let (static_server_addr, _tx, static_server_handle) =

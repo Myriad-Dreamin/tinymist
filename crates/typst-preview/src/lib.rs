@@ -72,16 +72,16 @@ pub async fn preview<T: CompileHost + Send + Sync + 'static>(
     client: Arc<T>,
     html: &str,
 ) -> Previewer {
-    PreviewBuilder::new(arguments, client).start(html).await
+    PreviewBuilder::new(arguments).start(client, html).await
 }
 
 async fn preview_<T: CompileHost + Send + Sync + 'static>(
-    builder: PreviewBuilder<T>,
+    builder: PreviewBuilder,
+    client: Arc<T>,
     html: &str,
 ) -> Previewer {
     let PreviewBuilder {
         arguments,
-        client,
         lsp_connection,
         typst_mailbox,
         renderer_mailbox,
@@ -284,9 +284,8 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
 type MpScChannel<T> = (mpsc::UnboundedSender<T>, mpsc::UnboundedReceiver<T>);
 type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
 
-pub struct PreviewBuilder<T> {
+pub struct PreviewBuilder {
     arguments: PreviewArgs,
-    client: Arc<T>,
     lsp_connection: Option<LspControlPlaneTx>,
 
     typst_mailbox: MpScChannel<TypstActorRequest>,
@@ -298,11 +297,10 @@ pub struct PreviewBuilder<T> {
     compile_watcher: OnceCell<Arc<CompileWatcher>>,
 }
 
-impl<T> PreviewBuilder<T> {
-    pub fn new(arguments: PreviewArgs, client: Arc<T>) -> Self {
+impl PreviewBuilder {
+    pub fn new(arguments: PreviewArgs) -> Self {
         Self {
             arguments,
-            client,
             lsp_connection: None,
             typst_mailbox: mpsc::unbounded_channel(),
             renderer_mailbox: broadcast::channel(1024),
@@ -330,11 +328,11 @@ impl<T> PreviewBuilder<T> {
         })
     }
 
-    pub async fn start(self, html: &str) -> Previewer
+    pub async fn start<T>(self, client: Arc<T>, html: &str) -> Previewer
     where
         T: CompileHost + Send + Sync + 'static,
     {
-        preview_(self, html).await
+        preview_(self, client, html).await
     }
 }
 

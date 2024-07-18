@@ -124,17 +124,18 @@ impl LanguageState {
             return Err(invalid_params("entry file must be absolute path"));
         };
 
-        // todo: race condition
-        let handle = self.primary().handle.clone();
-        if handle.registered_preview() {
+        let primary = self.primary().handle.clone();
+
+        let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
+
+        if !primary.register_preview(previewer.compile_watcher()) {
             return Err(internal_error("preview is already running"));
         }
 
         // todo: recover pin status reliably
         self.pin_entry(Some(entry))
             .map_err(|e| internal_error(format!("could not pin file: {e}")))?;
-
-        self.preview.start(cli_args, handle)
+        self.preview.start(cli_args, previewer, primary)
     }
 
     /// Kill a preview instance.

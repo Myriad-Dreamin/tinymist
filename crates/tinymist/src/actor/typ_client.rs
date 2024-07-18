@@ -226,24 +226,27 @@ impl CompileHandler {
         Ok(f(&mut analysis))
     }
 
+    // todo: multiple preview support
     #[cfg(feature = "preview")]
-    pub fn register_preview(&self, handle: Arc<typst_preview::CompileWatcher>) {
-        // todo: conflict detection
-        *self.inner.write() = Some(handle);
+    #[must_use]
+    pub fn register_preview(&self, handle: &Arc<typst_preview::CompileWatcher>) -> bool {
+        let mut p = self.inner.write();
+        if p.as_ref().is_some() {
+            return false;
+        }
+        *p = Some(handle.clone());
+        true
     }
 
     #[cfg(feature = "preview")]
-    pub fn unregister_preview(&self, task_id: &str) {
+    #[must_use]
+    pub fn unregister_preview(&self, task_id: &str) -> bool {
         let mut p = self.inner.write();
         if p.as_ref().is_some_and(|p| p.task_id() == task_id) {
             *p = None;
+            return true;
         }
-    }
-
-    // todo: multiple preview support
-    #[cfg(feature = "preview")]
-    pub fn registered_preview(&self) -> bool {
-        self.inner.read().is_some()
+        false
     }
 }
 
