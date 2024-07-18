@@ -107,7 +107,7 @@ impl LanguageState {
         let cli_args = ["preview"]
             .into_iter()
             .chain(cli_args.iter().map(|e| e.as_str()));
-        let cli_args =
+        let mut cli_args =
             PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
 
         // todo: preview specific arguments are not used
@@ -123,6 +123,9 @@ impl LanguageState {
             // std::env::current_dir().unwrap().join(input)
             return Err(invalid_params("entry file must be absolute path"));
         };
+
+        // Disble control plane host
+        cli_args.preview.control_plane_host = String::default();
 
         let primary = self.primary().handle.clone();
 

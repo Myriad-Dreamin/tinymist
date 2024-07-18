@@ -237,15 +237,12 @@ impl PreviewState {
     /// Start a preview on a given compiler.
     pub fn start(
         &self,
-        mut args: PreviewCliArgs,
+        args: PreviewCliArgs,
         mut previewer: PreviewBuilder,
         compile_handler: Arc<CompileHandler>,
     ) -> SchedulableResponse<StartPreviewResponse> {
         let task_id = args.preview.task_id.clone();
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
-
-        // Disble control plane host
-        args.preview.control_plane_host = String::default();
 
         let (lsp_tx, lsp_rx) = LspControlPlaneTx::new();
         let LspControlPlaneRx {
