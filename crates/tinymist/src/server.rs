@@ -88,7 +88,7 @@ pub struct LanguageState {
     /// The primary compiler actor.
     pub primary: Option<CompileClientActor>,
     /// The compiler actors for tasks
-    // pub dedicates: Vec<CompileClientActor>,
+    pub dedicates: Vec<CompileClientActor>,
     /// The formatter tasks running in backend, which will be scheduled by async
     /// runtime.
     pub formatter: FormatTask,
@@ -121,6 +121,7 @@ impl LanguageState {
             client: client.clone(),
             editor_tx,
             primary: None,
+            dedicates: Vec::new(),
             memory_changes: HashMap::new(),
             #[cfg(feature = "preview")]
             preview: tool::preview::PreviewState::new(client.cast(|s| &mut s.preview)),
@@ -161,7 +162,7 @@ impl LanguageState {
                 service.config.compile.notify_status,
             );
 
-            service.restart_server("primary");
+            service.restart_primary();
 
             // Run the cluster in the background after we referencing it
             client.handle.spawn(editor_actor.run());
@@ -180,9 +181,21 @@ impl LanguageState {
         &self.config.compile
     }
 
-    /// Get the primary compiler for those commands without task context.
+    /// Get the primary compile server for those commands without task context.
     pub fn primary(&self) -> &CompileClientActor {
         self.primary.as_ref().expect("primary")
+    }
+
+    /// Get the task-dedicated compile server.
+    pub fn dedicate(&self, group: &str) -> Option<&CompileClientActor> {
+        self.dedicates
+            .iter()
+            .find(|dedicate| dedicate.handle.diag_group == group)
+    }
+
+    /// Get all compile servers in current state.
+    pub fn servers_mut(&mut self) -> impl Iterator<Item = &mut CompileClientActor> {
+        self.primary.iter_mut().chain(self.dedicates.iter_mut())
     }
 
     /// Install handlers to the language server.
@@ -474,7 +487,7 @@ impl LanguageState {
             }
         }
 
-        if let Some(e) = self.primary.as_mut() {
+        for e in self.primary.iter_mut().chain(self.dedicates.iter_mut()) {
             e.sync_config(self.config.compile.clone());
         }
 
@@ -494,7 +507,8 @@ impl LanguageState {
 
         if config.compile.primary_opts() != self.config.compile.primary_opts() {
             self.config.compile.fonts = OnceCell::new(); // todo: don't reload fonts if not changed
-            self.restart_server("primary");
+            self.restart_primary();
+            // todo: restart dedicates
         }
 
         if config.semantic_tokens != self.config.semantic_tokens {
@@ -830,9 +844,10 @@ impl LanguageState {
 }
 
 impl LanguageState {
-    fn update_source(&self, files: FileChangeSet) -> Result<(), Error> {
-        self.primary()
-            .add_memory_changes(MemoryEvent::Update(files.clone()));
+    fn update_source(&mut self, files: FileChangeSet) -> Result<(), Error> {
+        for srv in self.servers_mut() {
+            srv.add_memory_changes(MemoryEvent::Update(files.clone()));
+        }
 
         Ok(())
     }

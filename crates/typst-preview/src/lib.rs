@@ -444,8 +444,13 @@ impl CompileWatcher {
             .send(EditorActorRequest::CompileStatus(status));
     }
 
-    pub fn notify_compile(&self, res: Result<Arc<Document>, CompileStatus>, is_on_saved: bool) {
-        if self.refresh_style == RefreshStyle::OnSave && !is_on_saved {
+    pub fn notify_compile(
+        &self,
+        res: Result<Arc<Document>, CompileStatus>,
+        is_on_saved: bool,
+        is_by_entry_update: bool,
+    ) {
+        if !is_by_entry_update && (self.refresh_style == RefreshStyle::OnSave && !is_on_saved) {
             return;
         }
 

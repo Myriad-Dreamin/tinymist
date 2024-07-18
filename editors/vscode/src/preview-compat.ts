@@ -307,11 +307,12 @@ function runServer(
 
 interface LaunchTask {
     context: vscode.ExtensionContext;
-    activeEditor: vscode.TextEditor;
+    editor: vscode.TextEditor;
     bindDocument: vscode.TextDocument;
     mode: "doc" | "slide";
     webviewPanel?: vscode.WebviewPanel;
     isDev?: boolean;
+    isNotPrimary?: boolean;
 }
 
 export interface LaunchInBrowserTask extends LaunchTask {
@@ -325,7 +326,7 @@ export interface LaunchInWebViewTask extends LaunchTask {
 export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
     let shadowDispose: vscode.Disposable | undefined = undefined;
     let shadowDisposeClose: vscode.Disposable | undefined = undefined;
-    const { context, activeEditor, bindDocument, webviewPanel } = task;
+    const { context, editor: activeEditor, bindDocument, webviewPanel } = task;
     const filePath = bindDocument.uri.fsPath;
 
     const refreshStyle =
