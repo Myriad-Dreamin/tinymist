@@ -51,7 +51,10 @@ impl PreviewActor {
                     };
 
                     // Unregister preview early
-                    tab.compile_handler.unregister_preview(&task_id);
+                    let unregistered = tab.compile_handler.unregister_preview(&task_id);
+                    if !unregistered {
+                        log::warn!("PreviewTask({task_id}): failed to unregister preview");
+                    }
 
                     let client = self.client.clone();
                     self.client.handle.spawn(async move {

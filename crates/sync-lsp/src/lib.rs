@@ -380,10 +380,10 @@ where
         self
     }
 
-    pub fn with_command(
+    pub fn with_command<T: Serialize + 'static>(
         mut self,
         cmd: &'static str,
-        handler: fn(&mut Args::S, Vec<JsonValue>) -> AnySchedulableResponse,
+        handler: fn(&mut Args::S, Vec<JsonValue>) -> SchedulableResponse<T>,
     ) -> Self {
         self.exec_cmds.insert(
             cmd,

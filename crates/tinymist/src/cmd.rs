@@ -93,7 +93,10 @@ impl LanguageState {
 
     /// Start a preview instance.
     #[cfg(feature = "preview")]
-    pub fn start_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn start_preview(
+        &mut self,
+        mut args: Vec<JsonValue>,
+    ) -> SchedulableResponse<crate::tool::preview::StartPreviewResponse> {
         use std::path::Path;
 
         use crate::tool::preview::PreviewCliArgs;
@@ -104,7 +107,7 @@ impl LanguageState {
         let cli_args = ["preview"]
             .into_iter()
             .chain(cli_args.iter().map(|e| e.as_str()));
-        let cli_args =
+        let mut cli_args =
             PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
 
         // todo: preview specific arguments are not used
@@ -121,17 +124,21 @@ impl LanguageState {
             return Err(invalid_params("entry file must be absolute path"));
         };
 
-        // todo: race condition
-        let handle = self.primary().handle.clone();
-        if handle.registered_preview() {
+        // Disble control plane host
+        cli_args.preview.control_plane_host = String::default();
+
+        let primary = self.primary().handle.clone();
+
+        let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
+
+        if !primary.register_preview(previewer.compile_watcher()) {
             return Err(internal_error("preview is already running"));
         }
 
         // todo: recover pin status reliably
         self.pin_entry(Some(entry))
             .map_err(|e| internal_error(format!("could not pin file: {e}")))?;
-
-        self.preview.start(cli_args, handle)
+        self.preview.start(cli_args, previewer, primary)
     }
 
     /// Kill a preview instance.
