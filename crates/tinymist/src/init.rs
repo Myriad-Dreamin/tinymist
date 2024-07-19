@@ -676,7 +676,7 @@ impl CompileConfig {
 
     /// Determines the creation timestamp.
     pub fn determine_creation_timestamp(&self) -> Option<chrono::DateTime<chrono::Utc>> {
-        None
+        self.typst_extra_args.as_ref()?.creation_timestamp
     }
 
     fn determine_user_inputs(&self) -> ImmutDict {
