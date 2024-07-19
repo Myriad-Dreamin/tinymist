@@ -7,13 +7,15 @@ pub use export::*;
 mod format;
 pub use format::*;
 mod user_action;
-use rayon::Scope;
 pub use user_action::*;
+mod cache;
+pub use cache::*;
 
 use std::{ops::DerefMut, pin::Pin, sync::Arc};
 
 use futures::Future;
 use parking_lot::Mutex;
+use rayon::Scope;
 use reflexo::TakeAs;
 
 /// Please uses this if you believe all mutations are fast

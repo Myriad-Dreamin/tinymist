@@ -15,7 +15,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
-use task::{ExportUserConfig, FormatTask, FormatUserConfig, UserActionTask};
+use task::{CacheTask, ExportUserConfig, FormatTask, FormatUserConfig, UserActionTask};
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
     get_semantic_tokens_unregistration, PageSelection, SemanticTokenContext,
@@ -95,6 +95,8 @@ pub struct LanguageState {
     /// The user action tasks running in backend, which will be scheduled by
     /// async runtime.
     pub user_action: UserActionTask,
+    /// The cache task running in backend
+    pub cache: CacheTask,
 }
 
 /// Getters and the main loop.
@@ -136,6 +138,7 @@ impl LanguageState {
             tokens_ctx,
             formatter,
             user_action: Default::default(),
+            cache: CacheTask::default(),
         }
     }
 

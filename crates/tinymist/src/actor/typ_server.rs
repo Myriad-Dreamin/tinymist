@@ -23,6 +23,8 @@ use typst_ts_compiler::{
 };
 use typst_ts_core::{exporter_builtins::GroupExporter, Exporter, GenericExporter, TypstDocument};
 
+use crate::task::CacheTask;
+
 type CompileRawResult = Deferred<(SourceResult<Arc<TypstDocument>>, CompileEnv)>;
 type DocState = once_cell::sync::OnceCell<CompileRawResult>;
 
@@ -264,6 +266,7 @@ struct TaggedMemoryEvent {
 pub struct CompileServerOpts<F: CompilerFeat> {
     pub exporter: GroupExporter<CompileSnapshot<F>>,
     pub feature_set: FeatureSet,
+    pub cache: CacheTask,
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
@@ -271,6 +274,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
         Self {
             exporter: GroupExporter::new(vec![]),
             feature_set: FeatureSet::default(),
+            cache: CacheTask::new(Default::default()),
         }
     }
 }
@@ -306,6 +310,8 @@ pub struct CompileServerActor<F: CompilerFeat> {
     intr_tx: mpsc::UnboundedSender<Interrupt<F>>,
     /// Channel for receiving interrupts from the compiler actor.
     intr_rx: mpsc::UnboundedReceiver<Interrupt<F>>,
+    /// Shared cache evict task.
+    cache: CacheTask,
 
     watch_snap: OnceLock<CompileSnapshot<F>>,
     suspended: bool,
@@ -323,6 +329,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         CompileServerOpts {
             exporter,
             feature_set,
+            cache: cache_evict,
         }: CompileServerOpts<F>,
     ) -> Self {
         let entry = verse.entry_state();
@@ -346,6 +353,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
             intr_tx,
             intr_rx,
+            cache: cache_evict,
 
             watch_snap: OnceLock::new(),
             suspended: entry.is_inactive(),
@@ -584,13 +592,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         )));
 
         // Trigger an evict task.
-        rayon::spawn(move || {
-            // Evict compilation cache.
-            let evict_start = std::time::Instant::now();
-            comemo::evict(30);
-            let elapsed = evict_start.elapsed();
-            log::info!("CompileServerActor: evict compilation cache in {elapsed:?}");
-        });
+        self.cache.evict();
     }
 
     /// Process some interrupt. Return whether it needs compilation.
