@@ -81,7 +81,6 @@
                         "onDocumentHasTitle"
                     ],
                     "enumDescriptions": [
-                        "Select best solution automatically. (Recommended)",
                         "Never export PDFs, you will manually run typst.",
                         "Export PDFs when you save a file.",
                         "Export PDFs as you type in a file.",
