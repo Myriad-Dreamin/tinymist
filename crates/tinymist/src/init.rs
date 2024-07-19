@@ -425,6 +425,8 @@ pub struct CompileConfig {
     pub preferred_theme: Option<String>,
     /// Whether the configuration can have a default entry path.
     pub has_default_entry_path: bool,
+    /// The inputs for the language server protocol.
+    pub lsp_inputs: ImmutDict,
 }
 
 impl CompileConfig {
@@ -449,6 +451,7 @@ impl CompileConfig {
             _ => bail!("compileStatus must be either 'enable' or 'disable'"),
         };
         self.preferred_theme = try_(|| Some(update.get("preferredTheme")?.as_str()?.to_owned()));
+        log::info!("preferred theme: {:?} {:?}", self.preferred_theme, update);
 
         // periscope_args
         self.periscope_args = match update.get("hoverPeriscope") {
@@ -506,6 +509,29 @@ impl CompileConfig {
         self.system_fonts = try_(|| update.get("systemFonts")?.as_bool());
 
         self.has_default_entry_path = self.determine_default_entry_path().is_some();
+        self.lsp_inputs = {
+            let mut dict = TypstDict::default();
+
+            #[derive(Serialize)]
+            #[serde(rename_all = "camelCase")]
+            struct PreviewInputs {
+                pub version: u32,
+                pub theme: String,
+            }
+
+            dict.insert(
+                "x-preview".into(),
+                serde_json::to_string(&PreviewInputs {
+                    version: 1,
+                    theme: self.preferred_theme.clone().unwrap_or_default(),
+                })
+                .unwrap()
+                .into_value(),
+            );
+
+            Arc::new(Prehashed::new(dict))
+        };
+
         self.validate()
     }
 
@@ -628,6 +654,22 @@ impl CompileConfig {
 
     /// Determines the `sys.inputs` for the entry file.
     pub fn determine_inputs(&self) -> ImmutDict {
+        #[comemo::memoize]
+        fn combine(lhs: ImmutDict, rhs: ImmutDict) -> ImmutDict {
+            let mut dict = (**lhs).clone();
+            for (k, v) in rhs.iter() {
+                dict.insert(k.clone(), v.clone());
+            }
+
+            Arc::new(Prehashed::new(dict))
+        }
+
+        let user_inputs = self.determine_user_inputs();
+
+        combine(user_inputs, self.lsp_inputs.clone())
+    }
+
+    fn determine_user_inputs(&self) -> ImmutDict {
         static EMPTY: Lazy<ImmutDict> = Lazy::new(ImmutDict::default);
 
         if let Some(extras) = &self.typst_extra_args {

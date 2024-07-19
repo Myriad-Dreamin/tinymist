@@ -16,6 +16,15 @@ is equivalent to
 tinymist preview /abs-path/to/main.typ --partial-rendering
 ```
 
+== `sys.inputs`
+
+If the document is compiled by lsp, you can use `sys.inputs` to get the preview arguments:
+
+```
+#let preview-args = json.decode(sys.inputs.at("x-preview", default: "{}"))
+#let preview-theme = preview-args.at("theme", default: "light")
+```
+
 == LSP Integration
 
 The preview feature is also integrated into the LSP server. You can use the preview feature like when you were using it in `mgt19937.typst-preview` extension.

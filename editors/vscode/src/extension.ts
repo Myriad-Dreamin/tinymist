@@ -46,6 +46,17 @@ export function activate(context: ExtensionContext): Promise<void> {
     let config: Record<string, any> = JSON.parse(
         JSON.stringify(workspace.getConfiguration("tinymist"))
     );
+    config.preferredTheme = "light";
+
+    {
+        const keys = Object.keys(config);
+        let values = keys.map((key) => config[key]);
+        values = substVscodeVarsInConfig(keys, values);
+        config = {};
+        for (let i = 0; i < keys.length; i++) {
+            config[keys[i]] = values[i];
+        }
+    }
 
     previewIsEnabled = config.previewFeature === "enable";
     devKitIsEnabled =
@@ -71,7 +82,8 @@ export function activate(context: ExtensionContext): Promise<void> {
         }
     }
 
-    setClient(initClient(context, config));
+    const client = initClient(context, config);
+    setClient(client);
 
     if (previewIsEnabled) {
         // test compat-mode preview extension
