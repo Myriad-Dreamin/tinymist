@@ -85,17 +85,17 @@ impl CompileHandler {
     pub fn snapshot(&self) -> ZResult<QuerySnap> {
         let (tx, rx) = oneshot::channel();
         self.intr_tx
-            .send(Interrupt::Snapshot(tx))
+            .send(Interrupt::SnapshotRead(tx))
             .map_err(map_string_err("failed to send snapshot request"))?;
 
         Ok(QuerySnap { rx })
     }
 
     /// Get latest artifact the compiler thread for tasks
-    pub fn succeeded_artifact(&self) -> ZResult<ArtifactSnap> {
+    pub fn artifact(&self) -> ZResult<ArtifactSnap> {
         let (tx, rx) = oneshot::channel();
         self.intr_tx
-            .send(Interrupt::SucceededArtifact(tx))
+            .send(Interrupt::CurrentRead(tx))
             .map_err(map_string_err("failed to send snapshot request"))?;
 
         Ok(ArtifactSnap { rx })
