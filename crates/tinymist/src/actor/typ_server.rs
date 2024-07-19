@@ -600,7 +600,12 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         use CompilerResponse::*;
 
         match event {
-            Interrupt::Compile => reason_by_entry_change(),
+            Interrupt::Compile => {
+                // Increment the revision anyway.
+                self.verse.increment_revision(|_| {});
+
+                reason_by_entry_change()
+            }
             Interrupt::Snapshot(task) => {
                 log::debug!("CompileServerActor: take snapshot");
                 if self
