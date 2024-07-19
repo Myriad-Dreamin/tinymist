@@ -8,11 +8,14 @@ mod format;
 pub use format::*;
 mod user_action;
 pub use user_action::*;
+mod cache;
+pub use cache::*;
 
 use std::{ops::DerefMut, pin::Pin, sync::Arc};
 
 use futures::Future;
 use parking_lot::Mutex;
+use rayon::Scope;
 use reflexo::TakeAs;
 
 /// Please uses this if you believe all mutations are fast
@@ -52,6 +55,15 @@ struct FutureFolder {
 }
 
 impl FutureFolder {
+    async fn compute<'scope, OP, R: Send + 'static>(op: OP) -> anyhow::Result<R>
+    where
+        OP: FnOnce(&Scope<'scope>) -> R + Send + 'static,
+    {
+        tokio::task::spawn_blocking(move || -> R { rayon::in_place_scope(op) })
+            .await
+            .map_err(|e| anyhow::anyhow!("compute error: {e:?}"))
+    }
+
     fn spawn(&self, revision: usize, fut: impl FnOnce() -> FoldFuture) {
         let mut state = self.state.lock();
         let state = state.deref_mut();

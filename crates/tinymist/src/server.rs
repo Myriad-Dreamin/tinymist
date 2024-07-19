@@ -15,7 +15,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
-use task::{ExportUserConfig, FormatTask, FormatUserConfig, UserActionTask};
+use task::{CacheTask, ExportUserConfig, FormatTask, FormatUserConfig, UserActionTask};
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
     get_semantic_tokens_unregistration, PageSelection, SemanticTokenContext,
@@ -95,6 +95,8 @@ pub struct LanguageState {
     /// The user action tasks running in backend, which will be scheduled by
     /// async runtime.
     pub user_action: UserActionTask,
+    /// The cache task running in backend
+    pub cache: CacheTask,
 }
 
 /// Getters and the main loop.
@@ -137,6 +139,7 @@ impl LanguageState {
             tokens_ctx,
             formatter,
             user_action: Default::default(),
+            cache: CacheTask::default(),
         }
     }
 
@@ -447,7 +450,8 @@ impl LanguageState {
         let path = as_path_(params.text_document.uri);
         let text = params.text_document.text;
 
-        self.create_source(path.clone(), text).unwrap();
+        self.create_source(path.clone(), text)
+            .map_err(|e| invalid_params(e.to_string()))?;
 
         // Focus after opening
         self.implicit_focus_entry(|| Some(path.as_path().into()), 'o');
@@ -457,7 +461,8 @@ impl LanguageState {
     fn did_close(&mut self, params: DidCloseTextDocumentParams) -> LspResult<()> {
         let path = as_path_(params.text_document.uri);
 
-        self.remove_source(path.clone()).unwrap();
+        self.remove_source(path.clone())
+            .map_err(|e| invalid_params(e.to_string()))?;
         Ok(())
     }
 
@@ -466,7 +471,7 @@ impl LanguageState {
         let changes = params.content_changes;
 
         self.edit_source(path.clone(), changes, self.const_config().position_encoding)
-            .unwrap();
+            .map_err(|e| invalid_params(e.to_string()))?;
         Ok(())
     }
 
@@ -967,6 +972,7 @@ impl LanguageState {
         use CompilerQueryRequest::*;
 
         let primary = || self.primary();
+        let is_pinning = self.pinning;
         just_ok(match query {
             InteractCodeContext(req) => query_source!(self, InteractCodeContext, req)?,
             SemanticTokensFull(req) => query_tokens_cache!(self, SemanticTokensFull, req)?,
@@ -978,11 +984,15 @@ impl LanguageState {
             ColorPresentation(req) => CompilerQueryResponse::ColorPresentation(req.request()),
             OnExport(OnExportRequest { kind, path }) => return primary().on_export(kind, path),
             ServerInfo(_) => return primary().collect_server_info(),
-            _ => return Self::query_on(primary(), query),
+            _ => return Self::query_on(primary(), is_pinning, query),
         })
     }
 
-    fn query_on(client: &CompileClientActor, query: CompilerQueryRequest) -> QueryFuture {
+    fn query_on(
+        client: &CompileClientActor,
+        is_pinning: bool,
+        query: CompilerQueryRequest,
+    ) -> QueryFuture {
         use CompilerQueryRequest::*;
         type R = CompilerQueryResponse;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
@@ -994,12 +1004,14 @@ impl LanguageState {
             .map(|path| client.config.determine_entry(Some(path.into())));
 
         just_future(async move {
-            let snap = snap.snapshot().await?;
+            let mut snap = snap.receive().await?;
             // todo: whether it is safe to inherit success_doc with changed entry
-            let snap = snap.task(TaskInputs {
-                entry,
-                ..Default::default()
-            });
+            if !is_pinning {
+                snap = snap.task(TaskInputs {
+                    entry,
+                    ..Default::default()
+                });
+            }
 
             match query {
                 Hover(req) => handle.run_stateful(snap, req, R::Hover),

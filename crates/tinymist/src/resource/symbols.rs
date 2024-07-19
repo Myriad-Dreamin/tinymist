@@ -163,7 +163,7 @@ static CAT_MAP: Lazy<HashMap<&str, SymCategory>> = Lazy::new(|| {
 impl LanguageState {
     /// Get the all valid symbols
     pub async fn get_symbol_resources(snap: QuerySnap) -> LspResult<JsonValue> {
-        let snap = snap.snapshot().await.map_err(z_internal_error)?;
+        let snap = snap.receive().await.map_err(z_internal_error)?;
 
         let mut symbols = ResourceSymbolMap::new();
         use typst::symbols::{emoji, sym};

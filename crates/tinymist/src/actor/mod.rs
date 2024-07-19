@@ -13,6 +13,7 @@ use tinymist_query::analysis::Analysis;
 use tinymist_query::ExportKind;
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::mpsc;
+use typ_server::CompileServerOpts;
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 use typst_ts_core::config::compiler::EntryState;
 
@@ -110,11 +111,14 @@ impl LanguageState {
                 caches: Default::default(),
             },
             periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
+
+            notified_revision: parking_lot::Mutex::new(0),
         });
 
         let font_resolver = self.compile_config().determine_fonts();
         let entry_ = entry.clone();
         let handle_ = handle.clone();
+        let cache = self.cache.clone();
 
         self.client.handle.spawn_blocking(move || {
             // Create the world
@@ -123,8 +127,17 @@ impl LanguageState {
                 .expect("incorrect options");
 
             // Create the actor
-            let server = CompileServerActor::new(verse, intr_tx, intr_rx).with_watch(Some(handle_));
-            tokio::spawn(server.spawn());
+            let server = CompileServerActor::new_with(
+                verse,
+                intr_tx,
+                intr_rx,
+                CompileServerOpts {
+                    cache,
+                    ..Default::default()
+                },
+            )
+            .with_watch(Some(handle_));
+            tokio::spawn(server.run());
         });
 
         // Create the client
