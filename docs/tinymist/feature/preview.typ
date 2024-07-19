@@ -20,8 +20,24 @@ tinymist preview /abs-path/to/main.typ --partial-rendering
 
 If the document is compiled by lsp, you can use `sys.inputs` to get the preview arguments:
 
-```
+```typ
 #let preview-args = json.decode(sys.inputs.at("x-preview", default: "{}"))
+```
+
+There is a `version` field in the `preview-args` object, which will increase when the scheme of the preview arguments is changed.
+
+```typ
+#let version = preview-args.at("version", default: 0)
+#if version <= 1 {
+  assert(preview-args.at("theme", default: "light") in ("light", "dark"))
+}
+```
+
+=== Theme-aware template
+
+The only two abstracted theme kinds are supported: `light` and `dark`. You can use the following code to get the theme:
+
+```typ
 #let preview-theme = preview-args.at("theme", default: "light")
 ```
 

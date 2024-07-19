@@ -931,6 +931,7 @@ function determineVscodeTheme(): any {
     console.log("determineVscodeTheme", vscode.window.activeColorTheme.kind);
     switch (vscode.window.activeColorTheme.kind) {
         case vscode.ColorThemeKind.Dark:
+        case vscode.ColorThemeKind.HighContrast:
             return "dark";
         default:
             return "light";
