@@ -500,7 +500,8 @@ impl CompileConfig {
                     entry: command.input.map(|e| Path::new(&e).into()),
                     root_dir: command.root,
                     inputs: Arc::new(Prehashed::new(inputs)),
-                    font_paths: command.font.font_paths,
+                    font: command.font,
+                    creation_timestamp: command.creation_timestamp,
                 });
             }
         }
@@ -621,13 +622,17 @@ impl CompileConfig {
         let font = || {
             let mut opts = self.font_opts.clone();
 
-            if let Some(system_fonts) = self.system_fonts {
+            if let Some(system_fonts) = self.system_fonts.or_else(|| {
+                self.typst_extra_args
+                    .as_ref()
+                    .map(|x| x.font.ignore_system_fonts)
+            }) {
                 opts.ignore_system_fonts = !system_fonts;
             }
 
             let font_paths = (!self.font_paths.is_empty()).then_some(&self.font_paths);
             let font_paths =
-                font_paths.or_else(|| self.typst_extra_args.as_ref().map(|x| &x.font_paths));
+                font_paths.or_else(|| self.typst_extra_args.as_ref().map(|x| &x.font.font_paths));
             if let Some(paths) = font_paths {
                 opts.font_paths.clone_from(paths);
             }
@@ -669,6 +674,11 @@ impl CompileConfig {
         combine(user_inputs, self.lsp_inputs.clone())
     }
 
+    /// Determines the creation timestamp.
+    pub fn determine_creation_timestamp(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        None
+    }
+
     fn determine_user_inputs(&self) -> ImmutDict {
         static EMPTY: Lazy<ImmutDict> = Lazy::new(ImmutDict::default);
 
@@ -686,13 +696,13 @@ impl CompileConfig {
     ) -> (
         Option<bool>,
         &Vec<PathBuf>,
-        Option<&Vec<PathBuf>>,
+        Option<&CompileFontArgs>,
         Option<Arc<Path>>,
     ) {
         (
             self.system_fonts,
             &self.font_paths,
-            self.typst_extra_args.as_ref().map(|e| &e.font_paths),
+            self.typst_extra_args.as_ref().map(|e| &e.font),
             self.determine_root(self.determine_default_entry_path().as_ref()),
         )
     }
@@ -766,8 +776,10 @@ pub struct CompileExtraOpts {
     pub entry: Option<ImmutPath>,
     /// Additional input arguments to compile the entry file.
     pub inputs: ImmutDict,
-    /// will remove later
-    pub font_paths: Vec<PathBuf>,
+    /// Additional font paths.
+    pub font: CompileFontArgs,
+    /// The creation timestamp for various output.
+    pub creation_timestamp: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// The path pattern that could be substituted.
