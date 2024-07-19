@@ -59,7 +59,9 @@ impl LanguageState {
                 output: self.compile_config().output_path.clone(),
                 mode: self.compile_config().export_pdf,
             },
-            kind: ExportKind::Pdf,
+            kind: ExportKind::Pdf {
+                creation_timestamp: self.config.compile.determine_creation_timestamp(),
+            },
             count_words: self.config.compile.notify_status,
         });
 

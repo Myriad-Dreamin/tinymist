@@ -27,7 +27,13 @@ struct ExportOpts {
 impl LanguageState {
     /// Export the current document as PDF file(s).
     pub fn export_pdf(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
-        self.export(req_id, ExportKind::Pdf, args)
+        self.export(
+            req_id,
+            ExportKind::Pdf {
+                creation_timestamp: self.config.compile.determine_creation_timestamp(),
+            },
+            args,
+        )
     }
 
     /// Export the current document as Svg file(s).

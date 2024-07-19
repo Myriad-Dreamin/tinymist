@@ -143,10 +143,11 @@ mod polymorphic {
         Merged,
     }
 
-    #[derive(Debug, Clone, Default)]
+    #[derive(Debug, Clone)]
     pub enum ExportKind {
-        #[default]
-        Pdf,
+        Pdf {
+            creation_timestamp: Option<chrono::DateTime<chrono::Utc>>,
+        },
         Svg {
             page: PageSelection,
         },
@@ -155,10 +156,18 @@ mod polymorphic {
         },
     }
 
+    impl Default for ExportKind {
+        fn default() -> Self {
+            Self::Pdf {
+                creation_timestamp: None,
+            }
+        }
+    }
+
     impl ExportKind {
         pub fn extension(&self) -> &str {
             match self {
-                Self::Pdf => "pdf",
+                Self::Pdf { .. } => "pdf",
                 Self::Svg { .. } => "svg",
                 Self::Png { .. } => "png",
             }

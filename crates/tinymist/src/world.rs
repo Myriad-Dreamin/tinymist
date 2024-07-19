@@ -1,5 +1,6 @@
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
 
+use chrono::{DateTime, Utc};
 use clap::{builder::ValueParser, ArgAction, Parser};
 use comemo::Prehashed;
 use serde::{Deserialize, Serialize};
@@ -20,7 +21,7 @@ use typst_ts_compiler::{
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
 /// The font arguments for the compiler.
-#[derive(Debug, Clone, Default, Parser, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Parser, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompileFontArgs {
     /// Font paths
@@ -62,6 +63,18 @@ pub struct CompileOnceArgs {
     /// Font related arguments.
     #[clap(flatten)]
     pub font: CompileFontArgs,
+
+    /// The document's creation date formatted as a UNIX timestamp.
+    ///
+    /// For more information, see <https://reproducible-builds.org/specs/source-date-epoch/>.
+    #[clap(
+        long = "creation-timestamp",
+        env = "SOURCE_DATE_EPOCH",
+        value_name = "UNIX_TIMESTAMP",
+        value_parser = parse_source_date_epoch,
+        hide(true),
+    )]
+    pub creation_timestamp: Option<DateTime<Utc>>,
 }
 
 /// Compiler feature for LSP world.
@@ -120,4 +133,12 @@ fn parse_input_pair(raw: &str) -> Result<(String, String), String> {
     }
     let val = val.trim().to_owned();
     Ok((key, val))
+}
+
+/// Parses a UNIX timestamp according to <https://reproducible-builds.org/specs/source-date-epoch/>
+fn parse_source_date_epoch(raw: &str) -> Result<DateTime<Utc>, String> {
+    let timestamp: i64 = raw
+        .parse()
+        .map_err(|err| format!("timestamp must be decimal integer ({err})"))?;
+    DateTime::from_timestamp(timestamp, 0).ok_or_else(|| "timestamp out of range".to_string())
 }

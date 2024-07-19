@@ -8,6 +8,7 @@ use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typst::{foundations::Smart, layout::Abs, layout::Frame, visualize::Color};
 use typst_ts_compiler::{EntryReader, EntryState, TaskInputs};
+use typst_ts_core::TypstDatetime;
 
 use crate::{
     actor::{
@@ -196,10 +197,12 @@ impl ExportConfig {
             static BLANK: Lazy<Frame> = Lazy::new(Frame::default);
             let first_frame = || doc.pages.first().map(|f| &f.frame).unwrap_or(&*BLANK);
             Ok(match kind2 {
-                Pdf => {
+                Pdf { creation_timestamp } => {
+                    let timestamp =
+                        convert_datetime(creation_timestamp.unwrap_or_else(chrono::Utc::now));
                     // todo: Some(pdf_uri.as_str())
                     // todo: timestamp world.now()
-                    typst_pdf::pdf(doc, Smart::Auto, None)
+                    typst_pdf::pdf(doc, Smart::Auto, timestamp)
                 }
                 Svg { page: First } => typst_svg::svg(first_frame()).into_bytes(),
                 Svg { page: Merged } => typst_svg::svg_merged(doc, Abs::zero()).into_bytes(),
@@ -231,6 +234,19 @@ fn log_err<T>(artifact: anyhow::Result<T>) -> Option<T> {
             None
         }
     }
+}
+
+/// Convert [`chrono::DateTime`] to [`TypstDatetime`]
+fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<TypstDatetime> {
+    use chrono::{Datelike, Timelike};
+    TypstDatetime::from_ymd_hms(
+        date_time.year(),
+        date_time.month().try_into().ok()?,
+        date_time.day().try_into().ok()?,
+        date_time.hour().try_into().ok()?,
+        date_time.minute().try_into().ok()?,
+        date_time.second().try_into().ok()?,
+    )
 }
 
 #[cfg(test)]
