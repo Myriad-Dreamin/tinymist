@@ -434,7 +434,8 @@ impl LanguageState {
         let path = as_path_(params.text_document.uri);
         let text = params.text_document.text;
 
-        self.create_source(path.clone(), text).unwrap();
+        self.create_source(path.clone(), text)
+            .map_err(|e| invalid_params(e.to_string()))?;
 
         // Focus after opening
         self.implicit_focus_entry(|| Some(path.as_path().into()), 'o');
@@ -444,7 +445,8 @@ impl LanguageState {
     fn did_close(&mut self, params: DidCloseTextDocumentParams) -> LspResult<()> {
         let path = as_path_(params.text_document.uri);
 
-        self.remove_source(path.clone()).unwrap();
+        self.remove_source(path.clone())
+            .map_err(|e| invalid_params(e.to_string()))?;
         Ok(())
     }
 
@@ -453,7 +455,7 @@ impl LanguageState {
         let changes = params.content_changes;
 
         self.edit_source(path.clone(), changes, self.const_config().position_encoding)
-            .unwrap();
+            .map_err(|e| invalid_params(e.to_string()))?;
         Ok(())
     }
 
