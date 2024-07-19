@@ -496,7 +496,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let registered = handle.register_preview(previewer.compile_watcher());
     assert!(registered, "failed to register preview");
     let previewer = previewer.start(handle.clone(), TYPST_PREVIEW_HTML).await;
-    tokio::spawn(service.spawn());
+    tokio::spawn(service.run());
 
     let (static_server_addr, _tx, static_server_handle) =
         make_static_host(&previewer, args.static_file_host, args.preview_mode);

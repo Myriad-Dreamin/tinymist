@@ -99,7 +99,7 @@ impl LanguageState {
 
             // Create the actor
             let server = CompileServerActor::new(verse, intr_tx, intr_rx).with_watch(Some(handle_));
-            tokio::spawn(server.spawn());
+            tokio::spawn(server.run());
         });
 
         // Create the client

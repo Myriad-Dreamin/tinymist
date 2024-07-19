@@ -10,10 +10,7 @@ use std::{
 };
 
 use once_cell::sync::OnceCell;
-use tokio::{
-    sync::{mpsc, oneshot},
-    task::JoinHandle,
-};
+use tokio::sync::{mpsc, oneshot};
 
 use typst::{diag::SourceResult, util::Deferred};
 use typst_ts_compiler::{
@@ -203,7 +200,7 @@ pub enum Interrupt<F: CompilerFeat> {
     Settle(oneshot::Sender<()>),
 }
 
-/// Responses from the compiler thread.
+/// Responses from the compiler actor.
 enum CompilerResponse {
     /// Response to the file watcher
     Notify(NotifyMessage),
@@ -305,10 +302,9 @@ pub struct CompileServerActor<F: CompilerFeat> {
     /// Shared feature set for watch mode.
     watch_feature_set: Arc<FeatureSet>,
 
-    // todo: private me
-    /// Channel for sending interrupts to the compiler thread.
-    pub intr_tx: mpsc::UnboundedSender<Interrupt<F>>,
-    /// Channel for receiving interrupts from the compiler thread.
+    /// Channel for sending interrupts to the compiler actor.
+    intr_tx: mpsc::UnboundedSender<Interrupt<F>>,
+    /// Channel for receiving interrupts from the compiler actor.
     intr_rx: mpsc::UnboundedReceiver<Interrupt<F>>,
 
     watch_snap: OnceLock<CompileSnapshot<F>>,
@@ -381,104 +377,68 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         CompileEnv::default().configure_shared(feature_set)
     }
 
-    /// Launches the compiler thread and blocks until it exits.
-    #[allow(unused)]
-    pub async fn run_and_wait(mut self) -> bool {
+    /// Launches the compiler actor.
+    pub async fn run(mut self) -> bool {
         if !self.enable_watch {
             let artifact = self.compile_once().await;
             return artifact.doc.is_ok();
         }
 
-        if let Some(h) = self.spawn().await {
-            // Note: this is blocking the current thread.
-            // Note: the block safety is ensured by `run` function.
-            h.await.unwrap();
-        }
-
-        true
-    }
-
-    /// Spawn the compiler thread.
-    pub async fn spawn(mut self) -> Option<JoinHandle<()>> {
-        if !self.enable_watch {
-            self.compile_once().await;
-            return None;
-        }
-
-        // Setup internal channel.
         let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut snapshot_events = vec![];
 
-        let settle_notify_tx = dep_tx.clone();
-        let settle_notify = move || {
-            log_send_error(
-                "settle_notify",
-                settle_notify_tx.send(NotifyMessage::Settle),
-            )
-        };
+        log::debug!("CompileServerActor: initialized");
 
-        // Wrap sender to send compiler response.
-        let ack = move |res: CompilerResponse| match res {
-            CompilerResponse::Notify(msg) => {
-                log_send_error("compile_deps", dep_tx.send(msg));
-            }
-        };
+        // Trigger the first compilation (if active)
+        self.watch_compile(reason_by_entry_change(), &mut snapshot_events);
 
-        // Spawn compiler task.
-        let compile_task = tokio::spawn(async move {
-            log::debug!("CompileServerActor: initialized");
+        // Spawn file system watcher.
+        let fs_tx = self.intr_tx.clone();
+        tokio::spawn(watch_deps(dep_rx, move |event| {
+            log_send_error("fs_event", fs_tx.send(Interrupt::Fs(event)));
+        }));
 
-            let mut snapshot_events = vec![];
+        'event_loop: while let Some(mut event) = self.intr_rx.recv().await {
+            let mut comp_reason = no_reason();
 
-            // Trigger the first compilation (if active)
-            self.watch_compile(reason_by_entry_change(), &mut snapshot_events, &ack);
+            'accumulate: loop {
+                // Warp the logical clock by one.
+                self.logical_tick += 1;
 
-            // Spawn file system watcher.
-            let fs_tx = self.intr_tx.clone();
-            tokio::spawn(watch_deps(dep_rx, move |event| {
-                log_send_error("fs_event", fs_tx.send(Interrupt::Fs(event)));
-            }));
-
-            // Wait for first events.
-            'event_loop: while let Some(mut event) = self.intr_rx.recv().await {
-                let mut comp_reason = no_reason();
-
-                'accumulate: loop {
-                    // Warp the logical clock by one.
-                    self.logical_tick += 1;
-
-                    // If settle, stop the actor.
-                    if let Interrupt::Settle(e) = event {
-                        log::info!("CompileServerActor: requested stop");
-                        e.send(()).ok();
-                        break 'event_loop;
-                    }
-
-                    if let Interrupt::SucceededArtifact(event) = event {
-                        snapshot_events.push(event);
-                    } else {
-                        comp_reason.see(self.process(event, &ack));
-                    }
-
-                    // Try to accumulate more events.
-                    match self.intr_rx.try_recv() {
-                        Ok(new_event) => event = new_event,
-                        _ => break 'accumulate,
-                    }
+                // If settle, stop the actor.
+                if let Interrupt::Settle(e) = event {
+                    log::info!("CompileServerActor: requested stop");
+                    e.send(()).ok();
+                    break 'event_loop;
                 }
 
-                // Either we have a reason to compile or we have events that want to have any
-                // compilation.
-                if comp_reason.any() || !snapshot_events.is_empty() {
-                    self.watch_compile(comp_reason, &mut snapshot_events, &ack);
+                if let Interrupt::SucceededArtifact(event) = event {
+                    snapshot_events.push(event);
+                } else {
+                    comp_reason.see(self.process(event, |res: CompilerResponse| match res {
+                        CompilerResponse::Notify(msg) => {
+                            log_send_error("compile_deps", dep_tx.send(msg));
+                        }
+                    }));
+                }
+
+                // Try to accumulate more events.
+                match self.intr_rx.try_recv() {
+                    Ok(new_event) => event = new_event,
+                    _ => break 'accumulate,
                 }
             }
 
-            settle_notify();
-            log::info!("CompileServerActor: exited");
-        });
+            // Either we have a reason to compile or we have events that want to have any
+            // compilation.
+            if comp_reason.any() || !snapshot_events.is_empty() {
+                self.watch_compile(comp_reason, &mut snapshot_events);
+            }
+        }
 
-        // Return the thread handle.
-        Some(compile_task)
+        log_send_error("settle_notify", dep_tx.send(NotifyMessage::Settle));
+        log::info!("CompileServerActor: exited");
+        true
     }
 
     fn snapshot(&self, is_once: bool, reason: CompileReasons) -> CompileSnapshot<F> {
@@ -521,7 +481,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         &mut self,
         reason: CompileReasons,
         snapshot_events: &mut Vec<oneshot::Sender<SucceededArtifact<F>>>,
-        _send: impl Fn(CompilerResponse),
     ) {
         self.suspended_reason.see(reason);
         let reason = std::mem::take(&mut self.suspended_reason);
