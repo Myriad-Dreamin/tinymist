@@ -89,7 +89,7 @@
                 },
                 "tinymist.rootPath": {
                     "title": "Root path",
-                    "description": "Configure the root for absolute paths in typst",
+                    "description": "Configure the root for absolute paths in typst. Hint: you can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path.",
                     "type": [
                         "string",
                         "null"
