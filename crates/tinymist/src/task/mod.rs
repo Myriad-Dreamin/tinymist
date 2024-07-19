@@ -7,6 +7,7 @@ pub use export::*;
 mod format;
 pub use format::*;
 mod user_action;
+use rayon::Scope;
 pub use user_action::*;
 
 use std::{ops::DerefMut, pin::Pin, sync::Arc};
@@ -52,6 +53,15 @@ struct FutureFolder {
 }
 
 impl FutureFolder {
+    async fn compute<'scope, OP, R: Send + 'static>(op: OP) -> anyhow::Result<R>
+    where
+        OP: FnOnce(&Scope<'scope>) -> R + Send + 'static,
+    {
+        tokio::task::spawn_blocking(move || -> R { rayon::in_place_scope(op) })
+            .await
+            .map_err(|e| anyhow::anyhow!("compute error: {e:?}"))
+    }
+
     fn spawn(&self, revision: usize, fut: impl FnOnce() -> FoldFuture) {
         let mut state = self.state.lock();
         let state = state.deref_mut();

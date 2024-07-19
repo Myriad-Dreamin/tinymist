@@ -986,7 +986,7 @@ impl LanguageState {
             .map(|path| client.config.determine_entry(Some(path.into())));
 
         just_future(async move {
-            let mut snap = snap.snapshot().await?;
+            let mut snap = snap.receive().await?;
             // todo: whether it is safe to inherit success_doc with changed entry
             if !is_pinning {
                 snap = snap.task(TaskInputs {

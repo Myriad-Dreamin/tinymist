@@ -83,6 +83,8 @@ impl LanguageState {
                 caches: Default::default(),
             },
             periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
+
+            notified_revision: parking_lot::Mutex::new(0),
         });
 
         let font_resolver = self.compile_config().determine_fonts();
