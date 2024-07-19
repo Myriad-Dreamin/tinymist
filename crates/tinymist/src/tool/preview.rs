@@ -119,7 +119,7 @@ impl SourceFileServer for CompileHandler {
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
     async fn resolve_document_position(&self, loc: Location) -> Result<Option<Position>, Error> {
-        let snap = self.succeeded_artifact()?.receive().await?;
+        let snap = self.artifact()?.receive().await?;
         Ok(Self::resolve_document_position(&snap, loc).await)
     }
 

@@ -190,10 +190,12 @@ pub enum Interrupt<F: CompilerFeat> {
     Compiled(CompiledArtifact<F>),
     /// Change the watching entry.
     ChangeTask(TaskInputs),
-    /// Request compiler to snapshot the current state.
-    Snapshot(oneshot::Sender<CompileSnapshot<F>>),
-    /// Request compiler to get latest succeeded artifact.
-    SucceededArtifact(oneshot::Sender<SucceededArtifact<F>>),
+    /// Request compiler to respond a snapshot without needing to wait latest
+    /// compilation.
+    SnapshotRead(oneshot::Sender<CompileSnapshot<F>>),
+    /// Request compiler to respond a snapshot with at least a compilation
+    /// happens on or after current revision.
+    CurrentRead(oneshot::Sender<SucceededArtifact<F>>),
     /// Memory file changes.
     Memory(MemoryEvent),
     /// File system event.
@@ -393,12 +395,12 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         }
 
         let (dep_tx, dep_rx) = tokio::sync::mpsc::unbounded_channel();
-        let mut snapshot_events = vec![];
+        let mut curr_reads = vec![];
 
         log::debug!("CompileServerActor: initialized");
 
         // Trigger the first compilation (if active)
-        self.watch_compile(reason_by_entry_change(), &mut snapshot_events);
+        self.watch_compile(reason_by_entry_change(), &mut curr_reads);
 
         // Spawn file system watcher.
         let fs_tx = self.intr_tx.clone();
@@ -420,8 +422,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     break 'event_loop;
                 }
 
-                if let Interrupt::SucceededArtifact(event) = event {
-                    snapshot_events.push(event);
+                if let Interrupt::CurrentRead(event) = event {
+                    curr_reads.push(event);
                 } else {
                     comp_reason.see(self.process(event, |res: CompilerResponse| match res {
                         CompilerResponse::Notify(msg) => {
@@ -439,8 +441,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
             // Either we have a reason to compile or we have events that want to have any
             // compilation.
-            if comp_reason.any() || !snapshot_events.is_empty() {
-                self.watch_compile(comp_reason, &mut snapshot_events);
+            if comp_reason.any() || !curr_reads.is_empty() {
+                self.watch_compile(comp_reason, &mut curr_reads);
             }
         }
 
@@ -488,7 +490,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
     fn watch_compile(
         &mut self,
         reason: CompileReasons,
-        snapshot_events: &mut Vec<oneshot::Sender<SucceededArtifact<F>>>,
+        curr_reads: &mut Vec<oneshot::Sender<SucceededArtifact<F>>>,
     ) {
         self.suspended_reason.see(reason);
         let reason = std::mem::take(&mut self.suspended_reason);
@@ -501,8 +503,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         if self.suspended {
             self.suspended_reason.see(reason);
 
-            for task in snapshot_events.drain(..) {
-                let _ = task.send(SucceededArtifact::Suspend(compiling.clone()));
+            for reader in curr_reads.drain(..) {
+                let _ = reader.send(SucceededArtifact::Suspend(compiling.clone()));
             }
             return;
         }
@@ -515,7 +517,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         self.compiling = true;
 
         let h = self.watch_handle.clone();
-        let snapshot_events = std::mem::take(snapshot_events);
+        let curr_reads = std::mem::take(curr_reads);
 
         // todo unwrap main id
         let id = compiling.world.main_id().unwrap();
@@ -526,8 +528,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         let compile = move || {
             let compiled = compiling.compile();
 
-            for task in snapshot_events {
-                let _ = task.send(SucceededArtifact::Compiled(compiled.clone()));
+            for reader in curr_reads {
+                let _ = reader.send(SucceededArtifact::Compiled(compiled.clone()));
             }
 
             let elapsed = start.elapsed().unwrap_or_default();
@@ -606,7 +608,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
                 reason_by_entry_change()
             }
-            Interrupt::Snapshot(task) => {
+            Interrupt::SnapshotRead(task) => {
                 log::debug!("CompileServerActor: take snapshot");
                 if self
                     .watch_snap
@@ -623,7 +625,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                 );
                 no_reason()
             }
-            Interrupt::SucceededArtifact(..) => {
+            Interrupt::CurrentRead(..) => {
                 unreachable!()
             }
             Interrupt::ChangeTask(change) => {
