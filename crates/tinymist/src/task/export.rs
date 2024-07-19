@@ -5,7 +5,7 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::{bail, Context};
 use once_cell::sync::Lazy;
 use tinymist_query::{ExportKind, PageSelection};
-use tokio::{sync::mpsc, task::spawn_blocking};
+use tokio::sync::mpsc;
 use typst::{foundations::Smart, layout::Abs, layout::Frame, visualize::Color};
 use typst_ts_compiler::{EntryReader, EntryState, TaskInputs};
 
@@ -63,13 +63,13 @@ impl ExportTask {
     ) -> impl Future<Output = anyhow::Result<Option<PathBuf>>> {
         let export = self.factory.task();
         async move {
-            let snap = snap.snapshot().await?;
+            let snap = snap.receive().await?;
             let snap = snap.task(TaskInputs {
                 entry,
                 ..Default::default()
             });
 
-            let artifact = snap.compile().await;
+            let artifact = snap.compile();
             export.do_export(&kind, artifact).await
         }
     }
@@ -143,10 +143,13 @@ impl ExportConfig {
             let group = self.group.clone();
             Box::pin(async move {
                 let doc = artifact.doc.ok()?;
-                let wc = word_count::word_count(&doc);
+                let wc =
+                    log_err(FutureFolder::compute(move |_| word_count::word_count(&doc)).await);
                 log::debug!("WordCount({group}:{revision}): {wc:?}");
 
-                let _ = editor_tx.send(EditorRequest::WordCount(group, wc));
+                if let Some(wc) = wc {
+                    let _ = editor_tx.send(EditorRequest::WordCount(group, wc));
+                }
 
                 Some(())
             })
@@ -187,33 +190,27 @@ impl ExportConfig {
 
         // Prepare data.
         let kind2 = kind.clone();
-        let data = spawn_blocking(move || -> anyhow::Result<Vec<u8>> {
-            rayon::in_place_scope(|_| {
-                let doc = &doc;
+        let data = FutureFolder::compute(move |_| -> anyhow::Result<Vec<u8>> {
+            let doc = &doc;
 
-                static BLANK: Lazy<Frame> = Lazy::new(Frame::default);
-                let first_frame = || doc.pages.first().map(|f| &f.frame).unwrap_or(&*BLANK);
-                Ok(match kind2 {
-                    Pdf => {
-                        // todo: Some(pdf_uri.as_str())
-                        // todo: timestamp world.now()
-                        typst_pdf::pdf(doc, Smart::Auto, None)
-                    }
-                    Svg { page: First } => typst_svg::svg(first_frame()).into_bytes(),
-                    Svg { page: Merged } => typst_svg::svg_merged(doc, Abs::zero()).into_bytes(),
-                    Png { page: First } => typst_render::render(first_frame(), 3., Color::WHITE)
-                        .encode_png()
-                        .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?,
-                    Png { page: Merged } => typst_render::render_merged(
-                        doc,
-                        3.,
-                        Color::WHITE,
-                        Abs::zero(),
-                        Color::WHITE,
-                    )
+            static BLANK: Lazy<Frame> = Lazy::new(Frame::default);
+            let first_frame = || doc.pages.first().map(|f| &f.frame).unwrap_or(&*BLANK);
+            Ok(match kind2 {
+                Pdf => {
+                    // todo: Some(pdf_uri.as_str())
+                    // todo: timestamp world.now()
+                    typst_pdf::pdf(doc, Smart::Auto, None)
+                }
+                Svg { page: First } => typst_svg::svg(first_frame()).into_bytes(),
+                Svg { page: Merged } => typst_svg::svg_merged(doc, Abs::zero()).into_bytes(),
+                Png { page: First } => typst_render::render(first_frame(), 3., Color::WHITE)
                     .encode_png()
                     .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?,
-                })
+                Png { page: Merged } => {
+                    typst_render::render_merged(doc, 3., Color::WHITE, Abs::zero(), Color::WHITE)
+                        .encode_png()
+                        .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
+                }
             })
         });
 

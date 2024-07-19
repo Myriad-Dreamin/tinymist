@@ -3,6 +3,7 @@
 use std::num::NonZeroUsize;
 use std::{borrow::Cow, collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
+use actor::typ_server::SucceededArtifact;
 use anyhow::Context;
 use hyper::service::{make_service_fn, service_fn};
 use lsp_types::notification::Notification;
@@ -33,7 +34,7 @@ use crate::*;
 use actor::{
     preview::{PreviewActor, PreviewRequest, PreviewTab},
     typ_client::CompileHandler,
-    typ_server::{CompileServerActor, CompileSnapshot},
+    typ_server::CompileServerActor,
 };
 
 impl CompileHost for CompileHandler {}
@@ -61,7 +62,7 @@ impl CompileHandler {
     }
 
     async fn resolve_document_position(
-        snap: &CompileSnapshot<LspCompilerFeat>,
+        snap: &SucceededArtifact<LspCompilerFeat>,
         loc: Location,
     ) -> Option<Position> {
         let Location::Src(src_loc) = loc;
@@ -70,9 +71,9 @@ impl CompileHandler {
         let line = src_loc.pos.line;
         let column = src_loc.pos.column;
 
-        let doc = snap.doc().await.ok();
+        let doc = snap.success_doc();
         let doc = doc.as_deref()?;
-        let world = &snap.world;
+        let world = snap.world();
 
         let relative_path = path.strip_prefix(&world.workspace_root()?).ok()?;
 
@@ -111,14 +112,14 @@ impl SourceFileServer for CompileHandler {
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
     async fn resolve_source_span(&self, loc: Location) -> Result<Option<SourceSpanOffset>, Error> {
-        let snap = self.snapshot()?.snapshot().await?;
+        let snap = self.snapshot()?.receive().await?;
         Ok(Self::resolve_source_span(&snap.world, loc))
     }
 
     /// fixme: character is 0-based, UTF-16 code unit.
     /// We treat it as UTF-8 now.
     async fn resolve_document_position(&self, loc: Location) -> Result<Option<Position>, Error> {
-        let snap = self.snapshot()?.snapshot().await?;
+        let snap = self.succeeded_artifact()?.receive().await?;
         Ok(Self::resolve_document_position(&snap, loc).await)
     }
 
@@ -127,7 +128,7 @@ impl SourceFileServer for CompileHandler {
         span: Span,
         offset: Option<usize>,
     ) -> Result<Option<DocToSrcJumpInfo>, Error> {
-        let snap = self.snapshot()?.snapshot().await?;
+        let snap = self.snapshot()?.receive().await?;
         Ok(Self::resolve_source_location(&snap.world, span, offset))
     }
 }
@@ -479,6 +480,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
                 caches: Default::default(),
             },
             periscope: tinymist_render::PeriscopeRenderer::default(),
+            notified_revision: parking_lot::Mutex::new(0),
         });
 
         // Consume editor_rx

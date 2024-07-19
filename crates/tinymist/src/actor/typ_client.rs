@@ -31,7 +31,6 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use log::{error, info, trace};
-use parking_lot::Mutex;
 use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnalysisResources},
@@ -54,7 +53,9 @@ use typst_ts_core::{
 
 use super::{
     editor::{DocVersion, EditorRequest, TinymistCompileStatusEnum},
-    typ_server::{CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt},
+    typ_server::{
+        CompilationHandle, CompileSnapshot, CompiledArtifact, Interrupt, SucceededArtifact,
+    },
 };
 use crate::{
     task::{ExportTask, ExportUserConfig},
@@ -75,6 +76,8 @@ pub struct CompileHandler {
     pub(crate) intr_tx: mpsc::UnboundedSender<Interrupt<LspCompilerFeat>>,
     pub(crate) export: ExportTask,
     pub(crate) editor_tx: EditorSender,
+
+    pub(crate) notified_revision: parking_lot::Mutex<usize>,
 }
 
 impl CompileHandler {
@@ -85,10 +88,17 @@ impl CompileHandler {
             .send(Interrupt::Snapshot(tx))
             .map_err(map_string_err("failed to send snapshot request"))?;
 
-        Ok(QuerySnap {
-            rx: Arc::new(Mutex::new(Some(rx))),
-            snap: tokio::sync::OnceCell::new(),
-        })
+        Ok(QuerySnap { rx })
+    }
+
+    /// Get latest artifact the compiler thread for tasks
+    pub fn succeeded_artifact(&self) -> ZResult<ArtifactSnap> {
+        let (tx, rx) = oneshot::channel();
+        self.intr_tx
+            .send(Interrupt::SucceededArtifact(tx))
+            .map_err(map_string_err("failed to send snapshot request"))?;
+
+        Ok(ArtifactSnap { rx })
     }
 
     pub fn flush_compile(&self) {
@@ -292,6 +302,19 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
     }
 
     fn notify_compile(&self, snap: &CompiledArtifact<LspCompilerFeat>, _rep: CompileReport) {
+        // todo: we need to manage the revision for fn status() as well
+        {
+            let mut n_rev = self.notified_revision.lock();
+            if *n_rev >= snap.world.revision().get() {
+                log::info!(
+                    "TypstActor: already notified for revision {} <= {n_rev}",
+                    snap.world.revision(),
+                );
+                return;
+            }
+            *n_rev = snap.world.revision().get();
+        }
+
         self.notify_diagnostics(
             &snap.world,
             snap.doc.clone().err().unwrap_or_default(),
@@ -427,7 +450,7 @@ impl CompileClientActor {
 
         let snap = self.snapshot()?;
         just_future(async move {
-            let snap = snap.snapshot().await?;
+            let snap = snap.receive().await?;
             let w = &snap.world;
 
             let info = ServerInfoResponse {
@@ -449,19 +472,27 @@ impl CompileClientActor {
 }
 
 pub struct QuerySnap {
-    rx: Arc<Mutex<Option<oneshot::Receiver<CompileSnapshot<LspCompilerFeat>>>>>,
-    snap: tokio::sync::OnceCell<ZResult<CompileSnapshot<LspCompilerFeat>>>,
+    rx: oneshot::Receiver<CompileSnapshot<LspCompilerFeat>>,
 }
 
 impl QuerySnap {
     /// Snapshot the compiler thread for tasks
-    pub async fn snapshot(&self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
-        self.snap
-            .get_or_init(|| async move {
-                let rx = self.rx.lock().take().unwrap();
-                rx.await.map_err(map_string_err("failed to get snapshot"))
-            })
+    pub async fn receive(self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
+        self.rx
             .await
-            .clone()
+            .map_err(map_string_err("failed to get snapshot"))
+    }
+}
+
+pub struct ArtifactSnap {
+    rx: oneshot::Receiver<SucceededArtifact<LspCompilerFeat>>,
+}
+
+impl ArtifactSnap {
+    /// Get latest artifact the compiler thread for tasks
+    pub async fn receive(self) -> ZResult<SucceededArtifact<LspCompilerFeat>> {
+        self.rx
+            .await
+            .map_err(map_string_err("failed to get snapshot"))
     }
 }

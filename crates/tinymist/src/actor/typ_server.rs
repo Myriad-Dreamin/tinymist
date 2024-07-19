@@ -6,7 +6,7 @@ use std::{
     collections::HashSet,
     ops::Deref,
     path::Path,
-    sync::{atomic::AtomicBool, Arc, OnceLock},
+    sync::{Arc, OnceLock},
 };
 
 use once_cell::sync::OnceCell;
@@ -57,7 +57,7 @@ pub struct CompileSnapshot<F: CompilerFeat> {
 }
 
 impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
-    pub fn start(&self) -> &CompileRawResult {
+    fn start(&self) -> &CompileRawResult {
         self.doc_state.get_or_init(|| {
             let w = self.world.clone();
             let mut env = self.env.clone();
@@ -92,11 +92,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
         self
     }
 
-    pub async fn doc(&self) -> SourceResult<Arc<TypstDocument>> {
-        self.start().wait().0.clone()
-    }
-
-    pub async fn compile(&self) -> CompiledArtifact<F> {
+    pub fn compile(&self) -> CompiledArtifact<F> {
         let (doc, env) = self.start().wait().clone();
         CompiledArtifact {
             signal: self.flags,
@@ -120,7 +116,6 @@ impl<F: CompilerFeat> Clone for CompileSnapshot<F> {
     }
 }
 
-#[derive(Clone)]
 pub struct CompiledArtifact<F: CompilerFeat> {
     /// All the export signal for the document.
     pub signal: ExportSignal,
@@ -129,16 +124,32 @@ pub struct CompiledArtifact<F: CompilerFeat> {
     /// Used env
     pub env: CompileEnv,
     pub doc: SourceResult<Arc<TypstDocument>>,
-    pub success_doc: Option<Arc<TypstDocument>>,
+    success_doc: Option<Arc<TypstDocument>>,
+}
+
+impl<F: CompilerFeat> Clone for CompiledArtifact<F> {
+    fn clone(&self) -> Self {
+        Self {
+            signal: self.signal,
+            world: self.world.clone(),
+            env: self.env.clone(),
+            doc: self.doc.clone(),
+            success_doc: self.success_doc.clone(),
+        }
+    }
+}
+
+impl<F: CompilerFeat> CompiledArtifact<F> {
+    pub fn success_doc(&self) -> Option<Arc<TypstDocument>> {
+        self.doc
+            .as_ref()
+            .ok()
+            .cloned()
+            .or_else(|| self.success_doc.clone())
+    }
 }
 
 // pub type NopCompilationHandle<T> = std::marker::PhantomData<fn(T)>;
-
-const COMPILE_CONCURRENCY: usize = 0;
-// const COMPILE_CONCURRENCY: usize = 1;
-
-/// Whether to enable deferred snapshot.
-pub static NO_DEFERRED_SNAPSHOT: AtomicBool = AtomicBool::new(false);
 
 pub trait CompilationHandle<F: CompilerFeat>: Send + Sync + 'static {
     fn status(&self, revision: usize, rep: CompileReport);
@@ -152,6 +163,27 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompilationHandle<F>
     fn notify_compile(&self, _: &CompiledArtifact<F>, _: CompileReport) {}
 }
 
+pub enum SucceededArtifact<F: CompilerFeat> {
+    Compiled(CompiledArtifact<F>),
+    Suspend(CompileSnapshot<F>),
+}
+
+impl<F: CompilerFeat> SucceededArtifact<F> {
+    pub fn success_doc(&self) -> Option<Arc<TypstDocument>> {
+        match self {
+            SucceededArtifact::Compiled(artifact) => artifact.success_doc(),
+            SucceededArtifact::Suspend(snapshot) => snapshot.success_doc.clone(),
+        }
+    }
+
+    pub fn world(&self) -> &Arc<CompilerWorld<F>> {
+        match self {
+            SucceededArtifact::Compiled(artifact) => &artifact.world,
+            SucceededArtifact::Suspend(snapshot) => &snapshot.world,
+        }
+    }
+}
+
 pub enum Interrupt<F: CompilerFeat> {
     /// Compile anyway.
     Compile,
@@ -161,6 +193,8 @@ pub enum Interrupt<F: CompilerFeat> {
     ChangeTask(TaskInputs),
     /// Request compiler to snapshot the current state.
     Snapshot(oneshot::Sender<CompileSnapshot<F>>),
+    /// Request compiler to get latest succeeded artifact.
+    SucceededArtifact(oneshot::Sender<SucceededArtifact<F>>),
     /// Memory file changes.
     Memory(MemoryEvent),
     /// File system event.
@@ -233,7 +267,6 @@ struct TaggedMemoryEvent {
 pub struct CompileServerOpts<F: CompilerFeat> {
     pub exporter: GroupExporter<CompileSnapshot<F>>,
     pub feature_set: FeatureSet,
-    pub compile_concurrency: usize,
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
@@ -241,7 +274,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
         Self {
             exporter: GroupExporter::new(vec![]),
             feature_set: FeatureSet::default(),
-            compile_concurrency: COMPILE_CONCURRENCY,
         }
     }
 }
@@ -281,9 +313,9 @@ pub struct CompileServerActor<F: CompilerFeat> {
 
     watch_snap: OnceLock<CompileSnapshot<F>>,
     suspended: bool,
+    compiling: bool,
     suspended_reason: CompileReasons,
     committed_revision: usize,
-    compile_concurrency: usize,
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
@@ -295,7 +327,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         CompileServerOpts {
             exporter,
             feature_set,
-            compile_concurrency,
         }: CompileServerOpts<F>,
     ) -> Self {
         let entry = verse.entry_state();
@@ -322,9 +353,9 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
             watch_snap: OnceLock::new(),
             suspended: entry.is_inactive(),
+            compiling: false,
             suspended_reason: no_reason(),
             committed_revision: 0,
-            compile_concurrency,
         }
     }
 
@@ -392,22 +423,20 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             }
         };
 
-        // Trigger the first compilation (if active)
-        self.watch_compile(reason_by_fs(), &ack).await;
-
-        // Spawn file system watcher.
-        let fs_tx = self.intr_tx.clone();
-        tokio::spawn(watch_deps(dep_rx, move |event| {
-            log_send_error("fs_event", fs_tx.send(Interrupt::Fs(event)));
-        }));
-
         // Spawn compiler task.
         let compile_task = tokio::spawn(async move {
             log::debug!("CompileServerActor: initialized");
 
-            let allow_deferred_snapshot =
-                !NO_DEFERRED_SNAPSHOT.load(std::sync::atomic::Ordering::SeqCst);
             let mut snapshot_events = vec![];
+
+            // Trigger the first compilation (if active)
+            self.watch_compile(reason_by_entry_change(), &mut snapshot_events, &ack);
+
+            // Spawn file system watcher.
+            let fs_tx = self.intr_tx.clone();
+            tokio::spawn(watch_deps(dep_rx, move |event| {
+                log_send_error("fs_event", fs_tx.send(Interrupt::Fs(event)));
+            }));
 
             // Wait for first events.
             'event_loop: while let Some(mut event) = self.intr_rx.recv().await {
@@ -424,19 +453,9 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                         break 'event_loop;
                     }
 
-                    // todo: deferred snapshots introduces unstable behavior. May have approach to
-                    // achieve both.
-                    if allow_deferred_snapshot {
-                        if let Interrupt::Snapshot(event) = event {
-                            snapshot_events.push(event);
-                        } else {
-                            comp_reason.see(self.process(event, &ack));
-                        }
+                    if let Interrupt::SucceededArtifact(event) = event {
+                        snapshot_events.push(event);
                     } else {
-                        // Ensure complied before executing tasks.
-                        if matches!(event, Interrupt::Snapshot(_)) && comp_reason.any() {
-                            comp_reason = self.watch_compile(comp_reason, &ack).await;
-                        }
                         comp_reason.see(self.process(event, &ack));
                     }
 
@@ -447,23 +466,10 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     }
                 }
 
-                if comp_reason.any() {
-                    comp_reason = self.watch_compile(comp_reason, &ack).await;
-                }
-                if comp_reason.any() {
-                    comp_reason = self.watch_compile(comp_reason, &ack).await;
-                    if comp_reason.any() {
-                        log::warn!("CompileServerActor: watch_compile infinite loop?");
-                    }
-                }
-
-                if !snapshot_events.is_empty() {
-                    let snap = self
-                        .watch_snap
-                        .get_or_init(|| self.snapshot(false, no_reason()));
-                    for task in snapshot_events.drain(..) {
-                        let _ = task.send(snap.clone());
-                    }
+                // Either we have a reason to compile or we have events that want to have any
+                // compilation.
+                if comp_reason.any() || !snapshot_events.is_empty() {
+                    self.watch_compile(comp_reason, &mut snapshot_events, &ack);
                 }
             }
 
@@ -507,39 +513,56 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             log::error!("CompileServerActor: export error: {err:?}");
         }
 
-        e.compile().await
+        e.compile()
     }
 
     /// Watch and compile the document once.
-    async fn watch_compile(
+    fn watch_compile(
         &mut self,
         reason: CompileReasons,
-        send: impl Fn(CompilerResponse),
-    ) -> CompileReasons {
+        snapshot_events: &mut Vec<oneshot::Sender<SucceededArtifact<F>>>,
+        _send: impl Fn(CompilerResponse),
+    ) {
         self.suspended_reason.see(reason);
-        if self.suspended {
-            return no_reason();
-        }
         let reason = std::mem::take(&mut self.suspended_reason);
-
         let start = reflexo::time::now();
 
         let compiling = self.snapshot(false, reason);
         self.watch_snap = OnceLock::new();
         self.watch_snap.get_or_init(|| compiling.clone());
 
+        if self.suspended {
+            self.suspended_reason.see(reason);
+
+            for task in snapshot_events.drain(..) {
+                let _ = task.send(SucceededArtifact::Suspend(compiling.clone()));
+            }
+            return;
+        }
+
+        if self.compiling {
+            self.suspended_reason.see(reason);
+            return;
+        }
+
+        self.compiling = true;
+
         let h = self.watch_handle.clone();
-        let intr_tx = self.intr_tx.clone();
+        let snapshot_events = std::mem::take(snapshot_events);
 
         // todo unwrap main id
         let id = compiling.world.main_id().unwrap();
         let revision = compiling.world.revision().get();
 
-        self.watch_handle
-            .status(revision, CompileReport::Stage(id, "compiling", start));
+        h.status(revision, CompileReport::Stage(id, "compiling", start));
 
-        let compile = move || async move {
-            let compiled = compiling.compile().await;
+        let compile = move || {
+            let compiled = compiling.compile();
+
+            for task in snapshot_events {
+                let _ = task.send(SucceededArtifact::Compiled(compiled.clone()));
+            }
+
             let elapsed = start.elapsed().unwrap_or_default();
             let rep;
             match &compiled.doc {
@@ -561,34 +584,26 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                 Arc::new((compiled.env.features.clone(), rep.clone())),
             );
 
+            // todo: we need to check revision for really concurrent compilation
             h.notify_compile(&compiled, rep);
 
             compiled
         };
 
-        if self.compile_concurrency == 0 {
-            self.process_compile(compile().await, send)
-        } else {
-            tokio::spawn(async move {
-                log_send_error(
-                    "compiled",
-                    intr_tx.send(Interrupt::Compiled(compile().await)),
-                );
-            });
-            no_reason()
-        }
+        let intr_tx = self.intr_tx.clone();
+        tokio::task::spawn_blocking(move || {
+            log_send_error("compiled", intr_tx.send(Interrupt::Compiled(compile())));
+        });
     }
 
-    fn process_compile(
-        &mut self,
-        artifact: CompiledArtifact<F>,
-        send: impl Fn(CompilerResponse),
-    ) -> CompileReasons {
+    fn process_compile(&mut self, artifact: CompiledArtifact<F>, send: impl Fn(CompilerResponse)) {
+        self.compiling = false;
+
         let w = &artifact.world;
 
         let compiled_revision = w.revision().get();
         if self.committed_revision >= compiled_revision {
-            return no_reason();
+            return;
         }
 
         let doc = artifact.doc.ok();
@@ -617,13 +632,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             let elapsed = evict_start.elapsed();
             log::info!("CompileServerActor: evict compilation cache in {elapsed:?}");
         });
-
-        self.process_may_laggy_compile()
-    }
-
-    fn process_may_laggy_compile(&mut self) -> CompileReasons {
-        // todo: rate limit
-        no_reason()
     }
 
     /// Process some interrupt. Return whether it needs compilation.
@@ -634,12 +642,23 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             Interrupt::Compile => reason_by_entry_change(),
             Interrupt::Snapshot(task) => {
                 log::debug!("CompileServerActor: take snapshot");
+                if self
+                    .watch_snap
+                    .get()
+                    .is_some_and(|e| e.world.revision() < *self.verse.revision.read())
+                {
+                    self.watch_snap = OnceLock::new();
+                }
+
                 let _ = task.send(
                     self.watch_snap
                         .get_or_init(|| self.snapshot(false, no_reason()))
                         .clone(),
                 );
                 no_reason()
+            }
+            Interrupt::SucceededArtifact(..) => {
+                unreachable!()
             }
             Interrupt::ChangeTask(change) => {
                 self.verse.increment_revision(|verse| {
@@ -671,7 +690,10 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
 
                 reason_by_entry_change()
             }
-            Interrupt::Compiled(artifact) => self.process_compile(artifact, send),
+            Interrupt::Compiled(artifact) => {
+                self.process_compile(artifact, send);
+                no_reason()
+            }
             Interrupt::Memory(event) => {
                 log::debug!("CompileServerActor: memory event incoming");
 

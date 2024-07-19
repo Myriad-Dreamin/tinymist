@@ -176,7 +176,7 @@ impl LanguageState {
         let snap = self.primary().snapshot().map_err(z_internal_error)?;
 
         just_future(async move {
-            let snap = snap.snapshot().await.map_err(z_internal_error)?;
+            let snap = snap.receive().await.map_err(z_internal_error)?;
 
             // Parse the package specification. If the user didn't specify the version,
             // we try to figure it out automatically by downloading the package index
@@ -221,7 +221,7 @@ impl LanguageState {
         let snap = self.primary().snapshot().map_err(z_internal_error)?;
 
         just_future(async move {
-            let snap = snap.snapshot().await.map_err(z_internal_error)?;
+            let snap = snap.receive().await.map_err(z_internal_error)?;
 
             // Parse the package specification. If the user didn't specify the version,
             // we try to figure it out automatically by downloading the package index
@@ -290,7 +290,7 @@ impl LanguageState {
         let user_action = self.user_action;
 
         just_future(async move {
-            let snap = snap.snapshot().await.map_err(z_internal_error)?;
+            let snap = snap.receive().await.map_err(z_internal_error)?;
             let display_entry = || format!("{entry:?}");
 
             // todo: rootless file
