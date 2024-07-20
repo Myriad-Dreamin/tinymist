@@ -8,11 +8,11 @@ import * as fs from "fs";
 
 class Test {
     readonly name: string;
-    readonly promise: Promise<void>;
+    readonly f: () => Promise<void>;
 
-    constructor(name: string, promise: Promise<void>) {
+    constructor(name: string, f: () => Promise<void>) {
         this.name = name;
-        this.promise = promise;
+        this.f = f;
     }
 }
 
@@ -24,7 +24,7 @@ class Suite {
     }
 
     public addTest(name: string, f: () => Promise<void>): void {
-        const test = new Test(name, f());
+        const test = new Test(name, f);
         this.tests.push(test);
     }
 
@@ -32,11 +32,10 @@ class Suite {
         let failed = 0;
         for (const test of this.tests) {
             try {
-                await test.promise;
+                await test.f();
                 ok(`  ✔ ${test.name}`);
-            } catch (e) {
-                assert.ok(e instanceof Error);
-                error(`  ✖︎ ${test.name}\n  ${e.stack}`);
+            } catch (e: any) {
+                error(`  ✖︎ ${test.name}\n  ${e?.message || e}  ${e?.stack}`);
                 failed += 1;
             }
         }
@@ -59,9 +58,8 @@ export class Context {
             ok(`⌛︎ ${name}`);
             await ctx.run();
             ok(`✔ ${name}`);
-        } catch (e) {
-            assert.ok(e instanceof Error);
-            error(`✖︎ ${name}\n  ${e.stack}`);
+        } catch (e: any) {
+            error(`  ✖︎ ${name}\n  ${e?.message || e}  ${e?.stack}`);
             throw e;
         }
     }
@@ -114,6 +112,21 @@ export class Context {
             position
         );
     }
+
+    diagnostics(
+        f: () => Promise<any> = Promise.resolve
+    ): Promise<[vscode.DiagnosticChangeEvent, [vscode.Uri, vscode.Diagnostic[]][]]> {
+        return new Promise(async (resolve, reject) => {
+            const diagnosticsHandler = vscode.languages.onDidChangeDiagnostics((e) => {
+                diagnosticsHandler.dispose();
+                resolve([e, vscode.languages.getDiagnostics()]);
+            });
+            f().catch(() => {
+                diagnosticsHandler.dispose();
+                reject();
+            });
+        });
+    }
 }
 
 export async function run(): Promise<void> {
@@ -124,7 +137,7 @@ export async function run(): Promise<void> {
     setTimeout(() => {
         console.error("Tests timed out");
         process.exit(81);
-    }, 60000);
+    }, 30000);
 
     const testFiles = (await readdir(path.resolve(__dirname))).filter((name) =>
         name.endsWith(".test.js")
