@@ -4,25 +4,73 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.16 - [2024-07-20]
+
+* Adding editor-side e2e testing in https://github.com/Myriad-Dreamin/tinymist/pull/441 and https://github.com/Myriad-Dreamin/tinymist/pull/442
+
+### Compiler
+
+* Making compilation not block most snapshot requests in https://github.com/Myriad-Dreamin/tinymist/pull/432 and https://github.com/Myriad-Dreamin/tinymist/pull/435
+* Making cache evicting shared in https://github.com/Myriad-Dreamin/tinymist/pull/434
+  * To make more sensible cache eviction when you are previewing multiple documents (running multiple compilers).
+* (Fix) Changing entry if pinning again in https://github.com/Myriad-Dreamin/tinymist/pull/430
+  * This was introduced by https://github.com/Myriad-Dreamin/tinymist/pull/406
+* (Fix) Tolerating client changing source state badly in https://github.com/Myriad-Dreamin/tinymist/pull/429
+  * Sometimes the client sends a request with a wrong source state, which causes a panic.
+
+### Editor
+
+* Showing views only if tinymist extension is activated in https://github.com/Myriad-Dreamin/tinymist/pull/420
+  * This is a slightly improvement on https://github.com/Myriad-Dreamin/tinymist/pull/414
+* (Fix) Removed dirty preview command changes in https://github.com/Myriad-Dreamin/tinymist/pull/421
+  * It also adds dev kit to avoid this stupid mistake in future. The kit contains a convenient command for previewing document on a fixed port for development.
+* Added hint documentation about configuring rootless document in https://github.com/Myriad-Dreamin/tinymist/pull/440
+  * You can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path.
+
+### Commands/Tools
+
+* Supported creation-timestamp configuration for exporting PDF in https://github.com/Myriad-Dreamin/tinymist/pull/439
+  * It now start to provide creation timestamp for the PDF export.
+  * You can disallow it to embed the creation timestamp in your document by `set document(..)`.
+  * You can also configure it by either [Passing Extra CLI Arguments](https://github.com/Myriad-Dreamin/tinymist/blob/9ceae118480448a5ef0c41a1cf810fa1a072420e/editors/vscode/README.md#passing-extra-cli-arguments) or the environment variable (`SOURCE_DATE_EPOCH`).
+    * For more details, please see [source-date-epoch](https://reproducible-builds.org/specs/source-date-epoch/)
+
+### Preview
+
+* Allowing multiple-tasked preview in https://github.com/Myriad-Dreamin/tinymist/pull/427
+* Provided `sys.inputs.x-preview` in https://github.com/Myriad-Dreamin/tinymist/pull/438
+  * It could be used for customizing the templates when you are previewing documents.
+
+### Completion
+
+* (Fix) Check string's quote prefix correctly when completing code in https://github.com/Myriad-Dreamin/tinymist/pull/422
+
+
+### Misc
+
+* Fixed description for exportPdf setting by @Otto-AA in https://github.com/Myriad-Dreamin/tinymist/pull/431
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.15...v0.11.16
+
 ## v0.11.15 - [2024-07-15]
 
 * Bumped typstyle to v0.11.30 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/416
 
-## Compiler
+### Compiler
 
 * (Fix) Noting `formatter_print_width` change on changed configuration in https://github.com/Myriad-Dreamin/tinymist/pull/387
 * Keeping entry on language query in https://github.com/Myriad-Dreamin/tinymist/pull/406
 * Allowed deferred snapshot event processing in https://github.com/Myriad-Dreamin/tinymist/pull/408
 
-## Editor
+### Editor
 
 * (Fix) Showing views in activity bar whenever the extension is activated in https://github.com/Myriad-Dreamin/tinymist/pull/414
 
-## Hover (Tooltip)
+### Hover (Tooltip)
 
 * Rendering example code in typst docs as typst syntax in https://github.com/Myriad-Dreamin/tinymist/pull/397
 
-## Preview
+### Preview
 
 * Using `requestIdleCallback` to wait for updating canvas pages when editor is in idle in https://github.com/Myriad-Dreamin/tinymist/pull/412
   * Improve performance when updating document quickly.
@@ -31,11 +79,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 * (Fix) Updating content preview incrementally again in https://github.com/Myriad-Dreamin/tinymist/pull/413
 * (Fix) wrong serialization of `task_id` v.s. `taskId` in https://github.com/Myriad-Dreamin/tinymist/pull/417
 
-## Misc
+### Misc
 
 * Added typlite for typst's doc comments in https://github.com/Myriad-Dreamin/tinymist/pull/398
 * Documented tinymist crate in https://github.com/Myriad-Dreamin/tinymist/pull/390
 * (Fix) Performing cyclic loop dependence correctly when checking def-use relation across module in https://github.com/Myriad-Dreamin/tinymist/pull/396
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.14...v0.11.15
 
 ## v0.11.14 - [2024-07-07]
 
