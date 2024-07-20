@@ -1,5 +1,4 @@
 import { LanguageClient } from "vscode-languageclient/node";
-import * as vscode from "vscode";
 
 export let client: LanguageClient | undefined = undefined;
 

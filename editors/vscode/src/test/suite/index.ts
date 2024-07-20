@@ -1,6 +1,8 @@
 import * as assert from "node:assert/strict";
 import { readdir } from "fs/promises";
 import * as path from "path";
+import * as vscode from "vscode";
+import * as fs from "fs";
 
 class Test {
     readonly name: string;
@@ -57,10 +59,50 @@ export class Context {
             throw e;
         }
     }
+
+    public async openWorkspace(workspace: string): Promise<void> {
+        console.log(`Opening workspace ${workspace}`);
+
+        const resolved = vscode.Uri.file(
+            path.resolve(__dirname, "../../../e2e-workspaces/", workspace)
+        );
+        // assert directory exists
+        assert.ok(fs.existsSync(resolved.fsPath), "Workspace directory does not exist");
+
+        vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length || 0, {
+            uri: resolved,
+        });
+        assert(
+            vscode.workspace.workspaceFolders?.length === 1,
+            "Expected exactly one workspace folder"
+        );
+        assert.strictEqual(
+            vscode.workspace.workspaceFolders[0].uri.toString(),
+            resolved.toString(),
+            "Unexpected workspace folder"
+        );
+    }
+
+    workspaceUri(): vscode.Uri {
+        const folders = vscode.workspace.workspaceFolders;
+        assert.ok(folders, "No workspace folders");
+        assert.strictEqual(folders.length, 1, "Expected exactly one workspace folder");
+        return folders[0].uri;
+    }
+
+    async openDocument(docUri: vscode.Uri): Promise<vscode.TextEditor> {
+        const doc = await vscode.workspace.openTextDocument(docUri);
+        return await vscode.window.showTextDocument(doc);
+    }
 }
 
 export async function run(): Promise<void> {
     const context = new Context();
+    // exit process after timeout
+    setTimeout(() => {
+        console.error("Tests timed out");
+        process.exit(81);
+    }, 10000);
 
     const testFiles = (await readdir(path.resolve(__dirname))).filter((name) =>
         name.endsWith(".test.js")

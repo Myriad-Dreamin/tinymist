@@ -8,8 +8,6 @@ async function main() {
     // The folder containing the Extension Manifest package.json
     // Passed to `--extensionDevelopmentPath`
     const extensionDevelopmentPath = path.resolve(__dirname, "../../");
-    // Running another test suite on a specific workspace
-    const testWorkspace = path.resolve(__dirname, "e2e/simple-docs");
 
     // Minimum supported version.
     const jsonData = fs.readFileSync(path.join(extensionDevelopmentPath, "package.json"));
@@ -20,7 +18,7 @@ async function main() {
     // All test suites (either unit tests or integration tests) should be in subfolders.
     const extensionTestsPath = path.resolve(__dirname, "./suite/index");
 
-    const launchArgs = ["--disable-extensions", testWorkspace];
+    const launchArgs = ["--disable-extensions"];
 
     // Run tests using the minimal supported version.
     await runTests({
