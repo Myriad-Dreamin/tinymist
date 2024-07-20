@@ -28,6 +28,13 @@ class Suite {
         this.tests.push(test);
     }
 
+    /// Convenience method to add a test multiple times (to reproduce flaky tests)
+    public addTestN(name: string, repeated: number, f: () => Promise<void>): void {
+        for (let i = 0; i < repeated; i++) {
+            this.addTest(`${name} ${i}`, f);
+        }
+    }
+
     public async run(): Promise<void> {
         let failed = 0;
         for (const test of this.tests) {
