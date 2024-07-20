@@ -1,5 +1,4 @@
 import { LanguageClient } from "vscode-languageclient/node";
-import * as vscode from "vscode";
 
 export let client: LanguageClient | undefined = undefined;
 
@@ -23,7 +22,9 @@ interface ResourceRoutes {
 
 export const tinymist = {
     async executeCommand<R>(command: string, args: any[]) {
-        return await client!.sendRequest<R>("workspace/executeCommand", {
+        return await (
+            await getClient()
+        ).sendRequest<R>("workspace/executeCommand", {
             command,
             arguments: args,
         });
