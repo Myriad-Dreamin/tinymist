@@ -54,6 +54,20 @@ Open command palette (Ctrl+Shift+P), and type `>Typst Preview:`.
 
 You can also use the shortcut (Ctrl+K V).
 
+#### Theme-aware template (previewing)
+
+In short, there is a `sys.inputs` item added to the compiler when your document is under the context of *user editing or previewing task*. You can use it to configure your template:
+
+```typ
+#let preview-args = json.decode(sys.inputs.at("x-preview", default: "{}"))
+// One is previewing the document.
+#let is-preview = sys.inputs.has("x-preview")
+// `dark` or `light`
+#let preview-theme = preview-args.at("theme", default: "light")
+```
+
+For details, please check [Preview's sys.inputs](https://myriad-dreamin.github.io/tinymist/feature/preview.html#label-sys.inputs).
+
 ### Configuring path to search fonts
 
 To configure path to search fonts:
