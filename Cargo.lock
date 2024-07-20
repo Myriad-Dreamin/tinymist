@@ -3500,7 +3500,7 @@ dependencies = [
 
 [[package]]
 name = "sync-lsp"
-version = "0.11.15"
+version = "0.11.16-rc1"
 dependencies = [
  "anyhow",
  "clap",
@@ -3639,7 +3639,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.11.15"
+version = "0.11.16-rc1"
 dependencies = [
  "insta",
  "lsp-server",
@@ -3736,7 +3736,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.11.15"
+version = "0.11.16-rc1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3769,7 +3769,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sync-lsp",
- "tinymist-assets 0.11.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.11.16-rc1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-query",
  "tinymist-render",
  "tokio",
@@ -3796,17 +3796,17 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.11.15"
+version = "0.11.16-rc1"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.11.15"
+version = "0.11.16-rc1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a903925a80e7eb0726472180da9b8a7cc7d14bc97f639e32110aa597f77f6e4"
+checksum = "8ce6aad7d750a0cedc63c5cacd8035e07ea2a3a28e3d1f828e82bb43c7f2fe2f"
 
 [[package]]
 name = "tinymist-query"
-version = "0.11.15"
+version = "0.11.16-rc1"
 dependencies = [
  "anyhow",
  "biblatex",
@@ -3852,7 +3852,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.11.15"
+version = "0.11.16-rc1"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -4127,7 +4127,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "typlite"
-version = "0.11.15"
+version = "0.11.16-rc1"
 dependencies = [
  "insta",
  "typst-syntax 0.11.1",
@@ -4238,7 +4238,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.11.15"
+version = "0.11.16-rc1"
 dependencies = [
  "clap",
  "comemo 0.4.0",
@@ -4249,7 +4249,7 @@ dependencies = [
  "once_cell",
  "serde",
  "serde_json",
- "tinymist-assets 0.11.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.11.16-rc1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",
  "tokio-tungstenite",
  "typst",
