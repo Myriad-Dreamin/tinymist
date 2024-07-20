@@ -11,6 +11,13 @@ export async function getTests(ctx: Context) {
         const workspaceUri = ctx.getWorkspace("simple-docs");
         console.log("Start all tests on ", workspaceUri.fsPath);
 
+        const completionLabel = (item: vscode.CompletionItem) => {
+            if (typeof item.label === "string") {
+                return item.label;
+            }
+            return item.label.label;
+        };
+
         suite.addTest("starts Client", async () => {
             const mainTyp = await ctx.openDocument(
                 vscode.Uri.joinPath(workspaceUri, "completion-base.typ")
@@ -19,7 +26,7 @@ export async function getTests(ctx: Context) {
                 mainTyp.document.uri,
                 new vscode.Position(7, 2)
             );
-            ctx.expect(pong.items.map((e) => e.label)).to.include.members(["aa", "aab", "aabc"]);
+            ctx.expect(pong.items.map(completionLabel)).to.include.members(["aa", "aab", "aabc"]);
 
             // close the editor
             await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
