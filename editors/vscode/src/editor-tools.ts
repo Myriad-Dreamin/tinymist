@@ -2,10 +2,6 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { readFile, writeFile } from "fs/promises";
 import { getFocusingFile, getLastFocusingDoc } from "./extension";
-import {
-    fontsExportConfigure,
-    fontsExportDefaultConfigure,
-} from "editor-tools/src/features/summary";
 import { tinymist } from "./lsp";
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
@@ -44,6 +40,71 @@ export function getUserPackageData(context: vscode.ExtensionContext) {
 }
 
 const FONTS_EXPORT_CONFIGURE_VERSION = "0.0.1";
+
+interface FsFontSource {
+    kind: "fs";
+    path: string;
+}
+
+interface MemoryFontSource {
+    kind: "memory";
+    name: string;
+}
+
+type FontSource = FsFontSource | MemoryFontSource;
+
+export type fontLocation = FontSource extends { kind: infer Kind } ? Kind : never;
+
+export type fontsCSVHeader =
+    | "name"
+    | "postscript"
+    | "style"
+    | "weight"
+    | "stretch"
+    | "location"
+    | "path";
+
+export interface fontsExportCSVConfigure {
+    header: boolean;
+    delimiter: string;
+    fields: fontsCSVHeader[];
+}
+
+export interface fontsExportJSONConfigure {
+    indent: number;
+}
+
+export interface fontsExportFormatConfigure {
+    csv: fontsExportCSVConfigure;
+    json: fontsExportJSONConfigure;
+}
+
+export type fontsExportFormat = keyof fontsExportFormatConfigure;
+
+interface fontsExportCommonConfigure {
+    format: fontsExportFormat;
+    filters: {
+        location: fontLocation[];
+    };
+}
+
+export type fontsExportConfigure = fontsExportCommonConfigure & fontsExportFormatConfigure;
+
+// todo: deduplicate me. it also occurs in tools/editor-tools/src/features/summary.ts
+export const fontsExportDefaultConfigure: fontsExportConfigure = {
+    format: "csv",
+    filters: {
+        location: ["fs"],
+    },
+    csv: {
+        header: false,
+        delimiter: ",",
+        fields: ["name", "path"],
+    },
+    json: {
+        indent: 2,
+    },
+};
 
 export function getFontsExportConfigure(context: vscode.ExtensionContext) {
     const defaultConfigure: Versioned<fontsExportConfigure> = {
