@@ -2,7 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import * as path from "path";
-import { DisposeList, getTargetViewColumn } from "./util";
+import { DisposeList, getSensibleTextEditorColumn, getTargetViewColumn } from "./util";
 import {
     launchPreviewCompat,
     previewActiveCompat as previewPostActivateCompat,
@@ -94,7 +94,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
             return launchImpl({
                 kind,
                 context,
-                activeEditor,
+                editor: activeEditor,
                 bindDocument,
                 mode,
                 isDev,
@@ -168,7 +168,11 @@ export async function launchPreviewInWebView({
             .toString()}/typst-webview-assets`
     );
     const previewMode = task.mode === "doc" ? "Doc" : "Slide";
-    const previewState = { mode: task.mode, fsPath: activeEditor.document.uri.fsPath };
+    const previewState = {
+        mode: task.mode,
+        asPrimary: task.isNotPrimary,
+        uri: activeEditor.document.uri.toString(),
+    };
     const previewStateEncoded = Buffer.from(JSON.stringify(previewState), "utf-8").toString(
         "base64"
     );
@@ -192,7 +196,7 @@ interface TaskControlBlock {
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
 async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask) {
-    const { kind, context, activeEditor, bindDocument, webviewPanel, isDev } = task;
+    const { kind, context, editor, bindDocument, webviewPanel, isDev, isNotPrimary } = task;
     if (activeTask.has(bindDocument)) {
         const { panel } = activeTask.get(bindDocument)!;
         if (panel) {
@@ -210,17 +214,22 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     const enableCursor = getPreviewConfCompat<boolean>("cursorIndicator") || false;
     const disposes = new DisposeList();
     registerPreviewTaskDispose(taskId, disposes);
-    const { dataPlanePort, staticServerPort } = await launchCommand();
+    const { dataPlanePort, staticServerPort, isPrimary } = await launchCommand();
     if (!dataPlanePort || !staticServerPort) {
         disposes.dispose();
         throw new Error(`Failed to launch preview ${filePath}`);
     }
 
-    let connectUrl = `ws://127.0.0.1:${dataPlanePort}`;
-    contentPreviewProvider.then((p) => p.postActivate(connectUrl));
-    disposes.add(() => {
-        contentPreviewProvider.then((p) => p.postDeactivate(connectUrl));
-    });
+    // update real primary state
+    task.isNotPrimary = !isPrimary;
+
+    if (isPrimary) {
+        let connectUrl = `ws://127.0.0.1:${dataPlanePort}`;
+        contentPreviewProvider.then((p) => p.postActivate(connectUrl));
+        disposes.add(() => {
+            contentPreviewProvider.then((p) => p.postDeactivate(connectUrl));
+        });
+    }
 
     let panel: vscode.WebviewPanel | undefined = undefined;
     switch (kind) {
@@ -228,7 +237,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             panel = await launchPreviewInWebView({
                 context,
                 task,
-                activeEditor,
+                activeEditor: editor,
                 dataPlanePort,
                 webviewPanel,
                 panelDispose() {
@@ -256,7 +265,9 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         }
 
         // todo: better way to unpin main
-        vscode.commands.executeCommand("tinymist.unpinMain");
+        if (isPrimary) {
+            vscode.commands.executeCommand("tinymist.unpinMain");
+        }
     });
 
     async function launchCommand() {
@@ -268,7 +279,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         const invertColorsArgs = ivArgs ? ["--invert-colors", ivArgs] : [];
         const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
         const dataPlaneHostArgs = !isDev ? ["--data-plane-host", "127.0.0.1:0"] : [];
-        const { dataPlanePort, staticServerPort } = await commandStartPreview([
+        const { dataPlanePort, staticServerPort, isPrimary } = await commandStartPreview([
             "--task-id",
             taskId,
             "--refresh-style",
@@ -279,6 +290,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             ...partialRenderingArgs,
             ...invertColorsArgs,
             ...previewInSlideModeArgs,
+            ...(isNotPrimary ? ["--not-primary"] : []),
             filePath,
         ]);
         console.log(
@@ -286,7 +298,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         );
 
         if (enableCursor) {
-            reportPosition(activeEditor, "changeCursorPosition");
+            reportPosition(editor, "changeCursorPosition");
         }
 
         if (scrollSyncMode !== ScrollSyncModeEnum.never) {
@@ -317,7 +329,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             disposes.add(vscode.window.onDidChangeTextEditorSelection(src2docHandler, 500));
         }
 
-        return { staticServerPort, dataPlanePort };
+        return { staticServerPort, dataPlanePort, isPrimary };
     }
 
     async function reportPosition(
@@ -641,28 +653,35 @@ class TypstPreviewSerializer implements vscode.WebviewPanelSerializer {
     }
 
     async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
+        console.log("deserializeWebviewPanel", state);
         if (!state) {
             return;
         }
 
-        const activeEditor = vscode.window.visibleTextEditors.find(
-            (editor) => editor.document.uri.fsPath === state.fsPath
+        state.uri = vscode.Uri.parse(state.uri);
+
+        // open this file and show in editor
+        const doc =
+            vscode.workspace.textDocuments.find((doc) => doc.uri === state.uri) ||
+            (await vscode.workspace.openTextDocument(state.uri));
+        const editor = await vscode.window.showTextDocument(
+            doc,
+            getSensibleTextEditorColumn(),
+            true
         );
 
-        if (!activeEditor) {
-            return;
-        }
-
-        const bindDocument = activeEditor.document;
+        const bindDocument = editor.document;
         const mode = state.mode;
+        const isNotPrimary = state.isNotPrimary;
 
         await launchImpl({
             kind: "webview",
             context: this.context,
-            activeEditor,
+            editor,
             bindDocument,
             mode,
             webviewPanel,
+            isNotPrimary,
         });
     }
 }

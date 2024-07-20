@@ -114,6 +114,13 @@ impl CompileHandler {
         let _ = self.intr_tx.send(Interrupt::ChangeTask(task_inputs));
     }
 
+    pub async fn settle(&self) -> anyhow::Result<()> {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.intr_tx.send(Interrupt::Settle(tx));
+        rx.await?;
+        Ok(())
+    }
+
     fn push_diagnostics(&self, revision: usize, diagnostics: Option<DiagnosticsMap>) {
         let dv = DocVersion {
             group: self.diag_group.clone(),
@@ -340,7 +347,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
                 .doc
                 .clone()
                 .map_err(|_| typst_preview::CompileStatus::CompileError);
-            inner.notify_compile(res, snap.signal.by_fs_events || snap.signal.by_entry_update);
+            inner.notify_compile(res, snap.signal.by_fs_events, snap.signal.by_entry_update);
         }
     }
 }
@@ -404,9 +411,7 @@ impl CompileClientActor {
     pub async fn settle(&mut self) {
         let _ = self.change_entry(None);
         info!("TypstActor({}): settle requested", self.handle.diag_group);
-        let (tx, rx) = oneshot::channel();
-        let _ = self.handle.intr_tx.send(Interrupt::Settle(tx));
-        match rx.await {
+        match self.handle.settle().await {
             Ok(()) => info!("TypstActor({}): settled", self.handle.diag_group),
             Err(err) => error!(
                 "TypstActor({}): failed to settle: {err:#}",

@@ -194,6 +194,10 @@ pub struct PreviewCliArgs {
     )]
     pub static_file_host: String,
 
+    /// Let it not be the primary instance.
+    #[clap(long = "not-primary", hide(true))]
+    pub not_as_primary: bool,
+
     /// Don't open the preview in the browser after compilation.
     #[clap(long = "no-open")]
     pub dont_open_in_browser: bool,
@@ -232,6 +236,7 @@ pub struct StartPreviewResponse {
     static_server_port: Option<u16>,
     static_server_addr: Option<String>,
     data_plane_port: Option<u16>,
+    is_primary: bool,
 }
 
 impl PreviewState {
@@ -241,6 +246,7 @@ impl PreviewState {
         args: PreviewCliArgs,
         mut previewer: PreviewBuilder,
         compile_handler: Arc<CompileHandler>,
+        is_primary: bool,
     ) -> SchedulableResponse<StartPreviewResponse> {
         let task_id = args.preview.task_id.clone();
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
@@ -298,7 +304,7 @@ impl PreviewState {
         just_future(async move {
             let previewer = previewer.await;
 
-            // Put a fence to ensure the previewer can receive the first compilation.   z
+            // Put a fence to ensure the previewer can receive the first compilation.
             // The fence must be put after the previewer is initialized.
             compile_handler.flush_compile();
 
@@ -310,6 +316,7 @@ impl PreviewState {
                 static_server_port: Some(ss_addr.port()),
                 static_server_addr: Some(ss_addr.to_string()),
                 data_plane_port: Some(previewer.data_plane_port()),
+                is_primary,
             };
 
             let sent = preview_tx.send(PreviewRequest::Started(PreviewTab {
@@ -319,6 +326,7 @@ impl PreviewState {
                 ss_handle,
                 ctl_tx,
                 compile_handler,
+                is_primary,
             }));
             sent.map_err(|_| internal_error("failed to register preview tab"))?;
 

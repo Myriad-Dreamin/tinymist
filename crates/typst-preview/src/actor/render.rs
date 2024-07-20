@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use log::{debug, info, trace};
-use tokio::sync::{broadcast, mpsc, watch};
+use tokio::sync::{broadcast, mpsc};
 use typst::model::Document;
 use typst_ts_core::debug_loc::{ElementPoint, SourceSpanOffset};
 use typst_ts_core::TypstDocument;
@@ -35,7 +35,7 @@ impl RenderActorRequest {
 
 pub struct RenderActor {
     mailbox: broadcast::Receiver<RenderActorRequest>,
-    document: watch::Receiver<Option<Arc<Document>>>,
+    document: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
     renderer: IncrSvgDocServer,
     resolve_sender: mpsc::UnboundedSender<TypstActorRequest>,
     svg_sender: mpsc::UnboundedSender<Vec<u8>>,
@@ -45,7 +45,7 @@ pub struct RenderActor {
 impl RenderActor {
     pub fn new(
         mailbox: broadcast::Receiver<RenderActorRequest>,
-        document: watch::Receiver<Option<Arc<Document>>>,
+        document: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
         resolve_sender: mpsc::UnboundedSender<TypstActorRequest>,
         svg_sender: mpsc::UnboundedSender<Vec<u8>>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
@@ -132,7 +132,7 @@ impl RenderActor {
             // otherwise, we render the incremental changes for only once
             let has_full_render = has_full_render;
             debug!("RenderActor: has_full_render: {}", has_full_render);
-            let Some(document) = self.document.borrow().clone() else {
+            let Some(document) = self.document.read().unwrap().clone() else {
                 info!("RenderActor: document is not ready");
                 continue;
             };
@@ -156,7 +156,7 @@ impl RenderActor {
 
 pub struct OutlineRenderActor {
     signal: broadcast::Receiver<RenderActorRequest>,
-    document: watch::Receiver<Option<Arc<Document>>>,
+    document: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
 
     span_interner: SpanInterner,
@@ -165,7 +165,7 @@ pub struct OutlineRenderActor {
 impl OutlineRenderActor {
     pub fn new(
         signal: broadcast::Receiver<RenderActorRequest>,
-        document: watch::Receiver<Option<Arc<Document>>>,
+        document: Arc<std::sync::RwLock<Option<Arc<Document>>>>,
         editor_tx: mpsc::UnboundedSender<EditorActorRequest>,
         span_interner: SpanInterner,
     ) -> Self {
@@ -196,7 +196,7 @@ impl OutlineRenderActor {
             while self.signal.try_recv().is_ok() {}
             // if a full render is requested, we render the latest document
             // otherwise, we render the incremental changes for only once
-            let Some(document) = self.document.borrow().clone() else {
+            let Some(document) = self.document.read().unwrap().clone() else {
                 info!("OutlineRenderActor: document is not ready");
                 continue;
             };

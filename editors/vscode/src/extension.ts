@@ -34,7 +34,7 @@ import {
     previewProcessOutline,
 } from "./preview";
 import { DisposeList, getSensibleTextEditorColumn } from "./util";
-import { client, setClient } from "./lsp";
+import { client, getClient, setClient } from "./lsp";
 
 let previewIsEnabled = false;
 let devKitIsEnabled = false;
@@ -103,7 +103,7 @@ export function activate(context: ExtensionContext): Promise<void> {
         );
     }
 
-    return startClient(context).catch((e) => {
+    return startClient(client, context).catch((e) => {
         void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
         throw e;
     });
@@ -158,7 +158,7 @@ function initClient(context: ExtensionContext, config: Record<string, any>) {
     );
 }
 
-async function startClient(context: ExtensionContext): Promise<void> {
+async function startClient(client: LanguageClient, context: ExtensionContext): Promise<void> {
     if (!client) {
         throw new Error("Language client is not set");
     }
@@ -559,6 +559,7 @@ export interface PreviewResult {
     staticServerPort?: number;
     staticServerAddr?: string;
     dataPlanePort?: number;
+    isPrimary?: boolean;
 }
 
 const previewDisposes: Record<string, () => void> = {};
@@ -573,7 +574,9 @@ export function registerPreviewTaskDispose(taskId: string, dl: DisposeList): voi
 }
 
 export async function commandStartPreview(previewArgs: string[]): Promise<PreviewResult> {
-    const res = await client?.sendRequest<PreviewResult>("workspace/executeCommand", {
+    const res = await (
+        await getClient()
+    ).sendRequest<PreviewResult>("workspace/executeCommand", {
         command: `tinymist.doStartPreview`,
         arguments: [previewArgs],
     });
@@ -581,14 +584,18 @@ export async function commandStartPreview(previewArgs: string[]): Promise<Previe
 }
 
 export async function commandKillPreview(taskId: string): Promise<void> {
-    return await client?.sendRequest("workspace/executeCommand", {
+    return await (
+        await getClient()
+    ).sendRequest("workspace/executeCommand", {
         command: `tinymist.doKillPreview`,
         arguments: [taskId],
     });
 }
 
 export async function commandScrollPreview(taskId: string, req: any): Promise<void> {
-    return await client?.sendRequest("workspace/executeCommand", {
+    return await (
+        await getClient()
+    ).sendRequest("workspace/executeCommand", {
         command: `tinymist.scrollPreview`,
         arguments: [taskId, req],
     });

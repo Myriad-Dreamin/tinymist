@@ -22,6 +22,8 @@ pub struct PreviewTab {
     pub ctl_tx: mpsc::UnboundedSender<ControlPlaneMessage>,
     /// Compile handler
     pub compile_handler: Arc<CompileHandler>,
+    /// Whether this tab is primary
+    pub is_primary: bool,
 }
 
 pub enum PreviewRequest {
@@ -54,6 +56,17 @@ impl PreviewActor {
                     let unregistered = tab.compile_handler.unregister_preview(&task_id);
                     if !unregistered {
                         log::warn!("PreviewTask({task_id}): failed to unregister preview");
+                    }
+
+                    if !tab.is_primary {
+                        let h = tab.compile_handler.clone();
+                        let task_id = tab.task_id.clone();
+                        self.client.handle.spawn(async move {
+                            let res = h.settle().await;
+                            if let Err(e) = res {
+                                log::error!("PreviewTask({task_id}): failed to settle: {:?}", e);
+                            }
+                        });
                     }
 
                     let client = self.client.clone();

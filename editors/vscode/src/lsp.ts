@@ -2,8 +2,18 @@ import { LanguageClient } from "vscode-languageclient/node";
 import * as vscode from "vscode";
 
 export let client: LanguageClient | undefined = undefined;
+
 export function setClient(newClient: LanguageClient) {
     client = newClient;
+    clientPromiseResolve(newClient);
+}
+
+let clientPromiseResolve = (_client: LanguageClient) => {};
+let clientPromise: Promise<LanguageClient> = new Promise((resolve) => {
+    clientPromiseResolve = resolve;
+});
+export async function getClient(): Promise<LanguageClient> {
+    return clientPromise;
 }
 
 interface ResourceRoutes {

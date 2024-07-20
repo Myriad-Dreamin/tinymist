@@ -64,7 +64,9 @@ impl LanguageState {
     /// Clear all cached resources.
     pub fn clear_cache(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         comemo::evict(0);
-        self.primary().clear_cache();
+        for ded in self.servers_mut() {
+            ded.clear_cache();
+        }
         just_ok(JsonValue::Null)
     }
 
@@ -130,21 +132,41 @@ impl LanguageState {
             return Err(invalid_params("entry file must be absolute path"));
         };
 
+        let task_id = cli_args.preview.task_id.clone();
+        if task_id == "primary" {
+            return Err(invalid_params("task id 'primary' is reserved"));
+        }
+
         // Disble control plane host
         cli_args.preview.control_plane_host = String::default();
 
-        let primary = self.primary().handle.clone();
-
         let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
 
-        if !primary.register_preview(previewer.compile_watcher()) {
-            return Err(internal_error("preview is already running"));
-        }
+        let primary = self.primary().handle.clone();
+        if !cli_args.not_as_primary && primary.register_preview(previewer.compile_watcher()) {
+            // todo: recover pin status reliably
+            self.pin_entry(Some(entry))
+                .map_err(|e| internal_error(format!("could not pin file: {e}")))?;
 
-        // todo: recover pin status reliably
-        self.pin_entry(Some(entry))
-            .map_err(|e| internal_error(format!("could not pin file: {e}")))?;
-        self.preview.start(cli_args, previewer, primary)
+            self.preview.start(cli_args, previewer, primary, true)
+        } else {
+            self.restart_dedicate(&task_id, Some(entry));
+            let Some(dedicate) = self.dedicate(&task_id) else {
+                return Err(invalid_params(
+                    "just restarted compiler instance for the task is not found",
+                ));
+            };
+
+            let handle = dedicate.handle.clone();
+
+            if !handle.register_preview(previewer.compile_watcher()) {
+                return Err(invalid_params(
+                    "cannot register preview to the compiler instance",
+                ));
+            }
+
+            self.preview.start(cli_args, previewer, handle, false)
+        }
     }
 
     /// Kill a preview instance.

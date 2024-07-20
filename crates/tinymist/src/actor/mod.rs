@@ -8,6 +8,7 @@ pub mod typ_server;
 
 use std::sync::Arc;
 
+use reflexo::ImmutPath;
 use tinymist_query::analysis::Analysis;
 use tinymist_query::ExportKind;
 use tinymist_render::PeriscopeRenderer;
@@ -27,16 +28,42 @@ use crate::{
 };
 
 impl LanguageState {
+    /// Restart the primary server.
+    pub fn restart_primary(&mut self) {
+        let entry = self.compile_config().determine_default_entry_path();
+        self.restart_server("primary", entry);
+    }
+
     /// Restart the server with the given group.
-    pub fn restart_server(&mut self, group: &str) {
+    pub fn restart_dedicate(&mut self, dedicate: &str, entry: Option<ImmutPath>) {
+        self.restart_server(dedicate, entry);
+    }
+
+    /// Restart the server with the given group.
+    fn restart_server(&mut self, group: &str, entry: Option<ImmutPath>) {
         let server = self.server(
             group.to_owned(),
-            self.compile_config()
-                .determine_entry(self.compile_config().determine_default_entry_path()),
+            self.compile_config().determine_entry(entry),
             self.compile_config().determine_inputs(),
             self.vfs_snapshot(),
         );
-        if let Some(mut prev) = self.primary.replace(server) {
+
+        let prev = if group == "primary" {
+            self.primary.replace(server)
+        } else {
+            let cell = self
+                .dedicates
+                .iter_mut()
+                .find(|dedicate| dedicate.handle.diag_group == group);
+            if let Some(dedicate) = cell {
+                Some(std::mem::replace(dedicate, server))
+            } else {
+                self.dedicates.push(server);
+                None
+            }
+        };
+
+        if let Some(mut prev) = prev {
             self.client.handle.spawn(async move { prev.settle().await });
         }
     }
