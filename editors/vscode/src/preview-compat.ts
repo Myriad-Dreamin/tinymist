@@ -395,6 +395,8 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
         staticFilePort,
     });
 
+    return { message: "ok" };
+
     async function watchEditorFiles() {
         if (refreshStyle === "onType") {
             console.log("watch editor changes");

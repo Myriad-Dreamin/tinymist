@@ -63,7 +63,26 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
         vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
         vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide")),
-        vscode.commands.registerCommand("tinymist.previewDev", launch("webview", "doc", true))
+        vscode.commands.registerCommand("tinymist.previewDev", launch("webview", "doc", true)),
+        vscode.commands.registerCommand("tinymist.doInspectPreviewState", () => {
+            const tasks = Array.from(activeTask.values()).map((t) => {
+                return {
+                    panel: !!t.panel,
+                    taskId: t.taskId,
+                };
+            });
+            return {
+                tasks,
+            };
+        }),
+        vscode.commands.registerCommand("tinymist.doDisposePreview", ({ taskId }) => {
+            for (const t of activeTask.values()) {
+                if (t.taskId === taskId) {
+                    t.panel?.dispose();
+                    return;
+                }
+            }
+        })
     );
     context.subscriptions.push(
         vscode.commands.registerCommand(
@@ -202,7 +221,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         if (panel) {
             panel.reveal();
         }
-        return;
+        return { message: "existed" };
     }
 
     const taskId = Math.random().toString(36).substring(7);
@@ -269,6 +288,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             vscode.commands.executeCommand("tinymist.unpinMain");
         }
     });
+    return { message: "ok", taskId };
 
     async function launchCommand() {
         console.log(`Preview Command ${filePath}`);
