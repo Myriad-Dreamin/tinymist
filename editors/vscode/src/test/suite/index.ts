@@ -1,3 +1,5 @@
+// Inspired from https://github.com/camel-tooling/camel-lsp-client-vscode/blob/main/src/test/suite/completion.util.ts
+
 import * as assert from "node:assert/strict";
 import { readdir } from "fs/promises";
 import * as path from "path";
@@ -45,7 +47,11 @@ class Suite {
     }
 }
 
+type CompResponse = vscode.CompletionList | vscode.CompletionItem[];
+
 export class Context {
+    expect!: typeof import("chai").expect;
+
     public async suite(name: string, f: (ctx: Suite) => void): Promise<void> {
         const ctx = new Suite();
         f(ctx);
@@ -94,15 +100,31 @@ export class Context {
         const doc = await vscode.workspace.openTextDocument(docUri);
         return await vscode.window.showTextDocument(doc);
     }
+
+    async completion<T extends CompResponse = CompResponse>(
+        docUri: vscode.Uri,
+        position: vscode.Position
+    ): Promise<T> {
+        const doc = await vscode.workspace.openTextDocument(docUri);
+        const editor = await vscode.window.showTextDocument(doc);
+        editor.selection = new vscode.Selection(position, position);
+        return await vscode.commands.executeCommand(
+            "vscode.executeCompletionItemProvider",
+            docUri,
+            position
+        );
+    }
 }
 
 export async function run(): Promise<void> {
     const context = new Context();
+    context.expect = (await importEsmModule<any>("chai")).expect;
+
     // exit process after timeout
     setTimeout(() => {
         console.error("Tests timed out");
         process.exit(81);
-    }, 10000);
+    }, 60000);
 
     const testFiles = (await readdir(path.resolve(__dirname))).filter((name) =>
         name.endsWith(".test.js")
@@ -126,4 +148,10 @@ function ok(message: string): void {
 function error(message: string): void {
     // eslint-disable-next-line no-console
     console.error(`\x1b[31m${message}\x1b[0m`);
+}
+
+// https://stackoverflow.com/questions/65265420/how-to-prevent-typescript-from-transpiling-dynamic-imports-into-require
+export async function importEsmModule<T>(name: string): Promise<T> {
+    const module = eval(`(async () => {return await import("${name}")})()`);
+    return module as T;
 }
