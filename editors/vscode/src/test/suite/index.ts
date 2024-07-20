@@ -64,26 +64,24 @@ export class Context {
         }
     }
 
+    getWorkspace(workspace: string): vscode.Uri {
+        return vscode.Uri.file(path.resolve(__dirname, "../../../e2e-workspaces/", workspace));
+    }
+
     public async openWorkspace(workspace: string): Promise<void> {
         console.log(`Opening workspace ${workspace}`);
 
-        const resolved = vscode.Uri.file(
-            path.resolve(__dirname, "../../../e2e-workspaces/", workspace)
-        );
+        const resolved = this.getWorkspace(workspace);
         // assert directory exists
         assert.ok(fs.existsSync(resolved.fsPath), "Workspace directory does not exist");
 
         vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length || 0, {
             uri: resolved,
         });
-        assert(
-            vscode.workspace.workspaceFolders?.length === 1,
-            "Expected exactly one workspace folder"
-        );
-        assert.strictEqual(
-            vscode.workspace.workspaceFolders[0].uri.toString(),
-            resolved.toString(),
-            "Unexpected workspace folder"
+        assert.ok(
+            vscode.workspace.workspaceFolders?.length === 1 &&
+                vscode.workspace.workspaceFolders[0].uri.toString() == resolved.toString(),
+            `Expected workspace folder to be ${resolved.toString()}, got ${vscode.workspace.workspaceFolders}`
         );
     }
 

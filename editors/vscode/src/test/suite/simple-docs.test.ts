@@ -4,10 +4,11 @@ import * as vscode from "vscode";
 import type { Context } from ".";
 
 export async function getTests(ctx: Context) {
-    await ctx.openWorkspace("simple-docs");
+    // await ctx.openWorkspace("simple-docs");
     await ctx.suite("starts Client", (suite) => {
         vscode.window.showInformationMessage("Start all tests.");
-        const workspaceUri = ctx.workspaceUri();
+        // const workspaceUri = ctx.workspaceUri();
+        const workspaceUri = ctx.getWorkspace("simple-docs");
         console.log("Start all tests on ", workspaceUri.fsPath);
 
         suite.addTest("starts Client", async () => {

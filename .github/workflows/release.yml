@@ -195,9 +195,10 @@ jobs:
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix --pre-release
         working-directory: ./editors/vscode
       - name: Test tinymist extension
-        run: |
-          yarn test
-        working-directory: ./editors/vscode
+        uses: coactions/setup-xvfb@v1
+        with:
+          run: yarn test
+          working-directory: ./editors/vscode
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && (matrix.platform == 'linux') && (matrix.arch == 'x64')
       - name: Upload typst-preview VSIX artifact
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
