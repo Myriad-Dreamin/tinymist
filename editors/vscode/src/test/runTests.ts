@@ -38,12 +38,12 @@ async function main() {
     });
 
     // and the latest one
-    // await runTests({
-    //     version: "stable",
-    //     launchArgs,
-    //     extensionDevelopmentPath,
-    //     extensionTestsPath,
-    // });
+    await runTests({
+        version: "stable",
+        launchArgs,
+        extensionDevelopmentPath,
+        extensionTestsPath,
+    });
 
     // await runVSCodeCommand(["--install-extension", "ms-python.python"], { version: "1.60.0" });
 }
