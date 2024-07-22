@@ -51,7 +51,6 @@ const blockRawLangAs = (as?: string) => blockRawLangGen(as);
 const blockRawLang = blockRawLangAs();
 
 export const blockRawLangs = [
-  // todo: these patterns may affect outer scope which is quite bad
   blockRawLang("typst", "typ"),
   blockRawLang("typst-code", "typc"),
   blockRawLang("css", "css.erb"),
@@ -68,7 +67,6 @@ export const blockRawLangs = [
   blockRawLang("java", "bsh"),
   blockRawLang("lua"),
   blockRawLang("makefile", "makefile", "GNUmakefile", "OCamlMakefile"),
-  // perl|pl|pm|pod|t|PL|psgi|vcl
   blockRawLang("perl", "pl", "pm", "pod", "t", "PL", "psgi", "vcl"),
   blockRawLang("r", "R", "r", "s", "S", "Rprofile"),
   blockRawLang(
