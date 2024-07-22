@@ -105,7 +105,10 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
 
 /// The main entry point for the compiler.
 pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
-    let mut input = PathBuf::from(args.compile.input.unwrap());
+    let mut input = PathBuf::from(match args.compile.input {
+        Some(value) => value,
+        None => return Err(anyhow::Error::msg("Provide a valid path")),
+    });
 
     let mut root_path = args.compile.root.unwrap_or(PathBuf::from("."));
 
