@@ -43,7 +43,7 @@ pub struct CompileFontArgs {
 /// Common arguments of compile, watch, and query.
 #[derive(Debug, Clone, Parser, Default)]
 pub struct CompileOnceArgs {
-    /// Path to input Typst file, use `-` to read input from stdin
+    /// Path to input Typst file
     #[clap(value_name = "INPUT")]
     pub input: Option<String>,
 

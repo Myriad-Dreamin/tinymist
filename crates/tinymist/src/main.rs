@@ -68,7 +68,7 @@ fn main() -> anyhow::Result<()> {
 
     match args.command.unwrap_or_default() {
         Commands::Lsp(args) => lsp_main(args),
-        Commands::Compile(args) => compiler_main(args),
+        Commands::TraceLsp(args) => trace_main(args),
         #[cfg(feature = "preview")]
         Commands::Preview(args) => {
             #[cfg(feature = "preview")]
@@ -104,7 +104,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
 }
 
 /// The main entry point for the compiler.
-pub fn compiler_main(args: CompileArgs) -> anyhow::Result<()> {
+pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
     let mut input = PathBuf::from(match args.compile.input {
         Some(value) => value,
         None => return Err(anyhow::Error::msg("Provide a valid path")),
