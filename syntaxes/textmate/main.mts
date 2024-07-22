@@ -2,6 +2,7 @@ import * as textmate from "./textmate.mjs";
 import {
   blockRaw,
   blockRawGeneral,
+  blockRawLangs,
   inlineRaw,
 } from "./fenced.mjs";
 
@@ -1575,6 +1576,10 @@ export const typst: textmate.Grammar = {
 
     inlineRaw,
     blockRaw,
+    ...blockRawLangs.reduce((acc: Record<string, textmate.Pattern>, lang) => {
+      acc[lang.name!.replace(/\./g, "_")] = lang;
+      return acc;
+    }, {}),
     blockRawGeneral,
 
     markupBold,
