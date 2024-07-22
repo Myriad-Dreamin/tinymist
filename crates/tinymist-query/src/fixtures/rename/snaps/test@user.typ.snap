@@ -1,0 +1,19 @@
+---
+source: crates/tinymist-query/src/rename.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/rename/user.typ
+---
+{
+ "changes": {
+  "s0.typ": [
+   {
+    "newText": "new_name",
+    "range": "1:5:1:6"
+   },
+   {
+    "newText": "new_name",
+    "range": "3:20:3:21"
+   }
+  ]
+ }
+}

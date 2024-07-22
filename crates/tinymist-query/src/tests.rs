@@ -286,6 +286,7 @@ pub static REDACT_LOC: Lazy<RedactFields> = Lazy::new(|| {
         "location",
         "uri",
         "range",
+        "changes",
         "selectionRange",
         "targetRange",
         "targetSelectionRange",
@@ -356,6 +357,29 @@ impl Redact for RedactFields {
                     };
 
                     match k {
+                        "changes" => {
+                            // object range => v
+                            m.insert(
+                                k.to_owned(),
+                                Value::Object(
+                                    t.as_object()
+                                        .unwrap()
+                                        .iter()
+                                        .map(|(k, v)| {
+                                            (
+                                                Path::new(k)
+                                                    .file_name()
+                                                    .unwrap()
+                                                    .to_str()
+                                                    .unwrap()
+                                                    .to_owned(),
+                                                v.clone(),
+                                            )
+                                        })
+                                        .collect(),
+                                ),
+                            );
+                        }
                         "range"
                         | "selectionRange"
                         | "originSelectionRange"

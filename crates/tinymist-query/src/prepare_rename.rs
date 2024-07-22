@@ -99,8 +99,8 @@ mod tests {
     use crate::tests::*;
 
     #[test]
-    fn test() {
-        snapshot_testing("prepare_rename", &|world, path| {
+    fn prepare() {
+        snapshot_testing("rename", &|world, path| {
             let source = world.source_by_path(&path).unwrap();
 
             let request = PrepareRenameRequest {
