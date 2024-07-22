@@ -39,7 +39,7 @@ async fn run_trace_program(params: TraceParams) -> anyhow::Result<TraceReport> {
     let mut cmd = tokio::process::Command::new(&params.compiler_program);
     let mut cmd = &mut cmd;
 
-    cmd = cmd.arg("compile");
+    cmd = cmd.arg("trace-lsp");
 
     cmd = cmd
         .arg("--root")

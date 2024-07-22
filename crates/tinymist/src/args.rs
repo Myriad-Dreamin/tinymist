@@ -15,8 +15,9 @@ pub struct CliArguments {
 pub enum Commands {
     /// Run Language Server
     Lsp(LspArgs),
-    /// Run Compile Server
-    Compile(CompileArgs),
+    /// Run Language Server for tracing some typst program.
+    #[clap(hide(true))]
+    TraceLsp(CompileArgs),
     /// Run Preview Server
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
