@@ -1,12 +1,13 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "es2020",
+    "moduleResolution": "Bundler",
     "target": "es2020",
     "lib": ["es2020"],
     "outDir": "dist",
     "sourceMap": true,
     "strict": true
   },
-  "include": ["main.ts", "scripts"],
+  "include": ["*.mts", "scripts"],
   "exclude": ["node_modules"]
 }
