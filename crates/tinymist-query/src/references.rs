@@ -1,6 +1,7 @@
 use log::debug;
 
 use crate::{
+    analysis::SearchCtx,
     prelude::*,
     syntax::{DerefTarget, IdentRef},
     SemanticRequest,
@@ -27,7 +28,7 @@ impl SemanticRequest for ReferencesRequest {
         let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
 
         let def_use = ctx.def_use(source.clone())?;
-        let locations = find_references(ctx, def_use, deref_target, ctx.position_encoding())?;
+        let locations = find_references(ctx, def_use, deref_target)?;
 
         debug!("references: {locations:?}");
         Some(locations)
@@ -38,7 +39,6 @@ pub(crate) fn find_references(
     ctx: &mut AnalysisContext<'_>,
     def_use: Arc<crate::analysis::DefUseInfo>,
     deref_target: DerefTarget<'_>,
-    position_encoding: PositionEncoding,
 ) -> Option<Vec<LspLocation>> {
     let node = match deref_target {
         DerefTarget::VarAccess(node) => node,
@@ -95,71 +95,83 @@ pub(crate) fn find_references(
     let root_def_use = ctx.def_use(def_source)?;
     let root_def_id = root_def_use.get_def(def_fid, &def_ident)?.0;
 
-    find_references_root(
-        ctx,
-        root_def_use,
+    let worker = ReferencesWorker {
+        ctx: ctx.fork_for_search(),
+        references: vec![],
         def_fid,
-        root_def_id,
         def_ident,
-        position_encoding,
-    )
+    };
+
+    worker.root(root_def_use, root_def_id)
 }
 
-pub(crate) fn find_references_root(
-    ctx: &mut AnalysisContext<'_>,
-    def_use: Arc<crate::analysis::DefUseInfo>,
+struct ReferencesWorker<'a, 'w> {
+    ctx: SearchCtx<'a, 'w>,
+    references: Vec<LspLocation>,
     def_fid: TypstFileId,
-    def_id: DefId,
     def_ident: IdentRef,
-    position_encoding: PositionEncoding,
-) -> Option<Vec<LspLocation>> {
-    let def_source = ctx.source_by_id(def_fid).ok()?;
-    let uri = ctx.uri_for_id(def_fid).ok()?;
+}
 
-    // todo: reuse uri, range to location
-    let mut references = def_use
-        .get_refs(def_id)
-        .map(|r| {
-            let range = typst_to_lsp::range(r.range.clone(), &def_source, position_encoding);
+impl<'a, 'w> ReferencesWorker<'a, 'w> {
+    fn file(&mut self, ref_fid: TypstFileId) -> Option<()> {
+        log::debug!("references: file: {ref_fid:?}");
+        let ref_source = self.ctx.ctx.source_by_id(ref_fid).ok()?;
+        let def_use = self.ctx.ctx.def_use(ref_source.clone())?;
 
-            LspLocation {
-                uri: uri.clone(),
-                range,
-            }
-        })
-        .collect::<Vec<_>>();
+        let uri = self.ctx.ctx.uri_for_id(ref_fid).ok()?;
 
-    if def_use.is_exported(def_id) {
-        // Find dependents
-        let mut ctx = ctx.fork_for_search();
-        ctx.push_dependents(def_fid);
-        while let Some(ref_fid) = ctx.worklist.pop() {
-            let ref_source = ctx.ctx.source_by_id(ref_fid).ok()?;
-            let def_use = ctx.ctx.def_use(ref_source.clone())?;
+        let mut redefines = vec![];
+        if let Some((id, _def)) = def_use.get_def(self.def_fid, &self.def_ident) {
+            self.references.extend(def_use.get_refs(id).map(|r| {
+                log::debug!("references: at file: {ref_fid:?}, {r:?}");
+                let range = self.ctx.ctx.to_lsp_range(r.range.clone(), &ref_source);
 
-            let uri = ctx.ctx.uri_for_id(ref_fid).ok()?;
-
-            let mut redefines = vec![];
-            if let Some((id, _def)) = def_use.get_def(def_fid, &def_ident) {
-                references.extend(def_use.get_refs(id).map(|r| {
-                    let range =
-                        typst_to_lsp::range(r.range.clone(), &ref_source, position_encoding);
-
-                    LspLocation {
-                        uri: uri.clone(),
-                        range,
-                    }
-                }));
-                redefines.push(id);
-
-                if def_use.is_exported(id) {
-                    ctx.push_dependents(ref_fid);
+                LspLocation {
+                    uri: uri.clone(),
+                    range,
                 }
-            };
-        }
+            }));
+            redefines.push(id);
+
+            if def_use.is_exported(id) {
+                self.ctx.push_dependents(ref_fid);
+            }
+        };
+
+        Some(())
     }
 
-    Some(references)
+    fn root(
+        mut self,
+        def_use: Arc<crate::analysis::DefUseInfo>,
+        def_id: DefId,
+    ) -> Option<Vec<LspLocation>> {
+        let def_source = self.ctx.ctx.source_by_id(self.def_fid).ok()?;
+        let uri = self.ctx.ctx.uri_for_id(self.def_fid).ok()?;
+
+        // todo: reuse uri, range to location
+        self.references = def_use
+            .get_refs(def_id)
+            .map(|r| {
+                let range = self.ctx.ctx.to_lsp_range(r.range.clone(), &def_source);
+
+                LspLocation {
+                    uri: uri.clone(),
+                    range,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        if def_use.is_exported(def_id) {
+            // Find dependents
+            self.ctx.push_dependents(self.def_fid);
+            while let Some(ref_fid) = self.ctx.worklist.pop() {
+                self.file(ref_fid);
+            }
+        }
+
+        Some(self.references)
+    }
 }
 
 #[cfg(test)]

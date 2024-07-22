@@ -31,7 +31,7 @@ impl StatefulRequest for RenameRequest {
         validate_renaming_definition(&lnk)?;
 
         let def_use = ctx.def_use(source.clone())?;
-        let references = find_references(ctx, def_use, deref_target, ctx.position_encoding())?;
+        let references = find_references(ctx, def_use, deref_target)?;
 
         let mut editions = HashMap::new();
 
@@ -63,10 +63,46 @@ impl StatefulRequest for RenameRequest {
             });
         }
 
+        log::info!("rename editions: {editions:?}");
+
         // todo: name conflict analysis
         Some(WorkspaceEdit {
             changes: Some(editions),
             ..Default::default()
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("rename", &|world, path| {
+            let source = world.source_by_path(&path).unwrap();
+
+            let request = RenameRequest {
+                path: path.clone(),
+                position: find_test_position(&source),
+                new_name: "new_name".to_string(),
+            };
+
+            let mut result = request.request(world, None);
+            // sort the edits to make the snapshot stable
+            if let Some(r) = result.as_mut().and_then(|r| r.changes.as_mut()) {
+                for edits in r.values_mut() {
+                    edits.sort_by(|a, b| {
+                        a.range
+                            .start
+                            .cmp(&b.range.start)
+                            .then(a.range.end.cmp(&b.range.end))
+                    });
+                }
+            };
+
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
     }
 }

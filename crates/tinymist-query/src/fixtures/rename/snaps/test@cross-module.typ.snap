@@ -1,0 +1,25 @@
+---
+source: crates/tinymist-query/src/rename.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/rename/cross-module.typ
+---
+{
+ "changes": {
+  "s1.typ": [
+   {
+    "newText": "new_name",
+    "range": "0:20:0:21"
+   },
+   {
+    "newText": "new_name",
+    "range": "1:23:1:24"
+   }
+  ],
+  "user.typ": [
+   {
+    "newText": "new_name",
+    "range": "0:5:0:6"
+   }
+  ]
+ }
+}

@@ -50,7 +50,7 @@ impl StatefulRequest for GotoDefinitionRequest {
             target_selection_range: range,
         }]));
 
-        log::info!("goto_definition: {fid:?} {res:?}");
+        log::debug!("goto_definition: {fid:?} {res:?}");
         res
     }
 }

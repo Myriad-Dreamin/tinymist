@@ -1,6 +1,9 @@
 ---
 source: crates/tinymist-query/src/prepare_rename.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
-input_file: crates/tinymist-query/src/fixtures/prepare_rename/builtin.typ
+input_file: crates/tinymist-query/src/fixtures/rename/cross-module.typ
 ---
-null
+{
+ "placeholder": "f",
+ "range": "1:23:1:24"
+}
