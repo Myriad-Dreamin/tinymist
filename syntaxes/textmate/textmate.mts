@@ -3,6 +3,7 @@ export interface Grammar {
   repository?: Repository;
 }
 export type Repository = Record<string, Pattern>;
+type MaybeRegExp = RegExp | string;
 
 export type PatternCommon = Pick<PatternAny, "comment" | "disabled" | "name">;
 export type PatternInclude = PatternCommon &
@@ -62,7 +63,7 @@ interface PatternAny {
    * @description A regular expression which is used to identify the portion of text to which the name should be assigned. Example: '\b(true|false)\b'.
    * @type string
    */
-  match?: RegExp;
+  match?: MaybeRegExp;
   /**
    * The name which gets assigned to the portion matched. This is used for styling and scope-specific settings and actions, which means it should generally be derived from one of the standard names.
    * @description The name which gets assigned to the portion matched. This is used for styling and scope-specific settings and actions, which means it should generally be derived from one of the standard names.
@@ -80,19 +81,19 @@ interface PatternAny {
    * @description These keys allow matches which span several lines and must both be mutually exclusive with the match key. Each is a regular expression pattern. begin is the pattern that starts the block and end is the pattern which ends the block. Captures from the begin pattern can be referenced in the end pattern by using normal regular expression back-references. This is often used with here-docs. A begin/end rule can have nested patterns using the patterns key.
    * @type string
    */
-  begin: RegExp;
+  begin: MaybeRegExp;
   /**
    * These keys allow matches which span several lines and must both be mutually exclusive with the match key. Each is a regular expression pattern. begin is the pattern that starts the block and end is the pattern which ends the block. Captures from the begin pattern can be referenced in the end pattern by using normal regular expression back-references. This is often used with here-docs. A begin/end rule can have nested patterns using the patterns key.
    * @description These keys allow matches which span several lines and must both be mutually exclusive with the match key. Each is a regular expression pattern. begin is the pattern that starts the block and end is the pattern which ends the block. Captures from the begin pattern can be referenced in the end pattern by using normal regular expression back-references. This is often used with here-docs. A begin/end rule can have nested patterns using the patterns key.
    * @type string
    */
-  end: RegExp;
+  end: MaybeRegExp;
   /**
    * These keys allow matches which span several lines and must both be mutually exclusive with the match key. Each is a regular expression pattern. begin is the pattern that starts the block and while continues it.
    * @description These keys allow matches which span several lines and must both be mutually exclusive with the match key. Each is a regular expression pattern. begin is the pattern that starts the block and while continues it.
    * @type string
    */
-  while: RegExp;
+  while: MaybeRegExp;
   /**
    * Allows you to assign attributes to the captures of the match pattern. Using the captures key for a begin/end rule is short-hand for giving both beginCaptures and endCaptures with same values.
    * @description Allows you to assign attributes to the captures of the match pattern. Using the captures key for a begin/end rule is short-hand for giving both beginCaptures and endCaptures with same values.

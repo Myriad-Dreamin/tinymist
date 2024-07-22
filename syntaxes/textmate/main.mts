@@ -1,4 +1,13 @@
-import * as textmate from "./textmate";
+import * as textmate from "./textmate.mjs";
+import {
+  blockRaw,
+  blockRawGeneral,
+  inlineRaw,
+} from "./fenced.mjs";
+
+import * as fs from "fs";
+import * as path from "path";
+import { fileURLToPath } from "node:url";
 
 // JS-Snippet to generate pattern
 function generatePattern(maxDepth: number, lb: string, rb: string) {
@@ -87,8 +96,7 @@ const primitiveTypes: textmate.PatternMatch = {
   name: "entity.name.type.primitive.typst",
 };
 
-const IDENTIFIER_BARE = /[\p{XID_Start}_][\p{XID_Continue}_\-]*/;
-const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_\-]*/;
+const IDENTIFIER = /(?<!\)|\]|\})\b[\p{XID_Start}_][\p{XID_Continue}_\-]*/u;
 
 // todo: distinguish type and variable
 const identifier: textmate.PatternMatch = {
@@ -97,19 +105,19 @@ const identifier: textmate.PatternMatch = {
 };
 
 const mathIdentifier: textmate.PatternMatch = {
-  match: /\p{XID_Start}(?:\p{XID_Continue}(?!-))*/,
+  match: /\p{XID_Start}(?:\p{XID_Continue}(?!-))*/u,
   name: "variable.other.readwrite.typst",
 };
 
 const markupLabel: textmate.PatternMatch = {
   name: "entity.other.label.typst",
-  match: /<[\p{XID_Start}_][\p{XID_Continue}_\-\.\:]*>/,
+  match: /<[\p{XID_Start}_][\p{XID_Continue}_\-\.:]*>/u,
 };
 
 const markupReference: textmate.PatternMatch = {
   name: "entity.other.reference.typst",
   match:
-    /(@)[\p{XID_Start}_](?:[\p{XID_Continue}_\-]|[\.\:](?!:\s|$|([\.\:]*[^\p{XID_Continue}_\-\.\:])))*/,
+    /(@)[\p{XID_Start}_](?:[\p{XID_Continue}_\-]|[\.:](?!:\s|$|([\.:]*[^\p{XID_Continue}_\-\.:])))*/u,
   captures: {
     "1": {
       name: "punctuation.definition.reference.typst",
@@ -354,11 +362,11 @@ const markupEnterCode: textmate.Pattern = {
     ),
     enterExpression(
       "entity.name.function.hash.typst",
-      /(?=[\p{XID_Start}_][\p{XID_Continue}_\-]*[\(\[])/
+      /(?=[\p{XID_Start}_][\p{XID_Continue}_\-]*[\(\[])/u
     ),
     enterExpression(
       "variable.other.readwrite.hash.typst",
-      /(?=[\p{XID_Start}_])/
+      /(?=[\p{XID_Start}_])/u
     ),
     enterExpression("string.hash.hash.typst", /(?=\")/),
     enterExpression("constant.numeric.hash.typst", /(?=\d)/),
@@ -634,52 +642,9 @@ const comments: textmate.Pattern = {
   patterns: [{ include: "#blockComment" }, { include: "#lineComment" }],
 };
 
-const inlineRaw: textmate.Pattern = {
-  name: "markup.raw.inline.typst",
-  begin: /`/,
-  end: /`/,
-  beginCaptures: {
-    "0": {
-      name: "punctuation.definition.raw.inline.typst",
-    },
-  },
-  endCaptures: {
-    "0": {
-      name: "punctuation.definition.raw.inline.typst",
-    },
-  },
-};
-
-const blockRaw: textmate.Pattern = {
-  patterns: [
-    {
-      include: "#blockRawGeneral",
-    },
-  ],
-};
-
-const blockRawGeneral: textmate.Pattern = {
-  name: "markup.raw.block.typst",
-  begin: new RegExp(/(`{3,})/.source + `(${IDENTIFIER_BARE.source}\\b)?`),
-  beginCaptures: {
-    "1": {
-      name: "punctuation.definition.raw.begin.typst",
-    },
-    "2": {
-      name: "fenced_code.block.language.typst",
-    },
-  },
-  end: /(\1)/,
-  endCaptures: {
-    "1": {
-      name: "punctuation.definition.raw.end.typst",
-    },
-  },
-};
-
 const markupAnnotate = (ch: string, style: string): textmate.Pattern => {
-  const MARKUP_BOUNDARY = /[\W_\p{Han}\p{Hangul}\p{Katakana}\p{Hiragana}]/;
-  const notationAtBound = `(^${ch}|${ch}$|((?<=${MARKUP_BOUNDARY.source})${ch})|(${ch}(?=${MARKUP_BOUNDARY.source})))`;
+  const MARKUP_BOUNDARY = `[\\W_\\p{Han}\\p{Hangul}\\p{Katakana}\\p{Hiragana}]`;
+  const notationAtBound = `(^${ch}|${ch}$|((?<=${MARKUP_BOUNDARY})${ch})|(${ch}(?=${MARKUP_BOUNDARY})))`;
   return {
     name: `markup.${style}.typst`,
     begin: new RegExp(notationAtBound),
@@ -843,7 +808,7 @@ const letStatement = (): textmate.Grammar => {
       },
       /// Matches a func call after the set clause
       {
-        begin: /(\b[\p{XID_Start}_][\p{XID_Continue}_\-]*)(\()/,
+        begin: /(\b[\p{XID_Start}_][\p{XID_Continue}_\-]*)(\()/u,
         end: /\)/,
         beginCaptures: {
           "1": {
@@ -1389,7 +1354,7 @@ const callArgs: textmate.Pattern = {
 };
 
 const funcRestParam: textmate.Pattern = {
-  match: /(\.\.)(\b[\p{XID_Start}_][\p{XID_Continue}_\-]*)?/,
+  match: /(\.\.)(\b[\p{XID_Start}_][\p{XID_Continue}_\-]*)?/u,
   // debugging
   // - name: meta.parameter.binding.typst
   captures: {
@@ -1642,17 +1607,16 @@ export const typst: textmate.Grammar = {
 };
 
 function generate() {
-  const fs = require("fs");
-  const path = require("path");
+  const dirname = fileURLToPath(new URL(".", import.meta.url));
 
-  const typstPath = path.join(__dirname, "../typst.tmLanguage");
+  const typstPath = path.join(dirname, "../typst.tmLanguage");
 
   const compiled = textmate.compile(typst);
   const repository = JSON.parse(compiled).repository;
 
   // dump to file
   fs.writeFileSync(
-    path.join(__dirname, "../typst.tmLanguage.json"),
+    path.join(dirname, "../typst.tmLanguage.json"),
     JSON.stringify({
       $schema:
         "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
@@ -1669,7 +1633,7 @@ function generate() {
 
   // dump to file
   fs.writeFileSync(
-    path.join(__dirname, "../typst-code.tmLanguage.json"),
+    path.join(dirname, "../typst-code.tmLanguage.json"),
     JSON.stringify({
       $schema:
         "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
