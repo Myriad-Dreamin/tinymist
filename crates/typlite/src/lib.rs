@@ -1,27 +1,20 @@
 //! # Typlite
 
 mod library;
-use library::library;
-use typst::eval::Eval;
-use typst::foundations::{Dict, Repr, Str};
-use typst::introspection::MetadataElem;
+pub mod scopes;
+mod value;
 
+use library::ArgGetter;
+use scopes::Scopes;
+use value::Value;
+
+use std::borrow::Cow;
 use std::fmt::Write;
-use std::{borrow::Cow, sync::OnceLock};
 
-use comemo::Prehashed;
-use ecow::EcoString;
-use typst::syntax::Span;
-use typst::{
-    diag::{FileError, FileResult},
-    eval::Vm,
-    foundations::{Bytes, Datetime, Value},
-    syntax::{
-        ast::{self, AstNode},
-        FileId, Source, SyntaxKind, SyntaxNode,
-    },
-    text::{Font, FontBook},
-    Library, World,
+use ecow::{eco_format, EcoString};
+use typst_syntax::{
+    ast::{self, AstNode},
+    Source, SyntaxKind, SyntaxNode,
 };
 
 type Result<T, Err = Cow<'static, str>> = std::result::Result<T, Err>;
@@ -59,29 +52,29 @@ impl Typlite {
 
     /// Convert the content to a markdown string.
     pub fn convert(self) -> Result<EcoString> {
-        let world = LiteWorld::new(self.main.clone());
-        with_vm(&world, |vm| {
-            let mut res = EcoString::new();
-            let mut worker = TypliteWorker { gfm: self.gfm, vm };
-            // vm.define(
-            //     SyntaxNode::leaf(SyntaxKind::Ident, "_typlite_object")
-            //         .cast()
-            //         .unwrap(),
-            //     worker_lit,
-            // );
+        let mut res = EcoString::new();
+        let mut worker = TypliteWorker {
+            gfm: self.gfm,
+            scopes: library::library(),
+        };
 
-            worker.convert_to(self.main.root(), &mut res)?;
-            Ok(res)
-        })
+        worker.convert_to(self.main.root(), &mut res)?;
+        Ok(res)
     }
 }
 
-struct TypliteWorker<'a, 'b> {
+struct TypliteWorker {
     gfm: bool,
-    vm: &'a mut Vm<'b>,
+    scopes: Scopes<Value>,
 }
 
-impl<'a, 'b> TypliteWorker<'a, 'b> {
+impl TypliteWorker {
+    pub fn convert(&mut self, node: &SyntaxNode) -> Result<EcoString> {
+        let mut res = EcoString::new();
+        self.convert_to(node, &mut res)?;
+        Ok(res)
+    }
+
     /// Convert the content to a markdown string.
     pub fn convert_to(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         use SyntaxKind::*;
@@ -96,9 +89,19 @@ impl<'a, 'b> TypliteWorker<'a, 'b> {
             Math => self.reduce(node, s),
             Markup => self.reduce(node, s),
             Code => self.reduce(node, s),
-            CodeBlock => self.reduce(node, s),
-            ContentBlock => self.reduce(node, s),
-            Parenthesized => self.reduce(node, s),
+
+            CodeBlock => {
+                let code_block: ast::CodeBlock = node.cast().unwrap();
+                self.convert_to(code_block.body().to_untyped(), s)
+            }
+            ContentBlock => {
+                let content_block: ast::ContentBlock = node.cast().unwrap();
+                self.convert_to(content_block.body().to_untyped(), s)
+            }
+            Parenthesized => {
+                let parenthesized: ast::Parenthesized = node.cast().unwrap();
+                self.convert_to(parenthesized.expr().to_untyped(), s)
+            }
 
             // Text nodes
             Text | Space | Linebreak | Parbreak => Self::str(node, s),
@@ -264,20 +267,10 @@ impl<'a, 'b> TypliteWorker<'a, 'b> {
 
     fn value(res: Value) -> EcoString {
         let Value::Content(content) = res else {
-            return res.repr();
+            return eco_format!("{res:?}");
         };
 
-        let elem = content.clone().unpack::<MetadataElem>().ok().and_then(|e| {
-            let dict = e.value.cast::<Dict>().ok()?;
-            if !dict.contains("$typlite") {
-                return None;
-            }
-
-            let str = dict.get("raw").ok()?.clone().cast::<Str>().ok()?;
-            Some(str.into())
-        });
-
-        elem.unwrap_or_else(|| content.repr())
+        content
     }
 
     fn escape(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
@@ -405,10 +398,18 @@ impl<'a, 'b> TypliteWorker<'a, 'b> {
 
     fn func_call(&mut self, node: &SyntaxNode) -> Result<EcoString> {
         let c: ast::FuncCall = node.cast().unwrap();
-        let res = c
-            .eval(self.vm)
-            .map_err(|e| format!("error evaluating function call: {e:?}"))?;
-        Ok(Self::value(res))
+
+        let callee = match c.callee() {
+            ast::Expr::Ident(callee) => self.scopes.get(callee.get()),
+            ast::Expr::FieldAccess(..) => return Ok(EcoString::new()),
+            _ => return Ok(EcoString::new()),
+        }?;
+
+        let Value::RawFunc(func) = callee else {
+            return Err("callee is not a function")?;
+        };
+
+        Ok(Self::value(func(ArgGetter::new(self, c.args()))?))
     }
 
     fn contextual(&self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
@@ -416,116 +417,6 @@ impl<'a, 'b> TypliteWorker<'a, 'b> {
         let _ = s;
 
         Ok(())
-    }
-}
-
-fn with_vm<T>(w: &dyn World, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
-    use comemo::Track;
-    use typst::engine::*;
-    use typst::eval::*;
-    use typst::foundations::*;
-    use typst::introspection::*;
-
-    let mut locator = Locator::default();
-    let introspector = Introspector::default();
-    let mut tracer = Tracer::new();
-    let engine = Engine {
-        world: w.track(),
-        route: Route::default(),
-        introspector: introspector.track(),
-        locator: &mut locator,
-        tracer: tracer.track_mut(),
-    };
-
-    let context = Context::none();
-    let mut vm = Vm::new(
-        engine,
-        context.track(),
-        Scopes::new(Some(w.library())),
-        Span::detached(),
-    );
-
-    f(&mut vm)
-}
-
-/// A world for TypstLite.
-pub struct LiteWorld {
-    main: Source,
-    base: &'static LiteBase,
-}
-
-impl LiteWorld {
-    /// Create a new world for a single test.
-    ///
-    /// This is cheap because the shared base for all test runs is lazily
-    /// initialized just once.
-    pub fn new(main: Source) -> Self {
-        static BASE: OnceLock<LiteBase> = OnceLock::new();
-        Self {
-            main,
-            base: BASE.get_or_init(LiteBase::default),
-        }
-    }
-
-    /// The ID of the main file in a `TestWorld`.
-    pub fn main_id() -> FileId {
-        static ID: OnceLock<FileId> = OnceLock::new();
-        *ID.get_or_init(|| Source::detached("").id())
-    }
-}
-
-impl World for LiteWorld {
-    fn library(&self) -> &Prehashed<Library> {
-        &self.base.library
-    }
-
-    fn book(&self) -> &Prehashed<FontBook> {
-        &self.base.book
-    }
-
-    fn main(&self) -> Source {
-        self.main.clone()
-    }
-
-    fn source(&self, id: FileId) -> FileResult<Source> {
-        if id == self.main.id() {
-            Ok(self.main.clone())
-        } else {
-            Err(FileError::NotFound(id.vpath().as_rootless_path().into()))
-        }
-    }
-
-    fn file(&self, id: FileId) -> FileResult<Bytes> {
-        Err(FileError::NotFound(id.vpath().as_rootless_path().into()))
-    }
-
-    fn font(&self, index: usize) -> Option<Font> {
-        Some(self.base.fonts[index].clone())
-    }
-
-    fn today(&self, _: Option<i64>) -> Option<Datetime> {
-        None
-    }
-}
-
-/// Shared foundation of all lite worlds.
-struct LiteBase {
-    library: Prehashed<Library>,
-    book: Prehashed<FontBook>,
-    fonts: Vec<Font>,
-}
-
-impl Default for LiteBase {
-    fn default() -> Self {
-        let fonts: Vec<_> = typst_assets::fonts()
-            .flat_map(|data| Font::iter(Bytes::from_static(data)))
-            .collect();
-
-        Self {
-            library: Prehashed::new(library()),
-            book: Prehashed::new(FontBook::from_fonts(&fonts)),
-            fonts,
-        }
     }
 }
 

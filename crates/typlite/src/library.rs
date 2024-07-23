@@ -1,53 +1,92 @@
-use std::sync::OnceLock;
-
+use super::*;
 use ecow::eco_format;
-use typst::{
-    diag::{At, SourceResult},
-    foundations::{Content, Dict, IntoValue, Module, NativeElement, Scope},
-    introspection::MetadataElem,
-    model::{Destination, LinkTarget},
-    Library,
-};
-use typst_macros::func;
+use typst_syntax::ast;
+use value::RawFunc;
 
-pub fn library() -> Library {
-    let mut lib = Library::default();
-    let mut global = Scope::new();
-    // Copy from stdlib
-    for (k, v) in lib.global.scope().iter() {
-        global.define(k.clone(), v.clone());
+pub fn library() -> Scopes<Value> {
+    let mut scopes = Scopes::new();
+    scopes.define("link", link as RawFunc);
+    scopes
+}
+
+pub struct ArgGetter<'a> {
+    pub worker: &'a mut TypliteWorker,
+    pub args: ast::Args<'a>,
+    pub pos: Vec<&'a SyntaxNode>,
+}
+
+impl<'a> ArgGetter<'a> {
+    pub fn new(worker: &'a mut TypliteWorker, args: ast::Args<'a>) -> Self {
+        let pos = args
+            .items()
+            .filter_map(|item| match item {
+                ast::Arg::Pos(pos) => Some(pos.to_untyped()),
+                _ => None,
+            })
+            .rev()
+            .collect();
+        Self { worker, args, pos }
     }
-    global.define_func::<link>();
 
-    lib.global = Module::new("global", global);
+    fn get(&mut self, key: &str) -> Result<&'a SyntaxNode> {
+        // find named
+        for item in self.args.items() {
+            if let ast::Arg::Named(named) = item {
+                if named.name().get() == key {
+                    return Ok(named.expr().to_untyped());
+                }
+            }
+        }
 
-    lib
+        // find positional
+        Ok(self
+            .pos
+            .pop()
+            .ok_or_else(|| format!("missing positional arguments: {key}"))?)
+    }
+
+    fn parse<T: Eval<'a>>(&mut self, node: &'a SyntaxNode) -> Result<T> {
+        T::eval(node, self.worker)
+    }
+}
+
+// [attr] key: ty
+macro_rules! get_args {
+    (
+        $args:expr,
+        $key:ident: $ty:ty
+    ) => {{
+        let raw = $args.get(stringify!($key))?;
+        $args.parse::<$ty>(raw)?
+    }};
 }
 
 /// Evaluate a link to markdown-format string.
-#[func]
-pub fn link(dest: LinkTarget, body: Content) -> SourceResult<Content> {
-    let mut dict = lite_elem();
+pub fn link(mut args: ArgGetter) -> Result<Value> {
+    let dest = get_args!(args, dest: EcoString);
+    let body = get_args!(args, body: &SyntaxNode);
+    let body = args.worker.convert(body)?;
 
-    let dest = match dest {
-        LinkTarget::Dest(Destination::Url(link)) => link,
-        _ => return Err(eco_format!("unsupported link target")).at(body.span()),
-    };
-    let body = body.plain_text();
-
-    dict.insert("raw".into(), eco_format!("[{body}]({dest})").into_value());
-    Ok(MetadataElem::new(dict.into_value()).pack())
+    Ok(Value::Content(eco_format!("[{body}]({dest})")))
 }
 
-fn lite_elem() -> Dict {
-    static ELEM_BASE: OnceLock<Dict> = OnceLock::new();
+/// Evaluate an expression.
+pub trait Eval<'a>: Sized {
+    /// Evaluate the expression to the output value.
+    fn eval(node: &'a SyntaxNode, vm: &mut TypliteWorker) -> Result<Self>;
+}
 
-    ELEM_BASE
-        .get_or_init(|| {
-            let mut dict = Dict::new();
-            dict.insert("$typlite".into(), true.into_value());
+impl<'a> Eval<'a> for &'a SyntaxNode {
+    fn eval(node: &'a SyntaxNode, _vm: &mut TypliteWorker) -> Result<Self> {
+        Ok(node)
+    }
+}
 
-            dict
-        })
-        .clone()
+impl<'a> Eval<'a> for EcoString {
+    fn eval(node: &'a SyntaxNode, _vm: &mut TypliteWorker) -> Result<Self> {
+        let node: ast::Str = node
+            .cast()
+            .ok_or_else(|| format!("expected string, found {:?}", node.kind()))?;
+        Ok(node.get())
+    }
 }

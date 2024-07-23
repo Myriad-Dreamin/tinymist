@@ -11,10 +11,8 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
-typst.workspace = true
+typst-syntax.workspace = true
 ecow.workspace = true
-typst-macros.workspace = true
-typst-assets = { workspace = true, features = ["fonts"] }
 comemo.workspace = true
 
 [dev-dependencies]
