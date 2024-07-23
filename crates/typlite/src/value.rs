@@ -2,12 +2,15 @@ use core::fmt;
 
 use crate::*;
 
-pub type RawFunc = fn(ArgGetter) -> Result<Value>;
+pub type RawFunc = fn(Args) -> Result<Value>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Value {
+    None,
     RawFunc(RawFunc),
+    Str(EcoString),
     Content(EcoString),
+    Image { path: EcoString, alt: EcoString },
 }
 
 impl From<RawFunc> for Value {
@@ -24,13 +27,13 @@ impl fmt::Display for Content {
     }
 }
 
-pub struct ArgGetter<'a> {
-    pub worker: &'a mut TypliteWorker,
+pub struct Args<'a> {
+    pub vm: &'a mut TypliteWorker,
     pub args: ast::Args<'a>,
     pub pos: Vec<&'a SyntaxNode>,
 }
 
-impl<'a> ArgGetter<'a> {
+impl<'a> Args<'a> {
     pub fn new(worker: &'a mut TypliteWorker, args: ast::Args<'a>) -> Self {
         let pos = args
             .items()
@@ -40,17 +43,29 @@ impl<'a> ArgGetter<'a> {
             })
             .rev()
             .collect();
-        Self { worker, args, pos }
+        Self {
+            vm: worker,
+            args,
+            pos,
+        }
     }
 
-    pub fn get(&mut self, key: &str) -> Result<&'a SyntaxNode> {
+    pub fn get_named_(&mut self, key: &str) -> Option<&'a SyntaxNode> {
         // find named
         for item in self.args.items() {
             if let ast::Arg::Named(named) = item {
                 if named.name().get() == key {
-                    return Ok(named.expr().to_untyped());
+                    return Some(named.expr().to_untyped());
                 }
             }
+        }
+
+        None
+    }
+
+    pub fn get(&mut self, key: &str) -> Result<&'a SyntaxNode> {
+        if let Some(named) = self.get_named_(key) {
+            return Ok(named);
         }
 
         // find positional
@@ -61,11 +76,10 @@ impl<'a> ArgGetter<'a> {
     }
 
     pub fn parse<T: Eval<'a>>(&mut self, node: &'a SyntaxNode) -> Result<T> {
-        T::eval(node, self.worker)
+        T::eval(node, self.vm)
     }
 }
 
-// [attr] key: ty
 macro_rules! get_pos_named {
     (
         $args:expr,
@@ -76,6 +90,37 @@ macro_rules! get_pos_named {
     }};
 }
 pub(crate) use get_pos_named;
+
+macro_rules! get_named {
+    (
+        $args:expr,
+        $key:ident: Option<$ty:ty>
+    ) => {{
+        if let Some(raw) = $args.get_named_(stringify!($key)) {
+            Some($args.parse::<$ty>(raw)?)
+        } else {
+            None
+        }
+    }};
+    (
+        $args:expr,
+        $key:ident: $ty:ty
+    ) => {{
+        let raw = $args.get_named(stringify!($key))?;
+        $args.parse::<$ty>(raw)?
+    }};
+    (
+        $args:expr,
+        $key:ident: $ty:ty := $default:expr
+    ) => {{
+        if let Some(raw) = $args.get_named_(stringify!($key)) {
+            $args.parse::<$ty>(raw)?
+        } else {
+            $default.into()
+        }
+    }};
+}
+pub(crate) use get_named;
 
 /// Evaluate an expression.
 pub trait Eval<'a>: Sized {
@@ -95,6 +140,12 @@ impl<'a> Eval<'a> for EcoString {
             .cast()
             .ok_or_else(|| format!("expected string, found {:?}", node.kind()))?;
         Ok(node.get())
+    }
+}
+
+impl<'a> Eval<'a> for Value {
+    fn eval(node: &'a SyntaxNode, vm: &mut TypliteWorker) -> Result<Self> {
+        vm.eval(node)
     }
 }
 
