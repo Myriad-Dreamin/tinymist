@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::*;
 
 pub type RawFunc = fn(ArgGetter) -> Result<Value>;
@@ -11,6 +13,14 @@ pub enum Value {
 impl From<RawFunc> for Value {
     fn from(func: RawFunc) -> Self {
         Self::RawFunc(func)
+    }
+}
+
+pub struct Content(pub EcoString);
+
+impl fmt::Display for Content {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -85,5 +95,11 @@ impl<'a> Eval<'a> for EcoString {
             .cast()
             .ok_or_else(|| format!("expected string, found {:?}", node.kind()))?;
         Ok(node.get())
+    }
+}
+
+impl<'a> Eval<'a> for Content {
+    fn eval(node: &'a SyntaxNode, vm: &mut TypliteWorker) -> Result<Self> {
+        Ok(Self(vm.convert(node)?))
     }
 }
