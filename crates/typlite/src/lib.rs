@@ -1,8 +1,16 @@
 //! # Typlite
 
+mod library;
+pub mod scopes;
+mod value;
+
+use scopes::Scopes;
+use value::{ArgGetter, Value};
+
 use std::borrow::Cow;
 use std::fmt::Write;
 
+use ecow::{eco_format, EcoString};
 use typst_syntax::{
     ast::{self, AstNode},
     Source, SyntaxKind, SyntaxNode,
@@ -13,7 +21,10 @@ type Result<T, Err = Cow<'static, str>> = std::result::Result<T, Err>;
 /// Task builder for converting a typst document to Markdown.
 #[derive(Debug, Clone)]
 pub struct Typlite {
-    root: SyntaxNode,
+    /// The document to convert.
+    main: Source,
+    /// Whether to enable GFM (GitHub Flavored Markdown) features.
+    gfm: bool,
 }
 
 impl Typlite {
@@ -23,31 +34,48 @@ impl Typlite {
     /// use typlite::Typlite;
     /// let content = "= Hello, World";
     /// let res = Typlite::new_with_content(content).convert();
-    /// assert_eq!(res, Ok("# Hello, World".to_string()));
+    /// assert_eq!(res, Ok("# Hello, World".into()));
     /// ```
     pub fn new_with_content(content: &str) -> Self {
-        let root = typst_syntax::parse(content);
-        Self { root }
+        let main = Source::detached(content);
+        Self { main, gfm: false }
     }
 
     /// Create a new Typlite instance from a [`Source`].
     ///
     /// This is useful when you have a [`Source`] instance and you can avoid
     /// reparsing the content.
-    pub fn new_with_src(src: Source) -> Self {
-        let root = src.root().clone();
-        Self { root }
+    pub fn new_with_src(main: Source) -> Self {
+        Self { main, gfm: false }
     }
 
     /// Convert the content to a markdown string.
-    pub fn convert(self) -> Result<String> {
-        let mut res = String::new();
-        Self::convert_to(&self.root, &mut res)?;
+    pub fn convert(self) -> Result<EcoString> {
+        let mut res = EcoString::new();
+        let mut worker = TypliteWorker {
+            gfm: self.gfm,
+            scopes: library::library(),
+        };
+
+        worker.convert_to(self.main.root(), &mut res)?;
+        Ok(res)
+    }
+}
+
+struct TypliteWorker {
+    gfm: bool,
+    scopes: Scopes<Value>,
+}
+
+impl TypliteWorker {
+    pub fn convert(&mut self, node: &SyntaxNode) -> Result<EcoString> {
+        let mut res = EcoString::new();
+        self.convert_to(node, &mut res)?;
         Ok(res)
     }
 
     /// Convert the content to a markdown string.
-    pub fn convert_to(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    pub fn convert_to(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         use SyntaxKind::*;
         match node.kind() {
             RawLang | RawDelim | RawTrimmed => Err("converting clause")?,
@@ -57,12 +85,22 @@ impl Typlite {
             Eof | None => Ok(()),
 
             // Non-leaf nodes
-            Math => Self::reduce(node, s),
-            Markup => Self::reduce(node, s),
-            Code => Self::reduce(node, s),
-            CodeBlock => Self::reduce(node, s),
-            ContentBlock => Self::reduce(node, s),
-            Parenthesized => Self::reduce(node, s),
+            Math => self.reduce(node, s),
+            Markup => self.reduce(node, s),
+            Code => self.reduce(node, s),
+
+            CodeBlock => {
+                let code_block: ast::CodeBlock = node.cast().unwrap();
+                self.convert_to(code_block.body().to_untyped(), s)
+            }
+            ContentBlock => {
+                let content_block: ast::ContentBlock = node.cast().unwrap();
+                self.convert_to(content_block.body().to_untyped(), s)
+            }
+            Parenthesized => {
+                let parenthesized: ast::Parenthesized = node.cast().unwrap();
+                self.convert_to(parenthesized.expr().to_untyped(), s)
+            }
 
             // Text nodes
             Text | Space | Linebreak | Parbreak => Self::str(node, s),
@@ -71,20 +109,20 @@ impl Typlite {
             Escape => Self::escape(node, s),
             Shorthand => Self::shorthand(node, s),
             SmartQuote => Self::str(node, s),
-            Strong => Self::strong(node, s),
-            Emph => Self::emph(node, s),
+            Strong => self.strong(node, s),
+            Emph => self.emph(node, s),
             Raw => Self::raw(node, s),
-            Link => Self::link(node, s),
+            Link => self.link(node, s),
             Label => Self::label(node, s),
             Ref => Self::label_ref(node, s),
             RefMarker => Self::ref_marker(node, s),
-            Heading => Self::heading(node, s),
+            Heading => self.heading(node, s),
             HeadingMarker => Self::str(node, s),
-            ListItem => Self::list_item(node, s),
+            ListItem => self.list_item(node, s),
             ListMarker => Self::str(node, s),
-            EnumItem => Self::enum_item(node, s),
+            EnumItem => self.enum_item(node, s),
             EnumMarker => Self::str(node, s),
-            TermItem => Self::term_item(node, s),
+            TermItem => self.term_item(node, s),
             TermMarker => Self::str(node, s),
             Equation => Self::equation(node, s),
             MathIdent => Self::str(node, s),
@@ -154,11 +192,22 @@ impl Typlite {
             Include => Self::str(node, s),
             As => Self::str(node, s),
 
+            LetBinding => self.let_binding(node, s),
+            FieldAccess => self.field_access(node, s),
+            FuncCall => Self::absorb(self.func_call(node), s),
+            Contextual => self.contextual(node, s),
+
             // Clause nodes
             Named => Ok(()),
             Keyed => Ok(()),
             Unary => Ok(()),
             Binary => Ok(()),
+            Spread => Ok(()),
+            ImportItems => Ok(()),
+            RenamedImportItem => Ok(()),
+            Closure => Ok(()),
+            Args => Ok(()),
+            Params => Ok(()),
 
             // Ignored code expressions
             Ident => Ok(()),
@@ -171,28 +220,20 @@ impl Typlite {
             Dict => Ok(()),
 
             // Ignored code expressions
-            FieldAccess => Ok(()),
-            FuncCall => Ok(()),
-            Args => Ok(()),
-            Spread => Ok(()),
-            Closure => Ok(()),
-            Params => Ok(()),
-            LetBinding => Ok(()),
             SetRule => Ok(()),
             ShowRule => Ok(()),
-            Contextual => Ok(()),
+            Destructuring => Ok(()),
+            DestructAssignment => Ok(()),
+
             Conditional => Ok(()),
             WhileLoop => Ok(()),
             ForLoop => Ok(()),
-            ModuleImport => Ok(()),
-            ImportItems => Ok(()),
-            RenamedImportItem => Ok(()),
-            ModuleInclude => Ok(()),
             LoopBreak => Ok(()),
             LoopContinue => Ok(()),
             FuncReturn => Ok(()),
-            Destructuring => Ok(()),
-            DestructAssignment => Ok(()),
+
+            ModuleImport => Ok(()),
+            ModuleInclude => Ok(()),
 
             // Ignored comments
             LineComment => Ok(()),
@@ -200,61 +241,74 @@ impl Typlite {
         }
     }
 
-    fn reduce(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn reduce(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         for child in node.children() {
-            Self::convert_to(child, s)?;
+            self.convert_to(child, s)?;
         }
 
         Ok(())
     }
 
-    fn char(arg: char, s: &mut String) -> Result<()> {
+    fn absorb(u: Result<EcoString>, v: &mut EcoString) -> Result<()> {
+        v.push_str(&u?);
+        Ok(())
+    }
+
+    fn char(arg: char, s: &mut EcoString) -> Result<()> {
         s.push(arg);
         Ok(())
     }
 
-    fn str(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn str(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         s.push_str(node.clone().into_text().as_str());
         Ok(())
     }
 
-    fn escape(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn value(res: Value) -> EcoString {
+        let Value::Content(content) = res else {
+            return eco_format!("{res:?}");
+        };
+
+        content
+    }
+
+    fn escape(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         // todo: escape characters
         Self::str(node, s)
     }
 
-    fn shorthand(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn shorthand(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         // todo: shorthands
         Self::str(node, s)
     }
 
-    fn strong(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn strong(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         let strong = node.cast::<ast::Strong>().unwrap();
         s.push_str("**");
-        Self::convert_to(strong.body().to_untyped(), s)?;
+        self.convert_to(strong.body().to_untyped(), s)?;
         s.push_str("**");
         Ok(())
     }
 
-    fn emph(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn emph(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         let emph = node.cast::<ast::Emph>().unwrap();
         s.push('_');
-        Self::convert_to(emph.body().to_untyped(), s)?;
+        self.convert_to(emph.body().to_untyped(), s)?;
         s.push('_');
         Ok(())
     }
 
-    fn heading(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn heading(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         let heading = node.cast::<ast::Heading>().unwrap();
         let level = heading.depth();
         for _ in 0..level.get() {
             s.push('#');
         }
         s.push(' ');
-        Self::convert_to(heading.body().to_untyped(), s)
+        self.convert_to(heading.body().to_untyped(), s)
     }
 
-    fn raw(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn raw(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         let raw = node.cast::<ast::Raw>().unwrap();
         if raw.block() {
             return Self::str(node, s);
@@ -267,42 +321,53 @@ impl Typlite {
         Ok(())
     }
 
-    fn link(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn link(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+        // GFM supports autolinks
+        if self.gfm {
+            return Self::str(node, s);
+        }
+        s.push('[');
+        Self::str(node, s)?;
+        s.push(']');
+        s.push('(');
+        Self::str(node, s)?;
+        s.push(')');
+
+        Ok(())
+    }
+
+    fn label(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         Self::str(node, s)
     }
 
-    fn label(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn label_ref(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         Self::str(node, s)
     }
 
-    fn label_ref(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn ref_marker(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         Self::str(node, s)
     }
 
-    fn ref_marker(node: &SyntaxNode, s: &mut String) -> Result<()> {
-        Self::str(node, s)
+    fn list_item(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+        self.reduce(node, s)
     }
 
-    fn list_item(node: &SyntaxNode, s: &mut String) -> Result<()> {
-        Self::reduce(node, s)
-    }
-
-    fn enum_item(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn enum_item(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         let enum_item = node.cast::<ast::EnumItem>().unwrap();
         if let Some(num) = enum_item.number() {
             write!(s, "{num}. ").map_err(|_| "cannot write enum item number")?;
         } else {
             s.push_str("1. ");
         }
-        Self::convert_to(enum_item.body().to_untyped(), s)
+        self.convert_to(enum_item.body().to_untyped(), s)
     }
 
-    fn term_item(node: &SyntaxNode, s: &mut String) -> Result<()> {
-        Self::reduce(node, s)
+    fn term_item(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+        self.reduce(node, s)
     }
 
     #[cfg(not(feature = "texmath"))]
-    fn equation(node: &SyntaxNode, s: &mut String) -> Result<()> {
+    fn equation(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         let equation = node.cast::<ast::Equation>().unwrap();
 
         #[rustfmt::skip]
@@ -315,60 +380,44 @@ impl Typlite {
 
         Ok(())
     }
+
+    fn let_binding(&self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+        let _ = node;
+        let _ = s;
+
+        Ok(())
+    }
+
+    fn field_access(&self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+        let _ = node;
+        let _ = s;
+
+        Ok(())
+    }
+
+    fn func_call(&mut self, node: &SyntaxNode) -> Result<EcoString> {
+        let c: ast::FuncCall = node.cast().unwrap();
+
+        let callee = match c.callee() {
+            ast::Expr::Ident(callee) => self.scopes.get(callee.get()),
+            ast::Expr::FieldAccess(..) => return Ok(EcoString::new()),
+            _ => return Ok(EcoString::new()),
+        }?;
+
+        let Value::RawFunc(func) = callee else {
+            return Err("callee is not a function")?;
+        };
+
+        Ok(Self::value(func(ArgGetter::new(self, c.args()))?))
+    }
+
+    fn contextual(&self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+        let _ = node;
+        let _ = s;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn conv(s: &str) -> String {
-        Typlite::new_with_content(s.trim()).convert().unwrap()
-    }
-
-    #[test]
-    fn test_converted() {
-        insta::assert_snapshot!(conv(r###"
-= Hello, World!
-This is a typst document.
-        "###), @r###"
-        # Hello, World!
-        This is a typst document.
-        "###);
-        insta::assert_snapshot!(conv(r###"
-Some inlined raw `a`, ```c b```
-        "###), @"Some inlined raw `a`, `b`");
-        insta::assert_snapshot!(conv(r###"
-- Some *item*
-- Another _item_
-        "###), @r###"
-        - Some **item**
-        - Another _item_
-        "###);
-        insta::assert_snapshot!(conv(r###"
-+ A
-+ B
-        "###), @r###"
-        1. A
-        1. B
-        "###);
-        insta::assert_snapshot!(conv(r###"
-2. A
-+ B
-        "###), @r###"
-        2. A
-        1. B
-        "###);
-        #[cfg(not(feature = "texmath"))]
-        insta::assert_snapshot!(conv(r###"
-$
-1/2 + 1/3 = 5/6
-$
-        "###), @r###"
-        ```typ
-        $
-        1/2 + 1/3 = 5/6
-        $
-        ```
-        "###);
-    }
-}
+mod tests;

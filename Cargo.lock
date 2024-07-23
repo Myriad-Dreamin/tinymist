@@ -4129,6 +4129,8 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 name = "typlite"
 version = "0.11.16"
 dependencies = [
+ "comemo 0.4.0",
+ "ecow 0.2.2",
  "insta",
  "typst-syntax 0.11.1",
 ]
