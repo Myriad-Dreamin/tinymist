@@ -12,6 +12,7 @@ repository.workspace = true
 
 [dependencies]
 typst-syntax.workspace = true
+ecow.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
