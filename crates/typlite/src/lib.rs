@@ -4,9 +4,8 @@ mod library;
 pub mod scopes;
 mod value;
 
-use library::ArgGetter;
 use scopes::Scopes;
-use value::Value;
+use value::{ArgGetter, Value};
 
 use std::borrow::Cow;
 use std::fmt::Write;
