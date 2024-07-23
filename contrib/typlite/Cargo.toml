@@ -1,0 +1,10 @@
+[package]
+name = "typlite"
+description = "Converts a subset of typst to markdown."
+categories = ["compilers"]
+keywords = ["language", "typst"]
+
+[workspace]
+
+[dependencies]
+typlite = { path = "../../crates/typlite" }
