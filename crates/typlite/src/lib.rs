@@ -1,26 +1,36 @@
 //! # Typlite
 
-pub mod scope;
-mod value;
+mod library;
+use library::library;
+use typst::eval::Eval;
+use typst::foundations::{Dict, Repr, Str};
+use typst::introspection::MetadataElem;
 
-use std::borrow::Cow;
 use std::fmt::Write;
+use std::{borrow::Cow, sync::OnceLock};
 
+use comemo::Prehashed;
 use ecow::EcoString;
-use scope::Scopes;
-use typst_syntax::{
-    ast::{self, AstNode},
-    Source, SyntaxKind, SyntaxNode,
+use typst::syntax::Span;
+use typst::{
+    diag::{FileError, FileResult},
+    eval::Vm,
+    foundations::{Bytes, Datetime, Value},
+    syntax::{
+        ast::{self, AstNode},
+        FileId, Source, SyntaxKind, SyntaxNode,
+    },
+    text::{Font, FontBook},
+    Library, World,
 };
-use value::Value;
 
 type Result<T, Err = Cow<'static, str>> = std::result::Result<T, Err>;
 
 /// Task builder for converting a typst document to Markdown.
 #[derive(Debug, Clone)]
 pub struct Typlite {
-    /// The root node of the parsed document.
-    root: SyntaxNode,
+    /// The document to convert.
+    main: Source,
     /// Whether to enable GFM (GitHub Flavored Markdown) features.
     gfm: bool,
 }
@@ -32,41 +42,46 @@ impl Typlite {
     /// use typlite::Typlite;
     /// let content = "= Hello, World";
     /// let res = Typlite::new_with_content(content).convert();
-    /// assert_eq!(res, Ok("# Hello, World".to_string()));
+    /// assert_eq!(res, Ok("# Hello, World".into()));
     /// ```
     pub fn new_with_content(content: &str) -> Self {
-        let root = typst_syntax::parse(content);
-        Self { root, gfm: false }
+        let main = Source::detached(content);
+        Self { main, gfm: false }
     }
 
     /// Create a new Typlite instance from a [`Source`].
     ///
     /// This is useful when you have a [`Source`] instance and you can avoid
     /// reparsing the content.
-    pub fn new_with_src(src: Source) -> Self {
-        let root = src.root().clone();
-        Self { root, gfm: false }
+    pub fn new_with_src(main: Source) -> Self {
+        Self { main, gfm: false }
     }
 
     /// Convert the content to a markdown string.
     pub fn convert(self) -> Result<EcoString> {
-        let mut res = EcoString::new();
-        let mut worker = TypliteWorker {
-            gfm: self.gfm,
-            scopes: Scopes::new(),
-        };
+        let world = LiteWorld::new(self.main.clone());
+        with_vm(&world, |vm| {
+            let mut res = EcoString::new();
+            let mut worker = TypliteWorker { gfm: self.gfm, vm };
+            // vm.define(
+            //     SyntaxNode::leaf(SyntaxKind::Ident, "_typlite_object")
+            //         .cast()
+            //         .unwrap(),
+            //     worker_lit,
+            // );
 
-        worker.convert_to(&self.root, &mut res)?;
-        Ok(res)
+            worker.convert_to(self.main.root(), &mut res)?;
+            Ok(res)
+        })
     }
 }
 
-struct TypliteWorker {
+struct TypliteWorker<'a, 'b> {
     gfm: bool,
-    scopes: Scopes<Value>,
+    vm: &'a mut Vm<'b>,
 }
 
-impl TypliteWorker {
+impl<'a, 'b> TypliteWorker<'a, 'b> {
     /// Convert the content to a markdown string.
     pub fn convert_to(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         use SyntaxKind::*;
@@ -177,7 +192,7 @@ impl TypliteWorker {
 
             LetBinding => self.let_binding(node, s),
             FieldAccess => self.field_access(node, s),
-            FuncCall => self.call(node, s),
+            FuncCall => Self::absorb(self.func_call(node), s),
             Contextual => self.contextual(node, s),
 
             // Clause nodes
@@ -232,6 +247,11 @@ impl TypliteWorker {
         Ok(())
     }
 
+    fn absorb(u: Result<EcoString>, v: &mut EcoString) -> Result<()> {
+        v.push_str(&u?);
+        Ok(())
+    }
+
     fn char(arg: char, s: &mut EcoString) -> Result<()> {
         s.push(arg);
         Ok(())
@@ -240,6 +260,24 @@ impl TypliteWorker {
     fn str(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
         s.push_str(node.clone().into_text().as_str());
         Ok(())
+    }
+
+    fn value(res: Value) -> EcoString {
+        let Value::Content(content) = res else {
+            return res.repr();
+        };
+
+        let elem = content.clone().unpack::<MetadataElem>().ok().and_then(|e| {
+            let dict = e.value.cast::<Dict>().ok()?;
+            if !dict.contains("$typlite") {
+                return None;
+            }
+
+            let str = dict.get("raw").ok()?.clone().cast::<Str>().ok()?;
+            Some(str.into())
+        });
+
+        elem.unwrap_or_else(|| content.repr())
     }
 
     fn escape(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
@@ -365,12 +403,12 @@ impl TypliteWorker {
         Ok(())
     }
 
-    fn call(&self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
-        let _ = node;
-        let _ = s;
-        let _ = self.scopes;
-
-        Ok(())
+    fn func_call(&mut self, node: &SyntaxNode) -> Result<EcoString> {
+        let c: ast::FuncCall = node.cast().unwrap();
+        let res = c
+            .eval(self.vm)
+            .map_err(|e| format!("error evaluating function call: {e:?}"))?;
+        Ok(Self::value(res))
     }
 
     fn contextual(&self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
@@ -378,6 +416,116 @@ impl TypliteWorker {
         let _ = s;
 
         Ok(())
+    }
+}
+
+fn with_vm<T>(w: &dyn World, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
+    use comemo::Track;
+    use typst::engine::*;
+    use typst::eval::*;
+    use typst::foundations::*;
+    use typst::introspection::*;
+
+    let mut locator = Locator::default();
+    let introspector = Introspector::default();
+    let mut tracer = Tracer::new();
+    let engine = Engine {
+        world: w.track(),
+        route: Route::default(),
+        introspector: introspector.track(),
+        locator: &mut locator,
+        tracer: tracer.track_mut(),
+    };
+
+    let context = Context::none();
+    let mut vm = Vm::new(
+        engine,
+        context.track(),
+        Scopes::new(Some(w.library())),
+        Span::detached(),
+    );
+
+    f(&mut vm)
+}
+
+/// A world for TypstLite.
+pub struct LiteWorld {
+    main: Source,
+    base: &'static LiteBase,
+}
+
+impl LiteWorld {
+    /// Create a new world for a single test.
+    ///
+    /// This is cheap because the shared base for all test runs is lazily
+    /// initialized just once.
+    pub fn new(main: Source) -> Self {
+        static BASE: OnceLock<LiteBase> = OnceLock::new();
+        Self {
+            main,
+            base: BASE.get_or_init(LiteBase::default),
+        }
+    }
+
+    /// The ID of the main file in a `TestWorld`.
+    pub fn main_id() -> FileId {
+        static ID: OnceLock<FileId> = OnceLock::new();
+        *ID.get_or_init(|| Source::detached("").id())
+    }
+}
+
+impl World for LiteWorld {
+    fn library(&self) -> &Prehashed<Library> {
+        &self.base.library
+    }
+
+    fn book(&self) -> &Prehashed<FontBook> {
+        &self.base.book
+    }
+
+    fn main(&self) -> Source {
+        self.main.clone()
+    }
+
+    fn source(&self, id: FileId) -> FileResult<Source> {
+        if id == self.main.id() {
+            Ok(self.main.clone())
+        } else {
+            Err(FileError::NotFound(id.vpath().as_rootless_path().into()))
+        }
+    }
+
+    fn file(&self, id: FileId) -> FileResult<Bytes> {
+        Err(FileError::NotFound(id.vpath().as_rootless_path().into()))
+    }
+
+    fn font(&self, index: usize) -> Option<Font> {
+        Some(self.base.fonts[index].clone())
+    }
+
+    fn today(&self, _: Option<i64>) -> Option<Datetime> {
+        None
+    }
+}
+
+/// Shared foundation of all lite worlds.
+struct LiteBase {
+    library: Prehashed<Library>,
+    book: Prehashed<FontBook>,
+    fonts: Vec<Font>,
+}
+
+impl Default for LiteBase {
+    fn default() -> Self {
+        let fonts: Vec<_> = typst_assets::fonts()
+            .flat_map(|data| Font::iter(Bytes::from_static(data)))
+            .collect();
+
+        Self {
+            library: Prehashed::new(library()),
+            book: Prehashed::new(FontBook::from_fonts(&fonts)),
+            fonts,
+        }
     }
 }
 

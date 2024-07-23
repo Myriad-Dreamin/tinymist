@@ -11,8 +11,11 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
-typst-syntax.workspace = true
+typst.workspace = true
 ecow.workspace = true
+typst-macros.workspace = true
+typst-assets = { workspace = true, features = ["fonts"] }
+comemo.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

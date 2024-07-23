@@ -4129,9 +4129,12 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 name = "typlite"
 version = "0.11.16"
 dependencies = [
+ "comemo 0.4.0",
  "ecow 0.2.2",
  "insta",
- "typst-syntax 0.11.1",
+ "typst",
+ "typst-assets",
+ "typst-macros 0.11.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -4184,7 +4187,7 @@ dependencies = [
  "two-face",
  "typed-arena",
  "typst-assets",
- "typst-macros",
+ "typst-macros 0.11.1 (git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.1)",
  "typst-syntax 0.11.1",
  "typst-timing",
  "unicode-bidi",
@@ -4200,6 +4203,18 @@ name = "typst-assets"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b3061f8d268e8eec7481c9ab24540455cb4912983c49aae38fa6e8bf8ef4d9c"
+
+[[package]]
+name = "typst-macros"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5a0fdfd46b4920b0f8e4215e5b8438c737e8bc3498a681ea59b0130228363fc"
+dependencies = [
+ "heck 0.4.1",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.70",
+]
 
 [[package]]
 name = "typst-macros"
@@ -4230,7 +4245,7 @@ dependencies = [
  "ttf-parser",
  "typst",
  "typst-assets",
- "typst-macros",
+ "typst-macros 0.11.1 (git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.1)",
  "typst-timing",
  "unicode-properties",
  "unscanny",
@@ -4275,7 +4290,7 @@ dependencies = [
  "tiny-skia",
  "ttf-parser",
  "typst",
- "typst-macros",
+ "typst-macros 0.11.1 (git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.1)",
  "typst-timing",
  "usvg",
 ]
@@ -4291,7 +4306,7 @@ dependencies = [
  "flate2",
  "ttf-parser",
  "typst",
- "typst-macros",
+ "typst-macros 0.11.1 (git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.1)",
  "typst-timing",
  "xmlparser",
  "xmlwriter",
