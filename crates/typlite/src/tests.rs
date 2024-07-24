@@ -11,12 +11,13 @@ fn conv(s: &str) -> EcoString {
     let res = Typlite::new_with_content(s.trim()).convert().unwrap();
     static REG: OnceLock<Regex> = OnceLock::new();
     let reg = REG.get_or_init(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
-    let res = reg.replace(&res, |captures: &regex::Captures| {
-        let hash = captures.get(1).unwrap().as_str();
-        format!(
-            "data:image-hash/svg+xml;base64,siphash128:{:x}",
-            typst::util::hash128(hash)
-        )
+    let res = reg.replace(&res, |_captures: &regex::Captures| {
+        // let hash = _captures.get(1).unwrap().as_str();
+        // format!(
+        //     "data:image-hash/svg+xml;base64,siphash128:{:x}",
+        //     typst::util::hash128(hash)
+        // )
+        "data:image-hash/svg+xml;base64,redacted"
     });
 
     res.into()
