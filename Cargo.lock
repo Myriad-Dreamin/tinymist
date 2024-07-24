@@ -4133,6 +4133,7 @@ dependencies = [
  "comemo 0.4.0",
  "ecow 0.2.2",
  "insta",
+ "regex",
  "typst",
  "typst-assets",
  "typst-svg",
