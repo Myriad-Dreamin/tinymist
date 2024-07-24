@@ -407,15 +407,7 @@ impl TypliteWorker {
     fn equation(&mut self, node: &SyntaxNode) -> Result<Value> {
         let equation: ast::Equation = node.cast().unwrap();
 
-        let content = self.render(node, !equation.block());
-        if !equation.block() {
-            return content;
-        }
-
-        content
-            .map(Self::value)
-            .map(|c| eco_format!("\n\n{c}\n\n"))
-            .map(Value::Content)
+        self.render(node, !equation.block())
     }
 
     fn let_binding(&self, node: &SyntaxNode) -> Result<Value> {
