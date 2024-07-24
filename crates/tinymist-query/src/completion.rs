@@ -257,6 +257,7 @@ pub(crate) fn completion_kind(typst_completion_kind: TypstCompletionKind) -> Lsp
         TypstCompletionKind::Field => LspCompletionKind::FIELD,
         TypstCompletionKind::Variable => LspCompletionKind::VARIABLE,
         TypstCompletionKind::Constant => LspCompletionKind::CONSTANT,
+        TypstCompletionKind::EnumMember => LspCompletionKind::ENUM_MEMBER,
         TypstCompletionKind::Symbol(_) => LspCompletionKind::FIELD,
         TypstCompletionKind::Type => LspCompletionKind::CLASS,
         TypstCompletionKind::Module => LspCompletionKind::MODULE,

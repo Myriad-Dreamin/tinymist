@@ -92,6 +92,8 @@ pub enum CompletionKind {
     /// A constant.
     #[default]
     Constant,
+    /// An enum member.
+    EnumMember,
     /// A symbol.
     Symbol(char),
     /// A variable.
@@ -1132,7 +1134,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
             if let Some(bib_title) = bib_title {
                 self.completions.push(Completion {
-                    kind: CompletionKind::Constant,
+                    kind: CompletionKind::EnumMember,
                     label: bib_title.clone(),
                     label_detail: Some(label),
                     filter_text: Some(bib_title),
