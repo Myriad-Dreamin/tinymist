@@ -15,6 +15,11 @@ typst-syntax.workspace = true
 ecow.workspace = true
 comemo.workspace = true
 
+typst.workspace = true
+typst-svg.workspace = true
+base64.workspace = true
+typst-assets = { workspace = true, features = ["fonts"] }
+
 [dev-dependencies]
 insta.workspace = true
 

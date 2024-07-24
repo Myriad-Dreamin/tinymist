@@ -3,9 +3,13 @@
 mod library;
 pub mod scopes;
 mod value;
+mod world;
 
+use base64::Engine;
 use scopes::Scopes;
+use typst::{eval::Tracer, layout::Abs};
 use value::{Args, Value};
+use world::LiteWorld;
 
 use std::borrow::Cow;
 
@@ -76,15 +80,17 @@ impl TypliteWorker {
         match node.kind() {
             RawLang | RawDelim | RawTrimmed => Err("converting clause")?,
 
+            Math | MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes
+            | MathFrac | MathRoot => Err("converting math node")?,
+
             // Error nodes
             Error => Err(node.clone().into_text().to_string())?,
             Eof | None => Ok(Value::None),
 
             // Non-leaf nodes
-            Math => self.reduce(node),
             Markup => self.reduce(node),
             Code => self.reduce(node),
-
+            Equation => self.equation(node),
             CodeBlock => {
                 let code_block: ast::CodeBlock = node.cast().unwrap();
                 self.eval(code_block.body().to_untyped())
@@ -121,14 +127,6 @@ impl TypliteWorker {
             EnumMarker => Self::str(node),
             TermItem => self.term_item(node),
             TermMarker => Self::str(node),
-            Equation => Self::equation(node),
-            MathIdent => Self::str(node),
-            MathAlignPoint => Self::str(node),
-            MathDelimited => Self::str(node),
-            MathAttach => Self::str(node),
-            MathPrimes => Self::str(node),
-            MathFrac => Self::str(node),
-            MathRoot => Self::str(node),
 
             // Punctuation
             // Hash => Self::char('#'),
@@ -250,6 +248,33 @@ impl TypliteWorker {
         }
 
         Ok(Value::Content(s))
+    }
+
+    fn render(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
+        let color = "#c0caf5";
+
+        let main = Source::detached(eco_format!(
+            r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em));#set text(rgb("{color}"))
+{}"##,
+            node.clone().into_text()
+        ));
+        let world = LiteWorld::new(main);
+        let mut tracer = Tracer::default();
+        let document = typst::compile(&world, &mut tracer)
+            .map_err(|e| format!("compiling math node: {e:?}"))?;
+
+        let svg_payload = typst_svg::svg_merged(&document, Abs::zero());
+        let base64 = base64::engine::general_purpose::STANDARD.encode(svg_payload);
+
+        if inline {
+            Ok(Value::Content(eco_format!(
+                r#"<img style="vertical-align: -0.35em" src="data:image/svg+xml;base64,{base64}" alt="typst-block" />"#
+            )))
+        } else {
+            Ok(Value::Content(eco_format!(
+                r#"<p align="center"><img src="data:image/svg+xml;base64,{base64}" alt="typst-block" /></p>"#
+            )))
+        }
     }
 
     fn char(arg: char) -> Result<Value> {
@@ -379,19 +404,18 @@ impl TypliteWorker {
     }
 
     #[cfg(not(feature = "texmath"))]
-    fn equation(node: &SyntaxNode) -> Result<Value> {
-        let equation = node.cast::<ast::Equation>().unwrap();
-        let mut s = EcoString::new();
+    fn equation(&mut self, node: &SyntaxNode) -> Result<Value> {
+        let equation: ast::Equation = node.cast().unwrap();
 
-        #[rustfmt::skip]
-        s.push_str(if equation.block() { "```typ\n$\n" } else { "`$" });
-        for e in equation.body().exprs() {
-            Self::str(e.to_untyped())?;
+        let content = self.render(node, !equation.block());
+        if !equation.block() {
+            return content;
         }
-        #[rustfmt::skip]
-        s.push_str(if equation.block() { "\n$\n```\n" } else { "$`" });
 
-        Ok(Value::Content(s))
+        content
+            .map(Self::value)
+            .map(|c| eco_format!("\n\n{c}\n\n"))
+            .map(Value::Content)
     }
 
     fn let_binding(&self, node: &SyntaxNode) -> Result<Value> {
