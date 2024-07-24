@@ -15,6 +15,8 @@
     - #chapter("feature/cli.typ")[Command line interface]
     - #chapter("feature/language.typ")[Language and Editor Features]
     - #chapter("feature/preview.typ")[Document Preview]
+    = Guide
+    - #chapter("guide/completion.typ")[Completion]
     = Editor Integration
     #prefix-chapter("configurations.typ")[Common Configurations]
     - #chapter("frontend/main.typ")[Editor Frontends]
