@@ -3,12 +3,15 @@
 mod library;
 pub mod scopes;
 mod value;
+mod world;
 
+use base64::Engine;
 use scopes::Scopes;
-use value::{ArgGetter, Value};
+use typst::{eval::Tracer, layout::Abs};
+use value::{Args, Value};
+use world::LiteWorld;
 
 use std::borrow::Cow;
-use std::fmt::Write;
 
 use ecow::{eco_format, EcoString};
 use typst_syntax::{
@@ -51,14 +54,12 @@ impl Typlite {
 
     /// Convert the content to a markdown string.
     pub fn convert(self) -> Result<EcoString> {
-        let mut res = EcoString::new();
         let mut worker = TypliteWorker {
             gfm: self.gfm,
             scopes: library::library(),
         };
 
-        worker.convert_to(self.main.root(), &mut res)?;
-        Ok(res)
+        worker.convert(self.main.root())
     }
 }
 
@@ -68,354 +69,379 @@ struct TypliteWorker {
 }
 
 impl TypliteWorker {
+    /// Convert the content to a markdown string.
     pub fn convert(&mut self, node: &SyntaxNode) -> Result<EcoString> {
-        let mut res = EcoString::new();
-        self.convert_to(node, &mut res)?;
-        Ok(res)
+        Ok(Self::value(self.eval(node)?))
     }
 
-    /// Convert the content to a markdown string.
-    pub fn convert_to(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    /// Eval the content
+    pub fn eval(&mut self, node: &SyntaxNode) -> Result<Value> {
         use SyntaxKind::*;
         match node.kind() {
             RawLang | RawDelim | RawTrimmed => Err("converting clause")?,
 
+            Math | MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes
+            | MathFrac | MathRoot => Err("converting math node")?,
+
             // Error nodes
             Error => Err(node.clone().into_text().to_string())?,
-            Eof | None => Ok(()),
+            Eof | None => Ok(Value::None),
 
             // Non-leaf nodes
-            Math => self.reduce(node, s),
-            Markup => self.reduce(node, s),
-            Code => self.reduce(node, s),
-
+            Markup => self.reduce(node),
+            Code => self.reduce(node),
+            Equation => self.equation(node),
             CodeBlock => {
                 let code_block: ast::CodeBlock = node.cast().unwrap();
-                self.convert_to(code_block.body().to_untyped(), s)
+                self.eval(code_block.body().to_untyped())
             }
             ContentBlock => {
                 let content_block: ast::ContentBlock = node.cast().unwrap();
-                self.convert_to(content_block.body().to_untyped(), s)
+                self.eval(content_block.body().to_untyped())
             }
             Parenthesized => {
                 let parenthesized: ast::Parenthesized = node.cast().unwrap();
-                self.convert_to(parenthesized.expr().to_untyped(), s)
+                // self.convert_to(parenthesized.expr().to_untyped(), )
+                self.eval(parenthesized.expr().to_untyped())
             }
 
             // Text nodes
-            Text | Space | Linebreak | Parbreak => Self::str(node, s),
+            Text | Space | Linebreak | Parbreak => Self::str(node),
 
             // Semantic nodes
-            Escape => Self::escape(node, s),
-            Shorthand => Self::shorthand(node, s),
-            SmartQuote => Self::str(node, s),
-            Strong => self.strong(node, s),
-            Emph => self.emph(node, s),
-            Raw => Self::raw(node, s),
-            Link => self.link(node, s),
-            Label => Self::label(node, s),
-            Ref => Self::label_ref(node, s),
-            RefMarker => Self::ref_marker(node, s),
-            Heading => self.heading(node, s),
-            HeadingMarker => Self::str(node, s),
-            ListItem => self.list_item(node, s),
-            ListMarker => Self::str(node, s),
-            EnumItem => self.enum_item(node, s),
-            EnumMarker => Self::str(node, s),
-            TermItem => self.term_item(node, s),
-            TermMarker => Self::str(node, s),
-            Equation => Self::equation(node, s),
-            MathIdent => Self::str(node, s),
-            MathAlignPoint => Self::str(node, s),
-            MathDelimited => Self::str(node, s),
-            MathAttach => Self::str(node, s),
-            MathPrimes => Self::str(node, s),
-            MathFrac => Self::str(node, s),
-            MathRoot => Self::str(node, s),
+            Escape => Self::escape(node),
+            Shorthand => Self::shorthand(node),
+            SmartQuote => Self::str(node),
+            Strong => self.strong(node),
+            Emph => self.emph(node),
+            Raw => Self::raw(node),
+            Link => self.link(node),
+            Label => Self::label(node),
+            Ref => Self::label_ref(node),
+            RefMarker => Self::ref_marker(node),
+            Heading => self.heading(node),
+            HeadingMarker => Self::str(node),
+            ListItem => self.list_item(node),
+            ListMarker => Self::str(node),
+            EnumItem => self.enum_item(node),
+            EnumMarker => Self::str(node),
+            TermItem => self.term_item(node),
+            TermMarker => Self::str(node),
 
             // Punctuation
-            // Hash => Self::char('#', s),
-            Hash => Ok(()),
-            LeftBrace => Self::char('{', s),
-            RightBrace => Self::char('}', s),
-            LeftBracket => Self::char('[', s),
-            RightBracket => Self::char(']', s),
-            LeftParen => Self::char('(', s),
-            RightParen => Self::char(')', s),
-            Comma => Self::char(',', s),
-            Semicolon => Self::char(';', s),
-            Colon => Self::char(':', s),
-            Star => Self::char('*', s),
-            Underscore => Self::char('_', s),
-            Dollar => Self::char('$', s),
-            Plus => Self::char('+', s),
-            Minus => Self::char('-', s),
-            Slash => Self::char('/', s),
-            Hat => Self::char('^', s),
-            Prime => Self::char('\'', s),
-            Dot => Self::char('.', s),
-            Eq => Self::char('=', s),
-            Lt => Self::char('<', s),
-            Gt => Self::char('>', s),
+            // Hash => Self::char('#'),
+            Hash => Ok(Value::None),
+            LeftBrace => Self::char('{'),
+            RightBrace => Self::char('}'),
+            LeftBracket => Self::char('['),
+            RightBracket => Self::char(']'),
+            LeftParen => Self::char('('),
+            RightParen => Self::char(')'),
+            Comma => Self::char(','),
+            Semicolon => Self::char(';'),
+            Colon => Self::char(':'),
+            Star => Self::char('*'),
+            Underscore => Self::char('_'),
+            Dollar => Self::char('$'),
+            Plus => Self::char('+'),
+            Minus => Self::char('-'),
+            Slash => Self::char('/'),
+            Hat => Self::char('^'),
+            Prime => Self::char('\''),
+            Dot => Self::char('.'),
+            Eq => Self::char('='),
+            Lt => Self::char('<'),
+            Gt => Self::char('>'),
 
             // Compound punctuation
-            EqEq => Self::str(node, s),
-            ExclEq => Self::str(node, s),
-            LtEq => Self::str(node, s),
-            GtEq => Self::str(node, s),
-            PlusEq => Self::str(node, s),
-            HyphEq => Self::str(node, s),
-            StarEq => Self::str(node, s),
-            SlashEq => Self::str(node, s),
-            Dots => Self::str(node, s),
-            Arrow => Self::str(node, s),
-            Root => Self::str(node, s),
+            EqEq => Self::str(node),
+            ExclEq => Self::str(node),
+            LtEq => Self::str(node),
+            GtEq => Self::str(node),
+            PlusEq => Self::str(node),
+            HyphEq => Self::str(node),
+            StarEq => Self::str(node),
+            SlashEq => Self::str(node),
+            Dots => Self::str(node),
+            Arrow => Self::str(node),
+            Root => Self::str(node),
 
             // Keywords
-            Auto => Self::str(node, s),
-            Not => Self::str(node, s),
-            And => Self::str(node, s),
-            Or => Self::str(node, s),
-            Let => Self::str(node, s),
-            Set => Self::str(node, s),
-            Show => Self::str(node, s),
-            Context => Self::str(node, s),
-            If => Self::str(node, s),
-            Else => Self::str(node, s),
-            For => Self::str(node, s),
-            In => Self::str(node, s),
-            While => Self::str(node, s),
-            Break => Self::str(node, s),
-            Continue => Self::str(node, s),
-            Return => Self::str(node, s),
-            Import => Self::str(node, s),
-            Include => Self::str(node, s),
-            As => Self::str(node, s),
+            Auto => Self::str(node),
+            Not => Self::str(node),
+            And => Self::str(node),
+            Or => Self::str(node),
+            Let => Self::str(node),
+            Set => Self::str(node),
+            Show => Self::str(node),
+            Context => Self::str(node),
+            If => Self::str(node),
+            Else => Self::str(node),
+            For => Self::str(node),
+            In => Self::str(node),
+            While => Self::str(node),
+            Break => Self::str(node),
+            Continue => Self::str(node),
+            Return => Self::str(node),
+            Import => Self::str(node),
+            Include => Self::str(node),
+            As => Self::str(node),
 
-            LetBinding => self.let_binding(node, s),
-            FieldAccess => self.field_access(node, s),
-            FuncCall => Self::absorb(self.func_call(node), s),
-            Contextual => self.contextual(node, s),
+            LetBinding => self.let_binding(node),
+            FieldAccess => self.field_access(node),
+            FuncCall => self.func_call(node),
+            Contextual => self.contextual(node),
 
             // Clause nodes
-            Named => Ok(()),
-            Keyed => Ok(()),
-            Unary => Ok(()),
-            Binary => Ok(()),
-            Spread => Ok(()),
-            ImportItems => Ok(()),
-            RenamedImportItem => Ok(()),
-            Closure => Ok(()),
-            Args => Ok(()),
-            Params => Ok(()),
+            Named => Ok(Value::None),
+            Keyed => Ok(Value::None),
+            Unary => Ok(Value::None),
+            Binary => Ok(Value::None),
+            Spread => Ok(Value::None),
+            ImportItems => Ok(Value::None),
+            RenamedImportItem => Ok(Value::None),
+            Closure => Ok(Value::None),
+            Args => Ok(Value::None),
+            Params => Ok(Value::None),
 
             // Ignored code expressions
-            Ident => Ok(()),
-            Bool => Ok(()),
-            Int => Ok(()),
-            Float => Ok(()),
-            Numeric => Ok(()),
-            Str => Ok(()),
-            Array => Ok(()),
-            Dict => Ok(()),
+            Ident => Ok(Value::None),
+            Bool => Ok(Value::None),
+            Int => Ok(Value::None),
+            Float => Ok(Value::None),
+            Numeric => Ok(Value::None),
+            Str => Ok(Value::Str({
+                let s: ast::Str = node.cast().unwrap();
+                s.get()
+            })),
+            Array => Ok(Value::None),
+            Dict => Ok(Value::None),
 
             // Ignored code expressions
-            SetRule => Ok(()),
-            ShowRule => Ok(()),
-            Destructuring => Ok(()),
-            DestructAssignment => Ok(()),
+            SetRule => Ok(Value::None),
+            ShowRule => Ok(Value::None),
+            Destructuring => Ok(Value::None),
+            DestructAssignment => Ok(Value::None),
 
-            Conditional => Ok(()),
-            WhileLoop => Ok(()),
-            ForLoop => Ok(()),
-            LoopBreak => Ok(()),
-            LoopContinue => Ok(()),
-            FuncReturn => Ok(()),
+            Conditional => Ok(Value::None),
+            WhileLoop => Ok(Value::None),
+            ForLoop => Ok(Value::None),
+            LoopBreak => Ok(Value::None),
+            LoopContinue => Ok(Value::None),
+            FuncReturn => Ok(Value::None),
 
-            ModuleImport => Ok(()),
-            ModuleInclude => Ok(()),
+            ModuleImport => Ok(Value::None),
+            ModuleInclude => Ok(Value::None),
 
             // Ignored comments
-            LineComment => Ok(()),
-            BlockComment => Ok(()),
+            LineComment => Ok(Value::None),
+            BlockComment => Ok(Value::None),
         }
     }
 
-    fn reduce(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    fn reduce(&mut self, node: &SyntaxNode) -> Result<Value> {
+        let mut s = EcoString::new();
+
         for child in node.children() {
-            self.convert_to(child, s)?;
+            // self.convert_to(child)?;
+            s.push_str(&Self::value(self.eval(child)?));
         }
 
-        Ok(())
+        Ok(Value::Content(s))
     }
 
-    fn absorb(u: Result<EcoString>, v: &mut EcoString) -> Result<()> {
-        v.push_str(&u?);
-        Ok(())
+    fn render(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
+        let color = "#c0caf5";
+
+        let main = Source::detached(eco_format!(
+            r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em));#set text(rgb("{color}"))
+{}"##,
+            node.clone().into_text()
+        ));
+        let world = LiteWorld::new(main);
+        let mut tracer = Tracer::default();
+        let document = typst::compile(&world, &mut tracer)
+            .map_err(|e| format!("compiling math node: {e:?}"))?;
+
+        let svg_payload = typst_svg::svg_merged(&document, Abs::zero());
+        let base64 = base64::engine::general_purpose::STANDARD.encode(svg_payload);
+
+        if inline {
+            Ok(Value::Content(eco_format!(
+                r#"<img style="vertical-align: -0.35em" src="data:image/svg+xml;base64,{base64}" alt="typst-block" />"#
+            )))
+        } else {
+            Ok(Value::Content(eco_format!(
+                r#"<p align="center"><img src="data:image/svg+xml;base64,{base64}" alt="typst-block" /></p>"#
+            )))
+        }
     }
 
-    fn char(arg: char, s: &mut EcoString) -> Result<()> {
-        s.push(arg);
-        Ok(())
+    fn char(arg: char) -> Result<Value> {
+        Ok(Value::Content(arg.into()))
     }
 
-    fn str(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
-        s.push_str(node.clone().into_text().as_str());
-        Ok(())
+    fn str(node: &SyntaxNode) -> Result<Value> {
+        Ok(Value::Content(node.clone().into_text()))
     }
 
     fn value(res: Value) -> EcoString {
-        let Value::Content(content) = res else {
-            return eco_format!("{res:?}");
-        };
-
-        content
+        match res {
+            Value::None => EcoString::new(),
+            Value::Content(content) => content,
+            Value::Str(s) => s,
+            Value::Image { path, alt } => eco_format!("![{alt}]({path})"),
+            _ => eco_format!("{res:?}"),
+        }
     }
 
-    fn escape(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    fn escape(node: &SyntaxNode) -> Result<Value> {
         // todo: escape characters
-        Self::str(node, s)
+        Self::str(node)
     }
 
-    fn shorthand(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    fn shorthand(node: &SyntaxNode) -> Result<Value> {
         // todo: shorthands
-        Self::str(node, s)
+        Self::str(node)
     }
 
-    fn strong(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    fn strong(&mut self, node: &SyntaxNode) -> Result<Value> {
+        let mut s = EcoString::new();
+
         let strong = node.cast::<ast::Strong>().unwrap();
         s.push_str("**");
-        self.convert_to(strong.body().to_untyped(), s)?;
+        s.push_str(&Self::value(self.eval(strong.body().to_untyped())?));
         s.push_str("**");
-        Ok(())
+
+        Ok(Value::Content(s))
     }
 
-    fn emph(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    fn emph(&mut self, node: &SyntaxNode) -> Result<Value> {
+        let mut s = EcoString::new();
         let emph = node.cast::<ast::Emph>().unwrap();
         s.push('_');
-        self.convert_to(emph.body().to_untyped(), s)?;
+        s.push_str(&Self::value(self.eval(emph.body().to_untyped())?));
         s.push('_');
-        Ok(())
+        Ok(Value::Content(s))
     }
 
-    fn heading(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    fn heading(&mut self, node: &SyntaxNode) -> Result<Value> {
+        let mut s = EcoString::new();
         let heading = node.cast::<ast::Heading>().unwrap();
         let level = heading.depth();
         for _ in 0..level.get() {
             s.push('#');
         }
         s.push(' ');
-        self.convert_to(heading.body().to_untyped(), s)
+        s.push_str(&Self::value(self.eval(heading.body().to_untyped())?));
+        Ok(Value::Content(s))
     }
 
-    fn raw(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    fn raw(node: &SyntaxNode) -> Result<Value> {
+        let mut s = EcoString::new();
         let raw = node.cast::<ast::Raw>().unwrap();
         if raw.block() {
-            return Self::str(node, s);
+            s.push_str(&Self::value(Self::str(node)?));
+            return Ok(Value::Content(s));
         }
         s.push('`');
         for e in raw.lines() {
-            Self::str(e.to_untyped(), s)?;
+            s.push_str(&Self::value(Self::str(e.to_untyped())?));
         }
         s.push('`');
-        Ok(())
+        Ok(Value::Content(s))
     }
 
-    fn link(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    fn link(&mut self, node: &SyntaxNode) -> Result<Value> {
         // GFM supports autolinks
         if self.gfm {
-            return Self::str(node, s);
+            // return Self::str(node, s);
+            return Self::str(node);
         }
+        let mut s = EcoString::new();
         s.push('[');
-        Self::str(node, s)?;
+        s.push_str(&Self::value(Self::str(node)?));
         s.push(']');
         s.push('(');
-        Self::str(node, s)?;
+        s.push_str(&Self::value(Self::str(node)?));
         s.push(')');
 
-        Ok(())
+        Ok(Value::Content(s))
     }
 
-    fn label(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
-        Self::str(node, s)
+    fn label(node: &SyntaxNode) -> Result<Value> {
+        Self::str(node)
     }
 
-    fn label_ref(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
-        Self::str(node, s)
+    fn label_ref(node: &SyntaxNode) -> Result<Value> {
+        Self::str(node)
     }
 
-    fn ref_marker(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
-        Self::str(node, s)
+    fn ref_marker(node: &SyntaxNode) -> Result<Value> {
+        Self::str(node)
     }
 
-    fn list_item(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
-        self.reduce(node, s)
+    fn list_item(&mut self, node: &SyntaxNode) -> Result<Value> {
+        self.reduce(node)
     }
 
-    fn enum_item(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    fn enum_item(&mut self, node: &SyntaxNode) -> Result<Value> {
         let enum_item = node.cast::<ast::EnumItem>().unwrap();
-        if let Some(num) = enum_item.number() {
-            write!(s, "{num}. ").map_err(|_| "cannot write enum item number")?;
+
+        let body = Self::value(self.eval(enum_item.body().to_untyped())?);
+
+        let s = if let Some(num) = enum_item.number() {
+            eco_format!("{num}. ")
         } else {
-            s.push_str("1. ");
-        }
-        self.convert_to(enum_item.body().to_untyped(), s)
+            "1. ".into()
+        };
+
+        Ok(Value::Content(eco_format!("{s}{body}")))
     }
 
-    fn term_item(&mut self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
-        self.reduce(node, s)
+    fn term_item(&mut self, node: &SyntaxNode) -> Result<Value> {
+        self.reduce(node)
     }
 
     #[cfg(not(feature = "texmath"))]
-    fn equation(node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
-        let equation = node.cast::<ast::Equation>().unwrap();
+    fn equation(&mut self, node: &SyntaxNode) -> Result<Value> {
+        let equation: ast::Equation = node.cast().unwrap();
 
-        #[rustfmt::skip]
-        s.push_str(if equation.block() { "```typ\n$\n" } else { "`$" });
-        for e in equation.body().exprs() {
-            Self::str(e.to_untyped(), s)?;
-        }
-        #[rustfmt::skip]
-        s.push_str(if equation.block() { "\n$\n```\n" } else { "$`" });
-
-        Ok(())
+        self.render(node, !equation.block())
     }
 
-    fn let_binding(&self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    fn let_binding(&self, node: &SyntaxNode) -> Result<Value> {
         let _ = node;
-        let _ = s;
 
-        Ok(())
+        Ok(Value::None)
     }
 
-    fn field_access(&self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    fn field_access(&self, node: &SyntaxNode) -> Result<Value> {
         let _ = node;
-        let _ = s;
 
-        Ok(())
+        Ok(Value::None)
     }
 
-    fn func_call(&mut self, node: &SyntaxNode) -> Result<EcoString> {
+    fn func_call(&mut self, node: &SyntaxNode) -> Result<Value> {
         let c: ast::FuncCall = node.cast().unwrap();
 
         let callee = match c.callee() {
             ast::Expr::Ident(callee) => self.scopes.get(callee.get()),
-            ast::Expr::FieldAccess(..) => return Ok(EcoString::new()),
-            _ => return Ok(EcoString::new()),
+            ast::Expr::FieldAccess(..) => return Ok(Value::None),
+            _ => return Ok(Value::None),
         }?;
 
         let Value::RawFunc(func) = callee else {
             return Err("callee is not a function")?;
         };
 
-        Ok(Self::value(func(ArgGetter::new(self, c.args()))?))
+        func(Args::new(self, c.args()))
     }
 
-    fn contextual(&self, node: &SyntaxNode, s: &mut EcoString) -> Result<()> {
+    fn contextual(&self, node: &SyntaxNode) -> Result<Value> {
         let _ = node;
-        let _ = s;
 
-        Ok(())
+        Ok(Value::None)
     }
 }
 
