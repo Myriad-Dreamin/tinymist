@@ -61,10 +61,5 @@ Some inlined raw `a`, ```c b```
 $
 1/2 + 1/3 = 5/6
 $
-        "###), @r###"
-
-
-    <p align="center"><img src="data:image-hash/svg+xml;base64,siphash128:24036839c7ffd897ec5442095323ab4c" alt="typst-block" /></p>
-
-    "###);
+        "###), @r###"<p align="center"><img src="data:image-hash/svg+xml;base64,redacted" alt="typst-block" /></p>"###);
 }
