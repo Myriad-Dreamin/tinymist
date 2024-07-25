@@ -124,7 +124,7 @@ function initClient(context: ExtensionContext, config: Record<string, any>) {
         ],
         options: { env: Object.assign({}, process.env, { RUST_BACKTRACE: "1" }) },
     };
-    console.log("use arguments", run);
+    // console.log("use arguments", run);
     const serverOptions: ServerOptions = {
         run,
         debug: run,
