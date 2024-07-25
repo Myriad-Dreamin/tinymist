@@ -651,16 +651,17 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                             .status(self.verse.revision.get_mut().get(), CompileReport::Suspend);
                     }
 
-                    // Reset the document state.
+                    // Reset the watch state and document state.
                     self.latest_doc = None;
                     self.latest_success_doc = None;
+                    self.suspended_reason = no_reason();
                 }
 
                 reason_by_entry_change()
             }
             Interrupt::Compiled(artifact) => {
                 self.process_compile(artifact, send);
-                no_reason()
+                self.process_lagged_compile()
             }
             Interrupt::Memory(event) => {
                 log::debug!("CompileServerActor: memory event incoming");
@@ -725,6 +726,12 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         }
     }
 
+    /// Process reason after each compilation.
+    fn process_lagged_compile(&mut self) -> CompileReasons {
+        // The reason which is kept but not used.
+        std::mem::take(&mut self.suspended_reason)
+    }
+
     /// Apply delayed memory changes to underlying compiler.
     fn apply_delayed_memory_changes(
         verse: &mut Revising<CompilerUniverse<F>>,
@@ -764,11 +771,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     let insert_file = match t.content().cloned() {
                         Ok(content) => content,
                         Err(err) => {
-                            log::error!(
-                                "CompileServerActor: read memory file at {}: {}",
-                                p.display(),
-                                err,
-                            );
+                            log::error!("CompileServerActor: read memory file at {p:?}: {err}");
                             continue;
                         }
                     };
