@@ -36,6 +36,7 @@ import {
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, getClient, setClient } from "./lsp";
+import { commandPullRepo, commandPushRepo } from "./git-sync";
 
 let previewIsEnabled = false;
 let devKitIsEnabled = false;
@@ -275,6 +276,8 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
         ),
         commands.registerCommand("tinymist.createLocalPackage", commandCreateLocalPackage),
         commands.registerCommand("tinymist.openLocalPackage", commandOpenLocalPackage),
+        commands.registerCommand("tinymist.pullSyncRepo", commandPullRepo),
+        commands.registerCommand("tinymist.typstSync", commandPushRepo),
         commands.registerCommand("tinymist.showSummary", () => commandShowSummary(context)),
         commands.registerCommand("tinymist.showSymbolView", () => commandShowSymbolView(context)),
         commands.registerCommand("tinymist.profileCurrentFile", () => commandShowTrace(context)),
