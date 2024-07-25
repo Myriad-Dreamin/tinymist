@@ -18,7 +18,6 @@ import {
     type LanguageClientOptions,
     type ServerOptions,
 } from "vscode-languageclient/node";
-import vscodeVariables from "vscode-variables";
 import {
     SymbolViewProvider as SymbolViewProvider,
     activateEditorTool,
@@ -35,6 +34,7 @@ import {
 } from "./preview";
 import { DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, getClient, setClient } from "./lsp";
+import { vscodeVariables } from "./vscode-variables";
 
 let previewIsEnabled = false;
 let devKitIsEnabled = false;
