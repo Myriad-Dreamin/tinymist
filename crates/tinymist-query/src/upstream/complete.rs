@@ -92,8 +92,8 @@ pub enum CompletionKind {
     /// A constant.
     #[default]
     Constant,
-    /// An enum member.
-    EnumMember,
+    /// A reference.
+    Reference,
     /// A symbol.
     Symbol(char),
     /// A variable.
@@ -1116,7 +1116,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         {
             let label: EcoString = label.as_str().into();
             let completion = Completion {
-                kind: CompletionKind::Constant,
+                kind: CompletionKind::Reference,
                 apply: (open || close).then(|| {
                     eco_format!(
                         "{}{}{}",
@@ -1134,7 +1134,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
             if let Some(bib_title) = bib_title {
                 self.completions.push(Completion {
-                    kind: CompletionKind::EnumMember,
+                    kind: CompletionKind::Constant,
                     label: bib_title.clone(),
                     label_detail: Some(label),
                     filter_text: Some(bib_title),
