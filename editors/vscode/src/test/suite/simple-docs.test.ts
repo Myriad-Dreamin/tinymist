@@ -80,7 +80,7 @@ export async function getTests(ctx: Context) {
                 await mainTyp.edit((edit) => {
                     edit.replace(new vscode.Range(0, 0, 0, 0), largeDoc0);
                 });
-                await ctx.timeout(250);
+                await ctx.timeout(400);
                 // We add non-atomical edit to test lagged diagnostics
                 return await mainTyp.edit((edit) => {
                     edit.replace(new vscode.Range(0, 0, 0, largeDoc0.length), largeDoc);
