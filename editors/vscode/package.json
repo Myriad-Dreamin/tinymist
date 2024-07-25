@@ -569,6 +569,16 @@
                 "category": "Typst"
             },
             {
+                "command": "tinymist.createLocalPackage",
+                "title": "Create Typst Local Package",
+                "category": "Typst"
+            },
+            {
+                "command": "tinymist.openLocalPackage",
+                "title": "Open Typst Local Package",
+                "category": "Typst"
+            },
+            {
                 "command": "tinymist.showSummary",
                 "title": "Show current document summary",
                 "category": "Typst"

@@ -33,6 +33,7 @@ import {
     previewPreload,
     previewProcessOutline,
 } from "./preview";
+import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, getClient, setClient } from "./lsp";
 
@@ -272,6 +273,8 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
         commands.registerCommand("tinymist.showTemplateGallery", () =>
             commandShowTemplateGallery(context)
         ),
+        commands.registerCommand("tinymist.createLocalPackage", commandCreateLocalPackage),
+        commands.registerCommand("tinymist.openLocalPackage", commandOpenLocalPackage),
         commands.registerCommand("tinymist.showSummary", () => commandShowSummary(context)),
         commands.registerCommand("tinymist.showSymbolView", () => commandShowSymbolView(context)),
         commands.registerCommand("tinymist.profileCurrentFile", () => commandShowTrace(context)),
