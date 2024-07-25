@@ -212,6 +212,11 @@ jobs:
         with:
           name: tinymist-${{ env.target }}.vsix
           path: editors/vscode/tinymist-${{ env.target }}.vsix
+      - name: Upload tinymist Testing log
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-lsp-tests.${{ env.target }}.log
+          path: editors/vscode/e2e-workspaces/simple-docs/tinymist-lsp.log
 
   build_alpine:
     name: build (x86_64-unknown-linux-musl)
@@ -298,11 +303,6 @@ jobs:
         with:
           name: tinymist-${{ env.target }}.vsix
           path: editors/vscode/tinymist-${{ env.target }}.vsix
-      - name: Upload tinymist Testing log
-        uses: actions/upload-artifact@v4
-        with:
-          name: tinymist-lsp-tests.${{ env.target }}.log
-          path: editors/vscode/e2e-workspaces/simple-docs/tinymist-lsp.log
 
   release:
     runs-on: ubuntu-latest
