@@ -86,6 +86,8 @@ pub struct DynLabel {
     pub label_desc: Option<EcoString>,
     /// Additional details about the label.
     pub detail: Option<EcoString>,
+    /// The title of the bibliography entry. Not present for non-bibliography labels.
+    pub bib_title: Option<EcoString>,
 }
 
 /// Find all labels and details for them.
@@ -119,6 +121,7 @@ pub fn analyze_labels(document: &Document) -> (Vec<DynLabel>, usize) {
                 eco_format!("{}(..)", elem.func().name())
             }),
             detail: Some(details),
+            bib_title: None,
         });
     }
 
@@ -129,7 +132,8 @@ pub fn analyze_labels(document: &Document) -> (Vec<DynLabel>, usize) {
         output.push(DynLabel {
             label: Label::new(&key),
             label_desc: detail.clone(),
-            detail,
+            detail: detail.clone(),
+            bib_title: detail,
         });
     }
 
