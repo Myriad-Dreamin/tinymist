@@ -21,6 +21,10 @@
   "devDependencies": {
     "cpr": "^3.0.1",
     "rimraf": "^5.0.1",
-    "vitest": "^0.32.2"
+    "vite": "^4.3.9",
+    "vite-plugin-singlefile": "^0.13.5",
+    "vite-plugin-wasm": "^3.2.2",
+    "vitest": "^0.32.2",
+    "typescript": "^5.3.3"
   }
 }
