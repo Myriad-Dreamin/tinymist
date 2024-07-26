@@ -544,7 +544,7 @@
             },
             {
                 "command": "tinymist.showPdf",
-                "title": "Export PDF",
+                "title": "Show exported PDF",
                 "category": "Typst",
                 "icon": "$(file-pdf)"
             },
