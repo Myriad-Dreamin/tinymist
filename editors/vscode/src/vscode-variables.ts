@@ -9,7 +9,7 @@ import path = require("path");
 export function vscodeVariables(
   string: string,
   recursive?: boolean,
-  context = new CodeVariableContext(vscode)
+  context = new CodeVariableContext()
 ): string {
   while (true) {
     string = string.replace(context.regex, (match) => {
@@ -81,7 +81,7 @@ export class CodeVariableContext {
   workspace?: vscode.WorkspaceFolder;
   private activeTextEditor?: vscode.TextEditor;
 
-  constructor(public code?: typeof vscode) {
+  constructor(public code = vscode) {
     this.workspaces = code?.workspace.workspaceFolders;
     this.workspace = this.workspaces?.length ? this.workspaces[0] : undefined;
     this.activeTextEditor = code?.window.activeTextEditor;
