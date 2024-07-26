@@ -9,7 +9,7 @@ import path = require("path");
 export function vscodeVariables(
   string: string,
   recursive?: boolean,
-  context = new CodeVariableContext()
+  context = new CodeVariableContext(vscode)
 ): string {
   while (true) {
     string = string.replace(context.regex, (match) => {
