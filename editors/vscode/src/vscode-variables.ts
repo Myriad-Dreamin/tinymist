@@ -69,7 +69,13 @@ export class CodeVariableContext {
     },
   };
 
-  regex = variableRegex(this.replacers);
+  static variableRegexCache: RegExp | undefined;
+  get regex() {
+    return (
+      CodeVariableContext.variableRegexCache ||
+      (CodeVariableContext.variableRegexCache = variableRegex(this.replacers))
+    );
+  }
 
   private workspaces?: readonly vscode.WorkspaceFolder[];
   workspace?: vscode.WorkspaceFolder;
@@ -168,12 +174,7 @@ export class CodeVariableContext {
   }
 }
 
-let variableRegexCache: RegExp | undefined;
 function variableRegex(replacers: Record<string, Replacer>) {
-  if (variableRegexCache) {
-    return variableRegexCache;
-  }
-
   let regexParts = [];
   regexParts.push("\\${(");
   for (let key in replacers) {
@@ -184,7 +185,7 @@ function variableRegex(replacers: Record<string, Replacer>) {
     }
   }
   regexParts.push(")}");
-  return (variableRegexCache = new RegExp(regexParts.join(""), "g"));
+  return new RegExp(regexParts.join(""), "g");
 }
 interface PureReplacer {
   variable?: false;
