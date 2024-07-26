@@ -419,7 +419,8 @@ function ensureInvertColors(root: HTMLElement | null, strategy: StrategyKey | St
      */
     const decide = (strategy: StrategyKey) => {
         switch (strategy) {
-            case 'never': default: return false;
+            case 'never': return false;
+            default: console.warn("Unknown invert-colors strategy:", strategy); return false;
             case 'auto': return (autoDecision ||= { value: determineInvertColor() }).value;
             case 'always': return true;
         }
