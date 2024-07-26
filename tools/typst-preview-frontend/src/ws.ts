@@ -398,7 +398,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 const INVERT_COLORS_STRATEGY = ['never', 'auto', 'always'] as const;
 /** The value of strategy constant */
 type StrategyKey = (typeof INVERT_COLORS_STRATEGY)[number];
-/** The map of target */
+/** The map from element kinds to strategy */
 type StrategyMap = Partial<Record<'rest' | 'image', StrategyKey>>;
 
 function ensureInvertColors(root: HTMLElement | null, strategy: StrategyKey | StrategyMap) {
