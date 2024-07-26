@@ -17,12 +17,5 @@
     "@myriaddreamin/typst.ts": "0.5.0-rc5",
     "typst-dom": "link:../typst-dom",
     "rxjs": "^7.8.1"
-  },
-  "devDependencies": {
-    "typescript": "^5.3.3",
-    "vite": "^4.3.9",
-    "vite-plugin-singlefile": "^0.13.5",
-    "vite-plugin-wasm": "^3.2.2",
-    "vitest": "^0.32.2"
   }
 }

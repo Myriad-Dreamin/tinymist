@@ -183,8 +183,18 @@ export async function run(): Promise<void> {
     const testFiles = (await readdir(path.resolve(__dirname))).filter((name) =>
         name.endsWith(".test.js")
     );
+
+    const filter = process.env.VSCODE_TEST_FILTER;
+    if (filter) {
+        console.log(`Running tests with filter: ${filter}`);
+    }
     for (const testFile of testFiles) {
         try {
+            console.log(`Running tests in ${testFile}`);
+            if (filter && !testFile.includes(filter)) {
+                continue;
+            }
+
             const testModule = require(path.resolve(__dirname, testFile));
             await testModule.getTests(context);
         } catch (e) {
