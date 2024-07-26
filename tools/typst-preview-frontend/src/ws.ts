@@ -394,134 +394,39 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         }));
 };
 
-/** The strategy to set invert colors */
-const INVERT_COLORS_STRATEGY = {
-  /** Disable color inversion of the preview */
-  NEVER: 'never',
-  /** Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document */
-  AUTO: 'auto',
-  /** Always invert colors of the preview */
-  ALWAYS: 'always'
-} as const
-
+/** The strategy to set invert colors, see editors/vscode/package.json for enum descriptions */
+const INVERT_COLORS_STRATEGY = ['never', 'auto', 'always'] as const;
 /** The value of strategy constant */
-type StrategyKey = typeof INVERT_COLORS_STRATEGY[keyof typeof INVERT_COLORS_STRATEGY]
-/** The map of strategy */
-type StrategyMap = Record<StrategyKey, TargetKey[]>
-
-/** The target for which to invert colors */
-const INVERT_COLORS_TARGET = {
-  /** All elements */
-  ALL: 'all',
-  /** The image */
-  IMAGE: 'image'
-} as const
-
-/** The value of target constant */
-type TargetKey = typeof INVERT_COLORS_TARGET[keyof typeof INVERT_COLORS_TARGET]
+type StrategyKey = (typeof INVERT_COLORS_STRATEGY)[number];
 /** The map of target */
-type TargetMap = Record<TargetKey, StrategyKey>
+type StrategyMap = Partial<Record<'rest' | 'image', StrategyKey>>;
 
-/** Strategy for ensure invert colors */
-type Strategy = string | TargetMap | StrategyMap
-function ensureInvertColors(root: HTMLElement | null, strategy: Strategy) {
+function ensureInvertColors(root: HTMLElement | null, strategy: StrategyKey | StrategyMap) {
     if (!root) {
         return;
     }
 
-    let [needInvertColor, needInvertImage] = [false, false]
-
-    const isStrategyMap = Object.keys(strategy).every(
-        item => Object.values(INVERT_COLORS_STRATEGY).includes(item as StrategyKey)
-    )
-
-    const isTargetMap = Object.keys(strategy).every(
-        item => Object.values(INVERT_COLORS_TARGET).includes(item as TargetKey)
-    )
-
+    // Uniforms type of strategy to `TargetMap`
     if (typeof strategy === 'string') {
-        needInvertColor =  handleInvertColorsByStringStrategy(strategy,  determineInvertColor)
-    } else if (isStrategyMap) {
-        [needInvertColor, needInvertImage] = handleInvertColorsByStrategyMap(
-            strategy as StrategyMap, 
-            determineInvertColor
-        )
-    } else if (isTargetMap) {
-        [needInvertColor, needInvertImage] = handleInvertColorsByTargetMap(
-            strategy as TargetMap, 
-            determineInvertColor
-        )
-    } 
+        strategy = { rest: strategy };
+    }
 
-    root.classList.toggle("invert-colors", needInvertColor)
-    root.classList.toggle("normal-image", !needInvertImage)
-
+    let autoDecision: { value: boolean } | undefined = undefined;
     /** 
-     * Handle invert colors mode based on a string value.  
-     * @param strategy - The mode user setted.
-     * @param autoComputer - The function to compute the mode for 'auto'.
+     * Handles invert colors mode based on a string enumerated strategy.  
+     * @param strategy - The strategy set by user.
      * @returns needInvertColor - Use or not use invert color.
      */
-    function handleInvertColorsByStringStrategy(strategy: string, autoComputer: () => boolean): boolean {
-        let needInvertColor = false;
-
+    const decide = (strategy: StrategyKey) => {
         switch (strategy) {
-            case INVERT_COLORS_STRATEGY.NEVER:
-            default:
-                break;
-            case INVERT_COLORS_STRATEGY.AUTO:
-                needInvertColor = autoComputer();
-                break;
-            case INVERT_COLORS_STRATEGY.ALWAYS:
-                needInvertColor = true;
-                break;
+            case 'never': default: return false;
+            case 'auto': return (autoDecision ||= { value: determineInvertColor() }).value;
+            case 'always': return true;
         }
-
-        return needInvertColor
     }
 
-    /** 
-     * Handle invert colors mode based on a target map.  
-     * @param strategy - The mode user setted.
-     * @param autoComputer - The function to compute the mode for 'auto'.
-     * @returns [needInvertColor, needInvertImage] - Use or not use invert color for targets.
-     */
-    function handleInvertColorsByTargetMap(strategy: TargetMap, autoComputer: () => boolean): [boolean, boolean] {
-        const invertColorStrategyMap: Record<StrategyKey, boolean> = {
-          [INVERT_COLORS_STRATEGY.NEVER]: false, 
-          [INVERT_COLORS_STRATEGY.AUTO]: autoComputer(), 
-          [INVERT_COLORS_STRATEGY.ALWAYS]: true, 
-        }
-
-        let [needInvertColor, needInvertImage] = [
-          invertColorStrategyMap[strategy.all],
-          invertColorStrategyMap[strategy.image]
-        ]
-
-        return [needInvertColor, needInvertImage]
-    }
-
-    /** 
-     * Handle invert colors mode based on a strategy map.  
-     * @param strategy - The mode user setted.
-     * @param autoComputer - The function to compute the mode for 'auto'.
-     * @returns [needInvertColor, needInvertImage] - Use or not use invert color for targets.
-     */
-    function handleInvertColorsByStrategyMap(strategy: StrategyMap, autoComputer: () => boolean): [boolean, boolean] {
-        const invertColorTargetMap = {
-          [INVERT_COLORS_TARGET.ALL]: false,
-          [INVERT_COLORS_TARGET.IMAGE]: false
-        }
-
-        strategy.always?.forEach(item => invertColorTargetMap[item] = true)
-        strategy.auto?.forEach(item => invertColorTargetMap[item] = autoComputer())
-        strategy.never?.forEach(item => invertColorTargetMap[item] = false)
-
-        return [
-            invertColorTargetMap[INVERT_COLORS_TARGET.ALL], 
-            invertColorTargetMap[INVERT_COLORS_TARGET.IMAGE]
-        ]
-    }
+    root.classList.toggle("invert-colors", decide(strategy?.rest || 'never'));
+    root.classList.toggle("normal-image", !decide(strategy?.image || strategy?.rest || 'never'));
 
     function determineInvertColor() {
         const vscodeAPI = typeof acquireVsCodeApi !== "undefined";
