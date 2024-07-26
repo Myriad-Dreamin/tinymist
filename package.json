@@ -20,6 +20,7 @@
   "dependencies": {},
   "devDependencies": {
     "cpr": "^3.0.1",
-    "rimraf": "^5.0.1"
+    "rimraf": "^5.0.1",
+    "vitest": "^0.32.2"
   }
 }
