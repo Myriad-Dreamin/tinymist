@@ -357,7 +357,8 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
                 svgDoc.setPartialRendering(true);
                 return;
             } else if (message[0] === "invert-colors") {
-                const strategy = dec.decode((message[1] as any).buffer);
+                const rawStrategy = dec.decode((message[1] as any).buffer).trim();
+                const strategy = INVERT_COLORS_STRATEGY.find(t => t === rawStrategy) || (JSON.parse(rawStrategy) as StrategyMap);
                 console.log("Experimental feature: invert colors strategy taken:", strategy);
                 ensureInvertColors(document.getElementById("typst-app"), strategy);
                 return;
