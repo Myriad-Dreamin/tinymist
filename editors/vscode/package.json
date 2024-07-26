@@ -544,9 +544,9 @@
             },
             {
                 "command": "tinymist.showPdf",
-                "title": "Show the compiled PDF of the currently opened typst file",
+                "title": "Export PDF",
                 "category": "Typst",
-                "icon": "$(open-preview)"
+                "icon": "$(file-pdf)"
             },
             {
                 "command": "tinymist.clearCache",
@@ -657,6 +657,11 @@
                 }
             ],
             "editor/title": [
+                {
+                    "command": "tinymist.showPdf",
+                    "when": "resourceLangId == typst && editorTextFocus",
+                    "group": "navigation"
+                },
                 {
                     "command": "typst-preview.preview",
                     "when": "resourceLangId == typst && editorTextFocus",
