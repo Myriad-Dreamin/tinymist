@@ -26,7 +26,7 @@ use tokio_tungstenite::WebSocketStream;
 use typst::{layout::Position, syntax::Span};
 use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_core::Error;
-use typst_ts_core::{ImmutStr, TypstDocument as Document};
+use typst_ts_core::TypstDocument as Document;
 
 use crate::actor::editor::EditorActorRequest;
 use crate::actor::render::RenderActorRequest;
@@ -36,7 +36,7 @@ use actor::typst::{TypstActor, TypstActorRequest};
 type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
 pub struct Previewer {
-    frontend_html_factory: Box<dyn Fn(PreviewMode) -> ImmutStr + Send + Sync>,
+    frontend_html_factory: Box<dyn Fn(PreviewMode) -> String + Send + Sync>,
     stop: Option<Box<dyn FnOnce() -> StopFuture + Send + Sync>>,
     data_plane_handle: tokio::task::JoinHandle<()>,
     control_plane_handle: tokio::task::JoinHandle<()>,
@@ -45,7 +45,7 @@ pub struct Previewer {
 
 impl Previewer {
     /// Get the HTML for the frontend by a given preview mode
-    pub fn frontend_html(&self, mode: PreviewMode) -> ImmutStr {
+    pub fn frontend_html(&self, mode: PreviewMode) -> String {
         (self.frontend_html_factory)(mode)
     }
 
@@ -252,16 +252,15 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
         format!("ws://127.0.0.1:{data_plane_port}").as_str(),
     );
     // previewMode
-    let frontend_html_factory = Box::new(move |mode| -> ImmutStr {
+    let frontend_html_factory = Box::new(move |mode| -> String {
         let mode = match mode {
             PreviewMode::Document => "Doc",
             PreviewMode::Slide => "Slide",
         };
         html.replace(
             "preview-arg:previewMode:Doc",
-            format!("preview-arg:previewMode:{}", mode).as_str(),
+            format!("preview-arg:previewMode:{mode}").as_str(),
         )
-        .into()
     });
 
     let editor_tx = editor_conn.0;

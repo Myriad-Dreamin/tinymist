@@ -47,6 +47,9 @@ To run analyzer tests for tinymist:
 cargo insta test -p tinymist-query --accept
 ```
 
+> [!Tip]  
+> Check [Cargo Insta](https://insta.rs/docs/cli/) to learn and install the `insta` command.
+
 ## Running E2E Tests
 
 This is required if you have changed any code in `crates/tinymist` or `crates/tinymist-query`.
