@@ -25,7 +25,7 @@ const blockRawLangGen =
           name: "fenced_code.block.language.typst",
         },
       },
-      end: /(\1)/,
+      end: /\s*(\1)/,
       endCaptures: {
         "1": {
           name: "punctuation.definition.raw.end.typst",
@@ -35,7 +35,7 @@ const blockRawLangGen =
         {
           begin: /(^|\G)(\s*)/,
           // end: "(?=`{" + n.toString() + ",})",
-          while: "(^|\\G)(?!`{" + n.toString() + ",})",
+          while: "(^|\\G)(?!\\s*`{" + n.toString() + ",}\\s*)",
           contentName: `meta.embedded.block.${lang}`,
           patterns: sourcePatterns,
         },
