@@ -15,6 +15,11 @@ Tinymist provides a single integrated language service for Typst.
 
 **Editor Frontends** – Leveraging the interface of LSP, tinymist provides frontends to each editor, located in the [editor folder](./editors).
 
+## Installing Toolchain
+
+- [Cargo](https://doc.rust-lang.org/cargo/) – Cargo is the Rust package manager.
+- [Yarn](https://yarnpkg.com/) – Yarn is a package manager that doubles down as project manager.
+
 ## Building and Running
 
 To build tinymist LSP:
@@ -30,6 +35,23 @@ cargo build --profile=gh-release
 ```
 
 To run VS Code extension locally, open the repository in VS Code and press `F5` to start a debug session to extension.
+
+## Local Documentation
+
+To serve the documentation locally, run:
+
+```bash
+yarn docs
+```
+
+To generate and open crate documentation, run:
+
+```bash
+yarn docs:rs --open
+```
+
+> [!Tip]  
+> Check [Shiroa](https://myriad-dreamin.github.io/shiroa/guide/installation.html) to install the `shiroa` command for documentation generation.
 
 ## Server Entries
 
@@ -49,6 +71,17 @@ cargo insta test -p tinymist-query --accept
 
 > [!Tip]  
 > Check [Cargo Insta](https://insta.rs/docs/cli/) to learn and install the `insta` command.
+
+## Running Syntax Grammar Tests
+
+This is required if you are going to change the textmate grammar in `syntaxes/textmate`.
+
+```bash
+# in root
+yarn test:grammar
+# Or in syntaxes/textmate
+cd syntaxes/textmate && yarn test
+```
 
 ## Running E2E Tests
 
