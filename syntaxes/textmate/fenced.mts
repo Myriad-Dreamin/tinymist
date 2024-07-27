@@ -50,7 +50,9 @@ const blockRawLangGen =
 const blockRawLangAs = (as?: string) => blockRawLangGen(as);
 const blockRawLang = blockRawLangAs();
 
-export const blockRawLangs = [
+const ENABLE_RAW_RENDERING = false;
+
+const blockRawLangs_ = [
   blockRawLang("typst", "typ"),
   blockRawLang("typst-code", "typc"),
   blockRawLang("css", "css.erb"),
@@ -202,6 +204,7 @@ export const blockRawLangs = [
   blockRawLangAs("text.bibtex")("bibtex"),
   blockRawLang("twig"),
 ];
+export const blockRawLangs = ENABLE_RAW_RENDERING ? blockRawLangs_ : [];
 
 export const inlineRaw: textmate.Pattern = {
   name: "markup.raw.inline.typst",
