@@ -3769,7 +3769,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sync-lsp",
- "tinymist-assets 0.11.17-rc1",
+ "tinymist-assets 0.11.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-query",
  "tinymist-render",
  "tokio",
@@ -3796,13 +3796,13 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.11.17-rc1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a885b0235ef2478446ca3aed7b97f3e4b6de0fbc2b8e38cbb2cc0070c79e363e"
+version = "0.11.17"
 
 [[package]]
 name = "tinymist-assets"
 version = "0.11.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce8a6b832ab2f2d3de958f386bb59cd5bc6d39d3740960d9fbba0d1842dd4389"
 
 [[package]]
 name = "tinymist-query"
@@ -4256,7 +4256,7 @@ dependencies = [
  "once_cell",
  "serde",
  "serde_json",
- "tinymist-assets 0.11.17-rc1",
+ "tinymist-assets 0.11.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",
  "tokio-tungstenite",
  "typst",
