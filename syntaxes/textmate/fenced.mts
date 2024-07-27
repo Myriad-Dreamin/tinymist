@@ -6,9 +6,16 @@ const blockRawLangGen =
   (ass0: string | undefined, ...ass: string[]) =>
   (...candidates: string[]): textmate.Pattern => {
     const lang = candidates[0];
-    const enter = (n: number) => ({
+    const sourcePatterns = [
+      {
+        include: ass0 || `source.${lang}`,
+      },
+      ...ass.map((include) => ({ include })),
+    ];
+
+    const enter = (n: number): textmate.Pattern => ({
       begin: new RegExp(
-        "(`{" + n.toString() + "})" + `\\s*(${candidates.join("|")})\\b`
+        "(`{" + n.toString() + "})" + `(${candidates.join("|")})\\b`
       ),
       beginCaptures: {
         "1": {
@@ -27,30 +34,49 @@ const blockRawLangGen =
       patterns: [
         {
           begin: /(^|\G)(\s*)/,
-          end: "(?=`{" + n.toString() + ",})",
-          contentName: `meta.embedded.block.${lang} source.${lang}`,
-          patterns: [
-            {
-              include: ass0 || `source.${lang}`,
-            },
-            ...ass.map((include) => {
-              return { include };
-            }),
-          ],
+          // end: "(?=`{" + n.toString() + ",})",
+          while: "(^|\\G)(?!`{" + n.toString() + ",})",
+          contentName: `meta.embedded.block.${lang}`,
+          patterns: sourcePatterns,
         },
       ],
     });
 
     return {
       name: `markup.raw.block.${lang}`,
-      patterns: [6, 5, 4, 3].map(enter),
+      patterns: [
+        // one line case
+        {
+          match: new RegExp(
+            /(`{3,})/.source +
+              `(${candidates.join("|")})` +
+              /\b(.*?)(\1)/.source
+          ),
+          captures: {
+            "1": {
+              name: "punctuation.definition.raw.begin.typst",
+            },
+            "2": {
+              name: "fenced_code.block.language.typst",
+            },
+            "3": {
+              name: `meta.embedded.block.${lang}`,
+              patterns: sourcePatterns,
+            },
+            "4": {
+              name: "punctuation.definition.raw.end.typst",
+            },
+          },
+        },
+        ...[6, 5, 4, 3].map(enter),
+      ],
     };
   };
 
 const blockRawLangAs = (as?: string) => blockRawLangGen(as);
 const blockRawLang = blockRawLangAs();
 
-const ENABLE_RAW_RENDERING = false;
+const ENABLE_RAW_RENDERING = true;
 
 const blockRawLangs_ = [
   blockRawLang("typst", "typ"),
