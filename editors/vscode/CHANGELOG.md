@@ -11,7 +11,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 * Added a `$(file-pdf)` icon for `showPdf` to navigation bar in https://github.com/Myriad-Dreamin/tinymist/pull/462
   * It is a shorter way to export and open documents as PDF.
   * It now has a different icon from the `preview` command.
-  * Note: This function is suitable to help perform your final checks to documents. Please uses `preview` command for better previewing experience.
+  * Note: This function is suitable to help perform your final checks to documents. For previewing, please uses `preview` command for better experience.
 * Interned vscode-variable package in https://github.com/Myriad-Dreamin/tinymist/pull/460
   * Fixed some bugs in the vscode-variable package.
   * Improving the performance of replacing variables a bit.
