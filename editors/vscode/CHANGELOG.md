@@ -4,6 +4,44 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.16 - [2024-07-27]
+
+### Editor
+
+* Added `showPdf` icon to navigation bar in https://github.com/Myriad-Dreamin/tinymist/pull/462
+  * It is a more convenient way to export and open documents as PDF.
+  * It now has a different icon from the `preview` command.
+  * Note: Please uses `preview` command for better previewing experience.
+* Interned vscode-variable package in https://github.com/Myriad-Dreamin/tinymist/pull/460
+  * Fixed some bugs in the vscode-variable package.
+  * Improving the performance of replacing variables a bit.
+
+### Compiler
+
+* (Fix) Processing lagged compile reason in https://github.com/Myriad-Dreamin/tinymist/pull/456
+  * Causing last key strokes not being processed correctly.
+
+### Preview
+
+* Modified static host to send Content-Type: text/html by @cskeeters in https://github.com/Myriad-Dreamin/tinymist/pull/465
+  * Causing that GitHub Codespaces and the browser just showed the text of the HTML.
+
+### Completion
+
+* Supported querying label with paper name in bib items by @kririae in https://github.com/Myriad-Dreamin/tinymist/pull/365
+* Added documentation about completion in https://github.com/Myriad-Dreamin/tinymist/pull/466
+
+### Syntax/Semantic Highlighting
+
+* Added syntax highlighting for raw blocks in https://github.com/Myriad-Dreamin/tinymist/pull/450
+  * To ensure 100% correctness of grammar, only the raw block with number fence ticks less than 6 is highlighted.
+
+### Misc
+
+* Handling unwrap for the args in compile command by @upsidedownsweetfood in https://github.com/Myriad-Dreamin/tinymist/pull/445
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.16...v0.11.17
+
 ## v0.11.16 - [2024-07-20]
 
 * Adding editor-side e2e testing in https://github.com/Myriad-Dreamin/tinymist/pull/441 and https://github.com/Myriad-Dreamin/tinymist/pull/442
