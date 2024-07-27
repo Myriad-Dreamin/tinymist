@@ -8,8 +8,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Editor
 
-* Added `showPdf` icon to navigation bar in https://github.com/Myriad-Dreamin/tinymist/pull/462
-  * It is a more convenient way to export and open documents as PDF.
+* Added a `$(file-pdf)` icon for `showPdf` to navigation bar in https://github.com/Myriad-Dreamin/tinymist/pull/462
+  * It is a shorter way to export and open documents as PDF.
   * It now has a different icon from the `preview` command.
   * Note: Please uses `preview` command for better previewing experience.
 * Interned vscode-variable package in https://github.com/Myriad-Dreamin/tinymist/pull/460
