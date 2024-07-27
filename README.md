@@ -83,7 +83,6 @@ After development for two months, most of the features are implemented. There ar
 
 - Documentation and refactoring: It is my current focus.
 - Spell checking: There is already a branch but no suitable (default) spell checking library is found.
-- Syntax Highlighting for embedded languages in raw blocks: It almost works, but it is disabled because of wrong syntax highlighting on syntax errors in the raw blocks.
 - Periscope renderer: It is disabled since vscode reject to render SVGs containing foreignObjects.
 - Inlay hint: It is disabled **by default** because of performance issues.
 - Find references of labels, dictionary fields, and named function arguments.
