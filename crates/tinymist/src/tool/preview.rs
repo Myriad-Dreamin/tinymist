@@ -359,19 +359,18 @@ pub fn make_static_host(
     static_file_addr: String,
     mode: PreviewMode,
 ) -> (SocketAddr, oneshot::Sender<()>, tokio::task::JoinHandle<()>) {
-    let frontend_html = previewer.frontend_html(mode);
+    let frontend_html = hyper::body::Bytes::from(previewer.frontend_html(mode));
     let make_service = make_service_fn(move |_| {
-        let html = frontend_html.clone();
+        let frontend_html = frontend_html.clone();
         async move {
             Ok::<_, hyper::http::Error>(service_fn(move |req| {
-                // todo: clone may not be necessary
-                let html = html.as_ref().to_owned();
+                let frontend_html = frontend_html.clone();
                 async move {
                     if req.uri().path() == "/" {
-                        log::info!("Serve frontend: {:?}", mode);
+                        log::debug!("Serve frontend: {mode:?}");
                         let res = hyper::Response::builder()
                             .header(hyper::header::CONTENT_TYPE, "text/html")
-                            .body(html)
+                            .body(hyper::body::Body::from(frontend_html))
                             .unwrap();
                         Ok::<_, hyper::Error>(res)
                     } else {
@@ -379,7 +378,7 @@ pub fn make_static_host(
                         let res = hyper::Response::builder()
                             .status(hyper::StatusCode::FOUND)
                             .header(hyper::header::LOCATION, "/")
-                            .body(String::from(""))
+                            .body(hyper::body::Body::empty())
                             .unwrap();
                         Ok(res)
                     }
