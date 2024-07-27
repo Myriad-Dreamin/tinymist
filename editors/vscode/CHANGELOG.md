@@ -4,7 +4,7 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## v0.11.16 - [2024-07-27]
+## v0.11.17 - [2024-07-27]
 
 ### Editor
 
