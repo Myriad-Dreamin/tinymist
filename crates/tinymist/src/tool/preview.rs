@@ -369,15 +369,18 @@ pub fn make_static_host(
                 async move {
                     if req.uri().path() == "/" {
                         log::info!("Serve frontend: {:?}", mode);
-                        Ok::<_, hyper::Error>(hyper::Response::new(hyper::Body::from(html)))
+                        let res = hyper::Response::builder()
+                            .header(hyper::header::CONTENT_TYPE, "text/html")
+                            .body(html)
+                            .unwrap();
+                        Ok::<_, hyper::Error>(res)
                     } else {
                         // jump to /
-                        let mut res = hyper::Response::new(hyper::Body::empty());
-                        *res.status_mut() = hyper::StatusCode::FOUND;
-                        res.headers_mut().insert(
-                            hyper::header::LOCATION,
-                            hyper::header::HeaderValue::from_static("/"),
-                        );
+                        let res = hyper::Response::builder()
+                            .status(hyper::StatusCode::FOUND)
+                            .header(hyper::header::LOCATION, "/")
+                            .body(String::from(""))
+                            .unwrap();
                         Ok(res)
                     }
                 }
