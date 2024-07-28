@@ -357,7 +357,8 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
                 svgDoc.setPartialRendering(true);
                 return;
             } else if (message[0] === "invert-colors") {
-                const strategy = dec.decode((message[1] as any).buffer);
+                const rawStrategy = dec.decode((message[1] as any).buffer).trim();
+                const strategy = INVERT_COLORS_STRATEGY.find(t => t === rawStrategy) || (JSON.parse(rawStrategy) as StrategyMap);
                 console.log("Experimental feature: invert colors strategy taken:", strategy);
                 ensureInvertColors(document.getElementById("typst-app"), strategy);
                 return;
@@ -393,29 +394,40 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         }));
 };
 
-function ensureInvertColors(root: HTMLElement | null, strategy: string) {
+/** The strategy to set invert colors, see editors/vscode/package.json for enum descriptions */
+const INVERT_COLORS_STRATEGY = ['never', 'auto', 'always'] as const;
+/** The value of strategy constant */
+type StrategyKey = (typeof INVERT_COLORS_STRATEGY)[number];
+/** The map from element kinds to strategy */
+type StrategyMap = Partial<Record<'rest' | 'image', StrategyKey>>;
+
+function ensureInvertColors(root: HTMLElement | null, strategy: StrategyKey | StrategyMap) {
     if (!root) {
         return;
     }
 
-    let needInvertColor = false;
-    switch (strategy) {
-        case "never":
-        default:
-            break;
-        case "auto":
-            needInvertColor = determineInvertColor();
-            break;
-        case "always":
-            needInvertColor = true;
-            break;
+    // Uniforms type of strategy to `TargetMap`
+    if (typeof strategy === 'string') {
+        strategy = { rest: strategy };
     }
 
-    if (needInvertColor) {
-        root.classList.add("invert-colors");
-    } else {
-        root.classList.remove("invert-colors");
+    let autoDecision: { value: boolean } | undefined = undefined;
+    /** 
+     * Handles invert colors mode based on a string enumerated strategy.  
+     * @param strategy - The strategy set by user.
+     * @returns needInvertColor - Use or not use invert color.
+     */
+    const decide = (strategy: StrategyKey) => {
+        switch (strategy) {
+            case 'never': return false;
+            default: console.warn("Unknown invert-colors strategy:", strategy); return false;
+            case 'auto': return (autoDecision ||= { value: determineInvertColor() }).value;
+            case 'always': return true;
+        }
     }
+
+    root.classList.toggle("invert-colors", decide(strategy?.rest || 'never'));
+    root.classList.toggle("normal-image", !decide(strategy?.image || strategy?.rest || 'never'));
 
     function determineInvertColor() {
         const vscodeAPI = typeof acquireVsCodeApi !== "undefined";

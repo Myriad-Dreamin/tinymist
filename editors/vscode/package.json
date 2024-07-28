@@ -265,18 +265,60 @@
           "default": true
         },
         "tinymist.preview.invertColors": {
-          "description": "Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview.",
-          "type": "string",
-          "enum": [
-            "never",
-            "auto",
-            "always"
-          ],
-          "default": "never",
-          "enumDescriptions": [
-            "Disable color inversion of the preview",
-            "Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document",
-            "Always invert colors of the preview"
+          "description": "Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview. It is also possible to specify strategy to each element kind by an object map in JSON format.",
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "Specify a strategy for all elements in the preview.",
+              "enum": [
+                "never",
+                "auto",
+                "always"
+              ],
+              "default": "never",
+              "enumDescriptions": [
+                "Disable color inversion of the preview",
+                "Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document",
+                "Always invert colors of the preview"
+              ]
+            },
+            {
+              "type": "object",
+              "description": "Specify strategies for each element kind",
+              "default": {},
+              "properties": {
+                "rest": {
+                  "type": "string",
+                  "enum": [
+                    "never",
+                    "auto",
+                    "always"
+                  ],
+                  "description": "Specify a strategy for rest elements in the preview",
+                  "default": "never",
+                  "enumDescriptions": [
+                    "Disable color inversion of the preview",
+                    "Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document",
+                    "Always invert colors of the preview"
+                  ]
+                },
+                "image": {
+                  "type": "string",
+                  "enum": [
+                    "never",
+                    "auto",
+                    "always"
+                  ],
+                  "description": "Specify a strategy for images in the preview",
+                  "default": "never",
+                  "enumDescriptions": [
+                    "Disable color inversion of the preview",
+                    "Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document",
+                    "Always invert colors of the preview"
+                  ]
+                }
+              }
+            }
           ]
         },
         "tinymist.preview.cursorIndicator": {

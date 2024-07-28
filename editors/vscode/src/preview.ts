@@ -295,8 +295,8 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         const partialRenderingArgs = getPreviewConfCompat<boolean>("partialRendering")
             ? ["--partial-rendering"]
             : [];
-        const ivArgs = getPreviewConfCompat<string>("invertColors");
-        const invertColorsArgs = ivArgs ? ["--invert-colors", ivArgs] : [];
+        const ivArgs = getPreviewConfCompat("invertColors");
+        const invertColorsArgs = ivArgs ? ["--invert-colors", JSON.stringify(ivArgs)] : [];
         const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
         const dataPlaneHostArgs = !isDev ? ["--data-plane-host", "127.0.0.1:0"] : [];
         const { dataPlanePort, staticServerPort, isPrimary } = await commandStartPreview([

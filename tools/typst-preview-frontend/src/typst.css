@@ -47,9 +47,11 @@ body {
   transition: filter 0.1s ease-in-out;
 }
 
-#typst-app.invert-colors .typst-image:hover {
+#typst-app.invert-colors .typst-image:hover,
+#typst-app.invert-colors.normal-image .typst-image {
   filter: invert(1) hue-rotate(180deg);
 }
+
 .hide-scrollbar-x {
   overflow-x: hidden;
 }
