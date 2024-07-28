@@ -563,7 +563,7 @@ pub fn param_completions<'a>(
     let Some(cc) = ctx
         .root
         .find(callee.span())
-        .and_then(|callee| resolve_call_target(ctx.ctx, callee))
+        .and_then(|callee| resolve_call_target(ctx.ctx, &callee))
     else {
         return;
     };
@@ -940,7 +940,7 @@ pub fn named_param_value_completions<'a>(
     let Some(cc) = ctx
         .root
         .find(callee.span())
-        .and_then(|callee| resolve_call_target(ctx.ctx, callee))
+        .and_then(|callee| resolve_call_target(ctx.ctx, &callee))
     else {
         // static analysis
         if let Some(ty) = ty {
