@@ -317,19 +317,19 @@ fn is_same_native_func(x: Option<&Func>, y: &Func) -> bool {
 /// Resolve a call target to a function or a method with a this.
 pub fn resolve_call_target(
     ctx: &mut AnalysisContext,
-    callee: LinkedNode,
+    callee: &LinkedNode,
 ) -> Option<CallConvention> {
     resolve_callee_(ctx, callee, true).map(identify_call_convention)
 }
 
 /// Resolve a callee expression to a function.
-pub fn resolve_callee(ctx: &mut AnalysisContext, callee: LinkedNode) -> Option<Func> {
+pub fn resolve_callee(ctx: &mut AnalysisContext, callee: &LinkedNode) -> Option<Func> {
     resolve_callee_(ctx, callee, false).map(|e| e.func_ptr)
 }
 
 fn resolve_callee_(
     ctx: &mut AnalysisContext,
-    callee: LinkedNode,
+    callee: &LinkedNode,
     resolve_this: bool,
 ) -> Option<DynCallTarget> {
     None.or_else(|| {
@@ -357,7 +357,7 @@ fn resolve_callee_(
         this: None,
     })
     .or_else(|| {
-        let values = analyze_expr(ctx.world(), &callee);
+        let values = analyze_expr(ctx.world(), callee);
 
         if let Some(func) = values.into_iter().find_map(|v| match v.0 {
             Value::Func(f) => Some(f),
