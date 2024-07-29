@@ -591,6 +591,13 @@
         "icon": "$(file-pdf)"
       },
       {
+        "command": "tinymist.showLog",
+        "title": "Tinymist: Show Log",
+        "description": "Show log of LSP Server",
+        "category": "Typst",
+        "icon": "$(list-flat)"
+      },
+      {
         "command": "tinymist.clearCache",
         "title": "Clear all cached resources",
         "category": "Typst"
@@ -659,13 +666,6 @@
         "description": "Scroll preview to current cursor position",
         "icon": "$(sync)",
         "when": "resourceLangId == typst && editorTextFocus"
-      },
-      {
-        "command": "typst-preview.showLog",
-        "title": "Typst Preview: Show Log",
-        "description": "Show typst-preview log",
-        "icon": "$(list-flat)",
-        "when": "resourceLangId == typst"
       },
       {
         "command": "typst-preview.noteOutline",
