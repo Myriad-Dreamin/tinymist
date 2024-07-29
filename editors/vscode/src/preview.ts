@@ -398,9 +398,10 @@ async function panelSyncScrollLsp(args: any) {
         return;
     }
 
+    const taskId = args?.taskId;
     for (const t of activeTask.values()) {
-        if (args.taskId && t.taskId !== args.taskId) {
-            return;
+        if (taskId && t.taskId !== taskId) {
+            continue;
         }
 
         const scrollRequest: ScrollRequest = {
