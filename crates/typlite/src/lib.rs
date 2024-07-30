@@ -38,7 +38,7 @@ impl Typlite {
     /// use typlite::Typlite;
     /// let content = "= Hello, World";
     /// let res = Typlite::new_with_content(content).convert();
-    /// assert_eq!(res, Ok("# Hello, World".into()));
+    /// assert!(matches!(res, Ok(e) if e == "# Hello, World"));
     /// ```
     pub fn new_with_content(content: &str) -> Self {
         let main = Source::detached(content);

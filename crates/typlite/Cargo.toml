@@ -25,6 +25,7 @@ insta.workspace = true
 regex.workspace = true
 
 [features]
+texmath = []
 
 [lints]
 workspace = true
