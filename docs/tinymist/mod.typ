@@ -17,9 +17,8 @@
   #raw(it + "()", lang: "typc") <typst-raw-func>
 ]
 
-#show <typst-raw-func>: it => {
-  it.lines.at(0).body.children.slice(0, -2).join()
-}
+#let kbd = raw
+#let md-alter(left, right) = left
 
 #let colors = (blue.lighten(10%), olive, eastern)
 #import fletcher.shapes: diamond
