@@ -1,0 +1,4 @@
+>("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#symbol-view")[integrating]
+#^^ source.typst
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst markup.underline.link.typst
+#                                                                                 ^^^^^^^^^^^^^^^^ source.typst
