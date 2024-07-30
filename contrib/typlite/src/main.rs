@@ -16,6 +16,13 @@ fn main() {
         .unwrap();
 
     let input = std::fs::read_to_string(input).unwrap();
-    let typlite = Typlite::new_with_content(&input);
-    std::fs::write(output, typlite.convert().unwrap().as_str()).unwrap();
+    let conv = Typlite::new_with_content(&input).convert();
+
+    match conv {
+        Ok(conv) => std::fs::write(output, conv.as_str()).unwrap(),
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+    }
 }

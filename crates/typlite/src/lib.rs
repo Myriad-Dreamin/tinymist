@@ -1,9 +1,12 @@
 //! # Typlite
 
+mod error;
 mod library;
 pub mod scopes;
 mod value;
 mod world;
+
+pub use error::*;
 
 use base64::Engine;
 use scopes::Scopes;
@@ -11,15 +14,13 @@ use typst::{eval::Tracer, layout::Abs};
 use value::{Args, Value};
 use world::LiteWorld;
 
-use std::borrow::Cow;
-
 use ecow::{eco_format, EcoString};
 use typst_syntax::{
     ast::{self, AstNode},
     Source, SyntaxKind, SyntaxNode,
 };
 
-type Result<T, Err = Cow<'static, str>> = std::result::Result<T, Err>;
+type Result<T, Err = Error> = std::result::Result<T, Err>;
 
 /// Task builder for converting a typst document to Markdown.
 #[derive(Debug, Clone)]

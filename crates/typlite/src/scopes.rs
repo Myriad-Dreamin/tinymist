@@ -1,7 +1,7 @@
 //! Variable scopes.
 
-use super::Result;
-use std::{borrow::Cow, collections::HashMap};
+use super::*;
+use std::collections::HashMap;
 
 /// A single scope.
 #[derive(Debug, Clone)]
@@ -100,6 +100,6 @@ impl<T> Scopes<T> {
 }
 
 /// The error message when a variable is not found.
-fn unknown_variable(var: &str) -> Cow<'static, str> {
-    Cow::Owned(format!("unknown variable: {var}"))
+fn unknown_variable(var: &str) -> Error {
+    format!("unknown variable: {var}").into()
 }
