@@ -16,7 +16,9 @@
     "build:preview": "cd tools/typst-preview-frontend && yarn run build && rimraf ../../crates/tinymist-assets/src/typst-preview.html && cpr ./dist/index.html ../../crates/tinymist-assets/src/typst-preview.html",
     "docs": "shiroa serve -w . docs/tinymist",
     "docs:rs": "cargo doc --workspace --no-deps",
-    "test:grammar": "cd syntaxes/textmate && yarn run test"
+    "test:grammar": "cd syntaxes/textmate && yarn run test",
+    "build:typlite": "cd contrib/typlite && cargo build",
+    "typlite": "cd contrib/typlite && target/debug/typlite"
   },
   "dependencies": {},
   "devDependencies": {
