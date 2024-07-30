@@ -62,6 +62,12 @@ Extra features:
   - Click a button in template gallery to initialize a new project with a template. (`tinymist.initTemplate` and `tinymist.initTemplateInPlace`)
   - Trace execution in current document. (`tinymist.profileCurrentFile`)
 
+## Release Cycle
+
+Tinymist follows the [Semantic Versioning](https://semver.org/) scheme. The version number is in the format of `MAJOR.MINOR.PATCH`. The release cycle is as follows:
+- If there is a typst version update, a new major or minor version will be released intermediately. This means tinymist will always align the minor version with typst.
+- If there is at least a bug or feature added this week, a new patch version will be released.
+
 ## Installation
 
 Follow the instructions to enable tinymist in your favorite editor.
@@ -70,15 +76,24 @@ Follow the instructions to enable tinymist in your favorite editor.
 1. [VSCode](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/README.md)
 1. [Zed](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/zed/README.md)
 
+## Installing Regular/Nightly Prebuilds from GitHub
+
+Note: if you are not knowing what is a regular/nightly release, please don't follow this section.
+
+Besides published releases specific for each editors, you can also download the latest regular/nightly prebuilts from GitHub and install them manually.
+
+- Regular prebuilts can be found in [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).
+- Nightly prebuilts can be found in [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions). For example, if you are seeking a nightly release for the featured [PR: build: bump version to 0.11.17-rc1](https://github.com/Myriad-Dreamin/tinymist/pull/468), you could click and go to the [action page](https://github.com/Myriad-Dreamin/tinymist/actions/runs/10120639466) run for the related commits and download the artifacts.
+
+To install extension file (the file with `.vsix` extension) manually, please <kbd>Ctrl+Shift+X</kbd> in the editor window and drop the downloaded vsix file into the opended extensions view.
+
 ## Documentation
 
 See [Online Documentation](https://myriad-dreamin.github.io/tinymist/).
 
 ## Packaging
 
-
 [![Packaging status](https://repology.org/badge/vertical-allrepos/tinymist.svg)](https://repology.org/project/tinymist/versions)
-
 
 ## Roadmap
 
