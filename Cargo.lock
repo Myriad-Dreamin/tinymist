@@ -3777,6 +3777,7 @@ dependencies = [
  "toml 0.8.14",
  "tower-layer",
  "tower-service",
+ "typlite",
  "typst",
  "typst-assets",
  "typst-pdf",

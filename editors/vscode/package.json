@@ -108,12 +108,18 @@
                       "enum": [
                         "pdf",
                         "png",
-                        "svg"
+                        "svg",
+                        "html",
+                        "markdown",
+                        "plaintext"
                       ],
                       "enumDescriptions": [
                         "PDF",
                         "PNG",
-                        "SVG"
+                        "SVG",
+                        "HTML",
+                        "Markdown",
+                        "Plain Text"
                       ],
                       "default": "pdf"
                     }

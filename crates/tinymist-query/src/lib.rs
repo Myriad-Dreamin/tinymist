@@ -150,6 +150,9 @@ mod polymorphic {
         Pdf {
             creation_timestamp: Option<chrono::DateTime<chrono::Utc>>,
         },
+        Html {},
+        Markdown {},
+        Text {},
         Svg {
             page: PageSelection,
         },
@@ -172,6 +175,9 @@ mod polymorphic {
         pub fn extension(&self) -> &str {
             match self {
                 Self::Pdf { .. } => "pdf",
+                Self::Html { .. } => "html",
+                Self::Markdown { .. } => "md",
+                Self::Text { .. } => "txt",
                 Self::Svg { .. } => "svg",
                 Self::Png { .. } => "png",
             }
