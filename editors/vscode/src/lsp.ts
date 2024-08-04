@@ -30,6 +30,19 @@ export const tinymist = {
     });
   },
   getResource<T extends keyof ResourceRoutes>(path: T) {
-    return this.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path]);
+    return tinymist.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path]);
+  },
+  exportPdf(uri: string, extraOpts?: any) {
+    return doExport("tinymist.exportPdf", uri, extraOpts);
+  },
+  exportSvg(uri: string, extraOpts?: any) {
+    return doExport("tinymist.exportSvg", uri, extraOpts);
+  },
+  exportPng(uri: string, extraOpts?: any) {
+    return doExport("tinymist.exportPng", uri, extraOpts);
   },
 };
+
+function doExport(command: string, uri: string, extraOpts?: any): Promise<string> {
+  return tinymist.executeCommand<string>(command, [uri, ...(extraOpts ? [extraOpts] : [])]);
+}

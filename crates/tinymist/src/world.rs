@@ -136,7 +136,7 @@ fn parse_input_pair(raw: &str) -> Result<(String, String), String> {
 }
 
 /// Parses a UNIX timestamp according to <https://reproducible-builds.org/specs/source-date-epoch/>
-fn parse_source_date_epoch(raw: &str) -> Result<DateTime<Utc>, String> {
+pub fn parse_source_date_epoch(raw: &str) -> Result<DateTime<Utc>, String> {
     let timestamp: i64 = raw
         .parse()
         .map_err(|err| format!("timestamp must be decimal integer ({err})"))?;

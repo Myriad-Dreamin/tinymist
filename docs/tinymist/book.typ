@@ -14,6 +14,7 @@
     = Features
     - #chapter("feature/cli.typ")[Command line interface]
     - #chapter("feature/language.typ")[Language and Editor Features]
+    - #chapter("feature/export.typ")[Exporting Documents]
     - #chapter("feature/preview.typ")[Document Preview]
     = Guide
     - #chapter("guide/completion.typ")[Completion]

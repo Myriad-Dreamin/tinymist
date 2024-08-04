@@ -16,12 +16,18 @@ impl<T> fmt::Debug for Derived<T> {
 macro_rules! get_arg {
     ($args:ident[$idx:expr] as $ty:ty) => {{
         let arg = $args.get_mut($idx);
-        let arg = arg.and_then(|x| from_value::<$ty>(x.take()).ok());
-        match arg {
+        let arg = match arg {
             Some(v) => v,
             None => {
-                let msg = concat!("expect ", stringify!($ty), "at args[", $idx, "]");
+                let msg = concat!("expect ", stringify!($ty), " at args[", $idx, "]");
                 return Err(invalid_params(msg));
+            }
+        };
+        match from_value::<$ty>(arg.take()) {
+            Ok(v) => v,
+            Err(err) => {
+                let msg = concat!("expect ", stringify!($ty), " at args[", $idx, "], error: ");
+                return Err(invalid_params(format!("{}{}", msg, err)));
             }
         }
     }};
