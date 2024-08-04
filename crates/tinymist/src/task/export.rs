@@ -370,8 +370,18 @@ mod tests {
         assert_eq!(parse_color("red".to_owned()).unwrap(), Color::RED);
         assert_eq!(parse_color("green".to_owned()).unwrap(), Color::GREEN);
         assert_eq!(parse_color("blue".to_owned()).unwrap(), Color::BLUE);
-        assert_eq!(parse_color("#000000".to_owned()).unwrap(), Color::BLACK);
-        assert_eq!(parse_color("#ffffff".to_owned()).unwrap(), Color::WHITE);
+        assert_eq!(
+            parse_color("#000000".to_owned()).unwrap().to_hex(),
+            "#000000"
+        );
+        assert_eq!(
+            parse_color("#ffffff".to_owned()).unwrap().to_hex(),
+            "#ffffff"
+        );
+        assert_eq!(
+            parse_color("#000000cc".to_owned()).unwrap().to_hex(),
+            "#000000cc"
+        );
         assert!(parse_color("invalid".to_owned()).is_err());
     }
 }
