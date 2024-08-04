@@ -1,0 +1,93 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on ) (136..137)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/completion_title3.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 21,
+    "label": "Harry Potter and the Order of the Phoenix",
+    "labelDetails": {
+     "description": "harry"
+    },
+    "textEdit": {
+     "newText": "harry>",
+     "range": {
+      "end": {
+       "character": 13,
+       "line": 3
+      },
+      "start": {
+       "character": 7,
+       "line": 3
+      }
+     }
+    }
+   },
+   {
+    "kind": 21,
+    "label": "Ishkur's Guide to Electronic Music",
+    "labelDetails": {
+     "description": "electronic"
+    },
+    "textEdit": {
+     "newText": "electronic>",
+     "range": {
+      "end": {
+       "character": 13,
+       "line": 3
+      },
+      "start": {
+       "character": 7,
+       "line": 3
+      }
+     }
+    }
+   },
+   {
+    "kind": 18,
+    "label": "electronic",
+    "labelDetails": {
+     "description": "Ishkur's Guide to Electronic Music"
+    },
+    "textEdit": {
+     "newText": "electronic>",
+     "range": {
+      "end": {
+       "character": 13,
+       "line": 3
+      },
+      "start": {
+       "character": 7,
+       "line": 3
+      }
+     }
+    }
+   },
+   {
+    "kind": 18,
+    "label": "harry",
+    "labelDetails": {
+     "description": "Harry Potter and the Order of the Phoenix"
+    },
+    "textEdit": {
+     "newText": "harry>",
+     "range": {
+      "end": {
+       "character": 13,
+       "line": 3
+      },
+      "start": {
+       "character": 7,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]
