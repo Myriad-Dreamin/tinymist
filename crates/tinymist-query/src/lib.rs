@@ -153,6 +153,15 @@ mod polymorphic {
         Html {},
         Markdown {},
         Text {},
+        Query {
+            format: String,
+            output_extension: Option<String>,
+            strict: bool,
+            selector: String,
+            field: Option<String>,
+            one: bool,
+            pretty: bool,
+        },
         Svg {
             page: PageSelection,
         },
@@ -180,6 +189,11 @@ mod polymorphic {
                 Self::Text { .. } => "txt",
                 Self::Svg { .. } => "svg",
                 Self::Png { .. } => "png",
+                Self::Query {
+                    format,
+                    output_extension,
+                    ..
+                } => output_extension.as_deref().unwrap_or(format),
             }
         }
     }

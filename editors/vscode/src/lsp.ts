@@ -50,6 +50,9 @@ export const tinymist = {
   exportText(uri: string, extraOpts?: any) {
     return doExport("tinymist.exportText", uri, extraOpts);
   },
+  exportQuery(uri: string, extraOpts?: any) {
+    return doExport("tinymist.exportQuery", uri, extraOpts);
+  },
 };
 
 function doExport(command: string, uri: string, extraOpts?: any): Promise<string> {

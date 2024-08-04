@@ -3768,6 +3768,7 @@ dependencies = [
  "reflexo",
  "serde",
  "serde_json",
+ "serde_yaml",
  "sync-lsp",
  "tinymist-assets",
  "tinymist-query",

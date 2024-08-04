@@ -257,6 +257,7 @@ impl LanguageState {
             .with_command_("tinymist.exportText", State::export_text)
             .with_command_("tinymist.exportHtml", State::export_html)
             .with_command_("tinymist.exportMarkdown", State::export_markdown)
+            .with_command_("tinymist.exportQuery", State::export_query)
             .with_command("tinymist.doClearCache", State::clear_cache)
             .with_command("tinymist.pinMain", State::pin_document)
             .with_command("tinymist.focusMain", State::focus_document)

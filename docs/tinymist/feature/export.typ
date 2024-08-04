@@ -4,6 +4,84 @@
 
 You can export your documents to various formats using the `export` feature.
 
+== Export from Query Result
+
+=== Hello World Example (VSCode Tasks)
+
+You can export the result of a query as text using the `export` command.
+
+Given a code:
+
+```typ
+#println("Hello World!")
+#println("Hello World! Again...")
+```
+
+LSP should export the result of the query as text with the following content:
+
+```txt
+Hello World!
+Hello World! Again...
+```
+
+This requires the following configuration in your `tasks.json` file:
+
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Query as Text",
+      "type": "typst",
+      "command": "export",
+      "export": {
+        "format": "query",
+        "query.format": "txt",
+        "query.outputExtension": "out",
+        "query.field": "value",
+        "query.selector": "<print-effect>",
+        "query.one": true
+      }
+    },
+  ]
+}
+```
+
+See the #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/e2e-workspaces/print-state")[Sample Workspace: print-state] for more details.
+
+=== Pdfpc Example (VSCode Tasks)
+
+A more practical example is exporting the result of a query as a pdfpc file. You can use the following configuration in your `tasks.json` file to export the result of a query as a pdfpc file, which is adapted by #link("https://touying-typ.github.io/touying/")[Touying Slides].
+
+```json
+{
+  "label": "Query as Pdfpc",
+  "type": "typst",
+  "command": "export",
+  "export": {
+    "format": "query",
+    "query.format": "json",
+    "query.outputExtension": "pdfpc",
+    "query.selector": "<pdfpc-file>",
+    "query.field": "value",
+    "query.one": true
+  }
+}
+```
+
+To simplify configuration,
+
+```json
+{
+  "label": "Query as Pdfpc",
+  "type": "typst",
+  "command": "export",
+  "export": {
+    "format": "pdfpc"
+  }
+}
+```
+
 == VSCode: Task Configuration
 
 You can configure tasks in your `tasks.json` file to "persist" the arguments for exporting documents.
@@ -56,6 +134,14 @@ Example:
         // Default fill is white, but you can set it to transparent.
         "fill": "#00000000",
         "merged": true
+      }
+    },
+    {
+      "label": "Query as Pdfpc",
+      "type": "typst",
+      "command": "export",
+      "export": {
+        "format": "pdfpc"
       }
     },
     {

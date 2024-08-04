@@ -13,7 +13,7 @@ export function activateTaskProvider(context: vscode.ExtensionContext): vscode.D
   return vscode.tasks.registerTaskProvider(TYPST_TASK_TYPE, provider);
 }
 
-export type ExportFormat = "pdf" | "png" | "svg";
+export type ExportFormat = "pdf" | "png" | "svg" | "html" | "markdown" | "text" | "query" | "pdfpc";
 
 export type TaskDefinition = vscode.TaskDefinition & {
   readonly type: typeof TYPST_TASK_TYPE;
@@ -32,6 +32,13 @@ export type TaskDefinition = vscode.TaskDefinition & {
     "merged.gap"?: string;
     "png.merged.gap"?: string;
     "svg.merged.gap"?: string;
+    "query.format"?: string;
+    "query.outputExtension"?: string;
+    "query.strict"?: boolean;
+    "query.pretty"?: boolean;
+    "query.selector"?: string;
+    "query.field"?: string;
+    "query.one"?: boolean;
   };
 };
 
@@ -121,6 +128,20 @@ export async function callTypstExportCommand(): Promise<vscode.CustomExecution> 
         },
         export: tinymist.exportText,
       },
+      query: {
+        opts() {
+          return {
+            format: exportArgs["query.format"],
+            outputExtension: exportArgs["query.outputExtension"],
+            strict: exportArgs["query.strict"],
+            pretty: exportArgs["query.pretty"],
+            selector: exportArgs["query.selector"],
+            field: exportArgs["query.field"],
+            one: exportArgs["query.one"],
+          };
+        },
+        export: tinymist.exportQuery,
+      },
     };
 
     return Promise.resolve({
@@ -131,8 +152,17 @@ export async function callTypstExportCommand(): Promise<vscode.CustomExecution> 
 
         try {
           await run();
-        } catch (e) {
-          writeEmitter.fire("Typst export task failed: " + obj(e) + "\r\n");
+        } catch (e: any) {
+          writeEmitter.fire(
+            "Typst export task failed: " +
+              obj({
+                code: e.code,
+                message: e.message,
+                stack: e.stack,
+                error: e,
+              }) +
+              "\r\n",
+          );
         } finally {
           closeEmitter.fire(0);
         }
@@ -152,7 +182,16 @@ export async function callTypstExportCommand(): Promise<vscode.CustomExecution> 
         return;
       }
 
-      for (const format of formats) {
+      for (let format of formats) {
+        if (format === "pdfpc") {
+          format = "query";
+          exportArgs["query.format"] = "json";
+          exportArgs["query.outputExtension"] = "pdfpc";
+          exportArgs["query.selector"] = "<pdfpc-file>";
+          exportArgs["query.field"] = "value";
+          exportArgs["query.one"] = true;
+        }
+
         const provider = formatProvider[format];
         if (!provider) {
           writeEmitter.fire("Unsupported export format: " + format + "\r\n");
