@@ -202,7 +202,7 @@ pub(crate) fn analyze_signature(
             //     TryResolveCalleeResult::Runtime(func) => func,
             // };
 
-            let func = resolve_callee(ctx, node)?;
+            let func = resolve_callee(ctx, &node)?;
 
             log::debug!("got function {func:?}");
             func

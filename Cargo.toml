@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.11.16"
+version = "0.11.17"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -134,7 +134,7 @@ insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
 typst-preview = { path = "./crates/typst-preview/" }
-tinymist-assets = { version = "0.11.16" }
+tinymist-assets = { version = "0.11.17" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
 tinymist-render = { path = "./crates/tinymist-render/" }
@@ -166,14 +166,14 @@ undocumented_unsafe_blocks = "warn"
 
 [patch.crates-io]
 
-# tinymist-assets = { path = "./crates/tinymist-assets/" }
+tinymist-assets = { path = "./crates/tinymist-assets/" }
 
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
-typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
-typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
-typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
-typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.1-2" }
+typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.1-2" }
+typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.1-2" }
+typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.1-2" }
+typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.1-2" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.1-2" }
 
 # typst = { path = "../typst/crates/typst" }
 # typst-timing = { path = "../typst/crates/typst-timing" }

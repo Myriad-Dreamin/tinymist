@@ -118,19 +118,55 @@ export class Context {
         );
     }
 
+    diagTick = 0;
     diagnostics(
-        f: () => Promise<any> = Promise.resolve
+        cnt: number,
+        f: () => Promise<any> = Promise.resolve,
+        timeout = 5000
     ): Promise<[vscode.DiagnosticChangeEvent, [vscode.Uri, vscode.Diagnostic[]][]]> {
+        let diagNow = performance.now();
+
+        this.diagTick += 1;
+        const tick = this.diagTick;
+
+        const received: any[] = [];
         return new Promise(async (resolve, reject) => {
-            const diagnosticsHandler = vscode.languages.onDidChangeDiagnostics((e) => {
+            const doReject = (reason: string) => (err: any) => {
+                console.error(
+                    `diagnostics[${tick}] ${reason}, expect ${cnt}, got ${JSON.stringify(received, undefined, 1)}`,
+                    err
+                );
                 diagnosticsHandler.dispose();
-                resolve([e, vscode.languages.getDiagnostics()]);
-            });
-            f().catch(() => {
-                diagnosticsHandler.dispose();
+                clearTimeout(t);
                 reject();
+            };
+            const t = setTimeout(doReject("timeout"), timeout);
+            const diagnosticsHandler = vscode.languages.onDidChangeDiagnostics((e) => {
+                const d = vscode.languages.getDiagnostics();
+                // flatten the array with setting uri
+                const diagnostics = d
+                    .map((e) => {
+                        for (const diag of e[1]) {
+                            (diag as any).uri = e[0];
+                        }
+                        return e[1];
+                    })
+                    .flat();
+                received.push(diagnostics);
+
+                if (cnt === undefined || cnt === diagnostics.length) {
+                    console.log(`diagnostics[${tick}] took`, performance.now() - diagNow, "ms");
+                    diagnosticsHandler.dispose();
+                    clearTimeout(t);
+                    resolve([e, d]);
+                }
             });
+            f().catch(doReject("error"));
         });
+    }
+
+    timeout(ms: number): Promise<void> {
+        return new Promise((resolve) => setTimeout(resolve, ms));
     }
 }
 
@@ -139,16 +175,26 @@ export async function run(): Promise<void> {
     context.expect = (await importEsmModule<any>("chai")).expect;
 
     // exit process after timeout
-    setTimeout(() => {
+    context.timeout(30000).then(() => {
         console.error("Tests timed out");
         process.exit(81);
-    }, 30000);
+    });
 
     const testFiles = (await readdir(path.resolve(__dirname))).filter((name) =>
         name.endsWith(".test.js")
     );
+
+    const filter = process.env.VSCODE_TEST_FILTER;
+    if (filter) {
+        console.log(`Running tests with filter: ${filter}`);
+    }
     for (const testFile of testFiles) {
         try {
+            console.log(`Running tests in ${testFile}`);
+            if (filter && !testFile.includes(filter)) {
+                continue;
+            }
+
             const testModule = require(path.resolve(__dirname, testFile));
             await testModule.getTests(context);
         } catch (e) {

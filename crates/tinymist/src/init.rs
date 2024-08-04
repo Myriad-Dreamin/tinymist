@@ -265,6 +265,8 @@ const CONFIG_ITEMS: &[&str] = &[
     "hoverPeriscope",
 ];
 
+// todo: Config::default() doesn't initialize arguments from environment
+// variables
 /// The user configuration read from the editor.
 #[derive(Debug, Default, Clone)]
 pub struct Config {
@@ -468,42 +470,42 @@ impl CompileConfig {
             }
         }
 
-        'parse_extra_args: {
-            if let Some(typst_extra_args) = update.get("typstExtraArgs") {
-                let typst_args: Vec<String> = match serde_json::from_value(typst_extra_args.clone())
-                {
-                    Ok(e) => e,
-                    Err(e) => bail!("failed to parse typstExtraArgs: {e}"),
-                };
+        {
+            let typst_args: Vec<String> = match update
+                .get("typstExtraArgs")
+                .cloned()
+                .map(serde_json::from_value)
+            {
+                Some(Ok(e)) => e,
+                Some(Err(e)) => bail!("failed to parse typstExtraArgs: {e}"),
+                // Even if the list is none, it should be parsed since we have env vars to retrieve.
+                None => Vec::new(),
+            };
 
-                let command = match CompileOnceArgs::try_parse_from(
-                    Some("typst-cli".to_owned()).into_iter().chain(typst_args),
-                ) {
-                    Ok(e) => e,
-                    Err(e) => {
-                        log::error!("failed to parse typstExtraArgs: {e}");
-                        break 'parse_extra_args;
-                    }
-                };
+            let command = match CompileOnceArgs::try_parse_from(
+                Some("typst-cli".to_owned()).into_iter().chain(typst_args),
+            ) {
+                Ok(e) => e,
+                Err(e) => bail!("failed to parse typstExtraArgs: {e}"),
+            };
 
-                // Convert the input pairs to a dictionary.
-                let inputs: TypstDict = if command.inputs.is_empty() {
-                    TypstDict::default()
-                } else {
-                    let pairs = command.inputs.iter();
-                    let pairs = pairs.map(|(k, v)| (k.as_str().into(), v.as_str().into_value()));
-                    pairs.collect()
-                };
+            // Convert the input pairs to a dictionary.
+            let inputs: TypstDict = if command.inputs.is_empty() {
+                TypstDict::default()
+            } else {
+                let pairs = command.inputs.iter();
+                let pairs = pairs.map(|(k, v)| (k.as_str().into(), v.as_str().into_value()));
+                pairs.collect()
+            };
 
-                // todo: the command.root may be not absolute
-                self.typst_extra_args = Some(CompileExtraOpts {
-                    entry: command.input.map(|e| Path::new(&e).into()),
-                    root_dir: command.root,
-                    inputs: Arc::new(Prehashed::new(inputs)),
-                    font: command.font,
-                    creation_timestamp: command.creation_timestamp,
-                });
-            }
+            // todo: the command.root may be not absolute
+            self.typst_extra_args = Some(CompileExtraOpts {
+                entry: command.input.map(|e| Path::new(&e).into()),
+                root_dir: command.root,
+                inputs: Arc::new(Prehashed::new(inputs)),
+                font: command.font,
+                creation_timestamp: command.creation_timestamp,
+            });
         }
 
         self.font_paths = try_or_default(|| Vec::<_>::deserialize(update.get("fontPaths")?).ok());
@@ -875,6 +877,14 @@ mod tests {
 
         config.update(&update).unwrap();
 
+        // Nix specifies this environment variable when testing.
+        let has_source_date_epoch = std::env::var("SOURCE_DATE_EPOCH").is_ok();
+        if has_source_date_epoch {
+            let args = config.compile.typst_extra_args.as_mut().unwrap();
+            assert!(args.creation_timestamp.is_some());
+            args.creation_timestamp = None;
+        }
+
         assert_eq!(config.compile.output_path, PathPattern::new("out"));
         assert_eq!(config.compile.export_pdf, ExportMode::OnSave);
         assert_eq!(config.compile.root_path, Some(PathBuf::from(root_path)));
@@ -887,6 +897,43 @@ mod tests {
                 ..Default::default()
             })
         );
+    }
+
+    #[test]
+    fn test_config_creation_timestamp() {
+        type Timestamp = Option<chrono::DateTime<chrono::Utc>>;
+
+        fn timestamp(f: impl FnOnce(&mut Config)) -> Timestamp {
+            let mut config = Config::default();
+
+            f(&mut config);
+
+            let args = config.compile.typst_extra_args;
+            args.and_then(|args| args.creation_timestamp)
+        }
+
+        // assert!(timestamp(|_| {}).is_none());
+        // assert!(timestamp(|config| {
+        //     let update = json!({});
+        //     config.update(&update).unwrap();
+        // })
+        // .is_none());
+
+        let args_timestamp = timestamp(|config| {
+            let update = json!({
+                "typstExtraArgs": ["--creation-timestamp", "1234"]
+            });
+            config.update(&update).unwrap();
+        });
+        assert!(args_timestamp.is_some());
+
+        // todo: concurrent get/set env vars is unsafe
+        //     std::env::set_var("SOURCE_DATE_EPOCH", "1234");
+        //     let env_timestamp = timestamp(|config| {
+        //         config.update(&json!({})).unwrap();
+        //     });
+
+        //     assert_eq!(args_timestamp, env_timestamp);
     }
 
     #[test]

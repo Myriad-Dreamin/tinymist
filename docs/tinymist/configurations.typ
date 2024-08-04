@@ -5,16 +5,25 @@
 
 #let packages = json("/editors/vscode/package.json")
 
-#let config-type(t) = if type(t) == array {
-  raw(t.join(" | "))
+#let config-type(t) = if "anyOf" in t {
+  let any-of = t.anyOf
+  if type(any-of) == array {
+    any-of.map(config-type).join(" | ")
+  }
 } else {
-  raw(t)
+  if type(t.type) == array {
+    t.type.join(" | ")
+  } else {
+    t.type
+  }
 }
 
 #let config_item(key, cfg) = [
   + *#raw(key)*:
-    - Type: #config-type(cfg.type)
-      #if cfg.type == "array" [
+    - Type: #raw(config-type(cfg))
+      #if "anyOf" in cfg {
+        // todo: anyOf
+      } else if cfg.type == "array" [
         - Items: #raw(cfg.items.type)
         - Description: #md(cfg.items.description)
       ]
@@ -24,16 +33,17 @@
             - #raw(item): #if "enumDescriptions" in cfg { md(cfg.enumDescriptions.at(i)) }
          ]
     ]
-    #if type(cfg.default) == str {
-      if cfg.default != "" [
-        - Default: #raw(cfg.default)
+    #let cfg-default = cfg.at("default", default: none)
+    #if type(cfg-default) == str {
+      if cfg-default != "" [
+        - Default: #raw(cfg-default)
       ] else [
         - Default: `""`
       ]
-    } else if type(cfg.default) == array [
-      - Default: [#cfg.default.join(",")]
-    ] else [
-      - Default: #cfg.default
+    } else if type(cfg-default) == array [
+      - Default: [#cfg-default.join(",")]
+    ] else if cfg-default != none [
+      - Default: #cfg-default
     ]
 ]
 

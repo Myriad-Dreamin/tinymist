@@ -15,11 +15,19 @@
     "build:editor-tools": "cd tools/editor-tools/ && yarn run build",
     "build:preview": "cd tools/typst-preview-frontend && yarn run build && rimraf ../../crates/tinymist-assets/src/typst-preview.html && cpr ./dist/index.html ../../crates/tinymist-assets/src/typst-preview.html",
     "docs": "shiroa serve -w . docs/tinymist",
-    "docs:rs": "cargo doc --workspace --no-deps"
+    "docs:rs": "cargo doc --workspace --no-deps",
+    "test:grammar": "cd syntaxes/textmate && yarn run test",
+    "build:typlite": "cd contrib/typlite && cargo build",
+    "typlite": "cd contrib/typlite && target/debug/typlite"
   },
   "dependencies": {},
   "devDependencies": {
     "cpr": "^3.0.1",
-    "rimraf": "^5.0.1"
+    "rimraf": "^5.0.1",
+    "vite": "^4.3.9",
+    "vite-plugin-singlefile": "^0.13.5",
+    "vite-plugin-wasm": "^3.2.2",
+    "vitest": "^0.32.2",
+    "typescript": "^5.3.3"
   }
 }

@@ -17,8 +17,8 @@ async function main() {
     let minimalVersion: string = json.engines.vscode;
     if (minimalVersion.startsWith("^")) minimalVersion = minimalVersion.slice(1);
 
-    // All test suites (either unit tests or integration tests) should be in subfolders.
-    const extensionTestsPath = path.resolve(__dirname, "./suite/index");
+    // All e2e test suites (either unit tests or integration tests) should be in subfolders.
+    const extensionTestsPath = path.resolve(__dirname, "./e2e/index");
 
     const launchArgs = [
         "--disable-extensions",
@@ -29,12 +29,21 @@ async function main() {
         "--no-sandbox",
     ];
 
+    const extensionTestsEnv: Record<string, any> = {};
+
+    // set filter
+    const filter = process.argv[2];
+    if (filter) {
+        extensionTestsEnv.VSCODE_TEST_FILTER = filter;
+    }
+
     // Run tests using the minimal supported version.
     await runTests({
         version: minimalVersion,
         launchArgs,
         extensionDevelopmentPath,
         extensionTestsPath,
+        extensionTestsEnv,
     });
 
     // and the latest one
@@ -43,6 +52,7 @@ async function main() {
         launchArgs,
         extensionDevelopmentPath,
         extensionTestsPath,
+        extensionTestsEnv,
     });
 
     // await runVSCodeCommand(["--install-extension", "ms-python.python"], { version: "1.60.0" });

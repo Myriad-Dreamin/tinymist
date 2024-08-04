@@ -18,7 +18,6 @@ import {
     type LanguageClientOptions,
     type ServerOptions,
 } from "vscode-languageclient/node";
-import vscodeVariables from "vscode-variables";
 import {
     SymbolViewProvider as SymbolViewProvider,
     activateEditorTool,
@@ -36,6 +35,7 @@ import {
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, getClient, setClient } from "./lsp";
+import { vscodeVariables } from "./vscode-variables";
 
 let previewIsEnabled = false;
 let devKitIsEnabled = false;
@@ -83,6 +83,26 @@ export function activate(context: ExtensionContext): Promise<void> {
         }
     }
 
+    console.log("vscodeVariables test:", {
+        workspaceFolder: vscodeVariables("<${workspaceFolder}>"),
+        workspaceFolderBasename: vscodeVariables("<${workspaceFolderBasename}>"),
+        file: vscodeVariables("<${file}>"),
+        fileWorkspaceFolder: vscodeVariables("<${fileWorkspaceFolder}>"),
+        relativeFile: vscodeVariables("<${relativeFile}>"),
+        relativeFileDirname: vscodeVariables("<${relativeFileDirname}>"),
+        fileBasename: vscodeVariables("<${fileBasename}>"),
+        fileBasenameNoExtension: vscodeVariables("<${fileBasenameNoExtension}>"),
+        fileExtname: vscodeVariables("<${fileExtname}>"),
+        fileDirname: vscodeVariables("<${fileDirname}>"),
+        cwd: vscodeVariables("<${cwd}>"),
+        pathSeparator: vscodeVariables("<${pathSeparator}>"),
+        lineNumber: vscodeVariables("<${lineNumber}>"),
+        selectedText: vscodeVariables("<${selectedText}>"),
+        config: vscodeVariables("<${config:editor.fontSize}>"),
+        composite: vscodeVariables("wof=<${workspaceFolder}>:<${file}>"),
+        composite2: vscodeVariables("fow=<${file}>:<${workspaceFolder}>"),
+    });
+
     const client = initClient(context, config);
     setClient(client);
 
@@ -125,7 +145,7 @@ function initClient(context: ExtensionContext, config: Record<string, any>) {
         ],
         options: { env: Object.assign({}, process.env, { RUST_BACKTRACE: "1" }) },
     };
-    console.log("use arguments", run);
+    // console.log("use arguments", run);
     const serverOptions: ServerOptions = {
         run,
         debug: run,

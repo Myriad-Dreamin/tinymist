@@ -1,0 +1,1 @@
+("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#symbol-view")[integrating]
