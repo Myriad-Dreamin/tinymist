@@ -149,7 +149,7 @@
               },
               "fill": {
                 "type": "string",
-                "description": "The fill color.  Affected formats: `png`",
+                "description": "The fill color. Affected formats: `png`",
                 "examples": [
                   "white",
                   "#ffffff",
@@ -158,7 +158,7 @@
               },
               "png.fill": {
                 "type": "string",
-                "description": "The fill color.  Affected formats: `png`",
+                "description": "The fill color. Affected formats: `png`",
                 "examples": [
                   "white",
                   "#ffffff",
