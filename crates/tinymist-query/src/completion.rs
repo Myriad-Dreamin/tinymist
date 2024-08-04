@@ -320,6 +320,20 @@ mod tests {
             let mut includes = HashSet::new();
             let mut excludes = HashSet::new();
 
+            let must_compile = properties
+                .get("compile")
+                .map(|v| v.trim() == "true")
+                .unwrap_or(false);
+            let doc = if must_compile {
+                let doc = typst::compile(ctx.world(), &mut Default::default()).unwrap();
+                Some(VersionedDocument {
+                    version: 0,
+                    document: Arc::new(doc),
+                })
+            } else {
+                None
+            };
+
             for kk in properties.get("contains").iter().flat_map(|v| v.split(',')) {
                 // split first char
                 let (kind, item) = kk.split_at(1);
@@ -369,7 +383,7 @@ mod tests {
                     position: ctx.to_lsp_pos(s, &source),
                     explicit: false,
                 };
-                results.push(request.request(ctx, None).map(|resp| {
+                results.push(request.request(ctx, doc.clone()).map(|resp| {
                     // CompletionResponse::Array(items)
                     match resp {
                         CompletionResponse::List(l) => CompletionResponse::List(CompletionList {

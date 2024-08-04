@@ -1117,14 +1117,12 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             let label: EcoString = label.as_str().into();
             let completion = Completion {
                 kind: CompletionKind::Reference,
-                apply: (open || close).then(|| {
-                    eco_format!(
-                        "{}{}{}",
-                        if open { "<" } else { "" },
-                        label.as_str(),
-                        if close { ">" } else { "" }
-                    )
-                }),
+                apply: Some(eco_format!(
+                    "{}{}{}",
+                    if open { "<" } else { "" },
+                    label.as_str(),
+                    if close { ">" } else { "" }
+                )),
                 label: label.clone(),
                 label_detail: label_desc.clone(),
                 filter_text: Some(label.clone()),
@@ -1133,6 +1131,8 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             };
 
             if let Some(bib_title) = bib_title {
+                // Note that this completion re-uses the above `apply` field to
+                // alter the `bib_title` to the corresponding label.
                 self.completions.push(Completion {
                     kind: CompletionKind::Constant,
                     label: bib_title.clone(),
