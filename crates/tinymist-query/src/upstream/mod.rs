@@ -274,6 +274,8 @@ impl Eq for CatKey {}
 
 // todo: category of types
 static ROUTE_MAPS: Lazy<HashMap<CatKey, String>> = Lazy::new(|| {
+    // todo: this is a false positive for clippy on LazyHash
+    #[allow(clippy::mutable_key_type)]
     let mut map = HashMap::new();
     let mut scope_to_finds = vec![
         (LIBRARY.global.scope(), None, None),
