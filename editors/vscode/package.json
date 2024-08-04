@@ -90,12 +90,22 @@
                     "enum": [
                       "pdf",
                       "png",
-                      "svg"
+                      "svg",
+                      "html",
+                      "markdown",
+                      "text",
+                      "query",
+                      "pdfpc"
                     ],
                     "enumDescriptions": [
                       "PDF",
                       "PNG",
-                      "SVG"
+                      "SVG",
+                      "HTML",
+                      "Markdown",
+                      "Plain Text",
+                      "Query Result",
+                      "Pdfpc (From Query)"
                     ],
                     "default": "pdf"
                   },
@@ -111,7 +121,9 @@
                         "svg",
                         "html",
                         "markdown",
-                        "text"
+                        "text",
+                        "query",
+                        "pdfpc"
                       ],
                       "enumDescriptions": [
                         "PDF",
@@ -119,7 +131,9 @@
                         "SVG",
                         "HTML",
                         "Markdown",
-                        "Plain Text"
+                        "Plain Text",
+                        "Query Result",
+                        "Pdfpc (From Query)"
                       ],
                       "default": "pdf"
                     }
@@ -192,6 +206,45 @@
                 "type": "string",
                 "description": "The gap between the pages when merging **with absolute typst unit**. Affected formats: `png`",
                 "default": "0pt"
+              },
+              "query.format": {
+                "type": "string",
+                "description": "The format of the query output. Defaults to `json`.",
+                "default": "json",
+                "enum": [
+                  "json",
+                  "yaml",
+                  "txt"
+                ],
+                "enumDescriptions": [
+                  "JSON",
+                  "YAML",
+                  "Plain Text if the result is a string, otherwise raises an error. You may specific the field to use for the query with `query.field` and assert that there is only one result with `query.one`."
+                ]
+              },
+              "query.outputExtension": {
+                "type": "string",
+                "description": "The extension of the query output. Inferring from `query.format` if not specified."
+              },
+              "query.strict": {
+                "type": "boolean",
+                "description": "Whether to strictly check the query format. Defaults to `true`."
+              },
+              "query.pretty": {
+                "type": "boolean",
+                "description": "Whether to pretty print the query output. Defaults to `true`."
+              },
+              "query.selector": {
+                "type": "string",
+                "description": "The selector to use for the query. Must specified if `format`."
+              },
+              "query.field": {
+                "type": "string",
+                "description": "The field to use for the query."
+              },
+              "query.one": {
+                "type": "boolean",
+                "description": "Whether to only return one result. Defaults to `false`."
               }
             }
           }

@@ -26,6 +26,18 @@ struct ExportOpts {
     page: PageSelection,
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QueryOpts {
+    format: String,
+    output_extension: Option<String>,
+    strict: Option<bool>,
+    pretty: Option<bool>,
+    selector: String,
+    field: Option<String>,
+    one: Option<bool>,
+}
+
 /// Here are implemented the handlers for each command.
 impl LanguageState {
     /// Export the current document as PDF file(s).
@@ -57,6 +69,24 @@ impl LanguageState {
     /// Export the current document as Text file(s).
     pub fn export_text(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
         self.export(req_id, ExportKind::Text {}, args)
+    }
+
+    /// Query the current document and export the result as JSON file(s).
+    pub fn export_query(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+        let opts = get_arg_or_default!(args[1] as QueryOpts);
+        self.export(
+            req_id,
+            ExportKind::Query {
+                format: opts.format,
+                output_extension: opts.output_extension,
+                strict: opts.strict.unwrap_or(true),
+                selector: opts.selector,
+                field: opts.field,
+                pretty: opts.pretty.unwrap_or(true),
+                one: opts.one.unwrap_or(false),
+            },
+            args,
+        )
     }
 
     /// Export the current document as Svg file(s).

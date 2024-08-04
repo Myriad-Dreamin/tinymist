@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Query as Text",
+      "type": "typst",
+      "command": "export",
+      "export": {
+        "format": "query",
+        "query.format": "txt",
+        "query.outputExtension": "out",
+        "query.field": "value",
+        "query.selector": "<print-effect>",
+        "query.one": true
+      }
+    },
+    {
+      "label": "Export PNG and SVG....",
+      "type": "typst",
+      "command": "export",
+      "export": {
+        "format": ["png", "svg"],
+        "png.ppi": 288,
+        "merged": true,
+        "merged.gap": "100pt"
+      }
+    }
+  ]
+}

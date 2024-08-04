@@ -1,5 +1,6 @@
 //! The actor that handles various document export, like PDF and SVG export.
 
+use std::ops::Deref;
 use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
@@ -8,6 +9,7 @@ use once_cell::sync::Lazy;
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
+use typst::foundations::IntoValue;
 use typst::{
     foundations::Smart,
     layout::{Abs, Frame},
@@ -213,6 +215,39 @@ impl ExportConfig {
                     // todo: timestamp world.now()
                     typst_pdf::pdf(doc, Smart::Auto, timestamp)
                 }
+                Query {
+                    format,
+                    output_extension: _,
+                    strict,
+                    selector,
+                    field,
+                    one,
+                    pretty,
+                } => {
+                    let elements =
+                        typst_ts_compiler::query::retrieve(artifact.world.deref(), &selector, doc)
+                            .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
+                    if one && elements.len() != 1 {
+                        bail!("expected exactly one element, found {}", elements.len());
+                    }
+
+                    let mapped: Vec<_> = elements
+                        .into_iter()
+                        .filter_map(|c| match &field {
+                            Some(field) => c.get_by_name(field),
+                            _ => Some(c.into_value()),
+                        })
+                        .collect();
+
+                    if one {
+                        let Some(value) = mapped.first() else {
+                            bail!("no such field found for element");
+                        };
+                        serialize(value, &format, strict, pretty).map(String::into_bytes)?
+                    } else {
+                        serialize(&mapped, &format, strict, pretty).map(String::into_bytes)?
+                    }
+                }
                 Html {} => typst_ts_svg_exporter::render_svg_html(doc).into_bytes(),
                 Text {} => format!("{}", FullTextDigest(doc.clone())).into_bytes(),
                 Markdown {} => {
@@ -353,6 +388,39 @@ fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<TypstDat
         date_time.minute().try_into().ok()?,
         date_time.second().try_into().ok()?,
     )
+}
+
+/// Serialize data to the output format.
+fn serialize(
+    data: &impl serde::Serialize,
+    format: &str,
+    strict: bool,
+    pretty: bool,
+) -> anyhow::Result<String> {
+    Ok(match format {
+        "json" if pretty => serde_json::to_string_pretty(data)?,
+        "json" => serde_json::to_string(data)?,
+        "yaml" => serde_yaml::to_string(&data)?,
+        format if format == "txt" || !strict => {
+            use serde_json::Value::*;
+            let value = serde_json::to_value(data)?;
+            match value {
+                String(s) => s,
+                _ => {
+                    let kind = match value {
+                        Null => "null",
+                        Bool(_) => "boolean",
+                        Number(_) => "number",
+                        String(_) => "string",
+                        Array(_) => "array",
+                        Object(_) => "object",
+                    };
+                    bail!("expected a string value for format: {format}, got {kind}")
+                }
+            }
+        }
+        _ => bail!("unsupported format for query: {format}"),
+    })
 }
 
 #[cfg(test)]
