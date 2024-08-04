@@ -56,13 +56,14 @@ Language service (LSP) features:
 
 Extra features:
 
-- Compiles to PDF on save (configurable to as-you-type, or other options)
-- Provides code lenses for exporting to various formats (PDF, SVG, PNG, etc.)
+- Compiles to PDF on save (configurable to as-you-type, or other options).
+- Compiles to SVG, PNG, HTML, Markdown, Text, and other formats by commands, vscode tasks, or code lenses.
+- Provides code lenses for exporting to PDF/SVG/PNG/etc.
 - Provides a status bar item to show the current document's compilation status and words count.
 - #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/tools/editor-tools")[Editor tools]:
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
   - Click a button in template gallery to initialize a new project with a template. (`tinymist.initTemplate` and `tinymist.initTemplateInPlace`)
-  - Trace execution in current document. (`tinymist.profileCurrentFile`)
+  - Trace execution in current document (`tinymist.profileCurrentFile`).
 
 == Release Cycle
 

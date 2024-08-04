@@ -104,7 +104,7 @@ To configure when PDFs are compiled:
   - `onSave` makes a PDF after saving the Typst file.
   - `onType` makes PDF files live, as you type.
   - `never` disables PDF compilation.
-  - "onDocumentHasTitle" makes a PDF when the document has a title and, as you save.
+  - `onDocumentHasTitle` makes a PDF when the document has a title and, as you save.
 
 To configure where PDFs are saved:
 
@@ -115,6 +115,15 @@ To configure where PDFs are saved:
   - e.g. `$root/target/$dir/$name` for `$root/target/path/to/main.pdf`.
   - e.g. `$root/target/foo` for `$root/target/foo.pdf`. This will ensure that the output is always output to `target/foo.pdf`.
 4. Note: the output path should be substituted as an absolute path.
+
+### Exporting to Other Formats
+
+You can export your documents to various other formats by lsp as well. Currently, the following formats are supported:
+- Official svg, png, and pdf.
+- Unofficial html, md (typlite, @ntjess), and txt
+- Query Results (into json, yaml, or txt), and pdfpc (by `typst query --selector <pdfpc-file>`, for [Touying](https://touying-typ.github.io/touying/))
+
+See [Docs: Exporting Documents](https://myriad-dreamin.github.io/tinymist/feature/export.html) for more information.
 
 ### Working with Multiple-File Projects
 
