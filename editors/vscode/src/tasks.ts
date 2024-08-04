@@ -30,8 +30,8 @@ export type TaskDefinition = vscode.TaskDefinition & {
     "svg.merged"?: boolean;
     "png.merged"?: boolean;
     "merged.gap"?: string;
-    "png.merge.gap"?: string;
-    "svg.merge.gap"?: string;
+    "png.merged.gap"?: string;
+    "svg.merged.gap"?: string;
   };
 };
 
@@ -158,15 +158,20 @@ export async function callTypstExportCommand(): Promise<vscode.CustomExecution> 
     }
 
     function resolvePageOpts(fmt: "svg" | "png"): any {
-      let merged = exportArgs[`${fmt}.merged`] || exportArgs[`merged`];
-      if (merged) {
+      if (inheritedProp("merged", fmt)) {
         return {
           merged: {
-            gap: exportArgs[`${fmt}.merge.gap`] || exportArgs[`merged.gap`],
+            gap: inheritedProp("merged.gap", fmt),
           },
         };
       }
       return "first";
+    }
+
+    function inheritedProp(prop: "merged" | "merged.gap", from: "svg" | "png"): any {
+      return exportArgs[`${from}.${prop}`] === undefined
+        ? exportArgs[prop]
+        : exportArgs[`${from}.${prop}`];
     }
   });
 
