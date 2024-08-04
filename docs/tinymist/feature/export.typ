@@ -15,7 +15,31 @@ Example:
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Export SVG",
+      "label": "Export as Html",
+      "type": "typst",
+      "command": "export",
+      "export": {
+        "format": "html"
+      }
+    },
+    {
+      "label": "Export as Markdown",
+      "type": "typst",
+      "command": "export",
+      "export": {
+        "format": "markdown"
+      }
+    },
+    {
+      "label": "Export as Plain Text",
+      "type": "typst",
+      "command": "export",
+      "export": {
+        "format": "html"
+      }
+    },
+    {
+      "label": "Export as SVG",
       "type": "typst",
       "command": "export",
       "export": {
@@ -24,7 +48,7 @@ Example:
       }
     },
     {
-      "label": "Export PNG",
+      "label": "Export as PNG",
       "type": "typst",
       "command": "export",
       "export": {
@@ -35,10 +59,11 @@ Example:
       }
     },
     {
-      "label": "Export PNG and SVG",
+      "label": "Export as PNG and SVG",
       "type": "typst",
       "command": "export",
       "export": {
+        // You can export multiple formats at once.
         "format": ["png", "svg"],
         // To make a visual effect, we set an obvious low resolution.
         // For a nice result, you should set a higher resolution like 288.
@@ -53,7 +78,11 @@ Example:
 }
 ```
 
-todo: documenting export options.
+#let packages = json("/editors/vscode/package.json")
+
+*todo: documenting export options.*
+
+#raw(lang: "json", json.encode(packages.contributes.taskDefinitions, pretty: true), block: true)
 
 After configuring the tasks, you can run them using the command palette.
 + Press `Ctrl+Shift+P` to open the command palette.
@@ -66,5 +95,8 @@ You can call the following export commands.
 - `tinymist.exportSvg`
 - `tinymist.exportPng`
 - `tinymist.exportPdf`
+- `tinymist.exportHtml`
+- `tinymist.exportMarkdown`
+- `tinymist.exportText`
 
 The first argument is the path to the file you want to export and the second argument is an object containing additional options.
