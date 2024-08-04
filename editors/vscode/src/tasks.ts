@@ -24,8 +24,14 @@ export type TaskDefinition = vscode.TaskDefinition & {
     outputPath: string;
     "pdf.creationTimestamp"?: string | null;
     "png.ppi"?: number;
+    fill?: string;
+    "png.fill"?: string;
     merged?: boolean;
+    "svg.merged"?: boolean;
+    "png.merged"?: boolean;
     "merged.gap"?: string;
+    "png.merge.gap"?: string;
+    "svg.merge.gap"?: string;
   };
 };
 
@@ -83,7 +89,8 @@ export async function callTypstExportCommand(): Promise<vscode.CustomExecution> 
         opts() {
           return {
             ppi: exportArgs["png.ppi"] || 96,
-            page: resolvePageOpts(),
+            fill: exportArgs["png.fill"] || exportArgs["fill"],
+            page: resolvePageOpts("png"),
           };
         },
         export: tinymist.exportPng,
@@ -91,7 +98,7 @@ export async function callTypstExportCommand(): Promise<vscode.CustomExecution> 
       svg: {
         opts() {
           return {
-            page: resolvePageOpts(),
+            page: resolvePageOpts("svg"),
           };
         },
         export: tinymist.exportSvg,
@@ -150,11 +157,12 @@ export async function callTypstExportCommand(): Promise<vscode.CustomExecution> 
       return inputPath;
     }
 
-    function resolvePageOpts(): any {
-      if (exportArgs.merged) {
+    function resolvePageOpts(fmt: "svg" | "png"): any {
+      let merged = exportArgs[`${fmt}.merged`] || exportArgs[`merged`];
+      if (merged) {
         return {
           merged: {
-            gap: exportArgs["merged.gap"],
+            gap: exportArgs[`${fmt}.merge.gap`] || exportArgs[`merged.gap`],
           },
         };
       }

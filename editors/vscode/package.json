@@ -141,13 +141,50 @@
                 "description": "The PPI (pixels per inch) to use for PNG export",
                 "default": 144
               },
+              "fill": {
+                "type": "string",
+                "description": "The fill color.  Affected formats: `png`",
+                "examples": [
+                  "white",
+                  "#ffffff",
+                  "#00000000"
+                ]
+              },
+              "png.fill": {
+                "type": "string",
+                "description": "The fill color.  Affected formats: `png`",
+                "examples": [
+                  "white",
+                  "#ffffff",
+                  "#00000000"
+                ],
+                "default": "white"
+              },
               "merged": {
                 "type": "boolean",
                 "description": "Merge the pages into a single image. Affected formats: `png`, `svg`"
               },
+              "svg.merged": {
+                "type": "boolean",
+                "description": "Merge the pages into a single SVG. Affected formats: `svg`"
+              },
+              "png.merged": {
+                "type": "boolean",
+                "description": "Merge the pages into a single PNG. Affected formats: `png`"
+              },
               "merged.gap": {
                 "type": "string",
                 "description": "The gap between the pages when merging **with absolute typst unit**. Affected formats: `png`, `svg`",
+                "default": "0pt"
+              },
+              "svg.merged.gap": {
+                "type": "string",
+                "description": "The gap between the pages when merging **with absolute typst unit**. Affected formats: `svg`",
+                "default": "0pt"
+              },
+              "png.merged.gap": {
+                "type": "string",
+                "description": "The gap between the pages when merging **with absolute typst unit**. Affected formats: `png`",
                 "default": "0pt"
               }
             }

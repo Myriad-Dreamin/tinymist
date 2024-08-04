@@ -29,6 +29,8 @@ Example:
       "command": "export",
       "export": {
         "format": "png",
+        // Default fill is white, but you can set it to transparent.
+        "fill": "#00000000",
         "merged": true
       }
     },
