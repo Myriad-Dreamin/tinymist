@@ -184,5 +184,6 @@ You can call the following export commands.
 - `tinymist.exportHtml`
 - `tinymist.exportMarkdown`
 - `tinymist.exportText`
+- `tinymist.exportQuery`
 
 The first argument is the path to the file you want to export and the second argument is an object containing additional options.
