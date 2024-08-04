@@ -20,20 +20,28 @@ use crate::tool::package::InitTask;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 struct ExportOpts {
+    creation_timestamp: Option<String>,
+    fill: Option<String>,
+    ppi: Option<f64>,
     page: PageSelection,
 }
 
 /// Here are implemented the handlers for each command.
 impl LanguageState {
     /// Export the current document as PDF file(s).
-    pub fn export_pdf(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
-        self.export(
-            req_id,
-            ExportKind::Pdf {
-                creation_timestamp: self.config.compile.determine_creation_timestamp(),
-            },
-            args,
-        )
+    pub fn export_pdf(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+        let opts = get_arg_or_default!(args[1] as ExportOpts);
+
+        let creation_timestamp = if let Some(value) = opts.creation_timestamp {
+            Some(
+                parse_source_date_epoch(&value)
+                    .map_err(|e| invalid_params(format!("Cannot parse creation timestamp: {e}")))?,
+            )
+        } else {
+            self.config.compile.determine_creation_timestamp()
+        };
+
+        self.export(req_id, ExportKind::Pdf { creation_timestamp }, args)
     }
 
     /// Export the current document as Svg file(s).
@@ -45,7 +53,15 @@ impl LanguageState {
     /// Export the current document as Png file(s).
     pub fn export_png(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
-        self.export(req_id, ExportKind::Png { page: opts.page }, args)
+        self.export(
+            req_id,
+            ExportKind::Png {
+                fill: opts.fill,
+                ppi: opts.ppi,
+                page: opts.page,
+            },
+            args,
+        )
     }
 
     /// Export the current document as some format. The client is responsible

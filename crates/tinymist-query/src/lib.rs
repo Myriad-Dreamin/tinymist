@@ -135,12 +135,14 @@ mod polymorphic {
     use super::prelude::*;
     use super::*;
 
-    #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
+    #[derive(Default, Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub enum PageSelection {
         #[default]
         First,
-        Merged,
+        Merged {
+            gap: Option<String>,
+        },
     }
 
     #[derive(Debug, Clone)]
@@ -152,6 +154,8 @@ mod polymorphic {
             page: PageSelection,
         },
         Png {
+            ppi: Option<f64>,
+            fill: Option<String>,
             page: PageSelection,
         },
     }
