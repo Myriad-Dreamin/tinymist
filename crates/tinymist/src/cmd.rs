@@ -44,6 +44,21 @@ impl LanguageState {
         self.export(req_id, ExportKind::Pdf { creation_timestamp }, args)
     }
 
+    /// Export the current document as HTML file(s).
+    pub fn export_html(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.export(req_id, ExportKind::Html {}, args)
+    }
+
+    /// Export the current document as Markdown file(s).
+    pub fn export_markdown(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.export(req_id, ExportKind::Markdown {}, args)
+    }
+
+    /// Export the current document as Text file(s).
+    pub fn export_text(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.export(req_id, ExportKind::Text {}, args)
+    }
+
     /// Export the current document as Svg file(s).
     pub fn export_svg(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);

@@ -41,6 +41,15 @@ export const tinymist = {
   exportPng(uri: string, extraOpts?: any) {
     return doExport("tinymist.exportPng", uri, extraOpts);
   },
+  exportHtml(uri: string, extraOpts?: any) {
+    return doExport("tinymist.exportHtml", uri, extraOpts);
+  },
+  exportMarkdown(uri: string, extraOpts?: any) {
+    return doExport("tinymist.exportMarkdown", uri, extraOpts);
+  },
+  exportText(uri: string, extraOpts?: any) {
+    return doExport("tinymist.exportText", uri, extraOpts);
+  },
 };
 
 function doExport(command: string, uri: string, extraOpts?: any): Promise<string> {

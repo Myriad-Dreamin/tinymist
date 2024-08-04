@@ -103,6 +103,24 @@ export async function callTypstExportCommand(): Promise<vscode.CustomExecution> 
         },
         export: tinymist.exportSvg,
       },
+      html: {
+        opts() {
+          return {};
+        },
+        export: tinymist.exportHtml,
+      },
+      markdown: {
+        opts() {
+          return {};
+        },
+        export: tinymist.exportMarkdown,
+      },
+      text: {
+        opts() {
+          return {};
+        },
+        export: tinymist.exportText,
+      },
     };
 
     return Promise.resolve({

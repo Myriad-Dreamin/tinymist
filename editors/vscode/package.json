@@ -108,12 +108,18 @@
                       "enum": [
                         "pdf",
                         "png",
-                        "svg"
+                        "svg",
+                        "html",
+                        "markdown",
+                        "text"
                       ],
                       "enumDescriptions": [
                         "PDF",
                         "PNG",
-                        "SVG"
+                        "SVG",
+                        "HTML",
+                        "Markdown",
+                        "Plain Text"
                       ],
                       "default": "pdf"
                     }
@@ -143,7 +149,7 @@
               },
               "fill": {
                 "type": "string",
-                "description": "The fill color.  Affected formats: `png`",
+                "description": "The fill color. Affected formats: `png`",
                 "examples": [
                   "white",
                   "#ffffff",
@@ -152,7 +158,7 @@
               },
               "png.fill": {
                 "type": "string",
-                "description": "The fill color.  Affected formats: `png`",
+                "description": "The fill color. Affected formats: `png`",
                 "examples": [
                   "white",
                   "#ffffff",

@@ -15,6 +15,7 @@ repository.workspace = true
 tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
 tinymist-render.workspace = true
+typlite.workspace = true
 sync-lsp.workspace = true
 chrono.workspace = true
 
