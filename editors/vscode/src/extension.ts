@@ -36,105 +36,75 @@ import { vscodeVariables } from "./vscode-variables";
 import { taskActivate } from "./tasks";
 import { onEnterHandler } from "./lsp.on-enter";
 import { extensionState } from "./state";
+import { devKitActivate } from "./dev-kit";
 
-let previewIsEnabled = false;
-let devKitIsEnabled = false;
+export async function activate(context: ExtensionContext): Promise<void> {
+  try {
+    return await doActivate(context);
+  } catch (e) {
+    void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
+    throw e;
+  }
+}
 
 export function deactivate(): Promise<void> | undefined {
   previewDeactivate();
   return client?.stop();
 }
 
-export function activate(context: ExtensionContext): Promise<void> {
-  // Set a global context key to indicate that the extension is activated
+export async function doActivate(context: ExtensionContext): Promise<void> {
+  const isDevMode = vscode.ExtensionMode.Development == context.extensionMode;
+  // Sets a global context key to indicate that the extension is activated
   vscode.commands.executeCommand("setContext", "ext.tinymistActivated", true);
-
-  let config: Record<string, any> = JSON.parse(
-    JSON.stringify(workspace.getConfiguration("tinymist")),
-  );
-  config.preferredTheme = "light";
-
-  {
-    const keys = Object.keys(config);
-    let values = keys.map((key) => config[key]);
-    values = substVscodeVarsInConfig(keys, values);
-    config = {};
-    for (let i = 0; i < keys.length; i++) {
-      config[keys[i]] = values[i];
-    }
-  }
-
-  previewIsEnabled = config.previewFeature === "enable";
-  devKitIsEnabled =
-    vscode.ExtensionMode.Development == context.extensionMode || config.devKit === "enable";
+  // Loads configuration
+  const config = loadConfig();
+  // Sets features
+  extensionState.features.preview = config.previewFeature === "enable";
+  extensionState.features.devKit = isDevMode || config.devKit === "enable";
   extensionState.features.onEnter = !!config.onEnterEvent;
-
-  if (previewIsEnabled) {
+  // Initializes language client
+  const client = initClient(context, config);
+  setClient(client);
+  // Activates features
+  if (extensionState.features.task) {
+    taskActivate(context);
+  }
+  if (extensionState.features.devKit) {
+    devKitActivate(context);
+  }
+  if (extensionState.features.preview) {
     const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
     if (typstPreviewExtension) {
       void vscode.window.showWarningMessage(
         "Tinymist Says:\n\nTypst Preview extension is already integrated into Tinymist. Please disable Typst Preview extension to avoid conflicts.",
       );
     }
-  }
 
-  {
-    const keys = Object.keys(config);
-    let values = keys.map((key) => config[key]);
-    values = substVscodeVarsInConfig(keys, values);
-    config = {};
-    for (let i = 0; i < keys.length; i++) {
-      config[keys[i]] = values[i];
-    }
-  }
-
-  console.log("vscodeVariables test:", {
-    workspaceFolder: vscodeVariables("<${workspaceFolder}>"),
-    workspaceFolderBasename: vscodeVariables("<${workspaceFolderBasename}>"),
-    file: vscodeVariables("<${file}>"),
-    fileWorkspaceFolder: vscodeVariables("<${fileWorkspaceFolder}>"),
-    relativeFile: vscodeVariables("<${relativeFile}>"),
-    relativeFileDirname: vscodeVariables("<${relativeFileDirname}>"),
-    fileBasename: vscodeVariables("<${fileBasename}>"),
-    fileBasenameNoExtension: vscodeVariables("<${fileBasenameNoExtension}>"),
-    fileExtname: vscodeVariables("<${fileExtname}>"),
-    fileDirname: vscodeVariables("<${fileDirname}>"),
-    cwd: vscodeVariables("<${cwd}>"),
-    pathSeparator: vscodeVariables("<${pathSeparator}>"),
-    lineNumber: vscodeVariables("<${lineNumber}>"),
-    selectedText: vscodeVariables("<${selectedText}>"),
-    config: vscodeVariables("<${config:editor.fontSize}>"),
-    composite: vscodeVariables("wof=<${workspaceFolder}>:<${file}>"),
-    composite2: vscodeVariables("fow=<${file}>:<${workspaceFolder}>"),
-  });
-
-  const client = initClient(context, config);
-  setClient(client);
-
-  taskActivate(context);
-
-  if (previewIsEnabled) {
-    // test compat-mode preview extension
+    // Tests compat-mode preview extension
     // previewActivate(context, true);
 
-    // integrated preview extension
+    // Runs Integrated preview extension
     previewSetIsTinymist();
     previewActivate(context, false);
   }
+  // Starts language client
+  return await startClient(client, context);
+}
 
-  if (devKitIsEnabled) {
-    vscode.commands.executeCommand("setContext", "ext.tinymistDevKit", true);
+function loadConfig() {
+  let config: Record<string, any> = JSON.parse(
+    JSON.stringify(workspace.getConfiguration("tinymist")),
+  );
+  config.preferredTheme = "light";
 
-    const devKitProvider = new DevKitProvider();
-    context.subscriptions.push(
-      vscode.window.registerTreeDataProvider("tinymist.dev-kit", devKitProvider),
-    );
+  const keys = Object.keys(config);
+  let values = keys.map((key) => config[key]);
+  values = substVscodeVarsInConfig(keys, values);
+  config = {};
+  for (let i = 0; i < keys.length; i++) {
+    config[keys[i]] = values[i];
   }
-
-  return startClient(client, context).catch((e) => {
-    void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
-    throw e;
-  });
+  return config;
 }
 
 function initClient(context: ExtensionContext, config: Record<string, any>) {
@@ -320,7 +290,7 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
 
   await client.start();
 
-  if (previewIsEnabled) {
+  if (extensionState.features.preview) {
     previewPreload(context);
   }
 
@@ -842,42 +812,6 @@ function determineVscodeTheme(): any {
 function triggerNamedCompletion() {
   vscode.commands.executeCommand("editor.action.triggerSuggest");
   vscode.commands.executeCommand("editor.action.triggerParameterHints");
-}
-
-class DevKitProvider implements vscode.TreeDataProvider<DevKitItem> {
-  constructor() {}
-
-  refresh(): void {}
-
-  getTreeItem(element: DevKitItem): vscode.TreeItem {
-    return element;
-  }
-
-  getChildren(element?: DevKitItem): Thenable<DevKitItem[]> {
-    if (element) {
-      return Promise.resolve([]);
-    }
-
-    return Promise.resolve([
-      new DevKitItem({
-        title: "Run Preview Dev",
-        command: "tinymist.previewDev",
-        tooltip: `Run Preview in Developing Mode. It sets data plane port to the fix default value.`,
-      }),
-    ]);
-  }
-}
-
-export class DevKitItem extends vscode.TreeItem {
-  constructor(
-    public readonly command: vscode.Command,
-    public description = "",
-  ) {
-    super(command.title, vscode.TreeItemCollapsibleState.None);
-    this.tooltip = this.command.tooltip || ``;
-  }
-
-  contextValue = "devkit-item";
 }
 
 // "tinymist.hoverPeriscope": {

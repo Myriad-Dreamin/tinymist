@@ -87,7 +87,6 @@ function probePaths(paths: [string, string][]): string {
   for (const [loc, path] of paths) {
     let messageSuffix;
     try {
-      console.log("validate", path, "args", ["probe"]);
       const result = spawnSync(path, ["probe"], { timeout: PROBE_TIMEOUT });
       if (result.status === 0) {
         return path;
