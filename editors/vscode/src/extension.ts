@@ -10,8 +10,6 @@ import {
 } from "vscode";
 import * as vscode from "vscode";
 import * as path from "path";
-import * as child_process from "child_process";
-import * as lc from "vscode-languageclient";
 
 import {
   LanguageClient,
@@ -25,7 +23,6 @@ import {
   getUserPackageData,
 } from "./editor-tools";
 import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
-import { applySnippetTextEdits } from "./snippets";
 import { setIsTinymist as previewSetIsTinymist } from "./preview-compat";
 import {
   previewActivate,
@@ -37,9 +34,16 @@ import { DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, getClient, setClient, tinymist } from "./lsp";
 import { vscodeVariables } from "./vscode-variables";
 import { taskActivate } from "./tasks";
+import { onEnterHandler } from "./lsp.on-enter";
+import { extensionState } from "./state";
 
 let previewIsEnabled = false;
 let devKitIsEnabled = false;
+
+export function deactivate(): Promise<void> | undefined {
+  previewDeactivate();
+  return client?.stop();
+}
 
 export function activate(context: ExtensionContext): Promise<void> {
   // Set a global context key to indicate that the extension is activated
@@ -63,7 +67,7 @@ export function activate(context: ExtensionContext): Promise<void> {
   previewIsEnabled = config.previewFeature === "enable";
   devKitIsEnabled =
     vscode.ExtensionMode.Development == context.extensionMode || config.devKit === "enable";
-  enableOnEnter = !!config.onEnterEvent;
+  extensionState.features.onEnter = !!config.onEnterEvent;
 
   if (previewIsEnabled) {
     const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
@@ -114,7 +118,7 @@ export function activate(context: ExtensionContext): Promise<void> {
     // previewActivate(context, true);
 
     // integrated preview extension
-    previewSetIsTinymist(config);
+    previewSetIsTinymist();
     previewActivate(context, false);
   }
 
@@ -133,10 +137,8 @@ export function activate(context: ExtensionContext): Promise<void> {
   });
 }
 
-let enableOnEnter = false;
-
 function initClient(context: ExtensionContext, config: Record<string, any>) {
-  const serverCommand = getServer(config.serverPath);
+  const serverCommand = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
   const run = {
     command: serverCommand,
     args: [
@@ -388,115 +390,6 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
   }
 
   return;
-}
-
-export function deactivate(): Promise<void> | undefined {
-  previewDeactivate();
-  return client?.stop();
-}
-
-export function getServer(serverPath: string): string {
-  if (serverPath) {
-    const validation = validateServer(serverPath);
-    if (!validation.valid) {
-      throw new Error(
-        `\`tinymist.serverPath\` (${serverPath}) does not point to a valid tinymist binary:\n${validation.message}`,
-      );
-    }
-    return serverPath;
-  }
-  const windows = process.platform === "win32";
-  const suffix = windows ? ".exe" : "";
-  const binaryName = "tinymist" + suffix;
-
-  const bundledPath = path.resolve(__dirname, binaryName);
-
-  const bundledValidation = validateServer(bundledPath);
-  if (bundledValidation.valid) {
-    return bundledPath;
-  }
-
-  const binaryValidation = validateServer(binaryName);
-  if (binaryValidation.valid) {
-    return binaryName;
-  }
-
-  throw new Error(
-    `Could not find a valid tinymist binary.\nBundled: ${bundledValidation.message}\nIn PATH: ${binaryValidation.message}`,
-  );
-}
-
-function validateServer(
-  path: string,
-): { valid: true; message: string } | { valid: false; message: string } {
-  try {
-    console.log("validate", path, "args", ["probe"]);
-    const result = child_process.spawnSync(path, ["probe"]);
-    if (result.status === 0) {
-      return { valid: true, message: "" };
-    } else {
-      const statusMessage = result.status !== null ? [`return status: ${result.status}`] : [];
-      const errorMessage =
-        result.error?.message !== undefined ? [`error: ${result.error.message}`] : [];
-      const messages = [statusMessage, errorMessage];
-      const messageSuffix = messages.length !== 0 ? `:\n\t${messages.flat().join("\n\t")}` : "";
-      const message = `Failed to launch '${path}'${messageSuffix}`;
-      return { valid: false, message };
-    }
-  } catch (e) {
-    if (e instanceof Error) {
-      return { valid: false, message: `Failed to launch '${path}': ${e.message}` };
-    } else {
-      return { valid: false, message: `Failed to launch '${path}': ${JSON.stringify(e)}` };
-    }
-  }
-}
-
-function activeTypstEditor() {
-  const editor = window.activeTextEditor;
-  if (!editor || editor.document.languageId !== "typst") {
-    return;
-  }
-  return editor;
-}
-
-export const onEnter = new lc.RequestType<lc.TextDocumentPositionParams, lc.TextEdit[], void>(
-  "experimental/onEnter",
-);
-
-export function onEnterHandler() {
-  async function handleKeypress() {
-    if (!enableOnEnter) return false;
-
-    const editor = activeTypstEditor();
-
-    if (!editor || !client) return false;
-
-    const lcEdits = await client
-      .sendRequest(onEnter, {
-        textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(editor.document),
-        position: client.code2ProtocolConverter.asPosition(editor.selection.active),
-      })
-      .catch((_error: any) => {
-        // client.handleFailedRequest(OnEnterRequest.type, error, null);
-        return null;
-      });
-    if (!lcEdits) return false;
-
-    const edits = await client.protocol2CodeConverter.asTextEdits(lcEdits);
-    await applySnippetTextEdits(editor, edits);
-    return true;
-  }
-
-  return async () => {
-    try {
-      if (await handleKeypress()) return;
-    } catch (e) {
-      console.error("onEnter failed", e);
-    }
-
-    await vscode.commands.executeCommand("default:type", { text: "\n" });
-  };
 }
 
 async function commandExport(
