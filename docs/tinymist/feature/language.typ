@@ -14,7 +14,7 @@ Language service (LSP) features:
   - (Todo) Highlight all captures in a closure context.
   - (Todo) Highlight all occurrences of a symbol in a document.
 - #link("https://code.visualstudio.com/docs/getstarted/userinterface#_outline-view")[Document symbols]
-  - Also known as "document outline" or "table of contents" **in Typst**.
+  - Also known as "document outline" or "table of contents" *in Typst*.
 - #link("https://burkeholland.gitbook.io/vs-code-can-do-that/exercise-3-navigation-and-refactoring/folding-sections")[Folding ranges]
   - You can collapse code/content blocks and headings.
 - #link("https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-definitions-of-a-symbol")[Goto definitions]

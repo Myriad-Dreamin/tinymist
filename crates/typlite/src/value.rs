@@ -136,6 +136,12 @@ pub trait Eval<'a>: Sized {
     fn eval(node: &'a SyntaxNode, vm: &mut TypliteWorker) -> Result<Self>;
 }
 
+impl<'a> Eval<'a> for () {
+    fn eval(_node: &'a SyntaxNode, _vm: &mut TypliteWorker) -> Result<Self> {
+        Ok(())
+    }
+}
+
 impl<'a> Eval<'a> for &'a SyntaxNode {
     fn eval(node: &'a SyntaxNode, _vm: &mut TypliteWorker) -> Result<Self> {
         Ok(node)
