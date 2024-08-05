@@ -311,7 +311,8 @@ const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
   return {
     /// name: 'markup.expr.typst'
     begin: new RegExp("#" + seek.source),
-    end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[\$])|(?=[\s\}\]\)\$]|$)|(;)/,
+    // `?=(?<![\d#])\.[^\p{XID_Start}_]`: This means that we are on a dot and the next character is not a valid identifier start, but we are not at the beginning of hash or number
+    end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[\$])|(?=(?<![#\d])\.[^\p{XID_Start}_])|(?=[\s\}\]\)\$]|$)|(;)/u,
     beginCaptures: {
       "0": {
         name: kind,
