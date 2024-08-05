@@ -139,7 +139,7 @@ impl TypliteWorker {
             LeftParen => Self::char('('),
             RightParen => Self::char(')'),
             Comma => Self::char(','),
-            Semicolon => Self::char(';'),
+            Semicolon => Ok(Value::None),
             Colon => Self::char(':'),
             Star => Self::char('*'),
             Underscore => Self::char('_'),
@@ -370,8 +370,8 @@ impl TypliteWorker {
         Ok(Value::Content(s))
     }
 
-    fn label(node: &SyntaxNode) -> Result<Value> {
-        Self::str(node)
+    fn label(_node: &SyntaxNode) -> Result<Value> {
+        Result::Ok(Value::None)
     }
 
     fn label_ref(node: &SyntaxNode) -> Result<Value> {

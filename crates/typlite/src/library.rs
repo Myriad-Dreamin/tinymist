@@ -69,7 +69,7 @@ pub fn cross_link(mut args: Args) -> Result<Value> {
 
 /// Evaluate a markdown alteration.
 pub fn md_alter(mut args: Args) -> Result<Value> {
-    let _left = get_pos_named!(args, left: Content);
+    let _: () = get_pos_named!(args, left: ());
     let right = get_pos_named!(args, right: LazyContent);
 
     Ok(Value::Content(right.0))
