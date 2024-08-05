@@ -57,3 +57,17 @@ export class DisposeList {
     }
   }
 }
+
+export class VirtualConsole {
+  writeEmitter = new vscode.EventEmitter<string>();
+  writeRaw(str: string) {
+    this.writeEmitter.fire(str);
+  }
+  write(str: string) {
+    this.writeEmitter.fire(str.replace(/\n/g, "\r\n"));
+  }
+  writeln(str: string) {
+    this.write(str);
+    this.writeRaw("\r\n");
+  }
+}
