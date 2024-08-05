@@ -16,6 +16,7 @@ import {
   type LanguageClientOptions,
   type ServerOptions,
 } from "vscode-languageclient/node";
+import { loadTinymistConfig, substVscodeVarsInConfig } from "./config";
 import {
   EditorToolName,
   SymbolViewProvider as SymbolViewProvider,
@@ -32,7 +33,6 @@ import {
 } from "./preview";
 import { DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, getClient, setClient, tinymist } from "./lsp";
-import { vscodeVariables } from "./vscode-variables";
 import { taskActivate } from "./tasks";
 import { onEnterHandler } from "./lsp.on-enter";
 import { extensionState } from "./state";
@@ -57,7 +57,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   // Sets a global context key to indicate that the extension is activated
   vscode.commands.executeCommand("setContext", "ext.tinymistActivated", true);
   // Loads configuration
-  const config = loadConfig();
+  const config = loadTinymistConfig();
   // Sets features
   extensionState.features.preview = config.previewFeature === "enable";
   extensionState.features.devKit = isDevMode || config.devKit === "enable";
@@ -89,22 +89,6 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   }
   // Starts language client
   return await startClient(client, context);
-}
-
-function loadConfig() {
-  let config: Record<string, any> = JSON.parse(
-    JSON.stringify(workspace.getConfiguration("tinymist")),
-  );
-  config.preferredTheme = "light";
-
-  const keys = Object.keys(config);
-  let values = keys.map((key) => config[key]);
-  values = substVscodeVarsInConfig(keys, values);
-  config = {};
-  for (let i = 0; i < keys.length; i++) {
-    config[keys[i]] = values[i];
-  }
-  return config;
 }
 
 function initClient(context: ExtensionContext, config: Record<string, any>) {
@@ -256,7 +240,7 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
 
   // prettier-ignore
   context.subscriptions.push(
-    commands.registerCommand("tinymist.onEnter", onEnterHandler()),
+    commands.registerCommand("tinymist.onEnter", onEnterHandler),
 
     commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
     commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
@@ -751,110 +735,7 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
   }
 }
 
-function substVscodeVars(str: string | null | undefined): string | undefined {
-  if (str === undefined || str === null) {
-    return undefined;
-  }
-  try {
-    return vscodeVariables(str);
-  } catch (e) {
-    console.error("failed to substitute vscode variables", e);
-    return str;
-  }
-}
-
-const STR_VARIABLES = [
-  "serverPath",
-  "tinymist.serverPath",
-  "rootPath",
-  "tinymist.rootPath",
-  "outputPath",
-  "tinymist.outputPath",
-];
-const STR_ARR_VARIABLES = ["fontPaths", "tinymist.fontPaths"];
-const PREFERRED_THEME = ["preferredTheme", "tinymist.preferredTheme"];
-
-// todo: documentation that, typstExtraArgs won't get variable extended
-function substVscodeVarsInConfig(keys: (string | undefined)[], values: unknown[]): unknown[] {
-  return values.map((value, i) => {
-    const k = keys[i];
-    if (!k) {
-      return value;
-    }
-    if (PREFERRED_THEME.includes(k)) {
-      return determineVscodeTheme();
-    }
-    if (STR_VARIABLES.includes(k)) {
-      return substVscodeVars(value as string);
-    }
-    if (STR_ARR_VARIABLES.includes(k)) {
-      const paths = value as string[];
-      if (!paths) {
-        return undefined;
-      }
-      return paths.map((path) => substVscodeVars(path));
-    }
-    return value;
-  });
-}
-
-function determineVscodeTheme(): any {
-  console.log("determineVscodeTheme", vscode.window.activeColorTheme.kind);
-  switch (vscode.window.activeColorTheme.kind) {
-    case vscode.ColorThemeKind.Dark:
-    case vscode.ColorThemeKind.HighContrast:
-      return "dark";
-    default:
-      return "light";
-  }
-}
-
 function triggerNamedCompletion() {
   vscode.commands.executeCommand("editor.action.triggerSuggest");
   vscode.commands.executeCommand("editor.action.triggerParameterHints");
 }
-
-// "tinymist.hoverPeriscope": {
-//     "title": "Show preview document in periscope mode on hovering",
-//     "description": "In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since neovim and helix don't have a such feature, it is disabled by default at the language server lebel.",
-//     "type": [
-//         "object",
-//         "string"
-//     ],
-//     "default": "disable",
-//     "enum": [
-//         "enable",
-//         "disable"
-//     ],
-//     "properties": {
-//         "yAbove": {
-//             "title": "Y above",
-//             "description": "The distance from the top of the screen to the top of the periscope hover.",
-//             "type": "number",
-//             "default": 55
-//         },
-//         "yBelow": {
-//             "title": "Y below",
-//             "description": "The distance from the bottom of the screen to the bottom of the periscope hover.",
-//             "type": "number",
-//             "default": 55
-//         },
-//         "scale": {
-//             "title": "Scale",
-//             "description": "The scale of the periscope hover.",
-//             "type": "number",
-//             "default": 1.5
-//         },
-//         "invertColors": {
-//             "title": "Invert colors",
-//             "description": "Invert the colors of the periscope to hover.",
-//             "type": "string",
-//             "enum": [
-//                 "auto",
-//                 "always",
-//                 "never"
-//             ],
-//             "default": "auto"
-//         }
-//     }
-// },
