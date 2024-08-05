@@ -19,6 +19,7 @@ import {
   type ServerOptions,
 } from "vscode-languageclient/node";
 import {
+  EditorToolName,
   SymbolViewProvider as SymbolViewProvider,
   activateEditorTool,
   getUserPackageData,
@@ -272,45 +273,47 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
     }),
   );
 
+  const editorToolCommand = (tool: EditorToolName) => async () => {
+    await activateEditorTool(context, tool);
+  };
+
+  const initTemplateCommand =
+    (inPlace: boolean) =>
+    (...args: string[]) =>
+      initTemplate(context, inPlace, ...args);
+
+  // prettier-ignore
   context.subscriptions.push(
     commands.registerCommand("tinymist.onEnter", onEnterHandler()),
 
     commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
-    commands.registerCommand("tinymist.getCurrentDocumentMetrics", () =>
-      commandGetCurrentDocumentMetrics(),
-    ),
+    commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
+    commands.registerCommand("tinymist.getCurrentDocumentMetrics", commandGetCurrentDocumentMetrics),
+    commands.registerCommand("tinymist.clearCache", commandClearCache),
+    commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
+    commands.registerCommand("tinymist.showLog", tinymist.showLog),
+
     commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true)),
     commands.registerCommand("tinymist.unpinMain", () => commandPinMain(false)),
     commands.registerCommand("typst-lsp.pinMainToCurrent", () => commandPinMain(true)),
     commands.registerCommand("typst-lsp.unpinMain", () => commandPinMain(false)),
-    commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
-    commands.registerCommand("tinymist.clearCache", commandClearCache),
-    commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
-    commands.registerCommand("tinymist.initTemplate", (...args) =>
-      commandInitTemplate(context, false, ...args),
-    ),
-    commands.registerCommand("tinymist.initTemplateInPlace", (...args) =>
-      commandInitTemplate(context, true, ...args),
-    ),
-    commands.registerCommand("tinymist.showTemplateGallery", () =>
-      commandShowTemplateGallery(context),
-    ),
-    commands.registerCommand("tinymist.showSummary", () => commandShowSummary(context)),
-    commands.registerCommand("tinymist.showSymbolView", () => commandShowSymbolView(context)),
-    commands.registerCommand("tinymist.profileCurrentFile", () => commandShowTrace(context)),
+
+    commands.registerCommand("tinymist.initTemplate", initTemplateCommand(false)),
+    commands.registerCommand("tinymist.initTemplateInPlace", initTemplateCommand(true)),
+
+    commands.registerCommand("tinymist.showTemplateGallery", editorToolCommand("template-gallery")),
+    commands.registerCommand("tinymist.showSummary", editorToolCommand("summary")),
+    commands.registerCommand("tinymist.showSymbolView", editorToolCommand("symbol-view")),
+    commands.registerCommand("tinymist.profileCurrentFile", editorToolCommand("tracing")),
+
     // We would like to define it at the server side, but it is not possible for now.
     // https://github.com/microsoft/language-server-protocol/issues/1117
     commands.registerCommand("tinymist.triggerNamedCompletion", triggerNamedCompletion),
-    commands.registerCommand("tinymist.showLog", () => {
-      if (client) {
-        client.outputChannel.show();
-      }
-    }),
   );
   // context.subscriptions.push
   const provider = new SymbolViewProvider(context);
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider("tinymist.side-symbol-view", provider),
+    vscode.window.registerWebviewViewProvider(SymbolViewProvider.Name, provider),
   );
 
   await client.start();
@@ -661,35 +664,7 @@ async function commandPinMain(isPin: boolean): Promise<void> {
   });
 }
 
-async function commandShowTemplateGallery(context: vscode.ExtensionContext): Promise<void> {
-  await activateEditorTool(context, "template-gallery");
-}
-
-async function commandShowSummary(context: vscode.ExtensionContext): Promise<void> {
-  await activateEditorTool(context, "summary");
-}
-
-async function commandShowSymbolView(context: vscode.ExtensionContext): Promise<void> {
-  await activateEditorTool(context, "symbol-view");
-}
-
-async function commandShowTrace(context: vscode.ExtensionContext): Promise<void> {
-  const activeEditor = window.activeTextEditor;
-  if (activeEditor === undefined) {
-    return;
-  }
-
-  const uri = activeEditor.document.uri.toString();
-  void uri;
-
-  await activateEditorTool(context, "tracing");
-}
-
-async function commandInitTemplate(
-  context: vscode.ExtensionContext,
-  inPlace: boolean,
-  ...args: string[]
-): Promise<void> {
+async function initTemplate(context: vscode.ExtensionContext, inPlace: boolean, ...args: string[]) {
   const initArgs: string[] = [];
   if (!inPlace) {
     if (args.length === 2) {

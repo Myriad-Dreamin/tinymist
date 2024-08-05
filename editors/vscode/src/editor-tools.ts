@@ -120,10 +120,8 @@ export function getFontsExportConfigure(context: vscode.ExtensionContext) {
   return configure;
 }
 
-export async function activateEditorTool(
-  context: vscode.ExtensionContext,
-  tool: "template-gallery" | "tracing" | "summary" | "symbol-view",
-) {
+export type EditorToolName = "template-gallery" | "tracing" | "summary" | "symbol-view";
+export async function activateEditorTool(context: vscode.ExtensionContext, tool: EditorToolName) {
   // Create and show a new WebView
   const title = {
     "template-gallery": "Template Gallery",
@@ -148,6 +146,8 @@ export async function activateEditorTool(
 }
 
 export class SymbolViewProvider implements vscode.WebviewViewProvider {
+  static readonly Name = "tinymist.side-symbol-view";
+
   constructor(private context: vscode.ExtensionContext) {}
 
   public resolveWebviewView(

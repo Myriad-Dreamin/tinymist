@@ -53,6 +53,11 @@ export const tinymist = {
   exportQuery(uri: string, extraOpts?: any) {
     return doExport("tinymist.exportQuery", uri, extraOpts);
   },
+  showLog() {
+    if (client) {
+      client.outputChannel.show();
+    }
+  },
 };
 
 function doExport(command: string, uri: string, extraOpts?: any): Promise<string> {
