@@ -88,7 +88,7 @@ export class Context {
     assert.ok(
       vscode.workspace.workspaceFolders?.length === 1 &&
         vscode.workspace.workspaceFolders[0].uri.toString() == resolved.toString(),
-      `Expected workspace folder to be ${resolved.toString()}, got ${vscode.workspace.workspaceFolders}`
+      `Expected workspace folder to be ${resolved.toString()}, got ${vscode.workspace.workspaceFolders}`,
     );
   }
 
@@ -106,7 +106,7 @@ export class Context {
 
   async completion<T extends CompResponse = CompResponse>(
     docUri: vscode.Uri,
-    position: vscode.Position
+    position: vscode.Position,
   ): Promise<T> {
     const doc = await vscode.workspace.openTextDocument(docUri);
     const editor = await vscode.window.showTextDocument(doc);
@@ -114,7 +114,7 @@ export class Context {
     return await vscode.commands.executeCommand(
       "vscode.executeCompletionItemProvider",
       docUri,
-      position
+      position,
     );
   }
 
@@ -122,7 +122,7 @@ export class Context {
   diagnostics(
     cnt: number,
     f: () => Promise<any> = Promise.resolve,
-    timeout = 5000
+    timeout = 5000,
   ): Promise<[vscode.DiagnosticChangeEvent, [vscode.Uri, vscode.Diagnostic[]][]]> {
     let diagNow = performance.now();
 
@@ -134,7 +134,7 @@ export class Context {
       const doReject = (reason: string) => (err: any) => {
         console.error(
           `diagnostics[${tick}] ${reason}, expect ${cnt}, got ${JSON.stringify(received, undefined, 1)}`,
-          err
+          err,
         );
         diagnosticsHandler.dispose();
         clearTimeout(t);
@@ -181,7 +181,7 @@ export async function run(): Promise<void> {
   });
 
   const testFiles = (await readdir(path.resolve(__dirname))).filter((name) =>
-    name.endsWith(".test.js")
+    name.endsWith(".test.js"),
   );
 
   const filter = process.env.VSCODE_TEST_FILTER;

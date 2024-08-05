@@ -18,7 +18,7 @@ export type SnippetTextDocumentEdit = [vscode.Uri, (vscode.TextEdit | vscode.Sni
 
 export async function applySnippetWorkspaceEdit(
   edit: vscode.WorkspaceEdit,
-  editEntries: SnippetTextDocumentEdit[]
+  editEntries: SnippetTextDocumentEdit[],
 ) {
   if (editEntries.length === 1) {
     const [uri, edits] = unwrapUndefinable(editEntries[0]);
@@ -36,7 +36,7 @@ export async function applySnippetWorkspaceEdit(
         for (const indel of edits) {
           assert(
             !(indel instanceof vscode.SnippetTextEdit),
-            `bad ws edit: snippet received with multiple edits: ${JSON.stringify(edit)}`
+            `bad ws edit: snippet received with multiple edits: ${JSON.stringify(edit)}`,
           );
           builder.replace(indel.range, indel.newText);
         }
@@ -51,7 +51,7 @@ async function editorFromUri(uri: vscode.Uri): Promise<vscode.TextEditor | undef
     await vscode.window.showTextDocument(uri, {});
   }
   return vscode.window.visibleTextEditors.find(
-    (it) => it.document.uri.toString() === uri.toString()
+    (it) => it.document.uri.toString() === uri.toString(),
   );
 }
 
@@ -68,7 +68,7 @@ function hasSnippet(snip: string): boolean {
 }
 
 function toSnippetTextEdits(
-  edits: vscode.TextEdit[]
+  edits: vscode.TextEdit[],
 ): (vscode.TextEdit | vscode.SnippetTextEdit)[] {
   return edits.map((textEdit) => {
     // Note: text edits without any snippets are returned as-is instead of
@@ -100,7 +100,7 @@ function toSnippetTextEdits(
  */
 function removeLeadingWhitespace(
   editor: vscode.TextEditor,
-  edits: (vscode.TextEdit | vscode.SnippetTextEdit)[]
+  edits: (vscode.TextEdit | vscode.SnippetTextEdit)[],
 ) {
   return edits.map((edit) => {
     if (edit instanceof vscode.SnippetTextEdit) {
@@ -114,7 +114,7 @@ function removeLeadingWhitespace(
         const leadingWhitespace = getLeadingWhitespace(
           startLine.text,
           0,
-          startLine.firstNonWhitespaceCharacterIndex
+          startLine.firstNonWhitespaceCharacterIndex,
         );
 
         const [firstLine, rest] = splitAt(snippetEdit.snippet.value, firstLineEnd + 1);

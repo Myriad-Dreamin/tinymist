@@ -57,7 +57,7 @@ async function getCliPath(extensionPath?: string): Promise<string> {
   const bundledPath = path.resolve(
     extensionPath || path.join(__dirname, ".."),
     "out",
-    state.BINARY_NAME
+    state.BINARY_NAME,
   );
   const configPath = state.getConfig();
 
@@ -99,7 +99,7 @@ async function getCliPath(extensionPath?: string): Promise<string> {
       `${state.BINARY_NAME} executable at ${bundledPath} not working,` +
         `maybe we didn't ship it for your platform or it cannot run due to library issues?` +
         `In this case you need compile and add ${state.BINARY_NAME} to your PATH.` +
-        `Error: ${errorMessage}`
+        `Error: ${errorMessage}`,
     );
     return state.BINARY_NAME;
   };
@@ -120,7 +120,7 @@ export function previewActiveCompat(context: vscode.ExtensionContext) {
     statusBarInit(),
     vscode.commands.registerCommand("typst-preview.showLog", async () => {
       outputChannel?.show();
-    })
+    }),
   );
   process.on("SIGINT", () => {
     for (const serverProcess of serverProcesses) {
@@ -135,7 +135,7 @@ export function previewActiveCompat(context: vscode.ExtensionContext) {
         return;
       }
       vscode.window.showInformationMessage("await tree feature is deprecated...");
-    })
+    }),
   );
 }
 
@@ -230,7 +230,7 @@ function runServer(
   command: string,
   projectRoot: string,
   args: string[],
-  outputChannel: vscode.OutputChannel
+  outputChannel: vscode.OutputChannel,
 ): Promise<LaunchCliResult> {
   const serverProcess = spawn(command, args, {
     env: {
@@ -254,7 +254,7 @@ function runServer(
     if (code !== null && code !== 0) {
       const response = await vscode.window.showErrorMessage(
         `typst-preview process exited with code ${code}`,
-        "Show Logs"
+        "Show Logs",
       );
       if (response === "Show Logs") {
         outputChannel.show();
@@ -335,7 +335,7 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
     vscode.workspace.getConfiguration().get<boolean>("typst-preview.cursorIndicator") || false;
   await watchEditorFiles();
   const { serverProcess, controlPlanePort, dataPlanePort, staticFilePort } = await launchCli(
-    task.kind === "browser"
+    task.kind === "browser",
   );
 
   const addonΠserver = new Addon2Server(
@@ -343,7 +343,7 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
     enableCursor,
     scrollSyncMode,
     bindDocument,
-    activeEditor
+    activeEditor,
   );
 
   // interact with typst-lsp
@@ -405,7 +405,7 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
               files: {
                 [e.document.fileName]: e.document.getText(),
               },
-            })
+            }),
           );
         }
       });
@@ -416,7 +416,7 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
             JSON.stringify({
               event: "removeMemoryFiles",
               files: [e.fileName],
-            })
+            }),
           );
         }
       });
@@ -456,10 +456,10 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
         ...codeGetCliFontArgs(),
         filePath,
       ],
-      outputChannel!
+      outputChannel!,
     );
     console.log(
-      `Launched server, data plane port:${dataPlanePort}, control plane port:${controlPlanePort}, static file port:${staticFilePort}`
+      `Launched server, data plane port:${dataPlanePort}, control plane port:${controlPlanePort}, static file port:${staticFilePort}`,
     );
     if (openInBrowser) {
       vscode.env.openExternal(vscode.Uri.parse(`http://127.0.0.1:${staticFilePort}`));
@@ -499,7 +499,7 @@ function getCliInputArgs(inputs?: { [key: string]: string }): string[] {
 
 export function codeGetCliInputArgs(): string[] {
   return getCliInputArgs(
-    vscode.workspace.getConfiguration().get<{ [key: string]: string }>("typst-preview.sysInputs")
+    vscode.workspace.getConfiguration().get<{ [key: string]: string }>("typst-preview.sysInputs"),
   );
 }
 
@@ -512,7 +512,7 @@ export function codeGetCliFontArgs(): string[] {
     .getConfiguration()
     .get<boolean>("typst-preview.systemFonts");
   let fontPaths = getCliFontPathArgs(
-    vscode.workspace.getConfiguration().get<string[]>("typst-preview.fontPaths")
+    vscode.workspace.getConfiguration().get<string[]>("typst-preview.fontPaths"),
   );
   return [...(needSystemFonts ? [] : ["--ignore-system-fonts"]), ...fontPaths];
 }
@@ -526,7 +526,7 @@ export class Addon2Server {
     enableCursor: boolean,
     scrollSyncMode: ScrollSyncModeEnum,
     bindDocument: vscode.TextDocument,
-    activeEditor: vscode.TextEditor
+    activeEditor: vscode.TextEditor,
   ) {
     const conn = new WebSocket(`ws://127.0.0.1:${controlPlanePort}`);
     conn.addEventListener("message", async (message) => {
@@ -566,7 +566,7 @@ export class Addon2Server {
 
           const kind = e.kind;
           console.log(
-            `selection changed, kind: ${kind && vscode.TextEditorSelectionChangeKind[kind]}`
+            `selection changed, kind: ${kind && vscode.TextEditorSelectionChangeKind[kind]}`,
           );
           const shouldScrollPanel =
             // scroll by mouse
@@ -625,7 +625,7 @@ export class Addon2Server {
         JSON.stringify({
           event: "syncMemoryFiles",
           files,
-        })
+        }),
       );
     }
   }
@@ -666,7 +666,7 @@ type DocRequests = SourceScrollBySpanRequest | ScrollByPositionRequest | ScrollR
 // See https://github.com/Enter-tainer/typst-preview/issues/164 for more detail.
 const sendDocRequest = async (
   bindDocument: vscode.TextDocument | undefined,
-  scrollRequest: DocRequests
+  scrollRequest: DocRequests,
 ) => {
   let tcb = bindDocument && activeTask.get(bindDocument);
   if (tcb === undefined) {
@@ -682,7 +682,7 @@ const sendDocRequest = async (
 const reportPosition = async (
   bindDocument: vscode.TextDocument,
   activeEditor: vscode.TextEditor,
-  event: string
+  event: string,
 ) => {
   // extension-output
   if (bindDocument.uri.fsPath.includes("extension-output")) {
