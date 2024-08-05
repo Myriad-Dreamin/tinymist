@@ -106,7 +106,7 @@ export function activate(context: ExtensionContext): Promise<void> {
   const client = initClient(context, config);
   setClient(client);
 
-  activateTaskProvider(context);
+  context.subscriptions.push(activateTaskProvider(context));
 
   if (previewIsEnabled) {
     // test compat-mode preview extension

@@ -142,6 +142,19 @@ export async function callTypstExportCommand(): Promise<vscode.CustomExecution> 
         },
         export: tinymist.exportQuery,
       },
+      pdfpc: {
+        opts() {
+          return {
+            format: "json",
+            pretty: exportArgs["query.pretty"],
+            outputExtension: "pdfpc",
+            selector: "<pdfpc-file>",
+            field: "value",
+            one: true,
+          };
+        },
+        export: tinymist.exportQuery,
+      },
     };
 
     return Promise.resolve({
@@ -183,15 +196,6 @@ export async function callTypstExportCommand(): Promise<vscode.CustomExecution> 
       }
 
       for (let format of formats) {
-        if (format === "pdfpc") {
-          format = "query";
-          exportArgs["query.format"] = "json";
-          exportArgs["query.outputExtension"] = "pdfpc";
-          exportArgs["query.selector"] = "<pdfpc-file>";
-          exportArgs["query.field"] = "value";
-          exportArgs["query.one"] = true;
-        }
-
         const provider = formatProvider[format];
         if (!provider) {
           writeEmitter.fire("Unsupported export format: " + format + "\r\n");
