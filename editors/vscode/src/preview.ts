@@ -37,8 +37,8 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(
         isCompat ? "typst-preview.content-preview" : "tinymist.preview.content-preview",
-        provider
-      )
+        provider,
+      ),
     );
   });
   {
@@ -47,15 +47,15 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     context.subscriptions.push(
       vscode.window.registerTreeDataProvider(
         isCompat ? "typst-preview.outline" : "tinymist.preview.outline",
-        outlineProvider
-      )
+        outlineProvider,
+      ),
     );
   }
   context.subscriptions.push(
     vscode.window.registerWebviewPanelSerializer(
       "typst-preview",
-      new TypstPreviewSerializer(context)
-    )
+      new TypstPreviewSerializer(context),
+    ),
   );
 
   context.subscriptions.push(
@@ -82,19 +82,19 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
           return;
         }
       }
-    })
+    }),
   );
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "typst-preview.revealDocument",
-      isCompat ? revealDocumentCompat : revealDocumentLsp
-    )
+      isCompat ? revealDocumentCompat : revealDocumentLsp,
+    ),
   );
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "typst-preview.sync",
-      isCompat ? panelSyncScrollCompat : panelSyncScrollLsp
-    )
+      isCompat ? panelSyncScrollCompat : panelSyncScrollLsp,
+    ),
   );
 
   if (isCompat) {
@@ -169,7 +169,7 @@ export async function launchPreviewInWebView({
           {
             enableScripts: true, // 启用 JS
             retainContextWhenHidden: true,
-          }
+          },
         );
 
   // todo: bindDocument.onDidDispose, but we did not find a similar way.
@@ -182,7 +182,7 @@ export async function launchPreviewInWebView({
   let html = await getPreviewHtmlCompat(context);
   html = html.replace(
     /\/typst-webview-assets/g,
-    `${panel.webview.asWebviewUri(vscode.Uri.file(fontendPath)).toString()}/typst-webview-assets`
+    `${panel.webview.asWebviewUri(vscode.Uri.file(fontendPath)).toString()}/typst-webview-assets`,
   );
   const previewMode = task.mode === "doc" ? "Doc" : "Slide";
   const previewState = {
@@ -310,7 +310,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
       filePath,
     ]);
     console.log(
-      `Launched preview, data plane port:${dataPlanePort}, static server port:${staticServerPort}`
+      `Launched preview, data plane port:${dataPlanePort}, static server port:${staticServerPort}`,
     );
 
     if (enableCursor) {
@@ -350,7 +350,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
 
   async function reportPosition(
     editorToReport: vscode.TextEditor,
-    event: "changeCursorPosition" | "panelScrollTo"
+    event: "changeCursorPosition" | "panelScrollTo",
   ) {
     const scrollRequest: ScrollRequest = {
       event,
@@ -471,13 +471,13 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly extensionUri: vscode.Uri,
-    private readonly htmlContent: string
+    private readonly htmlContent: string,
   ) {}
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
-    _token: vscode.CancellationToken
+    _token: vscode.CancellationToken,
   ) {
     this._view = webviewView; // 将已经准备好的 HTML 设置为 Webview 内容
 
@@ -486,7 +486,7 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
       /\/typst-webview-assets/g,
       `${this._view.webview
         .asWebviewUri(vscode.Uri.file(fontendPath))
-        .toString()}/typst-webview-assets`
+        .toString()}/typst-webview-assets`,
     );
 
     html = html.replace("ws://127.0.0.1:23625", ``);
@@ -623,9 +623,9 @@ class OutlineProvider implements vscode.TreeDataProvider<OutlineItem> {
           item,
           item.children.length > 0
             ? vscode.TreeItemCollapsibleState.Collapsed
-            : vscode.TreeItemCollapsibleState.None
+            : vscode.TreeItemCollapsibleState.None,
         );
-      })
+      }),
     );
   }
 }
@@ -638,7 +638,7 @@ export class OutlineItem extends vscode.TreeItem {
       title: "Reveal Outline Item",
       command: "typst-preview.revealDocument",
       arguments: [{ span: data.span, position: data.position }],
-    }
+    },
   ) {
     super(data.title, collapsibleState);
     const span = this.data.span;

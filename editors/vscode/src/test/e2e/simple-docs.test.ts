@@ -20,11 +20,11 @@ export async function getTests(ctx: Context) {
 
     suite.addTest("starts Client", async () => {
       const mainTyp = await ctx.openDocument(
-        vscode.Uri.joinPath(workspaceUri, "completion-base.typ")
+        vscode.Uri.joinPath(workspaceUri, "completion-base.typ"),
       );
       const pong = await ctx.completion<vscode.CompletionList>(
         mainTyp.document.uri,
-        new vscode.Position(7, 2)
+        new vscode.Position(7, 2),
       );
       ctx.expect(pong.items.map(completionLabel)).to.include.members(["aa", "aab", "aabc"]);
 
@@ -39,7 +39,7 @@ export async function getTests(ctx: Context) {
       const { taskId } = resp;
 
       let previewState: any = await vscode.commands.executeCommand(
-        "tinymist.doInspectPreviewState"
+        "tinymist.doInspectPreviewState",
       );
       ctx.expect(previewState.tasks).to.have.lengthOf(1);
       ctx.expect(previewState.tasks[0].taskId).to.be.equal(taskId);

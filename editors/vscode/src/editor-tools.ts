@@ -122,7 +122,7 @@ export function getFontsExportConfigure(context: vscode.ExtensionContext) {
 
 export async function activateEditorTool(
   context: vscode.ExtensionContext,
-  tool: "template-gallery" | "tracing" | "summary" | "symbol-view"
+  tool: "template-gallery" | "tracing" | "summary" | "symbol-view",
 ) {
   // Create and show a new WebView
   const title = {
@@ -141,7 +141,7 @@ export async function activateEditorTool(
     {
       enableScripts: true,
       retainContextWhenHidden: true,
-    }
+    },
   );
 
   await activateEditorToolAt(context, tool, panel);
@@ -153,7 +153,7 @@ export class SymbolViewProvider implements vscode.WebviewViewProvider {
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
-    _token: vscode.CancellationToken
+    _token: vscode.CancellationToken,
   ) {
     webviewView.webview.options = {
       // Allow scripts in the webview
@@ -167,7 +167,7 @@ export class SymbolViewProvider implements vscode.WebviewViewProvider {
 async function activateEditorToolAt(
   context: vscode.ExtensionContext,
   tool: "template-gallery" | "tracing" | "summary" | "symbol-view",
-  panel: vscode.WebviewView | vscode.WebviewPanel
+  panel: vscode.WebviewView | vscode.WebviewPanel,
 ) {
   const dispose = () => {
     // if has dispose method
@@ -227,7 +227,7 @@ async function activateEditorToolAt(
         }
 
         const editor = vscode.window.visibleTextEditors.find(
-          (editor) => editor.document === activeDocument
+          (editor) => editor.document === activeDocument,
         );
         if (!editor) {
           await vscode.window.showErrorMessage("No focusing editor");
@@ -283,7 +283,7 @@ async function activateEditorToolAt(
               let replaceText = math || newText;
               let range = new vscode.Range(
                 selectionStart.with(undefined, selectionStart.character - 1),
-                selectionStart
+                selectionStart,
               );
               const before = selectionStart.character > 0 ? activeDocument.getText(range) : "";
               if (before.match(/[\p{XID_Start}\p{XID_Continue}_]/u)) {
@@ -338,7 +338,7 @@ async function activateEditorToolAt(
 
   html = html.replace(
     /`editor-tools-args:{"page": [^`]*?`/,
-    `\`editor-tools-args:{"page": "${tool}"}\``
+    `\`editor-tools-args:{"page": "${tool}"}\``,
   );
 
   let afterReloadHtml = undefined;
@@ -357,7 +357,7 @@ async function activateEditorToolAt(
       }
       const traceDataTask = vscode.commands.executeCommand(
         "tinymist.getDocumentTrace",
-        focusingFile
+        focusingFile,
       );
 
       // do that after the html is reloaded
@@ -440,7 +440,7 @@ async function fetchSummaryInfo(): Promise<[any | undefined, any | undefined]> {
     if (!res[0]) {
       const result = await vscode.commands.executeCommand(
         "tinymist.getDocumentMetrics",
-        focusingFile
+        focusingFile,
       );
       if (!result) {
         return;
