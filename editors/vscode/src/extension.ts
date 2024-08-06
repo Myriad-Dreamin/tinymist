@@ -35,7 +35,7 @@ import {
 import { DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, getClient, setClient, tinymist } from "./lsp";
 import { vscodeVariables } from "./vscode-variables";
-import { activateTaskProvider } from "./tasks";
+import { taskActivate } from "./tasks";
 
 let previewIsEnabled = false;
 let devKitIsEnabled = false;
@@ -106,7 +106,7 @@ export function activate(context: ExtensionContext): Promise<void> {
   const client = initClient(context, config);
   setClient(client);
 
-  context.subscriptions.push(activateTaskProvider(context));
+  taskActivate(context);
 
   if (previewIsEnabled) {
     // test compat-mode preview extension
