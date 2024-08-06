@@ -92,14 +92,14 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
 }
 
 function initClient(context: ExtensionContext, config: Record<string, any>) {
+  const isProdMode = context.extensionMode === ExtensionMode.Production;
+
   const run = {
     command: tinymist.probeEnvPath("tinymist.serverPath", config.serverPath),
     args: [
-      ...["lsp"],
+      "lsp",
       /// The `--mirror` flag is only used in development/test mode for testing
-      ...(context.extensionMode != ExtensionMode.Production
-        ? ["--mirror", "tinymist-lsp.log"]
-        : []),
+      ...(isProdMode ? [] : ["--mirror", "tinymist-lsp.log"]),
     ],
     options: { env: Object.assign({}, process.env, { RUST_BACKTRACE: "1" }) },
   };
