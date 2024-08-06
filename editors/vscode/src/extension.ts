@@ -92,9 +92,8 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
 }
 
 function initClient(context: ExtensionContext, config: Record<string, any>) {
-  const serverCommand = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
   const run = {
-    command: serverCommand,
+    command: tinymist.probeEnvPath("tinymist.serverPath", config.serverPath),
     args: [
       ...["lsp"],
       /// The `--mirror` flag is only used in development/test mode for testing
