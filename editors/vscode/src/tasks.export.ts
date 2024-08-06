@@ -106,21 +106,6 @@ const exportOps = (exportArgs: ExportArgs) => ({
 });
 
 const provideFormats = (exportArgs: ExportArgs, ops = exportOps(exportArgs)) => ({
-  inheritedProp(prop: "merged" | "merged.gap", from: "svg" | "png"): any {
-    return exportArgs[`${from}.${prop}`] === undefined
-      ? exportArgs[prop]
-      : exportArgs[`${from}.${prop}`];
-  },
-  resolvePageOpts(fmt: "svg" | "png"): any {
-    if (ops.inheritedProp("merged", fmt)) {
-      return {
-        merged: {
-          gap: ops.inheritedProp("merged.gap", fmt),
-        },
-      };
-    }
-    return "first";
-  },
   pdf: {
     opts() {
       return {
