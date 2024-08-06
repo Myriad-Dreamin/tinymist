@@ -25,6 +25,13 @@ interface ResourceRoutes {
 export const tinymist = {
   probeEnvPath,
   probePaths,
+  exportPdf: exportCommand("tinymist.exportPdf"),
+  exportSvg: exportCommand("tinymist.exportSvg"),
+  exportPng: exportCommand("tinymist.exportPng"),
+  exportHtml: exportCommand("tinymist.exportHtml"),
+  exportMarkdown: exportCommand("tinymist.exportMarkdown"),
+  exportText: exportCommand("tinymist.exportText"),
+  exportQuery: exportCommand("tinymist.exportQuery"),
   async executeCommand<R>(command: string, args: any[]) {
     return await (
       await getClient()
@@ -35,27 +42,6 @@ export const tinymist = {
   },
   getResource<T extends keyof ResourceRoutes>(path: T) {
     return tinymist.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path]);
-  },
-  exportPdf(uri: string, extraOpts?: any) {
-    return doExport("tinymist.exportPdf", uri, extraOpts);
-  },
-  exportSvg(uri: string, extraOpts?: any) {
-    return doExport("tinymist.exportSvg", uri, extraOpts);
-  },
-  exportPng(uri: string, extraOpts?: any) {
-    return doExport("tinymist.exportPng", uri, extraOpts);
-  },
-  exportHtml(uri: string, extraOpts?: any) {
-    return doExport("tinymist.exportHtml", uri, extraOpts);
-  },
-  exportMarkdown(uri: string, extraOpts?: any) {
-    return doExport("tinymist.exportMarkdown", uri, extraOpts);
-  },
-  exportText(uri: string, extraOpts?: any) {
-    return doExport("tinymist.exportText", uri, extraOpts);
-  },
-  exportQuery(uri: string, extraOpts?: any) {
-    return doExport("tinymist.exportQuery", uri, extraOpts);
   },
   showLog() {
     if (client) {
@@ -112,6 +98,8 @@ function probePaths(paths: [string, string][]): string {
   throw new Error(`Could not find a valid tinymist binary.\n${infos}`);
 }
 
-function doExport(command: string, uri: string, extraOpts?: any): Promise<string> {
-  return tinymist.executeCommand<string>(command, [uri, ...(extraOpts ? [extraOpts] : [])]);
+function exportCommand(command: string) {
+  return (uri: string, extraOpts?: any) => {
+    return tinymist.executeCommand<string>(command, [uri, ...(extraOpts ? [extraOpts] : [])]);
+  };
 }
