@@ -542,7 +542,7 @@
     "languages": [
       {
         "id": "typst",
-        "configuration": "./language-configuration.json",
+        "configuration": "./syntaxes/language-configuration.json",
         "extensions": [
           ".typ"
         ],
@@ -558,7 +558,7 @@
       },
       {
         "id": "typst-code",
-        "configuration": "./language-configuration.json",
+        "configuration": "./syntaxes/language-configuration.json",
         "extensions": [
           ".typc"
         ],
@@ -570,6 +570,9 @@
           "light": "./icons/typst-small.png",
           "dark": "./icons/typst-small.png"
         }
+      },
+      {
+        "id": "typst-markdown-injection"
       }
     ],
     "grammars": [
@@ -608,6 +611,18 @@
           "comment.block.typst",
           "comment.line.double-slash.typst"
         ]
+      },
+      {
+        "language": "typst-markdown-injection",
+        "scopeName": "markdown.typst.codeblock",
+        "path": "./syntaxes/typst-markdown-injection.json",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.typst": "typst",
+          "meta.embedded.block.typst-code": "typst-code"
+        }
       }
     ],
     "semanticTokenTypes": [
