@@ -3,6 +3,14 @@ import * as path from "path";
 import { ViewColumn } from "vscode";
 import { readFile } from "fs/promises";
 
+export function activeTypstEditor() {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || editor.document.languageId !== "typst") {
+    return;
+  }
+  return editor;
+}
+
 export function getTargetViewColumn(viewColumn: ViewColumn | undefined): ViewColumn {
   if (viewColumn === ViewColumn.One) {
     return ViewColumn.Two;

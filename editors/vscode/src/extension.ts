@@ -10,21 +10,20 @@ import {
 } from "vscode";
 import * as vscode from "vscode";
 import * as path from "path";
-import * as child_process from "child_process";
-import * as lc from "vscode-languageclient";
 
 import {
   LanguageClient,
   type LanguageClientOptions,
   type ServerOptions,
 } from "vscode-languageclient/node";
+import { loadTinymistConfig, substVscodeVarsInConfig } from "./config";
 import {
+  EditorToolName,
   SymbolViewProvider as SymbolViewProvider,
   activateEditorTool,
   getUserPackageData,
 } from "./editor-tools";
 import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
-import { applySnippetTextEdits } from "./snippets";
 import { setIsTinymist as previewSetIsTinymist } from "./preview-compat";
 import {
   previewActivate,
@@ -34,116 +33,73 @@ import {
 } from "./preview";
 import { DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, getClient, setClient, tinymist } from "./lsp";
-import { vscodeVariables } from "./vscode-variables";
 import { taskActivate } from "./tasks";
+import { onEnterHandler } from "./lsp.on-enter";
+import { extensionState } from "./state";
+import { devKitActivate } from "./dev-kit";
 
-let previewIsEnabled = false;
-let devKitIsEnabled = false;
-
-export function activate(context: ExtensionContext): Promise<void> {
-  // Set a global context key to indicate that the extension is activated
-  vscode.commands.executeCommand("setContext", "ext.tinymistActivated", true);
-
-  let config: Record<string, any> = JSON.parse(
-    JSON.stringify(workspace.getConfiguration("tinymist")),
-  );
-  config.preferredTheme = "light";
-
-  {
-    const keys = Object.keys(config);
-    let values = keys.map((key) => config[key]);
-    values = substVscodeVarsInConfig(keys, values);
-    config = {};
-    for (let i = 0; i < keys.length; i++) {
-      config[keys[i]] = values[i];
-    }
+export async function activate(context: ExtensionContext): Promise<void> {
+  try {
+    return await doActivate(context);
+  } catch (e) {
+    void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
+    throw e;
   }
+}
 
-  previewIsEnabled = config.previewFeature === "enable";
-  devKitIsEnabled =
-    vscode.ExtensionMode.Development == context.extensionMode || config.devKit === "enable";
-  enableOnEnter = !!config.onEnterEvent;
+export function deactivate(): Promise<void> | undefined {
+  previewDeactivate();
+  return client?.stop();
+}
 
-  if (previewIsEnabled) {
+export async function doActivate(context: ExtensionContext): Promise<void> {
+  const isDevMode = vscode.ExtensionMode.Development == context.extensionMode;
+  // Sets a global context key to indicate that the extension is activated
+  vscode.commands.executeCommand("setContext", "ext.tinymistActivated", true);
+  // Loads configuration
+  const config = loadTinymistConfig();
+  // Sets features
+  extensionState.features.preview = config.previewFeature === "enable";
+  extensionState.features.devKit = isDevMode || config.devKit === "enable";
+  extensionState.features.onEnter = !!config.onEnterEvent;
+  // Initializes language client
+  const client = initClient(context, config);
+  setClient(client);
+  // Activates features
+  if (extensionState.features.task) {
+    taskActivate(context);
+  }
+  if (extensionState.features.devKit) {
+    devKitActivate(context);
+  }
+  if (extensionState.features.preview) {
     const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
     if (typstPreviewExtension) {
       void vscode.window.showWarningMessage(
         "Tinymist Says:\n\nTypst Preview extension is already integrated into Tinymist. Please disable Typst Preview extension to avoid conflicts.",
       );
     }
-  }
 
-  {
-    const keys = Object.keys(config);
-    let values = keys.map((key) => config[key]);
-    values = substVscodeVarsInConfig(keys, values);
-    config = {};
-    for (let i = 0; i < keys.length; i++) {
-      config[keys[i]] = values[i];
-    }
-  }
-
-  console.log("vscodeVariables test:", {
-    workspaceFolder: vscodeVariables("<${workspaceFolder}>"),
-    workspaceFolderBasename: vscodeVariables("<${workspaceFolderBasename}>"),
-    file: vscodeVariables("<${file}>"),
-    fileWorkspaceFolder: vscodeVariables("<${fileWorkspaceFolder}>"),
-    relativeFile: vscodeVariables("<${relativeFile}>"),
-    relativeFileDirname: vscodeVariables("<${relativeFileDirname}>"),
-    fileBasename: vscodeVariables("<${fileBasename}>"),
-    fileBasenameNoExtension: vscodeVariables("<${fileBasenameNoExtension}>"),
-    fileExtname: vscodeVariables("<${fileExtname}>"),
-    fileDirname: vscodeVariables("<${fileDirname}>"),
-    cwd: vscodeVariables("<${cwd}>"),
-    pathSeparator: vscodeVariables("<${pathSeparator}>"),
-    lineNumber: vscodeVariables("<${lineNumber}>"),
-    selectedText: vscodeVariables("<${selectedText}>"),
-    config: vscodeVariables("<${config:editor.fontSize}>"),
-    composite: vscodeVariables("wof=<${workspaceFolder}>:<${file}>"),
-    composite2: vscodeVariables("fow=<${file}>:<${workspaceFolder}>"),
-  });
-
-  const client = initClient(context, config);
-  setClient(client);
-
-  taskActivate(context);
-
-  if (previewIsEnabled) {
-    // test compat-mode preview extension
+    // Tests compat-mode preview extension
     // previewActivate(context, true);
 
-    // integrated preview extension
-    previewSetIsTinymist(config);
+    // Runs Integrated preview extension
+    previewSetIsTinymist();
     previewActivate(context, false);
   }
-
-  if (devKitIsEnabled) {
-    vscode.commands.executeCommand("setContext", "ext.tinymistDevKit", true);
-
-    const devKitProvider = new DevKitProvider();
-    context.subscriptions.push(
-      vscode.window.registerTreeDataProvider("tinymist.dev-kit", devKitProvider),
-    );
-  }
-
-  return startClient(client, context).catch((e) => {
-    void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
-    throw e;
-  });
+  // Starts language client
+  return await startClient(client, context);
 }
 
-let enableOnEnter = false;
-
 function initClient(context: ExtensionContext, config: Record<string, any>) {
-  const serverCommand = getServer(config.serverPath);
+  const isProdMode = context.extensionMode === ExtensionMode.Production;
+
   const run = {
-    command: serverCommand,
+    command: tinymist.probeEnvPath("tinymist.serverPath", config.serverPath),
     args: [
-      ...["lsp"],
+      "lsp",
       /// The `--mirror` flag is only used in development/test mode for testing
-      ...(context.extensionMode != ExtensionMode.Production
-        ? ["--mirror", "tinymist-lsp.log"]
-        : []),
+      ...(isProdMode ? [] : ["--mirror", "tinymist-lsp.log"]),
     ],
     options: { env: Object.assign({}, process.env, { RUST_BACKTRACE: "1" }) },
   };
@@ -272,50 +228,52 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
     }),
   );
 
+  const editorToolCommand = (tool: EditorToolName) => async () => {
+    await activateEditorTool(context, tool);
+  };
+
+  const initTemplateCommand =
+    (inPlace: boolean) =>
+    (...args: string[]) =>
+      initTemplate(context, inPlace, ...args);
+
+  // prettier-ignore
   context.subscriptions.push(
-    commands.registerCommand("tinymist.onEnter", onEnterHandler()),
+    commands.registerCommand("tinymist.onEnter", onEnterHandler),
 
     commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
-    commands.registerCommand("tinymist.getCurrentDocumentMetrics", () =>
-      commandGetCurrentDocumentMetrics(),
-    ),
+    commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
+    commands.registerCommand("tinymist.getCurrentDocumentMetrics", commandGetCurrentDocumentMetrics),
+    commands.registerCommand("tinymist.clearCache", commandClearCache),
+    commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
+    commands.registerCommand("tinymist.showLog", tinymist.showLog),
+
     commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true)),
     commands.registerCommand("tinymist.unpinMain", () => commandPinMain(false)),
     commands.registerCommand("typst-lsp.pinMainToCurrent", () => commandPinMain(true)),
     commands.registerCommand("typst-lsp.unpinMain", () => commandPinMain(false)),
-    commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
-    commands.registerCommand("tinymist.clearCache", commandClearCache),
-    commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
-    commands.registerCommand("tinymist.initTemplate", (...args) =>
-      commandInitTemplate(context, false, ...args),
-    ),
-    commands.registerCommand("tinymist.initTemplateInPlace", (...args) =>
-      commandInitTemplate(context, true, ...args),
-    ),
-    commands.registerCommand("tinymist.showTemplateGallery", () =>
-      commandShowTemplateGallery(context),
-    ),
-    commands.registerCommand("tinymist.showSummary", () => commandShowSummary(context)),
-    commands.registerCommand("tinymist.showSymbolView", () => commandShowSymbolView(context)),
-    commands.registerCommand("tinymist.profileCurrentFile", () => commandShowTrace(context)),
+
+    commands.registerCommand("tinymist.initTemplate", initTemplateCommand(false)),
+    commands.registerCommand("tinymist.initTemplateInPlace", initTemplateCommand(true)),
+
+    commands.registerCommand("tinymist.showTemplateGallery", editorToolCommand("template-gallery")),
+    commands.registerCommand("tinymist.showSummary", editorToolCommand("summary")),
+    commands.registerCommand("tinymist.showSymbolView", editorToolCommand("symbol-view")),
+    commands.registerCommand("tinymist.profileCurrentFile", editorToolCommand("tracing")),
+
     // We would like to define it at the server side, but it is not possible for now.
     // https://github.com/microsoft/language-server-protocol/issues/1117
     commands.registerCommand("tinymist.triggerNamedCompletion", triggerNamedCompletion),
-    commands.registerCommand("tinymist.showLog", () => {
-      if (client) {
-        client.outputChannel.show();
-      }
-    }),
   );
   // context.subscriptions.push
   const provider = new SymbolViewProvider(context);
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider("tinymist.side-symbol-view", provider),
+    vscode.window.registerWebviewViewProvider(SymbolViewProvider.Name, provider),
   );
 
   await client.start();
 
-  if (previewIsEnabled) {
+  if (extensionState.features.preview) {
     previewPreload(context);
   }
 
@@ -385,115 +343,6 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
   }
 
   return;
-}
-
-export function deactivate(): Promise<void> | undefined {
-  previewDeactivate();
-  return client?.stop();
-}
-
-export function getServer(serverPath: string): string {
-  if (serverPath) {
-    const validation = validateServer(serverPath);
-    if (!validation.valid) {
-      throw new Error(
-        `\`tinymist.serverPath\` (${serverPath}) does not point to a valid tinymist binary:\n${validation.message}`,
-      );
-    }
-    return serverPath;
-  }
-  const windows = process.platform === "win32";
-  const suffix = windows ? ".exe" : "";
-  const binaryName = "tinymist" + suffix;
-
-  const bundledPath = path.resolve(__dirname, binaryName);
-
-  const bundledValidation = validateServer(bundledPath);
-  if (bundledValidation.valid) {
-    return bundledPath;
-  }
-
-  const binaryValidation = validateServer(binaryName);
-  if (binaryValidation.valid) {
-    return binaryName;
-  }
-
-  throw new Error(
-    `Could not find a valid tinymist binary.\nBundled: ${bundledValidation.message}\nIn PATH: ${binaryValidation.message}`,
-  );
-}
-
-function validateServer(
-  path: string,
-): { valid: true; message: string } | { valid: false; message: string } {
-  try {
-    console.log("validate", path, "args", ["probe"]);
-    const result = child_process.spawnSync(path, ["probe"]);
-    if (result.status === 0) {
-      return { valid: true, message: "" };
-    } else {
-      const statusMessage = result.status !== null ? [`return status: ${result.status}`] : [];
-      const errorMessage =
-        result.error?.message !== undefined ? [`error: ${result.error.message}`] : [];
-      const messages = [statusMessage, errorMessage];
-      const messageSuffix = messages.length !== 0 ? `:\n\t${messages.flat().join("\n\t")}` : "";
-      const message = `Failed to launch '${path}'${messageSuffix}`;
-      return { valid: false, message };
-    }
-  } catch (e) {
-    if (e instanceof Error) {
-      return { valid: false, message: `Failed to launch '${path}': ${e.message}` };
-    } else {
-      return { valid: false, message: `Failed to launch '${path}': ${JSON.stringify(e)}` };
-    }
-  }
-}
-
-function activeTypstEditor() {
-  const editor = window.activeTextEditor;
-  if (!editor || editor.document.languageId !== "typst") {
-    return;
-  }
-  return editor;
-}
-
-export const onEnter = new lc.RequestType<lc.TextDocumentPositionParams, lc.TextEdit[], void>(
-  "experimental/onEnter",
-);
-
-export function onEnterHandler() {
-  async function handleKeypress() {
-    if (!enableOnEnter) return false;
-
-    const editor = activeTypstEditor();
-
-    if (!editor || !client) return false;
-
-    const lcEdits = await client
-      .sendRequest(onEnter, {
-        textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(editor.document),
-        position: client.code2ProtocolConverter.asPosition(editor.selection.active),
-      })
-      .catch((_error: any) => {
-        // client.handleFailedRequest(OnEnterRequest.type, error, null);
-        return null;
-      });
-    if (!lcEdits) return false;
-
-    const edits = await client.protocol2CodeConverter.asTextEdits(lcEdits);
-    await applySnippetTextEdits(editor, edits);
-    return true;
-  }
-
-  return async () => {
-    try {
-      if (await handleKeypress()) return;
-    } catch (e) {
-      console.error("onEnter failed", e);
-    }
-
-    await vscode.commands.executeCommand("default:type", { text: "\n" });
-  };
 }
 
 async function commandExport(
@@ -661,35 +510,7 @@ async function commandPinMain(isPin: boolean): Promise<void> {
   });
 }
 
-async function commandShowTemplateGallery(context: vscode.ExtensionContext): Promise<void> {
-  await activateEditorTool(context, "template-gallery");
-}
-
-async function commandShowSummary(context: vscode.ExtensionContext): Promise<void> {
-  await activateEditorTool(context, "summary");
-}
-
-async function commandShowSymbolView(context: vscode.ExtensionContext): Promise<void> {
-  await activateEditorTool(context, "symbol-view");
-}
-
-async function commandShowTrace(context: vscode.ExtensionContext): Promise<void> {
-  const activeEditor = window.activeTextEditor;
-  if (activeEditor === undefined) {
-    return;
-  }
-
-  const uri = activeEditor.document.uri.toString();
-  void uri;
-
-  await activateEditorTool(context, "tracing");
-}
-
-async function commandInitTemplate(
-  context: vscode.ExtensionContext,
-  inPlace: boolean,
-  ...args: string[]
-): Promise<void> {
+async function initTemplate(context: vscode.ExtensionContext, inPlace: boolean, ...args: string[]) {
   const initArgs: string[] = [];
   if (!inPlace) {
     if (args.length === 2) {
@@ -913,146 +734,7 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
   }
 }
 
-function substVscodeVars(str: string | null | undefined): string | undefined {
-  if (str === undefined || str === null) {
-    return undefined;
-  }
-  try {
-    return vscodeVariables(str);
-  } catch (e) {
-    console.error("failed to substitute vscode variables", e);
-    return str;
-  }
-}
-
-const STR_VARIABLES = [
-  "serverPath",
-  "tinymist.serverPath",
-  "rootPath",
-  "tinymist.rootPath",
-  "outputPath",
-  "tinymist.outputPath",
-];
-const STR_ARR_VARIABLES = ["fontPaths", "tinymist.fontPaths"];
-const PREFERRED_THEME = ["preferredTheme", "tinymist.preferredTheme"];
-
-// todo: documentation that, typstExtraArgs won't get variable extended
-function substVscodeVarsInConfig(keys: (string | undefined)[], values: unknown[]): unknown[] {
-  return values.map((value, i) => {
-    const k = keys[i];
-    if (!k) {
-      return value;
-    }
-    if (PREFERRED_THEME.includes(k)) {
-      return determineVscodeTheme();
-    }
-    if (STR_VARIABLES.includes(k)) {
-      return substVscodeVars(value as string);
-    }
-    if (STR_ARR_VARIABLES.includes(k)) {
-      const paths = value as string[];
-      if (!paths) {
-        return undefined;
-      }
-      return paths.map((path) => substVscodeVars(path));
-    }
-    return value;
-  });
-}
-
-function determineVscodeTheme(): any {
-  console.log("determineVscodeTheme", vscode.window.activeColorTheme.kind);
-  switch (vscode.window.activeColorTheme.kind) {
-    case vscode.ColorThemeKind.Dark:
-    case vscode.ColorThemeKind.HighContrast:
-      return "dark";
-    default:
-      return "light";
-  }
-}
-
 function triggerNamedCompletion() {
   vscode.commands.executeCommand("editor.action.triggerSuggest");
   vscode.commands.executeCommand("editor.action.triggerParameterHints");
 }
-
-class DevKitProvider implements vscode.TreeDataProvider<DevKitItem> {
-  constructor() {}
-
-  refresh(): void {}
-
-  getTreeItem(element: DevKitItem): vscode.TreeItem {
-    return element;
-  }
-
-  getChildren(element?: DevKitItem): Thenable<DevKitItem[]> {
-    if (element) {
-      return Promise.resolve([]);
-    }
-
-    return Promise.resolve([
-      new DevKitItem({
-        title: "Run Preview Dev",
-        command: "tinymist.previewDev",
-        tooltip: `Run Preview in Developing Mode. It sets data plane port to the fix default value.`,
-      }),
-    ]);
-  }
-}
-
-export class DevKitItem extends vscode.TreeItem {
-  constructor(
-    public readonly command: vscode.Command,
-    public description = "",
-  ) {
-    super(command.title, vscode.TreeItemCollapsibleState.None);
-    this.tooltip = this.command.tooltip || ``;
-  }
-
-  contextValue = "devkit-item";
-}
-
-// "tinymist.hoverPeriscope": {
-//     "title": "Show preview document in periscope mode on hovering",
-//     "description": "In VSCode, enable compile status meaning that the extension will show the compilation status in the status bar. Since neovim and helix don't have a such feature, it is disabled by default at the language server lebel.",
-//     "type": [
-//         "object",
-//         "string"
-//     ],
-//     "default": "disable",
-//     "enum": [
-//         "enable",
-//         "disable"
-//     ],
-//     "properties": {
-//         "yAbove": {
-//             "title": "Y above",
-//             "description": "The distance from the top of the screen to the top of the periscope hover.",
-//             "type": "number",
-//             "default": 55
-//         },
-//         "yBelow": {
-//             "title": "Y below",
-//             "description": "The distance from the bottom of the screen to the bottom of the periscope hover.",
-//             "type": "number",
-//             "default": 55
-//         },
-//         "scale": {
-//             "title": "Scale",
-//             "description": "The scale of the periscope hover.",
-//             "type": "number",
-//             "default": 1.5
-//         },
-//         "invertColors": {
-//             "title": "Invert colors",
-//             "description": "Invert the colors of the periscope to hover.",
-//             "type": "string",
-//             "enum": [
-//                 "auto",
-//                 "always",
-//                 "never"
-//             ],
-//             "default": "auto"
-//         }
-//     }
-// },
