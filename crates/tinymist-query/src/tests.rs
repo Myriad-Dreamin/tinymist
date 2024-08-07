@@ -201,14 +201,9 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
     }
     use AstMatcher::*;
 
-    let re = s.text().find("/* TEST LABEL ONLY */").and_then(|_| {
-        s.text().find("@").zip(Some(MatchAny { prev: false }))
-    });
-    let re = re.or_else(|| {
-        s.text()
+    let re = s.text()
             .find("/* position */")
-            .zip(Some(MatchAny { prev: true }))
-    });
+            .zip(Some(MatchAny { prev: true }));
     let re = re.or_else(|| {
         s.text()
             .find("/* position after */")
@@ -252,11 +247,6 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
         }
         if matches!(n.kind(), SyntaxKind::Named) {
             n = n.children().last().unwrap();
-            continue;
-        }
-        if matches!(n.kind(), SyntaxKind::RefMarker) {
-            n = n.parent().cloned().unwrap();
-            assert_eq!(n.kind(), SyntaxKind::Ref);
             continue;
         }
         if match_ident {
