@@ -47,7 +47,7 @@ class Suite {
       }
     }
     if (failed) {
-      const plural = failed > 1 ? "s" : "";
+      const plural = failed != 1 ? "s" : "";
       throw new Error(`${failed} failed test${plural}`);
     }
   }

@@ -81,7 +81,7 @@ ${cjkChars} CJK ${plural("Character", cjkChars)}
   }
 }
 function plural(w: string, words: number): string {
-  if (words <= 1) {
+  if (words == 1) {
     return w;
   } else {
     return w + "s";
