@@ -201,10 +201,9 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
     }
     use AstMatcher::*;
 
-    let re = s
-        .text()
-        .find("/* position */")
-        .map(|e| (e, MatchAny { prev: true }));
+    let re = s.text()
+            .find("/* position */")
+            .zip(Some(MatchAny { prev: true }));
     let re = re.or_else(|| {
         s.text()
             .find("/* position after */")

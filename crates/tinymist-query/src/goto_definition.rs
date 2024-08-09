@@ -57,6 +57,7 @@ impl StatefulRequest for GotoDefinitionRequest {
 
 #[cfg(test)]
 mod tests {
+    use crate::syntax::find_module_level_docs;
     use super::*;
     use crate::tests::*;
 
@@ -65,12 +66,28 @@ mod tests {
         snapshot_testing("goto_definition", &|world, path| {
             let source = world.source_by_path(&path).unwrap();
 
+            let docs = find_module_level_docs(&source).unwrap_or_default();
+            let properties = get_test_properties(&docs);
+            let must_compile = properties
+                .get("compile")
+                .map(|v| v.trim() == "true")
+                .unwrap_or(false);
+            let doc = if must_compile {
+                let doc = typst::compile(world.world(), &mut Default::default()).unwrap();
+                Some(VersionedDocument {
+                    version: 0,
+                    document: Arc::new(doc),
+                })
+            } else {
+                None
+            };
+
             let request = GotoDefinitionRequest {
                 path: path.clone(),
                 position: find_test_position(&source),
             };
 
-            let result = request.request(world, None);
+            let result = request.request(world, doc.clone());
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }
