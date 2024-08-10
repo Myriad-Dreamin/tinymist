@@ -12,9 +12,7 @@ use lsp_server::RequestId;
 use once_cell::sync::Lazy;
 use serde_json::Value as JsonValue;
 use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClientRoot};
-use tinymist::{
-    CompileConfig, Config, ConstConfig, LanguageState, LspWorld, RegularInit, SuperInit,
-};
+use tinymist::{CompileConfig, Config, LanguageState, LspWorld, RegularInit, SuperInit};
 use typst::World;
 use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
 use typst_ts_compiler::{CompileEnv, Compiler, TaskInputs};
@@ -134,7 +132,6 @@ pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
         let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
         let client = client_root.weak();
 
-        let cc = ConstConfig::default();
         let config = Config {
             compile: CompileConfig {
                 roots: vec![root_path],
@@ -149,7 +146,6 @@ pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
                 client: client.to_typed(),
                 exec_cmds: Vec::new(),
                 config,
-                cc,
                 err: None,
             },
             client.clone(),

@@ -71,9 +71,6 @@ pub struct LanguageState {
     // Configurations
     /// User configuration from the editor.
     pub config: Config,
-    /// Const configuration initialized at the start of the session.
-    /// For example, the position encoding.
-    pub const_config: ConstConfig,
 
     // Resources
     /// The semantic token context.
@@ -105,17 +102,17 @@ impl LanguageState {
     pub fn new(
         client: TypedLspClient<LanguageState>,
         config: Config,
-        const_config: ConstConfig,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
     ) -> Self {
+        let const_config = &config.const_config;
         let tokens_ctx = SemanticTokenContext::new(
             const_config.position_encoding,
             const_config.tokens_overlapping_token_support,
             const_config.tokens_multiline_token_support,
         );
         let formatter = FormatTask::new(FormatUserConfig {
-            mode: config.formatter,
-            width: config.formatter_print_width,
+            mode: config.formatter_mode,
+            width: config.formatter_print_width.unwrap_or(120),
             position_encoding: const_config.position_encoding,
         });
 
@@ -132,7 +129,6 @@ impl LanguageState {
             sema_tokens_registered: false,
             formatter_registered: false,
             config,
-            const_config,
 
             pinning: false,
             focusing: None,
@@ -144,19 +140,13 @@ impl LanguageState {
     }
 
     /// The entry point for the language server.
-    pub fn main(
-        client: TypedLspClient<Self>,
-        config: Config,
-        cc: ConstConfig,
-        start: bool,
-    ) -> Self {
+    pub fn main(client: TypedLspClient<Self>, config: Config, start: bool) -> Self {
         info!("LanguageState: initialized with config {config:?}");
-        info!("LanguageState: initialized with const_config {cc:?}");
 
         // Bootstrap server
         let (editor_tx, editor_rx) = mpsc::unbounded_channel();
 
-        let mut service = LanguageState::new(client.clone(), config, cc.clone(), editor_tx);
+        let mut service = LanguageState::new(client.clone(), config, editor_tx);
 
         if start {
             let editor_actor = EditorActor::new(
@@ -176,7 +166,7 @@ impl LanguageState {
 
     /// Get the const configuration.
     pub fn const_config(&self) -> &ConstConfig {
-        &self.const_config
+        &self.config.const_config
     }
 
     /// Get the compile configuration.
@@ -398,7 +388,7 @@ impl LanguageState {
         }
 
         if self.const_config().doc_fmt_dynamic_registration
-            && self.config.formatter != FormatterMode::Disable
+            && self.config.formatter_mode != FormatterMode::Disable
         {
             let err = self.enable_formatter_caps(true);
             if let Err(err) = err {
@@ -528,19 +518,15 @@ impl LanguageState {
             }
         }
 
-        if config.formatter != self.config.formatter
-            || config.formatter_print_width != self.config.formatter_print_width
-        {
-            let err = self.enable_formatter_caps(self.config.formatter != FormatterMode::Disable);
+        let new_formatter_config = self.config.formatter();
+        if config.formatter() != new_formatter_config {
+            let err =
+                self.enable_formatter_caps(new_formatter_config.mode != FormatterMode::Disable);
             if let Err(err) = err {
                 error!("could not change formatter config: {err}");
             }
 
-            self.formatter.change_config(FormatUserConfig {
-                mode: self.config.formatter,
-                width: self.config.formatter_print_width,
-                position_encoding: self.const_config.position_encoding,
-            });
+            self.formatter.change_config(new_formatter_config);
         }
 
         info!("new settings applied");
@@ -682,7 +668,7 @@ impl LanguageState {
         req_id: RequestId,
         params: DocumentFormattingParams,
     ) -> ScheduledResult {
-        if matches!(self.config.formatter, FormatterMode::Disable) {
+        if matches!(self.config.formatter_mode, FormatterMode::Disable) {
             return Ok(None);
         }
 
@@ -952,7 +938,7 @@ macro_rules! query_source {
         let path: ImmutPath = $req.path.clone().into();
 
         $self.query_source(path, |source| {
-            let enc = $self.const_config.position_encoding;
+            let enc = $self.const_config().position_encoding;
             let res = $req.request(&source, enc);
             Ok(CompilerQueryResponse::$method(res))
         })
