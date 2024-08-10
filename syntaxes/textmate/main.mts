@@ -63,6 +63,7 @@ const contentBlock: textmate.Pattern = {
   // name: "meta.block.content.typst",
   begin: /\[/,
   end: /\]/,
+  contentName: "markup.content.typst",
   beginCaptures: {
     "0": {
       name: "meta.brace.square.typst",
@@ -974,6 +975,7 @@ const ifStatement = (): textmate.Grammar => {
     //   name: "meta.else.clause.typst",
     begin: /(\belse)\s*(\[)/,
     end: /\]/,
+    contentName: "markup.content.typst",
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",

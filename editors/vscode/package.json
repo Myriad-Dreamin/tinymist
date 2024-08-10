@@ -582,9 +582,11 @@
         "path": "./out/typst.tmLanguage.json",
         "balancedBracketScopes": [
           "meta.expr",
-          "meta.brace"
+          "meta.brace",
+          "markup.math.typst"
         ],
         "unbalancedBracketScopes": [
+          "markup.content.typst",
           "markup.raw.block.typst",
           "markup.raw.inline.typst",
           "string.other.label.typst",
@@ -600,9 +602,11 @@
         "path": "./out/typst-code.tmLanguage.json",
         "balancedBracketScopes": [
           "meta.expr",
-          "meta.brace"
+          "meta.brace",
+          "markup.math.typst"
         ],
         "unbalancedBracketScopes": [
+          "markup.content.typst",
           "markup.raw.block.typst",
           "markup.raw.inline.typst",
           "string.other.label.typst",
