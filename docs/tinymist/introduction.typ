@@ -76,6 +76,7 @@ Tinymist follows the #link("https://semver.org/")[Semantic Versioning] scheme. T
 Follow the instructions to enable tinymist in your favorite editor.
 + #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/helix/README.md")[Helix]
 + #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/README.md")[Neovim]
++ #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/sublime-text/README.md")[Sublime Text]
 + #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/README.md")[VSCode]
 + #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/zed/README.md")[Zed]
 
