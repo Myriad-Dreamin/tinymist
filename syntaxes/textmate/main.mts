@@ -264,7 +264,7 @@ const markup: textmate.Pattern = {
     //       # - include: '#markupItalic'
     {
       name: "markup.underline.link.typst",
-      match: /https?:\/\/[0-9a-zA-Z~\/%#&='',;\.\+\?\-]*/,
+      match: /https?:\/\/[0-9a-zA-Z~\/%#&='',;\.\+\?\-\_]*/,
     },
     {
       include: "#markupMath",
