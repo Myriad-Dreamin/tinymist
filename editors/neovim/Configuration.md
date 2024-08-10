@@ -12,16 +12,15 @@ The extension can export PDFs of your Typst files. This setting controls whether
 
 - **Type**: `string`
 - **Enum**:
-  - `auto`: Select best solution automatically. (Recommended)
   - `never`: Never export PDFs, you will manually run typst.
   - `onSave`: Export PDFs when you save a file.
   - `onType`: Export PDFs as you type in a file.
   - `onDocumentHasTitle`: Export PDFs when a document has a title (and save a file), which is useful to filter out template files.
-- **Default**: `"auto"`
+- **Default**: `"never"`
 
 ## `rootPath`
 
-Configure the root for absolute paths in typst
+Configure the root for absolute paths in typst. Hint: you can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path.
 
 - **Type**: `string` or `null`
 
@@ -34,13 +33,6 @@ Enable or disable semantic tokens (LSP syntax highlighting)
   - `enable`: Use semantic tokens for syntax highlighting
   - `disable`: Do not use semantic tokens for syntax highlighting
 - **Default**: `"enable"`
-
-## `onEnterEvent`
-
-Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter) (LSP onEnter feature) to allow automatic insertion of characters on enter, such as `///` for comments. Note: restarting the editor is required to change this setting.
-
-- **Type**: `boolean`
-- **Default**: `true`
 
 ## `systemFonts`
 
@@ -72,23 +64,6 @@ You can pass any arguments as you like, and we will try to follow behaviors of t
 - **Type**: `array`
 - **Default**: `[]`
 
-## `serverPath`
-
-The extension can use a local tinymist executable instead of the one bundled with the extension. This setting controls the path to the executable.
-
-- **Type**: `string` or `null`
-
-## `trace.server`
-
-Traces the communication between VS Code and the language server.
-
-- **Type**: `string`
-- **Enum**:
-  - `off`
-  - `messages`
-  - `verbose`
-- **Default**: `"off"`
-
 ## `formatterMode`
 
 The extension can format Typst files using typstfmt or typstyle.
@@ -106,64 +81,3 @@ Set the print width for the formatter, which is a **soft limit** of characters p
 
 - **Type**: `number`
 - **Default**: `120`
-
-## `preview`
-
-Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.
-
-- **Type**: `string`
-- **Enum**:
-  - `enable`
-  - `disable`
-- **Default**: `"enable"`
-
-## `preview.refresh`
-
-Refresh preview when the document is saved or when the document is changed
-
-- **Type**: `string`
-- **Enum**:
-  - `onSave`: Refresh preview on save
-  - `onType`: Refresh preview on type
-- **Default**: `"onType"`
-
-## `preview.scrollSync`
-
-Configure scroll sync mode.
-
-- **Type**: `string`
-- **Enum**:
-  - `never`: Disable automatic scroll sync
-  - `onSelectionChangeByMouse`: Scroll preview to current cursor position when selection changes by mouse
-  - `onSelectionChange`: Scroll preview to current cursor position when selection changes by mouse or keyboard (any source)
-- **Default**: `"onSelectionChangeByMouse"`
-
-## `preview.partialRendering`
-
-Only render visible part of the document. This can improve performance but still being experimental.
-
-- **Type**: `boolean`
-- **Default**: `true`
-
-## `preview.invertColors`
-
-Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview.
-
-- **Type**: `string`
-- **Enum**:
-  - `never`: Disable color inversion of the preview
-  - `auto`: Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document
-  - `always`: Always invert colors of the preview
-- **Default**: `"never"`
-
-## `preview.cursorIndicator`
-
-(Experimental) Show typst cursor indicator in preview.
-
-- **Type**: `boolean`
-
-## `preview.showInActivityBar`
-
-(Experimental) Show a preview panel in activity bar.
-
-- **Type**: `boolean`

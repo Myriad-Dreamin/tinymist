@@ -250,6 +250,7 @@ impl Initializer for SuperInit {
     }
 }
 
+// region Configuration Items
 const CONFIG_ITEMS: &[&str] = &[
     "outputPath",
     "exportPdf",
@@ -264,6 +265,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "preferredTheme",
     "hoverPeriscope",
 ];
+// endregion Configuration Items
 
 // todo: Config::default() doesn't initialize arguments from environment
 // variables

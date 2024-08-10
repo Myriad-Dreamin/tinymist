@@ -12,16 +12,15 @@ The extension can export PDFs of your Typst files. This setting controls whether
 
 - **Type**: `string`
 - **Enum**:
-  - `auto`: Select best solution automatically. (Recommended)
   - `never`: Never export PDFs, you will manually run typst.
   - `onSave`: Export PDFs when you save a file.
   - `onType`: Export PDFs as you type in a file.
   - `onDocumentHasTitle`: Export PDFs when a document has a title (and save a file), which is useful to filter out template files.
-- **Default**: `"auto"`
+- **Default**: `"never"`
 
 ## `tinymist.rootPath`
 
-Configure the root for absolute paths in typst
+Configure the root for absolute paths in typst. Hint: you can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path.
 
 - **Type**: `string` or `null`
 
@@ -107,7 +106,7 @@ Set the print width for the formatter, which is a **soft limit** of characters p
 - **Type**: `number`
 - **Default**: `120`
 
-## `tinymist.preview`
+## `tinymist.previewFeature`
 
 Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.
 
@@ -147,14 +146,8 @@ Only render visible part of the document. This can improve performance but still
 
 ## `tinymist.preview.invertColors`
 
-Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview.
+Invert colors of the preview (useful for dark themes without cost). Please note you could see the origin colors when you hover elements in the preview. It is also possible to specify strategy to each element kind by an object map in JSON format.
 
-- **Type**: `string`
-- **Enum**:
-  - `never`: Disable color inversion of the preview
-  - `auto`: Invert colors smartly by detecting dark/light themes in browser environment or by `typst query` your document
-  - `always`: Always invert colors of the preview
-- **Default**: `"never"`
 
 ## `tinymist.preview.cursorIndicator`
 
