@@ -3,14 +3,14 @@ use std::fmt::Write;
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use typst::eval::{CapturesVisitor, Tracer};
-use typst::foundations::{repr, Capturer, CastInfo, Repr, Value};
+use typst::foundations::{repr, Capturer, CastInfo, Value};
 use typst::layout::Length;
 use typst::model::Document;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 use typst::util::{round_2, Numeric};
 use typst::World;
 
-use super::{plain_docs_sentence, summarize_font_family};
+use super::{plain_docs_sentence, summarize_font_family, truncated_repr};
 use crate::analysis::{analyze_expr, analyze_labels, DynLabel};
 
 /// Describe the item under the cursor.
@@ -87,7 +87,7 @@ pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
                 write!(pieces.last_mut().unwrap(), " (x{count})").unwrap();
             }
         }
-        pieces.push(value.repr());
+        pieces.push(truncated_repr(value));
         last = Some((value, 1));
     }
 
