@@ -44,6 +44,7 @@ const main = async () => {
         convert('docs/tinymist/introduction.typ', 'README.md', { before: "# Tinymist\n\n" }),
         convert('docs/tinymist/frontend/neovim.typ', 'editors/neovim/README.md', { before: "# Tinymist Neovim Support for Typst\n\n" }),
         convert('docs/tinymist/frontend/helix.typ', 'editors/helix/README.md', { before: "# Tinymist Helix Support for Typst\n\n" }),
+        convert('docs/tinymist/frontend/sublime-text.typ', 'editors/sublime-text/README.md', { before: "# Tinymist Sublime Support for Typst\n\n" }),
         convert('docs/tinymist/frontend/vscode.typ', 'editors/vscode/README.md', { before: "# Tinymist Typst VS Code Extension\n\n" }),
         convert('docs/tinymist/frontend/zed.typ', 'editors/zed/README.md', { before: "# Tinymist Zed Support for Typst\n\n" }),
     ])
