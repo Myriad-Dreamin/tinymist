@@ -5,7 +5,9 @@ use crate::{
     jump_from_cursor,
     prelude::*,
     syntax::{find_docs_before, get_deref_target, LexicalKind, LexicalVarKind},
-    upstream::{expr_tooltip, plain_docs_sentence, route_of_value, tooltip, Tooltip},
+    upstream::{
+        expr_tooltip, plain_docs_sentence, route_of_value, tooltip, truncated_repr, Tooltip,
+    },
     LspHoverContents, StatefulRequest,
 };
 
@@ -141,11 +143,18 @@ fn def_tooltip(
 
     match lnk.kind {
         LexicalKind::Mod(_)
-        | LexicalKind::Var(LexicalVarKind::Label)
         | LexicalKind::Var(LexicalVarKind::LabelRef)
         | LexicalKind::Var(LexicalVarKind::ValRef)
         | LexicalKind::Block
         | LexicalKind::Heading(..) => None,
+        LexicalKind::Var(LexicalVarKind::Label) => {
+            results.push(MarkedString::String(format!("Label: {}\n", lnk.name)));
+            if let Some(c) = lnk.value.as_ref() {
+                let c = truncated_repr(c);
+                results.push(MarkedString::String(format!("{c}")));
+            }
+            Some(LspHoverContents::Array(results))
+        }
         LexicalKind::Var(LexicalVarKind::BibKey) => {
             results.push(MarkedString::String(format!("Bibliography: @{}", lnk.name)));
 

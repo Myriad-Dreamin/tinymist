@@ -72,8 +72,14 @@ pub fn find_definition(
                 name_range: None,
             });
         }
-        DerefTarget::Ref(r) => {
-            let ref_node = r.cast::<ast::Ref>()?.target();
+        DerefTarget::Label(r) | DerefTarget::Ref(r) => {
+            let ref_expr: ast::Expr = r.cast()?;
+            let ref_node = match ref_expr {
+                ast::Expr::Ref(r) => r.target(),
+                ast::Expr::Label(r) => r.get(),
+                _ => return None,
+            };
+
             let doc = document?;
             let introspector = &doc.document.introspector;
             let label = Label::new(ref_node);
@@ -103,14 +109,14 @@ pub fn find_definition(
 
                     Some(DefinitionLink {
                         kind: LexicalKind::Var(LexicalVarKind::Label),
-                        name: r.text().to_string(),
-                        value: None,
+                        name: ref_node.to_owned(),
+                        value: Some(Value::Content(elem)),
                         def_at: Some((fid, rng.clone())),
                         name_range: Some(rng.clone()),
                     })
                 });
         }
-        DerefTarget::Label(..) | DerefTarget::Normal(..) => {
+        DerefTarget::Normal(..) => {
             return None;
         }
     };
