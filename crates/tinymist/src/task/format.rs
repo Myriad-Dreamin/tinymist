@@ -10,7 +10,7 @@ use typst::syntax::Source;
 use super::SyncTaskFactory;
 use crate::FormatterMode;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FormatUserConfig {
     pub mode: FormatterMode,
     pub width: u32,
