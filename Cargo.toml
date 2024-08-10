@@ -1,13 +1,13 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.11.18"
+version = "0.11.19-rc1"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
 homepage = "https://github.com/Myriad-Dreamin/tinymist"
 repository = "https://github.com/Myriad-Dreamin/tinymist"
-rust-version = "1.75"
+rust-version = "1.80"
 
 [workspace]
 resolver = "2"
@@ -134,7 +134,7 @@ insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
 typst-preview = { path = "./crates/typst-preview/" }
-tinymist-assets = { version = "0.11.18" }
+tinymist-assets = { version = "0.11.19-rc1" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
 tinymist-render = { path = "./crates/tinymist-render/" }

@@ -4,6 +4,27 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.19 - [2024-08-10]
+
+* fix: parse dot operation on atomic expression correctly in https://github.com/Myriad-Dreamin/tinymist/pull/497
+* feat: convert editor READMEs to docs.typ in https://github.com/Myriad-Dreamin/tinymist/pull/498
+* fix: two bugs in tasks feature in https://github.com/Myriad-Dreamin/tinymist/pull/499
+* refactor: export tasks in https://github.com/Myriad-Dreamin/tinymist/pull/501
+* dev: reformat code in https://github.com/Myriad-Dreamin/tinymist/pull/502
+* refactor: extension entry in https://github.com/Myriad-Dreamin/tinymist/pull/503
+* feat: inject typst{,-code} syntaxes into markdown syntax highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/504
+* fix: use plural for 0 items by @Nerixyz in https://github.com/Myriad-Dreamin/tinymist/pull/507
+* chore: bump typstyle v0.11.31 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/512
+* feat: show target of label and con tent of metadata when hovering in https://github.com/Myriad-Dreamin/tinymist/pull/517
+* fix: broken vscode package configuration in https://github.com/Myriad-Dreamin/tinymist/pull/518
+* feat: link sublime text support in https://github.com/Myriad-Dreamin/tinymist/pull/519
+* fix: allow underline in url link in https://github.com/Myriad-Dreamin/tinymist/pull/520
+* fix: bad configuration document in https://github.com/Myriad-Dreamin/tinymist/pull/521
+* feat: identify more context for bracket colorization in https://github.com/Myriad-Dreamin/tinymist/pull/522
+* fix: bad configuration initialization in https://github.com/Myriad-Dreamin/tinymist/pull/523
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.18...v0.11.19-rc1
+
 ## v0.11.18 - [2024-08-05]
 
 ### Compiler
