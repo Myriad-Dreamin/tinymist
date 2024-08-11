@@ -44,11 +44,13 @@ pub(crate) fn find_references(
         DerefTarget::VarAccess(node) => node,
         DerefTarget::Callee(node) => node,
         DerefTarget::Label(node) => node,
+        // TODO: Cross document reference Ref
+        DerefTarget::Ref(node) => node,
         DerefTarget::ImportPath(..) | DerefTarget::IncludePath(..) => {
             return None;
         }
         // todo: reference
-        DerefTarget::Ref(..) | DerefTarget::Normal(..) => {
+        DerefTarget::Normal(..) => {
             return None;
         }
     };
@@ -73,6 +75,10 @@ pub(crate) fn find_references(
             }
             ast::Expr::Label(e) => {
                 name = e.get().to_string();
+                break;
+            }
+            ast::Expr::Ref(e) => {
+                name = e.target().to_string();
                 break;
             }
             _ => return None,
