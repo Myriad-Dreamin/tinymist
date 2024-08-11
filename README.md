@@ -74,6 +74,7 @@ Tinymist follows the [Semantic Versioning](https://semver.org/) scheme. The vers
 Follow the instructions to enable tinymist in your favorite editor.
 1. [Helix](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/helix/README.md)
 1. [Neovim](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/README.md)
+1. [Sublime Text](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/sublime-text/README.md)
 1. [VSCode](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/README.md)
 1. [Zed](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/zed/README.md)
 
