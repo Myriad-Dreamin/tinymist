@@ -320,16 +320,9 @@ mod tests {
             let mut includes = HashSet::new();
             let mut excludes = HashSet::new();
 
-            let must_compile = properties
-                .get("compile")
-                .map(|v| v.trim() == "true")
-                .unwrap_or(false);
+            let must_compile = has_test_property(&properties, "compile");
             let doc = if must_compile {
-                let doc = typst::compile(ctx.world(), &mut Default::default()).unwrap();
-                Some(VersionedDocument {
-                    version: 0,
-                    document: Arc::new(doc),
-                })
+                compile_doc_for_test(ctx)
             } else {
                 None
             };
