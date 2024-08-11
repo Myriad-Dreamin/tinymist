@@ -31,7 +31,7 @@ import {
   previewPreload,
   previewProcessOutline,
 } from "./preview";
-import { DisposeList, getSensibleTextEditorColumn } from "./util";
+import { activeTypstEditor, DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, getClient, setClient, tinymist } from "./lsp";
 import { taskActivate } from "./tasks";
 import { onEnterHandler } from "./lsp.on-enter";
@@ -247,6 +247,7 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
     commands.registerCommand("tinymist.clearCache", commandClearCache),
     commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
     commands.registerCommand("tinymist.showLog", tinymist.showLog),
+    commands.registerCommand("tinymist.copyAnsiHighlight", commandCopyAnsiHighlight),
 
     commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true)),
     commands.registerCommand("tinymist.unpinMain", () => commandPinMain(false)),
@@ -386,6 +387,24 @@ async function commandGetCurrentDocumentMetrics(): Promise<any> {
     return undefined;
   }
   return res;
+}
+
+async function commandCopyAnsiHighlight(): Promise<void> {
+  const editor = activeTypstEditor();
+  if (editor === undefined) {
+    return;
+  }
+
+  const res = await tinymist.exportAnsiHighlight(editor.document.uri.fsPath, {
+    range: editor.selection,
+  });
+
+  if (res === null) {
+    return;
+  }
+
+  // copy to clipboard
+  await vscode.env.clipboard.writeText(res);
 }
 
 /**

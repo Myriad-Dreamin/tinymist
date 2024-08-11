@@ -38,6 +38,12 @@ struct QueryOpts {
     one: Option<bool>,
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HiglightRangeOpts {
+    range: Option<Range>,
+}
+
 /// Here are implemented the handlers for each command.
 impl LanguageState {
     /// Export the current document as PDF file(s).
@@ -120,6 +126,42 @@ impl LanguageState {
         let path = get_arg!(args[0] as PathBuf);
 
         run_query!(req_id, self.OnExport(path, kind))
+    }
+
+    /// Export a range of the current document as Ansi highlighted text.
+    pub fn export_ansi_hl(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let path = get_arg!(args[0] as PathBuf);
+        let opts = get_arg_or_default!(args[1] as HiglightRangeOpts);
+
+        let s = self
+            .query_source(path.into(), Ok)
+            .map_err(|e| internal_error(format!("cannot find source: {e}")))?;
+
+        // todo: cannot select syntax-sensitive data well
+        // let node = LinkedNode::new(s.root());
+
+        let range = opts
+            .range
+            .map(|r| {
+                tinymist_query::lsp_to_typst::range(r, self.const_config().position_encoding, &s)
+                    .ok_or_else(|| internal_error("cannoet convert range"))
+            })
+            .transpose()?;
+
+        let mut text_in_range = s.text();
+        if let Some(range) = range {
+            text_in_range = text_in_range
+                .get(range)
+                .ok_or_else(|| internal_error("cannot get text in range"))?;
+        }
+
+        let output = typst_ansi_hl::Highlighter::default()
+            .for_discord()
+            .with_soft_limit(2000)
+            .highlight(text_in_range)
+            .map_err(|e| internal_error(format!("cannot highlight: {e}")))?;
+
+        just_ok(JsonValue::String(output))
     }
 
     /// Clear all cached resources.

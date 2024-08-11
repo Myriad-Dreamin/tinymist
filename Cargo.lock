@@ -71,6 +71,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ansi_colours"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14eec43e0298190790f41679fe69ef7a829d2a2ddd78c8c00339e84710e435fe"
+dependencies = [
+ "rgb",
+]
+
+[[package]]
 name = "anstream"
 version = "0.6.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3780,6 +3789,7 @@ dependencies = [
  "tower-service",
  "typlite",
  "typst",
+ "typst-ansi-hl",
  "typst-assets",
  "typst-pdf",
  "typst-preview",
@@ -4201,6 +4211,21 @@ dependencies = [
  "unicode-segmentation",
  "usvg",
  "wasmi",
+]
+
+[[package]]
+name = "typst-ansi-hl"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b457d0812d51dbc28f7a5b8583b8c28cd3c43628e1e7e5a0ae63975fda65351"
+dependencies = [
+ "ansi_colours",
+ "once_cell",
+ "syntect",
+ "termcolor",
+ "thiserror",
+ "two-face",
+ "typst-syntax 0.11.1",
 ]
 
 [[package]]

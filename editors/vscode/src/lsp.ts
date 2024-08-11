@@ -32,6 +32,7 @@ export const tinymist = {
   exportMarkdown: exportCommand("tinymist.exportMarkdown"),
   exportText: exportCommand("tinymist.exportText"),
   exportQuery: exportCommand("tinymist.exportQuery"),
+  exportAnsiHighlight: exportCommand("tinymist.exportAnsiHighlight"),
   async executeCommand<R>(command: string, args: any[]) {
     return await (
       await getClient()

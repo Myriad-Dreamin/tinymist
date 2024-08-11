@@ -802,6 +802,11 @@
         "icon": "$(file-pdf)"
       },
       {
+        "command": "tinymist.copyAnsiHighlight",
+        "title": "Copy as Highlighted Code",
+        "category": "Typst"
+      },
+      {
         "command": "tinymist.showLog",
         "title": "Tinymist: Show Log",
         "description": "Show log of LSP Server",
@@ -919,6 +924,13 @@
           "command": "typst-preview.preview",
           "when": "resourceLangId == typst && editorTextFocus",
           "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "tinymist.copyAnsiHighlight",
+          "when": "resourceLangId == typst && editorTextFocus",
+          "group": "9_cutcopypaste"
         }
       ],
       "view/title": [
