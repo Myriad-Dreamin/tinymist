@@ -77,7 +77,7 @@ To configure path to search fonts:
   - File -\> Preferences -\> Settings (Linux, Windows).
   - Code -\> Preferences -\> Settings (Mac).
 1. Search for "Tinymist Font Paths" for providing paths to search fonts order-by-order.
-1. Search for "Tinymist No System Fonts" for disabling system fonts to be searched, which is useful for reproducible rendering your PDF documents.
+1. Search for "Tinymist System Fonts" for disabling system fonts to be searched, which is useful for reproducible rendering your PDF documents.
 1. Reload the window or restart the vscode editor to make the settings take effect.
 
 
