@@ -5,7 +5,7 @@ use std::{
     ops::Range,
     path::{Path, PathBuf},
 };
-
+use std::sync::Arc;
 use once_cell::sync::Lazy;
 pub use serde::Serialize;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
@@ -26,11 +26,7 @@ use typst_ts_core::{config::CompileOpts, package::PackageSpec};
 pub use insta::assert_snapshot;
 pub use typst_ts_compiler::TypstSystemWorld;
 
-use crate::{
-    analysis::{Analysis, AnalysisResources},
-    prelude::AnalysisContext,
-    typst_to_lsp, LspPosition, PositionEncoding,
-};
+use crate::{analysis::{Analysis, AnalysisResources}, prelude::AnalysisContext, typst_to_lsp, LspPosition, PositionEncoding, VersionedDocument};
 
 struct WrapWorld<'a>(&'a mut TypstSystemWorld);
 
@@ -93,6 +89,21 @@ pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
         props.insert(key, value);
     }
     props
+}
+
+pub fn has_test_property(properties: &HashMap<&'_ str, &'_ str>, prop: &str) -> bool {
+    properties
+        .get(prop)
+        .map(|v| v.trim() == "true")
+        .unwrap_or(false)
+}
+
+pub fn compile_doc_for_test(ctx: &mut AnalysisContext) -> Option<VersionedDocument> {
+    let doc = typst::compile(ctx.world(), &mut Default::default()).unwrap();
+    Some(VersionedDocument {
+        version: 0,
+        document: Arc::new(doc),
+    })
 }
 
 pub fn run_with_sources<T>(

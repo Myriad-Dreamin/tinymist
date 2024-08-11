@@ -63,21 +63,14 @@ mod tests {
 
     #[test]
     fn test() {
-        snapshot_testing("goto_definition", &|world, path| {
-            let source = world.source_by_path(&path).unwrap();
+        snapshot_testing("goto_definition", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
 
             let docs = find_module_level_docs(&source).unwrap_or_default();
             let properties = get_test_properties(&docs);
-            let must_compile = properties
-                .get("compile")
-                .map(|v| v.trim() == "true")
-                .unwrap_or(false);
+            let must_compile = has_test_property(&properties, "compile");
             let doc = if must_compile {
-                let doc = typst::compile(world.world(), &mut Default::default()).unwrap();
-                Some(VersionedDocument {
-                    version: 0,
-                    document: Arc::new(doc),
-                })
+                compile_doc_for_test(ctx)
             } else {
                 None
             };
@@ -87,7 +80,7 @@ mod tests {
                 position: find_test_position(&source),
             };
 
-            let result = request.request(world, doc.clone());
+            let result = request.request(ctx, doc.clone());
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }
