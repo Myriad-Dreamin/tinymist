@@ -23,6 +23,8 @@ pub enum Commands {
     Preview(tinymist::tool::preview::PreviewCliArgs),
     /// Probe
     Probe,
+    /// Completion script for current Shell(from env)
+    Completion,
 }
 
 impl Default for Commands {

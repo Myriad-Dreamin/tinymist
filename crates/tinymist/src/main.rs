@@ -2,10 +2,12 @@
 
 mod args;
 
-use std::{path::PathBuf, sync::Arc};
+use std::{io, path::PathBuf, sync::Arc};
 
 use anyhow::bail;
 use clap::Parser;
+use clap_builder::{Command, CommandFactory, Subcommand};
+use clap_complete::{generate, Shell};
 use comemo::Prehashed;
 use futures::future::MaybeDone;
 use lsp_server::RequestId;
@@ -77,6 +79,12 @@ fn main() -> anyhow::Result<()> {
             RUNTIMES.tokio_runtime.block_on(preview_main(args))
         }
         Commands::Probe => Ok(()),
+        Commands::Completion => {
+            let mut cmd = CliArguments::command();
+            generate(Shell::from_env().unwrap(), &mut cmd, "tinymist", &mut io::stdout());
+
+            Ok(())
+        }
     }
 }
 
