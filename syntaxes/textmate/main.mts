@@ -63,7 +63,6 @@ const contentBlock: textmate.Pattern = {
   // name: "meta.block.content.typst",
   begin: /\[/,
   end: /\]/,
-  contentName: "markup.content.typst",
   beginCaptures: {
     "0": {
       name: "meta.brace.square.typst",
@@ -77,6 +76,9 @@ const contentBlock: textmate.Pattern = {
   patterns: [
     {
       include: "#markup",
+    },
+    {
+      include: "#markupBrace",
     },
   ],
 };
@@ -130,6 +132,11 @@ const markupReference: textmate.PatternMatch = {
 const markupEscape: textmate.PatternMatch = {
   name: "constant.character.escape.content.typst",
   match: /\\(?:[^u]|u\{?[0-9a-zA-Z]*\}?)/,
+};
+
+const markupBrace: textmate.PatternMatch = {
+  name: "markup.content.brace.typst",
+  match: /[{}()\[\]]/,
 };
 
 const stringLiteral: textmate.PatternBeginEnd = {
@@ -975,7 +982,6 @@ const ifStatement = (): textmate.Grammar => {
     //   name: "meta.else.clause.typst",
     begin: /(\belse)\s*(\[)/,
     end: /\]/,
-    contentName: "markup.content.typst",
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",
@@ -992,6 +998,9 @@ const ifStatement = (): textmate.Grammar => {
     patterns: [
       {
         include: "#code",
+      },
+      {
+        include: "#markupBrace",
       },
     ],
   };
@@ -1589,6 +1598,7 @@ export const typst: textmate.Grammar = {
     markupItalic,
     markupMath,
     markupHeading,
+    markupBrace,
 
     ...expression().repository,
 

@@ -7,7 +7,8 @@
 >#[func(]
 #^ source.typst meta.expr.call.typst
 # ^ source.typst meta.expr.call.typst meta.brace.square.typst
-#  ^^^^^ source.typst meta.expr.call.typst markup.content.typst
+#  ^^^^ source.typst meta.expr.call.typst
+#      ^ source.typst meta.expr.call.typst markup.content.brace.typst
 #       ^ source.typst meta.expr.call.typst meta.brace.square.typst
 >#func("]
 #^ source.typst meta.expr.call.typst

@@ -7,9 +7,9 @@
 # ^^^ source.typst markup.math.typst
 #    ^ source.typst markup.math.typst keyword.control.hash.typst
 #     ^ source.typst markup.math.typst meta.brace.square.typst
-#      ^ source.typst markup.math.typst markup.content.typst markup.math.typst punctuation.definition.string.math.typst
-#       ^ source.typst markup.math.typst markup.content.typst markup.math.typst
-#        ^ source.typst markup.math.typst markup.content.typst markup.math.typst punctuation.definition.string.math.typst
+#      ^ source.typst markup.math.typst markup.math.typst punctuation.definition.string.math.typst
+#       ^ source.typst markup.math.typst markup.math.typst
+#        ^ source.typst markup.math.typst markup.math.typst punctuation.definition.string.math.typst
 #         ^ source.typst markup.math.typst meta.brace.square.typst
 #          ^ source.typst markup.math.typst
 #           ^ source.typst markup.math.typst punctuation.definition.string.math.typst

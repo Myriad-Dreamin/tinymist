@@ -7,7 +7,7 @@
 #       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
 #         ^ source.typst meta.expr.for.typst
 #          ^ source.typst meta.expr.for.typst meta.brace.square.typst
-#           ^^^^ source.typst meta.expr.for.typst markup.content.typst
+#           ^^^^ source.typst meta.expr.for.typst
 #               ^ source.typst meta.expr.for.typst meta.brace.square.typst
 #                ^ source.typst meta.expr.for.typst
 #                 ^ source.typst meta.expr.for.typst meta.brace.curly.typst

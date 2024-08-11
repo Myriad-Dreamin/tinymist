@@ -7,7 +7,7 @@
 #                                                            ^ source.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
 #                                                             ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #                                                              ^ source.typst meta.expr.call.typst meta.brace.square.typst
-#                                                               ^^^^^^^^^^^^^^^^^^^^^^^^ source.typst meta.expr.call.typst markup.content.typst
+#                                                               ^^^^^^^^^^^^^^^^^^^^^^^^ source.typst meta.expr.call.typst
 #                                                                                       ^ source.typst meta.expr.call.typst meta.brace.square.typst
 #                                                                                        ^ source.typst meta.expr.call.typst keyword.operator.accessor.typst
 #                                                                                         ^^^^^^^^^^ source.typst

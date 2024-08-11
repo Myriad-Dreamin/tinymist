@@ -586,7 +586,7 @@
           "markup.math.typst"
         ],
         "unbalancedBracketScopes": [
-          "markup.content.typst",
+          "markup.content.brace.typst",
           "markup.raw.block.typst",
           "markup.raw.inline.typst",
           "string.other.label.typst",
@@ -606,7 +606,7 @@
           "markup.math.typst"
         ],
         "unbalancedBracketScopes": [
-          "markup.content.typst",
+          "markup.content.brace.typst",
           "markup.raw.block.typst",
           "markup.raw.inline.typst",
           "string.other.label.typst",
