@@ -43,11 +43,12 @@ pub(crate) fn find_references(
     let node = match deref_target {
         DerefTarget::VarAccess(node) => node,
         DerefTarget::Callee(node) => node,
+        DerefTarget::Label(node) => node,
         DerefTarget::ImportPath(..) | DerefTarget::IncludePath(..) => {
             return None;
         }
-        // todo: label, reference
-        DerefTarget::Label(..) | DerefTarget::Ref(..) | DerefTarget::Normal(..) => {
+        // todo: reference
+        DerefTarget::Ref(..) | DerefTarget::Normal(..) => {
             return None;
         }
     };
@@ -67,6 +68,10 @@ pub(crate) fn find_references(
                 break;
             }
             ast::Expr::Ident(e) => {
+                name = e.get().to_string();
+                break;
+            }
+            ast::Expr::Label(e) => {
                 name = e.get().to_string();
                 break;
             }
