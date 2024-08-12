@@ -85,6 +85,14 @@ pub(crate) fn find_references(
         }
     }
 
+    ctx.resources.iter_dependencies(&mut |path| {
+        let Ok(_) = ctx.source_by_path(&path) else {
+            return;
+        };
+        let _ = path_to_url(&path).unwrap();
+        return;
+    });
+
     let ident = node.find(may_ident.span())?;
 
     // todo: if it is exported, find all the references in the workspace
@@ -191,12 +199,20 @@ mod tests {
 
     use super::*;
     use crate::{tests::*, url_to_path};
+    use crate::syntax::find_module_level_docs;
 
     #[test]
     fn test() {
         // goto_definition
         snapshot_testing("references", &|world, path| {
             let source = world.source_by_path(&path).unwrap();
+
+            let docs = find_module_level_docs(&source).unwrap_or_default();
+            let properties = get_test_properties(&docs);
+            let must_compile = has_test_property(&properties, "compile");
+            if must_compile {
+                compile_doc_for_test(world);
+            }
 
             let request = ReferencesRequest {
                 path: path.clone(),
