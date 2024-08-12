@@ -75,6 +75,8 @@ pin-project-lite.workspace = true
 base64.workspace = true
 rayon.workspace = true
 
+typst-ansi-hl = "0.2.0"
+
 [features]
 default = ["cli", "embed-fonts", "no-content-hint", "preview"]
 
