@@ -13,24 +13,32 @@ pub struct CliArguments {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum Commands {
-    /// Run Language Server
+    /// Generates completion script to stdout
+    Completion(ShellCompletionArgs),
+    /// Runs language server
     Lsp(LspArgs),
-    /// Run Language Server for tracing some typst program.
+    /// Runs language server for tracing some typst program.
     #[clap(hide(true))]
     TraceLsp(CompileArgs),
-    /// Run Preview Server
+    /// Runs preview server
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
-    /// Probe
+    /// Probes existence (Nop run)
     Probe,
-    /// Completion script for current Shell(from env)
-    Completion,
 }
 
 impl Default for Commands {
     fn default() -> Self {
         Self::Lsp(Default::default())
     }
+}
+
+#[derive(Debug, Clone, clap::Parser)]
+pub struct ShellCompletionArgs {
+    /// The shell to generate the completion script for. If not provided, it
+    /// will be inferred from the environment.
+    #[clap(value_enum)]
+    pub shell: Option<clap_complete::Shell>,
 }
 
 #[derive(Debug, Clone, Default, clap::Parser)]

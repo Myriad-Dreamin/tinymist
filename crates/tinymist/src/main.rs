@@ -6,7 +6,7 @@ use std::{io, path::PathBuf, sync::Arc};
 
 use anyhow::bail;
 use clap::Parser;
-use clap_builder::{Command, CommandFactory, Subcommand};
+use clap_builder::CommandFactory;
 use clap_complete::{generate, Shell};
 use comemo::Prehashed;
 use futures::future::MaybeDone;
@@ -22,7 +22,7 @@ use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
 use typst_ts_compiler::{CompileEnv, Compiler, TaskInputs};
 use typst_ts_core::{typst::prelude::EcoVec, TypstDict};
 
-use crate::args::{CliArguments, Commands, CompileArgs, LspArgs};
+use crate::args::*;
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -69,6 +69,7 @@ fn main() -> anyhow::Result<()> {
     let args = CliArguments::parse();
 
     match args.command.unwrap_or_default() {
+        Commands::Completion(args) => completion(args),
         Commands::Lsp(args) => lsp_main(args),
         Commands::TraceLsp(args) => trace_main(args),
         #[cfg(feature = "preview")]
@@ -79,13 +80,19 @@ fn main() -> anyhow::Result<()> {
             RUNTIMES.tokio_runtime.block_on(preview_main(args))
         }
         Commands::Probe => Ok(()),
-        Commands::Completion => {
-            let mut cmd = CliArguments::command();
-            generate(Shell::from_env().unwrap(), &mut cmd, "tinymist", &mut io::stdout());
-
-            Ok(())
-        }
     }
+}
+
+/// Generates completion script to stdout.
+pub fn completion(args: ShellCompletionArgs) -> anyhow::Result<()> {
+    let Some(shell) = args.shell.or_else(Shell::from_env) else {
+        anyhow::bail!("could not infer shell");
+    };
+
+    let mut cmd = CliArguments::command();
+    generate(shell, &mut cmd, "tinymist", &mut io::stdout());
+
+    Ok(())
 }
 
 /// The main entry point for the LSP server.
@@ -115,7 +122,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
 pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
     let mut input = PathBuf::from(match args.compile.input {
         Some(value) => value,
-        None => return Err(anyhow::Error::msg("Provide a valid path")),
+        None => return Err(anyhow::anyhow!("provide a valid path")),
     });
 
     let mut root_path = args.compile.root.unwrap_or(PathBuf::from("."));
