@@ -56,6 +56,7 @@ pub(crate) fn find_references(
     };
 
     let mut may_ident = node.cast::<ast::Expr>()?;
+    let mut is_ref = false;
     let name;
     loop {
         match may_ident {
@@ -79,19 +80,12 @@ pub(crate) fn find_references(
             }
             ast::Expr::Ref(e) => {
                 name = e.target().to_string();
+                is_ref = true;
                 break;
             }
             _ => return None,
         }
     }
-
-    ctx.resources.iter_dependencies(&mut |path| {
-        let Ok(_) = ctx.source_by_path(&path) else {
-            return;
-        };
-        let _ = path_to_url(&path).unwrap();
-        return;
-    });
 
     let ident = node.find(may_ident.span())?;
 
@@ -121,7 +115,7 @@ pub(crate) fn find_references(
         def_ident,
     };
 
-    worker.root(root_def_use, root_def_id)
+    worker.root(root_def_use, root_def_id, is_ref)
 }
 
 struct ReferencesWorker<'a, 'w> {
@@ -164,9 +158,18 @@ impl<'a, 'w> ReferencesWorker<'a, 'w> {
         mut self,
         def_use: Arc<crate::analysis::DefUseInfo>,
         def_id: DefId,
+        is_ref: bool,
     ) -> Option<Vec<LspLocation>> {
         let def_source = self.ctx.ctx.source_by_id(self.def_fid).ok()?;
         let uri = self.ctx.ctx.uri_for_id(self.def_fid).ok()?;
+        if is_ref {
+            self.ctx.ctx.resources.iter_dependencies(&mut |path| {
+                if let Ok(ref_fid) = self.ctx.ctx.file_id_by_path(&path) {
+                    self.file(ref_fid);
+                }
+            });
+            return Some(self.references);
+        }
 
         // todo: reuse uri, range to location
         self.references = def_use
