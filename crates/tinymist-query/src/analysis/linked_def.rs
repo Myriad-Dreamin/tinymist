@@ -74,9 +74,9 @@ pub fn find_definition(
         }
         DerefTarget::Label(r) | DerefTarget::Ref(r) => {
             let ref_expr: ast::Expr = r.cast()?;
-            let ref_node = match ref_expr {
-                ast::Expr::Ref(r) => r.target(),
-                ast::Expr::Label(r) => r.get(),
+            let (ref_node, is_label) = match ref_expr {
+                ast::Expr::Ref(r) => (r.target(), false),
+                ast::Expr::Label(r) => (r.get(), true),
                 _ => return None,
             };
 
@@ -100,19 +100,34 @@ pub fn find_definition(
                 .or_else(|| {
                     let sel = Selector::Label(label);
                     let elem = introspector.query_first(&sel)?;
-                    let span = elem.span();
-                    let fid = span.id()?;
 
-                    let source = ctx.source_by_id(fid).ok()?;
+                    // if it is a label, we put the selection range to itself
+                    let (fid, rng, name_range) = if is_label {
+                        let span = r.span();
+                        let fid = span.id()?;
+                        let source = ctx.source_by_id(fid).ok()?;
+                        let rng = source.range(span)?;
 
-                    let rng = source.range(span)?;
+                        let name_range = rng.start + 1..rng.end - 1;
+                        let name_range = (name_range.start <= name_range.end).then_some(name_range);
+                        (fid, rng, name_range)
+                    } else {
+                        // otherwise, it is estimated to the span of the pointed content
+                        // todo: get the label's span
+                        let span = elem.span();
+                        let fid = span.id()?;
+                        let source = ctx.source_by_id(fid).ok()?;
+                        let rng = source.range(span)?;
+
+                        (fid, rng, None)
+                    };
 
                     Some(DefinitionLink {
                         kind: LexicalKind::Var(LexicalVarKind::Label),
                         name: ref_node.to_owned(),
                         value: Some(Value::Content(elem)),
-                        def_at: Some((fid, rng.clone())),
-                        name_range: Some(rng.clone()),
+                        def_at: Some((fid, rng)),
+                        name_range,
                     })
                 });
         }
