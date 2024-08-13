@@ -385,7 +385,7 @@ fn e2e() {
         });
 
         let hash = replay_log(&tinymist_binary, &root.join("vscode"));
-        insta::assert_snapshot!(hash, @"siphash128_13:94a9c7a7af77d041ff48651e2d17799c");
+        insta::assert_snapshot!(hash, @"siphash128_13:16e3c6c677e354093d0ab458a749329d");
     }
 }
 
