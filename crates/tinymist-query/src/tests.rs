@@ -1,11 +1,12 @@
 use core::fmt;
+use std::sync::Arc;
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
     ops::Range,
     path::{Path, PathBuf},
 };
-use std::sync::Arc;
+
 use once_cell::sync::Lazy;
 pub use serde::Serialize;
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
@@ -26,7 +27,11 @@ use typst_ts_core::{config::CompileOpts, package::PackageSpec};
 pub use insta::assert_snapshot;
 pub use typst_ts_compiler::TypstSystemWorld;
 
-use crate::{analysis::{Analysis, AnalysisResources}, prelude::AnalysisContext, typst_to_lsp, LspPosition, PositionEncoding, VersionedDocument};
+use crate::{
+    analysis::{Analysis, AnalysisResources},
+    prelude::AnalysisContext,
+    typst_to_lsp, LspPosition, PositionEncoding, VersionedDocument,
+};
 
 struct WrapWorld<'a>(&'a mut TypstSystemWorld);
 
@@ -91,14 +96,19 @@ pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
     props
 }
 
-pub fn has_test_property(properties: &HashMap<&'_ str, &'_ str>, prop: &str) -> bool {
-    properties
-        .get(prop)
+pub fn compile_doc_for_test(
+    ctx: &mut AnalysisContext,
+    properties: &HashMap<&str, &str>,
+) -> Option<VersionedDocument> {
+    let must_compile = properties
+        .get("compile")
         .map(|v| v.trim() == "true")
-        .unwrap_or(false)
-}
+        .unwrap_or(false);
 
-pub fn compile_doc_for_test(ctx: &mut AnalysisContext) -> Option<VersionedDocument> {
+    if !must_compile {
+        return None;
+    }
+
     let doc = typst::compile(ctx.world(), &mut Default::default()).unwrap();
     Some(VersionedDocument {
         version: 0,
@@ -212,9 +222,10 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
     }
     use AstMatcher::*;
 
-    let re = s.text()
-            .find("/* position */")
-            .zip(Some(MatchAny { prev: true }));
+    let re = s
+        .text()
+        .find("/* position */")
+        .zip(Some(MatchAny { prev: true }));
     let re = re.or_else(|| {
         s.text()
             .find("/* position after */")

@@ -320,12 +320,7 @@ mod tests {
             let mut includes = HashSet::new();
             let mut excludes = HashSet::new();
 
-            let must_compile = has_test_property(&properties, "compile");
-            let doc = if must_compile {
-                compile_doc_for_test(ctx)
-            } else {
-                None
-            };
+            let doc = compile_doc_for_test(ctx, &properties);
 
             for kk in properties.get("contains").iter().flat_map(|v| v.split(',')) {
                 // split first char

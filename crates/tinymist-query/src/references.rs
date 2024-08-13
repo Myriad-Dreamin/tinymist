@@ -188,12 +188,7 @@ mod tests {
 
             let docs = find_module_level_docs(&source).unwrap_or_default();
             let properties = get_test_properties(&docs);
-            let must_compile = has_test_property(&properties, "compile");
-            let doc = if must_compile {
-                compile_doc_for_test(ctx)
-            } else {
-                None
-            };
+            let doc = compile_doc_for_test(ctx, &properties);
 
             let request = ReferencesRequest {
                 path: path.clone(),
