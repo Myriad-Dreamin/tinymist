@@ -102,7 +102,7 @@ pub fn find_definition(
                     let elem = introspector.query_first(&sel)?;
 
                     // if it is a label, we put the selection range to itself
-                    let (fid, rng, name_range) = if is_label {
+                    let (def_at, name_range) = if is_label {
                         let span = r.span();
                         let fid = span.id()?;
                         let source = ctx.source_by_id(fid).ok()?;
@@ -110,7 +110,7 @@ pub fn find_definition(
 
                         let name_range = rng.start + 1..rng.end - 1;
                         let name_range = (name_range.start <= name_range.end).then_some(name_range);
-                        (fid, rng, name_range)
+                        (Some((fid, rng)), name_range)
                     } else {
                         // otherwise, it is estimated to the span of the pointed content
                         // todo: get the label's span
@@ -119,14 +119,14 @@ pub fn find_definition(
                         let source = ctx.source_by_id(fid).ok()?;
                         let rng = source.range(span)?;
 
-                        (fid, rng, None)
+                        (Some((fid, rng)), None)
                     };
 
                     Some(DefinitionLink {
                         kind: LexicalKind::Var(LexicalVarKind::Label),
                         name: ref_node.to_owned(),
                         value: Some(Value::Content(elem)),
-                        def_at: Some((fid, rng)),
+                        def_at,
                         name_range,
                     })
                 });

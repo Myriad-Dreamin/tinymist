@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/references.rs
 expression: "JsonRepr::new_pure(result)"
-input_file: crates/tinymist-query/src/fixtures/references/label.typ
+input_file: crates/tinymist-query/src/fixtures/references/ref_label.typ
 ---
 null

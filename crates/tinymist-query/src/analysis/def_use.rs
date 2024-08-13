@@ -11,12 +11,15 @@ use crate::adt::snapshot_map::SnapshotMap;
 /// The type namespace of def-use relations
 ///
 /// The symbols from different namespaces are not visible to each other.
-enum Ns {
+#[derive(Debug, Clone, Hash)]
+pub enum IdentNs {
     /// Def-use for labels
     Label,
     /// Def-use for values
     Value,
 }
+
+type Ns = IdentNs;
 
 type ExternalRefMap = HashMap<(TypstFileId, Option<String>), Vec<(Option<DefId>, IdentRef)>>;
 
@@ -29,7 +32,7 @@ pub struct DefUseInfo {
     /// The references to defined symbols.
     pub ident_refs: HashMap<IdentRef, DefId>,
     /// The references to undefined symbols.
-    pub undefined_refs: Vec<IdentRef>,
+    pub undefined_refs: Vec<(IdentRef, Ns)>,
     exports_refs: Vec<DefId>,
     exports_defs: HashMap<String, DefId>,
 
@@ -361,7 +364,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                 self.info.ident_refs.insert(id_ref, *id);
             }
             None => {
-                self.info.undefined_refs.push(id_ref);
+                self.info.undefined_refs.push((id_ref, label));
             }
         }
     }
