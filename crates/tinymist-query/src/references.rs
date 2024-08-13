@@ -196,16 +196,7 @@ mod tests {
             };
 
             let result = request.request(ctx, doc);
-            // sort
-            let result = result.map(|mut e| {
-                e.sort_by(|a, b| match a.range.start.cmp(&b.range.start) {
-                    std::cmp::Ordering::Equal => a.range.end.cmp(&b.range.end),
-                    e => e,
-                });
-                e
-            });
-
-            let result = result.map(|v| {
+            let mut result = result.map(|v| {
                 v.into_iter()
                     .map(|l| {
                         let fp = unix_slash(&url_to_path(l.uri));
@@ -220,6 +211,10 @@ mod tests {
                     })
                     .collect::<Vec<_>>()
             });
+            // sort
+            if let Some(result) = result.as_mut() {
+                result.sort();
+            }
 
             assert_snapshot!(JsonRepr::new_pure(result));
         });
