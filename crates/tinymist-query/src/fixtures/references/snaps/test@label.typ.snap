@@ -3,4 +3,6 @@ source: crates/tinymist-query/src/references.rs
 expression: "JsonRepr::new_pure(result)"
 input_file: crates/tinymist-query/src/fixtures/references/label.typ
 ---
-null
+[
+ "/s0.typ@5:0:5:12"
+]

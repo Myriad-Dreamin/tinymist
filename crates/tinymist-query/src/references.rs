@@ -79,8 +79,6 @@ pub(crate) fn find_references(
         }
     }
 
-    let ident = node.find(may_ident.span())?;
-
     let def = find_definition(ctx, source, document, deref_target)?;
 
     // todo: reference of builtin items?
