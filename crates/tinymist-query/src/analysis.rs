@@ -325,7 +325,7 @@ mod lexical_hierarchy_tests {
                 )?;
             }
 
-            if !self.0.label_refs.is_empty() {
+            if !self.0.undefined_refs.is_empty() {
                 let mut undefined_refs = self.0.undefined_refs.clone();
                 undefined_refs.sort();
                 let entry = DefUseEntry {

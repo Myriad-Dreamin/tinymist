@@ -11,7 +11,7 @@ use crate::adt::snapshot_map::SnapshotMap;
 /// The type namespace of def-use relations
 ///
 /// The symbols from different namespaces are not visible to each other.
-pub enum Ns {
+enum Ns {
     /// Def-use for labels
     Label,
     /// Def-use for values
@@ -28,7 +28,7 @@ pub struct DefUseInfo {
     external_refs: ExternalRefMap,
     /// The references to defined symbols.
     pub ident_refs: HashMap<IdentRef, DefId>,
-    /// The references to undefined symbols.
+    /// The references of labels.
     pub label_refs: HashMap<String, Vec<Range<usize>>>,
     /// The references to undefined symbols.
     pub undefined_refs: Vec<IdentRef>,
@@ -58,8 +58,9 @@ impl DefUseInfo {
                     + 32)
             + self.ident_refs.capacity()
                 * (std::mem::size_of::<IdentRef>() + std::mem::size_of::<DefId>() + 32)
-            + (self.label_refs.capacity() * std::mem::size_of::<IdentRef>() + 32)
-            + (self.exports_refs.capacity() * std::mem::size_of::<DefId>() + 32)
+            + self.label_refs.capacity() * (std::mem::size_of::<Range<usize>>() + 32)
+            + self.undefined_refs.capacity() * (std::mem::size_of::<IdentRef>() + 32)
+            + self.exports_refs.capacity() * (std::mem::size_of::<DefId>() + 32)
             + self.exports_defs.capacity()
                 * (std::mem::size_of::<String>() + std::mem::size_of::<DefId>() + 32)
     }
