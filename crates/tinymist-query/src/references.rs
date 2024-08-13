@@ -1,7 +1,9 @@
+use std::ops::Range;
+
 use log::debug;
 
 use crate::{
-    analysis::{find_definition, IdentNs, SearchCtx},
+    analysis::{find_definition, SearchCtx},
     prelude::*,
     syntax::{DerefTarget, IdentRef},
 };
@@ -43,41 +45,13 @@ pub(crate) fn find_references(
     document: Option<&VersionedDocument>,
     deref_target: DerefTarget<'_>,
 ) -> Option<Vec<LspLocation>> {
-    let node = match deref_target.clone() {
-        DerefTarget::VarAccess(node) => node,
-        DerefTarget::Callee(node) => node,
-        DerefTarget::Label(node) => node,
-        // TODO: Cross document reference Ref
-        DerefTarget::Ref(node) => node,
-        DerefTarget::ImportPath(..) | DerefTarget::IncludePath(..) => {
-            return None;
-        }
-        // todo: reference
-        DerefTarget::Normal(..) => {
+    let finding_label = match deref_target {
+        DerefTarget::VarAccess(..) | DerefTarget::Callee(..) => false,
+        DerefTarget::Label(..) | DerefTarget::Ref(..) => true,
+        DerefTarget::ImportPath(..) | DerefTarget::IncludePath(..) | DerefTarget::Normal(..) => {
             return None;
         }
     };
-
-    let mut may_ident = node.cast::<ast::Expr>()?;
-    let mut is_ref = false;
-    loop {
-        match may_ident {
-            ast::Expr::Parenthesized(e) => {
-                may_ident = e.expr();
-            }
-            ast::Expr::FieldAccess(e) => {
-                may_ident = e.target();
-            }
-            ast::Expr::MathIdent(..) | ast::Expr::Ident(..) => {
-                break;
-            }
-            ast::Expr::Label(..) | ast::Expr::Ref(..) => {
-                is_ref = true;
-                break;
-            }
-            _ => return None,
-        }
-    }
 
     let def = find_definition(ctx, source, document, deref_target)?;
 
@@ -98,10 +72,10 @@ pub(crate) fn find_references(
         references: vec![],
         def_fid,
         def_ident,
-        is_ref,
+        finding_label,
     };
 
-    if is_ref {
+    if finding_label {
         worker.label_root()
     } else {
         worker.ident_root(root_def_use, root_def_id?)
@@ -113,14 +87,14 @@ struct ReferencesWorker<'a, 'w> {
     references: Vec<LspLocation>,
     def_fid: TypstFileId,
     def_ident: IdentRef,
-    is_ref: bool,
+    finding_label: bool,
 }
 
 impl<'a, 'w> ReferencesWorker<'a, 'w> {
     fn label_root(mut self) -> Option<Vec<LspLocation>> {
         let mut ids = vec![];
 
-        // collect ids first to avoid deadlocks
+        // Collect ids first to avoid deadlocks
         self.ctx.ctx.resources.iter_dependencies(&mut |path| {
             if let Ok(ref_fid) = self.ctx.ctx.file_id_by_path(&path) {
                 ids.push(ref_fid);
@@ -142,7 +116,7 @@ impl<'a, 'w> ReferencesWorker<'a, 'w> {
         let def_source = self.ctx.ctx.source_by_id(self.def_fid).ok()?;
         let uri = self.ctx.ctx.uri_for_id(self.def_fid).ok()?;
 
-        self.push_ident(self.def_fid, &def_source, &uri, def_use.get_refs(def_id));
+        self.push_idents(&def_source, &uri, def_use.get_refs(def_id));
 
         if def_use.is_exported(def_id) {
             // Find dependents
@@ -159,12 +133,11 @@ impl<'a, 'w> ReferencesWorker<'a, 'w> {
         log::debug!("references: file: {ref_fid:?}");
         let ref_source = self.ctx.ctx.source_by_id(ref_fid).ok()?;
         let def_use = self.ctx.ctx.def_use(ref_source.clone())?;
-
         let uri = self.ctx.ctx.uri_for_id(ref_fid).ok()?;
 
         let mut redefines = vec![];
         if let Some((id, _def)) = def_use.get_def(self.def_fid, &self.def_ident) {
-            self.push_ident(ref_fid, &ref_source, &uri, def_use.get_refs(id));
+            self.push_idents(&ref_source, &uri, def_use.get_refs(id));
 
             redefines.push(id);
 
@@ -173,33 +146,27 @@ impl<'a, 'w> ReferencesWorker<'a, 'w> {
             }
         };
 
-        if self.is_ref {
-            // todo: avoid clone by intern names
-            let ident_name = self.def_ident.name.clone();
-            let ref_idents = def_use.undefined_refs.iter().filter_map(|(ident, ns)| {
-                (matches!(ns, IdentNs::Label) && ident.name == ident_name).then_some(ident)
-            });
-
-            self.push_ident(ref_fid, &ref_source, &uri, ref_idents);
+        // All references are not resolved since static analyzers doesn't know anything
+        // about labels (which is working at runtime).
+        if self.finding_label {
+            let label_refs = def_use.label_refs.get(&self.def_ident.name);
+            self.push_ranges(&ref_source, &uri, label_refs.into_iter().flatten());
         }
 
         Some(())
     }
 
-    fn push_ident<'b>(
-        &mut self,
-        ref_fid: TypstFileId,
-        ref_source: &Source,
-        uri: &Url,
-        r: impl Iterator<Item = &'b IdentRef>,
-    ) {
-        self.references.extend(r.map(|r| {
-            log::debug!("references: at file: {ref_fid:?}, {r:?}");
+    fn push_idents<'b>(&mut self, s: &Source, u: &Url, idents: impl Iterator<Item = &'b IdentRef>) {
+        self.push_ranges(s, u, idents.map(|e| &e.range));
+    }
 
-            let range = self.ctx.ctx.to_lsp_range(r.range.clone(), ref_source);
+    fn push_ranges<'b>(&mut self, s: &Source, u: &Url, rs: impl Iterator<Item = &'b Range<usize>>) {
+        self.references.extend(rs.map(|rng| {
+            log::debug!("references: at file: {s:?}, {rng:?}");
 
+            let range = self.ctx.ctx.to_lsp_range(rng.clone(), s);
             LspLocation {
-                uri: uri.clone(),
+                uri: u.clone(),
                 range,
             }
         }));
