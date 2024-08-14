@@ -57,8 +57,8 @@ impl StatefulRequest for GotoDefinitionRequest {
 
 #[cfg(test)]
 mod tests {
-    use crate::syntax::find_module_level_docs;
     use super::*;
+    use crate::syntax::find_module_level_docs;
     use crate::tests::*;
 
     #[test]
@@ -68,12 +68,7 @@ mod tests {
 
             let docs = find_module_level_docs(&source).unwrap_or_default();
             let properties = get_test_properties(&docs);
-            let must_compile = has_test_property(&properties, "compile");
-            let doc = if must_compile {
-                compile_doc_for_test(ctx)
-            } else {
-                None
-            };
+            let doc = compile_doc_for_test(ctx, &properties);
 
             let request = GotoDefinitionRequest {
                 path: path.clone(),

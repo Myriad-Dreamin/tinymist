@@ -14,7 +14,7 @@ use reflexo::hash::{hash128, FxDashMap};
 use reflexo::{debug_loc::DataSource, ImmutPath};
 use typst::eval::Eval;
 use typst::foundations::{self, Func};
-use typst::syntax::{LinkedNode, SyntaxNode};
+use typst::syntax::{FileId, LinkedNode, SyntaxNode};
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
     foundations::Bytes,
@@ -310,8 +310,8 @@ impl<'w> AnalysisContext<'w> {
         self.get(id).unwrap().source(self, id)
     }
 
-    /// Get the source of a file by file path.
-    pub fn source_by_path(&mut self, p: &Path) -> FileResult<Source> {
+    /// Get the fileId from its path
+    pub fn file_id_by_path(&self, p: &Path) -> FileResult<FileId> {
         // todo: source in packages
         let relative_path = p.strip_prefix(&self.root).map_err(|_| {
             FileError::Other(Some(eco_format!(
@@ -320,7 +320,13 @@ impl<'w> AnalysisContext<'w> {
             )))
         })?;
 
-        let id = TypstFileId::new(None, VirtualPath::new(relative_path));
+        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
+    }
+
+    /// Get the source of a file by file path.
+    pub fn source_by_path(&mut self, p: &Path) -> FileResult<Source> {
+        // todo: source in packages
+        let id = self.file_id_by_path(p)?;
         self.source_by_id(id)
     }
 

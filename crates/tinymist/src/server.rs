@@ -1008,7 +1008,7 @@ impl LanguageState {
                 Hover(req) => handle.run_stateful(snap, req, R::Hover),
                 GotoDefinition(req) => handle.run_stateful(snap, req, R::GotoDefinition),
                 GotoDeclaration(req) => handle.run_semantic(snap, req, R::GotoDeclaration),
-                References(req) => handle.run_semantic(snap, req, R::References),
+                References(req) => handle.run_stateful(snap, req, R::References),
                 InlayHint(req) => handle.run_semantic(snap, req, R::InlayHint),
                 DocumentHighlight(req) => handle.run_semantic(snap, req, R::DocumentHighlight),
                 DocumentColor(req) => handle.run_semantic(snap, req, R::DocumentColor),
