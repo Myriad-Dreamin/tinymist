@@ -57,7 +57,7 @@ pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
         return None;
     }
 
-    let values = analyze_expr_(world, ancestor); // todo: rate limit
+    let values = analyze_expr_(world, ancestor);
 
     if let [(value, _)] = values.as_slice() {
         if let Some(docs) = value.docs() {
