@@ -527,7 +527,7 @@ impl<'w> AnalysisContext<'w> {
         let w = w.track();
 
         let token = &self.analysis.workers.import;
-        token.acquire(|| import_info(w, source))
+        token.enter(|| import_info(w, source))
     }
 
     /// Get the def-use information of a source file.
@@ -681,13 +681,13 @@ impl<'w> AnalysisContext<'w> {
     /// Try to load a module from the current source file.
     pub fn analyze_import(&mut self, source: &LinkedNode) -> Option<Value> {
         let token = &self.analysis.workers.import;
-        token.acquire(|| analyze_import_(self.world(), source))
+        token.enter(|| analyze_import_(self.world(), source))
     }
 
     /// Try to determine a set of possible values for an expression.
     pub fn analyze_expr(&mut self, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
         let token = &self.analysis.workers.expression;
-        token.acquire(|| analyze_expr_(self.world(), node))
+        token.enter(|| analyze_expr_(self.world(), node))
     }
 
     /// Describe the item under the cursor.
@@ -702,7 +702,7 @@ impl<'w> AnalysisContext<'w> {
         cursor: usize,
     ) -> Option<Tooltip> {
         let token = &self.analysis.workers.tooltip;
-        token.acquire(|| tooltip_(self.world(), document, source, cursor))
+        token.enter(|| tooltip_(self.world(), document, source, cursor))
     }
 
     fn gc(&self) {
@@ -866,9 +866,9 @@ pub struct RateLimiter {
 }
 
 impl RateLimiter {
-    /// Retrieve a token for executing some (cpu-heavy) action
+    /// Executes some (cpu-heavy) action with rate limit
     #[must_use]
-    pub fn acquire<T>(&self, f: impl FnOnce() -> T) -> T {
+    pub fn enter<T>(&self, f: impl FnOnce() -> T) -> T {
         let _c = self.token.lock().unwrap();
         f()
     }
