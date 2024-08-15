@@ -5,9 +5,7 @@ use crate::{
     jump_from_cursor,
     prelude::*,
     syntax::{find_docs_before, get_deref_target, LexicalKind, LexicalVarKind},
-    upstream::{
-        expr_tooltip, plain_docs_sentence, route_of_value, tooltip, truncated_repr, Tooltip,
-    },
+    upstream::{expr_tooltip, plain_docs_sentence, route_of_value, truncated_repr, Tooltip},
     LspHoverContents, StatefulRequest,
 };
 
@@ -42,12 +40,9 @@ impl StatefulRequest for HoverRequest {
         let cursor = offset + 1;
 
         let contents = def_tooltip(ctx, &source, doc.as_ref(), cursor).or_else(|| {
-            Some(typst_to_lsp::tooltip(&tooltip(
-                ctx.world(),
-                doc_ref,
-                &source,
-                cursor,
-            )?))
+            Some(typst_to_lsp::tooltip(
+                &ctx.tooltip(doc_ref, &source, cursor)?,
+            ))
         })?;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;

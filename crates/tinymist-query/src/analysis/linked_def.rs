@@ -210,7 +210,7 @@ pub fn find_definition(
             let root = LinkedNode::new(def_source.root());
             let def_name = root.leaf_at(def.range.start + 1)?;
             log::info!("def_name for function: {def_name:?}", def_name = def_name);
-            let values = analyze_expr(ctx.world(), &def_name);
+            let values = ctx.analyze_expr(&def_name);
             let func = values.into_iter().find(|v| matches!(v.0, Value::Func(..)));
             log::info!("okay for function: {func:?}");
 
@@ -378,7 +378,7 @@ fn resolve_callee_(
         this: None,
     })
     .or_else(|| {
-        let values = analyze_expr(ctx.world(), callee);
+        let values = ctx.analyze_expr(callee);
 
         if let Some(func) = values.into_iter().find_map(|v| match v.0 {
             Value::Func(f) => Some(f),
@@ -397,7 +397,7 @@ fn resolve_callee_(
             } {
                 let target = access.target();
                 let field = access.field().get();
-                let values = analyze_expr(ctx.world(), &callee.find(target.span())?);
+                let values = ctx.analyze_expr(&callee.find(target.span())?);
                 if let Some((this, func_ptr)) = values.into_iter().find_map(|(this, _styles)| {
                     if let Some(Value::Func(f)) = this.ty().scope().get(field) {
                         return Some((this, f.clone()));
