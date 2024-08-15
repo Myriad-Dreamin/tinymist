@@ -12,9 +12,7 @@ use typst::visualize::Color;
 
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::adt::interner::Interned;
-use crate::analysis::{
-    analyze_dyn_signature, analyze_import, resolve_call_target, BuiltinTy, PathPreference, Ty,
-};
+use crate::analysis::{analyze_dyn_signature, resolve_call_target, BuiltinTy, PathPreference, Ty};
 use crate::syntax::{param_index_at_leaf, CheckTarget};
 use crate::upstream::complete::complete_code;
 use crate::upstream::plain_docs_sentence;
@@ -90,7 +88,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                     let anaylyze = node.children().find(|child| child.is::<ast::Expr>());
                     let analyzed = anaylyze
                         .as_ref()
-                        .and_then(|source| analyze_import(self.world(), source));
+                        .and_then(|source| self.ctx.analyze_import(source));
                     if analyzed.is_none() {
                         log::debug!("failed to analyze import: {:?}", anaylyze);
                     }

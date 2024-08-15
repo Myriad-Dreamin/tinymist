@@ -111,6 +111,7 @@ impl LanguageState {
                 position_encoding,
                 enable_periscope,
                 caches: Default::default(),
+                workers: Default::default(),
             },
             periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
 
