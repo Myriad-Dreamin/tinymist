@@ -404,7 +404,6 @@ impl TypliteWorker {
         self.reduce(node)
     }
 
-    #[cfg(not(feature = "texmath"))]
     fn equation(&mut self, node: &SyntaxNode) -> Result<Value> {
         let equation: ast::Equation = node.cast().unwrap();
 

@@ -56,7 +56,6 @@ Some inlined raw `a`, ```c b```
         2. A
         1. B
         "###);
-    #[cfg(not(feature = "texmath"))]
     insta::assert_snapshot!(conv(r###"
 $
 1/2 + 1/3 = 5/6

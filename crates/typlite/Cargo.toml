@@ -24,8 +24,5 @@ typst-assets = { workspace = true, features = ["fonts"] }
 insta.workspace = true
 regex.workspace = true
 
-[features]
-texmath = []
-
 [lints]
 workspace = true
