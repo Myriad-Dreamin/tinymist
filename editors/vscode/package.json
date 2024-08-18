@@ -50,12 +50,12 @@
           "id": "tinymist.preview.content-preview",
           "type": "webview",
           "name": "Content",
-          "when": "ext.tinymistActivated && (config.tinymist.preview.showInActivityBar || config.typst-preview.showInActivityBar)"
+          "when": "ext.tinymistActivated"
         },
         {
           "id": "tinymist.preview.outline",
           "name": "Outline",
-          "when": "ext.tinymistActivated && (config.tinymist.preview.showInActivityBar || config.typst-preview.showInActivityBar)"
+          "when": "ext.tinymistActivated"
         }
       ]
     },
@@ -515,11 +515,6 @@
         },
         "tinymist.preview.cursorIndicator": {
           "description": "(Experimental) Show typst cursor indicator in preview.",
-          "type": "boolean",
-          "default": false
-        },
-        "tinymist.preview.showInActivityBar": {
-          "description": "(Experimental) Show a preview panel in activity bar.",
           "type": "boolean",
           "default": false
         },
