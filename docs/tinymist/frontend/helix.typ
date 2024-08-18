@@ -8,18 +8,7 @@ Run and configure tinymist in helix for Typst.
 <features>
 See #link("https://github.com/Myriad-Dreamin/tinymist#features")[Tinymist Features] for a list of features.
 
-== Finding Executable
-<finding-executable>
-To enable LSP, you must install `tinymist`. You can find `tinymist` on:
-
-- Night versions available at #link("https://github.com/Myriad-Dreamin/tinymist/actions")[GitHub Actions];.
-- Stable versions available at #link("https://github.com/Myriad-Dreamin/tinymist/releases")[GitHub Releases];.
-
-You can also compile and install *latest* `tinymist` by #link("https://www.rust-lang.org/tools/install")[Cargo];.
-
-```bash
-cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist
-```
+#include "common-finding-executable.typ"
 
 == Setup Server
 <setup-server>

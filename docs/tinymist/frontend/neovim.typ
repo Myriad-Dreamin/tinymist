@@ -8,13 +8,9 @@ Run and configure tinymist in neovim for Typst.
 <features>
 See #link("https://github.com/Myriad-Dreamin/tinymist#features")[Tinymist Features] for a list of features.
 
-== Finding Executable
-<finding-executable>
-To enable LSP, you must install `tinymist`. You can find `tinymist` on:
+#include "common-finding-executable.typ"
 
-- Night versions available at #link("https://github.com/Myriad-Dreamin/tinymist/actions")[GitHub Actions];.
-
-- Stable versions available with #link("https://github.com/williamboman/mason.nvim")[mason.nvim];.
+- (Recommended) Stable versions available with #link("https://github.com/williamboman/mason.nvim")[mason.nvim];.
 
   ```lua
   {
@@ -26,14 +22,6 @@ To enable LSP, you must install `tinymist`. You can find `tinymist` on:
     },
   }
   ```
-
-- Stable versions available at #link("https://github.com/Myriad-Dreamin/tinymist/releases")[GitHub Releases];.
-
-You can also compile and install *latest* `tinymist` by #link("https://www.rust-lang.org/tools/install")[Cargo];.
-
-```bash
-cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist
-```
 
 == Minimal Setup: LazyVim as an Example
 <minimal-setup-lazyvim-as-an-example>

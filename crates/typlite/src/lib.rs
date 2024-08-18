@@ -18,7 +18,7 @@ use value::{Args, Value};
 use ecow::{eco_format, EcoString};
 use typst_syntax::{
     ast::{self, AstNode},
-    FileId, SyntaxKind, SyntaxNode, VirtualPath,
+    FileId, Source, SyntaxKind, SyntaxNode, VirtualPath,
 };
 
 /// The result type for typlite.
@@ -53,21 +53,22 @@ impl Typlite {
             .source(current)
             .map_err(|e| format!("getting source for main file: {e:?}"))?;
 
-        let mut worker = TypliteWorker {
+        let worker = TypliteWorker {
             current,
             gfm: self.gfm,
-            scopes: library::library(),
+            scopes: Arc::new(library::library()),
             world,
         };
 
-        worker.convert(main.root())
+        worker.sub_file(main)
     }
 }
 
+#[derive(Clone)]
 struct TypliteWorker {
     current: FileId,
     gfm: bool,
-    scopes: Scopes<Value>,
+    scopes: Arc<Scopes<Value>>,
     world: Arc<LspWorld>,
 }
 
@@ -455,10 +456,19 @@ impl TypliteWorker {
     }
 
     fn include(&self, node: &SyntaxNode) -> Result<Value> {
-        let _ = node;
-        let _ = self.current;
+        let include: ast::ModuleInclude = node.cast().unwrap();
 
-        Ok(Value::None)
+        let path = include.source();
+        let src =
+            tinymist_query::syntax::find_source_by_expr(self.world.as_ref(), self.current, path)
+                .ok_or_else(|| format!("failed to find source on path {path:?}"))?;
+
+        self.clone().sub_file(src).map(Value::Content)
+    }
+
+    fn sub_file(mut self, src: Source) -> Result<EcoString> {
+        self.current = src.id();
+        self.convert(src.root())
     }
 }
 
