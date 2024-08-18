@@ -15,10 +15,10 @@ To enable LSP, you must install `tinymist`. You can find `tinymist` on:
 
 - Night versions available at #link("https://github.com/Myriad-Dreamin/tinymist/actions")[GitHub Actions];.
 - Stable versions available at #link("https://github.com/Myriad-Dreamin/tinymist/releases")[GitHub Releases];. \
-    If you are using the latest version of
-    #link("https://codeberg.org/meow_king/typst-ts-mode")[typst-ts-mode], then
-    you can use command `typst-ts-lsp-download-binary` to download the latest
-    stable binary of `tinymist` at `typst-ts-lsp-download-path`.
+  If you are using the latest version of
+  #link("https://codeberg.org/meow_king/typst-ts-mode")[typst-ts-mode], then
+  you can use command `typst-ts-lsp-download-binary` to download the latest
+  stable binary of `tinymist` at `typst-ts-lsp-download-path`.
 
 
 You can also compile and install *latest* `tinymist` by #link("https://www.rust-lang.org/tools/install")[Cargo];.
@@ -81,7 +81,7 @@ configuration entry, so the following configuration won't work:
 ```
 
 You can also have configuration per directory. Be sure to look at the
-documentation of `eglot-workspace-configuration`.
+documentation of `eglot-workspace-configuration` by #link("https://www.gnu.org/software/emacs/manual/html_node/emacs/Name-Help.html")[`describe-symbol`]..
 
 See #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md")[Tinymist Server Configuration]
 for references.
@@ -101,6 +101,6 @@ For example:
                                           "typst-lsp"))))))
 ```
 
-You can run command `tinymist help lsp` to view all available launch arguments for 
+You can run command `tinymist help lsp` to view all available launch arguments for
 configuration.
 
