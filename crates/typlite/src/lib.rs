@@ -4,26 +4,21 @@ mod error;
 mod library;
 pub mod scopes;
 mod value;
-// mod world;
 
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 pub use error::*;
 
 use base64::Engine;
 use scopes::Scopes;
-use tinymist_world::{
-    base::ShadowApi, CompileFontArgs, EntryReader, EntryState, FontResolverImpl,
-    LspUniverseBuilder, LspWorld,
-};
-use typst::{eval::Tracer, foundations::Bytes, layout::Abs};
+use tinymist_world::{base::ShadowApi, EntryReader, LspWorld};
+use typst::{eval::Tracer, foundations::Bytes, layout::Abs, World};
 use value::{Args, Value};
-// use world::LiteWorld;
 
 use ecow::{eco_format, EcoString};
 use typst_syntax::{
     ast::{self, AstNode},
-    FileId, Source, SyntaxKind, SyntaxNode, VirtualPath,
+    FileId, SyntaxKind, SyntaxNode, VirtualPath,
 };
 
 /// The result type for typlite.
@@ -33,88 +28,47 @@ pub use tinymist_world::CompileOnceArgs;
 
 /// Task builder for converting a typst document to Markdown.
 pub struct Typlite {
-    /// The document to convert.
-    main: Source,
+    /// The universe to use for the conversion.
+    world: Arc<LspWorld>,
     /// Whether to enable GFM (GitHub Flavored Markdown) features.
     gfm: bool,
-    /// The universe to use for the conversion.
-    world: Option<LspWorld>,
 }
 
 impl Typlite {
-    /// Create a new Typlite instance from a string.
-    /// # Example
-    /// ```rust
-    /// use typlite::Typlite;
-    /// let content = "= Hello, World";
-    /// let res = Typlite::new_with_content(content).convert();
-    /// assert!(matches!(res, Ok(e) if e == "# Hello, World"));
-    /// ```
-    pub fn new_with_content(content: &str) -> Self {
-        let main = Source::detached(content);
-        Self {
-            main,
-            gfm: false,
-            world: None,
-        }
-    }
-
-    /// Create a new Typlite instance from a [`Source`].
+    /// Create a new Typlite instance from a [`World`].
     ///
     /// This is useful when you have a [`Source`] instance and you can avoid
     /// reparsing the content.
-    pub fn new_with_src(main: Source) -> Self {
-        Self {
-            main,
-            gfm: false,
-            world: None,
-        }
-    }
-
-    /// With a common world.
-    pub fn with_world(mut self, world: LspWorld) -> Self {
-        self.world = Some(world);
-        self
+    pub fn new(world: Arc<LspWorld>) -> Self {
+        Self { world, gfm: false }
     }
 
     /// Convert the content to a markdown string.
     pub fn convert(self) -> Result<EcoString> {
-        static FONT_RESOLVER: LazyLock<Result<Arc<FontResolverImpl>>> = LazyLock::new(|| {
-            Ok(Arc::new(
-                LspUniverseBuilder::resolve_fonts(CompileFontArgs::default())
-                    .map_err(|e| format!("{e:?}"))?,
-            ))
-        });
+        let main = self.world.entry_state().main();
+        let current = main.ok_or("no main file in workspace")?;
+        let world = self.world;
 
-        let world = match self.world {
-            Some(u) => u,
-            None => {
-                let font_resolver = FONT_RESOLVER.clone();
-                let cwd = std::env::current_dir().map_err(|e| format!("{e:?}"))?;
-                let u = LspUniverseBuilder::build(
-                    EntryState::new_workspace(cwd.as_path().into()),
-                    font_resolver?,
-                    Default::default(),
-                )
-                .map_err(|e| format!("{e:?}"))?;
-                u.snapshot()
-            }
-        };
+        let main = world
+            .source(current)
+            .map_err(|e| format!("getting source for main file: {e:?}"))?;
 
         let mut worker = TypliteWorker {
+            current,
             gfm: self.gfm,
             scopes: library::library(),
             world,
         };
 
-        worker.convert(self.main.root())
+        worker.convert(main.root())
     }
 }
 
 struct TypliteWorker {
+    current: FileId,
     gfm: bool,
     scopes: Scopes<Value>,
-    world: LspWorld,
+    world: Arc<LspWorld>,
 }
 
 impl TypliteWorker {
@@ -280,7 +234,7 @@ impl TypliteWorker {
             FuncReturn => Ok(Value::None),
 
             ModuleImport => Ok(Value::None),
-            ModuleInclude => Ok(Value::None),
+            ModuleInclude => self.include(node),
 
             // Ignored comments
             LineComment => Ok(Value::None),
@@ -496,6 +450,13 @@ impl TypliteWorker {
 
     fn contextual(&self, node: &SyntaxNode) -> Result<Value> {
         let _ = node;
+
+        Ok(Value::None)
+    }
+
+    fn include(&self, node: &SyntaxNode) -> Result<Value> {
+        let _ = node;
+        let _ = self.current;
 
         Ok(Value::None)
     }

@@ -3878,9 +3878,11 @@ dependencies = [
 name = "tinymist-world"
 version = "0.11.19"
 dependencies = [
+ "anyhow",
  "chrono",
  "clap",
  "comemo 0.4.0",
+ "log",
  "serde",
  "serde_json",
  "tinymist-assets 0.11.19 (registry+https://github.com/rust-lang/crates.io-index)",
