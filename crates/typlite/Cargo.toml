@@ -12,6 +12,7 @@ repository.workspace = true
 
 [dependencies]
 typst-syntax.workspace = true
+tinymist-world.workspace = true
 ecow.workspace = true
 comemo.workspace = true
 

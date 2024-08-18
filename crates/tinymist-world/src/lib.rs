@@ -1,15 +1,19 @@
+//! World implementation of typst for tinymist.
+
+pub use typst_ts_compiler::world as base;
+pub use typst_ts_compiler::{entry::*, EntryOpts, EntryState};
+pub use typst_ts_compiler::{font, vfs};
+pub use typst_ts_core::config::CompileFontOpts;
+pub use typst_ts_core::error::prelude;
+pub use typst_ts_core::font::FontResolverImpl;
+
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
 
 use chrono::{DateTime, Utc};
 use clap::{builder::ValueParser, ArgAction, Parser};
 use comemo::Prehashed;
 use serde::{Deserialize, Serialize};
-use typst_ts_core::{
-    config::{compiler::EntryState, CompileFontOpts as FontOptsInner},
-    error::prelude::*,
-    font::FontResolverImpl,
-    TypstDict,
-};
+use typst_ts_core::{config::CompileFontOpts as FontOptsInner, error::prelude::*, TypstDict};
 
 use typst_ts_compiler::{
     font::system::SystemFontSearcher,
@@ -77,7 +81,7 @@ pub struct CompileOnceArgs {
     pub creation_timestamp: Option<DateTime<Utc>>,
 }
 
-/// Compiler feature for LSP world.
+/// Compiler feature for LSP universe and worlds.
 pub type LspCompilerFeat = SystemCompilerFeat;
 /// LSP universe that spawns LSP worlds.
 pub type LspUniverse = TypstSystemUniverse;
@@ -86,10 +90,10 @@ pub type LspWorld = TypstSystemWorld;
 /// Immutable prehashed reference to dictionary.
 pub type ImmutDict = Arc<Prehashed<TypstDict>>;
 
-/// Builder for LSP world.
-pub struct LspWorldBuilder;
+/// Builder for LSP universe.
+pub struct LspUniverseBuilder;
 
-impl LspWorldBuilder {
+impl LspUniverseBuilder {
     /// Create [`LspUniverse`] with the given options.
     /// See [`LspCompilerFeat`] for instantiation details.
     pub fn build(
@@ -107,7 +111,7 @@ impl LspWorldBuilder {
     }
 
     /// Resolve fonts from given options.
-    pub(crate) fn resolve_fonts(args: CompileFontArgs) -> ZResult<FontResolverImpl> {
+    pub fn resolve_fonts(args: CompileFontArgs) -> ZResult<FontResolverImpl> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(FontOptsInner {
             font_profile_cache_path: Default::default(),

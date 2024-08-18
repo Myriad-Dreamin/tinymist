@@ -662,7 +662,7 @@ impl CompileConfig {
 
             log::info!("creating SharedFontResolver with {opts:?}");
             Derived(Deferred::new(|| {
-                crate::world::LspWorldBuilder::resolve_fonts(opts)
+                crate::world::LspUniverseBuilder::resolve_fonts(opts)
                     .map(Arc::new)
                     .expect("failed to create font book")
             }))

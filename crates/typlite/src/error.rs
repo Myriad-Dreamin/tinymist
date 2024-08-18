@@ -2,8 +2,10 @@ use core::fmt;
 use std::{borrow::Cow, ops::Deref};
 
 /// An error that can occur during the conversion process.
+#[derive(Clone)]
 pub struct Error(Box<Repr>);
 
+#[derive(Clone)]
 enum Repr {
     /// Just a message.
     Msg(Cow<'static, str>),

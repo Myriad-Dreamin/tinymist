@@ -4,31 +4,41 @@ mod error;
 mod library;
 pub mod scopes;
 mod value;
-mod world;
+// mod world;
+
+use std::sync::{Arc, LazyLock};
 
 pub use error::*;
 
 use base64::Engine;
 use scopes::Scopes;
-use typst::{eval::Tracer, layout::Abs};
+use tinymist_world::{
+    base::ShadowApi, CompileFontArgs, EntryReader, EntryState, FontResolverImpl,
+    LspUniverseBuilder, LspWorld,
+};
+use typst::{eval::Tracer, foundations::Bytes, layout::Abs};
 use value::{Args, Value};
-use world::LiteWorld;
+// use world::LiteWorld;
 
 use ecow::{eco_format, EcoString};
 use typst_syntax::{
     ast::{self, AstNode},
-    Source, SyntaxKind, SyntaxNode,
+    FileId, Source, SyntaxKind, SyntaxNode, VirtualPath,
 };
 
-type Result<T, Err = Error> = std::result::Result<T, Err>;
+/// The result type for typlite.
+pub type Result<T, Err = Error> = std::result::Result<T, Err>;
+
+pub use tinymist_world::CompileOnceArgs;
 
 /// Task builder for converting a typst document to Markdown.
-#[derive(Debug, Clone)]
 pub struct Typlite {
     /// The document to convert.
     main: Source,
     /// Whether to enable GFM (GitHub Flavored Markdown) features.
     gfm: bool,
+    /// The universe to use for the conversion.
+    world: Option<LspWorld>,
 }
 
 impl Typlite {
@@ -42,7 +52,11 @@ impl Typlite {
     /// ```
     pub fn new_with_content(content: &str) -> Self {
         let main = Source::detached(content);
-        Self { main, gfm: false }
+        Self {
+            main,
+            gfm: false,
+            world: None,
+        }
     }
 
     /// Create a new Typlite instance from a [`Source`].
@@ -50,14 +64,47 @@ impl Typlite {
     /// This is useful when you have a [`Source`] instance and you can avoid
     /// reparsing the content.
     pub fn new_with_src(main: Source) -> Self {
-        Self { main, gfm: false }
+        Self {
+            main,
+            gfm: false,
+            world: None,
+        }
+    }
+
+    /// With a common world.
+    pub fn with_world(mut self, world: LspWorld) -> Self {
+        self.world = Some(world);
+        self
     }
 
     /// Convert the content to a markdown string.
     pub fn convert(self) -> Result<EcoString> {
+        static FONT_RESOLVER: LazyLock<Result<Arc<FontResolverImpl>>> = LazyLock::new(|| {
+            Ok(Arc::new(
+                LspUniverseBuilder::resolve_fonts(CompileFontArgs::default())
+                    .map_err(|e| format!("{e:?}"))?,
+            ))
+        });
+
+        let world = match self.world {
+            Some(u) => u,
+            None => {
+                let font_resolver = FONT_RESOLVER.clone();
+                let cwd = std::env::current_dir().map_err(|e| format!("{e:?}"))?;
+                let u = LspUniverseBuilder::build(
+                    EntryState::new_workspace(cwd.as_path().into()),
+                    font_resolver?,
+                    Default::default(),
+                )
+                .map_err(|e| format!("{e:?}"))?;
+                u.snapshot()
+            }
+        };
+
         let mut worker = TypliteWorker {
             gfm: self.gfm,
             scopes: library::library(),
+            world,
         };
 
         worker.convert(self.main.root())
@@ -67,6 +114,7 @@ impl Typlite {
 struct TypliteWorker {
     gfm: bool,
     scopes: Scopes<Value>,
+    world: LspWorld,
 }
 
 impl TypliteWorker {
@@ -254,12 +302,20 @@ impl TypliteWorker {
     fn render(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
         let color = "#c0caf5";
 
-        let main = Source::detached(eco_format!(
+        let main = Bytes::from(eco_format!(
             r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em));#set text(rgb("{color}"))
 {}"##,
             node.clone().into_text()
-        ));
-        let world = LiteWorld::new(main);
+        ).as_bytes().to_owned());
+        // let world = LiteWorld::new(main);
+        let main_id = FileId::new(None, VirtualPath::new("__render__.typ"));
+        let entry = self.world.entry_state().select_in_workspace(main_id);
+        let mut world = self.world.task(tinymist_world::base::TaskInputs {
+            entry: Some(entry),
+            inputs: None,
+        });
+        world.map_shadow_by_id(main_id, main).unwrap();
+
         let mut tracer = Tracer::default();
         let document = typst::compile(&world, &mut tracer)
             .map_err(|e| format!("compiling math node: {e:?}"))?;

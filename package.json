@@ -17,8 +17,8 @@
     "docs": "shiroa serve -w . docs/tinymist",
     "docs:rs": "cargo doc --workspace --no-deps",
     "test:grammar": "cd syntaxes/textmate && yarn run test",
-    "build:typlite": "cd contrib/typlite && cargo build",
-    "typlite": "cd contrib/typlite && target/debug/typlite"
+    "build:typlite": "cargo build --bin typlite",
+    "typlite": "target/debug/typlite"
   },
   "dependencies": {},
   "devDependencies": {
