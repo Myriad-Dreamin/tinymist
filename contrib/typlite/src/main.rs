@@ -18,7 +18,7 @@ pub struct CompileArgs {
     #[clap(flatten)]
     pub compile: CompileOnceArgs,
 
-    /// Path to ouput Markdown file
+    /// Path to ouput file
     #[clap(value_name = "OUTPUT")]
     pub output: Option<String>,
 }

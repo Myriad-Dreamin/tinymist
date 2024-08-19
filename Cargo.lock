@@ -4164,9 +4164,9 @@ dependencies = [
  "ecow 0.2.2",
  "insta",
  "regex",
+ "tinymist-query",
  "tinymist-world",
  "typst",
- "typst-assets",
  "typst-svg",
  "typst-syntax 0.11.1",
 ]

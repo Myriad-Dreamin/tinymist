@@ -12,6 +12,9 @@ It contains:
 
 ## Features
 
+
+
+
 Language service (LSP) features:
 
 - [Semantic highlighting](https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide)
@@ -62,6 +65,7 @@ Extra features:
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
   - Click a button in template gallery to initialize a new project with a template. (`tinymist.initTemplate` and `tinymist.initTemplateInPlace`)
   - Trace execution in current document (`tinymist.profileCurrentFile`).
+
 
 ## Release Cycle
 

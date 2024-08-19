@@ -10,21 +10,22 @@ See [Tinymist Features](https://github.com/Myriad-Dreamin/tinymist#features) for
 
 ## Finding Executable
 
-To enable LSP, you must install `tinymist`. You can find `tinymist` on:
+To enable LSP, you must install `tinymist`. You can find `tinymist` by:
 
 - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
+
 - Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases). \
   If you are using the latest version of
   [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then
   you can use command `typst-ts-lsp-download-binary` to download the latest
   stable binary of `tinymist` at `typst-ts-lsp-download-path`.
 
+- Build from source by cargo.
+  You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
 
-You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
-
-```bash
-cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist
-```
+  ```bash
+  cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist
+  ```
 
 
 ## Setup Server
