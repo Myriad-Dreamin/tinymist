@@ -4,6 +4,118 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.19 - [2024-08-10]
+
+* Bumped typstyle v0.11.31 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/512
+
+### Compiler
+
+* (Fix) Tested and fixed initialization of formatter configuration in https://github.com/Myriad-Dreamin/tinymist/pull/523
+
+### Editor
+
+* (Fix) Using plural for 0 items by @Nerixyz in https://github.com/Myriad-Dreamin/tinymist/pull/507
+
+### Hover (Tooltip)
+
+* Showing target of label and con tent of metadata when hovering in https://github.com/Myriad-Dreamin/tinymist/pull/517
+
+### Preview
+
+* (Fix) Two small bugs in tasks feature in https://github.com/Myriad-Dreamin/tinymist/pull/499
+  * deactivating task provider when the extension is deactivated
+  * don't write args variable when exporting pdfpc task
+
+### Syntax/Semantic Highlighting
+
+* Injecting typst{,-code} syntaxes into markdown syntax highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/504 and https://github.com/Myriad-Dreamin/tinymist/pull/518
+* (Fix) Parsing dot operation on atomic expression correctly in https://github.com/Myriad-Dreamin/tinymist/pull/497
+* Identifying more context for bracket colorization in https://github.com/Myriad-Dreamin/tinymist/pull/522
+* (Fix) Allowing underline in url link in https://github.com/Myriad-Dreamin/tinymist/pull/520
+
+### Misc
+
+* Linked sublime text support to [sublimelsp](https://github.com/sublimelsp/LSP/blob/main/docs/src/language_servers.md#tinymist) in https://github.com/Myriad-Dreamin/tinymist/pull/519
+* Fixed bad configuration documentation in https://github.com/Myriad-Dreamin/tinymist/pull/521
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.18...v0.11.19
+
+## v0.11.18 - [2024-08-05]
+
+### Compiler
+
+* Cherry picked concurrent id error in https://github.com/Myriad-Dreamin/tinymist/pull/472
+  * This affects lsp since the server parallelized the requests.
+* (Fix) Retrieving environments even if `typstExtraArgs` is unspecified in https://github.com/Myriad-Dreamin/tinymist/pull/482
+  * For example, the env variable `SOURCE_DATE_EPOCH` is not used when `typstExtraArgs` is not specified.
+
+### Commands/Tools
+
+* Supported vscode tasks for exporting pdf, svg, and png in https://github.com/Myriad-Dreamin/tinymist/pull/488
+* Supported vscode tasks for exporting html, md, and txt in https://github.com/Myriad-Dreamin/tinymist/pull/489
+* Supported vscode tasks for exporting query and pdfpc in https://github.com/Myriad-Dreamin/tinymist/pull/490
+
+### Preview
+
+* Added normal-image option for `tinymist.preview.invertColor` feature by @SetsuikiHyoryu in https://github.com/Myriad-Dreamin/tinymist/pull/464 and https://github.com/Myriad-Dreamin/tinymist/pull/473
+  * People may love inverted color for preview, but not for images. This feature helps them.
+* Removed `typst-preview.showLog` and added `tinymist.showLog` in https://github.com/Myriad-Dreamin/tinymist/pull/476
+* (Fix) Processing task id correctly when executing scroll command in https://github.com/Myriad-Dreamin/tinymist/pull/477
+
+### Completion
+
+* (Fix) Applying label instead of bib title name in `at` completion by @kririae in https://github.com/Myriad-Dreamin/tinymist/pull/485
+
+### Syntax/Semantic Highlighting
+
+* (Fix) Allowing hyphenate in url link in https://github.com/Myriad-Dreamin/tinymist/pull/481
+  * It was not highlighted correctly.
+
+### Misc
+
+* Added documentation about installing nightly prebuilts in https://github.com/Myriad-Dreamin/tinymist/pull/480
+* Improved contribution guide and added sections for syntaxes in https://github.com/Myriad-Dreamin/tinymist/pull/471
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.17...v0.11.18
+
+## v0.11.17 - [2024-07-27]
+
+### Editor
+
+* Added a `$(file-pdf)` icon for `showPdf` to navigation bar in https://github.com/Myriad-Dreamin/tinymist/pull/462
+  * It is a shorter way to export and open documents as PDF.
+  * It now has a different icon from the `preview` command.
+  * Note: This function is suitable to help perform your final checks to documents. For previewing, please uses `preview` command for better experience.
+* Interned vscode-variable package in https://github.com/Myriad-Dreamin/tinymist/pull/460
+  * Fixed some bugs in the vscode-variable package.
+  * Improving the performance of replacing variables a bit.
+
+### Compiler
+
+* (Fix) Processing lagged compile reason in https://github.com/Myriad-Dreamin/tinymist/pull/456
+  * Causing last key strokes not being processed correctly.
+
+### Preview
+
+* Modified static host to send Content-Type: text/html by @cskeeters in https://github.com/Myriad-Dreamin/tinymist/pull/465
+  * Causing that GitHub Codespaces and the browser just showed the text of the HTML.
+
+### Completion
+
+* Supported querying label with paper name in bib items by @kririae in https://github.com/Myriad-Dreamin/tinymist/pull/365
+* Added documentation about completion in https://github.com/Myriad-Dreamin/tinymist/pull/466
+
+### Syntax/Semantic Highlighting
+
+* Added syntax highlighting for raw blocks in https://github.com/Myriad-Dreamin/tinymist/pull/450
+  * To ensure 100% correctness of grammar, only the raw block with number fence ticks less than 6 is highlighted.
+
+### Misc
+
+* Handling unwrap for the args in compile command by @upsidedownsweetfood in https://github.com/Myriad-Dreamin/tinymist/pull/445
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.16...v0.11.17
+
 ## v0.11.16 - [2024-07-20]
 
 * Adding editor-side e2e testing in https://github.com/Myriad-Dreamin/tinymist/pull/441 and https://github.com/Myriad-Dreamin/tinymist/pull/442

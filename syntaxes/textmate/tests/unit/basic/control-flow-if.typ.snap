@@ -191,7 +191,15 @@
 #                 ^ source.typst meta.expr.if.typst
 #                  ^ source.typst meta.expr.if.typst meta.brace.square.typst
 >  {Bad}, but we {dont-care}!
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.typst meta.expr.if.typst
+#^^ source.typst meta.expr.if.typst
+#  ^ source.typst meta.expr.if.typst markup.content.brace.typst
+#   ^^^ source.typst meta.expr.if.typst
+#      ^ source.typst meta.expr.if.typst markup.content.brace.typst
+#       ^^^^^^^^^ source.typst meta.expr.if.typst
+#                ^ source.typst meta.expr.if.typst markup.content.brace.typst
+#                 ^^^^^^^^^ source.typst meta.expr.if.typst
+#                          ^ source.typst meta.expr.if.typst markup.content.brace.typst
+#                           ^^ source.typst meta.expr.if.typst
 >]
 #^ source.typst meta.expr.if.typst meta.brace.square.typst
 >

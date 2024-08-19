@@ -135,12 +135,14 @@ mod polymorphic {
     use super::prelude::*;
     use super::*;
 
-    #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
+    #[derive(Default, Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub enum PageSelection {
         #[default]
         First,
-        Merged,
+        Merged {
+            gap: Option<String>,
+        },
     }
 
     #[derive(Debug, Clone)]
@@ -148,10 +150,24 @@ mod polymorphic {
         Pdf {
             creation_timestamp: Option<chrono::DateTime<chrono::Utc>>,
         },
+        Html {},
+        Markdown {},
+        Text {},
+        Query {
+            format: String,
+            output_extension: Option<String>,
+            strict: bool,
+            selector: String,
+            field: Option<String>,
+            one: bool,
+            pretty: bool,
+        },
         Svg {
             page: PageSelection,
         },
         Png {
+            ppi: Option<f64>,
+            fill: Option<String>,
             page: PageSelection,
         },
     }
@@ -168,8 +184,16 @@ mod polymorphic {
         pub fn extension(&self) -> &str {
             match self {
                 Self::Pdf { .. } => "pdf",
+                Self::Html { .. } => "html",
+                Self::Markdown { .. } => "md",
+                Self::Text { .. } => "txt",
                 Self::Svg { .. } => "svg",
                 Self::Png { .. } => "png",
+                Self::Query {
+                    format,
+                    output_extension,
+                    ..
+                } => output_extension.as_deref().unwrap_or(format),
             }
         }
     }

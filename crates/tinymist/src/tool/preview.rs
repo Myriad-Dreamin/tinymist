@@ -1,19 +1,17 @@
 //! Document preview tool for Typst
 
 use std::num::NonZeroUsize;
-use std::{borrow::Cow, collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
 use actor::typ_server::SucceededArtifact;
-use anyhow::Context;
 use hyper::service::{make_service_fn, service_fn};
 use lsp_types::notification::Notification;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_query::{analysis::Analysis, PositionEncoding};
+use tinymist_query::analysis::Analysis;
 use tokio::sync::{mpsc, oneshot};
-use typst::foundations::{Str, Value};
 use typst::layout::{Frame, FrameItem, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
@@ -25,7 +23,6 @@ use typst_preview::{
 };
 use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
 use typst_ts_compiler::EntryReader;
-use typst_ts_core::config::{compiler::EntryOpts, CompileOpts};
 use typst_ts_core::debug_loc::SourceSpanOffset;
 use typst_ts_core::{Error, TypstDocument, TypstFileId};
 
@@ -359,25 +356,27 @@ pub fn make_static_host(
     static_file_addr: String,
     mode: PreviewMode,
 ) -> (SocketAddr, oneshot::Sender<()>, tokio::task::JoinHandle<()>) {
-    let frontend_html = previewer.frontend_html(mode);
+    let frontend_html = hyper::body::Bytes::from(previewer.frontend_html(mode));
     let make_service = make_service_fn(move |_| {
-        let html = frontend_html.clone();
+        let frontend_html = frontend_html.clone();
         async move {
             Ok::<_, hyper::http::Error>(service_fn(move |req| {
-                // todo: clone may not be necessary
-                let html = html.as_ref().to_owned();
+                let frontend_html = frontend_html.clone();
                 async move {
                     if req.uri().path() == "/" {
-                        log::info!("Serve frontend: {:?}", mode);
-                        Ok::<_, hyper::Error>(hyper::Response::new(hyper::Body::from(html)))
+                        log::debug!("Serve frontend: {mode:?}");
+                        let res = hyper::Response::builder()
+                            .header(hyper::header::CONTENT_TYPE, "text/html")
+                            .body(hyper::body::Body::from(frontend_html))
+                            .unwrap();
+                        Ok::<_, hyper::Error>(res)
                     } else {
                         // jump to /
-                        let mut res = hyper::Response::new(hyper::Body::empty());
-                        *res.status_mut() = hyper::StatusCode::FOUND;
-                        res.headers_mut().insert(
-                            hyper::header::LOCATION,
-                            hyper::header::HeaderValue::from_static("/"),
-                        );
+                        let res = hyper::Response::builder()
+                            .status(hyper::StatusCode::FOUND)
+                            .header(hyper::header::LOCATION, "/")
+                            .body(hyper::body::Body::empty())
+                            .unwrap();
                         Ok(res)
                     }
                 }
@@ -418,57 +417,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         std::process::exit(0);
     });
 
-    let entry = {
-        let input = args.compile.input.context("entry file must be provided")?;
-        let input = Path::new(&input);
-        let entry = if input.is_absolute() {
-            input.to_owned()
-        } else {
-            std::env::current_dir().unwrap().join(input)
-        };
-
-        let root = if let Some(root) = &args.compile.root {
-            if root.is_absolute() {
-                root.clone()
-            } else {
-                std::env::current_dir().unwrap().join(root)
-            }
-        } else {
-            std::env::current_dir().unwrap()
-        };
-
-        if !entry.starts_with(&root) {
-            log::error!("entry file must be in the root directory");
-            std::process::exit(1);
-        }
-
-        let relative_entry = match entry.strip_prefix(&root) {
-            Ok(e) => e,
-            Err(_) => {
-                log::error!("entry path must be inside the root: {}", entry.display());
-                std::process::exit(1);
-            }
-        };
-
-        EntryOpts::new_rooted(root.clone(), Some(relative_entry.to_owned()))
-    };
-
-    let inputs = args
-        .compile
-        .inputs
-        .iter()
-        .map(|(k, v)| (Str::from(k.as_str()), Value::Str(Str::from(v.as_str()))))
-        .collect();
-
-    let world = LspUniverse::new(CompileOpts {
-        entry,
-        inputs,
-        no_system_fonts: args.compile.font.ignore_system_fonts,
-        font_paths: args.compile.font.font_paths.clone(),
-        with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
-        ..CompileOpts::default()
-    })
-    .expect("incorrect options");
+    let verse = args.compile.resolve()?;
 
     let (service, handle) = {
         // type EditorSender = mpsc::UnboundedSender<EditorRequest>;
@@ -482,11 +431,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             // export_tx,
             export: Default::default(),
             editor_tx,
-            analysis: Analysis {
-                position_encoding: PositionEncoding::Utf16,
-                enable_periscope: false,
-                caches: Default::default(),
-            },
+            analysis: Analysis::default(),
             periscope: tinymist_render::PeriscopeRenderer::default(),
             notified_revision: parking_lot::Mutex::new(0),
         });
@@ -495,7 +440,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
 
         let service =
-            CompileServerActor::new(world, intr_tx, intr_rx).with_watch(Some(handle.clone()));
+            CompileServerActor::new(verse, intr_tx, intr_rx).with_watch(Some(handle.clone()));
 
         (service, handle)
     };

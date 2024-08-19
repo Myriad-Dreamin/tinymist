@@ -2,12 +2,12 @@
 #^^^^ source.typst punctuation.definition.raw.begin.typst
 #    ^^^ source.typst fenced_code.block.language.typst
 >```typ
-#^^^ source.typst meta.embedded.block.typst source.typst punctuation.definition.raw.begin.typst
-#   ^^^ source.typst meta.embedded.block.typst source.typst fenced_code.block.language.typst
+#^^^ source.typst meta.embedded.block.typst punctuation.definition.raw.begin.typst
+#   ^^^ source.typst meta.embedded.block.typst fenced_code.block.language.typst
 >abc
-#^^^^ source.typst meta.embedded.block.typst source.typst meta.embedded.block.typst source.typst
+#^^^^ source.typst meta.embedded.block.typst meta.embedded.block.typst
 >```
-#^^^ source.typst meta.embedded.block.typst source.typst punctuation.definition.raw.end.typst
+#^^^ source.typst meta.embedded.block.typst punctuation.definition.raw.end.typst
 >````
 #^^^^ source.typst punctuation.definition.raw.end.typst
 >
@@ -15,16 +15,16 @@
 #^^^^^ source.typst punctuation.definition.raw.begin.typst
 #     ^^^ source.typst fenced_code.block.language.typst
 >````md
-#^^^^ source.typst meta.embedded.block.typst source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
-#    ^^ source.typst meta.embedded.block.typst source.typst markup.raw.block.typst fenced_code.block.language.typst
+#^^^^ source.typst meta.embedded.block.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#    ^^ source.typst meta.embedded.block.typst markup.raw.block.typst fenced_code.block.language.typst
 >```typ
-#^^^^^^^ source.typst meta.embedded.block.typst source.typst markup.raw.block.typst
+#^^^^^^^ source.typst meta.embedded.block.typst markup.raw.block.typst
 >abc
-#^^^^ source.typst meta.embedded.block.typst source.typst markup.raw.block.typst
+#^^^^ source.typst meta.embedded.block.typst markup.raw.block.typst
 >```
-#^^^^ source.typst meta.embedded.block.typst source.typst markup.raw.block.typst
+#^^^^ source.typst meta.embedded.block.typst markup.raw.block.typst
 >````
-#^^^^ source.typst meta.embedded.block.typst source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+#^^^^ source.typst meta.embedded.block.typst markup.raw.block.typst punctuation.definition.raw.end.typst
 >`````
 #^^^^^ source.typst punctuation.definition.raw.end.typst
 >

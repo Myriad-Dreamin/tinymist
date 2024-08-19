@@ -13,25 +13,27 @@ use once_cell::sync::OnceCell;
 use reflexo::hash::{hash128, FxDashMap};
 use reflexo::{debug_loc::DataSource, ImmutPath};
 use typst::eval::Eval;
-use typst::foundations::{self, Func};
-use typst::syntax::{LinkedNode, SyntaxNode};
+use typst::foundations::{self, Func, Styles};
+use typst::syntax::{FileId, LinkedNode, SyntaxNode};
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
     foundations::Bytes,
     syntax::{package::PackageSpec, Source, Span, VirtualPath},
     World,
 };
-use typst::{foundations::Value, syntax::ast, text::Font};
+use typst::{foundations::Value, model::Document, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
 
 use super::{
-    analyze_bib, post_type_check, BibInfo, DefUseInfo, DefinitionLink, IdentRef, ImportInfo,
-    PathPreference, SigTy, Signature, SignatureTarget, Ty, TypeScheme,
+    analyze_bib, analyze_expr_, analyze_import_, post_type_check, BibInfo, DefUseInfo,
+    DefinitionLink, IdentRef, ImportInfo, PathPreference, SigTy, Signature, SignatureTarget, Ty,
+    TypeScheme,
 };
 use crate::adt::interner::Interned;
 use crate::analysis::analyze_dyn_signature;
 use crate::path_to_url;
 use crate::syntax::{get_deref_target, resolve_id_by_path, DerefTarget};
+use crate::upstream::{tooltip_, Tooltip};
 use crate::{
     lsp_to_typst,
     syntax::{
@@ -40,58 +42,8 @@ use crate::{
     typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange, VersionedDocument,
 };
 
-/// A cache for module-level analysis results of a module.
-///
-/// You should not holds across requests, because source code may change.
-#[derive(Default)]
-pub struct ModuleAnalysisCache {
-    file: OnceCell<FileResult<Bytes>>,
-    source: OnceCell<FileResult<Source>>,
-    def_use: OnceCell<Option<Arc<DefUseInfo>>>,
-    type_check: OnceCell<Option<Arc<TypeScheme>>>,
-}
-
-impl ModuleAnalysisCache {
-    /// Get the bytes content of a file.
-    pub fn file(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Bytes> {
-        self.file.get_or_init(|| ctx.world().file(file_id)).clone()
-    }
-
-    /// Get the source of a file.
-    pub fn source(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Source> {
-        self.source
-            .get_or_init(|| ctx.world().source(file_id))
-            .clone()
-    }
-
-    /// Try to get the def-use information of a file.
-    pub fn def_use(&self) -> Option<Arc<DefUseInfo>> {
-        self.def_use.get().cloned().flatten()
-    }
-
-    /// Compute the def-use information of a file.
-    pub(crate) fn compute_def_use(
-        &self,
-        f: impl FnOnce() -> Option<Arc<DefUseInfo>>,
-    ) -> Option<Arc<DefUseInfo>> {
-        self.def_use.get_or_init(f).clone()
-    }
-
-    /// Try to get the type check information of a file.
-    pub(crate) fn type_check(&self) -> Option<Arc<TypeScheme>> {
-        self.type_check.get().cloned().flatten()
-    }
-
-    /// Compute the type check information of a file.
-    pub(crate) fn compute_type_check(
-        &self,
-        f: impl FnOnce() -> Option<Arc<TypeScheme>>,
-    ) -> Option<Arc<TypeScheme>> {
-        self.type_check.get_or_init(f).clone()
-    }
-}
-
 /// The analysis data holds globally.
+#[derive(Default)]
 pub struct Analysis {
     /// The position encoding for the workspace.
     pub position_encoding: PositionEncoding,
@@ -99,6 +51,8 @@ pub struct Analysis {
     pub enable_periscope: bool,
     /// The global caches for analysis.
     pub caches: AnalysisGlobalCaches,
+    /// The global caches for analysis.
+    pub workers: AnalysisGlobalWorkers,
 }
 
 impl Analysis {
@@ -152,6 +106,57 @@ pub struct AnalysisCaches {
     module_deps: OnceCell<HashMap<TypstFileId, ModuleDependency>>,
 }
 
+/// A cache for module-level analysis results of a module.
+///
+/// You should not holds across requests, because source code may change.
+#[derive(Default)]
+pub struct ModuleAnalysisCache {
+    file: OnceCell<FileResult<Bytes>>,
+    source: OnceCell<FileResult<Source>>,
+    def_use: OnceCell<Option<Arc<DefUseInfo>>>,
+    type_check: OnceCell<Option<Arc<TypeScheme>>>,
+}
+
+impl ModuleAnalysisCache {
+    /// Get the bytes content of a file.
+    pub fn file(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Bytes> {
+        self.file.get_or_init(|| ctx.world().file(file_id)).clone()
+    }
+
+    /// Get the source of a file.
+    pub fn source(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Source> {
+        self.source
+            .get_or_init(|| ctx.world().source(file_id))
+            .clone()
+    }
+
+    /// Try to get the def-use information of a file.
+    pub fn def_use(&self) -> Option<Arc<DefUseInfo>> {
+        self.def_use.get().cloned().flatten()
+    }
+
+    /// Compute the def-use information of a file.
+    pub(crate) fn compute_def_use(
+        &self,
+        f: impl FnOnce() -> Option<Arc<DefUseInfo>>,
+    ) -> Option<Arc<DefUseInfo>> {
+        self.def_use.get_or_init(f).clone()
+    }
+
+    /// Try to get the type check information of a file.
+    pub(crate) fn type_check(&self) -> Option<Arc<TypeScheme>> {
+        self.type_check.get().cloned().flatten()
+    }
+
+    /// Compute the type check information of a file.
+    pub(crate) fn compute_type_check(
+        &self,
+        f: impl FnOnce() -> Option<Arc<TypeScheme>>,
+    ) -> Option<Arc<TypeScheme>> {
+        self.type_check.get_or_init(f).clone()
+    }
+}
+
 /// The resources for analysis.
 pub trait AnalysisResources {
     /// Get the world surface for Typst compiler.
@@ -177,6 +182,17 @@ pub trait AnalysisResources {
     ) -> Option<String> {
         None
     }
+}
+
+/// Shared workers to limit resource usage
+#[derive(Default)]
+pub struct AnalysisGlobalWorkers {
+    /// A possible long running import dynamic analysis task
+    import: RateLimiter,
+    /// A possible long running expression dynamic analysis task
+    expression: RateLimiter,
+    /// A possible long running tooltip dynamic analysis task
+    tooltip: RateLimiter,
 }
 
 /// The context for analyzers.
@@ -310,8 +326,8 @@ impl<'w> AnalysisContext<'w> {
         self.get(id).unwrap().source(self, id)
     }
 
-    /// Get the source of a file by file path.
-    pub fn source_by_path(&mut self, p: &Path) -> FileResult<Source> {
+    /// Get the fileId from its path
+    pub fn file_id_by_path(&self, p: &Path) -> FileResult<FileId> {
         // todo: source in packages
         let relative_path = p.strip_prefix(&self.root).map_err(|_| {
             FileError::Other(Some(eco_format!(
@@ -320,7 +336,13 @@ impl<'w> AnalysisContext<'w> {
             )))
         })?;
 
-        let id = TypstFileId::new(None, VirtualPath::new(relative_path));
+        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
+    }
+
+    /// Get the source of a file by file path.
+    pub fn source_by_path(&mut self, p: &Path) -> FileResult<Source> {
+        // todo: source in packages
+        let id = self.file_id_by_path(p)?;
         self.source_by_id(id)
     }
 
@@ -504,7 +526,8 @@ impl<'w> AnalysisContext<'w> {
         let w = self.resources.world();
         let w = w.track();
 
-        import_info(w, source)
+        let token = &self.analysis.workers.import;
+        token.enter(|| import_info(w, source))
     }
 
     /// Get the def-use information of a source file.
@@ -653,6 +676,33 @@ impl<'w> AnalysisContext<'w> {
         let ty_chk = self.type_check(source.clone())?;
 
         post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.type_of_span(k.span()))
+    }
+
+    /// Try to load a module from the current source file.
+    pub fn analyze_import(&mut self, source: &LinkedNode) -> Option<Value> {
+        let token = &self.analysis.workers.import;
+        token.enter(|| analyze_import_(self.world(), source))
+    }
+
+    /// Try to determine a set of possible values for an expression.
+    pub fn analyze_expr(&mut self, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
+        let token = &self.analysis.workers.expression;
+        token.enter(|| analyze_expr_(self.world(), node))
+    }
+
+    /// Describe the item under the cursor.
+    ///
+    /// Passing a `document` (from a previous compilation) is optional, but
+    /// enhances the autocompletions. Label completions, for instance, are
+    /// only generated when the document is available.
+    pub fn tooltip(
+        &mut self,
+        document: Option<&Document>,
+        source: &Source,
+        cursor: usize,
+    ) -> Option<Tooltip> {
+        let token = &self.analysis.workers.tooltip;
+        token.enter(|| tooltip_(self.world(), document, source, cursor))
     }
 
     fn gc(&self) {
@@ -806,5 +856,20 @@ impl SearchCtx<'_, '_> {
         for dep in dependents {
             self.push(dep);
         }
+    }
+}
+
+/// A rate limiter on some (cpu-heavy) action
+#[derive(Default)]
+pub struct RateLimiter {
+    token: std::sync::Mutex<()>,
+}
+
+impl RateLimiter {
+    /// Executes some (cpu-heavy) action with rate limit
+    #[must_use]
+    pub fn enter<T>(&self, f: impl FnOnce() -> T) -> T {
+        let _c = self.token.lock().unwrap();
+        f()
     }
 }

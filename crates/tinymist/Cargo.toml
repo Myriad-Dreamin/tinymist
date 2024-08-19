@@ -14,7 +14,9 @@ repository.workspace = true
 
 tinymist-assets = { workspace = true }
 tinymist-query.workspace = true
+tinymist-world.workspace = true
 tinymist-render.workspace = true
+typlite.workspace = true
 sync-lsp.workspace = true
 chrono.workspace = true
 
@@ -30,6 +32,7 @@ env_logger.workspace = true
 log.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+serde_yaml.workspace = true
 parking_lot.workspace = true
 paste.workspace = true
 
@@ -67,11 +70,14 @@ dhat = { workspace = true, optional = true }
 unicode-script.workspace = true
 hyper = { workspace = true, optional = true }
 open = { workspace = true, optional = true }
+dirs.workspace = true
 tower-layer.workspace = true
 tower-service.workspace = true
 pin-project-lite.workspace = true
 base64.workspace = true
 rayon.workspace = true
+
+typst-ansi-hl = "0.2.0"
 
 [features]
 default = ["cli", "embed-fonts", "no-content-hint", "preview"]

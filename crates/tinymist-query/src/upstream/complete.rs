@@ -15,7 +15,7 @@ use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
 use crate::adt::interner::Interned;
-use crate::analysis::{analyze_expr, analyze_import, analyze_labels, DynLabel, Ty};
+use crate::analysis::{analyze_labels, DynLabel, Ty};
 use crate::AnalysisContext;
 
 mod ext;
@@ -63,6 +63,8 @@ pub struct Completion {
     pub label_detail: Option<EcoString>,
     /// The label the completion is shown with.
     pub sort_text: Option<EcoString>,
+    /// The composed text used for filtering.
+    pub filter_text: Option<EcoString>,
     /// The completed version of the input, possibly described with snippet
     /// syntax like `${lhs} + ${rhs}`.
     ///
@@ -91,6 +93,8 @@ pub enum CompletionKind {
     /// A constant.
     #[default]
     Constant,
+    /// A reference.
+    Reference,
     /// A symbol.
     Symbol(char),
     /// A variable.
@@ -363,7 +367,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
         if prev.is::<ast::Expr>();
         if prev.parent_kind() != Some(SyntaxKind::Markup) ||
            prev.prev_sibling_kind() == Some(SyntaxKind::Hash);
-        if let Some((value, styles)) = analyze_expr(ctx.world(), &prev).into_iter().next();
+        if let Some((value, styles)) = ctx.ctx.analyze_expr(&prev).into_iter().next();
         then {
             ctx.from = ctx.cursor;
             field_access_completions(ctx, &value, &styles);
@@ -378,7 +382,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
         if prev.kind() == SyntaxKind::Dot;
         if let Some(prev_prev) = prev.prev_sibling();
         if prev_prev.is::<ast::Expr>();
-        if let Some((value, styles)) = analyze_expr(ctx.world(), &prev_prev).into_iter().next();
+        if let Some((value, styles)) = ctx.ctx.analyze_expr(&prev_prev).into_iter().next();
         then {
             ctx.from = ctx.leaf.offset();
             field_access_completions(ctx, &value, &styles);
@@ -539,7 +543,7 @@ fn import_item_completions<'a>(
     existing: ast::ImportItems<'a>,
     source: &LinkedNode,
 ) {
-    let Some(value) = analyze_import(ctx.world(), source) else {
+    let Some(value) = ctx.ctx.analyze_import(source) else {
         return;
     };
     let Some(scope) = value.scope() else { return };
@@ -1049,52 +1053,54 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         // directory and not the cache directory, because the latter is not
         // intended for storage of local packages.
         let mut packages = vec![];
-        if let Some(data_dir) = dirs::data_dir() {
-            let local_path = data_dir.join("typst/packages");
-            if local_path.exists() {
-                // namespace/package_name/version
-                // 1. namespace
-                let namespaces = std::fs::read_dir(local_path).unwrap();
-                for namespace in namespaces {
-                    let namespace = namespace.unwrap();
-                    if !namespace.file_type().unwrap().is_dir() {
+        let Some(data_dir) = dirs::data_dir() else {
+            return packages;
+        };
+        let local_path = data_dir.join("typst/packages");
+        if !local_path.exists() {
+            return packages;
+        }
+        // namespace/package_name/version
+        // 1. namespace
+        let namespaces = std::fs::read_dir(local_path).unwrap();
+        for namespace in namespaces {
+            let namespace = namespace.unwrap();
+            if !namespace.file_type().unwrap().is_dir() {
+                continue;
+            }
+            // start with . are hidden directories
+            if namespace.file_name().to_string_lossy().starts_with('.') {
+                continue;
+            }
+            // 2. package_name
+            let package_names = std::fs::read_dir(namespace.path()).unwrap();
+            for package in package_names {
+                let package = package.unwrap();
+                if !package.file_type().unwrap().is_dir() {
+                    continue;
+                }
+                if package.file_name().to_string_lossy().starts_with('.') {
+                    continue;
+                }
+                // 3. version
+                let versions = std::fs::read_dir(package.path()).unwrap();
+                for version in versions {
+                    let version = version.unwrap();
+                    if !version.file_type().unwrap().is_dir() {
                         continue;
                     }
-                    // start with . are hidden directories
-                    if namespace.file_name().to_string_lossy().starts_with('.') {
+                    if version.file_name().to_string_lossy().starts_with('.') {
                         continue;
                     }
-                    // 2. package_name
-                    let package_names = std::fs::read_dir(namespace.path()).unwrap();
-                    for package in package_names {
-                        let package = package.unwrap();
-                        if !package.file_type().unwrap().is_dir() {
-                            continue;
-                        }
-                        if package.file_name().to_string_lossy().starts_with('.') {
-                            continue;
-                        }
-                        // 3. version
-                        let versions = std::fs::read_dir(package.path()).unwrap();
-                        for version in versions {
-                            let version = version.unwrap();
-                            if !version.file_type().unwrap().is_dir() {
-                                continue;
-                            }
-                            if version.file_name().to_string_lossy().starts_with('.') {
-                                continue;
-                            }
-                            let version = version.file_name().to_string_lossy().parse().unwrap();
-                            let spec = PackageSpec {
-                                namespace: namespace.file_name().to_string_lossy().into(),
-                                name: package.file_name().to_string_lossy().into(),
-                                version,
-                            };
-                            let description = eco_format!("{} v{}", spec.name, spec.version);
-                            let package = (spec, Some(description));
-                            packages.push(package);
-                        }
-                    }
+                    let version = version.file_name().to_string_lossy().parse().unwrap();
+                    let spec = PackageSpec {
+                        namespace: namespace.file_name().to_string_lossy().into(),
+                        name: package.file_name().to_string_lossy().into(),
+                        version,
+                    };
+                    let description = eco_format!("{} v{}", spec.name, spec.version);
+                    let package = (spec, Some(description));
+                    packages.push(package);
                 }
             }
         }
@@ -1172,23 +1178,39 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             label,
             label_desc,
             detail,
+            bib_title,
         } in labels.into_iter().skip(skip).take(take)
         {
-            self.completions.push(Completion {
-                kind: CompletionKind::Constant,
-                apply: (open || close).then(|| {
-                    eco_format!(
-                        "{}{}{}",
-                        if open { "<" } else { "" },
-                        label.as_str(),
-                        if close { ">" } else { "" }
-                    )
-                }),
-                label_detail: label_desc,
-                label: label.as_str().into(),
-                detail,
+            let label: EcoString = label.as_str().into();
+            let completion = Completion {
+                kind: CompletionKind::Reference,
+                apply: Some(eco_format!(
+                    "{}{}{}",
+                    if open { "<" } else { "" },
+                    label.as_str(),
+                    if close { ">" } else { "" }
+                )),
+                label: label.clone(),
+                label_detail: label_desc.clone(),
+                filter_text: Some(label.clone()),
+                detail: detail.clone(),
                 ..Completion::default()
-            });
+            };
+
+            if let Some(bib_title) = bib_title {
+                // Note that this completion re-uses the above `apply` field to
+                // alter the `bib_title` to the corresponding label.
+                self.completions.push(Completion {
+                    kind: CompletionKind::Constant,
+                    label: bib_title.clone(),
+                    label_detail: Some(label),
+                    filter_text: Some(bib_title),
+                    detail,
+                    ..completion.clone()
+                });
+            }
+
+            self.completions.push(completion);
         }
     }
 

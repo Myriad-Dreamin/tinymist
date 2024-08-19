@@ -1,17 +1,17 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.11.16"
+version = "0.11.19"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
 homepage = "https://github.com/Myriad-Dreamin/tinymist"
 repository = "https://github.com/Myriad-Dreamin/tinymist"
-rust-version = "1.75"
+rust-version = "1.80"
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "tests"]
+members = ["crates/*", "contrib/typlite", "tests"]
 
 [workspace.dependencies]
 
@@ -105,7 +105,8 @@ typst-ts-core = { version = "0.5.0-rc5", default-features = false }
 typst-ts-compiler = { version = "0.5.0-rc5" }
 typst-ts-svg-exporter = { version = "0.5.0-rc5" }
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
-typstyle = { version = "0.11.30", default-features = false }
+typstyle = { version = "0.11.31", default-features = false }
+typlite = { path = "./crates/typlite" }
 
 # LSP
 crossbeam-channel = "0.5.12"
@@ -134,9 +135,10 @@ insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
 typst-preview = { path = "./crates/typst-preview/" }
-tinymist-assets = { version = "0.11.16" }
+tinymist-assets = { version = "0.11.19" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
+tinymist-world = { path = "./crates/tinymist-world/" }
 tinymist-render = { path = "./crates/tinymist-render/" }
 
 [profile.dev.package.insta]
@@ -168,12 +170,12 @@ undocumented_unsafe_blocks = "warn"
 
 # tinymist-assets = { path = "./crates/tinymist-assets/" }
 
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
-typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
-typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
-typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
-typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.1" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.1-2" }
+typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.1-2" }
+typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.1-2" }
+typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.1-2" }
+typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.1-2" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.1-2" }
 
 # typst = { path = "../typst/crates/typst" }
 # typst-timing = { path = "../typst/crates/typst-timing" }

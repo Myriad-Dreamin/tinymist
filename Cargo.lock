@@ -71,6 +71,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ansi_colours"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14eec43e0298190790f41679fe69ef7a829d2a2ddd78c8c00339e84710e435fe"
+dependencies = [
+ "rgb",
+]
+
+[[package]]
 name = "anstream"
 version = "0.6.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3500,7 +3509,7 @@ dependencies = [
 
 [[package]]
 name = "sync-lsp"
-version = "0.11.16"
+version = "0.11.19"
 dependencies = [
  "anyhow",
  "clap",
@@ -3639,7 +3648,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.11.16"
+version = "0.11.19"
 dependencies = [
  "insta",
  "lsp-server",
@@ -3736,7 +3745,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.11.16"
+version = "0.11.19"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3752,6 +3761,7 @@ dependencies = [
  "comemo 0.4.0",
  "crossbeam-channel",
  "dhat",
+ "dirs",
  "env_logger",
  "futures",
  "hyper",
@@ -3768,16 +3778,20 @@ dependencies = [
  "reflexo",
  "serde",
  "serde_json",
+ "serde_yaml",
  "sync-lsp",
- "tinymist-assets 0.11.16 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.11.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-query",
  "tinymist-render",
+ "tinymist-world",
  "tokio",
  "tokio-util",
  "toml 0.8.14",
  "tower-layer",
  "tower-service",
+ "typlite",
  "typst",
+ "typst-ansi-hl",
  "typst-assets",
  "typst-pdf",
  "typst-preview",
@@ -3796,17 +3810,17 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.11.16"
+version = "0.11.19"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.11.16"
+version = "0.11.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "062cb57e1c109783370323fd2aa7c5160b3b1e169bf7f5fffb196e8157bedcd3"
+checksum = "85be1e87f7b44cafd3fa5195af352c8ea5f8e747aefff207b76986174f1085ea"
 
 [[package]]
 name = "tinymist-query"
-version = "0.11.16"
+version = "0.11.19"
 dependencies = [
  "anyhow",
  "biblatex",
@@ -3853,13 +3867,30 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.11.16"
+version = "0.11.19"
 dependencies = [
  "base64 0.22.1",
  "log",
  "serde",
  "tinymist-query",
  "typst-ts-svg-exporter",
+]
+
+[[package]]
+name = "tinymist-world"
+version = "0.11.19"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "comemo 0.4.0",
+ "log",
+ "serde",
+ "serde_json",
+ "tinymist-assets 0.11.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typst-assets",
+ "typst-ts-compiler",
+ "typst-ts-core",
 ]
 
 [[package]]
@@ -4128,23 +4159,33 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "typlite"
-version = "0.11.16"
+version = "0.11.19"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
  "ecow 0.2.2",
  "insta",
  "regex",
+ "tinymist-query",
+ "tinymist-world",
  "typst",
- "typst-assets",
  "typst-svg",
  "typst-syntax 0.11.1",
 ]
 
 [[package]]
+name = "typlite-cli"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "tinymist-world",
+ "typlite",
+]
+
+[[package]]
 name = "typst"
 version = "0.11.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.1#152d935d379f524b12c6b55a14c6343b718956d6"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.1-2#314749ea26ac3f62622bc3b3c30d3a7d6a457a74"
 dependencies = [
  "az",
  "bitflags 2.6.0",
@@ -4203,6 +4244,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "typst-ansi-hl"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b457d0812d51dbc28f7a5b8583b8c28cd3c43628e1e7e5a0ae63975fda65351"
+dependencies = [
+ "ansi_colours",
+ "once_cell",
+ "syntect",
+ "termcolor",
+ "thiserror",
+ "two-face",
+ "typst-syntax 0.11.1",
+]
+
+[[package]]
 name = "typst-assets"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4211,7 +4267,7 @@ checksum = "2b3061f8d268e8eec7481c9ab24540455cb4912983c49aae38fa6e8bf8ef4d9c"
 [[package]]
 name = "typst-macros"
 version = "0.11.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.1#152d935d379f524b12c6b55a14c6343b718956d6"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.1-2#314749ea26ac3f62622bc3b3c30d3a7d6a457a74"
 dependencies = [
  "heck 0.4.1",
  "proc-macro2",
@@ -4222,7 +4278,7 @@ dependencies = [
 [[package]]
 name = "typst-pdf"
 version = "0.11.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.1#152d935d379f524b12c6b55a14c6343b718956d6"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.1-2#314749ea26ac3f62622bc3b3c30d3a7d6a457a74"
 dependencies = [
  "base64 0.22.1",
  "bytemuck",
@@ -4246,7 +4302,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.11.16"
+version = "0.11.19"
 dependencies = [
  "clap",
  "comemo 0.4.0",
@@ -4257,7 +4313,7 @@ dependencies = [
  "once_cell",
  "serde",
  "serde_json",
- "tinymist-assets 0.11.16 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.11.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",
  "tokio-tungstenite",
  "typst",
@@ -4270,7 +4326,7 @@ dependencies = [
 [[package]]
 name = "typst-render"
 version = "0.11.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.1#152d935d379f524b12c6b55a14c6343b718956d6"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.1-2#314749ea26ac3f62622bc3b3c30d3a7d6a457a74"
 dependencies = [
  "bytemuck",
  "comemo 0.4.0",
@@ -4290,7 +4346,7 @@ dependencies = [
 [[package]]
 name = "typst-svg"
 version = "0.11.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.1#152d935d379f524b12c6b55a14c6343b718956d6"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.1-2#314749ea26ac3f62622bc3b3c30d3a7d6a457a74"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
@@ -4323,7 +4379,7 @@ dependencies = [
 [[package]]
 name = "typst-syntax"
 version = "0.11.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.1#152d935d379f524b12c6b55a14c6343b718956d6"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.1-2#314749ea26ac3f62622bc3b3c30d3a7d6a457a74"
 dependencies = [
  "comemo 0.4.0",
  "ecow 0.2.2",
@@ -4339,7 +4395,7 @@ dependencies = [
 [[package]]
 name = "typst-timing"
 version = "0.11.1"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?branch=tinymist-v0.11.1#152d935d379f524b12c6b55a14c6343b718956d6"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.1-2#314749ea26ac3f62622bc3b3c30d3a7d6a457a74"
 dependencies = [
  "parking_lot",
  "serde",
@@ -4453,9 +4509,9 @@ dependencies = [
 
 [[package]]
 name = "typstyle"
-version = "0.11.30"
+version = "0.11.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9faebdb185575bc0f43a0f2af010c7cff314764c7df896a506ea1b55f0a82b8"
+checksum = "04207b151e637bcf307d974e5963fc51c2912688343a0b7575246a3acb6aeab9"
 dependencies = [
  "anyhow",
  "itertools 0.13.0",

@@ -131,7 +131,7 @@ impl RenderActor {
             // if a full render is requested, we render the latest document
             // otherwise, we render the incremental changes for only once
             let has_full_render = has_full_render;
-            debug!("RenderActor: has_full_render: {}", has_full_render);
+            debug!("RenderActor: has_full_render: {has_full_render}");
             let Some(document) = self.document.read().unwrap().clone() else {
                 info!("RenderActor: document is not ready");
                 continue;

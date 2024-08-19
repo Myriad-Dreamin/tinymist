@@ -60,6 +60,27 @@ pub struct PreviewArgs {
     /// Invert colors of the preview (useful for dark themes without cost).
     /// Please note you could see the origin colors when you hover elements in
     /// the preview.
+    ///
+    /// It is also possible to specify strategy to each element kind by an
+    /// object map in JSON format.
+    ///
+    /// Possible element kinds:
+    /// - `image`: Images in the preview.
+    /// - `rest`: Rest elements in the preview.
+    ///
+    /// ## Example
+    ///
+    /// By string:
+    ///
+    /// ```shell
+    /// --invert-colors=auto
+    /// ```
+    ///
+    /// By element:
+    ///
+    /// ```shell
+    /// --invert-colors='{"rest": "always", "image": "never"}'
+    /// ```
     #[cfg_attr(feature = "clap", clap(long, default_value = "never"))]
     pub invert_colors: String,
 

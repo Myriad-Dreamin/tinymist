@@ -27,6 +27,14 @@ impl fmt::Display for Content {
     }
 }
 
+pub struct LazyContent(pub EcoString);
+
+impl fmt::Display for LazyContent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 pub struct Args<'a> {
     pub vm: &'a mut TypliteWorker,
     pub args: ast::Args<'a>,
@@ -128,6 +136,12 @@ pub trait Eval<'a>: Sized {
     fn eval(node: &'a SyntaxNode, vm: &mut TypliteWorker) -> Result<Self>;
 }
 
+impl<'a> Eval<'a> for () {
+    fn eval(_node: &'a SyntaxNode, _vm: &mut TypliteWorker) -> Result<Self> {
+        Ok(())
+    }
+}
+
 impl<'a> Eval<'a> for &'a SyntaxNode {
     fn eval(node: &'a SyntaxNode, _vm: &mut TypliteWorker) -> Result<Self> {
         Ok(node)
@@ -151,6 +165,17 @@ impl<'a> Eval<'a> for Value {
 
 impl<'a> Eval<'a> for Content {
     fn eval(node: &'a SyntaxNode, vm: &mut TypliteWorker) -> Result<Self> {
+        Ok(Self(vm.convert(node)?))
+    }
+}
+
+impl<'a> Eval<'a> for LazyContent {
+    fn eval(node: &'a SyntaxNode, vm: &mut TypliteWorker) -> Result<Self> {
+        let node = match node.cast() {
+            Some(s @ ast::Closure { .. }) => s.body().to_untyped(),
+            None => node,
+        };
+
         Ok(Self(vm.convert(node)?))
     }
 }

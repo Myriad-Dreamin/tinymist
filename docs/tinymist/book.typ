@@ -11,17 +11,21 @@
   language: "en",
   summary: [
     #prefix-chapter("introduction.typ")[Introduction]
-    = Features
-    - #chapter("feature/cli.typ")[Command line interface]
-    - #chapter("feature/language.typ")[Language and Editor Features]
-    - #chapter("feature/preview.typ")[Document Preview]
     = Editor Integration
     #prefix-chapter("configurations.typ")[Common Configurations]
     - #chapter("frontend/main.typ")[Editor Frontends]
       - #chapter("frontend/vscode.typ")[VS Cod(e,ium)]
       - #chapter("frontend/neovim.typ")[NeoVim]
+      - #chapter("frontend/emacs.typ")[Emacs]
+      - #chapter("frontend/sublime-text.typ")[Sublime Text]
       - #chapter("frontend/helix.typ")[Helix]
       - #chapter("frontend/zed.typ")[Zed]
+    = Features
+    - #chapter("feature/cli.typ")[Command line interface]
+    - #chapter("guide/completion.typ")[Completion]
+    - #chapter("feature/export.typ")[Exporting Documents]
+    - #chapter("feature/preview.typ")[Document Preview]
+    - #chapter("feature/language.typ")[Other Features]
     = Service Overview
     #prefix-chapter("overview.typ")[Overview of Service]
     - #chapter("principles.typ")[Principles]

@@ -21,11 +21,12 @@
 // Fonts
 #let main-font = (
   "Charter",
-  "Source Han Serif SC",
-  "Source Han Serif TC",
   // shiroa's embedded font
   "Linux Libertine",
+  "Source Han Serif SC",
+  "Source Han Serif TC",
 )
+
 #let code-font = (
   "BlexMono Nerd Font Mono",
   // shiroa's embedded font
@@ -139,6 +140,10 @@
     } else {
       it
     }
+  }
+
+  show <typst-raw-func>: it => {
+    it.lines.at(0).body.children.slice(0, -2).join()
   }
 
   // Main body.

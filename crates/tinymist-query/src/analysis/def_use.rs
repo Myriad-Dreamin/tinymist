@@ -28,6 +28,8 @@ pub struct DefUseInfo {
     external_refs: ExternalRefMap,
     /// The references to defined symbols.
     pub ident_refs: HashMap<IdentRef, DefId>,
+    /// The references of labels.
+    pub label_refs: HashMap<String, Vec<Range<usize>>>,
     /// The references to undefined symbols.
     pub undefined_refs: Vec<IdentRef>,
     exports_refs: Vec<DefId>,
@@ -56,8 +58,9 @@ impl DefUseInfo {
                     + 32)
             + self.ident_refs.capacity()
                 * (std::mem::size_of::<IdentRef>() + std::mem::size_of::<DefId>() + 32)
-            + (self.undefined_refs.capacity() * std::mem::size_of::<IdentRef>() + 32)
-            + (self.exports_refs.capacity() * std::mem::size_of::<DefId>() + 32)
+            + self.label_refs.capacity() * (std::mem::size_of::<Range<usize>>() + 32)
+            + self.undefined_refs.capacity() * (std::mem::size_of::<IdentRef>() + 32)
+            + self.exports_refs.capacity() * (std::mem::size_of::<DefId>() + 32)
             + self.exports_defs.capacity()
                 * (std::mem::size_of::<String>() + std::mem::size_of::<DefId>() + 32)
     }
@@ -226,12 +229,12 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                 LexicalKind::Var(LexicalVarKind::Label) => {
                     self.insert(Ns::Label, e);
                 }
-                LexicalKind::Var(LexicalVarKind::LabelRef) => self.insert_ref(Ns::Label, e),
+                LexicalKind::Var(LexicalVarKind::LabelRef) => self.insert_label_ref(e),
                 LexicalKind::Var(LexicalVarKind::Function)
                 | LexicalKind::Var(LexicalVarKind::Variable) => {
                     self.insert(Ns::Value, e);
                 }
-                LexicalKind::Var(LexicalVarKind::ValRef) => self.insert_ref(Ns::Value, e),
+                LexicalKind::Var(LexicalVarKind::ValRef) => self.insert_value_ref(e),
                 LexicalKind::Block => {
                     if let Some(e) = &e.children {
                         self.enter(|this| this.scan(e.as_slice()))?;
@@ -266,7 +269,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                 | LexicalKind::Mod(LexicalModKind::ModuleAlias) => self.insert_module(Ns::Value, e),
                 LexicalKind::Mod(LexicalModKind::Ident) => match self.import_name(&e.info.name) {
                     Some(()) => {
-                        self.insert_ref(Ns::Value, e);
+                        self.insert_value_ref(e);
                     }
                     None => {
                         let def_id = self.insert(Ns::Value, e);
@@ -276,13 +279,10 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
                 LexicalKind::Mod(LexicalModKind::Alias { target }) => {
                     match self.import_name(&target.name) {
                         Some(()) => {
-                            self.insert_ident_ref(
-                                Ns::Value,
-                                IdentRef {
-                                    name: target.name.clone(),
-                                    range: target.range.clone(),
-                                },
-                            );
+                            self.insert_value_ref_(IdentRef {
+                                name: target.name.clone(),
+                                range: target.range.clone(),
+                            });
                             self.insert(Ns::Value, e);
                         }
                         None => {
@@ -350,13 +350,8 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
         id
     }
 
-    fn insert_ident_ref(&mut self, label: Ns, id_ref: IdentRef) {
-        let snap = match label {
-            Ns::Label => &mut self.label_scope,
-            Ns::Value => &mut self.id_scope,
-        };
-
-        match snap.get(&id_ref.name) {
+    fn insert_value_ref_(&mut self, id_ref: IdentRef) {
+        match self.id_scope.get(&id_ref.name) {
             Some(id) => {
                 self.info.ident_refs.insert(id_ref, *id);
             }
@@ -366,13 +361,15 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
         }
     }
 
-    fn insert_ref(&mut self, label: Ns, e: &LexicalHierarchy) {
-        self.insert_ident_ref(
-            label,
-            IdentRef {
-                name: e.info.name.clone(),
-                range: e.info.range.clone(),
-            },
-        );
+    fn insert_value_ref(&mut self, e: &LexicalHierarchy) {
+        self.insert_value_ref_(IdentRef {
+            name: e.info.name.clone(),
+            range: e.info.range.clone(),
+        });
+    }
+
+    fn insert_label_ref(&mut self, e: &LexicalHierarchy) {
+        let refs = self.info.label_refs.entry(e.info.name.clone()).or_default();
+        refs.push(e.info.range.clone());
     }
 }

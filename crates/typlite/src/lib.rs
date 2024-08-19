@@ -1,71 +1,75 @@
 //! # Typlite
 
+mod error;
 mod library;
 pub mod scopes;
 mod value;
-mod world;
+
+use std::sync::Arc;
+
+pub use error::*;
 
 use base64::Engine;
 use scopes::Scopes;
-use typst::{eval::Tracer, layout::Abs};
+use tinymist_world::{base::ShadowApi, EntryReader, LspWorld};
+use typst::{eval::Tracer, foundations::Bytes, layout::Abs, World};
 use value::{Args, Value};
-use world::LiteWorld;
-
-use std::borrow::Cow;
 
 use ecow::{eco_format, EcoString};
 use typst_syntax::{
     ast::{self, AstNode},
-    Source, SyntaxKind, SyntaxNode,
+    FileId, Source, SyntaxKind, SyntaxNode, VirtualPath,
 };
 
-type Result<T, Err = Cow<'static, str>> = std::result::Result<T, Err>;
+/// The result type for typlite.
+pub type Result<T, Err = Error> = std::result::Result<T, Err>;
+
+pub use tinymist_world::CompileOnceArgs;
 
 /// Task builder for converting a typst document to Markdown.
-#[derive(Debug, Clone)]
 pub struct Typlite {
-    /// The document to convert.
-    main: Source,
+    /// The universe to use for the conversion.
+    world: Arc<LspWorld>,
     /// Whether to enable GFM (GitHub Flavored Markdown) features.
     gfm: bool,
 }
 
 impl Typlite {
-    /// Create a new Typlite instance from a string.
-    /// # Example
-    /// ```rust
-    /// use typlite::Typlite;
-    /// let content = "= Hello, World";
-    /// let res = Typlite::new_with_content(content).convert();
-    /// assert_eq!(res, Ok("# Hello, World".into()));
-    /// ```
-    pub fn new_with_content(content: &str) -> Self {
-        let main = Source::detached(content);
-        Self { main, gfm: false }
-    }
-
-    /// Create a new Typlite instance from a [`Source`].
+    /// Create a new Typlite instance from a [`World`].
     ///
     /// This is useful when you have a [`Source`] instance and you can avoid
     /// reparsing the content.
-    pub fn new_with_src(main: Source) -> Self {
-        Self { main, gfm: false }
+    pub fn new(world: Arc<LspWorld>) -> Self {
+        Self { world, gfm: false }
     }
 
     /// Convert the content to a markdown string.
     pub fn convert(self) -> Result<EcoString> {
-        let mut worker = TypliteWorker {
+        let main = self.world.entry_state().main();
+        let current = main.ok_or("no main file in workspace")?;
+        let world = self.world;
+
+        let main = world
+            .source(current)
+            .map_err(|e| format!("getting source for main file: {e:?}"))?;
+
+        let worker = TypliteWorker {
+            current,
             gfm: self.gfm,
-            scopes: library::library(),
+            scopes: Arc::new(library::library()),
+            world,
         };
 
-        worker.convert(self.main.root())
+        worker.sub_file(main)
     }
 }
 
+#[derive(Clone)]
 struct TypliteWorker {
+    current: FileId,
     gfm: bool,
-    scopes: Scopes<Value>,
+    scopes: Arc<Scopes<Value>>,
+    world: Arc<LspWorld>,
 }
 
 impl TypliteWorker {
@@ -138,7 +142,7 @@ impl TypliteWorker {
             LeftParen => Self::char('('),
             RightParen => Self::char(')'),
             Comma => Self::char(','),
-            Semicolon => Self::char(';'),
+            Semicolon => Ok(Value::None),
             Colon => Self::char(':'),
             Star => Self::char('*'),
             Underscore => Self::char('_'),
@@ -231,7 +235,7 @@ impl TypliteWorker {
             FuncReturn => Ok(Value::None),
 
             ModuleImport => Ok(Value::None),
-            ModuleInclude => Ok(Value::None),
+            ModuleInclude => self.include(node),
 
             // Ignored comments
             LineComment => Ok(Value::None),
@@ -253,12 +257,20 @@ impl TypliteWorker {
     fn render(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
         let color = "#c0caf5";
 
-        let main = Source::detached(eco_format!(
+        let main = Bytes::from(eco_format!(
             r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em));#set text(rgb("{color}"))
 {}"##,
             node.clone().into_text()
-        ));
-        let world = LiteWorld::new(main);
+        ).as_bytes().to_owned());
+        // let world = LiteWorld::new(main);
+        let main_id = FileId::new(None, VirtualPath::new("__render__.typ"));
+        let entry = self.world.entry_state().select_in_workspace(main_id);
+        let mut world = self.world.task(tinymist_world::base::TaskInputs {
+            entry: Some(entry),
+            inputs: None,
+        });
+        world.map_shadow_by_id(main_id, main).unwrap();
+
         let mut tracer = Tracer::default();
         let document = typst::compile(&world, &mut tracer)
             .map_err(|e| format!("compiling math node: {e:?}"))?;
@@ -369,8 +381,8 @@ impl TypliteWorker {
         Ok(Value::Content(s))
     }
 
-    fn label(node: &SyntaxNode) -> Result<Value> {
-        Self::str(node)
+    fn label(_node: &SyntaxNode) -> Result<Value> {
+        Result::Ok(Value::None)
     }
 
     fn label_ref(node: &SyntaxNode) -> Result<Value> {
@@ -403,7 +415,6 @@ impl TypliteWorker {
         self.reduce(node)
     }
 
-    #[cfg(not(feature = "texmath"))]
     fn equation(&mut self, node: &SyntaxNode) -> Result<Value> {
         let equation: ast::Equation = node.cast().unwrap();
 
@@ -442,6 +453,22 @@ impl TypliteWorker {
         let _ = node;
 
         Ok(Value::None)
+    }
+
+    fn include(&self, node: &SyntaxNode) -> Result<Value> {
+        let include: ast::ModuleInclude = node.cast().unwrap();
+
+        let path = include.source();
+        let src =
+            tinymist_query::syntax::find_source_by_expr(self.world.as_ref(), self.current, path)
+                .ok_or_else(|| format!("failed to find source on path {path:?}"))?;
+
+        self.clone().sub_file(src).map(Value::Content)
+    }
+
+    fn sub_file(mut self, src: Source) -> Result<EcoString> {
+        self.current = src.id();
+        self.convert(src.root())
     }
 }
 

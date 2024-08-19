@@ -6,7 +6,8 @@ use serde::Deserialize;
 use serde_yaml as yaml;
 use typst::{
     diag::{bail, StrResult},
-    foundations::{Func, Module, Type, Value},
+    foundations::{Content, Func, Module, Type, Value},
+    introspection::MetadataElem,
     text::{FontInfo, FontStyle},
     Library,
 };
@@ -274,6 +275,8 @@ impl Eq for CatKey {}
 
 // todo: category of types
 static ROUTE_MAPS: Lazy<HashMap<CatKey, String>> = Lazy::new(|| {
+    // todo: this is a false positive for clippy on LazyHash
+    #[allow(clippy::mutable_key_type)]
     let mut map = HashMap::new();
     let mut scope_to_finds = vec![
         (LIBRARY.global.scope(), None, None),
@@ -392,6 +395,27 @@ fn summarize_font_family<'a>(variants: impl Iterator<Item = &'a FontInfo>) -> Ec
     }
 
     detail
+}
+
+pub fn truncated_repr(value: &Value) -> EcoString {
+    const _10MB: usize = 100 * 1024 * 1024;
+    use typst::foundations::Repr;
+
+    let data: Option<Content> = value.clone().cast().ok();
+    let metadata: Option<MetadataElem> = data.and_then(|content| content.unpack().ok());
+
+    // todo: early truncation
+    let repr = if let Some(metadata) = metadata {
+        metadata.value.repr()
+    } else {
+        value.repr()
+    };
+
+    if repr.len() > _10MB {
+        eco_format!("[truncated-repr: {} bytes]", repr.len())
+    } else {
+        repr
+    }
 }
 
 #[cfg(test)]

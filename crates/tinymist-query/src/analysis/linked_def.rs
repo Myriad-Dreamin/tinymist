@@ -72,8 +72,14 @@ pub fn find_definition(
                 name_range: None,
             });
         }
-        DerefTarget::Ref(r) => {
-            let ref_node = r.cast::<ast::Ref>()?.target();
+        DerefTarget::Label(r) | DerefTarget::Ref(r) => {
+            let ref_expr: ast::Expr = r.cast()?;
+            let (ref_node, is_label) = match ref_expr {
+                ast::Expr::Ref(r) => (r.target(), false),
+                ast::Expr::Label(r) => (r.get(), true),
+                _ => return None,
+            };
+
             let doc = document?;
             let introspector = &doc.document.introspector;
             let label = Label::new(ref_node);
@@ -94,23 +100,38 @@ pub fn find_definition(
                 .or_else(|| {
                     let sel = Selector::Label(label);
                     let elem = introspector.query_first(&sel)?;
-                    let span = elem.span();
-                    let fid = span.id()?;
 
-                    let source = ctx.source_by_id(fid).ok()?;
+                    // if it is a label, we put the selection range to itself
+                    let (def_at, name_range) = if is_label {
+                        let span = r.span();
+                        let fid = span.id()?;
+                        let source = ctx.source_by_id(fid).ok()?;
+                        let rng = source.range(span)?;
 
-                    let rng = source.range(span)?;
+                        let name_range = rng.start + 1..rng.end - 1;
+                        let name_range = (name_range.start <= name_range.end).then_some(name_range);
+                        (Some((fid, rng)), name_range)
+                    } else {
+                        // otherwise, it is estimated to the span of the pointed content
+                        // todo: get the label's span
+                        let span = elem.span();
+                        let fid = span.id()?;
+                        let source = ctx.source_by_id(fid).ok()?;
+                        let rng = source.range(span)?;
+
+                        (Some((fid, rng)), None)
+                    };
 
                     Some(DefinitionLink {
                         kind: LexicalKind::Var(LexicalVarKind::Label),
-                        name: r.text().to_string(),
-                        value: None,
-                        def_at: Some((fid, rng.clone())),
-                        name_range: Some(rng.clone()),
+                        name: ref_node.to_owned(),
+                        value: Some(Value::Content(elem)),
+                        def_at,
+                        name_range,
                     })
                 });
         }
-        DerefTarget::Label(..) | DerefTarget::Normal(..) => {
+        DerefTarget::Normal(..) => {
             return None;
         }
     };
@@ -189,7 +210,7 @@ pub fn find_definition(
             let root = LinkedNode::new(def_source.root());
             let def_name = root.leaf_at(def.range.start + 1)?;
             log::info!("def_name for function: {def_name:?}", def_name = def_name);
-            let values = analyze_expr(ctx.world(), &def_name);
+            let values = ctx.analyze_expr(&def_name);
             let func = values.into_iter().find(|v| matches!(v.0, Value::Func(..)));
             log::info!("okay for function: {func:?}");
 
@@ -317,19 +338,19 @@ fn is_same_native_func(x: Option<&Func>, y: &Func) -> bool {
 /// Resolve a call target to a function or a method with a this.
 pub fn resolve_call_target(
     ctx: &mut AnalysisContext,
-    callee: LinkedNode,
+    callee: &LinkedNode,
 ) -> Option<CallConvention> {
     resolve_callee_(ctx, callee, true).map(identify_call_convention)
 }
 
 /// Resolve a callee expression to a function.
-pub fn resolve_callee(ctx: &mut AnalysisContext, callee: LinkedNode) -> Option<Func> {
+pub fn resolve_callee(ctx: &mut AnalysisContext, callee: &LinkedNode) -> Option<Func> {
     resolve_callee_(ctx, callee, false).map(|e| e.func_ptr)
 }
 
 fn resolve_callee_(
     ctx: &mut AnalysisContext,
-    callee: LinkedNode,
+    callee: &LinkedNode,
     resolve_this: bool,
 ) -> Option<DynCallTarget> {
     None.or_else(|| {
@@ -357,7 +378,7 @@ fn resolve_callee_(
         this: None,
     })
     .or_else(|| {
-        let values = analyze_expr(ctx.world(), &callee);
+        let values = ctx.analyze_expr(callee);
 
         if let Some(func) = values.into_iter().find_map(|v| match v.0 {
             Value::Func(f) => Some(f),
@@ -376,7 +397,7 @@ fn resolve_callee_(
             } {
                 let target = access.target();
                 let field = access.field().get();
-                let values = analyze_expr(ctx.world(), &callee.find(target.span())?);
+                let values = ctx.analyze_expr(&callee.find(target.span())?);
                 if let Some((this, func_ptr)) = values.into_iter().find_map(|(this, _styles)| {
                     if let Some(Value::Func(f)) = this.ty().scope().get(field) {
                         return Some((this, f.clone()));

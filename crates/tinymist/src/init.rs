@@ -10,6 +10,7 @@ use once_cell::sync::{Lazy, OnceCell};
 use reflexo::path::PathClean;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
+use task::FormatUserConfig;
 use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use typst::foundations::IntoValue;
@@ -68,8 +69,8 @@ impl Initializer for RegularInit {
     /// Errors if the configuration could not be updated.
     fn initialize(mut self, params: InitializeParams) -> (LanguageState, AnySchedulableResponse) {
         // Initialize configurations
-        let cc = ConstConfig::from(&params);
         let mut config = Config {
+            const_config: ConstConfig::from(&params),
             compile: CompileConfig {
                 roots: match params.workspace_folders.as_ref() {
                     Some(roots) => roots
@@ -102,7 +103,6 @@ impl Initializer for RegularInit {
             client: self.client,
             exec_cmds: self.exec_cmds,
             config,
-            cc,
             err,
         };
 
@@ -118,8 +118,6 @@ pub struct SuperInit {
     pub exec_cmds: Vec<String>,
     /// The configuration for the server.
     pub config: Config,
-    /// The constant configuration for the server.
-    pub cc: ConstConfig,
     /// Whether an error occurred before super initialization.
     pub err: Option<ResponseError>,
 }
@@ -138,11 +136,11 @@ impl Initializer for SuperInit {
             client,
             exec_cmds,
             config,
-            cc,
             err,
         } = self;
+        let const_config = config.const_config.clone();
         // Bootstrap server
-        let service = LanguageState::main(client, config, cc.clone(), err.is_none());
+        let service = LanguageState::main(client, config, err.is_none());
 
         if let Some(err) = err {
             return (service, Err(err));
@@ -152,14 +150,14 @@ impl Initializer for SuperInit {
         // Register these capabilities statically if the client does not support dynamic
         // registration
         let semantic_tokens_provider = match service.config.semantic_tokens {
-            SemanticTokensMode::Enable if !cc.tokens_dynamic_registration => {
+            SemanticTokensMode::Enable if !const_config.tokens_dynamic_registration => {
                 Some(get_semantic_tokens_options().into())
             }
             _ => None,
         };
-        let document_formatting_provider = match service.config.formatter {
+        let document_formatting_provider = match service.config.formatter_mode {
             FormatterMode::Typstyle | FormatterMode::Typstfmt
-                if !cc.doc_fmt_dynamic_registration =>
+                if !const_config.doc_fmt_dynamic_registration =>
             {
                 Some(OneOf::Left(true))
             }
@@ -250,6 +248,7 @@ impl Initializer for SuperInit {
     }
 }
 
+// region Configuration Items
 const CONFIG_ITEMS: &[&str] = &[
     "outputPath",
     "exportPdf",
@@ -264,18 +263,23 @@ const CONFIG_ITEMS: &[&str] = &[
     "preferredTheme",
     "hoverPeriscope",
 ];
+// endregion Configuration Items
 
+// todo: Config::default() doesn't initialize arguments from environment
+// variables
 /// The user configuration read from the editor.
 #[derive(Debug, Default, Clone)]
 pub struct Config {
+    /// Constant configuration for the server.
+    pub const_config: ConstConfig,
     /// The compile configurations
     pub compile: CompileConfig,
     /// Dynamic configuration for semantic tokens.
     pub semantic_tokens: SemanticTokensMode,
     /// Dynamic configuration for the experimental formatter.
-    pub formatter: FormatterMode,
+    pub formatter_mode: FormatterMode,
     /// Dynamic configuration for the experimental formatter.
-    pub formatter_print_width: u32,
+    pub formatter_print_width: Option<u32>,
 }
 
 impl Config {
@@ -327,11 +331,20 @@ impl Config {
         try_(|| SemanticTokensMode::deserialize(update.get("semanticTokens")?).ok())
             .inspect(|v| self.semantic_tokens = *v);
         try_(|| FormatterMode::deserialize(update.get("formatterMode")?).ok())
-            .inspect(|v| self.formatter = *v);
+            .inspect(|v| self.formatter_mode = *v);
         try_(|| u32::deserialize(update.get("formatterPrintWidth")?).ok())
-            .inspect(|v| self.formatter_print_width = *v);
+            .inspect(|v| self.formatter_print_width = Some(*v));
         self.compile.update_by_map(update)?;
         self.compile.validate()
+    }
+
+    /// Get the formatter configuration.
+    pub fn formatter(&self) -> FormatUserConfig {
+        FormatUserConfig {
+            mode: self.formatter_mode,
+            width: self.formatter_print_width.unwrap_or(120),
+            position_encoding: self.const_config.position_encoding,
+        }
     }
 }
 
@@ -468,42 +481,42 @@ impl CompileConfig {
             }
         }
 
-        'parse_extra_args: {
-            if let Some(typst_extra_args) = update.get("typstExtraArgs") {
-                let typst_args: Vec<String> = match serde_json::from_value(typst_extra_args.clone())
-                {
-                    Ok(e) => e,
-                    Err(e) => bail!("failed to parse typstExtraArgs: {e}"),
-                };
+        {
+            let typst_args: Vec<String> = match update
+                .get("typstExtraArgs")
+                .cloned()
+                .map(serde_json::from_value)
+            {
+                Some(Ok(e)) => e,
+                Some(Err(e)) => bail!("failed to parse typstExtraArgs: {e}"),
+                // Even if the list is none, it should be parsed since we have env vars to retrieve.
+                None => Vec::new(),
+            };
 
-                let command = match CompileOnceArgs::try_parse_from(
-                    Some("typst-cli".to_owned()).into_iter().chain(typst_args),
-                ) {
-                    Ok(e) => e,
-                    Err(e) => {
-                        log::error!("failed to parse typstExtraArgs: {e}");
-                        break 'parse_extra_args;
-                    }
-                };
+            let command = match CompileOnceArgs::try_parse_from(
+                Some("typst-cli".to_owned()).into_iter().chain(typst_args),
+            ) {
+                Ok(e) => e,
+                Err(e) => bail!("failed to parse typstExtraArgs: {e}"),
+            };
 
-                // Convert the input pairs to a dictionary.
-                let inputs: TypstDict = if command.inputs.is_empty() {
-                    TypstDict::default()
-                } else {
-                    let pairs = command.inputs.iter();
-                    let pairs = pairs.map(|(k, v)| (k.as_str().into(), v.as_str().into_value()));
-                    pairs.collect()
-                };
+            // Convert the input pairs to a dictionary.
+            let inputs: TypstDict = if command.inputs.is_empty() {
+                TypstDict::default()
+            } else {
+                let pairs = command.inputs.iter();
+                let pairs = pairs.map(|(k, v)| (k.as_str().into(), v.as_str().into_value()));
+                pairs.collect()
+            };
 
-                // todo: the command.root may be not absolute
-                self.typst_extra_args = Some(CompileExtraOpts {
-                    entry: command.input.map(|e| Path::new(&e).into()),
-                    root_dir: command.root,
-                    inputs: Arc::new(Prehashed::new(inputs)),
-                    font: command.font,
-                    creation_timestamp: command.creation_timestamp,
-                });
-            }
+            // todo: the command.root may be not absolute
+            self.typst_extra_args = Some(CompileExtraOpts {
+                entry: command.input.map(|e| Path::new(&e).into()),
+                root_dir: command.root,
+                inputs: Arc::new(Prehashed::new(inputs)),
+                font: command.font,
+                creation_timestamp: command.creation_timestamp,
+            });
         }
 
         self.font_paths = try_or_default(|| Vec::<_>::deserialize(update.get("fontPaths")?).ok());
@@ -649,7 +662,7 @@ impl CompileConfig {
 
             log::info!("creating SharedFontResolver with {opts:?}");
             Derived(Deferred::new(|| {
-                crate::world::LspWorldBuilder::resolve_fonts(opts)
+                crate::world::LspUniverseBuilder::resolve_fonts(opts)
                     .map(Arc::new)
                     .expect("failed to create font book")
             }))
@@ -875,11 +888,19 @@ mod tests {
 
         config.update(&update).unwrap();
 
+        // Nix specifies this environment variable when testing.
+        let has_source_date_epoch = std::env::var("SOURCE_DATE_EPOCH").is_ok();
+        if has_source_date_epoch {
+            let args = config.compile.typst_extra_args.as_mut().unwrap();
+            assert!(args.creation_timestamp.is_some());
+            args.creation_timestamp = None;
+        }
+
         assert_eq!(config.compile.output_path, PathPattern::new("out"));
         assert_eq!(config.compile.export_pdf, ExportMode::OnSave);
         assert_eq!(config.compile.root_path, Some(PathBuf::from(root_path)));
         assert_eq!(config.semantic_tokens, SemanticTokensMode::Enable);
-        assert_eq!(config.formatter, FormatterMode::Typstyle);
+        assert_eq!(config.formatter_mode, FormatterMode::Typstyle);
         assert_eq!(
             config.compile.typst_extra_args,
             Some(CompileExtraOpts {
@@ -887,6 +908,43 @@ mod tests {
                 ..Default::default()
             })
         );
+    }
+
+    #[test]
+    fn test_config_creation_timestamp() {
+        type Timestamp = Option<chrono::DateTime<chrono::Utc>>;
+
+        fn timestamp(f: impl FnOnce(&mut Config)) -> Timestamp {
+            let mut config = Config::default();
+
+            f(&mut config);
+
+            let args = config.compile.typst_extra_args;
+            args.and_then(|args| args.creation_timestamp)
+        }
+
+        // assert!(timestamp(|_| {}).is_none());
+        // assert!(timestamp(|config| {
+        //     let update = json!({});
+        //     config.update(&update).unwrap();
+        // })
+        // .is_none());
+
+        let args_timestamp = timestamp(|config| {
+            let update = json!({
+                "typstExtraArgs": ["--creation-timestamp", "1234"]
+            });
+            config.update(&update).unwrap();
+        });
+        assert!(args_timestamp.is_some());
+
+        // todo: concurrent get/set env vars is unsafe
+        //     std::env::set_var("SOURCE_DATE_EPOCH", "1234");
+        //     let env_timestamp = timestamp(|config| {
+        //         config.update(&json!({})).unwrap();
+        //     });
+
+        //     assert_eq!(args_timestamp, env_timestamp);
     }
 
     #[test]
@@ -945,5 +1003,13 @@ mod tests {
             PathPattern::new("/substitute/target/$dir/$name").substitute(&entry),
             Some(PathBuf::from("/substitute/target/dir1/dir2/file.txt").into())
         );
+    }
+
+    #[test]
+    fn test_default_formatting_config() {
+        let config = Config::default().formatter();
+        assert_eq!(config.mode, FormatterMode::Disable);
+        assert_eq!(config.width, 120);
+        assert_eq!(config.position_encoding, PositionEncoding::Utf16);
     }
 }
