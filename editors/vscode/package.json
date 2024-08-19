@@ -798,7 +798,7 @@
       },
       {
         "command": "tinymist.copyAnsiHighlight",
-        "title": "Copy as Highlighted Code",
+        "title": "Copy as ANSI Code",
         "category": "Typst"
       },
       {
