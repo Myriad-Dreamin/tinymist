@@ -16,6 +16,7 @@
     - #chapter("frontend/main.typ")[Editor Frontends]
       - #chapter("frontend/vscode.typ")[VS Cod(e,ium)]
       - #chapter("frontend/neovim.typ")[NeoVim]
+      - #chapter("frontend/emacs.typ")[Emacs]
       - #chapter("frontend/sublime-text.typ")[Sublime Text]
       - #chapter("frontend/helix.typ")[Helix]
       - #chapter("frontend/zed.typ")[Zed]

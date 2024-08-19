@@ -72,11 +72,12 @@ Tinymist follows the [Semantic Versioning](https://semver.org/) scheme. The vers
 ## Installation
 
 Follow the instructions to enable tinymist in your favorite editor.
-1. [Helix](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/helix/README.md)
-1. [Neovim](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/README.md)
-1. [Sublime Text](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/sublime-text/README.md)
-1. [VSCode](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/README.md)
-1. [Zed](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/zed/README.md)
+- [VS Cod(e,ium)](https://myriad-dreamin.github.io/tinymist//frontend/vscode.html)
+- [NeoVim](https://myriad-dreamin.github.io/tinymist//frontend/neovim.html)
+- [Emacs](https://myriad-dreamin.github.io/tinymist//frontend/emacs.html)
+- [Sublime Text](https://myriad-dreamin.github.io/tinymist//frontend/sublime-text.html)
+- [Helix](https://myriad-dreamin.github.io/tinymist//frontend/helix.html)
+- [Zed](https://myriad-dreamin.github.io/tinymist//frontend/zed.html)
 
 ## Installing Regular/Nightly Prebuilds from GitHub
 

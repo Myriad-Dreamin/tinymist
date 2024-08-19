@@ -7,6 +7,7 @@ Leveraging the interface of LSP, tinymist provides frontends to each editor, loc
 Check the following chapters for uses:
 - #cross-link("/frontend/vscode.typ")[VS Cod(e,ium)]
 - #cross-link("/frontend/neovim.typ")[NeoVim]
+- #cross-link("/frontend/emacs.typ")[Emacs]
 - #cross-link("/frontend/sublime-text.typ")[Sublime Text]
 - #cross-link("/frontend/helix.typ")[Helix]
 - #cross-link("/frontend/zed.typ")[Zed]
