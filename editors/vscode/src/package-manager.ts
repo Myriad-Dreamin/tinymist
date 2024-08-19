@@ -1,31 +1,12 @@
 import { window, workspace } from 'vscode';
+import { tinymist } from './lsp';
 import * as fs from 'fs';
 
 // error message
 export const dataDirErrorMessage = 'Can not find package directory.';
 
-// https://github.com/typst/packages#local-packages
-export function getDataDir() {
-    const dataDirMap = {
-        linux: process.env.XDG_DATA_HOME || `${process.env.HOME}/.local/share`,
-        darwin: `${process.env.HOME}/Library/Application Support`,
-        win32: process.env.APPDATA,
-    };
-    return dataDirMap[process.platform as keyof typeof dataDirMap];
-}
-
-export function getTypstDir() {
-    const dataDir = getDataDir();
-    return dataDir ? `${dataDir}/typst` : null;
-}
-
-export function getPackagesDir() {
-    const typstDir = getTypstDir();
-    return typstDir ? `${typstDir}/packages` : null;
-}
-
-export function getLocalPackagesDir() {
-    const packagesDir = getPackagesDir();
+export async function getLocalPackagesDir() {
+    const packagesDir = await tinymist.getResource('/dirs/local-packages');
     return packagesDir ? `${packagesDir}/local` : null;
 }
 
@@ -52,7 +33,7 @@ function versionCompare(a: string, b: string) {
  * get local packages list
  */
 export async function getLocalPackagesList() {
-    const localPackagesDir = getLocalPackagesDir();
+    const localPackagesDir = await getLocalPackagesDir();
     // return list of local packages like ['@local/mypkg:1.0.0']
     if (!localPackagesDir) {
         return [];
@@ -100,7 +81,7 @@ export async function getLocalPackagesList() {
  * create local package
  */
 export async function commandCreateLocalPackage() {
-    const localPackagesDir = getLocalPackagesDir();
+    const localPackagesDir = await getLocalPackagesDir();
     if (!localPackagesDir) {
         window.showErrorMessage(dataDirErrorMessage);
         return;
@@ -169,7 +150,7 @@ export async function commandCreateLocalPackage() {
  * open local package in editor
  */
 export async function commandOpenLocalPackage() {
-    const localPackagesDir = getLocalPackagesDir();
+    const localPackagesDir = await getLocalPackagesDir();
     if (!localPackagesDir) {
         window.showErrorMessage(dataDirErrorMessage);
         return;

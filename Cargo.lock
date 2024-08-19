@@ -3752,6 +3752,7 @@ dependencies = [
  "comemo 0.4.0",
  "crossbeam-channel",
  "dhat",
+ "dirs",
  "env_logger",
  "futures",
  "hyper",

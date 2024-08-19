@@ -67,6 +67,7 @@ dhat = { workspace = true, optional = true }
 unicode-script.workspace = true
 hyper = { workspace = true, optional = true }
 open = { workspace = true, optional = true }
+dirs.workspace = true
 tower-layer.workspace = true
 tower-service.workspace = true
 pin-project-lite.workspace = true
