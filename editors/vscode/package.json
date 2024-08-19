@@ -985,6 +985,7 @@
     "vscode-languageclient": "^9.0.0",
     "cpr": "^3.0.1",
     "node-fetch": "^3.3.2",
+    "simple-git": "^3.20.0",
     "ws": "^8.13.0"
   },
   "devDependencies": {
