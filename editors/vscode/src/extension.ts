@@ -32,7 +32,7 @@ import {
   previewProcessOutline,
 } from "./preview";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
-import { commandPullRepo, commandPushRepo } from "./git-sync";
+import { commandPullRemoteRepo, commandPushRemoteRepo } from "./git-sync";
 import { activeTypstEditor, DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, getClient, setClient, tinymist } from "./lsp";
 import { taskActivate } from "./tasks";
@@ -266,8 +266,8 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
 
     commands.registerCommand("tinymist.createLocalPackage", commandCreateLocalPackage),
     commands.registerCommand("tinymist.openLocalPackage", commandOpenLocalPackage),
-    commands.registerCommand("tinymist.pullSyncRepo", commandPullRepo),
-    commands.registerCommand("tinymist.typstSync", commandPushRepo),
+    commands.registerCommand("tinymist.pullLocalPackage", commandPullRemoteRepo),
+    commands.registerCommand("tinymist.pushLocalPackage", commandPushRemoteRepo),
 
     // We would like to define it at the server side, but it is not possible for now.
     // https://github.com/microsoft/language-server-protocol/issues/1117

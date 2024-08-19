@@ -1,34 +1,36 @@
 import { ProgressLocation, window, workspace } from "vscode";
-import { dataDirErrorMessage, getTypstDir } from "./package-manager";
+import { tinymist } from "./lsp";
 import * as fs from 'fs';
 import simpleGit from 'simple-git';
 
 // error message
-const syncRepoErrorMessage = 'Can not find Sync Repo, please make sure you have configured Sync Repo in settings.';
+const repositoryErrorMessage = 'Can not find remoteUrl, please make sure you have configured "tinymist.localPackage.remoteUrl" in settings.';
+const dataDirErrorMessage = 'Can not find package directory.';
 
 // main branch
 const mainBranch = 'main';
 
-export function getSyncRepo() {
-  if (workspace.getConfiguration().has('tinymist.syncRepo')) {
-    return workspace.getConfiguration().get('tinymist.syncRepo') as string;
+export function getRemoteRepo() {
+  if (workspace.getConfiguration().has('tinymist.localPackage.remoteUrl')) {
+    return workspace.getConfiguration().get('tinymist.localPackage.remoteUrl') as string;
   }
   return '';
 }
 
-export async function getSyncRepoGit() {
-  // 1. get syncRepo
-  const syncRepo = getSyncRepo();
-  if (!syncRepo) {
-    window.showErrorMessage(syncRepoErrorMessage);
+export async function getRemoteRepoGit() {
+  // 1. get remote repository
+  const remoteUrl = getRemoteRepo();
+  if (!remoteUrl) {
+    window.showErrorMessage(repositoryErrorMessage);
     return;
   }
   // 2. if typstDir not exist, create it
-  const typstDir = getTypstDir();
-  if (!typstDir) {
+  const typstPackageDir = await tinymist.getResource('/dirs/local-packages');
+  if (!typstPackageDir) {
     window.showErrorMessage(dataDirErrorMessage);
     return;
   }
+  const typstDir = await fs.promises.realpath(`${typstPackageDir}/..`);
   try {
     await fs.promises.access(typstDir);
   } catch (err) {
@@ -38,7 +40,7 @@ export async function getSyncRepoGit() {
   const git = simpleGit(typstDir);
   if (!(await git.checkIsRepo())) {
     if ((await fs.promises.readdir(typstDir)).length === 0) {
-      await git.clone(syncRepo, typstDir);
+      await git.clone(remoteUrl, typstDir);
     } else {
       await git.init({ '--initial-branch': mainBranch });
       await git.add('.');
@@ -48,23 +50,23 @@ export async function getSyncRepoGit() {
   // 4. add remote, if remote exist and is not the same, ask
   const originRemotes = (await git.getRemotes(true)).filter(remote => remote.name === 'origin');
   const originRemote = originRemotes.length > 0 ? originRemotes[0] : null;
-  if (originRemote && originRemote.refs.fetch !== syncRepo) {
+  if (originRemote && originRemote.refs.fetch !== remoteUrl) {
     const answer = await window.showQuickPick(['Yes', 'No'], {
       placeHolder: 'Remote origin already exists, do you want to replace it?'
     });
     if (answer === 'Yes') {
       await git.removeRemote('origin');
-      await git.addRemote('origin', syncRepo);
+      await git.addRemote('origin', remoteUrl);
     }
   }
   if (!originRemote) {
-    await git.addRemote('origin', syncRepo);
+    await git.addRemote('origin', remoteUrl);
   }
   // 5. return git
   return git;
 }
 
-export async function commandPushRepo() {
+export async function commandPushRemoteRepo() {
   await window.withProgress({
     location: ProgressLocation.Notification,
     title: 'Syncing',
@@ -72,12 +74,12 @@ export async function commandPushRepo() {
   }, async (progress, token) => {
     // 0. cancel callback
     token.onCancellationRequested(() => {
-      window.showInformationMessage('Syncing with syncRepo canceled.');
+      window.showInformationMessage('Syncing with remote repository canceled.');
     });
-    // 1. get syncRepo git
-    progress.report({ increment: 15, message: 'Getting syncRepo...' });
+    // 1. get remote repository
+    progress.report({ increment: 15, message: 'Getting remote repository...' });
     if (token.isCancellationRequested) { return; }
-    const git = await getSyncRepoGit();
+    const git = await getRemoteRepoGit();
     if (!git) {
       return;
     }
@@ -108,7 +110,7 @@ export async function commandPushRepo() {
   });
 }
 
-export async function commandPullRepo() {
+export async function commandPullRemoteRepo() {
   await window.withProgress({
     location: ProgressLocation.Notification,
     title: 'Pulling',
@@ -116,11 +118,11 @@ export async function commandPullRepo() {
   }, async (progress, token) => {
     // 0. cancel callback
     token.onCancellationRequested(() => {
-      window.showInformationMessage('Pulling from syncRepo canceled.');
+      window.showInformationMessage('Pulling from remote repository canceled.');
     });
-    // 1. get syncRepo git
-    progress.report({ increment: 33, message: 'Getting syncRepo...' });
-    const git = await getSyncRepoGit();
+    // 1. get remote repository git
+    progress.report({ increment: 33, message: 'Getting remote repository...' });
+    const git = await getRemoteRepoGit();
     if (!git) {
       return;
     }

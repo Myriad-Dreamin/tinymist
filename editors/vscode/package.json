@@ -523,6 +523,12 @@
           "type": "boolean",
           "default": false,
           "markdownDeprecationMessage": "This setting is deprecated and no longer needed. The extension will always pin the previewed file as the entrypoint for the language server."
+        },
+        "tinymist.localPackage.remoteUrl": {
+          "type": "string",
+          "default": "",
+          "title": "Remote repository URL",
+          "description": "The URL of the remote repository to pull local packages from."
         }
       }
     },
@@ -839,13 +845,13 @@
         "category": "Typst"
       },
       {
-        "command": "tinymist.pullSyncRepo",
+        "command": "tinymist.pullLocalPackage",
         "title": "Pull local packages from remote repository",
         "category": "Typst"
       },
       {
-        "command": "tinymist.typstSync",
-        "title": "Sync local packages from remote repository",
+        "command": "tinymist.pushLocalPackage",
+        "title": "Push local packages to remote repository",
         "category": "Typst"
       },
       {
