@@ -15,7 +15,6 @@ use typst::{
     layout::{Abs, Frame},
     syntax::{ast, SyntaxNode},
     visualize::Color,
-    World,
 };
 use typst_ts_compiler::{EntryReader, EntryState, TaskInputs};
 use typst_ts_core::TypstDatetime;
@@ -251,8 +250,7 @@ impl ExportConfig {
                 Html {} => typst_ts_svg_exporter::render_svg_html(doc).into_bytes(),
                 Text {} => format!("{}", FullTextDigest(doc.clone())).into_bytes(),
                 Markdown {} => {
-                    let main = artifact.world.main();
-                    let conv = Typlite::new_with_src(main)
+                    let conv = Typlite::new(artifact.world)
                         .convert()
                         .map_err(|e| anyhow::anyhow!("failed to convert to markdown: {e}"))?;
 

@@ -11,7 +11,7 @@ rust-version = "1.80"
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "tests"]
+members = ["crates/*", "contrib/typlite", "tests"]
 
 [workspace.dependencies]
 
@@ -137,6 +137,7 @@ typst-preview = { path = "./crates/typst-preview/" }
 tinymist-assets = { version = "0.11.19" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
+tinymist-world = { path = "./crates/tinymist-world/" }
 tinymist-render = { path = "./crates/tinymist-render/" }
 
 [profile.dev.package.insta]

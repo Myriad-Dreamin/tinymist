@@ -3782,6 +3782,7 @@ dependencies = [
  "tinymist-assets 0.11.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-query",
  "tinymist-render",
+ "tinymist-world",
  "tokio",
  "tokio-util",
  "toml 0.8.14",
@@ -3871,6 +3872,23 @@ dependencies = [
  "serde",
  "tinymist-query",
  "typst-ts-svg-exporter",
+]
+
+[[package]]
+name = "tinymist-world"
+version = "0.11.19"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "comemo 0.4.0",
+ "log",
+ "serde",
+ "serde_json",
+ "tinymist-assets 0.11.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typst-assets",
+ "typst-ts-compiler",
+ "typst-ts-core",
 ]
 
 [[package]]
@@ -4146,10 +4164,20 @@ dependencies = [
  "ecow 0.2.2",
  "insta",
  "regex",
+ "tinymist-world",
  "typst",
  "typst-assets",
  "typst-svg",
  "typst-syntax 0.11.1",
+]
+
+[[package]]
+name = "typlite-cli"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "tinymist-world",
+ "typlite",
 ]
 
 [[package]]

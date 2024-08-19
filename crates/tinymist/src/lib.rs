@@ -26,11 +26,11 @@ mod server;
 mod task;
 pub mod tool;
 mod utils;
-mod world;
 
 pub use init::*;
 pub use server::*;
 pub use sync_lsp::LspClient;
+pub use tinymist_world as world;
 pub use world::*;
 
 use lsp_server::ResponseError;

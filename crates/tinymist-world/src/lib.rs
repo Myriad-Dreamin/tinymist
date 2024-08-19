@@ -1,15 +1,22 @@
+//! World implementation of typst for tinymist.
+
+use anyhow::Context;
+pub use typst_ts_compiler::world as base;
+pub use typst_ts_compiler::{entry::*, EntryOpts, EntryState};
+pub use typst_ts_compiler::{font, vfs};
+pub use typst_ts_core::config::CompileFontOpts;
+pub use typst_ts_core::error::prelude;
+pub use typst_ts_core::font::FontResolverImpl;
+use typst_ts_core::foundations::{Str, Value};
+
+use std::path::Path;
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
 
 use chrono::{DateTime, Utc};
 use clap::{builder::ValueParser, ArgAction, Parser};
 use comemo::Prehashed;
 use serde::{Deserialize, Serialize};
-use typst_ts_core::{
-    config::{compiler::EntryState, CompileFontOpts as FontOptsInner},
-    error::prelude::*,
-    font::FontResolverImpl,
-    TypstDict,
-};
+use typst_ts_core::{config::CompileFontOpts as FontOptsInner, error::prelude::*, TypstDict};
 
 use typst_ts_compiler::{
     font::system::SystemFontSearcher,
@@ -77,7 +84,62 @@ pub struct CompileOnceArgs {
     pub creation_timestamp: Option<DateTime<Utc>>,
 }
 
-/// Compiler feature for LSP world.
+impl CompileOnceArgs {
+    /// Get a universe instance from the given arguments.
+    pub fn resolve(&self) -> anyhow::Result<LspUniverse> {
+        let entry = self.entry()?.try_into()?;
+        let fonts = LspUniverseBuilder::resolve_fonts(self.font.clone())?;
+        let inputs = self
+            .inputs
+            .iter()
+            .map(|(k, v)| (Str::from(k.as_str()), Value::Str(Str::from(v.as_str()))))
+            .collect();
+
+        LspUniverseBuilder::build(entry, Arc::new(fonts), Arc::new(Prehashed::new(inputs)))
+            .context("failed to create universe")
+    }
+
+    /// Get the entry options from the arguments.
+    pub fn entry(&self) -> anyhow::Result<EntryOpts> {
+        let input = self.input.as_ref().context("entry file must be provided")?;
+        let input = Path::new(&input);
+        let entry = if input.is_absolute() {
+            input.to_owned()
+        } else {
+            std::env::current_dir().unwrap().join(input)
+        };
+
+        let root = if let Some(root) = &self.root {
+            if root.is_absolute() {
+                root.clone()
+            } else {
+                std::env::current_dir().unwrap().join(root)
+            }
+        } else {
+            std::env::current_dir().unwrap()
+        };
+
+        if !entry.starts_with(&root) {
+            log::error!("entry file must be in the root directory");
+            std::process::exit(1);
+        }
+
+        let relative_entry = match entry.strip_prefix(&root) {
+            Ok(e) => e,
+            Err(_) => {
+                log::error!("entry path must be inside the root: {}", entry.display());
+                std::process::exit(1);
+            }
+        };
+
+        Ok(EntryOpts::new_rooted(
+            root.clone(),
+            Some(relative_entry.to_owned()),
+        ))
+    }
+}
+
+/// Compiler feature for LSP universe and worlds.
 pub type LspCompilerFeat = SystemCompilerFeat;
 /// LSP universe that spawns LSP worlds.
 pub type LspUniverse = TypstSystemUniverse;
@@ -86,10 +148,10 @@ pub type LspWorld = TypstSystemWorld;
 /// Immutable prehashed reference to dictionary.
 pub type ImmutDict = Arc<Prehashed<TypstDict>>;
 
-/// Builder for LSP world.
-pub struct LspWorldBuilder;
+/// Builder for LSP universe.
+pub struct LspUniverseBuilder;
 
-impl LspWorldBuilder {
+impl LspUniverseBuilder {
     /// Create [`LspUniverse`] with the given options.
     /// See [`LspCompilerFeat`] for instantiation details.
     pub fn build(
@@ -107,7 +169,7 @@ impl LspWorldBuilder {
     }
 
     /// Resolve fonts from given options.
-    pub(crate) fn resolve_fonts(args: CompileFontArgs) -> ZResult<FontResolverImpl> {
+    pub fn resolve_fonts(args: CompileFontArgs) -> ZResult<FontResolverImpl> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(FontOptsInner {
             font_profile_cache_path: Default::default(),
