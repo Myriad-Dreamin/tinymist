@@ -1053,52 +1053,54 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         // directory and not the cache directory, because the latter is not
         // intended for storage of local packages.
         let mut packages = vec![];
-        if let Some(data_dir) = dirs::data_dir() {
-            let local_path = data_dir.join("typst/packages");
-            if local_path.exists() {
-                // namespace/package_name/version
-                // 1. namespace
-                let namespaces = std::fs::read_dir(local_path).unwrap();
-                for namespace in namespaces {
-                    let namespace = namespace.unwrap();
-                    if !namespace.file_type().unwrap().is_dir() {
+        let Some(data_dir) = dirs::data_dir() else {
+            return packages;
+        };
+        let local_path = data_dir.join("typst/packages");
+        if !local_path.exists() {
+            return packages;
+        }
+        // namespace/package_name/version
+        // 1. namespace
+        let namespaces = std::fs::read_dir(local_path).unwrap();
+        for namespace in namespaces {
+            let namespace = namespace.unwrap();
+            if !namespace.file_type().unwrap().is_dir() {
+                continue;
+            }
+            // start with . are hidden directories
+            if namespace.file_name().to_string_lossy().starts_with('.') {
+                continue;
+            }
+            // 2. package_name
+            let package_names = std::fs::read_dir(namespace.path()).unwrap();
+            for package in package_names {
+                let package = package.unwrap();
+                if !package.file_type().unwrap().is_dir() {
+                    continue;
+                }
+                if package.file_name().to_string_lossy().starts_with('.') {
+                    continue;
+                }
+                // 3. version
+                let versions = std::fs::read_dir(package.path()).unwrap();
+                for version in versions {
+                    let version = version.unwrap();
+                    if !version.file_type().unwrap().is_dir() {
                         continue;
                     }
-                    // start with . are hidden directories
-                    if namespace.file_name().to_string_lossy().starts_with('.') {
+                    if version.file_name().to_string_lossy().starts_with('.') {
                         continue;
                     }
-                    // 2. package_name
-                    let package_names = std::fs::read_dir(namespace.path()).unwrap();
-                    for package in package_names {
-                        let package = package.unwrap();
-                        if !package.file_type().unwrap().is_dir() {
-                            continue;
-                        }
-                        if package.file_name().to_string_lossy().starts_with('.') {
-                            continue;
-                        }
-                        // 3. version
-                        let versions = std::fs::read_dir(package.path()).unwrap();
-                        for version in versions {
-                            let version = version.unwrap();
-                            if !version.file_type().unwrap().is_dir() {
-                                continue;
-                            }
-                            if version.file_name().to_string_lossy().starts_with('.') {
-                                continue;
-                            }
-                            let version = version.file_name().to_string_lossy().parse().unwrap();
-                            let spec = PackageSpec {
-                                namespace: namespace.file_name().to_string_lossy().into(),
-                                name: package.file_name().to_string_lossy().into(),
-                                version,
-                            };
-                            let description = eco_format!("{} v{}", spec.name, spec.version);
-                            let package = (spec, Some(description));
-                            packages.push(package);
-                        }
-                    }
+                    let version = version.file_name().to_string_lossy().parse().unwrap();
+                    let spec = PackageSpec {
+                        namespace: namespace.file_name().to_string_lossy().into(),
+                        name: package.file_name().to_string_lossy().into(),
+                        version,
+                    };
+                    let description = eco_format!("{} v{}", spec.name, spec.version);
+                    let package = (spec, Some(description));
+                    packages.push(package);
                 }
             }
         }
