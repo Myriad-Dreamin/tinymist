@@ -1,6 +1,4 @@
 **
-!language-configuration.json
-!typst.tmLanguage.json
 !out/extension.js
 !out/tinymist
 !out/tinymist.exe
@@ -10,6 +8,7 @@
 !package.json
 !package-lock.json
 !icons/**
+!syntaxes/**
 !README.md
 !LICENSE
 !CHANGELOG.md

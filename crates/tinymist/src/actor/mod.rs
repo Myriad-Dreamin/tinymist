@@ -23,7 +23,7 @@ use self::{
 };
 use crate::{
     task::{ExportConfig, ExportTask, ExportUserConfig},
-    world::{ImmutDict, LspWorldBuilder},
+    world::{ImmutDict, LspUniverseBuilder},
     LanguageState,
 };
 
@@ -111,6 +111,7 @@ impl LanguageState {
                 position_encoding,
                 enable_periscope,
                 caches: Default::default(),
+                workers: Default::default(),
             },
             periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
 
@@ -125,7 +126,7 @@ impl LanguageState {
         self.client.handle.spawn_blocking(move || {
             // Create the world
             let font_resolver = font_resolver.wait().clone();
-            let verse = LspWorldBuilder::build(entry_.clone(), font_resolver, inputs)
+            let verse = LspUniverseBuilder::build(entry_.clone(), font_resolver, inputs)
                 .expect("incorrect options");
 
             // Create the actor

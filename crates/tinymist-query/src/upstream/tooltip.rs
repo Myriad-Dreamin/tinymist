@@ -3,22 +3,22 @@ use std::fmt::Write;
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
 use typst::eval::{CapturesVisitor, Tracer};
-use typst::foundations::{repr, Capturer, CastInfo, Repr, Value};
+use typst::foundations::{repr, Capturer, CastInfo, Value};
 use typst::layout::Length;
 use typst::model::Document;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 use typst::util::{round_2, Numeric};
 use typst::World;
 
-use super::{plain_docs_sentence, summarize_font_family};
-use crate::analysis::{analyze_expr, analyze_labels, DynLabel};
+use super::{plain_docs_sentence, summarize_font_family, truncated_repr};
+use crate::analysis::{analyze_expr_, analyze_labels, DynLabel};
 
 /// Describe the item under the cursor.
 ///
 /// Passing a `document` (from a previous compilation) is optional, but enhances
 /// the autocompletions. Label completions, for instance, are only generated
 /// when the document is available.
-pub fn tooltip(
+pub fn tooltip_(
     world: &dyn World,
     document: Option<&Document>,
     source: &Source,
@@ -57,7 +57,7 @@ pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
         return None;
     }
 
-    let values = analyze_expr(world, ancestor);
+    let values = analyze_expr_(world, ancestor);
 
     if let [(value, _)] = values.as_slice() {
         if let Some(docs) = value.docs() {
@@ -87,7 +87,7 @@ pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
                 write!(pieces.last_mut().unwrap(), " (x{count})").unwrap();
             }
         }
-        pieces.push(value.repr());
+        pieces.push(truncated_repr(value));
         last = Some((value, 1));
     }
 

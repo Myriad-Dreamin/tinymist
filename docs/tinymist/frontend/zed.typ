@@ -1,5 +1,6 @@
-#import "mod.typ": *
+#import "/docs/tinymist/frontend/mod.typ": *
 
-#show: book-page.with(title: "Tinymist Neovim Extension")
+#show: book-page.with(title: "Tinymist Zed Extension")
 
-#link("https://github.com/WeetHet/typst.zed")[Zed]
+See #link("https://github.com/WeetHet/typst.zed")[typst.zed];.
+

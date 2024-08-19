@@ -58,19 +58,24 @@ impl StatefulRequest for GotoDefinitionRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::syntax::find_module_level_docs;
     use crate::tests::*;
 
     #[test]
     fn test() {
-        snapshot_testing("goto_definition", &|world, path| {
-            let source = world.source_by_path(&path).unwrap();
+        snapshot_testing("goto_definition", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let docs = find_module_level_docs(&source).unwrap_or_default();
+            let properties = get_test_properties(&docs);
+            let doc = compile_doc_for_test(ctx, &properties);
 
             let request = GotoDefinitionRequest {
                 path: path.clone(),
                 position: find_test_position(&source),
             };
 
-            let result = request.request(world, None);
+            let result = request.request(ctx, doc.clone());
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

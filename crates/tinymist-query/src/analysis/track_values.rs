@@ -11,7 +11,7 @@ use typst::syntax::{ast, LinkedNode, Span, SyntaxKind};
 use typst::World;
 
 /// Try to determine a set of possible values for an expression.
-pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
+pub fn analyze_expr_(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
     let Some(expr) = node.cast::<ast::Expr>() else {
         return eco_vec![];
     };
@@ -27,13 +27,13 @@ pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Opti
         _ => {
             if node.kind() == SyntaxKind::Contextual {
                 if let Some(child) = node.children().last() {
-                    return analyze_expr(world, &child);
+                    return analyze_expr_(world, &child);
                 }
             }
 
             if let Some(parent) = node.parent() {
                 if parent.kind() == SyntaxKind::FieldAccess && node.index() > 0 {
-                    return analyze_expr(world, parent);
+                    return analyze_expr_(world, parent);
                 }
             }
 
@@ -48,9 +48,9 @@ pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Opti
 }
 
 /// Try to load a module from the current source file.
-pub fn analyze_import(world: &dyn World, source: &LinkedNode) -> Option<Value> {
+pub fn analyze_import_(world: &dyn World, source: &LinkedNode) -> Option<Value> {
     let source_span = source.span();
-    let (source, _) = analyze_expr(world, source).into_iter().next()?;
+    let (source, _) = analyze_expr_(world, source).into_iter().next()?;
     if source.scope().is_some() {
         return Some(source);
     }
@@ -86,7 +86,8 @@ pub struct DynLabel {
     pub label_desc: Option<EcoString>,
     /// Additional details about the label.
     pub detail: Option<EcoString>,
-    /// The title of the bibliography entry. Not present for non-bibliography labels.
+    /// The title of the bibliography entry. Not present for non-bibliography
+    /// labels.
     pub bib_title: Option<EcoString>,
 }
 

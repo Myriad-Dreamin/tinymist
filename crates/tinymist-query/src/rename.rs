@@ -30,8 +30,7 @@ impl StatefulRequest for RenameRequest {
 
         validate_renaming_definition(&lnk)?;
 
-        let def_use = ctx.def_use(source.clone())?;
-        let references = find_references(ctx, def_use, deref_target)?;
+        let references = find_references(ctx, source.clone(), doc.as_ref(), deref_target)?;
 
         let mut editions = HashMap::new();
 

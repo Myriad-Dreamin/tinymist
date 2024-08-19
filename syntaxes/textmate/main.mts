@@ -77,6 +77,9 @@ const contentBlock: textmate.Pattern = {
     {
       include: "#markup",
     },
+    {
+      include: "#markupBrace",
+    },
   ],
 };
 
@@ -129,6 +132,11 @@ const markupReference: textmate.PatternMatch = {
 const markupEscape: textmate.PatternMatch = {
   name: "constant.character.escape.content.typst",
   match: /\\(?:[^u]|u\{?[0-9a-zA-Z]*\}?)/,
+};
+
+const markupBrace: textmate.PatternMatch = {
+  name: "markup.content.brace.typst",
+  match: /[{}()\[\]]/,
 };
 
 const stringLiteral: textmate.PatternBeginEnd = {
@@ -264,7 +272,7 @@ const markup: textmate.Pattern = {
     //       # - include: '#markupItalic'
     {
       name: "markup.underline.link.typst",
-      match: /https?:\/\/[0-9a-zA-Z~\/%#&='',;\.\+\?\-]*/,
+      match: /https?:\/\/[0-9a-zA-Z~\/%#&='',;\.\+\?\-\_]*/,
     },
     {
       include: "#markupMath",
@@ -311,7 +319,8 @@ const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
   return {
     /// name: 'markup.expr.typst'
     begin: new RegExp("#" + seek.source),
-    end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[\$])|(?=[\s\}\]\)\$]|$)|(;)/,
+    // `?=(?<![\d#])\.[^\p{XID_Start}_]`: This means that we are on a dot and the next character is not a valid identifier start, but we are not at the beginning of hash or number
+    end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[\$])|(?=(?<![#\d])\.[^\p{XID_Start}_])|(?=[\s\}\]\)\$]|$)|(;)/u,
     beginCaptures: {
       "0": {
         name: kind,
@@ -990,6 +999,9 @@ const ifStatement = (): textmate.Grammar => {
       {
         include: "#code",
       },
+      {
+        include: "#markupBrace",
+      },
     ],
   };
 
@@ -1586,6 +1598,7 @@ export const typst: textmate.Grammar = {
     markupItalic,
     markupMath,
     markupHeading,
+    markupBrace,
 
     ...expression().repository,
 

@@ -1,10 +1,14 @@
 [package]
-name = "typlite"
+name = "typlite-cli"
 description = "Converts a subset of typst to markdown."
 categories = ["compilers"]
 keywords = ["language", "typst"]
 
-[workspace]
+[[bin]]
+name = "typlite"
+path = "src/main.rs"
 
 [dependencies]
-typlite = { path = "../../crates/typlite" }
+typlite.workspace = true
+clap.workspace = true
+tinymist-world.workspace = true

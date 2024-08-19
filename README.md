@@ -12,6 +12,9 @@ It contains:
 
 ## Features
 
+
+
+
 Language service (LSP) features:
 
 - [Semantic highlighting](https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide)
@@ -54,13 +57,15 @@ Language service (LSP) features:
 
 Extra features:
 
-- Compiles to PDF on save (configurable to as-you-type, or other options)
-- Provides code lenses for exporting to various formats (PDF, SVG, PNG, etc.)
+- Compiles to PDF on save (configurable to as-you-type, or other options).
+- Compiles to SVG, PNG, HTML, Markdown, Text, and other formats by commands, vscode tasks, or code lenses.
+- Provides code lenses for exporting to PDF/SVG/PNG/etc.
 - Provides a status bar item to show the current document's compilation status and words count.
 - [Editor tools](https://github.com/Myriad-Dreamin/tinymist/tree/main/tools/editor-tools):
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
   - Click a button in template gallery to initialize a new project with a template. (`tinymist.initTemplate` and `tinymist.initTemplateInPlace`)
-  - Trace execution in current document. (`tinymist.profileCurrentFile`)
+  - Trace execution in current document (`tinymist.profileCurrentFile`).
+
 
 ## Release Cycle
 
@@ -71,10 +76,12 @@ Tinymist follows the [Semantic Versioning](https://semver.org/) scheme. The vers
 ## Installation
 
 Follow the instructions to enable tinymist in your favorite editor.
-1. [Helix](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/helix/README.md)
-1. [Neovim](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/README.md)
-1. [VSCode](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/README.md)
-1. [Zed](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/zed/README.md)
+- [VS Cod(e,ium)](https://myriad-dreamin.github.io/tinymist//frontend/vscode.html)
+- [NeoVim](https://myriad-dreamin.github.io/tinymist//frontend/neovim.html)
+- [Emacs](https://myriad-dreamin.github.io/tinymist//frontend/emacs.html)
+- [Sublime Text](https://myriad-dreamin.github.io/tinymist//frontend/sublime-text.html)
+- [Helix](https://myriad-dreamin.github.io/tinymist//frontend/helix.html)
+- [Zed](https://myriad-dreamin.github.io/tinymist//frontend/zed.html)
 
 ## Installing Regular/Nightly Prebuilds from GitHub
 

@@ -1,14 +1,37 @@
 mod model;
 mod rendering;
 
-use std::sync::OnceLock;
+use std::sync::{LazyLock, OnceLock};
 
 use regex::Regex;
+use tinymist_world::{CompileFontArgs, EntryState, FontResolverImpl, LspUniverseBuilder};
+use typst_syntax::Source;
 
 use super::*;
 
 fn conv(s: &str) -> EcoString {
-    let res = Typlite::new_with_content(s.trim()).convert().unwrap();
+    static FONT_RESOLVER: LazyLock<Result<Arc<FontResolverImpl>>> = LazyLock::new(|| {
+        Ok(Arc::new(
+            LspUniverseBuilder::resolve_fonts(CompileFontArgs::default())
+                .map_err(|e| format!("{e:?}"))?,
+        ))
+    });
+
+    let font_resolver = FONT_RESOLVER.clone();
+    let cwd = std::env::current_dir().unwrap();
+    let main = Source::detached(s);
+    let mut universe = LspUniverseBuilder::build(
+        EntryState::new_rooted(cwd.as_path().into(), Some(main.id())),
+        font_resolver.unwrap(),
+        Default::default(),
+    )
+    .unwrap();
+    universe
+        .map_shadow_by_id(main.id(), Bytes::from(main.text().as_bytes().to_owned()))
+        .unwrap();
+    let world = universe.snapshot();
+
+    let res = Typlite::new(Arc::new(world)).convert().unwrap();
     static REG: OnceLock<Regex> = OnceLock::new();
     let reg = REG.get_or_init(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
     let res = reg.replace(&res, |_captures: &regex::Captures| {
@@ -56,7 +79,6 @@ Some inlined raw `a`, ```c b```
         2. A
         1. B
         "###);
-    #[cfg(not(feature = "texmath"))]
     insta::assert_snapshot!(conv(r###"
 $
 1/2 + 1/3 = 5/6

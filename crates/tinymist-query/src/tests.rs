@@ -1,4 +1,5 @@
 use core::fmt;
+use std::sync::Arc;
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
@@ -29,7 +30,7 @@ pub use typst_ts_compiler::TypstSystemWorld;
 use crate::{
     analysis::{Analysis, AnalysisResources},
     prelude::AnalysisContext,
-    typst_to_lsp, LspPosition, PositionEncoding,
+    typst_to_lsp, LspPosition, PositionEncoding, VersionedDocument,
 };
 
 struct WrapWorld<'a>(&'a mut TypstSystemWorld);
@@ -70,11 +71,7 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
                     .collect::<Vec<_>>();
                 let mut w = w.snapshot();
                 let w = WrapWorld(&mut w);
-                let a = Analysis {
-                    position_encoding: PositionEncoding::Utf16,
-                    enable_periscope: false,
-                    caches: Default::default(),
-                };
+                let a = Analysis::default();
                 let mut ctx = AnalysisContext::new(root, &w, &a);
                 ctx.test_completion_files(Vec::new);
                 ctx.test_files(|| paths);
@@ -93,6 +90,26 @@ pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
         props.insert(key, value);
     }
     props
+}
+
+pub fn compile_doc_for_test(
+    ctx: &mut AnalysisContext,
+    properties: &HashMap<&str, &str>,
+) -> Option<VersionedDocument> {
+    let must_compile = properties
+        .get("compile")
+        .map(|v| v.trim() == "true")
+        .unwrap_or(false);
+
+    if !must_compile {
+        return None;
+    }
+
+    let doc = typst::compile(ctx.world(), &mut Default::default()).unwrap();
+    Some(VersionedDocument {
+        version: 0,
+        document: Arc::new(doc),
+    })
 }
 
 pub fn run_with_sources<T>(
@@ -204,7 +221,7 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
     let re = s
         .text()
         .find("/* position */")
-        .map(|e| (e, MatchAny { prev: true }));
+        .zip(Some(MatchAny { prev: true }));
     let re = re.or_else(|| {
         s.text()
             .find("/* position after */")

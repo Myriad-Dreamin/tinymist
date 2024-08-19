@@ -20,17 +20,76 @@ use crate::tool::package::InitTask;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 struct ExportOpts {
+    creation_timestamp: Option<String>,
+    fill: Option<String>,
+    ppi: Option<f64>,
     page: PageSelection,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QueryOpts {
+    format: String,
+    output_extension: Option<String>,
+    strict: Option<bool>,
+    pretty: Option<bool>,
+    selector: String,
+    field: Option<String>,
+    one: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HiglightRangeOpts {
+    range: Option<Range>,
 }
 
 /// Here are implemented the handlers for each command.
 impl LanguageState {
     /// Export the current document as PDF file(s).
-    pub fn export_pdf(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+    pub fn export_pdf(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+        let opts = get_arg_or_default!(args[1] as ExportOpts);
+
+        let creation_timestamp = if let Some(value) = opts.creation_timestamp {
+            Some(
+                parse_source_date_epoch(&value)
+                    .map_err(|e| invalid_params(format!("Cannot parse creation timestamp: {e}")))?,
+            )
+        } else {
+            self.config.compile.determine_creation_timestamp()
+        };
+
+        self.export(req_id, ExportKind::Pdf { creation_timestamp }, args)
+    }
+
+    /// Export the current document as HTML file(s).
+    pub fn export_html(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.export(req_id, ExportKind::Html {}, args)
+    }
+
+    /// Export the current document as Markdown file(s).
+    pub fn export_markdown(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.export(req_id, ExportKind::Markdown {}, args)
+    }
+
+    /// Export the current document as Text file(s).
+    pub fn export_text(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
+        self.export(req_id, ExportKind::Text {}, args)
+    }
+
+    /// Query the current document and export the result as JSON file(s).
+    pub fn export_query(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+        let opts = get_arg_or_default!(args[1] as QueryOpts);
         self.export(
             req_id,
-            ExportKind::Pdf {
-                creation_timestamp: self.config.compile.determine_creation_timestamp(),
+            ExportKind::Query {
+                format: opts.format,
+                output_extension: opts.output_extension,
+                strict: opts.strict.unwrap_or(true),
+                selector: opts.selector,
+                field: opts.field,
+                pretty: opts.pretty.unwrap_or(true),
+                one: opts.one.unwrap_or(false),
             },
             args,
         )
@@ -45,7 +104,15 @@ impl LanguageState {
     /// Export the current document as Png file(s).
     pub fn export_png(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
-        self.export(req_id, ExportKind::Png { page: opts.page }, args)
+        self.export(
+            req_id,
+            ExportKind::Png {
+                fill: opts.fill,
+                ppi: opts.ppi,
+                page: opts.page,
+            },
+            args,
+        )
     }
 
     /// Export the current document as some format. The client is responsible
@@ -59,6 +126,42 @@ impl LanguageState {
         let path = get_arg!(args[0] as PathBuf);
 
         run_query!(req_id, self.OnExport(path, kind))
+    }
+
+    /// Export a range of the current document as Ansi highlighted text.
+    pub fn export_ansi_hl(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let path = get_arg!(args[0] as PathBuf);
+        let opts = get_arg_or_default!(args[1] as HiglightRangeOpts);
+
+        let s = self
+            .query_source(path.into(), Ok)
+            .map_err(|e| internal_error(format!("cannot find source: {e}")))?;
+
+        // todo: cannot select syntax-sensitive data well
+        // let node = LinkedNode::new(s.root());
+
+        let range = opts
+            .range
+            .map(|r| {
+                tinymist_query::lsp_to_typst::range(r, self.const_config().position_encoding, &s)
+                    .ok_or_else(|| internal_error("cannoet convert range"))
+            })
+            .transpose()?;
+
+        let mut text_in_range = s.text();
+        if let Some(range) = range {
+            text_in_range = text_in_range
+                .get(range)
+                .ok_or_else(|| internal_error("cannot get text in range"))?;
+        }
+
+        let output = typst_ansi_hl::Highlighter::default()
+            .for_discord()
+            .with_soft_limit(2000)
+            .highlight(text_in_range)
+            .map_err(|e| internal_error(format!("cannot highlight: {e}")))?;
+
+        just_ok(JsonValue::String(output))
     }
 
     /// Clear all cached resources.

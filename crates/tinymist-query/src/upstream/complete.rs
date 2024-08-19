@@ -15,7 +15,7 @@ use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
 use crate::adt::interner::Interned;
-use crate::analysis::{analyze_expr, analyze_import, analyze_labels, DynLabel, Ty};
+use crate::analysis::{analyze_labels, DynLabel, Ty};
 use crate::AnalysisContext;
 
 mod ext;
@@ -367,7 +367,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
         if prev.is::<ast::Expr>();
         if prev.parent_kind() != Some(SyntaxKind::Markup) ||
            prev.prev_sibling_kind() == Some(SyntaxKind::Hash);
-        if let Some((value, styles)) = analyze_expr(ctx.world(), &prev).into_iter().next();
+        if let Some((value, styles)) = ctx.ctx.analyze_expr(&prev).into_iter().next();
         then {
             ctx.from = ctx.cursor;
             field_access_completions(ctx, &value, &styles);
@@ -382,7 +382,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
         if prev.kind() == SyntaxKind::Dot;
         if let Some(prev_prev) = prev.prev_sibling();
         if prev_prev.is::<ast::Expr>();
-        if let Some((value, styles)) = analyze_expr(ctx.world(), &prev_prev).into_iter().next();
+        if let Some((value, styles)) = ctx.ctx.analyze_expr(&prev_prev).into_iter().next();
         then {
             ctx.from = ctx.leaf.offset();
             field_access_completions(ctx, &value, &styles);
@@ -543,7 +543,7 @@ fn import_item_completions<'a>(
     existing: ast::ImportItems<'a>,
     source: &LinkedNode,
 ) {
-    let Some(value) = analyze_import(ctx.world(), source) else {
+    let Some(value) = ctx.ctx.analyze_import(source) else {
         return;
     };
     let Some(scope) = value.scope() else { return };
@@ -1184,14 +1184,12 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             let label: EcoString = label.as_str().into();
             let completion = Completion {
                 kind: CompletionKind::Reference,
-                apply: (open || close).then(|| {
-                    eco_format!(
-                        "{}{}{}",
-                        if open { "<" } else { "" },
-                        label.as_str(),
-                        if close { ">" } else { "" }
-                    )
-                }),
+                apply: Some(eco_format!(
+                    "{}{}{}",
+                    if open { "<" } else { "" },
+                    label.as_str(),
+                    if close { ">" } else { "" }
+                )),
                 label: label.clone(),
                 label_detail: label_desc.clone(),
                 filter_text: Some(label.clone()),
@@ -1200,6 +1198,8 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             };
 
             if let Some(bib_title) = bib_title {
+                // Note that this completion re-uses the above `apply` field to
+                // alter the `bib_title` to the corresponding label.
                 self.completions.push(Completion {
                     kind: CompletionKind::Constant,
                     label: bib_title.clone(),

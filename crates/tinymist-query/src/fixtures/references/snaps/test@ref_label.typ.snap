@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/references.rs
+expression: "JsonRepr::new_pure(result)"
+input_file: crates/tinymist-query/src/fixtures/references/ref_label.typ
+---
+[
+ "/s0.typ@5:0:5:12",
+ "/s0.typ@7:21:7:33",
+ "/s0.typ@9:0:9:12"
+]

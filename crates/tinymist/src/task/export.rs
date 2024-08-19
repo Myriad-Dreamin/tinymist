@@ -1,15 +1,25 @@
 //! The actor that handles various document export, like PDF and SVG export.
 
+use std::ops::Deref;
+use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{bail, Context};
 use once_cell::sync::Lazy;
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
-use typst::{foundations::Smart, layout::Abs, layout::Frame, visualize::Color};
+use typlite::Typlite;
+use typst::foundations::IntoValue;
+use typst::{
+    foundations::Smart,
+    layout::{Abs, Frame},
+    syntax::{ast, SyntaxNode},
+    visualize::Color,
+};
 use typst_ts_compiler::{EntryReader, EntryState, TaskInputs};
 use typst_ts_core::TypstDatetime;
 
+use crate::tool::text::FullTextDigest;
 use crate::{
     actor::{
         editor::EditorRequest,
@@ -204,13 +214,95 @@ impl ExportConfig {
                     // todo: timestamp world.now()
                     typst_pdf::pdf(doc, Smart::Auto, timestamp)
                 }
+                Query {
+                    format,
+                    output_extension: _,
+                    strict,
+                    selector,
+                    field,
+                    one,
+                    pretty,
+                } => {
+                    let elements =
+                        typst_ts_compiler::query::retrieve(artifact.world.deref(), &selector, doc)
+                            .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
+                    if one && elements.len() != 1 {
+                        bail!("expected exactly one element, found {}", elements.len());
+                    }
+
+                    let mapped: Vec<_> = elements
+                        .into_iter()
+                        .filter_map(|c| match &field {
+                            Some(field) => c.get_by_name(field),
+                            _ => Some(c.into_value()),
+                        })
+                        .collect();
+
+                    if one {
+                        let Some(value) = mapped.first() else {
+                            bail!("no such field found for element");
+                        };
+                        serialize(value, &format, strict, pretty).map(String::into_bytes)?
+                    } else {
+                        serialize(&mapped, &format, strict, pretty).map(String::into_bytes)?
+                    }
+                }
+                Html {} => typst_ts_svg_exporter::render_svg_html(doc).into_bytes(),
+                Text {} => format!("{}", FullTextDigest(doc.clone())).into_bytes(),
+                Markdown {} => {
+                    let conv = Typlite::new(artifact.world)
+                        .convert()
+                        .map_err(|e| anyhow::anyhow!("failed to convert to markdown: {e}"))?;
+
+                    conv.as_bytes().to_owned()
+                }
                 Svg { page: First } => typst_svg::svg(first_frame()).into_bytes(),
-                Svg { page: Merged } => typst_svg::svg_merged(doc, Abs::zero()).into_bytes(),
-                Png { page: First } => typst_render::render(first_frame(), 3., Color::WHITE)
-                    .encode_png()
-                    .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?,
-                Png { page: Merged } => {
-                    typst_render::render_merged(doc, 3., Color::WHITE, Abs::zero(), Color::WHITE)
+                Svg {
+                    page: Merged { .. },
+                } => typst_svg::svg_merged(doc, Abs::zero()).into_bytes(),
+                Png {
+                    ppi,
+                    fill,
+                    page: First,
+                } => {
+                    let ppi = ppi.unwrap_or(144.) as f32;
+                    if ppi <= 1e-6 {
+                        bail!("invalid ppi: {ppi}");
+                    }
+
+                    let fill = if let Some(fill) = fill {
+                        parse_color(fill).map_err(|err| anyhow::anyhow!("invalid fill ({err})"))?
+                    } else {
+                        Color::WHITE
+                    };
+
+                    typst_render::render(first_frame(), ppi / 72., fill)
+                        .encode_png()
+                        .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
+                }
+                Png {
+                    ppi,
+                    fill,
+                    page: Merged { gap },
+                } => {
+                    let ppi = ppi.unwrap_or(144.) as f32;
+                    if ppi <= 1e-6 {
+                        bail!("invalid ppi: {ppi}");
+                    }
+
+                    let fill = if let Some(fill) = fill {
+                        parse_color(fill).map_err(|err| anyhow::anyhow!("invalid fill ({err})"))?
+                    } else {
+                        Color::WHITE
+                    };
+
+                    let gap = if let Some(gap) = gap {
+                        parse_length(gap).map_err(|err| anyhow::anyhow!("invalid gap ({err})"))?
+                    } else {
+                        Abs::zero()
+                    };
+
+                    typst_render::render_merged(doc, ppi / 72., fill, gap, fill)
                         .encode_png()
                         .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
                 }
@@ -224,6 +316,53 @@ impl ExportConfig {
         log::info!("RenderActor({kind:?}): export complete");
         Ok(Some(to))
     }
+}
+
+fn parse_color(fill: String) -> anyhow::Result<Color> {
+    match fill.as_str() {
+        "black" => Ok(Color::BLACK),
+        "white" => Ok(Color::WHITE),
+        "red" => Ok(Color::RED),
+        "green" => Ok(Color::GREEN),
+        "blue" => Ok(Color::BLUE),
+        hex if hex.starts_with('#') => {
+            Color::from_str(&hex[1..]).map_err(|e| anyhow::anyhow!("failed to parse color: {e}"))
+        }
+        _ => bail!("invalid color: {fill}"),
+    }
+}
+
+fn parse_length(gap: String) -> anyhow::Result<Abs> {
+    let length = typst::syntax::parse_code(&gap);
+    if length.erroneous() {
+        bail!("invalid length: {gap}, errors: {:?}", length.errors());
+    }
+
+    let length: Option<ast::Numeric> = descendants(&length).into_iter().find_map(SyntaxNode::cast);
+
+    let Some(length) = length else {
+        bail!("not a length: {gap}");
+    };
+
+    let (value, unit) = length.get();
+    match unit {
+        ast::Unit::Pt => Ok(Abs::pt(value)),
+        ast::Unit::Mm => Ok(Abs::mm(value)),
+        ast::Unit::Cm => Ok(Abs::cm(value)),
+        ast::Unit::In => Ok(Abs::inches(value)),
+        _ => bail!("invalid unit: {unit:?} in {gap}"),
+    }
+}
+
+/// Low performance but simple recursive iterator.
+fn descendants(node: &SyntaxNode) -> impl IntoIterator<Item = &SyntaxNode> + '_ {
+    let mut res = vec![];
+    for child in node.children() {
+        res.push(child);
+        res.extend(descendants(child));
+    }
+
+    res
 }
 
 fn log_err<T>(artifact: anyhow::Result<T>) -> Option<T> {
@@ -249,6 +388,39 @@ fn convert_datetime(date_time: chrono::DateTime<chrono::Utc>) -> Option<TypstDat
     )
 }
 
+/// Serialize data to the output format.
+fn serialize(
+    data: &impl serde::Serialize,
+    format: &str,
+    strict: bool,
+    pretty: bool,
+) -> anyhow::Result<String> {
+    Ok(match format {
+        "json" if pretty => serde_json::to_string_pretty(data)?,
+        "json" => serde_json::to_string(data)?,
+        "yaml" => serde_yaml::to_string(&data)?,
+        format if format == "txt" || !strict => {
+            use serde_json::Value::*;
+            let value = serde_json::to_value(data)?;
+            match value {
+                String(s) => s,
+                _ => {
+                    let kind = match value {
+                        Null => "null",
+                        Bool(_) => "boolean",
+                        Number(_) => "number",
+                        String(_) => "string",
+                        Array(_) => "array",
+                        Object(_) => "object",
+                    };
+                    bail!("expected a string value for format: {format}, got {kind}")
+                }
+            }
+        }
+        _ => bail!("unsupported format for query: {format}"),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,5 +430,37 @@ mod tests {
         let conf = ExportConfig::default();
         assert!(!conf.count_words);
         assert_eq!(conf.config.mode, ExportMode::Never);
+    }
+
+    #[test]
+    fn test_parse_length() {
+        assert_eq!(parse_length("1pt".to_owned()).unwrap(), Abs::pt(1.));
+        assert_eq!(parse_length("1mm".to_owned()).unwrap(), Abs::mm(1.));
+        assert_eq!(parse_length("1cm".to_owned()).unwrap(), Abs::cm(1.));
+        assert_eq!(parse_length("1in".to_owned()).unwrap(), Abs::inches(1.));
+        assert!(parse_length("1".to_owned()).is_err());
+        assert!(parse_length("1px".to_owned()).is_err());
+    }
+
+    #[test]
+    fn test_parse_color() {
+        assert_eq!(parse_color("black".to_owned()).unwrap(), Color::BLACK);
+        assert_eq!(parse_color("white".to_owned()).unwrap(), Color::WHITE);
+        assert_eq!(parse_color("red".to_owned()).unwrap(), Color::RED);
+        assert_eq!(parse_color("green".to_owned()).unwrap(), Color::GREEN);
+        assert_eq!(parse_color("blue".to_owned()).unwrap(), Color::BLUE);
+        assert_eq!(
+            parse_color("#000000".to_owned()).unwrap().to_hex(),
+            "#000000"
+        );
+        assert_eq!(
+            parse_color("#ffffff".to_owned()).unwrap().to_hex(),
+            "#ffffff"
+        );
+        assert_eq!(
+            parse_color("#000000cc".to_owned()).unwrap().to_hex(),
+            "#000000cc"
+        );
+        assert!(parse_color("invalid".to_owned()).is_err());
     }
 }

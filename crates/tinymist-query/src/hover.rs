@@ -5,7 +5,7 @@ use crate::{
     jump_from_cursor,
     prelude::*,
     syntax::{find_docs_before, get_deref_target, LexicalKind, LexicalVarKind},
-    upstream::{expr_tooltip, plain_docs_sentence, route_of_value, tooltip, Tooltip},
+    upstream::{expr_tooltip, plain_docs_sentence, route_of_value, truncated_repr, Tooltip},
     LspHoverContents, StatefulRequest,
 };
 
@@ -40,12 +40,9 @@ impl StatefulRequest for HoverRequest {
         let cursor = offset + 1;
 
         let contents = def_tooltip(ctx, &source, doc.as_ref(), cursor).or_else(|| {
-            Some(typst_to_lsp::tooltip(&tooltip(
-                ctx.world(),
-                doc_ref,
-                &source,
-                cursor,
-            )?))
+            Some(typst_to_lsp::tooltip(
+                &ctx.tooltip(doc_ref, &source, cursor)?,
+            ))
         })?;
 
         let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
@@ -141,11 +138,18 @@ fn def_tooltip(
 
     match lnk.kind {
         LexicalKind::Mod(_)
-        | LexicalKind::Var(LexicalVarKind::Label)
         | LexicalKind::Var(LexicalVarKind::LabelRef)
         | LexicalKind::Var(LexicalVarKind::ValRef)
         | LexicalKind::Block
         | LexicalKind::Heading(..) => None,
+        LexicalKind::Var(LexicalVarKind::Label) => {
+            results.push(MarkedString::String(format!("Label: {}\n", lnk.name)));
+            if let Some(c) = lnk.value.as_ref() {
+                let c = truncated_repr(c);
+                results.push(MarkedString::String(format!("{c}")));
+            }
+            Some(LspHoverContents::Array(results))
+        }
         LexicalKind::Var(LexicalVarKind::BibKey) => {
             results.push(MarkedString::String(format!("Bibliography: @{}", lnk.name)));
 

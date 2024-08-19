@@ -7,9 +7,8 @@ use typst::{
     World,
 };
 
-use crate::syntax::resolve_id_by_path;
+use crate::{analysis::analyze_import_, syntax::resolve_id_by_path};
 
-use super::analyze_import;
 pub use super::prelude::*;
 
 /// The import information of a source file.
@@ -95,7 +94,7 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
                             let exp = find_import_expr(self.root.leaf_at(exp.range.end));
                             let val = exp
                                 .as_ref()
-                                .and_then(|exp| analyze_import(self.ctx.deref(), exp));
+                                .and_then(|exp| analyze_import_(self.ctx.deref(), exp));
 
                             match val {
                                 Some(Value::Module(m)) => {
