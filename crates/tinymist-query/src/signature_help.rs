@@ -1,4 +1,5 @@
 use once_cell::sync::OnceCell;
+use typst::syntax::Side;
 
 use crate::{
     adt::interner::Interned,
@@ -27,7 +28,7 @@ impl SemanticRequest for SignatureHelpRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let cursor = ctx.to_typst_pos(self.position, &source)? + 1;
 
-        let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
+        let ast_node = LinkedNode::new(source.root()).leaf_at(cursor, Side::Before)?;
         let CheckTarget::Param {
             callee,
             target,

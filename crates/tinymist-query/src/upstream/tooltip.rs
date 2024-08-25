@@ -6,7 +6,7 @@ use typst::eval::{CapturesVisitor, Tracer};
 use typst::foundations::{repr, Capturer, CastInfo, Value};
 use typst::layout::Length;
 use typst::model::Document;
-use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
+use typst::syntax::{ast, LinkedNode, Side, Source, SyntaxKind};
 use typst::util::{round_2, Numeric};
 use typst::World;
 
@@ -24,7 +24,7 @@ pub fn tooltip_(
     source: &Source,
     cursor: usize,
 ) -> Option<Tooltip> {
-    let leaf = LinkedNode::new(source.root()).leaf_at(cursor)?;
+    let leaf = LinkedNode::new(source.root()).leaf_at(cursor, Side::Before)?;
     if leaf.kind().is_trivia() {
         return None;
     }

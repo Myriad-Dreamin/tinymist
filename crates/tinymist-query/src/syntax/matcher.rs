@@ -589,7 +589,7 @@ fn find_param_index(deciding: &LinkedNode, params: &[ParamInfo], args: ast::Args
 mod tests {
     use super::*;
     use insta::assert_snapshot;
-    use typst::syntax::{is_newline, Source};
+    use typst::syntax::{is_newline, Side, Source};
 
     fn map_base(source: &str, mapper: impl Fn(&LinkedNode, usize) -> char) -> String {
         let source = Source::detached(source.to_owned());
@@ -617,7 +617,7 @@ mod tests {
 
     fn map_deref(source: &str) -> String {
         map_base(source, |root, cursor| {
-            let node = root.leaf_at(cursor);
+            let node = root.leaf_at(cursor, Side::Before);
             let kind = node.and_then(|node| get_deref_target(node, cursor));
             match kind {
                 Some(DerefTarget::VarAccess(..)) => 'v',
@@ -634,7 +634,7 @@ mod tests {
 
     fn map_check(source: &str) -> String {
         map_base(source, |root, cursor| {
-            let node = root.leaf_at(cursor);
+            let node = root.leaf_at(cursor, Side::Before);
             let kind = node.and_then(|node| get_check_target(node));
             match kind {
                 Some(CheckTarget::Param { .. }) => 'p',

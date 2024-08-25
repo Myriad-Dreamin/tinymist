@@ -16,7 +16,7 @@ use reflexo_typst::{
 };
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use typst::syntax::ast::{self, AstNode};
-use typst::syntax::{FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath};
+use typst::syntax::{FileId as TypstFileId, LinkedNode, Side, Source, SyntaxKind, VirtualPath};
 use typst::{diag::PackageError, foundations::Bytes};
 
 pub use insta::assert_snapshot;
@@ -238,7 +238,7 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
         .unwrap();
 
     let n = LinkedNode::new(s.root());
-    let mut n = n.leaf_at(re + 1).unwrap();
+    let mut n = n.leaf_at(re + 1, Side::Before).unwrap();
 
     let match_prev = match &m {
         MatchAny { prev } => *prev,

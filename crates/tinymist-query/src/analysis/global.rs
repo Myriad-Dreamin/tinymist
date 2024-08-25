@@ -14,7 +14,7 @@ use reflexo::hash::{hash128, FxDashMap};
 use reflexo::{debug_loc::DataSource, ImmutPath};
 use typst::eval::Eval;
 use typst::foundations::{self, Func, Styles};
-use typst::syntax::{FileId, LinkedNode, SyntaxNode};
+use typst::syntax::{FileId, LinkedNode, Side, SyntaxNode};
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
     foundations::Bytes,
@@ -367,7 +367,7 @@ impl<'w> AnalysisContext<'w> {
         let offset = self.to_typst_pos(position, source)?;
         let cursor = ceil_char_boundary(source.text(), offset + shift);
 
-        let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
+        let node = LinkedNode::new(source.root()).leaf_at(cursor, Side::Before)?;
         Some((cursor, get_deref_target(node, cursor)))
     }
 
@@ -601,15 +601,15 @@ impl<'w> AnalysisContext<'w> {
         use typst::foundations::*;
         use typst::introspection::*;
 
-        let mut locator = Locator::default();
         let introspector = Introspector::default();
-        let mut tracer = Tracer::new();
+        let traced = Traced::default();
+        let mut sink = Sink::new();
         let engine = Engine {
             world: self.world().track(),
-            route: Route::default(),
             introspector: introspector.track(),
-            locator: &mut locator,
-            tracer: tracer.track_mut(),
+            traced: traced.track(),
+            sink: sink.track_mut(),
+            route: Route::default(),
         };
 
         let context = Context::none();

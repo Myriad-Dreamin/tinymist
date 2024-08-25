@@ -89,21 +89,21 @@ env_logger = "0.11.3"
 log = "0.4"
 
 # Typst
-reflexo = { version = "0.5.0-rc7", default-features = false, features = [
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts", branch = "main", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-world = { version = "0.5.0-rc7", features = ["system"] }
-reflexo-typst = { version = "0.5.0-rc7", features = [
+reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts", branch = "main", features = ["system"] }
+reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts", branch = "main", features = [
     "system",
 ], default-features = false }
-reflexo-vec2svg = { version = "0.5.0-rc7" }
-typst = "0.11.1"
-typst-timing = "0.11.1"
-typst-pdf = "0.11.1"
-typst-svg = "0.11.1"
-typst-render = "0.11.1"
-typst-assets = "0.11.1"
-typst-syntax = "0.11.1"
+reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts", branch = "main" }
+typst = { git = "https://github.com/typst/typst", branch = "main" }
+typst-timing = { git = "https://github.com/typst/typst", branch = "main" }
+typst-pdf = { git = "https://github.com/typst/typst", branch = "main" }
+typst-svg = { git = "https://github.com/typst/typst", branch = "main" }
+typst-render = { git = "https://github.com/typst/typst", branch = "main" }
+typst-assets = { git = "https://github.com/typst/typst-assets", branch = "main" }
+typst-syntax = { git = "https://github.com/typst/typst", branch = "main" }
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
 typstyle = { version = "0.11.32", default-features = false }
 typlite = { path = "./crates/typlite" }

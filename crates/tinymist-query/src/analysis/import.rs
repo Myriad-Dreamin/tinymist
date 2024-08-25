@@ -3,7 +3,7 @@
 use ecow::EcoVec;
 use typst::{
     foundations::Value,
-    syntax::{LinkedNode, SyntaxKind},
+    syntax::{LinkedNode, Side, SyntaxKind},
     World,
 };
 
@@ -91,7 +91,8 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
                 LexicalKind::Mod(LexicalModKind::Module(p)) => {
                     let id = match p {
                         ModSrc::Expr(exp) => {
-                            let exp = find_import_expr(self.root.leaf_at(exp.range.end));
+                            let exp =
+                                find_import_expr(self.root.leaf_at(exp.range.end, Side::Before));
                             let val = exp
                                 .as_ref()
                                 .and_then(|exp| analyze_import_(self.ctx.deref(), exp));

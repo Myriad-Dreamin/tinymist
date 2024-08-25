@@ -1,5 +1,7 @@
 use core::fmt;
 
+use typst::syntax::Side;
+
 use crate::{
     analysis::{analyze_dyn_signature, find_definition, DefinitionLink, Signature},
     jump_from_cursor,
@@ -45,7 +47,7 @@ impl StatefulRequest for HoverRequest {
             ))
         })?;
 
-        let ast_node = LinkedNode::new(source.root()).leaf_at(cursor)?;
+        let ast_node = LinkedNode::new(source.root()).leaf_at(cursor, Side::Before)?;
         let range = ctx.to_lsp_range(ast_node.range(), &source);
 
         // Neovim shows ugly hover if the hover content is in array, so we join them
@@ -127,7 +129,7 @@ fn def_tooltip(
     document: Option<&VersionedDocument>,
     cursor: usize,
 ) -> Option<LspHoverContents> {
-    let leaf = LinkedNode::new(source.root()).leaf_at(cursor)?;
+    let leaf = LinkedNode::new(source.root()).leaf_at(cursor, Side::Before)?;
 
     let deref_target = get_deref_target(leaf.clone(), cursor)?;
 
