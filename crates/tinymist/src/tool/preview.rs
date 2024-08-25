@@ -3,7 +3,7 @@
 use std::num::NonZeroUsize;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
-use actor::typ_server::SucceededArtifact;
+use actor::typ_server::{CompileServerOpts, SucceededArtifact};
 use hyper::service::{make_service_fn, service_fn};
 use lsp_types::notification::Notification;
 use serde::Serialize;
@@ -439,8 +439,16 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         // Consume editor_rx
         tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
 
-        let service =
-            CompileServerActor::new(verse, intr_tx, intr_rx).with_watch(Some(handle.clone()));
+        let service = CompileServerActor::new_with(
+            verse,
+            intr_tx,
+            intr_rx,
+            CompileServerOpts {
+                compile_handle: handle.clone(),
+                ..Default::default()
+            },
+        )
+        .with_watch(true);
 
         (service, handle)
     };

@@ -9,7 +9,6 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use once_cell::sync::OnceCell;
 use tokio::sync::{mpsc, oneshot};
 
 use typst::{diag::SourceResult, util::Deferred};
@@ -21,12 +20,12 @@ use typst_ts_compiler::{
     CompileEnv, CompileReport, Compiler, ConsoleDiagReporter, EntryReader, Revising, TaskInputs,
     WorldDeps,
 };
-use typst_ts_core::{exporter_builtins::GroupExporter, Exporter, GenericExporter, TypstDocument};
+use typst_ts_core::{GenericExporter, TypstDocument};
 
 use crate::task::CacheTask;
 
 type CompileRawResult = Deferred<(SourceResult<Arc<TypstDocument>>, CompileEnv)>;
-type DocState = once_cell::sync::OnceCell<CompileRawResult>;
+type DocState = std::sync::OnceLock<CompileRawResult>;
 
 /// A signal that possibly triggers an export.
 ///
@@ -86,7 +85,7 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
         };
 
         self.world = Arc::new(self.world.task(inputs));
-        self.doc_state = Arc::new(OnceCell::new());
+        self.doc_state = Arc::new(OnceLock::new());
 
         self
     }
@@ -266,7 +265,7 @@ struct TaggedMemoryEvent {
 }
 
 pub struct CompileServerOpts<F: CompilerFeat> {
-    pub exporter: GroupExporter<CompileSnapshot<F>>,
+    pub compile_handle: Arc<dyn CompilationHandle<F>>,
     pub feature_set: FeatureSet,
     pub cache: CacheTask,
 }
@@ -274,9 +273,9 @@ pub struct CompileServerOpts<F: CompilerFeat> {
 impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
     fn default() -> Self {
         Self {
-            exporter: GroupExporter::new(vec![]),
-            feature_set: FeatureSet::default(),
-            cache: CacheTask::new(Default::default()),
+            compile_handle: Arc::new(std::marker::PhantomData),
+            feature_set: Default::default(),
+            cache: Default::default(),
         }
     }
 }
@@ -285,10 +284,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> Default for CompileServerOpts<F> {
 pub struct CompileServerActor<F: CompilerFeat> {
     /// The underlying universe.
     pub verse: CompilerUniverse<F>,
-    /// The exporter for the compiled document.
-    pub exporter: GroupExporter<CompileSnapshot<F>>,
     /// The compilation handle.
-    pub watch_handle: Arc<dyn CompilationHandle<F>>,
+    pub compile_handle: Arc<dyn CompilationHandle<F>>,
     /// Whether to enable file system watching.
     pub enable_watch: bool,
 
@@ -329,7 +326,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         intr_tx: mpsc::UnboundedSender<Interrupt<F>>,
         intr_rx: mpsc::UnboundedReceiver<Interrupt<F>>,
         CompileServerOpts {
-            exporter,
+            compile_handle,
             feature_set,
             cache: cache_evict,
         }: CompileServerOpts<F>,
@@ -337,11 +334,10 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         let entry = verse.entry_state();
 
         Self {
-            exporter,
             verse,
 
             logical_tick: 1,
-            watch_handle: Arc::new(std::marker::PhantomData),
+            compile_handle,
             enable_watch: false,
             dirty_shadow_logical_tick: 0,
 
@@ -374,12 +370,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         Self::new_with(verse, intr_tx, intr_rx, CompileServerOpts::default())
     }
 
-    pub fn with_watch(mut self, watch: Option<Arc<dyn CompilationHandle<F>>>) -> Self {
-        self.enable_watch = watch.is_some();
-        match watch {
-            Some(watch) => self.watch_handle = watch,
-            None => self.watch_handle = Arc::new(std::marker::PhantomData),
-        }
+    pub fn with_watch(mut self, watch: bool) -> Self {
+        self.enable_watch = watch;
         self
     }
 
@@ -400,7 +392,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         log::debug!("CompileServerActor: initialized");
 
         // Trigger the first compilation (if active)
-        self.watch_compile(reason_by_entry_change(), &mut curr_reads);
+        self.run_compile(reason_by_entry_change(), &mut curr_reads, false);
 
         // Spawn file system watcher.
         let fs_tx = self.intr_tx.clone();
@@ -442,7 +434,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             // Either we have a reason to compile or we have events that want to have any
             // compilation.
             if comp_reason.any() || !curr_reads.is_empty() {
-                self.watch_compile(comp_reason, &mut curr_reads);
+                self.run_compile(comp_reason, &mut curr_reads, false);
             }
         }
 
@@ -469,34 +461,29 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                 by_mem_events: reason.by_memory_events,
                 by_fs_events: reason.by_fs_events,
             },
-            doc_state: Arc::new(OnceCell::new()),
+            doc_state: Arc::new(OnceLock::new()),
             success_doc: self.latest_success_doc.clone(),
         }
     }
 
     /// Compile the document once.
     pub async fn compile_once(&mut self) -> CompiledArtifact<F> {
-        let e = Arc::new(self.snapshot(true, reason_by_fs()));
-        let err = self.exporter.export(e.world.deref(), e.clone());
-        if let Err(err) = err {
-            // todo: ExportError
-            log::error!("CompileServerActor: export error: {err:?}");
-        }
-
-        e.compile()
+        self.run_compile(reason_by_entry_change(), &mut vec![], true)
+            .unwrap()
     }
 
-    /// Watch and compile the document once.
-    fn watch_compile(
+    /// Compile the document once.
+    fn run_compile(
         &mut self,
         reason: CompileReasons,
         curr_reads: &mut Vec<oneshot::Sender<SucceededArtifact<F>>>,
-    ) {
+        is_once: bool,
+    ) -> Option<CompiledArtifact<F>> {
         self.suspended_reason.see(reason);
         let reason = std::mem::take(&mut self.suspended_reason);
         let start = reflexo::time::now();
 
-        let compiling = self.snapshot(false, reason);
+        let compiling = self.snapshot(is_once, reason);
         self.watch_snap = OnceLock::new();
         self.watch_snap.get_or_init(|| compiling.clone());
 
@@ -506,17 +493,17 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             for reader in curr_reads.drain(..) {
                 let _ = reader.send(SucceededArtifact::Suspend(compiling.clone()));
             }
-            return;
+            return None;
         }
 
         if self.compiling {
             self.suspended_reason.see(reason);
-            return;
+            return None;
         }
 
         self.compiling = true;
 
-        let h = self.watch_handle.clone();
+        let h = self.compile_handle.clone();
         let curr_reads = std::mem::take(curr_reads);
 
         // todo unwrap main id
@@ -559,10 +546,16 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             compiled
         };
 
-        let intr_tx = self.intr_tx.clone();
-        tokio::task::spawn_blocking(move || {
-            log_send_error("compiled", intr_tx.send(Interrupt::Compiled(compile())));
-        });
+        if is_once {
+            Some(compile())
+        } else {
+            let intr_tx = self.intr_tx.clone();
+            tokio::task::spawn_blocking(move || {
+                log_send_error("compiled", intr_tx.send(Interrupt::Compiled(compile())));
+            });
+
+            None
+        }
     }
 
     fn process_compile(&mut self, artifact: CompiledArtifact<F>, send: impl Fn(CompilerResponse)) {
@@ -647,7 +640,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
                     self.suspended = entry.is_inactive();
                     if self.suspended {
                         log::info!("CompileServerActor: removing diag");
-                        self.watch_handle
+                        self.compile_handle
                             .status(self.verse.revision.get_mut().get(), CompileReport::Suspend);
                     }
 

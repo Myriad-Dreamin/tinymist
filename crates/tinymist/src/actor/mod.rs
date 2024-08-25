@@ -120,7 +120,7 @@ impl LanguageState {
 
         let font_resolver = self.compile_config().determine_fonts();
         let entry_ = entry.clone();
-        let handle_ = handle.clone();
+        let compile_handle = handle.clone();
         let cache = self.cache.clone();
 
         self.client.handle.spawn_blocking(move || {
@@ -135,11 +135,12 @@ impl LanguageState {
                 intr_tx,
                 intr_rx,
                 CompileServerOpts {
+                    compile_handle,
                     cache,
                     ..Default::default()
                 },
             )
-            .with_watch(Some(handle_));
+            .with_watch(true);
             tokio::spawn(server.run());
         });
 
