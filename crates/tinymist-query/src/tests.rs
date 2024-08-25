@@ -8,24 +8,20 @@ use std::{
 };
 
 use once_cell::sync::Lazy;
-pub use serde::Serialize;
-use serde_json::{ser::PrettyFormatter, Serializer, Value};
-use typst::syntax::{
-    ast::{self, AstNode},
-    FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath,
-};
-use typst::{diag::PackageError, foundations::Bytes};
-use typst_ts_compiler::{
+use reflexo_typst::config::CompileOpts;
+use reflexo_typst::package::{PackageRegistry, PackageSpec};
+use reflexo_typst::world::{EntryOpts, EntryState};
+use reflexo_typst::{
     CompileDriver, EntryManager, EntryReader, ShadowApi, TypstSystemUniverse, WorldDeps,
 };
-use typst_ts_core::{
-    config::compiler::{EntryOpts, EntryState},
-    package::Registry,
-};
-use typst_ts_core::{config::CompileOpts, package::PackageSpec};
+use serde_json::{ser::PrettyFormatter, Serializer, Value};
+use typst::syntax::ast::{self, AstNode};
+use typst::syntax::{FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath};
+use typst::{diag::PackageError, foundations::Bytes};
 
 pub use insta::assert_snapshot;
-pub use typst_ts_compiler::TypstSystemWorld;
+pub use reflexo_typst::TypstSystemWorld;
+pub use serde::Serialize;
 
 use crate::{
     analysis::{Analysis, AnalysisResources},

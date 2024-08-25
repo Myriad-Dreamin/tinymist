@@ -12,13 +12,11 @@ use comemo::Prehashed;
 use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;
+use reflexo_typst::{typst::prelude::EcoVec, CompileEnv, Compiler, TaskInputs, TypstDict};
 use serde_json::Value as JsonValue;
 use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClientRoot};
 use tinymist::{CompileConfig, Config, LanguageState, LspWorld, RegularInit, SuperInit};
-use typst::World;
-use typst::{eval::Tracer, foundations::IntoValue, syntax::Span};
-use typst_ts_compiler::{CompileEnv, Compiler, TaskInputs};
-use typst_ts_core::{typst::prelude::EcoVec, TypstDict};
+use typst::{eval::Tracer, foundations::IntoValue, syntax::Span, World};
 
 use crate::args::*;
 

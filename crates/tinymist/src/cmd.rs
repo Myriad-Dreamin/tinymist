@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use lsp_server::RequestId;
 use lsp_types::*;
+use reflexo_typst::error::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use task::TraceParams;
@@ -12,7 +13,6 @@ use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::{ExportKind, PageSelection};
 use typst::diag::StrResult;
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
-use typst_ts_core::error::prelude::*;
 
 use super::server::*;
 use super::*;

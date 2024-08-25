@@ -1,8 +1,10 @@
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
+// use reflexo_typst::font::GlyphId;
+use reflexo_typst::{
+    vector::font::GlyphId, world::EntryState, ShadowApi, TaskInputs, TypstDocument, TypstFont,
+};
 use sync_lsp::LspResult;
-use typst_ts_compiler::{ShadowApi, TaskInputs};
-use typst_ts_core::{config::compiler::EntryState, font::GlyphId, TypstDocument, TypstFont};
 
 use crate::{actor::typ_client::QuerySnap, z_internal_error};
 
@@ -221,9 +223,9 @@ impl LanguageState {
         let mut collected_fonts = None;
 
         if let Some(glyph_mapping) = font.clone() {
-            let glyph_provider = typst_ts_core::font::GlyphProvider::default();
+            let glyph_provider = reflexo_vec2svg::GlyphProvider::default();
             let glyph_pass =
-                typst_ts_core::vector::pass::ConvertInnerImpl::new(glyph_provider, false);
+                reflexo_typst::vector::pass::ConvertInnerImpl::new(glyph_provider, false);
 
             let mut glyph_renderer = Svg::default();
             let mut glyphs = vec![];

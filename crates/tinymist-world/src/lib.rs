@@ -1,29 +1,25 @@
 //! World implementation of typst for tinymist.
 
-use anyhow::Context;
-pub use typst_ts_compiler::world as base;
-pub use typst_ts_compiler::{entry::*, EntryOpts, EntryState};
-pub use typst_ts_compiler::{font, vfs};
-pub use typst_ts_core::config::CompileFontOpts;
-pub use typst_ts_core::error::prelude;
-pub use typst_ts_core::font::FontResolverImpl;
-use typst_ts_core::foundations::{Str, Value};
+pub use reflexo_typst::config::CompileFontOpts;
+pub use reflexo_typst::error::prelude;
+pub use reflexo_typst::font::FontResolverImpl;
+pub use reflexo_typst::world as base;
+pub use reflexo_typst::{entry::*, font, vfs, EntryOpts, EntryState};
 
 use std::path::Path;
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
 
+use anyhow::Context;
 use chrono::{DateTime, Utc};
 use clap::{builder::ValueParser, ArgAction, Parser};
 use comemo::Prehashed;
+use reflexo_typst::error::prelude::*;
+use reflexo_typst::font::system::SystemFontSearcher;
+use reflexo_typst::foundations::{Str, Value};
+use reflexo_typst::package::http::HttpRegistry;
+use reflexo_typst::vfs::{system::SystemAccessModel, Vfs};
+use reflexo_typst::{SystemCompilerFeat, TypstDict, TypstSystemUniverse, TypstSystemWorld};
 use serde::{Deserialize, Serialize};
-use typst_ts_core::{config::CompileFontOpts as FontOptsInner, error::prelude::*, TypstDict};
-
-use typst_ts_compiler::{
-    font::system::SystemFontSearcher,
-    package::http::HttpRegistry,
-    vfs::{system::SystemAccessModel, Vfs},
-    SystemCompilerFeat, TypstSystemUniverse, TypstSystemWorld,
-};
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
@@ -171,7 +167,7 @@ impl LspUniverseBuilder {
     /// Resolve fonts from given options.
     pub fn resolve_fonts(args: CompileFontArgs) -> ZResult<FontResolverImpl> {
         let mut searcher = SystemFontSearcher::new();
-        searcher.resolve_opts(FontOptsInner {
+        searcher.resolve_opts(CompileFontOpts {
             font_profile_cache_path: Default::default(),
             font_paths: args.font_paths,
             no_system_fonts: args.ignore_system_fonts,

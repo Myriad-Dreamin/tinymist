@@ -1,10 +1,10 @@
 use futures::{SinkExt, StreamExt};
 use log::{debug, info, trace, warn};
+use reflexo_typst::debug_loc::DocumentPosition;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::{net::TcpStream, sync::broadcast};
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
-use typst_ts_core::debug_loc::DocumentPosition;
 
 use crate::debug_loc::{InternQuery, SpanInterner};
 use crate::outline::Outline;

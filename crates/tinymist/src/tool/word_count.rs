@@ -4,9 +4,9 @@ use std::io::{self, Write};
 use std::ops::Range;
 use std::sync::Arc;
 
+use reflexo_typst::{debug_loc::SourceSpanOffset, exporter_utils::map_err};
 use serde::{Deserialize, Serialize};
 use typst::{model::Document, syntax::Span, text::TextItem};
-use typst_ts_core::{debug_loc::SourceSpanOffset, exporter_utils::map_err};
 use unicode_script::{Script, UnicodeScript};
 
 /// Words count for a document.

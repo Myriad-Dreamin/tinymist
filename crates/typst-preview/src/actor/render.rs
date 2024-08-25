@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use log::{debug, info, trace};
+use reflexo_typst::debug_loc::{ElementPoint, SourceSpanOffset};
+use reflexo_typst::TypstDocument;
+use reflexo_vec2svg::IncrSvgDocServer;
 use tokio::sync::{broadcast, mpsc};
 use typst::model::Document;
-use typst_ts_core::debug_loc::{ElementPoint, SourceSpanOffset};
-use typst_ts_core::TypstDocument;
-use typst_ts_svg_exporter::IncrSvgDocServer;
 
 use crate::{debug_loc::SpanInterner, outline::Outline};
 
