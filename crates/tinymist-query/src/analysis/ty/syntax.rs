@@ -45,6 +45,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::TermMarker => Ty::Builtin(BuiltinTy::Content),
             SyntaxKind::MathAlignPoint => Ty::Builtin(BuiltinTy::Content),
             SyntaxKind::MathPrimes => Ty::Builtin(BuiltinTy::Content),
+            SyntaxKind::MathShorthand => Ty::Builtin(BuiltinTy::Content),
 
             SyntaxKind::Strong => return self.check_children(root),
             SyntaxKind::Emph => return self.check_children(root),
@@ -62,7 +63,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::LoopContinue => Ty::Builtin(BuiltinTy::None),
             SyntaxKind::FuncReturn => Ty::Builtin(BuiltinTy::None),
             SyntaxKind::Error => Ty::Builtin(BuiltinTy::None),
-            SyntaxKind::Eof => Ty::Builtin(BuiltinTy::None),
+            SyntaxKind::End => Ty::Builtin(BuiltinTy::None),
 
             SyntaxKind::None => Ty::Builtin(BuiltinTy::None),
             SyntaxKind::Auto => Ty::Builtin(BuiltinTy::Auto),
@@ -110,6 +111,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             SyntaxKind::Spread => Ty::Builtin(BuiltinTy::Clause),
             SyntaxKind::Params => Ty::Builtin(BuiltinTy::Clause),
             SyntaxKind::ImportItems => Ty::Builtin(BuiltinTy::Clause),
+            SyntaxKind::ImportItemPath => Ty::Builtin(BuiltinTy::Clause),
             SyntaxKind::RenamedImportItem => Ty::Builtin(BuiltinTy::Clause),
             SyntaxKind::Hash => Ty::Builtin(BuiltinTy::Clause),
             SyntaxKind::LeftBrace => Ty::Builtin(BuiltinTy::Clause),

@@ -86,7 +86,7 @@ pub(crate) fn interpret_mode_at(k: SyntaxKind) -> Option<InterpretMode> {
         | RightBrace | LeftBracket | RightBracket | LeftParen | RightParen | Comma | Semicolon
         | Colon | Star | Underscore | Dollar | Plus | Minus | Slash | Hat | Prime | Dot | Eq
         | EqEq | ExclEq | Lt | LtEq | Gt | GtEq | PlusEq | HyphEq | StarEq | SlashEq | Dots
-        | Arrow | Root | Not | And | Or | None | Auto | As | Named | Keyed | Error | Eof => {
+        | Arrow | Root | Not | And | Or | None | Auto | As | Named | Keyed | Error | End => {
             return Option::None
         }
         Text | Strong | Emph | Link | Label | Ref | RefMarker | Heading | HeadingMarker
@@ -94,12 +94,12 @@ pub(crate) fn interpret_mode_at(k: SyntaxKind) -> Option<InterpretMode> {
             InterpretMode::Markup
         }
         MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes | MathFrac
-        | MathRoot => InterpretMode::Math,
+        | MathRoot | MathShorthand => InterpretMode::Math,
         Let | Set | Show | Context | If | Else | For | In | While | Break | Continue | Return
         | Import | Include | Args | Spread | Closure | Params | LetBinding | SetRule | ShowRule
         | Contextual | Conditional | WhileLoop | ForLoop | LoopBreak | ModuleImport
-        | ImportItems | RenamedImportItem | ModuleInclude | LoopContinue | FuncReturn
-        | FuncCall | Unary | Binary | Parenthesized | Dict | Array | Destructuring
+        | ImportItems | ImportItemPath | RenamedImportItem | ModuleInclude | LoopContinue
+        | FuncReturn | FuncCall | Unary | Binary | Parenthesized | Dict | Array | Destructuring
         | DestructAssignment => InterpretMode::Code,
     })
 }

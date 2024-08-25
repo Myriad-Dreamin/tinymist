@@ -396,12 +396,12 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
 
 /// Add completions for all fields on a value.
 fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: &Option<Styles>) {
-    for (name, value) in value.ty().scope().iter() {
+    for (name, value, _) in value.ty().scope().iter() {
         ctx.value_completion(Some(name.clone()), value, true, None);
     }
 
     if let Some(scope) = value.scope() {
-        for (name, value) in scope.iter() {
+        for (name, value, _) in scope.iter() {
             ctx.value_completion(Some(name.clone()), value, true, None);
         }
     }
@@ -449,9 +449,9 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                 for param in elem.params().iter().filter(|param| !param.required) {
                     if let Some(value) = elem
                         .field_id(param.name)
-                        .and_then(|id| elem.field_from_styles(id, StyleChain::new(styles)))
+                        .and_then(|id| Some(elem.field_from_styles(id, StyleChain::new(styles))))
                     {
-                        ctx.value_completion(Some(param.name.into()), &value, false, None);
+                        ctx.value_completion(Some(param.name.into()), &value.unwrap(), false, None);
                     }
                 }
             }
@@ -553,7 +553,7 @@ fn import_item_completions<'a>(
         ctx.snippet_completion("*", "*", "Import everything.");
     }
 
-    for (name, value) in scope.iter() {
+    for (name, value, _) in scope.iter() {
         if existing
             .iter()
             .all(|item| item.original_name().as_str() != name)
@@ -1179,7 +1179,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         docs: Option<&str>,
     ) {
         // Prevent duplicate completions from appearing.
-        if !self.seen_casts.insert(typst::util::hash128(value)) {
+        if !self.seen_casts.insert(typst::utils::hash128(value)) {
             return;
         }
 

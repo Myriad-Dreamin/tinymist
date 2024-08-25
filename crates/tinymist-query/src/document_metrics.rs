@@ -144,7 +144,12 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
         match elem {
             FrameItem::Text(text) => self.work_text(text),
             FrameItem::Group(frame) => self.work_frame(&frame.frame),
-            FrameItem::Shape(..) | FrameItem::Image(..) | FrameItem::Meta(..) => Some(()),
+            FrameItem::Shape(..)
+            | FrameItem::Image(..)
+            | FrameItem::Tag(..)
+            | FrameItem::Link(..) => Some(()),
+            #[cfg(not(feature = "no-content-hint"))]
+            FrameItem::ContentHint(..) => Some(()),
         }
     }
 

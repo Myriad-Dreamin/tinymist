@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use anyhow::bail;
 use clap::Parser;
-use comemo::Prehashed;
 use itertools::Itertools;
 use lsp_types::*;
 use once_cell::sync::{Lazy, OnceCell};
@@ -18,7 +17,7 @@ use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use typst::foundations::IntoValue;
 use typst::syntax::{FileId, VirtualPath};
-use typst::util::Deferred;
+use typst::utils::{Deferred, LazyHash};
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
@@ -513,7 +512,7 @@ impl CompileConfig {
             self.typst_extra_args = Some(CompileExtraOpts {
                 entry: command.input.map(|e| Path::new(&e).into()),
                 root_dir: command.root,
-                inputs: Arc::new(Prehashed::new(inputs)),
+                inputs: Arc::new(LazyHash::new(inputs)),
                 font: command.font,
                 creation_timestamp: command.creation_timestamp,
             });
@@ -543,7 +542,7 @@ impl CompileConfig {
                 .into_value(),
             );
 
-            Arc::new(Prehashed::new(dict))
+            Arc::new(LazyHash::new(dict))
         };
 
         self.validate()
@@ -679,7 +678,7 @@ impl CompileConfig {
                 dict.insert(k.clone(), v.clone());
             }
 
-            Arc::new(Prehashed::new(dict))
+            Arc::new(LazyHash::new(dict))
         }
 
         let user_inputs = self.determine_user_inputs();

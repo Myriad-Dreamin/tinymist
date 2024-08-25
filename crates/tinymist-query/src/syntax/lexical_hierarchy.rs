@@ -14,7 +14,7 @@ use typst::{
         package::PackageSpec,
         LinkedNode, Source, SyntaxKind,
     },
-    util::LazyHash,
+    utils::LazyHash,
 };
 
 use super::IdentRef;

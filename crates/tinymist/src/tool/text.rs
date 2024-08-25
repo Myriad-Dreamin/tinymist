@@ -1,9 +1,8 @@
 //! Text export utilities.
 
 use core::fmt;
-use std::sync::Arc;
-
 use reflexo_typst::TypstDocument;
+use std::sync::Arc;
 
 /// A full text digest of a document.
 pub struct FullTextDigest(pub Arc<TypstDocument>);
@@ -18,14 +17,15 @@ impl FullTextDigest {
     }
 
     fn export_item(f: &mut fmt::Formatter<'_>, item: &typst::layout::FrameItem) -> fmt::Result {
-        use typst::introspection::Meta::*;
+        #[cfg(not(feature = "no-content-hint"))]
+        use std::fmt::Write;
         use typst::layout::FrameItem::*;
         match item {
             Group(g) => Self::export_frame(f, &g.frame),
             Text(t) => f.write_str(t.text.as_str()),
             #[cfg(not(feature = "no-content-hint"))]
-            Meta(ContentHint(c), _) => f.write_char(*c),
-            Meta(Link(..) | Elem(..) | Hide, _) | Shape(..) | Image(..) => Ok(()),
+            ContentHint(c) => f.write_char(*c),
+            Link(..) | Tag(..) | Shape(..) | Image(..) => Ok(()),
         }
     }
 }

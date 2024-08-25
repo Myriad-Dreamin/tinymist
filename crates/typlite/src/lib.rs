@@ -12,7 +12,7 @@ pub use error::*;
 use base64::Engine;
 use scopes::Scopes;
 use tinymist_world::{base::ShadowApi, EntryReader, LspWorld};
-use typst::{eval::Tracer, foundations::Bytes, layout::Abs, World};
+use typst::{foundations::Bytes, layout::Abs, World};
 use value::{Args, Value};
 
 use ecow::{eco_format, EcoString};
@@ -85,11 +85,11 @@ impl TypliteWorker {
             RawLang | RawDelim | RawTrimmed => Err("converting clause")?,
 
             Math | MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes
-            | MathFrac | MathRoot => Err("converting math node")?,
+            | MathFrac | MathRoot | MathShorthand => Err("converting math node")?,
 
             // Error nodes
             Error => Err(node.clone().into_text().to_string())?,
-            Eof | None => Ok(Value::None),
+            None | End => Ok(Value::None),
 
             // Non-leaf nodes
             Markup => self.reduce(node),
@@ -203,6 +203,7 @@ impl TypliteWorker {
             Binary => Ok(Value::None),
             Spread => Ok(Value::None),
             ImportItems => Ok(Value::None),
+            ImportItemPath => Ok(Value::None),
             RenamedImportItem => Ok(Value::None),
             Closure => Ok(Value::None),
             Args => Ok(Value::None),
@@ -271,8 +272,8 @@ impl TypliteWorker {
         });
         world.map_shadow_by_id(main_id, main).unwrap();
 
-        let mut tracer = Tracer::default();
-        let document = typst::compile(&world, &mut tracer)
+        let document = typst::compile(&world)
+            .output
             .map_err(|e| format!("compiling math node: {e:?}"))?;
 
         let svg_payload = typst_svg::svg_merged(&document, Abs::zero());

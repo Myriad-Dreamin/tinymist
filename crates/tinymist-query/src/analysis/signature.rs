@@ -12,7 +12,7 @@ use typst::{
         ast::{self, AstNode},
         LinkedNode, Span, SyntaxKind,
     },
-    util::LazyHash,
+    utils::LazyHash,
 };
 
 use crate::adt::interner::Interned;
