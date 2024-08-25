@@ -8,8 +8,8 @@
 use core::fmt;
 
 use base64::Engine;
+use reflexo_vec2svg::{ExportFeature, SvgExporter, SvgText};
 use tinymist_query::{AnalysisContext, FramePosition, VersionedDocument};
-use typst_ts_svg_exporter::{ExportFeature, SvgExporter, SvgText};
 
 struct PeriscopeExportFeature {}
 

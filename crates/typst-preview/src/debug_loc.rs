@@ -1,8 +1,8 @@
 use std::{ops::DerefMut, sync::Arc};
 
 use indexmap::IndexSet;
+use reflexo_typst::debug_loc::SourceSpan;
 use tokio::sync::RwLock;
-use typst_ts_core::debug_loc::SourceSpan;
 
 #[derive(Debug)]
 pub enum InternQuery<T> {
@@ -45,8 +45,9 @@ impl InternId {
 
 /// Span interner
 ///
-/// Interns spans and returns an intern id. Intern id can be converted to a span.
-/// Clone of the interner is cheap, and the clone shares the same interned spans.
+/// Interns spans and returns an intern id. Intern id can be converted to a
+/// span. Clone of the interner is cheap, and the clone shares the same interned
+/// spans.
 #[derive(Clone, Default)]
 pub struct SpanInterner {
     inner: Arc<RwLock<SpanInternerImpl>>,

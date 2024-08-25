@@ -6,32 +6,32 @@ mod outline;
 pub use actor::editor::{
     CompileStatus, ControlPlaneMessage, ControlPlaneResponse, LspControlPlaneRx, LspControlPlaneTx,
 };
-use actor::webview::WebviewActorRequest;
 pub use args::*;
-use once_cell::sync::OnceCell;
 pub use outline::Outline;
 
 use std::pin::Pin;
 use std::time::Duration;
 use std::{collections::HashMap, future::Future, path::PathBuf, sync::Arc};
 
-use debug_loc::SpanInterner;
 use futures::SinkExt;
 use log::info;
+use once_cell::sync::OnceCell;
+use reflexo_typst::debug_loc::SourceSpanOffset;
+use reflexo_typst::Error;
+use reflexo_typst::TypstDocument as Document;
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
 use typst::{layout::Position, syntax::Span};
-use typst_ts_core::debug_loc::SourceSpanOffset;
-use typst_ts_core::Error;
-use typst_ts_core::TypstDocument as Document;
 
 use crate::actor::editor::EditorActorRequest;
 use crate::actor::render::RenderActorRequest;
 use actor::editor::{EditorActor, EditorConnection};
 use actor::typst::{TypstActor, TypstActorRequest};
+use actor::webview::WebviewActorRequest;
+use debug_loc::SpanInterner;
 
 type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
@@ -335,7 +335,7 @@ impl PreviewBuilder {
     }
 }
 
-pub type SourceLocation = typst_ts_core::debug_loc::SourceLocation;
+pub type SourceLocation = reflexo_typst::debug_loc::SourceLocation;
 
 pub enum Location {
     Src(SourceLocation),

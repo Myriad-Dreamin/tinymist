@@ -1,12 +1,12 @@
 use std::num::NonZeroUsize;
 
+use reflexo_typst::debug_loc::DocumentPosition;
+use reflexo_typst::TypstDocument;
 use serde::{Deserialize, Serialize};
 use typst::foundations::{Content, NativeElement, Packed, StyleChain};
 use typst::introspection::Introspector;
 use typst::model::HeadingElem;
 use typst::syntax::Span;
-use typst_ts_core::debug_loc::DocumentPosition;
-use typst_ts_core::TypstDocument;
 
 use crate::debug_loc::SpanInternerImpl;
 

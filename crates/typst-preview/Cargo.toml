@@ -15,12 +15,8 @@ tinymist-assets.workspace = true
 typst-assets.workspace = true
 comemo.workspace = true
 
-typst-ts-svg-exporter.workspace = true
-typst-ts-core = { workspace = true, default-features = false, features = [
-  "flat-vector",
-  "vector-bbox",
-] }
-typst-ts-compiler.workspace = true
+reflexo-vec2svg.workspace = true
+reflexo-typst.workspace = true
 once_cell.workspace = true
 tokio.workspace = true
 tokio-tungstenite.workspace = true
@@ -39,4 +35,4 @@ default = ["no-content-hint"]
 
 # Disable the default content hint.
 # This requires modifying typst.
-no-content-hint = ["typst-ts-core/no-content-hint"]
+no-content-hint = ["reflexo-typst/no-content-hint"]

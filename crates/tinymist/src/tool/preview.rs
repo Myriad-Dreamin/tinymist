@@ -6,6 +6,9 @@ use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 use actor::typ_server::{CompileServerOpts, SucceededArtifact};
 use hyper::service::{make_service_fn, service_fn};
 use lsp_types::notification::Notification;
+use reflexo_typst::debug_loc::SourceSpanOffset;
+use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
+use reflexo_typst::{EntryReader, Error, TypstDocument, TypstFileId};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
@@ -21,10 +24,6 @@ use typst_preview::{
     Location, LspControlPlaneRx, LspControlPlaneTx, MemoryFiles, MemoryFilesShort, PreviewArgs,
     PreviewBuilder, PreviewMode, Previewer, SourceFileServer,
 };
-use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
-use typst_ts_compiler::EntryReader;
-use typst_ts_core::debug_loc::SourceSpanOffset;
-use typst_ts_core::{Error, TypstDocument, TypstFileId};
 
 use crate::world::{LspCompilerFeat, LspWorld};
 use crate::*;

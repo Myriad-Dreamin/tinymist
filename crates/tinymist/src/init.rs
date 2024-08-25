@@ -8,6 +8,9 @@ use itertools::Itertools;
 use lsp_types::*;
 use once_cell::sync::{Lazy, OnceCell};
 use reflexo::path::PathClean;
+use reflexo_typst::font::FontResolverImpl;
+use reflexo_typst::world::EntryState;
+use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 use task::FormatUserConfig;
@@ -16,9 +19,6 @@ use tinymist_render::PeriscopeArgs;
 use typst::foundations::IntoValue;
 use typst::syntax::{FileId, VirtualPath};
 use typst::util::Deferred;
-use typst_ts_core::config::compiler::EntryState;
-use typst_ts_core::font::FontResolverImpl;
-use typst_ts_core::{ImmutPath, TypstDict};
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the

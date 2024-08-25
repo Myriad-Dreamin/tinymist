@@ -1,8 +1,8 @@
 //! Package management tools.
 
+use reflexo_typst::package::PackageRegistry;
 use typst::diag::{eco_format, StrResult};
 use typst::syntax::package::{PackageVersion, VersionlessPackageSpec};
-use typst_ts_compiler::package::Registry;
 
 use crate::LspWorld;
 

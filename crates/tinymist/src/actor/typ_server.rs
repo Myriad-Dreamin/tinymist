@@ -11,16 +11,15 @@ use std::{
 
 use tokio::sync::{mpsc, oneshot};
 
-use typst::{diag::SourceResult, util::Deferred};
-use typst_ts_compiler::{
+use reflexo_typst::{
     features::{FeatureSet, WITH_COMPILING_STATUS_FEATURE},
     vfs::notify::{FilesystemEvent, MemoryEvent, NotifyMessage, UpstreamUpdateEvent},
     watch_deps,
     world::{CompilerFeat, CompilerUniverse, CompilerWorld},
-    CompileEnv, CompileReport, Compiler, ConsoleDiagReporter, EntryReader, Revising, TaskInputs,
-    WorldDeps,
+    CompileEnv, CompileReport, Compiler, ConsoleDiagReporter, EntryReader, GenericExporter,
+    Revising, TaskInputs, TypstDocument, WorldDeps,
 };
-use typst_ts_core::{GenericExporter, TypstDocument};
+use typst::{diag::SourceResult, util::Deferred};
 
 use crate::task::CacheTask;
 

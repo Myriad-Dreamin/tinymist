@@ -9,23 +9,20 @@ pub mod typ_server;
 use std::sync::Arc;
 
 use reflexo::ImmutPath;
+use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
+use reflexo_typst::world::EntryState;
 use tinymist_query::analysis::Analysis;
 use tinymist_query::ExportKind;
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::mpsc;
-use typ_server::CompileServerOpts;
-use typst_ts_compiler::vfs::notify::{FileChangeSet, MemoryEvent};
-use typst_ts_core::config::compiler::EntryState;
 
-use self::{
-    typ_client::{CompileClientActor, CompileHandler},
-    typ_server::CompileServerActor,
-};
 use crate::{
     task::{ExportConfig, ExportTask, ExportUserConfig},
     world::{ImmutDict, LspUniverseBuilder},
     LanguageState,
 };
+use typ_client::{CompileClientActor, CompileHandler};
+use typ_server::{CompileServerActor, CompileServerOpts};
 
 impl LanguageState {
     /// Restart the primary server.

@@ -14,7 +14,7 @@ repository.workspace = true
 
 serde.workspace = true
 tinymist-query.workspace = true
-typst-ts-svg-exporter.workspace = true
+reflexo-vec2svg.workspace = true
 base64.workspace = true
 log.workspace = true
 
