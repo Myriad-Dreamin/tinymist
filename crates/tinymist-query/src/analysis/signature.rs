@@ -5,7 +5,7 @@ use std::{borrow::Cow, collections::HashMap, ops::Range, sync::Arc};
 use ecow::{eco_format, eco_vec, EcoString, EcoVec};
 use itertools::Itertools;
 use log::trace;
-use typst::syntax::{FileId as TypstFileId, Source};
+use typst::syntax::{FileId as TypstFileId, Side, Source};
 use typst::{
     foundations::{CastInfo, Closure, Func, ParamInfo, Repr, Value},
     syntax::{

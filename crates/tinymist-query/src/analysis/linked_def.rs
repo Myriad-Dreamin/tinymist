@@ -6,7 +6,7 @@ use log::debug;
 use once_cell::sync::Lazy;
 use typst::foundations::{IntoValue, Label, Selector, Type};
 use typst::model::BibliographyElem;
-use typst::syntax::FileId as TypstFileId;
+use typst::syntax::{FileId as TypstFileId, Side};
 use typst::{foundations::Value, syntax::Span};
 use typst_shim::syntax::LinkedNodeExt;
 

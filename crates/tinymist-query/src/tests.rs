@@ -14,7 +14,7 @@ use reflexo_typst::{CompileDriverImpl, EntryManager, EntryReader, ShadowApi, Wor
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_world::CompileFontArgs;
 use typst::syntax::ast::{self, AstNode};
-use typst::syntax::{FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath};
+use typst::syntax::{FileId as TypstFileId, LinkedNode, Side, Source, SyntaxKind, VirtualPath};
 use typst::{diag::PackageError, foundations::Bytes};
 
 pub use insta::assert_snapshot;

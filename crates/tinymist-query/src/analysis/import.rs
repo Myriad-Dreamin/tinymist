@@ -3,7 +3,7 @@
 use ecow::EcoVec;
 use typst::{
     foundations::Value,
-    syntax::{LinkedNode, SyntaxKind},
+    syntax::{LinkedNode, Side, SyntaxKind},
     World,
 };
 use typst_shim::syntax::LinkedNodeExt;

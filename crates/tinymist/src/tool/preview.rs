@@ -19,7 +19,7 @@ use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::analysis::Analysis;
 use tokio::sync::{mpsc, oneshot};
 use typst::layout::{Frame, FrameItem, Point, Position};
-use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
+use typst::syntax::{LinkedNode, Side, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
 pub use typst_preview::CompileStatus;
 use typst_preview::{
