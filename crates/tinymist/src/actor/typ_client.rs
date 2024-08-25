@@ -340,7 +340,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
         self.notify_diagnostics(
             &snap.world,
             snap.doc.clone().err().unwrap_or_default(),
-            snap.env.tracer.as_ref().map(|e| e.clone().warnings()),
+            snap.env.sink.as_ref().map(|e| e.clone().warnings()),
         );
 
         self.export.signal(snap, snap.signal);

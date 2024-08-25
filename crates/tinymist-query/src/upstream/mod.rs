@@ -114,8 +114,8 @@ static GROUPS: Lazy<Vec<GroupData>> = Lazy::new(|| {
                 .module()
                 .scope()
                 .iter()
-                .filter(|(_, v)| matches!(v, Value::Func(_)))
-                .map(|(k, _)| k.clone())
+                .filter(|(_, v, _)| matches!(v, Value::Func(_)))
+                .map(|(k, _, _)| k.clone())
                 .collect();
         }
     }
@@ -284,7 +284,7 @@ static ROUTE_MAPS: Lazy<HashMap<CatKey, String>> = Lazy::new(|| {
         (LIBRARY.math.scope(), None, None),
     ];
     while let Some((scope, parent_name, cat)) = scope_to_finds.pop() {
-        for (name, value) in scope.iter() {
+        for (name, value, _) in scope.iter() {
             let cat = cat.or_else(|| scope.get_category(name));
             let name = urlify(name);
             match value {

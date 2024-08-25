@@ -8,7 +8,9 @@ use serde::{Deserialize, Serialize};
 use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::model::Document;
 use typst::syntax::ast::AstNode;
-use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
+use typst::syntax::{
+    ast, is_id_continue, is_id_start, is_ident, LinkedNode, Side, Source, SyntaxKind,
+};
 use typst::text::RawElem;
 use typst_shim::syntax::LinkedNodeExt;
 use unscanny::Scanner;
@@ -395,12 +397,12 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
 
 /// Add completions for all fields on a value.
 fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: &Option<Styles>) {
-    for (name, value) in value.ty().scope().iter() {
+    for (name, value, _) in value.ty().scope().iter() {
         ctx.value_completion(Some(name.clone()), value, true, None);
     }
 
     if let Some(scope) = value.scope() {
-        for (name, value) in scope.iter() {
+        for (name, value, _) in scope.iter() {
             ctx.value_completion(Some(name.clone()), value, true, None);
         }
     }
@@ -448,9 +450,9 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                 for param in elem.params().iter().filter(|param| !param.required) {
                     if let Some(value) = elem
                         .field_id(param.name)
-                        .and_then(|id| elem.field_from_styles(id, StyleChain::new(styles)))
+                        .and_then(|id| Some(elem.field_from_styles(id, StyleChain::new(styles))))
                     {
-                        ctx.value_completion(Some(param.name.into()), &value, false, None);
+                        ctx.value_completion(Some(param.name.into()), &value.unwrap(), false, None);
                     }
                 }
             }
@@ -552,7 +554,7 @@ fn import_item_completions<'a>(
         ctx.snippet_completion("*", "*", "Import everything.");
     }
 
-    for (name, value) in scope.iter() {
+    for (name, value, _) in scope.iter() {
         if existing
             .iter()
             .all(|item| item.original_name().as_str() != name)

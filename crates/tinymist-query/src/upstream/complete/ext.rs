@@ -137,7 +137,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                                         match item {
                                             ast::ImportItem::Simple(n) => {
                                                 filter.insert(
-                                                    n.get().clone(),
+                                                    n.name().get().clone(),
                                                     DefKind::Syntax(n.span()),
                                                 );
                                             }
@@ -154,7 +154,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                             };
 
                             if let Some(scope) = module_ins.scope() {
-                                for (name, v) in scope.iter() {
+                                for (name, v, _) in scope.iter() {
                                     let kind = value_to_completion_kind(v);
                                     let def_kind = match &import_filter {
                                         Some(import_filter) => {
@@ -248,7 +248,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         let scope = if in_math { &lib.math } else { &lib.global }
             .scope()
             .clone();
-        for (name, value) in scope.iter() {
+        for (name, value, _) in scope.iter() {
             if filter(Some(value)) && !defined.contains_key(name) {
                 defined.insert(
                     name.clone(),

@@ -14,7 +14,7 @@ use reflexo_typst::{CompileDriverImpl, EntryManager, EntryReader, ShadowApi, Wor
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_world::CompileFontArgs;
 use typst::syntax::ast::{self, AstNode};
-use typst::syntax::{FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath};
+use typst::syntax::{FileId as TypstFileId, LinkedNode, Side, Source, SyntaxKind, VirtualPath};
 use typst::{diag::PackageError, foundations::Bytes};
 
 pub use insta::assert_snapshot;
@@ -114,7 +114,7 @@ pub fn compile_doc_for_test(
         return None;
     }
 
-    let doc = typst::compile(ctx.world(), &mut Default::default()).unwrap();
+    let doc = typst::compile(ctx.world()).output.unwrap();
     Some(VersionedDocument {
         version: 0,
         document: Arc::new(doc),
