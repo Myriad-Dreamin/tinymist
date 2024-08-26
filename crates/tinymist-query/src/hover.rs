@@ -41,7 +41,10 @@ impl StatefulRequest for HoverRequest {
         // the typst's cursor is 1-based, so we need to add 1 to the offset
         let cursor = offset + 1;
 
-        let contents = def_tooltip(ctx, &source, doc.as_ref(), cursor).or_else(|| {
+        let contents = def_tooltip(ctx, &source, doc.as_ref(), cursor)
+            .or_else(|| star_tooltip(ctx, &source, cursor));
+
+        let contents = contents.or_else(|| {
             Some(typst_to_lsp::tooltip(
                 &ctx.tooltip(doc_ref, &source, cursor)?,
             ))
@@ -112,6 +115,50 @@ impl StatefulRequest for HoverRequest {
             range: Some(range),
         })
     }
+}
+
+fn star_tooltip(
+    ctx: &mut AnalysisContext,
+    source: &Source,
+    cursor: usize,
+) -> Option<HoverContents> {
+    let leaf = LinkedNode::new(source.root()).leaf_at(cursor)?;
+
+    if !matches!(leaf.kind(), SyntaxKind::Star) {
+        return None;
+    }
+
+    let mut leaf = &leaf;
+    while !matches!(leaf.kind(), SyntaxKind::ModuleImport) {
+        leaf = leaf.parent()?;
+    }
+
+    let mi: ast::ModuleImport = leaf.cast()?;
+    let source = mi.source();
+    let module = ctx.analyze_import(&leaf.find(source.span())?);
+    log::info!("star import: {source:?} => {:?}", module.is_some());
+
+    let i = module?;
+    let scope = i.scope()?;
+
+    let mut results = vec![];
+
+    let mut names = scope.iter().map(|(name, _)| name).collect::<Vec<_>>();
+    names.sort();
+    let mut items = String::new();
+    items.push_str("let (");
+    for name in &names {
+        items.push_str(name);
+        items.push_str(", ");
+    }
+    items.push_str(") = ..");
+
+    results.push(MarkedString::LanguageString(LanguageString {
+        language: "typc".to_owned(),
+        value: items,
+    }));
+
+    Some(LspHoverContents::Array(results))
 }
 
 enum CommandOrLink {
