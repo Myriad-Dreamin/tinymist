@@ -380,7 +380,7 @@ const markupEnterCode: textmate.Pattern = {
       /(?=[\p{XID_Start}_])/u
     ),
     enterExpression("string.hash.hash.typst", /(?=\")/),
-    enterExpression("constant.numeric.hash.typst", /(?=\d)/),
+    enterExpression("constant.numeric.hash.typst", /(?=\d|\.\d)/),
     enterExpression("keyword.control.hash.typst", new RegExp("")),
   ],
 };
@@ -403,8 +403,7 @@ const code: textmate.Pattern = {
   ],
 };
 
-const FLOAT_OR_INT =
-  /(?<!\)|\]|\}\d)(^|(?<=\s)|\b)(?:(\d*)?\.?\d+([eE][+-]?\d+)?|\d+\.)/;
+const FLOAT_OR_INT = /(?:\d+\.(?!\d)|\d*\.?\d+(?:[eE][+-]?\d+)?)/;
 
 const floatUnit = (unit: RegExp, canDotSuff: boolean) =>
   new RegExp(
@@ -443,11 +442,24 @@ const constants: textmate.Pattern = {
     },
     {
       name: "constant.numeric.integer.typst",
-      match: /(?<!\)|\]|\})(^|(?<=\s)|\b)\d+\b(?![\.eE])/,
+      match:
+        /(?<!\)|\]|\})(^|(?<=\s|#)|\b)\d+\b(?!\.(?:[^\p{XID_Start}_]|$)|[eE])/u,
+    },
+    {
+      name: "constant.numeric.hex.typst",
+      match: /(?<!\)|\]|\})(^|(?<=\s|#)|\b)0x[0-9a-fA-F]+\b/,
+    },
+    {
+      name: "constant.numeric.octal.typst",
+      match: /(?<!\)|\]|\})(^|(?<=\s|#)|\b)0o[0-7]+\b/,
+    },
+    {
+      name: "constant.numeric.binary.typst",
+      match: /(?<!\)|\]|\})(^|(?<=\s|#)|\b)0b[01]+\b/,
     },
     {
       name: "constant.numeric.float.typst",
-      match: floatUnit(/($|\b)/, true),
+      match: floatUnit(new RegExp(""), true),
     },
     {
       include: "#stringLiteral",
