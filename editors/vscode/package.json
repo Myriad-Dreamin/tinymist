@@ -528,7 +528,7 @@
           "type": "string",
           "default": "",
           "title": "Remote repository URL",
-          "description": "The URL of the remote repository to pull local packages from."
+          "markdownDescription": "The URL of the remote repository to pull local packages from, conforming [format](https://docs.github.com/en/get-started/getting-started-with-git/about-remote-repositories#about-remote-repositories)."
         }
       }
     },

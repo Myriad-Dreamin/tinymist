@@ -154,3 +154,9 @@ Invert colors of the preview (useful for dark themes without cost). Please note 
 (Experimental) Show typst cursor indicator in preview.
 
 - **Type**: `boolean`
+
+## `tinymist.localPackage.remoteUrl`
+
+The URL of the remote repository to pull local packages from, conforming [format](https://docs.github.com/en/get-started/getting-started-with-git/about-remote-repositories#about-remote-repositories).
+
+- **Type**: `string`
