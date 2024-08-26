@@ -64,13 +64,16 @@ const configMd = (editor, prefix) =>
   Object.keys(config)
     .map((key) => {
       const {
-        description,
+        description: rawDescription,
+        markdownDescription,
         default: dv,
         type: itemType,
         enum: enumBase,
         enumDescriptions: enumBaseDescription,
         markdownDeprecationMessage,
       } = config[key];
+
+      const description = markdownDescription || rawDescription;
 
       if (markdownDeprecationMessage) {
         return;

@@ -27,7 +27,7 @@
         - Items: #raw(cfg.items.type)
         - Description: #md(cfg.items.description)
       ]
-    - Description: #md(cfg.description)
+    - Description: #md(cfg.at("markdownDescription", default: cfg.at("description", default: none)))
     #if cfg.at("enum", default: none) != none [
       - Valid values: #for (i, item) in cfg.enum.enumerate() [
             - #raw(item): #if "enumDescriptions" in cfg { md(cfg.enumDescriptions.at(i)) }
