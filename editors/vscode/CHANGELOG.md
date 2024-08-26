@@ -6,46 +6,44 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## v0.11.20 - [2024-08-26]
 
-* chore: bump typstyle to v0.11.32 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/551
-* build: bump typst.ts to v0.5.0-rc7 in https://github.com/Myriad-Dreamin/tinymist/pull/554
+* Bumped typstyle to v0.11.32 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/551
+* Bumped typst.ts to v0.5.0-rc7 in https://github.com/Myriad-Dreamin/tinymist/pull/554
 
 ## Compiler
 
-* dev: perform simple rate limit on heavy dynamic analysis in https://github.com/Myriad-Dreamin/tinymist/pull/532
+* Performing simple rate limit on heavy dynamic analysis in https://github.com/Myriad-Dreamin/tinymist/pull/532
 
 ## Editor
 
-* feat: export text in range as ansi highlighted code in https://github.com/Myriad-Dreamin/tinymist/pull/526 and https://github.com/Myriad-Dreamin/tinymist/pull/544
+* Provide contextual action to export text in range as ansi highlighted code in https://github.com/Myriad-Dreamin/tinymist/pull/526 and https://github.com/Myriad-Dreamin/tinymist/pull/544
+* Fixed invalid merged command options in https://github.com/Myriad-Dreamin/tinymist/pull/564
 
 ## Preview
 
-* feat: remove useless `tinymist.preview.showInActivityBar` in https://github.com/Myriad-Dreamin/tinymist/pull/543
+* Removed useless `tinymist.preview.showInActivityBar` in https://github.com/Myriad-Dreamin/tinymist/pull/543
 
 ## Hover (Tooltip)
 
-* fix: remove feature texmath by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/535
-
-## Goto Definition
-
-* test: add test for `goto_definition` for label by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/510
+* (Fix) Removed feature texmath by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/535
 
 ## References
 
-* feat: find references for `Ref` and `Label` by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/527
+* Finding references for `Ref` and `Label` by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/527
 
 ### Syntax/Semantic Highlighting
 
-* fix: parse dot issue 492 again in https://github.com/Myriad-Dreamin/tinymist/pull/557
-* feat: improve numeric literal parsers in https://github.com/Myriad-Dreamin/tinymist/pull/558
-* fix: parse quotes near the atomic hash expression in https://github.com/Myriad-Dreamin/tinymist/pull/559
+* (Fix): parse dot issue 492 again in https://github.com/Myriad-Dreamin/tinymist/pull/557
+* Improved numeric literal parsers in https://github.com/Myriad-Dreamin/tinymist/pull/558
+* (Fix): parse quotes near the atomic hash expression in https://github.com/Myriad-Dreamin/tinymist/pull/559
 
 ## Misc
 
-* feat: generate shell completion by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/525
-* docs: add installation and configuration instruction for Emacs by @Ziqi-Yang in https://github.com/Myriad-Dreamin/tinymist/pull/538
-* docs: add document preview feature documentations for non-vscode clients in https://github.com/Myriad-Dreamin/tinymist/pull/560
-* docs: add root path hints for neovim users in https://github.com/Myriad-Dreamin/tinymist/pull/561
-* docs: add notes to stateful pin commands in https://github.com/Myriad-Dreamin/tinymist/pull/562
+* Added test for `goto_definition` for label by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/510
+* Generating shell completion by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/525
+* Added installation and configuration instruction for Emacs by @Ziqi-Yang in https://github.com/Myriad-Dreamin/tinymist/pull/538
+* Added document preview feature documentations for non-vscode clients in https://github.com/Myriad-Dreamin/tinymist/pull/560
+* Added root path hints in documentation for neovim users in https://github.com/Myriad-Dreamin/tinymist/pull/561
+* Added notes to stateful pin commands in documentation in https://github.com/Myriad-Dreamin/tinymist/pull/562
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.19...v0.11.20
 
