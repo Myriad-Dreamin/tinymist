@@ -13,6 +13,5 @@
 #            ^^ source.typst variable.other.readwrite.typst
 #              ^ source.typst keyword.operator.accessor.typst
 #               ^ source.typst variable.other.readwrite.typst
-#                ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
-#                 ^^^^^^^^^^^^^ source.typst string.quoted.double.typst
+#                ^^^^^^^^^^^^^^ source.typst
 >
