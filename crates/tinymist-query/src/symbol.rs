@@ -38,9 +38,9 @@ impl SemanticRequest for SymbolRequest {
 
         // todo! need compilation for iter_dependencies
 
-        ctx.resources.iter_dependencies(&mut |path| {
+        for path in ctx.resources.dependencies() {
             let Ok(source) = ctx.source_by_path(&path) else {
-                return;
+                continue;
             };
             let uri = path_to_url(&path).unwrap();
             let res = get_lexical_hierarchy(source.clone(), LexicalScopeKind::Symbol).and_then(
@@ -60,7 +60,7 @@ impl SemanticRequest for SymbolRequest {
             if let Some(mut res) = res {
                 symbols.append(&mut res)
             }
-        });
+        }
 
         Some(symbols)
     }

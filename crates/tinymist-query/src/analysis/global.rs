@@ -166,7 +166,7 @@ pub trait AnalysisResources {
     fn resolve(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError>;
 
     /// Get all the files in the workspace.
-    fn iter_dependencies(&self, f: &mut dyn FnMut(ImmutPath));
+    fn dependencies(&self) -> EcoVec<ImmutPath>;
 
     /// Resolve extra font information.
     fn font_info(&self, _font: Font) -> Option<Arc<DataSource>> {

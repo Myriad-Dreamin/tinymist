@@ -7,6 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use ecow::EcoVec;
 use once_cell::sync::Lazy;
 use reflexo_typst::config::CompileOpts;
 use reflexo_typst::package::{PackageRegistry, PackageSpec};
@@ -40,8 +41,13 @@ impl<'a> AnalysisResources for WrapWorld<'a> {
         self.0.registry.resolve(spec)
     }
 
-    fn iter_dependencies(&self, f: &mut dyn FnMut(reflexo::ImmutPath)) {
-        self.0.iter_dependencies(f)
+    fn dependencies(&self) -> EcoVec<reflexo::ImmutPath> {
+        let mut v = EcoVec::new();
+        self.0.iter_dependencies(&mut |p| {
+            v.push(p);
+        });
+
+        v
     }
 }
 
