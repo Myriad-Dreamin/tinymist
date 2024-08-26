@@ -6,6 +6,8 @@ Two ways of previewing a Typst document are provided:
 - PDF Preview: let lsp export your PDF on typed, and open related PDF by your favorite PDF viewer.
 - Web (SVG) Preview: use builtin preview feature.
 
+Whenever you can get a web preview feature, it is recomended since it is much faster than PDF preview and provides bidirectional navigation feature, allowing jumping between the source code and the preview by clicking or lsp commands.
+
 == PDF Preview
 
 For non-vscode clients, neovim client as an example. One who uses `nvim-lspconfig` can place their configuration in the `servers.tinymist.settings` section. If you want to export PDF on typing and output files in `$root_dir/target` directory, please configure it like that:
