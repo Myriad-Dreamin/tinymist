@@ -3,13 +3,12 @@
 # ^^^^^ source.typst constant.numeric.length.typst
 >#1.em
 #^ source.typst constant.numeric.hash.typst
-# ^ source.typst constant.numeric.float.typst
+# ^ source.typst constant.numeric.integer.typst
 #  ^ source.typst keyword.operator.accessor.typst
 #   ^^ source.typst variable.other.readwrite.typst
 >#.1em
-#^ source.typst keyword.control.hash.typst
-# ^ source.typst keyword.operator.accessor.typst
-#  ^^^ source.typst constant.numeric.length.typst
+#^ source.typst constant.numeric.hash.typst
+# ^^^^ source.typst constant.numeric.length.typst
 >#1.1%
 #^ source.typst constant.numeric.hash.typst
 # ^^^^ source.typst constant.numeric.percentage.typst
@@ -17,20 +16,26 @@
 #^ source.typst constant.numeric.hash.typst
 # ^^^ source.typst constant.numeric.percentage.typst
 >#.1%
-#^ source.typst keyword.control.hash.typst
-# ^ source.typst keyword.operator.accessor.typst
-#  ^^ source.typst constant.numeric.percentage.typst
+#^ source.typst constant.numeric.hash.typst
+# ^^^ source.typst constant.numeric.percentage.typst
 >#1.1
 #^ source.typst constant.numeric.hash.typst
 # ^^^ source.typst constant.numeric.float.typst
 >#1.
 #^ source.typst constant.numeric.hash.typst
-# ^ source.typst constant.numeric.float.typst
-#  ^ source.typst keyword.operator.accessor.typst
+# ^^ source.typst constant.numeric.float.typst
 >#.1
-#^ source.typst keyword.control.hash.typst
-# ^ source.typst keyword.operator.accessor.typst
-#  ^ source.typst constant.numeric.integer.typst
+#^ source.typst constant.numeric.hash.typst
+# ^^ source.typst constant.numeric.float.typst
+>#0x01
+#^ source.typst constant.numeric.hash.typst
+# ^^^^ source.typst constant.numeric.hex.typst
+>#0o01
+#^ source.typst constant.numeric.hash.typst
+# ^^^^ source.typst constant.numeric.octal.typst
+>#0b1101
+#^ source.typst constant.numeric.hash.typst
+# ^^^^^^ source.typst constant.numeric.binary.typst
 >#1.1e1
 #^ source.typst constant.numeric.hash.typst
 # ^^^^^ source.typst constant.numeric.float.typst
@@ -56,3 +61,20 @@
 # ^ source.typst meta.brace.round.typst
 #  ^^^^ source.typst constant.numeric.float.typst
 #      ^ source.typst meta.brace.round.typst
+>#(1.)
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^ source.typst constant.numeric.float.typst
+#    ^ source.typst meta.brace.round.typst
+>#(11.)
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^ source.typst constant.numeric.float.typst
+#     ^ source.typst meta.brace.round.typst
+>#64.bit-not()
+#^ source.typst constant.numeric.hash.typst
+# ^^ source.typst constant.numeric.integer.typst
+#   ^ source.typst meta.expr.call.typst keyword.operator.accessor.typst
+#    ^^^^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#           ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#            ^ source.typst meta.expr.call.typst meta.brace.round.typst
