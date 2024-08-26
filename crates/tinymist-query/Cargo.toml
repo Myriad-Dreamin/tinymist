@@ -20,6 +20,7 @@ no-content-hint = ["reflexo-typst/no-content-hint"]
 
 anyhow.workspace = true
 comemo.workspace = true
+dirs.workspace = true
 regex.workspace = true
 yaml-rust2.workspace = true
 biblatex.workspace = true
