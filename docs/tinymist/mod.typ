@@ -37,3 +37,5 @@
     },
   )
 })
+
+#let note-box = pro-tip
