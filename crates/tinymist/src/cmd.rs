@@ -491,4 +491,20 @@ impl LanguageState {
     pub fn resource_tutoral(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         Err(method_not_found())
     }
+
+    /// Get directory of local pacakges
+    pub fn resource_local_packages(
+        &mut self,
+        _arguments: Vec<JsonValue>,
+    ) -> AnySchedulableResponse {
+        let Some(data_dir) = dirs::data_dir() else {
+            return just_ok(JsonValue::Null);
+        };
+        let local_path = data_dir.join("typst/packages");
+        if !local_path.exists() {
+            return just_ok(JsonValue::Null);
+        }
+        let local_path = local_path.to_string_lossy().to_string();
+        just_ok(JsonValue::String(local_path))
+    }
 }

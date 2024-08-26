@@ -31,6 +31,7 @@ import {
   previewPreload,
   previewProcessOutline,
 } from "./preview";
+import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { activeTypstEditor, DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, getClient, setClient, tinymist } from "./lsp";
 import { taskActivate } from "./tasks";
@@ -261,6 +262,9 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
     commands.registerCommand("tinymist.showSummary", editorToolCommand("summary")),
     commands.registerCommand("tinymist.showSymbolView", editorToolCommand("symbol-view")),
     commands.registerCommand("tinymist.profileCurrentFile", editorToolCommand("tracing")),
+
+    commands.registerCommand("tinymist.createLocalPackage", commandCreateLocalPackage),
+    commands.registerCommand("tinymist.openLocalPackage", commandOpenLocalPackage),
 
     // We would like to define it at the server side, but it is not possible for now.
     // https://github.com/microsoft/language-server-protocol/issues/1117

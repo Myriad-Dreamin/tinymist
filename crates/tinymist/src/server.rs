@@ -260,7 +260,8 @@ impl LanguageState {
             // resources
             .with_resource("/symbols", State::resource_symbols)
             .with_resource("/preview/index.html", State::resource_preview_html)
-            .with_resource("/tutorial", State::resource_tutoral);
+            .with_resource("/tutorial", State::resource_tutoral)
+            .with_resource("/dirs/local-packages", State::resource_local_packages);
 
         // todo: generalize me
         provider.args.add_commands(

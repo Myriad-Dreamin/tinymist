@@ -18,8 +18,9 @@ export async function getClient(): Promise<LanguageClient> {
 }
 
 interface ResourceRoutes {
-  "/symbols": any;
-  "/preview/index.html": string;
+    "/symbols": any;
+    "/preview/index.html": string;
+    "/dirs/local-packages": string;
 }
 
 export const tinymist = {

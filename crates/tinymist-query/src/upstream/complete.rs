@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::model::Document;
 use typst::syntax::ast::AstNode;
+use typst::syntax::package::PackageSpec;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
 use unscanny::Scanner;
@@ -1046,9 +1047,75 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         }
     }
 
+    /// Get local packages
+    fn local_packages(&mut self) -> Vec<(PackageSpec, Option<EcoString>)> {
+        // search packages locally. We only search in the data
+        // directory and not the cache directory, because the latter is not
+        // intended for storage of local packages.
+        let mut packages = vec![];
+        let Some(data_dir) = dirs::data_dir() else {
+            return packages;
+        };
+        let local_path = data_dir.join("typst/packages");
+        if !local_path.exists() {
+            return packages;
+        }
+        // namespace/package_name/version
+        // 1. namespace
+        let namespaces = std::fs::read_dir(local_path).unwrap();
+        for namespace in namespaces {
+            let namespace = namespace.unwrap();
+            if !namespace.file_type().unwrap().is_dir() {
+                continue;
+            }
+            // start with . are hidden directories
+            if namespace.file_name().to_string_lossy().starts_with('.') {
+                continue;
+            }
+            // 2. package_name
+            let package_names = std::fs::read_dir(namespace.path()).unwrap();
+            for package in package_names {
+                let package = package.unwrap();
+                if !package.file_type().unwrap().is_dir() {
+                    continue;
+                }
+                if package.file_name().to_string_lossy().starts_with('.') {
+                    continue;
+                }
+                // 3. version
+                let versions = std::fs::read_dir(package.path()).unwrap();
+                for version in versions {
+                    let version = version.unwrap();
+                    if !version.file_type().unwrap().is_dir() {
+                        continue;
+                    }
+                    if version.file_name().to_string_lossy().starts_with('.') {
+                        continue;
+                    }
+                    let version = version.file_name().to_string_lossy().parse().unwrap();
+                    let spec = PackageSpec {
+                        namespace: namespace.file_name().to_string_lossy().into(),
+                        name: package.file_name().to_string_lossy().into(),
+                        version,
+                    };
+                    let description = eco_format!("{} v{}", spec.name, spec.version);
+                    let package = (spec, Some(description));
+                    packages.push(package);
+                }
+            }
+        }
+        packages
+    }
+
     /// Add completions for all available packages.
     fn package_completions(&mut self, all_versions: bool) {
         let mut packages: Vec<_> = self.world().packages().iter().collect();
+        // local_packages to references and add them to the packages
+        let local_packages = self.local_packages();
+        let local_packages_refs: Vec<&(PackageSpec, Option<EcoString>)> =
+            local_packages.iter().collect();
+        packages.extend(local_packages_refs);
+
         packages.sort_by_key(|(spec, _)| (&spec.namespace, &spec.name, Reverse(spec.version)));
         if !all_versions {
             packages.dedup_by_key(|(spec, _)| (&spec.namespace, &spec.name));
