@@ -18,6 +18,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 * Provide contextual action to export text in range as ansi highlighted code in https://github.com/Myriad-Dreamin/tinymist/pull/526 and https://github.com/Myriad-Dreamin/tinymist/pull/544
 * Fixed invalid merged command options in https://github.com/Myriad-Dreamin/tinymist/pull/564
 
+## Commands/Tools
+
+* Added local package manager by @OrangeX4 in https://github.com/Myriad-Dreamin/tinymist/pull/458
+
 ## Preview
 
 * Removed useless `tinymist.preview.showInActivityBar` in https://github.com/Myriad-Dreamin/tinymist/pull/543
@@ -25,6 +29,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## Hover (Tooltip)
 
 * (Fix) Removed feature texmath by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/535
+* Displaying all imported definitions for wildcard imports in https://github.com/Myriad-Dreamin/tinymist/pull/565
 
 ## References
 
