@@ -57,12 +57,7 @@ insta.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 typst-assets = { workspace = true, features = ["fonts"] }
-typst-ts-core = { workspace = true, default-features = false, features = [
-    "flat-vector",
-    "vector-bbox",
-    "no-content-hint",
-] }
-typst-ts-compiler.workspace = true
+reflexo-typst.workspace = true
 sha2 = { version = "0.10" }
 hex = { version = "0.4" }
 

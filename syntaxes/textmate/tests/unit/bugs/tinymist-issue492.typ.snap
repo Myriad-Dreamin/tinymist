@@ -4,17 +4,14 @@
 #  ^^^^^^^^^ source.typst variable.other.readwrite.typst
 #           ^ source.typst keyword.operator.accessor.typst
 #            ^^ source.typst variable.other.readwrite.typst
-#              ^ source.typst keyword.operator.accessor.typst
-#               ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
-#                ^^^^^^^^^^^^^ source.typst string.quoted.double.typst
+#              ^^^^^^^^^^^^^^^ source.typst
 >"#spec_char.d8.a" For example
-#^ source.typst string.quoted.double.typst punctuation.definition.string.typst
-# ^ source.typst
+#^ source.typst
+# ^ source.typst variable.other.readwrite.hash.typst
 #  ^^^^^^^^^ source.typst variable.other.readwrite.typst
 #           ^ source.typst keyword.operator.accessor.typst
 #            ^^ source.typst variable.other.readwrite.typst
 #              ^ source.typst keyword.operator.accessor.typst
 #               ^ source.typst variable.other.readwrite.typst
-#                ^ source.typst string.quoted.double.typst punctuation.definition.string.typst
-#                 ^^^^^^^^^^^^^ source.typst string.quoted.double.typst
+#                ^^^^^^^^^^^^^^ source.typst
 >

@@ -1,0 +1,6 @@
+>#ident"foo
+#^ source.typst variable.other.readwrite.hash.typst
+# ^^^^^ source.typst variable.other.readwrite.typst
+#      ^^^^^ source.typst
+>"bar
+#^^^^^ source.typst

@@ -142,6 +142,10 @@ You can pin a main file by command.
 - Use command `Typst Pin Main` (tinymist.pinMainToCurrent) to set the current file as the main file.
 - Use command `Typst Unpin Main` (tinymist.unpinMain) to unset the main file.
 
+#note-box[
+  `tinymist.pinMain` is a stateful command, and tinymist doesn't remember it between sessions (closing and opening the editor).
+]
+
 === Passing Extra CLI Arguments
 <passing-extra-cli-arguments>
 There is a *global* configuration `tinymist.typstExtraArgs` to pass extra arguments to tinymist LSP, like what you usually do with `typst-cli` CLI. For example, you can set it to `["--input=awa=1", "--input=abaaba=2", "main.typ"]` to configure `sys.inputs` and entry for compiler, which is equivalent to make LSP run like a `typst-cli` with such arguments:

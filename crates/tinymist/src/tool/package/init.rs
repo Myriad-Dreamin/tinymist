@@ -3,11 +3,11 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use reflexo_typst::{Bytes, ImmutPath, TypstFileId};
 use typst::diag::{bail, eco_format, FileError, FileResult, StrResult};
 use typst::syntax::package::{PackageManifest, PackageSpec, TemplateInfo};
 use typst::syntax::VirtualPath;
 use typst::World;
-use typst_ts_core::{Bytes, ImmutPath, TypstFileId};
 
 use crate::world::LspWorld;
 

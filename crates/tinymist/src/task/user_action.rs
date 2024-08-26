@@ -4,9 +4,9 @@ use std::path::PathBuf;
 
 use anyhow::bail;
 use base64::Engine;
+use reflexo_typst::TypstDict;
 use serde::{Deserialize, Serialize};
 use sync_lsp::{just_future, SchedulableResponse};
-use typst_ts_core::TypstDict;
 
 use crate::internal_error;
 

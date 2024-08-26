@@ -53,13 +53,9 @@ typstyle.workspace = true
 typstfmt_lib.workspace = true
 
 reflexo.workspace = true
-typst-ts-core = { workspace = true, default-features = false, features = [
-    "flat-vector",
-    "vector-bbox",
-] }
-typst-ts-svg-exporter.workspace = true
+reflexo-typst.workspace = true
+reflexo-vec2svg.workspace = true
 codespan-reporting.workspace = true
-typst-ts-compiler.workspace = true
 toml.workspace = true
 walkdir.workspace = true
 typst-preview = { workspace = true, optional = true }
@@ -96,7 +92,7 @@ embed-fonts = ["typst-assets/fonts"]
 
 # Disable the default content hint.
 # This requires modifying typst.
-no-content-hint = ["typst-ts-core/no-content-hint"]
+no-content-hint = ["reflexo-typst/no-content-hint"]
 
 preview = [
     "typst-preview",

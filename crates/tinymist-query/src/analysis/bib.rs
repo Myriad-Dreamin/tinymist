@@ -196,8 +196,7 @@ impl BibWorker {
 mod tests {
     use std::path::Path;
 
-    use typst::syntax::VirtualPath;
-    use typst_ts_core::TypstFileId;
+    use typst::syntax::{FileId, VirtualPath};
 
     #[test]
     fn yaml_bib_test() {
@@ -211,7 +210,7 @@ Euclid2:
 "#;
         let yaml = super::YamlBib::from_content(
             content,
-            TypstFileId::new_fake(VirtualPath::new(Path::new("test.yml"))),
+            FileId::new_fake(VirtualPath::new(Path::new("test.yml"))),
         );
         assert_eq!(yaml.entries.len(), 2);
         assert_eq!(yaml.entries[0].0, "Euclid");
@@ -228,7 +227,7 @@ Euclid3
 "#;
         super::YamlBib::from_content(
             content,
-            TypstFileId::new_fake(VirtualPath::new(Path::new("test.yml"))),
+            FileId::new_fake(VirtualPath::new(Path::new("test.yml"))),
         );
     }
 }

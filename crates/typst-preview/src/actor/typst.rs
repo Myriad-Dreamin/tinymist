@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use log::{debug, error, info};
+use reflexo_typst::debug_loc::{CharPosition, DocumentPosition, SourceLocation, SourceSpanOffset};
 use tokio::sync::{broadcast, mpsc};
 use typst::syntax::Span;
-use typst_ts_core::debug_loc::{CharPosition, DocumentPosition, SourceLocation, SourceSpanOffset};
 
 use crate::{
     ChangeCursorPositionRequest, EditorServer, MemoryFiles, MemoryFilesShort, SourceFileServer,
@@ -253,7 +253,7 @@ impl<T: SourceFileServer + EditorServer> TypstActor<T> {
     }
 }
 
-fn handle_error<T>(loc: &'static str, m: Result<T, typst_ts_core::Error>) -> Option<T> {
+fn handle_error<T>(loc: &'static str, m: Result<T, reflexo_typst::Error>) -> Option<T> {
     if let Err(err) = &m {
         error!("TypstActor: failed to {loc}: {err:#}");
     }

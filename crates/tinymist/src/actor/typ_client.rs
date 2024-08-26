@@ -31,6 +31,10 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use log::{error, info, trace};
+use reflexo_typst::{
+    debug_loc::DataSource, error::prelude::*, typst::prelude::EcoVec, vfs::notify::MemoryEvent,
+    world::EntryState, CompileReport, EntryReader, Error, ImmutPath, TaskInputs, TypstFont,
+};
 use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnalysisResources},
@@ -44,11 +48,6 @@ use typst::{
     layout::Position,
     syntax::package::PackageSpec,
     World as TypstWorld,
-};
-use typst_ts_compiler::{vfs::notify::MemoryEvent, CompileReport, EntryReader, TaskInputs};
-use typst_ts_core::{
-    config::compiler::EntryState, debug_loc::DataSource, error::prelude::*, typst::prelude::EcoVec,
-    Error, ImmutPath, TypstFont,
 };
 
 use super::{
@@ -212,12 +211,12 @@ impl CompileHandler {
             }
 
             fn resolve(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError> {
-                use typst_ts_compiler::package::Registry;
+                use reflexo_typst::world::package::PackageRegistry;
                 self.0.registry.resolve(spec)
             }
 
             fn iter_dependencies(&self, f: &mut dyn FnMut(ImmutPath)) {
-                use typst_ts_compiler::WorldDeps;
+                use reflexo_typst::WorldDeps;
                 self.0.iter_dependencies(f)
             }
 

@@ -1,11 +1,11 @@
 use futures::{SinkExt, StreamExt};
 use log::{info, trace};
+use reflexo_typst::debug_loc::{DocumentPosition, ElementPoint};
 use tokio::{
     net::TcpStream,
     sync::{broadcast, mpsc},
 };
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
-use typst_ts_core::debug_loc::{DocumentPosition, ElementPoint};
 
 use crate::actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest};
 

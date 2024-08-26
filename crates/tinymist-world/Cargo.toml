@@ -20,11 +20,7 @@ serde_json.workspace = true
 anyhow.workspace = true
 log.workspace = true
 
-typst-ts-core = { workspace = true, default-features = false, features = [
-    "flat-vector",
-    "vector-bbox",
-] }
-typst-ts-compiler.workspace = true
+reflexo-typst.workspace = true
 
 tinymist-assets = { workspace = true }
 typst-assets = { workspace = true, features = ["fonts"] }

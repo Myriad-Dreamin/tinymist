@@ -739,13 +739,13 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
           await commandShow("Svg");
           break;
         case FastKind.SVGMerged:
-          await commandShow("Svg", { page: "merged" });
+          await commandShow("Svg", { page: { merged: { gap: "0pt" } } });
           break;
         case FastKind.PNG:
           await commandShow("Png");
           break;
         case FastKind.PNGMerged:
-          await commandShow("Png", { page: "merged" });
+          await commandShow("Png", { page: { merged: { gap: "0pt" } } });
           break;
       }
 
