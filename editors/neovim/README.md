@@ -65,7 +65,12 @@ vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.ap
 vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { nil } })
 ```
 
-There is also a plan to support multiple-file project by workspace configuration, but I don’t know what is neovim’s way, so it needs further discussion.
+There is also a plan to support multiple-file project by workspace configuration, but I don’t know whether it is neovim’s way, so it needs further discussion.
+
+> [!NOTE]
+> 
+>   `tinymist.pinMain` is a stateful command, and tinymist doesn't remember it between sessions (closing and opening the editor).
+
 
 ## Troubleshooting
 
