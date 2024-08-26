@@ -320,7 +320,8 @@ const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
     /// name: 'markup.expr.typst'
     begin: new RegExp("#" + seek.source),
     // `?=(?<![\d#])\.[^\p{XID_Start}_]`: This means that we are on a dot and the next character is not a valid identifier start, but we are not at the beginning of hash or number
-    end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[\$])|(?=(?<![#\d])\.[^\p{XID_Start}_])|(?=[\s\}\]\)\$]|$)|(;)/u,
+    end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[\$])|(?=\.(?:[^0-9\p{XID_Start}_]|$))|(?=[\s\}\]\)\$]|$)|(;)/u
+      .source,
     beginCaptures: {
       "0": {
         name: kind,
@@ -457,7 +458,7 @@ const constants: textmate.Pattern = {
   ],
 };
 
-const expression = (): textmate.Grammar => {
+const expressions = (): textmate.Grammar => {
   const expression: textmate.Pattern = {
     patterns: [
       { include: "#comments" },
@@ -1600,7 +1601,7 @@ export const typst: textmate.Grammar = {
     markupHeading,
     markupBrace,
 
-    ...expression().repository,
+    ...expressions().repository,
 
     includeStatement,
     ...importStatement().repository,
