@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.11.19",
+  "version": "0.11.20-rc1",
   "description": "An integrated language service for Typst",
   "categories": [
     "Programming Languages",
@@ -281,7 +281,7 @@
         },
         "tinymist.rootPath": {
           "title": "Root path",
-          "description": "Configure the root for absolute paths in typst. Hint: you can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path.",
+          "markdownDescription": "Configure the root for absolute paths in typst. Hint: you can set the rootPath to `-`, so that tinymist will always use parent directory of the file as the root path. Note: for neovim users, if it complains root not found, you must set `require(\"lspconfig\")[\"tinymist\"].setup { root_dir }` as well, see [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528).",
           "type": [
             "string",
             "null"

@@ -6,18 +6,16 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{bail, Context};
 use once_cell::sync::Lazy;
+use reflexo_typst::{EntryReader, EntryState, TaskInputs, TypstDatetime};
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
-use typst::foundations::IntoValue;
+use typst::foundations::{IntoValue, Smart};
 use typst::{
-    foundations::Smart,
     layout::{Abs, Frame},
     syntax::{ast, SyntaxNode},
     visualize::Color,
 };
-use typst_ts_compiler::{EntryReader, EntryState, TaskInputs};
-use typst_ts_core::TypstDatetime;
 
 use crate::tool::text::FullTextDigest;
 use crate::{
@@ -172,6 +170,7 @@ impl ExportConfig {
         kind: &ExportKind,
         artifact: CompiledArtifact<LspCompilerFeat>,
     ) -> anyhow::Result<Option<PathBuf>> {
+        use reflexo_vec2svg::DefaultExportFeature;
         use ExportKind::*;
         use PageSelection::*;
 
@@ -224,7 +223,7 @@ impl ExportConfig {
                     pretty,
                 } => {
                     let elements =
-                        typst_ts_compiler::query::retrieve(artifact.world.deref(), &selector, doc)
+                        reflexo_typst::query::retrieve(artifact.world.deref(), &selector, doc)
                             .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
                     if one && elements.len() != 1 {
                         bail!("expected exactly one element, found {}", elements.len());
@@ -247,7 +246,9 @@ impl ExportConfig {
                         serialize(&mapped, &format, strict, pretty).map(String::into_bytes)?
                     }
                 }
-                Html {} => typst_ts_svg_exporter::render_svg_html(doc).into_bytes(),
+                Html {} => {
+                    reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(doc).into_bytes()
+                }
                 Text {} => format!("{}", FullTextDigest(doc.clone())).into_bytes(),
                 Markdown {} => {
                     let conv = Typlite::new(artifact.world)

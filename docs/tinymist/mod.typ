@@ -22,3 +22,20 @@
 
 #let colors = (blue.lighten(10%), olive, eastern)
 #import fletcher.shapes: diamond
+
+#let fg-blue = main-color.mix(rgb("#0074d9"))
+#let pro-tip(content) = locate(loc => {
+  block(
+    width: 100%,
+    breakable: false,
+    inset: (x: 0.65em, y: 0.65em, left: 0.65em * 0.6),
+    radius: 4pt,
+    fill: rgb("#0074d920"),
+    {
+      set text(fill: fg-blue)
+      content
+    },
+  )
+})
+
+#let note-box = pro-tip

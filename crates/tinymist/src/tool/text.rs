@@ -3,7 +3,7 @@
 use core::fmt;
 use std::sync::Arc;
 
-use typst_ts_core::TypstDocument;
+use reflexo_typst::TypstDocument;
 
 /// A full text digest of a document.
 pub struct FullTextDigest(pub Arc<TypstDocument>);

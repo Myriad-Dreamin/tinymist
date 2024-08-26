@@ -12,6 +12,11 @@ use lsp_server::RequestId;
 use lsp_types::request::{GotoDeclarationParams, WorkspaceConfiguration};
 use lsp_types::*;
 use once_cell::sync::OnceCell;
+use reflexo_typst::{
+    error::prelude::*,
+    vfs::notify::{FileChangeSet, MemoryEvent},
+    Bytes, Error, ImmutPath, TaskInputs, Time,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
@@ -26,12 +31,6 @@ use tinymist_query::{
 };
 use tokio::sync::mpsc;
 use typst::{diag::FileResult, syntax::Source};
-use typst_ts_compiler::TaskInputs;
-use typst_ts_compiler::{
-    vfs::notify::{FileChangeSet, MemoryEvent},
-    Time,
-};
-use typst_ts_core::{error::prelude::*, Bytes, Error, ImmutPath};
 
 use super::{init::*, *};
 use crate::actor::editor::EditorRequest;
@@ -1050,8 +1049,8 @@ impl lsp_types::request::Request for OnEnter {
 
 #[test]
 fn test_as_path() {
+    use reflexo::path::PathClean;
     use std::path::Path;
-    use typst_ts_core::path::PathClean;
 
     let uri = Url::parse("untitled:/path/to/file").unwrap();
     assert_eq!(as_path_(uri), Path::new("/untitled/path/to/file").clean());

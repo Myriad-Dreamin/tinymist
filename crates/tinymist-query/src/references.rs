@@ -175,7 +175,7 @@ impl<'a, 'w> ReferencesWorker<'a, 'w> {
 
 #[cfg(test)]
 mod tests {
-    use typst_ts_core::path::unix_slash;
+    use reflexo::path::unix_slash;
 
     use super::*;
     use crate::syntax::find_module_level_docs;
