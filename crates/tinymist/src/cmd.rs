@@ -240,9 +240,6 @@ impl LanguageState {
             return Err(invalid_params("task id 'primary' is reserved"));
         }
 
-        // Disble control plane host
-        // cli_args.preview.control_plane_host = String::default();
-
         let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
 
         let primary = self.primary().handle.clone();

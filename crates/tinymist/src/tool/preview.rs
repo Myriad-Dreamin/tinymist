@@ -13,6 +13,7 @@ use futures::{SinkExt, TryStreamExt};
 use hyper::service::service_fn;
 use hyper_tungstenite::HyperWebsocketStream;
 use hyper_util::rt::TokioIo;
+use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use reflexo::error::prelude::*;
 use reflexo::error_once;
@@ -306,13 +307,11 @@ impl PreviewState {
             mut shutdown_rx,
         } = lsp_rx;
 
-        let conn = lsp_tx;
-
         let (websocket_tx, websocket_rx) = mpsc::unbounded_channel::<ToWsConn>();
 
         let previewer = previewer.start(
             websocket_rx,
-            conn,
+            lsp_tx,
             compile_handler.clone(),
             TYPST_PREVIEW_HTML,
         );
@@ -418,6 +417,7 @@ pub async fn make_static_host(
 ) -> (SocketAddr, oneshot::Sender<()>, tokio::task::JoinHandle<()>) {
     use http_body_util::Full;
     use hyper::body::{Bytes, Incoming};
+    type Server = hyper_util::server::conn::auto::Builder<hyper_util::rt::TokioExecutor>;
 
     let frontend_html = hyper::body::Bytes::from(frontend_html);
     let make_service = move || {
@@ -435,24 +435,14 @@ pub async fn make_static_host(
                             // let e = Error::new(e);
                         })
                         .unwrap();
-                    // hyper_tungstenite::HyperWebsocket
-
-                    const CONVERT_SINK: fn(WsMessage) -> MessageFuture = convert_sink;
-
-                    const CONVERT_ERR: fn(
-                        hyper_tungstenite::tungstenite::Error,
-                    ) -> reflexo_typst::Error = convert_err;
-
-                    const CONVERT_OK: fn(hyper_tungstenite::tungstenite::Message) -> WsMessage =
-                        convert_ok;
 
                     tokio::spawn(async move {});
                     let _ = websocket_tx.send(Box::pin(async move {
                         let conn = websocket.await.unwrap();
-                        conn.sink_map_err(CONVERT_ERR)
-                            .map_err(CONVERT_ERR)
-                            .with(CONVERT_SINK)
-                            .map_ok(CONVERT_OK)
+                        conn.sink_map_err(convert_err as fn(_) -> _)
+                            .map_err(convert_err as fn(_) -> _)
+                            .with(convert_sink as fn(_) -> _)
+                            .map_ok(convert_ok as fn(_) -> _)
                     }));
 
                     // Return the response so the spawned future can continue.
@@ -481,7 +471,7 @@ pub async fn make_static_host(
         .await
         .unwrap();
     let addr = listener.local_addr().unwrap();
-    println!("Listening on http://{addr}");
+    log::info!("Listening preview server on http://{addr}");
 
     let (tx, rx) = tokio::sync::oneshot::channel();
     let (final_tx, final_rx) = tokio::sync::oneshot::channel();
@@ -489,42 +479,36 @@ pub async fn make_static_host(
     // the graceful watcher
     let graceful = hyper_util::server::graceful::GracefulShutdown::new();
 
+    let serve_conn = move |server: &Server, graceful: &GracefulShutdown, conn| {
+        let (stream, _peer_addr) = match conn {
+            Ok(conn) => conn,
+            Err(e) => {
+                log::error!("accept error: {e}");
+                return;
+            }
+        };
+
+        let conn = server.serve_connection_with_upgrades(TokioIo::new(stream), make_service());
+        let conn = graceful.watch(conn.into_owned());
+        tokio::spawn(async move {
+            if let Err(err) = conn.await {
+                log::error!("Error serving connection: {err:?}");
+            }
+        });
+    };
+
     let join_handle = tokio::spawn(async move {
         // when this signal completes, start shutdown
         let mut signal = std::pin::pin!(final_rx);
 
-        let mut server =
-            hyper_util::server::conn::auto::Builder::new(hyper_util::rt::TokioExecutor::new());
+        let mut server = Server::new(hyper_util::rt::TokioExecutor::new());
         server.http1().keep_alive(true);
-        let server = server;
 
         loop {
             tokio::select! {
-                conn = listener.accept() => {
-                    let (stream, _peer_addr) = match conn {
-                        Ok(conn) => conn,
-                        Err(e) => {
-                            eprintln!("accept error: {e}");
-                            tokio::time::sleep(Duration::from_secs(1)).await;
-                            continue;
-                        }
-                    };
-
-                    let conn =
-                        server.serve_connection_with_upgrades(TokioIo::new(Box::pin(stream)), make_service()).into_owned();
-
-                        // watch this conn
-                    let conn = graceful.watch(conn);
-                    tokio::spawn(async move {
-
-                        if let Err(err) = conn.await {
-                            println!("Error serving connection: {err:?}");
-                        }
-                    });
-                },
+                conn = listener.accept() => serve_conn(&server, &graceful, conn),
                 Ok(_) = &mut signal => {
-                    eprintln!("graceful shutdown signal received");
-                    // stop the accept loop
+                    log::info!("graceful shutdown signal received");
                     break;
                 }
             }
@@ -532,17 +516,17 @@ pub async fn make_static_host(
 
         tokio::select! {
             _ = graceful.shutdown() => {
-                eprintln!("Gracefully shutdown!");
+                log::info!("Gracefully shutdown!");
             },
             _ = tokio::time::sleep(Duration::from_secs(10)) => {
-                eprintln!("Waited 10 seconds for graceful shutdown, aborting...");
+                log::info!("Waited 10 seconds for graceful shutdown, aborting...");
             }
         }
     });
     tokio::spawn(async move {
         let _ = rx.await;
         final_tx.send(()).ok();
-        log::info!("Static file server joined");
+        log::info!("Preview server joined");
     });
     (addr, tx, join_handle)
 }

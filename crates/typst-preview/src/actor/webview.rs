@@ -150,8 +150,8 @@ impl<
                             self.render_sender.send(RenderActorRequest::ResolveSpan(ResolveSpanRequest(path))).unwrap();
                         };
                     } else {
-                        info!("WebviewActor: received unknown message from websocket: {}", msg);
-                        self.webview_websocket_conn.send(WsMessage::Text(format!("error, received unknown message: {}", msg))).await.unwrap();
+                        let err = self.webview_websocket_conn.send(WsMessage::Text(format!("error, received unknown message: {}", msg))).await;
+                        info!("WebviewActor: received unknown message from websocket: {msg} {err:?}");
                         break;
                     }
                 }
