@@ -3928,6 +3928,7 @@ dependencies = [
  "typst-pdf",
  "typst-preview",
  "typst-render",
+ "typst-shim",
  "typst-svg",
  "typst-timing",
  "typstfmt_lib",
@@ -3987,7 +3988,8 @@ dependencies = [
  "triomphe",
  "ttf-parser 0.20.0",
  "typst",
- "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?branch=main)",
+ "typst-assets",
+ "typst-shim",
  "unscanny",
  "walkdir",
  "yaml-rust2",
@@ -4498,6 +4500,15 @@ dependencies = [
  "typst-macros",
  "typst-timing",
  "usvg",
+]
+
+[[package]]
+name = "typst-shim"
+version = "0.11.20"
+dependencies = [
+ "cfg-if",
+ "typst",
+ "typst-syntax 0.11.1",
 ]
 
 [[package]]

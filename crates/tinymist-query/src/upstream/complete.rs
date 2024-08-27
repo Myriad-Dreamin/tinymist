@@ -1244,7 +1244,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         docs: Option<&str>,
     ) {
         // Prevent duplicate completions from appearing.
-        if !self.seen_casts.insert(typst::utils::hash128(value)) {
+        if !self.seen_casts.insert(typst_shim::utils::hash128(value)) {
             return;
         }
 

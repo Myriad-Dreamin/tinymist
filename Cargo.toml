@@ -21,6 +21,7 @@ if_chain = "1"
 itertools = "0.13"
 once_cell = "1"
 paste = "1.0"
+cfg-if = "1.0"
 strum = { version = "0.26.2", features = ["derive"] }
 triomphe = { version = "0.1.10", default-features = false, features = ["std"] }
 
@@ -110,6 +111,7 @@ typst-assets = { git = "https://github.com/typst/typst-assets", branch = "main" 
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
 typstyle = { git = "https://github.com/ParaN3xus/typstyle", branch = "typst-mainline", default-features = false }
 typlite = { path = "./crates/typlite" }
+typst-shim = { path = "./crates/typst-shim", features = [] }
 
 # LSP
 crossbeam-channel = "0.5.12"
