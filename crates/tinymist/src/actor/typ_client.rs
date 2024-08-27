@@ -215,9 +215,14 @@ impl CompileHandler {
                 self.0.registry.resolve(spec)
             }
 
-            fn iter_dependencies(&self, f: &mut dyn FnMut(ImmutPath)) {
+            fn dependencies(&self) -> EcoVec<ImmutPath> {
                 use reflexo_typst::WorldDeps;
-                self.0.iter_dependencies(f)
+                let mut deps = EcoVec::new();
+                self.0.iter_dependencies(&mut |dep| {
+                    deps.push(dep);
+                });
+
+                deps
             }
 
             /// Resolve extra font information.
