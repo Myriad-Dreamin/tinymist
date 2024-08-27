@@ -561,6 +561,20 @@ impl LexicalHierarchyWorker {
     fn get_ident(&self, node: &LinkedNode) -> anyhow::Result<Option<LexicalInfo>> {
         let (name, kind) = match node.kind() {
             SyntaxKind::Label if self.g.affect_symbol() => {
+                // filter out label in code context.
+                let p = node.prev_sibling_kind();
+                if p.is_some_and(|p| {
+                    matches!(
+                        p,
+                        SyntaxKind::LeftBracket
+                            | SyntaxKind::LeftBrace
+                            | SyntaxKind::LeftParen
+                            | SyntaxKind::Comma
+                            | SyntaxKind::Colon
+                    ) || p.is_keyword()
+                }) {
+                    return Ok(None);
+                }
                 let ast_node = node
                     .cast::<ast::Label>()
                     .ok_or_else(|| anyhow!("cast to ast node failed: {:?}", node))?;

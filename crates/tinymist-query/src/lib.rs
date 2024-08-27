@@ -36,6 +36,8 @@ mod document_highlight;
 pub use document_highlight::*;
 mod document_symbol;
 pub use document_symbol::*;
+mod workspace_label;
+pub use workspace_label::*;
 mod document_metrics;
 pub use document_metrics::*;
 mod folding_range;
@@ -259,6 +261,7 @@ mod polymorphic {
         OnEnter(OnEnterRequest),
 
         DocumentMetrics(DocumentMetricsRequest),
+        WorkspaceLabel(WorkspaceLabelRequest),
         ServerInfo(ServerInfoRequest),
     }
 
@@ -282,6 +285,7 @@ mod polymorphic {
                 Self::Rename(..) => Mergeable,
                 Self::PrepareRename(..) => Mergeable,
                 Self::DocumentSymbol(..) => ContextFreeUnique,
+                Self::WorkspaceLabel(..) => Mergeable,
                 Self::Symbol(..) => Mergeable,
                 Self::SemanticTokensFull(..) => ContextFreeUnique,
                 Self::SemanticTokensDelta(..) => ContextFreeUnique,
@@ -316,6 +320,7 @@ mod polymorphic {
                 Self::PrepareRename(req) => &req.path,
                 Self::DocumentSymbol(req) => &req.path,
                 Self::Symbol(..) => return None,
+                Self::WorkspaceLabel(..) => return None,
                 Self::SemanticTokensFull(req) => &req.path,
                 Self::SemanticTokensDelta(req) => &req.path,
                 Self::Formatting(req) => &req.path,
@@ -350,6 +355,7 @@ mod polymorphic {
         Rename(Option<WorkspaceEdit>),
         DocumentSymbol(Option<DocumentSymbolResponse>),
         Symbol(Option<Vec<SymbolInformation>>),
+        WorkspaceLabel(Option<Vec<SymbolInformation>>),
         SemanticTokensFull(Option<SemanticTokensResult>),
         SemanticTokensDelta(Option<SemanticTokensFullDeltaResult>),
         Formatting(Option<Vec<TextEdit>>),
@@ -383,6 +389,7 @@ mod polymorphic {
                 Self::Rename(res) => serde_json::to_value(res),
                 Self::DocumentSymbol(res) => serde_json::to_value(res),
                 Self::Symbol(res) => serde_json::to_value(res),
+                Self::WorkspaceLabel(res) => serde_json::to_value(res),
                 Self::SemanticTokensFull(res) => serde_json::to_value(res),
                 Self::SemanticTokensDelta(res) => serde_json::to_value(res),
                 Self::Formatting(res) => serde_json::to_value(res),
