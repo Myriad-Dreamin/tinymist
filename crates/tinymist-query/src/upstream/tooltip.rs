@@ -7,8 +7,8 @@ use typst::foundations::{repr, Capturer, CastInfo, Value};
 use typst::layout::Length;
 use typst::model::Document;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
-use typst::util::{round_2, Numeric};
 use typst::World;
+use typst_shim::utils::{round_2, Numeric};
 
 use super::{plain_docs_sentence, summarize_font_family, truncated_repr};
 use crate::analysis::{analyze_expr_, analyze_labels, DynLabel};

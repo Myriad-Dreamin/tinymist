@@ -8,14 +8,12 @@ use ecow::{eco_vec, EcoVec};
 use log::info;
 use lsp_types::SymbolKind;
 use serde::{Deserialize, Serialize};
-use typst::{
-    syntax::{
-        ast::{self, AstNode},
-        package::PackageSpec,
-        LinkedNode, Source, SyntaxKind,
-    },
-    util::LazyHash,
+use typst::syntax::{
+    ast::{self, AstNode},
+    package::PackageSpec,
+    LinkedNode, Source, SyntaxKind,
 };
+use typst_shim::utils::LazyHash;
 
 use super::IdentRef;
 
