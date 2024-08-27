@@ -1,6 +1,6 @@
 // This is important for shiroa to produce a responsive layout
 // and multiple targets.
-#import "@preview/shiroa:0.1.0": get-page-width, target, is-web-target, is-pdf-target, plain-text, templates
+#import "@preview/shiroa:0.1.1": get-page-width, target, is-web-target, is-pdf-target, plain-text, templates
 #import templates: *
 
 // Metadata
