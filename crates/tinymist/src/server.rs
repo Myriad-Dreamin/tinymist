@@ -256,7 +256,7 @@ impl LanguageState {
             .with_command_("tinymist.interactCodeContext", State::interact_code_context)
             .with_command("tinymist.getDocumentTrace", State::get_document_trace)
             .with_command_("tinymist.getDocumentMetrics", State::get_document_metrics)
-            .with_command_("tinymist.getWorkspaceLabels", State::get_workspace_labes)
+            .with_command_("tinymist.getWorkspaceLabels", State::get_workspace_labels)
             .with_command_("tinymist.getServerInfo", State::get_server_info)
             // resources
             .with_resource("/symbols", State::resource_symbols)

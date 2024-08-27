@@ -465,7 +465,7 @@ impl LanguageState {
     }
 
     /// Get all syntatic labels in workspace.
-    pub fn get_workspace_labes(
+    pub fn get_workspace_labels(
         &mut self,
         req_id: RequestId,
         _arguments: Vec<JsonValue>,
