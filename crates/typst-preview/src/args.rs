@@ -28,18 +28,6 @@ pub enum RefreshStyle {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct PreviewArgs {
-    /// Control plane server will bind to this address
-    #[cfg_attr(
-        feature = "clap",
-        clap(
-            long = "control-plane-host",
-            default_value = "127.0.0.1:23626",
-            value_name = "HOST",
-            hide(true)
-        )
-    )]
-    pub control_plane_host: String,
-
     /// Only render visible part of the document. This can improve performance
     /// but still being experimental.
     #[cfg_attr(feature = "clap", clap(long = "partial-rendering"))]

@@ -6,7 +6,6 @@ pub use actor::editor::{
     CompileStatus, ControlPlaneMessage, ControlPlaneResponse, LspControlPlaneRx, LspControlPlaneTx,
 };
 pub use args::*;
-use hyper_tungstenite::HyperWebsocket;
 pub use outline::Outline;
 
 use std::pin::Pin;
@@ -27,14 +26,18 @@ use typst::{layout::Position, syntax::Span};
 
 use crate::actor::editor::EditorActorRequest;
 use crate::actor::render::RenderActorRequest;
-use actor::editor::{EditorActor, EditorConnection};
+use actor::editor::EditorActor;
 use actor::typst::{TypstActor, TypstActorRequest};
 use actor::webview::WebviewActorRequest;
 use debug_loc::SpanInterner;
 
+pub use crate::actor::editor::EditorConnection;
+
 type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
-pub type WebviewConn = Box<dyn futures::Sink<Message, Error = reflexo_typst::Error>>;
+// type WsError = hyper_tungstenite::tungstenite::Error;
+type WsError = reflexo_typst::Error;
+type ToWsConn<C> = Pin<Box<dyn Future<Output = C> + Send>>;
 
 pub struct Previewer {
     frontend_html_factory: Box<dyn Fn(PreviewMode) -> String + Send + Sync>,
@@ -68,24 +71,43 @@ impl Previewer {
 
 pub trait CompileHost: SourceFileServer + EditorServer {}
 
-pub async fn preview<T: CompileHost + Send + Sync + 'static>(
+pub async fn preview<
+    C: futures::Sink<Message, Error = WsError>
+        + futures::Stream<Item = Result<Message, WsError>>
+        + Send
+        + Sync
+        + 'static,
+    T: CompileHost + Send + Sync + 'static,
+>(
     arguments: PreviewArgs,
-    rx: mpsc::UnboundedReceiver<HyperWebsocket>,
+    rx: mpsc::UnboundedReceiver<ToWsConn<C>>,
+    conn: EditorConnection<'static, C>,
     client: Arc<T>,
     html: &str,
 ) -> Previewer {
-    PreviewBuilder::new(arguments).start(rx, client, html).await
+    PreviewBuilder::new(arguments)
+        .start(rx, conn, client, html)
+        .await
 }
 
-async fn preview_<T: CompileHost + Send + Sync + 'static>(
+// futures::Sink<Message, Error = WsError>
+async fn preview_<
+    C: futures::Sink<Message, Error = WsError>
+        + futures::Stream<Item = Result<Message, WsError>>
+        + Send
+        + 'static,
+    T: CompileHost + Send + Sync + 'static,
+>(
     builder: PreviewBuilder,
-    mut websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>,
+    mut websocket_rx: mpsc::UnboundedReceiver<ToWsConn<C>>,
+    conn: EditorConnection<'static, C>,
     client: Arc<T>,
     html: &str,
 ) -> Previewer {
     let PreviewBuilder {
         arguments,
-        lsp_connection,
+        shutdown_tx,
+        // lsp_connection,
         typst_mailbox,
         renderer_mailbox,
         editor_conn,
@@ -119,41 +141,65 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
         let webview_tx = webview_tx.clone();
         let renderer_tx = renderer_mailbox.0.clone();
         let editor_tx = editor_conn.0.clone();
-        let shutdown_tx = lsp_connection.as_ref().map(|e| e.shutdown_tx.clone());
+
+        // let shutdown_tx = lsp_connection.as_ref().map(|e| e.shutdown_tx.clone());
         tokio::spawn(async move {
             let (alive_tx, mut alive_rx) = mpsc::unbounded_channel();
 
-            let recv = |websocket: HyperWebsocket| async {
-                let mut conn = websocket.await.expect("cannot accept websocket");
+            let recv = |conn: ToWsConn<C>| {
+                // let mut conn = websocket.await.expect("cannot accept websocket");
+                // C: futures::Sink<Message, Error = reflexo_typst::Error>,
                 let span_interner = span_interner.clone();
                 let webview_tx = webview_tx.clone();
                 let webview_rx = webview_tx.subscribe();
                 let typst_tx = typst_tx.clone();
-                if enable_partial_rendering {
-                    conn.send(Message::Binary("partial-rendering,true".into()))
-                        .await
-                        .unwrap();
-                }
-                if !invert_colors.is_empty() {
-                    conn.send(Message::Binary(
-                        format!("invert-colors,{}", invert_colors).into(),
-                    ))
-                    .await
-                    .unwrap();
-                }
-                let actor::webview::Channels { svg } =
-                    actor::webview::WebviewActor::set_up_channels();
-                let webview_actor = actor::webview::WebviewActor::new(
-                    conn,
-                    svg.1,
-                    webview_tx.clone(),
-                    webview_rx,
-                    editor_tx.clone(),
-                    renderer_tx.clone(),
-                );
-
+                let editor_tx = editor_tx.clone();
+                let invert_colors = invert_colors.clone();
+                let renderer_tx = renderer_tx.clone();
+                let doc_sender = doc_sender.clone();
                 let alive_tx = alive_tx.clone();
                 tokio::spawn(async move {
+                    let conn = conn.await;
+                    tokio::pin!(conn);
+
+                    if enable_partial_rendering {
+                        conn.send(Message::Binary("partial-rendering,true".into()))
+                            .await
+                            .unwrap();
+                    }
+                    if !invert_colors.is_empty() {
+                        conn.send(Message::Binary(
+                            format!("invert-colors,{}", invert_colors).into(),
+                        ))
+                        .await
+                        .unwrap();
+                    }
+                    let actor::webview::Channels { svg } =
+                        actor::webview::WebviewActor::<'_, C>::set_up_channels();
+                    let webview_actor = actor::webview::WebviewActor::new(
+                        conn,
+                        svg.1,
+                        webview_tx.clone(),
+                        webview_rx,
+                        editor_tx.clone(),
+                        renderer_tx.clone(),
+                    );
+                    let render_actor = actor::render::RenderActor::new(
+                        renderer_tx.subscribe(),
+                        doc_sender.clone(),
+                        typst_tx,
+                        svg.0,
+                        webview_tx,
+                    );
+                    tokio::spawn(render_actor.run());
+                    let outline_render_actor = actor::render::OutlineRenderActor::new(
+                        renderer_tx.subscribe(),
+                        doc_sender.clone(),
+                        editor_tx.clone(),
+                        span_interner,
+                    );
+                    tokio::spawn(outline_render_actor.run());
+
                     struct FinallySend(mpsc::UnboundedSender<()>);
                     impl Drop for FinallySend {
                         fn drop(&mut self) {
@@ -164,21 +210,6 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
                     let _send = FinallySend(alive_tx);
                     webview_actor.run().await;
                 });
-                let render_actor = actor::render::RenderActor::new(
-                    renderer_tx.subscribe(),
-                    doc_sender.clone(),
-                    typst_tx,
-                    svg.0,
-                    webview_tx,
-                );
-                tokio::spawn(render_actor.run());
-                let outline_render_actor = actor::render::OutlineRenderActor::new(
-                    renderer_tx.subscribe(),
-                    doc_sender.clone(),
-                    editor_tx.clone(),
-                    span_interner,
-                );
-                tokio::spawn(outline_render_actor.run());
             };
 
             let mut alive_cnt = 0;
@@ -194,7 +225,7 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
                     }
                     Some(stream) = websocket_rx.recv() => {
                         alive_cnt += 1;
-                        recv(stream).await;
+                        recv(stream);
                     },
                     _ = alive_rx.recv() => {
                         alive_cnt -= 1;
@@ -212,28 +243,11 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
         })
     };
 
-    let control_plane_addr = arguments.control_plane_host;
     let control_plane_handle = {
         let span_interner = span_interner.clone();
         let typst_tx = typst_mailbox.0.clone();
         let editor_rx = editor_conn.1;
         tokio::spawn(async move {
-            let conn = if !control_plane_addr.is_empty() {
-                let try_socket = TcpListener::bind(&control_plane_addr).await;
-                let listener = try_socket.expect("Failed to bind");
-                info!(
-                    "Control plane server listening on: {}",
-                    listener.local_addr().unwrap()
-                );
-                let (stream, _) = listener.accept().await.unwrap();
-
-                let conn = accept_connection(stream).await;
-
-                EditorConnection::WebSocket(conn)
-            } else {
-                EditorConnection::Lsp(lsp_connection.unwrap())
-            };
-
             let editor_actor =
                 EditorActor::new(editor_rx, conn, typst_tx, webview_tx, span_interner);
             editor_actor.run().await;
@@ -277,8 +291,8 @@ type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
 
 pub struct PreviewBuilder {
     arguments: PreviewArgs,
-    lsp_connection: Option<LspControlPlaneTx>,
-
+    shutdown_tx: Option<mpsc::Sender<()>>,
+    // lsp_connection: Option<LspControlPlaneTx>,
     typst_mailbox: MpScChannel<TypstActorRequest>,
     renderer_mailbox: BroadcastChannel<RenderActorRequest>,
     editor_conn: MpScChannel<EditorActorRequest>,
@@ -292,7 +306,8 @@ impl PreviewBuilder {
     pub fn new(arguments: PreviewArgs) -> Self {
         Self {
             arguments,
-            lsp_connection: None,
+            shutdown_tx: None,
+            // lsp_connection: None,
             typst_mailbox: mpsc::unbounded_channel(),
             renderer_mailbox: broadcast::channel(1024),
             editor_conn: mpsc::unbounded_channel(),
@@ -302,8 +317,14 @@ impl PreviewBuilder {
         }
     }
 
-    pub fn with_lsp_connection(mut self, lsp_connection: Option<LspControlPlaneTx>) -> Self {
-        self.lsp_connection = lsp_connection;
+    // pub fn with_lsp_connection(mut self, lsp_connection:
+    // Option<LspControlPlaneTx>) -> Self {     self.lsp_connection =
+    // lsp_connection;     self
+    // }
+    // pub shutdown_tx: Option<mpsc::Sender<()>>,
+
+    pub fn with_shutdown_tx(mut self, shutdown_tx: mpsc::Sender<()>) -> Self {
+        self.shutdown_tx = Some(shutdown_tx);
         self
     }
 
@@ -319,16 +340,21 @@ impl PreviewBuilder {
         })
     }
 
-    pub async fn start<T>(
+    pub async fn start<C, T>(
         self,
-        websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>,
+        websocket_rx: mpsc::UnboundedReceiver<ToWsConn<C>>,
+        conn: EditorConnection<'static, C>,
         client: Arc<T>,
         html: &str,
     ) -> Previewer
     where
+        C: futures::Sink<Message, Error = WsError>
+            + futures::Stream<Item = Result<Message, WsError>>
+            + Send
+            + 'static,
         T: CompileHost + Send + Sync + 'static,
     {
-        preview_(self, websocket_rx, client, html).await
+        preview_(self, websocket_rx, conn, client, html).await
     }
 }
 

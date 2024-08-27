@@ -241,7 +241,7 @@ impl LanguageState {
         }
 
         // Disble control plane host
-        cli_args.preview.control_plane_host = String::default();
+        // cli_args.preview.control_plane_host = String::default();
 
         let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
 

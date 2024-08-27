@@ -1,15 +1,20 @@
 //! Document preview tool for Typst
 
 use std::convert::Infallible;
+use std::future::Future;
 use std::num::NonZeroUsize;
+use std::pin::Pin;
 use std::time::Duration;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
 use actor::typ_server::{CompileServerOpts, SucceededArtifact};
+use futures::{SinkExt, TryStreamExt};
 use hyper::service::service_fn;
-use hyper_tungstenite::HyperWebsocket;
+use hyper_tungstenite::HyperWebsocketStream;
 use hyper_util::rt::TokioIo;
 use lsp_types::notification::Notification;
+use reflexo::error::prelude::*;
+use reflexo::error_once;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
 use reflexo_typst::{EntryReader, Error, TypstDocument, TypstFileId};
@@ -24,9 +29,9 @@ use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
 pub use typst_preview::CompileStatus;
 use typst_preview::{
-    CompileHost, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo, EditorServer,
-    Location, LspControlPlaneRx, LspControlPlaneTx, MemoryFiles, MemoryFilesShort, PreviewArgs,
-    PreviewBuilder, PreviewMode, Previewer, SourceFileServer,
+    CompileHost, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo, EditorConnection,
+    EditorServer, Location, LspControlPlaneRx, LspControlPlaneTx, MemoryFiles, MemoryFilesShort,
+    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, SourceFileServer,
 };
 
 use crate::world::{LspCompilerFeat, LspWorld};
@@ -36,6 +41,13 @@ use actor::{
     typ_client::CompileHandler,
     typ_server::CompileServerActor,
 };
+
+type ErrConverter = fn(hyper_tungstenite::tungstenite::Error) -> reflexo_typst::Error;
+type WsConn = futures::sink::SinkMapErr<
+    futures::stream::MapErr<HyperWebsocketStream, ErrConverter>,
+    ErrConverter,
+>;
+type ToWsConn = Pin<Box<dyn Future<Output = WsConn> + Send>>;
 
 impl CompileHost for CompileHandler {}
 
@@ -194,6 +206,18 @@ pub struct PreviewCliArgs {
     )]
     pub data_plane_host: String,
 
+    /// Control plane server will bind to this address
+    #[cfg_attr(
+        feature = "clap",
+        clap(
+            long = "control-plane-host",
+            default_value = "127.0.0.1:23626",
+            value_name = "HOST",
+            hide(true)
+        )
+    )]
+    pub control_plane_host: String,
+
     /// (File) Host for the preview server
     #[clap(
         long = "host",
@@ -268,9 +292,13 @@ impl PreviewState {
         } = lsp_rx;
 
         // Create a previewer
-        previewer = previewer.with_lsp_connection(Some(lsp_tx));
+        // previewer = previewer.with_lsp_connection(Some(lsp_tx));
 
-        let (websocket_tx, websocket_rx) = mpsc::unbounded_channel();
+        //
+        // conn: EditorConnection<'static, C>,
+        let conn = EditorConnection::Lsp(lsp_tx);
+
+        let (websocket_tx, websocket_rx) = mpsc::unbounded_channel::<ToWsConn>();
 
         // websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>,
         // Create the event loop and TCP listener we'll accept connections on.
@@ -295,10 +323,20 @@ impl PreviewState {
         // } else {
         //     url
         // };
+        // C: futures::Sink<Message, Error = reflexo_typst::Error>
+        // + futures::Stream<Item = Result<Message, reflexo_typst::Error>>
+        // + Send
+        // + Sync
+        // + 'static,
 
         let data_plane_port = 0;
 
-        let previewer = previewer.start(websocket_rx, compile_handler.clone(), TYPST_PREVIEW_HTML);
+        let previewer = previewer.start(
+            websocket_rx,
+            conn,
+            compile_handler.clone(),
+            TYPST_PREVIEW_HTML,
+        );
 
         // Forward preview responses to lsp client
         let tid = task_id.clone();
@@ -408,7 +446,7 @@ pub async fn make_static_host(
     previewer: &Previewer,
     static_file_addr: String,
     mode: PreviewMode,
-    websocket_tx: mpsc::UnboundedSender<HyperWebsocket>,
+    websocket_tx: mpsc::UnboundedSender<ToWsConn>,
 ) -> (SocketAddr, oneshot::Sender<()>, tokio::task::JoinHandle<()>) {
     use http_body_util::Full;
     use hyper::body::{Bytes, Incoming};
@@ -429,8 +467,18 @@ pub async fn make_static_host(
                             // let e = Error::new(e);
                         })
                         .unwrap();
+                    // hyper_tungstenite::HyperWebsocket
 
-                    let _ = websocket_tx.send(websocket);
+                    const CONVERT_ERR: fn(
+                        hyper_tungstenite::tungstenite::Error,
+                    ) -> reflexo_typst::Error = convert_err;
+
+                    // tokio::spawn(async move {
+                    // });
+                    let _ = websocket_tx.send(Box::pin(async move {
+                        let conn = websocket.await.unwrap();
+                        conn.map_err(CONVERT_ERR).sink_map_err(CONVERT_ERR)
+                    }));
 
                     // Return the response so the spawned future can continue.
                     Ok(response)
@@ -570,17 +618,41 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         (service, handle)
     };
 
+    // let control_plane_addr = arguments.control_plane_host;
+    // let conn = if !control_plane_addr.is_empty() {
+    //     let try_socket = TcpListener::bind(&control_plane_addr).await;
+    //     let listener = try_socket.expect("Failed to bind");
+    //     info!(
+    //         "Control plane server listening on: {}",
+    //         listener.local_addr().unwrap()
+    //     );
+    //     let (stream, _) = listener.accept().await.unwrap();
+
+    //     let conn = accept_connection(stream).await;
+
+    //     EditorConnection::WebSocket(conn)
+    // } else {
+    //     EditorConnection::Lsp(lsp_connection.unwrap())
+    // };
+
+    let conn = EditorConnection::WebSocket(todo!());
+
     let previewer = PreviewBuilder::new(args.preview);
     let registered = handle.register_preview(previewer.compile_watcher());
     assert!(registered, "failed to register preview");
-    let (tx, rx) = mpsc::unbounded_channel();
+    let (websocket_tx, websocket_rx) = mpsc::unbounded_channel::<ToWsConn>();
     let previewer = previewer
-        .start(rx, handle.clone(), TYPST_PREVIEW_HTML)
+        .start(websocket_rx, conn, handle.clone(), TYPST_PREVIEW_HTML)
         .await;
     tokio::spawn(service.run());
 
-    let (static_server_addr, _tx, static_server_handle) =
-        make_static_host(&previewer, args.static_file_host, args.preview_mode, tx).await;
+    let (static_server_addr, _tx, static_server_handle) = make_static_host(
+        &previewer,
+        args.static_file_host,
+        args.preview_mode,
+        websocket_tx,
+    )
+    .await;
     log::info!("Static file server listening on: {}", static_server_addr);
 
     if !args.dont_open_in_browser {
@@ -671,4 +743,8 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
     }
 
     None
+}
+
+fn convert_err(e: hyper_tungstenite::tungstenite::Error) -> reflexo::Error {
+    error_once!("cannot serve websocket", err: e.to_string())
 }

@@ -1,14 +1,17 @@
+use std::pin::Pin;
+
 use futures::{SinkExt, StreamExt};
+use hyper_tungstenite::{tungstenite::Message, WebSocketStream};
 use log::{debug, info, trace, warn};
 use reflexo_typst::debug_loc::DocumentPosition;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio::{net::TcpStream, sync::broadcast};
-use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 // use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 
 use crate::debug_loc::{InternQuery, SpanInterner};
 use crate::outline::Outline;
+use crate::WsError;
 use crate::{
     actor::typst::TypstActorRequest, ChangeCursorPositionRequest, DocToSrcJumpInfo, MemoryFiles,
     MemoryFilesShort, SrcToDocJumpRequest,
@@ -76,12 +79,25 @@ impl LspControlPlaneTx {
     }
 }
 
-pub enum EditorConnection {
-    WebSocket(WebSocketStream<TcpStream>),
+pub enum EditorConnection<
+    'a,
+    C: futures::Sink<Message, Error = WsError>
+        + futures::Stream<Item = Result<Message, WsError>>
+        + Send
+        + 'static,
+> {
+    WebSocket(Pin<&'a mut C>),
     Lsp(LspControlPlaneTx),
 }
 
-impl EditorConnection {
+impl<
+        'a,
+        C: futures::Sink<Message, Error = WsError>
+            + futures::Stream<Item = Result<Message, WsError>>
+            + Send
+            + 'static,
+    > EditorConnection<'a, C>
+{
     fn need_sync_files(&self) -> bool {
         matches!(self, EditorConnection::WebSocket(_))
     }
@@ -137,9 +153,15 @@ impl EditorConnection {
     }
 }
 
-pub struct EditorActor {
+pub struct EditorActor<
+    'a,
+    C: futures::Sink<Message, Error = WsError>
+        + futures::Stream<Item = Result<Message, WsError>>
+        + Send
+        + 'static,
+> {
     mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
-    editor_conn: EditorConnection,
+    editor_conn: EditorConnection<'a, C>,
 
     world_sender: mpsc::UnboundedSender<TypstActorRequest>,
     webview_sender: broadcast::Sender<WebviewActorRequest>,
@@ -179,10 +201,17 @@ pub enum ControlPlaneResponse {
     Outline(Outline),
 }
 
-impl EditorActor {
+impl<
+        'a,
+        C: futures::Sink<Message, Error = WsError>
+            + futures::Stream<Item = Result<Message, WsError>>
+            + Send
+            + 'static,
+    > EditorActor<'a, C>
+{
     pub fn new(
         mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
-        editor_websocket_conn: EditorConnection,
+        editor_websocket_conn: EditorConnection<'a, C>,
         world_sender: mpsc::UnboundedSender<TypstActorRequest>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
         span_interner: SpanInterner,

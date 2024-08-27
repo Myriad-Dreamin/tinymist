@@ -1,10 +1,13 @@
 use futures::{SinkExt, StreamExt};
-use hyper_tungstenite::{tungstenite::Message, HyperWebsocketStream};
+use hyper_tungstenite::tungstenite::Message;
 use log::{info, trace};
 use reflexo_typst::debug_loc::{DocumentPosition, ElementPoint};
 use tokio::sync::{broadcast, mpsc};
 
-use crate::actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest};
+use crate::{
+    actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest},
+    WsError,
+};
 
 use super::{editor::EditorActorRequest, render::RenderActorRequest};
 
@@ -26,8 +29,11 @@ fn position_req(
     format!("{event},{page_no} {x} {y}")
 }
 
-pub struct WebviewActor {
-    webview_websocket_conn: HyperWebsocketStream,
+pub struct WebviewActor<
+    'a,
+    C: futures::Sink<Message, Error = WsError> + futures::Stream<Item = Result<Message, WsError>>,
+> {
+    webview_websocket_conn: std::pin::Pin<&'a mut C>,
     svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     mailbox: broadcast::Receiver<WebviewActorRequest>,
 
@@ -43,14 +49,18 @@ pub struct Channels {
     ),
 }
 
-impl WebviewActor {
+impl<
+        'a,
+        C: futures::Sink<Message, Error = WsError> + futures::Stream<Item = Result<Message, WsError>>,
+    > WebviewActor<'a, C>
+{
     pub fn set_up_channels() -> Channels {
         Channels {
             svg: mpsc::unbounded_channel(),
         }
     }
     pub fn new(
-        websocket_conn: HyperWebsocketStream,
+        websocket_conn: std::pin::Pin<&'a mut C>,
         svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
         broadcast_sender: broadcast::Sender<WebviewActorRequest>,
         mailbox: broadcast::Receiver<WebviewActorRequest>,
