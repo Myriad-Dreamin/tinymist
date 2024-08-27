@@ -53,6 +53,11 @@
           "when": "ext.tinymistActivated"
         },
         {
+          "id": "tinymist.label-view",
+          "name": "Label",
+          "when": "ext.tinymistActivated"
+        },
+        {
           "id": "tinymist.preview.outline",
           "name": "Outline",
           "when": "ext.tinymistActivated"
@@ -854,6 +859,11 @@
         "category": "Typst"
       },
       {
+        "command": "tinymist.syncLabel",
+        "title": "Scan workspace and collect all labels again",
+        "icon": "$(extensions-sync-enabled)"
+      },
+      {
         "command": "typst-preview.preview",
         "title": "Typst Preview: Preview current file",
         "description": "Launch typst-preview server",
@@ -942,6 +952,11 @@
         {
           "command": "typst-preview.noteOutline",
           "when": "view == tinymist.preview.outline",
+          "group": "navigation"
+        },
+        {
+          "command": "tinymist.syncLabel",
+          "when": "view == tinymist.label-view",
           "group": "navigation"
         }
       ]

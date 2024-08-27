@@ -464,6 +464,15 @@ impl LanguageState {
         run_query!(req_id, self.DocumentMetrics(path))
     }
 
+    /// Get all syntatic labels in workspace.
+    pub fn get_workspace_labes(
+        &mut self,
+        req_id: RequestId,
+        _arguments: Vec<JsonValue>,
+    ) -> ScheduledResult {
+        run_query!(req_id, self.WorkspaceLabel())
+    }
+
     /// Get the server info.
     pub fn get_server_info(
         &mut self,

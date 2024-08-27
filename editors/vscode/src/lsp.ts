@@ -1,4 +1,4 @@
-import { LanguageClient } from "vscode-languageclient/node";
+import { LanguageClient, SymbolInformation } from "vscode-languageclient/node";
 import { spawnSync } from "child_process";
 import { resolve } from "path";
 
@@ -18,12 +18,13 @@ export async function getClient(): Promise<LanguageClient> {
 }
 
 interface ResourceRoutes {
-    "/symbols": any;
-    "/preview/index.html": string;
-    "/dirs/local-packages": string;
+  "/symbols": any;
+  "/preview/index.html": string;
+  "/dirs/local-packages": string;
 }
 
 export const tinymist = {
+  getClient,
   probeEnvPath,
   probePaths,
   exportPdf: exportCommand("tinymist.exportPdf"),
@@ -44,6 +45,9 @@ export const tinymist = {
   },
   getResource<T extends keyof ResourceRoutes>(path: T) {
     return tinymist.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path]);
+  },
+  getWorkspaceLabels() {
+    return tinymist.executeCommand<SymbolInformation[]>("tinymist.getWorkspaceLabels", []);
   },
   showLog() {
     if (client) {
