@@ -3825,6 +3825,7 @@ dependencies = [
  "typst-pdf",
  "typst-preview",
  "typst-render",
+ "typst-shim",
  "typst-svg",
  "typst-timing",
  "typstfmt_lib",
@@ -3885,6 +3886,7 @@ dependencies = [
  "ttf-parser",
  "typst",
  "typst-assets",
+ "typst-shim",
  "unscanny",
  "walkdir",
  "yaml-rust2",
@@ -4364,6 +4366,15 @@ dependencies = [
  "typst-macros",
  "typst-timing",
  "usvg",
+]
+
+[[package]]
+name = "typst-shim"
+version = "0.11.20"
+dependencies = [
+ "cfg-if",
+ "typst",
+ "typst-syntax 0.11.1",
 ]
 
 [[package]]

@@ -55,6 +55,7 @@ typstfmt_lib.workspace = true
 reflexo.workspace = true
 reflexo-typst.workspace = true
 reflexo-vec2svg.workspace = true
+typst-shim.workspace = true
 codespan-reporting.workspace = true
 toml.workspace = true
 walkdir.workspace = true

@@ -19,7 +19,8 @@ use reflexo_typst::{
     CompileEnv, CompileReport, Compiler, ConsoleDiagReporter, EntryReader, GenericExporter,
     Revising, TaskInputs, TypstDocument, WorldDeps,
 };
-use typst::{diag::SourceResult, util::Deferred};
+use typst::diag::SourceResult;
+use typst_shim::utils::Deferred;
 
 use crate::task::CacheTask;
 

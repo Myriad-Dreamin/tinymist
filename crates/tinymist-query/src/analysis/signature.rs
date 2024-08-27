@@ -12,8 +12,8 @@ use typst::{
         ast::{self, AstNode},
         LinkedNode, Span, SyntaxKind,
     },
-    util::LazyHash,
 };
+use typst_shim::utils::LazyHash;
 
 use crate::adt::interner::Interned;
 use crate::analysis::resolve_callee;
