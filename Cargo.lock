@@ -3988,7 +3988,7 @@ dependencies = [
  "triomphe",
  "ttf-parser 0.20.0",
  "typst",
- "typst-assets",
+ "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?branch=main)",
  "typst-shim",
  "unscanny",
  "walkdir",
@@ -4021,7 +4021,6 @@ dependencies = [
  "tinymist-assets 0.11.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "typst",
  "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?branch=main)",
- "typst-assets",
 ]
 
 [[package]]
@@ -4508,7 +4507,7 @@ version = "0.11.20"
 dependencies = [
  "cfg-if",
  "typst",
- "typst-syntax 0.11.1",
+ "typst-syntax 0.11.0",
 ]
 
 [[package]]
