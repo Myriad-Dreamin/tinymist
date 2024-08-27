@@ -122,7 +122,7 @@ fn star_tooltip(
     source: &Source,
     cursor: usize,
 ) -> Option<HoverContents> {
-    let leaf = LinkedNode::new(source.root()).leaf_at(cursor)?;
+    let leaf = LinkedNode::new(source.root()).leaf_at(cursor, Side::Before)?;
 
     if !matches!(leaf.kind(), SyntaxKind::Star) {
         return None;
@@ -143,7 +143,7 @@ fn star_tooltip(
 
     let mut results = vec![];
 
-    let mut names = scope.iter().map(|(name, _)| name).collect::<Vec<_>>();
+    let mut names = scope.iter().map(|(name, _, _)| name).collect::<Vec<_>>();
     names.sort();
     let mut items = String::new();
     items.push_str("let (");
