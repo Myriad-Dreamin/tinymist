@@ -1,11 +1,8 @@
 use futures::{SinkExt, StreamExt};
+use hyper_tungstenite::{tungstenite::Message, HyperWebsocketStream};
 use log::{info, trace};
 use reflexo_typst::debug_loc::{DocumentPosition, ElementPoint};
-use tokio::{
-    net::TcpStream,
-    sync::{broadcast, mpsc},
-};
-use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
+use tokio::sync::{broadcast, mpsc};
 
 use crate::actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest};
 
@@ -30,7 +27,7 @@ fn position_req(
 }
 
 pub struct WebviewActor {
-    webview_websocket_conn: WebSocketStream<TcpStream>,
+    webview_websocket_conn: HyperWebsocketStream,
     svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     mailbox: broadcast::Receiver<WebviewActorRequest>,
 
@@ -53,7 +50,7 @@ impl WebviewActor {
         }
     }
     pub fn new(
-        websocket_conn: WebSocketStream<TcpStream>,
+        websocket_conn: HyperWebsocketStream,
         svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
         broadcast_sender: broadcast::Sender<WebviewActorRequest>,
         mailbox: broadcast::Receiver<WebviewActorRequest>,

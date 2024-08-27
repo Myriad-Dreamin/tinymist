@@ -45,8 +45,10 @@ chrono = "0.4"
 dirs = "5"
 
 # Networking
-hyper = { version = "0.14", features = ["full"] }
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1.7", features = ["tokio"] }
 tokio-tungstenite = "0.21.0"
+hyper-tungstenite = "0.14.0"
 tower-layer = "0.3.2"
 tower-service = "0.3.2"
 

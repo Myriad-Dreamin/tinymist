@@ -66,6 +66,15 @@ lsp-types.workspace = true
 dhat = { workspace = true, optional = true }
 unicode-script.workspace = true
 hyper = { workspace = true, optional = true }
+hyper-util = { workspace = true, optional = true, features = [
+    "server",
+    "http1",
+    "http2",
+    "server-graceful",
+    "server-auto",
+] }
+http-body-util = { version = "0.1.2", optional = true }
+hyper-tungstenite = { workspace = true, optional = true }
 open = { workspace = true, optional = true }
 dirs.workspace = true
 tower-layer.workspace = true
@@ -100,6 +109,9 @@ preview = [
     "typst-preview/clap",
     "tinymist-assets/typst-preview",
     "hyper",
+    "hyper-util",
+    "hyper-tungstenite",
+    "http-body-util",
     "open",
 ]
 

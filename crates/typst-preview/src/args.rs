@@ -28,18 +28,6 @@ pub enum RefreshStyle {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct PreviewArgs {
-    /// Data plane server will bind to this address
-    #[cfg_attr(
-        feature = "clap",
-        clap(
-            long = "data-plane-host",
-            default_value = "127.0.0.1:23625",
-            value_name = "HOST",
-            hide(true)
-        )
-    )]
-    pub data_plane_host: String,
-
     /// Control plane server will bind to this address
     #[cfg_attr(
         feature = "clap",

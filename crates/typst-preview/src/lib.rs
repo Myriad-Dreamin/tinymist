@@ -2,18 +2,19 @@ mod actor;
 mod args;
 mod debug_loc;
 mod outline;
-
 pub use actor::editor::{
     CompileStatus, ControlPlaneMessage, ControlPlaneResponse, LspControlPlaneRx, LspControlPlaneTx,
 };
 pub use args::*;
+use hyper_tungstenite::HyperWebsocket;
 pub use outline::Outline;
 
 use std::pin::Pin;
 use std::time::Duration;
 use std::{collections::HashMap, future::Future, path::PathBuf, sync::Arc};
 
-use futures::SinkExt;
+use futures::sink::SinkExt;
+use hyper_tungstenite::tungstenite::Message;
 use log::info;
 use once_cell::sync::OnceCell;
 use reflexo_typst::debug_loc::SourceSpanOffset;
@@ -21,9 +22,7 @@ use reflexo_typst::Error;
 use reflexo_typst::TypstDocument as Document;
 use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::WebSocketStream;
+use tokio::sync::{broadcast, mpsc};
 use typst::{layout::Position, syntax::Span};
 
 use crate::actor::editor::EditorActorRequest;
@@ -35,12 +34,14 @@ use debug_loc::SpanInterner;
 
 type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
+pub type WebviewConn = Box<dyn futures::Sink<Message, Error = reflexo_typst::Error>>;
+
 pub struct Previewer {
     frontend_html_factory: Box<dyn Fn(PreviewMode) -> String + Send + Sync>,
     stop: Option<Box<dyn FnOnce() -> StopFuture + Send + Sync>>,
     data_plane_handle: tokio::task::JoinHandle<()>,
     control_plane_handle: tokio::task::JoinHandle<()>,
-    data_plane_port: u16,
+    // data_plane_port: u16,
 }
 
 impl Previewer {
@@ -49,9 +50,9 @@ impl Previewer {
         (self.frontend_html_factory)(mode)
     }
 
-    pub fn data_plane_port(&self) -> u16 {
-        self.data_plane_port
-    }
+    // pub fn data_plane_port(&self) -> u16 {
+    //     self.data_plane_port
+    // }
 
     /// Join the previewer actors.
     pub async fn join(self) {
@@ -69,14 +70,16 @@ pub trait CompileHost: SourceFileServer + EditorServer {}
 
 pub async fn preview<T: CompileHost + Send + Sync + 'static>(
     arguments: PreviewArgs,
+    rx: mpsc::UnboundedReceiver<HyperWebsocket>,
     client: Arc<T>,
     html: &str,
 ) -> Previewer {
-    PreviewBuilder::new(arguments).start(client, html).await
+    PreviewBuilder::new(arguments).start(rx, client, html).await
 }
 
 async fn preview_<T: CompileHost + Send + Sync + 'static>(
     builder: PreviewBuilder,
+    mut websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>,
     client: Arc<T>,
     html: &str,
 ) -> Previewer {
@@ -109,8 +112,6 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
 
     log::info!("Previewer: typst actor spawned");
 
-    let (data_plane_port_tx, data_plane_port_rx) = oneshot::channel();
-    let data_plane_addr = arguments.data_plane_host;
     let (shutdown_data_plane_tx, mut shutdown_data_plane_rx) = mpsc::channel(1);
     let data_plane_handle = {
         let span_interner = span_interner.clone();
@@ -120,21 +121,14 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
         let editor_tx = editor_conn.0.clone();
         let shutdown_tx = lsp_connection.as_ref().map(|e| e.shutdown_tx.clone());
         tokio::spawn(async move {
-            // Create the event loop and TCP listener we'll accept connections on.
-            let try_socket = TcpListener::bind(&data_plane_addr).await;
-            let listener = try_socket.expect("Failed to bind");
-            info!(
-                "Data plane server listening on: {}",
-                listener.local_addr().unwrap()
-            );
-            let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
             let (alive_tx, mut alive_rx) = mpsc::unbounded_channel();
-            let recv = |stream: TcpStream| async {
+
+            let recv = |websocket: HyperWebsocket| async {
+                let mut conn = websocket.await.expect("cannot accept websocket");
                 let span_interner = span_interner.clone();
                 let webview_tx = webview_tx.clone();
                 let webview_rx = webview_tx.subscribe();
                 let typst_tx = typst_tx.clone();
-                let mut conn = accept_connection(stream).await;
                 if enable_partial_rendering {
                     conn.send(Message::Binary("partial-rendering,true".into()))
                         .await
@@ -198,7 +192,7 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
                         info!("Data plane server shutdown");
                         return;
                     }
-                    Ok((stream, _)) = listener.accept() => {
+                    Some(stream) = websocket_rx.recv() => {
                         alive_cnt += 1;
                         recv(stream).await;
                     },
@@ -246,11 +240,9 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
             info!("Control plane client shutdown");
         })
     };
-    let data_plane_port = data_plane_port_rx.await.unwrap();
-    let html = html.replace(
-        "ws://127.0.0.1:23625",
-        format!("ws://127.0.0.1:{data_plane_port}").as_str(),
-    );
+
+    // Relace the data plane port in the html to self
+    let html = html.replace("ws://127.0.0.1:23625", "/");
     // previewMode
     let frontend_html_factory = Box::new(move |mode| -> String {
         let mode = match mode {
@@ -275,7 +267,7 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
         frontend_html_factory,
         data_plane_handle,
         control_plane_handle,
-        data_plane_port,
+        // data_plane_port,
         stop: Some(Box::new(stop)),
     }
 }
@@ -327,11 +319,16 @@ impl PreviewBuilder {
         })
     }
 
-    pub async fn start<T>(self, client: Arc<T>, html: &str) -> Previewer
+    pub async fn start<T>(
+        self,
+        websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>,
+        client: Arc<T>,
+        html: &str,
+    ) -> Previewer
     where
         T: CompileHost + Send + Sync + 'static,
     {
-        preview_(self, client, html).await
+        preview_(self, websocket_rx, client, html).await
     }
 }
 
@@ -473,7 +470,7 @@ impl CompileWatcher {
     }
 }
 
-async fn accept_connection(stream: TcpStream) -> WebSocketStream<TcpStream> {
+async fn accept_connection(stream: TcpStream) -> tokio_tungstenite::WebSocketStream<TcpStream> {
     let addr = stream
         .peer_addr()
         .expect("connected streams should have a peer address");
