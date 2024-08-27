@@ -43,19 +43,16 @@ impl SemanticRequest for SymbolRequest {
                 return;
             };
             let uri = path_to_url(&path).unwrap();
-            let res = get_lexical_hierarchy(source.clone(), LexicalScopeKind::Symbol).and_then(
-                |symbols| {
-                    self.pattern.as_ref().map(|pattern| {
-                        filter_document_symbols(
-                            &symbols,
-                            pattern,
-                            &source,
-                            &uri,
-                            ctx.position_encoding(),
-                        )
-                    })
-                },
-            );
+            let res =
+                get_lexical_hierarchy(source.clone(), LexicalScopeKind::Symbol).map(|symbols| {
+                    filter_document_symbols(
+                        &symbols,
+                        self.pattern.as_deref(),
+                        &source,
+                        &uri,
+                        ctx.position_encoding(),
+                    )
+                });
 
             if let Some(mut res) = res {
                 symbols.append(&mut res)
@@ -69,7 +66,7 @@ impl SemanticRequest for SymbolRequest {
 #[allow(deprecated)]
 fn filter_document_symbols(
     symbols: &[LexicalHierarchy],
-    query_string: &str,
+    query_string: Option<&str>,
     source: &Source,
     uri: &Url,
     position_encoding: PositionEncoding,
@@ -80,11 +77,14 @@ fn filter_document_symbols(
             [e].into_iter()
                 .chain(e.children.as_deref().into_iter().flatten())
         })
-        .filter(|e| e.info.name.contains(query_string))
-        .map(|e| {
+        .flat_map(|e| {
+            if query_string.is_some_and(|s| !e.info.name.contains(s)) {
+                return None;
+            }
+
             let rng = typst_to_lsp::range(e.info.range.clone(), source, position_encoding);
 
-            SymbolInformation {
+            Some(SymbolInformation {
                 name: e.info.name.clone(),
                 kind: e.info.kind.clone().try_into().unwrap(),
                 tags: None,
@@ -94,7 +94,7 @@ fn filter_document_symbols(
                     range: rng,
                 },
                 container_name: None,
-            }
+            })
         })
         .collect()
 }
