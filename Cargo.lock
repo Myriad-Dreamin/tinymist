@@ -3902,7 +3902,6 @@ dependencies = [
  "open",
  "parking_lot",
  "paste",
- "pin-project-lite",
  "rayon",
  "reflexo",
  "reflexo-typst",
@@ -3918,8 +3917,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "toml 0.8.14",
- "tower-layer",
- "tower-service",
  "typlite",
  "typst",
  "typst-ansi-hl",
@@ -4181,12 +4178,6 @@ dependencies = [
  "toml_datetime",
  "winnow 0.6.13",
 ]
-
-[[package]]
-name = "tower-layer"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c20c8dbed6283a09604c3e69b4b7eeb54e298b8a600d4d5ecb5ad39de609f1d0"
 
 [[package]]
 name = "tower-service"

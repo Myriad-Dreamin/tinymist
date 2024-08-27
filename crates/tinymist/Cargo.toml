@@ -77,9 +77,6 @@ http-body-util = { version = "0.1.2", optional = true }
 hyper-tungstenite = { workspace = true, optional = true }
 open = { workspace = true, optional = true }
 dirs.workspace = true
-tower-layer.workspace = true
-tower-service.workspace = true
-pin-project-lite.workspace = true
 base64.workspace = true
 rayon.workspace = true
 
