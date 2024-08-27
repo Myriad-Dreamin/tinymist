@@ -40,21 +40,21 @@ pub enum EditorActorRequest {
     CompileStatus(CompileStatus),
 }
 
-pub struct LspControlPlaneTx {
+pub struct ControlPlaneTx {
     pub is_standalone: bool,
     pub resp_tx: mpsc::UnboundedSender<ControlPlaneResponse>,
     pub ctl_rx: mpsc::UnboundedReceiver<ControlPlaneMessage>,
     pub shutdown_tx: mpsc::Sender<()>,
 }
 
-pub struct LspControlPlaneRx {
+pub struct ControlPlaneRx {
     pub resp_rx: mpsc::UnboundedReceiver<ControlPlaneResponse>,
     pub ctl_tx: mpsc::UnboundedSender<ControlPlaneMessage>,
     pub shutdown_rx: mpsc::Receiver<()>,
 }
 
-impl LspControlPlaneTx {
-    pub fn new(need_sync_files: bool) -> (LspControlPlaneTx, LspControlPlaneRx) {
+impl ControlPlaneTx {
+    pub fn new(need_sync_files: bool) -> (ControlPlaneTx, ControlPlaneRx) {
         let (resp_tx, resp_rx) = mpsc::unbounded_channel();
         let (ctl_tx, ctl_rx) = mpsc::unbounded_channel();
         let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
@@ -66,7 +66,7 @@ impl LspControlPlaneTx {
                 ctl_rx,
                 shutdown_tx,
             },
-            LspControlPlaneRx {
+            ControlPlaneRx {
                 resp_rx,
                 ctl_tx,
                 shutdown_rx,
@@ -75,9 +75,7 @@ impl LspControlPlaneTx {
     }
 }
 
-pub type EditorConnection = LspControlPlaneTx;
-
-impl LspControlPlaneTx {
+impl ControlPlaneTx {
     fn need_sync_files(&self) -> bool {
         self.is_standalone
     }
@@ -106,7 +104,7 @@ impl LspControlPlaneTx {
 
 pub struct EditorActor {
     mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
-    editor_conn: EditorConnection,
+    editor_conn: ControlPlaneTx,
 
     world_sender: mpsc::UnboundedSender<TypstActorRequest>,
     webview_sender: broadcast::Sender<WebviewActorRequest>,
@@ -149,7 +147,7 @@ pub enum ControlPlaneResponse {
 impl EditorActor {
     pub fn new(
         mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
-        editor_websocket_conn: EditorConnection,
+        editor_websocket_conn: ControlPlaneTx,
         world_sender: mpsc::UnboundedSender<TypstActorRequest>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
         span_interner: SpanInterner,

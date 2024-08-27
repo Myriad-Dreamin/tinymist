@@ -30,8 +30,8 @@ use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
 pub use typst_preview::CompileStatus;
 use typst_preview::{
-    CompileHost, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo, EditorServer,
-    Location, LspControlPlaneRx, LspControlPlaneTx, MemoryFiles, MemoryFilesShort, PreviewArgs,
+    CompileHost, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
+    DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort, PreviewArgs,
     PreviewBuilder, PreviewMode, SourceFileServer, WsMessage,
 };
 
@@ -299,52 +299,16 @@ impl PreviewState {
         let task_id = args.preview.task_id.clone();
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
 
-        let (lsp_tx, lsp_rx) = LspControlPlaneTx::new(false);
-        let LspControlPlaneRx {
+        let (lsp_tx, lsp_rx) = ControlPlaneTx::new(false);
+        let ControlPlaneRx {
             resp_rx,
             ctl_tx,
             mut shutdown_rx,
         } = lsp_rx;
 
-        // Create a previewer
-        // previewer = previewer.with_lsp_connection(Some(lsp_tx));
-
-        //
-        // conn: EditorConnection<'static, C>,
         let conn = lsp_tx;
 
         let (websocket_tx, websocket_rx) = mpsc::unbounded_channel::<ToWsConn>();
-
-        // websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>,
-        // Create the event loop and TCP listener we'll accept connections on.
-        // let try_socket = TcpListener::bind(&data_plane_addr).await;
-        // let listener = try_socket.expect("Failed to bind");
-        // info!(
-        //     "Data plane server listening on: {}",
-        //     listener.local_addr().unwrap()
-        // );
-        // let _ = data_plane_port_tx.send(listener.local_addr().unwrap().port());
-        // let (alive_tx, mut alive_rx) = mpsc::unbounded_channel();
-
-        // let mut http = hyper::server::conn::http1::Builder::new();
-        // http.keep_alive(true);
-
-        // let (data_plane_port_tx, data_plane_port_rx) = oneshot::channel();
-        // let data_plane_addr = arguments.data_plane_host;
-        // let data_plane_port = data_plane_port_rx.await.unwrap();
-        // let url = format!("ws://127.0.0.1:{data_plane_port}");
-        // let new_url = if gitpod::is_gitpod() {
-        //     gitpod::translate_gitpod_url(&url).unwrap()
-        // } else {
-        //     url
-        // };
-        // C: futures::Sink<Message, Error = reflexo_typst::Error>
-        // + futures::Stream<Item = Result<Message, reflexo_typst::Error>>
-        // + Send
-        // + Sync
-        // + 'static,
-
-        let data_plane_port = 0;
 
         let previewer = previewer.start(
             websocket_rx,
@@ -399,13 +363,6 @@ impl PreviewState {
             // The fence must be put after the previewer is initialized.
             compile_handler.flush_compile();
 
-            // Spawn a task to handle the websocket connection.
-            // tokio::spawn(async move {
-            //     if let Err(e) = serve_websocket(websocket).await {
-            //         eprintln!("Error in websocket connection: {e}");
-            //     }
-            // });
-
             let frontend_html = previewer.frontend_html(args.preview_mode);
 
             let (ss_addr, ss_killer, ss_handle) =
@@ -415,7 +372,7 @@ impl PreviewState {
             let resp = StartPreviewResponse {
                 static_server_port: Some(ss_addr.port()),
                 static_server_addr: Some(ss_addr.to_string()),
-                data_plane_port: Some(data_plane_port),
+                data_plane_port: Some(ss_addr.port()),
                 is_primary,
             };
 
@@ -636,60 +593,36 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         (service, handle)
     };
 
-    // let control_plane_addr = arguments.control_plane_host;
-    // let conn = if !control_plane_addr.is_empty() {
-    //     let try_socket = TcpListener::bind(&control_plane_addr).await;
-    //     let listener = try_socket.expect("Failed to bind");
-    //     info!(
-    //         "Control plane server listening on: {}",
-    //         listener.local_addr().unwrap()
-    //     );
-    //     let (stream, _) = listener.accept().await.unwrap();
+    let (lsp_tx, mut lsp_rx) = ControlPlaneTx::new(true);
 
-    //     let conn = accept_connection(stream).await;
-
-    //     EditorConnection::WebSocket(conn)
-    // } else {
-    //     EditorConnection::Lsp(lsp_connection.unwrap())
-    // };
-
-    let (lsp_tx, mut lsp_rx) = LspControlPlaneTx::new(true);
-
-    let static_server_handle2 = tokio::spawn(async move {
+    let control_plane_server_handle = tokio::spawn(async move {
         let (control_websocket_tx, mut control_websocket_rx) =
             mpsc::unbounded_channel::<ToWsConn>();
 
-        let (static_server_addr2, _tx, static_server_handle2) = make_static_host(
+        let (control_panel_server, shutdown_tx, control_panel_join) = make_static_host(
             String::default(),
             args.control_plane_host,
             control_websocket_tx,
         )
         .await;
-        log::info!("Control panel server listening on: {}", static_server_addr2);
+        log::info!("Control panel server listening on: {control_panel_server}");
 
         let control_websocket = control_websocket_rx.recv().await.unwrap();
         let ws = control_websocket.await;
-        // tokio::pin!(control_websocket);
-
-        // pub resp_rx: mpsc::UnboundedReceiver<ControlPlaneResponse>,
-        // pub ctl_tx: mpsc::UnboundedSender<ControlPlaneMessage>,
-        // pub shutdown_rx: mpsc::Receiver<()>,
 
         tokio::pin!(ws);
 
         loop {
             tokio::select! {
                 Some(resp) = lsp_rx.resp_rx.recv() => {
-                 let r =  ws
-                 .send(WsMessage::Text(serde_json::to_string(&resp).unwrap()))
-                 .await;
-                   let Err(err) =  r  else {
-
-                            continue;
+                    let r = ws
+                        .send(WsMessage::Text(serde_json::to_string(&resp).unwrap()))
+                        .await;
+                    let Err(err) = r else {
+                        continue;
                     };
 
-
-                log::warn!("failed to send response to editor {err:?}");
+                    log::warn!("failed to send response to editor {err:?}");
                     break;
 
                 }
@@ -723,7 +656,8 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             }
         }
 
-        let _ = static_server_handle2.await;
+        let _ = shutdown_tx.send(());
+        let _ = control_panel_join.await;
     });
 
     let previewer = PreviewBuilder::new(args.preview);
@@ -749,7 +683,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let _ = tokio::join!(
         previewer.join(),
         static_server_handle,
-        static_server_handle2
+        control_plane_server_handle
     );
 
     Ok(())

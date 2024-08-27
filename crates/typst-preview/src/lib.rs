@@ -3,7 +3,7 @@ mod args;
 mod debug_loc;
 mod outline;
 pub use actor::editor::{
-    CompileStatus, ControlPlaneMessage, ControlPlaneResponse, LspControlPlaneRx, LspControlPlaneTx,
+    CompileStatus, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
 };
 pub use args::*;
 pub use outline::Outline;
@@ -14,7 +14,6 @@ use std::time::Duration;
 use std::{collections::HashMap, future::Future, path::PathBuf, sync::Arc};
 
 use futures::sink::SinkExt;
-// use hyper_tungstenite::tungstenite::Message;
 use log::info;
 use once_cell::sync::OnceCell;
 use reflexo_typst::debug_loc::SourceSpanOffset;
@@ -31,11 +30,8 @@ use actor::typst::{TypstActor, TypstActorRequest};
 use actor::webview::WebviewActorRequest;
 use debug_loc::SpanInterner;
 
-pub use crate::actor::editor::EditorConnection;
-
 type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
-// type WsError = hyper_tungstenite::tungstenite::Error;
 type WsError = reflexo_typst::Error;
 type ToWsConn<C> = Pin<Box<dyn Future<Output = C> + Send>>;
 
@@ -98,7 +94,7 @@ pub async fn preview<
 >(
     arguments: PreviewArgs,
     rx: mpsc::UnboundedReceiver<ToWsConn<C>>,
-    conn: EditorConnection,
+    conn: ControlPlaneTx,
     client: Arc<T>,
     html: &str,
 ) -> Previewer {
@@ -117,7 +113,7 @@ async fn preview_<
 >(
     builder: PreviewBuilder,
     mut websocket_rx: mpsc::UnboundedReceiver<ToWsConn<C>>,
-    conn: EditorConnection,
+    conn: ControlPlaneTx,
     client: Arc<T>,
     html: &str,
 ) -> Previewer {
@@ -360,7 +356,7 @@ impl PreviewBuilder {
     pub async fn start<C, T>(
         self,
         websocket_rx: mpsc::UnboundedReceiver<ToWsConn<C>>,
-        conn: EditorConnection,
+        conn: ControlPlaneTx,
         client: Arc<T>,
         html: &str,
     ) -> Previewer
@@ -512,17 +508,3 @@ impl CompileWatcher {
         }
     }
 }
-
-// async fn accept_connection(stream: TcpStream) ->
-// tokio_tungstenite::WebSocketStream<TcpStream> {     let addr = stream
-//         .peer_addr()
-//         .expect("connected streams should have a peer address");
-//     info!("Peer address: {}", addr);
-
-//     let ws_stream = tokio_tungstenite::accept_async(stream)
-//         .await
-//         .expect("Error during the websocket handshake occurred");
-
-//     info!("New WebSocket connection: {}", addr);
-//     ws_stream
-// }
