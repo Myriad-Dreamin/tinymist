@@ -94,12 +94,11 @@ impl<'a, 'w> ReferencesWorker<'a, 'w> {
     fn label_root(mut self) -> Option<Vec<LspLocation>> {
         let mut ids = vec![];
 
-        // Collect ids first to avoid deadlocks
-        self.ctx.ctx.resources.iter_dependencies(&mut |path| {
-            if let Ok(ref_fid) = self.ctx.ctx.file_id_by_path(&path) {
+        for dep in self.ctx.ctx.resources.dependencies() {
+            if let Ok(ref_fid) = self.ctx.ctx.file_id_by_path(&dep) {
                 ids.push(ref_fid);
             }
-        });
+        }
 
         for ref_fid in ids {
             self.file(ref_fid)?;
