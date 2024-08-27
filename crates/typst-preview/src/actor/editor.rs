@@ -1,17 +1,11 @@
-use std::pin::Pin;
-
-use futures::{SinkExt, StreamExt};
-use hyper_tungstenite::{tungstenite::Message, WebSocketStream};
 use log::{debug, info, trace, warn};
 use reflexo_typst::debug_loc::DocumentPosition;
 use serde::{Deserialize, Serialize};
+use tokio::sync::broadcast;
 use tokio::sync::mpsc;
-use tokio::{net::TcpStream, sync::broadcast};
-// use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
 
 use crate::debug_loc::{InternQuery, SpanInterner};
 use crate::outline::Outline;
-use crate::WsError;
 use crate::{
     actor::typst::TypstActorRequest, ChangeCursorPositionRequest, DocToSrcJumpInfo, MemoryFiles,
     MemoryFilesShort, SrcToDocJumpRequest,
@@ -47,6 +41,7 @@ pub enum EditorActorRequest {
 }
 
 pub struct LspControlPlaneTx {
+    pub is_standalone: bool,
     pub resp_tx: mpsc::UnboundedSender<ControlPlaneResponse>,
     pub ctl_rx: mpsc::UnboundedReceiver<ControlPlaneMessage>,
     pub shutdown_tx: mpsc::Sender<()>,
@@ -59,13 +54,14 @@ pub struct LspControlPlaneRx {
 }
 
 impl LspControlPlaneTx {
-    pub fn new() -> (LspControlPlaneTx, LspControlPlaneRx) {
+    pub fn new(need_sync_files: bool) -> (LspControlPlaneTx, LspControlPlaneRx) {
         let (resp_tx, resp_rx) = mpsc::unbounded_channel();
         let (ctl_tx, ctl_rx) = mpsc::unbounded_channel();
         let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
 
         (
             Self {
+                is_standalone: need_sync_files,
                 resp_tx,
                 ctl_rx,
                 shutdown_tx,
@@ -79,54 +75,23 @@ impl LspControlPlaneTx {
     }
 }
 
-pub enum EditorConnection<
-    'a,
-    C: futures::Sink<Message, Error = WsError>
-        + futures::Stream<Item = Result<Message, WsError>>
-        + Send
-        + 'static,
-> {
-    WebSocket(Pin<&'a mut C>),
-    Lsp(LspControlPlaneTx),
-}
+pub type EditorConnection = LspControlPlaneTx;
 
-impl<
-        'a,
-        C: futures::Sink<Message, Error = WsError>
-            + futures::Stream<Item = Result<Message, WsError>>
-            + Send
-            + 'static,
-    > EditorConnection<'a, C>
-{
+impl LspControlPlaneTx {
     fn need_sync_files(&self) -> bool {
-        matches!(self, EditorConnection::WebSocket(_))
+        self.is_standalone
     }
 
     async fn sync_editor_changes(&mut self) {
-        let EditorConnection::WebSocket(ws) = self else {
-            return;
-        };
-
-        let Ok(_) = ws
-            .send(Message::Text(
-                serde_json::to_string(&ControlPlaneResponse::SyncEditorChanges(())).unwrap(),
-            ))
-            .await
-        else {
-            warn!("failed to send sync editor changes to editor");
-            return;
-        };
+        self.resp_ctl_plane(
+            "SyncEditorChanges",
+            ControlPlaneResponse::SyncEditorChanges(()),
+        )
+        .await;
     }
 
     async fn resp_ctl_plane(&mut self, loc: &str, resp: ControlPlaneResponse) -> bool {
-        let sent = match self {
-            EditorConnection::WebSocket(ws) => ws
-                .send(Message::Text(serde_json::to_string(&resp).unwrap()))
-                .await
-                .is_ok(),
-            EditorConnection::Lsp(LspControlPlaneTx { resp_tx, .. }) => resp_tx.send(resp).is_ok(),
-        };
-
+        let sent = self.resp_tx.send(resp).is_ok();
         if !sent {
             warn!("failed to send {loc} response to editor");
         }
@@ -135,33 +100,13 @@ impl<
     }
 
     async fn next(&mut self) -> Option<ControlPlaneMessage> {
-        match self {
-            EditorConnection::Lsp(LspControlPlaneTx { ctl_rx, .. }) => ctl_rx.recv().await,
-            EditorConnection::WebSocket(ws) => {
-                let Some(Ok(Message::Text(msg))) = ws.next().await else {
-                    return None;
-                };
-
-                let Ok(msg) = serde_json::from_str::<ControlPlaneMessage>(&msg) else {
-                    warn!("failed to parse control plane request: {msg:?}");
-                    return None;
-                };
-
-                Some(msg)
-            }
-        }
+        self.ctl_rx.recv().await
     }
 }
 
-pub struct EditorActor<
-    'a,
-    C: futures::Sink<Message, Error = WsError>
-        + futures::Stream<Item = Result<Message, WsError>>
-        + Send
-        + 'static,
-> {
+pub struct EditorActor {
     mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
-    editor_conn: EditorConnection<'a, C>,
+    editor_conn: EditorConnection,
 
     world_sender: mpsc::UnboundedSender<TypstActorRequest>,
     webview_sender: broadcast::Sender<WebviewActorRequest>,
@@ -201,17 +146,10 @@ pub enum ControlPlaneResponse {
     Outline(Outline),
 }
 
-impl<
-        'a,
-        C: futures::Sink<Message, Error = WsError>
-            + futures::Stream<Item = Result<Message, WsError>>
-            + Send
-            + 'static,
-    > EditorActor<'a, C>
-{
+impl EditorActor {
     pub fn new(
         mailbox: mpsc::UnboundedReceiver<EditorActorRequest>,
-        editor_websocket_conn: EditorConnection<'a, C>,
+        editor_websocket_conn: EditorConnection,
         world_sender: mpsc::UnboundedSender<TypstActorRequest>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
         span_interner: SpanInterner,
@@ -300,7 +238,7 @@ impl<
 
         info!("EditorActor: editor disconnected");
 
-        if !matches!(self.editor_conn, EditorConnection::Lsp(_)) {
+        if self.editor_conn.is_standalone {
             info!("EditorActor: shutting down whole program");
             std::process::exit(0);
         }

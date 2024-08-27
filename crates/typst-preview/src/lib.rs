@@ -8,19 +8,19 @@ pub use actor::editor::{
 pub use args::*;
 pub use outline::Outline;
 
+use core::fmt;
 use std::pin::Pin;
 use std::time::Duration;
 use std::{collections::HashMap, future::Future, path::PathBuf, sync::Arc};
 
 use futures::sink::SinkExt;
-use hyper_tungstenite::tungstenite::Message;
+// use hyper_tungstenite::tungstenite::Message;
 use log::info;
 use once_cell::sync::OnceCell;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::Error;
 use reflexo_typst::TypstDocument as Document;
 use serde::{Deserialize, Serialize};
-use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc};
 use typst::{layout::Position, syntax::Span};
 
@@ -38,6 +38,23 @@ type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 // type WsError = hyper_tungstenite::tungstenite::Error;
 type WsError = reflexo_typst::Error;
 type ToWsConn<C> = Pin<Box<dyn Future<Output = C> + Send>>;
+
+#[derive(Debug)]
+pub enum WsMessage {
+    /// A text WebSocket message
+    Text(String),
+    /// A binary WebSocket message
+    Binary(Vec<u8>),
+}
+
+impl fmt::Display for WsMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WsMessage::Text(s) => write!(f, "Text({})", s),
+            WsMessage::Binary(b) => write!(f, "Binary({:?})", b),
+        }
+    }
+}
 
 pub struct Previewer {
     frontend_html_factory: Box<dyn Fn(PreviewMode) -> String + Send + Sync>,
@@ -72,8 +89,8 @@ impl Previewer {
 pub trait CompileHost: SourceFileServer + EditorServer {}
 
 pub async fn preview<
-    C: futures::Sink<Message, Error = WsError>
-        + futures::Stream<Item = Result<Message, WsError>>
+    C: futures::Sink<WsMessage, Error = WsError>
+        + futures::Stream<Item = Result<WsMessage, WsError>>
         + Send
         + Sync
         + 'static,
@@ -81,7 +98,7 @@ pub async fn preview<
 >(
     arguments: PreviewArgs,
     rx: mpsc::UnboundedReceiver<ToWsConn<C>>,
-    conn: EditorConnection<'static, C>,
+    conn: EditorConnection,
     client: Arc<T>,
     html: &str,
 ) -> Previewer {
@@ -92,15 +109,15 @@ pub async fn preview<
 
 // futures::Sink<Message, Error = WsError>
 async fn preview_<
-    C: futures::Sink<Message, Error = WsError>
-        + futures::Stream<Item = Result<Message, WsError>>
+    C: futures::Sink<WsMessage, Error = WsError>
+        + futures::Stream<Item = Result<WsMessage, WsError>>
         + Send
         + 'static,
     T: CompileHost + Send + Sync + 'static,
 >(
     builder: PreviewBuilder,
     mut websocket_rx: mpsc::UnboundedReceiver<ToWsConn<C>>,
-    conn: EditorConnection<'static, C>,
+    conn: EditorConnection,
     client: Arc<T>,
     html: &str,
 ) -> Previewer {
@@ -163,12 +180,12 @@ async fn preview_<
                     tokio::pin!(conn);
 
                     if enable_partial_rendering {
-                        conn.send(Message::Binary("partial-rendering,true".into()))
+                        conn.send(WsMessage::Binary("partial-rendering,true".into()))
                             .await
                             .unwrap();
                     }
                     if !invert_colors.is_empty() {
-                        conn.send(Message::Binary(
+                        conn.send(WsMessage::Binary(
                             format!("invert-colors,{}", invert_colors).into(),
                         ))
                         .await
@@ -343,13 +360,13 @@ impl PreviewBuilder {
     pub async fn start<C, T>(
         self,
         websocket_rx: mpsc::UnboundedReceiver<ToWsConn<C>>,
-        conn: EditorConnection<'static, C>,
+        conn: EditorConnection,
         client: Arc<T>,
         html: &str,
     ) -> Previewer
     where
-        C: futures::Sink<Message, Error = WsError>
-            + futures::Stream<Item = Result<Message, WsError>>
+        C: futures::Sink<WsMessage, Error = WsError>
+            + futures::Stream<Item = Result<WsMessage, WsError>>
             + Send
             + 'static,
         T: CompileHost + Send + Sync + 'static,
@@ -496,16 +513,16 @@ impl CompileWatcher {
     }
 }
 
-async fn accept_connection(stream: TcpStream) -> tokio_tungstenite::WebSocketStream<TcpStream> {
-    let addr = stream
-        .peer_addr()
-        .expect("connected streams should have a peer address");
-    info!("Peer address: {}", addr);
+// async fn accept_connection(stream: TcpStream) ->
+// tokio_tungstenite::WebSocketStream<TcpStream> {     let addr = stream
+//         .peer_addr()
+//         .expect("connected streams should have a peer address");
+//     info!("Peer address: {}", addr);
 
-    let ws_stream = tokio_tungstenite::accept_async(stream)
-        .await
-        .expect("Error during the websocket handshake occurred");
+//     let ws_stream = tokio_tungstenite::accept_async(stream)
+//         .await
+//         .expect("Error during the websocket handshake occurred");
 
-    info!("New WebSocket connection: {}", addr);
-    ws_stream
-}
+//     info!("New WebSocket connection: {}", addr);
+//     ws_stream
+// }

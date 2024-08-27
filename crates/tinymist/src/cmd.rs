@@ -218,7 +218,7 @@ impl LanguageState {
         let cli_args = ["preview"]
             .into_iter()
             .chain(cli_args.iter().map(|e| e.as_str()));
-        let mut cli_args =
+        let cli_args =
             PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
 
         // todo: preview specific arguments are not used

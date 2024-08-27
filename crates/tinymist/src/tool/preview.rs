@@ -8,6 +8,7 @@ use std::time::Duration;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
 use actor::typ_server::{CompileServerOpts, SucceededArtifact};
+use futures::StreamExt;
 use futures::{SinkExt, TryStreamExt};
 use hyper::service::service_fn;
 use hyper_tungstenite::HyperWebsocketStream;
@@ -29,9 +30,9 @@ use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
 pub use typst_preview::CompileStatus;
 use typst_preview::{
-    CompileHost, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo, EditorConnection,
-    EditorServer, Location, LspControlPlaneRx, LspControlPlaneTx, MemoryFiles, MemoryFilesShort,
-    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, SourceFileServer,
+    CompileHost, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo, EditorServer,
+    Location, LspControlPlaneRx, LspControlPlaneTx, MemoryFiles, MemoryFilesShort, PreviewArgs,
+    PreviewBuilder, PreviewMode, SourceFileServer, WsMessage,
 };
 
 use crate::world::{LspCompilerFeat, LspWorld};
@@ -42,10 +43,27 @@ use actor::{
     typ_server::CompileServerActor,
 };
 
+type OkConverter = fn(hyper_tungstenite::tungstenite::Message) -> WsMessage;
 type ErrConverter = fn(hyper_tungstenite::tungstenite::Error) -> reflexo_typst::Error;
-type WsConn = futures::sink::SinkMapErr<
-    futures::stream::MapErr<HyperWebsocketStream, ErrConverter>,
-    ErrConverter,
+type FutConverter = fn(WsMessage) -> MessageFuture;
+type MessageFuture = Pin<
+    Box<
+        dyn Future<Output = Result<hyper_tungstenite::tungstenite::Message, reflexo_typst::Error>>
+            + Send,
+    >,
+>;
+type WsConn = futures::stream::MapOk<
+    futures::sink::With<
+        futures::stream::MapErr<
+            futures::sink::SinkMapErr<HyperWebsocketStream, ErrConverter>,
+            ErrConverter,
+        >,
+        hyper_tungstenite::tungstenite::Message,
+        WsMessage,
+        MessageFuture,
+        FutConverter,
+    >,
+    OkConverter,
 >;
 type ToWsConn = Pin<Box<dyn Future<Output = WsConn> + Send>>;
 
@@ -207,14 +225,11 @@ pub struct PreviewCliArgs {
     pub data_plane_host: String,
 
     /// Control plane server will bind to this address
-    #[cfg_attr(
-        feature = "clap",
-        clap(
-            long = "control-plane-host",
-            default_value = "127.0.0.1:23626",
-            value_name = "HOST",
-            hide(true)
-        )
+    #[clap(
+        long = "control-plane-host",
+        default_value = "127.0.0.1:23626",
+        value_name = "HOST",
+        hide(true)
     )]
     pub control_plane_host: String,
 
@@ -277,14 +292,14 @@ impl PreviewState {
     pub fn start(
         &self,
         args: PreviewCliArgs,
-        mut previewer: PreviewBuilder,
+        previewer: PreviewBuilder,
         compile_handler: Arc<CompileHandler>,
         is_primary: bool,
     ) -> SchedulableResponse<StartPreviewResponse> {
         let task_id = args.preview.task_id.clone();
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
 
-        let (lsp_tx, lsp_rx) = LspControlPlaneTx::new();
+        let (lsp_tx, lsp_rx) = LspControlPlaneTx::new(false);
         let LspControlPlaneRx {
             resp_rx,
             ctl_tx,
@@ -296,7 +311,7 @@ impl PreviewState {
 
         //
         // conn: EditorConnection<'static, C>,
-        let conn = EditorConnection::Lsp(lsp_tx);
+        let conn = lsp_tx;
 
         let (websocket_tx, websocket_rx) = mpsc::unbounded_channel::<ToWsConn>();
 
@@ -391,13 +406,10 @@ impl PreviewState {
             //     }
             // });
 
-            let (ss_addr, ss_killer, ss_handle) = make_static_host(
-                &previewer,
-                args.static_file_host,
-                args.preview_mode,
-                websocket_tx,
-            )
-            .await;
+            let frontend_html = previewer.frontend_html(args.preview_mode);
+
+            let (ss_addr, ss_killer, ss_handle) =
+                make_static_host(frontend_html, args.static_file_host, websocket_tx).await;
             log::info!("PreviewTask({task_id}): static file server listening on: {ss_addr}");
 
             let resp = StartPreviewResponse {
@@ -443,15 +455,14 @@ impl PreviewState {
 
 /// Create a static file server for the previewer.
 pub async fn make_static_host(
-    previewer: &Previewer,
+    frontend_html: String,
     static_file_addr: String,
-    mode: PreviewMode,
     websocket_tx: mpsc::UnboundedSender<ToWsConn>,
 ) -> (SocketAddr, oneshot::Sender<()>, tokio::task::JoinHandle<()>) {
     use http_body_util::Full;
     use hyper::body::{Bytes, Incoming};
 
-    let frontend_html = hyper::body::Bytes::from(previewer.frontend_html(mode));
+    let frontend_html = hyper::body::Bytes::from(frontend_html);
     let make_service = move || {
         let frontend_html = frontend_html.clone();
         let websocket_tx = websocket_tx.clone();
@@ -469,21 +480,28 @@ pub async fn make_static_host(
                         .unwrap();
                     // hyper_tungstenite::HyperWebsocket
 
+                    const CONVERT_SINK: fn(WsMessage) -> MessageFuture = convert_sink;
+
                     const CONVERT_ERR: fn(
                         hyper_tungstenite::tungstenite::Error,
                     ) -> reflexo_typst::Error = convert_err;
 
-                    // tokio::spawn(async move {
-                    // });
+                    const CONVERT_OK: fn(hyper_tungstenite::tungstenite::Message) -> WsMessage =
+                        convert_ok;
+
+                    tokio::spawn(async move {});
                     let _ = websocket_tx.send(Box::pin(async move {
                         let conn = websocket.await.unwrap();
-                        conn.map_err(CONVERT_ERR).sink_map_err(CONVERT_ERR)
+                        conn.sink_map_err(CONVERT_ERR)
+                            .map_err(CONVERT_ERR)
+                            .with(CONVERT_SINK)
+                            .map_ok(CONVERT_OK)
                     }));
 
                     // Return the response so the spawned future can continue.
                     Ok(response)
                 } else if req.uri().path() == "/" {
-                    log::debug!("Serve frontend: {mode:?}");
+                    // log::debug!("Serve frontend: {mode:?}");
                     let res = hyper::Response::builder()
                         .header(hyper::header::CONTENT_TYPE, "text/html")
                         .body(Full::<Bytes>::from(frontend_html))
@@ -635,24 +653,91 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     //     EditorConnection::Lsp(lsp_connection.unwrap())
     // };
 
-    let conn = EditorConnection::WebSocket(todo!());
+    let (lsp_tx, mut lsp_rx) = LspControlPlaneTx::new(true);
+
+    let static_server_handle2 = tokio::spawn(async move {
+        let (control_websocket_tx, mut control_websocket_rx) =
+            mpsc::unbounded_channel::<ToWsConn>();
+
+        let (static_server_addr2, _tx, static_server_handle2) = make_static_host(
+            String::default(),
+            args.control_plane_host,
+            control_websocket_tx,
+        )
+        .await;
+        log::info!("Control panel server listening on: {}", static_server_addr2);
+
+        let control_websocket = control_websocket_rx.recv().await.unwrap();
+        let ws = control_websocket.await;
+        // tokio::pin!(control_websocket);
+
+        // pub resp_rx: mpsc::UnboundedReceiver<ControlPlaneResponse>,
+        // pub ctl_tx: mpsc::UnboundedSender<ControlPlaneMessage>,
+        // pub shutdown_rx: mpsc::Receiver<()>,
+
+        tokio::pin!(ws);
+
+        loop {
+            tokio::select! {
+                Some(resp) = lsp_rx.resp_rx.recv() => {
+                 let r =  ws
+                 .send(WsMessage::Text(serde_json::to_string(&resp).unwrap()))
+                 .await;
+                   let Err(err) =  r  else {
+
+                            continue;
+                    };
+
+
+                log::warn!("failed to send response to editor {err:?}");
+                    break;
+
+                }
+                msg = ws.next() => {
+                    let msg = match msg {
+                        Some(Ok(WsMessage::Text(msg))) => Some(msg),
+                        Some(Ok(msg)) => {
+                            log::error!("unsupported message: {msg:?}");
+                            break;
+                        }
+                        Some(Err(e)) => {
+                            log::error!("failed to receive message: {e}");
+                            break;
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(msg) = msg {
+                        let Ok(msg) = serde_json::from_str::<ControlPlaneMessage>(&msg) else {
+                            log::warn!("failed to parse control plane request: {msg:?}");
+                            break;
+                        };
+
+                        lsp_rx.ctl_tx.send(msg).unwrap();
+                    } else {
+                        // todo: inform the editor that the connection is closed.
+                        break;
+                    }
+                }
+
+            }
+        }
+
+        let _ = static_server_handle2.await;
+    });
 
     let previewer = PreviewBuilder::new(args.preview);
     let registered = handle.register_preview(previewer.compile_watcher());
     assert!(registered, "failed to register preview");
     let (websocket_tx, websocket_rx) = mpsc::unbounded_channel::<ToWsConn>();
     let previewer = previewer
-        .start(websocket_rx, conn, handle.clone(), TYPST_PREVIEW_HTML)
+        .start(websocket_rx, lsp_tx, handle.clone(), TYPST_PREVIEW_HTML)
         .await;
     tokio::spawn(service.run());
 
-    let (static_server_addr, _tx, static_server_handle) = make_static_host(
-        &previewer,
-        args.static_file_host,
-        args.preview_mode,
-        websocket_tx,
-    )
-    .await;
+    let frontend_html = previewer.frontend_html(args.preview_mode);
+    let (static_server_addr, _tx, static_server_handle) =
+        make_static_host(frontend_html, args.static_file_host, websocket_tx).await;
     log::info!("Static file server listening on: {}", static_server_addr);
 
     if !args.dont_open_in_browser {
@@ -661,7 +746,11 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         };
     }
 
-    let _ = tokio::join!(previewer.join(), static_server_handle);
+    let _ = tokio::join!(
+        previewer.join(),
+        static_server_handle,
+        static_server_handle2
+    );
 
     Ok(())
 }
@@ -747,4 +836,22 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
 
 fn convert_err(e: hyper_tungstenite::tungstenite::Error) -> reflexo::Error {
     error_once!("cannot serve websocket", err: e.to_string())
+}
+
+fn convert_ok(msg: hyper_tungstenite::tungstenite::Message) -> WsMessage {
+    match msg {
+        hyper_tungstenite::tungstenite::Message::Text(msg) => WsMessage::Text(msg),
+        hyper_tungstenite::tungstenite::Message::Binary(msg) => WsMessage::Binary(msg),
+        _ => WsMessage::Text("unsupported message".to_owned()),
+    }
+}
+
+fn convert_sink(msg: WsMessage) -> MessageFuture {
+    Box::pin(async move {
+        let msg = match msg {
+            WsMessage::Text(msg) => hyper_tungstenite::tungstenite::Message::Text(msg),
+            WsMessage::Binary(msg) => hyper_tungstenite::tungstenite::Message::Binary(msg),
+        };
+        Ok(msg)
+    })
 }
