@@ -86,8 +86,8 @@ export class LabelViewItem extends vscode.TreeItem {
 }
 
 function makeLabelTree(labels: LabelViewItem[]): LabelViewItem[] {
-  // split labels by :/_- and any space
-  const splitRegex = /[:_-\s]+/;
+  // split labels by : and any space
+  const splitRegex = /[:\s]+/;
 
   const trie = new LabelViewItem("");
 
@@ -114,7 +114,7 @@ function makeLabelTree(labels: LabelViewItem[]): LabelViewItem[] {
 function mergeLabelTree(trie: LabelViewItem): LabelViewItem {
   trie.children = [...(trie.refs || []), ...mergeLabelTreeChildren(trie)];
   if (trie.children.length !== 1) {
-    trie.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+    trie.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
     return trie;
   }
 
