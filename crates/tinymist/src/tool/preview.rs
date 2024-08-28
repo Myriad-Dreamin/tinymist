@@ -15,6 +15,7 @@ use hyper_tungstenite::HyperWebsocketStream;
 use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
+use parking_lot::Mutex;
 use reflexo::error::prelude::*;
 use reflexo::error_once;
 use reflexo_typst::debug_loc::SourceSpanOffset;
@@ -25,6 +26,7 @@ use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::analysis::Analysis;
+use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::{mpsc, oneshot};
 use typst::layout::{Frame, FrameItem, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
@@ -66,7 +68,6 @@ type WsConn = futures::stream::MapOk<
     >,
     OkConverter,
 >;
-type ToWsConn = Pin<Box<dyn Future<Output = WsConn> + Send>>;
 
 impl CompileHost for CompileHandler {}
 
@@ -307,14 +308,9 @@ impl PreviewState {
             mut shutdown_rx,
         } = lsp_rx;
 
-        let (websocket_tx, websocket_rx) = mpsc::unbounded_channel::<ToWsConn>();
+        let (websocket_tx, websocket_rx) = mpsc::unbounded_channel();
 
-        let previewer = previewer.start(
-            websocket_rx,
-            lsp_tx,
-            compile_handler.clone(),
-            TYPST_PREVIEW_HTML,
-        );
+        let previewer = previewer.start(lsp_tx, compile_handler.clone(), TYPST_PREVIEW_HTML);
 
         // Forward preview responses to lsp client
         let tid = task_id.clone();
@@ -356,7 +352,13 @@ impl PreviewState {
 
         let preview_tx = self.preview_tx.clone();
         just_future(async move {
-            let previewer = previewer.await;
+            let mut previewer = previewer.await;
+
+            let websocket_rx = Arc::new(AsyncMutex::new(websocket_rx));
+            previewer.serve(move || {
+                let x = websocket_rx.clone();
+                Box::pin(async move { x.lock().await.recv().await })
+            });
 
             // Put a fence to ensure the previewer can receive the first compilation.
             // The fence must be put after the previewer is initialized.
@@ -364,22 +366,22 @@ impl PreviewState {
 
             let frontend_html = previewer.frontend_html(args.preview_mode);
 
-            let (ss_addr, ss_killer, ss_handle) =
-                make_static_host(frontend_html, args.static_file_host, websocket_tx).await;
-            log::info!("PreviewTask({task_id}): static file server listening on: {ss_addr}");
+            let srv = make_http_server(frontend_html, args.static_file_host, websocket_tx).await;
+            let HttpServer { addr, tx, join } = srv;
+            log::info!("PreviewTask({task_id}): static file server listening on: {addr}");
 
             let resp = StartPreviewResponse {
-                static_server_port: Some(ss_addr.port()),
-                static_server_addr: Some(ss_addr.to_string()),
-                data_plane_port: Some(ss_addr.port()),
+                static_server_port: Some(addr.port()),
+                static_server_addr: Some(addr.to_string()),
+                data_plane_port: Some(addr.port()),
                 is_primary,
             };
 
             let sent = preview_tx.send(PreviewRequest::Started(PreviewTab {
                 task_id,
                 previewer,
-                ss_killer,
-                ss_handle,
+                ss_killer: tx,
+                ss_handle: join,
                 ctl_tx,
                 compile_handler,
                 is_primary,
@@ -409,12 +411,22 @@ impl PreviewState {
     }
 }
 
-/// Create a static file server for the previewer.
-pub async fn make_static_host(
+/// created by `make_http_server`
+pub struct HttpServer {
+    /// The address the server is listening on.
+    pub addr: SocketAddr,
+    /// The sender to shutdown the server.
+    pub tx: oneshot::Sender<()>,
+    /// The join handle of the server.
+    pub join: tokio::task::JoinHandle<()>,
+}
+
+/// Create a http server for the previewer.
+pub async fn make_http_server(
     frontend_html: String,
     static_file_addr: String,
-    websocket_tx: mpsc::UnboundedSender<ToWsConn>,
-) -> (SocketAddr, oneshot::Sender<()>, tokio::task::JoinHandle<()>) {
+    websocket_tx: mpsc::UnboundedSender<Pin<Box<dyn Future<Output = WsConn> + Send>>>,
+) -> HttpServer {
     use http_body_util::Full;
     use hyper::body::{Bytes, Incoming};
     type Server = hyper_util::server::conn::auto::Builder<hyper_util::rt::TokioExecutor>;
@@ -473,7 +485,7 @@ pub async fn make_static_host(
     let addr = listener.local_addr().unwrap();
     log::info!("Listening preview server on http://{addr}");
 
-    let (tx, rx) = tokio::sync::oneshot::channel();
+    let (_tx, rx) = tokio::sync::oneshot::channel();
     let (final_tx, final_rx) = tokio::sync::oneshot::channel();
 
     // the graceful watcher
@@ -497,7 +509,7 @@ pub async fn make_static_host(
         });
     };
 
-    let join_handle = tokio::spawn(async move {
+    let join = tokio::spawn(async move {
         // when this signal completes, start shutdown
         let mut signal = std::pin::pin!(final_rx);
 
@@ -528,7 +540,12 @@ pub async fn make_static_host(
         final_tx.send(()).ok();
         log::info!("Preview server joined");
     });
-    (addr, tx, join_handle)
+
+    HttpServer {
+        addr,
+        tx: _tx,
+        join,
+    }
 }
 
 /// Entry point of the preview tool.
@@ -557,7 +574,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             editor_tx,
             analysis: Analysis::default(),
             periscope: tinymist_render::PeriscopeRenderer::default(),
-            notified_revision: parking_lot::Mutex::new(0),
+            notified_revision: Mutex::new(0),
         });
 
         // Consume editor_rx
@@ -580,18 +597,13 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let (lsp_tx, mut lsp_rx) = ControlPlaneTx::new(true);
 
     let control_plane_server_handle = tokio::spawn(async move {
-        let (control_websocket_tx, mut control_websocket_rx) =
-            mpsc::unbounded_channel::<ToWsConn>();
+        let (control_sock_tx, mut control_sock_rx) = mpsc::unbounded_channel();
 
-        let (control_panel_server, shutdown_tx, control_panel_join) = make_static_host(
-            String::default(),
-            args.control_plane_host,
-            control_websocket_tx,
-        )
-        .await;
-        log::info!("Control panel server listening on: {control_panel_server}");
+        let srv =
+            make_http_server(String::default(), args.control_plane_host, control_sock_tx).await;
+        log::info!("Control panel server listening on: {}", srv.addr);
 
-        let control_websocket = control_websocket_rx.recv().await.unwrap();
+        let control_websocket = control_sock_rx.recv().await.unwrap();
         let ws = control_websocket.await;
 
         tokio::pin!(ws);
@@ -640,35 +652,36 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             }
         }
 
-        let _ = shutdown_tx.send(());
-        let _ = control_panel_join.await;
+        let _ = srv.tx.send(());
+        let _ = srv.join.await;
     });
 
     let previewer = PreviewBuilder::new(args.preview);
     let registered = handle.register_preview(previewer.compile_watcher());
     assert!(registered, "failed to register preview");
-    let (websocket_tx, websocket_rx) = mpsc::unbounded_channel::<ToWsConn>();
-    let previewer = previewer
-        .start(websocket_rx, lsp_tx, handle.clone(), TYPST_PREVIEW_HTML)
+    let (websocket_tx, websocket_rx) = mpsc::unbounded_channel();
+    let mut previewer = previewer
+        .start(lsp_tx, handle.clone(), TYPST_PREVIEW_HTML)
         .await;
     tokio::spawn(service.run());
 
+    let websocket_rx = Arc::new(AsyncMutex::new(websocket_rx));
+    previewer.serve(move || {
+        let x = websocket_rx.clone();
+        Box::pin(async move { x.lock().await.recv().await })
+    });
+
     let frontend_html = previewer.frontend_html(args.preview_mode);
-    let (static_server_addr, _tx, static_server_handle) =
-        make_static_host(frontend_html, args.static_file_host, websocket_tx).await;
-    log::info!("Static file server listening on: {}", static_server_addr);
+    let srv = make_http_server(frontend_html, args.static_file_host, websocket_tx).await;
+    log::info!("Static file server listening on: {}", srv.addr);
 
     if !args.dont_open_in_browser {
-        if let Err(e) = open::that_detached(format!("http://{static_server_addr}")) {
+        if let Err(e) = open::that_detached(format!("http://{}", srv.addr)) {
             log::error!("failed to open browser: {}", e);
         };
     }
 
-    let _ = tokio::join!(
-        previewer.join(),
-        static_server_handle,
-        control_plane_server_handle
-    );
+    let _ = tokio::join!(previewer.join(), srv.join, control_plane_server_handle);
 
     Ok(())
 }
