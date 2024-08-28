@@ -8,7 +8,6 @@ pub use actor::editor::{
 };
 pub use args::*;
 pub use outline::Outline;
-use tokio::task::JoinError;
 
 use core::fmt;
 use std::pin::Pin;
@@ -31,7 +30,7 @@ use actor::typst::{TypstActor, TypstActorRequest};
 use actor::webview::WebviewActorRequest;
 use debug_loc::SpanInterner;
 
-type JoinFuture = Pin<Box<dyn Future<Output = Result<(), JoinError>> + Send + Sync>>;
+type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
 type WsError = reflexo_typst::Error;
 
@@ -54,8 +53,8 @@ impl fmt::Display for WsMessage {
 
 pub struct Previewer {
     frontend_html_factory: Box<dyn Fn(PreviewMode) -> String + Send + Sync>,
-    stop: Option<Box<dyn FnOnce() -> JoinFuture + Send + Sync>>,
-    // do_serve: Box<dyn Fn(ToWsConn<C>) -> JoinFuture + Send + Sync>,
+    stop: Option<Box<dyn FnOnce() -> StopFuture + Send + Sync>>,
+    // do_serve: Box<dyn Fn(ToWsConn<C>) -> StopFuture + Send + Sync>,
     data_plane_handle: Option<tokio::task::JoinHandle<()>>,
     conn_handler: Option<(ConnHandler, Option<mpsc::Sender<()>>, mpsc::Receiver<()>)>,
     control_plane_handle: tokio::task::JoinHandle<()>,
@@ -288,11 +287,11 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
     });
 
     let editor_tx = editor_conn.0;
-    let stop = move || -> JoinFuture {
-        Box::pin(tokio::spawn(async move {
+    let stop = move || -> StopFuture {
+        Box::pin(async move {
             let _ = shutdown_data_plane_tx.send(()).await;
             let _ = editor_tx.send(EditorActorRequest::Shutdown);
-        }))
+        })
     };
 
     Previewer {
