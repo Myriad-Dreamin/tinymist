@@ -324,6 +324,7 @@ impl PreviewState {
             // The fence must be put after the previewer is initialized.
             compile_handler.flush_compile();
 
+            // Relace the data plane port in the html to self
             let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
 
             let srv = make_http_server(frontend_html, args.static_file_host, websocket_tx).await;

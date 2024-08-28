@@ -186,13 +186,12 @@ pub trait CompileHost: SourceFileServer + EditorServer {}
 
 /// Get the HTML for the frontend by a given preview mode and server to connect
 pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
-    // Relace the data plane port in the html to self
-    let html = html.replace("ws://127.0.0.1:23625", to);
     let mode = match mode {
         PreviewMode::Document => "Doc",
         PreviewMode::Slide => "Slide",
     };
-    html.replace(
+
+    html.replace("ws://127.0.0.1:23625", to).replace(
         "preview-arg:previewMode:Doc",
         format!("preview-arg:previewMode:{mode}").as_str(),
     )
