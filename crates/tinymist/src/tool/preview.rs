@@ -1,9 +1,7 @@
 //! Document preview tool for Typst
 
 use std::convert::Infallible;
-use std::future::Future;
 use std::num::NonZeroUsize;
-use std::pin::Pin;
 use std::time::Duration;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
@@ -11,7 +9,7 @@ use actor::typ_server::{CompileServerOpts, SucceededArtifact};
 use futures::StreamExt;
 use futures::{SinkExt, TryStreamExt};
 use hyper::service::service_fn;
-use hyper_tungstenite::HyperWebsocketStream;
+use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};
 use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
@@ -26,7 +24,6 @@ use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::analysis::Analysis;
-use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::{mpsc, oneshot};
 use typst::layout::{Frame, FrameItem, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
@@ -35,7 +32,7 @@ pub use typst_preview::CompileStatus;
 use typst_preview::{
     CompileHost, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
     DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort, PreviewArgs,
-    PreviewBuilder, PreviewMode, SourceFileServer, WsMessage,
+    PreviewBuilder, PreviewMode, Previewer, SourceFileServer, WsMessage,
 };
 
 use crate::world::{LspCompilerFeat, LspWorld};
@@ -45,29 +42,6 @@ use actor::{
     typ_client::CompileHandler,
     typ_server::CompileServerActor,
 };
-
-type OkConverter = fn(hyper_tungstenite::tungstenite::Message) -> WsMessage;
-type ErrConverter = fn(hyper_tungstenite::tungstenite::Error) -> reflexo_typst::Error;
-type FutConverter = fn(WsMessage) -> MessageFuture;
-type MessageFuture = Pin<
-    Box<
-        dyn Future<Output = Result<hyper_tungstenite::tungstenite::Message, reflexo_typst::Error>>
-            + Send,
-    >,
->;
-type WsConn = futures::stream::MapOk<
-    futures::sink::With<
-        futures::stream::MapErr<
-            futures::sink::SinkMapErr<HyperWebsocketStream, ErrConverter>,
-            ErrConverter,
-        >,
-        hyper_tungstenite::tungstenite::Message,
-        WsMessage,
-        MessageFuture,
-        FutConverter,
-    >,
-    OkConverter,
->;
 
 impl CompileHost for CompileHandler {}
 
@@ -353,12 +327,7 @@ impl PreviewState {
         let preview_tx = self.preview_tx.clone();
         just_future(async move {
             let mut previewer = previewer.await;
-
-            let websocket_rx = Arc::new(AsyncMutex::new(websocket_rx));
-            previewer.serve(move || {
-                let x = websocket_rx.clone();
-                Box::pin(async move { x.lock().await.recv().await })
-            });
+            bind_streams(&mut previewer, websocket_rx);
 
             // Put a fence to ensure the previewer can receive the first compilation.
             // The fence must be put after the previewer is initialized.
@@ -425,7 +394,7 @@ pub struct HttpServer {
 pub async fn make_http_server(
     frontend_html: String,
     static_file_addr: String,
-    websocket_tx: mpsc::UnboundedSender<Pin<Box<dyn Future<Output = WsConn> + Send>>>,
+    websocket_tx: mpsc::UnboundedSender<HyperWebsocket>,
 ) -> HttpServer {
     use http_body_util::Full;
     use hyper::body::{Bytes, Incoming};
@@ -448,14 +417,7 @@ pub async fn make_http_server(
                         })
                         .unwrap();
 
-                    tokio::spawn(async move {});
-                    let _ = websocket_tx.send(Box::pin(async move {
-                        let conn = websocket.await.unwrap();
-                        conn.sink_map_err(convert_err as fn(_) -> _)
-                            .map_err(convert_err as fn(_) -> _)
-                            .with(convert_sink as fn(_) -> _)
-                            .map_ok(convert_ok as fn(_) -> _)
-                    }));
+                    let _ = websocket_tx.send(websocket);
 
                     // Return the response so the spawned future can continue.
                     Ok(response)
@@ -604,7 +566,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         log::info!("Control panel server listening on: {}", srv.addr);
 
         let control_websocket = control_sock_rx.recv().await.unwrap();
-        let ws = control_websocket.await;
+        let ws = control_websocket.await.unwrap();
 
         tokio::pin!(ws);
 
@@ -612,7 +574,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             tokio::select! {
                 Some(resp) = lsp_rx.resp_rx.recv() => {
                     let r = ws
-                        .send(WsMessage::Text(serde_json::to_string(&resp).unwrap()))
+                        .send(Message::Text(serde_json::to_string(&resp).unwrap()))
                         .await;
                     let Err(err) = r else {
                         continue;
@@ -624,7 +586,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
                 }
                 msg = ws.next() => {
                     let msg = match msg {
-                        Some(Ok(WsMessage::Text(msg))) => Some(msg),
+                        Some(Ok(Message::Text(msg))) => Some(msg),
                         Some(Ok(msg)) => {
                             log::error!("unsupported message: {msg:?}");
                             break;
@@ -665,11 +627,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         .await;
     tokio::spawn(service.run());
 
-    let websocket_rx = Arc::new(AsyncMutex::new(websocket_rx));
-    previewer.serve(move || {
-        let x = websocket_rx.clone();
-        Box::pin(async move { x.lock().await.recv().await })
-    });
+    bind_streams(&mut previewer, websocket_rx);
 
     let frontend_html = previewer.frontend_html(args.preview_mode);
     let srv = make_http_server(frontend_html, args.static_file_host, websocket_tx).await;
@@ -765,24 +723,33 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
     None
 }
 
-fn convert_err(e: hyper_tungstenite::tungstenite::Error) -> reflexo::Error {
-    error_once!("cannot serve websocket", err: e.to_string())
-}
+fn bind_streams(previewer: &mut Previewer, websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>) {
+    previewer.serve_with(
+        websocket_rx,
+        |conn: Result<HyperWebsocketStream, hyper_tungstenite::tungstenite::Error>| {
+            let conn = conn.map_err(error_once_map_string!("cannot receive websocket"))?;
 
-fn convert_ok(msg: hyper_tungstenite::tungstenite::Message) -> WsMessage {
-    match msg {
-        hyper_tungstenite::tungstenite::Message::Text(msg) => WsMessage::Text(msg),
-        hyper_tungstenite::tungstenite::Message::Binary(msg) => WsMessage::Binary(msg),
-        _ => WsMessage::Text("unsupported message".to_owned()),
-    }
-}
-
-fn convert_sink(msg: WsMessage) -> MessageFuture {
-    Box::pin(async move {
-        let msg = match msg {
-            WsMessage::Text(msg) => hyper_tungstenite::tungstenite::Message::Text(msg),
-            WsMessage::Binary(msg) => hyper_tungstenite::tungstenite::Message::Binary(msg),
-        };
-        Ok(msg)
-    })
+            Ok(conn
+                .sink_map_err(|e| error_once!("cannot serve_with websocket", err: e.to_string()))
+                .map_err(|e| error_once!("cannot serve_with websocket", err: e.to_string()))
+                .with(|msg| {
+                    Box::pin(async move {
+                        let msg = match msg {
+                            WsMessage::Text(msg) => {
+                                hyper_tungstenite::tungstenite::Message::Text(msg)
+                            }
+                            WsMessage::Binary(msg) => {
+                                hyper_tungstenite::tungstenite::Message::Binary(msg)
+                            }
+                        };
+                        Ok(msg)
+                    })
+                })
+                .map_ok(|msg| match msg {
+                    hyper_tungstenite::tungstenite::Message::Text(msg) => WsMessage::Text(msg),
+                    hyper_tungstenite::tungstenite::Message::Binary(msg) => WsMessage::Binary(msg),
+                    _ => WsMessage::Text("unsupported message".to_owned()),
+                }))
+        },
+    );
 }

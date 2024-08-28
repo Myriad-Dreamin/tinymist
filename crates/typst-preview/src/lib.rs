@@ -34,7 +34,6 @@ use debug_loc::SpanInterner;
 type JoinFuture = Pin<Box<dyn Future<Output = Result<(), JoinError>> + Send + Sync>>;
 
 type WsError = reflexo_typst::Error;
-type ToWsConn<C> = Pin<Box<dyn Future<Output = C> + Send>>;
 
 #[derive(Debug)]
 pub enum WsMessage {
@@ -87,20 +86,33 @@ impl Previewer {
             + 'static,
     >(
         &mut self,
-        mut accept: impl FnMut() -> Pin<Box<dyn Future<Output = Option<ToWsConn<C>>> + Send + Sync + 'static>>
+        streams: mpsc::UnboundedReceiver<Pin<Box<dyn Future<Output = C> + Send>>>,
+    ) {
+        self.serve_with(streams, Ok)
+    }
+
+    pub fn serve_with<
+        C: futures::Sink<WsMessage, Error = WsError>
+            + futures::Stream<Item = Result<WsMessage, WsError>>
             + Send
             + 'static,
+        S: 'static,
+        SFut: Future<Output = S> + Send + 'static,
+    >(
+        &mut self,
+        mut streams: mpsc::UnboundedReceiver<SFut>,
+        caster: impl Fn(S) -> Result<C, Error> + Send + Sync + Copy + 'static,
     ) {
         let idle_timeout = Duration::from_secs(5);
         let (conn_handler, shutdown_tx, mut shutdown_data_plane_rx) =
             self.conn_handler.take().unwrap();
         let (alive_tx, mut alive_rx) = mpsc::unbounded_channel::<()>();
 
-        let recv = move |conn: ToWsConn<C>| {
+        let recv = move |conn| {
             let h = conn_handler.clone();
             let alive_tx = alive_tx.clone();
             tokio::spawn(async move {
-                let conn = conn.await;
+                let conn: C = caster(conn.await).unwrap();
                 tokio::pin!(conn);
 
                 if h.enable_partial_rendering {
@@ -166,7 +178,7 @@ impl Previewer {
                         log::info!("Data plane server shutdown");
                         return;
                     }
-                    Some(stream) = accept() => {
+                    Some(stream) = streams.recv() => {
                         alive_cnt += 1;
                         tokio::spawn(recv(stream));
                     },
