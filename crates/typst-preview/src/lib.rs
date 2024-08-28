@@ -54,7 +54,6 @@ impl fmt::Display for WsMessage {
 pub struct Previewer {
     frontend_html_factory: Box<dyn Fn(PreviewMode) -> String + Send + Sync>,
     stop: Option<Box<dyn FnOnce() -> StopFuture + Send + Sync>>,
-    // do_serve: Box<dyn Fn(ToWsConn<C>) -> StopFuture + Send + Sync>,
     data_plane_handle: Option<tokio::task::JoinHandle<()>>,
     conn_handler: Option<(ConnHandler, Option<mpsc::Sender<()>>, mpsc::Receiver<()>)>,
     control_plane_handle: tokio::task::JoinHandle<()>,
@@ -76,18 +75,6 @@ impl Previewer {
         if let Some(stop) = self.stop.take() {
             let _ = stop().await;
         }
-    }
-
-    pub fn serve<
-        C: futures::Sink<WsMessage, Error = WsError>
-            + futures::Stream<Item = Result<WsMessage, WsError>>
-            + Send
-            + 'static,
-    >(
-        &mut self,
-        streams: mpsc::UnboundedReceiver<Pin<Box<dyn Future<Output = C> + Send>>>,
-    ) {
-        self.serve_with(streams, Ok)
     }
 
     pub fn serve_with<
