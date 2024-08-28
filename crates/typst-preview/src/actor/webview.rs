@@ -6,7 +6,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use crate::{
     actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest},
-    WsError, WsMessage,
+    Message, WsError,
 };
 
 use super::{editor::EditorActorRequest, render::RenderActorRequest};
@@ -31,7 +31,7 @@ fn position_req(
 
 pub struct WebviewActor<
     'a,
-    C: futures::Sink<WsMessage, Error = WsError> + futures::Stream<Item = Result<WsMessage, WsError>>,
+    C: futures::Sink<Message, Error = WsError> + futures::Stream<Item = Result<Message, WsError>>,
 > {
     webview_websocket_conn: std::pin::Pin<&'a mut C>,
     svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
@@ -51,8 +51,7 @@ pub struct Channels {
 
 impl<
         'a,
-        C: futures::Sink<WsMessage, Error = WsError>
-            + futures::Stream<Item = Result<WsMessage, WsError>>,
+        C: futures::Sink<Message, Error = WsError> + futures::Stream<Item = Result<Message, WsError>>,
     > WebviewActor<'a, C>
 {
     pub fn set_up_channels() -> Channels {
@@ -86,12 +85,12 @@ impl<
                     match msg {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
                             let msg = position_req("jump", jump_info);
-                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into_bytes()))
+                            self.webview_websocket_conn.send(Message::Binary(msg.into_bytes()))
                             .await.unwrap();
                         }
                         WebviewActorRequest::ViewportPosition(jump_info) => {
                             let msg = position_req("viewport", jump_info);
-                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into_bytes()))
+                            self.webview_websocket_conn.send(Message::Binary(msg.into_bytes()))
                             .await.unwrap();
                         }
                         // WebviewActorRequest::CursorPosition(jump_info) => {
@@ -101,14 +100,14 @@ impl<
                         WebviewActorRequest::CursorPaths(jump_info) => {
                             let json = serde_json::to_string(&jump_info).unwrap();
                             let msg = format!("cursor-paths,{json}");
-                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into_bytes()))
+                            self.webview_websocket_conn.send(Message::Binary(msg.into_bytes()))
                             .await.unwrap();
                         }
                     }
                 }
                 Some(svg) = self.svg_receiver.recv() => {
                     trace!("WebviewActor: received svg from renderer");
-                    self.webview_websocket_conn.send(WsMessage::Binary(svg))
+                    self.webview_websocket_conn.send(Message::Binary(svg))
                     .await.unwrap();
                 }
                 Some(msg) = self.webview_websocket_conn.next() => {
@@ -117,9 +116,9 @@ impl<
                         info!("WebviewActor: no more messages from websocket: {}", msg.unwrap_err());
                       break;
                     };
-                    let WsMessage::Text(msg) = msg else {
+                    let Message::Text(msg) = msg else {
                         info!("WebviewActor: received non-text message from websocket: {:?}", msg);
-                        let _ = self.webview_websocket_conn.send(WsMessage::Text(format!("Webview Actor: error, received non-text message: {}", msg)))
+                        let _ = self.webview_websocket_conn.send(Message::Text(format!("Webview Actor: error, received non-text message: {}", msg)))
                         .await;
                         break;
                     };
@@ -150,7 +149,7 @@ impl<
                             self.render_sender.send(RenderActorRequest::ResolveSpan(ResolveSpanRequest(path))).unwrap();
                         };
                     } else {
-                        let err = self.webview_websocket_conn.send(WsMessage::Text(format!("error, received unknown message: {}", msg))).await;
+                        let err = self.webview_websocket_conn.send(Message::Text(format!("error, received unknown message: {}", msg))).await;
                         info!("WebviewActor: received unknown message from websocket: {msg} {err:?}");
                         break;
                     }

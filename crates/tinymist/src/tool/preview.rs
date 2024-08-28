@@ -735,19 +735,15 @@ fn bind_streams(previewer: &mut Previewer, websocket_rx: mpsc::UnboundedReceiver
                 .with(|msg| {
                     Box::pin(async move {
                         let msg = match msg {
-                            WsMessage::Text(msg) => {
-                                hyper_tungstenite::tungstenite::Message::Text(msg)
-                            }
-                            WsMessage::Binary(msg) => {
-                                hyper_tungstenite::tungstenite::Message::Binary(msg)
-                            }
+                            WsMessage::Text(msg) => Message::Text(msg),
+                            WsMessage::Binary(msg) => Message::Binary(msg),
                         };
                         Ok(msg)
                     })
                 })
                 .map_ok(|msg| match msg {
-                    hyper_tungstenite::tungstenite::Message::Text(msg) => WsMessage::Text(msg),
-                    hyper_tungstenite::tungstenite::Message::Binary(msg) => WsMessage::Binary(msg),
+                    Message::Text(msg) => WsMessage::Text(msg),
+                    Message::Binary(msg) => WsMessage::Binary(msg),
                     _ => WsMessage::Text("unsupported message".to_owned()),
                 }))
         },

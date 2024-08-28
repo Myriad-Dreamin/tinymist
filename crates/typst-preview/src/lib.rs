@@ -33,6 +33,7 @@ use debug_loc::SpanInterner;
 type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
 type WsError = reflexo_typst::Error;
+type Message = WsMessage;
 
 #[derive(Debug)]
 pub enum WsMessage {
