@@ -1,24 +1,17 @@
 //! Document preview tool for Typst
 
-use std::convert::Infallible;
 use std::num::NonZeroUsize;
-use std::time::Duration;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
-use actor::typ_server::{CompileServerOpts, SucceededArtifact};
-use futures::StreamExt;
-use futures::{SinkExt, TryStreamExt};
+use futures::{SinkExt, StreamExt, TryStreamExt};
 use hyper::service::service_fn;
 use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};
 use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
-use parking_lot::Mutex;
-use reflexo::error::prelude::*;
-use reflexo::error_once;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
-use reflexo_typst::{EntryReader, Error, TypstDocument, TypstFileId};
+use reflexo_typst::{error::prelude::*, EntryReader, Error, TypstDocument, TypstFileId};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
@@ -37,11 +30,9 @@ use typst_preview::{
 
 use crate::world::{LspCompilerFeat, LspWorld};
 use crate::*;
-use actor::{
-    preview::{PreviewActor, PreviewRequest, PreviewTab},
-    typ_client::CompileHandler,
-    typ_server::CompileServerActor,
-};
+use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
+use actor::typ_client::CompileHandler;
+use actor::typ_server::{CompileServerActor, CompileServerOpts, SucceededArtifact};
 
 impl CompileHost for CompileHandler {}
 
@@ -336,7 +327,7 @@ impl PreviewState {
             let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
 
             let srv = make_http_server(frontend_html, args.static_file_host, websocket_tx).await;
-            let HttpServer { addr, tx, join } = srv;
+            let addr = srv.addr;
             log::info!("PreviewTask({task_id}): static file server listening on: {addr}");
 
             let resp = StartPreviewResponse {
@@ -349,8 +340,7 @@ impl PreviewState {
             let sent = preview_tx.send(PreviewRequest::Started(PreviewTab {
                 task_id,
                 previewer,
-                ss_killer: tx,
-                ss_handle: join,
+                srv,
                 ctl_tx,
                 compile_handler,
                 is_primary,
@@ -427,7 +417,7 @@ pub async fn make_http_server(
                         .header(hyper::header::CONTENT_TYPE, "text/html")
                         .body(Full::<Bytes>::from(frontend_html))
                         .unwrap();
-                    Ok::<_, Infallible>(res)
+                    Ok::<_, std::convert::Infallible>(res)
                 } else {
                     // jump to /
                     let res = hyper::Response::builder()
@@ -492,7 +482,7 @@ pub async fn make_http_server(
             _ = graceful.shutdown() => {
                 log::info!("Gracefully shutdown!");
             },
-            _ = tokio::time::sleep(Duration::from_secs(10)) => {
+            _ = tokio::time::sleep(reflexo::time::Duration::from_secs(10)) => {
                 log::info!("Waited 10 seconds for graceful shutdown, aborting...");
             }
         }
@@ -536,7 +526,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             editor_tx,
             analysis: Analysis::default(),
             periscope: tinymist_render::PeriscopeRenderer::default(),
-            notified_revision: Mutex::new(0),
+            notified_revision: parking_lot::Mutex::new(0),
         });
 
         // Consume editor_rx

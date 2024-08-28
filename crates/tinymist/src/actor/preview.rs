@@ -8,16 +8,15 @@ use tokio::sync::{mpsc, oneshot};
 use typst_preview::{ControlPlaneMessage, Previewer};
 
 use super::typ_client::CompileHandler;
+use crate::tool::preview::HttpServer;
 
 pub struct PreviewTab {
     /// Task ID
     pub task_id: String,
     /// Previewer
     pub previewer: Previewer,
-    /// Static server killer
-    pub ss_killer: oneshot::Sender<()>,
-    /// Static server handle
-    pub ss_handle: tokio::task::JoinHandle<()>,
+    /// Http Server for Previewer
+    pub srv: HttpServer,
     /// Control plane message sender
     pub ctl_tx: mpsc::UnboundedSender<ControlPlaneMessage>,
     /// Compile handler
@@ -72,13 +71,13 @@ impl PreviewActor {
                     let client = self.client.clone();
                     self.client.handle.spawn(async move {
                         tab.previewer.stop().await;
-                        let _ = tab.ss_killer.send(());
+                        let _ = tab.srv.tx.send(());
 
                         // Wait for previewer to stop
                         log::info!("PreviewTask({task_id}): wait for previewer to stop");
                         tab.previewer.join().await;
                         log::info!("PreviewTask({task_id}): wait for static server to stop");
-                        let _ = tab.ss_handle.await;
+                        let _ = tab.srv.join.await;
 
                         log::info!("PreviewTask({task_id}): killed");
                         // Send response
