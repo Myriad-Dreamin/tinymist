@@ -30,9 +30,9 @@ use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
 pub use typst_preview::CompileStatus;
 use typst_preview::{
-    CompileHost, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
-    DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort, PreviewArgs,
-    PreviewBuilder, PreviewMode, Previewer, SourceFileServer, WsMessage,
+    frontend_html, CompileHost, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx,
+    ControlPlaneTx, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
+    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, SourceFileServer, WsMessage,
 };
 
 use crate::world::{LspCompilerFeat, LspWorld};
@@ -284,7 +284,7 @@ impl PreviewState {
 
         let (websocket_tx, websocket_rx) = mpsc::unbounded_channel();
 
-        let previewer = previewer.start(lsp_tx, compile_handler.clone(), TYPST_PREVIEW_HTML);
+        let previewer = previewer.start(lsp_tx, compile_handler.clone());
 
         // Forward preview responses to lsp client
         let tid = task_id.clone();
@@ -333,7 +333,7 @@ impl PreviewState {
             // The fence must be put after the previewer is initialized.
             compile_handler.flush_compile();
 
-            let frontend_html = previewer.frontend_html(args.preview_mode);
+            let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
 
             let srv = make_http_server(frontend_html, args.static_file_host, websocket_tx).await;
             let HttpServer { addr, tx, join } = srv;
@@ -622,14 +622,12 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let registered = handle.register_preview(previewer.compile_watcher());
     assert!(registered, "failed to register preview");
     let (websocket_tx, websocket_rx) = mpsc::unbounded_channel();
-    let mut previewer = previewer
-        .start(lsp_tx, handle.clone(), TYPST_PREVIEW_HTML)
-        .await;
+    let mut previewer = previewer.start(lsp_tx, handle.clone()).await;
     tokio::spawn(service.run());
 
     bind_streams(&mut previewer, websocket_rx);
 
-    let frontend_html = previewer.frontend_html(args.preview_mode);
+    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
     let srv = make_http_server(frontend_html, args.static_file_host, websocket_tx).await;
     log::info!("Static file server listening on: {}", srv.addr);
 

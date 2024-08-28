@@ -53,19 +53,13 @@ impl fmt::Display for WsMessage {
 }
 
 pub struct Previewer {
-    frontend_html_factory: Box<dyn Fn(PreviewMode) -> String + Send + Sync>,
     stop: Option<Box<dyn FnOnce() -> StopFuture + Send + Sync>>,
     data_plane_handle: Option<tokio::task::JoinHandle<()>>,
-    conn_handler: Option<(ConnHandler, Option<mpsc::Sender<()>>, mpsc::Receiver<()>)>,
+    data_plane_resources: Option<(ConnHandler, Option<mpsc::Sender<()>>, mpsc::Receiver<()>)>,
     control_plane_handle: tokio::task::JoinHandle<()>,
 }
 
 impl Previewer {
-    /// Get the HTML for the frontend by a given preview mode
-    pub fn frontend_html(&self, mode: PreviewMode) -> String {
-        (self.frontend_html_factory)(mode)
-    }
-
     /// Join the previewer actors.
     pub async fn join(mut self) {
         let data_plane_handle = self.data_plane_handle.take().unwrap();
@@ -92,7 +86,7 @@ impl Previewer {
     ) {
         let idle_timeout = Duration::from_secs(5);
         let (conn_handler, shutdown_tx, mut shutdown_data_plane_rx) =
-            self.conn_handler.take().unwrap();
+            self.data_plane_resources.take().unwrap();
         let (alive_tx, mut alive_rx) = mpsc::unbounded_channel::<()>();
 
         let recv = move |conn| {
@@ -152,7 +146,6 @@ impl Previewer {
             })
         };
 
-        //{
         let data_plane_handle = tokio::spawn(async move {
             let mut alive_cnt = 0;
             let mut shutdown_bell = tokio::time::interval(idle_timeout);
@@ -191,22 +184,32 @@ impl Previewer {
 
 pub trait CompileHost: SourceFileServer + EditorServer {}
 
-pub async fn preview<T: CompileHost + Send + Sync + 'static>(
+/// Get the HTML for the frontend by a given preview mode and server to connect
+pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
+    // Relace the data plane port in the html to self
+    let html = html.replace("ws://127.0.0.1:23625", to);
+    let mode = match mode {
+        PreviewMode::Document => "Doc",
+        PreviewMode::Slide => "Slide",
+    };
+    html.replace(
+        "preview-arg:previewMode:Doc",
+        format!("preview-arg:previewMode:{mode}").as_str(),
+    )
+}
+
+pub async fn preview(
     arguments: PreviewArgs,
     conn: ControlPlaneTx,
-    client: Arc<T>,
-    html: &str,
+    client: Arc<impl CompileHost + Send + Sync + 'static>,
 ) -> Previewer {
-    PreviewBuilder::new(arguments)
-        .start(conn, client, html)
-        .await
+    PreviewBuilder::new(arguments).start(conn, client).await
 }
 
 async fn preview_<T: CompileHost + Send + Sync + 'static>(
     builder: PreviewBuilder,
     conn: ControlPlaneTx,
     client: Arc<T>,
-    html: &str,
 ) -> Previewer {
     let PreviewBuilder {
         arguments,
@@ -260,20 +263,6 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
         })
     };
 
-    // Relace the data plane port in the html to self
-    let html = html.replace("ws://127.0.0.1:23625", "/");
-    // previewMode
-    let frontend_html_factory = Box::new(move |mode| -> String {
-        let mode = match mode {
-            PreviewMode::Document => "Doc",
-            PreviewMode::Slide => "Slide",
-        };
-        html.replace(
-            "preview-arg:previewMode:Doc",
-            format!("preview-arg:previewMode:{mode}").as_str(),
-        )
-    });
-
     let editor_tx = editor_conn.0;
     let stop = move || -> StopFuture {
         Box::pin(async move {
@@ -283,10 +272,9 @@ async fn preview_<T: CompileHost + Send + Sync + 'static>(
     };
 
     Previewer {
-        frontend_html_factory,
         control_plane_handle,
         data_plane_handle: None,
-        conn_handler: Some((conn_handler, shutdown_tx, shutdown_data_plane_rx)),
+        data_plane_resources: Some((conn_handler, shutdown_tx, shutdown_data_plane_rx)),
         stop: Some(Box::new(stop)),
     }
 }
@@ -339,11 +327,11 @@ impl PreviewBuilder {
         })
     }
 
-    pub async fn start<T>(self, conn: ControlPlaneTx, client: Arc<T>, html: &str) -> Previewer
+    pub async fn start<T>(self, conn: ControlPlaneTx, client: Arc<T>) -> Previewer
     where
         T: CompileHost + Send + Sync + 'static,
     {
-        preview_(self, conn, client, html).await
+        preview_(self, conn, client).await
     }
 }
 
