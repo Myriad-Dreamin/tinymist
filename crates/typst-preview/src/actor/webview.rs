@@ -118,7 +118,7 @@ impl<
                     };
                     let Message::Text(msg) = msg else {
                         info!("WebviewActor: received non-text message from websocket: {:?}", msg);
-                        let _ = self.webview_websocket_conn.send(Message::Text(format!("Webview Actor: error, received non-text message: {}", msg)))
+                        let _ = self.webview_websocket_conn.send(Message::Text(format!("Webview Actor: error, received non-text message: {msg:?}")))
                         .await;
                         break;
                     };

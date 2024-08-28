@@ -275,7 +275,7 @@ impl PreviewState {
 
         let (websocket_tx, websocket_rx) = mpsc::unbounded_channel();
 
-        let previewer = previewer.start(lsp_tx, compile_handler.clone());
+        let previewer = previewer.build(lsp_tx, compile_handler.clone());
 
         // Forward preview responses to lsp client
         let tid = task_id.clone();
@@ -613,7 +613,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     let registered = handle.register_preview(previewer.compile_watcher());
     assert!(registered, "failed to register preview");
     let (websocket_tx, websocket_rx) = mpsc::unbounded_channel();
-    let mut previewer = previewer.start(lsp_tx, handle.clone()).await;
+    let mut previewer = previewer.build(lsp_tx, handle.clone()).await;
     tokio::spawn(service.run());
 
     bind_streams(&mut previewer, websocket_rx);
@@ -713,7 +713,7 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
 }
 
 fn bind_streams(previewer: &mut Previewer, websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>) {
-    previewer.serve_with(
+    previewer.start_data_plane(
         websocket_rx,
         |conn: Result<HyperWebsocketStream, hyper_tungstenite::tungstenite::Error>| {
             let conn = conn.map_err(error_once_map_string!("cannot receive websocket"))?;

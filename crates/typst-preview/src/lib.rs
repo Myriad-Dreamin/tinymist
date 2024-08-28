@@ -9,10 +9,7 @@ pub use actor::editor::{
 pub use args::*;
 pub use outline::Outline;
 
-use core::fmt;
-use std::pin::Pin;
-use std::time::Duration;
-use std::{collections::HashMap, future::Future, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin, sync::Arc};
 
 use futures::sink::SinkExt;
 use once_cell::sync::OnceCell;
@@ -23,9 +20,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc};
 use typst::{layout::Position, syntax::Span};
 
-use crate::actor::editor::EditorActorRequest;
-use crate::actor::render::RenderActorRequest;
-use actor::editor::EditorActor;
+use actor::editor::{EditorActor, EditorActorRequest};
+use actor::render::RenderActorRequest;
 use actor::typst::{TypstActor, TypstActorRequest};
 use actor::webview::WebviewActorRequest;
 use debug_loc::SpanInterner;
@@ -35,44 +31,53 @@ type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 type WsError = reflexo_typst::Error;
 type Message = WsMessage;
 
-#[derive(Debug)]
-pub enum WsMessage {
-    /// A text WebSocket message
-    Text(String),
-    /// A binary WebSocket message
-    Binary(Vec<u8>),
+pub trait CompileHost: SourceFileServer + EditorServer {}
+
+/// Get the HTML for the frontend by a given preview mode and server to connect
+pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
+    let mode = match mode {
+        PreviewMode::Document => "Doc",
+        PreviewMode::Slide => "Slide",
+    };
+
+    html.replace("ws://127.0.0.1:23625", to).replace(
+        "preview-arg:previewMode:Doc",
+        format!("preview-arg:previewMode:{mode}").as_str(),
+    )
 }
 
-impl fmt::Display for WsMessage {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            WsMessage::Text(s) => write!(f, "Text({})", s),
-            WsMessage::Binary(b) => write!(f, "Binary({:?})", b),
-        }
-    }
+/// Shortcut to create a previewer.
+pub async fn preview(
+    arguments: PreviewArgs,
+    conn: ControlPlaneTx,
+    client: Arc<impl CompileHost + Send + Sync + 'static>,
+) -> Previewer {
+    PreviewBuilder::new(arguments).build(conn, client).await
 }
 
 pub struct Previewer {
     stop: Option<Box<dyn FnOnce() -> StopFuture + Send + Sync>>,
     data_plane_handle: Option<tokio::task::JoinHandle<()>>,
-    data_plane_resources: Option<(ConnHandler, Option<mpsc::Sender<()>>, mpsc::Receiver<()>)>,
+    data_plane_resources: Option<(DataPlane, Option<mpsc::Sender<()>>, mpsc::Receiver<()>)>,
     control_plane_handle: tokio::task::JoinHandle<()>,
 }
 
 impl Previewer {
-    /// Join the previewer actors.
-    pub async fn join(mut self) {
-        let data_plane_handle = self.data_plane_handle.take().unwrap();
-        let _ = tokio::join!(data_plane_handle, self.control_plane_handle);
-    }
-
+    /// Send stop requests to preview actors.
     pub async fn stop(&mut self) {
         if let Some(stop) = self.stop.take() {
             let _ = stop().await;
         }
     }
 
-    pub fn serve_with<
+    /// Join all the previewer actors. Note: send stop request first.
+    pub async fn join(mut self) {
+        let data_plane_handle = self.data_plane_handle.take().expect("must bind data plane");
+        let _ = tokio::join!(data_plane_handle, self.control_plane_handle);
+    }
+
+    /// Listen streams that accepting data plane messages.
+    pub fn start_data_plane<
         C: futures::Sink<WsMessage, Error = WsError>
             + futures::Stream<Item = Result<WsMessage, WsError>>
             + Send
@@ -84,7 +89,7 @@ impl Previewer {
         mut streams: mpsc::UnboundedReceiver<SFut>,
         caster: impl Fn(S) -> Result<C, Error> + Send + Sync + Copy + 'static,
     ) {
-        let idle_timeout = Duration::from_secs(5);
+        let idle_timeout = reflexo_typst::time::Duration::from_secs(5);
         let (conn_handler, shutdown_tx, mut shutdown_data_plane_rx) =
             self.data_plane_resources.take().unwrap();
         let (alive_tx, mut alive_rx) = mpsc::unbounded_channel::<()>();
@@ -182,102 +187,6 @@ impl Previewer {
     }
 }
 
-pub trait CompileHost: SourceFileServer + EditorServer {}
-
-/// Get the HTML for the frontend by a given preview mode and server to connect
-pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
-    let mode = match mode {
-        PreviewMode::Document => "Doc",
-        PreviewMode::Slide => "Slide",
-    };
-
-    html.replace("ws://127.0.0.1:23625", to).replace(
-        "preview-arg:previewMode:Doc",
-        format!("preview-arg:previewMode:{mode}").as_str(),
-    )
-}
-
-pub async fn preview(
-    arguments: PreviewArgs,
-    conn: ControlPlaneTx,
-    client: Arc<impl CompileHost + Send + Sync + 'static>,
-) -> Previewer {
-    PreviewBuilder::new(arguments).start(conn, client).await
-}
-
-async fn preview_<T: CompileHost + Send + Sync + 'static>(
-    builder: PreviewBuilder,
-    conn: ControlPlaneTx,
-    client: Arc<T>,
-) -> Previewer {
-    let PreviewBuilder {
-        arguments,
-        shutdown_tx,
-        typst_mailbox,
-        renderer_mailbox,
-        editor_conn,
-        webview_conn: (webview_tx, _),
-        doc_sender,
-        ..
-    } = builder;
-    let enable_partial_rendering = arguments.enable_partial_rendering;
-    let invert_colors = arguments.invert_colors;
-
-    // Shared resource
-    let span_interner = SpanInterner::new();
-
-    // Spawns the typst actor
-    let typst_actor = TypstActor::new(
-        client,
-        typst_mailbox.1,
-        renderer_mailbox.0.clone(),
-        editor_conn.0.clone(),
-        webview_tx.clone(),
-    );
-    tokio::spawn(typst_actor.run());
-
-    log::info!("Previewer: typst actor spawned");
-
-    let (shutdown_data_plane_tx, shutdown_data_plane_rx) = mpsc::channel(1);
-    let conn_handler = ConnHandler {
-        span_interner: span_interner.clone(),
-        webview_tx: webview_tx.clone(),
-        typst_tx: typst_mailbox.0.clone(),
-        editor_tx: editor_conn.0.clone(),
-        invert_colors: invert_colors.clone(),
-        renderer_tx: renderer_mailbox.0.clone(),
-        enable_partial_rendering,
-        doc_sender,
-    };
-
-    let control_plane_handle = {
-        let span_interner = span_interner.clone();
-        let typst_tx = typst_mailbox.0.clone();
-        let editor_rx = editor_conn.1;
-        tokio::spawn(async move {
-            let editor_actor =
-                EditorActor::new(editor_rx, conn, typst_tx, webview_tx, span_interner);
-            editor_actor.run().await;
-            log::info!("Control plane client shutdown");
-        })
-    };
-
-    let editor_tx = editor_conn.0;
-    let stop = move || -> StopFuture {
-        Box::pin(async move {
-            let _ = shutdown_data_plane_tx.send(()).await;
-            let _ = editor_tx.send(EditorActorRequest::Shutdown);
-        })
-    };
-
-    Previewer {
-        control_plane_handle,
-        data_plane_handle: None,
-        data_plane_resources: Some((conn_handler, shutdown_tx, shutdown_data_plane_rx)),
-        stop: Some(Box::new(stop)),
-    }
-}
-
 type MpScChannel<T> = (mpsc::UnboundedSender<T>, mpsc::UnboundedReceiver<T>);
 type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
 
@@ -299,7 +208,6 @@ impl PreviewBuilder {
         Self {
             arguments,
             shutdown_tx: None,
-            // lsp_connection: None,
             typst_mailbox: mpsc::unbounded_channel(),
             renderer_mailbox: broadcast::channel(1024),
             editor_conn: mpsc::unbounded_channel(),
@@ -326,12 +234,79 @@ impl PreviewBuilder {
         })
     }
 
-    pub async fn start<T>(self, conn: ControlPlaneTx, client: Arc<T>) -> Previewer
+    pub async fn build<T>(self, conn: ControlPlaneTx, client: Arc<T>) -> Previewer
     where
         T: CompileHost + Send + Sync + 'static,
     {
-        preview_(self, conn, client).await
+        let PreviewBuilder {
+            arguments,
+            shutdown_tx,
+            typst_mailbox,
+            renderer_mailbox,
+            editor_conn: (editor_tx, editor_rx),
+            webview_conn: (webview_tx, _),
+            doc_sender,
+            ..
+        } = self;
+
+        // Shared resource
+        let span_interner = SpanInterner::new();
+        let (shutdown_data_plane_tx, shutdown_data_plane_rx) = mpsc::channel(1);
+
+        // Spawns the typst actor
+        let typst_actor = TypstActor::new(
+            client,
+            typst_mailbox.1,
+            renderer_mailbox.0.clone(),
+            editor_tx.clone(),
+            webview_tx.clone(),
+        );
+        tokio::spawn(typst_actor.run());
+        log::info!("Previewer: typst actor spawned");
+
+        // Spawns the editor actor
+        let editor_actor = EditorActor::new(
+            editor_rx,
+            conn,
+            typst_mailbox.0.clone(),
+            webview_tx.clone(),
+            span_interner.clone(),
+        );
+        let control_plane_handle = tokio::spawn(editor_actor.run());
+        log::info!("Previewer: editor actor spawned");
+
+        // Delayed data plane binding
+        let data_plane = DataPlane {
+            span_interner: span_interner.clone(),
+            webview_tx: webview_tx.clone(),
+            typst_tx: typst_mailbox.0.clone(),
+            editor_tx: editor_tx.clone(),
+            invert_colors: arguments.invert_colors.clone(),
+            renderer_tx: renderer_mailbox.0.clone(),
+            enable_partial_rendering: arguments.enable_partial_rendering,
+            doc_sender,
+        };
+
+        Previewer {
+            control_plane_handle,
+            data_plane_handle: None,
+            data_plane_resources: Some((data_plane, shutdown_tx, shutdown_data_plane_rx)),
+            stop: Some(Box::new(move || {
+                Box::pin(async move {
+                    let _ = shutdown_data_plane_tx.send(()).await;
+                    let _ = editor_tx.send(EditorActorRequest::Shutdown);
+                })
+            })),
+        }
     }
+}
+
+#[derive(Debug)]
+pub enum WsMessage {
+    /// A text WebSocket message
+    Text(String),
+    /// A binary WebSocket message
+    Binary(Vec<u8>),
 }
 
 pub type SourceLocation = reflexo_typst::debug_loc::SourceLocation;
@@ -473,7 +448,7 @@ impl CompileWatcher {
 }
 
 #[derive(Clone)]
-struct ConnHandler {
+struct DataPlane {
     span_interner: SpanInterner,
     webview_tx: broadcast::Sender<WebviewActorRequest>,
     typst_tx: mpsc::UnboundedSender<TypstActorRequest>,
