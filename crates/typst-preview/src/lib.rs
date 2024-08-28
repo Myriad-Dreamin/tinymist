@@ -28,7 +28,7 @@ use debug_loc::SpanInterner;
 
 type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
-type WsError = reflexo_typst::Error;
+type WsError = Error;
 type Message = WsMessage;
 
 pub trait CompileHost: SourceFileServer + EditorServer {}
@@ -193,7 +193,6 @@ type BroadcastChannel<T> = (broadcast::Sender<T>, broadcast::Receiver<T>);
 pub struct PreviewBuilder {
     arguments: PreviewArgs,
     shutdown_tx: Option<mpsc::Sender<()>>,
-    // lsp_connection: Option<LspControlPlaneTx>,
     typst_mailbox: MpScChannel<TypstActorRequest>,
     renderer_mailbox: BroadcastChannel<RenderActorRequest>,
     editor_conn: MpScChannel<EditorActorRequest>,
