@@ -2,6 +2,7 @@ mod actor;
 mod args;
 mod debug_loc;
 mod outline;
+
 pub use actor::editor::{
     CompileStatus, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
 };
@@ -14,7 +15,6 @@ use std::time::Duration;
 use std::{collections::HashMap, future::Future, path::PathBuf, sync::Arc};
 
 use futures::sink::SinkExt;
-use log::info;
 use once_cell::sync::OnceCell;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::Error;
@@ -57,7 +57,6 @@ pub struct Previewer {
     stop: Option<Box<dyn FnOnce() -> StopFuture + Send + Sync>>,
     data_plane_handle: tokio::task::JoinHandle<()>,
     control_plane_handle: tokio::task::JoinHandle<()>,
-    // data_plane_port: u16,
 }
 
 impl Previewer {
@@ -65,10 +64,6 @@ impl Previewer {
     pub fn frontend_html(&self, mode: PreviewMode) -> String {
         (self.frontend_html_factory)(mode)
     }
-
-    // pub fn data_plane_port(&self) -> u16 {
-    //     self.data_plane_port
-    // }
 
     /// Join the previewer actors.
     pub async fn join(self) {
@@ -103,7 +98,6 @@ pub async fn preview<
         .await
 }
 
-// futures::Sink<Message, Error = WsError>
 async fn preview_<
     C: futures::Sink<WsMessage, Error = WsError>
         + futures::Stream<Item = Result<WsMessage, WsError>>
@@ -120,7 +114,6 @@ async fn preview_<
     let PreviewBuilder {
         arguments,
         shutdown_tx,
-        // lsp_connection,
         typst_mailbox,
         renderer_mailbox,
         editor_conn,
@@ -148,83 +141,81 @@ async fn preview_<
     log::info!("Previewer: typst actor spawned");
 
     let (shutdown_data_plane_tx, mut shutdown_data_plane_rx) = mpsc::channel(1);
-    let data_plane_handle = {
+    let (alive_tx, mut alive_rx) = mpsc::unbounded_channel();
+    let recv = {
         let span_interner = span_interner.clone();
         let typst_tx = typst_mailbox.0.clone();
         let webview_tx = webview_tx.clone();
         let renderer_tx = renderer_mailbox.0.clone();
         let editor_tx = editor_conn.0.clone();
 
-        // let shutdown_tx = lsp_connection.as_ref().map(|e| e.shutdown_tx.clone());
-        tokio::spawn(async move {
-            let (alive_tx, mut alive_rx) = mpsc::unbounded_channel();
+        move |conn: ToWsConn<C>| {
+            let span_interner = span_interner.clone();
+            let webview_tx = webview_tx.clone();
+            let webview_rx = webview_tx.subscribe();
+            let typst_tx = typst_tx.clone();
+            let editor_tx = editor_tx.clone();
+            let invert_colors = invert_colors.clone();
+            let renderer_tx = renderer_tx.clone();
+            let doc_sender = doc_sender.clone();
+            let alive_tx = alive_tx.clone();
+            tokio::spawn(async move {
+                let conn = conn.await;
+                tokio::pin!(conn);
 
-            let recv = |conn: ToWsConn<C>| {
-                // let mut conn = websocket.await.expect("cannot accept websocket");
-                // C: futures::Sink<Message, Error = reflexo_typst::Error>,
-                let span_interner = span_interner.clone();
-                let webview_tx = webview_tx.clone();
-                let webview_rx = webview_tx.subscribe();
-                let typst_tx = typst_tx.clone();
-                let editor_tx = editor_tx.clone();
-                let invert_colors = invert_colors.clone();
-                let renderer_tx = renderer_tx.clone();
-                let doc_sender = doc_sender.clone();
-                let alive_tx = alive_tx.clone();
-                tokio::spawn(async move {
-                    let conn = conn.await;
-                    tokio::pin!(conn);
-
-                    if enable_partial_rendering {
-                        conn.send(WsMessage::Binary("partial-rendering,true".into()))
-                            .await
-                            .unwrap();
-                    }
-                    if !invert_colors.is_empty() {
-                        conn.send(WsMessage::Binary(
-                            format!("invert-colors,{}", invert_colors).into(),
-                        ))
+                if enable_partial_rendering {
+                    conn.send(WsMessage::Binary("partial-rendering,true".into()))
                         .await
                         .unwrap();
+                }
+                if !invert_colors.is_empty() {
+                    conn.send(WsMessage::Binary(
+                        format!("invert-colors,{}", invert_colors).into(),
+                    ))
+                    .await
+                    .unwrap();
+                }
+                let actor::webview::Channels { svg } =
+                    actor::webview::WebviewActor::<'_, C>::set_up_channels();
+                let webview_actor = actor::webview::WebviewActor::new(
+                    conn,
+                    svg.1,
+                    webview_tx.clone(),
+                    webview_rx,
+                    editor_tx.clone(),
+                    renderer_tx.clone(),
+                );
+                let render_actor = actor::render::RenderActor::new(
+                    renderer_tx.subscribe(),
+                    doc_sender.clone(),
+                    typst_tx,
+                    svg.0,
+                    webview_tx,
+                );
+                tokio::spawn(render_actor.run());
+                let outline_render_actor = actor::render::OutlineRenderActor::new(
+                    renderer_tx.subscribe(),
+                    doc_sender.clone(),
+                    editor_tx.clone(),
+                    span_interner,
+                );
+                tokio::spawn(outline_render_actor.run());
+
+                struct FinallySend(mpsc::UnboundedSender<()>);
+                impl Drop for FinallySend {
+                    fn drop(&mut self) {
+                        let _ = self.0.send(());
                     }
-                    let actor::webview::Channels { svg } =
-                        actor::webview::WebviewActor::<'_, C>::set_up_channels();
-                    let webview_actor = actor::webview::WebviewActor::new(
-                        conn,
-                        svg.1,
-                        webview_tx.clone(),
-                        webview_rx,
-                        editor_tx.clone(),
-                        renderer_tx.clone(),
-                    );
-                    let render_actor = actor::render::RenderActor::new(
-                        renderer_tx.subscribe(),
-                        doc_sender.clone(),
-                        typst_tx,
-                        svg.0,
-                        webview_tx,
-                    );
-                    tokio::spawn(render_actor.run());
-                    let outline_render_actor = actor::render::OutlineRenderActor::new(
-                        renderer_tx.subscribe(),
-                        doc_sender.clone(),
-                        editor_tx.clone(),
-                        span_interner,
-                    );
-                    tokio::spawn(outline_render_actor.run());
+                }
 
-                    struct FinallySend(mpsc::UnboundedSender<()>);
-                    impl Drop for FinallySend {
-                        fn drop(&mut self) {
-                            let _ = self.0.send(());
-                        }
-                    }
+                let _send = FinallySend(alive_tx);
+                webview_actor.run().await;
+            });
+        }
+    };
 
-                    let _send = FinallySend(alive_tx);
-                    webview_actor.run().await;
-                });
-            };
-
+    let data_plane_handle = {
+        tokio::spawn(async move {
             let mut alive_cnt = 0;
             let mut shutdown_bell = tokio::time::interval(idle_timeout);
             loop {
@@ -233,7 +224,7 @@ async fn preview_<
                 }
                 tokio::select! {
                     Some(()) = shutdown_data_plane_rx.recv() => {
-                        info!("Data plane server shutdown");
+                        log::info!("Data plane server shutdown");
                         return;
                     }
                     Some(stream) = websocket_rx.recv() => {
@@ -245,10 +236,9 @@ async fn preview_<
                     }
                     _ = shutdown_bell.tick(), if alive_cnt == 0 && shutdown_tx.is_some() => {
                         let shutdown_tx = shutdown_tx.expect("scheduled shutdown without shutdown_tx");
-
-                        info!("Data plane server has been idle for {idle_timeout:?}, shutting down.");
+                        log::info!("Data plane server has been idle for {idle_timeout:?}, shutting down.");
                         let _ = shutdown_tx.send(()).await;
-                        info!("Data plane server shutdown");
+                        log::info!("Data plane server shutdown");
                         return;
                     }
                 }
@@ -264,7 +254,7 @@ async fn preview_<
             let editor_actor =
                 EditorActor::new(editor_rx, conn, typst_tx, webview_tx, span_interner);
             editor_actor.run().await;
-            info!("Control plane client shutdown");
+            log::info!("Control plane client shutdown");
         })
     };
 
@@ -294,7 +284,6 @@ async fn preview_<
         frontend_html_factory,
         data_plane_handle,
         control_plane_handle,
-        // data_plane_port,
         stop: Some(Box::new(stop)),
     }
 }
@@ -329,12 +318,6 @@ impl PreviewBuilder {
             compile_watcher: OnceCell::new(),
         }
     }
-
-    // pub fn with_lsp_connection(mut self, lsp_connection:
-    // Option<LspControlPlaneTx>) -> Self {     self.lsp_connection =
-    // lsp_connection;     self
-    // }
-    // pub shutdown_tx: Option<mpsc::Sender<()>>,
 
     pub fn with_shutdown_tx(mut self, shutdown_tx: mpsc::Sender<()>) -> Self {
         self.shutdown_tx = Some(shutdown_tx);
