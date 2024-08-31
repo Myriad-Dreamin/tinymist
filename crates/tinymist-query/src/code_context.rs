@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use typst_shim::typst_linked_node_leaf_at;
 
 use crate::{
     prelude::*,
@@ -75,7 +76,7 @@ impl InteractCodeContextRequest {
 
         // Get mode
         let root = LinkedNode::new(source.root());
-        let leaf = root.leaf_at(pos);
+        let leaf = typst_linked_node_leaf_at!(root, pos);
         let mut leaf = leaf.as_ref();
         Some(loop {
             log::debug!("leaf for context: {leaf:?}");

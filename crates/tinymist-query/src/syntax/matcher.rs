@@ -590,6 +590,7 @@ mod tests {
     use super::*;
     use insta::assert_snapshot;
     use typst::syntax::{is_newline, Source};
+    use typst_shim::typst_linked_node_leaf_at;
 
     fn map_base(source: &str, mapper: impl Fn(&LinkedNode, usize) -> char) -> String {
         let source = Source::detached(source.to_owned());
@@ -617,7 +618,7 @@ mod tests {
 
     fn map_deref(source: &str) -> String {
         map_base(source, |root, cursor| {
-            let node = root.leaf_at(cursor);
+            let node = typst_linked_node_leaf_at!(root, cursor);
             let kind = node.and_then(|node| get_deref_target(node, cursor));
             match kind {
                 Some(DerefTarget::VarAccess(..)) => 'v',
@@ -634,7 +635,7 @@ mod tests {
 
     fn map_check(source: &str) -> String {
         map_base(source, |root, cursor| {
-            let node = root.leaf_at(cursor);
+            let node = typst_linked_node_leaf_at!(root, cursor);
             let kind = node.and_then(|node| get_check_target(node));
             match kind {
                 Some(CheckTarget::Param { .. }) => 'p',

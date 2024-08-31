@@ -1,5 +1,7 @@
 use std::ops::Range;
 
+use typst_shim::typst_linked_node_leaf_at;
+
 use crate::prelude::*;
 use crate::syntax::get_def_target;
 
@@ -89,7 +91,7 @@ pub fn find_docs_before(src: &Source, cursor: usize) -> Option<String> {
     log::debug!("finding docs at: {id:?}, {cursor}", id = src.id());
 
     let root = LinkedNode::new(src.root());
-    let leaf = root.leaf_at(cursor)?;
+    let leaf = typst_linked_node_leaf_at!(root, cursor)?;
     let def_target = get_def_target(leaf.clone())?;
     log::debug!("found docs target: {:?}", def_target.node().kind());
     // todo: import node

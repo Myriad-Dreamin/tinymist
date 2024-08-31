@@ -1,6 +1,7 @@
 use lsp_types::TextEdit;
 use once_cell::sync::{Lazy, OnceCell};
 use regex::Regex;
+use typst_shim::typst_linked_node_leaf_at;
 
 use crate::{prelude::*, SemanticRequest};
 
@@ -269,7 +270,7 @@ impl<'a, 'w> CodeActionWorker<'a, 'w> {
     }
 
     fn work(&mut self, root: LinkedNode, cursor: usize) -> Option<()> {
-        let node = root.leaf_at(cursor)?;
+        let node = typst_linked_node_leaf_at!(root, cursor)?;
         let mut node = &node;
 
         let mut heading_resolved = false;

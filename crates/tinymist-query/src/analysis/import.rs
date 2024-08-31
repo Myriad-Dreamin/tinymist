@@ -6,6 +6,7 @@ use typst::{
     syntax::{LinkedNode, SyntaxKind},
     World,
 };
+use typst_shim::typst_linked_node_leaf_at;
 
 use crate::{analysis::analyze_import_, syntax::resolve_id_by_path};
 
@@ -91,7 +92,10 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
                 LexicalKind::Mod(LexicalModKind::Module(p)) => {
                     let id = match p {
                         ModSrc::Expr(exp) => {
-                            let exp = find_import_expr(self.root.leaf_at(exp.range.end));
+                            let exp = find_import_expr(typst_linked_node_leaf_at!(
+                                self.root,
+                                exp.range.end
+                            ));
                             let val = exp
                                 .as_ref()
                                 .and_then(|exp| analyze_import_(self.ctx.deref(), exp));

@@ -11,6 +11,7 @@ use typst::syntax::ast::AstNode;
 use typst::syntax::package::PackageSpec;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
+use typst_shim::typst_linked_node_leaf_at;
 use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
@@ -969,7 +970,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
     ) -> Option<Self> {
         let text = source.text();
         let root = LinkedNode::new(source.root());
-        let leaf = root.leaf_at(cursor)?;
+        let leaf = typst_linked_node_leaf_at!(root, cursor)?;
         Some(Self {
             ctx,
             document,

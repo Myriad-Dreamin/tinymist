@@ -1,3 +1,5 @@
+use typst_shim::typst_linked_node_leaf_at;
+
 use crate::{prelude::*, SemanticRequest};
 
 /// The [`textDocument/documentHighlight`] request
@@ -19,7 +21,7 @@ impl SemanticRequest for DocumentHighlightRequest {
         let cursor = ctx.to_typst_pos(self.position, &source)?;
 
         let root = LinkedNode::new(source.root());
-        let mut node = &root.leaf_at(cursor)?;
+        let mut node = &typst_linked_node_leaf_at!(root, cursor)?;
 
         loop {
             match node.kind() {
