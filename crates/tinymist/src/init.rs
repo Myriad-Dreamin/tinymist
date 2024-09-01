@@ -516,6 +516,7 @@ impl CompileConfig {
                 inputs: Arc::new(Prehashed::new(inputs)),
                 font: command.font,
                 creation_timestamp: command.creation_timestamp,
+                cert: command.certification,
             });
         }
 
@@ -793,6 +794,8 @@ pub struct CompileExtraOpts {
     pub font: CompileFontArgs,
     /// The creation timestamp for various output.
     pub creation_timestamp: Option<chrono::DateTime<chrono::Utc>>,
+    /// Path to certification file
+    pub cert: Option<PathBuf>,
 }
 
 /// The path pattern that could be substituted.
