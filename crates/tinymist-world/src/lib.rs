@@ -18,7 +18,7 @@ use reflexo_typst::font::system::SystemFontSearcher;
 use reflexo_typst::foundations::{Str, Value};
 use reflexo_typst::package::http::HttpRegistry;
 use reflexo_typst::vfs::{system::SystemAccessModel, Vfs};
-use reflexo_typst::{SystemCompilerFeat, TypstDict, TypstSystemUniverse, TypstSystemWorld};
+use reflexo_typst::{CompilerFeat, CompilerUniverse, CompilerWorld, TypstDict};
 use serde::{Deserialize, Serialize};
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
@@ -146,11 +146,11 @@ impl CompileOnceArgs {
 }
 
 /// Compiler feature for LSP universe and worlds.
-pub type LspCompilerFeat = SystemCompilerFeat;
+pub type LspCompilerFeat = SystemCompilerFeatExtend;
 /// LSP universe that spawns LSP worlds.
-pub type LspUniverse = TypstSystemUniverse;
+pub type LspUniverse = TypstSystemUniverseExtend;
 /// LSP world.
-pub type LspWorld = TypstSystemWorld;
+pub type LspWorld = TypstSystemWorldExtend;
 /// Immutable prehashed reference to dictionary.
 pub type ImmutDict = Arc<Prehashed<TypstDict>>;
 
@@ -210,3 +210,22 @@ pub fn parse_source_date_epoch(raw: &str) -> Result<DateTime<Utc>, String> {
         .map_err(|err| format!("timestamp must be decimal integer ({err})"))?;
     DateTime::from_timestamp(timestamp, 0).ok_or_else(|| "timestamp out of range".to_string())
 }
+
+/// Compiler feature for LSP universe and worlds without typst.ts to implement more for tinymist.
+/// type trait of [`TypstSystemWorld`].
+#[derive(Debug, Clone, Copy)]
+pub struct SystemCompilerFeatExtend;
+
+impl CompilerFeat for SystemCompilerFeatExtend {
+    /// Uses [`FontResolverImpl`] directly.
+    type FontResolver = FontResolverImpl;
+    /// It accesses a physical file system.
+    type AccessModel = SystemAccessModel;
+    /// It performs native HTTP requests for fetching package data.
+    type Registry = HttpRegistry;
+}
+
+/// The compiler universe in system environment.
+pub type TypstSystemUniverseExtend = CompilerUniverse<SystemCompilerFeatExtend>;
+/// The compiler world in system environment.
+pub type TypstSystemWorldExtend = CompilerWorld<SystemCompilerFeatExtend>;
