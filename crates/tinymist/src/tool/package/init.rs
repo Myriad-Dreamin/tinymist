@@ -5,11 +5,13 @@ use std::path::{Path, PathBuf};
 
 use reflexo_typst::{Bytes, ImmutPath, TypstFileId};
 use typst::diag::{bail, eco_format, FileError, FileResult, StrResult};
-use typst::syntax::package::{PackageManifest, PackageSpec, TemplateInfo};
+use typst::syntax::package::{PackageSpec, TemplateInfo};
 use typst::syntax::VirtualPath;
 use typst::World;
 
 use crate::world::LspWorld;
+
+use super::get_manifest;
 
 /// The source of a template.
 #[derive(Debug, Clone)]
@@ -31,10 +33,7 @@ pub fn get_entry(world: &LspWorld, tmpl: TemplateSource) -> StrResult<Bytes> {
     let TemplateSource::Package(spec) = tmpl;
 
     let toml_id = TypstFileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
-
-    // Parse the manifest.
-    let manifest = parse_manifest(world, toml_id)?;
-    manifest.validate(&spec)?;
+    let manifest = get_manifest(world, toml_id)?;
 
     // Ensure that it is indeed a template.
     let Some(tmpl_info) = &manifest.template else {
@@ -56,10 +55,7 @@ pub fn init(world: &LspWorld, task: InitTask) -> StrResult<PathBuf> {
         .unwrap_or_else(|| Path::new(spec.name.as_str()).into());
 
     let toml_id = TypstFileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
-
-    // Parse the manifest.
-    let manifest = parse_manifest(world, toml_id)?;
-    manifest.validate(&spec)?;
+    let manifest = get_manifest(world, toml_id)?;
 
     // Ensure that it is indeed a template.
     let Some(template) = &manifest.template else {
@@ -76,19 +72,6 @@ pub fn init(world: &LspWorld, task: InitTask) -> StrResult<PathBuf> {
     scaffold_project(world, template, toml_id, &project_dir)?;
 
     Ok(entry_point)
-}
-
-/// Parses the manifest of the package located at `package_path`.
-fn parse_manifest(world: &LspWorld, toml_id: TypstFileId) -> StrResult<PackageManifest> {
-    let toml_data = world
-        .file(toml_id)
-        .map_err(|err| eco_format!("failed to read package manifest ({})", err))?;
-
-    let string = std::str::from_utf8(&toml_data)
-        .map_err(|err| eco_format!("package manifest is not valid UTF-8 ({})", err))?;
-
-    toml::from_str(string)
-        .map_err(|err| eco_format!("package manifest is malformed ({})", err.message()))
 }
 
 /// Creates the project directory with the template's contents and returns the

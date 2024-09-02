@@ -8,6 +8,7 @@ use typst::{
     diag::{bail, StrResult},
     foundations::{Content, Func, Module, Type, Value},
     introspection::MetadataElem,
+    syntax::Span,
     text::{FontInfo, FontStyle},
     Library,
 };
@@ -416,6 +417,36 @@ pub fn truncated_repr(value: &Value) -> EcoString {
     } else {
         repr
     }
+}
+
+/// Run a function with a VM instance in the world
+pub fn with_vm<T>(world: &dyn typst::World, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
+    use comemo::Track;
+    use typst::engine::*;
+    use typst::eval::*;
+    use typst::foundations::*;
+    use typst::introspection::*;
+
+    let mut locator = Locator::default();
+    let introspector = Introspector::default();
+    let mut tracer = Tracer::new();
+    let engine = Engine {
+        world: world.track(),
+        route: Route::default(),
+        introspector: introspector.track(),
+        locator: &mut locator,
+        tracer: tracer.track_mut(),
+    };
+
+    let context = Context::none();
+    let mut vm = Vm::new(
+        engine,
+        context.track(),
+        Scopes::new(Some(world.library())),
+        Span::detached(),
+    );
+
+    f(&mut vm)
 }
 
 #[cfg(test)]

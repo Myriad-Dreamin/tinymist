@@ -39,6 +39,7 @@ import { onEnterHandler } from "./lsp.on-enter";
 import { extensionState } from "./state";
 import { devKitFeatureActivate } from "./features/dev-kit";
 import { labelFeatureActivate } from "./features/label";
+import { packageFeatureActivate } from "./features/package";
 
 export async function activate(context: ExtensionContext): Promise<void> {
   try {
@@ -69,6 +70,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   setClient(client);
   // Activates features
   labelFeatureActivate(context);
+  packageFeatureActivate(context);
   if (extensionState.features.task) {
     taskActivate(context);
   }

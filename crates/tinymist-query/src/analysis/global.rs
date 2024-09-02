@@ -174,6 +174,11 @@ pub trait AnalysisResources {
         None
     }
 
+    /// Get the local packages and their descriptions.
+    fn local_packages(&self) -> EcoVec<PackageSpec> {
+        EcoVec::new()
+    }
+
     /// Resolve telescope image at the given position.
     fn periscope_at(
         &self,
@@ -596,32 +601,7 @@ impl<'w> AnalysisContext<'w> {
     }
 
     pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
-        use comemo::Track;
-        use typst::engine::*;
-        use typst::eval::*;
-        use typst::foundations::*;
-        use typst::introspection::*;
-
-        let mut locator = Locator::default();
-        let introspector = Introspector::default();
-        let mut tracer = Tracer::new();
-        let engine = Engine {
-            world: self.world().track(),
-            route: Route::default(),
-            introspector: introspector.track(),
-            locator: &mut locator,
-            tracer: tracer.track_mut(),
-        };
-
-        let context = Context::none();
-        let mut vm = Vm::new(
-            engine,
-            context.track(),
-            Scopes::new(Some(self.world().library())),
-            Span::detached(),
-        );
-
-        f(&mut vm)
+        crate::upstream::with_vm(self.world(), f)
     }
 
     pub(crate) fn const_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
