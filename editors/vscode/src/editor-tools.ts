@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { readFile, writeFile } from "fs/promises";
-import { getFocusingFile, getLastFocusingDoc } from "./extension";
 import { tinymist } from "./lsp";
+import { extensionState } from "./state";
 
 async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
   const filePath = path.resolve(context.extensionPath, relativePath);
@@ -220,7 +220,7 @@ async function activateEditorToolAt(
         break;
       }
       case "editText": {
-        const activeDocument = getLastFocusingDoc();
+        const activeDocument = extensionState.getFocusingDoc();
         if (!activeDocument) {
           await vscode.window.showErrorMessage("No focusing document");
           return;
@@ -350,7 +350,7 @@ async function activateEditorToolAt(
       html = html.replace(":[[preview:FavoritePlaceholder]]:", btoa(packageData));
       break;
     case "tracing": {
-      const focusingFile = getFocusingFile();
+      const focusingFile = extensionState.getFocusingFile();
       if (focusingFile === undefined) {
         await vscode.window.showErrorMessage("No focusing typst file");
         return;
@@ -420,7 +420,7 @@ async function fetchSummaryInfo(): Promise<[any | undefined, any | undefined]> {
   let res: [any | undefined, any | undefined] = [undefined, undefined];
 
   for (const to of waitTimeList) {
-    const focusingFile = getFocusingFile();
+    const focusingFile = extensionState.getFocusingFile();
     if (focusingFile === undefined) {
       await vscode.window.showErrorMessage("No focusing typst file");
       return res;

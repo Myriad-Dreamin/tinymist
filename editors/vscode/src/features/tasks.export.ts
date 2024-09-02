@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import { tinymist } from "./lsp";
-import { getFocusingFile } from "./extension";
-import { VirtualConsole } from "./util";
+import { tinymist } from "../lsp";
+import { VirtualConsole } from "../util";
+import { extensionState } from "../state";
 
 type ExportFormat = "pdf" | "png" | "svg" | "html" | "markdown" | "text" | "query" | "pdfpc";
 
@@ -98,7 +98,7 @@ const exportOps = (exportArgs: ExportArgs) => ({
   resolveInputPath() {
     const inputPath = exportArgs.inputPath;
     if (inputPath === "$focused" || inputPath === undefined) {
-      return getFocusingFile();
+      return extensionState.getFocusingFile();
     }
 
     return inputPath;
