@@ -124,6 +124,7 @@ clap = { version = "4.5", features = ["derive", "env", "unicode", "wrap_help"] }
 clap_builder = { version = "4.5", features = ["string"] }
 clap_complete = "4.5"
 clap_complete_fig = "4.5"
+clap_complete_nushell = "4.5.3"
 clap_mangen = { version = "0.2.22" }
 vergen = { version = "8.3.1", features = [
     "build",
