@@ -521,6 +521,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap_complete_nushell"
+version = "4.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fe32110e006bccf720f8c9af3fee1ba7db290c724eab61544e1d3295be3a40e"
+dependencies = [
+ "clap",
+ "clap_complete",
+]
+
+[[package]]
 name = "clap_derive"
 version = "4.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3783,6 +3793,7 @@ dependencies = [
  "clap_builder",
  "clap_complete",
  "clap_complete_fig",
+ "clap_complete_nushell",
  "clap_mangen",
  "codespan-reporting",
  "comemo 0.4.0",
