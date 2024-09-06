@@ -1,0 +1,54 @@
+---
+source: crates/tinymist-query/src/folding_range.rs
+expression: "JsonRepr::new_pure(json!({ \"false\": result_false, \"true\": result_true, }))"
+input_file: crates/tinymist-query/src/fixtures/folding_range/nested-blocks-2.typ
+---
+{
+ "false": [
+  {
+   "collapsedText": "Heading",
+   "endCharacter": 11,
+   "endLine": 4,
+   "startCharacter": 4,
+   "startLine": 3
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 1,
+   "endLine": 4,
+   "startCharacter": 7,
+   "startLine": 1
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 1,
+   "endLine": 6,
+   "startCharacter": 1,
+   "startLine": 4
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 1,
+   "endLine": 6,
+   "startCharacter": 7,
+   "startLine": 1
+  }
+ ],
+ "true": [
+  {
+   "collapsedText": "",
+   "endLine": 3,
+   "startLine": 2
+  },
+  {
+   "collapsedText": "",
+   "endLine": 6,
+   "startLine": 4
+  },
+  {
+   "collapsedText": "",
+   "endLine": 6,
+   "startLine": 1
+  }
+ ]
+}
