@@ -1,14 +1,23 @@
 ---
 source: crates/tinymist-query/src/folding_range.rs
-expression: "JsonRepr::new_pure(result.unwrap())"
+expression: "JsonRepr::new_pure(json!({ \"false\": result_false, \"true\": result_true, }))"
 input_file: crates/tinymist-query/src/fixtures/folding_range/array_folding.typ
 ---
-[
- {
-  "collapsedText": "",
-  "endCharacter": 1,
-  "endLine": 4,
-  "startCharacter": 1,
-  "startLine": 0
- }
-]
+{
+ "false": [
+  {
+   "collapsedText": "",
+   "endCharacter": 1,
+   "endLine": 4,
+   "startCharacter": 1,
+   "startLine": 0
+  }
+ ],
+ "true": [
+  {
+   "collapsedText": "",
+   "endLine": 4,
+   "startLine": 0
+  }
+ ]
+}
