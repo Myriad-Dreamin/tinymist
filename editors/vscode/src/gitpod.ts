@@ -17,7 +17,7 @@ export function translateGitpodURL(urlstr: string): string {
     throw new Error("port is not specified in the URL");
   }
   if (!isGitpod()) {
-    throw new Error("Not in Gitpod environment");
+    throw new Error("not in Gitpod environment");
   }
   if (url.protocol.match("ws")) {
     url.protocol = "wss";
