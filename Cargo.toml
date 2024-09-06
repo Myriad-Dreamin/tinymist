@@ -28,7 +28,6 @@ triomphe = { version = "0.1.10", default-features = false, features = ["std"] }
 # Asynchoronous and Multi-threading
 async-trait = "0.1.77"
 futures = "0.3"
-pin-project-lite = "0.2.13"
 rayon = "1.10.0"
 tokio = { version = "1.36.0", features = [
     "macros",
@@ -45,10 +44,9 @@ chrono = "0.4"
 dirs = "5"
 
 # Networking
-hyper = { version = "0.14", features = ["full"] }
-tokio-tungstenite = "0.21.0"
-tower-layer = "0.3.2"
-tower-service = "0.3.2"
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1.7", features = ["tokio"] }
+hyper-tungstenite = "0.14.0"
 
 # Algorithms
 base64 = "0.22"

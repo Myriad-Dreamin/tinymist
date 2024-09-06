@@ -3,12 +3,15 @@
 use std::num::NonZeroUsize;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
-use actor::typ_server::{CompileServerOpts, SucceededArtifact};
-use hyper::service::{make_service_fn, service_fn};
+use futures::{SinkExt, StreamExt, TryStreamExt};
+use hyper::service::service_fn;
+use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};
+use hyper_util::rt::TokioIo;
+use hyper_util::server::graceful::GracefulShutdown;
 use lsp_types::notification::Notification;
 use reflexo_typst::debug_loc::SourceSpanOffset;
 use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
-use reflexo_typst::{EntryReader, Error, TypstDocument, TypstFileId};
+use reflexo_typst::{error::prelude::*, EntryReader, Error, TypstDocument, TypstFileId};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
@@ -20,18 +23,16 @@ use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
 use typst::World;
 pub use typst_preview::CompileStatus;
 use typst_preview::{
-    CompileHost, ControlPlaneMessage, ControlPlaneResponse, DocToSrcJumpInfo, EditorServer,
-    Location, LspControlPlaneRx, LspControlPlaneTx, MemoryFiles, MemoryFilesShort, PreviewArgs,
-    PreviewBuilder, PreviewMode, Previewer, SourceFileServer,
+    frontend_html, CompileHost, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx,
+    ControlPlaneTx, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
+    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, SourceFileServer, WsMessage,
 };
 
 use crate::world::{LspCompilerFeat, LspWorld};
 use crate::*;
-use actor::{
-    preview::{PreviewActor, PreviewRequest, PreviewTab},
-    typ_client::CompileHandler,
-    typ_server::CompileServerActor,
-};
+use actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
+use actor::typ_client::CompileHandler;
+use actor::typ_server::{CompileServerActor, CompileServerOpts, SucceededArtifact};
 
 impl CompileHost for CompileHandler {}
 
@@ -181,11 +182,31 @@ pub struct PreviewCliArgs {
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
     pub preview_mode: PreviewMode,
 
-    /// (File) Host for the preview server
+    /// Data plane server will bind to this address. Note: if it equals to
+    /// `static_file_host`, same address will be used.
+    #[clap(
+        long = "data-plane-host",
+        default_value = "127.0.0.1:23625",
+        value_name = "HOST",
+        hide(true)
+    )]
+    pub data_plane_host: String,
+
+    /// Control plane server will bind to this address
+    #[clap(
+        long = "control-plane-host",
+        default_value = "127.0.0.1:23626",
+        value_name = "HOST",
+        hide(true)
+    )]
+    pub control_plane_host: String,
+
+    /// (File) Host for the preview server. Note: if it equals to
+    /// `data_plane_host`, same address will be used.
     #[clap(
         long = "host",
         value_name = "HOST",
-        default_value = "127.0.0.1:23627",
+        default_value = "",
         alias = "static-file-host"
     )]
     pub static_file_host: String,
@@ -240,23 +261,27 @@ impl PreviewState {
     pub fn start(
         &self,
         args: PreviewCliArgs,
-        mut previewer: PreviewBuilder,
+        previewer: PreviewBuilder,
         compile_handler: Arc<CompileHandler>,
         is_primary: bool,
     ) -> SchedulableResponse<StartPreviewResponse> {
         let task_id = args.preview.task_id.clone();
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
 
-        let (lsp_tx, lsp_rx) = LspControlPlaneTx::new();
-        let LspControlPlaneRx {
+        if !args.static_file_host.is_empty() && (args.static_file_host != args.data_plane_host) {
+            return Err(internal_error("--static-file-host is removed"));
+        }
+
+        let (lsp_tx, lsp_rx) = ControlPlaneTx::new(false);
+        let ControlPlaneRx {
             resp_rx,
             ctl_tx,
             mut shutdown_rx,
         } = lsp_rx;
 
-        // Create a previewer
-        previewer = previewer.with_lsp_connection(Some(lsp_tx));
-        let previewer = previewer.start(compile_handler.clone(), TYPST_PREVIEW_HTML);
+        let (websocket_tx, websocket_rx) = mpsc::unbounded_channel();
+
+        let previewer = previewer.build(lsp_tx, compile_handler.clone());
 
         // Forward preview responses to lsp client
         let tid = task_id.clone();
@@ -298,28 +323,31 @@ impl PreviewState {
 
         let preview_tx = self.preview_tx.clone();
         just_future(async move {
-            let previewer = previewer.await;
+            let mut previewer = previewer.await;
+            bind_streams(&mut previewer, websocket_rx);
 
             // Put a fence to ensure the previewer can receive the first compilation.
             // The fence must be put after the previewer is initialized.
             compile_handler.flush_compile();
 
-            let (ss_addr, ss_killer, ss_handle) =
-                make_static_host(&previewer, args.static_file_host, args.preview_mode);
-            log::info!("PreviewTask({task_id}): static file server listening on: {ss_addr}");
+            // Relace the data plane port in the html to self
+            let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
+
+            let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
+            let addr = srv.addr;
+            log::info!("PreviewTask({task_id}): preview server listening on: {addr}");
 
             let resp = StartPreviewResponse {
-                static_server_port: Some(ss_addr.port()),
-                static_server_addr: Some(ss_addr.to_string()),
-                data_plane_port: Some(previewer.data_plane_port()),
+                static_server_port: Some(addr.port()),
+                static_server_addr: Some(addr.to_string()),
+                data_plane_port: Some(addr.port()),
                 is_primary,
             };
 
             let sent = preview_tx.send(PreviewRequest::Started(PreviewTab {
                 task_id,
                 previewer,
-                ss_killer,
-                ss_handle,
+                srv,
                 ctl_tx,
                 compile_handler,
                 is_primary,
@@ -349,66 +377,146 @@ impl PreviewState {
     }
 }
 
-/// Create a static file server for the previewer.
-pub fn make_static_host(
-    previewer: &Previewer,
+/// created by `make_http_server`
+pub struct HttpServer {
+    /// The address the server is listening on.
+    pub addr: SocketAddr,
+    /// The sender to shutdown the server.
+    pub shutdown_tx: oneshot::Sender<()>,
+    /// The join handle of the server.
+    pub join: tokio::task::JoinHandle<()>,
+}
+
+/// Create a http server for the previewer.
+pub async fn make_http_server(
+    frontend_html: String,
     static_file_addr: String,
-    mode: PreviewMode,
-) -> (SocketAddr, oneshot::Sender<()>, tokio::task::JoinHandle<()>) {
-    let frontend_html = hyper::body::Bytes::from(previewer.frontend_html(mode));
-    let make_service = make_service_fn(move |_| {
+    websocket_tx: mpsc::UnboundedSender<HyperWebsocket>,
+) -> HttpServer {
+    use http_body_util::Full;
+    use hyper::body::{Bytes, Incoming};
+    type Server = hyper_util::server::conn::auto::Builder<hyper_util::rt::TokioExecutor>;
+
+    let frontend_html = hyper::body::Bytes::from(frontend_html);
+    let make_service = move || {
         let frontend_html = frontend_html.clone();
-        async move {
-            Ok::<_, hyper::http::Error>(service_fn(move |req| {
-                let frontend_html = frontend_html.clone();
-                async move {
-                    if req.uri().path() == "/" {
-                        log::debug!("Serve frontend: {mode:?}");
-                        let res = hyper::Response::builder()
-                            .header(hyper::header::CONTENT_TYPE, "text/html")
-                            .body(hyper::body::Body::from(frontend_html))
-                            .unwrap();
-                        Ok::<_, hyper::Error>(res)
-                    } else {
-                        // jump to /
-                        let res = hyper::Response::builder()
-                            .status(hyper::StatusCode::FOUND)
-                            .header(hyper::header::LOCATION, "/")
-                            .body(hyper::body::Body::empty())
-                            .unwrap();
-                        Ok(res)
-                    }
+        let websocket_tx = websocket_tx.clone();
+        service_fn(move |mut req: hyper::Request<Incoming>| {
+            let frontend_html = frontend_html.clone();
+            let websocket_tx = websocket_tx.clone();
+            async move {
+                // Check if the request is a websocket upgrade request.
+                if hyper_tungstenite::is_upgrade_request(&req) {
+                    let (response, websocket) = hyper_tungstenite::upgrade(&mut req, None)
+                        .map_err(|e| {
+                            log::error!("Error in websocket upgrade: {e}");
+                            // let e = Error::new(e);
+                        })
+                        .unwrap();
+
+                    let _ = websocket_tx.send(websocket);
+
+                    // Return the response so the spawned future can continue.
+                    Ok(response)
+                } else if req.uri().path() == "/" {
+                    // log::debug!("Serve frontend: {mode:?}");
+                    let res = hyper::Response::builder()
+                        .header(hyper::header::CONTENT_TYPE, "text/html")
+                        .body(Full::<Bytes>::from(frontend_html))
+                        .unwrap();
+                    Ok::<_, std::convert::Infallible>(res)
+                } else {
+                    // jump to /
+                    let res = hyper::Response::builder()
+                        .status(hyper::StatusCode::FOUND)
+                        .header(hyper::header::LOCATION, "/")
+                        .body(Full::<Bytes>::default())
+                        .unwrap();
+                    Ok(res)
                 }
-            }))
-        }
-    });
-    let server = hyper::Server::bind(&static_file_addr.parse().unwrap()).serve(make_service);
-    let addr = server.local_addr();
+            }
+        })
+    };
 
-    let (tx, rx) = tokio::sync::oneshot::channel();
+    let listener = tokio::net::TcpListener::bind(&static_file_addr)
+        .await
+        .unwrap();
+    let addr = listener.local_addr().unwrap();
+    log::info!("preview server listening on http://{addr}");
+
+    let (shutdown_tx, rx) = tokio::sync::oneshot::channel();
     let (final_tx, final_rx) = tokio::sync::oneshot::channel();
-    let graceful = server.with_graceful_shutdown(async {
-        final_rx.await.ok();
-        log::info!("Static file server stop requested");
-    });
 
-    let join_handle = tokio::spawn(async move {
-        tokio::select! {
-            Err(err) = graceful => {
-                log::error!("Static file server error: {err:?}");
+    // the graceful watcher
+    let graceful = hyper_util::server::graceful::GracefulShutdown::new();
+
+    let serve_conn = move |server: &Server, graceful: &GracefulShutdown, conn| {
+        let (stream, _peer_addr) = match conn {
+            Ok(conn) => conn,
+            Err(e) => {
+                log::error!("accept error: {e}");
+                return;
             }
-            _ = rx => {
-                final_tx.send(()).ok();
+        };
+
+        let conn = server.serve_connection_with_upgrades(TokioIo::new(stream), make_service());
+        let conn = graceful.watch(conn.into_owned());
+        tokio::spawn(async move {
+            if let Err(err) = conn.await {
+                log::error!("Error serving connection: {err:?}");
+            }
+        });
+    };
+
+    let join = tokio::spawn(async move {
+        // when this signal completes, start shutdown
+        let mut signal = std::pin::pin!(final_rx);
+
+        let mut server = Server::new(hyper_util::rt::TokioExecutor::new());
+        server.http1().keep_alive(true);
+
+        loop {
+            tokio::select! {
+                conn = listener.accept() => serve_conn(&server, &graceful, conn),
+                Ok(_) = &mut signal => {
+                    log::info!("graceful shutdown signal received");
+                    break;
+                }
             }
         }
-        log::info!("Static file server joined");
+
+        tokio::select! {
+            _ = graceful.shutdown() => {
+                log::info!("Gracefully shutdown!");
+            },
+            _ = tokio::time::sleep(reflexo::time::Duration::from_secs(10)) => {
+                log::info!("Waited 10 seconds for graceful shutdown, aborting...");
+            }
+        }
     });
-    (addr, tx, join_handle)
+    tokio::spawn(async move {
+        let _ = rx.await;
+        final_tx.send(()).ok();
+        log::info!("Preview server joined");
+    });
+
+    HttpServer {
+        addr,
+        shutdown_tx,
+        join,
+    }
 }
 
 /// Entry point of the preview tool.
 pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     log::info!("Arguments: {args:#?}");
+
+    let static_file_host =
+        if args.static_file_host == args.data_plane_host || !args.static_file_host.is_empty() {
+            Some(args.static_file_host)
+        } else {
+            None
+        };
 
     tokio::spawn(async move {
         let _ = tokio::signal::ctrl_c().await;
@@ -452,23 +560,102 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
         (service, handle)
     };
 
+    let (lsp_tx, mut lsp_rx) = ControlPlaneTx::new(true);
+
+    let control_plane_server_handle = tokio::spawn(async move {
+        let (control_sock_tx, mut control_sock_rx) = mpsc::unbounded_channel();
+
+        let srv =
+            make_http_server(String::default(), args.control_plane_host, control_sock_tx).await;
+        log::info!("Control panel server listening on: {}", srv.addr);
+
+        let control_websocket = control_sock_rx.recv().await.unwrap();
+        let ws = control_websocket.await.unwrap();
+
+        tokio::pin!(ws);
+
+        loop {
+            tokio::select! {
+                Some(resp) = lsp_rx.resp_rx.recv() => {
+                    let r = ws
+                        .send(Message::Text(serde_json::to_string(&resp).unwrap()))
+                        .await;
+                    let Err(err) = r else {
+                        continue;
+                    };
+
+                    log::warn!("failed to send response to editor {err:?}");
+                    break;
+
+                }
+                msg = ws.next() => {
+                    let msg = match msg {
+                        Some(Ok(Message::Text(msg))) => Some(msg),
+                        Some(Ok(msg)) => {
+                            log::error!("unsupported message: {msg:?}");
+                            break;
+                        }
+                        Some(Err(e)) => {
+                            log::error!("failed to receive message: {e}");
+                            break;
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(msg) = msg {
+                        let Ok(msg) = serde_json::from_str::<ControlPlaneMessage>(&msg) else {
+                            log::warn!("failed to parse control plane request: {msg:?}");
+                            break;
+                        };
+
+                        lsp_rx.ctl_tx.send(msg).unwrap();
+                    } else {
+                        // todo: inform the editor that the connection is closed.
+                        break;
+                    }
+                }
+
+            }
+        }
+
+        let _ = srv.shutdown_tx.send(());
+        let _ = srv.join.await;
+    });
+
     let previewer = PreviewBuilder::new(args.preview);
     let registered = handle.register_preview(previewer.compile_watcher());
     assert!(registered, "failed to register preview");
-    let previewer = previewer.start(handle.clone(), TYPST_PREVIEW_HTML).await;
+    let (websocket_tx, websocket_rx) = mpsc::unbounded_channel();
+    let mut previewer = previewer.build(lsp_tx, handle.clone()).await;
     tokio::spawn(service.run());
 
-    let (static_server_addr, _tx, static_server_handle) =
-        make_static_host(&previewer, args.static_file_host, args.preview_mode);
-    log::info!("Static file server listening on: {}", static_server_addr);
+    bind_streams(&mut previewer, websocket_rx);
+
+    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
+
+    let static_server = if let Some(static_file_host) = static_file_host {
+        log::warn!("--static-file-host is deprecated, which will be removed in the future. Use --data-plane-host instead.");
+        let html = frontend_html.clone();
+        Some(make_http_server(html, static_file_host, websocket_tx.clone()).await)
+    } else {
+        None
+    };
+
+    let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
+    log::info!("Data plane server listening on: {}", srv.addr);
+
+    let static_server_addr = static_server.as_ref().map(|s| s.addr).unwrap_or(srv.addr);
+    log::info!("Static file server listening on: {static_server_addr}");
 
     if !args.dont_open_in_browser {
         if let Err(e) = open::that_detached(format!("http://{static_server_addr}")) {
-            log::error!("failed to open browser: {}", e);
+            log::error!("failed to open browser: {e}");
         };
     }
 
-    let _ = tokio::join!(previewer.join(), static_server_handle);
+    let _ = tokio::join!(previewer.join(), srv.join, control_plane_server_handle);
+    // Assert that the static server's lifetime is longer than the previewer.
+    let _s = static_server;
 
     Ok(())
 }
@@ -550,4 +737,31 @@ fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, p: &mut Point) ->
     }
 
     None
+}
+
+fn bind_streams(previewer: &mut Previewer, websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>) {
+    previewer.start_data_plane(
+        websocket_rx,
+        |conn: Result<HyperWebsocketStream, hyper_tungstenite::tungstenite::Error>| {
+            let conn = conn.map_err(error_once_map_string!("cannot receive websocket"))?;
+
+            Ok(conn
+                .sink_map_err(|e| error_once!("cannot serve_with websocket", err: e.to_string()))
+                .map_err(|e| error_once!("cannot serve_with websocket", err: e.to_string()))
+                .with(|msg| {
+                    Box::pin(async move {
+                        let msg = match msg {
+                            WsMessage::Text(msg) => Message::Text(msg),
+                            WsMessage::Binary(msg) => Message::Binary(msg),
+                        };
+                        Ok(msg)
+                    })
+                })
+                .map_ok(|msg| match msg {
+                    Message::Text(msg) => WsMessage::Text(msg),
+                    Message::Binary(msg) => WsMessage::Binary(msg),
+                    _ => WsMessage::Text("unsupported message".to_owned()),
+                }))
+        },
+    );
 }
