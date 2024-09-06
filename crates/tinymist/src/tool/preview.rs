@@ -182,7 +182,8 @@ pub struct PreviewCliArgs {
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
     pub preview_mode: PreviewMode,
 
-    /// Data plane server will bind to this address
+    /// Data plane server will bind to this address. Note: if it equals to
+    /// `static_file_host`, same address will be used.
     #[clap(
         long = "data-plane-host",
         default_value = "127.0.0.1:23625",
@@ -200,11 +201,12 @@ pub struct PreviewCliArgs {
     )]
     pub control_plane_host: String,
 
-    /// (File) Host for the preview server
+    /// (File) Host for the preview server. Note: if it equals to
+    /// `data_plane_host`, same address will be used.
     #[clap(
         long = "host",
         value_name = "HOST",
-        default_value = "127.0.0.1:23627",
+        default_value = "",
         alias = "static-file-host"
     )]
     pub static_file_host: String,
@@ -265,6 +267,10 @@ impl PreviewState {
     ) -> SchedulableResponse<StartPreviewResponse> {
         let task_id = args.preview.task_id.clone();
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
+
+        if !args.static_file_host.is_empty() && (args.static_file_host != args.data_plane_host) {
+            return Err(internal_error("--static-file-host is removed"));
+        }
 
         let (lsp_tx, lsp_rx) = ControlPlaneTx::new(false);
         let ControlPlaneRx {
@@ -327,9 +333,9 @@ impl PreviewState {
             // Relace the data plane port in the html to self
             let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
 
-            let srv = make_http_server(frontend_html, args.static_file_host, websocket_tx).await;
+            let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
             let addr = srv.addr;
-            log::info!("PreviewTask({task_id}): static file server listening on: {addr}");
+            log::info!("PreviewTask({task_id}): preview server listening on: {addr}");
 
             let resp = StartPreviewResponse {
                 static_server_port: Some(addr.port()),
@@ -436,7 +442,7 @@ pub async fn make_http_server(
         .await
         .unwrap();
     let addr = listener.local_addr().unwrap();
-    log::info!("Listening preview server on http://{addr}");
+    log::info!("preview server listening on http://{addr}");
 
     let (_tx, rx) = tokio::sync::oneshot::channel();
     let (final_tx, final_rx) = tokio::sync::oneshot::channel();
@@ -504,6 +510,13 @@ pub async fn make_http_server(
 /// Entry point of the preview tool.
 pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     log::info!("Arguments: {args:#?}");
+
+    let static_file_host =
+        if args.static_file_host == args.data_plane_host || !args.static_file_host.is_empty() {
+            Some(args.static_file_host)
+        } else {
+            None
+        };
 
     tokio::spawn(async move {
         let _ = tokio::signal::ctrl_c().await;
@@ -619,16 +632,30 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
     bind_streams(&mut previewer, websocket_rx);
 
     let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
-    let srv = make_http_server(frontend_html, args.static_file_host, websocket_tx).await;
-    log::info!("Static file server listening on: {}", srv.addr);
+
+    let static_server = if let Some(static_file_host) = static_file_host {
+        log::warn!("--static-file-host is deprecated, which will be removed in the future. Use --data-plane-host instead.");
+        let html = frontend_html.clone();
+        Some(make_http_server(html, static_file_host, websocket_tx.clone()).await)
+    } else {
+        None
+    };
+
+    let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
+    log::info!("Data plane server listening on: {}", srv.addr);
+
+    let static_server_addr = static_server.as_ref().map(|s| s.addr).unwrap_or(srv.addr);
+    log::info!("Static file server listening on: {static_server_addr}");
 
     if !args.dont_open_in_browser {
-        if let Err(e) = open::that_detached(format!("http://{}", srv.addr)) {
-            log::error!("failed to open browser: {}", e);
+        if let Err(e) = open::that_detached(format!("http://{static_server_addr}")) {
+            log::error!("failed to open browser: {e}");
         };
     }
 
     let _ = tokio::join!(previewer.join(), srv.join, control_plane_server_handle);
+    // Assert that the static server's lifetime is longer than the previewer.
+    let _s = static_server;
 
     Ok(())
 }

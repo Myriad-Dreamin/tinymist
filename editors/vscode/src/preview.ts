@@ -300,8 +300,6 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
       taskId,
       "--refresh-style",
       refreshStyle,
-      "--static-file-host",
-      "127.0.0.1:0",
       ...dataPlaneHostArgs,
       ...partialRenderingArgs,
       ...invertColorsArgs,
