@@ -23,6 +23,7 @@ use typst::{diag::PackageError, foundations::Bytes};
 pub use insta::assert_snapshot;
 pub use reflexo_typst::TypstSystemWorld;
 pub use serde::Serialize;
+pub use serde_json::json;
 
 use crate::{
     analysis::{Analysis, AnalysisResources},

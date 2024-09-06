@@ -1,35 +1,54 @@
 ---
 source: crates/tinymist-query/src/folding_range.rs
-expression: "JsonRepr::new_pure(result.unwrap())"
+expression: "JsonRepr::new_pure(json!({ \"false\": result_false, \"true\": result_true, }))"
 input_file: crates/tinymist-query/src/fixtures/folding_range/base.typ
 ---
-[
- {
-  "collapsedText": "Heading 2",
-  "endCharacter": 12,
-  "endLine": 2,
-  "startCharacter": 3,
-  "startLine": 2
- },
- {
-  "collapsedText": "Heading 1",
-  "endCharacter": 11,
-  "endLine": 3,
-  "startCharacter": 2,
-  "startLine": 0
- },
- {
-  "collapsedText": "",
-  "endCharacter": 1,
-  "endLine": 9,
-  "startCharacter": 9,
-  "startLine": 6
- },
- {
-  "collapsedText": "Heading 3",
-  "endCharacter": 11,
-  "endLine": 9,
-  "startCharacter": 2,
-  "startLine": 4
- }
-]
+{
+ "false": [
+  {
+   "collapsedText": "Heading 2",
+   "endCharacter": 12,
+   "endLine": 2,
+   "startCharacter": 3,
+   "startLine": 2
+  },
+  {
+   "collapsedText": "Heading 1",
+   "endCharacter": 11,
+   "endLine": 3,
+   "startCharacter": 2,
+   "startLine": 0
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 1,
+   "endLine": 9,
+   "startCharacter": 9,
+   "startLine": 6
+  },
+  {
+   "collapsedText": "Heading 3",
+   "endCharacter": 11,
+   "endLine": 9,
+   "startCharacter": 2,
+   "startLine": 4
+  }
+ ],
+ "true": [
+  {
+   "collapsedText": "Heading 1",
+   "endLine": 3,
+   "startLine": 0
+  },
+  {
+   "collapsedText": "",
+   "endLine": 9,
+   "startLine": 6
+  },
+  {
+   "collapsedText": "Heading 3",
+   "endLine": 9,
+   "startLine": 4
+  }
+ ]
+}

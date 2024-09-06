@@ -1,49 +1,73 @@
 ---
 source: crates/tinymist-query/src/folding_range.rs
-expression: "JsonRepr::new_pure(result.unwrap())"
+expression: "JsonRepr::new_pure(json!({ \"false\": result_false, \"true\": result_true, }))"
 input_file: crates/tinymist-query/src/fixtures/folding_range/headings-in-blocks.typ
 ---
-[
- {
-  "collapsedText": "",
-  "endCharacter": 11,
-  "endLine": 2,
-  "startCharacter": 8,
-  "startLine": 2
- },
- {
-  "collapsedText": "",
-  "endCharacter": 13,
-  "endLine": 6,
-  "startCharacter": 10,
-  "startLine": 6
- },
- {
-  "collapsedText": "Heading 2",
-  "endCharacter": 16,
-  "endLine": 8,
-  "startCharacter": 7,
-  "startLine": 5
- },
- {
-  "collapsedText": "",
-  "endCharacter": 3,
-  "endLine": 7,
-  "startCharacter": 11,
-  "startLine": 3
- },
- {
-  "collapsedText": "Heading 1",
-  "endCharacter": 14,
-  "endLine": 8,
-  "startCharacter": 5,
-  "startLine": 1
- },
- {
-  "collapsedText": "",
-  "endCharacter": 1,
-  "endLine": 8,
-  "startCharacter": 9,
-  "startLine": 0
- }
-]
+{
+ "false": [
+  {
+   "collapsedText": "",
+   "endCharacter": 11,
+   "endLine": 2,
+   "startCharacter": 8,
+   "startLine": 2
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 13,
+   "endLine": 6,
+   "startCharacter": 10,
+   "startLine": 6
+  },
+  {
+   "collapsedText": "Heading 2",
+   "endCharacter": 16,
+   "endLine": 8,
+   "startCharacter": 7,
+   "startLine": 5
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 7,
+   "startCharacter": 11,
+   "startLine": 3
+  },
+  {
+   "collapsedText": "Heading 1",
+   "endCharacter": 14,
+   "endLine": 8,
+   "startCharacter": 5,
+   "startLine": 1
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 1,
+   "endLine": 8,
+   "startCharacter": 9,
+   "startLine": 0
+  }
+ ],
+ "true": [
+  {
+   "collapsedText": "Heading 2",
+   "endLine": 8,
+   "startLine": 5
+  },
+  {
+   "collapsedText": "",
+   "endLine": 7,
+   "startLine": 3
+  },
+  {
+   "collapsedText": "Heading 1",
+   "endLine": 8,
+   "startLine": 1
+  },
+  {
+   "collapsedText": "",
+   "endLine": 8,
+   "startLine": 0
+  }
+ ]
+}
