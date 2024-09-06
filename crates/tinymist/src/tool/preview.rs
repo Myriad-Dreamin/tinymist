@@ -382,7 +382,7 @@ pub struct HttpServer {
     /// The address the server is listening on.
     pub addr: SocketAddr,
     /// The sender to shutdown the server.
-    pub tx: oneshot::Sender<()>,
+    pub shutdown_tx: oneshot::Sender<()>,
     /// The join handle of the server.
     pub join: tokio::task::JoinHandle<()>,
 }
@@ -444,7 +444,7 @@ pub async fn make_http_server(
     let addr = listener.local_addr().unwrap();
     log::info!("preview server listening on http://{addr}");
 
-    let (_tx, rx) = tokio::sync::oneshot::channel();
+    let (shutdown_tx, rx) = tokio::sync::oneshot::channel();
     let (final_tx, final_rx) = tokio::sync::oneshot::channel();
 
     // the graceful watcher
@@ -502,7 +502,7 @@ pub async fn make_http_server(
 
     HttpServer {
         addr,
-        tx: _tx,
+        shutdown_tx,
         join,
     }
 }
@@ -618,7 +618,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             }
         }
 
-        let _ = srv.tx.send(());
+        let _ = srv.shutdown_tx.send(());
         let _ = srv.join.await;
     });
 

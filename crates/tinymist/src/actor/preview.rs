@@ -71,7 +71,7 @@ impl PreviewActor {
                     let client = self.client.clone();
                     self.client.handle.spawn(async move {
                         tab.previewer.stop().await;
-                        let _ = tab.srv.tx.send(());
+                        let _ = tab.srv.shutdown_tx.send(());
 
                         // Wait for previewer to stop
                         log::info!("PreviewTask({task_id}): wait for previewer to stop");
