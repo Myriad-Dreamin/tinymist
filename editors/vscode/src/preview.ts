@@ -19,6 +19,15 @@ import {
   commandStartPreview,
   registerPreviewTaskDispose,
 } from "./extension";
+import { isGitpod, translateGitpodURL } from "./gitpod";
+
+function translateExternalURL(urlstr: string): string {
+  if (isGitpod()) {
+    return translateGitpodURL(urlstr);
+  } else {
+    return urlstr;
+  }
+}
 
 export function previewPreload(context: vscode.ExtensionContext) {
   getPreviewHtmlCompat(context);
@@ -193,12 +202,17 @@ export async function launchPreviewInWebView({
   const previewStateEncoded = Buffer.from(JSON.stringify(previewState), "utf-8").toString("base64");
   html = html.replace("preview-arg:previewMode:Doc", `preview-arg:previewMode:${previewMode}`);
   html = html.replace("preview-arg:state:", `preview-arg:state:${previewStateEncoded}`);
-  html = html.replace("ws://127.0.0.1:23625", `ws://127.0.0.1:${dataPlanePort}`);
+  html = html.replace(
+    "ws://127.0.0.1:23625",
+    translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`),
+  );
 
   panel.webview.html = html;
   // 虽然配置的是 http，但是如果是桌面客户端，任何 tcp 连接都支持，这也就包括了 ws
   // https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
-  await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${dataPlanePort}`));
+  await vscode.env.asExternalUri(
+    vscode.Uri.parse(translateExternalURL(`http://127.0.0.1:${dataPlanePort}`)),
+  );
   return panel;
 }
 
@@ -239,7 +253,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   task.isNotPrimary = !isPrimary;
 
   if (isPrimary) {
-    let connectUrl = `ws://127.0.0.1:${dataPlanePort}`;
+    let connectUrl = translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`);
     contentPreviewProvider.then((p) => p.postActivate(connectUrl));
     disposes.add(() => {
       contentPreviewProvider.then((p) => p.postDeactivate(connectUrl));
