@@ -38,7 +38,9 @@ function retrieveWsArgs() {
     /// The string `ws://127.0.0.1:23625` is a placeholder
     /// Also, it is the default url to connect to.
     let url = "ws://127.0.0.1:23625";
-
+    if (location.href.startsWith("https://")) {
+        url = url.replace("ws://", "wss://")
+    }
     /// Return a `WsArgs` object.
     return { url, previewMode, isContentPreview: false };
 }
