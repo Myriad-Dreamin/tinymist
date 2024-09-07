@@ -1,0 +1,12 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on   (162..163)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/bug_cite_function_infer.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": []
+ }
+]

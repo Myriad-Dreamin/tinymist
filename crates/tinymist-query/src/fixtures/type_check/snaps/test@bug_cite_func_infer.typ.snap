@@ -1,0 +1,20 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/bug_cite_func_infer.typ
+---
+"cite_prose" = (( ⪯ Type(label))) => Element(ref)
+"cite_prose_different_name" = (( ⪯ Type(label))) => Element(ref)
+"labl" = Any
+"labl" = Any
+---
+5..15 -> @cite_prose
+16..20 -> @labl
+24..27 -> Func(ref)
+24..33 -> Element(ref)
+28..32 -> @labl
+39..64 -> @cite_prose_different_name
+65..69 -> @labl
+73..76 -> Func(ref)
+73..82 -> Element(ref)
+77..81 -> @labl
