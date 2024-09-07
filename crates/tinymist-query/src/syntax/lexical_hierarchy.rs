@@ -437,6 +437,7 @@ impl LexicalHierarchyWorker {
                 }
                 SyntaxKind::Closure => {
                     let n = node.children().next();
+                    let current = self.stack.last_mut().unwrap().1.len();
                     if let Some(n) = n {
                         if n.kind() == SyntaxKind::Ident {
                             self.get_symbols_with(n, IdentContext::Func)?;
@@ -447,27 +448,38 @@ impl LexicalHierarchyWorker {
                         .rev()
                         .find(|n| n.cast::<ast::Expr>().is_some());
                     if let Some(body) = body {
-                        if self.g == LexicalScopeKind::DefUse {
-                            let symbol = LexicalInfo {
+                        let symbol = if self.g == LexicalScopeKind::DefUse {
+                            // DefUse mode does not nest symbols inside of functions
+                            LexicalInfo {
                                 name: String::new(),
                                 kind: LexicalKind::Block,
                                 range: body.range(),
-                            };
-                            self.stack.push((symbol, eco_vec![]));
-                            let stack_height = self.stack.len();
-
-                            if self.g == LexicalScopeKind::DefUse {
-                                let param =
-                                    node.children().find(|n| n.kind() == SyntaxKind::Params);
-                                self.get_symbols_in_opt_with(param, IdentContext::Params)?;
                             }
-
-                            self.get_symbols_with(body, IdentContext::Ref)?;
-                            while stack_height <= self.stack.len() {
-                                self.symbreak();
+                        } else if current == self.stack.last().unwrap().1.len() {
+                            // Closure has no updated symbol stack
+                            LexicalInfo {
+                                name: "<anonymous>".to_string(),
+                                kind: LexicalKind::function(),
+                                range: node.range(),
                             }
                         } else {
-                            self.get_symbols_with(body, IdentContext::Ref)?;
+                            // Closure has a name
+                            let mut info = self.stack.last_mut().unwrap().1.pop().unwrap().info;
+                            info.range = node.range();
+                            info
+                        };
+
+                        self.stack.push((symbol, eco_vec![]));
+                        let stack_height = self.stack.len();
+
+                        if self.g == LexicalScopeKind::DefUse {
+                            let param = node.children().find(|n| n.kind() == SyntaxKind::Params);
+                            self.get_symbols_in_opt_with(param, IdentContext::Params)?;
+                        }
+
+                        self.get_symbols_with(body, IdentContext::Ref)?;
+                        while stack_height <= self.stack.len() {
+                            self.symbreak();
                         }
                     }
                 }
