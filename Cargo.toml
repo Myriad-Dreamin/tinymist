@@ -109,7 +109,7 @@ typst-assets = { git = "https://github.com/typst/typst-assets", branch = "main" 
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
 typstyle = { git = "https://github.com/ParaN3xus/typstyle", branch = "typst-mainline", default-features = false }
 typlite = { path = "./crates/typlite" }
-typst-shim = { path = "./crates/typst-shim", features = [] }
+typst-shim = { path = "./crates/typst-shim", features = ["nightly"] }
 
 # LSP
 crossbeam-channel = "0.5.12"

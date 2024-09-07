@@ -8,7 +8,6 @@ use typst::foundations::{repr, Capturer, CastInfo, Value};
 use typst::layout::Length;
 use typst::model::Document;
 use typst::syntax::{ast, LinkedNode, Side, Source, SyntaxKind};
-use typst::utils::{round_2, Numeric};
 use typst::World;
 use typst_shim::utils::{round_2, Numeric};
 

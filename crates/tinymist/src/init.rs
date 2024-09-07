@@ -17,7 +17,7 @@ use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use typst::foundations::IntoValue;
 use typst::syntax::{FileId, VirtualPath};
-use typst_shim::utils::Deferred;
+use typst_shim::utils::{Deferred, LazyHash};
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the

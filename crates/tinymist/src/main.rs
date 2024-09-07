@@ -8,7 +8,6 @@ use anyhow::bail;
 use clap::Parser;
 use clap_builder::CommandFactory;
 use clap_complete::generate;
-use comemo::Prehashed;
 use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;

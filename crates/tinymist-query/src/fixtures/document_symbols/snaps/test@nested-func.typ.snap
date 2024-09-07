@@ -1,0 +1,27 @@
+---
+source: crates/tinymist-query/src/document_symbol.rs
+expression: "JsonRepr::new_redacted(result.unwrap(), &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/document_symbols/nested-func.typ
+---
+[
+ {
+  "children": [
+   {
+    "kind": 12,
+    "name": "g",
+    "range": "1:6:1:14",
+    "selectionRange": "1:6:1:14"
+   },
+   {
+    "kind": 13,
+    "name": "t",
+    "range": "2:6:2:7",
+    "selectionRange": "2:6:2:7"
+   }
+  ],
+  "kind": 12,
+  "name": "f",
+  "range": "0:5:4:1",
+  "selectionRange": "0:5:4:1"
+ }
+]
