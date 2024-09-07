@@ -6,6 +6,13 @@ input_file: crates/tinymist-query/src/fixtures/folding_range/nested-blocks-2.typ
 {
  "false": [
   {
+   "collapsedText": "<anonymous>",
+   "endCharacter": 26,
+   "endLine": 0,
+   "startCharacter": 5,
+   "startLine": 0
+  },
+  {
    "collapsedText": "Heading",
    "endCharacter": 11,
    "endLine": 4,

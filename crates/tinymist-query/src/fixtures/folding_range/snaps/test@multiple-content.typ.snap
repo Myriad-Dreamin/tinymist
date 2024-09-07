@@ -6,6 +6,13 @@ input_file: crates/tinymist-query/src/fixtures/folding_range/multiple-content.ty
 {
  "false": [
   {
+   "collapsedText": "<anonymous>",
+   "endCharacter": 26,
+   "endLine": 0,
+   "startCharacter": 5,
+   "startLine": 0
+  },
+  {
    "collapsedText": "",
    "endCharacter": 1,
    "endLine": 3,
