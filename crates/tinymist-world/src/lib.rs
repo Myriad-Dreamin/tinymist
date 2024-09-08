@@ -25,7 +25,10 @@ use reflexo_typst::typst::{
     diag::{eco_format, EcoString},
     syntax::package::PackageVersion,
 };
-use reqwest::blocking::Response;
+use reqwest::{
+    blocking::Response,
+    Certificate
+};
 use log::error;
 use parking_lot::Mutex;
 use reflexo_typst::package::{DummyNotifier, Notifier, PackageError, PackageSpec, PackageRegistry};
@@ -348,7 +351,7 @@ impl HttpsRegistry {
                     std::fs::remove_dir_all(package_dir).ok();
                     PackageError::MalformedArchive(Some(eco_format!("{err}")))
                 })
-        })
+        }, self.cert_path.as_deref())
         .ok_or_else(|| PackageError::Other(Some(eco_format!("cannot spawn http thread"))))?
     }
 }
@@ -400,7 +403,7 @@ impl PackageRegistry for HttpsRegistry {
                         )
                     })
                     .collect::<Vec<_>>()
-            })
+            }, self.cert_path.as_deref())
             .unwrap_or_default()
         })
     }
@@ -409,10 +412,23 @@ impl PackageRegistry for HttpsRegistry {
 fn threaded_http<T: Send + Sync>(
     url: &str,
     f: impl FnOnce(Result<Response, reqwest::Error>) -> T + Send + Sync,
+    cert_path: Option<&Path>
 ) -> Option<T> {
     std::thread::scope(|s| {
-        s.spawn(|| {
-            let client = reqwest::blocking::Client::builder().build().unwrap();
+                s.spawn(move || {
+            let client_builder = reqwest::blocking::Client::builder();
+
+            let client = if let Some(cert_path) = cert_path {
+                let cert = std::fs::read(cert_path).ok().and_then(|buf| Certificate::from_pem(&buf).ok());
+                if let Some(cert) = cert {
+                    client_builder.add_root_certificate(cert).build().unwrap()
+                } else {
+                    client_builder.build().unwrap()
+                }
+            } else {
+                client_builder.build().unwrap()
+            };
+
             f(client.get(url).send())
         })
         .join()
