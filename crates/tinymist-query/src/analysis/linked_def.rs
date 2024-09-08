@@ -8,7 +8,7 @@ use typst::foundations::{IntoValue, Label, Selector, Type};
 use typst::model::BibliographyElem;
 use typst::syntax::FileId as TypstFileId;
 use typst::{foundations::Value, syntax::Span};
-use typst_shim::typst_linked_node_leaf_at;
+use typst_shim::syntax::LinkedNodeExt;
 
 use super::{prelude::*, BibInfo};
 use crate::{
@@ -209,7 +209,7 @@ pub fn find_definition(
         LexicalKind::Var(LexicalVarKind::Function) => {
             let def_source = ctx.source_by_id(def_fid).ok()?;
             let root = LinkedNode::new(def_source.root());
-            let def_name = typst_linked_node_leaf_at!(root, def.range.start + 1)?;
+            let def_name = root.leaf_at_compat(def.range.start + 1)?;
             log::info!("def_name for function: {def_name:?}", def_name = def_name);
             let values = ctx.analyze_expr(&def_name);
             let func = values.into_iter().find(|v| matches!(v.0, Value::Func(..)));

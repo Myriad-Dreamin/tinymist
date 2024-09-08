@@ -23,7 +23,7 @@ use typst::{diag::PackageError, foundations::Bytes};
 pub use insta::assert_snapshot;
 pub use reflexo_typst::TypstSystemWorld;
 pub use serde::Serialize;
-use typst_shim::typst_linked_node_leaf_at;
+use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     analysis::{Analysis, AnalysisResources},
@@ -245,7 +245,7 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
         .unwrap();
 
     let n = LinkedNode::new(s.root());
-    let mut n = typst_linked_node_leaf_at!(n, re + 1).unwrap();
+    let mut n = n.leaf_at_compat(re + 1).unwrap();
 
     let match_prev = match &m {
         MatchAny { prev } => *prev,

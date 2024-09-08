@@ -9,11 +9,11 @@ use typst::{
     layout::{Frame, FrameItem, Point, Position},
     syntax::{LinkedNode, Source, Span, SyntaxKind},
 };
-use typst_shim::typst_linked_node_leaf_at;
+use typst_shim::syntax::LinkedNodeExt;
 
 /// Find the output location in the document for a cursor position.
 pub fn jump_from_cursor(document: &Document, source: &Source, cursor: usize) -> Option<Position> {
-    let node = typst_linked_node_leaf_at!(LinkedNode::new(source.root()), cursor)?;
+    let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
     if node.kind() != SyntaxKind::Text {
         return None;
     }

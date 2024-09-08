@@ -1,9 +1,14 @@
 //! Typst Syntax
+use typst_syntax::LinkedNode;
 
-/// node.leaf_at(cursor)
-#[macro_export]
-macro_rules! typst_linked_node_leaf_at {
-    ($node:expr, $cursor:expr) => {
-        $node.leaf_at($cursor)
-    };
+/// The `LinkedNodeExt` trait is designed for compatibility between new and old versions of `typst`.
+pub trait LinkedNodeExt: Sized {
+    /// Get the leaf at the specified byte offset.
+    fn leaf_at_compat(&self, cursor: usize) -> Option<Self>;
+}
+
+impl<'a> LinkedNodeExt for LinkedNode<'a> {
+    fn leaf_at_compat(&self, cursor: usize) -> Option<Self> {
+        self.leaf_at(cursor)
+    }
 }

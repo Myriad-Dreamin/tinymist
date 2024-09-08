@@ -1,4 +1,4 @@
-use typst_shim::typst_linked_node_leaf_at;
+use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{prelude::*, SyntaxRequest};
 
@@ -36,7 +36,7 @@ impl SyntaxRequest for SelectionRangeRequest {
         for position in self.positions {
             let typst_offset = lsp_to_typst::position(position, position_encoding, source)?;
             let tree = LinkedNode::new(source.root());
-            let leaf = typst_linked_node_leaf_at!(tree, typst_offset + 1)?;
+            let leaf = tree.leaf_at_compat(typst_offset + 1)?;
             ranges.push(range_for_node(source, position_encoding, &leaf));
         }
 

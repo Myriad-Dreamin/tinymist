@@ -97,7 +97,7 @@ mod post_type_check_tests {
 
     use insta::with_settings;
     use typst::syntax::LinkedNode;
-    use typst_shim::typst_linked_node_leaf_at;
+    use typst_shim::syntax::LinkedNodeExt;
 
     use crate::analysis::ty;
     use crate::tests::*;
@@ -111,7 +111,7 @@ mod post_type_check_tests {
                 .to_typst_pos(find_test_position(&source), &source)
                 .unwrap();
             let root = LinkedNode::new(source.root());
-            let node = typst_linked_node_leaf_at!(root, pos + 1).unwrap();
+            let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
             let result = ty::type_check(ctx, source.clone());
@@ -133,7 +133,7 @@ mod type_describe_tests {
 
     use insta::with_settings;
     use typst::syntax::LinkedNode;
-    use typst_shim::typst_linked_node_leaf_at;
+    use typst_shim::syntax::LinkedNodeExt;
 
     use crate::analysis::ty;
     use crate::tests::*;
@@ -147,7 +147,7 @@ mod type_describe_tests {
                 .to_typst_pos(find_test_position(&source), &source)
                 .unwrap();
             let root = LinkedNode::new(source.root());
-            let node = typst_linked_node_leaf_at!(root, pos + 1).unwrap();
+            let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
             let result = ty::type_check(ctx, source.clone());
@@ -222,7 +222,7 @@ mod module_tests {
 mod matcher_tests {
 
     use typst::syntax::LinkedNode;
-    use typst_shim::typst_linked_node_leaf_at;
+    use typst_shim::syntax::LinkedNodeExt;
 
     use crate::{syntax::get_def_target, tests::*};
 
@@ -236,7 +236,7 @@ mod matcher_tests {
                 .unwrap();
 
             let root = LinkedNode::new(source.root());
-            let node = typst_linked_node_leaf_at!(root, pos).unwrap();
+            let node = root.leaf_at_compat(pos).unwrap();
 
             let result = get_def_target(node).map(|e| format!("{:?}", e.node().range()));
             let result = result.as_deref().unwrap_or("<nil>");
@@ -385,7 +385,7 @@ mod signature_tests {
 
     use typst::foundations::Repr;
     use typst::syntax::LinkedNode;
-    use typst_shim::typst_linked_node_leaf_at;
+    use typst_shim::syntax::LinkedNodeExt;
 
     use crate::analysis::{analyze_signature, Signature, SignatureTarget};
     use crate::syntax::get_deref_target;
@@ -401,7 +401,7 @@ mod signature_tests {
                 .unwrap();
 
             let root = LinkedNode::new(source.root());
-            let callee_node = typst_linked_node_leaf_at!(root, pos).unwrap();
+            let callee_node = root.leaf_at_compat(pos).unwrap();
             let callee_node = get_deref_target(callee_node, pos).unwrap();
             let callee_node = callee_node.node();
 
@@ -467,7 +467,7 @@ mod call_info_tests {
     use core::fmt;
 
     use typst::syntax::{LinkedNode, SyntaxKind};
-    use typst_shim::typst_linked_node_leaf_at;
+    use typst_shim::syntax::LinkedNodeExt;
 
     use crate::analysis::analyze_call;
     use crate::tests::*;
@@ -484,7 +484,7 @@ mod call_info_tests {
                 .unwrap();
 
             let root = LinkedNode::new(source.root());
-            let mut call_node = typst_linked_node_leaf_at!(root, pos + 1).unwrap();
+            let mut call_node = root.leaf_at_compat(pos + 1).unwrap();
 
             while let Some(parent) = call_node.parent() {
                 if call_node.kind() == SyntaxKind::FuncCall {
