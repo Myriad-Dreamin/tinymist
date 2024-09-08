@@ -112,8 +112,9 @@ impl CompileOnceArgs {
             .iter()
             .map(|(k, v)| (Str::from(k.as_str()), Value::Str(Str::from(v.as_str()))))
             .collect();
+        let cert_path = self.certification.clone();
 
-        LspUniverseBuilder::build(entry, Arc::new(fonts), Arc::new(Prehashed::new(inputs)))
+        LspUniverseBuilder::build(entry, Arc::new(fonts), Arc::new(Prehashed::new(inputs)), cert_path)
             .context("failed to create universe")
     }
 
@@ -176,12 +177,19 @@ impl LspUniverseBuilder {
         entry: EntryState,
         font_resolver: Arc<FontResolverImpl>,
         inputs: ImmutDict,
+        cert_path: Option<PathBuf>,
     ) -> ZResult<LspUniverse> {
+
+        let mut registry = HttpsRegistry::default();
+        if let Some(ref cert_path) = cert_path {
+            registry.set_certificate_path(cert_path);
+        }
+
         Ok(LspUniverse::new_raw(
             entry,
             Some(inputs),
             Vfs::new(SystemAccessModel {}),
-            HttpsRegistry::default(),
+            registry,
             font_resolver,
         ))
     }
@@ -295,6 +303,11 @@ impl HttpsRegistry {
         }
 
         res
+    }
+
+    /// Set the certificate path to use for HTTP requests.
+    pub fn set_certificate_path(&mut self, path: &Path) {
+        self.cert_path = Some(path.to_path_buf());
     }
 
     /// Make a package available in the on-disk cache.

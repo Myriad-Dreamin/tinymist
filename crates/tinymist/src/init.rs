@@ -692,6 +692,12 @@ impl CompileConfig {
     pub fn determine_creation_timestamp(&self) -> Option<chrono::DateTime<chrono::Utc>> {
         self.typst_extra_args.as_ref()?.creation_timestamp
     }
+    
+    /// Determines the certification path.
+    pub fn determine_certification_path(&self) -> Option<PathBuf> {
+        let extras = self.typst_extra_args.as_ref()?;
+        extras.cert.clone()
+    }
 
     fn determine_user_inputs(&self) -> ImmutDict {
         static EMPTY: Lazy<ImmutDict> = Lazy::new(ImmutDict::default);
