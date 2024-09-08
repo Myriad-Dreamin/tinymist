@@ -27,6 +27,7 @@ use typst_preview::{
     ControlPlaneTx, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
     PreviewArgs, PreviewBuilder, PreviewMode, Previewer, SourceFileServer, WsMessage,
 };
+use typst_shim::syntax::LinkedNodeExt;
 
 use crate::world::{LspCompilerFeat, LspWorld};
 use crate::*;
@@ -47,7 +48,7 @@ impl CompileHandler {
         let source = world.source(source_id).ok()?;
         let cursor = source.line_column_to_byte(loc.pos.line, loc.pos.column)?;
 
-        let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
+        let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
         if node.kind() != SyntaxKind::Text {
             return None;
         }
@@ -676,7 +677,7 @@ impl Notification for NotifDocumentOutline {
 
 /// Find the output location in the document for a cursor position.
 fn jump_from_cursor(document: &TypstDocument, source: &Source, cursor: usize) -> Option<Position> {
-    let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
+    let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
     if node.kind() != SyntaxKind::Text {
         return None;
     }

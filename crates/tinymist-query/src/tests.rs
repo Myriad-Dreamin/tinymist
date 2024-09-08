@@ -24,6 +24,7 @@ pub use insta::assert_snapshot;
 pub use reflexo_typst::TypstSystemWorld;
 pub use serde::Serialize;
 pub use serde_json::json;
+use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     analysis::{Analysis, AnalysisResources},
@@ -245,7 +246,7 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
         .unwrap();
 
     let n = LinkedNode::new(s.root());
-    let mut n = n.leaf_at(re + 1).unwrap();
+    let mut n = n.leaf_at_compat(re + 1).unwrap();
 
     let match_prev = match &m {
         MatchAny { prev } => *prev,
