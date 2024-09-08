@@ -1,13 +1,13 @@
 use futures::{SinkExt, StreamExt};
+// use hyper_tungstenite::tungstenite::Message;
 use log::{info, trace};
 use reflexo_typst::debug_loc::{DocumentPosition, ElementPoint};
-use tokio::{
-    net::TcpStream,
-    sync::{broadcast, mpsc},
-};
-use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
+use tokio::sync::{broadcast, mpsc};
 
-use crate::actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest};
+use crate::{
+    actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest},
+    Message, WsError,
+};
 
 use super::{editor::EditorActorRequest, render::RenderActorRequest};
 
@@ -29,8 +29,11 @@ fn position_req(
     format!("{event},{page_no} {x} {y}")
 }
 
-pub struct WebviewActor {
-    webview_websocket_conn: WebSocketStream<TcpStream>,
+pub struct WebviewActor<
+    'a,
+    C: futures::Sink<Message, Error = WsError> + futures::Stream<Item = Result<Message, WsError>>,
+> {
+    webview_websocket_conn: std::pin::Pin<&'a mut C>,
     svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
     mailbox: broadcast::Receiver<WebviewActorRequest>,
 
@@ -46,14 +49,18 @@ pub struct Channels {
     ),
 }
 
-impl WebviewActor {
+impl<
+        'a,
+        C: futures::Sink<Message, Error = WsError> + futures::Stream<Item = Result<Message, WsError>>,
+    > WebviewActor<'a, C>
+{
     pub fn set_up_channels() -> Channels {
         Channels {
             svg: mpsc::unbounded_channel(),
         }
     }
     pub fn new(
-        websocket_conn: WebSocketStream<TcpStream>,
+        websocket_conn: std::pin::Pin<&'a mut C>,
         svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
         broadcast_sender: broadcast::Sender<WebviewActorRequest>,
         mailbox: broadcast::Receiver<WebviewActorRequest>,
@@ -88,7 +95,7 @@ impl WebviewActor {
                         }
                         // WebviewActorRequest::CursorPosition(jump_info) => {
                         //     let msg = position_req("cursor", jump_info);
-                        //     self.webview_websocket_conn.send(Message::Binary(msg.into_bytes())).await.unwrap();
+                        //     self.webview_websocket_conn.send(WsMessage::Binary(msg.into_bytes())).await.unwrap();
                         // }
                         WebviewActorRequest::CursorPaths(jump_info) => {
                             let json = serde_json::to_string(&jump_info).unwrap();
@@ -111,7 +118,7 @@ impl WebviewActor {
                     };
                     let Message::Text(msg) = msg else {
                         info!("WebviewActor: received non-text message from websocket: {:?}", msg);
-                        let _ = self.webview_websocket_conn.send(Message::Text(format!("Webview Actor: error, received non-text message: {}", msg)))
+                        let _ = self.webview_websocket_conn.send(Message::Text(format!("Webview Actor: error, received non-text message: {msg:?}")))
                         .await;
                         break;
                     };
@@ -142,8 +149,8 @@ impl WebviewActor {
                             self.render_sender.send(RenderActorRequest::ResolveSpan(ResolveSpanRequest(path))).unwrap();
                         };
                     } else {
-                        info!("WebviewActor: received unknown message from websocket: {}", msg);
-                        self.webview_websocket_conn.send(Message::Text(format!("error, received unknown message: {}", msg))).await.unwrap();
+                        let err = self.webview_websocket_conn.send(Message::Text(format!("error, received unknown message: {}", msg))).await;
+                        info!("WebviewActor: received unknown message from websocket: {msg} {err:?}");
                         break;
                     }
                 }

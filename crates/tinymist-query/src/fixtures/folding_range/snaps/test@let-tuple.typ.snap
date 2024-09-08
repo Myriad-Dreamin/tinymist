@@ -1,0 +1,44 @@
+---
+source: crates/tinymist-query/src/folding_range.rs
+expression: "JsonRepr::new_pure(json!({ \"false\": result_false, \"true\": result_true, }))"
+input_file: crates/tinymist-query/src/fixtures/folding_range/let-tuple.typ
+---
+{
+ "false": [
+  {
+   "collapsedText": "<anonymous>",
+   "endCharacter": 14,
+   "endLine": 1,
+   "startCharacter": 6,
+   "startLine": 1
+  },
+  {
+   "collapsedText": "<anonymous>",
+   "endCharacter": 14,
+   "endLine": 2,
+   "startCharacter": 6,
+   "startLine": 2
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 1,
+   "endLine": 3,
+   "startCharacter": 12,
+   "startLine": 0
+  },
+  {
+   "collapsedText": "<anonymous>",
+   "endCharacter": 1,
+   "endLine": 3,
+   "startCharacter": 5,
+   "startLine": 0
+  }
+ ],
+ "true": [
+  {
+   "collapsedText": "<anonymous>",
+   "endLine": 3,
+   "startLine": 0
+  }
+ ]
+}

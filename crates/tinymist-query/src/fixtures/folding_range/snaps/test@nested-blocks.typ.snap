@@ -1,70 +1,114 @@
 ---
 source: crates/tinymist-query/src/folding_range.rs
-expression: "JsonRepr::new_pure(result.unwrap())"
+expression: "JsonRepr::new_pure(json!({ \"false\": result_false, \"true\": result_true, }))"
 input_file: crates/tinymist-query/src/fixtures/folding_range/nested-blocks.typ
 ---
-[
- {
-  "collapsedText": "",
-  "endCharacter": 5,
-  "endLine": 4,
-  "startCharacter": 12,
-  "startLine": 2
- },
- {
-  "collapsedText": "",
-  "endCharacter": 3,
-  "endLine": 5,
-  "startCharacter": 10,
-  "startLine": 1
- },
- {
-  "collapsedText": "",
-  "endCharacter": 3,
-  "endLine": 8,
-  "startCharacter": 11,
-  "startLine": 6
- },
- {
-  "collapsedText": "",
-  "endCharacter": 4,
-  "endLine": 8,
-  "startCharacter": 10,
-  "startLine": 6
- },
- {
-  "collapsedText": "",
-  "endCharacter": 5,
-  "endLine": 12,
-  "startCharacter": 12,
-  "startLine": 10
- },
- {
-  "collapsedText": "",
-  "endCharacter": 5,
-  "endLine": 14,
-  "startCharacter": 8,
-  "startLine": 12
- },
- {
-  "collapsedText": "",
-  "endCharacter": 3,
-  "endLine": 15,
-  "startCharacter": 10,
-  "startLine": 9
- },
- {
-  "collapsedText": "",
-  "endCharacter": 3,
-  "endLine": 17,
-  "startCharacter": 10,
-  "startLine": 16
- },
- {
-  "collapsedText": "",
-  "endCharacter": 1,
-  "endLine": 18,
-  "startCharacter": 9,
-  "startLine": 0
- }
-]
+{
+ "false": [
+  {
+   "collapsedText": "",
+   "endCharacter": 5,
+   "endLine": 4,
+   "startCharacter": 12,
+   "startLine": 2
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 5,
+   "startCharacter": 10,
+   "startLine": 1
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 8,
+   "startCharacter": 11,
+   "startLine": 6
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 4,
+   "endLine": 8,
+   "startCharacter": 10,
+   "startLine": 6
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 5,
+   "endLine": 12,
+   "startCharacter": 12,
+   "startLine": 10
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 5,
+   "endLine": 14,
+   "startCharacter": 8,
+   "startLine": 12
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 15,
+   "startCharacter": 10,
+   "startLine": 9
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 3,
+   "endLine": 17,
+   "startCharacter": 10,
+   "startLine": 16
+  },
+  {
+   "collapsedText": "",
+   "endCharacter": 1,
+   "endLine": 18,
+   "startCharacter": 9,
+   "startLine": 0
+  }
+ ],
+ "true": [
+  {
+   "collapsedText": "",
+   "endLine": 4,
+   "startLine": 2
+  },
+  {
+   "collapsedText": "",
+   "endLine": 5,
+   "startLine": 1
+  },
+  {
+   "collapsedText": "",
+   "endLine": 8,
+   "startLine": 6
+  },
+  {
+   "collapsedText": "",
+   "endLine": 11,
+   "startLine": 10
+  },
+  {
+   "collapsedText": "",
+   "endLine": 14,
+   "startLine": 12
+  },
+  {
+   "collapsedText": "",
+   "endLine": 15,
+   "startLine": 9
+  },
+  {
+   "collapsedText": "",
+   "endLine": 17,
+   "startLine": 16
+  },
+  {
+   "collapsedText": "",
+   "endLine": 18,
+   "startLine": 0
+  }
+ ]
+}

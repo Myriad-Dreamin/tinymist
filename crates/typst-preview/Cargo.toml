@@ -19,7 +19,6 @@ reflexo-vec2svg.workspace = true
 reflexo-typst.workspace = true
 once_cell.workspace = true
 tokio.workspace = true
-tokio-tungstenite.workspace = true
 env_logger.workspace = true
 log.workspace = true
 serde_json.workspace = true

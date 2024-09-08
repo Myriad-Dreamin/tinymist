@@ -378,8 +378,6 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
         "127.0.0.1:0",
         "--control-plane-host",
         "127.0.0.1:0",
-        "--static-file-host",
-        "127.0.0.1:0",
         "--no-open",
         ...rootArgs,
         ...partialRenderingArgs,
