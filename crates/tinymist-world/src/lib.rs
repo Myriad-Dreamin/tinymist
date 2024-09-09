@@ -344,7 +344,7 @@ impl HttpsRegistry {
         );
 
         self.notifier.lock().downloading(spec);
-        threaded_http(&url, |resp| {
+        threaded_http(&url, self.cert_path.as_deref(), |resp| {
             let reader = match resp.and_then(|r| r.error_for_status()) {
                 Ok(response) => response,
                 Err(err) if matches!(err.status().map(|s| s.as_u16()), Some(404)) => {
@@ -360,7 +360,7 @@ impl HttpsRegistry {
                     std::fs::remove_dir_all(package_dir).ok();
                     PackageError::MalformedArchive(Some(eco_format!("{err}")))
                 })
-        }, self.cert_path.as_deref())
+        })
         .ok_or_else(|| PackageError::Other(Some(eco_format!("cannot spawn http thread"))))?
     }
 }
@@ -374,7 +374,7 @@ impl PackageRegistry for HttpsRegistry {
         self.packages.get_or_init(|| {
             let url = "https://packages.typst.org/preview/index.json";
 
-            threaded_http(url, |resp| {
+            threaded_http(url, self.cert_path.as_deref(), |resp| {
                 let reader = match resp.and_then(|r| r.error_for_status()) {
                     Ok(response) => response,
                     Err(err) => {
@@ -412,7 +412,7 @@ impl PackageRegistry for HttpsRegistry {
                         )
                     })
                     .collect::<Vec<_>>()
-            }, self.cert_path.as_deref())
+            })
             .unwrap_or_default()
         })
     }
@@ -420,8 +420,8 @@ impl PackageRegistry for HttpsRegistry {
 
 fn threaded_http<T: Send + Sync>(
     url: &str,
+    cert_path: Option<&Path>,
     f: impl FnOnce(Result<Response, reqwest::Error>) -> T + Send + Sync,
-    cert_path: Option<&Path>
 ) -> Option<T> {
     std::thread::scope(|s| {
                 s.spawn(move || {
