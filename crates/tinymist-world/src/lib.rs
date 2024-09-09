@@ -177,17 +177,11 @@ impl LspUniverseBuilder {
         inputs: ImmutDict,
         cert_path: Option<PathBuf>,
     ) -> ZResult<LspUniverse> {
-
-        let mut registry = HttpsRegistry::default();
-        if let Some(ref cert_path) = cert_path {
-            registry.set_certificate_path(cert_path);
-        }
-
         Ok(LspUniverse::new_raw(
             entry,
             Some(inputs),
             Vfs::new(SystemAccessModel {}),
-            registry,
+            HttpsRegistry::new(cert_path),
             font_resolver,
         ))
     }
@@ -272,6 +266,14 @@ impl Default for HttpsRegistry {
 }
 
 impl HttpsRegistry {
+    fn new(cert_path: Option<PathBuf>) -> Self {
+        Self { 
+            notifier: Arc::new(Mutex::<DummyNotifier>::default()), 
+            packages: OnceLock::new(), 
+            cert_path,
+        }
+    }
+
     /// Get local path option 
     pub fn local_path(&self) -> Option<Box<Path>> {
         if let Some(data_dir) = dirs::data_dir() {
@@ -303,10 +305,6 @@ impl HttpsRegistry {
         res
     }
 
-    /// Set the certificate path to use for HTTP requests.
-    pub fn set_certificate_path(&mut self, path: &Path) {
-        self.cert_path = Some(path.to_path_buf());
-    }
 
     /// Make a package available in the on-disk cache.
     pub fn prepare_package(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError> {
