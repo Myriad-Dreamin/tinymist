@@ -7,7 +7,7 @@ input_file: crates/tinymist-query/src/fixtures/document_symbols/func.typ
  {
   "kind": 12,
   "name": "f",
-  "range": "0:5:0:6",
-  "selectionRange": "0:5:0:6"
+  "range": "0:5:0:13",
+  "selectionRange": "0:5:0:13"
  }
 ]

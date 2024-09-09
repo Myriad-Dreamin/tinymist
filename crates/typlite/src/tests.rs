@@ -38,7 +38,7 @@ fn conv(s: &str) -> EcoString {
         // let hash = _captures.get(1).unwrap().as_str();
         // format!(
         //     "data:image-hash/svg+xml;base64,siphash128:{:x}",
-        //     typst::util::hash128(hash)
+        //     typst_shim::utils::hash128(hash)
         // )
         "data:image-hash/svg+xml;base64,redacted"
     });

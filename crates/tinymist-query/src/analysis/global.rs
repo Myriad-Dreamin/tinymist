@@ -23,6 +23,7 @@ use typst::{
 };
 use typst::{foundations::Value, model::Document, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
+use typst_shim::syntax::LinkedNodeExt;
 
 use super::{
     analyze_bib, analyze_expr_, analyze_import_, post_type_check, BibInfo, DefUseInfo,
@@ -166,7 +167,7 @@ pub trait AnalysisResources {
     fn resolve(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError>;
 
     /// Get all the files in the workspace.
-    fn iter_dependencies(&self, f: &mut dyn FnMut(ImmutPath));
+    fn dependencies(&self) -> EcoVec<ImmutPath>;
 
     /// Resolve extra font information.
     fn font_info(&self, _font: Font) -> Option<Arc<DataSource>> {
@@ -367,7 +368,7 @@ impl<'w> AnalysisContext<'w> {
         let offset = self.to_typst_pos(position, source)?;
         let cursor = ceil_char_boundary(source.text(), offset + shift);
 
-        let node = LinkedNode::new(source.root()).leaf_at(cursor)?;
+        let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
         Some((cursor, get_deref_target(node, cursor)))
     }
 

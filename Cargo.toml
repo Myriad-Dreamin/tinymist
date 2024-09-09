@@ -21,13 +21,13 @@ if_chain = "1"
 itertools = "0.13"
 once_cell = "1"
 paste = "1.0"
+cfg-if = "1.0"
 strum = { version = "0.26.2", features = ["derive"] }
 triomphe = { version = "0.1.10", default-features = false, features = ["std"] }
 
 # Asynchoronous and Multi-threading
 async-trait = "0.1.77"
 futures = "0.3"
-pin-project-lite = "0.2.13"
 rayon = "1.10.0"
 tokio = { version = "1.36.0", features = [
     "macros",
@@ -44,10 +44,9 @@ chrono = "0.4"
 dirs = "5"
 
 # Networking
-hyper = { version = "0.14", features = ["full"] }
-tokio-tungstenite = "0.21.0"
-tower-layer = "0.3.2"
-tower-service = "0.3.2"
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1.7", features = ["tokio"] }
+hyper-tungstenite = "0.14.0"
 
 # Algorithms
 base64 = "0.22"
@@ -108,6 +107,7 @@ typst-syntax = "0.11.1"
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
 typstyle = { version = "0.11.32", default-features = false }
 typlite = { path = "./crates/typlite" }
+typst-shim = { path = "./crates/typst-shim", features = [] }
 
 # LSP
 crossbeam-channel = "0.5.12"
@@ -120,6 +120,7 @@ clap = { version = "4.5", features = ["derive", "env", "unicode", "wrap_help"] }
 clap_builder = { version = "4.5", features = ["string"] }
 clap_complete = "4.5"
 clap_complete_fig = "4.5"
+clap_complete_nushell = "4.5.3"
 clap_mangen = { version = "0.2.22" }
 vergen = { version = "8.3.1", features = [
     "build",

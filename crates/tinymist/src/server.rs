@@ -256,6 +256,7 @@ impl LanguageState {
             .with_command_("tinymist.interactCodeContext", State::interact_code_context)
             .with_command("tinymist.getDocumentTrace", State::get_document_trace)
             .with_command_("tinymist.getDocumentMetrics", State::get_document_metrics)
+            .with_command_("tinymist.getWorkspaceLabels", State::get_workspace_labels)
             .with_command_("tinymist.getServerInfo", State::get_server_info)
             // resources
             .with_resource("/symbols", State::resource_symbols)
@@ -1019,6 +1020,7 @@ impl LanguageState {
                 Rename(req) => handle.run_stateful(snap, req, R::Rename),
                 PrepareRename(req) => handle.run_stateful(snap, req, R::PrepareRename),
                 Symbol(req) => handle.run_semantic(snap, req, R::Symbol),
+                WorkspaceLabel(req) => handle.run_semantic(snap, req, R::WorkspaceLabel),
                 DocumentMetrics(req) => handle.run_stateful(snap, req, R::DocumentMetrics),
                 _ => unreachable!(),
             }

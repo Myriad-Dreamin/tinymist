@@ -12,8 +12,9 @@ use typst::{
         ast::{self, AstNode},
         LinkedNode, Span, SyntaxKind,
     },
-    util::LazyHash,
 };
+use typst_shim::syntax::LinkedNodeExt;
+use typst_shim::utils::LazyHash;
 
 use crate::adt::interner::Interned;
 use crate::analysis::resolve_callee;
@@ -260,7 +261,7 @@ pub(crate) fn analyze_signature(
 //     };
 
 //     let root = LinkedNode::new(def_source.root());
-//     let def_node = root.leaf_at(def_at.1.start + 1)?;
+//     let def_node = root.leaf_at_compat(def_at.1.start + 1)?;
 //     let def_node = get_def_target(def_node)?;
 //     let def_node = match def_node {
 //         DefTarget::Let(node) => node,
@@ -304,7 +305,7 @@ fn resolve_callee_v2(
         let _t = ctx.type_check(source)?;
 
         let root = LinkedNode::new(def_source.root());
-        let def_node = root.leaf_at(def_at.1.start + 1)?;
+        let def_node = root.leaf_at_compat(def_at.1.start + 1)?;
         let def_node = get_def_target(def_node)?;
         let _def_node = match def_node {
             DefTarget::Let(node) => node,

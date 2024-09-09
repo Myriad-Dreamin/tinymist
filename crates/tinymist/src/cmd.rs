@@ -218,7 +218,7 @@ impl LanguageState {
         let cli_args = ["preview"]
             .into_iter()
             .chain(cli_args.iter().map(|e| e.as_str()));
-        let mut cli_args =
+        let cli_args =
             PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
 
         // todo: preview specific arguments are not used
@@ -239,9 +239,6 @@ impl LanguageState {
         if task_id == "primary" {
             return Err(invalid_params("task id 'primary' is reserved"));
         }
-
-        // Disble control plane host
-        cli_args.preview.control_plane_host = String::default();
 
         let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
 
@@ -462,6 +459,15 @@ impl LanguageState {
     ) -> ScheduledResult {
         let path = get_arg!(args[0] as PathBuf);
         run_query!(req_id, self.DocumentMetrics(path))
+    }
+
+    /// Get all syntatic labels in workspace.
+    pub fn get_workspace_labels(
+        &mut self,
+        req_id: RequestId,
+        _arguments: Vec<JsonValue>,
+    ) -> ScheduledResult {
+        run_query!(req_id, self.WorkspaceLabel())
     }
 
     /// Get the server info.

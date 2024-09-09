@@ -7,6 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use ecow::EcoVec;
 use once_cell::sync::Lazy;
 use reflexo_typst::config::CompileOpts;
 use reflexo_typst::package::{PackageRegistry, PackageSpec};
@@ -22,6 +23,8 @@ use typst::{diag::PackageError, foundations::Bytes};
 pub use insta::assert_snapshot;
 pub use reflexo_typst::TypstSystemWorld;
 pub use serde::Serialize;
+pub use serde_json::json;
+use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     analysis::{Analysis, AnalysisResources},
@@ -40,8 +43,13 @@ impl<'a> AnalysisResources for WrapWorld<'a> {
         self.0.registry.resolve(spec)
     }
 
-    fn iter_dependencies(&self, f: &mut dyn FnMut(reflexo::ImmutPath)) {
-        self.0.iter_dependencies(f)
+    fn dependencies(&self) -> EcoVec<reflexo::ImmutPath> {
+        let mut v = EcoVec::new();
+        self.0.iter_dependencies(&mut |p| {
+            v.push(p);
+        });
+
+        v
     }
 }
 
@@ -238,7 +246,7 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
         .unwrap();
 
     let n = LinkedNode::new(s.root());
-    let mut n = n.leaf_at(re + 1).unwrap();
+    let mut n = n.leaf_at_compat(re + 1).unwrap();
 
     let match_prev = match &m {
         MatchAny { prev } => *prev,

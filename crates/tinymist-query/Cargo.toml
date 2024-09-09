@@ -37,6 +37,7 @@ chrono.workspace = true
 typst.workspace = true
 
 reflexo.workspace = true
+typst-shim.workspace = true
 
 lsp-types.workspace = true
 if_chain.workspace = true
@@ -57,7 +58,7 @@ insta.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 typst-assets = { workspace = true, features = ["fonts"] }
-reflexo-typst.workspace = true
+reflexo-typst = { workspace = true, features = ["no-content-hint"] }
 sha2 = { version = "0.10" }
 hex = { version = "0.4" }
 

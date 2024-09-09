@@ -40,6 +40,7 @@ clap.workspace = true
 clap_builder.workspace = true
 clap_complete.workspace = true
 clap_complete_fig.workspace = true
+clap_complete_nushell.workspace = true
 clap_mangen.workspace = true
 
 typst.workspace = true
@@ -55,6 +56,7 @@ typstfmt_lib.workspace = true
 reflexo.workspace = true
 reflexo-typst.workspace = true
 reflexo-vec2svg.workspace = true
+typst-shim.workspace = true
 codespan-reporting.workspace = true
 toml.workspace = true
 walkdir.workspace = true
@@ -65,11 +67,17 @@ lsp-types.workspace = true
 dhat = { workspace = true, optional = true }
 unicode-script.workspace = true
 hyper = { workspace = true, optional = true }
+hyper-util = { workspace = true, optional = true, features = [
+    "server",
+    "http1",
+    "http2",
+    "server-graceful",
+    "server-auto",
+] }
+http-body-util = { version = "0.1.2", optional = true }
+hyper-tungstenite = { workspace = true, optional = true }
 open = { workspace = true, optional = true }
 dirs.workspace = true
-tower-layer.workspace = true
-tower-service.workspace = true
-pin-project-lite.workspace = true
 base64.workspace = true
 rayon.workspace = true
 
@@ -92,13 +100,19 @@ embed-fonts = ["typst-assets/fonts"]
 
 # Disable the default content hint.
 # This requires modifying typst.
-no-content-hint = ["reflexo-typst/no-content-hint"]
+no-content-hint = [
+    "reflexo-typst/no-content-hint",
+    "reflexo-vec2svg/no-content-hint",
+]
 
 preview = [
     "typst-preview",
     "typst-preview/clap",
     "tinymist-assets/typst-preview",
     "hyper",
+    "hyper-util",
+    "hyper-tungstenite",
+    "http-body-util",
     "open",
 ]
 

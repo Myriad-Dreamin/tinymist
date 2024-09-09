@@ -1,3 +1,5 @@
+use hashbrown::HashSet;
+
 use crate::{
     prelude::*,
     syntax::{get_lexical_hierarchy, LexicalHierarchy, LexicalKind, LexicalScopeKind},
@@ -42,12 +44,45 @@ impl SyntaxRequest for FoldingRangeRequest {
             &symbols,
             source,
             position_encoding,
-            line_folding_only,
             loc,
             loc,
             true,
             &mut results,
         );
+
+        // Generally process of folding ranges with line_folding_only
+        if line_folding_only {
+            let mut max_line = 0;
+            for r in &mut results {
+                r.start_character = None;
+                r.end_character = None;
+                max_line = max_line.max(r.end_line);
+            }
+            let mut line_coverage = vec![false; max_line as usize + 1];
+            let mut pair_coverage = HashSet::new();
+            results.reverse();
+            results.retain_mut(|r| {
+                if pair_coverage.contains(&(r.start_line, r.end_line)) {
+                    return false;
+                }
+
+                if line_coverage[r.start_line as usize] {
+                    r.start_line += 1;
+                }
+                if line_coverage[r.end_line as usize] {
+                    r.end_line = r.end_line.saturating_sub(1);
+                }
+                if r.start_line >= r.end_line {
+                    return false;
+                }
+
+                line_coverage[r.start_line as usize] = true;
+                pair_coverage.insert((r.start_line, r.end_line));
+                true
+            });
+            results.reverse();
+        }
+
         if false {
             trace!("FoldingRangeRequest(line_folding_only={line_folding_only}) symbols: {symbols:#?} results: {results:#?}");
         }
@@ -58,13 +93,10 @@ impl SyntaxRequest for FoldingRangeRequest {
 
 type LoC = (u32, Option<u32>);
 
-#[allow(clippy::too_many_arguments)]
-#[allow(deprecated)]
 fn calc_folding_range(
     symbols: &[LexicalHierarchy],
     source: &Source,
     position_encoding: PositionEncoding,
-    line_folding_only: bool,
     parent_last_loc: LoC,
     last_loc: LoC,
     is_last_range: bool,
@@ -79,7 +111,7 @@ fn calc_folding_range(
             start_line: rng.start.line,
             start_character: Some(rng.start.character),
             end_line: rng.end.line,
-            end_character: line_folding_only.then_some(rng.end.character),
+            end_character: Some(rng.end.character),
             kind: None,
             collapsed_text: Some(e.info.name.clone()),
         };
@@ -113,7 +145,6 @@ fn calc_folding_range(
                 ch,
                 source,
                 position_encoding,
-                line_folding_only,
                 parent_last_loc,
                 last_loc,
                 !is_not_final_last_range,
@@ -133,15 +164,23 @@ mod tests {
     #[test]
     fn test() {
         snapshot_testing("folding_range", &|world, path| {
-            let request = FoldingRangeRequest {
-                path: path.clone(),
-                line_folding_only: true,
+            let mut r = |line_folding_only| {
+                let request = FoldingRangeRequest {
+                    path: path.clone(),
+                    line_folding_only,
+                };
+
+                let source = world.source_by_path(&path).unwrap();
+
+                request.request(&source, PositionEncoding::Utf16)
             };
 
-            let source = world.source_by_path(&path).unwrap();
-
-            let result = request.request(&source, PositionEncoding::Utf16);
-            assert_snapshot!(JsonRepr::new_pure(result.unwrap()));
+            let result_false = r(false);
+            let result_true = r(true);
+            assert_snapshot!(JsonRepr::new_pure(json!({
+                "false": result_false,
+                "true": result_true,
+            })));
         });
     }
 }

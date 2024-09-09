@@ -38,6 +38,7 @@ import { taskActivate } from "./tasks";
 import { onEnterHandler } from "./lsp.on-enter";
 import { extensionState } from "./state";
 import { devKitActivate } from "./dev-kit";
+import { labelViewActivate } from "./label";
 
 export async function activate(context: ExtensionContext): Promise<void> {
   try {
@@ -67,6 +68,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   const client = initClient(context, config);
   setClient(client);
   // Activates features
+  labelViewActivate(context);
   if (extensionState.features.task) {
     taskActivate(context);
   }
