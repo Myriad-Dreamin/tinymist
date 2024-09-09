@@ -24,6 +24,7 @@ fn conv(s: &str) -> EcoString {
         EntryState::new_rooted(cwd.as_path().into(), Some(main.id())),
         font_resolver.unwrap(),
         Default::default(),
+        Default::default()
     )
     .unwrap();
     universe
