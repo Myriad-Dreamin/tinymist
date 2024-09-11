@@ -20,7 +20,7 @@ import { loadTinymistConfig, substVscodeVarsInConfig } from "./config";
 import {
   EditorToolName,
   SymbolViewProvider as SymbolViewProvider,
-  activateEditorTool,
+  editorTool,
   getUserPackageData,
 } from "./editor-tools";
 import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
@@ -234,7 +234,7 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
   );
 
   const editorToolCommand = (tool: EditorToolName) => async () => {
-    await activateEditorTool(context, tool);
+    await editorTool(context, tool);
   };
 
   const initTemplateCommand =

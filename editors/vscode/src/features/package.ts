@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { PackageInfo, SymbolInfo, tinymist } from "../lsp";
 import { getTargetViewColumn } from "../util";
+import { editorTool } from "../editor-tools";
 
 export function packageFeatureActivate(context: vscode.ExtensionContext) {
   const packageView = new PackageViewProvider();
@@ -9,43 +10,18 @@ export function packageFeatureActivate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "tinymist.showPackageDocsInternal",
       async (pkg: PackageInfo) => {
-        console.log("show package docs", pkg);
+        // console.log("show package docs", pkg);
         //
         try {
           const docs = await tinymist.getResource("/package/docs", pkg);
-          console.log("docs", docs);
+          // console.log("docs", docs);
 
           const content = (await vscode.commands.executeCommand(
             "markdown.api.render",
             docs,
           )) as string;
 
-          const activeEditor = vscode.window.activeTextEditor;
-
-          // Create and show a new WebView
-          const panel = vscode.window.createWebviewPanel(
-            "typst-docs", // 标识符
-            `@${pkg.namespace}/${pkg.name}:${pkg.version} (Documentation)`, // 面板标题
-            getTargetViewColumn(activeEditor?.viewColumn),
-            {
-              enableScripts: false, // 启用 JS
-              retainContextWhenHidden: true,
-              enableFindWidget: true,
-            },
-          );
-
-          panel.webview.html = `<html>
-  <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https:; script-src 'nonce-${panel.webview.cspSource}';">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta charset="UTF-8">
-    <title>${pkg.namespace}/${pkg.name}:${pkg.version}</title>
-  </head>
-  <body>
-  ${content}
-  </body>
-  </html>
-  `;
+          await editorTool(context, "docs", { pkg, content });
         } catch (e) {
           console.error("show package docs error", e);
           vscode.window.showErrorMessage(`Failed to show package documentation: ${e}`);

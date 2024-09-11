@@ -9,6 +9,7 @@
 
 mod adt;
 pub mod analysis;
+pub mod docs;
 pub mod syntax;
 pub mod ty;
 mod upstream;

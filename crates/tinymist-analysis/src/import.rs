@@ -1,3 +1,5 @@
+//! Import resolution utilities.
+
 use crate::prelude::*;
 
 /// Resolve a file id by its import path.

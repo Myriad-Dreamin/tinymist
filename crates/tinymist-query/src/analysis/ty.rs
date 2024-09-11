@@ -441,7 +441,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
 fn to_ident_ref(root: &LinkedNode, c: ast::Ident) -> Option<IdentRef> {
     Some(IdentRef {
-        name: c.get().to_string(),
+        name: c.get().clone(),
         range: root.find(c.span())?.range(),
     })
 }

@@ -64,25 +64,31 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
             #[cfg(windows)]
             let contents = contents.replace("\r\n", "\n");
 
-            run_with_sources(&contents, |w: &mut TypstSystemUniverse, p| {
-                let root = w.workspace_root().unwrap();
-                let paths = w
-                    .shadow_paths()
-                    .into_iter()
-                    .map(|p| {
-                        TypstFileId::new(None, VirtualPath::new(p.strip_prefix(&root).unwrap()))
-                    })
-                    .collect::<Vec<_>>();
-                let mut w = w.snapshot();
-                let w = WrapWorld(&mut w);
-                let a = Analysis::default();
-                let mut ctx = AnalysisContext::new(root, &w, &a);
-                ctx.test_completion_files(Vec::new);
-                ctx.test_files(|| paths);
-                f(&mut ctx, p);
+            run_with_sources(&contents, |w, p| {
+                run_with_ctx(w, p, f);
             });
         });
     });
+}
+
+pub fn run_with_ctx<T>(
+    w: &mut TypstSystemUniverse,
+    p: PathBuf,
+    f: &impl Fn(&mut AnalysisContext, PathBuf) -> T,
+) -> T {
+    let root = w.workspace_root().unwrap();
+    let paths = w
+        .shadow_paths()
+        .into_iter()
+        .map(|p| TypstFileId::new(None, VirtualPath::new(p.strip_prefix(&root).unwrap())))
+        .collect::<Vec<_>>();
+    let mut w = w.snapshot();
+    let w = WrapWorld(&mut w);
+    let a = Analysis::default();
+    let mut ctx = AnalysisContext::new(root, &w, &a);
+    ctx.test_completion_files(Vec::new);
+    ctx.test_files(|| paths);
+    f(&mut ctx, p)
 }
 
 pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {

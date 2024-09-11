@@ -5,8 +5,8 @@
 // todo: remove this
 #![allow(missing_docs)]
 
-pub(crate) mod import;
-pub use import::*;
+use ecow::EcoString;
+pub use tinymist_analysis::import::*;
 pub(crate) mod lexical_hierarchy;
 pub use lexical_hierarchy::*;
 pub(crate) mod matcher;
@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct IdentRef {
     /// The name of the symbol.
-    pub name: String,
+    pub name: EcoString,
     /// The byte range of the symbol in the source file.
     pub range: Range<usize>,
 }
@@ -89,7 +89,7 @@ impl<'de> Deserialize<'de> for IdentRef {
             (name, st_ed[0]..st_ed[1])
         };
         Ok(IdentRef {
-            name: name.to_string(),
+            name: name.into(),
             range,
         })
     }
@@ -101,7 +101,7 @@ impl<'de> Deserialize<'de> for IdentRef {
 #[derive(Debug, Clone, Serialize)]
 pub struct IdentDef {
     /// The name of the symbol.
-    pub name: String,
+    pub name: EcoString,
     /// The kind of the symbol.
     pub kind: LexicalKind,
     /// The byte range of the symbol in the source file.

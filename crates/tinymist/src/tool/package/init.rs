@@ -4,14 +4,13 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use reflexo_typst::{Bytes, ImmutPath, TypstFileId};
+use tinymist_query::docs::get_manifest;
 use typst::diag::{bail, eco_format, FileError, FileResult, StrResult};
 use typst::syntax::package::{PackageSpec, TemplateInfo};
 use typst::syntax::VirtualPath;
 use typst::World;
 
 use crate::world::LspWorld;
-
-use super::get_manifest;
 
 /// The source of a template.
 #[derive(Debug, Clone)]

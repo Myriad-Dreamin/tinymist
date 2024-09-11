@@ -9,7 +9,7 @@ use typst_syntax::Source;
 
 use super::*;
 
-fn conv(s: &str) -> EcoString {
+fn conv_(s: &str, for_docs: bool) -> EcoString {
     static FONT_RESOLVER: LazyLock<Result<Arc<FontResolverImpl>>> = LazyLock::new(|| {
         Ok(Arc::new(
             LspUniverseBuilder::resolve_fonts(CompileFontArgs::default())
@@ -32,7 +32,8 @@ fn conv(s: &str) -> EcoString {
         .unwrap();
     let world = universe.snapshot();
 
-    let res = Typlite::new(Arc::new(world)).convert().unwrap();
+    let converter = Typlite::new(Arc::new(world)).annotate_elements(for_docs);
+    let res = converter.convert().unwrap();
     static REG: OnceLock<Regex> = OnceLock::new();
     let reg = REG.get_or_init(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
     let res = reg.replace(&res, |_captures: &regex::Captures| {
@@ -45,6 +46,14 @@ fn conv(s: &str) -> EcoString {
     });
 
     res.into()
+}
+
+fn conv(s: &str) -> EcoString {
+    conv_(s, false)
+}
+
+fn conv_docs(s: &str) -> EcoString {
+    conv_(s, true)
 }
 
 #[test]
@@ -85,4 +94,76 @@ $
 1/2 + 1/3 = 5/6
 $
         "###), @r###"<p align="center"><img src="data:image-hash/svg+xml;base64,redacted" alt="typst-block" /></p>"###);
+}
+
+#[test]
+fn test_converted_docs() {
+    insta::assert_snapshot!(conv_docs(r###"
+These again are dictionaries with the keys
+- `description` (optional): The description for the argument.
+- `types` (optional): A list of accepted argument types. 
+- `default` (optional): Default value for this argument.
+
+See @@show-module() for outputting the results of this function.
+
+- content (string): Content of `.typ` file to analyze for docstrings.
+- name (string): The name for the module. 
+- label-prefix (auto, string): The label-prefix for internal function 
+      references. If `auto`, the label-prefix name will be the module name. 
+- require-all-parameters (boolean): Require that all parameters of a 
+      functions are documented and fail if some are not. 
+- scope (dictionary): A dictionary of definitions that are then available 
+      in all function and parameter descriptions. 
+- preamble (string): Code to prepend to all code snippets shown with `#example()`. 
+      This can for instance be used to import something from the scope. 
+-> string
+        "###), @r###"
+
+    These again are dictionaries with the keys
+    - <!-- typlite:begin:list-item 0 -->`description` (optional): The description for the argument.<!-- typlite:end:list-item 0 -->
+    - <!-- typlite:begin:list-item 0 -->`types` (optional): A list of accepted argument types.<!-- typlite:end:list-item 0 --> 
+    - <!-- typlite:begin:list-item 0 -->`default` (optional): Default value for this argument.<!-- typlite:end:list-item 0 -->
+
+    See @@show-module() for outputting the results of this function.
+
+    - <!-- typlite:begin:list-item 0 -->content (string): Content of `.typ` file to analyze for docstrings.<!-- typlite:end:list-item 0 -->
+    - <!-- typlite:begin:list-item 0 -->name (string): The name for the module.<!-- typlite:end:list-item 0 --> 
+    - <!-- typlite:begin:list-item 0 -->label-prefix (auto, string): The label-prefix for internal function 
+          references. If `auto`, the label-prefix name will be the module name.<!-- typlite:end:list-item 0 --> 
+    - <!-- typlite:begin:list-item 0 -->require-all-parameters (boolean): Require that all parameters of a 
+          functions are documented and fail if some are not.<!-- typlite:end:list-item 0 --> 
+    - <!-- typlite:begin:list-item 0 -->scope (dictionary): A dictionary of definitions that are then available 
+          in all function and parameter descriptions.<!-- typlite:end:list-item 0 --> 
+    - <!-- typlite:begin:list-item 0 -->preamble (string): Code to prepend to all code snippets shown with `#example()`. 
+          This can for instance be used to import something from the scope.<!-- typlite:end:list-item 0 --> 
+    -> string
+            
+    "###);
+    insta::assert_snapshot!(conv_docs(r###"
+These again are dictionaries with the keys
+- `description` (optional): The description for the argument.
+
+See @@show-module() for outputting the results of this function.
+
+- name (string): The name for the module. 
+- label-prefix (auto, string): The label-prefix for internal function 
+      references. If `auto`, the label-prefix name will be the module name. 
+  - nested something
+  - nested something 2
+-> string
+        "###), @r###"
+
+    These again are dictionaries with the keys
+    - <!-- typlite:begin:list-item 0 -->`description` (optional): The description for the argument.<!-- typlite:end:list-item 0 -->
+
+    See @@show-module() for outputting the results of this function.
+
+    - <!-- typlite:begin:list-item 0 -->name (string): The name for the module.<!-- typlite:end:list-item 0 --> 
+    - <!-- typlite:begin:list-item 0 -->label-prefix (auto, string): The label-prefix for internal function 
+          references. If `auto`, the label-prefix name will be the module name. 
+      - <!-- typlite:begin:list-item 1 -->nested something<!-- typlite:end:list-item 1 -->
+      - <!-- typlite:begin:list-item 1 -->nested something 2<!-- typlite:end:list-item 1 --><!-- typlite:end:list-item 0 -->
+    -> string
+            
+    "###);
 }

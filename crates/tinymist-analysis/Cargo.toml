@@ -1,6 +1,6 @@
 [package]
-name = "typlite"
-description = "Converts a subset of typst to markdown."
+name = "tinymist-analysis"
+description = "Typst Static Analyzers for Tinymist."
 categories = ["compilers"]
 keywords = ["language", "typst"]
 authors.workspace = true
@@ -12,10 +12,11 @@ repository.workspace = true
 
 [dependencies]
 typst-syntax.workspace = true
-tinymist-analysis.workspace = true
-tinymist-world = { workspace = true, features = ["no-content-hint"] }
+tinymist-world.workspace = true
 ecow.workspace = true
 comemo.workspace = true
+log.workspace = true
+toml.workspace = true
 
 typst.workspace = true
 typst-svg.workspace = true
@@ -25,5 +26,5 @@ base64.workspace = true
 insta.workspace = true
 regex.workspace = true
 
-# [lints]
-# workspace = true
+[lints]
+workspace = true

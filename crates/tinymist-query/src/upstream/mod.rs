@@ -398,8 +398,7 @@ fn summarize_font_family<'a>(variants: impl Iterator<Item = &'a FontInfo>) -> Ec
     detail
 }
 
-pub fn truncated_repr(value: &Value) -> EcoString {
-    const _10MB: usize = 100 * 1024 * 1024;
+pub fn truncated_repr_<const SZ_LIMIT: usize>(value: &Value) -> EcoString {
     use typst::foundations::Repr;
 
     let data: Option<Content> = value.clone().cast().ok();
@@ -412,11 +411,21 @@ pub fn truncated_repr(value: &Value) -> EcoString {
         value.repr()
     };
 
-    if repr.len() > _10MB {
+    if repr.len() > SZ_LIMIT {
         eco_format!("[truncated-repr: {} bytes]", repr.len())
     } else {
         repr
     }
+}
+
+pub fn truncated_repr(value: &Value) -> EcoString {
+    const _10MB: usize = 100 * 1024 * 1024;
+    truncated_repr_::<_10MB>(value)
+}
+
+pub fn truncated_doc_repr(value: &Value) -> EcoString {
+    const _128B: usize = 128;
+    truncated_repr_::<_128B>(value)
 }
 
 /// Run a function with a VM instance in the world

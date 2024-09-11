@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
+use tinymist_query::docs::PackageInfo;
 use tinymist_query::{ExportKind, PageSelection};
-use tool::package::PackageInfo;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 
@@ -556,7 +556,8 @@ impl LanguageState {
         let snap = self.primary().snapshot().map_err(z_internal_error)?;
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
-            let symbols = tool::package::list_symbols(&snap.world, &info)
+            let w = snap.world.as_ref();
+            let symbols = tinymist_query::docs::list_symbols(w, &info)
                 .map_err(map_string_err("failed to list symbols"))
                 .map_err(z_internal_error)?;
 
@@ -571,14 +572,21 @@ impl LanguageState {
     ) -> AnySchedulableResponse {
         let info = get_arg!(arguments[1] as PackageInfo);
 
-        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        let handle = self.primary().handle.clone();
+        let snap = handle.snapshot().map_err(z_internal_error)?;
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
-            let symbols = tool::package::generate_md_docs(&snap.world, &info)
-                .map_err(map_string_err("failed to list symbols"))
-                .map_err(z_internal_error)?;
+            let w = snap.world.as_ref();
 
-            serde_json::to_value(symbols).map_err(|e| internal_error(e.to_string()))
+            let res = handle.run_analysis(w, |a| {
+                let symbols = tinymist_query::docs::generate_md_docs(a, w, &info)
+                    .map_err(map_string_err("failed to list symbols"))
+                    .map_err(z_internal_error)?;
+
+                serde_json::to_value(symbols).map_err(|e| internal_error(e.to_string()))
+            });
+
+            res.map_err(|e| internal_error(e.to_string()))?
         })
     }
 }

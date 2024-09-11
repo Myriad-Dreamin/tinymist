@@ -1,4 +1,7 @@
 import * as vscode from "vscode";
+
+export type ExtensionContext = vscode.ExtensionContext;
+
 interface ExtensionState {
   features: {
     task: boolean;

@@ -159,7 +159,7 @@ impl SemanticRequest for SignatureHelpRequest {
 
         Some(SignatureHelp {
             signatures: vec![SignatureInformation {
-                label,
+                label: label.to_string(),
                 documentation,
                 parameters: Some(params),
                 active_parameter: active_parameter.map(|x| x as u32),
