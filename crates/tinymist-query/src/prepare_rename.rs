@@ -47,7 +47,7 @@ impl StatefulRequest for PrepareRenameRequest {
         debug!("prepare_rename: {}", lnk.name);
         Some(PrepareRenameResponse::RangeWithPlaceholder {
             range: origin_selection_range,
-            placeholder: lnk.name,
+            placeholder: lnk.name.to_string(),
         })
     }
 }

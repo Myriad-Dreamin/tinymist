@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, ops::Range, sync::Arc};
 
-use ecow::EcoVec;
+use ecow::{EcoString, EcoVec};
 use reflexo::hash::hash128;
 
 use super::{prelude::*, ImportInfo};
@@ -18,7 +18,7 @@ enum Ns {
     Value,
 }
 
-type ExternalRefMap = HashMap<(TypstFileId, Option<String>), Vec<(Option<DefId>, IdentRef)>>;
+type ExternalRefMap = HashMap<(TypstFileId, Option<EcoString>), Vec<(Option<DefId>, IdentRef)>>;
 
 /// The def-use information of a source file.
 #[derive(Default)]
@@ -29,11 +29,11 @@ pub struct DefUseInfo {
     /// The references to defined symbols.
     pub ident_refs: HashMap<IdentRef, DefId>,
     /// The references of labels.
-    pub label_refs: HashMap<String, Vec<Range<usize>>>,
+    pub label_refs: HashMap<EcoString, Vec<Range<usize>>>,
     /// The references to undefined symbols.
     pub undefined_refs: Vec<IdentRef>,
     exports_refs: Vec<DefId>,
-    exports_defs: HashMap<String, DefId>,
+    exports_defs: HashMap<EcoString, DefId>,
 
     self_id: Option<TypstFileId>,
     self_hash: u128,
@@ -93,7 +93,7 @@ impl DefUseInfo {
     pub fn get_external_refs(
         &self,
         ext_id: TypstFileId,
-        ext_name: Option<String>,
+        ext_name: Option<EcoString>,
     ) -> impl Iterator<Item = &(Option<DefId>, IdentRef)> {
         self.external_refs
             .get(&(ext_id, ext_name))
@@ -160,8 +160,8 @@ pub(super) fn get_def_use_inner(
 struct DefUseCollector<'a, 'b, 'w> {
     ctx: &'a mut SearchCtx<'b, 'w>,
     info: DefUseInfo,
-    label_scope: SnapshotMap<String, DefId>,
-    id_scope: SnapshotMap<String, DefId>,
+    label_scope: SnapshotMap<EcoString, DefId>,
+    id_scope: SnapshotMap<EcoString, DefId>,
     import: Arc<ImportInfo>,
 
     current_id: TypstFileId,
@@ -317,7 +317,7 @@ impl<'a, 'b, 'w> DefUseCollector<'a, 'b, 'w> {
         }
     }
 
-    fn insert_extern(&mut self, name: String, range: Range<usize>, redefine_id: Option<DefId>) {
+    fn insert_extern(&mut self, name: EcoString, range: Range<usize>, redefine_id: Option<DefId>) {
         if let Some(src) = &self.ext_src {
             self.info.external_refs.insert(
                 (src.id(), Some(name.clone())),

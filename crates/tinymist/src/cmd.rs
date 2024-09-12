@@ -10,8 +10,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
+use tinymist_query::docs::PackageInfo;
 use tinymist_query::{ExportKind, PageSelection};
-use typst::diag::StrResult;
+use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 
 use super::server::*;
@@ -498,19 +499,94 @@ impl LanguageState {
         Err(method_not_found())
     }
 
-    /// Get directory of local pacakges
-    pub fn resource_local_packages(
+    /// Get directory of pacakges
+    pub fn resource_package_dirs(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
+        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        just_future(async move {
+            let snap = snap.receive().await.map_err(z_internal_error)?;
+            let paths = snap.world.registry.paths();
+            serde_json::to_value(paths).map_err(|e| internal_error(e.to_string()))
+        })
+    }
+
+    /// Get writable directory of pacakges
+    pub fn resource_local_package_dir(
         &mut self,
         _arguments: Vec<JsonValue>,
     ) -> AnySchedulableResponse {
-        let Some(data_dir) = dirs::data_dir() else {
-            return just_ok(JsonValue::Null);
-        };
-        let local_path = data_dir.join("typst/packages");
-        if !local_path.exists() {
-            return just_ok(JsonValue::Null);
-        }
-        let local_path = local_path.to_string_lossy().to_string();
-        just_ok(JsonValue::String(local_path))
+        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        just_future(async move {
+            let snap = snap.receive().await.map_err(z_internal_error)?;
+            let paths = snap
+                .world
+                .registry
+                .local_path()
+                .into_iter()
+                .collect::<Vec<_>>();
+            serde_json::to_value(paths).map_err(|e| internal_error(e.to_string()))
+        })
+    }
+
+    /// Get writable directory of pacakges
+    pub fn resource_package_by_ns(
+        &mut self,
+        mut arguments: Vec<JsonValue>,
+    ) -> AnySchedulableResponse {
+        let ns = get_arg!(arguments[1] as EcoString);
+
+        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        just_future(async move {
+            let snap = snap.receive().await.map_err(z_internal_error)?;
+            let packages = tool::package::list_package_by_namespace(&snap.world.registry, ns)
+                .into_iter()
+                .map(PackageInfo::from)
+                .collect::<Vec<_>>();
+
+            serde_json::to_value(packages).map_err(|e| internal_error(e.to_string()))
+        })
+    }
+
+    /// Get the all valid symbols
+    pub fn resource_package_symbols(
+        &mut self,
+        mut arguments: Vec<JsonValue>,
+    ) -> AnySchedulableResponse {
+        let info = get_arg!(arguments[1] as PackageInfo);
+
+        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        just_future(async move {
+            let snap = snap.receive().await.map_err(z_internal_error)?;
+            let w = snap.world.as_ref();
+            let symbols = tinymist_query::docs::list_symbols(w, &info)
+                .map_err(map_string_err("failed to list symbols"))
+                .map_err(z_internal_error)?;
+
+            serde_json::to_value(symbols).map_err(|e| internal_error(e.to_string()))
+        })
+    }
+
+    /// Get the all symbol docs
+    pub fn resource_package_docs(
+        &mut self,
+        mut arguments: Vec<JsonValue>,
+    ) -> AnySchedulableResponse {
+        let info = get_arg!(arguments[1] as PackageInfo);
+
+        let handle = self.primary().handle.clone();
+        let snap = handle.snapshot().map_err(z_internal_error)?;
+        just_future(async move {
+            let snap = snap.receive().await.map_err(z_internal_error)?;
+            let w = snap.world.as_ref();
+
+            let res = handle.run_analysis(w, |a| {
+                let symbols = tinymist_query::docs::generate_md_docs(a, w, &info)
+                    .map_err(map_string_err("failed to list symbols"))
+                    .map_err(z_internal_error)?;
+
+                serde_json::to_value(symbols).map_err(|e| internal_error(e.to_string()))
+            });
+
+            res.map_err(|e| internal_error(e.to_string()))?
+        })
     }
 }

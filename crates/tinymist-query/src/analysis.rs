@@ -333,7 +333,7 @@ mod lexical_hierarchy_tests {
                 undefined_refs.sort();
                 let entry = DefUseEntry {
                     def: &IdentDef {
-                        name: "<nil>".to_string(),
+                        name: "<nil>".into(),
                         kind: LexicalKind::Block,
                         range: 0..0,
                     },

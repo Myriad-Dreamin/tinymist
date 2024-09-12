@@ -12,3 +12,4 @@ path = "src/main.rs"
 typlite.workspace = true
 clap.workspace = true
 tinymist-world.workspace = true
+ecow.workspace = true

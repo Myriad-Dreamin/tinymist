@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use ecow::EcoVec;
 use serde::Serialize;
 use typst::{
@@ -209,6 +211,29 @@ impl<'a> DefTarget<'a> {
         match self {
             DefTarget::Let(node) => node,
             DefTarget::Import(node) => node,
+        }
+    }
+
+    pub fn name_range(&self) -> Option<Range<usize>> {
+        match self {
+            DefTarget::Let(node) => {
+                let lb: ast::LetBinding<'_> = node.cast()?;
+                let names = match lb.kind() {
+                    ast::LetBindingKind::Closure(name) => node.find(name.span())?,
+                    ast::LetBindingKind::Normal(ast::Pattern::Normal(name)) => {
+                        node.find(name.span())?
+                    }
+                    _ => return None,
+                };
+
+                Some(names.range())
+            }
+            DefTarget::Import(_node) => {
+                // let ident = node.cast::<ast::ImportItem>()?;
+                // Some(ident.span().into())
+                // todo: implement this
+                None
+            }
         }
     }
 }

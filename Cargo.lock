@@ -3946,6 +3946,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinymist-analysis"
+version = "0.11.20"
+dependencies = [
+ "base64 0.22.1",
+ "comemo 0.4.0",
+ "ecow 0.2.2",
+ "insta",
+ "log",
+ "regex",
+ "tinymist-world",
+ "toml 0.8.14",
+ "typst",
+ "typst-svg",
+ "typst-syntax 0.11.1",
+]
+
+[[package]]
 name = "tinymist-assets"
 version = "0.11.20"
 
@@ -3960,6 +3977,7 @@ name = "tinymist-query"
 version = "0.11.20"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "biblatex",
  "chrono",
  "comemo 0.4.0",
@@ -3991,9 +4009,12 @@ dependencies = [
  "sha2",
  "siphasher 1.0.1",
  "strum 0.26.3",
+ "tinymist-analysis",
+ "tinymist-world",
  "toml 0.8.14",
  "triomphe",
  "ttf-parser",
+ "typlite",
  "typst",
  "typst-assets",
  "typst-shim",
@@ -4300,7 +4321,7 @@ dependencies = [
  "ecow 0.2.2",
  "insta",
  "regex",
- "tinymist-query",
+ "tinymist-analysis",
  "tinymist-world",
  "typst",
  "typst-svg",
@@ -4312,6 +4333,7 @@ name = "typlite-cli"
 version = "0.0.0"
 dependencies = [
  "clap",
+ "ecow 0.2.2",
  "tinymist-world",
  "typlite",
 ]

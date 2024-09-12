@@ -67,7 +67,7 @@ fn filter_document_labels(
             let rng = typst_to_lsp::range(e.info.range.clone(), source, position_encoding);
 
             Some(SymbolInformation {
-                name: e.info.name.clone(),
+                name: e.info.name.to_string(),
                 kind: e.info.kind.clone().try_into().unwrap(),
                 tags: None,
                 deprecated: None,
