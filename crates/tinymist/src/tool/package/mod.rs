@@ -2,8 +2,9 @@
 
 use std::path::PathBuf;
 
-use reflexo_typst::package::{http::HttpRegistry, PackageRegistry, PackageSpec};
+use reflexo_typst::package::{PackageRegistry, PackageSpec};
 use reflexo_typst::typst::prelude::*;
+use tinymist_world::https::HttpsRegistry;
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageVersion, VersionlessPackageSpec};
 
@@ -46,7 +47,7 @@ pub fn determine_latest_version(
 
 /// Get the packages in namespaces and their descriptions.
 pub fn list_package_by_namespace(
-    registry: &HttpRegistry,
+    registry: &HttpsRegistry,
     ns: EcoString,
 ) -> EcoVec<(PathBuf, PackageSpec)> {
     // search packages locally. We only search in the data

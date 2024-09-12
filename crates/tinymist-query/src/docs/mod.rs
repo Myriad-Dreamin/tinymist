@@ -761,16 +761,13 @@ fn remove_list_annotations(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use reflexo_typst::{
-        package::{PackageRegistry, PackageSpec},
-        TypstSystemUniverse,
-    };
+    use reflexo_typst::package::{PackageRegistry, PackageSpec};
 
     use super::{generate_md_docs, PackageInfo};
     use crate::tests::*;
 
     fn test(pkg: PackageSpec) {
-        run_with_sources("", |verse: &mut TypstSystemUniverse, p| {
+        run_with_sources("", |verse: &mut LspUniverse, p| {
             let w = verse.snapshot();
             let path = verse.registry.resolve(&pkg).unwrap();
             let pi = PackageInfo {

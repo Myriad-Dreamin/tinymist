@@ -20,8 +20,10 @@ use reflexo_typst::vfs::{system::SystemAccessModel, Vfs};
 use reflexo_typst::TypstDict;
 use serde::{Deserialize, Serialize};
 
-mod https;
-use https::{SystemCompilerFeatExtend, TypstSystemUniverseExtend, TypstSystemWorldExtend, HttpsRegistry};
+pub mod https;
+use https::{
+    HttpsRegistry, SystemCompilerFeatExtend, TypstSystemUniverseExtend, TypstSystemWorldExtend,
+};
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
@@ -81,12 +83,9 @@ pub struct CompileOnceArgs {
     )]
     pub creation_timestamp: Option<DateTime<Utc>>,
 
-    /// Path to CA certificate file for network access, especially for downloading typst packages.
-    #[clap(
-        long = "cert",
-        env = "TYPST_CERT",
-        value_name = "CERT_PATH"
-    )]
+    /// Path to CA certificate file for network access, especially for
+    /// downloading typst packages.
+    #[clap(long = "cert", env = "TYPST_CERT", value_name = "CERT_PATH")]
     pub certification: Option<PathBuf>,
 }
 
@@ -102,8 +101,13 @@ impl CompileOnceArgs {
             .collect();
         let cert_path = self.certification.clone();
 
-        LspUniverseBuilder::build(entry, Arc::new(fonts), Arc::new(Prehashed::new(inputs)), cert_path)
-            .context("failed to create universe")
+        LspUniverseBuilder::build(
+            entry,
+            Arc::new(fonts),
+            Arc::new(Prehashed::new(inputs)),
+            cert_path,
+        )
+        .context("failed to create universe")
     }
 
     /// Get the entry options from the arguments.
