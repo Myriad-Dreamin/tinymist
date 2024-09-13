@@ -71,6 +71,9 @@ pub struct DocumentFontInfo {
     /// The line number of the locatable text element
     /// in which the font first occurs.
     pub first_occur_line: Option<u32>,
+    /// The column number of the locatable text element
+    /// in which the font first occurs.
+    pub first_occur_column: Option<u32>,
 }
 
 /// The response to a DocumentMetricsRequest.
@@ -128,6 +131,7 @@ struct FontInfoValue {
     uses: u32,
     first_occur_file: Option<String>,
     first_occur_line: Option<u32>,
+    first_occur_column: Option<u32>,
 }
 
 struct DocumentMetricsWorker<'a, 'w> {
@@ -175,7 +179,7 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
         if !has_source_info && glyph_len > 0 {
             let (span, span_offset) = text.glyphs[0].span;
 
-            if let Some((filepath, line)) = self.source_code_file_line(span, span_offset) {
+            if let Some((filepath, line, column)) = self.source_code_file_line(span, span_offset) {
                 let uses = self.font_info.get(&font_key).map_or(0, |info| info.uses);
                 self.font_info.insert(
                     font_key.clone(),
@@ -183,6 +187,7 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
                         uses,
                         first_occur_file: Some(filepath),
                         first_occur_line: Some(line),
+                        first_occur_column: Some(column),
                     },
                 );
             }
@@ -194,18 +199,20 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
         Some(())
     }
 
-    fn source_code_file_line(&self, span: Span, span_offset: u16) -> Option<(String, u32)> {
+    fn source_code_file_line(&self, span: Span, span_offset: u16) -> Option<(String, u32, u32)> {
         let world = self.ctx.world();
         let file_id = span.id()?;
         let source = world.source(file_id).ok()?;
         let range = source.range(span)?;
         let byte_index = range.start + usize::from(span_offset);
-        let line = source.byte_to_line(byte_index.min(range.end - 1))?;
+        let byte_index = byte_index.min(range.end - 1);
+        let line = source.byte_to_line(byte_index)?;
+        let column = source.byte_to_column(byte_index)?;
 
         let filepath = self.ctx.path_for_id(file_id).ok()?;
         let filepath_str = filepath.to_string_lossy().to_string();
 
-        Some((filepath_str, line as u32 + 1))
+        Some((filepath_str, line as u32 + 1, column as u32 + 1))
     }
 
     fn internal_source(&mut self, source: Arc<DataSource>) -> u32 {
@@ -240,6 +247,7 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
                     uses: None,
                     first_occur_file: font_info_value.first_occur_file,
                     first_occur_line: font_info_value.first_occur_line,
+                    first_occur_column: font_info_value.first_occur_column,
                 }
             })
             .collect();
