@@ -175,7 +175,7 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
         if !has_source_info && glyph_len > 0 {
             let (span, span_offset) = text.glyphs[0].span;
 
-            if let Some((filepath, line)) = self.source_code_file_line(span) {
+            if let Some((filepath, line)) = self.source_code_file_line(span, span_offset) {
                 let uses = self.font_info.get(&font_key).map_or(0, |info| info.uses);
                 self.font_info.insert(
                     font_key.clone(),
@@ -194,12 +194,13 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
         Some(())
     }
 
-    fn source_code_file_line(&self, span: Span) -> Option<(String, u32)> {
+    fn source_code_file_line(&self, span: Span, span_offset: u16) -> Option<(String, u32)> {
         let world = self.ctx.world();
         let file_id = span.id()?;
         let source = world.source(file_id).ok()?;
         let range = source.range(span)?;
-        let line = source.byte_to_line(range.start)?;
+        let byte_index = range.start + usize::from(span_offset);
+        let line = source.byte_to_line(byte_index.min(range.end - 1))?;
 
         let filepath = self.ctx.path_for_id(file_id).ok()?;
         let filepath_str = filepath.to_string_lossy().to_string();
