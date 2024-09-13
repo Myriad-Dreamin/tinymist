@@ -176,10 +176,11 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
             let (span, span_offset) = text.glyphs[0].span;
 
             if let Some((filepath, line)) = self.source_code_file_line(span) {
+                let uses = self.font_info.get(&font_key).map_or(0, |info| info.uses);
                 self.font_info.insert(
                     font_key.clone(),
                     FontInfoValue {
-                        uses: 0,
+                        uses,
                         first_occur_file: Some(filepath),
                         first_occur_line: Some(line),
                     },
