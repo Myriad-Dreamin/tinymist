@@ -9,10 +9,10 @@ pub use reflexo_typst::{entry::*, font, vfs, EntryOpts, EntryState};
 use std::path::Path;
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
 
+use ::typst::utils::LazyHash;
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use clap::{builder::ValueParser, ArgAction, Parser};
-use comemo::Prehashed;
 use reflexo_typst::error::prelude::*;
 use reflexo_typst::font::system::SystemFontSearcher;
 use reflexo_typst::foundations::{Str, Value};
@@ -104,7 +104,7 @@ impl CompileOnceArgs {
         LspUniverseBuilder::build(
             entry,
             Arc::new(fonts),
-            Arc::new(Prehashed::new(inputs)),
+            Arc::new(LazyHash::new(inputs)),
             cert_path,
         )
         .context("failed to create universe")
@@ -157,7 +157,7 @@ pub type LspUniverse = TypstSystemUniverseExtend;
 /// LSP world.
 pub type LspWorld = TypstSystemWorldExtend;
 /// Immutable prehashed reference to dictionary.
-pub type ImmutDict = Arc<Prehashed<TypstDict>>;
+pub type ImmutDict = Arc<LazyHash<TypstDict>>;
 
 /// Builder for LSP universe.
 pub struct LspUniverseBuilder;

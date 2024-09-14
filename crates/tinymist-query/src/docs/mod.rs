@@ -19,9 +19,8 @@ use serde::{Deserialize, Serialize};
 use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
 use tinymist_world::LspWorld;
 use typst::diag::{eco_format, StrResult};
-use typst::engine::Route;
-use typst::eval::Tracer;
-use typst::foundations::{Bytes, Module, Value};
+use typst::engine::{Route, Sink, Traced};
+use typst::foundations::{Bytes, Value};
 use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{FileId, Span, VirtualPath};
 use typst::World;
@@ -254,6 +253,21 @@ impl ScanSymbolCtx<'_> {
         let route = self.route.track();
         let tracer = self.tracer.track_mut();
         let w: &dyn typst::World = self.world;
+
+        // let entry_point = toml_id.join(&manifest.package.entrypoint);
+        // let mut sink = Sink::new();
+        // let source = world.source(entry_point).map_err(|e| eco_format!("{e}"))?;
+        // let route = Route::default();
+        // let w: &dyn typst::World = world;
+
+        // let src = typst::eval::eval(
+        //     w.track(),
+        //     Traced::default().track(),
+        //     sink.track_mut(),
+        //     route.track(),
+        //     &source,
+        // )
+        // .map_err(|e| eco_format!("{e:?}"))?;
 
         typst::eval::eval(w.track(), route, tracer, &source).map_err(|e| eco_format!("{e:?}"))
     }

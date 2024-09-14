@@ -5,14 +5,13 @@ use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{bail, Context};
-use once_cell::sync::Lazy;
 use reflexo_typst::{EntryReader, EntryState, TaskInputs, TypstDatetime};
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::{IntoValue, Smart};
 use typst::{
-    layout::{Abs, Frame},
+    layout::Abs,
     syntax::{ast, SyntaxNode},
     visualize::Color,
 };
@@ -118,7 +117,7 @@ impl ExportConfig {
                 ExportMode::Never => false,
                 ExportMode::OnType => s.by_mem_events,
                 ExportMode::OnSave => s.by_fs_events,
-                ExportMode::OnDocumentHasTitle => s.by_fs_events && doc.title.is_some(),
+                ExportMode::OnDocumentHasTitle => s.by_fs_events && doc.info.title.is_some(),
             };
 
         if !need_export {
@@ -203,15 +202,15 @@ impl ExportConfig {
         let data = FutureFolder::compute(move |_| -> anyhow::Result<Vec<u8>> {
             let doc = &doc;
 
-            static BLANK: Lazy<Frame> = Lazy::new(Frame::default);
-            let first_frame = || doc.pages.first().map(|f| &f.frame).unwrap_or(&*BLANK);
+            // static BLANK: Lazy<Page> = Lazy::new(Page::default);
+            let first_page = doc.pages.first().unwrap();
             Ok(match kind2 {
                 Pdf { creation_timestamp } => {
                     let timestamp =
                         convert_datetime(creation_timestamp.unwrap_or_else(chrono::Utc::now));
                     // todo: Some(pdf_uri.as_str())
                     // todo: timestamp world.now()
-                    typst_pdf::pdf(doc, Smart::Auto, timestamp)
+                    typst_pdf::pdf(doc, Smart::Auto, timestamp, None)
                 }
                 Query {
                     format,
@@ -232,7 +231,7 @@ impl ExportConfig {
                     let mapped: Vec<_> = elements
                         .into_iter()
                         .filter_map(|c| match &field {
-                            Some(field) => c.get_by_name(field),
+                            Some(field) => c.get_by_name(field).ok(),
                             _ => Some(c.into_value()),
                         })
                         .collect();
@@ -257,13 +256,13 @@ impl ExportConfig {
 
                     conv.as_bytes().to_owned()
                 }
-                Svg { page: First } => typst_svg::svg(first_frame()).into_bytes(),
+                Svg { page: First } => typst_svg::svg(first_page).into_bytes(),
                 Svg {
                     page: Merged { .. },
                 } => typst_svg::svg_merged(doc, Abs::zero()).into_bytes(),
                 Png {
                     ppi,
-                    fill,
+                    fill: _,
                     page: First,
                 } => {
                     let ppi = ppi.unwrap_or(144.) as f32;
@@ -271,13 +270,7 @@ impl ExportConfig {
                         bail!("invalid ppi: {ppi}");
                     }
 
-                    let fill = if let Some(fill) = fill {
-                        parse_color(fill).map_err(|err| anyhow::anyhow!("invalid fill ({err})"))?
-                    } else {
-                        Color::WHITE
-                    };
-
-                    typst_render::render(first_frame(), ppi / 72., fill)
+                    typst_render::render(first_page, ppi / 72.)
                         .encode_png()
                         .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
                 }
@@ -303,7 +296,7 @@ impl ExportConfig {
                         Abs::zero()
                     };
 
-                    typst_render::render_merged(doc, ppi / 72., fill, gap, fill)
+                    typst_render::render_merged(doc, ppi / 72., gap, Some(fill))
                         .encode_png()
                         .map_err(|err| anyhow::anyhow!("failed to encode PNG ({err})"))?
                 }
