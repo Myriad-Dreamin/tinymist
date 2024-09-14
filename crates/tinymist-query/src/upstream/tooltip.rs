@@ -7,7 +7,7 @@ use typst::eval::CapturesVisitor;
 use typst::foundations::{repr, Capturer, CastInfo, Value};
 use typst::layout::Length;
 use typst::model::Document;
-use typst::syntax::{ast, LinkedNode, Side, Source, SyntaxKind};
+use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 use typst::World;
 use typst_shim::syntax::LinkedNodeExt;
 use typst_shim::utils::{round_2, Numeric};

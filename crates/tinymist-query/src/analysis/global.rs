@@ -14,7 +14,7 @@ use reflexo::hash::{hash128, FxDashMap};
 use reflexo::{debug_loc::DataSource, ImmutPath};
 use typst::eval::Eval;
 use typst::foundations::{self, Func, Styles};
-use typst::syntax::{FileId, LinkedNode, Side, SyntaxNode};
+use typst::syntax::{FileId, LinkedNode, SyntaxNode};
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
     foundations::Bytes,

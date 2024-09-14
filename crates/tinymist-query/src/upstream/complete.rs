@@ -8,9 +8,7 @@ use serde::{Deserialize, Serialize};
 use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::model::Document;
 use typst::syntax::ast::AstNode;
-use typst::syntax::{
-    ast, is_id_continue, is_id_start, is_ident, LinkedNode, Side, Source, SyntaxKind,
-};
+use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
 use typst_shim::syntax::LinkedNodeExt;
 use unscanny::Scanner;

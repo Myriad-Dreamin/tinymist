@@ -5,7 +5,6 @@
 use std::num::NonZeroUsize;
 
 use typst::model::Document;
-use typst::syntax::Side;
 use typst::{
     layout::{Frame, FrameItem, Point, Position},
     syntax::{LinkedNode, Source, Span, SyntaxKind},
