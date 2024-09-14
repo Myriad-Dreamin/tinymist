@@ -5,14 +5,13 @@ use std::str::FromStr;
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{bail, Context};
-use once_cell::sync::Lazy;
 use reflexo_typst::{EntryReader, EntryState, TaskInputs, TypstDatetime};
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
 use typst::foundations::{IntoValue, Smart};
 use typst::{
-    layout::{Abs, Frame},
+    layout::Abs,
     syntax::{ast, SyntaxNode},
     visualize::Color,
 };

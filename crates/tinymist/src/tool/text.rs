@@ -4,8 +4,6 @@ use core::fmt;
 use reflexo_typst::TypstDocument;
 use std::sync::Arc;
 
-use reflexo_typst::TypstDocument;
-
 /// A full text digest of a document.
 pub struct FullTextDigest(pub Arc<TypstDocument>);
 
