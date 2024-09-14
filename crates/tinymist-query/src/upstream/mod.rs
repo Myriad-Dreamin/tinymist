@@ -436,15 +436,15 @@ pub fn with_vm<T>(world: &dyn typst::World, f: impl FnOnce(&mut typst::eval::Vm)
     use typst::foundations::*;
     use typst::introspection::*;
 
-    let mut locator = Locator::default();
     let introspector = Introspector::default();
-    let mut tracer = Tracer::new();
+    let traced = Traced::default();
+    let mut sink = Sink::new();
     let engine = Engine {
         world: world.track(),
-        route: Route::default(),
         introspector: introspector.track(),
-        locator: &mut locator,
-        tracer: tracer.track_mut(),
+        traced: traced.track(),
+        sink: sink.track_mut(),
+        route: Route::default(),
     };
 
     let context = Context::none();

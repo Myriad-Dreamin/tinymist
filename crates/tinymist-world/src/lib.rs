@@ -104,7 +104,7 @@ impl CompileOnceArgs {
         LspUniverseBuilder::build(
             entry,
             Arc::new(fonts),
-            Arc::new(Prehashed::new(inputs)),
+            Arc::new(LazyHash::new(inputs)),
             cert_path,
         )
         .context("failed to create universe")
