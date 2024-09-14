@@ -129,7 +129,6 @@ impl TextExportWorker {
     }
 
     fn item(&mut self, item: &typst::layout::FrameItem) -> io::Result<()> {
-        use typst::introspection::Meta::*;
         use typst::layout::FrameItem::*;
         match item {
             Group(g) => self.frame(&g.frame),
@@ -137,8 +136,8 @@ impl TextExportWorker {
                 write!(self.w, "{}", t.text.as_str())
             }
             // Meta(ContentHint(c), _) => f.write_char(*c),
-            Meta(Link(..), _) | Shape(..) | Image(..) => self.w.write_all(b"object"),
-            Meta(Elem(..) | Hide, _) => Ok(()),
+            Link(..) | Shape(..) | Image(..) => self.w.write_all(b"object"),
+            Tag(..) => Ok(()),
         }
     }
 }
@@ -212,17 +211,16 @@ impl SpanMapper {
     }
 
     fn item(&mut self, item: &typst::layout::FrameItem) {
-        use typst::introspection::Meta::*;
         use typst::layout::FrameItem::*;
         match item {
             Group(g) => self.frame(&g.frame),
             Text(t) => {
                 self.check(t.text.as_str(), Some(t));
             }
-            Meta(Link(..), _) | Shape(..) | Image(..) => {
+            Link(..) | Shape(..) | Image(..) => {
                 self.check("object", None);
             }
-            Meta(Elem(..) | Hide, _) => {}
+            Tag(..) => {}
         }
     }
 

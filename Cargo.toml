@@ -89,31 +89,35 @@ env_logger = "0.11.3"
 log = "0.4"
 
 # Typst
-reflexo = { version = "0.5.0-rc7", default-features = false, features = [
+reflexo = { git = "https://github.com/paran3xus/typst.ts", branch = "typst-mainline", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-world = { version = "0.5.0-rc7", features = ["system"] }
-reflexo-typst = { version = "0.5.0-rc7", features = [
+reflexo-world = { git = "https://github.com/paran3xus/typst.ts", branch = "typst-mainline", features = [
+    "system",
+] }
+reflexo-typst = { git = "https://github.com/paran3xus/typst.ts", branch = "typst-mainline", features = [
     "system",
 ], default-features = false }
-reflexo-vec2svg = { version = "0.5.0-rc7" }
-typst = "0.11.1"
-typst-timing = "0.11.1"
-typst-pdf = "0.11.1"
-typst-svg = "0.11.1"
-typst-render = "0.11.1"
-typst-assets = "0.11.1"
-typst-syntax = "0.11.1"
+reflexo-vec2svg = { git = "https://github.com/paran3xus/typst.ts", branch = "typst-mainline" }
+
+
+typst = { git = "https://github.com/paran3xus/typst.git", branch = "tinymist-typst-mainline" }
+typst-timing = { git = "https://github.com/paran3xus/typst.git", branch = "tinymist-typst-mainline" }
+typst-svg = { git = "https://github.com/paran3xus/typst.git", branch = "tinymist-typst-mainline" }
+typst-render = { git = "https://github.com/paran3xus/typst.git", branch = "tinymist-typst-mainline" }
+typst-pdf = { git = "https://github.com/paran3xus/typst.git", branch = "tinymist-typst-mainline" }
+typst-syntax = { git = "https://github.com/paran3xus/typst.git", branch = "tinymist-typst-mainline" }
+typst-assets = { git = "https://github.com/typst/typst-assets", branch = "main" }
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
-typstyle = { version = "0.11.32", default-features = false }
+typstyle = { git = "https://github.com/ParaN3xus/typstyle", branch = "typst-mainline", default-features = false }
 typlite = { path = "./crates/typlite" }
-typst-shim = { path = "./crates/typst-shim", features = [] }
+typst-shim = { path = "./crates/typst-shim", features = ["nightly"] }
 
 # LSP
 crossbeam-channel = "0.5.12"
 lsp-server = "0.7.6"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
-sync-lsp = { path = "./crates/sync-lsp" }
+sync-lsp = { path = "./crates/sync-lsp", features = ["clap"] }
 
 # CLI
 clap = { version = "4.5", features = ["derive", "env", "unicode", "wrap_help"] }

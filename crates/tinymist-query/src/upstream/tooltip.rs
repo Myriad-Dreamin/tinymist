@@ -2,7 +2,8 @@ use std::fmt::Write;
 
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
-use typst::eval::{CapturesVisitor, Tracer};
+use typst::engine::Sink;
+use typst::eval::CapturesVisitor;
 use typst::foundations::{repr, Capturer, CastInfo, Value};
 use typst::layout::Length;
 use typst::model::Document;
@@ -79,7 +80,7 @@ pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
     let mut last = None;
     let mut pieces: Vec<EcoString> = vec![];
     let mut iter = values.iter();
-    for (value, _) in (&mut iter).take(Tracer::MAX_VALUES - 1) {
+    for (value, _) in (&mut iter).take(Sink::MAX_VALUES - 1) {
         if let Some((prev, count)) = &mut last {
             if *prev == value {
                 *count += 1;
@@ -127,7 +128,7 @@ fn closure_tooltip(leaf: &LinkedNode) -> Option<Tooltip> {
     let captures = visitor.finish();
     let mut names: Vec<_> = captures
         .iter()
-        .map(|(name, _)| eco_format!("`{name}`"))
+        .map(|(name, _, _)| eco_format!("`{name}`"))
         .collect();
     if names.is_empty() {
         return None;
