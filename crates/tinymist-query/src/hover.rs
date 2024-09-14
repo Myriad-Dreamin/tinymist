@@ -143,7 +143,7 @@ fn star_tooltip(
 
     let mut results = vec![];
 
-    let mut names = scope.iter().map(|(name, _)| name).collect::<Vec<_>>();
+    let mut names = scope.iter().map(|(name, _, _)| name).collect::<Vec<_>>();
     names.sort();
     let mut items = String::new();
     items.push_str("let (");

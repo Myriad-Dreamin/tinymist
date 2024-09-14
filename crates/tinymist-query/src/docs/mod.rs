@@ -17,8 +17,7 @@ use serde::{Deserialize, Serialize};
 use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
 use tinymist_world::LspWorld;
 use typst::diag::{eco_format, StrResult};
-use typst::engine::Route;
-use typst::eval::Tracer;
+use typst::engine::{Route, Sink, Traced};
 use typst::foundations::{Bytes, Value};
 use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{FileId, Span, VirtualPath};
@@ -216,13 +215,19 @@ pub fn list_symbols(world: &LspWorld, spec: &PackageInfo) -> StrResult<SymbolInf
     let manifest = get_manifest(world, toml_id)?;
 
     let entry_point = toml_id.join(&manifest.package.entrypoint);
+    let mut sink = Sink::new();
     let source = world.source(entry_point).map_err(|e| eco_format!("{e}"))?;
     let route = Route::default();
-    let mut tracer = Tracer::default();
     let w: &dyn typst::World = world;
 
-    let src = typst::eval::eval(w.track(), route.track(), tracer.track_mut(), &source)
-        .map_err(|e| eco_format!("{e:?}"))?;
+    let src = typst::eval::eval(
+        w.track(),
+        Traced::default().track(),
+        sink.track_mut(),
+        route.track(),
+        &source,
+    )
+    .map_err(|e| eco_format!("{e:?}"))?;
 
     let for_spec = PackageSpec {
         namespace: spec.namespace.clone(),
@@ -647,7 +652,7 @@ fn symbol(world: &LspWorld, for_spec: Option<&PackageSpec>, key: &str, val: &Val
             } else {
                 let symbols = module.scope().iter();
                 symbols
-                    .map(|(k, v)| symbol(world, for_spec, k, v))
+                    .map(|(k, v, _)| symbol(world, for_spec, k, v))
                     .collect()
             }
         }

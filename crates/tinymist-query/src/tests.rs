@@ -114,7 +114,7 @@ pub fn compile_doc_for_test(
         return None;
     }
 
-    let doc = typst::compile(ctx.world(), &mut Default::default()).unwrap();
+    let doc = typst::compile(ctx.world()).output.unwrap();
     Some(VersionedDocument {
         version: 0,
         document: Arc::new(doc),
