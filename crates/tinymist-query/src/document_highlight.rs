@@ -1,4 +1,4 @@
-use typst::syntax::Side;
+use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{prelude::*, SemanticRequest};
 
@@ -21,7 +21,7 @@ impl SemanticRequest for DocumentHighlightRequest {
         let cursor = ctx.to_typst_pos(self.position, &source)?;
 
         let root = LinkedNode::new(source.root());
-        let mut node = &root.leaf_at(cursor, Side::Before)?;
+        let mut node = &root.leaf_at_compat(cursor)?;
 
         loop {
             match node.kind() {

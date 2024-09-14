@@ -9,10 +9,9 @@ use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, 
 use typst::model::Document;
 use typst::syntax::ast::AstNode;
 use typst::syntax::package::PackageSpec;
-use typst::syntax::{
-    ast, is_id_continue, is_id_start, is_ident, LinkedNode, Side, Source, SyntaxKind,
-};
+use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
+use typst_shim::syntax::LinkedNodeExt;
 use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
@@ -971,7 +970,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
     ) -> Option<Self> {
         let text = source.text();
         let root = LinkedNode::new(source.root());
-        let leaf = root.leaf_at(cursor, Side::Before)?;
+        let leaf = root.leaf_at_compat(cursor)?;
         Some(Self {
             ctx,
             document,
@@ -1111,12 +1110,19 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
     /// Add completions for all available packages.
     fn package_completions(&mut self, all_versions: bool) {
-        let mut packages: Vec<_> = self.world().packages().iter().collect();
+        let mut packages: Vec<_> = self
+            .world()
+            .packages()
+            .iter()
+            .map(|e| (&e.0, e.1.clone()))
+            .collect();
         // local_packages to references and add them to the packages
-        let local_packages = self.local_packages();
-        let local_packages_refs: Vec<&(PackageSpec, Option<EcoString>)> =
-            local_packages.iter().collect();
-        packages.extend(local_packages_refs);
+        let local_packages_refs = self.ctx.resources.local_packages();
+        packages.extend(
+            local_packages_refs
+                .iter()
+                .map(|spec| (spec, Some(eco_format!("{} v{}", spec.name, spec.version)))),
+        );
 
         packages.sort_by_key(|(spec, _)| (&spec.namespace, &spec.name, Reverse(spec.version)));
         if !all_versions {

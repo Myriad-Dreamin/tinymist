@@ -6,8 +6,9 @@ use log::debug;
 use once_cell::sync::Lazy;
 use typst::foundations::{IntoValue, Label, Selector, Type};
 use typst::model::BibliographyElem;
-use typst::syntax::{FileId as TypstFileId, Side};
+use typst::syntax::FileId as TypstFileId;
 use typst::{foundations::Value, syntax::Span};
+use typst_shim::syntax::LinkedNodeExt;
 
 use super::{prelude::*, BibInfo};
 use crate::{
@@ -25,7 +26,7 @@ pub struct DefinitionLink {
     /// A possible instance of the definition.
     pub value: Option<Value>,
     /// The name of the definition.
-    pub name: String,
+    pub name: EcoString,
     /// The location of the definition.
     pub def_at: Option<(TypstFileId, Range<usize>)>,
     /// The range of the name of the definition.
@@ -53,7 +54,7 @@ pub fn find_definition(
             let source = find_source_by_expr(ctx.world(), def_fid, import_node.source())?;
             return Some(DefinitionLink {
                 kind: LexicalKind::Mod(LexicalModKind::PathVar),
-                name: String::new(),
+                name: EcoString::new(),
                 value: None,
                 def_at: Some((source.id(), LinkedNode::new(source.root()).range())),
                 name_range: None,
@@ -66,7 +67,7 @@ pub fn find_definition(
             let source = find_source_by_expr(ctx.world(), def_fid, include_node.source())?;
             return Some(DefinitionLink {
                 kind: LexicalKind::Mod(LexicalModKind::PathInclude),
-                name: String::new(),
+                name: EcoString::new(),
                 value: None,
                 def_at: Some((source.id(), (LinkedNode::new(source.root())).range())),
                 name_range: None,
@@ -124,7 +125,7 @@ pub fn find_definition(
 
                     Some(DefinitionLink {
                         kind: LexicalKind::Var(LexicalVarKind::Label),
-                        name: ref_node.to_owned(),
+                        name: ref_node.into(),
                         value: Some(Value::Content(elem)),
                         def_at,
                         name_range,
@@ -139,11 +140,11 @@ pub fn find_definition(
     // Lexical reference
     let ident_ref = match use_site.cast::<ast::Expr>()? {
         ast::Expr::Ident(e) => Some(IdentRef {
-            name: e.get().to_string(),
+            name: e.get().clone(),
             range: use_site.range(),
         }),
         ast::Expr::MathIdent(e) => Some(IdentRef {
-            name: e.get().to_string(),
+            name: e.get().clone(),
             range: use_site.range(),
         }),
         ast::Expr::FieldAccess(..) => {
@@ -172,12 +173,7 @@ pub fn find_definition(
     // Global definition
     let Some((def_fid, def)) = def_info else {
         return resolve_global_value(ctx, use_site.clone(), false).and_then(move |f| {
-            value_to_def(
-                ctx,
-                f,
-                || Some(use_site.get().clone().into_text().to_string()),
-                None,
-            )
+            value_to_def(ctx, f, || Some(use_site.get().clone().into_text()), None)
         });
     };
 
@@ -208,7 +204,7 @@ pub fn find_definition(
         LexicalKind::Var(LexicalVarKind::Function) => {
             let def_source = ctx.source_by_id(def_fid).ok()?;
             let root = LinkedNode::new(def_source.root());
-            let def_name = root.leaf_at(def.range.start + 1, Side::Before)?;
+            let def_name = root.leaf_at_compat(def.range.start + 1)?;
             log::info!("def_name for function: {def_name:?}", def_name = def_name);
             let values = ctx.analyze_expr(&def_name);
             let func = values.into_iter().find(|v| matches!(v.0, Value::Func(..)));
@@ -236,7 +232,7 @@ fn find_bib_definition(bib_elem: Arc<BibInfo>, key: &str) -> Option<DefinitionLi
     let entry = entry?;
     Some(DefinitionLink {
         kind: LexicalKind::Var(LexicalVarKind::BibKey),
-        name: key.to_string(),
+        name: key.into(),
         value: None,
         def_at: Some((entry.file_id, entry.span.clone())),
         // todo: rename with regard to string format: yaml-key/bib etc.
@@ -447,7 +443,7 @@ pub(crate) fn resolve_global_value(
 fn value_to_def(
     ctx: &mut AnalysisContext,
     value: Value,
-    name: impl FnOnce() -> Option<String>,
+    name: impl FnOnce() -> Option<EcoString>,
     name_range: Option<Range<usize>>,
 ) -> Option<DefinitionLink> {
     let mut def_at = |span: Span| {
@@ -459,7 +455,7 @@ fn value_to_def(
 
     Some(match value {
         Value::Func(func) => {
-            let name = func.name().map(|e| e.to_owned()).or_else(name)?;
+            let name = func.name().map(|e| e.into()).or_else(name)?;
             let span = func.span();
             DefinitionLink {
                 kind: LexicalKind::Var(LexicalVarKind::Function),
@@ -470,7 +466,7 @@ fn value_to_def(
             }
         }
         Value::Module(module) => {
-            let name = module.name().to_string();
+            let name = module.name().clone();
             DefinitionLink {
                 kind: LexicalKind::Var(LexicalVarKind::Variable),
                 name,

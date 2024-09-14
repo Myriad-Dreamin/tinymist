@@ -1,7 +1,6 @@
 use core::fmt;
 use std::sync::Arc;
 use std::{
-    borrow::Cow,
     collections::{HashMap, HashSet},
     ops::Range,
     path::{Path, PathBuf},
@@ -9,21 +8,20 @@ use std::{
 
 use ecow::EcoVec;
 use once_cell::sync::Lazy;
-use reflexo_typst::config::CompileOpts;
 use reflexo_typst::package::{PackageRegistry, PackageSpec};
-use reflexo_typst::world::{EntryOpts, EntryState};
-use reflexo_typst::{
-    CompileDriver, EntryManager, EntryReader, ShadowApi, TypstSystemUniverse, WorldDeps,
-};
+use reflexo_typst::world::EntryState;
+use reflexo_typst::{CompileDriverImpl, EntryManager, EntryReader, ShadowApi, WorldDeps};
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
+use tinymist_world::CompileFontArgs;
 use typst::syntax::ast::{self, AstNode};
-use typst::syntax::{FileId as TypstFileId, LinkedNode, Side, Source, SyntaxKind, VirtualPath};
+use typst::syntax::{FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath};
 use typst::{diag::PackageError, foundations::Bytes};
 
 pub use insta::assert_snapshot;
-pub use reflexo_typst::TypstSystemWorld;
 pub use serde::Serialize;
 pub use serde_json::json;
+pub use tinymist_world::{LspUniverse, LspUniverseBuilder, LspWorld};
+use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     analysis::{Analysis, AnalysisResources},
@@ -31,7 +29,9 @@ use crate::{
     typst_to_lsp, LspPosition, PositionEncoding, VersionedDocument,
 };
 
-struct WrapWorld<'a>(&'a mut TypstSystemWorld);
+type CompileDriver<C> = CompileDriverImpl<C, tinymist_world::LspCompilerFeat>;
+
+struct WrapWorld<'a>(&'a mut LspWorld);
 
 impl<'a> AnalysisResources for WrapWorld<'a> {
     fn world(&self) -> &dyn typst::World {
@@ -63,25 +63,31 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
             #[cfg(windows)]
             let contents = contents.replace("\r\n", "\n");
 
-            run_with_sources(&contents, |w: &mut TypstSystemUniverse, p| {
-                let root = w.workspace_root().unwrap();
-                let paths = w
-                    .shadow_paths()
-                    .into_iter()
-                    .map(|p| {
-                        TypstFileId::new(None, VirtualPath::new(p.strip_prefix(&root).unwrap()))
-                    })
-                    .collect::<Vec<_>>();
-                let mut w = w.snapshot();
-                let w = WrapWorld(&mut w);
-                let a = Analysis::default();
-                let mut ctx = AnalysisContext::new(root, &w, &a);
-                ctx.test_completion_files(Vec::new);
-                ctx.test_files(|| paths);
-                f(&mut ctx, p);
+            run_with_sources(&contents, |w, p| {
+                run_with_ctx(w, p, f);
             });
         });
     });
+}
+
+pub fn run_with_ctx<T>(
+    w: &mut LspUniverse,
+    p: PathBuf,
+    f: &impl Fn(&mut AnalysisContext, PathBuf) -> T,
+) -> T {
+    let root = w.workspace_root().unwrap();
+    let paths = w
+        .shadow_paths()
+        .into_iter()
+        .map(|p| TypstFileId::new(None, VirtualPath::new(p.strip_prefix(&root).unwrap())))
+        .collect::<Vec<_>>();
+    let mut w = w.snapshot();
+    let w = WrapWorld(&mut w);
+    let a = Analysis::default();
+    let mut ctx = AnalysisContext::new(root, &w, &a);
+    ctx.test_completion_files(Vec::new);
+    ctx.test_files(|| paths);
+    f(&mut ctx, p)
 }
 
 pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
@@ -115,21 +121,24 @@ pub fn compile_doc_for_test(
     })
 }
 
-pub fn run_with_sources<T>(
-    source: &str,
-    f: impl FnOnce(&mut TypstSystemUniverse, PathBuf) -> T,
-) -> T {
+pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBuf) -> T) -> T {
     let root = if cfg!(windows) {
         PathBuf::from("C:\\")
     } else {
         PathBuf::from("/")
     };
-    let mut world = TypstSystemUniverse::new(CompileOpts {
-        entry: EntryOpts::new_rooted(root.as_path().into(), None),
-        with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
-        no_system_fonts: true,
-        ..Default::default()
-    })
+    let mut world = LspUniverseBuilder::build(
+        EntryState::new_rooted(root.as_path().into(), None),
+        Arc::new(
+            LspUniverseBuilder::resolve_fonts(CompileFontArgs {
+                ignore_system_fonts: true,
+                ..Default::default()
+            })
+            .unwrap(),
+        ),
+        Default::default(),
+        None,
+    )
     .unwrap();
     let sources = source.split("-----");
 
@@ -245,7 +254,7 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
         .unwrap();
 
     let n = LinkedNode::new(s.root());
-    let mut n = n.leaf_at(re + 1, Side::Before).unwrap();
+    let mut n = n.leaf_at_compat(re + 1).unwrap();
 
     let match_prev = match &m {
         MatchAny { prev } => *prev,

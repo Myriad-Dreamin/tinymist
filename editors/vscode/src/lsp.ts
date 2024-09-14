@@ -9,7 +9,7 @@ export function setClient(newClient: LanguageClient) {
   clientPromiseResolve(newClient);
 }
 
-let clientPromiseResolve = (_client: LanguageClient) => {};
+let clientPromiseResolve = (_client: LanguageClient) => { };
 let clientPromise: Promise<LanguageClient> = new Promise((resolve) => {
   clientPromiseResolve = resolve;
 });
@@ -17,10 +17,27 @@ export async function getClient(): Promise<LanguageClient> {
   return clientPromise;
 }
 
+export interface PackageInfo {
+  path: string;
+  namespace: string;
+  name: string;
+  version: string;
+}
+
+export interface SymbolInfo {
+  name: string;
+  kind: string;
+  children: SymbolInfo[];
+}
+
 interface ResourceRoutes {
   "/symbols": any;
   "/preview/index.html": string;
-  "/dirs/local-packages": string;
+  "/dir/package": string;
+  "/dir/package/local": string;
+  "/package/by-namespace": PackageInfo[];
+  "/package/symbol": SymbolInfo[];
+  "/package/docs": string;
 }
 
 export const tinymist = {
@@ -43,8 +60,8 @@ export const tinymist = {
       arguments: args,
     });
   },
-  getResource<T extends keyof ResourceRoutes>(path: T) {
-    return tinymist.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path]);
+  getResource<T extends keyof ResourceRoutes>(path: T, ...args: any[]) {
+    return tinymist.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path, ...args]);
   },
   getWorkspaceLabels() {
     return tinymist.executeCommand<SymbolInformation[]>("tinymist.getWorkspaceLabels", []);
@@ -67,9 +84,9 @@ function probeEnvPath(configName: string, configPath?: string): string {
   const serverPaths: [string, string][] = configPath
     ? [[`\`${configName}\` (${configPath})`, configPath as string]]
     : [
-        ["Bundled", resolve(__dirname, binaryName)],
-        ["In PATH", binaryName],
-      ];
+      ["Bundled", resolve(__dirname, binaryName)],
+      ["In PATH", binaryName],
+    ];
 
   return tinymist.probePaths(serverPaths);
 }

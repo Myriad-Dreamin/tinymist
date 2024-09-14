@@ -1,3 +1,5 @@
+//! # Typlite Values
+
 use core::fmt;
 
 use crate::*;
@@ -88,6 +90,7 @@ impl<'a> Args<'a> {
     }
 }
 
+#[macro_export]
 macro_rules! get_pos_named {
     (
         $args:expr,
@@ -97,8 +100,9 @@ macro_rules! get_pos_named {
         $args.parse::<$ty>(raw)?
     }};
 }
-pub(crate) use get_pos_named;
+pub use get_pos_named;
 
+#[macro_export]
 macro_rules! get_named {
     (
         $args:expr,
@@ -128,7 +132,7 @@ macro_rules! get_named {
         }
     }};
 }
-pub(crate) use get_named;
+pub use get_named;
 
 /// Evaluate an expression.
 pub trait Eval<'a>: Sized {

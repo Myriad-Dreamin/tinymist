@@ -58,6 +58,10 @@ dashmap.workspace = true
 rustc-hash.workspace = true
 hashbrown.workspace = true
 triomphe.workspace = true
+base64.workspace = true
+typlite.workspace = true
+tinymist-world.workspace = true
+tinymist-analysis.workspace = true
 
 [dev-dependencies]
 once_cell.workspace = true

@@ -515,6 +515,7 @@ impl CompileConfig {
                 inputs: Arc::new(LazyHash::new(inputs)),
                 font: command.font,
                 creation_timestamp: command.creation_timestamp,
+                cert: command.certification,
             });
         }
 
@@ -628,36 +629,43 @@ impl CompileConfig {
         })
     }
 
+    /// Determines the font options.
+    pub fn determine_font_opts(&self) -> CompileFontArgs {
+        let mut opts = self.font_opts.clone();
+
+        if let Some(system_fonts) = self.system_fonts.or_else(|| {
+            self.typst_extra_args
+                .as_ref()
+                .map(|x| !x.font.ignore_system_fonts)
+        }) {
+            opts.ignore_system_fonts = !system_fonts;
+        }
+
+        let font_paths = (!self.font_paths.is_empty()).then_some(&self.font_paths);
+        let font_paths =
+            font_paths.or_else(|| self.typst_extra_args.as_ref().map(|x| &x.font.font_paths));
+        if let Some(paths) = font_paths {
+            opts.font_paths.clone_from(paths);
+        }
+
+        let root = OnceCell::new();
+        for path in opts.font_paths.iter_mut() {
+            if path.is_relative() {
+                if let Some(root) = root.get_or_init(|| self.determine_root(None)) {
+                    let p = std::mem::take(path);
+                    *path = root.join(p);
+                }
+            }
+        }
+
+        opts
+    }
+
     /// Determines the font resolver.
     pub fn determine_fonts(&self) -> Deferred<Arc<FontResolverImpl>> {
         // todo: on font resolving failure, downgrade to a fake font book
         let font = || {
-            let mut opts = self.font_opts.clone();
-
-            if let Some(system_fonts) = self.system_fonts.or_else(|| {
-                self.typst_extra_args
-                    .as_ref()
-                    .map(|x| x.font.ignore_system_fonts)
-            }) {
-                opts.ignore_system_fonts = !system_fonts;
-            }
-
-            let font_paths = (!self.font_paths.is_empty()).then_some(&self.font_paths);
-            let font_paths =
-                font_paths.or_else(|| self.typst_extra_args.as_ref().map(|x| &x.font.font_paths));
-            if let Some(paths) = font_paths {
-                opts.font_paths.clone_from(paths);
-            }
-
-            let root = OnceCell::new();
-            for path in opts.font_paths.iter_mut() {
-                if path.is_relative() {
-                    if let Some(root) = root.get_or_init(|| self.determine_root(None)) {
-                        let p = std::mem::take(path);
-                        *path = root.join(p);
-                    }
-                }
-            }
+            let opts = self.determine_font_opts();
 
             log::info!("creating SharedFontResolver with {opts:?}");
             Derived(Deferred::new(|| {
@@ -689,6 +697,12 @@ impl CompileConfig {
     /// Determines the creation timestamp.
     pub fn determine_creation_timestamp(&self) -> Option<chrono::DateTime<chrono::Utc>> {
         self.typst_extra_args.as_ref()?.creation_timestamp
+    }
+
+    /// Determines the certification path.
+    pub fn determine_certification_path(&self) -> Option<PathBuf> {
+        let extras = self.typst_extra_args.as_ref()?;
+        extras.cert.clone()
     }
 
     fn determine_user_inputs(&self) -> ImmutDict {
@@ -792,6 +806,8 @@ pub struct CompileExtraOpts {
     pub font: CompileFontArgs,
     /// The creation timestamp for various output.
     pub creation_timestamp: Option<chrono::DateTime<chrono::Utc>>,
+    /// Path to certification file
+    pub cert: Option<PathBuf>,
 }
 
 /// The path pattern that could be substituted.
@@ -954,6 +970,45 @@ mod tests {
         });
 
         config.update(&update).unwrap();
+    }
+
+    #[test]
+    fn test_font_opts() {
+        fn opts(update: Option<&JsonValue>) -> CompileFontArgs {
+            let mut config = Config::default();
+            if let Some(update) = update {
+                config.update(update).unwrap();
+            }
+
+            config.compile.determine_font_opts()
+        }
+
+        let font_opts = opts(None);
+        assert!(!font_opts.ignore_system_fonts);
+
+        let font_opts = opts(Some(&json!({})));
+        assert!(!font_opts.ignore_system_fonts);
+
+        let font_opts = opts(Some(&json!({
+            "typstExtraArgs": []
+        })));
+        assert!(!font_opts.ignore_system_fonts);
+
+        let font_opts = opts(Some(&json!({
+            "systemFonts": false,
+        })));
+        assert!(font_opts.ignore_system_fonts);
+
+        let font_opts = opts(Some(&json!({
+            "typstExtraArgs": ["--ignore-system-fonts"]
+        })));
+        assert!(font_opts.ignore_system_fonts);
+
+        let font_opts = opts(Some(&json!({
+            "systemFonts": true,
+            "typstExtraArgs": ["--ignore-system-fonts"]
+        })));
+        assert!(!font_opts.ignore_system_fonts);
     }
 
     #[test]

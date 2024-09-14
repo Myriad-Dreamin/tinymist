@@ -141,6 +141,7 @@ insta = { version = "1.39", features = ["glob"] }
 typst-preview = { path = "./crates/typst-preview/" }
 tinymist-assets = { version = "0.11.20" }
 tinymist = { path = "./crates/tinymist/" }
+tinymist-analysis = { path = "./crates/tinymist-analysis/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
 tinymist-world = { path = "./crates/tinymist-world/" }
 tinymist-render = { path = "./crates/tinymist-render/" }

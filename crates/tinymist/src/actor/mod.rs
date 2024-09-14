@@ -119,11 +119,12 @@ impl LanguageState {
         let entry_ = entry.clone();
         let compile_handle = handle.clone();
         let cache = self.cache.clone();
+        let cert_path = self.compile_config().determine_certification_path();
 
         self.client.handle.spawn_blocking(move || {
             // Create the world
             let font_resolver = font_resolver.wait().clone();
-            let verse = LspUniverseBuilder::build(entry_.clone(), font_resolver, inputs)
+            let verse = LspUniverseBuilder::build(entry_.clone(), font_resolver, inputs, cert_path)
                 .expect("incorrect options");
 
             // Create the actor

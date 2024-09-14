@@ -2,7 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import * as path from "path";
-import { DisposeList, getSensibleTextEditorColumn, getTargetViewColumn } from "./util";
+import { DisposeList, getSensibleTextEditorColumn, getTargetViewColumn } from "../util";
 import {
   launchPreviewCompat,
   previewActiveCompat as previewPostActivateCompat,
@@ -18,8 +18,8 @@ import {
   commandScrollPreview,
   commandStartPreview,
   registerPreviewTaskDispose,
-} from "./extension";
-import { isGitpod, translateGitpodURL } from "./gitpod";
+} from "../extension";
+import { isGitpod, translateGitpodURL } from "../gitpod";
 
 function translateExternalURL(urlstr: string): string {
   if (isGitpod()) {
@@ -172,14 +172,14 @@ export async function launchPreviewInWebView({
     webviewPanel !== undefined
       ? webviewPanel
       : vscode.window.createWebviewPanel(
-          "typst-preview", // 标识符
-          `${basename} (Preview)`, // 面板标题
-          getTargetViewColumn(activeEditor.viewColumn),
-          {
-            enableScripts: true, // 启用 JS
-            retainContextWhenHidden: true,
-          },
-        );
+        "typst-preview", // 标识符
+        `${basename} (Preview)`, // 面板标题
+        getTargetViewColumn(activeEditor.viewColumn),
+        {
+          enableScripts: true, // 启用 JS
+          retainContextWhenHidden: true,
+        },
+      );
 
   // todo: bindDocument.onDidDispose, but we did not find a similar way.
   panel.onDidDispose(async () => {
@@ -454,12 +454,12 @@ async function scrollPreviewPanel(taskId: string, scrollRequest: DocRequests) {
   commandScrollPreview(taskId, scrollRequest);
 }
 
-let resolveContentPreviewProvider: (value: ContentPreviewProvider) => void = () => {};
+let resolveContentPreviewProvider: (value: ContentPreviewProvider) => void = () => { };
 export let contentPreviewProvider = new Promise<ContentPreviewProvider>((resolve) => {
   resolveContentPreviewProvider = resolve;
 });
 
-let resolveOutlineProvider: (value: OutlineProvider) => void = () => {};
+let resolveOutlineProvider: (value: OutlineProvider) => void = () => { };
 export let outlineProvider = new Promise<OutlineProvider>((resolve) => {
   resolveOutlineProvider = resolve;
 });
@@ -484,7 +484,7 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
     private readonly context: vscode.ExtensionContext,
     private readonly extensionUri: vscode.Uri,
     private readonly htmlContent: string,
-  ) {}
+  ) { }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -601,7 +601,7 @@ interface OutlineItemData {
 }
 
 class OutlineProvider implements vscode.TreeDataProvider<OutlineItem> {
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(private readonly _extensionUri: vscode.Uri) { }
 
   private _onDidChangeTreeData: vscode.EventEmitter<OutlineItem | undefined | void> =
     new vscode.EventEmitter<OutlineItem | undefined | void>();

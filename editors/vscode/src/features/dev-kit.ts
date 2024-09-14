@@ -1,15 +1,15 @@
 import * as vscode from "vscode";
 
-export function devKitActivate(context: vscode.ExtensionContext) {
+export function devKitFeatureActivate(context: vscode.ExtensionContext) {
   vscode.commands.executeCommand("setContext", "ext.tinymistDevKit", true);
 
-  const devKitProvider = new DevKitProvider();
+  const devKitProvider = new DevKitViewProvider();
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("tinymist.dev-kit", devKitProvider),
   );
 }
 
-class DevKitProvider implements vscode.TreeDataProvider<DevKitItem> {
+class DevKitViewProvider implements vscode.TreeDataProvider<DevKitItem> {
   constructor() {}
 
   refresh(): void {}

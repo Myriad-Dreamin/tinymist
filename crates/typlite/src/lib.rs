@@ -1,10 +1,11 @@
 //! # Typlite
 
 mod error;
-mod library;
+pub mod library;
 pub mod scopes;
-mod value;
+pub mod value;
 
+use std::fmt::Write;
 use std::sync::Arc;
 
 pub use error::*;
@@ -30,6 +31,10 @@ pub use tinymist_world::CompileOnceArgs;
 pub struct Typlite {
     /// The universe to use for the conversion.
     world: Arc<LspWorld>,
+    /// library to use for the conversion.
+    library: Option<Arc<Scopes<Value>>>,
+    /// Documentation style to use for annotating the document.
+    do_annotate: bool,
     /// Whether to enable GFM (GitHub Flavored Markdown) features.
     gfm: bool,
 }
@@ -40,11 +45,31 @@ impl Typlite {
     /// This is useful when you have a [`Source`] instance and you can avoid
     /// reparsing the content.
     pub fn new(world: Arc<LspWorld>) -> Self {
-        Self { world, gfm: false }
+        Self {
+            world,
+            library: None,
+            do_annotate: false,
+            gfm: false,
+        }
+    }
+
+    /// Set library to use for the conversion.
+    pub fn with_library(mut self, library: Arc<Scopes<Value>>) -> Self {
+        self.library = Some(library);
+        self
+    }
+
+    /// Annotate the elements for identification.
+    pub fn annotate_elements(mut self, do_annotate: bool) -> Self {
+        self.do_annotate = do_annotate;
+        self
     }
 
     /// Convert the content to a markdown string.
     pub fn convert(self) -> Result<EcoString> {
+        static DEFAULT_LIB: std::sync::LazyLock<Arc<Scopes<Value>>> =
+            std::sync::LazyLock::new(|| Arc::new(library::library()));
+
         let main = self.world.entry_state().main();
         let current = main.ok_or("no main file in workspace")?;
         let world = self.world;
@@ -56,7 +81,13 @@ impl Typlite {
         let worker = TypliteWorker {
             current,
             gfm: self.gfm,
-            scopes: Arc::new(library::library()),
+            do_annotate: self.do_annotate,
+            list_depth: 0,
+            scopes: self
+                .library
+                .as_ref()
+                .unwrap_or_else(|| &*DEFAULT_LIB)
+                .clone(),
             world,
         };
 
@@ -64,12 +95,15 @@ impl Typlite {
     }
 }
 
+/// Typlite worker
 #[derive(Clone)]
-struct TypliteWorker {
+pub struct TypliteWorker {
     current: FileId,
     gfm: bool,
+    do_annotate: bool,
     scopes: Arc<Scopes<Value>>,
     world: Arc<LspWorld>,
+    list_depth: usize,
 }
 
 impl TypliteWorker {
@@ -110,7 +144,8 @@ impl TypliteWorker {
             }
 
             // Text nodes
-            Text | Space | Linebreak | Parbreak => Self::str(node),
+            Text | Space | Parbreak => Self::str(node),
+            Linebreak => Self::char('\n'),
 
             // Semantic nodes
             Escape => Self::escape(node),
@@ -395,7 +430,22 @@ impl TypliteWorker {
     }
 
     fn list_item(&mut self, node: &SyntaxNode) -> Result<Value> {
-        self.reduce(node)
+        let mut s = EcoString::new();
+
+        let list_item = node.cast::<ast::ListItem>().unwrap();
+
+        s.push_str("- ");
+        if self.do_annotate {
+            let _ = write!(s, "<!-- typlite:begin:list-item {} -->", self.list_depth);
+            self.list_depth += 1;
+        }
+        s.push_str(&Self::value(self.eval(list_item.body().to_untyped())?));
+        if self.do_annotate {
+            self.list_depth -= 1;
+            let _ = write!(s, "<!-- typlite:end:list-item {} -->", self.list_depth);
+        }
+
+        Ok(Value::Content(s))
     }
 
     fn enum_item(&mut self, node: &SyntaxNode) -> Result<Value> {
@@ -461,7 +511,7 @@ impl TypliteWorker {
 
         let path = include.source();
         let src =
-            tinymist_query::syntax::find_source_by_expr(self.world.as_ref(), self.current, path)
+            tinymist_analysis::import::find_source_by_expr(self.world.as_ref(), self.current, path)
                 .ok_or_else(|| format!("failed to find source on path {path:?}"))?;
 
         self.clone().sub_file(src).map(Value::Content)

@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Context};
-use ecow::{eco_vec, EcoVec};
+use ecow::{eco_vec, EcoString, EcoVec};
 use log::info;
 use lsp_types::SymbolKind;
 use serde::{Deserialize, Serialize};
@@ -30,7 +30,7 @@ pub(crate) fn get_lexical_hierarchy(
     };
     worker.stack.push((
         LexicalInfo {
-            name: "deadbeef".to_string(),
+            name: "deadbeef".into(),
             kind: LexicalKind::Heading(-1),
             range: 0..0,
         },
@@ -223,7 +223,7 @@ impl LexicalScopeKind {
 
 #[derive(Debug, Clone, Hash)]
 pub(crate) struct LexicalInfo {
-    pub name: String,
+    pub name: EcoString,
     pub kind: LexicalKind,
     pub range: Range<usize>,
 }
@@ -451,14 +451,14 @@ impl LexicalHierarchyWorker {
                         let symbol = if self.g == LexicalScopeKind::DefUse {
                             // DefUse mode does not nest symbols inside of functions
                             LexicalInfo {
-                                name: String::new(),
+                                name: EcoString::new(),
                                 kind: LexicalKind::Block,
                                 range: body.range(),
                             }
                         } else if current == self.stack.last().unwrap().1.len() {
                             // Closure has no updated symbol stack
                             LexicalInfo {
-                                name: "<anonymous>".to_string(),
+                                name: "<anonymous>".into(),
                                 kind: LexicalKind::function(),
                                 range: node.range(),
                             }
@@ -495,9 +495,9 @@ impl LexicalHierarchyWorker {
                     let target_name_node = node.find(target_name.span()).context("no pos")?;
 
                     self.push_leaf(LexicalInfo {
-                        name: origin_name.get().to_string(),
+                        name: origin_name.get().clone(),
                         kind: LexicalKind::module_import_alias(IdentRef {
-                            name: target_name.get().to_string(),
+                            name: target_name.get().clone(),
                             range: target_name_node.range(),
                         }),
                         range: origin_name_node.range(),
@@ -590,19 +590,19 @@ impl LexicalHierarchyWorker {
                 let ast_node = node
                     .cast::<ast::Label>()
                     .ok_or_else(|| anyhow!("cast to ast node failed: {:?}", node))?;
-                let name = ast_node.get().to_string();
+                let name = ast_node.get().into();
 
                 (name, LexicalKind::label())
             }
             SyntaxKind::RefMarker if self.g.affect_ref() => {
-                let name = node.text().trim_start_matches('@').to_owned();
+                let name = node.text().trim_start_matches('@').into();
                 (name, LexicalKind::label_ref())
             }
             SyntaxKind::Ident if self.g.affect_symbol() => {
                 let ast_node = node
                     .cast::<ast::Ident>()
                     .ok_or_else(|| anyhow!("cast to ast node failed: {:?}", node))?;
-                let name = ast_node.get().to_string();
+                let name = ast_node.get().clone();
                 let kind = match self.ident_context {
                     IdentContext::Ref if self.g.affect_ref() => LexicalKind::val_ref(),
                     IdentContext::Func => LexicalKind::function(),
@@ -616,10 +616,10 @@ impl LexicalHierarchyWorker {
             SyntaxKind::Equation | SyntaxKind::Raw | SyntaxKind::BlockComment
                 if self.g.affect_markup() =>
             {
-                (String::new(), LexicalKind::Block)
+                (EcoString::new(), LexicalKind::Block)
             }
             SyntaxKind::CodeBlock | SyntaxKind::ContentBlock if self.g.affect_block() => {
-                (String::new(), LexicalKind::Block)
+                (EcoString::new(), LexicalKind::Block)
             }
             SyntaxKind::Parenthesized
             | SyntaxKind::Destructuring
@@ -628,7 +628,7 @@ impl LexicalHierarchyWorker {
             | SyntaxKind::Dict
                 if self.g.affect_expr() =>
             {
-                (String::new(), LexicalKind::Block)
+                (EcoString::new(), LexicalKind::Block)
             }
             SyntaxKind::ModuleImport if self.g.affect_import() => {
                 let src = node
@@ -639,23 +639,23 @@ impl LexicalHierarchyWorker {
                 match src {
                     ast::Expr::Str(e) => {
                         let e = e.get();
-                        (String::new(), LexicalKind::module(e.as_ref().into()))
+                        (EcoString::new(), LexicalKind::module(e.as_ref().into()))
                     }
                     src => {
                         let e = node
                             .find(src.span())
                             .ok_or_else(|| anyhow!("find expression failed: {:?}", src))?;
                         let e = IdentRef {
-                            name: String::new(),
+                            name: EcoString::new(),
                             range: e.range(),
                         };
 
-                        (String::new(), LexicalKind::module_expr(e.into()))
+                        (EcoString::new(), LexicalKind::module_expr(e.into()))
                     }
                 }
             }
             SyntaxKind::Markup => {
-                let name = node.get().to_owned().into_text().to_string();
+                let name = node.get().to_owned().into_text();
                 if name.is_empty() {
                     return Ok(None);
                 }
@@ -703,7 +703,7 @@ impl LexicalHierarchyWorker {
             //                       ^^^
             let import_node = node.find(name.span()).context("no pos")?;
             self.push_leaf(LexicalInfo {
-                name: name.get().to_string(),
+                name: name.get().clone(),
                 kind: LexicalKind::module_as(),
                 range: import_node.range(),
             });
@@ -721,14 +721,14 @@ impl LexicalHierarchyWorker {
                         let spec = e
                             .parse::<PackageSpec>()
                             .map_err(|e| anyhow!("parse package spec failed: {:?}", e))?;
-                        spec.name.to_string()
+                        spec.name.clone()
                     } else {
                         let e = Path::new(e.as_ref())
                             .file_name()
                             .context("no file name")?
                             .to_string_lossy();
                         let e = e.as_ref();
-                        e.strip_suffix(".typ").context("no suffix")?.to_owned()
+                        e.strip_suffix(".typ").context("no suffix")?.into()
                     };
 
                     // return (e == name).then_some(ImportRef::Path(v));
@@ -757,7 +757,7 @@ impl LexicalHierarchyWorker {
                     .context("no star")?;
                 let v = node.find(wildcard.span()).context("no pos")?;
                 self.push_leaf(LexicalInfo {
-                    name: "*".to_string(),
+                    name: "*".into(),
                     kind: LexicalKind::module_star(),
                     range: v.range(),
                 });

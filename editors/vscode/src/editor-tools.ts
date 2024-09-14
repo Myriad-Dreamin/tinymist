@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { readFile, writeFile } from "fs/promises";
-import { getFocusingFile, getLastFocusingDoc } from "./extension";
 import { tinymist } from "./lsp";
+import { extensionState, ExtensionContext } from "./state";
 
-async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
+async function loadHTMLFile(context: ExtensionContext, relativePath: string) {
   const filePath = path.resolve(context.extensionPath, relativePath);
   const fileContents = await readFile(filePath, "utf8");
   return fileContents;
@@ -25,7 +25,7 @@ export interface PackageData {
   };
 }
 
-export function getUserPackageData(context: vscode.ExtensionContext) {
+export function getUserPackageData(context: ExtensionContext) {
   const defaultPackageData: Versioned<PackageData> = {
     version: USER_PACKAGE_VERSION,
     data: {},
@@ -106,7 +106,7 @@ export const fontsExportDefaultConfigure: fontsExportConfigure = {
   },
 };
 
-export function getFontsExportConfigure(context: vscode.ExtensionContext) {
+export function getFontsExportConfigure(context: ExtensionContext) {
   const defaultConfigure: Versioned<fontsExportConfigure> = {
     version: FONTS_EXPORT_CONFIGURE_VERSION,
     data: fontsExportDefaultConfigure,
@@ -120,14 +120,19 @@ export function getFontsExportConfigure(context: vscode.ExtensionContext) {
   return configure;
 }
 
-export type EditorToolName = "template-gallery" | "tracing" | "summary" | "symbol-view";
-export async function activateEditorTool(context: vscode.ExtensionContext, tool: EditorToolName) {
+const Standalone: Partial<Record<EditorToolName, boolean>> = {
+  "symbol-view": true,
+} as const;
+
+export type EditorToolName = "template-gallery" | "tracing" | "summary" | "symbol-view" | "docs";
+export async function editorTool(context: ExtensionContext, tool: EditorToolName, opts?: any) {
   // Create and show a new WebView
   const title = {
     "template-gallery": "Template Gallery",
     "symbol-view": "Symbol View",
     tracing: "Tracing",
     summary: "Summary",
+    docs: `@${opts?.pkg?.namespace}/${opts?.pkg?.name}:${opts?.pkg?.version} (Docs)`,
   }[tool];
   const panel = vscode.window.createWebviewPanel(
     `tinymist-${tool}`,
@@ -139,16 +144,17 @@ export async function activateEditorTool(context: vscode.ExtensionContext, tool:
     {
       enableScripts: true,
       retainContextWhenHidden: true,
+      enableFindWidget: tool === "docs",
     },
   );
 
-  await activateEditorToolAt(context, tool, panel);
+  await editorToolAt(context, tool, panel, opts);
 }
 
 export class SymbolViewProvider implements vscode.WebviewViewProvider {
   static readonly Name = "tinymist.side-symbol-view";
 
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(private context: ExtensionContext) {}
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -160,14 +166,15 @@ export class SymbolViewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
     };
 
-    activateEditorToolAt(this.context, "symbol-view", webviewView);
+    editorToolAt(this.context, "symbol-view", webviewView);
   }
 }
 
-async function activateEditorToolAt(
-  context: vscode.ExtensionContext,
-  tool: "template-gallery" | "tracing" | "summary" | "symbol-view",
+async function editorToolAt(
+  context: ExtensionContext,
+  tool: EditorToolName,
   panel: vscode.WebviewView | vscode.WebviewPanel,
+  opts?: any,
 ) {
   const dispose = () => {
     // if has dispose method
@@ -220,7 +227,7 @@ async function activateEditorToolAt(
         break;
       }
       case "editText": {
-        const activeDocument = getLastFocusingDoc();
+        const activeDocument = extensionState.getFocusingDoc();
         if (!activeDocument) {
           await vscode.window.showErrorMessage("No focusing document");
           return;
@@ -333,7 +340,8 @@ async function activateEditorToolAt(
     disposed = true;
   });
 
-  let html = await loadHTMLFile(context, "./out/editor-tools/index.html");
+  const appDir = Standalone[tool] ? tool : "default";
+  let html = await loadHTMLFile(context, `./out/editor-tools/${appDir}/index.html`);
   // packageData
 
   html = html.replace(
@@ -350,7 +358,7 @@ async function activateEditorToolAt(
       html = html.replace(":[[preview:FavoritePlaceholder]]:", btoa(packageData));
       break;
     case "tracing": {
-      const focusingFile = getFocusingFile();
+      const focusingFile = extensionState.getFocusingFile();
       if (focusingFile === undefined) {
         await vscode.window.showErrorMessage("No focusing typst file");
         return;
@@ -406,6 +414,10 @@ async function activateEditorToolAt(
       html = html.replace(":[[preview:SymbolInformation]]:", btoa(symbolInfo));
       break;
     }
+    case "docs": {
+      html = html.replace(":[[preview:DocContent]]:", btoa(encodeURIComponent(opts.content)));
+      break;
+    }
   }
 
   panel.webview.html = html;
@@ -420,7 +432,7 @@ async function fetchSummaryInfo(): Promise<[any | undefined, any | undefined]> {
   let res: [any | undefined, any | undefined] = [undefined, undefined];
 
   for (const to of waitTimeList) {
-    const focusingFile = getFocusingFile();
+    const focusingFile = extensionState.getFocusingFile();
     if (focusingFile === undefined) {
       await vscode.window.showErrorMessage("No focusing typst file");
       return res;

@@ -113,7 +113,7 @@ fn calc_folding_range(
             end_line: rng.end.line,
             end_character: Some(rng.end.character),
             kind: None,
-            collapsed_text: Some(e.info.name.clone()),
+            collapsed_text: Some(e.info.name.to_string()),
         };
 
         let next_start = if is_not_last_range {

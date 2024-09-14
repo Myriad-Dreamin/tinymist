@@ -22,9 +22,19 @@ log.workspace = true
 
 reflexo-typst.workspace = true
 typst.workspace = true
+typst-shim = { workspace = true }
 
 tinymist-assets = { workspace = true }
 typst-assets = { workspace = true, features = ["fonts"] }
+
+dirs.workspace = true
+parking_lot.workspace = true
+flate2 = "1"
+tar = "0.4"
+reqwest = "^0.11"
+
+[features]
+no-content-hint = ["reflexo-typst/no-content-hint"]
 
 [lints]
 workspace = true

@@ -9,17 +9,21 @@ pub use reflexo_typst::{entry::*, font, vfs, EntryOpts, EntryState};
 use std::path::Path;
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
 
-use ::typst::utils::LazyHash;
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use clap::{builder::ValueParser, ArgAction, Parser};
 use reflexo_typst::error::prelude::*;
 use reflexo_typst::font::system::SystemFontSearcher;
 use reflexo_typst::foundations::{Str, Value};
-use reflexo_typst::package::http::HttpRegistry;
 use reflexo_typst::vfs::{system::SystemAccessModel, Vfs};
-use reflexo_typst::{SystemCompilerFeat, TypstDict, TypstSystemUniverse, TypstSystemWorld};
+use reflexo_typst::TypstDict;
 use serde::{Deserialize, Serialize};
+use typst_shim::utils::LazyHash;
+
+pub mod https;
+use https::{
+    HttpsRegistry, SystemCompilerFeatExtend, TypstSystemUniverseExtend, TypstSystemWorldExtend,
+};
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
@@ -78,6 +82,11 @@ pub struct CompileOnceArgs {
         hide(true),
     )]
     pub creation_timestamp: Option<DateTime<Utc>>,
+
+    /// Path to CA certificate file for network access, especially for
+    /// downloading typst packages.
+    #[clap(long = "cert", env = "TYPST_CERT", value_name = "CERT_PATH")]
+    pub certification: Option<PathBuf>,
 }
 
 impl CompileOnceArgs {
@@ -90,9 +99,15 @@ impl CompileOnceArgs {
             .iter()
             .map(|(k, v)| (Str::from(k.as_str()), Value::Str(Str::from(v.as_str()))))
             .collect();
+        let cert_path = self.certification.clone();
 
-        LspUniverseBuilder::build(entry, Arc::new(fonts), Arc::new(LazyHash::new(inputs)))
-            .context("failed to create universe")
+        LspUniverseBuilder::build(
+            entry,
+            Arc::new(fonts),
+            Arc::new(LazyHash::new(inputs)),
+            cert_path,
+        )
+        .context("failed to create universe")
     }
 
     /// Get the entry options from the arguments.
@@ -136,11 +151,11 @@ impl CompileOnceArgs {
 }
 
 /// Compiler feature for LSP universe and worlds.
-pub type LspCompilerFeat = SystemCompilerFeat;
+pub type LspCompilerFeat = SystemCompilerFeatExtend;
 /// LSP universe that spawns LSP worlds.
-pub type LspUniverse = TypstSystemUniverse;
+pub type LspUniverse = TypstSystemUniverseExtend;
 /// LSP world.
-pub type LspWorld = TypstSystemWorld;
+pub type LspWorld = TypstSystemWorldExtend;
 /// Immutable prehashed reference to dictionary.
 pub type ImmutDict = Arc<LazyHash<TypstDict>>;
 
@@ -154,12 +169,13 @@ impl LspUniverseBuilder {
         entry: EntryState,
         font_resolver: Arc<FontResolverImpl>,
         inputs: ImmutDict,
+        cert_path: Option<PathBuf>,
     ) -> ZResult<LspUniverse> {
         Ok(LspUniverse::new_raw(
             entry,
             Some(inputs),
             Vfs::new(SystemAccessModel {}),
-            HttpRegistry::default(),
+            HttpsRegistry::new(cert_path),
             font_resolver,
         ))
     }

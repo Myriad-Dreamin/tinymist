@@ -1,0 +1,105 @@
+@import url("https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,700;0,900;1,300;1,700&display=swap");
+
+.tinymist-docs {
+  --mainLight: hsl(250, 68%, 74%);
+  --textDetailAccent: var(--mainLight);
+  font-family:
+    Merriweather,
+    serif,
+    "Inter var experimental",
+    "Inter var",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    "Fira Sans",
+    "Droid Sans",
+    "Helvetica Neue",
+    sans-serif;
+}
+
+.tinymist-docs code {
+  font-family: Menlo, Monaco, "JetBrains Mono", "Fira Code", Consolas,
+    "Courier New", monospace;
+}
+
+.tinymist-docs h1 {
+  font-size: 3em;
+}
+
+.tinymist-docs h2 {
+  font-size: 1.7em;
+  margin-block-start: 1em;
+  margin-block-end: 0.83em;
+}
+
+.tinymist-docs h3 {
+  font-size: 1.17em;
+  margin-block-start: 1.17em;
+  margin-block-end: 0.83em;
+}
+
+.tinymist-docs .detail-header {
+  margin: 1em 0;
+  margin-top: 1.5em;
+  padding: 0.5em 1em;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid var(--textDetailAccent);
+  font-size: 1em;
+  position: relative;
+}
+
+.tinymist-docs .detail-header h3.doc-symbol-name {
+  font-size: 1em;
+  font-weight: 700;
+  margin: 0;
+}
+
+
+.tinymist-docs .detail-header .doc-param-title {
+  font-size: 1em;
+  font-weight: 600;
+  margin-block-start: 1.17em;
+  margin-block-end: 0.5em;
+}
+.tinymist-docs .type-int {
+  color: #e7d9ff;
+}
+
+.tinymist-docs .type-float {
+  color: #e7d9ff;
+}
+
+.tinymist-docs .type-builtin {
+  color: #d2a8ff;
+}
+
+.tinymist-docs .type-none {
+  color: #ff6d00;
+}
+
+.tinymist-docs .code-kw,
+.tinymist-docs .type-auto {
+  color: #ff6d00;
+}
+
+.tinymist-docs .code-func {
+  color: #79c0ff;
+}
+
+.tinymist-docs .code-op {
+  color: #79c0ff;
+}
+
+.tinymist-docs .type-inferred-as,
+.tinymist-docs .code-kw.type-inferred {
+  transition: background-color 0.1s;
+}
+
+.tinymist-docs .type-inferred-as:hover,
+.tinymist-docs .code-kw.type-inferred:hover {
+  background-color: #344134;
+}

@@ -14,7 +14,7 @@ use reflexo::hash::{hash128, FxDashMap};
 use reflexo::{debug_loc::DataSource, ImmutPath};
 use typst::eval::Eval;
 use typst::foundations::{self, Func, Styles};
-use typst::syntax::{FileId, LinkedNode, Side, SyntaxNode};
+use typst::syntax::{FileId, LinkedNode, SyntaxNode};
 use typst::{
     diag::{eco_format, FileError, FileResult, PackageError},
     foundations::Bytes,
@@ -23,6 +23,7 @@ use typst::{
 };
 use typst::{foundations::Value, model::Document, syntax::ast, text::Font};
 use typst::{layout::Position, syntax::FileId as TypstFileId};
+use typst_shim::syntax::LinkedNodeExt;
 
 use super::{
     analyze_bib, analyze_expr_, analyze_import_, post_type_check, BibInfo, DefUseInfo,
@@ -171,6 +172,11 @@ pub trait AnalysisResources {
     /// Resolve extra font information.
     fn font_info(&self, _font: Font) -> Option<Arc<DataSource>> {
         None
+    }
+
+    /// Get the local packages and their descriptions.
+    fn local_packages(&self) -> EcoVec<PackageSpec> {
+        EcoVec::new()
     }
 
     /// Resolve telescope image at the given position.
@@ -367,7 +373,7 @@ impl<'w> AnalysisContext<'w> {
         let offset = self.to_typst_pos(position, source)?;
         let cursor = ceil_char_boundary(source.text(), offset + shift);
 
-        let node = LinkedNode::new(source.root()).leaf_at(cursor, Side::Before)?;
+        let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
         Some((cursor, get_deref_target(node, cursor)))
     }
 
@@ -595,32 +601,7 @@ impl<'w> AnalysisContext<'w> {
     }
 
     pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
-        use comemo::Track;
-        use typst::engine::*;
-        use typst::eval::*;
-        use typst::foundations::*;
-        use typst::introspection::*;
-
-        let introspector = Introspector::default();
-        let traced = Traced::default();
-        let mut sink = Sink::new();
-        let engine = Engine {
-            world: self.world().track(),
-            introspector: introspector.track(),
-            traced: traced.track(),
-            sink: sink.track_mut(),
-            route: Route::default(),
-        };
-
-        let context = Context::none();
-        let mut vm = Vm::new(
-            engine,
-            context.track(),
-            Scopes::new(Some(self.world().library())),
-            Span::detached(),
-        );
-
-        f(&mut vm)
+        crate::upstream::with_vm(self.world(), f)
     }
 
     pub(crate) fn const_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
@@ -650,17 +631,26 @@ impl<'w> AnalysisContext<'w> {
         Some(analyze_dyn_signature(self, func.clone()).type_sig())
     }
 
-    pub(crate) fn user_type_of_def(&mut self, source: &Source, def: &DefinitionLink) -> Option<Ty> {
-        let def_at = def.def_at.clone()?;
+    pub(crate) fn user_type_of_ident(
+        &mut self,
+        source: &Source,
+        def_fid: TypstFileId,
+        def_ident: &IdentRef,
+    ) -> Option<Ty> {
         let ty_chk = self.type_check(source.clone())?;
         let def_use = self.def_use(source.clone())?;
 
+        let (def_id, _) = def_use.get_def(def_fid, def_ident)?;
+        ty_chk.type_of_def(def_id)
+    }
+
+    pub(crate) fn user_type_of_def(&mut self, source: &Source, def: &DefinitionLink) -> Option<Ty> {
+        let def_at = def.def_at.clone()?;
         let def_ident = IdentRef {
             name: def.name.clone(),
             range: def_at.1,
         };
-        let (def_id, _) = def_use.get_def(def_at.0, &def_ident)?;
-        ty_chk.type_of_def(def_id)
+        self.user_type_of_ident(source, def_at.0, &def_ident)
     }
 
     pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {

@@ -1,6 +1,6 @@
 //! <https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter>
 
-use typst::syntax::Side;
+use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{prelude::*, SyntaxRequest};
 
@@ -34,7 +34,7 @@ impl SyntaxRequest for OnEnterRequest {
     ) -> Option<Self::Response> {
         let root = LinkedNode::new(source.root());
         let cursor = lsp_to_typst::position(self.position, position_encoding, source)?;
-        let leaf = root.leaf_at(cursor, Side::Before)?;
+        let leaf = root.leaf_at_compat(cursor)?;
 
         let worker = OnEnterWorker {
             source,

@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use ecow::EcoVec;
 use serde::Serialize;
 use typst::{
@@ -209,6 +211,29 @@ impl<'a> DefTarget<'a> {
         match self {
             DefTarget::Let(node) => node,
             DefTarget::Import(node) => node,
+        }
+    }
+
+    pub fn name_range(&self) -> Option<Range<usize>> {
+        match self {
+            DefTarget::Let(node) => {
+                let lb: ast::LetBinding<'_> = node.cast()?;
+                let names = match lb.kind() {
+                    ast::LetBindingKind::Closure(name) => node.find(name.span())?,
+                    ast::LetBindingKind::Normal(ast::Pattern::Normal(name)) => {
+                        node.find(name.span())?
+                    }
+                    _ => return None,
+                };
+
+                Some(names.range())
+            }
+            DefTarget::Import(_node) => {
+                // let ident = node.cast::<ast::ImportItem>()?;
+                // Some(ident.span().into())
+                // todo: implement this
+                None
+            }
         }
     }
 }
@@ -589,7 +614,8 @@ fn find_param_index(deciding: &LinkedNode, params: &[ParamInfo], args: ast::Args
 mod tests {
     use super::*;
     use insta::assert_snapshot;
-    use typst::syntax::{is_newline, Side, Source};
+    use typst::syntax::{is_newline, Source};
+    use typst_shim::syntax::LinkedNodeExt;
 
     fn map_base(source: &str, mapper: impl Fn(&LinkedNode, usize) -> char) -> String {
         let source = Source::detached(source.to_owned());
@@ -617,7 +643,7 @@ mod tests {
 
     fn map_deref(source: &str) -> String {
         map_base(source, |root, cursor| {
-            let node = root.leaf_at(cursor, Side::Before);
+            let node = root.leaf_at_compat(cursor);
             let kind = node.and_then(|node| get_deref_target(node, cursor));
             match kind {
                 Some(DerefTarget::VarAccess(..)) => 'v',
@@ -634,7 +660,7 @@ mod tests {
 
     fn map_check(source: &str) -> String {
         map_base(source, |root, cursor| {
-            let node = root.leaf_at(cursor, Side::Before);
+            let node = root.leaf_at_compat(cursor);
             let kind = node.and_then(|node| get_check_target(node));
             match kind {
                 Some(CheckTarget::Param { .. }) => 'p',
