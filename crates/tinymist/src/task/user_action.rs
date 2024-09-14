@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_lsp::{just_future, LspClient, SchedulableResponse};
 use tinymist_world::LspWorld;
-use typst::{eval::Tracer, syntax::Span, World};
+use typst::{engine::Sink, foundations::IntoValue, syntax::Span, utils::LazyHash, World};
 
 use crate::{internal_error, LanguageState};
 
@@ -162,7 +162,7 @@ async fn trace_main(
     req_id: RequestId,
 ) -> ! {
     let mut env = CompileEnv {
-        tracer: Some(Tracer::default()),
+        sink: Some(Sink::default()),
         ..Default::default()
     };
     typst_timing::enable();
@@ -177,7 +177,7 @@ async fn trace_main(
 
     let timings = writer.into_inner().unwrap();
 
-    let warnings = env.tracer.map(|e| e.warnings());
+    let warnings = env.sink.map(|e| e.warnings());
 
     let diagnostics = state.primary().handle.run_analysis(w, |ctx| {
         tinymist_query::convert_diagnostics(ctx, warnings.iter().flatten().chain(errors.iter()))

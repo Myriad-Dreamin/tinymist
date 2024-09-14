@@ -193,7 +193,7 @@ fn star_tooltip(
 
     let mut results = vec![];
 
-    let mut names = scope.iter().map(|(name, _)| name).collect::<Vec<_>>();
+    let mut names = scope.iter().map(|(name, _, _)| name).collect::<Vec<_>>();
     names.sort();
     let items = typst::foundations::repr::separated_list(&names, "and");
 
