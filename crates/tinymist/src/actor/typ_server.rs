@@ -441,8 +441,8 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         } else {
             self.watch_feature_set.clone()
         });
-        if env.tracer.is_none() {
-            env.tracer = Some(Default::default());
+        if env.sink.is_none() {
+            env.sink = Some(Default::default());
         }
         CompileSnapshot {
             world: Arc::new(world.clone()),
@@ -514,7 +514,7 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
             let rep;
             match &compiled.doc {
                 Ok(..) => {
-                    let warnings = compiled.env.tracer.as_ref().unwrap().clone().warnings();
+                    let warnings = compiled.env.sink.as_ref().unwrap().clone().warnings();
                     if warnings.is_empty() {
                         rep = CompileReport::CompileSuccess(id, warnings, elapsed);
                     } else {

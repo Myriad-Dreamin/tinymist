@@ -8,7 +8,6 @@ use anyhow::bail;
 use clap::Parser;
 use clap_builder::CommandFactory;
 use clap_complete::generate;
-use comemo::Prehashed;
 use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;
@@ -16,7 +15,7 @@ use reflexo_typst::{typst::prelude::EcoVec, CompileEnv, Compiler, TaskInputs, Ty
 use serde_json::Value as JsonValue;
 use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClientRoot};
 use tinymist::{CompileConfig, Config, LanguageState, LspWorld, RegularInit, SuperInit};
-use typst::{eval::Tracer, foundations::IntoValue, syntax::Span, World};
+use typst::{engine::Sink, foundations::IntoValue, syntax::Span, utils::LazyHash, World};
 
 use crate::args::*;
 
@@ -138,7 +137,7 @@ pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
         bail!("input file is not within the root path: {input:?} not in {root_path:?}");
     }
 
-    let inputs = Arc::new(Prehashed::new(if args.compile.inputs.is_empty() {
+    let inputs = Arc::new(LazyHash::new(if args.compile.inputs.is_empty() {
         TypstDict::default()
     } else {
         let pairs = args.compile.inputs.iter();
@@ -206,7 +205,7 @@ pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
             });
 
             let mut env = CompileEnv {
-                tracer: Some(Tracer::default()),
+                sink: Some(Sink::default()),
                 ..Default::default()
             };
             typst_timing::enable();
@@ -221,7 +220,7 @@ pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
 
             let timings = String::from_utf8(writer.into_inner().unwrap()).unwrap();
 
-            let warnings = env.tracer.map(|e| e.warnings());
+            let warnings = env.sink.map(|e| e.warnings());
 
             let diagnostics = state.primary().handle.run_analysis(&w, |ctx| {
                 tinymist_query::convert_diagnostics(
