@@ -694,7 +694,7 @@ fn type_completion(
         return Some(());
     }
 
-    log::debug!("type_completion: {:?}", infer_type);
+    log::debug!("type_completion: {infer_type:?}");
 
     match infer_type {
         Ty::Any => return None,
@@ -1018,7 +1018,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     use crate::syntax::get_check_target;
 
     let check_target = get_check_target(ctx.leaf.clone());
-    log::debug!("complete_type: pos {:?} -> {:#?}", ctx.leaf, check_target);
+    log::debug!("complete_type: pos {:?} -> {check_target:#?}", ctx.leaf);
 
     match check_target {
         Some(CheckTarget::Element { container, .. }) => {
@@ -1048,8 +1048,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         .literal_type_of_node(ctx.leaf.clone())
         .filter(|ty| !matches!(ty, Ty::Any))?;
 
-    log::debug!("complete_type: ty  {:?} -> {:#?}", ctx.leaf, ty);
-    // log::debug!("complete_type: before {:?}", ctx.before.chars().last());
+    log::debug!("complete_type: ty  {:?} -> {ty:#?}", ctx.leaf);
 
     type_completion(ctx, &ty, None);
     if ctx.before.ends_with(',') || ctx.before.ends_with(':') {

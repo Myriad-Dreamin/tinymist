@@ -1,12 +1,53 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on   (162..163)
+description: Completion on > (269..270)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/bug_cite_function_infer.typ
 ---
 [
  {
   "isIncomplete": false,
-  "items": []
+  "items": [
+   {
+    "kind": 21,
+    "label": "Mathematical logic based on the theory of types",
+    "labelDetails": {
+     "description": "Russell:1908"
+    },
+    "textEdit": {
+     "newText": "Russell:1908",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 12
+      },
+      "start": {
+       "character": 13,
+       "line": 12
+      }
+     }
+    }
+   },
+   {
+    "kind": 18,
+    "label": "Russell:1908",
+    "labelDetails": {
+     "description": "Mathematical logic based on the theory of types"
+    },
+    "textEdit": {
+     "newText": "Russell:1908",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 12
+      },
+      "start": {
+       "character": 13,
+       "line": 12
+      }
+     }
+    }
+   }
+  ]
  }
 ]
