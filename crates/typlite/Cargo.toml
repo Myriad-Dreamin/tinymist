@@ -12,8 +12,8 @@ repository.workspace = true
 
 [dependencies]
 typst-syntax.workspace = true
-tinymist-query.workspace = true
-tinymist-world.workspace = true
+tinymist-analysis.workspace = true
+tinymist-world = { workspace = true, features = ["no-content-hint"] }
 ecow.workspace = true
 comemo.workspace = true
 
@@ -25,5 +25,5 @@ base64.workspace = true
 insta.workspace = true
 regex.workspace = true
 
-[lints]
-workspace = true
+# [lints]
+# workspace = true

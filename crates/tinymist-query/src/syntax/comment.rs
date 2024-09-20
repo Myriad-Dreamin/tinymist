@@ -5,6 +5,8 @@ use typst_shim::syntax::LinkedNodeExt;
 use crate::prelude::*;
 use crate::syntax::get_def_target;
 
+use super::DefTarget;
+
 fn extract_document_between(
     node: &LinkedNode,
     rng: Range<usize>,
@@ -93,6 +95,11 @@ pub fn find_docs_before(src: &Source, cursor: usize) -> Option<String> {
     let root = LinkedNode::new(src.root());
     let leaf = root.leaf_at_compat(cursor)?;
     let def_target = get_def_target(leaf.clone())?;
+    find_docs_of(src, def_target)
+}
+
+pub fn find_docs_of(src: &Source, def_target: DefTarget) -> Option<String> {
+    let root = LinkedNode::new(src.root());
     log::debug!("found docs target: {:?}", def_target.node().kind());
     // todo: import node
     let target = def_target.node().clone();

@@ -182,7 +182,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     fn check_ident(&mut self, root: LinkedNode<'_>, mode: InterpretMode) -> Option<Ty> {
         let ident: ast::Ident = root.cast()?;
         let ident_ref = IdentRef {
-            name: ident.get().to_string(),
+            name: ident.get().clone(),
             range: root.range(),
         };
 

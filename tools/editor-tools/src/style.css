@@ -183,3 +183,8 @@ body.typst-preview-light .tinymist-button.warning.activated {
 .hidden {
   display: none;
 }
+
+/* aria-hidden */
+span[aria-hidden="true"] {
+  display: none;
+}

@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use ecow::EcoVec;
 use serde::Serialize;
 use typst::{
@@ -211,6 +213,29 @@ impl<'a> DefTarget<'a> {
             DefTarget::Import(node) => node,
         }
     }
+
+    pub fn name_range(&self) -> Option<Range<usize>> {
+        match self {
+            DefTarget::Let(node) => {
+                let lb: ast::LetBinding<'_> = node.cast()?;
+                let names = match lb.kind() {
+                    ast::LetBindingKind::Closure(name) => node.find(name.span())?,
+                    ast::LetBindingKind::Normal(ast::Pattern::Normal(name)) => {
+                        node.find(name.span())?
+                    }
+                    _ => return None,
+                };
+
+                Some(names.range())
+            }
+            DefTarget::Import(_node) => {
+                // let ident = node.cast::<ast::ImportItem>()?;
+                // Some(ident.span().into())
+                // todo: implement this
+                None
+            }
+        }
+    }
 }
 
 // todo: whether we should distinguish between strict and non-strict def targets
@@ -347,8 +372,10 @@ pub fn get_check_target_by_context<'a>(
 
     match context_deref_target {
         DerefTarget::Callee(callee)
-            if matches!(node_deref_target, DerefTarget::Normal(..))
-                && !matches!(node_deref_target, DerefTarget::Callee(..)) =>
+            if matches!(
+                node_deref_target,
+                DerefTarget::Normal(..) | DerefTarget::Label(..) | DerefTarget::Ref(..)
+            ) && !matches!(node_deref_target, DerefTarget::Callee(..)) =>
         {
             let parent = callee.parent()?;
             let args = match parent.cast::<ast::Expr>() {

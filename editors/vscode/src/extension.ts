@@ -20,25 +20,26 @@ import { loadTinymistConfig, substVscodeVarsInConfig } from "./config";
 import {
   EditorToolName,
   SymbolViewProvider as SymbolViewProvider,
-  activateEditorTool,
+  editorTool,
   getUserPackageData,
 } from "./editor-tools";
 import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
-import { setIsTinymist as previewSetIsTinymist } from "./preview-compat";
+import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
 import {
   previewActivate,
   previewDeactivate,
   previewPreload,
   previewProcessOutline,
-} from "./preview";
+} from "./features/preview";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { activeTypstEditor, DisposeList, getSensibleTextEditorColumn } from "./util";
 import { client, getClient, setClient, tinymist } from "./lsp";
-import { taskActivate } from "./tasks";
+import { taskActivate } from "./features/tasks";
 import { onEnterHandler } from "./lsp.on-enter";
 import { extensionState } from "./state";
-import { devKitActivate } from "./dev-kit";
-import { labelViewActivate } from "./label";
+import { devKitFeatureActivate } from "./features/dev-kit";
+import { labelFeatureActivate } from "./features/label";
+import { packageFeatureActivate } from "./features/package";
 
 export async function activate(context: ExtensionContext): Promise<void> {
   try {
@@ -68,12 +69,13 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   const client = initClient(context, config);
   setClient(client);
   // Activates features
-  labelViewActivate(context);
+  labelFeatureActivate(context);
+  packageFeatureActivate(context);
   if (extensionState.features.task) {
     taskActivate(context);
   }
   if (extensionState.features.devKit) {
-    devKitActivate(context);
+    devKitFeatureActivate(context);
   }
   if (extensionState.features.preview) {
     const typstPreviewExtension = vscode.extensions.getExtension("mgt19937.typst-preview");
@@ -224,15 +226,15 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
   );
   context.subscriptions.push(
     vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
-      if (focusingDoc === doc) {
-        focusingDoc = undefined;
+      if (extensionState.mut.focusingDoc === doc) {
+        extensionState.mut.focusingDoc = undefined;
         commandActivateDoc(undefined);
       }
     }),
   );
 
   const editorToolCommand = (tool: EditorToolName) => async () => {
-    await activateEditorTool(context, tool);
+    await editorTool(context, tool);
   };
 
   const initTemplateCommand =
@@ -651,15 +653,6 @@ async function initTemplate(context: vscode.ExtensionContext, inPlace: boolean, 
   }
 }
 
-let focusingFile: string | undefined = undefined;
-let focusingDoc: vscode.TextDocument | undefined = undefined;
-export function getFocusingFile() {
-  return focusingFile;
-}
-export function getLastFocusingDoc() {
-  return focusingDoc;
-}
-
 async function commandActivateDoc(doc: vscode.TextDocument | undefined): Promise<void> {
   await commandActivateDocPath(doc, doc?.uri.fsPath);
 }
@@ -669,15 +662,15 @@ async function commandActivateDocPath(
   fsPath: string | undefined,
 ): Promise<void> {
   // console.log("focus main", fsPath, new Error().stack);
-  focusingFile = fsPath;
+  extensionState.mut.focusingFile = fsPath;
   if (fsPath) {
-    focusingDoc = doc;
+    extensionState.mut.focusingDoc = doc;
   }
-  if (focusingDoc?.isClosed) {
-    focusingDoc = undefined;
+  if (extensionState.mut.focusingDoc?.isClosed) {
+    extensionState.mut.focusingDoc = undefined;
   }
   // remove the status bar until the last focusing file is closed
-  triggerStatusBar(!!(fsPath || focusingDoc?.isClosed === false));
+  triggerStatusBar(!!(fsPath || extensionState.mut.focusingDoc?.isClosed === false));
   await client?.sendRequest("workspace/executeCommand", {
     command: "tinymist.focusMain",
     arguments: [fsPath],

@@ -12,8 +12,8 @@ import {
   launchPreviewInWebView,
   previewProcessOutline,
 } from "./preview";
-import { tinymist } from "./lsp";
-import { loadHTMLFile } from "./util";
+import { tinymist } from "../lsp";
+import { loadHTMLFile } from "../util";
 
 const vscodeVariables = require("vscode-variables");
 

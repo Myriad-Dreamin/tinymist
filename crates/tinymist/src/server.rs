@@ -262,7 +262,11 @@ impl LanguageState {
             .with_resource("/symbols", State::resource_symbols)
             .with_resource("/preview/index.html", State::resource_preview_html)
             .with_resource("/tutorial", State::resource_tutoral)
-            .with_resource("/dirs/local-packages", State::resource_local_packages);
+            .with_resource("/package/by-namespace", State::resource_package_by_ns)
+            .with_resource("/package/symbol", State::resource_package_symbols)
+            .with_resource("/package/docs", State::resource_package_docs)
+            .with_resource("/dir/package", State::resource_package_dirs)
+            .with_resource("/dir/package/local", State::resource_local_package_dir);
 
         // todo: generalize me
         provider.args.add_commands(

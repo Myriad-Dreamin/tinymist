@@ -2,7 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import * as path from "path";
-import { DisposeList, getSensibleTextEditorColumn, getTargetViewColumn } from "./util";
+import { DisposeList, getSensibleTextEditorColumn, getTargetViewColumn } from "../util";
 import {
   launchPreviewCompat,
   previewActiveCompat as previewPostActivateCompat,
@@ -18,8 +18,8 @@ import {
   commandScrollPreview,
   commandStartPreview,
   registerPreviewTaskDispose,
-} from "./extension";
-import { isGitpod, translateGitpodURL } from "./gitpod";
+} from "../extension";
+import { isGitpod, translateGitpodURL } from "../gitpod";
 
 function translateExternalURL(urlstr: string): string {
   if (isGitpod()) {

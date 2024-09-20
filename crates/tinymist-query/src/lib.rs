@@ -9,14 +9,13 @@
 
 mod adt;
 pub mod analysis;
+pub mod docs;
 pub mod syntax;
 pub mod ty;
 mod upstream;
 
-use std::sync::Arc;
-
 pub use analysis::AnalysisContext;
-use typst::{model::Document as TypstDocument, syntax::Source};
+pub use upstream::with_vm;
 
 mod diagnostics;
 pub use diagnostics::*;
@@ -79,6 +78,10 @@ mod lsp_features;
 pub use lsp_features::*;
 
 mod prelude;
+
+use std::sync::Arc;
+
+use typst::{model::Document as TypstDocument, syntax::Source};
 
 /// The physical position in a document.
 pub type FramePosition = typst::layout::Position;

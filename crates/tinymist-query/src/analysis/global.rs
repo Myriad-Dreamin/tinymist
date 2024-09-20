@@ -174,6 +174,11 @@ pub trait AnalysisResources {
         None
     }
 
+    /// Get the local packages and their descriptions.
+    fn local_packages(&self) -> EcoVec<PackageSpec> {
+        EcoVec::new()
+    }
+
     /// Resolve telescope image at the given position.
     fn periscope_at(
         &self,
@@ -596,32 +601,7 @@ impl<'w> AnalysisContext<'w> {
     }
 
     pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
-        use comemo::Track;
-        use typst::engine::*;
-        use typst::eval::*;
-        use typst::foundations::*;
-        use typst::introspection::*;
-
-        let mut locator = Locator::default();
-        let introspector = Introspector::default();
-        let mut tracer = Tracer::new();
-        let engine = Engine {
-            world: self.world().track(),
-            route: Route::default(),
-            introspector: introspector.track(),
-            locator: &mut locator,
-            tracer: tracer.track_mut(),
-        };
-
-        let context = Context::none();
-        let mut vm = Vm::new(
-            engine,
-            context.track(),
-            Scopes::new(Some(self.world().library())),
-            Span::detached(),
-        );
-
-        f(&mut vm)
+        crate::upstream::with_vm(self.world(), f)
     }
 
     pub(crate) fn const_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
@@ -651,17 +631,26 @@ impl<'w> AnalysisContext<'w> {
         Some(analyze_dyn_signature(self, func.clone()).type_sig())
     }
 
-    pub(crate) fn user_type_of_def(&mut self, source: &Source, def: &DefinitionLink) -> Option<Ty> {
-        let def_at = def.def_at.clone()?;
+    pub(crate) fn user_type_of_ident(
+        &mut self,
+        source: &Source,
+        def_fid: TypstFileId,
+        def_ident: &IdentRef,
+    ) -> Option<Ty> {
         let ty_chk = self.type_check(source.clone())?;
         let def_use = self.def_use(source.clone())?;
 
+        let (def_id, _) = def_use.get_def(def_fid, def_ident)?;
+        ty_chk.type_of_def(def_id)
+    }
+
+    pub(crate) fn user_type_of_def(&mut self, source: &Source, def: &DefinitionLink) -> Option<Ty> {
+        let def_at = def.def_at.clone()?;
         let def_ident = IdentRef {
             name: def.name.clone(),
             range: def_at.1,
         };
-        let (def_id, _) = def_use.get_def(def_at.0, &def_ident)?;
-        ty_chk.type_of_def(def_id)
+        self.user_type_of_ident(source, def_at.0, &def_ident)
     }
 
     pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {

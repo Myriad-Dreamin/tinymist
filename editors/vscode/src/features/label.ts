@@ -1,9 +1,8 @@
 import * as vscode from "vscode";
-import { tinymist } from "./lsp";
-import { WorkspaceSymbol } from "vscode-languageclient";
+import { tinymist } from "../lsp";
 
-export function labelViewActivate(context: vscode.ExtensionContext) {
-  const labelViewProvider = new LabelViewProviderProvider();
+export function labelFeatureActivate(context: vscode.ExtensionContext) {
+  const labelViewProvider = new LabelViewProvider();
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("tinymist.label-view", labelViewProvider),
     // tinymist.syncLabel
@@ -13,7 +12,7 @@ export function labelViewActivate(context: vscode.ExtensionContext) {
   );
 }
 
-class LabelViewProviderProvider implements vscode.TreeDataProvider<LabelViewItem> {
+class LabelViewProvider implements vscode.TreeDataProvider<LabelViewItem> {
   changeTreeDataEvent = new vscode.EventEmitter<LabelViewItem | undefined>();
   onDidChangeTreeData = this.changeTreeDataEvent.event;
 

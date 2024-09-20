@@ -8,10 +8,9 @@ use serde::{Deserialize, Serialize};
 use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::model::Document;
 use typst::syntax::ast::AstNode;
-use typst::syntax::package::PackageSpec;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
-use typst_shim::syntax::LinkedNodeExt;
+use typst_shim::{syntax::LinkedNodeExt, utils::hash128};
 use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
@@ -38,16 +37,16 @@ pub fn autocomplete(
     mut ctx: CompletionContext,
 ) -> Option<(usize, bool, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
     let _ = complete_comments(&mut ctx)
-        || complete_labels(&mut ctx)
         || complete_type(&mut ctx).is_none() && {
             log::info!("continue after completing type");
-            complete_field_accesses(&mut ctx)
+            complete_labels(&mut ctx)
+                || complete_field_accesses(&mut ctx)
                 || complete_imports(&mut ctx)
                 || complete_rules(&mut ctx)
                 || complete_params(&mut ctx)
                 || complete_markup(&mut ctx)
                 || complete_math(&mut ctx)
-                || complete_code(&mut ctx)
+                || complete_code(&mut ctx, false)
         };
 
     Some((ctx.from, ctx.incomplete, ctx.completions, ctx.completions2))
@@ -143,7 +142,7 @@ fn complete_markup(ctx: &mut CompletionContext) -> bool {
     // Start of a reference: "@|" or "@he|".
     if ctx.leaf.kind() == SyntaxKind::RefMarker {
         ctx.from = ctx.leaf.offset() + 1;
-        ctx.label_completions();
+        ctx.ref_completions();
         return true;
     }
 
@@ -476,7 +475,7 @@ fn complete_labels(ctx: &mut CompletionContext) -> bool {
         || ctx.leaf.kind() == SyntaxKind::Label
     {
         ctx.from = ctx.leaf.offset() + 1;
-        ctx.label_completions();
+        ctx.label_completions(false);
         return true;
     }
 
@@ -736,7 +735,7 @@ fn complete_params(ctx: &mut CompletionContext) -> bool {
 }
 
 /// Complete in code mode.
-fn complete_code(ctx: &mut CompletionContext) -> bool {
+fn complete_code(ctx: &mut CompletionContext, from_type: bool) -> bool {
     if matches!(
         ctx.leaf.parent_kind(),
         None | Some(SyntaxKind::Markup)
@@ -756,9 +755,9 @@ fn complete_code(ctx: &mut CompletionContext) -> bool {
     }
 
     // A potential label (only at the start of an argument list): "(<|".
-    if ctx.before.ends_with("(<") {
+    if !from_type && ctx.before.ends_with("(<") {
         ctx.from = ctx.cursor;
-        ctx.label_completions();
+        ctx.label_completions(false);
         return true;
     }
 
@@ -1048,74 +1047,21 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         }
     }
 
-    /// Get local packages
-    fn local_packages(&mut self) -> Vec<(PackageSpec, Option<EcoString>)> {
-        // search packages locally. We only search in the data
-        // directory and not the cache directory, because the latter is not
-        // intended for storage of local packages.
-        let mut packages = vec![];
-        let Some(data_dir) = dirs::data_dir() else {
-            return packages;
-        };
-        let local_path = data_dir.join("typst/packages");
-        if !local_path.exists() {
-            return packages;
-        }
-        // namespace/package_name/version
-        // 1. namespace
-        let namespaces = std::fs::read_dir(local_path).unwrap();
-        for namespace in namespaces {
-            let namespace = namespace.unwrap();
-            if !namespace.file_type().unwrap().is_dir() {
-                continue;
-            }
-            // start with . are hidden directories
-            if namespace.file_name().to_string_lossy().starts_with('.') {
-                continue;
-            }
-            // 2. package_name
-            let package_names = std::fs::read_dir(namespace.path()).unwrap();
-            for package in package_names {
-                let package = package.unwrap();
-                if !package.file_type().unwrap().is_dir() {
-                    continue;
-                }
-                if package.file_name().to_string_lossy().starts_with('.') {
-                    continue;
-                }
-                // 3. version
-                let versions = std::fs::read_dir(package.path()).unwrap();
-                for version in versions {
-                    let version = version.unwrap();
-                    if !version.file_type().unwrap().is_dir() {
-                        continue;
-                    }
-                    if version.file_name().to_string_lossy().starts_with('.') {
-                        continue;
-                    }
-                    let version = version.file_name().to_string_lossy().parse().unwrap();
-                    let spec = PackageSpec {
-                        namespace: namespace.file_name().to_string_lossy().into(),
-                        name: package.file_name().to_string_lossy().into(),
-                        version,
-                    };
-                    let description = eco_format!("{} v{}", spec.name, spec.version);
-                    let package = (spec, Some(description));
-                    packages.push(package);
-                }
-            }
-        }
-        packages
-    }
-
     /// Add completions for all available packages.
     fn package_completions(&mut self, all_versions: bool) {
-        let mut packages: Vec<_> = self.world().packages().iter().collect();
+        let mut packages: Vec<_> = self
+            .world()
+            .packages()
+            .iter()
+            .map(|e| (&e.0, e.1.clone()))
+            .collect();
         // local_packages to references and add them to the packages
-        let local_packages = self.local_packages();
-        let local_packages_refs: Vec<&(PackageSpec, Option<EcoString>)> =
-            local_packages.iter().collect();
-        packages.extend(local_packages_refs);
+        let local_packages_refs = self.ctx.resources.local_packages();
+        packages.extend(
+            local_packages_refs
+                .iter()
+                .map(|spec| (spec, Some(eco_format!("{} v{}", spec.name, spec.version)))),
+        );
 
         packages.sort_by_key(|(spec, _)| (&spec.namespace, &spec.name, Reverse(spec.version)));
         if !all_versions {
@@ -1155,7 +1101,17 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
     }
 
     /// Add completions for labels and references.
-    fn label_completions(&mut self) {
+    fn ref_completions(&mut self) {
+        self.label_completions_(false, true);
+    }
+
+    /// Add completions for labels and references.
+    fn label_completions(&mut self, only_citation: bool) {
+        self.label_completions_(only_citation, false);
+    }
+
+    /// Add completions for labels and references.
+    fn label_completions_(&mut self, only_citation: bool, ref_label: bool) {
         let Some(document) = self.document else {
             return;
         };
@@ -1165,9 +1121,9 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         let at = head.ends_with('@');
         let open = !at && !head.ends_with('<');
         let close = !at && !self.after.starts_with('>');
-        let citation = !at && self.before_window(15).contains("cite");
+        let citation = !at && only_citation;
 
-        let (skip, take) = if at {
+        let (skip, take) = if at || ref_label {
             (0, usize::MAX)
         } else if citation {
             (split, usize::MAX)
@@ -1182,6 +1138,9 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             bib_title,
         } in labels.into_iter().skip(skip).take(take)
         {
+            if !self.seen_casts.insert(hash128(&label)) {
+                continue;
+            }
             let label: EcoString = label.as_str().into();
             let completion = Completion {
                 kind: CompletionKind::Reference,
@@ -1245,7 +1204,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         docs: Option<&str>,
     ) {
         // Prevent duplicate completions from appearing.
-        if !self.seen_casts.insert(typst_shim::utils::hash128(value)) {
+        if !self.seen_casts.insert(hash128(&(&label, &value))) {
             return;
         }
 

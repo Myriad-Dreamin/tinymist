@@ -32,7 +32,7 @@ use std::{
 use anyhow::{anyhow, bail};
 use log::{error, info, trace};
 use reflexo_typst::{
-    debug_loc::DataSource, error::prelude::*, typst::prelude::EcoVec, vfs::notify::MemoryEvent,
+    debug_loc::DataSource, error::prelude::*, typst::prelude::*, vfs::notify::MemoryEvent,
     world::EntryState, CompileReport, EntryReader, Error, ImmutPath, TaskInputs, TypstFont,
 };
 use sync_lsp::{just_future, QueryFuture};
@@ -228,6 +228,17 @@ impl CompileHandler {
             /// Resolve extra font information.
             fn font_info(&self, font: TypstFont) -> Option<Arc<DataSource>> {
                 self.0.font_resolver.describe_font(&font)
+            }
+
+            /// Get the local packages and their descriptions.
+            fn local_packages(&self) -> EcoVec<PackageSpec> {
+                crate::tool::package::list_package_by_namespace(
+                    &self.0.registry,
+                    eco_format!("local"),
+                )
+                .into_iter()
+                .map(|(_, spec)| spec)
+                .collect()
             }
 
             /// Resolve periscope image at the given position.

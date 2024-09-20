@@ -49,7 +49,7 @@ fn filter_document_symbols(
             let rng = typst_to_lsp::range(e.info.range.clone(), source, position_encoding);
 
             DocumentSymbol {
-                name: e.info.name.clone(),
+                name: e.info.name.to_string(),
                 detail: None,
                 kind: e.info.kind.clone().try_into().unwrap(),
                 tags: None,

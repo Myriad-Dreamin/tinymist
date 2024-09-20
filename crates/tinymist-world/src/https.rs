@@ -1,3 +1,5 @@
+//! Https registry for tinymist.
+
 pub use reflexo_typst::font::FontResolverImpl;
 
 use std::path::Path;
@@ -6,21 +8,18 @@ use std::{path::PathBuf, sync::Arc};
 use reflexo_typst::vfs::system::SystemAccessModel;
 use reflexo_typst::{CompilerFeat, CompilerUniverse, CompilerWorld};
 
-use std::sync::OnceLock;
+use log::error;
+use parking_lot::Mutex;
+use reflexo_typst::package::{DummyNotifier, Notifier, PackageError, PackageRegistry, PackageSpec};
 use reflexo_typst::typst::{
     diag::{eco_format, EcoString},
     syntax::package::PackageVersion,
 };
-use reqwest::{
-    blocking::Response,
-    Certificate
-};
-use log::error;
-use parking_lot::Mutex;
-use reflexo_typst::package::{DummyNotifier, Notifier, PackageError, PackageSpec, PackageRegistry};
+use reqwest::{blocking::Response, Certificate};
+use std::sync::OnceLock;
 
-/// Compiler feature for LSP universe and worlds without typst.ts to implement more for tinymist.
-/// type trait of [`TypstSystemWorld`].
+/// Compiler feature for LSP universe and worlds without typst.ts to implement
+/// more for tinymist. type trait of [`TypstSystemWorld`].
 #[derive(Debug, Clone, Copy)]
 pub struct SystemCompilerFeatExtend;
 
@@ -49,11 +48,11 @@ pub struct HttpsRegistry {
 
 impl Default for HttpsRegistry {
     fn default() -> Self {
-        Self { 
-            notifier: Arc::new(Mutex::<DummyNotifier>::default()), 
+        Self {
+            notifier: Arc::new(Mutex::<DummyNotifier>::default()),
 
             // todo: reset cache
-            packages: OnceLock::new(), 
+            packages: OnceLock::new(),
 
             // Default to None
             cert_path: None,
@@ -62,15 +61,16 @@ impl Default for HttpsRegistry {
 }
 
 impl HttpsRegistry {
+    /// Create a new registry.
     pub fn new(cert_path: Option<PathBuf>) -> Self {
-        Self { 
-            notifier: Arc::new(Mutex::<DummyNotifier>::default()), 
-            packages: OnceLock::new(), 
+        Self {
+            notifier: Arc::new(Mutex::<DummyNotifier>::default()),
+            packages: OnceLock::new(),
             cert_path,
         }
     }
 
-    /// Get local path option 
+    /// Get local path option
     pub fn local_path(&self) -> Option<Box<Path>> {
         if let Some(data_dir) = dirs::data_dir() {
             if data_dir.exists() {
@@ -100,7 +100,6 @@ impl HttpsRegistry {
 
         res
     }
-
 
     /// Make a package available in the on-disk cache.
     pub fn prepare_package(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError> {
@@ -220,11 +219,13 @@ fn threaded_http<T: Send + Sync>(
     f: impl FnOnce(Result<Response, reqwest::Error>) -> T + Send + Sync,
 ) -> Option<T> {
     std::thread::scope(|s| {
-                s.spawn(move || {
+        s.spawn(move || {
             let client_builder = reqwest::blocking::Client::builder();
 
             let client = if let Some(cert_path) = cert_path {
-                let cert = std::fs::read(cert_path).ok().and_then(|buf| Certificate::from_pem(&buf).ok());
+                let cert = std::fs::read(cert_path)
+                    .ok()
+                    .and_then(|buf| Certificate::from_pem(&buf).ok());
                 if let Some(cert) = cert {
                     client_builder.add_root_certificate(cert).build().unwrap()
                 } else {
