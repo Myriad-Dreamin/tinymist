@@ -7,7 +7,7 @@ type MaybeRegExp = RegExp | string;
 
 export type PatternCommon = Pick<PatternAny, "comment" | "disabled" | "name">;
 export type PatternInclude = PatternCommon &
-  (Pick<PatternAny, "include"> | Pick<PatternAny, "patterns">);
+  Pick<PatternAny, "include" | "patterns">;
 export type PatternMatch = PatternCommon &
   Pick<PatternAny, "match" | "captures">;
 export type PatternBeginEnd = PatternCommon &
