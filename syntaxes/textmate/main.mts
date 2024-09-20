@@ -1602,7 +1602,7 @@ export const typst: textmate.Grammar = {
     inlineRaw,
     blockRaw,
     ...blockRawLangs.reduce((acc: Record<string, textmate.Pattern>, lang) => {
-      acc[lang.name!.replace(/\./g, "_")] = lang;
+      acc[lang.lang.replace(/\./g, "_")] = lang;
       return acc;
     }, {}),
     blockRawGeneral,

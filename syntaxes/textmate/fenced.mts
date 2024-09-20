@@ -8,7 +8,9 @@ export interface Lang {
   candidates: string[];
 }
 
-const genLang = (langMeta: Lang): textmate.Pattern => {
+const genLang = (
+  langMeta: Lang
+): textmate.PatternInclude & { lang: string } => {
   const lang = langMeta.candidates[0];
   let includes = langMeta.as;
   if (!includes) {
@@ -23,6 +25,7 @@ const genLang = (langMeta: Lang): textmate.Pattern => {
   );
 
   const enter = (n: number): textmate.Pattern => ({
+    name: `markup.raw.block.typst`,
     begin: new RegExp(
       "(`{" + n.toString() + "})" + `(${candidates.join("|")})\\b`
     ),
@@ -52,10 +55,11 @@ const genLang = (langMeta: Lang): textmate.Pattern => {
   });
 
   return {
-    name: `markup.raw.block.${lang}`,
+    lang,
     patterns: [
       // one line case
       {
+        name: `markup.raw.block.typst`,
         match: new RegExp(
           /(`{3,})/.source + `(${candidates.join("|")})` + /\b(.*?)(\1)/.source
         ),
@@ -84,7 +88,7 @@ const RENDER_LANGS = true;
 export const blockRawLangs = RENDER_LANGS ? rawLanguages.map(genLang) : [];
 
 export const inlineRaw: textmate.Pattern = {
-  name: "markup.raw.inline.typst",
+  name: "markup.raw.inline.typst string.other.raw.typst",
   begin: /`/,
   end: /`/,
   beginCaptures: {
@@ -102,7 +106,7 @@ export const inlineRaw: textmate.Pattern = {
 export const blockRaw: textmate.Pattern = {
   patterns: [
     ...blockRawLangs.map((blockRawLang) => ({
-      include: "#" + blockRawLang.name!.replace(/\./g, "_"),
+      include: "#" + blockRawLang.lang.replace(/\./g, "_"),
     })),
     {
       include: "#blockRawGeneral",
