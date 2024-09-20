@@ -7,6 +7,7 @@ use typst::text::{Font, FontStretch, FontStyle, FontWeight};
 use typst::{
     layout::{Frame, FrameItem},
     model::Document,
+    syntax::Span,
     text::TextItem,
 };
 
@@ -64,6 +65,15 @@ pub struct DocumentFontInfo {
     /// The annotated content of the font.
     /// If it is not None, the uses_scale must be provided.
     pub uses: Option<AnnotatedContent>,
+    /// The source Typst file of the locatable text element
+    /// in which the font first occurs.
+    pub first_occur_file: Option<String>,
+    /// The line number of the locatable text element
+    /// in which the font first occurs.
+    pub first_occur_line: Option<u32>,
+    /// The column number of the locatable text element
+    /// in which the font first occurs.
+    pub first_occur_column: Option<u32>,
 }
 
 /// The response to a DocumentMetricsRequest.
@@ -116,11 +126,19 @@ impl StatefulRequest for DocumentMetricsRequest {
     }
 }
 
+#[derive(Default)]
+struct FontInfoValue {
+    uses: u32,
+    first_occur_file: Option<String>,
+    first_occur_line: Option<u32>,
+    first_occur_column: Option<u32>,
+}
+
 struct DocumentMetricsWorker<'a, 'w> {
     ctx: &'a mut AnalysisContext<'w>,
     span_info: HashMap<Arc<DataSource>, u32>,
     span_info2: Vec<DataSource>,
-    font_info: HashMap<Font, u32>,
+    font_info: HashMap<Font, FontInfoValue>,
 }
 
 impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
@@ -154,10 +172,52 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
     }
 
     fn work_text(&mut self, text: &TextItem) -> Option<()> {
-        let use_cnt = self.font_info.entry(text.font.clone()).or_default();
-        *use_cnt = use_cnt.checked_add(text.glyphs.len() as u32)?;
+        let font_key = text.font.clone();
+        let glyph_len = text.glyphs.len();
+
+        let has_source_info = if let Some(font_info) = self.font_info.get(&font_key) {
+            font_info.first_occur_file.is_some()
+        } else {
+            false
+        };
+
+        if !has_source_info && glyph_len > 0 {
+            let (span, span_offset) = text.glyphs[0].span;
+
+            if let Some((filepath, line, column)) = self.source_code_file_line(span, span_offset) {
+                let uses = self.font_info.get(&font_key).map_or(0, |info| info.uses);
+                self.font_info.insert(
+                    font_key.clone(),
+                    FontInfoValue {
+                        uses,
+                        first_occur_file: Some(filepath),
+                        first_occur_line: Some(line),
+                        first_occur_column: Some(column),
+                    },
+                );
+            }
+        }
+
+        let font_info_value = self.font_info.entry(font_key).or_default();
+        font_info_value.uses = font_info_value.uses.checked_add(glyph_len as u32)?;
 
         Some(())
+    }
+
+    fn source_code_file_line(&self, span: Span, span_offset: u16) -> Option<(String, u32, u32)> {
+        let world = self.ctx.world();
+        let file_id = span.id()?;
+        let source = world.source(file_id).ok()?;
+        let range = source.range(span)?;
+        let byte_index = range.start + usize::from(span_offset);
+        let byte_index = byte_index.min(range.end - 1);
+        let line = source.byte_to_line(byte_index)?;
+        let column = source.byte_to_column(byte_index)?;
+
+        let filepath = self.ctx.path_for_id(file_id).ok()?;
+        let filepath_str = filepath.to_string_lossy().to_string();
+
+        Some((filepath_str, line as u32 + 1, column as u32 + 1))
     }
 
     fn internal_source(&mut self, source: Arc<DataSource>) -> u32 {
@@ -174,7 +234,7 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
         use ttf_parser::name_id::*;
         let font_info = std::mem::take(&mut self.font_info)
             .into_iter()
-            .map(|(font, uses)| {
+            .map(|(font, font_info_value)| {
                 let extra = self.ctx.resources.font_info(font.clone());
                 let info = &font.info();
                 DocumentFontInfo {
@@ -188,8 +248,11 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
                     fixed_family: Some(info.family.clone()),
                     source: extra.map(|e| self.internal_source(e)),
                     index: Some(font.index()),
-                    uses_scale: Some(uses),
+                    uses_scale: Some(font_info_value.uses),
                     uses: None,
+                    first_occur_file: font_info_value.first_occur_file,
+                    first_occur_line: font_info_value.first_occur_line,
+                    first_occur_column: font_info_value.first_occur_column,
                 }
             })
             .collect();
