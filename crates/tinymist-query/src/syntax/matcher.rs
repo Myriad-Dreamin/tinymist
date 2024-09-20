@@ -372,8 +372,10 @@ pub fn get_check_target_by_context<'a>(
 
     match context_deref_target {
         DerefTarget::Callee(callee)
-            if matches!(node_deref_target, DerefTarget::Normal(..))
-                && !matches!(node_deref_target, DerefTarget::Callee(..)) =>
+            if matches!(
+                node_deref_target,
+                DerefTarget::Normal(..) | DerefTarget::Label(..) | DerefTarget::Ref(..)
+            ) && !matches!(node_deref_target, DerefTarget::Callee(..)) =>
         {
             let parent = callee.parent()?;
             let args = match parent.cast::<ast::Expr>() {

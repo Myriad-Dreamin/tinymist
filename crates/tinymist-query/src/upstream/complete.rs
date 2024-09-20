@@ -37,16 +37,16 @@ pub fn autocomplete(
     mut ctx: CompletionContext,
 ) -> Option<(usize, bool, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
     let _ = complete_comments(&mut ctx)
-        || complete_labels(&mut ctx)
         || complete_type(&mut ctx).is_none() && {
             log::info!("continue after completing type");
-            complete_field_accesses(&mut ctx)
+            complete_labels(&mut ctx)
+                || complete_field_accesses(&mut ctx)
                 || complete_imports(&mut ctx)
                 || complete_rules(&mut ctx)
                 || complete_params(&mut ctx)
                 || complete_markup(&mut ctx)
                 || complete_math(&mut ctx)
-                || complete_code(&mut ctx)
+                || complete_code(&mut ctx, false)
         };
 
     Some((ctx.from, ctx.incomplete, ctx.completions, ctx.completions2))
@@ -142,7 +142,7 @@ fn complete_markup(ctx: &mut CompletionContext) -> bool {
     // Start of a reference: "@|" or "@he|".
     if ctx.leaf.kind() == SyntaxKind::RefMarker {
         ctx.from = ctx.leaf.offset() + 1;
-        ctx.label_completions();
+        ctx.ref_completions();
         return true;
     }
 
@@ -475,7 +475,7 @@ fn complete_labels(ctx: &mut CompletionContext) -> bool {
         || ctx.leaf.kind() == SyntaxKind::Label
     {
         ctx.from = ctx.leaf.offset() + 1;
-        ctx.label_completions();
+        ctx.label_completions(false);
         return true;
     }
 
@@ -735,7 +735,7 @@ fn complete_params(ctx: &mut CompletionContext) -> bool {
 }
 
 /// Complete in code mode.
-fn complete_code(ctx: &mut CompletionContext) -> bool {
+fn complete_code(ctx: &mut CompletionContext, from_type: bool) -> bool {
     if matches!(
         ctx.leaf.parent_kind(),
         None | Some(SyntaxKind::Markup)
@@ -755,9 +755,9 @@ fn complete_code(ctx: &mut CompletionContext) -> bool {
     }
 
     // A potential label (only at the start of an argument list): "(<|".
-    if ctx.before.ends_with("(<") {
+    if !from_type && ctx.before.ends_with("(<") {
         ctx.from = ctx.cursor;
-        ctx.label_completions();
+        ctx.label_completions(false);
         return true;
     }
 
@@ -1101,7 +1101,17 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
     }
 
     /// Add completions for labels and references.
-    fn label_completions(&mut self) {
+    fn ref_completions(&mut self) {
+        self.label_completions_(false, true);
+    }
+
+    /// Add completions for labels and references.
+    fn label_completions(&mut self, only_citation: bool) {
+        self.label_completions_(only_citation, false);
+    }
+
+    /// Add completions for labels and references.
+    fn label_completions_(&mut self, only_citation: bool, ref_label: bool) {
         let Some(document) = self.document else {
             return;
         };
@@ -1111,9 +1121,9 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         let at = head.ends_with('@');
         let open = !at && !head.ends_with('<');
         let close = !at && !self.after.starts_with('>');
-        let citation = !at && self.before_window(15).contains("cite");
+        let citation = !at && only_citation;
 
-        let (skip, take) = if at {
+        let (skip, take) = if at || ref_label {
             (0, usize::MAX)
         } else if citation {
             (split, usize::MAX)
@@ -1128,6 +1138,9 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             bib_title,
         } in labels.into_iter().skip(skip).take(take)
         {
+            if !self.seen_casts.insert(typst_shim::utils::hash128(&label)) {
+                continue;
+            }
             let label: EcoString = label.as_str().into();
             let completion = Completion {
                 kind: CompletionKind::Reference,
