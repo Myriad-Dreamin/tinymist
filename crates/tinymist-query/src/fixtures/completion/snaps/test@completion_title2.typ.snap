@@ -14,15 +14,16 @@ input_file: crates/tinymist-query/src/fixtures/completion/completion_title2.typ
     "labelDetails": {
      "description": "Russell:1908"
     },
+    "sortText": "000",
     "textEdit": {
-     "newText": "Russell:1908>",
+     "newText": "<Russell:1908>",
      "range": {
       "end": {
        "character": 16,
        "line": 3
       },
       "start": {
-       "character": 7,
+       "character": 16,
        "line": 3
       }
      }
@@ -34,15 +35,16 @@ input_file: crates/tinymist-query/src/fixtures/completion/completion_title2.typ
     "labelDetails": {
      "description": "Mathematical logic based on the theory of types"
     },
+    "sortText": "001",
     "textEdit": {
-     "newText": "Russell:1908>",
+     "newText": "<Russell:1908>",
      "range": {
       "end": {
        "character": 16,
        "line": 3
       },
       "start": {
-       "character": 7,
+       "character": 16,
        "line": 3
       }
      }

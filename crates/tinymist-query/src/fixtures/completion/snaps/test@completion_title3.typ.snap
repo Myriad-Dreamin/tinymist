@@ -14,15 +14,16 @@ input_file: crates/tinymist-query/src/fixtures/completion/completion_title3.typ
     "labelDetails": {
      "description": "harry"
     },
+    "sortText": "000",
     "textEdit": {
-     "newText": "harry>",
+     "newText": "<harry>",
      "range": {
       "end": {
        "character": 13,
        "line": 3
       },
       "start": {
-       "character": 7,
+       "character": 13,
        "line": 3
       }
      }
@@ -34,15 +35,16 @@ input_file: crates/tinymist-query/src/fixtures/completion/completion_title3.typ
     "labelDetails": {
      "description": "electronic"
     },
+    "sortText": "001",
     "textEdit": {
-     "newText": "electronic>",
+     "newText": "<electronic>",
      "range": {
       "end": {
        "character": 13,
        "line": 3
       },
       "start": {
-       "character": 7,
+       "character": 13,
        "line": 3
       }
      }
@@ -54,15 +56,16 @@ input_file: crates/tinymist-query/src/fixtures/completion/completion_title3.typ
     "labelDetails": {
      "description": "Ishkur's Guide to Electronic Music"
     },
+    "sortText": "002",
     "textEdit": {
-     "newText": "electronic>",
+     "newText": "<electronic>",
      "range": {
       "end": {
        "character": 13,
        "line": 3
       },
       "start": {
-       "character": 7,
+       "character": 13,
        "line": 3
       }
      }
@@ -74,15 +77,16 @@ input_file: crates/tinymist-query/src/fixtures/completion/completion_title3.typ
     "labelDetails": {
      "description": "Harry Potter and the Order of the Phoenix"
     },
+    "sortText": "004",
     "textEdit": {
-     "newText": "harry>",
+     "newText": "<harry>",
      "range": {
       "end": {
        "character": 13,
        "line": 3
       },
       "start": {
-       "character": 7,
+       "character": 13,
        "line": 3
       }
      }

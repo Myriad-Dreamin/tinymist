@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on > (269..270)
+description: Completion on > (262..263)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/bug_cite_function_infer.typ
 ---
@@ -14,16 +14,38 @@ input_file: crates/tinymist-query/src/fixtures/completion/bug_cite_function_infe
     "labelDetails": {
      "description": "Russell:1908"
     },
+    "sortText": "000",
     "textEdit": {
-     "newText": "Russell:1908",
+     "newText": "<Russell:1908",
      "range": {
       "end": {
        "character": 16,
-       "line": 12
+       "line": 10
       },
       "start": {
-       "character": 13,
-       "line": 12
+       "character": 16,
+       "line": 10
+      }
+     }
+    }
+   },
+   {
+    "kind": 21,
+    "label": "Mathematical logic based on the theory of types",
+    "labelDetails": {
+     "description": "Rus"
+    },
+    "sortText": "001",
+    "textEdit": {
+     "newText": "<Rus",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 10
+      },
+      "start": {
+       "character": 16,
+       "line": 10
       }
      }
     }
@@ -34,16 +56,17 @@ input_file: crates/tinymist-query/src/fixtures/completion/bug_cite_function_infe
     "labelDetails": {
      "description": "Mathematical logic based on the theory of types"
     },
+    "sortText": "003",
     "textEdit": {
-     "newText": "Russell:1908",
+     "newText": "<Russell:1908",
      "range": {
       "end": {
        "character": 16,
-       "line": 12
+       "line": 10
       },
       "start": {
-       "character": 13,
-       "line": 12
+       "character": 16,
+       "line": 10
       }
      }
     }

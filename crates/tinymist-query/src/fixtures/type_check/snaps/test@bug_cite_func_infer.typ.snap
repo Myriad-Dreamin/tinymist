@@ -3,8 +3,8 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/bug_cite_func_infer.typ
 ---
-"cite_prose" = (( ⪯ Type(label))) => Element(ref)
-"cite_prose_different_name" = (( ⪯ Type(label))) => Element(ref)
+"cite_prose" = (( ⪯ (RefLabel))) => Element(ref)
+"cite_prose_different_name" = (( ⪯ (RefLabel))) => Element(ref)
 "labl" = Any
 "labl" = Any
 ---
