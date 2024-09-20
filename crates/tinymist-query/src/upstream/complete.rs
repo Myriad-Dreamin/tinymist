@@ -10,7 +10,7 @@ use typst::model::Document;
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
-use typst_shim::syntax::LinkedNodeExt;
+use typst_shim::{syntax::LinkedNodeExt, utils::hash128};
 use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
@@ -1138,7 +1138,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             bib_title,
         } in labels.into_iter().skip(skip).take(take)
         {
-            if !self.seen_casts.insert(typst_shim::utils::hash128(&label)) {
+            if !self.seen_casts.insert(hash128(&label)) {
                 continue;
             }
             let label: EcoString = label.as_str().into();
@@ -1204,7 +1204,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         docs: Option<&str>,
     ) {
         // Prevent duplicate completions from appearing.
-        if !self.seen_casts.insert(typst_shim::utils::hash128(value)) {
+        if !self.seen_casts.insert(hash128(&(&label, &value))) {
             return;
         }
 
