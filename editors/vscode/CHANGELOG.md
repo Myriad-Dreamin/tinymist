@@ -4,6 +4,49 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.22 - [2024-09-20]
+
+## (New) Tinymist Nightly
+
+This is a new release channel for Tinymist, which uses *main branch of typst*. Currently it is only available at [nightly branch,](https://github.com/Myriad-Dreamin/tinymist/tree/nightly), but we will set up nightly release in soon future.
+
+* Added compatibility layer for Typst stable and nightly APIs by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/573
+* Added compatibility for `typst_syntax::LinkedNode.leaf_at` by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/582
+
+## Compiler
+
+* (Fix) Deadlock when iterating dependencies in https://github.com/Myriad-Dreamin/tinymist/pull/568
+  * This could happen when you are triggering workspace-level requests, like `symbol` or `reference` requests.
+* (Fix) Ignoring system fonts correctly in https://github.com/Myriad-Dreamin/tinymist/pull/597
+* Supported CA certificate customization by @ricOC3 in https://github.com/Myriad-Dreamin/tinymist/pull/592
+
+## Editor
+
+* Providing label view in https://github.com/Myriad-Dreamin/tinymist/pull/570
+* Providing package view and local documentation in https://github.com/Myriad-Dreamin/tinymist/pull/596
+
+## Preview
+
+* Listening data plane socket and serve frontend html on same address in https://github.com/Myriad-Dreamin/tinymist/pull/577
+* Added gitpod layer for previewing from remote host by @tani in https://github.com/Myriad-Dreamin/tinymist/pull/575
+
+## Document Symbol
+
+* (Fix) Showing symbols when pattern is not provided in https://github.com/Myriad-Dreamin/tinymist/pull/569
+
+## Folding Range
+
+* (Fix) Processing overlapping cases in line folding only mode (3ab4fa62) in https://github.com/Myriad-Dreamin/tinymist/pull/588
+* (Fix) Creating function scopes for nest symbols in https://github.com/Myriad-Dreamin/tinymist/pull/589
+
+## Misc
+
+* Added shell completions for Fig and Nushell by @T1mVo in https://github.com/Myriad-Dreamin/tinymist/pull/578
+
+## What's Changed
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.20...v0.11.22
+
 ## v0.11.20 - [2024-08-26]
 
 * Bumped typstyle to v0.11.32 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/551
