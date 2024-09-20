@@ -148,7 +148,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
     let mut last_pw = None;
     for (i, source) in sources.enumerate() {
         // find prelude
-        let mut source = source.trim();
+        let mut source = source.trim_start();
         let mut path = None;
 
         if source.starts_with("//") {

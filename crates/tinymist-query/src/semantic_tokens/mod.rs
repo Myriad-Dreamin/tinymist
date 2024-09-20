@@ -146,14 +146,25 @@ impl Tokenizer {
     }
 
     fn push(&mut self, token: Token) {
+        let Token {
+            token_type,
+            modifiers,
+            range,
+        } = token;
+
         use crate::typst_to_lsp;
         use lsp_types::Position;
-        let utf8_start = token.range.start;
+        let utf8_start = range.start;
         if self.pos_offset > utf8_start {
             return;
         }
-        let utf8_end = token.range.end;
+
+        // This might be a bug of typst, that `end > len` is possible
+        let utf8_end = (range.end).min(self.source.text().len());
         self.pos_offset = utf8_start;
+        if utf8_end < range.start || range.start > self.source.text().len() {
+            return;
+        }
 
         let position = typst_to_lsp::offset_to_position(utf8_start, self.encoding, &self.source);
 
@@ -177,8 +188,8 @@ impl Tokenizer {
                 delta_line: delta.delta_line,
                 delta_start: delta.delta_start,
                 length: encode_length(utf8_start, utf8_end) as u32,
-                token_type: token.token_type as u32,
-                token_modifiers_bitset: token.modifiers.bitset(),
+                token_type: token_type as u32,
+                token_modifiers_bitset: modifiers.bitset(),
             });
         } else {
             let final_line = self
@@ -193,8 +204,8 @@ impl Tokenizer {
                 delta_line: delta.delta_line,
                 delta_start: delta.delta_start,
                 length: encode_length(utf8_start, utf8_end.min(next_offset)) as u32,
-                token_type: token.token_type as u32,
-                token_modifiers_bitset: token.modifiers.bitset(),
+                token_type: token_type as u32,
+                token_modifiers_bitset: modifiers.bitset(),
             });
             let mut utf8_cursor = next_offset;
             if self.curr_pos.line < final_line {
@@ -211,8 +222,8 @@ impl Tokenizer {
                         delta_line: 1,
                         delta_start: 0,
                         length: encode_length(utf8_cursor, next_offset) as u32,
-                        token_type: token.token_type as u32,
-                        token_modifiers_bitset: token.modifiers.bitset(),
+                        token_type: token_type as u32,
+                        token_modifiers_bitset: modifiers.bitset(),
                     });
                     self.pos_offset = utf8_cursor;
                     utf8_cursor = next_offset;
