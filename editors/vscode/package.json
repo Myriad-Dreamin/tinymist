@@ -738,8 +738,7 @@
             "markup.underline.link.typst"
           ],
           "raw": [
-            "markup.inline.raw.typst",
-            "markup.raw.inline.typst"
+            "markup.other.raw.typst"
           ],
           "delim.math": [
             "punctuation.definition.math.typst",
