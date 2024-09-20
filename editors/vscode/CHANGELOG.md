@@ -13,37 +13,49 @@ This is a new release channel for Tinymist, which uses *main branch of typst*. C
 * Added compatibility layer for Typst stable and nightly APIs by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/573
 * Added compatibility for `typst_syntax::LinkedNode.leaf_at` by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/582
 
-## Compiler
+### Compiler
 
 * (Fix) Deadlock when iterating dependencies in https://github.com/Myriad-Dreamin/tinymist/pull/568
   * This could happen when you are triggering workspace-level requests, like `symbol` or `reference` requests.
 * (Fix) Ignoring system fonts correctly in https://github.com/Myriad-Dreamin/tinymist/pull/597
 * Supported CA certificate customization by @ricOC3 in https://github.com/Myriad-Dreamin/tinymist/pull/592
 
-## Editor
+### Editor
 
 * Providing label view in https://github.com/Myriad-Dreamin/tinymist/pull/570
 * Providing package view and local documentation in https://github.com/Myriad-Dreamin/tinymist/pull/596
 
-## Preview
+### Preview
 
 * Listening data plane socket and serve frontend html on same address in https://github.com/Myriad-Dreamin/tinymist/pull/577
 * Added gitpod layer for previewing from remote host by @tani in https://github.com/Myriad-Dreamin/tinymist/pull/575
 
-## Document Symbol
+### Syntax/Semantic Highlighting
 
-* (Fix) Showing symbols when pattern is not provided in https://github.com/Myriad-Dreamin/tinymist/pull/569
+* (Fix) Ignoring invalid tokens in typst's syntax tree in https://github.com/Myriad-Dreamin/tinymist/pull/605
+* Improved theme settings for raw blocks in https://github.com/Myriad-Dreamin/tinymist/pull/606
 
-## Folding Range
+### Completion
+
+* (Fix) Refined label types to remove hacking citation filter in https://github.com/Myriad-Dreamin/tinymist/pull/603
+* (Fix) Deduplicating value completion correctly in https://github.com/Myriad-Dreamin/tinymist/pull/604
+
+### Folding Range
 
 * (Fix) Processing overlapping cases in line folding only mode (3ab4fa62) in https://github.com/Myriad-Dreamin/tinymist/pull/588
 * (Fix) Creating function scopes for nest symbols in https://github.com/Myriad-Dreamin/tinymist/pull/589
 
-## Misc
+### Document Symbol
+
+* (Fix) Showing symbols when pattern is not provided in https://github.com/Myriad-Dreamin/tinymist/pull/569
+
+### Commands/Tools
+
+* Showing first occurrence locations for used fonts by @hooyuser in https://github.com/Myriad-Dreamin/tinymist/pull/598
+
+### Misc
 
 * Added shell completions for Fig and Nushell by @T1mVo in https://github.com/Myriad-Dreamin/tinymist/pull/578
-
-## What's Changed
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.20...v0.11.22
 
@@ -52,29 +64,29 @@ This is a new release channel for Tinymist, which uses *main branch of typst*. C
 * Bumped typstyle to v0.11.32 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/551
 * Bumped typst.ts to v0.5.0-rc7 in https://github.com/Myriad-Dreamin/tinymist/pull/554
 
-## Compiler
+### Compiler
 
 * Performing simple rate limit on heavy dynamic analysis in https://github.com/Myriad-Dreamin/tinymist/pull/532
 
-## Editor
+### Editor
 
 * Provide contextual action to export text in range as ansi highlighted code in https://github.com/Myriad-Dreamin/tinymist/pull/526 and https://github.com/Myriad-Dreamin/tinymist/pull/544
 * Fixed invalid merged command options in https://github.com/Myriad-Dreamin/tinymist/pull/564
 
-## Commands/Tools
+### Commands/Tools
 
 * Added local package manager by @OrangeX4 in https://github.com/Myriad-Dreamin/tinymist/pull/458
 
-## Preview
+### Preview
 
 * Removed useless `tinymist.preview.showInActivityBar` in https://github.com/Myriad-Dreamin/tinymist/pull/543
 
-## Hover (Tooltip)
+### Hover (Tooltip)
 
 * (Fix) Removed feature texmath by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/535
 * Displaying all imported definitions for wildcard imports in https://github.com/Myriad-Dreamin/tinymist/pull/565
 
-## References
+### References
 
 * Finding references for `Ref` and `Label` by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/527
 
@@ -84,7 +96,7 @@ This is a new release channel for Tinymist, which uses *main branch of typst*. C
 * Improved numeric literal parsers in https://github.com/Myriad-Dreamin/tinymist/pull/558
 * (Fix): parse quotes near the atomic hash expression in https://github.com/Myriad-Dreamin/tinymist/pull/559
 
-## Misc
+### Misc
 
 * Added test for `goto_definition` for label by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/510
 * Generating shell completion by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/525
@@ -360,24 +372,24 @@ These bugs are introduced by [Preparing for parallelizing lsp requests](https://
 
 * Bumped typstyle to v0.11.26 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/326
 
-## Compiler
+### Compiler
 
 * (Fix): Handling the conversion of offset at the EOF in https://github.com/Myriad-Dreamin/tinymist/pull/325
 * (Fix) Accumulating export events correctly in https://github.com/Myriad-Dreamin/tinymist/pull/330
 
-## Document Highlighting (New)
+### Document Highlighting (New)
 
 * Highlighting all break points for that loop context in https://github.com/Myriad-Dreamin/tinymist/pull/317
 
-## On Enter (New)
+### On Enter (New)
 
 * Implemented `experimental/onEnter` in https://github.com/Myriad-Dreamin/tinymist/pull/328
 
-## Completion
+### Completion
 
 * Generating names for destructuring closure params by @wrenger in https://github.com/Myriad-Dreamin/tinymist/pull/319
 
-## Misc
+### Misc
 
 * Combined CompileClient and CompileClientActor by @QuarticCat in https://github.com/Myriad-Dreamin/tinymist/pull/318
 * Simplified pin_entry by @QuarticCat in https://github.com/Myriad-Dreamin/tinymist/pull/320
