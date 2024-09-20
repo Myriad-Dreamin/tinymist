@@ -116,7 +116,7 @@ impl StatefulRequest for CompletionRequest {
                     let ty_chk = ctx.type_check(source.clone());
                     if let Some(ty_chk) = ty_chk {
                         let ty = ty_chk.type_of_span(cano_expr.span());
-                        log::debug!("check string ty: {:?}", ty);
+                        log::debug!("check string ty: {ty:?}");
                         if let Some(Ty::Builtin(BuiltinTy::Path(path_filter))) = ty {
                             completion_result =
                                 complete_path(ctx, Some(cano_expr), &source, cursor, &path_filter);
@@ -371,17 +371,12 @@ mod tests {
                     position: ctx.to_lsp_pos(s, &source),
                     explicit: false,
                 };
-                results.push(request.request(ctx, doc.clone()).map(|resp| {
-                    // CompletionResponse::Array(items)
-                    match resp {
-                        CompletionResponse::List(l) => CompletionResponse::List(CompletionList {
-                            is_incomplete: l.is_incomplete,
-                            items: get_items(l.items),
-                        }),
-                        CompletionResponse::Array(items) => {
-                            CompletionResponse::Array(get_items(items))
-                        }
-                    }
+                results.push(request.request(ctx, doc.clone()).map(|resp| match resp {
+                    CompletionResponse::List(l) => CompletionResponse::List(CompletionList {
+                        is_incomplete: l.is_incomplete,
+                        items: get_items(l.items),
+                    }),
+                    CompletionResponse::Array(items) => CompletionResponse::Array(get_items(items)),
                 }));
             }
             with_settings!({

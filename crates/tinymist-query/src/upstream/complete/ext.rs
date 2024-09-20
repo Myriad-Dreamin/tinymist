@@ -493,7 +493,7 @@ fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
     let mut completions = std::mem::take(&mut ctx.completions);
     let explict = ctx.explicit;
     ctx.explicit = true;
-    complete_code(ctx);
+    complete_code(ctx, true);
     ctx.explicit = explict;
 
     log::debug!(
@@ -694,7 +694,7 @@ fn type_completion(
         return Some(());
     }
 
-    log::debug!("type_completion: {:?}", infer_type);
+    log::debug!("type_completion: {infer_type:?}");
 
     match infer_type {
         Ty::Any => return None,
@@ -711,6 +711,14 @@ fn type_completion(
         Ty::Field(f) => {
             let f = &f.name;
             if ctx.seen_field(f.clone()) {
+                return Some(());
+            }
+
+            let mut rev_stream = ctx.before.chars().rev();
+            let ch = rev_stream.find(|c| !typst::syntax::is_id_continue(*c));
+            // skip label/ref completion.
+            // todo: more elegant way
+            if matches!(ch, Some('<' | '@')) {
                 return Some(());
             }
 
@@ -854,6 +862,12 @@ fn type_completion(
             BuiltinTy::Float => {
                 ctx.snippet_completion("exponential notation", "${1}e${0}", "Exponential notation");
             }
+            BuiltinTy::CiteLabel => {
+                ctx.label_completions(true);
+            }
+            BuiltinTy::RefLabel => {
+                ctx.ref_completions();
+            }
             BuiltinTy::Type(ty) => {
                 if *ty == Type::of::<NoneValue>() {
                     let docs = docs.or(Some("Nothing."));
@@ -867,7 +881,7 @@ fn type_completion(
                 } else if *ty == Type::of::<Color>() {
                     type_completion(ctx, &Ty::Builtin(BuiltinTy::Color), docs);
                 } else if *ty == Type::of::<Label>() {
-                    ctx.label_completions()
+                    ctx.label_completions(false)
                 } else if *ty == Type::of::<Func>() {
                     ctx.snippet_completion(
                         "function",
@@ -1018,7 +1032,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     use crate::syntax::get_check_target;
 
     let check_target = get_check_target(ctx.leaf.clone());
-    log::debug!("complete_type: pos {:?} -> {:#?}", ctx.leaf, check_target);
+    log::debug!("complete_type: pos {:?} -> {check_target:#?}", ctx.leaf);
 
     match check_target {
         Some(CheckTarget::Element { container, .. }) => {
@@ -1038,6 +1052,8 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
                 }
             }
         }
+        Some(CheckTarget::Normal(e)) if matches!(e.kind(), SyntaxKind::Label | SyntaxKind::Ref) => {
+        }
         Some(CheckTarget::Paren { .. }) => {}
         Some(CheckTarget::Normal(..)) => return None,
         None => return None,
@@ -1048,8 +1064,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         .literal_type_of_node(ctx.leaf.clone())
         .filter(|ty| !matches!(ty, Ty::Any))?;
 
-    log::debug!("complete_type: ty  {:?} -> {:#?}", ctx.leaf, ty);
-    // log::debug!("complete_type: before {:?}", ctx.before.chars().last());
+    log::debug!("complete_type: ty  {:?} -> {ty:#?}", ctx.leaf);
 
     type_completion(ctx, &ty, None);
     if ctx.before.ends_with(',') || ctx.before.ends_with(':') {
