@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.11.22-rc1"
+version = "0.11.22"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -137,7 +137,7 @@ insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
 typst-preview = { path = "./crates/typst-preview/" }
-tinymist-assets = { version = "0.11.22-rc1" }
+tinymist-assets = { version = "0.11.22" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/" }
 tinymist-query = { path = "./crates/tinymist-query/" }

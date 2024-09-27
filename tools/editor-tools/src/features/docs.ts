@@ -125,6 +125,8 @@ async function recoverDocsStructure(content: string) {
         break;
       case TokenKind.PackageEnd:
         const pkg = current;
+        pkg.data = pkg.data || {};
+        pkg.data["pkgEndData"] = token[1];
         current = structStack.pop()!;
         currentPkg = packageStack.pop()!;
         current.children.push(pkg);
@@ -274,19 +276,82 @@ async function base64ToUtf8(base64: string) {
   return await res.text();
 }
 
-function getKnownModules(v: DocElement, s: Set<string>) {
-  for (const child of v.children) {
-    if (child.kind === DocKind.Module) {
-      s.add(child.id);
-    }
-    getKnownModules(child, s);
-  }
+interface TypstFileMeta {
+  package: number;
+  path: string;
+  isInternal?: boolean;
 }
 
-function MakeDoc(v: DocElement) {
-  const knownModules = new Set<string>();
-  getKnownModules(v, knownModules);
-  console.log("MakeDoc", v, knownModules);
+interface TypstPackageMeta {
+  namespace: string;
+  name: string;
+  version: string;
+}
+
+function MakeDoc(root: DocElement) {
+  // s: TypstFileMeta[],
+  // t: TypstPackageMeta[]
+  let knownFiles: TypstFileMeta[] = [];
+  let knownPackages: TypstPackageMeta[] = [];
+  let selfPackageId = -1;
+  // module-symbol-module-src.lib-barchart
+  getKnownPackages(root);
+  processInternalModules(root);
+  console.log("MakeDoc", root, knownFiles, knownPackages);
+
+  function getKnownPackages(v: DocElement) {
+    for (const child of v.children) {
+      if (child.kind === DocKind.Package) {
+        knownFiles = [...child.data.pkgEndData["files"]];
+        knownFiles.forEach((e) => {
+          e.path = e.path.replace(/\\/g, "/");
+        });
+        knownPackages = [...child.data.pkgEndData["packages"]];
+        selfPackageId = knownPackages.findIndex(
+          (e) =>
+            e.namespace === child.data.namespace &&
+            e.name === child.data.name &&
+            e.version === child.data.version
+        );
+        return;
+      }
+      getKnownPackages(child);
+    }
+  }
+
+  function processInternalModules(v: DocElement) {
+    if (v.kind === DocKind.Module) {
+      v.data.aka = v.data.aka || [];
+      v.data.realAka = v.data.aka.filter((e: string) => !e.includes(".-."));
+      knownFiles[v.data.loc].isInternal = v.data.realAka.length === 0;
+    }
+    for (const child of v.children) {
+      processInternalModules(child);
+    }
+  }
+
+  function genFileId(file: TypstFileMeta) {
+    if (!file) {
+      return "not-found";
+    }
+    const pkg = knownPackages[file.package];
+    const pathId = file.path.replaceAll("\\", ".").replaceAll("/", ".");
+    if (pkg) {
+      return `module-${pkg.namespace}-${pkg.name}-${pkg.version}-${pathId}`;
+    }
+    return `module-${pathId}`;
+  }
+
+  function getExternalPackage(loc: number) {
+    if (loc < 0 || loc >= knownFiles.length) {
+      return undefined;
+    }
+    // return knownFiles[loc]?.package !== selfPackageId;
+    if (knownFiles[loc]?.package === selfPackageId) {
+      return undefined;
+    }
+    return knownPackages[knownFiles[loc]?.package];
+  }
 
   function Item(v: DocElement): ChildDom {
     switch (v.kind) {
@@ -315,6 +380,18 @@ function MakeDoc(v: DocElement) {
       default:
         return div();
     }
+  }
+
+  function ItemDoc(v: DocElement): ChildDom {
+    return div({
+      style: "margin-left: 0.62em",
+      innerHTML: v.contents.join(""),
+    });
+  }
+
+  function ShortItemDoc(v: DocElement): ChildDom[] {
+    console.log("item ref to ", v);
+    return [ItemDoc(v)];
   }
 
   function ModuleBody(v: DocElement) {
@@ -346,7 +423,42 @@ function MakeDoc(v: DocElement) {
       }
     }
 
+    // sort modules
+    modules.sort((x, y) => {
+      const xIsExternal = knownFiles[x.data?.loc[0]].package;
+      const yIsExternal = knownFiles[y.data?.loc[0]].package;
+      if (xIsExternal != yIsExternal) {
+        return xIsExternal ? 1 : -1;
+      }
+
+      const xIsInternal = knownFiles[x.data?.loc[0]].isInternal;
+      const yIsInternal = knownFiles[y.data?.loc[0]].isInternal;
+      if (xIsInternal != yIsInternal) {
+        return xIsInternal ? 1 : -1;
+      }
+
+      return x.id.localeCompare(y.id);
+    });
+
     const chs = [];
+
+    // if (v.data?.aka) {
+    //   const aka: string[] = v.data.aka.filter(
+    //     (e: string) => e && !e.includes(".-.")
+    //   );
+    //   chs.push(
+    //     ul(
+    //       ...[
+    //         aka.map((moduleId: string) =>
+    //           li(
+    //             `referenced as `,
+    //             a({ href: `#symbol-module-${moduleId}` }, moduleId)
+    //           )
+    //         ),
+    //       ]
+    //     )
+    //   );
+    // }
 
     if (modules.length > 0) {
       chs.push(h2("Modules"), div(...modules.map(ModuleRefItem)));
@@ -368,9 +480,30 @@ function MakeDoc(v: DocElement) {
   }
 
   function ModuleItem(v: DocElement) {
+    const fileLoc = v.data.loc;
+    const fid = genFileId(knownFiles[fileLoc]);
+    const isInternal = knownFiles[fileLoc]?.isInternal;
+    console.log("ModuleItem", v, fid);
+
+    const title = [];
+    if (isInternal) {
+      title.push(
+        span(
+          {
+            style: "text-decoration: underline",
+            title: `It is inaccessible by paths`,
+          },
+          "Module"
+        ),
+        code(" ", knownFiles[fileLoc]?.path || v.id)
+      );
+    } else {
+      title.push(span(`Module: ${v.id}`));
+    }
+
     return div(
       { class: "tinymist-module" },
-      h1({ id: `module-${v.id}` }, `Module: ${v.data.prefix}`),
+      h1({ id: v.id }, ...(fid ? [span({ id: fid }, ...title)] : title)),
       ModuleBody(v)
     );
   }
@@ -397,16 +530,53 @@ function MakeDoc(v: DocElement) {
   }
 
   function ModuleRefItem(v: DocElement) {
-    const isExternal = !knownModules.has(v.id);
+    // const isExternal = !v.data.loc;
+    const fileLoc = v.data.loc;
+    const extPkg = getExternalPackage(fileLoc?.[0]);
+    const internal = knownFiles[fileLoc?.[0]].isInternal;
 
     let body;
-    if (isExternal) {
-      body = code("external ", v.data.name);
-    } else {
+    if (extPkg) {
       body = code(
+        extPkg.namespace === "preview"
+          ? a(
+              {
+                href: `https://typst.app/universe/package/${extPkg.name}/${extPkg.version}`,
+                style: "text-decoration: underline",
+                title: `In external package @${extPkg.namespace}/${extPkg.name}:${extPkg.version}`,
+              },
+              "external"
+            )
+          : span(
+              {
+                style: "text-decoration: underline",
+                title: `In local package @${extPkg.namespace}/${extPkg.name}:${extPkg.version}`,
+              },
+              "external"
+            ),
+        code(" ", v.data.name)
+      );
+    } else {
+      const file = knownFiles[fileLoc?.[0]];
+      const fid = genFileId(file);
+      const bodyPre = internal
+        ? code(
+            span(
+              {
+                style: "text-decoration: underline",
+                title: `This module is inaccessible by paths`,
+              },
+              "internal"
+            ),
+            code(" ")
+          )
+        : code();
+
+      body = code(
+        bodyPre,
         a(
           {
-            href: `#module-${v.id}`,
+            href: `#${fid}`,
           },
           v.data.name
         )
@@ -415,6 +585,7 @@ function MakeDoc(v: DocElement) {
 
     return div(
       {
+        id: v.id,
         class: "tinymist-module-ref",
       },
       div(
@@ -439,7 +610,18 @@ function MakeDoc(v: DocElement) {
 
   function FuncItem(v: DocElement) {
     const sig = v.data.signature;
-    let funcTitle = [code(v.data.name), "("];
+
+    const export_again = v.data.export_again
+      ? [kwHl("external"), code(" ")]
+      : [];
+    // symbol-function-src.draw.grouping-place-anchors
+    const name = a(
+      {
+        id: v.id,
+      },
+      code(v.data.name)
+    );
+    let funcTitle = [...export_again, name, "("];
     if (sig) {
       // funcTitle.push(...sig.pos.map((e: DocParam) => code(e.name)));
       for (let i = 0; i < sig.pos.length; i++) {
@@ -473,11 +655,7 @@ function MakeDoc(v: DocElement) {
         h3({ class: "doc-symbol-name" }, code(...funcTitle))
       ),
       ...SigPreview(v),
-      div({
-        style: "margin-left: 0.62em",
-        innerHTML: v.contents.join(""),
-      }),
-      ...SigDocs(v)
+      ...(v.data.export_again ? ShortItemDoc(v) : [ItemDoc(v), ...SigDocs(v)])
     );
   }
 
@@ -534,7 +712,7 @@ function MakeDoc(v: DocElement) {
 
     if (parsed_docs?.return_ty || sig.ret_ty) {
       let paramTitle = [codeHl("op", "-> ")];
-      sigTypeHighlighted(parsed_docs.return_ty, sig.ret_ty, paramTitle);
+      sigTypeHighlighted(parsed_docs?.return_ty, sig.ret_ty, paramTitle);
 
       res.push(h3("Resultant"));
       res.push(
@@ -560,8 +738,6 @@ function MakeDoc(v: DocElement) {
     if (paramsAll.length) {
       res.push(h3("Parameters"));
     }
-
-    console.log("SigDocs", { paramsAll, docsMapping });
 
     for (const { kind, param } of paramsAll) {
       let docs: string[] = [];
@@ -641,9 +817,24 @@ function MakeDoc(v: DocElement) {
     //   }
     //   return code(param.name);
     // }),
+    // http://localhost:5173/#symbol-function-src.lib.draw-copy-anchors
+    // http://localhost:5173/#symbol-function-src.draw.grouping-copy-anchors
+    const export_again = v.data.export_again
+      ? [
+          a(
+            {
+              href: v.data.external_link,
+              title: "this symbol is re-exported from other modules",
+            },
+            kwHl("external")
+          ),
+          code(" "),
+        ]
+      : [];
 
     const sigTitle = [
-      code(kwHl("let")),
+      ...export_again,
+      kwHl("let"),
       code(" "),
       code(fnHl(v.data.name)),
       code("("),
@@ -714,14 +905,11 @@ function MakeDoc(v: DocElement) {
           // )
         )
       ),
-      div({
-        style: "margin-left: 0.62em",
-        innerHTML: v.contents.join(""),
-      })
+      ItemDoc(v)
     );
   }
 
-  return Item(v);
+  return Item(root);
 }
 
 function sigTypeHighlighted(
@@ -729,7 +917,6 @@ function sigTypeHighlighted(
   inferred: [string, string] | undefined,
   target: ChildDom[]
 ) {
-  console.log("sigTypeHighlighted", { types, inferred });
   if (types) {
     typeHighlighted(types, target);
   } else if (inferred) {
