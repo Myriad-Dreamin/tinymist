@@ -12,14 +12,16 @@ use std::sync::Arc;
 use comemo::Track;
 use ecow::{eco_vec, EcoString, EcoVec};
 use indexmap::IndexSet;
+use itertools::Itertools;
 use parking_lot::Mutex;
+use reflexo::path::unix_slash;
 use serde::{Deserialize, Serialize};
 use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
 use tinymist_world::LspWorld;
 use typst::diag::{eco_format, StrResult};
 use typst::engine::Route;
 use typst::eval::Tracer;
-use typst::foundations::{Bytes, Value};
+use typst::foundations::{Bytes, Module, Value};
 use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{FileId, Span, VirtualPath};
 use typst::World;
@@ -85,6 +87,8 @@ impl Docs {
     }
 }
 
+type TypeRepr = Option<(/* short */ String, /* long */ String)>;
+
 /// Describes a primary function signature.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocSignature {
@@ -95,7 +99,7 @@ pub struct DocSignature {
     /// The rest parameter.
     pub rest: Option<DocParamSpec>,
     /// The return type.
-    pub ret_ty: Option<(String, String)>,
+    pub ret_ty: TypeRepr,
 }
 
 /// Describes a function parameter.
@@ -106,7 +110,7 @@ pub struct DocParamSpec {
     /// Documentation for the parameter.
     pub docs: String,
     /// Inferred type of the parameter.
-    pub cano_type: Option<(String, String)>,
+    pub cano_type: TypeRepr,
     /// The parameter's default name as type.
     pub type_repr: Option<EcoString>,
     /// The parameter's default name as value.
@@ -125,7 +129,7 @@ pub struct DocParamSpec {
 }
 
 /// Information about a symbol.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SymbolInfoHead {
     /// The name of the symbol.
     pub name: EcoString,
@@ -133,6 +137,12 @@ pub struct SymbolInfoHead {
     pub kind: EcoString,
     /// The location (file, start, end) of the symbol.
     pub loc: Option<(usize, usize, usize)>,
+    /// Is the symbol reexport
+    pub export_again: bool,
+    /// Is the symbol reexport
+    pub external_link: Option<String>,
+    /// The one-line documentation of the symbol.
+    pub oneliner: Option<String>,
     /// The raw documentation of the symbol.
     pub docs: Option<String>,
     /// The signature of the symbol.
@@ -142,6 +152,9 @@ pub struct SymbolInfoHead {
     /// The value of the symbol.
     #[serde(skip)]
     pub constant: Option<EcoString>,
+    /// The file owning the symbol.
+    #[serde(skip)]
+    pub fid: Option<FileId>,
     /// The span of the symbol.
     #[serde(skip)]
     pub span: Option<Span>,
@@ -161,6 +174,16 @@ pub struct SymbolInfo {
     pub head: SymbolInfoHead,
     /// The children of the symbol.
     pub children: EcoVec<SymbolInfo>,
+}
+
+/// Information about the symbols in a package.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolsInfo {
+    /// The root module information.
+    #[serde(flatten)]
+    pub root: SymbolInfo,
+    /// The module accessible paths.
+    pub module_uses: HashMap<String, EcoVec<String>>,
 }
 
 /// Information about a package.
@@ -191,6 +214,18 @@ pub struct FileMeta {
 }
 
 /// Parses the manifest of the package located at `package_path`.
+pub fn get_manifest_id(spec: &PackageInfo) -> StrResult<FileId> {
+    Ok(FileId::new(
+        Some(PackageSpec {
+            namespace: spec.namespace.clone(),
+            name: spec.name.clone(),
+            version: spec.version.parse()?,
+        }),
+        VirtualPath::new("typst.toml"),
+    ))
+}
+
+/// Parses the manifest of the package located at `package_path`.
 pub fn get_manifest(world: &LspWorld, toml_id: FileId) -> StrResult<PackageManifest> {
     let toml_data = world
         .file(toml_id)
@@ -203,33 +238,160 @@ pub fn get_manifest(world: &LspWorld, toml_id: FileId) -> StrResult<PackageManif
         .map_err(|err| eco_format!("package manifest is malformed ({})", err.message()))
 }
 
+struct ScanSymbolCtx<'a> {
+    world: &'a LspWorld,
+    for_spec: Option<&'a PackageSpec>,
+    aliases: &'a mut HashMap<FileId, Vec<String>>,
+    extras: &'a mut Vec<SymbolInfo>,
+    route: Route<'a>,
+    root: FileId,
+    tracer: Tracer,
+}
+
+impl ScanSymbolCtx<'_> {
+    fn module(&mut self, fid: FileId) -> StrResult<Module> {
+        let source = self.world.source(fid).map_err(|e| eco_format!("{e}"))?;
+        let route = self.route.track();
+        let tracer = self.tracer.track_mut();
+        let w: &dyn typst::World = self.world;
+
+        typst::eval::eval(w.track(), route, tracer, &source).map_err(|e| eco_format!("{e:?}"))
+    }
+
+    fn module_sym(&mut self, path: EcoVec<&str>, module: Module) -> SymbolInfo {
+        let key = module.name().to_owned();
+        let site = Some(self.root);
+        let p = path.clone();
+        self.sym(&key, p, site.as_ref(), &Value::Module(module))
+    }
+
+    fn sym(
+        &mut self,
+        key: &str,
+        path: EcoVec<&str>,
+        site: Option<&FileId>,
+        val: &Value,
+    ) -> SymbolInfo {
+        let mut head = create_head(self.world, key, val);
+
+        if !matches!(&val, Value::Module(..)) {
+            if let Some((span, mod_fid)) = head.span.and_then(Span::id).zip(site) {
+                if span != *mod_fid {
+                    head.export_again = true;
+                    head.oneliner = head.docs.as_deref().map(oneliner).map(|e| e.to_owned());
+                    head.docs = None;
+                }
+            }
+        }
+
+        let children = match val {
+            Value::Module(module) => module.file_id().and_then(|fid| {
+                // only generate docs for the same package
+                if fid.package() != self.for_spec {
+                    return None;
+                }
+
+                // !aliases.insert(fid)
+                let aliases_vec = self.aliases.entry(fid).or_default();
+                let is_fresh = aliases_vec.is_empty();
+                aliases_vec.push(path.iter().join("."));
+
+                if !is_fresh {
+                    log::debug!("found module: {path:?} (reexport)");
+                    return None;
+                }
+
+                log::debug!("found module: {path:?}");
+
+                let symbols = module.scope().iter();
+                let symbols = symbols
+                    .map(|(k, v)| {
+                        let mut path = path.clone();
+                        path.push(k);
+                        self.sym(k, path.clone(), Some(&fid), v)
+                    })
+                    .collect();
+                Some(symbols)
+            }),
+            _ => None,
+        };
+
+        // Insert module that is not exported
+        if let Some(fid) = head.fid {
+            // only generate docs for the same package
+            if fid.package() == self.for_spec {
+                let av = self.aliases.entry(fid).or_default();
+                if av.is_empty() {
+                    let m = self.module(fid);
+                    let mut path = path.clone();
+                    path.push("-");
+                    path.push(key);
+
+                    log::debug!("found internal module: {path:?}");
+                    if let Ok(m) = m {
+                        let msym = self.module_sym(path, m);
+                        self.extras.push(msym)
+                    }
+                }
+            }
+        }
+
+        let children = children.unwrap_or_default();
+        SymbolInfo { head, children }
+    }
+}
+
 /// List all symbols in a package.
-pub fn list_symbols(world: &LspWorld, spec: &PackageInfo) -> StrResult<SymbolInfo> {
-    let toml_id = FileId::new(
-        Some(PackageSpec {
-            namespace: spec.namespace.clone(),
-            name: spec.name.clone(),
-            version: spec.version.parse()?,
-        }),
-        VirtualPath::new("typst.toml"),
-    );
+pub fn list_symbols(world: &LspWorld, spec: &PackageInfo) -> StrResult<SymbolsInfo> {
+    let toml_id = get_manifest_id(spec)?;
     let manifest = get_manifest(world, toml_id)?;
-
-    let entry_point = toml_id.join(&manifest.package.entrypoint);
-    let source = world.source(entry_point).map_err(|e| eco_format!("{e}"))?;
-    let route = Route::default();
-    let mut tracer = Tracer::default();
-    let w: &dyn typst::World = world;
-
-    let src = typst::eval::eval(w.track(), route.track(), tracer.track_mut(), &source)
-        .map_err(|e| eco_format!("{e:?}"))?;
 
     let for_spec = PackageSpec {
         namespace: spec.namespace.clone(),
         name: spec.name.clone(),
         version: spec.version.parse()?,
     };
-    Ok(symbol(world, Some(&for_spec), "root", &Value::Module(src)))
+    let mut aliases = HashMap::new();
+    let mut extras = vec![];
+    let entry_point = toml_id.join(&manifest.package.entrypoint);
+
+    let mut scan_ctx = ScanSymbolCtx {
+        world,
+        root: entry_point,
+        for_spec: Some(&for_spec),
+        aliases: &mut aliases,
+        extras: &mut extras,
+        route: Route::default(),
+        tracer: Tracer::default(),
+    };
+
+    let src = scan_ctx.module(entry_point)?;
+    let mut symbols = scan_ctx.module_sym(eco_vec![], src);
+
+    let module_uses = aliases
+        .into_iter()
+        .map(|(k, mut v)| {
+            v.sort_by(|a, b| a.len().cmp(&b.len()).then(a.cmp(b)));
+            (file_id_repr(k), v.into())
+        })
+        .collect();
+
+    log::debug!("module_uses: {module_uses:#?}",);
+
+    symbols.children.extend(extras);
+
+    Ok(SymbolsInfo {
+        root: symbols,
+        module_uses,
+    })
+}
+
+fn file_id_repr(k: FileId) -> String {
+    if let Some(p) = k.package() {
+        format!("{p}{}", unix_slash(k.vpath().as_rooted_path()))
+    } else {
+        unix_slash(k.vpath().as_rooted_path())
+    }
 }
 
 fn jbase64<T: Serialize>(s: &T) -> String {
@@ -269,6 +431,135 @@ fn convert_docs(world: &LspWorld, content: &str) -> StrResult<EcoString> {
     Ok(conv)
 }
 
+fn identify_docs(kind: &str, content: &str) -> StrResult<Docs> {
+    match kind {
+        "function" => identify_tidy_func_docs(content).map(Docs::Function),
+        "variable" => identify_tidy_var_docs(content).map(Docs::Variable),
+        "module" => identify_tidy_module_docs(content).map(Docs::Module),
+        _ => Err(eco_format!("unknown kind {kind}")),
+    }
+}
+
+type TypeInfo = (Arc<crate::analysis::DefUseInfo>, Arc<crate::ty::TypeScheme>);
+
+fn docs_signature(
+    ctx: &mut AnalysisContext,
+    type_info: Option<&TypeInfo>,
+    sym: &SymbolInfo,
+    e: Value,
+    doc_ty: &mut impl FnMut(Option<&Ty>) -> TypeRepr,
+) -> Option<DocSignature> {
+    let func = match &e {
+        Value::Func(f) => f,
+        _ => return None,
+    };
+
+    // todo: documenting with bindings
+    use typst::foundations::func::Repr;
+    let mut func = func;
+    loop {
+        match func.inner() {
+            Repr::Element(..) | Repr::Native(..) => {
+                break;
+            }
+            Repr::With(w) => {
+                func = &w.0;
+            }
+            Repr::Closure(..) => {
+                break;
+            }
+        }
+    }
+
+    let sig = analyze_dyn_signature(ctx, func.clone());
+    let type_sig = type_info.and_then(|(def_use, ty_chk)| {
+        let def_fid = func.span().id()?;
+        let def_ident = IdentRef {
+            name: sym.head.name.clone(),
+            range: sym.head.name_range.clone()?,
+        };
+        let (def_id, _) = def_use.get_def(def_fid, &def_ident)?;
+        ty_chk.type_of_def(def_id)
+    });
+    let type_sig = type_sig.and_then(|type_sig| type_sig.sig_repr(true));
+
+    let pos_in = sig
+        .primary()
+        .pos
+        .iter()
+        .enumerate()
+        .map(|(i, pos)| (pos, type_sig.as_ref().and_then(|sig| sig.pos(i))));
+    let named_in = sig
+        .primary()
+        .named
+        .iter()
+        .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.named(x.0))));
+    let rest_in = sig
+        .primary()
+        .rest
+        .as_ref()
+        .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.rest_param())));
+
+    let ret_in = type_sig
+        .as_ref()
+        .and_then(|sig| sig.body.as_ref())
+        .or_else(|| sig.primary().ret_ty.as_ref());
+
+    let pos = pos_in
+        .map(|(param, ty)| DocParamSpec {
+            name: param.name.as_ref().to_owned(),
+            docs: param.docs.as_ref().to_owned(),
+            cano_type: doc_ty(ty),
+            type_repr: param.type_repr.clone(),
+            expr: param.expr.clone(),
+            positional: param.positional,
+            named: param.named,
+            variadic: param.variadic,
+            settable: param.settable,
+        })
+        .collect();
+
+    let named = named_in
+        .map(|((name, param), ty)| {
+            (
+                name.as_ref().to_owned(),
+                DocParamSpec {
+                    name: param.name.as_ref().to_owned(),
+                    docs: param.docs.as_ref().to_owned(),
+                    cano_type: doc_ty(ty),
+                    type_repr: param.type_repr.clone(),
+                    expr: param.expr.clone(),
+                    positional: param.positional,
+                    named: param.named,
+                    variadic: param.variadic,
+                    settable: param.settable,
+                },
+            )
+        })
+        .collect();
+
+    let rest = rest_in.map(|(param, ty)| DocParamSpec {
+        name: param.name.as_ref().to_owned(),
+        docs: param.docs.as_ref().to_owned(),
+        cano_type: doc_ty(ty),
+        type_repr: param.type_repr.clone(),
+        expr: param.expr.clone(),
+        positional: param.positional,
+        named: param.named,
+        variadic: param.variadic,
+        settable: param.settable,
+    });
+
+    let ret_ty = doc_ty(ret_in);
+
+    Some(DocSignature {
+        pos,
+        named,
+        rest,
+        ret_ty,
+    })
+}
+
 #[derive(Serialize, Deserialize)]
 struct ConvertResult {
     errors: Vec<String>,
@@ -281,17 +572,18 @@ pub fn generate_md_docs(
     spec: &PackageInfo,
 ) -> StrResult<String> {
     log::info!("generate_md_docs {spec:?}");
-    let toml_id = FileId::new(
-        Some(PackageSpec {
-            namespace: spec.namespace.clone(),
-            name: spec.name.clone(),
-            version: spec.version.parse()?,
-        }),
-        VirtualPath::new("typst.toml"),
-    );
+    let toml_id = get_manifest_id(spec)?;
+
+    let for_spec = PackageSpec {
+        namespace: spec.namespace.clone(),
+        name: spec.name.clone(),
+        version: spec.version.parse()?,
+    };
 
     let mut md = String::new();
-    let sym = list_symbols(world, spec)?;
+    let SymbolsInfo { root, module_uses } = list_symbols(world, spec)?;
+
+    log::debug!("module_uses: {module_uses:#?}");
 
     let title = format!("@{}/{}:{}", spec.namespace, spec.name, spec.version);
 
@@ -314,27 +606,62 @@ pub fn generate_md_docs(
     let package_meta = jbase64(&meta);
     let _ = writeln!(md, "<!-- begin:package {package_meta} -->");
 
-    let mut key = 0;
-
-    let mut modules_to_generate = vec![(EcoString::new(), sym.head.name.clone(), sym)];
+    let mut modules_to_generate = vec![(root.head.name.clone(), root)];
     let mut generated_modules = HashSet::new();
-    let mut file_ids = IndexSet::new();
+    let mut file_ids: IndexSet<FileId> = IndexSet::new();
+
+    // let aka = module_uses[&file_id_repr(fid.unwrap())].clone();
+    // let primary = &aka[0];
+    let mut primary_aka_cache = HashMap::<FileId, EcoVec<String>>::new();
+    let mut akas = |fid: FileId| {
+        primary_aka_cache
+            .entry(fid)
+            .or_insert_with(|| {
+                module_uses
+                    .get(&file_id_repr(fid))
+                    .unwrap_or_else(|| panic!("no module uses for {}", file_id_repr(fid)))
+                    .clone()
+            })
+            .clone()
+    };
+
+    // todo: extend this cache idea for all crate?
+    #[allow(clippy::mutable_key_type)]
+    let mut describe_cache = HashMap::<Ty, String>::new();
+    let mut doc_ty = |ty: Option<&Ty>| {
+        let ty = ty?;
+        let short = {
+            describe_cache
+                .entry(ty.clone())
+                .or_insert_with(|| ty.describe().unwrap_or_else(|| "unknown".to_string()))
+                .clone()
+        };
+
+        Some((short, format!("{ty:?}")))
+    };
 
     while !modules_to_generate.is_empty() {
-        for (prefix, parent_ident, sym) in std::mem::take(&mut modules_to_generate) {
+        for (parent_ident, sym) in std::mem::take(&mut modules_to_generate) {
             // parent_ident, symbols
             let symbols = sym.children;
-            if !prefix.is_empty() {
-                let _ = writeln!(md, "---\n## Module: {prefix}");
-            }
 
             let module_val = sym.head.value.as_ref().unwrap();
             let module = match module_val {
                 Value::Module(m) => m,
                 _ => todo!(),
             };
-
             let fid = module.file_id();
+            let aka = fid.map(&mut akas).unwrap_or_default();
+
+            // It is (primary) known to safe as a part of HTML string, so we don't have to
+            // do sanitization here.
+            let primary = aka.first().cloned().unwrap_or_default();
+            if !primary.is_empty() {
+                let _ = writeln!(md, "---\n## Module: {primary}");
+            }
+
+            log::debug!("module: {primary} -- {parent_ident}");
+
             let type_info = None.or_else(|| {
                 let file_id = fid?;
                 let src = world.source(file_id).ok()?;
@@ -352,14 +679,16 @@ pub fn generate_md_docs(
                 name: EcoString,
                 loc: Option<usize>,
                 parent_ident: EcoString,
+                aka: EcoVec<String>,
             }
             let m = jbase64(&ModuleInfo {
-                prefix: prefix.clone(),
+                prefix: primary.as_str().into(),
                 name: sym.head.name.clone(),
                 loc: persist_fid,
                 parent_ident: parent_ident.clone(),
+                aka,
             });
-            let _ = writeln!(md, "<!-- begin:module {parent_ident} {m} -->");
+            let _ = writeln!(md, "<!-- begin:module {primary} {m} -->");
 
             for mut sym in symbols {
                 let span = sym.head.span.and_then(|v| {
@@ -370,27 +699,25 @@ pub fn generate_md_docs(
                         Some((fid, rng.start, rng.end))
                     })
                 });
+                let sym_fid = sym.head.fid;
+                let sym_fid = sym_fid.or_else(|| sym.head.span.and_then(Span::id)).or(fid);
+                let span = span.or_else(|| {
+                    let fid = sym_fid?;
+                    Some((file_ids.insert_full(fid).0, 0, 0))
+                });
                 sym.head.loc = span;
+
+                let sym_value = sym.head.value.clone();
+                let signature =
+                    sym_value.and_then(|e| docs_signature(ctx, type_info, &sym, e, &mut doc_ty));
+                sym.head.signature = signature;
 
                 let mut convert_err = None;
                 if let Some(docs) = &sym.head.docs {
                     match convert_docs(world, docs) {
                         Ok(content) => {
-                            let docs = match sym.head.kind.as_str() {
-                                "function" => {
-                                    let t = identify_tidy_func_docs(&content).ok();
-                                    t.map(Docs::Function).unwrap_or(Docs::Plain(content))
-                                }
-                                "variable" => {
-                                    let t = identify_tidy_var_docs(&content).ok();
-                                    t.map(Docs::Variable).unwrap_or(Docs::Plain(content))
-                                }
-                                "module" => {
-                                    let t = identify_tidy_module_docs(&content).ok();
-                                    t.map(Docs::Module).unwrap_or(Docs::Plain(content))
-                                }
-                                _ => Docs::Plain(content),
-                            };
+                            let docs = identify_docs(sym.head.kind.as_str(), &content)
+                                .unwrap_or(Docs::Plain(content));
 
                             sym.head.parsed_docs = Some(docs.clone());
                             sym.head.docs = None;
@@ -405,115 +732,41 @@ pub fn generate_md_docs(
                     }
                 }
 
-                let signature =
-                    match &sym.head.parsed_docs {
-                        Some(Docs::Function(TidyFuncDocs {
-                            params, return_ty, ..
-                        })) => sym.head.value.clone().and_then(|e| {
-                            let func = match e {
-                                Value::Func(f) => f,
-                                _ => return None,
-                            };
-                            let sig = analyze_dyn_signature(ctx, func.clone());
-                            let type_sig = type_info.and_then(|(def_use, ty_chk)| {
-                                let def_fid = func.span().id()?;
-                                let def_ident = IdentRef {
-                                    name: sym.head.name.clone(),
-                                    range: sym.head.name_range.clone()?,
-                                };
-                                let (def_id, _) = def_use.get_def(def_fid, &def_ident)?;
-                                ty_chk.type_of_def(def_id)
-                            });
-                            let type_sig = type_sig.and_then(|type_sig| type_sig.sig_repr(true));
+                let ident = if !primary.is_empty() {
+                    eco_format!("symbol-{}-{primary}.{}", sym.head.kind, sym.head.name)
+                } else {
+                    eco_format!("symbol-{}-{}", sym.head.kind, sym.head.name)
+                };
+                let _ = writeln!(md, "### {}: {} in {primary}", sym.head.kind, sym.head.name);
 
-                            let pos_in = sig.primary().pos.iter().enumerate().map(|(i, pos)| {
-                                (pos, type_sig.as_ref().and_then(|sig| sig.pos(i)))
-                            });
-                            let named_in = sig
-                                .primary()
-                                .named
-                                .iter()
-                                .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.named(x.0))));
-                            let rest_in =
-                                sig.primary().rest.as_ref().map(|x| {
-                                    (x, type_sig.as_ref().and_then(|sig| sig.rest_param()))
-                                });
+                if sym.head.export_again {
+                    let sub_fid = sym.head.fid;
+                    if let Some(fid) = sub_fid {
+                        let lnk = if fid.package() == Some(&for_spec) {
+                            let sub_aka = akas(fid);
+                            let sub_primary = sub_aka.first().cloned().unwrap_or_default();
+                            sym.head.external_link = Some(format!(
+                                "#symbol-{}-{sub_primary}.{}",
+                                sym.head.kind, sym.head.name
+                            ));
+                            format!("#{}-{}-in-{sub_primary}", sym.head.kind, sym.head.name)
+                                .replace(".", "")
+                        } else if let Some(spec) = fid.package() {
+                            let lnk = format!(
+                                "https://typst.app/universe/package/{}/{}",
+                                spec.name, spec.version
+                            );
+                            sym.head.external_link = Some(lnk.clone());
+                            lnk
+                        } else {
+                            let lnk: String = "https://typst.app/docs".into();
+                            sym.head.external_link = Some(lnk.clone());
+                            lnk
+                        };
+                        let _ = writeln!(md, "[Symbol Docs]({lnk})\n");
+                    }
+                }
 
-                            let ret_in = type_sig
-                                .as_ref()
-                                .and_then(|sig| sig.body.as_ref())
-                                .or_else(|| sig.primary().ret_ty.as_ref());
-
-                            let doc_ty = |ty: Option<&Ty>| {
-                                ty.and_then(|ty| ty.describe().map(|e| (e, format!("{ty:?}"))))
-                            };
-
-                            let _ = params;
-                            let _ = return_ty;
-
-                            let pos = pos_in
-                                .map(|(param, ty)| DocParamSpec {
-                                    name: param.name.as_ref().to_owned(),
-                                    docs: param.docs.as_ref().to_owned(),
-                                    cano_type: doc_ty(ty),
-                                    type_repr: param.type_repr.clone(),
-                                    expr: param.expr.clone(),
-                                    positional: param.positional,
-                                    named: param.named,
-                                    variadic: param.variadic,
-                                    settable: param.settable,
-                                })
-                                .collect();
-
-                            let named = named_in
-                                .map(|((name, param), ty)| {
-                                    (
-                                        name.as_ref().to_owned(),
-                                        DocParamSpec {
-                                            name: param.name.as_ref().to_owned(),
-                                            docs: param.docs.as_ref().to_owned(),
-                                            cano_type: doc_ty(ty),
-                                            type_repr: param.type_repr.clone(),
-                                            expr: param.expr.clone(),
-                                            positional: param.positional,
-                                            named: param.named,
-                                            variadic: param.variadic,
-                                            settable: param.settable,
-                                        },
-                                    )
-                                })
-                                .collect();
-
-                            let rest = rest_in.map(|(param, ty)| DocParamSpec {
-                                name: param.name.as_ref().to_owned(),
-                                docs: param.docs.as_ref().to_owned(),
-                                cano_type: doc_ty(ty),
-                                type_repr: param.type_repr.clone(),
-                                expr: param.expr.clone(),
-                                positional: param.positional,
-                                named: param.named,
-                                variadic: param.variadic,
-                                settable: param.settable,
-                            });
-
-                            let ret_ty = doc_ty(ret_in);
-
-                            Some(DocSignature {
-                                pos,
-                                named,
-                                rest,
-                                ret_ty,
-                            })
-                        }),
-                        _ => None,
-                    };
-
-                sym.head.signature = signature;
-
-                let _ = writeln!(md, "### {}: {}", sym.head.kind, sym.head.name);
-
-                let ident = eco_format!("symbol-{}-{}-{key}", sym.head.kind, sym.head.name);
-                key += 1;
                 let head = jbase64(&sym.head);
                 let _ = writeln!(md, "<!-- begin:symbol {ident} {head} -->");
 
@@ -555,7 +808,10 @@ pub fn generate_md_docs(
                     (None, None) => {}
                 }
 
-                if let Some(docs) = &sym.head.docs {
+                let plain_docs = sym.head.docs.as_deref();
+                let plain_docs = plain_docs.or(sym.head.oneliner.as_deref());
+
+                if let Some(docs) = plain_docs {
                     let contains_code = docs.contains("```");
                     if contains_code {
                         let _ = writeln!(md, "`````typ");
@@ -567,23 +823,29 @@ pub fn generate_md_docs(
                 }
 
                 if !sym.children.is_empty() {
-                    let mut full_path = prefix.clone();
-                    if !full_path.is_empty() {
-                        full_path.push_str(".");
-                    }
-                    full_path.push_str(&sym.head.name);
-                    let link = format!("Module-{full_path}").replace(".", "-");
-                    let _ = writeln!(md, "[Module Docs](#{link})\n");
+                    let sub_fid = sym.head.fid;
+                    log::debug!("sub_fid: {sub_fid:?}");
+                    match sub_fid {
+                        Some(fid) => {
+                            let aka = akas(fid);
+                            let primary = aka.first().cloned().unwrap_or_default();
+                            let link = format!("module-{primary}").replace(".", "");
+                            let _ = writeln!(md, "[Module Docs](#{link})\n");
 
-                    if generated_modules.insert(full_path.clone()) {
-                        modules_to_generate.push((full_path, ident.clone(), sym));
+                            if generated_modules.insert(fid) {
+                                modules_to_generate.push((ident.clone(), sym));
+                            }
+                        }
+                        None => {
+                            let _ = writeln!(md, "A Builtin Module");
+                        }
                     }
                 }
 
                 let _ = writeln!(md, "<!-- end:symbol {ident} -->");
             }
 
-            let _ = writeln!(md, "<!-- end:module {parent_ident} -->");
+            let _ = writeln!(md, "<!-- end:module {primary} -->");
         }
     }
 
@@ -638,30 +900,9 @@ fn kind_of(val: &Value) -> EcoString {
     .into()
 }
 
-fn symbol(world: &LspWorld, for_spec: Option<&PackageSpec>, key: &str, val: &Value) -> SymbolInfo {
-    let children = match val {
-        Value::Module(module) => {
-            // only generate docs for the same package
-            if module.file_id().map_or(true, |e| e.package() != for_spec) {
-                eco_vec![]
-            } else {
-                let symbols = module.scope().iter();
-                symbols
-                    .map(|(k, v)| symbol(world, for_spec, k, v))
-                    .collect()
-            }
-        }
-        _ => eco_vec![],
-    };
-    SymbolInfo {
-        head: create_head(world, key, val),
-        children,
-    }
-}
-
 fn create_head(world: &LspWorld, k: &str, v: &Value) -> SymbolInfoHead {
     let kind = kind_of(v);
-    let (docs, name_range, span) = match v {
+    let (docs, name_range, fid, span) = match v {
         Value::Func(f) => {
             let mut span = None;
             let mut name_range = None;
@@ -677,29 +918,36 @@ fn create_head(world: &LspWorld, k: &str, v: &Value) -> SymbolInfoHead {
                 find_docs_of(&source, def)
             });
 
-            (docs, name_range, span.or(Some(f.span())))
+            let s = span.or(Some(f.span()));
+
+            (docs, name_range, s.and_then(Span::id), s)
         }
-        _ => (None, None, None),
+        Value::Module(m) => (None, None, m.file_id(), None),
+        _ => Default::default(),
     };
 
     SymbolInfoHead {
         name: k.to_string().into(),
         kind,
-        loc: None,
         constant: None.or_else(|| match v {
             Value::Func(_) => None,
             t => Some(truncated_doc_repr(t)),
         }),
-        signature: None,
-        parsed_docs: None,
         docs,
         name_range,
+        fid,
         span,
         value: Some(v.clone()),
+        ..Default::default()
     }
 }
 
-// todo: hover with `with_stack`
+/// Extract the first line of documentation.
+fn oneliner(docs: &str) -> &str {
+    docs.lines().next().unwrap_or_default()
+}
+
+// todo: hover with `with_stack`, todo: merge with hover tooltip
 struct ParamTooltip<'a>(&'a DocSignature);
 
 impl<'a> fmt::Display for ParamTooltip<'a> {
