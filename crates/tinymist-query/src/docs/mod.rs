@@ -20,7 +20,7 @@ use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
 use tinymist_world::LspWorld;
 use typst::diag::{eco_format, StrResult};
 use typst::engine::{Route, Sink, Traced};
-use typst::foundations::{Bytes, Value};
+use typst::foundations::{Bytes, Module, Value};
 use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{FileId, Span, VirtualPath};
 use typst::World;
@@ -242,34 +242,25 @@ struct ScanSymbolCtx<'a> {
     for_spec: Option<&'a PackageSpec>,
     aliases: &'a mut HashMap<FileId, Vec<String>>,
     extras: &'a mut Vec<SymbolInfo>,
-    route: Route<'a>,
     root: FileId,
-    tracer: Tracer,
 }
 
 impl ScanSymbolCtx<'_> {
     fn module(&mut self, fid: FileId) -> StrResult<Module> {
         let source = self.world.source(fid).map_err(|e| eco_format!("{e}"))?;
-        let route = self.route.track();
-        let tracer = self.tracer.track_mut();
+        let route = Route::default();
+        let tracer = Traced::default();
+        let mut sink = Sink::new();
         let w: &dyn typst::World = self.world;
 
-        // let entry_point = toml_id.join(&manifest.package.entrypoint);
-        // let mut sink = Sink::new();
-        // let source = world.source(entry_point).map_err(|e| eco_format!("{e}"))?;
-        // let route = Route::default();
-        // let w: &dyn typst::World = world;
-
-        // let src = typst::eval::eval(
-        //     w.track(),
-        //     Traced::default().track(),
-        //     sink.track_mut(),
-        //     route.track(),
-        //     &source,
-        // )
-        // .map_err(|e| eco_format!("{e:?}"))?;
-
-        typst::eval::eval(w.track(), route, tracer, &source).map_err(|e| eco_format!("{e:?}"))
+        typst::eval::eval(
+            w.track(),
+            tracer.track(),
+            sink.track_mut(),
+            route.track(),
+            &source,
+        )
+        .map_err(|e| eco_format!("{e:?}"))
     }
 
     fn module_sym(&mut self, path: EcoVec<&str>, module: Module) -> SymbolInfo {
@@ -319,7 +310,7 @@ impl ScanSymbolCtx<'_> {
 
                 let symbols = module.scope().iter();
                 let symbols = symbols
-                    .map(|(k, v)| {
+                    .map(|(k, v, _)| {
                         let mut path = path.clone();
                         path.push(k);
                         self.sym(k, path.clone(), Some(&fid), v)
@@ -375,8 +366,6 @@ pub fn list_symbols(world: &LspWorld, spec: &PackageInfo) -> StrResult<SymbolsIn
         for_spec: Some(&for_spec),
         aliases: &mut aliases,
         extras: &mut extras,
-        route: Route::default(),
-        tracer: Tracer::default(),
     };
 
     let src = scan_ctx.module(entry_point)?;
