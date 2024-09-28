@@ -448,7 +448,7 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                 for param in elem.params().iter().filter(|param| !param.required) {
                     if let Some(value) = elem
                         .field_id(param.name)
-                        .and_then(|id| Some(elem.field_from_styles(id, StyleChain::new(styles))))
+                        .map(|id| elem.field_from_styles(id, StyleChain::new(styles)))
                     {
                         ctx.value_completion(Some(param.name.into()), &value.unwrap(), false, None);
                     }
