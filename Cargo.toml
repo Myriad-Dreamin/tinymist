@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.11.23"
+version = "0.11.25"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -89,16 +89,16 @@ env_logger = "0.11.3"
 log = "0.4"
 
 # Typst
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts", branch = "tinymist-v0.11.23", default-features = false, features = [
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts", tag = "tinymist-v0.11.23", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts", branch = "tinymist-v0.11.23", features = [
+reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts", tag = "tinymist-v0.11.23", features = [
     "system",
 ] }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts", branch = "tinymist-v0.11.23", features = [
+reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts", tag = "tinymist-v0.11.23", features = [
     "system",
 ], default-features = false }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts", branch = "tinymist-v0.11.23" }
+reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts", tag = "tinymist-v0.11.23" }
 
 
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.11.23" }
@@ -141,7 +141,7 @@ insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
 typst-preview = { path = "./crates/typst-preview/" }
-tinymist-assets = { version = "0.11.23" }
+tinymist-assets = { version = "0.11.24-rc1" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
