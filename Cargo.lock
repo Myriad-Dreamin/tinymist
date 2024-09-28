@@ -12,12 +12,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "adler"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
-
-[[package]]
 name = "adler2"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -184,13 +178,13 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
 name = "async-trait"
-version = "0.1.82"
+version = "0.1.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a27b8a3a6e1a44fa4c8baf1f653e4172e81486d4941f2237e20dc2d0cf4ddff1"
+checksum = "721cae7de5c34fbb2acd27e21e6d2cf7b886dce0c27388d46c4e6c47ea4318dd"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -201,9 +195,9 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "autocfg"
-version = "1.3.0"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c4b4d0bd25bd0b74681c0ad21497610ce1b7c91b1022cd21c80c6fbdd9476b0"
+checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "az"
@@ -220,7 +214,7 @@ dependencies = [
  "addr2line",
  "cfg-if",
  "libc",
- "miniz_oxide 0.8.0",
+ "miniz_oxide",
  "object",
  "rustc-demangle",
  "windows-targets 0.52.6",
@@ -368,6 +362,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
+name = "byteorder-lite"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495"
+
+[[package]]
 name = "bytes"
 version = "1.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -407,9 +407,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.1.21"
+version = "1.1.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07b1695e2c7e8fc85310cde85aeaab7e3097f593c91d209d3f9df76c928100f0"
+checksum = "9540e661f81799159abee814118cc139a2004b3a3aa3ea37724a1b66530b90e0"
 dependencies = [
  "shlex",
 ]
@@ -553,7 +553,7 @@ dependencies = [
  "heck 0.5.0",
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -630,7 +630,7 @@ checksum = "54af6ac68ada2d161fa9cc1ab52676228e340866d094d6542107e74b82acc095"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -641,7 +641,7 @@ checksum = "c8936e42f9b4f5bdfaf23700609ac1f11cb03ad4c1ec128a4ee4fd0903e228db"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -800,7 +800,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strsim",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -811,7 +811,7 @@ checksum = "d336a2a514f6ccccaa3e09b02d41d35330c07ddf03a62165fcec10bb561c7806"
 dependencies = [
  "darling_core",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -925,7 +925,7 @@ checksum = "97369cbbc041bc366949bc74d34658d6cda5621039731c6310521892a3a20ae0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -1017,7 +1017,7 @@ checksum = "0d28318a75d4aead5c4db25382e8ef717932d0346600cacae6357eb5941bc5ff"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -1083,9 +1083,9 @@ checksum = "e8c02a5121d4ea3eb16a80748c74f5549a5665e4c21333c6098f283870fbdea6"
 
 [[package]]
 name = "fdeflate"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f9bfee30e4dedf0ab8b422f03af778d9612b63f502710fc500a334ebe2de645"
+checksum = "d8090f921a24b04994d9929e204f50b498a33ea6ba559ffaa05e04f7ee7fb5ab"
 dependencies = [
  "simd-adler32",
 ]
@@ -1104,12 +1104,12 @@ dependencies = [
 
 [[package]]
 name = "flate2"
-version = "1.0.33"
+version = "1.0.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "324a1be68054ef05ad64b861cc9eaf1d623d2d8cb25b4bf2cb9cdd902b4bf253"
+checksum = "a1b589b4dc103969ad3cf85c950899926ec64300a1a46d76c03a6072957036f0"
 dependencies = [
  "crc32fast",
- "miniz_oxide 0.8.0",
+ "miniz_oxide",
 ]
 
 [[package]]
@@ -1130,7 +1130,7 @@ version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1fcfcd44ca6e90c921fee9fa665d530b21ef1327a4c1a6c5250ea44b776ada7"
 dependencies = [
- "roxmltree 0.20.0",
+ "roxmltree",
 ]
 
 [[package]]
@@ -1256,7 +1256,7 @@ checksum = "87750cf4b7a4c0625b1529e4c543c2182106e4dedc60a2a6455e00d212c489ac"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -1649,9 +1649,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util"
-version = "0.1.8"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da62f120a8a37763efb0cf8fdf264b884c7b8b9ac8660b900c8661030c00e6ba"
+checksum = "41296eb09f183ac68eec06e03cdbea2e759633d4067b2f6552fc2e009bcad08b"
 dependencies = [
  "bytes",
  "futures-util",
@@ -1813,7 +1813,7 @@ checksum = "1ec89e9337638ecdc08744df490b221a7399bf8d164eb52a665454e60e075ad6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -2078,6 +2078,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "kurbo"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89234b2cc610a7dd927ebde6b41dd1a5d4214cffaef4cf1fb2195d592f92518f"
+dependencies = [
+ "arrayvec 0.7.6",
+ "smallvec",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2085,9 +2095,9 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libc"
-version = "0.2.158"
+version = "0.2.159"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8adc4bb1803a324070e64a98ae98f38934d91957a99cfb3a43dcbc01bc56439"
+checksum = "561d97a539a36e26a9a5fad1ea11a3039a67714694aaa379433e580854bc3dc5"
 
 [[package]]
 name = "libm"
@@ -2211,21 +2221,12 @@ dependencies = [
 
 [[package]]
 name = "miniz_oxide"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8a240ddb74feaf34a79a7add65a741f3167852fba007066dcac1ca548d89c08"
-dependencies = [
- "adler",
- "simd-adler32",
-]
-
-[[package]]
-name = "miniz_oxide"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2d80299ef12ff69b16a84bb182e3b9df68b5a91574d3d4fa6e41b65deec4df1"
 dependencies = [
  "adler2",
+ "simd-adler32",
 ]
 
 [[package]]
@@ -2257,6 +2258,12 @@ dependencies = [
  "wasi",
  "windows-sys 0.52.0",
 ]
+
+[[package]]
+name = "multi-stash"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "685a9ac4b61f4e728e1d2c6a7844609c16527aeb5e6c865915c08e619c16410f"
 
 [[package]]
 name = "mutate_once"
@@ -2330,7 +2337,7 @@ checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -2377,9 +2384,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.20.0"
+version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33ea5043e58958ee56f3e15a90aee535795cd7dfd319846288d93c5b57d85cbe"
+checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
 
 [[package]]
 name = "open"
@@ -2415,7 +2422,7 @@ checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -2463,7 +2470,7 @@ dependencies = [
  "by_address",
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -2555,7 +2562,7 @@ dependencies = [
  "phf_shared",
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -2596,9 +2603,9 @@ dependencies = [
 
 [[package]]
 name = "pkg-config"
-version = "0.3.30"
+version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d231b230927b5e4ad203db57bbcbee2802f6bce620b1e4a9024a07d94e2907ec"
+checksum = "953ec861398dccce10c670dfeaf3ec4911ca479e9c02154b3a215178c5f566f2"
 
 [[package]]
 name = "plist"
@@ -2615,15 +2622,15 @@ dependencies = [
 
 [[package]]
 name = "png"
-version = "0.17.13"
+version = "0.17.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06e4b0d3d1312775e782c86c91a111aa1f910cbb65e1337f9975b5f9a554b5e1"
+checksum = "52f9d46a34a05a6a57566bc2bfae066ef07585a6e3fa30fbbdff5936380623f0"
 dependencies = [
  "bitflags 1.3.2",
  "crc32fast",
  "fdeflate",
  "flate2",
- "miniz_oxide 0.7.4",
+ "miniz_oxide",
 ]
 
 [[package]]
@@ -2820,9 +2827,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.4"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0884ad60e090bf1345b93da0a5de8923c93884cd03f40dfcfddd3b4bee661853"
+checksum = "355ae415ccd3a04315d3f8246e86d67689ea74d88d915576e1589a351062a13b"
 dependencies = [
  "bitflags 2.6.0",
 ]
@@ -2841,7 +2848,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.0-rc7"
-source = "git+https://github.com/paran3xus/typst.ts?branch=typst-mainline#35368a65ed863e8605dd4e070e50ec12e3844307"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?branch=tinymist-v0.11.23#9570ee2c7ed1f794b0d46809e37d26452670d001"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -2865,7 +2872,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.5.0-rc7"
-source = "git+https://github.com/paran3xus/typst.ts?branch=typst-mainline#35368a65ed863e8605dd4e070e50ec12e3844307"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?branch=tinymist-v0.11.23#9570ee2c7ed1f794b0d46809e37d26452670d001"
 dependencies = [
  "codespan-reporting",
  "comemo 0.4.0",
@@ -2893,7 +2900,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.5.0-rc7"
-source = "git+https://github.com/paran3xus/typst.ts?branch=typst-mainline#35368a65ed863e8605dd4e070e50ec12e3844307"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?branch=tinymist-v0.11.23#9570ee2c7ed1f794b0d46809e37d26452670d001"
 dependencies = [
  "bitvec",
  "comemo 0.4.0",
@@ -2918,7 +2925,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.5.0-rc7"
-source = "git+https://github.com/paran3xus/typst.ts?branch=typst-mainline#35368a65ed863e8605dd4e070e50ec12e3844307"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?branch=tinymist-v0.11.23#9570ee2c7ed1f794b0d46809e37d26452670d001"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
@@ -2931,7 +2938,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vfs"
 version = "0.5.0-rc7"
-source = "git+https://github.com/paran3xus/typst.ts?branch=typst-mainline#35368a65ed863e8605dd4e070e50ec12e3844307"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?branch=tinymist-v0.11.23#9570ee2c7ed1f794b0d46809e37d26452670d001"
 dependencies = [
  "indexmap 2.5.0",
  "log",
@@ -2945,7 +2952,7 @@ dependencies = [
 [[package]]
 name = "reflexo-world"
 version = "0.5.0-rc7"
-source = "git+https://github.com/paran3xus/typst.ts?branch=typst-mainline#35368a65ed863e8605dd4e070e50ec12e3844307"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts?branch=tinymist-v0.11.23#9570ee2c7ed1f794b0d46809e37d26452670d001"
 dependencies = [
  "chrono",
  "codespan-reporting",
@@ -3127,12 +3134,6 @@ name = "roff"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88f8660c1ff60292143c98d08fc6e2f654d722db50410e3f3797d40baaf9d8f3"
-
-[[package]]
-name = "roxmltree"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
 
 [[package]]
 name = "roxmltree"
@@ -3362,7 +3363,7 @@ checksum = "243902eda00fad750862fc144cea25caca5e20d615af0a81bee94ca738f1df1f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -3385,14 +3386,14 @@ checksum = "6c64451ba24fc7a6a2d60fc75dd9c83c90903b19028d4eff35e88fc1e86564e9"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
 name = "serde_spanned"
-version = "0.6.7"
+version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb5b1b31579f3811bf615c144393417496f152e12ac8b7663bf664f4a815306d"
+checksum = "87607cb1398ed59d48732e575a4c28a7a8ebf2454b964fe3f224f2afc07909e1"
 dependencies = [
  "serde",
 ]
@@ -3436,7 +3437,7 @@ dependencies = [
  "darling",
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -3497,9 +3498,9 @@ checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
 
 [[package]]
 name = "simdutf8"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f27f6278552951f1f2b8cf9da965d10969b2efdea95a6ec47987ab46edfe263a"
+checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
 name = "similar"
@@ -3641,7 +3642,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustversion",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -3654,7 +3655,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustversion",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -3669,7 +3670,8 @@ source = "git+https://github.com/typst/svg2pdf?rev=5963e1e#5963e1e890ac89fbf6b47
 dependencies = [
  "fontdb 0.21.0",
  "image",
- "miniz_oxide 0.7.4",
+ "log",
+ "miniz_oxide",
  "once_cell",
  "pdf-writer",
  "resvg",
@@ -3713,9 +3715,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.77"
+version = "2.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f35bcdf61fd8e7be6caf75f429fdca8beb3ed76584befb503b1569faee373ed"
+checksum = "89132cd0bf050864e1d38dc3bbc07a0eb8e7530af26344d3d2bbbef83499f590"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3756,7 +3758,7 @@ checksum = "c8af7666ab7b6390ab78131fb5b0fce11d6b7a6951602017c35fa82800708971"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -3810,9 +3812,9 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tar"
-version = "0.4.41"
+version = "0.4.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb797dad5fb5b76fcf519e702f4a589483b5ef06567f160c392832c1f5e44909"
+checksum = "4ff6c40d3aedb5e06b57c6f669ad17ab063dd1e63d977c6a88e7f4dfa4f04020"
 dependencies = [
  "filetime",
  "libc",
@@ -3875,23 +3877,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "thiserror"
-version = "1.0.63"
+name = "thin-vec"
+version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0342370b38b6a11b6cc11d6a805569958d54cfa061a29969c3b5ce2ea405724"
+checksum = "a38c90d48152c236a3ab59271da4f4ae63d678c5d7ad6b7714d7cb9760be5e4b"
+
+[[package]]
+name = "thiserror"
+version = "1.0.64"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d50af8abc119fb8bb6dbabcfa89656f46f84aa0ac7688088608076ad2b459a84"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.63"
+version = "1.0.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4558b58466b9ad7ca0f102865eccc95938dca1a74a856f2b57b6629050da261"
+checksum = "08904e7672f5eb876eaaf87e0ce17857500934f4981c4a0ab2b4aa98baac7fc3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -4011,7 +4019,7 @@ dependencies = [
  "typlite",
  "typst",
  "typst-ansi-hl",
- "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?branch=main)",
+ "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?rev=4ee794cf8fb98eb67194e757c9820ab8562d853b)",
  "typst-pdf",
  "typst-preview",
  "typst-render",
@@ -4096,7 +4104,7 @@ dependencies = [
  "ttf-parser 0.20.0",
  "typlite",
  "typst",
- "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?branch=main)",
+ "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?rev=4ee794cf8fb98eb67194e757c9820ab8562d853b)",
  "typst-shim",
  "unscanny",
  "walkdir",
@@ -4132,7 +4140,8 @@ dependencies = [
  "serde_json",
  "tar",
  "tinymist-assets 0.11.22 (registry+https://github.com/rust-lang/crates.io-index)",
- "typst-assets",
+ "typst",
+ "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?rev=4ee794cf8fb98eb67194e757c9820ab8562d853b)",
 ]
 
 [[package]]
@@ -4187,7 +4196,7 @@ checksum = "693d596312e88961bc67d7f1f97af8a70227d9f90c31bba5806eec004978d752"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -4257,7 +4266,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "toml_edit 0.22.21",
+ "toml_edit 0.22.22",
 ]
 
 [[package]]
@@ -4284,15 +4293,15 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.22.21"
+version = "0.22.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b072cee73c449a636ffd6f32bd8de3a9f7119139aff882f44943ce2986dc5cf"
+checksum = "4ae48d6208a266e853d946088ed816055e556cc6028c5e8e2b84d9fa5dd7c7f5"
 dependencies = [
  "indexmap 2.5.0",
  "serde",
  "serde_spanned",
  "toml_datetime",
- "winnow 0.6.18",
+ "winnow 0.6.20",
 ]
 
 [[package]]
@@ -4320,7 +4329,7 @@ checksum = "34704c8d6ebcbc939824180af020566b01a7c01f80641264eba0999f6c2b6be7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -4440,7 +4449,7 @@ dependencies = [
 [[package]]
 name = "typst"
 version = "0.11.0"
-source = "git+https://github.com/paran3xus/typst.git?branch=tinymist-typst-mainline#cf8d78248839439b67e7858857a965fa9e275f0f"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.23#cf8d78248839439b67e7858857a965fa9e275f0f"
 dependencies = [
  "arrayvec 0.7.6",
  "az",
@@ -4475,7 +4484,7 @@ dependencies = [
  "qcms",
  "rayon",
  "regex",
- "roxmltree 0.19.0",
+ "roxmltree",
  "rustybuzz",
  "serde",
  "serde_json",
@@ -4486,8 +4495,8 @@ dependencies = [
  "syntect",
  "time",
  "toml 0.8.19",
- "ttf-parser",
- "two-face",
+ "ttf-parser 0.24.1",
+ "two-face 0.4.0",
  "typed-arena",
  "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?rev=4ee794c)",
  "typst-macros",
@@ -4522,28 +4531,28 @@ dependencies = [
 [[package]]
 name = "typst-assets"
 version = "0.11.0"
-source = "git+https://github.com/typst/typst-assets?branch=main#4ee794cf8fb98eb67194e757c9820ab8562d853b"
+source = "git+https://github.com/typst/typst-assets?rev=4ee794c#4ee794cf8fb98eb67194e757c9820ab8562d853b"
 
 [[package]]
 name = "typst-assets"
 version = "0.11.0"
-source = "git+https://github.com/typst/typst-assets?rev=4ee794c#4ee794cf8fb98eb67194e757c9820ab8562d853b"
+source = "git+https://github.com/typst/typst-assets?rev=4ee794cf8fb98eb67194e757c9820ab8562d853b#4ee794cf8fb98eb67194e757c9820ab8562d853b"
 
 [[package]]
 name = "typst-macros"
 version = "0.11.0"
-source = "git+https://github.com/paran3xus/typst.git?branch=tinymist-typst-mainline#cf8d78248839439b67e7858857a965fa9e275f0f"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.23#cf8d78248839439b67e7858857a965fa9e275f0f"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
 name = "typst-pdf"
 version = "0.11.0"
-source = "git+https://github.com/paran3xus/typst.git?branch=tinymist-typst-mainline#cf8d78248839439b67e7858857a965fa9e275f0f"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.23#cf8d78248839439b67e7858857a965fa9e275f0f"
 dependencies = [
  "arrayvec 0.7.6",
  "base64 0.22.1",
@@ -4551,7 +4560,8 @@ dependencies = [
  "comemo 0.4.0",
  "ecow 0.2.2",
  "image",
- "miniz_oxide 0.7.4",
+ "indexmap 2.5.0",
+ "miniz_oxide",
  "once_cell",
  "pdf-writer",
  "subsetter",
@@ -4583,20 +4593,20 @@ dependencies = [
  "tinymist-assets 0.11.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",
  "typst",
- "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?branch=main)",
+ "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?rev=4ee794cf8fb98eb67194e757c9820ab8562d853b)",
 ]
 
 [[package]]
 name = "typst-render"
 version = "0.11.0"
-source = "git+https://github.com/paran3xus/typst.git?branch=tinymist-typst-mainline#cf8d78248839439b67e7858857a965fa9e275f0f"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.23#cf8d78248839439b67e7858857a965fa9e275f0f"
 dependencies = [
  "bytemuck",
  "comemo 0.4.0",
  "image",
  "pixglyph",
  "resvg",
- "roxmltree 0.19.0",
+ "roxmltree",
  "tiny-skia",
  "ttf-parser 0.24.1",
  "typst",
@@ -4617,7 +4627,7 @@ dependencies = [
 [[package]]
 name = "typst-svg"
 version = "0.11.0"
-source = "git+https://github.com/paran3xus/typst.git?branch=tinymist-typst-mainline#cf8d78248839439b67e7858857a965fa9e275f0f"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.23#cf8d78248839439b67e7858857a965fa9e275f0f"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
@@ -4650,7 +4660,7 @@ dependencies = [
 [[package]]
 name = "typst-syntax"
 version = "0.11.0"
-source = "git+https://github.com/paran3xus/typst.git?branch=tinymist-typst-mainline#cf8d78248839439b67e7858857a965fa9e275f0f"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.23#cf8d78248839439b67e7858857a965fa9e275f0f"
 dependencies = [
  "ecow 0.2.2",
  "once_cell",
@@ -4684,7 +4694,7 @@ dependencies = [
 [[package]]
 name = "typst-timing"
 version = "0.11.0"
-source = "git+https://github.com/paran3xus/typst.git?branch=tinymist-typst-mainline#cf8d78248839439b67e7858857a965fa9e275f0f"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.23#cf8d78248839439b67e7858857a965fa9e275f0f"
 dependencies = [
  "parking_lot",
  "serde",
@@ -4695,7 +4705,7 @@ dependencies = [
 [[package]]
 name = "typst-utils"
 version = "0.11.0"
-source = "git+https://github.com/paran3xus/typst.git?branch=tinymist-typst-mainline#cf8d78248839439b67e7858857a965fa9e275f0f"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.11.23#cf8d78248839439b67e7858857a965fa9e275f0f"
 dependencies = [
  "once_cell",
  "portable-atomic",
@@ -4721,14 +4731,13 @@ dependencies = [
 
 [[package]]
 name = "typstyle"
-version = "0.11.33"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c430c527e8048f19522448613e95da687ed64fb0a3b78969f0643e6e99a95ef"
+version = "0.11.34"
+source = "git+https://github.com/ParaN3xus/typstyle?rev=2129609c0414e163d3ca1460d97c7b2ae5c271ff#2129609c0414e163d3ca1460d97c7b2ae5c271ff"
 dependencies = [
  "anyhow",
  "itertools 0.13.0",
  "pretty",
- "typst-syntax 0.11.0",
+ "typst-syntax 0.11.1",
  "vergen",
 ]
 
@@ -4872,22 +4881,8 @@ dependencies = [
  "imagesize",
  "kurbo 0.11.1",
  "log",
- "roxmltree 0.19.0",
- "simplecss",
- "siphasher 0.3.11",
- "svgtypes",
- "usvg-tree",
-]
-
-[[package]]
-name = "usvg-text-layout"
-version = "0.38.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c41888b9d5cf431fe852eaf9d047bbde83251b98f1749c2f08b1071e6db46e2"
-dependencies = [
- "fontdb",
- "kurbo",
- "log",
+ "pico-args",
+ "roxmltree",
  "rustybuzz",
  "simplecss",
  "siphasher 1.0.1",
@@ -4998,7 +4993,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
  "wasm-bindgen-shared",
 ]
 
@@ -5032,7 +5027,7 @@ checksum = "afc340c74d9005395cf9dd098506f7f44e38f2b4a21c6aaacf9a105ea5e1e836"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -5313,9 +5308,9 @@ dependencies = [
 
 [[package]]
 name = "winnow"
-version = "0.6.18"
+version = "0.6.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68a9bda4691f099d435ad181000724da8e5899daa10713c2d432552b9ccd3a6f"
+checksum = "36c1fec1a2bb5866f07c25f68c26e565c4c200aebb96d7e55710c19d3e8ac49b"
 dependencies = [
  "memchr",
 ]
@@ -5414,7 +5409,7 @@ checksum = "28cc31741b18cb6f1d5ff12f5b7523e3d6eb0852bbbad19d73905511d9849b95"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
  "synstructure",
 ]
 
@@ -5436,7 +5431,7 @@ checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
 ]
 
 [[package]]
@@ -5456,7 +5451,7 @@ checksum = "0ea7b4a3637ea8669cedf0f1fd5c286a17f3de97b8dd5a70a6c167a1730e63a5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
  "synstructure",
 ]
 
@@ -5492,5 +5487,20 @@ checksum = "6eafa6dfb17584ea3e2bd6e76e0cc15ad7af12b09abdd1ca55961bed9b1063c6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.77",
+ "syn 2.0.79",
+]
+
+[[package]]
+name = "zune-core"
+version = "0.4.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f423a2c17029964870cfaabb1f13dfab7d092a62a29a89264f4d36990ca414a"
+
+[[package]]
+name = "zune-jpeg"
+version = "0.4.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16099418600b4d8f028622f73ff6e3deaabdff330fb9a2a131dea781ee8b0768"
+dependencies = [
+ "zune-core",
 ]
