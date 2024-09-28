@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.11.28"
+version = "0.11.31"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -89,27 +89,27 @@ env_logger = "0.11.3"
 log = "0.4"
 
 # Typst
-reflexo = { git = "https://github.com/paran3xus/typst.ts", branch = "typst-mainline", default-features = false, features = [
+reflexo = { git = "https://github.com/paran3xus/typst.ts", tag = "tinymist-v0.11.31", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-world = { git = "https://github.com/paran3xus/typst.ts", branch = "typst-mainline", features = [
+reflexo-world = { git = "https://github.com/paran3xus/typst.ts", tag = "tinymist-v0.11.31", features = [
     "system",
 ] }
-reflexo-typst = { git = "https://github.com/paran3xus/typst.ts", branch = "typst-mainline", features = [
+reflexo-typst = { git = "https://github.com/paran3xus/typst.ts", tag = "tinymist-v0.11.31", features = [
     "system",
 ], default-features = false }
-reflexo-vec2svg = { git = "https://github.com/paran3xus/typst.ts", branch = "typst-mainline" }
+reflexo-vec2svg = { git = "https://github.com/paran3xus/typst.ts", tag = "tinymist-v0.11.31" }
 
 
-typst = { git = "https://github.com/paran3xus/typst.git", branch = "tinymist-typst-mainline" }
-typst-timing = { git = "https://github.com/paran3xus/typst.git", branch = "tinymist-typst-mainline" }
-typst-svg = { git = "https://github.com/paran3xus/typst.git", branch = "tinymist-typst-mainline" }
-typst-render = { git = "https://github.com/paran3xus/typst.git", branch = "tinymist-typst-mainline" }
-typst-pdf = { git = "https://github.com/paran3xus/typst.git", branch = "tinymist-typst-mainline" }
-typst-syntax = { git = "https://github.com/paran3xus/typst.git", branch = "tinymist-typst-mainline" }
-typst-assets = { git = "https://github.com/typst/typst-assets", branch = "main" }
+typst = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
+typst-timing = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
+typst-svg = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
+typst-render = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
+typst-pdf = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
+typst-syntax = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
+typst-assets = { git = "https://github.com/typst/typst-assets", rev = "4afd428" }
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
-typstyle = { git = "https://github.com/ParaN3xus/typstyle", branch = "typst-mainline", default-features = false }
+typstyle = { git = "https://github.com/paran3xus/typstyle", tag = "tinymist-v0.11.31", default-features = false }
 typlite = { path = "./crates/typlite" }
 typst-shim = { path = "./crates/typst-shim", features = ["nightly"] }
 
@@ -140,8 +140,10 @@ divan = "0.1.14"
 insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
-typst-preview = { path = "./crates/typst-preview/" }
-tinymist-assets = { version = "0.11.28" }
+
+
+typst-preview = { path = "./crates/typst-preview" }
+tinymist-assets = { version = "0.11.31-rc1" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
@@ -177,12 +179,15 @@ undocumented_unsafe_blocks = "warn"
 
 # tinymist-assets = { path = "./crates/tinymist-assets/" }
 
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.30" }
-typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.30" }
-typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.30" }
-typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.30" }
-typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.30" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.11.30" }
+typst = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
+typst-timing = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
+typst-svg = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
+typst-render = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
+typst-pdf = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
+typst-syntax = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
+reflexo-typst-shim = { git = "https://github.com/paran3xus/typst.ts", tag = "tinymist-v0.11.31", features = [
+    "nightly",
+] }
 
 # typst = { path = "../typst/crates/typst" }
 # typst-timing = { path = "../typst/crates/typst-timing" }
