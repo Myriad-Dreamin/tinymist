@@ -4732,12 +4732,12 @@ dependencies = [
 [[package]]
 name = "typstyle"
 version = "0.11.34"
-source = "git+https://github.com/ParaN3xus/typstyle?rev=2129609c0414e163d3ca1460d97c7b2ae5c271ff#2129609c0414e163d3ca1460d97c7b2ae5c271ff"
+source = "git+https://github.com/Enter-tainer/typstyle?branch=tinymist-v0.11.23#9ae5fa02b05c61daf87994ca6319c139e55b63a0"
 dependencies = [
  "anyhow",
  "itertools 0.13.0",
  "pretty",
- "typst-syntax 0.11.1",
+ "typst-syntax 0.11.0",
  "vergen",
 ]
 
