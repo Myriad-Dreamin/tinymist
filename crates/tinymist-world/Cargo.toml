@@ -21,6 +21,7 @@ anyhow.workspace = true
 log.workspace = true
 
 reflexo-typst.workspace = true
+reflexo-typst-shim = { workspace = true, features = ["nightly"] }
 typst.workspace = true
 
 tinymist-assets = { workspace = true }
