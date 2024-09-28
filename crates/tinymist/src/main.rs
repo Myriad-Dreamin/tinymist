@@ -92,7 +92,12 @@ pub fn completion(args: ShellCompletionArgs) -> anyhow::Result<()> {
 
 /// The main entry point for the LSP server.
 pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
-    log::info!("starting LSP server: {:#?}", args);
+    let pairs = LONG_VERSION.trim().split('\n');
+    let pairs = pairs
+        .map(|e| e.splitn(2, ":").map(|e| e.trim()).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    log::info!("tinymist LSP version information: {pairs:?}");
+    log::info!("starting LSP server: {args:#?}");
 
     let is_replay = !args.mirror.replay.is_empty();
     with_stdio_transport(args.mirror.clone(), |conn| {

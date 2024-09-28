@@ -21,5 +21,11 @@ fn main() -> Result<()> {
         .expect("Typst should be a dependency");
 
     println!("cargo:rustc-env=TYPST_VERSION={}", typst.version);
+    let src = typst
+        .source
+        .as_ref()
+        .map(|e| e.repr.as_str())
+        .unwrap_or_default();
+    println!("cargo:rustc-env=TYPST_SOURCE={src}");
     Ok(())
 }
