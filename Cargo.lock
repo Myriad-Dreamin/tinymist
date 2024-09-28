@@ -3726,7 +3726,7 @@ dependencies = [
 
 [[package]]
 name = "sync-lsp"
-version = "0.11.25"
+version = "0.11.27"
 dependencies = [
  "anyhow",
  "clap",
@@ -3866,7 +3866,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.11.25"
+version = "0.11.27"
 dependencies = [
  "insta",
  "lsp-server",
@@ -3969,7 +3969,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.11.25"
+version = "0.11.27"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4035,7 +4035,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.11.25"
+version = "0.11.27"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
@@ -4058,11 +4058,11 @@ checksum = "4906ee79291373cdbed9aa3d172a6e15b6b0b496ad8c213796b0bf9df7baf983"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.11.25"
+version = "0.11.27"
 
 [[package]]
 name = "tinymist-query"
-version = "0.11.25"
+version = "0.11.27"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4113,7 +4113,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.11.25"
+version = "0.11.27"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -4124,7 +4124,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.11.25"
+version = "0.11.27"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4422,7 +4422,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "typlite"
-version = "0.11.25"
+version = "0.11.27"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
@@ -4577,7 +4577,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.11.25"
+version = "0.11.27"
 dependencies = [
  "clap",
  "comemo 0.4.0",
@@ -4617,7 +4617,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.11.25"
+version = "0.11.27"
 dependencies = [
  "cfg-if",
  "typst",
