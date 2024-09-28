@@ -361,15 +361,6 @@ impl<F: CompilerFeat + Send + Sync + 'static> CompileServerActor<F> {
         }
     }
 
-    /// Create a new compiler actor.
-    pub fn new(
-        verse: CompilerUniverse<F>,
-        intr_tx: mpsc::UnboundedSender<Interrupt<F>>,
-        intr_rx: mpsc::UnboundedReceiver<Interrupt<F>>,
-    ) -> Self {
-        Self::new_with(verse, intr_tx, intr_rx, CompileServerOpts::default())
-    }
-
     pub fn with_watch(mut self, watch: bool) -> Self {
         self.enable_watch = watch;
         self

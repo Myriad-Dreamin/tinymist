@@ -243,19 +243,18 @@ struct ScanSymbolCtx<'a> {
     for_spec: Option<&'a PackageSpec>,
     aliases: &'a mut HashMap<FileId, Vec<String>>,
     extras: &'a mut Vec<SymbolInfo>,
-    route: Route<'a>,
     root: FileId,
-    tracer: Tracer,
 }
 
 impl ScanSymbolCtx<'_> {
     fn module(&mut self, fid: FileId) -> StrResult<Module> {
         let source = self.world.source(fid).map_err(|e| eco_format!("{e}"))?;
-        let route = self.route.track();
-        let tracer = self.tracer.track_mut();
+        let route = Route::default();
+        let mut tracer = Tracer::default();
         let w: &dyn typst::World = self.world;
 
-        typst::eval::eval(w.track(), route, tracer, &source).map_err(|e| eco_format!("{e:?}"))
+        typst::eval::eval(w.track(), route.track(), tracer.track_mut(), &source)
+            .map_err(|e| eco_format!("{e:?}"))
     }
 
     fn module_sym(&mut self, path: EcoVec<&str>, module: Module) -> SymbolInfo {
@@ -361,8 +360,6 @@ pub fn list_symbols(world: &LspWorld, spec: &PackageInfo) -> StrResult<SymbolsIn
         for_spec: Some(&for_spec),
         aliases: &mut aliases,
         extras: &mut extras,
-        route: Route::default(),
-        tracer: Tracer::default(),
     };
 
     let src = scan_ctx.module(entry_point)?;
