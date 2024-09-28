@@ -141,6 +141,7 @@ Commit Date:         {}
 Commit Branch:       {}
 Cargo Target Triple: {}
 Typst Version:       {}
+Typst Source:        {}
 ",
         env!("VERGEN_BUILD_TIMESTAMP"),
         env!("VERGEN_GIT_DESCRIBE"),
@@ -149,5 +150,6 @@ Typst Version:       {}
         option_env!("VERGEN_GIT_BRANCH").unwrap_or("None"),
         env!("VERGEN_CARGO_TARGET_TRIPLE"),
         env!("TYPST_VERSION"),
+        env!("TYPST_SOURCE"),
     )
 });
