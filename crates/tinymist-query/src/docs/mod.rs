@@ -20,7 +20,7 @@ use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
 use tinymist_world::LspWorld;
 use typst::diag::{eco_format, StrResult};
 use typst::engine::{Route, Sink, Traced};
-use typst::foundations::{Bytes, Value};
+use typst::foundations::{Bytes, Module, Value};
 use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{FileId, Span, VirtualPath};
 use typst::World;
@@ -249,11 +249,18 @@ impl ScanSymbolCtx<'_> {
     fn module(&mut self, fid: FileId) -> StrResult<Module> {
         let source = self.world.source(fid).map_err(|e| eco_format!("{e}"))?;
         let route = Route::default();
-        let mut tracer = Tracer::default();
+        let tracer = Traced::default();
+        let mut sink = Sink::new();
         let w: &dyn typst::World = self.world;
 
-        typst::eval::eval(w.track(), route.track(), tracer.track_mut(), &source)
-            .map_err(|e| eco_format!("{e:?}"))
+        typst::eval::eval(
+            w.track(),
+            tracer.track(),
+            sink.track_mut(),
+            route.track(),
+            &source,
+        )
+        .map_err(|e| eco_format!("{e:?}"))
     }
 
     fn module_sym(&mut self, path: EcoVec<&str>, module: Module) -> SymbolInfo {
@@ -303,7 +310,7 @@ impl ScanSymbolCtx<'_> {
 
                 let symbols = module.scope().iter();
                 let symbols = symbols
-                    .map(|(k, v)| {
+                    .map(|(k, v, _)| {
                         let mut path = path.clone();
                         path.push(k);
                         self.sym(k, path.clone(), Some(&fid), v)
