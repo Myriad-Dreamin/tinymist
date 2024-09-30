@@ -1,19 +1,25 @@
 import type { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
+import { TypstCancellationToken } from "@myriaddreamin/typst.ts/dist/esm/contrib/dom/typst-cancel.mjs";
 
 export interface ContainerDOMState {
   /// cached `hookedElem.offsetWidth` or `hookedElem.innerWidth`
   width: number;
   /// cached `hookedElem.offsetHeight` or `hookedElem.innerHeight`
   height: number;
+  window: {
+    innerWidth: number;
+    innerHeight: number;
+  };
   /// cached `hookedElem.getBoundingClientRect()`
   /// We only use `left` and `top` here.
   boundingRect: {
     left: number;
     top: number;
+    right: number;
   };
 }
 
-export type RenderMode = "svg" | "canvas";
+export type RenderMode = "svg" | "canvas" | "dom";
 
 export enum PreviewMode {
   Doc,
@@ -76,6 +82,8 @@ export class TypstDocumentContext<O = any> {
   patchQueue: [string, string][] = [];
   /// resources to dispose
   disposeList: (() => void)[] = [];
+  /// canvas render ctoken
+  canvasRenderCToken?: TypstCancellationToken;
 
   /// There are two scales in this class: The real scale is to adjust the size
   /// of `hookedElem` to fit the svg. The virtual scale (scale ratio) is to let
@@ -105,9 +113,14 @@ export class TypstDocumentContext<O = any> {
   cachedDOMState: ContainerDOMState = {
     width: 0,
     height: 0,
+    window: {
+      innerWidth: 0,
+      innerHeight: 0,
+    },
     boundingRect: {
       left: 0,
       top: 0,
+      right: 0,
     },
   };
 
@@ -129,6 +142,10 @@ export class TypstDocumentContext<O = any> {
           return {
             width: this.hookedElem.offsetWidth,
             height: this.hookedElem.offsetHeight,
+            window: {
+              innerWidth: window.innerWidth,
+              innerHeight: window.innerHeight,
+            },
             boundingRect: this.hookedElem.getBoundingClientRect(),
           };
         });
@@ -277,10 +294,8 @@ export class TypstDocumentContext<O = any> {
     const wheelEventHandler = (event: WheelEvent) => {
       if (event.ctrlKey) {
         event.preventDefault();
-
         // retrieve dom state before any operation
         this.cachedDOMState = this.retrieveDOMState();
-
         if (window.onresize !== null) {
           // is auto resizing
           window.onresize = null;
@@ -389,6 +404,14 @@ export class TypstDocumentContext<O = any> {
       try {
         let t0 = performance.now();
 
+        const ctoken = this.canvasRenderCToken;
+        if (ctoken) {
+          await ctoken.cancel();
+          await ctoken.wait();
+          this.canvasRenderCToken = undefined;
+          console.log("cancel canvas rendering");
+        }
+
         let needRerender = false;
         // console.log('patchQueue', JSON.stringify(this.patchQueue.map(x => x[0])));
         while (this.patchQueue.length > 0) {
@@ -420,13 +443,6 @@ export class TypstDocumentContext<O = any> {
   }
 
   private postprocessChanges() {
-    // case RenderMode.Svg: {
-    // const docRoot = this.hookedElem.firstElementChild as SVGElement;
-    // if (docRoot) {
-    //   window.initTypstSvg(docRoot);
-    //   this.rescale();
-    // }
-
     this.r.postRender();
 
     // todo: abstract this

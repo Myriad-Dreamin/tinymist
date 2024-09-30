@@ -1,5 +1,5 @@
 import { PreviewMode } from "./typst-doc.mjs";
-import { TypstCancellationToken } from "./typst-cancel.mjs";
+import { TypstCancellationToken } from "@myriaddreamin/typst.ts/dist/esm/contrib/dom/typst-cancel.mjs";
 import { TypstPatchAttrs, isDummyPatchElem } from "./typst-patch.mjs";
 import type { GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
 import type { CanvasPage, TypstCanvasDocument } from "./typst-doc.canvas.mjs";
@@ -14,9 +14,6 @@ export function provideSvgDoc<
   TBase extends GConstructor<TypstDocumentContext & Partial<TypstCanvasDocument>>,
 >(Base: TBase): TBase & GConstructor<TypstSvgDocument> {
   return class SvgDocument extends Base {
-    /// canvas render ctoken
-    canvasRenderCToken?: TypstCancellationToken;
-
     constructor(...args: any[]) {
       super(...args);
       this.registerMode("svg");
