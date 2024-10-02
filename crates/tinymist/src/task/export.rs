@@ -9,12 +9,13 @@ use reflexo_typst::{EntryReader, EntryState, TaskInputs, TypstDatetime};
 use tinymist_query::{ExportKind, PageSelection};
 use tokio::sync::mpsc;
 use typlite::Typlite;
-use typst::foundations::{IntoValue, Smart};
+use typst::foundations::IntoValue;
 use typst::{
     layout::Abs,
     syntax::{ast, SyntaxNode},
     visualize::Color,
 };
+use typst_pdf::PdfOptions;
 
 use crate::tool::text::FullTextDigest;
 use crate::{
@@ -210,7 +211,14 @@ impl ExportConfig {
                         convert_datetime(creation_timestamp.unwrap_or_else(chrono::Utc::now));
                     // todo: Some(pdf_uri.as_str())
                     // todo: timestamp world.now()
-                    typst_pdf::pdf(doc, Smart::Auto, timestamp, None)
+                    typst_pdf::pdf(
+                        doc,
+                        &PdfOptions {
+                            timestamp,
+                            ..Default::default()
+                        },
+                    )
+                    .map_err(|e| anyhow::anyhow!("failed to convert to pdf: {e:?}"))?
                 }
                 Query {
                     format,
