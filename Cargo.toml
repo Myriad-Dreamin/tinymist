@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.11.23-rc1"
+version = "0.11.29"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -107,7 +107,7 @@ typst-svg = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0
 typst-render = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.29" }
 typst-pdf = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.29" }
 typst-syntax = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.29" }
-typst-assets = { git = "https://github.com/typst/typst-assets", rev = "4afd428838a8fc99151c00dcf52f26b94c367aa0" }
+typst-assets = { git = "https://github.com/typst/typst-assets", rev = "4afd428" }
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
 typstyle = { git = "https://github.com/paran3xus/typstyle", tag = "tinymist-v0.11.29", default-features = false }
 typlite = { path = "./crates/typlite" }
@@ -141,8 +141,9 @@ insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
 
-typst-preview = { path = "./crates/typst-preview/" }
-tinymist-assets = { version = "0.11.23-rc1" }
+
+typst-preview = { path = "./crates/typst-preview" }
+tinymist-assets = { version = "0.11.29-rc1" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/" }
 tinymist-query = { path = "./crates/tinymist-query/" }
@@ -184,9 +185,7 @@ typst-svg = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0
 typst-render = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.29" }
 typst-pdf = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.29" }
 typst-syntax = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.29" }
-reflexo-typst-shim = { git = "https://github.com/paran3xus/typst.ts", tag = "tinymist-v0.11.29", features = [
-    "nightly",
-] }
+reflexo-typst-shim = { git = "https://github.com/paran3xus/typst.ts", tag = "tinymist-v0.11.29" }
 
 # typst = { path = "../typst/crates/typst" }
 # typst-timing = { path = "../typst/crates/typst-timing" }
