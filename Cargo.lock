@@ -3937,7 +3937,7 @@ dependencies = [
 
 [[package]]
 name = "sync-lsp"
-version = "0.11.27"
+version = "0.11.29"
 dependencies = [
  "anyhow",
  "clap",
@@ -4086,7 +4086,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.11.27"
+version = "0.11.29"
 dependencies = [
  "insta",
  "lsp-server",
@@ -4189,7 +4189,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.11.27"
+version = "0.11.29"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4229,7 +4229,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sync-lsp",
- "tinymist-assets 0.11.24-rc1",
+ "tinymist-assets 0.11.29-rc1",
  "tinymist-query",
  "tinymist-render",
  "tinymist-world",
@@ -4239,7 +4239,7 @@ dependencies = [
  "typlite",
  "typst",
  "typst-ansi-hl",
- "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?rev=4afd428838a8fc99151c00dcf52f26b94c367aa0)",
+ "typst-assets",
  "typst-pdf",
  "typst-preview",
  "typst-render",
@@ -4255,7 +4255,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.11.27"
+version = "0.11.29"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
@@ -4272,17 +4272,17 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.11.24-rc1"
+version = "0.11.29-rc1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4906ee79291373cdbed9aa3d172a6e15b6b0b496ad8c213796b0bf9df7baf983"
+checksum = "29fc8b5bdee3573da3a2a9fa9dbbac1820492998edbadb8f4aa2a54823b2a5f2"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.11.27"
+version = "0.11.29"
 
 [[package]]
 name = "tinymist-query"
-version = "0.11.27"
+version = "0.11.29"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4324,7 +4324,7 @@ dependencies = [
  "ttf-parser 0.20.0",
  "typlite",
  "typst",
- "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?rev=4afd428838a8fc99151c00dcf52f26b94c367aa0)",
+ "typst-assets",
  "typst-shim",
  "unscanny",
  "walkdir",
@@ -4333,7 +4333,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.11.27"
+version = "0.11.29"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -4344,7 +4344,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.11.27"
+version = "0.11.29"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4359,9 +4359,9 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
- "tinymist-assets 0.11.24-rc1",
+ "tinymist-assets 0.11.29-rc1",
  "typst",
- "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?rev=4afd428838a8fc99151c00dcf52f26b94c367aa0)",
+ "typst-assets",
 ]
 
 [[package]]
@@ -4653,7 +4653,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "typlite"
-version = "0.11.27"
+version = "0.11.29"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
@@ -4730,7 +4730,7 @@ dependencies = [
  "ttf-parser 0.24.1",
  "two-face 0.4.0",
  "typed-arena",
- "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?rev=4afd428)",
+ "typst-assets",
  "typst-macros",
  "typst-syntax 0.11.1",
  "typst-timing",
@@ -4766,11 +4766,6 @@ version = "0.11.0"
 source = "git+https://github.com/typst/typst-assets?rev=4afd428#4afd428838a8fc99151c00dcf52f26b94c367aa0"
 
 [[package]]
-name = "typst-assets"
-version = "0.11.0"
-source = "git+https://github.com/typst/typst-assets?rev=4afd428838a8fc99151c00dcf52f26b94c367aa0#4afd428838a8fc99151c00dcf52f26b94c367aa0"
-
-[[package]]
 name = "typst-macros"
 version = "0.11.1"
 source = "git+https://github.com/paran3xus/typst.git?tag=tinymist-v0.11.29#59da57d9edb0547a20f4d2afc1732cb60b9952b6"
@@ -4800,7 +4795,7 @@ dependencies = [
  "svg2pdf",
  "ttf-parser 0.24.1",
  "typst",
- "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?rev=4afd428)",
+ "typst-assets",
  "typst-macros",
  "typst-timing",
  "unscanny",
@@ -4809,7 +4804,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.11.27"
+version = "0.11.29"
 dependencies = [
  "clap",
  "comemo 0.4.0",
@@ -4822,10 +4817,10 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.11.24-rc1",
+ "tinymist-assets 0.11.29-rc1",
  "tokio",
  "typst",
- "typst-assets 0.11.0 (git+https://github.com/typst/typst-assets?rev=4afd428838a8fc99151c00dcf52f26b94c367aa0)",
+ "typst-assets",
 ]
 
 [[package]]
@@ -4849,7 +4844,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.11.27"
+version = "0.11.29"
 dependencies = [
  "cfg-if",
  "typst",
