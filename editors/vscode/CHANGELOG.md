@@ -4,6 +4,20 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.11.28 - [2024-10-05]
+
+### Compiler
+
+* (Fix) Allowing keeping garbage directories in the package directory in https://github.com/Myriad-Dreamin/tinymist/pull/622
+  * The previous code asserts all directories in the package directory are typst packages, but this is not always true. Prints errors once and skips these directories.
+
+### Misc
+
+* Printing version information when starting lsp server in https://github.com/Myriad-Dreamin/tinymist/pull/614
+  * Open server log to see the version information of the server. It is usually the first line of the log.
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.22...v0.11.28
+
 ## v0.11.22 - [2024-09-20]
 
 ## (New) Tinymist Nightly
