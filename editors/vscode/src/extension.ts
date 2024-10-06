@@ -32,7 +32,12 @@ import {
   previewProcessOutline,
 } from "./features/preview";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
-import { activeTypstEditor, DisposeList, getSensibleTextEditorColumn } from "./util";
+import {
+  activeTypstEditor,
+  DisposeList,
+  getSensibleTextEditorColumn,
+  typstDocumentSelector,
+} from "./util";
 import { client, getClient, setClient, tinymist } from "./lsp";
 import { taskActivate } from "./features/tasks";
 import { onEnterHandler } from "./lsp.on-enter";
@@ -40,6 +45,7 @@ import { extensionState } from "./state";
 import { devKitFeatureActivate } from "./features/dev-kit";
 import { labelFeatureActivate } from "./features/label";
 import { packageFeatureActivate } from "./features/package";
+import { dragAndDropActivate } from "./features/drag-and-drop";
 
 export async function activate(context: ExtensionContext): Promise<void> {
   try {
@@ -64,6 +70,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   // Sets features
   extensionState.features.preview = config.previewFeature === "enable";
   extensionState.features.devKit = isDevMode || config.devKit === "enable";
+  extensionState.features.dragAndDrop = true;
   extensionState.features.onEnter = !!config.onEnterEvent;
   // Initializes language client
   const client = initClient(context, config);
@@ -71,6 +78,9 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   // Activates features
   labelFeatureActivate(context);
   packageFeatureActivate(context);
+  if (extensionState.features.dragAndDrop) {
+    dragAndDropActivate(context);
+  }
   if (extensionState.features.task) {
     taskActivate(context);
   }
@@ -115,10 +125,7 @@ function initClient(context: ExtensionContext, config: Record<string, any>) {
   };
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [
-      { scheme: "file", language: "typst" },
-      { scheme: "untitled", language: "typst" },
-    ],
+    documentSelector: typstDocumentSelector,
     initializationOptions: config,
     middleware: {
       workspace: {
