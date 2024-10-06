@@ -457,7 +457,8 @@ async function commandShow(kind: "Pdf" | "Svg" | "Png", extraOpts?: any): Promis
     }
   }
 
-  const openIn: string = vscode.workspace.getConfiguration("tinymist").get("openIn", "editorTab");
+  const conf = vscode.workspace.getConfiguration("tinymist");
+  const openIn: string = conf.get("showExportFileIn", "editorTab");
 
   switch (openIn) {
     default:
