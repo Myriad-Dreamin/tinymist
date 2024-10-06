@@ -106,6 +106,16 @@ Set the print width for the formatter, which is a **soft limit** of characters p
 - **Type**: `number`
 - **Default**: `120`
 
+## `tinymist.dragAndDrop`
+
+Whether to handle drag-and-drop of resources into the editing typst document.
+
+- **Type**: `boolean`
+- **Enum**:
+  - `enable`
+  - `disable`
+- **Default**: `"enable"`
+
 ## `tinymist.previewFeature`
 
 Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.

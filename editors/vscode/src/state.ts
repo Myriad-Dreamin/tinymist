@@ -6,6 +6,7 @@ interface ExtensionState {
   features: {
     task: boolean;
     devKit: boolean;
+    dragAndDrop: boolean;
     onEnter: boolean;
     preview: boolean;
   };
@@ -21,6 +22,7 @@ export const extensionState: ExtensionState = {
   features: {
     task: true,
     devKit: false,
+    dragAndDrop: false,
     onEnter: false,
     preview: false,
   },

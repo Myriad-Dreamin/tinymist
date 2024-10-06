@@ -3,6 +3,11 @@ import * as path from "path";
 import { ViewColumn } from "vscode";
 import { readFile } from "fs/promises";
 
+export const typstDocumentSelector = [
+  { scheme: "file", language: "typst" },
+  { scheme: "untitled", language: "typst" },
+];
+
 export function activeTypstEditor() {
   const editor = vscode.window.activeTextEditor;
   if (!editor || editor.document.languageId !== "typst") {

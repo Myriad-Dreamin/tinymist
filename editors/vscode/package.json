@@ -396,6 +396,16 @@
           "type": "number",
           "default": 120
         },
+        "tinymist.dragAndDrop": {
+          "title": "Drag and drop",
+          "description": "Whether to handle drag-and-drop of resources into the editing typst document. Note: restarting the editor is required to change this setting.",
+          "type": "string",
+          "default": "enable",
+          "enum": [
+            "enable",
+            "disable"
+          ]
+        },
         "tinymist.previewFeature": {
           "title": "Enable preview features",
           "description": "Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.",
