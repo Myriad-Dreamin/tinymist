@@ -396,6 +396,25 @@
           "type": "number",
           "default": 120
         },
+        "tinymist.openIn": {
+          "title": "(Experimental) Open Exported Files in",
+          "description": "Configures way of opening exported files in some place, e.g. inside of editor tabs or using system application.",
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "For all kind of files.",
+              "enum": [
+                "editorTab",
+                "systemDefault"
+              ],
+              "default": "editorTab",
+              "enumDescriptions": [
+                "Open the exported files in editor tabs.",
+                "Open the exported files by system default application."
+              ]
+            }
+          ]
+        },
         "tinymist.dragAndDrop": {
           "title": "Drag and drop",
           "description": "Whether to handle drag-and-drop of resources into the editing typst document. Note: restarting the editor is required to change this setting.",

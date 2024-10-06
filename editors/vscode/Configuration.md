@@ -106,11 +106,16 @@ Set the print width for the formatter, which is a **soft limit** of characters p
 - **Type**: `number`
 - **Default**: `120`
 
+## `tinymist.openIn`
+
+Configures way of opening exported files in some place, e.g. inside of editor tabs or using system application.
+
+
 ## `tinymist.dragAndDrop`
 
-Whether to handle drag-and-drop of resources into the editing typst document.
+Whether to handle drag-and-drop of resources into the editing typst document. Note: restarting the editor is required to change this setting.
 
-- **Type**: `boolean`
+- **Type**: `string`
 - **Enum**:
   - `enable`
   - `disable`
