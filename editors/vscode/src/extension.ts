@@ -70,7 +70,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   // Sets features
   extensionState.features.preview = config.previewFeature === "enable";
   extensionState.features.devKit = isDevMode || config.devKit === "enable";
-  extensionState.features.dragAndDrop = true;
+  extensionState.features.dragAndDrop = config.dragAndDrop === "enable";
   extensionState.features.onEnter = !!config.onEnterEvent;
   // Initializes language client
   const client = initClient(context, config);
