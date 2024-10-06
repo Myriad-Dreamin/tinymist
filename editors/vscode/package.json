@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.11.22",
+  "version": "0.11.28",
   "description": "An integrated language service for Typst",
   "categories": [
     "Programming Languages",
