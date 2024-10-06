@@ -457,11 +457,22 @@ async function commandShow(kind: "Pdf" | "Svg" | "Png", extraOpts?: any): Promis
     }
   }
 
-  // here we can be sure that the pdf exists
-  await commands.executeCommand("vscode.open", exportUri, {
-    viewColumn: ViewColumn.Beside,
-    preserveFocus: true,
-  } as vscode.TextDocumentShowOptions);
+  const conf = vscode.workspace.getConfiguration("tinymist");
+  const openIn: string = conf.get("showExportFileIn", "editorTab");
+
+  switch (openIn) {
+    default:
+    case "editorTab":
+      // here we can be sure that the pdf exists
+      await commands.executeCommand("vscode.open", exportUri, {
+        viewColumn: ViewColumn.Beside,
+        preserveFocus: true,
+      } as vscode.TextDocumentShowOptions);
+      break;
+    case "systemDefault":
+      await vscode.env.openExternal(exportUri);
+      break;
+  }
 }
 
 export interface PreviewResult {
