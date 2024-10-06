@@ -396,9 +396,9 @@
           "type": "number",
           "default": 120
         },
-        "tinymist.openIn": {
-          "title": "(Experimental) Open Exported Files in",
-          "description": "Configures way of opening exported files in some place, e.g. inside of editor tabs or using system application.",
+        "tinymist.showExportFileIn": {
+          "title": "(Experimental) Show Exported Files in Some Place",
+          "description": "Configures way of opening exported files, e.g. inside of editor tabs or using system application.",
           "anyOf": [
             {
               "type": "string",
@@ -409,8 +409,8 @@
               ],
               "default": "editorTab",
               "enumDescriptions": [
-                "Open the exported files in editor tabs.",
-                "Open the exported files by system default application."
+                "Show the exported files in editor tabs.",
+                "Show the exported files by system default application."
               ]
             }
           ]

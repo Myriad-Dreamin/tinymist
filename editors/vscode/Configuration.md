@@ -106,9 +106,9 @@ Set the print width for the formatter, which is a **soft limit** of characters p
 - **Type**: `number`
 - **Default**: `120`
 
-## `tinymist.openIn`
+## `tinymist.showExportFileIn`
 
-Configures way of opening exported files in some place, e.g. inside of editor tabs or using system application.
+Configures way of opening exported files, e.g. inside of editor tabs or using system application.
 
 
 ## `tinymist.dragAndDrop`
