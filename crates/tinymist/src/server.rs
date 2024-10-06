@@ -17,6 +17,7 @@ use reflexo_typst::{
     vfs::notify::{FileChangeSet, MemoryEvent},
     Bytes, Error, ImmutPath, TaskInputs, Time,
 };
+use request::{RegisterCapability, UnregisterCapability};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
@@ -295,6 +296,31 @@ impl LanguageState {
 }
 
 impl LanguageState {
+    // todo: handle error
+    fn register_capability(&self, registrations: Vec<Registration>) -> anyhow::Result<()> {
+        self.client.send_request_::<RegisterCapability>(
+            RegistrationParams { registrations },
+            |_, resp| {
+                if let Some(err) = resp.error {
+                    log::error!("failed to register capability: {err:?}");
+                }
+            },
+        );
+        Ok(())
+    }
+
+    fn unregister_capability(&self, unregisterations: Vec<Unregistration>) -> anyhow::Result<()> {
+        self.client.send_request_::<UnregisterCapability>(
+            UnregistrationParams { unregisterations },
+            |_, resp| {
+                if let Some(err) = resp.error {
+                    log::error!("failed to unregister capability: {err:?}");
+                }
+            },
+        );
+        Ok(())
+    }
+
     /// Registers or unregisters semantic tokens.
     fn enable_sema_token_caps(&mut self, enable: bool) -> anyhow::Result<()> {
         if !self.const_config().tokens_dynamic_registration {
@@ -306,15 +332,13 @@ impl LanguageState {
             (true, false) => {
                 trace!("registering semantic tokens");
                 let options = get_semantic_tokens_options();
-                self.client
-                    .register_capability(vec![get_semantic_tokens_registration(options)])
+                self.register_capability(vec![get_semantic_tokens_registration(options)])
                     .inspect(|_| self.sema_tokens_registered = enable)
                     .context("could not register semantic tokens")
             }
             (false, true) => {
                 trace!("unregistering semantic tokens");
-                self.client
-                    .unregister_capability(vec![get_semantic_tokens_unregistration()])
+                self.unregister_capability(vec![get_semantic_tokens_unregistration()])
                     .inspect(|_| self.sema_tokens_registered = enable)
                     .context("could not unregister semantic tokens")
             }
@@ -350,15 +374,13 @@ impl LanguageState {
         match (enable, self.formatter_registered) {
             (true, false) => {
                 trace!("registering formatter");
-                self.client
-                    .register_capability(vec![get_formatting_registration()])
+                self.register_capability(vec![get_formatting_registration()])
                     .inspect(|_| self.formatter_registered = enable)
                     .context("could not register formatter")
             }
             (false, true) => {
                 trace!("unregistering formatter");
-                self.client
-                    .unregister_capability(vec![get_formatting_unregistration()])
+                self.unregister_capability(vec![get_formatting_unregistration()])
                     .inspect(|_| self.formatter_registered = enable)
                     .context("could not unregister formatter")
             }
@@ -409,7 +431,6 @@ impl LanguageState {
             const CONFIG_METHOD_ID: &str = "workspace/didChangeConfiguration";
 
             let err = self
-                .client
                 .register_capability(vec![Registration {
                     id: CONFIG_REGISTRATION_ID.to_owned(),
                     method: CONFIG_METHOD_ID.to_owned(),
