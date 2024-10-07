@@ -5,12 +5,13 @@ use std::ops::Range;
 use log::debug;
 use once_cell::sync::Lazy;
 use typst::foundations::{IntoValue, Label, Selector, Type};
+use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
 use typst::syntax::FileId as TypstFileId;
 use typst::{foundations::Value, syntax::Span};
 use typst_shim::syntax::LinkedNodeExt;
 
-use super::{prelude::*, BibInfo};
+use super::prelude::*;
 use crate::{
     prelude::*,
     syntax::{
@@ -41,37 +42,37 @@ pub fn find_definition(
     document: Option<&VersionedDocument>,
     deref_target: DerefTarget<'_>,
 ) -> Option<DefinitionLink> {
-    let source_id = source.id();
-
-    let use_site = match deref_target {
+    match deref_target {
         // todi: field access
-        DerefTarget::VarAccess(node) | DerefTarget::Callee(node) => node,
+        DerefTarget::VarAccess(node) | DerefTarget::Callee(node) => {
+            find_ident_definition(ctx, source, node)
+        }
         // todo: better support (rename import path?)
         DerefTarget::ImportPath(path) => {
             let parent = path.parent()?;
             let def_fid = parent.span().id()?;
             let import_node = parent.cast::<ast::ModuleImport>()?;
             let source = find_source_by_expr(ctx.world(), def_fid, import_node.source())?;
-            return Some(DefinitionLink {
+            Some(DefinitionLink {
                 kind: LexicalKind::Mod(LexicalModKind::PathVar),
                 name: EcoString::new(),
                 value: None,
                 def_at: Some((source.id(), LinkedNode::new(source.root()).range())),
                 name_range: None,
-            });
+            })
         }
         DerefTarget::IncludePath(path) => {
             let parent = path.parent()?;
             let def_fid = parent.span().id()?;
             let include_node = parent.cast::<ast::ModuleInclude>()?;
             let source = find_source_by_expr(ctx.world(), def_fid, include_node.source())?;
-            return Some(DefinitionLink {
+            Some(DefinitionLink {
                 kind: LexicalKind::Mod(LexicalModKind::PathInclude),
                 name: EcoString::new(),
                 value: None,
                 def_at: Some((source.id(), (LinkedNode::new(source.root())).range())),
                 name_range: None,
-            });
+            })
         }
         DerefTarget::Label(r) | DerefTarget::Ref(r) => {
             let ref_expr: ast::Expr = r.cast()?;
@@ -81,62 +82,19 @@ pub fn find_definition(
                 _ => return None,
             };
 
-            let doc = document?;
-            let introspector = &doc.document.introspector;
-            let label = Label::new(ref_node);
-            let bib_elem = BibliographyElem::find(introspector.track())
-                .ok()
-                .and_then(|bib_elem| {
-                    ctx.analyze_bib(bib_elem.span(), {
-                        let Value::Array(arr) = bib_elem.path().clone().into_value() else {
-                            return None;
-                        };
-
-                        arr.into_iter().map(Value::cast).flat_map(|e| e.ok())
-                    })
-                });
-
-            return bib_elem
-                .and_then(|e| find_bib_definition(e, ref_node))
-                .or_else(|| {
-                    let sel = Selector::Label(label);
-                    let elem = introspector.query_first(&sel)?;
-
-                    // if it is a label, we put the selection range to itself
-                    let (def_at, name_range) = if is_label {
-                        let span = r.span();
-                        let fid = span.id()?;
-                        let source = ctx.source_by_id(fid).ok()?;
-                        let rng = source.range(span)?;
-
-                        let name_range = rng.start + 1..rng.end - 1;
-                        let name_range = (name_range.start <= name_range.end).then_some(name_range);
-                        (Some((fid, rng)), name_range)
-                    } else {
-                        // otherwise, it is estimated to the span of the pointed content
-                        // todo: get the label's span
-                        let span = elem.span();
-                        let fid = span.id()?;
-                        let source = ctx.source_by_id(fid).ok()?;
-                        let rng = source.range(span)?;
-
-                        (Some((fid, rng)), None)
-                    };
-
-                    Some(DefinitionLink {
-                        kind: LexicalKind::Var(LexicalVarKind::Label),
-                        name: ref_node.into(),
-                        value: Some(Value::Content(elem)),
-                        def_at,
-                        name_range,
-                    })
-                });
+            let introspector = &document?.document.introspector;
+            find_bib_definition(ctx, introspector, ref_node)
+                .or_else(|| find_ref_definition(ctx, introspector, ref_node, is_label, r.span()))
         }
-        DerefTarget::Normal(..) => {
-            return None;
-        }
-    };
+        DerefTarget::Normal(..) => None,
+    }
+}
 
+fn find_ident_definition(
+    ctx: &mut AnalysisContext<'_>,
+    source: Source,
+    use_site: LinkedNode,
+) -> Option<DefinitionLink> {
     // Lexical reference
     let ident_ref = match use_site.cast::<ast::Expr>()? {
         ast::Expr::Ident(e) => Some(IdentRef {
@@ -159,6 +117,7 @@ pub fn find_definition(
     };
 
     // Syntactic definition
+    let source_id = source.id();
     let def_use = ctx.def_use(source);
     let def_info = ident_ref
         .as_ref()
@@ -226,8 +185,20 @@ pub fn find_definition(
     }
 }
 
-fn find_bib_definition(bib_elem: Arc<BibInfo>, key: &str) -> Option<DefinitionLink> {
-    let entry = bib_elem.entries.get(key);
+fn find_bib_definition(
+    ctx: &mut AnalysisContext,
+    introspector: &Introspector,
+    key: &str,
+) -> Option<DefinitionLink> {
+    let bib_elem = BibliographyElem::find(introspector.track()).ok()?;
+    let Value::Array(arr) = bib_elem.path().clone().into_value() else {
+        return None;
+    };
+
+    let bib_paths = arr.into_iter().map(Value::cast).flat_map(|e| e.ok());
+    let bib_info = ctx.analyze_bib(bib_elem.span(), bib_paths)?;
+
+    let entry = bib_info.entries.get(key);
     log::debug!("find_bib_definition: {key} => {entry:?}");
     let entry = entry?;
     Some(DefinitionLink {
@@ -237,6 +208,50 @@ fn find_bib_definition(bib_elem: Arc<BibInfo>, key: &str) -> Option<DefinitionLi
         def_at: Some((entry.file_id, entry.span.clone())),
         // todo: rename with regard to string format: yaml-key/bib etc.
         name_range: Some(entry.span.clone()),
+    })
+}
+
+fn find_ref_definition(
+    ctx: &mut AnalysisContext,
+    introspector: &Introspector,
+    ref_node: &str,
+    is_label: bool,
+    span: Span,
+) -> Option<DefinitionLink> {
+    let label = Label::new(ref_node);
+    let sel = Selector::Label(label);
+    let elem = introspector.query_first(&sel)?;
+
+    // if it is a label, we put the selection range to itself
+    let (def_at, name_range) = if is_label {
+        let fid = span.id()?;
+        let source = ctx.source_by_id(fid).ok()?;
+        let rng = source.range(span)?;
+
+        let name_range = rng.start + 1..rng.end - 1;
+        let name_range = (name_range.start <= name_range.end).then_some(name_range);
+        (Some((fid, rng)), name_range)
+    } else {
+        let span = elem.labelled_at();
+        let span = if !span.is_detached() {
+            span
+        } else {
+            // otherwise, it is estimated to the span of the pointed content
+            elem.span()
+        };
+        let fid = span.id()?;
+        let source = ctx.source_by_id(fid).ok()?;
+        let rng = source.range(span)?;
+
+        (Some((fid, rng)), None)
+    };
+
+    Some(DefinitionLink {
+        kind: LexicalKind::Var(LexicalVarKind::Label),
+        name: ref_node.into(),
+        value: Some(Value::Content(elem)),
+        def_at,
+        name_range,
     })
 }
 
