@@ -1,0 +1,40 @@
+>#for b in "if".at(1) { }
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
+#    ^ source.typst meta.expr.for.typst
+#     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
+#      ^ source.typst meta.expr.for.typst
+#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#         ^ source.typst meta.expr.for.typst
+#          ^ source.typst meta.expr.for.typst string.quoted.double.typst punctuation.definition.string.typst
+#           ^^ source.typst meta.expr.for.typst string.quoted.double.typst
+#             ^ source.typst meta.expr.for.typst string.quoted.double.typst punctuation.definition.string.typst
+#              ^ source.typst meta.expr.for.typst meta.expr.call.typst keyword.operator.accessor.typst
+#               ^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                  ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
+#                   ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                    ^ source.typst meta.expr.for.typst
+#                     ^ source.typst meta.expr.for.typst meta.brace.curly.typst
+#                      ^ source.typst meta.expr.for.typst
+#                       ^ source.typst meta.expr.for.typst meta.brace.curly.typst
+>#for b in "in".at(1) { }
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
+#    ^ source.typst meta.expr.for.typst
+#     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
+#      ^ source.typst meta.expr.for.typst
+#       ^^ source.typst meta.expr.for.typst keyword.operator.range.typst
+#         ^ source.typst meta.expr.for.typst
+#          ^ source.typst meta.expr.for.typst string.quoted.double.typst punctuation.definition.string.typst
+#           ^^ source.typst meta.expr.for.typst string.quoted.double.typst
+#             ^ source.typst meta.expr.for.typst string.quoted.double.typst punctuation.definition.string.typst
+#              ^ source.typst meta.expr.for.typst meta.expr.call.typst keyword.operator.accessor.typst
+#               ^^ source.typst meta.expr.for.typst meta.expr.call.typst entity.name.function.typst
+#                 ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                  ^ source.typst meta.expr.for.typst meta.expr.call.typst constant.numeric.integer.typst
+#                   ^ source.typst meta.expr.for.typst meta.expr.call.typst meta.brace.round.typst
+#                    ^ source.typst meta.expr.for.typst
+#                     ^ source.typst meta.expr.for.typst meta.brace.curly.typst
+#                      ^ source.typst meta.expr.for.typst
+#                       ^ source.typst meta.expr.for.typst meta.brace.curly.typst

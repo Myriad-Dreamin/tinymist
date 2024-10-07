@@ -1,0 +1,12 @@
+>*#title:* #loremum(1)
+#^ source.typst
+# ^ source.typst variable.other.readwrite.hash.typst
+#  ^^^^^ source.typst variable.other.readwrite.typst
+#       ^ source.typst punctuation.separator.colon.typst
+#        ^ source.typst
+#         ^ source.typst
+#          ^ source.typst entity.name.function.hash.typst
+#           ^^^^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#                  ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#                   ^ source.typst meta.expr.call.typst constant.numeric.integer.typst
+#                    ^ source.typst meta.expr.call.typst meta.brace.round.typst

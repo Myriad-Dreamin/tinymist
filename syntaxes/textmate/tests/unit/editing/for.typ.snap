@@ -1,6 +1,6 @@
 >#for
 #^ source.typst keyword.control.hash.typst
-# ^^^ source.typst meta.expr.for.typst
+# ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 >
 >test
 #^^^^^ source.typst
