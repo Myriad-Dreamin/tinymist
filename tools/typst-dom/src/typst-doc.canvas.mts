@@ -159,7 +159,7 @@ export function provideCanvasDoc<
       this.kModule.pixelPerPt = this.pixelPerPt;
       const waitABit = async () => {
         return new Promise((resolve) => {
-          if (opts?.lazy) {
+          if (opts?.lazy && "requestIdleCallback" in window) {
             requestIdleCallback(() => resolve(undefined), { timeout: 100 });
           } else {
             resolve(undefined);

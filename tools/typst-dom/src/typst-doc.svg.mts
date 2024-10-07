@@ -620,7 +620,8 @@ export function provideSvgDoc<
         );
 
         const tok = (this.canvasRenderCToken = new TypstCancellationToken());
-        requestIdleCallback(
+
+        renderCanvasWhenIdle(
           async () => {
             await waitCancel;
             this.updateCanvas(pagesInCanvasMode, {
@@ -710,3 +711,8 @@ export function provideSvgDoc<
     }
   };
 }
+
+const renderCanvasWhenIdle =
+  "requestIdleCallback" in window
+    ? requestIdleCallback
+    : (cb: (args: void) => void, { timeout }: any) => setTimeout(cb, timeout);
