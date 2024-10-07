@@ -3,4 +3,4 @@ source: crates/tinymist-query/src/semantic_tokens_full.rs
 expression: "serde_json::to_string(&result).unwrap()"
 input_file: crates/tinymist-query/src/fixtures/semantic_tokens/heading.typ
 ---
-{"data":[0,0,3,14,0,0,0,3,14,0,0,3,1,20,0,0,0,1,14,0,0,1,1,5,0,0,0,1,14,0,0,1,4,5,0,0,0,4,14,0,0,4,1,8,0,0,0,1,14,0,0,1,17,1,0,0,0,17,14,0,0,17,1,8,0,0,0,1,14,0]}
+{"data":[0,0,3,14,0,0,3,1,20,0,0,1,1,5,0,0,1,4,5,0,0,4,1,8,0,0,1,17,1,0,0,17,1,8,0]}
