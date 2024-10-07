@@ -95,7 +95,6 @@ fn find_ident_definition(
     source: Source,
     use_site: LinkedNode,
 ) -> Option<DefinitionLink> {
-    //  let use_site =
     // Lexical reference
     let ident_ref = match use_site.cast::<ast::Expr>()? {
         ast::Expr::Ident(e) => Some(IdentRef {
@@ -233,9 +232,13 @@ fn find_ref_definition(
         let name_range = (name_range.start <= name_range.end).then_some(name_range);
         (Some((fid, rng)), name_range)
     } else {
-        // otherwise, it is estimated to the span of the pointed content
-        // todo: get the label's span
-        let span = elem.span();
+        let span = elem.labelled_at();
+        let span = if !span.is_detached() {
+            span
+        } else {
+            // otherwise, it is estimated to the span of the pointed content
+            elem.span()
+        };
         let fid = span.id()?;
         let source = ctx.source_by_id(fid).ok()?;
         let rng = source.range(span)?;
