@@ -34,8 +34,8 @@ function braceMatch(pattern: RegExp) {
 }
 
 const PAREN_BLOCK = generatePattern(6, "\\(", "\\)");
-const CODE_BLOCK = generatePattern(6, "\\{", "\\}");
-const BRACE_FREE_EXPR = /[^\s\}\{\[\]][^\}\{\[\]]*/.source;
+const exprEndReg =
+  /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s*)(?=[\[\{\n])|(?=[;\}\]\)\n]|$)/;
 
 // todo: This is invocable
 const codeBlock: textmate.Pattern = {
@@ -482,6 +482,10 @@ const expressions = (): textmate.Grammar => {
         name: "keyword.control.loop.typst",
       },
       {
+        match: /\b(in)\b(?!-)/,
+        name: "keyword.operator.range.typst",
+      },
+      {
         match: /\b(and|or|not)\b(?!-)/,
         name: "keyword.other.logical.typst",
       },
@@ -516,6 +520,14 @@ const expressions = (): textmate.Grammar => {
       {
         match: /(in)\b(?!-)/,
         name: "keyword.operator.range.typst",
+      },
+      {
+        match: /\.\./,
+        name: "keyword.operator.spread.typst",
+      },
+      {
+        match: /:/,
+        name: "punctuation.separator.colon.typst",
       },
       {
         match: /\./,
@@ -948,7 +960,7 @@ const ifStatement = (): textmate.Grammar => {
   const ifClause: textmate.Pattern = {
     //   name: "meta.if.clause.typst",
     begin: /(?:(\belse)\s+)?(\bif)\s+/,
-    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s*)(?=[\[\{\n])|(?=[;\n\]}]|$)/,
+    end: exprEndReg,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",
@@ -1056,43 +1068,11 @@ const forStatement = (): textmate.Grammar => {
 
   const forClause: textmate.Pattern = {
     // name: "meta.for.clause.bind.typst",
-    // todo: consider comment in for /* {} */ in .. {}
-    begin: new RegExp(
-      /(for\b)\s*/.source + `(${BRACE_FREE_EXPR}|${CODE_BLOCK})\\s*(in)\\s*`
-    ),
-    end: /(?=[;{\[\}\]\)\n]|$)/,
+    begin: /(for\b)\s*/,
+    end: exprEndReg,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
-      },
-      "2": {
-        patterns: [
-          {
-            include: "#comments",
-          },
-          // todo: reuse pattern binding
-          {
-            begin: /\(/,
-            end: /\)/,
-            beginCaptures: {
-              "0": {
-                name: "meta.brace.round.typst",
-              },
-            },
-            endCaptures: {
-              "0": {
-                name: "meta.brace.round.typst",
-              },
-            },
-            patterns: [{ include: "#patternBindingItems" }],
-          },
-          {
-            include: "#identifier",
-          },
-        ],
-      },
-      "3": {
-        name: "keyword.operator.range.typst",
       },
     },
     patterns: [
@@ -1142,7 +1122,7 @@ const whileStatement = (): textmate.Grammar => {
   const whileClause: textmate.Pattern = {
     // name: "meta.while.clause.bind.typst",
     begin: /(while\b)\s*/,
-    end: /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s+)(?=[\[\{])|(?=[;\}\]\)\n]|$)/,
+    end: exprEndReg,
     beginCaptures: {
       "1": {
         name: "keyword.control.loop.typst",
@@ -1361,14 +1341,6 @@ const callArgs: textmate.Pattern = {
     },
   },
   patterns: [
-    {
-      match: /\.\./,
-      name: "keyword.operator.spread.typst",
-    },
-    {
-      match: /:/,
-      name: "punctuation.separator.colon.typst",
-    },
     {
       match: /,/,
       name: "punctuation.separator.comma.typst",
