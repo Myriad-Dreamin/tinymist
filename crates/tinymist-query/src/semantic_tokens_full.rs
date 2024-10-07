@@ -46,10 +46,12 @@ mod tests {
     use super::*;
     use crate::tests::*;
 
-    const DESIRED_TOKENS_PER_AREA: usize = 400;
-    const DESIRED_MAX_AREAS: usize = 1024;
+    /// This is converted by Copilot from TypeScript `to_multiline_tokens2`.
+    /// <https://github.com/microsoft/vscode/blob/2acc0e52cbc7434c415f221d5c34ee1bbdd6cd71/src/vs/editor/common/services/semanticTokensProviderStyling.ts#L147>
+    fn check_tokens(tokens: &SemanticTokens) {
+        const DESIRED_TOKENS_PER_AREA: usize = 400;
+        const DESIRED_MAX_AREAS: usize = 1024;
 
-    fn to_multiline_tokens2(tokens: &SemanticTokens) {
         let src_data = &tokens.data;
         let token_count = src_data.len();
         let tokens_per_area = std::cmp::max(
@@ -142,7 +144,7 @@ mod tests {
 
             match &result {
                 SemanticTokensResult::Tokens(tokens) => {
-                    to_multiline_tokens2(tokens);
+                    check_tokens(tokens);
                 }
                 SemanticTokensResult::Partial(_) => {
                     panic!("Unexpected partial result");
