@@ -42,37 +42,37 @@ pub fn find_definition(
     document: Option<&VersionedDocument>,
     deref_target: DerefTarget<'_>,
 ) -> Option<DefinitionLink> {
-    let source_id = source.id();
-
-    let use_site = match deref_target {
+    match deref_target {
         // todi: field access
-        DerefTarget::VarAccess(node) | DerefTarget::Callee(node) => node,
+        DerefTarget::VarAccess(node) | DerefTarget::Callee(node) => {
+            find_ident_definition(ctx, source, node)
+        }
         // todo: better support (rename import path?)
         DerefTarget::ImportPath(path) => {
             let parent = path.parent()?;
             let def_fid = parent.span().id()?;
             let import_node = parent.cast::<ast::ModuleImport>()?;
             let source = find_source_by_expr(ctx.world(), def_fid, import_node.source())?;
-            return Some(DefinitionLink {
+            Some(DefinitionLink {
                 kind: LexicalKind::Mod(LexicalModKind::PathVar),
                 name: EcoString::new(),
                 value: None,
                 def_at: Some((source.id(), LinkedNode::new(source.root()).range())),
                 name_range: None,
-            });
+            })
         }
         DerefTarget::IncludePath(path) => {
             let parent = path.parent()?;
             let def_fid = parent.span().id()?;
             let include_node = parent.cast::<ast::ModuleInclude>()?;
             let source = find_source_by_expr(ctx.world(), def_fid, include_node.source())?;
-            return Some(DefinitionLink {
+            Some(DefinitionLink {
                 kind: LexicalKind::Mod(LexicalModKind::PathInclude),
                 name: EcoString::new(),
                 value: None,
                 def_at: Some((source.id(), (LinkedNode::new(source.root())).range())),
                 name_range: None,
-            });
+            })
         }
         DerefTarget::Label(r) | DerefTarget::Ref(r) => {
             let ref_expr: ast::Expr = r.cast()?;
@@ -82,17 +82,20 @@ pub fn find_definition(
                 _ => return None,
             };
 
-            let doc = document?;
-            let introspector = &doc.document.introspector;
-
-            return find_bib_definition(ctx, introspector, ref_node)
-                .or_else(|| find_ref_definition(ctx, introspector, ref_node, is_label, r.span()));
+            let introspector = &document?.document.introspector;
+            find_bib_definition(ctx, introspector, ref_node)
+                .or_else(|| find_ref_definition(ctx, introspector, ref_node, is_label, r.span()))
         }
-        DerefTarget::Normal(..) => {
-            return None;
-        }
-    };
+        DerefTarget::Normal(..) => None,
+    }
+}
 
+fn find_ident_definition(
+    ctx: &mut AnalysisContext<'_>,
+    source: Source,
+    use_site: LinkedNode,
+) -> Option<DefinitionLink> {
+    //  let use_site =
     // Lexical reference
     let ident_ref = match use_site.cast::<ast::Expr>()? {
         ast::Expr::Ident(e) => Some(IdentRef {
@@ -115,6 +118,7 @@ pub fn find_definition(
     };
 
     // Syntactic definition
+    let source_id = source.id();
     let def_use = ctx.def_use(source);
     let def_info = ident_ref
         .as_ref()
