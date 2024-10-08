@@ -1,14 +1,13 @@
 //! Import analysis
 
 use ecow::EcoVec;
-use typst::{
-    foundations::Value,
-    syntax::{LinkedNode, SyntaxKind},
-    World,
-};
+use typst::{foundations::Value, syntax::LinkedNode, World};
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::{analysis::analyze_import_, syntax::resolve_id_by_path};
+use crate::{
+    analysis::analyze_import_,
+    syntax::{find_expr_in_import, resolve_id_by_path},
+};
 
 pub use super::prelude::*;
 
@@ -92,7 +91,10 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
                 LexicalKind::Mod(LexicalModKind::Module(p)) => {
                     let id = match p {
                         ModSrc::Expr(exp) => {
-                            let exp = find_import_expr(self.root.leaf_at_compat(exp.range.end));
+                            let exp = self
+                                .root
+                                .leaf_at_compat(exp.range.end)
+                                .and_then(find_expr_in_import);
                             let val = exp
                                 .as_ref()
                                 .and_then(|exp| analyze_import_(self.ctx.deref(), exp));
@@ -100,9 +102,8 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
                             match val {
                                 Some(Value::Module(m)) => {
                                     log::debug!(
-                                        "current id {:?} exp {:?} => id: {:?}",
+                                        "current id {:?} exp {exp:?} => id: {:?}",
                                         self.current_id,
-                                        exp,
                                         m.file_id()
                                     );
                                     m.file_id()
@@ -131,18 +132,4 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
             }
         }
     }
-}
-
-fn find_import_expr(end: Option<LinkedNode>) -> Option<LinkedNode> {
-    let mut node = end?;
-    while let Some(parent) = node.parent() {
-        if matches!(
-            parent.kind(),
-            SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude
-        ) {
-            return Some(node);
-        }
-        node = parent.clone();
-    }
-    None
 }

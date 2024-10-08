@@ -12,6 +12,7 @@ use typst::{foundations::Value, syntax::Span};
 use typst_shim::syntax::LinkedNodeExt;
 
 use super::prelude::*;
+use crate::syntax::find_expr_in_import;
 use crate::{
     prelude::*,
     syntax::{
@@ -93,10 +94,12 @@ pub fn find_definition(
 fn find_ident_definition(
     ctx: &mut AnalysisContext<'_>,
     source: Source,
-    use_site: LinkedNode,
+    mut use_site: LinkedNode,
 ) -> Option<DefinitionLink> {
+    let mut proj = vec![];
     // Lexical reference
-    let ident_ref = match use_site.cast::<ast::Expr>()? {
+    let ident_store = use_site.clone();
+    let ident_ref = match ident_store.cast::<ast::Expr>()? {
         ast::Expr::Ident(e) => Some(IdentRef {
             name: e.get().clone(),
             range: use_site.range(),
@@ -105,10 +108,32 @@ fn find_ident_definition(
             name: e.get().clone(),
             range: use_site.range(),
         }),
-        ast::Expr::FieldAccess(..) => {
-            debug!("find field access");
+        ast::Expr::FieldAccess(s) => {
+            proj.push(s.field());
 
-            None
+            let mut i = s.target();
+            while let ast::Expr::FieldAccess(f) = i {
+                proj.push(f.field());
+                i = f.target();
+            }
+
+            match i {
+                ast::Expr::Ident(e) => {
+                    use_site = use_site.find(e.span())?;
+                    Some(IdentRef {
+                        name: e.get().clone(),
+                        range: use_site.range(),
+                    })
+                }
+                ast::Expr::MathIdent(e) => {
+                    use_site = use_site.find(e.span())?;
+                    Some(IdentRef {
+                        name: e.get().clone(),
+                        range: use_site.range(),
+                    })
+                }
+                _ => None,
+            }
         }
         _ => {
             debug!("unsupported kind {kind:?}", kind = use_site.kind());
@@ -136,10 +161,39 @@ fn find_ident_definition(
         });
     };
 
-    match def.kind {
+    match &def.kind {
         LexicalKind::Var(LexicalVarKind::BibKey)
         | LexicalKind::Heading(..)
         | LexicalKind::Block => unreachable!(),
+        LexicalKind::Mod(
+            LexicalModKind::Module(..) | LexicalModKind::PathVar | LexicalModKind::ModuleAlias,
+        ) => {
+            if !proj.is_empty() {
+                proj.reverse();
+                let def_src = ctx.source_by_id(def_fid).ok()?;
+                let def_root = LinkedNode::new(def_src.root());
+                let cursor = def.range.start + 1;
+                let mod_exp = find_expr_in_import(def_root.leaf_at_compat(cursor)?)?;
+                let mod_import = mod_exp.parent()?.clone();
+                let mod_import_node = mod_import.cast::<ast::ModuleImport>()?;
+                let import_path = mod_import.find(mod_import_node.source().span())?;
+
+                let m = ctx.analyze_import(&import_path)?;
+                let obj = project_obj(&m, proj.as_slice())?;
+
+                // todo: name range
+                let name = proj.last().map(|e| e.get().clone());
+                return value_to_def(ctx, obj.clone(), || name, None);
+            }
+
+            Some(DefinitionLink {
+                kind: def.kind.clone(),
+                name: def.name.clone(),
+                value: None,
+                def_at: Some((def_fid, def.range.clone())),
+                name_range: Some(def.range.clone()),
+            })
+        }
         LexicalKind::Var(
             LexicalVarKind::Variable
             | LexicalVarKind::ValRef
@@ -147,12 +201,7 @@ fn find_ident_definition(
             | LexicalVarKind::LabelRef,
         )
         | LexicalKind::Mod(
-            LexicalModKind::Module(..)
-            | LexicalModKind::PathVar
-            | LexicalModKind::PathInclude
-            | LexicalModKind::ModuleAlias
-            | LexicalModKind::Alias { .. }
-            | LexicalModKind::Ident,
+            LexicalModKind::PathInclude | LexicalModKind::Alias { .. } | LexicalModKind::Ident,
         ) => Some(DefinitionLink {
             kind: def.kind.clone(),
             name: def.name.clone(),
@@ -179,10 +228,20 @@ fn find_ident_definition(
             })
         }
         LexicalKind::Mod(LexicalModKind::Star) => {
-            log::info!("unimplemented star import {:?}", ident_ref);
+            log::info!("unimplemented star import {ident_ref:?}");
             None
         }
     }
+}
+
+fn project_obj<'a>(m: &'a Value, proj: &[ast::Ident<'_>]) -> Option<&'a Value> {
+    if proj.is_empty() {
+        return Some(m);
+    }
+    let scope = m.scope()?;
+    let (ident, proj) = proj.split_first()?;
+    let v = scope.get(ident.as_str())?;
+    project_obj(v, proj)
 }
 
 fn find_bib_definition(
