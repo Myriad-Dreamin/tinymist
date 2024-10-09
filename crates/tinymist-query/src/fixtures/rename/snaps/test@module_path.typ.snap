@@ -6,11 +6,6 @@ input_file: crates/tinymist-query/src/fixtures/rename/module_path.typ
 {
  "documentChanges": [
   {
-   "kind": "rename",
-   "newUri": "new_name.typ",
-   "oldUri": "variable.typ"
-  },
-  {
    "edits": [
     {
      "newText": "\"new_name.typ\" as variable",
@@ -21,6 +16,11 @@ input_file: crates/tinymist-query/src/fixtures/rename/module_path.typ
     "uri": "s1.typ",
     "version": null
    }
+  },
+  {
+   "kind": "rename",
+   "newUri": "new_name.typ",
+   "oldUri": "variable.typ"
   }
  ]
 }
