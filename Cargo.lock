@@ -3947,7 +3947,7 @@ dependencies = [
 
 [[package]]
 name = "sync-lsp"
-version = "0.11.29"
+version = "0.11.31"
 dependencies = [
  "anyhow",
  "clap",
@@ -4096,7 +4096,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.11.29"
+version = "0.11.31"
 dependencies = [
  "insta",
  "lsp-server",
@@ -4199,7 +4199,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.11.29"
+version = "0.11.31"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4239,7 +4239,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sync-lsp",
- "tinymist-assets 0.11.29-rc1",
+ "tinymist-assets 0.11.31-rc1",
  "tinymist-query",
  "tinymist-render",
  "tinymist-world",
@@ -4265,7 +4265,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.11.29"
+version = "0.11.31"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
@@ -4282,17 +4282,17 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.11.29-rc1"
+version = "0.11.31-rc1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29fc8b5bdee3573da3a2a9fa9dbbac1820492998edbadb8f4aa2a54823b2a5f2"
+checksum = "de1839b954527f4301fa8e19f148d768235c67b91bb59362a1b807636a0864b4"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.11.29"
+version = "0.11.31"
 
 [[package]]
 name = "tinymist-query"
-version = "0.11.29"
+version = "0.11.31"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4343,7 +4343,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.11.29"
+version = "0.11.31"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -4354,7 +4354,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.11.29"
+version = "0.11.31"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4370,7 +4370,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
- "tinymist-assets 0.11.29-rc1",
+ "tinymist-assets 0.11.31-rc1",
  "typst",
  "typst-assets",
 ]
@@ -4664,7 +4664,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "typlite"
-version = "0.11.29"
+version = "0.11.31"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
@@ -4816,7 +4816,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.11.29"
+version = "0.11.31"
 dependencies = [
  "clap",
  "comemo 0.4.0",
@@ -4829,7 +4829,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.11.29-rc1",
+ "tinymist-assets 0.11.31-rc1",
  "tokio",
  "typst",
  "typst-assets",
@@ -4856,7 +4856,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.11.29"
+version = "0.11.31"
 dependencies = [
  "cfg-if",
  "typst",
