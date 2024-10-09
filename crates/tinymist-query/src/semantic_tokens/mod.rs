@@ -85,7 +85,7 @@ struct Tokenizer {
 
     allow_multiline_token: bool,
 
-    token: Token,
+    token: Option<Token>,
 }
 
 impl Tokenizer {
@@ -98,7 +98,7 @@ impl Tokenizer {
             allow_multiline_token,
             encoding,
 
-            token: Token::default(),
+            token: None,
         }
     }
 
@@ -113,33 +113,35 @@ impl Tokenizer {
             .map(|token_type| Token::new(token_type, modifiers, range.clone()));
 
         // Push start
-        if !self.token.range.is_empty() && self.token.range.start < range.start {
-            let end = self.token.range.end.min(range.start);
-            self.push(Token {
-                token_type: self.token.token_type,
-                modifiers: self.token.modifiers,
-                range: self.token.range.start..end,
-            });
-            self.token.range.start = end;
+        if let Some(prev_token) = self.token.as_mut() {
+            if !prev_token.range.is_empty() && prev_token.range.start < range.start {
+                let end = prev_token.range.end.min(range.start);
+                let sliced = Token {
+                    token_type: prev_token.token_type,
+                    modifiers: prev_token.modifiers,
+                    range: prev_token.range.start..end,
+                };
+                // Slice the previous token
+                prev_token.range.start = end;
+                self.push(sliced);
+            }
         }
 
         if !is_leaf {
-            if let Some(token) = token.as_mut() {
-                std::mem::swap(&mut self.token, token);
-            }
-
+            std::mem::swap(&mut self.token, &mut token);
             for child in root.children() {
                 self.tokenize_tree(&child, modifiers);
             }
-
-            if let Some(token) = token.as_mut() {
-                std::mem::swap(&mut self.token, token);
-            }
+            std::mem::swap(&mut self.token, &mut token);
         }
 
         // Push end
         if let Some(token) = token.clone() {
             if !token.range.is_empty() {
+                // Slice the previous token
+                if let Some(prev_token) = self.token.as_mut() {
+                    prev_token.range.start = token.range.end;
+                }
                 self.push(token);
             }
         }
@@ -160,16 +162,16 @@ impl Tokenizer {
         }
 
         // This might be a bug of typst, that `end > len` is possible
-        let utf8_end = (range.end).min(self.source.text().len());
+        let source_len = self.source.text().len();
+        let utf8_end = (range.end).min(source_len);
         self.pos_offset = utf8_start;
-        if utf8_end < range.start || range.start > self.source.text().len() {
+        if utf8_end <= utf8_start || utf8_start > source_len {
             return;
         }
 
         let position = typst_to_lsp::offset_to_position(utf8_start, self.encoding, &self.source);
 
         let delta = self.curr_pos.delta(&position);
-        self.curr_pos = position;
 
         let encode_length = |s, t| {
             match self.encoding {
@@ -191,6 +193,7 @@ impl Tokenizer {
                 token_type: token_type as u32,
                 token_modifiers_bitset: modifiers.bitset(),
             });
+            self.curr_pos = position;
         } else {
             let final_line = self
                 .source
@@ -199,38 +202,51 @@ impl Tokenizer {
             let next_offset = self
                 .source
                 .line_to_byte((self.curr_pos.line + 1) as usize)
-                .unwrap_or(self.source.text().len());
-            self.output.push(SemanticToken {
-                delta_line: delta.delta_line,
-                delta_start: delta.delta_start,
-                length: encode_length(utf8_start, utf8_end.min(next_offset)) as u32,
-                token_type: token_type as u32,
-                token_modifiers_bitset: modifiers.bitset(),
-            });
-            let mut utf8_cursor = next_offset;
-            if self.curr_pos.line < final_line {
-                for line in self.curr_pos.line + 1..=final_line {
-                    let next_offset = if line == final_line {
-                        utf8_end
-                    } else {
-                        self.source
-                            .line_to_byte((line + 1) as usize)
-                            .unwrap_or(self.source.text().len())
-                    };
+                .unwrap_or(source_len);
+            let inline_length = encode_length(utf8_start, utf8_end.min(next_offset)) as u32;
+            if inline_length != 0 {
+                self.output.push(SemanticToken {
+                    delta_line: delta.delta_line,
+                    delta_start: delta.delta_start,
+                    length: inline_length,
+                    token_type: token_type as u32,
+                    token_modifiers_bitset: modifiers.bitset(),
+                });
+                self.curr_pos = position;
+            }
+            if self.curr_pos.line >= final_line {
+                return;
+            }
 
+            let mut utf8_cursor = next_offset;
+            let mut delta_line = 0;
+            for line in self.curr_pos.line + 1..=final_line {
+                let next_offset = if line == final_line {
+                    utf8_end
+                } else {
+                    self.source
+                        .line_to_byte((line + 1) as usize)
+                        .unwrap_or(source_len)
+                };
+
+                if utf8_cursor < next_offset {
+                    let inline_length = encode_length(utf8_cursor, next_offset) as u32;
                     self.output.push(SemanticToken {
-                        delta_line: 1,
+                        delta_line: delta_line + 1,
                         delta_start: 0,
-                        length: encode_length(utf8_cursor, next_offset) as u32,
+                        length: inline_length,
                         token_type: token_type as u32,
                         token_modifiers_bitset: modifiers.bitset(),
                     });
-                    self.pos_offset = utf8_cursor;
-                    utf8_cursor = next_offset;
+                    delta_line = 0;
+                    self.curr_pos.character = 0;
+                } else {
+                    delta_line += 1;
                 }
-                self.curr_pos.line = final_line;
-                self.curr_pos.character = 0;
+                self.pos_offset = utf8_cursor;
+                utf8_cursor = next_offset;
             }
+            self.curr_pos.line = final_line - delta_line;
         }
 
         pub trait PositionExt {
