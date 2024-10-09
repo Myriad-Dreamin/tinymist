@@ -7,6 +7,7 @@ input_file: crates/tinymist-query/src/fixtures/goto_definition/label_indir.typ
  {
   "originSelectionRange": "4:21:4:31",
   "targetRange": "3:16:3:27",
-  "targetSelectionRange": "3:16:3:27"
+  "targetSelectionRange": "3:16:3:27",
+  "targetUri": "s0.typ"
  }
 ]
