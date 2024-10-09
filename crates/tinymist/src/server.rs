@@ -233,6 +233,7 @@ impl LanguageState {
             .with_request_::<References>(State::references)
             .with_request_::<WorkspaceSymbolRequest>(State::symbol)
             .with_request_::<OnEnter>(State::on_enter)
+            .with_request_::<WillRenameFiles>(State::will_rename_files)
             // notifications
             .with_notification::<Initialized>(State::initialized)
             .with_notification::<DidOpenTextDocument>(State::did_open)
@@ -790,6 +791,27 @@ impl LanguageState {
         let (path, position) = as_path_pos(params);
         run_query!(req_id, self.OnEnter(path, position))
     }
+
+    fn will_rename_files(
+        &mut self,
+        req_id: RequestId,
+        params: RenameFilesParams,
+    ) -> ScheduledResult {
+        log::info!("will rename files {params:?}");
+        let paths = params
+            .files
+            .iter()
+            .map(|f| {
+                Some((
+                    as_path_(Url::parse(&f.old_uri).ok()?),
+                    as_path_(Url::parse(&f.new_uri).ok()?),
+                ))
+            })
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| invalid_params("invalid urls"))?;
+
+        run_query!(req_id, self.WillRenameFiles(paths))
+    }
 }
 
 impl LanguageState {
@@ -1047,6 +1069,7 @@ impl LanguageState {
                 Completion(req) => handle.run_stateful(snap, req, R::Completion),
                 SignatureHelp(req) => handle.run_semantic(snap, req, R::SignatureHelp),
                 Rename(req) => handle.run_stateful(snap, req, R::Rename),
+                WillRenameFiles(req) => handle.run_stateful(snap, req, R::WillRenameFiles),
                 PrepareRename(req) => handle.run_stateful(snap, req, R::PrepareRename),
                 Symbol(req) => handle.run_semantic(snap, req, R::Symbol),
                 WorkspaceLabel(req) => handle.run_semantic(snap, req, R::WorkspaceLabel),

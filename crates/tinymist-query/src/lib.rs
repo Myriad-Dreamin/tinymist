@@ -51,6 +51,8 @@ mod inlay_hint;
 pub use inlay_hint::*;
 mod jump;
 pub use jump::*;
+mod will_rename_files;
+pub use will_rename_files::*;
 mod rename;
 pub use rename::*;
 mod selection_range;
@@ -251,6 +253,7 @@ mod polymorphic {
         Completion(CompletionRequest),
         SignatureHelp(SignatureHelpRequest),
         Rename(RenameRequest),
+        WillRenameFiles(WillRenameFilesRequest),
         PrepareRename(PrepareRenameRequest),
         DocumentSymbol(DocumentSymbolRequest),
         Symbol(SymbolRequest),
@@ -286,6 +289,7 @@ mod polymorphic {
                 Self::Completion(..) => Mergeable,
                 Self::SignatureHelp(..) => PinnedFirst,
                 Self::Rename(..) => Mergeable,
+                Self::WillRenameFiles(..) => Mergeable,
                 Self::PrepareRename(..) => Mergeable,
                 Self::DocumentSymbol(..) => ContextFreeUnique,
                 Self::WorkspaceLabel(..) => Mergeable,
@@ -320,6 +324,7 @@ mod polymorphic {
                 Self::Completion(req) => &req.path,
                 Self::SignatureHelp(req) => &req.path,
                 Self::Rename(req) => &req.path,
+                Self::WillRenameFiles(..) => return None,
                 Self::PrepareRename(req) => &req.path,
                 Self::DocumentSymbol(req) => &req.path,
                 Self::Symbol(..) => return None,
@@ -356,6 +361,7 @@ mod polymorphic {
         SignatureHelp(Option<SignatureHelp>),
         PrepareRename(Option<PrepareRenameResponse>),
         Rename(Option<WorkspaceEdit>),
+        WillRenameFiles(Option<WorkspaceEdit>),
         DocumentSymbol(Option<DocumentSymbolResponse>),
         Symbol(Option<Vec<SymbolInformation>>),
         WorkspaceLabel(Option<Vec<SymbolInformation>>),
@@ -390,6 +396,7 @@ mod polymorphic {
                 Self::SignatureHelp(res) => serde_json::to_value(res),
                 Self::PrepareRename(res) => serde_json::to_value(res),
                 Self::Rename(res) => serde_json::to_value(res),
+                Self::WillRenameFiles(res) => serde_json::to_value(res),
                 Self::DocumentSymbol(res) => serde_json::to_value(res),
                 Self::Symbol(res) => serde_json::to_value(res),
                 Self::WorkspaceLabel(res) => serde_json::to_value(res),
