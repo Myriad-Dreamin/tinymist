@@ -25,7 +25,7 @@ pub use typst::foundations::{Func, Value};
 pub use typst::syntax::FileId as TypstFileId;
 pub use typst::syntax::{
     ast::{self, AstNode},
-    LinkedNode, Source, Spanned, SyntaxKind,
+    LinkedNode, Source, Spanned, SyntaxKind, SyntaxNode,
 };
 pub use typst::World;
 

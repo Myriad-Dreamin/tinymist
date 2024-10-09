@@ -314,6 +314,8 @@ pub static REDACT_LOC: Lazy<RedactFields> = Lazy::new(|| {
     RedactFields::from_iter([
         "location",
         "uri",
+        "oldUri",
+        "newUri",
         "range",
         "changes",
         "selectionRange",
@@ -331,11 +333,6 @@ impl JsonRepr {
         let s = serde_json::to_value(v).unwrap();
         Self(s)
     }
-
-    // pub fn new(v: impl serde::Serialize) -> Self {
-    //     let s = serde_json::to_value(v).unwrap();
-    //     Self(REDACT_URI.redact(s))
-    // }
 
     pub fn new_redacted(v: impl serde::Serialize, rm: &RedactFields) -> Self {
         let s = serde_json::to_value(v).unwrap();
@@ -387,27 +384,16 @@ impl Redact for RedactFields {
 
                     match k {
                         "changes" => {
-                            // object range => v
+                            let obj = t.as_object().unwrap();
                             m.insert(
                                 k.to_owned(),
                                 Value::Object(
-                                    t.as_object()
-                                        .unwrap()
-                                        .iter()
-                                        .map(|(k, v)| {
-                                            (
-                                                Path::new(k)
-                                                    .file_name()
-                                                    .unwrap()
-                                                    .to_str()
-                                                    .unwrap()
-                                                    .to_owned(),
-                                                v.clone(),
-                                            )
-                                        })
-                                        .collect(),
+                                    obj.iter().map(|(k, v)| (file_name(k), v.clone())).collect(),
                                 ),
                             );
+                        }
+                        "uri" | "oldUri" | "newUri" | "targetUri" => {
+                            m.insert(k.to_owned(), file_name(t.as_str().unwrap()).into());
                         }
                         "range"
                         | "selectionRange"
@@ -434,6 +420,11 @@ impl Redact for RedactFields {
             v => v,
         }
     }
+}
+
+fn file_name(k: &str) -> String {
+    let name = Path::new(k).file_name().unwrap();
+    name.to_str().unwrap().to_owned()
 }
 
 pub struct HashRepr<T>(pub T);

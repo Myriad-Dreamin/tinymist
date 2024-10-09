@@ -1,46 +1,33 @@
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Deref,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{collections::HashSet, ops::Deref};
 
 use comemo::Tracked;
-use ecow::{EcoString, EcoVec};
-use lsp_types::Url;
 use once_cell::sync::OnceCell;
 use reflexo::hash::{hash128, FxDashMap};
 use reflexo::{debug_loc::DataSource, ImmutPath};
+use typst::diag::{eco_format, FileError, FileResult, PackageError};
 use typst::eval::Eval;
-use typst::foundations::{self, Func, Styles};
-use typst::syntax::{FileId, LinkedNode, SyntaxNode};
-use typst::{
-    diag::{eco_format, FileError, FileResult, PackageError},
-    foundations::Bytes,
-    syntax::{package::PackageSpec, Source, Span, VirtualPath},
-    World,
-};
-use typst::{foundations::Value, model::Document, syntax::ast, text::Font};
-use typst::{layout::Position, syntax::FileId as TypstFileId};
+use typst::foundations::{self, Bytes, Func, Styles};
+use typst::layout::Position;
+use typst::syntax::{package::PackageSpec, Span, VirtualPath};
+use typst::{model::Document, text::Font};
 use typst_shim::syntax::LinkedNodeExt;
 
-use super::{
-    analyze_bib, analyze_expr_, analyze_import_, post_type_check, BibInfo, DefUseInfo,
-    DefinitionLink, IdentRef, ImportInfo, PathPreference, SigTy, Signature, SignatureTarget, Ty,
-    TypeScheme,
-};
 use crate::adt::interner::Interned;
-use crate::analysis::analyze_dyn_signature;
-use crate::path_to_url;
-use crate::syntax::{get_deref_target, resolve_id_by_path, DerefTarget};
+use crate::analysis::{
+    analyze_bib, analyze_dyn_signature, analyze_expr_, analyze_import_, post_type_check, BibInfo,
+    DefUseInfo, DefinitionLink, IdentRef, ImportInfo, PathPreference, SigTy, Signature,
+    SignatureTarget, Ty, TypeScheme,
+};
+use crate::prelude::*;
+use crate::syntax::{
+    construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
+    scan_workspace_files, DerefTarget, LexicalHierarchy, ModuleDependency,
+};
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
-    lsp_to_typst,
-    syntax::{
-        construct_module_dependencies, scan_workspace_files, LexicalHierarchy, ModuleDependency,
-    },
-    typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange, VersionedDocument,
+    lsp_to_typst, path_to_url, typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange,
+    VersionedDocument,
 };
 
 /// The analysis data holds globally.
@@ -333,7 +320,7 @@ impl<'w> AnalysisContext<'w> {
     }
 
     /// Get the fileId from its path
-    pub fn file_id_by_path(&self, p: &Path) -> FileResult<FileId> {
+    pub fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
         // todo: source in packages
         let relative_path = p.strip_prefix(&self.root).map_err(|_| {
             FileError::Other(Some(eco_format!(
@@ -666,6 +653,18 @@ impl<'w> AnalysisContext<'w> {
         let ty_chk = self.type_check(source.clone())?;
 
         post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.type_of_span(k.span()))
+    }
+
+    /// Get module import at location.
+    pub fn module_ins_at(&mut self, def_fid: TypstFileId, cursor: usize) -> Option<Value> {
+        let def_src = self.source_by_id(def_fid).ok()?;
+        let def_root = LinkedNode::new(def_src.root());
+        let mod_exp = find_expr_in_import(def_root.leaf_at_compat(cursor)?)?;
+        let mod_import = mod_exp.parent()?.clone();
+        let mod_import_node = mod_import.cast::<ast::ModuleImport>()?;
+        let import_path = mod_import.find(mod_import_node.source().span())?;
+
+        self.analyze_import(&import_path)
     }
 
     /// Try to load a module from the current source file.
