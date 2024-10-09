@@ -14,7 +14,27 @@ pub fn deref_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
     while let Some(e) = node.cast::<ast::Parenthesized>() {
         node = node.find(e.expr().span())?;
     }
+    if let Some(e) = node.parent() {
+        if let Some(f) = e.cast::<ast::FieldAccess>() {
+            if node.span() == f.field().span() {
+                return Some(e.clone());
+            }
+        }
+    }
     Some(node)
+}
+
+pub(crate) fn find_expr_in_import(mut node: LinkedNode) -> Option<LinkedNode> {
+    while let Some(parent) = node.parent() {
+        if matches!(
+            parent.kind(),
+            SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude
+        ) {
+            return Some(node);
+        }
+        node = parent.clone();
+    }
+    None
 }
 
 fn is_mark(sk: SyntaxKind) -> bool {
