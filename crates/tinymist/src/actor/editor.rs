@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use log::info;
-use lsp_types::Url;
+use lsp_types::{notification::PublishDiagnostics, PublishDiagnosticsParams, Url};
 use tinymist_query::{DiagnosticsMap, LspDiagnostic};
 use tokio::sync::mpsc;
 
@@ -136,7 +136,12 @@ impl EditorActor {
             None => path_diags.remove(group),
         };
 
-        self.client.publish_diagnostics(url, to_publish, None)
+        self.client
+            .send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
+                uri: url,
+                diagnostics: to_publish,
+                version: None,
+            });
     }
 }
 // Notification
