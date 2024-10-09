@@ -3,13 +3,15 @@ name: CI
 on:
   push:
     branches:
-      - typst-mainline
+      - main
+      - 'nightly/*'
     tags:
       - "*"
   pull_request:
     types: [opened, synchronize]
     branches:
-      - typst-mainline
+      - main
+      - 'nightly/*'
   workflow_dispatch:
 
 env:
