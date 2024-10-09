@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - main
+      - 'nightly/*'
     tags:
       - "*"
   pull_request:
     types: [opened, synchronize]
     branches:
       - main
+      - 'nightly/*'
   workflow_dispatch:
 
 env:
