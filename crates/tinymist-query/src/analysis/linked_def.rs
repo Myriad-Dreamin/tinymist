@@ -179,11 +179,11 @@ fn find_ident_definition(
                 let import_path = mod_import.find(mod_import_node.source().span())?;
 
                 let m = ctx.analyze_import(&import_path)?;
-                let obj = project_obj(&m, proj.as_slice())?;
+                let val = project_value(&m, proj.as_slice())?;
 
                 // todo: name range
                 let name = proj.last().map(|e| e.get().clone());
-                return value_to_def(ctx, obj.clone(), || name, None);
+                return value_to_def(ctx, val.clone(), || name, None);
             }
 
             Some(DefinitionLink {
@@ -234,14 +234,14 @@ fn find_ident_definition(
     }
 }
 
-fn project_obj<'a>(m: &'a Value, proj: &[ast::Ident<'_>]) -> Option<&'a Value> {
+fn project_value<'a>(m: &'a Value, proj: &[ast::Ident<'_>]) -> Option<&'a Value> {
     if proj.is_empty() {
         return Some(m);
     }
     let scope = m.scope()?;
     let (ident, proj) = proj.split_first()?;
     let v = scope.get(ident.as_str())?;
-    project_obj(v, proj)
+    project_value(v, proj)
 }
 
 fn find_bib_definition(
