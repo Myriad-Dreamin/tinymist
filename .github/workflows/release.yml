@@ -77,7 +77,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 22
         if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Install deps
         run: yarn install
