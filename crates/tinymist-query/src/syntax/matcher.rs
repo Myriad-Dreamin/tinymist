@@ -44,6 +44,10 @@ pub(crate) fn find_expr_in_import(mut node: LinkedNode) -> Option<LinkedNode> {
     None
 }
 
+pub fn node_ancestors<'a>(node: &'a LinkedNode<'a>) -> impl Iterator<Item = &'a LinkedNode<'a>> {
+    std::iter::successors(Some(node), |node| node.parent())
+}
+
 fn is_mark(sk: SyntaxKind) -> bool {
     use SyntaxKind::*;
     matches!(

@@ -1,6 +1,6 @@
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::{prelude::*, SemanticRequest};
+use crate::{prelude::*, syntax::node_ancestors, SemanticRequest};
 
 /// The [`textDocument/documentHighlight`] request
 ///
@@ -120,7 +120,7 @@ impl<'a, 'w> DocumentHighlightWorker<'a, 'w> {
         let _ = self.ctx;
 
         // find the nearest loop node
-        let loop_node = ancestors(node)
+        let loop_node = node_ancestors(node)
             .find(|node| matches!(node.kind(), SyntaxKind::ForLoop | SyntaxKind::WhileLoop))?;
 
         // find the first key word of the loop node
@@ -144,10 +144,6 @@ fn highlight_func_returns(
     let _ = ctx;
     let _ = node;
     None
-}
-
-fn ancestors<'a>(node: &'a LinkedNode<'a>) -> impl Iterator<Item = &'a LinkedNode<'a>> {
-    std::iter::successors(Some(node), |node| node.parent())
 }
 
 #[cfg(test)]

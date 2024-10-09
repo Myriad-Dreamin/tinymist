@@ -2,7 +2,7 @@
 
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::{prelude::*, SyntaxRequest};
+use crate::{prelude::*, syntax::node_ancestors, SyntaxRequest};
 
 /// The [`experimental/onEnter`] request is sent from client to server to handle
 /// the <kbd>Enter</kbd> key press.
@@ -45,6 +45,12 @@ impl SyntaxRequest for OnEnterRequest {
             return worker.enter_line_doc_comment(&leaf, cursor);
         }
 
+        let math_node =
+            node_ancestors(&leaf).find(|node| matches!(node.kind(), SyntaxKind::Equation));
+        if let Some(mn) = math_node {
+            return worker.enter_block_math(mn, cursor);
+        }
+
         None
     }
 }
@@ -55,6 +61,13 @@ struct OnEnterWorker<'a> {
 }
 
 impl OnEnterWorker<'_> {
+    fn indent_of(&self, of: usize) -> String {
+        let all_text = self.source.text();
+        let start = all_text[..of].rfind('\n').map(|e| e + 1);
+        let indent_size = all_text[start.unwrap_or_default()..of].chars().count();
+        " ".repeat(indent_size)
+    }
+
     fn enter_line_doc_comment(&self, leaf: &LinkedNode, cursor: usize) -> Option<Vec<TextEdit>> {
         let skipper = |n: &LinkedNode| {
             matches!(
@@ -84,8 +97,7 @@ impl OnEnterWorker<'_> {
             return None;
         }
 
-        // todo: indent
-        let indent = "";
+        let indent = self.indent_of(leaf.offset());
         // todo: remove_trailing_whitespace
 
         let rng = cursor..cursor;
@@ -93,6 +105,34 @@ impl OnEnterWorker<'_> {
         let edit = TextEdit {
             range: typst_to_lsp::range(rng, self.source, self.position_encoding),
             new_text: format!("\n{indent}{comment_prefix} $0"),
+        };
+
+        Some(vec![edit])
+    }
+
+    fn enter_block_math(&self, math_node: &LinkedNode<'_>, cursor: usize) -> Option<Vec<TextEdit>> {
+        let o = math_node.range();
+        if !o.contains(&cursor) {
+            return None;
+        }
+
+        let all_text = self.source.text();
+        let math_text = &all_text[o.clone()];
+        let content = math_text.trim_start_matches('$').trim_end_matches('$');
+        if !content.trim().is_empty() {
+            return None;
+        }
+
+        let indent = self.indent_of(o.start);
+        let rng = cursor..cursor;
+        let edit = TextEdit {
+            range: typst_to_lsp::range(rng, self.source, self.position_encoding),
+            // todo: read indent configuration
+            new_text: if !content.contains('\n') {
+                format!("\n{indent}  $0\n{indent}")
+            } else {
+                format!("\n{indent}  $0")
+            },
         };
 
         Some(vec![edit])
