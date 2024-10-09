@@ -4365,6 +4365,7 @@ dependencies = [
  "log",
  "parking_lot",
  "reflexo-typst",
+ "reflexo-typst-shim",
  "reqwest 0.11.27",
  "serde",
  "serde_json",
