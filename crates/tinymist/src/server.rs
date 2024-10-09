@@ -1018,7 +1018,11 @@ impl LanguageState {
         let handle = client.handle.clone();
         let entry = query
             .associated_path()
-            .map(|path| client.config.determine_entry(Some(path.into())));
+            .map(|path| client.config.determine_entry(Some(path.into())))
+            .or_else(|| {
+                let root = client.config.determine_root(None)?;
+                Some(EntryState::new_rooted(root, Some(*DETACHED_ENTRY)))
+            });
 
         just_future(async move {
             let mut snap = snap.receive().await?;
