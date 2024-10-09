@@ -1,0 +1,26 @@
+---
+source: crates/tinymist-query/src/rename.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/rename/module_path_abs.typ
+---
+{
+ "documentChanges": [
+  {
+   "kind": "rename",
+   "newUri": "new_name.typ",
+   "oldUri": "variable.typ"
+  },
+  {
+   "edits": [
+    {
+     "newText": "\"/new_name.typ\" as variable",
+     "range": "0:29:0:44"
+    }
+   ],
+   "textDocument": {
+    "uri": "s1.typ",
+    "version": null
+   }
+  }
+ ]
+}

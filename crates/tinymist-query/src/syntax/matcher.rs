@@ -10,6 +10,13 @@ use typst::{
     },
 };
 
+pub fn deref_expr(mut ancestor: LinkedNode) -> Option<LinkedNode> {
+    while !ancestor.is::<ast::Expr>() {
+        ancestor = ancestor.parent()?.clone();
+    }
+    Some(ancestor)
+}
+
 pub fn deref_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
     while let Some(e) = node.cast::<ast::Parenthesized>() {
         node = node.find(e.expr().span())?;
@@ -181,10 +188,7 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'
     }
 
     // Move to the first ancestor that is an expression.
-    let mut ancestor = node;
-    while !ancestor.is::<ast::Expr>() {
-        ancestor = ancestor.parent()?.clone();
-    }
+    let ancestor = deref_expr(node)?;
     log::debug!("deref expr: {ancestor:?}");
 
     // Unwrap all parentheses to get the actual expression.

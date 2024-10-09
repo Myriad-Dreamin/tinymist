@@ -6,6 +6,7 @@ use regex::RegexSet;
 use crate::prelude::*;
 
 /// The dependency information of a module (file).
+#[derive(Debug, Clone)]
 pub struct ModuleDependency {
     /// The dependencies of this module.
     pub dependencies: EcoVec<TypstFileId>,

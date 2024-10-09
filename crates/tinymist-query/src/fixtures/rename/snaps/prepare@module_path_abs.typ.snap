@@ -1,0 +1,9 @@
+---
+source: crates/tinymist-query/src/prepare_rename.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/rename/module_path_abs.typ
+---
+{
+ "placeholder": "/variable.typ",
+ "range": "0:29:0:44"
+}

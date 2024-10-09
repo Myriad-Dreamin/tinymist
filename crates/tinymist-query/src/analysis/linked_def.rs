@@ -12,7 +12,6 @@ use typst::{foundations::Value, syntax::Span};
 use typst_shim::syntax::LinkedNodeExt;
 
 use super::prelude::*;
-use crate::syntax::find_expr_in_import;
 use crate::{
     prelude::*,
     syntax::{
@@ -170,15 +169,7 @@ fn find_ident_definition(
         ) => {
             if !proj.is_empty() {
                 proj.reverse();
-                let def_src = ctx.source_by_id(def_fid).ok()?;
-                let def_root = LinkedNode::new(def_src.root());
-                let cursor = def.range.start + 1;
-                let mod_exp = find_expr_in_import(def_root.leaf_at_compat(cursor)?)?;
-                let mod_import = mod_exp.parent()?.clone();
-                let mod_import_node = mod_import.cast::<ast::ModuleImport>()?;
-                let import_path = mod_import.find(mod_import_node.source().span())?;
-
-                let m = ctx.analyze_import(&import_path)?;
+                let m = ctx.module_ins_at(def_fid, def.range.start + 1)?;
                 let val = project_value(&m, proj.as_slice())?;
 
                 // todo: name range

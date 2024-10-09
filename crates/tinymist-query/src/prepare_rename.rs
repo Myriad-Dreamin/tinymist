@@ -1,6 +1,7 @@
 use crate::{
     analysis::{find_definition, DefinitionLink},
     prelude::*,
+    syntax::DerefTarget,
 };
 use log::debug;
 
@@ -39,58 +40,87 @@ impl StatefulRequest for PrepareRenameRequest {
     ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
+        if matches!(deref_target.node().kind(), SyntaxKind::FieldAccess) {
+            // todo: rename field access
+            log::info!("prepare_rename: field access is not a definition site");
+            return None;
+        }
+
         let origin_selection_range = ctx.to_lsp_range(deref_target.node().range(), &source);
+        let lnk = find_definition(ctx, source.clone(), doc.as_ref(), deref_target.clone())?;
 
-        let lnk = find_definition(ctx, source.clone(), doc.as_ref(), deref_target)?;
-        validate_renaming_definition(&lnk)?;
+        let (name, range) = prepare_renaming(ctx, &deref_target, &lnk)?;
 
-        debug!("prepare_rename: {}", lnk.name);
         Some(PrepareRenameResponse::RangeWithPlaceholder {
-            range: origin_selection_range,
-            placeholder: lnk.name.to_string(),
+            range: range.unwrap_or(origin_selection_range),
+            placeholder: name,
         })
     }
 }
 
-pub(crate) fn validate_renaming_definition(lnk: &DefinitionLink) -> Option<()> {
-    'check_func: {
-        use typst::foundations::func::Repr;
-        let mut f = match &lnk.value {
-            Some(Value::Func(f)) => f,
-            Some(..) => {
-                log::info!(
-                    "prepare_rename: not a function on function definition site: {:?}",
-                    lnk.value
-                );
-                return None;
-            }
-            None => {
-                break 'check_func;
-            }
-        };
-        loop {
-            match f.inner() {
-                // native functions can't be renamed
-                Repr::Native(..) | Repr::Element(..) => return None,
-                // todo: rename with site
-                Repr::With(w) => f = &w.0,
-                Repr::Closure(..) => break,
-            }
-        }
-    }
+pub(crate) fn prepare_renaming(
+    _ctx: &mut AnalysisContext,
+    deref_target: &DerefTarget,
+    lnk: &DefinitionLink,
+) -> Option<(String, Option<LspRange>)> {
+    let name = lnk.name.clone();
+    let (def_fid, _def_range) = lnk.def_at.clone()?;
 
-    let (fid, _def_range) = lnk.def_at.clone()?;
-
-    if fid.package().is_some() {
+    if def_fid.package().is_some() {
         debug!(
             "prepare_rename: {name} is in a package {pkg:?}",
-            name = lnk.name,
-            pkg = fid.package()
+            pkg = def_fid.package()
         );
         return None;
     }
 
-    Some(())
+    let var_rename = || Some((name.to_string(), None));
+
+    debug!("prepare_rename: {name}");
+    use crate::syntax::{LexicalKind, LexicalModKind::*, LexicalVarKind::*, ModSrc};
+    match lnk.kind {
+        // Cannot rename headings or blocks
+        LexicalKind::Heading(_) | LexicalKind::Block => None,
+        // Cannot rename module star
+        LexicalKind::Mod(Star) => None,
+        // Cannot rename expression import
+        LexicalKind::Mod(Module(ModSrc::Expr(..))) => None,
+        // todo: label renaming, bibkey renaming
+        LexicalKind::Var(LabelRef | Label | BibKey) => None,
+        LexicalKind::Var(Variable | ValRef) => var_rename(),
+        LexicalKind::Mod(ModuleAlias | Ident | Alias { .. }) => var_rename(),
+        LexicalKind::Var(Function) => validate_fn_renaming(lnk).map(|_| (name.to_string(), None)),
+        LexicalKind::Mod(PathInclude | PathVar | Module(ModSrc::Path(..))) => {
+            let node = deref_target.node().get().clone();
+            let path = node.cast::<ast::Str>()?;
+            let name = path.get().to_string();
+            Some((name, None))
+        }
+    }
+}
+
+fn validate_fn_renaming(lnk: &DefinitionLink) -> Option<()> {
+    use typst::foundations::func::Repr;
+    let mut f = match &lnk.value {
+        None => return Some(()),
+        Some(Value::Func(f)) => f,
+        Some(..) => {
+            log::info!(
+                "prepare_rename: not a function on function definition site: {:?}",
+                lnk.value
+            );
+            return None;
+        }
+    };
+    loop {
+        match f.inner() {
+            // todo: rename with site
+            Repr::With(w) => f = &w.0,
+            Repr::Closure(..) => return Some(()),
+            // native functions can't be renamed
+            Repr::Native(..) | Repr::Element(..) => return None,
+        }
+    }
 }
 
 #[cfg(test)]

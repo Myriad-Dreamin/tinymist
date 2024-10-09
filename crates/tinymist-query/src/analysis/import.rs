@@ -121,10 +121,9 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
                         }
                     };
                     log::debug!(
-                        "current id {:?} range {:?} => id: {:?}",
+                        "current id {:?} range {:?} => id: {id:?}",
                         self.current_id,
                         e.info.range,
-                        id
                     );
                     let source = id.and_then(|id| self.ctx.source(id).ok());
                     self.info.imports.insert(e.info.range.clone(), source);
