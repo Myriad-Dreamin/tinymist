@@ -551,7 +551,7 @@ impl CompileConfig {
     }
 
     /// Determines the root directory for the entry file.
-    fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
+    pub fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
         if let Some(path) = &self.root_path {
             return Some(path.as_path().into());
         }
