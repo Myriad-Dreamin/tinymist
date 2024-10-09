@@ -1,7 +1,8 @@
 use std::ops::Range;
 
 use lsp_types::{
-    DocumentChanges, OneOf, OptionalVersionedTextDocumentIdentifier, RenameFile, TextDocumentEdit,
+    DocumentChangeOperation, DocumentChanges, OneOf, OptionalVersionedTextDocumentIdentifier,
+    RenameFile, TextDocumentEdit,
 };
 use reflexo::path::{unix_slash, PathClean};
 use typst::foundations::{Repr, Str};
@@ -56,9 +57,6 @@ impl StatefulRequest for RenameRequest {
                     self.new_name
                 };
 
-                let mut editions: HashMap<Url, Vec<TextEdit>> = HashMap::new();
-                let mut document_changes = vec![];
-
                 let def_fid = lnk.def_at?.0;
                 let old_path = ctx.path_for_id(def_fid).ok()?;
 
@@ -74,6 +72,11 @@ impl StatefulRequest for RenameRequest {
                 let old_uri = path_to_url(&old_path).ok()?;
                 let new_uri = path_to_url(&new_path).ok()?;
 
+                let mut edits: HashMap<Url, Vec<TextEdit>> = HashMap::new();
+                do_rename_file(ctx, def_fid, diff, &mut edits)?;
+
+                let mut document_changes = edits_to_document_changes(edits);
+
                 document_changes.push(lsp_types::DocumentChangeOperation::Op(
                     lsp_types::ResourceOp::Rename(RenameFile {
                         old_uri,
@@ -83,40 +86,7 @@ impl StatefulRequest for RenameRequest {
                     }),
                 ));
 
-                let dep = ctx.module_dependencies().get(&def_fid)?.clone();
-
-                for ref_fid in dep.dependents.iter() {
-                    let ref_src = ctx.source_by_id(*ref_fid).ok()?;
-                    let uri = ctx.uri_for_id(*ref_fid).ok()?;
-
-                    let Some(import_info) = ctx.import_info(ref_src.clone()) else {
-                        continue;
-                    };
-
-                    let edits = editions.entry(uri).or_default();
-                    for (rng, importing_src) in &import_info.imports {
-                        let importing = importing_src.as_ref().map(|s| s.id());
-                        if importing.map_or(true, |i| i != def_fid) {
-                            continue;
-                        }
-                        log::debug!("import: {rng:?} -> {importing:?} v.s. {def_fid:?}");
-                        rename_importer(ctx, &ref_src, rng.clone(), &diff, edits);
-                    }
-                }
-
                 // todo: validate: workspace.workspaceEdit.resourceOperations
-                for edition in editions.into_iter() {
-                    document_changes.push(lsp_types::DocumentChangeOperation::Edit(
-                        TextDocumentEdit {
-                            text_document: OptionalVersionedTextDocumentIdentifier {
-                                uri: edition.0,
-                                version: None,
-                            },
-                            edits: edition.1.into_iter().map(OneOf::Left).collect(),
-                        },
-                    ));
-                }
-
                 Some(WorkspaceEdit {
                     document_changes: Some(DocumentChanges::Operations(document_changes)),
                     ..Default::default()
@@ -125,7 +95,7 @@ impl StatefulRequest for RenameRequest {
             _ => {
                 let references = find_references(ctx, source.clone(), doc.as_ref(), deref_target)?;
 
-                let mut editions = HashMap::new();
+                let mut edits = HashMap::new();
 
                 let (def_fid, _def_range) = lnk.def_at?;
                 let def_loc = {
@@ -147,22 +117,67 @@ impl StatefulRequest for RenameRequest {
                 for i in (Some(def_loc).into_iter()).chain(references) {
                     let uri = i.uri;
                     let range = i.range;
-                    let edits = editions.entry(uri).or_insert_with(Vec::new);
+                    let edits = edits.entry(uri).or_insert_with(Vec::new);
                     edits.push(TextEdit {
                         range,
                         new_text: self.new_name.clone(),
                     });
                 }
 
-                log::info!("rename editions: {editions:?}");
+                log::info!("rename edits: {edits:?}");
 
                 Some(WorkspaceEdit {
-                    changes: Some(editions),
+                    changes: Some(edits),
                     ..Default::default()
                 })
             }
         }
     }
+}
+
+pub(crate) fn do_rename_file(
+    ctx: &mut AnalysisContext,
+    def_fid: TypstFileId,
+    diff: PathBuf,
+    edits: &mut HashMap<Url, Vec<TextEdit>>,
+) -> Option<()> {
+    let dep = ctx.module_dependencies().get(&def_fid)?.clone();
+
+    for ref_fid in dep.dependents.iter() {
+        let ref_src = ctx.source_by_id(*ref_fid).ok()?;
+        let uri = ctx.uri_for_id(*ref_fid).ok()?;
+
+        let Some(import_info) = ctx.import_info(ref_src.clone()) else {
+            continue;
+        };
+
+        let edits = edits.entry(uri).or_default();
+        for (rng, importing_src) in &import_info.imports {
+            let importing = importing_src.as_ref().map(|s| s.id());
+            if importing.map_or(true, |i| i != def_fid) {
+                continue;
+            }
+            log::debug!("import: {rng:?} -> {importing:?} v.s. {def_fid:?}");
+            rename_importer(ctx, &ref_src, rng.clone(), &diff, edits);
+        }
+    }
+
+    Some(())
+}
+
+pub(crate) fn edits_to_document_changes(
+    edits: HashMap<Url, Vec<TextEdit>>,
+) -> Vec<DocumentChangeOperation> {
+    let mut document_changes = vec![];
+
+    for (uri, edits) in edits {
+        document_changes.push(lsp_types::DocumentChangeOperation::Edit(TextDocumentEdit {
+            text_document: OptionalVersionedTextDocumentIdentifier { uri, version: None },
+            edits: edits.into_iter().map(OneOf::Left).collect(),
+        }));
+    }
+
+    document_changes
 }
 
 fn rename_importer(
