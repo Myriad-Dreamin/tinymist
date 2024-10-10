@@ -177,22 +177,22 @@ jobs:
           name: tinymist-${{ env.target }}
           path: tinymist-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
       - name: Package typst-preview extension
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && !contains(github.ref, 'rc') && ((endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && (!contains(github.ref, 'rc') && ((endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8'))))
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./contrib/typst-preview/editors/vscode
       - name: Package tinymist extension
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && !contains(github.ref, 'rc') && ((endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && (!contains(github.ref, 'rc') && ((endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8'))))
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
         working-directory: ./editors/vscode
       - name: Package typst-preview extension (Pre Release)
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && contains(github.ref, 'rc') || (endsWith(github.ref, '1') || endsWith(github.ref, '3') || endsWith(github.ref, '5') || endsWith(github.ref, '7') || endsWith(github.ref, '9'))
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && (contains(github.ref, 'rc') || (endsWith(github.ref, '1') || endsWith(github.ref, '3') || endsWith(github.ref, '5') || endsWith(github.ref, '7') || endsWith(github.ref, '9')))
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix --pre-release
         working-directory: ./contrib/typst-preview/editors/vscode
       - name: Package tinymist extension (Pre Release)
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && contains(github.ref, 'rc') || (endsWith(github.ref, '1') || endsWith(github.ref, '3') || endsWith(github.ref, '5') || endsWith(github.ref, '7') || endsWith(github.ref, '9'))
+        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && (contains(github.ref, 'rc') || (endsWith(github.ref, '1') || endsWith(github.ref, '3') || endsWith(github.ref, '5') || endsWith(github.ref, '7') || endsWith(github.ref, '9')))
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix --pre-release
         working-directory: ./editors/vscode
