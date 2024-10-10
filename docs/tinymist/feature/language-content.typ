@@ -4,7 +4,7 @@
 Language service (LSP) features:
 
 - #link("https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide")[Semantic highlighting]
-  - Also known as "syntax highlighting".
+  - The "semantic highlighting" is supplementary to #link("https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide")["syntax highlighting"].
 - #link("https://code.visualstudio.com/api/language-extensions/programmatic-language-features#provide-diagnostics")[Diagnostics]
   - Also known as "error checking" or "error reporting".
 - #link("https://code.visualstudio.com/api/language-extensions/programmatic-language-features#highlight-all-occurrences-of-a-symbol-in-a-document")[Document highlight]
@@ -12,6 +12,8 @@ Language service (LSP) features:
   - (Todo) Highlight all exit points in a function context.
   - (Todo) Highlight all captures in a closure context.
   - (Todo) Highlight all occurrences of a symbol in a document.
+- #link("https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentLink")[Document links]
+  - Renders path or link references in the document, such as `image("path.png")` or `bibliography(style: "path.csl")`.
 - #link("https://code.visualstudio.com/docs/getstarted/userinterface#_outline-view")[Document symbols]
   - Also known as "document outline" or "table of contents" _in Typst_.
 - #link("https://burkeholland.gitbook.io/vs-code-can-do-that/exercise-3-navigation-and-refactoring/folding-sections")[Folding ranges]

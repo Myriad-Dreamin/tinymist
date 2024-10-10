@@ -35,6 +35,8 @@ mod document_highlight;
 pub use document_highlight::*;
 mod document_symbol;
 pub use document_symbol::*;
+mod document_link;
+pub use document_link::*;
 mod workspace_label;
 pub use workspace_label::*;
 mod document_metrics;
@@ -246,6 +248,7 @@ mod polymorphic {
         References(ReferencesRequest),
         InlayHint(InlayHintRequest),
         DocumentColor(DocumentColorRequest),
+        DocumentLink(DocumentLinkRequest),
         DocumentHighlight(DocumentHighlightRequest),
         ColorPresentation(ColorPresentationRequest),
         CodeAction(CodeActionRequest),
@@ -282,6 +285,7 @@ mod polymorphic {
                 Self::References(..) => PinnedFirst,
                 Self::InlayHint(..) => Unique,
                 Self::DocumentColor(..) => PinnedFirst,
+                Self::DocumentLink(..) => PinnedFirst,
                 Self::DocumentHighlight(..) => PinnedFirst,
                 Self::ColorPresentation(..) => ContextFreeUnique,
                 Self::CodeAction(..) => Unique,
@@ -317,6 +321,7 @@ mod polymorphic {
                 Self::References(req) => &req.path,
                 Self::InlayHint(req) => &req.path,
                 Self::DocumentColor(req) => &req.path,
+                Self::DocumentLink(req) => &req.path,
                 Self::DocumentHighlight(req) => &req.path,
                 Self::ColorPresentation(req) => &req.path,
                 Self::CodeAction(req) => &req.path,
@@ -353,6 +358,7 @@ mod polymorphic {
         References(Option<Vec<LspLocation>>),
         InlayHint(Option<Vec<InlayHint>>),
         DocumentColor(Option<Vec<ColorInformation>>),
+        DocumentLink(Option<Vec<DocumentLink>>),
         DocumentHighlight(Option<Vec<DocumentHighlight>>),
         ColorPresentation(Option<Vec<ColorPresentation>>),
         CodeAction(Option<Vec<CodeActionOrCommand>>),
@@ -388,6 +394,7 @@ mod polymorphic {
                 Self::References(res) => serde_json::to_value(res),
                 Self::InlayHint(res) => serde_json::to_value(res),
                 Self::DocumentColor(res) => serde_json::to_value(res),
+                Self::DocumentLink(res) => serde_json::to_value(res),
                 Self::DocumentHighlight(res) => serde_json::to_value(res),
                 Self::ColorPresentation(res) => serde_json::to_value(res),
                 Self::CodeAction(res) => serde_json::to_value(res),

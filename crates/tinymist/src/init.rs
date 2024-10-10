@@ -236,6 +236,12 @@ impl Initializer for SuperInit {
                         work_done_progress: None,
                     },
                 })),
+                document_link_provider: Some(DocumentLinkOptions {
+                    resolve_provider: None,
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
+                }),
                 folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 workspace: Some(WorkspaceServerCapabilities {
                     workspace_folders: Some(WorkspaceFoldersServerCapabilities {

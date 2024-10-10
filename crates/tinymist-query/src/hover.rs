@@ -3,10 +3,13 @@ use core::fmt;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
-    analysis::{analyze_dyn_signature, find_definition, DefinitionLink, Signature},
+    analysis::{
+        analyze_dyn_signature, find_definition, get_link_exprs_in, DefinitionLink, Signature,
+    },
     jump_from_cursor,
     prelude::*,
     syntax::{find_docs_before, get_deref_target, LexicalKind, LexicalVarKind},
+    ty::PathPreference,
     upstream::{expr_tooltip, plain_docs_sentence, route_of_value, truncated_repr, Tooltip},
     LspHoverContents, StatefulRequest,
 };
@@ -42,7 +45,8 @@ impl StatefulRequest for HoverRequest {
         let cursor = offset + 1;
 
         let contents = def_tooltip(ctx, &source, doc.as_ref(), cursor)
-            .or_else(|| star_tooltip(ctx, &source, cursor));
+            .or_else(|| star_tooltip(ctx, &source, cursor))
+            .or_else(|| link_tooltip(ctx, &source, cursor));
 
         let contents = contents.or_else(|| {
             Some(typst_to_lsp::tooltip(
@@ -64,7 +68,7 @@ impl StatefulRequest for HoverRequest {
                     }
                     MarkedString::String(e) => e,
                 })
-                .join("\n---\n"),
+                .join("\n\n---\n"),
             LspHoverContents::Scalar(MarkedString::String(contents)) => contents,
             LspHoverContents::Scalar(MarkedString::LanguageString(contents)) => {
                 format!("```{}\n{}\n```", contents.language, contents.value)
@@ -117,6 +121,53 @@ impl StatefulRequest for HoverRequest {
     }
 }
 
+fn link_tooltip(
+    ctx: &mut AnalysisContext<'_>,
+    source: &Source,
+    cursor: usize,
+) -> Option<HoverContents> {
+    let mut node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+    while !matches!(node.kind(), SyntaxKind::FuncCall) {
+        node = node.parent()?.clone();
+    }
+
+    let mut links = get_link_exprs_in(ctx, &node)?;
+    links.retain(|link| link.0.contains(&cursor));
+    if links.is_empty() {
+        return None;
+    }
+
+    let mut results = vec![];
+    let mut actions = vec![];
+    for (_, target) in links {
+        // open file in tab or system application
+        actions.push(CommandLink {
+            title: Some("Open in Tab".to_string()),
+            command_or_links: vec![CommandOrLink::Command(Command {
+                id: "tinymist.openInternal".to_string(),
+                args: vec![JsonValue::String(target.to_string())],
+            })],
+        });
+        actions.push(CommandLink {
+            title: Some("Open Externally".to_string()),
+            command_or_links: vec![CommandOrLink::Command(Command {
+                id: "tinymist.openExternal".to_string(),
+                args: vec![JsonValue::String(target.to_string())],
+            })],
+        });
+        if let Some(kind) = PathPreference::from_ext(target.path()) {
+            let preview = format!("A `{kind:?}` file.");
+            results.push(MarkedString::String(preview));
+        }
+    }
+    render_actions(&mut results, actions);
+    if results.is_empty() {
+        return None;
+    }
+
+    Some(LspHoverContents::Array(results))
+}
+
 fn star_tooltip(
     ctx: &mut AnalysisContext,
     source: &Source,
@@ -161,8 +212,14 @@ fn star_tooltip(
     Some(LspHoverContents::Array(results))
 }
 
+struct Command {
+    id: String,
+    args: Vec<JsonValue>,
+}
+
 enum CommandOrLink {
     Link(String),
+    Command(Command),
 }
 
 struct CommandLink {
@@ -281,13 +338,27 @@ fn render_actions(results: &mut Vec<MarkedString>, actions: Vec<CommandLink>) {
                 .into_iter()
                 .map(|col| match col {
                     CommandOrLink::Link(link) => link,
+                    CommandOrLink::Command(command) => {
+                        let id = command.id;
+                        // <https://code.visualstudio.com/api/extension-guides/command#command-uris>
+                        if command.args.is_empty() {
+                            format!("command:{id}")
+                        } else {
+                            let args = serde_json::to_string(&command.args).unwrap();
+                            let args = percent_encoding::utf8_percent_encode(
+                                &args,
+                                percent_encoding::NON_ALPHANUMERIC,
+                            );
+                            format!("command:{id}?{args}")
+                        }
+                    }
                 })
                 .collect::<Vec<_>>()
                 .join(" ");
             format!("[{title}]({command_or_links})")
         })
         .collect::<Vec<_>>()
-        .join("___");
+        .join(" | ");
     results.push(MarkedString::String(g));
 }
 
