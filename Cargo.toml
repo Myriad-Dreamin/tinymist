@@ -99,6 +99,9 @@ reflexo-typst = { git = "https://github.com/paran3xus/typst.ts", tag = "tinymist
     "system",
 ], default-features = false }
 reflexo-vec2svg = { git = "https://github.com/paran3xus/typst.ts", tag = "tinymist-v0.11.31" }
+reflexo-typst-shim = { git = "https://github.com/paran3xus/typst.ts", tag = "tinymist-v0.11.31", features = [
+    "nightly",
+] }
 
 
 typst = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
@@ -185,9 +188,7 @@ typst-svg = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0
 typst-render = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
 typst-pdf = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
 typst-syntax = { git = "https://github.com/paran3xus/typst.git", tag = "tinymist-v0.11.31" }
-reflexo-typst-shim = { git = "https://github.com/paran3xus/typst.ts", tag = "tinymist-v0.11.31", features = [
-    "nightly",
-] }
+reflexo-typst-shim = { git = "https://github.com/paran3xus/typst.ts", tag = "tinymist-v0.11.31" }
 
 # typst = { path = "../typst/crates/typst" }
 # typst-timing = { path = "../typst/crates/typst-timing" }
