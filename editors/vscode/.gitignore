@@ -2,6 +2,7 @@ tinymist-*.vsix
 *.log
 test-dist
 .vscode-test
+.vscode
 coverage
 icons/ti.svg
 icons/typst-small.svg
