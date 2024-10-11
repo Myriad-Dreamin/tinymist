@@ -124,6 +124,9 @@ function initClient(context: ExtensionContext, config: Record<string, any>) {
     debug: run,
   };
 
+  const trustedCommands = {
+    enabledCommands: ["tinymist.openInternal", "tinymist.openExternal"],
+  };
   const clientOptions: LanguageClientOptions = {
     documentSelector: typstDocumentSelector,
     initializationOptions: config,
@@ -137,6 +140,19 @@ function initClient(context: ExtensionContext, config: Record<string, any>) {
           }
           return substVscodeVarsInConfig(items, result);
         },
+      },
+      provideHover: async (document, position, token, next) => {
+        const hover = await next(document, position, token);
+        if (!hover) {
+          return hover;
+        }
+
+        for (const content of hover.contents) {
+          if (content instanceof vscode.MarkdownString) {
+            content.isTrusted = trustedCommands;
+          }
+        }
+        return hover;
       },
     },
   };
@@ -252,6 +268,8 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
   // prettier-ignore
   context.subscriptions.push(
     commands.registerCommand("tinymist.onEnter", onEnterHandler),
+    commands.registerCommand("tinymist.openInternal", openInternal),
+    commands.registerCommand("tinymist.openExternal", openExternal),
 
     commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
     commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
@@ -359,6 +377,16 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
   }
 
   return;
+}
+
+async function openInternal(target: string): Promise<void> {
+  const uri = Uri.parse(target);
+  await commands.executeCommand("vscode.open", uri, ViewColumn.Beside);
+}
+
+async function openExternal(target: string): Promise<void> {
+  const uri = Uri.parse(target);
+  await vscode.env.openExternal(uri);
 }
 
 async function commandExport(

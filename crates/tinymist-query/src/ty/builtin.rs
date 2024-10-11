@@ -2,6 +2,7 @@ use core::fmt;
 
 use once_cell::sync::Lazy;
 use regex::RegexSet;
+use strum::{EnumIter, IntoEnumIterator};
 use typst::{foundations::CastInfo, syntax::Span};
 use typst::{
     foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
@@ -10,10 +11,8 @@ use typst::{
 
 use crate::{adt::interner::Interned, ty::*};
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, EnumIter)]
 pub enum PathPreference {
-    None,
-    Special,
     Source,
     Csv,
     Image,
@@ -25,6 +24,8 @@ pub enum PathPreference {
     Bibliography,
     RawTheme,
     RawSyntax,
+    Special,
+    None,
 }
 
 impl PathPreference {
@@ -33,7 +34,8 @@ impl PathPreference {
             Lazy::new(|| RegexSet::new([r"^typ$", r"^typc$"]).unwrap());
         static IMAGE_REGSET: Lazy<RegexSet> = Lazy::new(|| {
             RegexSet::new([
-                r"^png$", r"^webp$", r"^jpg$", r"^jpeg$", r"^svg$", r"^svgz$",
+                r"^ico$", r"^bmp$", r"^png$", r"^webp$", r"^jpg$", r"^jpeg$", r"^jfif$", r"^tiff$",
+                r"^gif$", r"^svg$", r"^svgz$",
             ])
             .unwrap()
         });
@@ -70,8 +72,6 @@ impl PathPreference {
         });
 
         match self {
-            PathPreference::None => &ALL_REGSET,
-            PathPreference::Special => &ALL_SPECIAL_REGSET,
             PathPreference::Source => &SOURCE_REGSET,
             PathPreference::Csv => &CSV_REGSET,
             PathPreference::Image => &IMAGE_REGSET,
@@ -83,7 +83,14 @@ impl PathPreference {
             PathPreference::Bibliography => &BIB_REGSET,
             PathPreference::RawTheme => &RAW_THEME_REGSET,
             PathPreference::RawSyntax => &RAW_SYNTAX_REGSET,
+            PathPreference::Special => &ALL_SPECIAL_REGSET,
+            PathPreference::None => &ALL_REGSET,
         }
+    }
+
+    pub fn from_ext(path: &str) -> Option<Self> {
+        let path = std::path::Path::new(path).extension()?.to_str()?;
+        PathPreference::iter().find(|p| p.ext_matcher().is_match(path))
     }
 }
 

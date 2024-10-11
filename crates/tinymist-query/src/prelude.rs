@@ -11,8 +11,8 @@ pub use log::{error, trace};
 pub use lsp_types::{
     request::GotoDeclarationResponse, CodeAction, CodeActionKind, CodeActionOrCommand, CodeLens,
     ColorInformation, ColorPresentation, CompletionResponse, DiagnosticRelatedInformation,
-    DocumentHighlight, DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange,
-    GotoDefinitionResponse, Hover, HoverContents, InlayHint, LanguageString,
+    DocumentHighlight, DocumentLink, DocumentSymbol, DocumentSymbolResponse, Documentation,
+    FoldingRange, GotoDefinitionResponse, Hover, HoverContents, InlayHint, LanguageString,
     Location as LspLocation, LocationLink, MarkedString, MarkupContent, MarkupKind,
     Position as LspPosition, PrepareRenameResponse, SelectionRange, SemanticTokens,
     SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp,
