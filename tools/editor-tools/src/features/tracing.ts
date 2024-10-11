@@ -83,7 +83,7 @@ export const Tracing = () => {
   );
 
   const since = Date.now();
-  const collecting = setInterval(() => {
+  const collecting = setInterval(async () => {
     const message = document.getElementById("message")!;
     if (!message) {
       return;
@@ -92,7 +92,7 @@ export const Tracing = () => {
     const elapsedAlign = (elapsed / 1000).toFixed(1).padStart(5, " ");
 
     if (traceReport.val) {
-      console.log(JSON.stringify(traceReport.val));
+      // console.log(JSON.stringify(traceReport.val));
 
       clearInterval(collecting);
       const openTraceButton = document.getElementById(
@@ -120,7 +120,14 @@ export const Tracing = () => {
         msg = `Error: ${firstResponse.error.message}`;
       } else {
         msg = "";
-        tracingContent = enc.encode(firstResponse.result.tracingData).buffer;
+        if (firstResponse.result.tracingData) {
+          tracingContent = enc.encode(firstResponse.result.tracingData).buffer;
+        } else if (firstResponse.result.tracingUrl) {
+          const response = await fetch(firstResponse.result.tracingUrl);
+          tracingContent = await response.arrayBuffer();
+        } else {
+          msg = "No trace data or url found in response";
+        }
       }
 
       if (!firstResponse) {

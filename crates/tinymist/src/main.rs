@@ -17,18 +17,16 @@ use comemo::Prehashed;
 use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;
-use reflexo_typst::{
-    package::PackageSpec, typst::prelude::EcoVec, CompileEnv, Compiler, TaskInputs, TypstDict,
-};
+use reflexo_typst::{package::PackageSpec, TaskInputs, TypstDict};
 use serde_json::Value as JsonValue;
 use sync_lsp::{
     internal_error,
     transport::{with_stdio_transport, MirrorArgs},
     LspBuilder, LspClientRoot, LspResult,
 };
-use tinymist::{CompileConfig, Config, LanguageState, LspWorld, RegularInit, SuperInit};
+use tinymist::{CompileConfig, Config, LanguageState, RegularInit, SuperInit, UserActionTask};
 use tinymist_query::docs::PackageInfo;
-use typst::{eval::Tracer, foundations::IntoValue, syntax::Span, World};
+use typst::foundations::IntoValue;
 
 use crate::args::*;
 
@@ -80,7 +78,7 @@ fn main() -> anyhow::Result<()> {
         Commands::Completion(args) => completion(args),
         Commands::Query(query_cmds) => query_main(query_cmds),
         Commands::Lsp(args) => lsp_main(args),
-        Commands::TraceLsp(args) => trace_main(args),
+        Commands::TraceLsp(args) => trace_lsp_main(args),
         #[cfg(feature = "preview")]
         Commands::Preview(args) => {
             #[cfg(feature = "preview")]
@@ -133,7 +131,7 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
 }
 
 /// The main entry point for the compiler.
-pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
+pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
     let mut input = PathBuf::from(match args.compile.input {
         Some(value) => value,
         None => return Err(anyhow::anyhow!("provide a valid path")),
@@ -218,45 +216,7 @@ pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
                 inputs: Some(inputs),
             });
 
-            let mut env = CompileEnv {
-                tracer: Some(Tracer::default()),
-                ..Default::default()
-            };
-            typst_timing::enable();
-            let mut errors = EcoVec::new();
-            if let Err(e) = std::marker::PhantomData.compile(&w, &mut env) {
-                errors = e;
-            }
-            let mut writer = std::io::BufWriter::new(Vec::new());
-            let _ = typst_timing::export_json(&mut writer, |span| {
-                resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
-            });
-
-            let timings = String::from_utf8(writer.into_inner().unwrap()).unwrap();
-
-            let warnings = env.tracer.map(|e| e.warnings());
-
-            let diagnostics = state.primary().handle.run_analysis(&w, |ctx| {
-                tinymist_query::convert_diagnostics(
-                    ctx,
-                    warnings.iter().flatten().chain(errors.iter()),
-                )
-            });
-
-            let diagnostics = diagnostics.unwrap_or_default();
-
-            client.send_notification_(lsp_server::Notification {
-                method: "tinymistExt/diagnostics".to_owned(),
-                params: serde_json::json!(diagnostics),
-            });
-
-            client.respond(lsp_server::Response {
-                id: req_id,
-                result: Some(serde_json::json!({
-                    "tracingData": timings,
-                })),
-                error: None,
-            });
+            UserActionTask::trace_main(client, state, &w, args.rpc_kind, req_id).await
         });
 
         Ok(())
@@ -326,13 +286,4 @@ pub fn query_main(cmds: QueryCommands) -> anyhow::Result<()> {
     })?;
 
     Ok(())
-}
-
-/// Turns a span into a (file, line) pair.
-fn resolve_span(world: &LspWorld, span: Span) -> Option<(String, u32)> {
-    let id = span.id()?;
-    let source = world.source(id).ok()?;
-    let range = source.range(span)?;
-    let line = source.byte_to_line(range.start)?;
-    Some((format!("{id:?}"), line as u32 + 1))
 }

@@ -25,7 +25,7 @@ pub enum Commands {
     Query(QueryCommands),
     /// Runs language server for tracing some typst program.
     #[clap(hide(true))]
-    TraceLsp(CompileArgs),
+    TraceLsp(TraceLspArgs),
     /// Runs preview server
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
@@ -118,9 +118,12 @@ impl clap_complete::Generator for Shell {
 }
 
 #[derive(Debug, Clone, Default, clap::Parser)]
-pub struct CompileArgs {
+pub struct TraceLspArgs {
     #[clap(long, default_value = "false")]
     pub persist: bool,
+    // lsp or http
+    #[clap(long, default_value = "lsp")]
+    pub rpc_kind: String,
     #[clap(flatten)]
     pub mirror: MirrorArgs,
     #[clap(flatten)]
