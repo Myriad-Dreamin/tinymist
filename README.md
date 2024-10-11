@@ -6,7 +6,7 @@ Tinymist [ˈtaɪni mɪst] is an integrated language service for [Typst](https://
 It contains:
 - an analyzing library for Typst, see [tinymist-query](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query).
 - a CLI for Typst, see [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist/).
-  - which provides a language server for Typst, see [Langauge Features](https://myriad-dreamin.github.io/tinymist//feature/language.html).
+  - which provides a language server for Typst, see [Language Features](https://myriad-dreamin.github.io/tinymist//feature/language.html).
   - which provides a preview server for Typst, see [Preview Feature](https://myriad-dreamin.github.io/tinymist//feature/preview.html).
 - a VSCode extension for Typst, see [Tinymist VSCode Extension](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/).
 
@@ -94,7 +94,7 @@ Besides published releases specific for each editors, you can also download the 
 - Regular prebuilts can be found in [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).
 - Nightly prebuilts can be found in [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions). For example, if you are seeking a nightly release for the featured [PR: build: bump version to 0.11.17-rc1](https://github.com/Myriad-Dreamin/tinymist/pull/468), you could click and go to the [action page](https://github.com/Myriad-Dreamin/tinymist/actions/runs/10120639466) run for the related commits and download the artifacts.
 
-To install extension file (the file with `.vsix` extension) manually, please <kbd>Ctrl+Shift+X</kbd> in the editor window and drop the downloaded vsix file into the opended extensions view.
+To install extension file (the file with `.vsix` extension) manually, please <kbd>Ctrl+Shift+X</kbd> in the editor window and drop the downloaded vsix file into the opened extensions view.
 
 ## Documentation
 
