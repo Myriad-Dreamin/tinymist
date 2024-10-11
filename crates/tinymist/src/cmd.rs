@@ -443,13 +443,12 @@ impl LanguageState {
                 main,
                 inputs: snap.world.inputs().as_ref().deref().clone(),
                 font_paths: snap.world.font_resolver.font_paths().to_owned(),
+                rpc_kind: "http".into(),
             })?;
 
             tokio::pin!(task);
             task.as_mut().await;
-            let resp = task.take_output().unwrap()?;
-
-            serde_json::to_value(resp).map_err(|e| internal_error(e.to_string()))
+            task.take_output().unwrap()
         })
     }
 
