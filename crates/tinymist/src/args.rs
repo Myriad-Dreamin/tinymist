@@ -19,6 +19,10 @@ pub enum Commands {
     Completion(ShellCompletionArgs),
     /// Runs language server
     Lsp(LspArgs),
+    /// Runs language query
+    #[clap(hide(true))] // still in development
+    #[clap(subcommand)]
+    Query(QueryCommands),
     /// Runs language server for tracing some typst program.
     #[clap(hide(true))]
     TraceLsp(CompileArgs),
@@ -129,6 +133,37 @@ pub struct LspArgs {
     pub mirror: MirrorArgs,
     #[clap(flatten)]
     pub font: CompileFontArgs,
+}
+
+#[derive(Debug, Clone, clap::Subcommand)]
+#[clap(rename_all = "camelCase")]
+pub enum QueryCommands {
+    /// Get the documentation for a specific package.
+    PackageDocs(PackageDocsArgs),
+}
+
+#[derive(Debug, Clone, clap::Parser)]
+pub struct PackageDocsArgs {
+    /// The path of the package to request docs for.
+    #[clap(long)]
+    pub path: Option<String>,
+    /// The package of the package to request docs for.
+    #[clap(long)]
+    pub id: String,
+    /// The output path for the requested docs.
+    #[clap(short, long)]
+    pub output: String,
+    // /// The format of requested docs.
+    // #[clap(long)]
+    // pub format: Option<QueryDocsFormat>,
+}
+
+#[derive(Debug, Clone, Default, clap::ValueEnum)]
+#[clap(rename_all = "camelCase")]
+pub enum QueryDocsFormat {
+    #[default]
+    Json,
+    Markdown,
 }
 
 pub static LONG_VERSION: Lazy<String> = Lazy::new(|| {

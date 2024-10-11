@@ -37,6 +37,8 @@ use super::{init::*, *};
 use crate::actor::editor::EditorRequest;
 use crate::actor::typ_client::CompileClientActor;
 
+pub(crate) use futures::Future;
+
 pub(super) fn as_path(inp: TextDocumentIdentifier) -> PathBuf {
     as_path_(inp.uri)
 }

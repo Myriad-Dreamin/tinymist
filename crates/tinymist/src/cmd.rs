@@ -566,6 +566,7 @@ impl LanguageState {
         })
     }
 
+    // todo: it looks like we can generate this function
     /// Get the all symbol docs
     pub fn resource_package_docs(
         &mut self,
@@ -573,9 +574,18 @@ impl LanguageState {
     ) -> AnySchedulableResponse {
         let info = get_arg!(arguments[1] as PackageInfo);
 
+        let fut = self.resource_package_docs_(info)?;
+        just_future(async move { serde_json::to_value(fut.await?).map_err(internal_error) })
+    }
+
+    /// Get the all symbol docs
+    pub fn resource_package_docs_(
+        &mut self,
+        info: PackageInfo,
+    ) -> LspResult<impl Future<Output = LspResult<String>>> {
         let handle = self.primary().handle.clone();
         let snap = handle.snapshot().map_err(z_internal_error)?;
-        just_future(async move {
+        Ok(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
             let w = snap.world.as_ref();
 
@@ -599,14 +609,12 @@ impl LanguageState {
             });
 
             let res = handle.run_analysis(w, |a| {
-                let symbols = tinymist_query::docs::generate_md_docs(a, w, &info)
+                tinymist_query::docs::generate_md_docs(a, w, &info)
                     .map_err(map_string_err("failed to list symbols"))
-                    .map_err(z_internal_error)?;
-
-                serde_json::to_value(symbols).map_err(|e| internal_error(e.to_string()))
+                    .map_err(z_internal_error)
             });
 
-            res.map_err(|e| internal_error(e.to_string()))?
+            res.map_err(internal_error)?
         })
     }
 }
