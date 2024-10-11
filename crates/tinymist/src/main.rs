@@ -2,7 +2,12 @@
 
 mod args;
 
-use std::{io, path::PathBuf, sync::Arc};
+use std::{
+    io,
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::Arc,
+};
 
 use anyhow::bail;
 use clap::Parser;
@@ -12,10 +17,17 @@ use comemo::Prehashed;
 use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;
-use reflexo_typst::{typst::prelude::EcoVec, CompileEnv, Compiler, TaskInputs, TypstDict};
+use reflexo_typst::{
+    package::PackageSpec, typst::prelude::EcoVec, CompileEnv, Compiler, TaskInputs, TypstDict,
+};
 use serde_json::Value as JsonValue;
-use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClientRoot};
+use sync_lsp::{
+    internal_error,
+    transport::{with_stdio_transport, MirrorArgs},
+    LspBuilder, LspClientRoot, LspResult,
+};
 use tinymist::{CompileConfig, Config, LanguageState, LspWorld, RegularInit, SuperInit};
+use tinymist_query::docs::PackageInfo;
 use typst::{eval::Tracer, foundations::IntoValue, syntax::Span, World};
 
 use crate::args::*;
@@ -66,6 +78,7 @@ fn main() -> anyhow::Result<()> {
 
     match args.command.unwrap_or_default() {
         Commands::Completion(args) => completion(args),
+        Commands::Query(query_cmds) => query_main(query_cmds),
         Commands::Lsp(args) => lsp_main(args),
         Commands::TraceLsp(args) => trace_main(args),
         #[cfg(feature = "preview")]
@@ -247,6 +260,69 @@ pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
         });
 
         Ok(())
+    })?;
+
+    Ok(())
+}
+
+/// The main entry point for language server queries.
+pub fn query_main(cmds: QueryCommands) -> anyhow::Result<()> {
+    use reflexo_typst::package::PackageRegistry;
+
+    with_stdio_transport(MirrorArgs::default(), |conn| {
+        let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
+        let client = client_root.weak();
+
+        // todo: roots, inputs, font_opts
+        let config = Config::default();
+
+        let mut service = LanguageState::install(LspBuilder::new(
+            SuperInit {
+                client: client.to_typed(),
+                exec_cmds: Vec::new(),
+                config,
+                err: None,
+            },
+            client.clone(),
+        ))
+        .build();
+
+        let resp = service.ready(()).unwrap();
+        let MaybeDone::Done(resp) = resp else {
+            bail!("internal error: not sync init")
+        };
+        resp.unwrap();
+
+        let state = service.state_mut().unwrap();
+
+        let snap = state.primary().snapshot().unwrap();
+        let res = RUNTIMES.tokio_runtime.block_on(async move {
+            let w = snap.receive().await.map_err(internal_error)?;
+            match cmds {
+                QueryCommands::PackageDocs(args) => {
+                    let pkg = PackageSpec::from_str(&args.id).unwrap();
+                    let path = args.path.map(PathBuf::from);
+                    let path = path
+                        .unwrap_or_else(|| w.world.registry.resolve(&pkg).unwrap().as_ref().into());
+
+                    let res = state
+                        .resource_package_docs_(PackageInfo {
+                            path,
+                            namespace: pkg.namespace,
+                            name: pkg.name,
+                            version: pkg.version.to_string(),
+                        })?
+                        .await?;
+
+                    let output_path = Path::new(&args.output);
+                    std::fs::write(output_path, res).map_err(internal_error)?;
+                }
+            };
+
+            LspResult::Ok(())
+        });
+
+        res.map_err(|e| anyhow::anyhow!("{e:?}"))
     })?;
 
     Ok(())
