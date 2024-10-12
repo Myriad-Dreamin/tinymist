@@ -11,7 +11,7 @@ use typst::{
 
 use crate::{adt::interner::Interned, ty::*};
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, EnumIter)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, EnumIter)]
 pub enum PathPreference {
     Source,
     Csv,
@@ -156,7 +156,7 @@ impl<'a> Iterator for UnionIter<'a> {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd)]
 pub enum BuiltinTy {
     Clause,
     Undef,
