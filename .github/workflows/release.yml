@@ -74,6 +74,12 @@ jobs:
       isRelease: ${{ (startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))) }}
       isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8'))))) || (!startsWith(github.ref, 'refs/tags/') && matrix.regular_build == 'true')) }}
     steps:
+      - name: "Print Env"
+        run: |
+          echo "Running on ${{ matrix.os }}"
+          echo "Target: ${{ env.target }}"
+          echo "Is Release: ${{ env.isRelease }}"
+          echo "Is Nightly: ${{ env.isNightly }}"
       - uses: actions/checkout@v4
         with:
           submodules: recursive
