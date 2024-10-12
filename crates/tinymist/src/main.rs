@@ -26,6 +26,7 @@ use sync_lsp::{
 use tinymist::{CompileConfig, Config, LanguageState, RegularInit, SuperInit, UserActionTask};
 use tinymist_query::docs::PackageInfo;
 use typst::foundations::IntoValue;
+use typst_shim::utils::LazyHash;
 
 use crate::args::*;
 

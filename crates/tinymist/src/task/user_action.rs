@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_lsp::{just_future, LspClient, SchedulableResponse};
 use tinymist_world::LspWorld;
-use typst::{engine::Sink, foundations::IntoValue, syntax::Span, utils::LazyHash, World};
+use typst::{engine::Sink, syntax::Span, World};
 
 use crate::{internal_error, LanguageState};
 
