@@ -21,4 +21,5 @@ input_file: crates/tinymist-query/src/fixtures/type_check/confusing-name.typ
 114..118 -> @info
 121..122 -> @x
 121..140 -> Any
+123..131 -> Type(datetime)
 123..139 -> Any

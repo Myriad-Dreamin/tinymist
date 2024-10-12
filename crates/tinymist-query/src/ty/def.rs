@@ -313,6 +313,10 @@ pub trait TypeInterface {
     fn interface(&self) -> impl Iterator<Item = (&StrRef, &Ty)>;
     /// Get the field by bone offset.
     fn field_by_bone_offset(&self, i: usize) -> Option<&Ty>;
+    /// Get the field by name.
+    fn field_by_name(&self, name: &StrRef) -> Option<&Ty> {
+        self.field_by_bone_offset(self.bone().find(name)?)
+    }
 }
 
 /// Extension common methods for [`TypeInterface`].

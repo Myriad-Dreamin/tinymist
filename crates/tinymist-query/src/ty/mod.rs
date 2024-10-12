@@ -5,7 +5,9 @@ mod bound;
 mod builtin;
 mod def;
 mod describe;
+mod iface;
 mod mutate;
+mod select;
 mod sig;
 mod simplify;
 mod subst;
@@ -14,7 +16,9 @@ pub(crate) use apply::*;
 pub(crate) use bound::*;
 pub(crate) use builtin::*;
 pub use def::*;
+pub(crate) use iface::*;
 pub(crate) use mutate::*;
+pub(crate) use select::*;
 pub(crate) use sig::*;
 
 #[cfg(test)]
