@@ -29,7 +29,7 @@ pub(super) type TyRef = Interned<Ty>;
 pub(super) type StrRef = Interned<str>;
 
 /// All possible types in tinymist
-#[derive(Hash, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ty {
     // Simple Types
     /// A top type, whose negation is bottom type.
@@ -147,7 +147,9 @@ impl Ty {
 
     /// Create a union type from an iterator of types
     pub fn iter_union(e: impl IntoIterator<Item = Ty>) -> Self {
-        Ty::Union(Interned::new(e.into_iter().collect()))
+        let mut v: Vec<Ty> = e.into_iter().collect();
+        v.sort();
+        Ty::Union(Interned::new(v))
     }
 
     /// Create an undefined type (which will emit an error)
@@ -213,7 +215,7 @@ impl TypeSource {
 }
 
 /// An ordered list of names
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NameBone {
     /// The names in the bone
     pub names: Box<[StrRef]>,
@@ -273,7 +275,7 @@ impl NameBone {
 /// A frozen type variable (bounds of some type in program)
 /// `t :> t1 | ... | tn <: f1 & ... & fn`
 /// `  lbs------------- ubs-------------`
-#[derive(Hash, Clone, PartialEq, Eq, Default, PartialOrd)]
+#[derive(Hash, Clone, PartialEq, Eq, Default, PartialOrd, Ord)]
 pub struct TypeBounds {
     /// The lower bounds
     pub lbs: EcoVec<Ty>,
@@ -350,7 +352,15 @@ impl Eq for InsTy {}
 
 impl PartialOrd for InsTy {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.val.partial_cmp(&other.val)
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for InsTy {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.val
+            .partial_cmp(&other.val)
+            .unwrap_or(std::cmp::Ordering::Equal)
     }
 }
 
@@ -387,7 +397,7 @@ impl InsTy {
 }
 
 /// A field type
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FieldTy {
     /// The name of the field
     pub name: StrRef,
@@ -452,7 +462,7 @@ impl TypeVar {
 }
 
 /// A record type
-#[derive(Hash, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RecordTy {
     /// The names of the fields
     pub names: Interned<NameBone>,
@@ -509,7 +519,7 @@ impl fmt::Debug for RecordTy {
 }
 
 /// A typst function type
-#[derive(Hash, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SigTy {
     /// The input types of the function
     pub inputs: Interned<Vec<Ty>>,
@@ -731,7 +741,7 @@ impl fmt::Debug for SigTy {
 pub type ArgsTy = SigTy;
 
 /// A type with partially applied arguments
-#[derive(Hash, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SigWithTy {
     /// The signature of the function
     pub sig: TyRef,
@@ -753,7 +763,7 @@ impl fmt::Debug for SigWithTy {
 }
 
 /// A field selection type
-#[derive(Hash, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SelectTy {
     /// The type to select from
     pub ty: TyRef,
@@ -811,11 +821,17 @@ pub struct TypeUnary {
 
 impl PartialOrd for TypeUnary {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TypeUnary {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         let op_as_int = self.op as u8;
         let other_op_as_int = other.op as u8;
         op_as_int
-            .partial_cmp(&other_op_as_int)
-            .or_else(|| self.lhs.partial_cmp(&other.lhs))
+            .cmp(&other_op_as_int)
+            .then_with(|| self.lhs.cmp(&other.lhs))
     }
 }
 
@@ -845,11 +861,17 @@ pub struct TypeBinary {
 
 impl PartialOrd for TypeBinary {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TypeBinary {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         let op_as_int = self.op as u8;
         let other_op_as_int = other.op as u8;
         op_as_int
-            .partial_cmp(&other_op_as_int)
-            .or_else(|| self.operands.partial_cmp(&other.operands))
+            .cmp(&other_op_as_int)
+            .then_with(|| self.operands.cmp(&other.operands))
     }
 }
 
@@ -870,7 +892,7 @@ impl TypeBinary {
 
 /// A conditional type
 /// `if t1 then t2 else t3`
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IfTy {
     /// The condition
     pub cond: TyRef,
