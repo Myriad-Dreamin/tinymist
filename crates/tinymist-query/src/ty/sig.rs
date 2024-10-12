@@ -4,12 +4,14 @@ use crate::{adt::interner::Interned, analysis::*, ty::def::*};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Sig<'a> {
+    Builtin(BuiltinSig<'a>),
     Type(&'a Interned<SigTy>),
     TypeCons {
         val: &'a typst::foundations::Type,
         at: &'a Ty,
     },
     ArrayCons(&'a TyRef),
+    TupleCons(&'a Interned<Vec<Ty>>),
     DictCons(&'a Interned<RecordTy>),
     Value {
         val: &'a Func,
@@ -31,8 +33,10 @@ pub struct SigShape<'a> {
 impl<'a> Sig<'a> {
     pub fn ty(self) -> Option<Ty> {
         Some(match self {
+            Sig::Builtin(_) => return None,
             Sig::Type(t) => Ty::Func(t.clone()),
             Sig::ArrayCons(t) => Ty::Array(t.clone()),
+            Sig::TupleCons(t) => Ty::Tuple(t.clone()),
             Sig::DictCons(t) => Ty::Dict(t.clone()),
             Sig::TypeCons { val, .. } => Ty::Builtin(BuiltinTy::Type(*val)),
             Sig::Value { at, .. } => at.clone(),
@@ -48,7 +52,9 @@ impl<'a> Sig<'a> {
         };
 
         let sig_ins = match cano_sig {
+            Sig::Builtin(_) => return None,
             Sig::ArrayCons(a) => SigTy::array_cons(a.as_ref().clone(), false),
+            Sig::TupleCons(t) => SigTy::tuple_cons(t.clone(), false),
             Sig::DictCons(d) => SigTy::dict_cons(d, false),
             Sig::TypeCons { val, .. } => ctx?.type_of_func(&val.constructor().ok()?)?,
             Sig::Value { val, .. } => ctx?.type_of_func(val)?,
@@ -160,6 +166,7 @@ impl<'a> SigCheckDriver<'a> {
     }
 
     fn ty(&mut self, ty: &Ty, pol: bool) {
+        println!("check sig: {ty:?}");
         match ty {
             Ty::Builtin(BuiltinTy::Stroke) if self.dict_as_sig() => {
                 self.checker
@@ -215,11 +222,11 @@ impl<'a> SigCheckDriver<'a> {
                 self.checker.check(Sig::Type(sig), &mut self.ctx, pol);
             }
             Ty::Array(sig) if self.array_as_sig() => {
-                // let sig = FlowSignature::array_cons(*sig.clone(), true);
                 self.checker.check(Sig::ArrayCons(sig), &mut self.ctx, pol);
             }
-            // todo: tuple
-            Ty::Tuple(_) => {}
+            Ty::Tuple(tup) if self.array_as_sig() => {
+                self.checker.check(Sig::TupleCons(tup), &mut self.ctx, pol);
+            }
             Ty::Dict(sig) if self.dict_as_sig() => {
                 // self.check_dict_signature(sig, pol, self.checker);
                 self.checker.check(Sig::DictCons(sig), &mut self.ctx, pol);
@@ -242,6 +249,7 @@ impl<'a> SigCheckDriver<'a> {
 
 impl BoundChecker for SigCheckDriver<'_> {
     fn collect(&mut self, ty: &Ty, pol: bool) {
+        println!("sig bounds: {ty:?}");
         self.ty(ty, pol);
     }
 
@@ -256,24 +264,39 @@ impl<'a, 'b> MethodDriver<'a, 'b> {
     fn is_binder(&self) -> bool {
         matches!(self.1.as_ref(), "with" | "where")
     }
+
+    fn array_method(&mut self, ty: &Ty, pol: bool) {
+        let method = match self.1.as_ref() {
+            "map" => BuiltinSig::TupleMap(ty),
+            "at" => BuiltinSig::TupleAt(ty),
+            _ => return,
+        };
+        self.0
+            .checker
+            .check(Sig::Builtin(method), &mut self.0.ctx, pol);
+    }
 }
 
 impl<'a, 'b> BoundChecker for MethodDriver<'a, 'b> {
     fn collect(&mut self, ty: &Ty, pol: bool) {
-        log::debug!("check method: {ty:?}.{}", self.1.as_ref());
+        println!("check method: {ty:?}.{}", self.1.as_ref());
         match ty {
             // todo: deduplicate checking early
             Ty::Value(v) => {
-                if let Value::Func(f) = &v.val {
-                    if self.is_binder() {
-                        self.0.checker.check(
-                            Sig::Partialize(&Sig::Value { val: f, at: ty }),
-                            &mut self.0.ctx,
-                            pol,
-                        );
-                    } else {
-                        // todo: general select operator
+                match &v.val {
+                    Value::Func(f) => {
+                        if self.is_binder() {
+                            self.0.checker.check(
+                                Sig::Partialize(&Sig::Value { val: f, at: ty }),
+                                &mut self.0.ctx,
+                                pol,
+                            );
+                        } else {
+                            // todo: general select operator
+                        }
                     }
+                    Value::Array(..) => self.array_method(ty, pol),
+                    _ => {}
                 }
             }
             Ty::Builtin(BuiltinTy::Element(e)) => {
@@ -298,6 +321,8 @@ impl<'a, 'b> BoundChecker for MethodDriver<'a, 'b> {
                     // todo: general select operator
                 }
             }
+            Ty::Tuple(..) => self.array_method(ty, pol),
+            Ty::Array(..) => self.array_method(ty, pol),
             // todo: general select operator
             _ => {}
         }

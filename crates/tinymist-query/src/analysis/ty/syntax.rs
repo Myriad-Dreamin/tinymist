@@ -333,7 +333,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             let mut worker = ApplyTypeChecker {
                 base: self,
                 call_site: func_call.callee().span(),
-                args: func_call.args(),
+                args: Some(func_call.args()),
                 resultant: vec![],
             };
             callee.call(&args, true, &mut worker);
@@ -467,7 +467,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             let mut worker = ApplyTypeChecker {
                 base: self,
                 call_site: set_rule.target().span(),
-                args: set_rule.args(),
+                args: Some(set_rule.args()),
                 resultant: vec![],
             };
             callee.call(&args, true, &mut worker);

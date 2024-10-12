@@ -12,16 +12,21 @@ pub trait ApplyChecker {
     }
 }
 
+static EMPTY_ARGS: Lazy<Interned<ArgsTy>> = Lazy::new(|| ArgsTy::default().into());
+
 impl Ty {
     /// Call the given type with the given arguments.
     pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, checker: &mut impl ApplyChecker) {
         self.apply(SigSurfaceKind::Call, args, pol, checker)
     }
 
+    /// Get the tuple element type of the given type.
+    pub fn tuple_element_of(&self, pol: bool, checker: &mut impl ApplyChecker) {
+        self.apply(SigSurfaceKind::Array, &EMPTY_ARGS, pol, checker)
+    }
+
     /// Get the element type of the given type.
     pub fn element_of(&self, pol: bool, checker: &mut impl ApplyChecker) {
-        static EMPTY_ARGS: Lazy<Interned<ArgsTy>> = Lazy::new(|| ArgsTy::default().into());
-
         self.apply(SigSurfaceKind::ArrayOrDict, &EMPTY_ARGS, pol, checker)
     }
 
