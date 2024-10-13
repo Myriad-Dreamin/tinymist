@@ -1,4 +1,4 @@
-//! Type checking on source file
+//! Type checking at apply site
 
 use typst::syntax::{ast, Span};
 

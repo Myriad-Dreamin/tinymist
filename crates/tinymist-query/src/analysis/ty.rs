@@ -22,10 +22,12 @@ use super::{
 
 mod apply;
 mod post_check;
+mod select;
 mod syntax;
 
 pub(crate) use apply::*;
 pub(crate) use post_check::*;
+pub(crate) use select::*;
 
 /// Type checking at the source unit level.
 pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Arc<TypeScheme>> {

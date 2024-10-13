@@ -1,0 +1,11 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/dict_infer.typ
+---
+"a" = {"a": "1"}
+"b" = ("1" | {"a": "1"}.a)
+---
+5..6 -> @a
+29..30 -> @b
+33..34 -> (@a | {"a": "1"})

@@ -305,10 +305,20 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     fn check_field_access(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let field_access: ast::FieldAccess = root.cast()?;
 
-        let ty = self.check_expr_in(field_access.target().span(), root.clone());
-        let field = field_access.field().get().clone();
+        let select_site = field_access.target().span();
+        let ty = self.check_expr_in(select_site, root.clone());
+        let field = Interned::new_str(field_access.field().get());
 
-        Some(Ty::Select(SelectTy::new(ty.into(), field.into())))
+        // todo: move this to base
+        let base = Ty::Select(SelectTy::new(ty.clone().into(), field.clone()));
+        let mut worker = SelectFieldChecker {
+            base: self,
+            select_site,
+            key: &field,
+            resultant: vec![base],
+        };
+        ty.select(&field, true, &mut worker);
+        Some(Ty::from_types(worker.resultant.into_iter()))
     }
 
     fn check_func_call(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
