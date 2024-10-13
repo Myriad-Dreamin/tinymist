@@ -166,7 +166,7 @@ impl<'a> SigCheckDriver<'a> {
     }
 
     fn ty(&mut self, ty: &Ty, pol: bool) {
-        println!("check sig: {ty:?}");
+        log::debug!("check sig: {ty:?}");
         match ty {
             Ty::Builtin(BuiltinTy::Stroke) if self.dict_as_sig() => {
                 self.checker
@@ -249,7 +249,7 @@ impl<'a> SigCheckDriver<'a> {
 
 impl BoundChecker for SigCheckDriver<'_> {
     fn collect(&mut self, ty: &Ty, pol: bool) {
-        println!("sig bounds: {ty:?}");
+        log::debug!("sig bounds: {ty:?}");
         self.ty(ty, pol);
     }
 
@@ -279,7 +279,7 @@ impl<'a, 'b> MethodDriver<'a, 'b> {
 
 impl<'a, 'b> BoundChecker for MethodDriver<'a, 'b> {
     fn collect(&mut self, ty: &Ty, pol: bool) {
-        println!("check method: {ty:?}.{}", self.1.as_ref());
+        log::debug!("check method: {ty:?}.{}", self.1.as_ref());
         match ty {
             // todo: deduplicate checking early
             Ty::Value(v) => {
