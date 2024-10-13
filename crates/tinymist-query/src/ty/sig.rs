@@ -45,7 +45,7 @@ impl<'a> Sig<'a> {
         })
     }
 
-    pub fn shape(self, ctx: &mut impl LocalTyCtx) -> Option<SigShape<'a>> {
+    pub fn shape(self, ctx: &mut impl TyCtxMut) -> Option<SigShape<'a>> {
         let (cano_sig, withs) = match self {
             Sig::With { sig, withs, .. } => (*sig, Some(withs)),
             _ => (self, None),

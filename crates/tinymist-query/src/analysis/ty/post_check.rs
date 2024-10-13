@@ -19,7 +19,7 @@ use crate::{
     AnalysisContext,
 };
 
-use super::{FieldTy, LocalTyCtx, SigShape, SigTy, Ty, TyCtx, TypeScheme, TypeVar};
+use super::{FieldTy, SigShape, SigTy, Ty, TyCtx, TyCtxMut, TypeScheme, TypeVar};
 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.
@@ -129,8 +129,8 @@ impl<'a, 'w> TyCtx for PostTypeCheckWorker<'a, 'w> {
     }
 }
 
-impl<'a, 'w> LocalTyCtx for PostTypeCheckWorker<'a, 'w> {
-    type Snap = <TypeScheme as LocalTyCtx>::Snap;
+impl<'a, 'w> TyCtxMut for PostTypeCheckWorker<'a, 'w> {
+    type Snap = <TypeScheme as TyCtxMut>::Snap;
 
     fn start_scope(&mut self) -> Self::Snap {
         self.locals.start_scope()

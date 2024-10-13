@@ -76,8 +76,8 @@ struct TypeChecker<'a, 'w> {
     mode: InterpretMode,
 }
 
-impl<'a, 'w> LocalTyCtx for TypeChecker<'a, 'w> {
-    type Snap = <TypeScheme as LocalTyCtx>::Snap;
+impl<'a, 'w> TyCtxMut for TypeChecker<'a, 'w> {
+    type Snap = <TypeScheme as TyCtxMut>::Snap;
 
     fn start_scope(&mut self) -> Self::Snap {
         self.info.start_scope()

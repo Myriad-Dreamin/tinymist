@@ -25,7 +25,7 @@ use crate::{
 
 pub use tinymist_derive::BindTyCtx;
 
-pub(crate) use super::{LocalTyCtx, TyCtx};
+pub(crate) use super::{TyCtxMut, TyCtx};
 pub(crate) use crate::adt::interner::Interned;
 
 /// A reference to the interned type
@@ -1015,7 +1015,7 @@ impl TypeScheme {
     }
 }
 
-impl LocalTyCtx for TypeScheme {
+impl TyCtxMut for TypeScheme {
     type Snap = ena::undo_log::Snapshot;
 
     fn start_scope(&mut self) -> Self::Snap {

@@ -30,8 +30,8 @@ pub trait TyCtx {
     fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds>;
 }
 
-/// A local type context.
-pub trait LocalTyCtx: TyCtx {
+/// A mutable type context.
+pub trait TyCtxMut: TyCtx {
     /// The type of a snapshot of the scope.
     type Snap;
 
@@ -62,7 +62,7 @@ impl TyCtx for () {
         None
     }
 }
-impl LocalTyCtx for () {
+impl TyCtxMut for () {
     type Snap = ();
 
     fn start_scope(&mut self) -> Self::Snap {

@@ -5,7 +5,7 @@ impl<'a> Sig<'a> {
         &self,
         args: &Interned<ArgsTy>,
         pol: bool,
-        ctx: &mut impl LocalTyCtx,
+        ctx: &mut impl TyCtxMut,
     ) -> Option<Ty> {
         ctx.with_scope(|ctx| {
             let body = self.check_bind(args, ctx)?;
@@ -16,7 +16,7 @@ impl<'a> Sig<'a> {
         })
     }
 
-    pub fn check_bind(&self, args: &Interned<ArgsTy>, ctx: &mut impl LocalTyCtx) -> Option<Ty> {
+    pub fn check_bind(&self, args: &Interned<ArgsTy>, ctx: &mut impl TyCtxMut) -> Option<Ty> {
         let SigShape { sig, withs } = self.shape(ctx)?;
 
         // todo: check if the signature has free variables
@@ -32,17 +32,17 @@ impl<'a> Sig<'a> {
     }
 }
 
-struct SubstituteChecker<'a, T: LocalTyCtx> {
+struct SubstituteChecker<'a, T: TyCtxMut> {
     ctx: &'a mut T,
 }
 
-impl<'a, T: LocalTyCtx> SubstituteChecker<'a, T> {
+impl<'a, T: TyCtxMut> SubstituteChecker<'a, T> {
     fn ty(&mut self, body: &Ty, pol: bool) -> Option<Ty> {
         body.mutate(pol, self)
     }
 }
 
-impl<'a, T: LocalTyCtx> TyMutator for SubstituteChecker<'a, T> {
+impl<'a, T: TyCtxMut> TyMutator for SubstituteChecker<'a, T> {
     fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
         // todo: extrude the type into a polarized type
         let _ = pol;
