@@ -582,7 +582,7 @@ pub fn generate_md_docs(
 
     log::debug!("module_uses: {module_uses:#?}");
 
-    let title = format!("@{}/{}:{}", spec.namespace, spec.name, spec.version);
+    let title = for_spec.to_string();
 
     let mut errors = vec![];
 
