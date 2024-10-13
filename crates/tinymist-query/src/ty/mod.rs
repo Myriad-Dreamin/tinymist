@@ -21,8 +21,6 @@ pub(crate) use mutate::*;
 pub(crate) use select::*;
 pub(crate) use sig::*;
 
-use crate::adt::interner::Interned;
-
 /// A type context.
 pub trait TyCtx {
     /// Get the type of a variable.

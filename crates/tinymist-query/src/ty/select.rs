@@ -1,6 +1,5 @@
-use crate::{adt::interner::Interned, ty::def::*};
-
-use super::{Iface, IfaceChecker, TyCtx};
+use super::{Iface, IfaceChecker};
+use crate::ty::def::*;
 
 pub trait SelectChecker: TyCtx {
     fn select(&mut self, sig: Iface, key: &Interned<str>, pol: bool);

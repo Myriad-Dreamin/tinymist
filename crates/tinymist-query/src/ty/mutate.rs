@@ -1,4 +1,4 @@
-use crate::{adt::interner::Interned, ty::def::*};
+use crate::ty::def::*;
 
 pub trait MutateDriver {
     fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty>;

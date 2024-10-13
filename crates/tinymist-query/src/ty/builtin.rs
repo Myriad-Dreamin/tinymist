@@ -9,7 +9,7 @@ use typst::{
     layout::Length,
 };
 
-use crate::{adt::interner::Interned, ty::*};
+use crate::ty::*;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, EnumIter)]
 pub enum PathPreference {

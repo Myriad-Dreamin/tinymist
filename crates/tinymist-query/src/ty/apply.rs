@@ -1,14 +1,13 @@
-use once_cell::sync::Lazy;
-
-use crate::{adt::interner::Interned, ty::def::*};
+use std::sync::LazyLock;
 
 use super::{Sig, SigChecker, SigSurfaceKind, TyCtx};
+use crate::ty::def::*;
 
 pub trait ApplyChecker: TyCtx {
     fn apply(&mut self, sig: Sig, arguments: &Interned<ArgsTy>, pol: bool);
 }
 
-static EMPTY_ARGS: Lazy<Interned<ArgsTy>> = Lazy::new(|| ArgsTy::default().into());
+static EMPTY_ARGS: LazyLock<Interned<ArgsTy>> = LazyLock::new(|| ArgsTy::default().into());
 
 impl Ty {
     /// Call the given type with the given arguments.

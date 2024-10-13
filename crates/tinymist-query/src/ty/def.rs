@@ -18,13 +18,12 @@ use typst::{
     syntax::{ast, Span, SyntaxKind, SyntaxNode},
 };
 
-use crate::{
-    adt::interner::{impl_internable, Interned},
-    analysis::BuiltinTy,
-};
+use crate::{adt::interner::impl_internable, analysis::BuiltinTy};
+
+pub use tinymist_derive::BindTyCtx;
 
 pub use super::TyCtx;
-pub use tinymist_derive::BindTyCtx;
+pub(crate) use crate::adt::interner::Interned;
 
 /// A reference to the interned type
 pub(crate) type TyRef = Interned<Ty>;

@@ -1,6 +1,6 @@
 use hashbrown::HashMap;
 
-use crate::{adt::interner::Interned, analysis::*, ty::def::*};
+use crate::{analysis::*, ty::def::*};
 
 impl<'a> Sig<'a> {
     pub fn call(
