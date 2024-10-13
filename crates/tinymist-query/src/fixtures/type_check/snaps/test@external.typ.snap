@@ -4,7 +4,7 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/external.typ
 ---
 "bad-instantiate" = Any
-"prefix" = ("title": ( ⪯ Any)) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, Infer), op: Add }, Infer), op: Add }, Infer), op: Add }
+"prefix" = (("title": ( ⪯ Any)) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, Infer), op: Add }, Infer), op: Add }, Infer), op: Add }).with(..("title": None) => any)
 "title" = None
 ---
 27..33 -> @prefix

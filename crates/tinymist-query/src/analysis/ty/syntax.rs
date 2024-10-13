@@ -375,6 +375,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let mut pos = vec![];
         let mut named = BTreeMap::new();
+        let mut defaults = BTreeMap::new();
         let mut rest = None;
 
         for param in closure.params().children() {
@@ -389,6 +390,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     // optimize it, so I put a todo here.
                     self.constrain(&exp, &v);
                     named.insert(e.name().into(), v);
+                    defaults.insert(e.name().into(), exp);
                 }
                 // todo: spread left/right
                 ast::Param::Spread(a) => {
@@ -418,8 +420,18 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             self.weaken(rest);
         }
 
-        let sig = SigTy::new(pos, named, rest, Some(body));
-        Some(Ty::Func(sig.into()))
+        let sig = SigTy::new(pos, named, rest, Some(body)).into();
+        let sig = Ty::Func(sig);
+        if defaults.is_empty() {
+            return Some(sig);
+        }
+
+        let defaults: Vec<(Interned<str>, Ty)> = defaults.into_iter().collect();
+        let with_defaults = SigWithTy {
+            sig: sig.into(),
+            with: ArgsTy::new(vec![], defaults, None, None).into(),
+        };
+        Some(Ty::With(with_defaults.into()))
     }
 
     fn check_let(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
