@@ -38,7 +38,7 @@ impl<'a> Iface<'a> {
     }
 
     pub fn shape(self, _ctx: Option<&mut AnalysisContext>) -> Option<IfaceShape> {
-        println!("iface shape: {self:?}");
+        log::debug!("iface shape: {self:?}");
 
         let record_ins = match self {
             // Iface::ArrayCons(a) => SigTy::array_cons(a.as_ref().clone(), false),
@@ -128,7 +128,7 @@ impl<'a> IfaceCheckDriver<'a> {
     }
 
     fn ty(&mut self, ty: &Ty, pol: bool) {
-        println!("check iface ty: {ty:?}");
+        log::debug!("check iface ty: {ty:?}");
 
         match ty {
             Ty::Builtin(BuiltinTy::Stroke) if self.dict_as_iface() => {

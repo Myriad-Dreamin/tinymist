@@ -29,7 +29,7 @@ impl<'a, 'b, 'w> SelectChecker for SelectFieldChecker<'a, 'b, 'w> {
     }
 
     fn select(&mut self, iface: Iface, key: &Interned<str>, pol: bool) {
-        println!("selecting field: {iface:?} {key:?}");
+        log::debug!("selecting field: {iface:?} {key:?}");
         let _ = pol;
 
         let ins = iface.ty();
