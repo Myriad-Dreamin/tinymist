@@ -16,5 +16,5 @@ input_file: crates/tinymist-query/src/fixtures/type_check/with.typ
 24..30 -> (@x) => @x
 24..33 -> ((@x) => @x).with(..(1) => any)
 40..41 -> @x
-44..45 -> (@g | Any)
+44..45 -> (Any | @g)
 44..47 -> 1
