@@ -8,6 +8,8 @@ use crate::analysis::Ty;
 use super::*;
 use crate::adt::interner::Interned;
 
+#[derive(BindTyCtx)]
+#[bind(base)]
 pub struct SelectFieldChecker<'a, 'b, 'w> {
     pub(super) base: &'a mut TypeChecker<'b, 'w>,
     pub select_site: Span,
@@ -16,18 +18,6 @@ pub struct SelectFieldChecker<'a, 'b, 'w> {
 }
 
 impl<'a, 'b, 'w> SelectChecker for SelectFieldChecker<'a, 'b, 'w> {
-    fn bound_of_var(
-        &mut self,
-        var: &Interned<super::TypeVar>,
-        _pol: bool,
-    ) -> Option<super::TypeBounds> {
-        self.base
-            .info
-            .vars
-            .get(&var.def)
-            .map(|v| v.bounds.bounds().read().clone())
-    }
-
     fn select(&mut self, iface: Iface, key: &Interned<str>, pol: bool) {
         log::debug!("selecting field: {iface:?} {key:?}");
         let _ = pol;

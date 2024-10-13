@@ -23,10 +23,13 @@ use crate::{
     analysis::BuiltinTy,
 };
 
+pub use super::TyCtx;
+pub use tinymist_derive::BindTyCtx;
+
 /// A reference to the interned type
-pub(super) type TyRef = Interned<Ty>;
+pub(crate) type TyRef = Interned<Ty>;
 /// A reference to the interned string
-pub(super) type StrRef = Interned<str>;
+pub(crate) type StrRef = Interned<str>;
 
 /// All possible types in tinymist
 #[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -955,6 +958,15 @@ pub struct TypeScheme {
     pub(super) cano_cache: Mutex<TypeCanoStore>,
 }
 
+impl TyCtx for TypeScheme {
+    fn var_bounds(&self, var: &Interned<TypeVar>, _pol: bool) -> (Option<Ty>, Option<TypeBounds>) {
+        let v = self.vars.get(&var.def);
+        let local_bind = v.and_then(|v| v.local_bind.clone());
+        let global_bounds = v.map(|v| v.bounds.bounds().read().clone());
+        (local_bind, global_bounds)
+    }
+}
+
 impl TypeScheme {
     /// Get the type of a definition
     pub fn type_of_def(&self, def: DefId) -> Option<Ty> {
@@ -1004,6 +1016,8 @@ pub struct TypeVarBounds {
     pub var: Interned<TypeVar>,
     /// The bounds of the type variable
     pub bounds: FlowVarKind,
+    /// The local binding of the type variable
+    pub local_bind: Option<Ty>,
 }
 
 impl fmt::Debug for TypeVarBounds {
@@ -1018,6 +1032,7 @@ impl TypeVarBounds {
         Self {
             var: Interned::new(var),
             bounds: FlowVarKind::Strong(Arc::new(RwLock::new(init))),
+            local_bind: None,
         }
     }
 
@@ -1049,7 +1064,7 @@ impl TypeVarBounds {
 /// A type variable bounds
 #[derive(Clone)]
 pub enum FlowVarKind {
-    /// A type variable that receives both types and values (type instnaces)
+    /// A type variable that receives both types and values (type instances)
     Strong(Arc<RwLock<TypeBounds>>),
     /// A type variable that receives only types
     /// The received values will be lifted to types

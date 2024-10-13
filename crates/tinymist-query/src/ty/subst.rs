@@ -83,7 +83,7 @@ mod tests {
 
     use crate::ty::tests::*;
 
-    use super::{ApplyChecker, Ty};
+    use super::{ApplyChecker, Ty, TyCtx};
     #[test]
     fn test_ty() {
         use super::*;
@@ -95,6 +95,7 @@ mod tests {
     #[derive(Default)]
     struct CallCollector(Vec<Ty>);
 
+    impl TyCtx for CallCollector {}
     impl ApplyChecker for CallCollector {
         fn apply(
             &mut self,

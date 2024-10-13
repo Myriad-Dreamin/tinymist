@@ -2,14 +2,10 @@ use once_cell::sync::Lazy;
 
 use crate::{adt::interner::Interned, ty::def::*};
 
-use super::{Sig, SigChecker, SigSurfaceKind};
+use super::{Sig, SigChecker, SigSurfaceKind, TyCtx};
 
-pub trait ApplyChecker {
+pub trait ApplyChecker: TyCtx {
     fn apply(&mut self, sig: Sig, arguments: &Interned<ArgsTy>, pol: bool);
-
-    fn bound_of_var(&mut self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
-        None
-    }
 }
 
 static EMPTY_ARGS: Lazy<Interned<ArgsTy>> = Lazy::new(|| ArgsTy::default().into());
@@ -42,7 +38,9 @@ impl Ty {
     }
 }
 
-pub struct ApplySigChecker<'a, T>(&'a mut T, &'a Interned<ArgsTy>);
+#[derive(BindTyCtx)]
+#[bind(0)]
+pub struct ApplySigChecker<'a, T: ApplyChecker>(&'a mut T, &'a Interned<ArgsTy>);
 
 impl<'a, T: ApplyChecker> ApplySigChecker<'a, T> {
     fn ty(&mut self, ty: &Ty, surface: SigSurfaceKind, pol: bool) {
@@ -64,9 +62,5 @@ impl<'a, T: ApplyChecker> SigChecker for ApplySigChecker<'a, T> {
         };
         self.0.apply(partial_sig, self.1, pol);
         Some(())
-    }
-
-    fn check_var(&mut self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
-        self.0.bound_of_var(_var, _pol)
     }
 }

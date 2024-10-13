@@ -21,6 +21,18 @@ pub(crate) use mutate::*;
 pub(crate) use select::*;
 pub(crate) use sig::*;
 
+use crate::adt::interner::Interned;
+
+/// A type context.
+pub trait TyCtx {
+    /// Get the type of a variable.
+    fn var_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> (Option<Ty>, Option<TypeBounds>) {
+        (None, None)
+    }
+}
+
+impl TyCtx for () {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

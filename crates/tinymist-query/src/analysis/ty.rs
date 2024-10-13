@@ -12,7 +12,10 @@ use typst::{
     },
 };
 
-use crate::analysis::{Ty, *};
+use crate::{
+    adt::interner::Interned,
+    analysis::{Ty, *},
+};
 use crate::{analysis::TypeScheme, ty::TypeInterface, AnalysisContext};
 
 use super::{
@@ -61,6 +64,8 @@ enum InterpretMode {
     Math,
 }
 
+#[derive(BindTyCtx)]
+#[bind(info)]
 struct TypeChecker<'a, 'w> {
     ctx: &'a mut AnalysisContext<'w>,
     source: Source,

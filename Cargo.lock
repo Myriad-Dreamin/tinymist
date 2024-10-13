@@ -4014,6 +4014,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea141357280a85cdacb962dc64b07ae6fa4381df468f6aba1d3dd93483afdc38"
 
 [[package]]
+name = "tinymist-derive"
+version = "0.11.28"
+dependencies = [
+ "quote",
+ "syn 2.0.79",
+]
+
+[[package]]
 name = "tinymist-query"
 version = "0.11.32"
 dependencies = [
@@ -4051,6 +4059,7 @@ dependencies = [
  "siphasher 1.0.1",
  "strum 0.26.3",
  "tinymist-analysis",
+ "tinymist-derive",
  "tinymist-world",
  "toml 0.8.19",
  "triomphe",

@@ -1,12 +1,10 @@
-use crate::{adt::interner::Interned, ty::def::*};
+use crate::ty::def::*;
 
-pub trait BoundChecker {
+pub trait BoundChecker: TyCtx {
     fn collect(&mut self, ty: &Ty, pol: bool);
-    fn bound_of_var(&mut self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
-        None
-    }
 }
 
+impl<T> TyCtx for T where T: FnMut(&Ty, bool) -> Option<TypeBounds> {}
 impl<T> BoundChecker for T
 where
     T: FnMut(&Ty, bool) -> Option<TypeBounds>,
@@ -53,7 +51,7 @@ impl BoundCheckContext {
                 self.tys(u.lbs.iter(), !pol, checker);
             }
             Ty::Var(u) => {
-                let Some(w) = checker.bound_of_var(u, pol) else {
+                let (_, Some(w)) = checker.var_bounds(u, pol) else {
                     return;
                 };
                 self.tys(w.ubs.iter(), pol, checker);

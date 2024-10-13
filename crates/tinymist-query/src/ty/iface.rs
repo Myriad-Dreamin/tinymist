@@ -56,20 +56,8 @@ impl<'a> Iface<'a> {
     }
 }
 
-pub trait IfaceChecker {
+pub trait IfaceChecker: TyCtx {
     fn check(&mut self, sig: Iface, args: &mut IfaceCheckContext, pol: bool) -> Option<()>;
-    fn check_var(&mut self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
-        None
-    }
-}
-
-impl<T> IfaceChecker for T
-where
-    T: FnMut(Iface, &mut IfaceCheckContext, bool) -> Option<()>,
-{
-    fn check(&mut self, sig: Iface, args: &mut IfaceCheckContext, pol: bool) -> Option<()> {
-        self(sig, args, pol)
-    }
 }
 
 impl Ty {
@@ -98,6 +86,8 @@ pub struct IfaceCheckContext {
     pub at: TyRef,
 }
 
+#[derive(BindTyCtx)]
+#[bind(checker)]
 pub struct IfaceCheckDriver<'a> {
     ctx: IfaceCheckContext,
     checker: &'a mut dyn IfaceChecker,
@@ -106,10 +96,6 @@ pub struct IfaceCheckDriver<'a> {
 impl BoundChecker for IfaceCheckDriver<'_> {
     fn collect(&mut self, ty: &Ty, pol: bool) {
         self.ty(ty, pol);
-    }
-
-    fn bound_of_var(&mut self, var: &Interned<TypeVar>, pol: bool) -> Option<TypeBounds> {
-        self.checker.check_var(var, pol)
     }
 }
 
