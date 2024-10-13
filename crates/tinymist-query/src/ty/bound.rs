@@ -4,7 +4,17 @@ pub trait BoundChecker: TyCtx {
     fn collect(&mut self, ty: &Ty, pol: bool);
 }
 
-impl<T> TyCtx for T where T: FnMut(&Ty, bool) -> Option<TypeBounds> {}
+impl<T> TyCtx for T
+where
+    T: FnMut(&Ty, bool) -> Option<TypeBounds>,
+{
+    fn local_bind_of(&self, _var: &Interned<TypeVar>) -> Option<Ty> {
+        None
+    }
+    fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
+        None
+    }
+}
 impl<T> BoundChecker for T
 where
     T: FnMut(&Ty, bool) -> Option<TypeBounds>,
@@ -51,7 +61,7 @@ impl BoundCheckContext {
                 self.tys(u.lbs.iter(), !pol, checker);
             }
             Ty::Var(u) => {
-                let (_, Some(w)) = checker.var_bounds(u, pol) else {
+                let Some(w) = checker.global_bounds(u, pol) else {
                     return;
                 };
                 self.tys(w.ubs.iter(), pol, checker);

@@ -18,11 +18,14 @@ use typst::{
     syntax::{ast, Span, SyntaxKind, SyntaxNode},
 };
 
-use crate::{adt::interner::impl_internable, analysis::BuiltinTy};
+use crate::{
+    adt::{interner::impl_internable, snapshot_map},
+    analysis::BuiltinTy,
+};
 
 pub use tinymist_derive::BindTyCtx;
 
-pub use super::TyCtx;
+pub(crate) use super::{LocalTyCtx, TyCtx};
 pub(crate) use crate::adt::interner::Interned;
 
 /// A reference to the interned type
@@ -951,6 +954,8 @@ impl IfTy {
 pub struct TypeScheme {
     /// The typing on definitions
     pub vars: HashMap<DefId, TypeVarBounds>,
+    /// The local binding of the type variable
+    pub local_binds: snapshot_map::SnapshotMap<DefId, Ty>,
     /// The typing on syntax structures
     pub mapping: HashMap<Span, Vec<Ty>>,
 
@@ -958,11 +963,13 @@ pub struct TypeScheme {
 }
 
 impl TyCtx for TypeScheme {
-    fn var_bounds(&self, var: &Interned<TypeVar>, _pol: bool) -> (Option<Ty>, Option<TypeBounds>) {
-        let v = self.vars.get(&var.def);
-        let local_bind = v.and_then(|v| v.local_bind.clone());
-        let global_bounds = v.map(|v| v.bounds.bounds().read().clone());
-        (local_bind, global_bounds)
+    fn global_bounds(&self, var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
+        let v = self.vars.get(&var.def)?;
+        Some(v.bounds.bounds().read().clone())
+    }
+
+    fn local_bind_of(&self, var: &Interned<TypeVar>) -> Option<Ty> {
+        self.local_binds.get(&var.def).cloned()
     }
 }
 
@@ -1008,6 +1015,26 @@ impl TypeScheme {
     }
 }
 
+impl LocalTyCtx for TypeScheme {
+    type Snap = ena::undo_log::Snapshot;
+
+    fn start_scope(&mut self) -> Self::Snap {
+        self.local_binds.snapshot()
+    }
+
+    fn end_scope(&mut self, snap: Self::Snap) {
+        self.local_binds.rollback_to(snap);
+    }
+
+    fn bind_local(&mut self, var: &Interned<TypeVar>, ty: Ty) {
+        self.local_binds.insert(var.def, ty);
+    }
+
+    fn type_of_func(&mut self, _func: &typst::foundations::Func) -> Option<Interned<SigTy>> {
+        None
+    }
+}
+
 /// A type variable bounds
 #[derive(Clone)]
 pub struct TypeVarBounds {
@@ -1015,8 +1042,6 @@ pub struct TypeVarBounds {
     pub var: Interned<TypeVar>,
     /// The bounds of the type variable
     pub bounds: FlowVarKind,
-    /// The local binding of the type variable
-    pub local_bind: Option<Ty>,
 }
 
 impl fmt::Debug for TypeVarBounds {
@@ -1031,7 +1056,6 @@ impl TypeVarBounds {
         Self {
             var: Interned::new(var),
             bounds: FlowVarKind::Strong(Arc::new(RwLock::new(init))),
-            local_bind: None,
         }
     }
 

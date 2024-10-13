@@ -28,7 +28,7 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
         };
 
         if !is_partialize {
-            if let Some(ty) = sig.call(args, pol, Some(self.base.ctx)) {
+            if let Some(ty) = sig.call(args, pol, self.base) {
                 self.resultant.push(ty);
             }
         }
@@ -145,7 +145,7 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
 
         let callee = sig.ty();
 
-        let Some(SigShape { sig, withs }) = sig.shape(Some(self.base.ctx)) else {
+        let Some(SigShape { sig, withs }) = sig.shape(self.base) else {
             return;
         };
         for (arg_recv, arg_ins) in sig.matches(args, withs) {

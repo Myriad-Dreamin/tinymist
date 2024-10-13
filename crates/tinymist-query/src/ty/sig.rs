@@ -45,7 +45,7 @@ impl<'a> Sig<'a> {
         })
     }
 
-    pub fn shape(self, ctx: Option<&mut AnalysisContext>) -> Option<SigShape<'a>> {
+    pub fn shape(self, ctx: &mut impl LocalTyCtx) -> Option<SigShape<'a>> {
         let (cano_sig, withs) = match self {
             Sig::With { sig, withs, .. } => (*sig, Some(withs)),
             _ => (self, None),
@@ -56,8 +56,8 @@ impl<'a> Sig<'a> {
             Sig::ArrayCons(a) => SigTy::array_cons(a.as_ref().clone(), false),
             Sig::TupleCons(t) => SigTy::tuple_cons(t.clone(), false),
             Sig::DictCons(d) => SigTy::dict_cons(d, false),
-            Sig::TypeCons { val, .. } => ctx?.type_of_func(&val.constructor().ok()?)?,
-            Sig::Value { val, .. } => ctx?.type_of_func(val)?,
+            Sig::TypeCons { val, .. } => ctx.type_of_func(&val.constructor().ok()?)?,
+            Sig::Value { val, .. } => ctx.type_of_func(val)?,
             // todo
             Sig::Partialize(..) => return None,
             Sig::With { .. } => return None,
@@ -116,7 +116,7 @@ impl Ty {
         impl<C: TyCtx> SigChecker for SigReprDriver<'_, C> {
             fn check(&mut self, sig: Sig, _ctx: &mut SigCheckContext, _pol: bool) -> Option<()> {
                 // todo: bind type context
-                let sig = sig.shape(None)?;
+                let sig = sig.shape(&mut ())?;
                 *self.1 = Some(sig.sig.clone());
                 Some(())
             }
