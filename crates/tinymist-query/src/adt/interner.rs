@@ -207,6 +207,24 @@ impl<T: Internable> PartialEq for Interned<T> {
 
 impl<T: Internable> Eq for Interned<T> {}
 
+impl<T: Internable + PartialOrd> PartialOrd for Interned<T> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.as_ref().partial_cmp(other.as_ref())
+    }
+}
+
+impl<T: Internable + Ord> Ord for Interned<T> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self == other {
+            std::cmp::Ordering::Equal
+        } else {
+            self.as_ref().cmp(other.as_ref())
+        }
+    }
+}
+
 impl PartialOrd for Interned<str> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))

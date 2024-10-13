@@ -3,11 +3,10 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/infer.typ
 ---
----
 1..6 -> Func(image)
 1..18 -> Element(image)
 21..25 -> Func(read)
-21..37 -> (Type(string) | Type(bytes))
+21..37 -> (Type(bytes) | Type(string))
 40..44 -> Func(json)
 40..57 -> Any
 60..64 -> Func(yaml)
