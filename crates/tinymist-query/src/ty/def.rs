@@ -558,6 +558,37 @@ impl SigTy {
         })
     }
 
+    /// Unary constructor
+    #[comemo::memoize]
+    pub fn unary(inp: Ty, ret: Ty) -> Interned<SigTy> {
+        Interned::new(Self {
+            inputs: Interned::new(vec![inp]),
+            body: Some(ret),
+            names: NameBone::empty(),
+            name_started: 0,
+            spread_left: false,
+            spread_right: false,
+        })
+    }
+
+    /// Tuple constructor
+    #[comemo::memoize]
+    pub fn tuple_cons(elems: Interned<Vec<Ty>>, anyify: bool) -> Interned<SigTy> {
+        let ret = if anyify {
+            Ty::Any
+        } else {
+            Ty::Tuple(elems.clone())
+        };
+        Interned::new(Self {
+            inputs: elems,
+            body: Some(ret),
+            names: NameBone::empty(),
+            name_started: 0,
+            spread_left: false,
+            spread_right: false,
+        })
+    }
+
     /// Dictionary constructor
     #[comemo::memoize]
     pub fn dict_cons(named: &Interned<RecordTy>, anyify: bool) -> Interned<SigTy> {

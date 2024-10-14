@@ -156,6 +156,15 @@ impl<'a> Iterator for UnionIter<'a> {
     }
 }
 
+// todo: we can write some proto files for builtin sigs
+#[derive(Debug, Clone, Copy)]
+pub enum BuiltinSig<'a> {
+    /// Map a function over a tuple.
+    TupleMap(&'a Ty),
+    /// Get element of a tuple.
+    TupleAt(&'a Ty),
+}
+
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BuiltinTy {
     Clause,
