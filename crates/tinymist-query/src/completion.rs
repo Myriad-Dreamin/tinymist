@@ -308,10 +308,13 @@ mod tests {
     use super::*;
     use crate::{syntax::find_module_level_docs, tests::*};
 
-    #[test]
-    fn test() {
-        snapshot_testing("completion", &|ctx, path| {
-            let source = ctx.source_by_path(&path).unwrap();
+    struct TestConfig {
+        pkg_mode: bool,
+    }
+
+    fn run(c: TestConfig) -> impl Fn(&mut AnalysisContext, PathBuf) {
+        fn test(ctx: &mut AnalysisContext, id: TypstFileId) {
+            let source = ctx.source_by_id(id).unwrap();
             let rng = find_test_range(&source);
             let text = source.text()[rng.clone()].to_string();
 
@@ -367,7 +370,7 @@ mod tests {
             let mut results = vec![];
             for s in rng.clone() {
                 let request = CompletionRequest {
-                    path: path.clone(),
+                    path: ctx.path_for_id(id).unwrap(),
                     position: ctx.to_lsp_pos(s, &source),
                     explicit: false,
                 };
@@ -384,6 +387,30 @@ mod tests {
             }, {
                 assert_snapshot!(JsonRepr::new_pure(results));
             })
-        });
+        }
+
+        move |ctx, path| {
+            if c.pkg_mode {
+                let files = ctx
+                    .source_files()
+                    .iter()
+                    .filter(|id| !id.vpath().as_rootless_path().ends_with("lib.typ"));
+                for id in files.copied().collect::<Vec<_>>() {
+                    test(ctx, id);
+                }
+            } else {
+                test(ctx, ctx.file_id_by_path(&path).unwrap());
+            }
+        }
+    }
+
+    #[test]
+    fn test_base() {
+        snapshot_testing("completion", &run(TestConfig { pkg_mode: false }));
+    }
+
+    #[test]
+    fn test_pkgs() {
+        snapshot_testing("completion-pkgs", &run(TestConfig { pkg_mode: true }));
     }
 }

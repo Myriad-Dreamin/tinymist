@@ -142,9 +142,6 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
     .unwrap();
     let sources = source.split("-----");
 
-    let pw = root.join(Path::new("/main.typ"));
-    world.map_shadow(&pw, Bytes::from_static(b"")).unwrap();
-
     let mut last_pw = None;
     for (i, source) in sources.enumerate() {
         // find prelude
