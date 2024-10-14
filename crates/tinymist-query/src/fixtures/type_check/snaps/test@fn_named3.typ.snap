@@ -1,0 +1,19 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/fn_named3.typ
+---
+"b" = ( ⪰ None | None)
+"foo" = (("b": Any) => Any).with(..("b": None) => any)
+"fun" = () => None
+"x" = None
+---
+5..8 -> @fun
+33..36 -> @foo
+37..38 -> @b
+40..43 -> (@fun | () => None)
+40..45 -> None
+49..50 -> @b
+56..57 -> @x
+60..63 -> (Any | @foo)
+60..65 -> None

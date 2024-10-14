@@ -7,7 +7,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/sig_template_set.typ
 "class" = ( ⪰ "article" | "article" | "letter" | "article" | "letter")
 "content" = Any
 "font" = None
-"tmpl" = (Any, "authors": ( ⪯ (Type(array) | Type(string))), "class": Any, "font": ( ⪯ (TextFont | Array<TextFont>))) => Any
+"tmpl" = ((Any, "authors": ( ⪯ (Type(array) | Type(string))), "class": Any, "font": ( ⪯ (TextFont | Array<TextFont>))) => Any).with(..("authors": (), "class": "article", "font": None) => any)
 ---
 5..9 -> @tmpl
 10..17 -> @content
