@@ -1,12 +1,7 @@
 use crate::{analysis::*, ty::def::*};
 
 impl<'a> Sig<'a> {
-    pub fn call(
-        &self,
-        args: &Interned<ArgsTy>,
-        pol: bool,
-        ctx: &mut impl TyCtxMut,
-    ) -> Option<Ty> {
+    pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, ctx: &mut impl TyCtxMut) -> Option<Ty> {
         log::debug!("call {self:?} {args:?} {pol:?}");
         ctx.with_scope(|ctx| {
             let body = self.check_bind(args, ctx)?;

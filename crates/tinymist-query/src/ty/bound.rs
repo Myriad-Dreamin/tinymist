@@ -4,26 +4,6 @@ pub trait BoundChecker: TyCtx {
     fn collect(&mut self, ty: &Ty, pol: bool);
 }
 
-impl<T> TyCtx for T
-where
-    T: FnMut(&Ty, bool) -> Option<TypeBounds>,
-{
-    fn local_bind_of(&self, _var: &Interned<TypeVar>) -> Option<Ty> {
-        None
-    }
-    fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
-        None
-    }
-}
-impl<T> BoundChecker for T
-where
-    T: FnMut(&Ty, bool) -> Option<TypeBounds>,
-{
-    fn collect(&mut self, ty: &Ty, pol: bool) {
-        self(ty, pol);
-    }
-}
-
 impl Ty {
     /// Check if the given type has bounds (is combinated).
     pub fn has_bounds(&self) -> bool {
@@ -32,22 +12,16 @@ impl Ty {
 
     /// Profile the bounds of the given type.
     pub fn bounds(&self, pol: bool, checker: &mut impl BoundChecker) {
-        let mut worker = BoundCheckContext;
-        worker.ty(self, pol, checker);
+        BoundCheckContext.ty(self, pol, checker);
     }
 }
 
 pub struct BoundCheckContext;
 
 impl BoundCheckContext {
-    fn tys<'a>(
-        &mut self,
-        tys: impl Iterator<Item = &'a Ty>,
-        pol: bool,
-        checker: &mut impl BoundChecker,
-    ) {
+    fn tys<'a>(&mut self, tys: impl Iterator<Item = &'a Ty>, pol: bool, c: &mut impl BoundChecker) {
         for ty in tys {
-            self.ty(ty, pol, checker);
+            self.ty(ty, pol, c);
         }
     }
 

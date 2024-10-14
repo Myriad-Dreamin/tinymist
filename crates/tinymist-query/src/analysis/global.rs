@@ -69,7 +69,7 @@ impl Analysis {
         self.caches.signatures.clear();
         self.caches.static_signatures.clear();
         self.caches.def_use.clear();
-        self.caches.type_ck.clear();
+        self.caches.type_check.clear();
     }
 }
 
@@ -80,7 +80,7 @@ pub struct AnalysisGlobalCaches {
     lifetime: AtomicU64,
     clear_lifetime: AtomicU64,
     def_use: FxDashMap<u128, (u64, Option<Arc<DefUseInfo>>)>,
-    type_ck: FxDashMap<u128, (u64, Option<Arc<TypeScheme>>)>,
+    type_check: FxDashMap<u128, (u64, Option<Arc<TypeScheme>>)>,
     static_signatures: FxDashMap<u128, (u64, Source, usize, Signature)>,
     signatures: FxDashMap<u128, (u64, foundations::Func, Signature)>,
 }
@@ -493,13 +493,13 @@ impl<'w> AnalysisContext<'w> {
 
         let h = hash128(&(&source, &def_use));
 
-        let res = if let Some(res) = self.analysis.caches.type_ck.get(&h) {
+        let res = if let Some(res) = self.analysis.caches.type_check.get(&h) {
             res.1.clone()
         } else {
-            let res = crate::analysis::ty::type_check(self, source);
+            let res = crate::analysis::type_check(self, source);
             self.analysis
                 .caches
-                .type_ck
+                .type_check
                 .insert(h, (self.lifetime, res.clone()));
             res
         };
@@ -729,7 +729,7 @@ impl<'w> AnalysisContext<'w> {
             .retain(|_, (l, _)| lifetime - *l < 60);
         self.analysis
             .caches
-            .type_ck
+            .type_check
             .retain(|_, (l, _)| lifetime - *l < 60);
     }
 }

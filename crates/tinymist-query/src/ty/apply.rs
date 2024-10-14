@@ -11,29 +11,18 @@ static EMPTY_ARGS: LazyLock<Interned<ArgsTy>> = LazyLock::new(|| ArgsTy::default
 
 impl Ty {
     /// Call the given type with the given arguments.
-    pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, checker: &mut impl ApplyChecker) {
-        self.apply(SigSurfaceKind::Call, args, pol, checker)
+    pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, c: &mut impl ApplyChecker) {
+        ApplySigChecker(c, args).ty(self, SigSurfaceKind::Call, pol);
     }
 
     /// Get the tuple element type of the given type.
-    pub fn tuple_element_of(&self, pol: bool, checker: &mut impl ApplyChecker) {
-        self.apply(SigSurfaceKind::Array, &EMPTY_ARGS, pol, checker)
+    pub fn tuple_element_of(&self, pol: bool, c: &mut impl ApplyChecker) {
+        ApplySigChecker(c, &EMPTY_ARGS).ty(self, SigSurfaceKind::Array, pol);
     }
 
     /// Get the element type of the given type.
-    pub fn element_of(&self, pol: bool, checker: &mut impl ApplyChecker) {
-        self.apply(SigSurfaceKind::ArrayOrDict, &EMPTY_ARGS, pol, checker)
-    }
-
-    fn apply(
-        &self,
-        surface: SigSurfaceKind,
-        args: &Interned<ArgsTy>,
-        pol: bool,
-        checker: &mut impl ApplyChecker,
-    ) {
-        let mut worker = ApplySigChecker(checker, args);
-        worker.ty(self, surface, pol);
+    pub fn element_of(&self, pol: bool, c: &mut impl ApplyChecker) {
+        ApplySigChecker(c, &EMPTY_ARGS).ty(self, SigSurfaceKind::ArrayOrDict, pol);
     }
 }
 
