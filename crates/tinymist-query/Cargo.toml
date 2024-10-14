@@ -55,6 +55,7 @@ base64.workspace = true
 typlite.workspace = true
 tinymist-world.workspace = true
 tinymist-analysis.workspace = true
+tinymist-derive.workspace = true
 
 [dev-dependencies]
 once_cell.workspace = true

@@ -1,13 +1,8 @@
-use crate::{adt::interner::Interned, ty::def::*};
-
 use super::{Iface, IfaceChecker};
+use crate::ty::def::*;
 
-pub trait SelectChecker {
+pub trait SelectChecker: TyCtx {
     fn select(&mut self, sig: Iface, key: &Interned<str>, pol: bool);
-
-    fn bound_of_var(&mut self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
-        None
-    }
 }
 
 impl Ty {
@@ -17,7 +12,9 @@ impl Ty {
     }
 }
 
-pub struct SelectKeyChecker<'a, T>(&'a mut T, &'a Interned<str>);
+#[derive(BindTyCtx)]
+#[bind(0)]
+pub struct SelectKeyChecker<'a, T: TyCtx>(&'a mut T, &'a Interned<str>);
 
 impl<'a, T: SelectChecker> SelectKeyChecker<'a, T> {
     fn ty(&mut self, ty: &Ty, pol: bool) {
@@ -34,9 +31,5 @@ impl<'a, T: SelectChecker> IfaceChecker for SelectKeyChecker<'a, T> {
     ) -> Option<()> {
         self.0.select(iface, self.1, pol);
         Some(())
-    }
-
-    fn check_var(&mut self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
-        self.0.bound_of_var(_var, _pol)
     }
 }

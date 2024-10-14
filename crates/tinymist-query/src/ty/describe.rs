@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use reflexo::hash::hash128;
 use typst::foundations::Repr;
 
-use crate::{adt::interner::Interned, analysis::*, ty::def::*};
+use crate::{analysis::*, ty::def::*};
 
 impl TypeScheme {
     /// Describe the given type with the given type scheme.

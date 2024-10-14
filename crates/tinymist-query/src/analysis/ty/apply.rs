@@ -9,6 +9,8 @@ use crate::{analysis::ApplyChecker, ty::ArgsTy};
 use super::*;
 use crate::adt::interner::Interned;
 
+#[derive(BindTyCtx)]
+#[bind(base)]
 pub struct ApplyTypeChecker<'a, 'b, 'w> {
     pub(super) base: &'a mut TypeChecker<'b, 'w>,
     pub call_site: Span,
@@ -17,18 +19,6 @@ pub struct ApplyTypeChecker<'a, 'b, 'w> {
 }
 
 impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
-    fn bound_of_var(
-        &mut self,
-        var: &Interned<super::TypeVar>,
-        _pol: bool,
-    ) -> Option<super::TypeBounds> {
-        self.base
-            .info
-            .vars
-            .get(&var.def)
-            .map(|v| v.bounds.bounds().read().clone())
-    }
-
     fn apply(&mut self, sig: Sig, args: &Interned<ArgsTy>, pol: bool) {
         let _ = self.args;
 
@@ -38,7 +28,7 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
         };
 
         if !is_partialize {
-            if let Some(ty) = sig.call(args, pol, Some(self.base.ctx)) {
+            if let Some(ty) = sig.call(args, pol, self.base) {
                 self.resultant.push(ty);
             }
         }
@@ -155,7 +145,7 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
 
         let callee = sig.ty();
 
-        let Some(SigShape { sig, withs }) = sig.shape(Some(self.base.ctx)) else {
+        let Some(SigShape { sig, withs }) = sig.shape(self.base) else {
             return;
         };
         for (arg_recv, arg_ins) in sig.matches(args, withs) {
@@ -210,24 +200,14 @@ impl<T: FnMut(&mut TypeChecker, Sig, bool)> TupleCheckDriver for T {
     }
 }
 
+#[derive(BindTyCtx)]
+#[bind(base)]
 pub struct TupleChecker<'a, 'b, 'w> {
     pub(super) base: &'a mut TypeChecker<'b, 'w>,
     driver: &'a mut dyn TupleCheckDriver,
 }
 
 impl<'a, 'b, 'w> ApplyChecker for TupleChecker<'a, 'b, 'w> {
-    fn bound_of_var(
-        &mut self,
-        var: &Interned<super::TypeVar>,
-        _pol: bool,
-    ) -> Option<super::TypeBounds> {
-        self.base
-            .info
-            .vars
-            .get(&var.def)
-            .map(|v| v.bounds.bounds().read().clone())
-    }
-
     fn apply(&mut self, sig: Sig, _args: &Interned<ArgsTy>, pol: bool) {
         self.driver.check(self.base, sig, pol);
     }

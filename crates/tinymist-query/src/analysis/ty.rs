@@ -5,14 +5,17 @@ use std::{collections::HashMap, sync::Arc};
 use once_cell::sync::Lazy;
 use reflexo::vector::ir::DefId;
 use typst::{
-    foundations::Value,
+    foundations::{Func, Value},
     syntax::{
         ast::{self, AstNode},
         LinkedNode, Source, Span, SyntaxKind,
     },
 };
 
-use crate::analysis::{Ty, *};
+use crate::{
+    adt::interner::Interned,
+    analysis::{Ty, *},
+};
 use crate::{analysis::TypeScheme, ty::TypeInterface, AnalysisContext};
 
 use super::{
@@ -61,6 +64,8 @@ enum InterpretMode {
     Math,
 }
 
+#[derive(BindTyCtx)]
+#[bind(info)]
 struct TypeChecker<'a, 'w> {
     ctx: &'a mut AnalysisContext<'w>,
     source: Source,
@@ -69,6 +74,26 @@ struct TypeChecker<'a, 'w> {
     info: &'a mut TypeScheme,
     externals: HashMap<DefId, Option<Ty>>,
     mode: InterpretMode,
+}
+
+impl<'a, 'w> TyCtxMut for TypeChecker<'a, 'w> {
+    type Snap = <TypeScheme as TyCtxMut>::Snap;
+
+    fn start_scope(&mut self) -> Self::Snap {
+        self.info.start_scope()
+    }
+
+    fn end_scope(&mut self, snap: Self::Snap) {
+        self.info.end_scope(snap)
+    }
+
+    fn bind_local(&mut self, var: &Interned<TypeVar>, ty: Ty) {
+        self.info.bind_local(var, ty);
+    }
+
+    fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>> {
+        self.ctx.type_of_func(func)
+    }
 }
 
 impl<'a, 'w> TypeChecker<'a, 'w> {

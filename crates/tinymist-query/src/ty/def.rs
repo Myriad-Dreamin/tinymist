@@ -19,14 +19,19 @@ use typst::{
 };
 
 use crate::{
-    adt::interner::{impl_internable, Interned},
+    adt::{interner::impl_internable, snapshot_map},
     analysis::BuiltinTy,
 };
 
+pub use tinymist_derive::BindTyCtx;
+
+pub(crate) use super::{TyCtxMut, TyCtx};
+pub(crate) use crate::adt::interner::Interned;
+
 /// A reference to the interned type
-pub(super) type TyRef = Interned<Ty>;
+pub(crate) type TyRef = Interned<Ty>;
 /// A reference to the interned string
-pub(super) type StrRef = Interned<str>;
+pub(crate) type StrRef = Interned<str>;
 
 /// All possible types in tinymist
 #[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -949,10 +954,23 @@ impl IfTy {
 pub struct TypeScheme {
     /// The typing on definitions
     pub vars: HashMap<DefId, TypeVarBounds>,
+    /// The local binding of the type variable
+    pub local_binds: snapshot_map::SnapshotMap<DefId, Ty>,
     /// The typing on syntax structures
     pub mapping: HashMap<Span, Vec<Ty>>,
 
     pub(super) cano_cache: Mutex<TypeCanoStore>,
+}
+
+impl TyCtx for TypeScheme {
+    fn global_bounds(&self, var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
+        let v = self.vars.get(&var.def)?;
+        Some(v.bounds.bounds().read().clone())
+    }
+
+    fn local_bind_of(&self, var: &Interned<TypeVar>) -> Option<Ty> {
+        self.local_binds.get(&var.def).cloned()
+    }
 }
 
 impl TypeScheme {
@@ -994,6 +1012,26 @@ impl TypeScheme {
                 e.insert(vec![ty]);
             }
         }
+    }
+}
+
+impl TyCtxMut for TypeScheme {
+    type Snap = ena::undo_log::Snapshot;
+
+    fn start_scope(&mut self) -> Self::Snap {
+        self.local_binds.snapshot()
+    }
+
+    fn end_scope(&mut self, snap: Self::Snap) {
+        self.local_binds.rollback_to(snap);
+    }
+
+    fn bind_local(&mut self, var: &Interned<TypeVar>, ty: Ty) {
+        self.local_binds.insert(var.def, ty);
+    }
+
+    fn type_of_func(&mut self, _func: &typst::foundations::Func) -> Option<Interned<SigTy>> {
+        None
     }
 }
 
@@ -1049,7 +1087,7 @@ impl TypeVarBounds {
 /// A type variable bounds
 #[derive(Clone)]
 pub enum FlowVarKind {
-    /// A type variable that receives both types and values (type instnaces)
+    /// A type variable that receives both types and values (type instances)
     Strong(Arc<RwLock<TypeBounds>>),
     /// A type variable that receives only types
     /// The received values will be lifted to types

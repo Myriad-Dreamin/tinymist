@@ -20,6 +20,61 @@ pub(crate) use iface::*;
 pub(crate) use mutate::*;
 pub(crate) use select::*;
 pub(crate) use sig::*;
+use typst::foundations::Func;
+
+/// A type context.
+pub trait TyCtx {
+    /// Get local binding of a variable.
+    fn local_bind_of(&self, _var: &Interned<TypeVar>) -> Option<Ty>;
+    /// Get the type of a variable.
+    fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds>;
+}
+
+/// A mutable type context.
+pub trait TyCtxMut: TyCtx {
+    /// The type of a snapshot of the scope.
+    type Snap;
+
+    /// Start a new scope.
+    #[must_use]
+    fn start_scope(&mut self) -> Self::Snap;
+    /// End the current scope.
+    fn end_scope(&mut self, snap: Self::Snap);
+    /// Execute a function with a new scope.
+    fn with_scope<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let snap = self.start_scope();
+        let res = f(self);
+        self.end_scope(snap);
+        res
+    }
+
+    /// Bind a variable locally.
+    fn bind_local(&mut self, var: &Interned<TypeVar>, ty: Ty);
+    /// Get the type of a runtime function.
+    fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>>;
+}
+
+impl TyCtx for () {
+    fn local_bind_of(&self, _var: &Interned<TypeVar>) -> Option<Ty> {
+        None
+    }
+    fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
+        None
+    }
+}
+impl TyCtxMut for () {
+    type Snap = ();
+
+    fn start_scope(&mut self) -> Self::Snap {
+        Self::Snap::default()
+    }
+    fn end_scope(&mut self, _snap: Self::Snap) {}
+
+    fn bind_local(&mut self, _var: &Interned<TypeVar>, _ty: Ty) {}
+    fn type_of_func(&mut self, _func: &Func) -> Option<Interned<SigTy>> {
+        None
+    }
+}
 
 #[cfg(test)]
 mod tests {

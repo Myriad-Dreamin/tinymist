@@ -1,79 +1,57 @@
-use hashbrown::HashMap;
-
-use crate::{adt::interner::Interned, analysis::*, ty::def::*};
+use crate::{analysis::*, ty::def::*};
 
 impl<'a> Sig<'a> {
     pub fn call(
         &self,
         args: &Interned<ArgsTy>,
         pol: bool,
-        ctx: Option<&mut AnalysisContext>,
+        ctx: &mut impl TyCtxMut,
     ) -> Option<Ty> {
-        let (bound_variables, body) = self.check_bind(args, ctx)?;
+        ctx.with_scope(|ctx| {
+            let body = self.check_bind(args, ctx)?;
 
-        if bound_variables.is_empty() {
-            return body;
-        }
-
-        let body = body?;
-
-        // Substitute the bound variables in the body or just body
-        let mut checker = SubstituteChecker { bound_variables };
-        Some(checker.ty(&body, pol).unwrap_or(body))
+            // Substitute the bound variables in the body or just body
+            let mut checker = SubstituteChecker { ctx };
+            Some(checker.ty(&body, pol).unwrap_or(body))
+        })
     }
 
-    pub fn check_bind(
-        &self,
-        args: &Interned<ArgsTy>,
-        ctx: Option<&mut AnalysisContext>,
-    ) -> Option<(HashMap<DefId, Ty>, Option<Ty>)> {
+    pub fn check_bind(&self, args: &Interned<ArgsTy>, ctx: &mut impl TyCtxMut) -> Option<Ty> {
         let SigShape { sig, withs } = self.shape(ctx)?;
 
         // todo: check if the signature has free variables
         // let has_free_vars = sig.has_free_variables;
-        let has_free_vars = true;
 
-        let mut arguments = HashMap::new();
-        if has_free_vars {
-            for (arg_recv, arg_ins) in sig.matches(args, withs) {
-                if let Ty::Var(arg_recv) = arg_recv {
-                    arguments.insert(arg_recv.def, arg_ins.clone());
-                }
+        for (arg_recv, arg_ins) in sig.matches(args, withs) {
+            if let Ty::Var(arg_recv) = arg_recv {
+                ctx.bind_local(arg_recv, arg_ins.clone());
             }
         }
 
-        Some((arguments, sig.body.clone()))
+        sig.body.clone()
     }
 }
 
-struct SubstituteChecker {
-    bound_variables: HashMap<DefId, Ty>,
+struct SubstituteChecker<'a, T: TyCtxMut> {
+    ctx: &'a mut T,
 }
 
-impl SubstituteChecker {
+impl<'a, T: TyCtxMut> SubstituteChecker<'a, T> {
     fn ty(&mut self, body: &Ty, pol: bool) -> Option<Ty> {
         body.mutate(pol, self)
     }
 }
 
-impl MutateDriver for SubstituteChecker {
+impl<'a, T: TyCtxMut> TyMutator for SubstituteChecker<'a, T> {
     fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
         // todo: extrude the type into a polarized type
         let _ = pol;
 
-        Some(match ty {
-            // todo: substitute the bound in the type
-            Ty::Let(..) => return None,
-            Ty::Var(v) => {
-                if let Some(ty) = self.bound_variables.get(&v.def) {
-                    ty.clone()
-                } else {
-                    return None;
-                }
-            }
-            Ty::Value(..) | Ty::Any | Ty::Boolean(..) | Ty::Builtin(..) => return None,
-            _ => return None,
-        })
+        if let Ty::Var(v) = ty {
+            self.ctx.local_bind_of(v)
+        } else {
+            self.mutate_rec(ty, pol)
+        }
     }
 }
 
@@ -83,7 +61,7 @@ mod tests {
 
     use crate::ty::tests::*;
 
-    use super::{ApplyChecker, Ty};
+    use super::{ApplyChecker, Interned, Ty, TyCtx, TypeBounds, TypeVar};
     #[test]
     fn test_ty() {
         use super::*;
@@ -95,6 +73,14 @@ mod tests {
     #[derive(Default)]
     struct CallCollector(Vec<Ty>);
 
+    impl TyCtx for CallCollector {
+        fn local_bind_of(&self, _var: &Interned<TypeVar>) -> Option<Ty> {
+            None
+        }
+        fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
+            None
+        }
+    }
     impl ApplyChecker for CallCollector {
         fn apply(
             &mut self,
@@ -102,7 +88,7 @@ mod tests {
             arguments: &crate::adt::interner::Interned<super::ArgsTy>,
             pol: bool,
         ) {
-            let ty = sig.call(arguments, pol, None);
+            let ty = sig.call(arguments, pol, &mut ());
             if let Some(ty) = ty {
                 self.0.push(ty);
             }
@@ -128,7 +114,7 @@ mod tests {
             })
         }
 
-        assert_snapshot!(call(literal_sig!(p1 -> p1), literal_args!(q1)), @"@q1");
-        assert_snapshot!(call(literal_sig!(!u1: w1 -> w1), literal_args!(!u1: w2)), @"@w2");
+        assert_snapshot!(call(literal_sig!(p1 -> p1), literal_args!(q1)), @"@p1");
+        assert_snapshot!(call(literal_sig!(!u1: w1 -> w1), literal_args!(!u1: w2)), @"@w1");
     }
 }

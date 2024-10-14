@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use ecow::EcoVec;
 use reflexo::hash::hash128;
 
-use crate::{adt::interner::Interned, analysis::*, ty::def::*};
+use crate::{analysis::*, ty::def::*};
 
 #[derive(Default)]
 struct CompactTy {

@@ -1,6 +1,6 @@
 use typst::foundations::{Func, Value};
 
-use crate::{adt::interner::Interned, analysis::*, ty::def::*};
+use crate::{analysis::*, ty::def::*};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Sig<'a> {
@@ -45,7 +45,7 @@ impl<'a> Sig<'a> {
         })
     }
 
-    pub fn shape(self, ctx: Option<&mut AnalysisContext>) -> Option<SigShape<'a>> {
+    pub fn shape(self, ctx: &mut impl TyCtxMut) -> Option<SigShape<'a>> {
         let (cano_sig, withs) = match self {
             Sig::With { sig, withs, .. } => (*sig, Some(withs)),
             _ => (self, None),
@@ -56,8 +56,8 @@ impl<'a> Sig<'a> {
             Sig::ArrayCons(a) => SigTy::array_cons(a.as_ref().clone(), false),
             Sig::TupleCons(t) => SigTy::tuple_cons(t.clone(), false),
             Sig::DictCons(d) => SigTy::dict_cons(d, false),
-            Sig::TypeCons { val, .. } => ctx?.type_of_func(&val.constructor().ok()?)?,
-            Sig::Value { val, .. } => ctx?.type_of_func(val)?,
+            Sig::TypeCons { val, .. } => ctx.type_of_func(&val.constructor().ok()?)?,
+            Sig::Value { val, .. } => ctx.type_of_func(val)?,
             // todo
             Sig::Partialize(..) => return None,
             Sig::With { .. } => return None,
@@ -79,20 +79,8 @@ pub enum SigSurfaceKind {
     ArrayOrDict,
 }
 
-pub trait SigChecker {
+pub trait SigChecker: TyCtx {
     fn check(&mut self, sig: Sig, args: &mut SigCheckContext, pol: bool) -> Option<()>;
-    fn check_var(&mut self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
-        None
-    }
-}
-
-impl<T> SigChecker for T
-where
-    T: FnMut(Sig, &mut SigCheckContext, bool) -> Option<()>,
-{
-    fn check(&mut self, sig: Sig, args: &mut SigCheckContext, pol: bool) -> Option<()> {
-        self(sig, args, pol)
-    }
 }
 
 impl Ty {
@@ -121,14 +109,24 @@ impl Ty {
 
         let mut primary = None;
 
+        #[derive(BindTyCtx)]
+        #[bind(0)]
+        struct SigReprDriver<'a, C: TyCtx>(&'a C, &'a mut Option<Interned<SigTy>>);
+
+        impl<C: TyCtx> SigChecker for SigReprDriver<'_, C> {
+            fn check(&mut self, sig: Sig, _ctx: &mut SigCheckContext, _pol: bool) -> Option<()> {
+                // todo: bind type context
+                let sig = sig.shape(&mut ())?;
+                *self.1 = Some(sig.sig.clone());
+                Some(())
+            }
+        }
+
         self.sig_surface(
             pol,
             SigSurfaceKind::Call,
-            &mut |sig: Sig, _ctx: &mut SigCheckContext, _pol: bool| {
-                let sig = sig.shape(None)?;
-                primary = Some(sig.sig.clone());
-                Some(())
-            },
+            // todo: bind type context
+            &mut SigReprDriver(&(), &mut primary),
         );
 
         primary
@@ -141,6 +139,8 @@ pub struct SigCheckContext {
     pub at: TyRef,
 }
 
+#[derive(BindTyCtx)]
+#[bind(checker)]
 pub struct SigCheckDriver<'a> {
     ctx: SigCheckContext,
     checker: &'a mut dyn SigChecker,
@@ -252,12 +252,10 @@ impl BoundChecker for SigCheckDriver<'_> {
         log::debug!("sig bounds: {ty:?}");
         self.ty(ty, pol);
     }
-
-    fn bound_of_var(&mut self, var: &Interned<TypeVar>, pol: bool) -> Option<TypeBounds> {
-        self.checker.check_var(var, pol)
-    }
 }
 
+#[derive(BindTyCtx)]
+#[bind(0)]
 struct MethodDriver<'a, 'b>(&'a mut SigCheckDriver<'b>, &'a StrRef);
 
 impl<'a, 'b> MethodDriver<'a, 'b> {
@@ -326,9 +324,5 @@ impl<'a, 'b> BoundChecker for MethodDriver<'a, 'b> {
             // todo: general select operator
             _ => {}
         }
-    }
-
-    fn bound_of_var(&mut self, var: &Interned<TypeVar>, pol: bool) -> Option<TypeBounds> {
-        self.0.checker.check_var(var, pol)
     }
 }
