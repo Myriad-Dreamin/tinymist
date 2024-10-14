@@ -86,17 +86,13 @@ pub trait SigChecker: TyCtx {
 impl Ty {
     /// Iterate over the signatures of the given type.
     pub fn sig_surface(&self, pol: bool, sig_kind: SigSurfaceKind, checker: &mut impl SigChecker) {
-        let context = SigCheckContext {
+        let ctx = SigCheckContext {
             sig_kind,
             args: Vec::new(),
             at: TyRef::new(Ty::Any),
         };
-        let mut worker = SigCheckDriver {
-            ctx: context,
-            checker,
-        };
 
-        worker.ty(self, pol);
+        SigCheckDriver { ctx, checker }.ty(self, pol);
     }
 
     /// Get the signature representation of the given type.

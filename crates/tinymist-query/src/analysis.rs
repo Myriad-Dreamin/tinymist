@@ -16,9 +16,11 @@ pub mod linked_def;
 pub use linked_def::*;
 pub mod signature;
 pub use signature::*;
-mod ty;
+mod post_tyck;
+mod tyck;
 pub(crate) use crate::ty::*;
-pub(crate) use ty::*;
+pub(crate) use post_tyck::*;
+pub(crate) use tyck::*;
 pub mod track_values;
 pub use track_values::*;
 mod prelude;
@@ -33,7 +35,7 @@ mod type_check_tests {
 
     use typst::syntax::Source;
 
-    use crate::analysis::ty;
+    use crate::analysis::*;
     use crate::tests::*;
 
     use super::{Ty, TypeScheme};
@@ -43,7 +45,7 @@ mod type_check_tests {
         snapshot_testing("type_check", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let result = ty::type_check(ctx, source.clone());
+            let result = type_check(ctx, source.clone());
             let result = result
                 .as_deref()
                 .map(|e| format!("{:#?}", TypeCheckSnapshot(&source, e)));
@@ -101,7 +103,7 @@ mod post_type_check_tests {
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
-    use crate::analysis::ty;
+    use crate::analysis::*;
     use crate::tests::*;
 
     #[test]
@@ -116,8 +118,8 @@ mod post_type_check_tests {
             let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
-            let result = ty::type_check(ctx, source.clone());
-            let literal_type = result.and_then(|info| ty::post_type_check(ctx, &info, node));
+            let result = type_check(ctx, source.clone());
+            let literal_type = result.and_then(|info| post_type_check(ctx, &info, node));
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),
@@ -137,7 +139,7 @@ mod type_describe_tests {
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
-    use crate::analysis::ty;
+    use crate::analysis::*;
     use crate::tests::*;
 
     #[test]
@@ -152,8 +154,8 @@ mod type_describe_tests {
             let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
-            let result = ty::type_check(ctx, source.clone());
-            let literal_type = result.and_then(|info| ty::post_type_check(ctx, &info, node));
+            let result = type_check(ctx, source.clone());
+            let literal_type = result.and_then(|info| post_type_check(ctx, &info, node));
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),
