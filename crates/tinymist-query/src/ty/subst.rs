@@ -55,10 +55,11 @@ impl<'a, T: TyCtxMut> TyMutator for SubstituteChecker<'a, T> {
 #[cfg(test)]
 mod tests {
     use insta::{assert_debug_snapshot, assert_snapshot};
+    use tinymist_derive::BindTyCtx;
 
     use crate::ty::tests::*;
 
-    use super::{ApplyChecker, Interned, Ty, TyCtx, TypeBounds, TypeVar};
+    use super::{ApplyChecker, Interned, Ty, TyCtx, TypeBounds, TypeScheme, TypeVar};
     #[test]
     fn test_ty() {
         use super::*;
@@ -67,17 +68,10 @@ mod tests {
         assert_debug_snapshot!(ty_ref, @"Clause");
     }
 
-    #[derive(Default)]
-    struct CallCollector(Vec<Ty>);
+    #[derive(Default, BindTyCtx)]
+    #[bind(0)]
+    struct CallCollector(TypeScheme, Vec<Ty>);
 
-    impl TyCtx for CallCollector {
-        fn local_bind_of(&self, _var: &Interned<TypeVar>) -> Option<Ty> {
-            None
-        }
-        fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
-            None
-        }
-    }
     impl ApplyChecker for CallCollector {
         fn apply(
             &mut self,
@@ -85,9 +79,9 @@ mod tests {
             arguments: &crate::adt::interner::Interned<super::ArgsTy>,
             pol: bool,
         ) {
-            let ty = sig.call(arguments, pol, &mut ());
+            let ty = sig.call(arguments, pol, &mut self.0);
             if let Some(ty) = ty {
-                self.0.push(ty);
+                self.1.push(ty);
             }
         }
     }
@@ -101,7 +95,7 @@ mod tests {
             let mut collector = CallCollector::default();
             sig_ty.call(&args, false, &mut collector);
 
-            collector.0.iter().fold(String::new(), |mut acc, ty| {
+            collector.1.iter().fold(String::new(), |mut acc, ty| {
                 if !acc.is_empty() {
                     acc.push_str(", ");
                 }
@@ -111,7 +105,7 @@ mod tests {
             })
         }
 
-        assert_snapshot!(call(literal_sig!(p1 -> p1), literal_args!(q1)), @"@p1");
-        assert_snapshot!(call(literal_sig!(!u1: w1 -> w1), literal_args!(!u1: w2)), @"@w1");
+        assert_snapshot!(call(literal_sig!(p1 -> p1), literal_args!(q1)), @"@q1");
+        assert_snapshot!(call(literal_sig!(!u1: w1 -> w1), literal_args!(!u1: w2)), @"@w2");
     }
 }
