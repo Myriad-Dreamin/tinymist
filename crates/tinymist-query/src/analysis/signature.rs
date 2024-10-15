@@ -56,7 +56,6 @@ impl ParamSpec {
             name: p.name.into(),
             docs: Cow::Borrowed(p.docs),
             base_type: Ty::from_param_site(f, p),
-            // type_repr: Some(eco_format!("{}", TypeExpr(&p.input))),
             expr: p.default.map(|d| truncated_repr(&d())),
             positional: p.positional,
             named: p.named,
@@ -423,7 +422,6 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: n.name().into(),
                     base_type: Ty::Any,
-                    // type_repr: Some(expr.clone()),
                     expr: Some(expr.clone()),
                     positional: false,
                     named: true,
@@ -437,7 +435,6 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: ident.unwrap_or_default().into(),
                     base_type: Ty::Any,
-                    // type_repr: None,
                     expr: None,
                     positional: true,
                     named: false,
