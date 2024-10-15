@@ -13,14 +13,14 @@ pub struct TidyParamDocs {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyFuncDocs {
-    pub docs: String,
+    pub docs: EcoString,
     pub return_ty: Option<EcoString>,
     pub params: Vec<TidyParamDocs>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyVarDocs {
-    pub docs: String,
+    pub docs: EcoString,
     pub return_ty: Option<String>,
 }
 
@@ -129,8 +129,8 @@ pub fn identify_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
     }
 
     let docs = match break_line {
-        Some(line_no) => (lines[..line_no]).iter().copied().join("\n"),
-        None => converted.to_owned(),
+        Some(line_no) => (lines[..line_no]).iter().copied().join("\n").into(),
+        None => converted.into(),
     };
 
     params.reverse();
@@ -170,8 +170,8 @@ pub fn identify_var_docs(converted: &str) -> StrResult<TidyVarDocs> {
     }
 
     let docs = match break_line {
-        Some(line_no) => (lines[..line_no]).iter().copied().join("\n"),
-        None => converted.to_owned(),
+        Some(line_no) => (lines[..line_no]).iter().copied().join("\n").into(),
+        None => converted.to_owned().into(),
     };
 
     Ok(TidyVarDocs { docs, return_ty })

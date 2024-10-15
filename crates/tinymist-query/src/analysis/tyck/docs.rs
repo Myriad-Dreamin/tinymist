@@ -55,23 +55,23 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 #[derive(Debug, Clone, Default)]
 pub struct DocString {
     /// The documentation of the item
-    pub docs: Option<String>,
+    pub docs: Option<EcoString>,
     /// The typing on definitions
     pub var_bounds: HashMap<DefId, TypeVarBounds>,
     /// The variable doc associated with the item
-    pub vars: HashMap<EcoString, VarDoc>,
+    pub vars: BTreeMap<StrRef, VarDoc>,
     /// The type of the resultant type
     pub res_ty: Option<Ty>,
 }
 
 impl DocString {
     /// Get the documentation of a variable associated with the item
-    pub fn get_var(&self, name: &str) -> Option<&VarDoc> {
+    pub fn get_var(&self, name: &StrRef) -> Option<&VarDoc> {
         self.vars.get(name)
     }
 
     /// Get the type of a variable associated with the item
-    pub fn var_ty(&self, name: &str) -> Option<&Ty> {
+    pub fn var_ty(&self, name: &StrRef) -> Option<&Ty> {
         self.get_var(name).and_then(|v| v.ty.as_ref())
     }
 
@@ -161,10 +161,10 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
         let converted = identify_func_docs(&converted).ok()?;
         let module = self.ctx.module_by_str(docs)?;
 
-        let mut params = HashMap::new();
+        let mut params = BTreeMap::new();
         for param in converted.params.into_iter() {
             params.insert(
-                param.name,
+                param.name.into(),
                 VarDoc {
                     docs: Some(param.docs),
                     ty: self.check_type_strings(&module, &param.types),
@@ -197,7 +197,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
         Some(DocString {
             docs: Some(converted.docs),
             var_bounds: self.vars,
-            vars: HashMap::new(),
+            vars: BTreeMap::new(),
             res_ty,
         })
     }

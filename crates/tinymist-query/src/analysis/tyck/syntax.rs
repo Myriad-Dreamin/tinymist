@@ -189,11 +189,13 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             range: root.range(),
         };
 
-        self.get_var(root.span(), ident_ref).or_else(|| {
-            let s = root.span();
-            let v = resolve_global_value(self.ctx, root, mode == InterpretMode::Math)?;
-            Some(Ty::Value(InsTy::new_at(v, s)))
-        })
+        self.get_var(root.span(), ident_ref)
+            .map(Ty::Var)
+            .or_else(|| {
+                let s = root.span();
+                let v = resolve_global_value(self.ctx, root, mode == InterpretMode::Math)?;
+                Some(Ty::Value(InsTy::new_at(v, s)))
+            })
     }
 
     fn check_array(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
@@ -389,24 +391,24 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     pos.push(self.check_pattern(pattern, Ty::Any, docstring, root.clone()));
                 }
                 ast::Param::Named(e) => {
-                    let name = e.name().get();
+                    let name = e.name().get().into();
                     let exp = self.check_expr_in(e.expr().span(), root.clone());
-                    let v = self.get_var(e.name().span(), to_ident_ref(&root, e.name())?)?;
-                    if let Some(annotated) = docstring.var_ty(name.as_str()) {
+                    let v = Ty::Var(self.get_var(e.name().span(), to_ident_ref(&root, e.name())?)?);
+                    if let Some(annotated) = docstring.var_ty(&name) {
                         self.constrain(&v, annotated);
                     }
                     // todo: this is less efficient than v.lbs.push(exp), we may have some idea to
                     // optimize it, so I put a todo here.
                     self.constrain(&exp, &v);
-                    named.insert(name.into(), v);
-                    defaults.insert(name.into(), exp);
+                    named.insert(name.clone(), v);
+                    defaults.insert(name, exp);
                 }
                 // todo: spread left/right
                 ast::Param::Spread(a) => {
                     if let Some(e) = a.sink_ident() {
                         let exp = Ty::Builtin(BuiltinTy::Args);
-                        let v = self.get_var(e.span(), to_ident_ref(&root, e)?)?;
-                        if let Some(annotated) = docstring.var_ty(e.get().as_str()) {
+                        let v = Ty::Var(self.get_var(e.span(), to_ident_ref(&root, e)?)?);
+                        if let Some(annotated) = docstring.var_ty(&e.get().as_str().into()) {
                             self.constrain(&v, annotated);
                         }
                         self.constrain(&exp, &v);
@@ -467,7 +469,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     .map(|init| self.check_expr_in(init.span(), root.clone()))
                     .unwrap_or_else(|| Ty::Builtin(BuiltinTy::Infer));
 
-                let v = self.get_var(c.span(), to_ident_ref(&root, c)?)?;
+                let v = Ty::Var(self.get_var(c.span(), to_ident_ref(&root, c)?)?);
                 self.constrain(&value, &v);
                 // todo lbs is the lexical signature.
             }
@@ -617,14 +619,15 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     ) -> Option<Ty> {
         Some(match pattern {
             ast::Pattern::Normal(ast::Expr::Ident(ident)) => {
-                let v = self.get_var(ident.span(), to_ident_ref(&root, ident)?)?;
-                let annotated = docs.var_ty(ident.get().as_str());
+                let var = self.get_var(ident.span(), to_ident_ref(&root, ident)?)?;
+                let annotated = docs.var_ty(&var.name);
+                let var = Ty::Var(var);
                 log::debug!("check pattern: {ident:?} with {value:?} and annotation {annotated:?}");
                 if let Some(annotated) = annotated {
-                    self.constrain(&v, annotated);
+                    self.constrain(&var, annotated);
                 }
-                self.constrain(&value, &v);
-                v
+                self.constrain(&value, &var);
+                var
             }
             ast::Pattern::Normal(_) => Ty::Any,
             ast::Pattern::Placeholder(_) => Ty::Any,

@@ -121,8 +121,7 @@ pub(crate) fn symbol_docs(
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignatureDocs {
     /// Documentation for the function.
-    pub docs: String,
-    // pub docs: String,
+    pub docs: EcoString,
     // pub return_ty: Option<EcoString>,
     // pub params: Vec<TidyParamDocs>,
     /// The positional parameters.
@@ -274,15 +273,14 @@ pub(crate) fn signature_docs(
     }
 
     let sig = analyze_dyn_signature(ctx, func.clone());
-    let type_sig = type_info.and_then(|(def_use, ty_chk)| {
+    let def_id = type_info.and_then(|(def_use, _)| {
         let def_fid = func.span().id()?;
         let (def_id, _) = def_use.get_def(def_fid, def_ident?)?;
-        ty_chk.type_of_def(def_id)
+        Some(def_id)
     });
+    let docstring = type_info.and_then(|(_, ty_chk)| ty_chk.var_docs.get(&def_id?));
+    let type_sig = type_info.and_then(|(_, ty_chk)| ty_chk.type_of_def(def_id?));
     let type_sig = type_sig.and_then(|type_sig| type_sig.sig_repr(true));
-
-    // todo: docstring
-    let docs = String::new();
 
     let pos_in = sig
         .primary()
@@ -304,7 +302,7 @@ pub(crate) fn signature_docs(
     let ret_in = type_sig
         .as_ref()
         .and_then(|sig| sig.body.as_ref())
-        .or_else(|| sig.primary().ret_ty.as_ref());
+        .or_else(|| sig.primary().sig_ty.body.as_ref());
 
     let pos = pos_in
         .map(|(param, ty)| ParamDocs::new(param, ty, doc_ty.as_mut()))
@@ -322,7 +320,7 @@ pub(crate) fn signature_docs(
     let ret_ty = format_ty(ret_in, doc_ty.as_mut());
 
     Some(SignatureDocs {
-        docs,
+        docs: docstring.and_then(|x| x.docs.clone()).unwrap_or_default(),
         pos,
         named,
         rest,
