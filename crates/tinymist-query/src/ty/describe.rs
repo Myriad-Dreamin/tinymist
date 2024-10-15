@@ -157,7 +157,7 @@ impl TypeDescriber {
                 return b.to_string();
             }
             Ty::Builtin(b) => {
-                return b.describe().to_string();
+                return b.describe();
             }
             Ty::Value(v) => return v.val.repr().to_string(),
             Ty::Field(..) => {

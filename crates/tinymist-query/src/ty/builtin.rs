@@ -1,5 +1,6 @@
 use core::fmt;
 
+use crate::prelude::*;
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use strum::{EnumIter, IntoEnumIterator};
@@ -165,6 +166,33 @@ pub enum BuiltinSig<'a> {
     TupleAt(&'a Ty),
 }
 
+/// A package identifier.
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PackageId {
+    pub namespace: StrRef,
+    pub name: StrRef,
+}
+
+impl fmt::Debug for PackageId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "@{}/{}", self.namespace, self.name)
+    }
+}
+
+impl TryFrom<TypstFileId> for PackageId {
+    type Error = ();
+
+    fn try_from(value: TypstFileId) -> Result<Self, Self::Error> {
+        let Some(spec) = value.package() else {
+            return Err(());
+        };
+        Ok(PackageId {
+            namespace: spec.namespace.as_str().into(),
+            name: spec.name.as_str().into(),
+        })
+    }
+}
+
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BuiltinTy {
     Clause,
@@ -195,6 +223,7 @@ pub enum BuiltinTy {
     Outset,
     Radius,
 
+    Tag(StrRef, Option<Interned<PackageId>>),
     Type(typst::foundations::Type),
     Element(typst::foundations::Element),
     Path(PathPreference),
@@ -230,6 +259,13 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::Radius => write!(f, "Radius"),
             BuiltinTy::Type(ty) => write!(f, "Type({})", ty.long_name()),
             BuiltinTy::Element(e) => e.fmt(f),
+            BuiltinTy::Tag(tag, id) => {
+                if let Some(id) = id {
+                    write!(f, "Tag({tag:?}) of {id:?}")
+                } else {
+                    write!(f, "Tag({tag:?})")
+                }
+            }
             BuiltinTy::Path(p) => write!(f, "Path({p:?})"),
         }
     }
@@ -270,8 +306,8 @@ impl BuiltinTy {
         BuiltinTy::Type(builtin).literally()
     }
 
-    pub(crate) fn describe(&self) -> &'static str {
-        match self {
+    pub(crate) fn describe(&self) -> String {
+        let res = match self {
             BuiltinTy::Clause => "any",
             BuiltinTy::Undef => "any",
             BuiltinTy::Content => "content",
@@ -299,6 +335,13 @@ impl BuiltinTy {
             BuiltinTy::Radius => "radius",
             BuiltinTy::Type(ty) => ty.short_name(),
             BuiltinTy::Element(ty) => ty.name(),
+            BuiltinTy::Tag(name, id) => {
+                return if let Some(id) = id {
+                    format!("tag {name} of {id:?}")
+                } else {
+                    format!("tag {name}")
+                }
+            }
             BuiltinTy::Path(s) => match s {
                 PathPreference::None => "[any]",
                 PathPreference::Special => "[any]",
@@ -314,7 +357,9 @@ impl BuiltinTy {
                 PathPreference::RawTheme => "[theme]",
                 PathPreference::RawSyntax => "[syntax]",
             },
-        }
+        };
+
+        res.to_string()
     }
 }
 

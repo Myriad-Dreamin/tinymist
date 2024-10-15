@@ -141,7 +141,7 @@ pub fn identify_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
     })
 }
 
-pub fn identify_tidy_var_docs(converted: &str) -> StrResult<TidyVarDocs> {
+pub fn identify_var_docs(converted: &str) -> StrResult<TidyVarDocs> {
     let lines = converted.lines().collect::<Vec<_>>();
 
     let mut return_ty = None;
@@ -232,7 +232,7 @@ mod tests {
     }
 
     fn var(s: &str) -> String {
-        let f = super::identify_tidy_var_docs(s).unwrap();
+        let f = super::identify_var_docs(s).unwrap();
         let mut res = format!(">> docs:\n{}\n<< docs", f.docs);
         if let Some(t) = f.return_ty {
             res.push_str(&format!("\n>>return\n{t}\n<<return"));

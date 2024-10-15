@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/annotation_fn.typ
+---
+"args" = Args
+"fn" = Any
+"max-repetitions" = None
+"repetitions" = None
+"touying-fn-wrapper" = ((( ⪯ Type(function)), "max-repetitions": ( ⪯ Type(integer)), "repetitions": ( ⪯ Type(integer)), ...: ( ⪯ Any)) => None).with(..("max-repetitions": None, "repetitions": None) => any)
+---
+162..180 -> @touying-fn-wrapper
+181..183 -> @fn
+185..200 -> @max-repetitions
+208..219 -> @repetitions
+229..233 -> @args

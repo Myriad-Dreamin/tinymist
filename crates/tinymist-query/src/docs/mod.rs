@@ -59,6 +59,8 @@ impl From<(PathBuf, PackageSpec)> for PackageInfo {
 pub enum DocStringKind {
     /// A docstring for a function.
     Function,
+    /// A docstring for a variable.
+    Variable,
 }
 
 /// Docs about a symbol.
@@ -428,7 +430,7 @@ pub(crate) fn convert_docs(world: &LspWorld, content: &str) -> StrResult<EcoStri
 fn identify_docs(kind: &str, content: &str) -> StrResult<Docs> {
     match kind {
         "function" => identify_func_docs(content).map(Docs::Function),
-        "variable" => identify_tidy_var_docs(content).map(Docs::Variable),
+        "variable" => identify_var_docs(content).map(Docs::Variable),
         "module" => identify_tidy_module_docs(content).map(Docs::Module),
         _ => Err(eco_format!("unknown kind {kind}")),
     }

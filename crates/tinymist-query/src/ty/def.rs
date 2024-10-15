@@ -18,15 +18,15 @@ use typst::{
     syntax::{ast, Span, SyntaxKind, SyntaxNode},
 };
 
+use super::PackageId;
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
     analysis::BuiltinTy,
 };
 
-pub use tinymist_derive::BindTyCtx;
-
 pub(crate) use super::{TyCtx, TyCtxMut};
 pub(crate) use crate::adt::interner::Interned;
+pub use tinymist_derive::BindTyCtx;
 
 /// A reference to the interned type
 pub(crate) type TyRef = Interned<Ty>;
@@ -1123,6 +1123,7 @@ impl_internable!(IfTy,);
 impl_internable!(Vec<Ty>,);
 impl_internable!(TypeBounds,);
 impl_internable!(NameBone,);
+impl_internable!(PackageId,);
 impl_internable!((Ty, Ty),);
 
 struct RefDebug<'a>(&'a Ty);
