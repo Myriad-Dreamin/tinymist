@@ -2,6 +2,7 @@
 
 use std::{collections::BTreeMap, sync::LazyLock};
 
+use ecow::eco_vec;
 use typst::{
     foundations::Value,
     syntax::{
@@ -371,11 +372,11 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     }
 
     fn check_closure(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let dostring = self.check_closure_docs(&root);
-        let dostring = dostring.as_ref().unwrap_or(&EMPTY_DOCSTRING);
+        let docstring = self.check_func_docs(&root);
+        let docstring = docstring.as_ref().unwrap_or(&EMPTY_DOCSTRING);
         let closure: ast::Closure = root.cast()?;
 
-        log::debug!("check closure: {:?} -> {dostring:#?}", closure.name());
+        log::debug!("check closure: {:?} -> {docstring:#?}", closure.name());
 
         let mut pos = vec![];
         let mut named = BTreeMap::new();
@@ -385,13 +386,13 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         for param in closure.params().children() {
             match param {
                 ast::Param::Pos(pattern) => {
-                    pos.push(self.check_pattern(pattern, Ty::Any, dostring, root.clone()));
+                    pos.push(self.check_pattern(pattern, Ty::Any, docstring, root.clone()));
                 }
                 ast::Param::Named(e) => {
                     let name = e.name().get();
                     let exp = self.check_expr_in(e.expr().span(), root.clone());
                     let v = self.get_var(e.name().span(), to_ident_ref(&root, e.name())?)?;
-                    if let Some(annotated) = dostring.var_ty(name.as_str()) {
+                    if let Some(annotated) = docstring.var_ty(name.as_str()) {
                         self.constrain(&v, annotated);
                     }
                     // todo: this is less efficient than v.lbs.push(exp), we may have some idea to
@@ -405,7 +406,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     if let Some(e) = a.sink_ident() {
                         let exp = Ty::Builtin(BuiltinTy::Args);
                         let v = self.get_var(e.span(), to_ident_ref(&root, e)?)?;
-                        if let Some(annotated) = dostring.var_ty(e.get().as_str()) {
+                        if let Some(annotated) = docstring.var_ty(e.get().as_str()) {
                             self.constrain(&v, annotated);
                         }
                         self.constrain(&exp, &v);
@@ -417,7 +418,16 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         }
 
         let body = self.check_expr_in(closure.body().span(), root);
-        let _ = dostring.res_ty;
+        // let res_ty = docstring.res_ty.clone().unwrap_or(body);
+        let res_ty = if let Some(annotated) = &docstring.res_ty {
+            self.constrain(&body, annotated);
+            Ty::Let(Interned::new(TypeBounds {
+                lbs: eco_vec![body],
+                ubs: eco_vec![annotated.clone()],
+            }))
+        } else {
+            body
+        };
 
         let named: Vec<(Interned<str>, Ty)> = named.into_iter().collect();
 
@@ -432,7 +442,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             self.weaken(rest);
         }
 
-        let sig = SigTy::new(pos, named, rest, Some(body)).into();
+        let sig = SigTy::new(pos, named, rest, Some(res_ty)).into();
         let sig = Ty::Func(sig);
         if defaults.is_empty() {
             return Some(sig);
@@ -462,13 +472,19 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 // todo lbs is the lexical signature.
             }
             ast::LetBindingKind::Normal(pattern) => {
-                // let _name = let_binding.name().get().to_string();
+                let docstring = self.check_var_docs(&root);
+                let docstring = docstring.as_ref().unwrap_or(&EMPTY_DOCSTRING);
+
                 let value = let_binding
                     .init()
                     .map(|init| self.check_expr_in(init.span(), root.clone()))
                     .unwrap_or_else(|| Ty::Builtin(BuiltinTy::Infer));
+                if let Some(annotated) = &docstring.res_ty {
+                    self.constrain(&value, annotated);
+                }
+                let value = docstring.res_ty.clone().unwrap_or(value);
 
-                self.check_pattern(pattern, value, &EMPTY_DOCSTRING, root.clone());
+                self.check_pattern(pattern, value, docstring, root.clone());
             }
         }
 

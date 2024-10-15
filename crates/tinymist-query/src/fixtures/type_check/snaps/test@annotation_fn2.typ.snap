@@ -1,0 +1,13 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/annotation_fn2.typ
+---
+"args" = Args
+"args" = Any
+"fn" = Any
+"fn-wrapper" = (( ⪯ (Type(function) | (...: Any) => Any)), ...: ( ⪯ Any)) => None
+---
+107..117 -> @fn-wrapper
+118..120 -> @fn
+124..128 -> @args

@@ -742,6 +742,7 @@ fn type_completion(
             BuiltinTy::Content => return None,
             BuiltinTy::Infer => return None,
             BuiltinTy::FlowNone => return None,
+            BuiltinTy::Tag(..) => return None,
 
             BuiltinTy::Path(p) => {
                 let source = ctx.ctx.source_by_id(ctx.root.span().id()?).ok()?;

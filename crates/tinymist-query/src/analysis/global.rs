@@ -483,14 +483,15 @@ impl<'w> AnalysisContext<'w> {
 
     pub(crate) fn compute_docstring(
         &self,
+        fid: TypstFileId,
         docs: String,
         kind: DocStringKind,
     ) -> Option<Arc<DocString>> {
-        let h = hash128(&(&docs, &kind));
+        let h = hash128(&(&fid, &docs, &kind));
         let res = if let Some(res) = self.analysis.caches.docstrings.get(&h) {
             res.clone()
         } else {
-            let res = crate::analysis::tyck::compute_docstring(self, docs, kind).map(Arc::new);
+            let res = crate::analysis::tyck::compute_docstring(self, fid, docs, kind).map(Arc::new);
             self.analysis.caches.docstrings.insert(h, res.clone());
             res
         };
