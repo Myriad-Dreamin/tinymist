@@ -5,9 +5,10 @@ input_file: crates/tinymist-query/src/fixtures/type_check/annotation.typ
 ---
 "args" = Args
 "fn" = Any
+"fn-args" = Any
 "max-repetitions" = None
 "repetitions" = None
-"touying-fn-wrapper" = ((( ⪯ Type(function)), "max-repetitions": ( ⪯ Type(integer)), "repetitions": ( ⪯ Type(integer)), ...: ( ⪯ Any)) => None).with(..("max-repetitions": None, "repetitions": None) => any)
+"touying-fn-wrapper" = ((( ⪯ (Type(function) | (...: Any) => Any)), "max-repetitions": ( ⪯ Type(integer)), "repetitions": ( ⪯ Type(integer)), ...: ( ⪯ (Any | Any))) => None).with(..("max-repetitions": None, "repetitions": None) => any)
 ---
 215..233 -> @touying-fn-wrapper
 234..236 -> @fn

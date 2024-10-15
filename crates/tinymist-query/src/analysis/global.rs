@@ -284,7 +284,7 @@ impl<'w> AnalysisContext<'w> {
         }
     }
 
-    /// Get the fileId from its path
+    /// Get file's id by its path
     pub fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
         // todo: source in packages
         let relative_path = p.strip_prefix(&self.root).map_err(|_| {
@@ -348,6 +348,12 @@ impl<'w> AnalysisContext<'w> {
         self.module_by_src(source)
     }
 
+    /// Get a module by string.
+    pub fn module_by_str(&mut self, rr: String) -> Option<Module> {
+        let src = Source::new(*DETACHED_ENTRY, rr);
+        self.module_by_src(src).ok()
+    }
+
     /// Get (Create) a module by source.
     pub fn module_by_src(&mut self, source: Source) -> SourceResult<Module> {
         let route = Route::default();
@@ -359,12 +365,6 @@ impl<'w> AnalysisContext<'w> {
             tracer.track_mut(),
             &source,
         )
-    }
-
-    /// Get a module by string.
-    pub fn module_by_str(&mut self, rr: String) -> Option<Module> {
-        let src = Source::new(*DETACHED_ENTRY, rr);
-        self.module_by_src(src).ok()
     }
 
     /// Get a syntax object at a position.

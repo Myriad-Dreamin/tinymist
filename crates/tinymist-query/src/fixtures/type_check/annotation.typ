@@ -1,4 +1,4 @@
-/// #let fn() = (..fn-args) => any;
+/// #let fn = `(..fn-args) => any`;
 ///
 /// - fn (function, fn): The `fn`.
 /// - max-repetitions (int): The `max-repetitions`.
