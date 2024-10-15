@@ -2,12 +2,11 @@
 use core::fmt;
 use std::{borrow::Cow, collections::HashMap, ops::Range, sync::Arc};
 
-use ecow::{eco_format, eco_vec, EcoString, EcoVec};
-use itertools::Itertools;
+use ecow::{eco_vec, EcoString, EcoVec};
 use log::trace;
 use typst::syntax::{FileId as TypstFileId, Source};
 use typst::{
-    foundations::{CastInfo, Closure, Func, ParamInfo, Repr, Value},
+    foundations::{Closure, Func, ParamInfo, Value},
     syntax::{
         ast::{self, AstNode},
         LinkedNode, Span, SyntaxKind,
@@ -20,6 +19,7 @@ use crate::adt::interner::Interned;
 use crate::analysis::resolve_callee;
 use crate::syntax::{get_def_target, get_deref_target, DefTarget};
 use crate::ty::SigTy;
+use crate::upstream::truncated_repr;
 use crate::AnalysisContext;
 
 use super::{find_definition, DefinitionLink, LexicalKind, LexicalVarKind, Ty};
@@ -35,12 +35,8 @@ pub struct ParamSpec {
     pub docs: Cow<'static, str>,
     /// Inferred type of the parameter.
     pub(crate) base_type: Ty,
-    /// The parameter's default name as type.
-    pub type_repr: Option<EcoString>,
     /// The parameter's default name as value.
     pub expr: Option<EcoString>,
-    /// Creates an instance of the parameter's default value.
-    pub default: Option<fn() -> Value>,
     /// Is the parameter positional?
     pub positional: bool,
     /// Is the parameter named?
@@ -60,9 +56,8 @@ impl ParamSpec {
             name: p.name.into(),
             docs: Cow::Borrowed(p.docs),
             base_type: Ty::from_param_site(f, p),
-            type_repr: Some(eco_format!("{}", TypeExpr(&p.input))),
-            expr: None,
-            default: p.default,
+            // type_repr: Some(eco_format!("{}", TypeExpr(&p.input))),
+            expr: p.default.map(|d| truncated_repr(&d())),
             positional: p.positional,
             named: p.named,
             variadic: p.variadic,
@@ -413,9 +408,8 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: name.as_str().into(),
                     base_type: Ty::Any,
-                    type_repr: None,
+                    // type_repr: None,
                     expr: None,
-                    default: None,
                     positional: true,
                     named: false,
                     variadic: false,
@@ -429,9 +423,8 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: n.name().into(),
                     base_type: Ty::Any,
-                    type_repr: Some(expr.clone()),
+                    // type_repr: Some(expr.clone()),
                     expr: Some(expr.clone()),
-                    default: None,
                     positional: false,
                     named: true,
                     variadic: false,
@@ -444,9 +437,8 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
                 params.push(Arc::new(ParamSpec {
                     name: ident.unwrap_or_default().into(),
                     base_type: Ty::Any,
-                    type_repr: None,
+                    // type_repr: None,
                     expr: None,
-                    default: None,
                     positional: true,
                     named: false,
                     variadic: true,
@@ -508,24 +500,4 @@ fn unwrap_expr(mut e: ast::Expr) -> ast::Expr {
     }
 
     e
-}
-
-struct TypeExpr<'a>(&'a CastInfo);
-
-impl<'a> fmt::Display for TypeExpr<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self.0 {
-            CastInfo::Any => "any",
-            CastInfo::Value(v, _doc) => return write!(f, "{}", v.repr()),
-            CastInfo::Type(v) => {
-                f.write_str(v.short_name())?;
-                return Ok(());
-            }
-            CastInfo::Union(v) => {
-                let mut values = v.iter().map(|e| TypeExpr(e).to_string());
-                f.write_str(&values.join(" | "))?;
-                return Ok(());
-            }
-        })
-    }
 }

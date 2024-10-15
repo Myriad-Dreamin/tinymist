@@ -94,6 +94,7 @@ impl Docs {
 }
 
 type TypeRepr = Option<(/* short */ String, /* long */ String)>;
+type ShowTypeRepr<'a> = &'a mut dyn FnMut(Option<&Ty>) -> TypeRepr;
 
 /// Describes a primary function signature.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -108,6 +109,65 @@ pub struct DocSignature {
     pub ret_ty: TypeRepr,
 }
 
+impl fmt::Display for DocSignature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut is_first = true;
+        let mut write_sep = |f: &mut fmt::Formatter<'_>| {
+            if is_first {
+                is_first = false;
+                return Ok(());
+            }
+            f.write_str(", ")
+        };
+
+        for p in &self.pos {
+            write_sep(f)?;
+            f.write_str(&p.name)?;
+            if let Some(t) = &p.cano_type {
+                write!(f, ": {}", t.0)?;
+            }
+        }
+        if let Some(rest) = &self.rest {
+            write_sep(f)?;
+            f.write_str("..")?;
+            f.write_str(&rest.name)?;
+            if let Some(t) = &rest.cano_type {
+                write!(f, ": {}", t.0)?;
+            }
+        }
+
+        if !self.named.is_empty() {
+            let mut name_prints = vec![];
+            for v in self.named.values() {
+                let ty = v.cano_type.as_ref().map(|t| &t.0);
+                name_prints.push((v.name.clone(), ty, v.expr.clone()))
+            }
+            name_prints.sort();
+            for (k, t, v) in name_prints {
+                write_sep(f)?;
+                let v = v.as_deref().unwrap_or("any");
+                let mut v = v.trim();
+                if v.starts_with('{') && v.ends_with('}') && v.len() > 30 {
+                    v = "{ ... }"
+                }
+                if v.starts_with('`') && v.ends_with('`') && v.len() > 30 {
+                    v = "raw"
+                }
+                if v.starts_with('[') && v.ends_with(']') && v.len() > 30 {
+                    v = "content"
+                }
+                f.write_str(&k)?;
+                if let Some(t) = t {
+                    write!(f, ": {t}")?;
+                }
+                write!(f, " = {v}")?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 /// Describes a function parameter.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocParamSpec {
@@ -117,8 +177,6 @@ pub struct DocParamSpec {
     pub docs: String,
     /// Inferred type of the parameter.
     pub cano_type: TypeRepr,
-    /// The parameter's default name as type.
-    pub type_repr: Option<EcoString>,
     /// The parameter's default name as value.
     pub expr: Option<EcoString>,
     /// Is the parameter positional?
@@ -438,14 +496,14 @@ fn identify_docs(kind: &str, content: &str) -> StrResult<Docs> {
 
 type TypeInfo = (Arc<crate::analysis::DefUseInfo>, Arc<crate::ty::TypeScheme>);
 
-fn docs_signature(
+pub(crate) fn docs_signature(
     ctx: &mut AnalysisContext,
     type_info: Option<&TypeInfo>,
-    sym: &SymbolInfo,
-    e: Value,
-    doc_ty: &mut impl FnMut(Option<&Ty>) -> TypeRepr,
+    def_ident: Option<&IdentRef>,
+    runtime_fn: &Value,
+    doc_ty: Option<ShowTypeRepr>,
 ) -> Option<DocSignature> {
-    let func = match &e {
+    let func = match runtime_fn {
         Value::Func(f) => f,
         _ => return None,
     };
@@ -470,15 +528,17 @@ fn docs_signature(
     let sig = analyze_dyn_signature(ctx, func.clone());
     let type_sig = type_info.and_then(|(def_use, ty_chk)| {
         let def_fid = func.span().id()?;
-        let def_ident = IdentRef {
-            name: sym.head.name.clone(),
-            range: sym.head.name_range.clone()?,
-        };
-        let (def_id, _) = def_use.get_def(def_fid, &def_ident)?;
+        let (def_id, _) = def_use.get_def(def_fid, def_ident?)?;
         ty_chk.type_of_def(def_id)
     });
     let type_sig = type_sig.and_then(|type_sig| type_sig.sig_repr(true));
 
+    const F: fn(Option<&Ty>) -> TypeRepr = |ty: Option<&Ty>| {
+        ty.and_then(|ty| ty.describe())
+            .map(|short| (short, format!("{ty:?}")))
+    };
+    let mut binding = F;
+    let doc_ty = doc_ty.unwrap_or(&mut binding);
     let pos_in = sig
         .primary()
         .pos
@@ -505,8 +565,7 @@ fn docs_signature(
         .map(|(param, ty)| DocParamSpec {
             name: param.name.as_ref().to_owned(),
             docs: param.docs.as_ref().to_owned(),
-            cano_type: doc_ty(ty),
-            type_repr: param.type_repr.clone(),
+            cano_type: doc_ty(ty.or(Some(&param.base_type))),
             expr: param.expr.clone(),
             positional: param.positional,
             named: param.named,
@@ -522,8 +581,7 @@ fn docs_signature(
                 DocParamSpec {
                     name: param.name.as_ref().to_owned(),
                     docs: param.docs.as_ref().to_owned(),
-                    cano_type: doc_ty(ty),
-                    type_repr: param.type_repr.clone(),
+                    cano_type: doc_ty(ty.or(Some(&param.base_type))),
                     expr: param.expr.clone(),
                     positional: param.positional,
                     named: param.named,
@@ -537,8 +595,7 @@ fn docs_signature(
     let rest = rest_in.map(|(param, ty)| DocParamSpec {
         name: param.name.as_ref().to_owned(),
         docs: param.docs.as_ref().to_owned(),
-        cano_type: doc_ty(ty),
-        type_repr: param.type_repr.clone(),
+        cano_type: doc_ty(ty.or(Some(&param.base_type))),
         expr: param.expr.clone(),
         positional: param.positional,
         named: param.named,
@@ -704,8 +761,13 @@ pub fn generate_md_docs(
                 sym.head.loc = span;
 
                 let sym_value = sym.head.value.clone();
-                let signature =
-                    sym_value.and_then(|e| docs_signature(ctx, type_info, &sym, e, &mut doc_ty));
+                let signature = sym_value.and_then(|e| {
+                    let def_ident = IdentRef {
+                        name: sym.head.name.clone(),
+                        range: sym.head.name_range.clone()?,
+                    };
+                    docs_signature(ctx, type_info, Some(&def_ident), &e, Some(&mut doc_ty))
+                });
                 sym.head.signature = signature;
 
                 let mut convert_err = None;
@@ -769,12 +831,7 @@ pub fn generate_md_docs(
                 if let Some(sig) = &sym.head.signature {
                     let _ = writeln!(md, "<!-- begin:sig -->");
                     let _ = writeln!(md, "```typc");
-                    let _ = writeln!(
-                        md,
-                        "let {name}({params});",
-                        name = sym.head.name,
-                        params = ParamTooltip(sig)
-                    );
+                    let _ = writeln!(md, "let {name}({sig});", name = sym.head.name);
                     let _ = writeln!(md, "```");
                     let _ = writeln!(md, "<!-- end:sig -->");
                 }
@@ -941,58 +998,6 @@ fn create_head(world: &mut AnalysisContext, k: &str, v: &Value) -> SymbolInfoHea
 /// Extract the first line of documentation.
 fn oneliner(docs: &str) -> &str {
     docs.lines().next().unwrap_or_default()
-}
-
-// todo: hover with `with_stack`, todo: merge with hover tooltip
-struct ParamTooltip<'a>(&'a DocSignature);
-
-impl<'a> fmt::Display for ParamTooltip<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut is_first = true;
-        let mut write_sep = |f: &mut fmt::Formatter<'_>| {
-            if is_first {
-                is_first = false;
-                return Ok(());
-            }
-            f.write_str(", ")
-        };
-
-        let primary_sig = self.0;
-
-        for p in &primary_sig.pos {
-            write_sep(f)?;
-            write!(f, "{}", p.name)?;
-        }
-        if let Some(rest) = &primary_sig.rest {
-            write_sep(f)?;
-            write!(f, "{}", rest.name)?;
-        }
-
-        if !primary_sig.named.is_empty() {
-            let mut name_prints = vec![];
-            for v in primary_sig.named.values() {
-                name_prints.push((v.name.clone(), v.type_repr.clone()))
-            }
-            name_prints.sort();
-            for (k, v) in name_prints {
-                write_sep(f)?;
-                let v = v.as_deref().unwrap_or("any");
-                let mut v = v.trim();
-                if v.starts_with('{') && v.ends_with('}') && v.len() > 30 {
-                    v = "{ ... }"
-                }
-                if v.starts_with('`') && v.ends_with('`') && v.len() > 30 {
-                    v = "raw"
-                }
-                if v.starts_with('[') && v.ends_with(']') && v.len() > 30 {
-                    v = "content"
-                }
-                write!(f, "{k}: {v}")?;
-            }
-        }
-
-        Ok(())
-    }
 }
 
 fn remove_list_annotations(s: &str) -> String {

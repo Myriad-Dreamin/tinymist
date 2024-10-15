@@ -34,6 +34,16 @@ pub struct DefinitionLink {
     pub name_range: Option<Range<usize>>,
 }
 
+impl DefinitionLink {
+    /// Convert the definition to an identifier reference.
+    pub fn to_ident_ref(&self) -> Option<IdentRef> {
+        Some(IdentRef {
+            name: self.name.clone(),
+            range: self.name_range.clone()?,
+        })
+    }
+}
+
 // todo: field definition
 /// Finds the definition of a symbol.
 pub fn find_definition(
