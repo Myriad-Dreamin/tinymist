@@ -5,7 +5,7 @@ use ecow::EcoString;
 use serde::{Deserialize, Serialize};
 use typst::foundations::Value;
 
-use crate::analysis::analyze_dyn_signature;
+use crate::analysis::{analyze_dyn_signature, ParamSpec};
 use crate::syntax::IdentRef;
 use crate::{ty::Ty, AnalysisContext};
 
@@ -108,14 +108,38 @@ pub struct ParamDocs {
     pub settable: bool,
 }
 
+impl ParamDocs {
+    fn new(param: &ParamSpec, ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> Self {
+        Self {
+            name: param.name.as_ref().to_owned(),
+            docs: param.docs.as_ref().to_owned(),
+            cano_type: format_ty(ty.or(Some(&param.base_type)), doc_ty),
+            expr: param.expr.clone(),
+            positional: param.positional,
+            named: param.named,
+            variadic: param.variadic,
+            settable: param.settable,
+        }
+    }
+}
+
 type TypeInfo = (Arc<crate::analysis::DefUseInfo>, Arc<crate::ty::TypeScheme>);
+
+fn format_ty(ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> TypeRepr {
+    match doc_ty {
+        Some(doc_ty) => doc_ty(ty),
+        None => ty
+            .and_then(|ty| ty.describe())
+            .map(|short| (short, format!("{ty:?}"))),
+    }
+}
 
 pub(crate) fn signature_docs(
     ctx: &mut AnalysisContext,
     type_info: Option<&TypeInfo>,
     def_ident: Option<&IdentRef>,
     runtime_fn: &Value,
-    doc_ty: Option<ShowTypeRepr>,
+    mut doc_ty: Option<ShowTypeRepr>,
 ) -> Option<SignatureDocs> {
     let func = match runtime_fn {
         Value::Func(f) => f,
@@ -147,12 +171,6 @@ pub(crate) fn signature_docs(
     });
     let type_sig = type_sig.and_then(|type_sig| type_sig.sig_repr(true));
 
-    const F: fn(Option<&Ty>) -> TypeRepr = |ty: Option<&Ty>| {
-        ty.and_then(|ty| ty.describe())
-            .map(|short| (short, format!("{ty:?}")))
-    };
-    let mut binding = F;
-    let doc_ty = doc_ty.unwrap_or(&mut binding);
     let pos_in = sig
         .primary()
         .pos
@@ -176,48 +194,19 @@ pub(crate) fn signature_docs(
         .or_else(|| sig.primary().ret_ty.as_ref());
 
     let pos = pos_in
-        .map(|(param, ty)| ParamDocs {
-            name: param.name.as_ref().to_owned(),
-            docs: param.docs.as_ref().to_owned(),
-            cano_type: doc_ty(ty.or(Some(&param.base_type))),
-            expr: param.expr.clone(),
-            positional: param.positional,
-            named: param.named,
-            variadic: param.variadic,
-            settable: param.settable,
-        })
+        .map(|(param, ty)| ParamDocs::new(param, ty, doc_ty.as_mut()))
         .collect();
-
     let named = named_in
         .map(|((name, param), ty)| {
             (
                 name.as_ref().to_owned(),
-                ParamDocs {
-                    name: param.name.as_ref().to_owned(),
-                    docs: param.docs.as_ref().to_owned(),
-                    cano_type: doc_ty(ty.or(Some(&param.base_type))),
-                    expr: param.expr.clone(),
-                    positional: param.positional,
-                    named: param.named,
-                    variadic: param.variadic,
-                    settable: param.settable,
-                },
+                ParamDocs::new(param, ty, doc_ty.as_mut()),
             )
         })
         .collect();
+    let rest = rest_in.map(|(param, ty)| ParamDocs::new(param, ty, doc_ty.as_mut()));
 
-    let rest = rest_in.map(|(param, ty)| ParamDocs {
-        name: param.name.as_ref().to_owned(),
-        docs: param.docs.as_ref().to_owned(),
-        cano_type: doc_ty(ty.or(Some(&param.base_type))),
-        expr: param.expr.clone(),
-        positional: param.positional,
-        named: param.named,
-        variadic: param.variadic,
-        settable: param.settable,
-    });
-
-    let ret_ty = doc_ty(ret_in);
+    let ret_ty = format_ty(ret_in, doc_ty.as_mut());
 
     Some(SignatureDocs {
         pos,
