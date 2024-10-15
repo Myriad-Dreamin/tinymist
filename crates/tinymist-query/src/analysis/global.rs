@@ -22,7 +22,7 @@ use crate::analysis::{
     DefUseInfo, DefinitionLink, DocString, IdentRef, ImportInfo, PathPreference, SigTy, Signature,
     SignatureTarget, Ty, TypeScheme,
 };
-use crate::docs::{DocSignature, DocStringKind};
+use crate::docs::{DocStringKind, SignatureDocs};
 use crate::prelude::*;
 use crate::syntax::{
     construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
@@ -481,35 +481,6 @@ impl<'w> AnalysisContext<'w> {
         }
     }
 
-    pub(crate) fn docs_signature(
-        &mut self,
-        source: &Source,
-        def_ident: Option<&IdentRef>,
-        runtime_fn: &Value,
-    ) -> Option<DocSignature> {
-        let def_use = self.def_use(source.clone())?;
-        let ty_chk = self.type_check(source.clone())?;
-        crate::docs::docs_signature(self, Some(&(def_use, ty_chk)), def_ident, runtime_fn, None)
-    }
-
-    pub(crate) fn compute_docstring(
-        &self,
-        fid: TypstFileId,
-        docs: String,
-        kind: DocStringKind,
-    ) -> Option<Arc<DocString>> {
-        let h = hash128(&(&fid, &docs, &kind));
-        let res = if let Some(res) = self.analysis.caches.docstrings.get(&h) {
-            res.clone()
-        } else {
-            let res = crate::analysis::tyck::compute_docstring(self, fid, docs, kind).map(Arc::new);
-            self.analysis.caches.docstrings.insert(h, res.clone());
-            res
-        };
-
-        res
-    }
-
     /// Compute the signature of a function.
     pub fn compute_signature(
         &self,
@@ -538,6 +509,35 @@ impl<'w> AnalysisContext<'w> {
                     .clone()
             }
         }
+    }
+
+    pub(crate) fn signature_docs(
+        &mut self,
+        source: &Source,
+        def_ident: Option<&IdentRef>,
+        runtime_fn: &Value,
+    ) -> Option<SignatureDocs> {
+        let def_use = self.def_use(source.clone())?;
+        let ty_chk = self.type_check(source.clone())?;
+        crate::docs::signature_docs(self, Some(&(def_use, ty_chk)), def_ident, runtime_fn, None)
+    }
+
+    pub(crate) fn compute_docstring(
+        &self,
+        fid: TypstFileId,
+        docs: String,
+        kind: DocStringKind,
+    ) -> Option<Arc<DocString>> {
+        let h = hash128(&(&fid, &docs, &kind));
+        let res = if let Some(res) = self.analysis.caches.docstrings.get(&h) {
+            res.clone()
+        } else {
+            let res = crate::analysis::tyck::compute_docstring(self, fid, docs, kind).map(Arc::new);
+            self.analysis.caches.docstrings.insert(h, res.clone());
+            res
+        };
+
+        res
     }
 
     /// Get the type check information of a source file.
