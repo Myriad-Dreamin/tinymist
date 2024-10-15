@@ -3,9 +3,8 @@ use core::fmt;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
-    analysis::{
-        analyze_dyn_signature, find_definition, get_link_exprs_in, DefinitionLink, Signature,
-    },
+    analysis::{find_definition, get_link_exprs_in, DefinitionLink},
+    docs::DocSignature,
     jump_from_cursor,
     prelude::*,
     syntax::{find_docs_before, get_deref_target, LexicalKind, LexicalVarKind},
@@ -252,17 +251,17 @@ fn def_tooltip(
             Some(LspHoverContents::Array(results))
         }
         LexicalKind::Var(LexicalVarKind::Function) => {
-            let sig = if let Some(Value::Func(func)) = &lnk.value {
-                Some(analyze_dyn_signature(ctx, func.clone()))
-            } else {
-                None
-            };
+            let sig = lnk
+                .value
+                .as_ref()
+                .and_then(|e| ctx.docs_signature(source, lnk.to_ident_ref().as_ref(), e));
+
             results.push(MarkedString::LanguageString(LanguageString {
                 language: "typc".to_owned(),
                 value: format!(
                     "let {name}({params});",
                     name = lnk.name,
-                    params = ParamTooltip(sig)
+                    params = ParamTooltip(sig.as_ref())
                 ),
             }));
 
@@ -353,64 +352,14 @@ fn render_actions(results: &mut Vec<MarkedString>, actions: Vec<CommandLink>) {
 }
 
 // todo: hover with `with_stack`
-struct ParamTooltip(Option<Signature>);
+struct ParamTooltip<'a>(Option<&'a DocSignature>);
 
-impl fmt::Display for ParamTooltip {
+impl fmt::Display for ParamTooltip<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Some(sig) = &self.0 else {
+        let Some(sig) = self.0 else {
             return Ok(());
         };
-        let mut is_first = true;
-        let mut write_sep = |f: &mut fmt::Formatter<'_>| {
-            if is_first {
-                is_first = false;
-                return Ok(());
-            }
-            f.write_str(", ")
-        };
-
-        let primary_sig = match sig {
-            Signature::Primary(sig) => sig,
-            Signature::Partial(sig) => {
-                let _ = sig.with_stack;
-
-                &sig.signature
-            }
-        };
-
-        for p in &primary_sig.pos {
-            write_sep(f)?;
-            write!(f, "{}", p.name)?;
-        }
-        if let Some(rest) = &primary_sig.rest {
-            write_sep(f)?;
-            write!(f, "{}", rest.name)?;
-        }
-
-        if !primary_sig.named.is_empty() {
-            let mut name_prints = vec![];
-            for v in primary_sig.named.values() {
-                name_prints.push((v.name.clone(), v.type_repr.clone()))
-            }
-            name_prints.sort();
-            for (k, v) in name_prints {
-                write_sep(f)?;
-                let v = v.as_deref().unwrap_or("any");
-                let mut v = v.trim();
-                if v.starts_with('{') && v.ends_with('}') && v.len() > 30 {
-                    v = "{ ... }"
-                }
-                if v.starts_with('`') && v.ends_with('`') && v.len() > 30 {
-                    v = "raw"
-                }
-                if v.starts_with('[') && v.ends_with(']') && v.len() > 30 {
-                    v = "content"
-                }
-                write!(f, "{k}: {v}")?;
-            }
-        }
-
-        Ok(())
+        sig.fmt(f)
     }
 }
 

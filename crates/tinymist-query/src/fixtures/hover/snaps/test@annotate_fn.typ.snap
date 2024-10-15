@@ -1,0 +1,9 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/hover/annotate_fn.typ
+---
+{
+ "contents": "```typc\nlet touying-fn-wrapper(fn: (..: []) => any | function, ..args: arguments, max-repetitions: int | none = none, repetitions: int | none = none);\n```\n\n---\n\n\n #let fn = `(..fn-args) => any`;\n\n - fn (function, fn): The `fn`.\n - max-repetitions (int): The `max-repetitions`.\n - repetitions (int): The `repetitions`.\n - args (any, fn-args): The `args`.",
+ "range": "8:20:8:38"
+}

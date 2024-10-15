@@ -22,7 +22,7 @@ use crate::analysis::{
     DefUseInfo, DefinitionLink, DocString, IdentRef, ImportInfo, PathPreference, SigTy, Signature,
     SignatureTarget, Ty, TypeScheme,
 };
-use crate::docs::DocStringKind;
+use crate::docs::{DocSignature, DocStringKind};
 use crate::prelude::*;
 use crate::syntax::{
     construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
@@ -479,6 +479,17 @@ impl<'w> AnalysisContext<'w> {
                 .get(&hash128(rt))
                 .and_then(|slot| (rt == &slot.1).then_some(slot.2.clone())),
         }
+    }
+
+    pub(crate) fn docs_signature(
+        &mut self,
+        source: &Source,
+        def_ident: Option<&IdentRef>,
+        runtime_fn: &Value,
+    ) -> Option<DocSignature> {
+        let def_use = self.def_use(source.clone())?;
+        let ty_chk = self.type_check(source.clone())?;
+        crate::docs::docs_signature(self, Some(&(def_use, ty_chk)), def_ident, runtime_fn, None)
     }
 
     pub(crate) fn compute_docstring(

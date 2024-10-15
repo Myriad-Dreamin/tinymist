@@ -317,7 +317,7 @@ impl BuiltinTy {
             BuiltinTy::FlowNone => "none",
             BuiltinTy::Auto => "auto",
 
-            BuiltinTy::Args => "args",
+            BuiltinTy::Args => "arguments",
             BuiltinTy::Color => "color",
             BuiltinTy::TextSize => "text.size",
             BuiltinTy::TextFont => "text.font",
