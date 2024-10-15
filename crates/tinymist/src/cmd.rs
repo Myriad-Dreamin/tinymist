@@ -561,7 +561,7 @@ impl LanguageState {
 
             let symbols = handle
                 .run_analysis(w, |a| {
-                    tinymist_query::docs::list_symbols(a, &info)
+                    tinymist_query::docs::package_module_docs(a, &info)
                         .map_err(map_string_err("failed to list symbols"))
                 })
                 .map_err(internal_error)?
@@ -615,7 +615,7 @@ impl LanguageState {
             });
 
             let res = handle.run_analysis(w, |a| {
-                tinymist_query::docs::generate_md_docs(a, w, &info)
+                tinymist_query::docs::package_docs(a, w, &info)
                     .map_err(map_string_err("failed to generate docs"))
                     .map_err(z_internal_error)
             });

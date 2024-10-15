@@ -11,12 +11,58 @@ use typst::foundations::{Module, Value};
 use typst::syntax::package::PackageSpec;
 use typst::syntax::{FileId, Span};
 
-use crate::docs::{file_id_repr, get_manifest, get_manifest_id};
+use crate::docs::file_id_repr;
 use crate::syntax::{find_docs_of, get_non_strict_def_target};
 use crate::upstream::truncated_doc_repr;
 use crate::AnalysisContext;
 
-use super::{kind_of, PackageInfo, RawDocs, SignatureDocs};
+use super::{get_manifest, get_manifest_id, kind_of, PackageInfo, RawDocs, SignatureDocs};
+
+/// Get documentation of symbols in a package.
+pub fn package_module_docs(ctx: &mut AnalysisContext, pkg: &PackageInfo) -> StrResult<SymbolsInfo> {
+    let toml_id = get_manifest_id(pkg)?;
+    let manifest = get_manifest(ctx.world(), toml_id)?;
+
+    let entry_point = toml_id.join(&manifest.package.entrypoint);
+    module_docs(ctx, entry_point)
+}
+
+/// Get documentation of symbols in a module.
+pub fn module_docs(ctx: &mut AnalysisContext, entry_point: FileId) -> StrResult<SymbolsInfo> {
+    let mut aliases = HashMap::new();
+    let mut extras = vec![];
+
+    let mut scan_ctx = ScanSymbolCtx {
+        ctx,
+        root: entry_point,
+        for_spec: entry_point.package(),
+        aliases: &mut aliases,
+        extras: &mut extras,
+    };
+
+    let src = scan_ctx
+        .ctx
+        .module_by_id(entry_point)
+        .map_err(|e| eco_format!("failed to get module by id {entry_point:?}: {e:?}"))?;
+    let mut symbols = scan_ctx.module_sym(eco_vec![], src);
+
+    let module_uses = aliases
+        .into_iter()
+        .map(|(k, mut v)| {
+            v.sort_by(|a, b| a.len().cmp(&b.len()).then(a.cmp(b)));
+            (file_id_repr(k), v.into())
+        })
+        .collect();
+
+    log::debug!("module_uses: {module_uses:#?}",);
+
+    symbols.children.extend(extras);
+
+    Ok(SymbolsInfo {
+        root: symbols,
+        module_uses,
+    })
+}
 
 /// Information about a symbol.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -166,52 +212,6 @@ impl ScanSymbolCtx<'_, '_> {
         let children = children.unwrap_or_default();
         SymbolInfo { head, children }
     }
-}
-
-/// List all symbols in a package.
-pub fn list_symbols(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<SymbolsInfo> {
-    let toml_id = get_manifest_id(spec)?;
-    let manifest = get_manifest(ctx.world(), toml_id)?;
-
-    let for_spec = PackageSpec {
-        namespace: spec.namespace.clone(),
-        name: spec.name.clone(),
-        version: spec.version.parse()?,
-    };
-    let mut aliases = HashMap::new();
-    let mut extras = vec![];
-    let entry_point = toml_id.join(&manifest.package.entrypoint);
-
-    let mut scan_ctx = ScanSymbolCtx {
-        ctx,
-        root: entry_point,
-        for_spec: Some(&for_spec),
-        aliases: &mut aliases,
-        extras: &mut extras,
-    };
-
-    let src = scan_ctx
-        .ctx
-        .module_by_id(entry_point)
-        .map_err(|e| eco_format!("failed to get module by id {entry_point:?}: {e:?}"))?;
-    let mut symbols = scan_ctx.module_sym(eco_vec![], src);
-
-    let module_uses = aliases
-        .into_iter()
-        .map(|(k, mut v)| {
-            v.sort_by(|a, b| a.len().cmp(&b.len()).then(a.cmp(b)));
-            (file_id_repr(k), v.into())
-        })
-        .collect();
-
-    log::debug!("module_uses: {module_uses:#?}",);
-
-    symbols.children.extend(extras);
-
-    Ok(SymbolsInfo {
-        root: symbols,
-        module_uses,
-    })
 }
 
 fn create_head(world: &mut AnalysisContext, k: &str, v: &Value) -> SymbolInfoHead {
