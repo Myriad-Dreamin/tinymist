@@ -1,24 +1,134 @@
-use std::fmt;
-use std::{collections::HashMap, sync::Arc};
+use core::fmt;
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
-use ecow::EcoString;
+use ecow::{eco_format, EcoString};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use typst::foundations::Value;
+use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
+use tinymist_world::LspWorld;
+use typst::foundations::{Bytes, Value};
+use typst::{
+    diag::StrResult,
+    syntax::{FileId, VirtualPath},
+};
 
+use super::tidy::*;
 use crate::analysis::{analyze_dyn_signature, ParamSpec};
+use crate::docs::library;
 use crate::syntax::IdentRef;
 use crate::{ty::Ty, AnalysisContext};
 
 type TypeRepr = Option<(/* short */ String, /* long */ String)>;
 type ShowTypeRepr<'a> = &'a mut dyn FnMut(Option<&Ty>) -> TypeRepr;
 
+/// Kind of a docstring.
+#[derive(Debug, Default, Clone, Copy, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DocStringKind {
+    /// A docstring for a any constant.
+    #[default]
+    Constant,
+    /// A docstring for a function.
+    Function,
+    /// A docstring for a variable.
+    Variable,
+    /// A docstring for a module.
+    Module,
+    /// A docstring for a struct.
+    Struct,
+    /// A docstring for a reference.
+    Reference,
+}
+
+impl fmt::Display for DocStringKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Constant => write!(f, "constant"),
+            Self::Function => write!(f, "function"),
+            Self::Variable => write!(f, "variable"),
+            Self::Module => write!(f, "module"),
+            Self::Struct => write!(f, "struct"),
+            Self::Reference => write!(f, "reference"),
+        }
+    }
+}
+
+/// Docs about a symbol.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum SymbolDocs {
+    /// Docs about a function.
+    #[serde(rename = "func")]
+    Function(Box<SignatureDocs>),
+    /// Docs about a variable.
+    #[serde(rename = "var")]
+    Variable(TidyVarDocs),
+    /// Docs about a module.
+    #[serde(rename = "module")]
+    Module(TidyModuleDocs),
+    /// Other kinds of docs.
+    #[serde(rename = "plain")]
+    Plain(EcoString),
+}
+
+impl SymbolDocs {
+    /// Get the markdown representation of the docs.
+    pub fn docs(&self) -> &str {
+        match self {
+            Self::Function(docs) => docs.docs.as_str(),
+            Self::Variable(docs) => docs.docs.as_str(),
+            Self::Module(docs) => docs.docs.as_str(),
+            Self::Plain(docs) => docs.as_str(),
+        }
+    }
+}
+
+pub(crate) fn symbol_docs(
+    ctx: &mut AnalysisContext,
+    type_info: Option<&TypeInfo>,
+    kind: DocStringKind,
+    def_ident: Option<&IdentRef>,
+    sym_value: Option<&Value>,
+    docs: Option<&str>,
+    doc_ty: Option<ShowTypeRepr>,
+) -> Result<SymbolDocs, String> {
+    let signature = sym_value.and_then(|e| signature_docs(ctx, type_info, def_ident, e, doc_ty));
+    if let Some(signature) = signature {
+        return Ok(SymbolDocs::Function(Box::new(signature)));
+    }
+
+    if let Some(docs) = &docs {
+        match convert_docs(ctx.world(), docs) {
+            Ok(content) => {
+                let docs = identify_docs(kind, &content).unwrap_or(SymbolDocs::Plain(content));
+                return Ok(docs);
+            }
+            Err(e) => {
+                let err = format!("failed to convert docs: {e}").replace(
+                    "-->", "—>", // avoid markdown comment
+                );
+                log::error!("{err}");
+                return Err(err);
+            }
+        }
+    }
+
+    Ok(SymbolDocs::Plain("".into()))
+}
+
 /// Describes a primary function signature.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignatureDocs {
+    /// Documentation for the function.
+    pub docs: String,
+    // pub docs: String,
+    // pub return_ty: Option<EcoString>,
+    // pub params: Vec<TidyParamDocs>,
     /// The positional parameters.
     pub pos: Vec<ParamDocs>,
     /// The named parameters.
-    pub named: HashMap<String, ParamDocs>,
+    pub named: BTreeMap<String, ParamDocs>,
     /// The rest parameter.
     pub rest: Option<ParamDocs>,
     /// The return type.
@@ -171,6 +281,9 @@ pub(crate) fn signature_docs(
     });
     let type_sig = type_sig.and_then(|type_sig| type_sig.sig_repr(true));
 
+    // todo: docstring
+    let docs = String::new();
+
     let pos_in = sig
         .primary()
         .pos
@@ -209,9 +322,53 @@ pub(crate) fn signature_docs(
     let ret_ty = format_ty(ret_in, doc_ty.as_mut());
 
     Some(SignatureDocs {
+        docs,
         pos,
         named,
         rest,
         ret_ty,
     })
+}
+
+// Unfortunately, we have only 65536 possible file ids and we cannot revoke
+// them. So we share a global file id for all docs conversion.
+static DOCS_CONVERT_ID: std::sync::LazyLock<Mutex<FileId>> = std::sync::LazyLock::new(|| {
+    Mutex::new(FileId::new(None, VirtualPath::new("__tinymist_docs__.typ")))
+});
+
+pub(crate) fn convert_docs(world: &LspWorld, content: &str) -> StrResult<EcoString> {
+    static DOCS_LIB: std::sync::LazyLock<Arc<typlite::scopes::Scopes<typlite::value::Value>>> =
+        std::sync::LazyLock::new(library::lib);
+
+    let conv_id = DOCS_CONVERT_ID.lock();
+    let entry = EntryState::new_rootless(conv_id.vpath().as_rooted_path().into()).unwrap();
+    let entry = entry.select_in_workspace(*conv_id);
+
+    let mut w = world.task(TaskInputs {
+        entry: Some(entry),
+        inputs: None,
+    });
+    w.map_shadow_by_id(*conv_id, Bytes::from(content.as_bytes().to_owned()))?;
+    // todo: bad performance
+    w.source_db.take_state();
+
+    let conv = typlite::Typlite::new(Arc::new(w))
+        .with_library(DOCS_LIB.clone())
+        .annotate_elements(true)
+        .convert()
+        .map_err(|e| eco_format!("failed to convert to markdown: {e}"))?;
+
+    Ok(conv)
+}
+
+pub(crate) fn identify_docs(kind: DocStringKind, content: &str) -> StrResult<SymbolDocs> {
+    match kind {
+        DocStringKind::Function => Err(eco_format!("must be already handled")),
+        DocStringKind::Variable => identify_var_docs(content).map(SymbolDocs::Variable),
+        DocStringKind::Constant => identify_var_docs(content).map(SymbolDocs::Variable),
+        DocStringKind::Module => identify_tidy_module_docs(content).map(SymbolDocs::Module),
+        DocStringKind::Struct => Ok(SymbolDocs::Plain(content.into())),
+        DocStringKind::Reference => Ok(SymbolDocs::Plain(content.into())),
+        // _ => Err(eco_format!("unknown kind {kind}")),
+    }
 }

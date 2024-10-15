@@ -14,7 +14,7 @@ use super::*;
 const DOC_VARS: u64 = 0;
 
 impl<'a, 'w> TypeChecker<'a, 'w> {
-    pub fn check_func_docs(&mut self, root: &LinkedNode) -> Option<DocString> {
+    pub fn check_func_docs(&mut self, root: &LinkedNode) -> Option<Arc<DocString>> {
         let closure = root.cast::<ast::Closure>()?;
         let documenting_id = closure
             .name()
@@ -23,7 +23,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         self.check_docstring(root, DocStringKind::Function, documenting_id)
     }
 
-    pub fn check_var_docs(&mut self, root: &LinkedNode) -> Option<DocString> {
+    pub fn check_var_docs(&mut self, root: &LinkedNode) -> Option<Arc<DocString>> {
         let lb = root.cast::<ast::LetBinding>()?;
         let first = lb.kind().bindings();
         let documenting_id = first
@@ -38,19 +38,22 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         root: &LinkedNode,
         kind: DocStringKind,
         base_id: DefId,
-    ) -> Option<DocString> {
+    ) -> Option<Arc<DocString>> {
         // todo: cache docs capture
         // use parent of params, todo: reliable way to get the def target
         let def = get_non_strict_def_target(root.clone())?;
         let docs = find_docs_of(&self.source, def)?;
 
         let docstring = self.ctx.compute_docstring(root.span().id()?, docs, kind)?;
-        Some(docstring.take().rename_based_on(base_id, self))
+        let res = Arc::new(docstring.take().rename_based_on(base_id, self));
+        self.info.var_docs.insert(base_id, res.clone());
+        Some(res)
     }
 }
 
+/// The documentation string of an item
 #[derive(Debug, Clone, Default)]
-pub(crate) struct DocString {
+pub struct DocString {
     /// The documentation of the item
     pub docs: Option<String>,
     /// The typing on definitions
@@ -62,10 +65,12 @@ pub(crate) struct DocString {
 }
 
 impl DocString {
+    /// Get the documentation of a variable associated with the item
     pub fn get_var(&self, name: &str) -> Option<&VarDoc> {
         self.vars.get(name)
     }
 
+    /// Get the type of a variable associated with the item
     pub fn var_ty(&self, name: &str) -> Option<&Ty> {
         self.get_var(name).and_then(|v| v.ty.as_ref())
     }
@@ -105,11 +110,15 @@ impl DocString {
     }
 }
 
+/// The documentation string of a variable associated with some item.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct VarDoc {
-    pub _docs: Option<EcoString>,
+pub struct VarDoc {
+    /// The documentation of the variable
+    pub docs: Option<EcoString>,
+    /// The type of the variable
     pub ty: Option<Ty>,
-    pub _default: Option<EcoString>,
+    /// The default value of the variable
+    pub default: Option<EcoString>,
 }
 
 pub(crate) fn compute_docstring(
@@ -129,6 +138,10 @@ pub(crate) fn compute_docstring(
     match kind {
         DocStringKind::Function => checker.check_func_docs(docs),
         DocStringKind::Variable => checker.check_var_docs(docs),
+        DocStringKind::Module => None,
+        DocStringKind::Constant => None,
+        DocStringKind::Struct => None,
+        DocStringKind::Reference => None,
     }
 }
 
@@ -153,9 +166,9 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
             params.insert(
                 param.name,
                 VarDoc {
-                    _docs: Some(param.docs),
+                    docs: Some(param.docs),
                     ty: self.check_type_strings(&module, &param.types),
-                    _default: param.default,
+                    default: param.default,
                 },
             );
         }

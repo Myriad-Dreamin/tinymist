@@ -16,7 +16,7 @@ use crate::syntax::{find_docs_of, get_non_strict_def_target};
 use crate::upstream::truncated_doc_repr;
 use crate::AnalysisContext;
 
-use super::{get_manifest, get_manifest_id, kind_of, PackageInfo, RawDocs, SignatureDocs};
+use super::{get_manifest, get_manifest_id, kind_of, DocStringKind, PackageInfo, SymbolDocs};
 
 /// Get documentation of symbols in a package.
 pub fn package_module_docs(ctx: &mut AnalysisContext, pkg: &PackageInfo) -> StrResult<SymbolsInfo> {
@@ -70,7 +70,7 @@ pub struct SymbolInfoHead {
     /// The name of the symbol.
     pub name: EcoString,
     /// The kind of the symbol.
-    pub kind: EcoString,
+    pub kind: DocStringKind,
     /// The location (file, start, end) of the symbol.
     pub loc: Option<(usize, usize, usize)>,
     /// Is the symbol reexport
@@ -81,10 +81,8 @@ pub struct SymbolInfoHead {
     pub oneliner: Option<String>,
     /// The raw documentation of the symbol.
     pub docs: Option<String>,
-    /// The signature of the symbol.
-    pub signature: Option<SignatureDocs>,
     /// The parsed documentation of the symbol.
-    pub parsed_docs: Option<RawDocs>,
+    pub parsed_docs: Option<SymbolDocs>,
     /// The value of the symbol.
     #[serde(skip)]
     pub constant: Option<EcoString>,

@@ -12,9 +12,7 @@ use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{FileId, Span, VirtualPath};
 use typst::World;
 
-use crate::docs::{
-    convert_docs, file_id_repr, identify_docs, module_docs, signature_docs, RawDocs, SymbolsInfo,
-};
+use crate::docs::{file_id_repr, module_docs, symbol_docs, SymbolDocs, SymbolsInfo};
 use crate::syntax::IdentRef;
 use crate::ty::Ty;
 use crate::AnalysisContext;
@@ -159,33 +157,32 @@ pub fn package_docs(
                 });
                 sym.head.loc = span;
 
-                let sym_value = sym.head.value.clone();
-                let signature = sym_value.and_then(|e| {
-                    let def_ident = IdentRef {
-                        name: sym.head.name.clone(),
-                        range: sym.head.name_range.clone()?,
-                    };
-                    signature_docs(ctx, type_info, Some(&def_ident), &e, Some(&mut doc_ty))
+                let def_ident = sym.head.name_range.as_ref().map(|range| IdentRef {
+                    name: sym.head.name.clone(),
+                    range: range.clone(),
                 });
-                sym.head.signature = signature;
+                let docs = symbol_docs(
+                    ctx,
+                    type_info,
+                    sym.head.kind,
+                    def_ident.as_ref(),
+                    sym.head.value.as_ref(),
+                    sym.head.docs.as_deref(),
+                    Some(&mut doc_ty),
+                );
 
                 let mut convert_err = None;
-                if let Some(docs) = &sym.head.docs {
-                    match convert_docs(world, docs) {
-                        Ok(content) => {
-                            let docs = identify_docs(sym.head.kind.as_str(), &content)
-                                .unwrap_or(RawDocs::Plain(content));
-
-                            sym.head.parsed_docs = Some(docs.clone());
-                            sym.head.docs = None;
-                        }
-                        Err(e) => {
-                            let err = format!("failed to convert docs in {title}: {e}").replace(
-                                "-->", "—>", // avoid markdown comment
-                            );
-                            log::error!("{err}");
-                            convert_err = Some(err);
-                        }
+                match &docs {
+                    Ok(docs) => {
+                        sym.head.parsed_docs = Some(docs.clone());
+                        sym.head.docs = None;
+                    }
+                    Err(e) => {
+                        let err = format!("failed to convert docs in {title}: {e}").replace(
+                            "-->", "—>", // avoid markdown comment
+                        );
+                        log::error!("{err}");
+                        convert_err = Some(err);
                     }
                 }
 
@@ -227,7 +224,7 @@ pub fn package_docs(
                 let head = jbase64(&sym.head);
                 let _ = writeln!(md, "<!-- begin:symbol {ident} {head} -->");
 
-                if let Some(sig) = &sym.head.signature {
+                if let Some(SymbolDocs::Function(sig)) = &sym.head.parsed_docs {
                     let _ = writeln!(md, "<!-- begin:sig -->");
                     let _ = writeln!(md, "```typc");
                     let _ = writeln!(md, "let {name}({sig});", name = sym.head.name);
@@ -245,13 +242,18 @@ pub fn package_docs(
                     }
                     (Some(docs), _) => {
                         let _ = writeln!(md, "{}", remove_list_annotations(docs.docs()));
-                        if let RawDocs::Function(f) = docs {
-                            for param in &f.params {
+                        if let SymbolDocs::Function(f) = docs {
+                            for param in f.pos.iter().chain(f.named.values()).chain(f.rest.as_ref())
+                            {
                                 let _ = writeln!(md, "<!-- begin:param {} -->", param.name);
+                                let ty = match &param.cano_type {
+                                    Some((short, _)) => short,
+                                    None => "unknown",
+                                };
                                 let _ = writeln!(
                                     md,
-                                    "#### {} ({})\n<!-- begin:param-doc {} -->\n{}\n<!-- end:param-doc {} -->",
-                                    param.name, param.types, param.name, param.docs, param.name
+                                    "#### {} ({ty:?})\n<!-- begin:param-doc {} -->\n{}\n<!-- end:param-doc {} -->",
+                                    param.name, param.name, param.docs, param.name
                                 );
                                 let _ = writeln!(md, "<!-- end:param -->");
                             }

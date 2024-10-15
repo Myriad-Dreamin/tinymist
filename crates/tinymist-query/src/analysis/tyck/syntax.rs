@@ -373,7 +373,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
     fn check_closure(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
         let docstring = self.check_func_docs(&root);
-        let docstring = docstring.as_ref().unwrap_or(&EMPTY_DOCSTRING);
+        let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
         let closure: ast::Closure = root.cast()?;
 
         log::debug!("check closure: {:?} -> {docstring:#?}", closure.name());
@@ -473,7 +473,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
             ast::LetBindingKind::Normal(pattern) => {
                 let docstring = self.check_var_docs(&root);
-                let docstring = docstring.as_ref().unwrap_or(&EMPTY_DOCSTRING);
+                let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
                 let value = let_binding
                     .init()
