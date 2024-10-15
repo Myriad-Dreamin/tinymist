@@ -16,7 +16,7 @@ use crate::syntax::{find_docs_of, get_non_strict_def_target};
 use crate::upstream::truncated_doc_repr;
 use crate::AnalysisContext;
 
-use super::{kind_of, DocSignature, PackageInfo, RawDocs};
+use super::{kind_of, PackageInfo, RawDocs, SignatureDocs};
 
 /// Information about a symbol.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -36,7 +36,7 @@ pub struct SymbolInfoHead {
     /// The raw documentation of the symbol.
     pub docs: Option<String>,
     /// The signature of the symbol.
-    pub signature: Option<DocSignature>,
+    pub signature: Option<SignatureDocs>,
     /// The parsed documentation of the symbol.
     pub parsed_docs: Option<RawDocs>,
     /// The value of the symbol.

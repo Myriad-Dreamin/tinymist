@@ -185,7 +185,7 @@ pub fn generate_md_docs(
                         name: sym.head.name.clone(),
                         range: sym.head.name_range.clone()?,
                     };
-                    docs_signature(ctx, type_info, Some(&def_ident), &e, Some(&mut doc_ty))
+                    signature_docs(ctx, type_info, Some(&def_ident), &e, Some(&mut doc_ty))
                 });
                 sym.head.signature = signature;
 

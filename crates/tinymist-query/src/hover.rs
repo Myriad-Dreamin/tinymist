@@ -4,7 +4,7 @@ use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     analysis::{find_definition, get_link_exprs_in, DefinitionLink},
-    docs::DocSignature,
+    docs::SignatureDocs,
     jump_from_cursor,
     prelude::*,
     syntax::{find_docs_before, get_deref_target, LexicalKind, LexicalVarKind},
@@ -254,7 +254,7 @@ fn def_tooltip(
             let sig = lnk
                 .value
                 .as_ref()
-                .and_then(|e| ctx.docs_signature(source, lnk.to_ident_ref().as_ref(), e));
+                .and_then(|e| ctx.signature_docs(source, lnk.to_ident_ref().as_ref(), e));
 
             results.push(MarkedString::LanguageString(LanguageString {
                 language: "typc".to_owned(),
@@ -352,7 +352,7 @@ fn render_actions(results: &mut Vec<MarkedString>, actions: Vec<CommandLink>) {
 }
 
 // todo: hover with `with_stack`
-struct ParamTooltip<'a>(Option<&'a DocSignature>);
+struct ParamTooltip<'a>(Option<&'a SignatureDocs>);
 
 impl fmt::Display for ParamTooltip<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -14,18 +14,18 @@ type ShowTypeRepr<'a> = &'a mut dyn FnMut(Option<&Ty>) -> TypeRepr;
 
 /// Describes a primary function signature.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocSignature {
+pub struct SignatureDocs {
     /// The positional parameters.
-    pub pos: Vec<DocParamSpec>,
+    pub pos: Vec<ParamDocs>,
     /// The named parameters.
-    pub named: HashMap<String, DocParamSpec>,
+    pub named: HashMap<String, ParamDocs>,
     /// The rest parameter.
-    pub rest: Option<DocParamSpec>,
+    pub rest: Option<ParamDocs>,
     /// The return type.
     pub ret_ty: TypeRepr,
 }
 
-impl fmt::Display for DocSignature {
+impl fmt::Display for SignatureDocs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut is_first = true;
         let mut write_sep = |f: &mut fmt::Formatter<'_>| {
@@ -86,7 +86,7 @@ impl fmt::Display for DocSignature {
 
 /// Describes a function parameter.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocParamSpec {
+pub struct ParamDocs {
     /// The parameter's name.
     pub name: String,
     /// Documentation for the parameter.
@@ -110,13 +110,13 @@ pub struct DocParamSpec {
 
 type TypeInfo = (Arc<crate::analysis::DefUseInfo>, Arc<crate::ty::TypeScheme>);
 
-pub(crate) fn docs_signature(
+pub(crate) fn signature_docs(
     ctx: &mut AnalysisContext,
     type_info: Option<&TypeInfo>,
     def_ident: Option<&IdentRef>,
     runtime_fn: &Value,
     doc_ty: Option<ShowTypeRepr>,
-) -> Option<DocSignature> {
+) -> Option<SignatureDocs> {
     let func = match runtime_fn {
         Value::Func(f) => f,
         _ => return None,
@@ -176,7 +176,7 @@ pub(crate) fn docs_signature(
         .or_else(|| sig.primary().ret_ty.as_ref());
 
     let pos = pos_in
-        .map(|(param, ty)| DocParamSpec {
+        .map(|(param, ty)| ParamDocs {
             name: param.name.as_ref().to_owned(),
             docs: param.docs.as_ref().to_owned(),
             cano_type: doc_ty(ty.or(Some(&param.base_type))),
@@ -192,7 +192,7 @@ pub(crate) fn docs_signature(
         .map(|((name, param), ty)| {
             (
                 name.as_ref().to_owned(),
-                DocParamSpec {
+                ParamDocs {
                     name: param.name.as_ref().to_owned(),
                     docs: param.docs.as_ref().to_owned(),
                     cano_type: doc_ty(ty.or(Some(&param.base_type))),
@@ -206,7 +206,7 @@ pub(crate) fn docs_signature(
         })
         .collect();
 
-    let rest = rest_in.map(|(param, ty)| DocParamSpec {
+    let rest = rest_in.map(|(param, ty)| ParamDocs {
         name: param.name.as_ref().to_owned(),
         docs: param.docs.as_ref().to_owned(),
         cano_type: doc_ty(ty.or(Some(&param.base_type))),
@@ -219,7 +219,7 @@ pub(crate) fn docs_signature(
 
     let ret_ty = doc_ty(ret_in);
 
-    Some(DocSignature {
+    Some(SignatureDocs {
         pos,
         named,
         rest,
