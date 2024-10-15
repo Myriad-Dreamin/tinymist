@@ -206,7 +206,7 @@ impl CompileHandler {
         struct WrapWorld<'a>(&'a LspWorld, &'a PeriscopeRenderer);
 
         impl<'a> AnalysisResources for WrapWorld<'a> {
-            fn world(&self) -> &dyn typst::World {
+            fn world(&self) -> &LspWorld {
                 self.0
             }
 

@@ -551,17 +551,23 @@ impl LanguageState {
         &mut self,
         mut arguments: Vec<JsonValue>,
     ) -> AnySchedulableResponse {
+        let handle = self.primary().handle.clone();
         let info = get_arg!(arguments[1] as PackageInfo);
 
         let snap = self.primary().snapshot().map_err(z_internal_error)?;
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
             let w = snap.world.as_ref();
-            let symbols = tinymist_query::docs::list_symbols(w, &info)
-                .map_err(map_string_err("failed to list symbols"))
-                .map_err(z_internal_error)?;
 
-            serde_json::to_value(symbols).map_err(|e| internal_error(e.to_string()))
+            let symbols = handle
+                .run_analysis(w, |a| {
+                    tinymist_query::docs::list_symbols(a, &info)
+                        .map_err(map_string_err("failed to list symbols"))
+                })
+                .map_err(internal_error)?
+                .map_err(internal_error)?;
+
+            serde_json::to_value(symbols).map_err(internal_error)
         })
     }
 
@@ -582,7 +588,8 @@ impl LanguageState {
         &mut self,
         info: PackageInfo,
     ) -> LspResult<impl Future<Output = LspResult<String>>> {
-        let handle = self.primary().handle.clone();
+        let handle: std::sync::Arc<actor::typ_client::CompileHandler> =
+            self.primary().handle.clone();
         let snap = handle.snapshot().map_err(z_internal_error)?;
         Ok(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
@@ -609,7 +616,7 @@ impl LanguageState {
 
             let res = handle.run_analysis(w, |a| {
                 tinymist_query::docs::generate_md_docs(a, w, &info)
-                    .map_err(map_string_err("failed to list symbols"))
+                    .map_err(map_string_err("failed to generate docs"))
                     .map_err(z_internal_error)
             });
 

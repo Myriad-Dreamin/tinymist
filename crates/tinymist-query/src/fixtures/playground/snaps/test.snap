@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/playground/base.typ
+---
+"args" = Args
+"fn" = Any
+"max-repetitions" = None
+"repetitions" = None
+"touying-fn-wrapper" = ((Any, "max-repetitions": Any, "repetitions": Any, ...: Any[]) => None).with(..("max-repetitions": None, "repetitions": None) => any)
+---
+215..233 -> @touying-fn-wrapper
+234..236 -> @fn
+238..253 -> @max-repetitions
+261..272 -> @repetitions
+282..286 -> @args

@@ -11,7 +11,7 @@ use typst::{
     text::TextItem,
 };
 
-use crate::{AnalysisContext, StatefulRequest, VersionedDocument};
+use crate::prelude::*;
 
 /// Span information for some content.
 #[derive(Debug, Clone, Serialize, Deserialize)]

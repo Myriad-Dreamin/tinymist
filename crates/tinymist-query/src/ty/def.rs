@@ -25,7 +25,7 @@ use crate::{
 
 pub use tinymist_derive::BindTyCtx;
 
-pub(crate) use super::{TyCtxMut, TyCtx};
+pub(crate) use super::{TyCtx, TyCtxMut};
 pub(crate) use crate::adt::interner::Interned;
 
 /// A reference to the interned type
@@ -179,7 +179,7 @@ impl fmt::Debug for TypeSigParam<'_> {
         match self {
             TypeSigParam::Pos(ty) => write!(f, "{ty:?}"),
             TypeSigParam::Named(name, ty) => write!(f, "{name:?}: {ty:?}"),
-            TypeSigParam::Rest(ty) => write!(f, "...: {ty:?}[]"),
+            TypeSigParam::Rest(ty) => write!(f, "...: {ty:?}"),
         }
     }
 }
@@ -548,13 +548,10 @@ impl SigTy {
     /// Array constructor
     #[comemo::memoize]
     pub fn array_cons(elem: Ty, anyify: bool) -> Interned<SigTy> {
-        let ret = if anyify {
-            Ty::Any
-        } else {
-            Ty::Array(Interned::new(elem.clone()))
-        };
+        let rest = Ty::Array(Interned::new(elem.clone()));
+        let ret = if anyify { Ty::Any } else { rest.clone() };
         Interned::new(Self {
-            inputs: Interned::new(vec![elem]),
+            inputs: Interned::new(vec![rest]),
             body: Some(ret),
             names: NameBone::empty(),
             name_started: 0,
