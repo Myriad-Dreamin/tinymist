@@ -1,8 +1,0 @@
----
-source: crates/tinymist-query/src/analysis.rs
-expression: result
-input_file: crates/tinymist-query/src/fixtures/playground/base.typ
----
-"config-common" = () => None
----
-113..126 -> @config-common

@@ -1,5 +1,2 @@
-/// #let tag-full = `tag("configs", ns: "@preview/touying")`
-/// #let tag = `tag("configs")`
-///
-/// -> tag
-#let config-common() = none
+#let tmpl2(stroke) = text(stroke: stroke)
+#tmpl2(/* position */)
