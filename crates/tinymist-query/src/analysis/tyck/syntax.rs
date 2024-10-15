@@ -391,8 +391,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     let name = e.name().get();
                     let exp = self.check_expr_in(e.expr().span(), root.clone());
                     let v = self.get_var(e.name().span(), to_ident_ref(&root, e.name())?)?;
-                    if let Some(anno) = dostring.var_ty(name.as_str()) {
-                        self.constrain(&v, anno);
+                    if let Some(annotated) = dostring.var_ty(name.as_str()) {
+                        self.constrain(&v, annotated);
                     }
                     // todo: this is less efficient than v.lbs.push(exp), we may have some idea to
                     // optimize it, so I put a todo here.
@@ -405,8 +405,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     if let Some(e) = a.sink_ident() {
                         let exp = Ty::Builtin(BuiltinTy::Args);
                         let v = self.get_var(e.span(), to_ident_ref(&root, e)?)?;
-                        if let Some(anno) = dostring.var_ty(e.get().as_str()) {
-                            self.constrain(&v, anno);
+                        if let Some(annotated) = dostring.var_ty(e.get().as_str()) {
+                            self.constrain(&v, annotated);
                         }
                         self.constrain(&exp, &v);
                         rest = Some(v);
@@ -574,6 +574,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     fn check_destruct_assign(&mut self, _root: LinkedNode<'_>) -> Option<Ty> {
         Some(Ty::Builtin(BuiltinTy::None))
     }
+
     fn check_expr_in(&mut self, span: Span, root: LinkedNode<'_>) -> Ty {
         root.find(span)
             .map(|node| self.check(node))
@@ -584,10 +585,10 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         &mut self,
         pattern: ast::Pattern<'_>,
         value: Ty,
-        param_docs: &DocString,
+        docs: &DocString,
         root: LinkedNode<'_>,
     ) -> Ty {
-        self.check_pattern_(pattern, value, param_docs, root)
+        self.check_pattern_(pattern, value, docs, root)
             .unwrap_or(Ty::Builtin(BuiltinTy::Undef))
     }
 
@@ -595,16 +596,16 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         &mut self,
         pattern: ast::Pattern<'_>,
         value: Ty,
-        param_docs: &DocString,
+        docs: &DocString,
         root: LinkedNode<'_>,
     ) -> Option<Ty> {
         Some(match pattern {
             ast::Pattern::Normal(ast::Expr::Ident(ident)) => {
                 let v = self.get_var(ident.span(), to_ident_ref(&root, ident)?)?;
-                let anno = param_docs.var_ty(ident.get().as_str());
-                log::debug!("check pattern: {ident:?} with {value:?} and annotation {anno:?}");
-                if let Some(anno) = anno {
-                    self.constrain(&v, anno);
+                let annotated = docs.var_ty(ident.get().as_str());
+                log::debug!("check pattern: {ident:?} with {value:?} and annotation {annotated:?}");
+                if let Some(annotated) = annotated {
+                    self.constrain(&v, annotated);
                 }
                 self.constrain(&value, &v);
                 v
@@ -612,7 +613,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             ast::Pattern::Normal(_) => Ty::Any,
             ast::Pattern::Placeholder(_) => Ty::Any,
             ast::Pattern::Parenthesized(exp) => {
-                self.check_pattern(exp.pattern(), value, param_docs, root)
+                self.check_pattern(exp.pattern(), value, docs, root)
             }
             // todo: pattern
             ast::Pattern::Destructuring(_destruct) => Ty::Any,

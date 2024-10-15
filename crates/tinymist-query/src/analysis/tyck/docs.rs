@@ -92,8 +92,6 @@ pub(crate) struct VarDoc {
     pub _default: Option<EcoString>,
 }
 
-pub(crate) type VarDocs = HashMap<EcoString, VarDoc>;
-
 pub(crate) fn compute_docstring(
     ctx: &AnalysisContext,
     docs: String,
@@ -113,7 +111,7 @@ pub(crate) fn compute_docstring(
 struct DocsChecker<'a, 'w> {
     ctx: &'a AnalysisContext<'w>,
     /// The typing on definitions
-    pub vars: HashMap<DefId, TypeVarBounds>,
+    vars: HashMap<DefId, TypeVarBounds>,
     docs_scope: HashMap<EcoString, Option<Ty>>,
     next_id: u32,
 }
@@ -124,7 +122,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
         let converted = identify_func_docs(&converted).ok()?;
         let module = self.ctx.module_by_str(docs)?;
 
-        let mut params = VarDocs::new();
+        let mut params = HashMap::new();
         for param in converted.params.into_iter() {
             params.insert(
                 param.name,
@@ -228,8 +226,8 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
         let v = m.scope().get(name)?;
         log::debug!("check doc type annotation: {name:?}");
         if let Value::Content(c) = v {
-            let anno = c.clone().unpack::<typst::text::RawElem>().ok()?;
-            let text = anno.text().clone().into_value().cast::<Str>().ok()?;
+            let annotated = c.clone().unpack::<typst::text::RawElem>().ok()?;
+            let text = annotated.text().clone().into_value().cast::<Str>().ok()?;
             let code = typst::syntax::parse_code(&text.as_str().replace('\'', "θ"));
             let mut exprs = code.cast::<ast::Code>()?.exprs();
             let ret = self.check_doc_type_expr(m, exprs.next()?);
