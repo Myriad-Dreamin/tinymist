@@ -1,19 +1,20 @@
+use ecow::EcoString;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use typst::diag::StrResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyParamDocs {
-    pub name: String,
-    pub docs: String,
-    pub types: String,
-    pub default: Option<String>,
+    pub name: EcoString,
+    pub docs: EcoString,
+    pub types: EcoString,
+    pub default: Option<EcoString>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyFuncDocs {
     pub docs: String,
-    pub return_ty: Option<String>,
+    pub return_ty: Option<EcoString>,
     pub params: Vec<TidyParamDocs>,
 }
 
@@ -57,7 +58,7 @@ pub fn identify_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
                     continue;
                 };
 
-                return_ty = Some(w.trim().to_string());
+                return_ty = Some(w.trim().into());
                 break;
             }
 
@@ -120,7 +121,7 @@ pub fn identify_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
                 name: param_line.0,
                 types: param_line.1,
                 default: None,
-                docs: buf.into_iter().join("\n"),
+                docs: buf.into_iter().join("\n").into(),
             });
 
             break;

@@ -19,9 +19,10 @@ use typst_shim::syntax::LinkedNodeExt;
 use crate::adt::interner::Interned;
 use crate::analysis::{
     analyze_bib, analyze_dyn_signature, analyze_expr_, analyze_import_, post_type_check, BibInfo,
-    DefUseInfo, DefinitionLink, IdentRef, ImportInfo, PathPreference, SigTy, Signature,
+    DefUseInfo, DefinitionLink, DocString, IdentRef, ImportInfo, PathPreference, SigTy, Signature,
     SignatureTarget, Ty, TypeScheme,
 };
+use crate::docs::DocStringKind;
 use crate::prelude::*;
 use crate::syntax::{
     construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
@@ -85,6 +86,7 @@ pub struct AnalysisGlobalCaches {
     def_use: FxDashMap<u128, (u64, Option<Arc<DefUseInfo>>)>,
     type_check: FxDashMap<u128, (u64, Option<Arc<TypeScheme>>)>,
     static_signatures: FxDashMap<u128, (u64, Source, usize, Signature)>,
+    docstrings: FxDashMap<u128, Option<Arc<DocString>>>,
     signatures: FxDashMap<u128, (u64, foundations::Func, Signature)>,
 }
 
@@ -349,13 +351,13 @@ impl<'w> AnalysisContext<'w> {
     }
 
     /// Get a module by string.
-    pub fn module_by_str(&mut self, rr: String) -> Option<Module> {
+    pub fn module_by_str(&self, rr: String) -> Option<Module> {
         let src = Source::new(*DETACHED_ENTRY, rr);
         self.module_by_src(src).ok()
     }
 
     /// Get (Create) a module by source.
-    pub fn module_by_src(&mut self, source: Source) -> SourceResult<Module> {
+    pub fn module_by_src(&self, source: Source) -> SourceResult<Module> {
         let route = Route::default();
         let mut tracer = Tracer::default();
 
@@ -477,6 +479,23 @@ impl<'w> AnalysisContext<'w> {
                 .get(&hash128(rt))
                 .and_then(|slot| (rt == &slot.1).then_some(slot.2.clone())),
         }
+    }
+
+    pub(crate) fn compute_docstring(
+        &self,
+        docs: String,
+        kind: DocStringKind,
+    ) -> Option<Arc<DocString>> {
+        let h = hash128(&(&docs, &kind));
+        let res = if let Some(res) = self.analysis.caches.docstrings.get(&h) {
+            res.clone()
+        } else {
+            let res = crate::analysis::tyck::compute_docstring(self, docs, kind).map(Arc::new);
+            self.analysis.caches.docstrings.insert(h, res.clone());
+            res
+        };
+
+        res
     }
 
     /// Compute the signature of a function.

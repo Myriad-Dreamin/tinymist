@@ -1057,8 +1057,8 @@ impl TypeVarBounds {
     }
 
     /// Get the name of the type variable
-    pub fn name(&self) -> StrRef {
-        self.var.name.clone()
+    pub fn name(&self) -> &StrRef {
+        &self.var.name
     }
     /// Get the definition id of the type variable
     pub fn id(&self) -> DefId {
