@@ -372,7 +372,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     }
 
     fn check_closure(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let docstring = self.check_closure_docstring(&root);
+        let docstring = self.check_func_docs(&root);
         let docstring = docstring.as_ref().unwrap_or(&EMPTY_DOCSTRING);
         let closure: ast::Closure = root.cast()?;
 
@@ -472,7 +472,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 // todo lbs is the lexical signature.
             }
             ast::LetBindingKind::Normal(pattern) => {
-                let docstring = self.check_variable_docstring(&root);
+                let docstring = self.check_var_docs(&root);
                 let docstring = docstring.as_ref().unwrap_or(&EMPTY_DOCSTRING);
 
                 let value = let_binding

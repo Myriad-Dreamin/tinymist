@@ -14,7 +14,7 @@ use super::*;
 const DOC_VARS: u64 = 0;
 
 impl<'a, 'w> TypeChecker<'a, 'w> {
-    pub fn check_closure_docstring(&mut self, root: &LinkedNode) -> Option<DocString> {
+    pub fn check_func_docs(&mut self, root: &LinkedNode) -> Option<DocString> {
         let closure = root.cast::<ast::Closure>()?;
         let documenting_id = closure
             .name()
@@ -23,7 +23,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         self.check_docstring(root, DocStringKind::Function, documenting_id)
     }
 
-    pub fn check_variable_docstring(&mut self, root: &LinkedNode) -> Option<DocString> {
+    pub fn check_var_docs(&mut self, root: &LinkedNode) -> Option<DocString> {
         let lb = root.cast::<ast::LetBinding>()?;
         let first = lb.kind().bindings();
         let documenting_id = first
@@ -127,8 +127,8 @@ pub(crate) fn compute_docstring(
         next_id: 0,
     };
     match kind {
-        DocStringKind::Function => checker.check_closure_docs(docs),
-        DocStringKind::Variable => checker.check_variable_docs(docs),
+        DocStringKind::Function => checker.check_func_docs(docs),
+        DocStringKind::Variable => checker.check_var_docs(docs),
     }
 }
 
@@ -143,24 +143,7 @@ struct DocsChecker<'a, 'w> {
 }
 
 impl<'a, 'w> DocsChecker<'a, 'w> {
-    pub fn check_variable_docs(mut self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(self.ctx.world(), &docs).ok()?;
-        let converted = identify_var_docs(&converted).ok()?;
-        let module = self.ctx.module_by_str(docs)?;
-
-        let res_ty = converted
-            .return_ty
-            .and_then(|ty| self.check_doc_types(&module, &ty));
-
-        Some(DocString {
-            docs: Some(converted.docs),
-            var_bounds: self.vars,
-            vars: HashMap::new(),
-            res_ty,
-        })
-    }
-
-    pub fn check_closure_docs(mut self, docs: String) -> Option<DocString> {
+    pub fn check_func_docs(mut self, docs: String) -> Option<DocString> {
         let converted = convert_docs(self.ctx.world(), &docs).ok()?;
         let converted = identify_func_docs(&converted).ok()?;
         let module = self.ctx.module_by_str(docs)?;
@@ -171,7 +154,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
                 param.name,
                 VarDoc {
                     _docs: Some(param.docs),
-                    ty: self.check_doc_types(&module, &param.types),
+                    ty: self.check_type_strings(&module, &param.types),
                     _default: param.default,
                 },
             );
@@ -179,7 +162,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
 
         let res_ty = converted
             .return_ty
-            .and_then(|ty| self.check_doc_types(&module, &ty));
+            .and_then(|ty| self.check_type_strings(&module, &ty));
 
         Some(DocString {
             docs: Some(converted.docs),
@@ -189,10 +172,37 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
         })
     }
 
-    fn check_doc_types(&mut self, m: &Module, strs: &str) -> Option<Ty> {
+    pub fn check_var_docs(mut self, docs: String) -> Option<DocString> {
+        let converted = convert_docs(self.ctx.world(), &docs).ok()?;
+        let converted = identify_var_docs(&converted).ok()?;
+        let module = self.ctx.module_by_str(docs)?;
+
+        let res_ty = converted
+            .return_ty
+            .and_then(|ty| self.check_type_strings(&module, &ty));
+
+        Some(DocString {
+            docs: Some(converted.docs),
+            var_bounds: self.vars,
+            vars: HashMap::new(),
+            res_ty,
+        })
+    }
+
+    fn generate_var(&mut self, name: StrRef) -> Ty {
+        self.next_id += 1;
+        let encoded = DefId(self.next_id as u64);
+        log::debug!("generate var {name:?} {encoded:?}");
+        let bounds = TypeVarBounds::new(TypeVar { name, def: encoded }, TypeBounds::default());
+        let var = bounds.as_type();
+        self.vars.insert(encoded, bounds);
+        var
+    }
+
+    fn check_type_strings(&mut self, m: &Module, strs: &str) -> Option<Ty> {
         let mut types = vec![];
         for name in strs.split(",").map(|e| e.trim()) {
-            let Some(ty) = self.check_doc_type_ident(m, name) else {
+            let Some(ty) = self.check_type_ident(m, name) else {
                 continue;
             };
             types.push(ty);
@@ -201,7 +211,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
         Some(Ty::from_types(types.into_iter()))
     }
 
-    fn check_doc_type_ident(&mut self, m: &Module, name: &str) -> Option<Ty> {
+    fn check_type_ident(&mut self, m: &Module, name: &str) -> Option<Ty> {
         static TYPE_REPRS: LazyLock<HashMap<&'static str, Ty>> = LazyLock::new(|| {
             let values = Vec::from_iter(
                 [
@@ -260,10 +270,10 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
         let builtin_ty = TYPE_REPRS.get(name).cloned();
         builtin_ty
             .or_else(|| self.locals.get(name).cloned())
-            .or_else(|| self.check_doc_type_anno(m, name))
+            .or_else(|| self.check_type_annotation(m, name))
     }
 
-    fn check_doc_type_anno(&mut self, m: &Module, name: &str) -> Option<Ty> {
+    fn check_type_annotation(&mut self, m: &Module, name: &str) -> Option<Ty> {
         if let Some(v) = self.globals.get(name) {
             return v.clone();
         }
@@ -275,7 +285,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
             let text = annotated.text().clone().into_value().cast::<Str>().ok()?;
             let code = typst::syntax::parse_code(&text.as_str().replace('\'', "θ"));
             let mut exprs = code.cast::<ast::Code>()?.exprs();
-            let ret = self.check_doc_type_expr(m, exprs.next()?);
+            let ret = self.check_type_expr(m, exprs.next()?);
             self.globals.insert(name.into(), ret.clone());
             ret
         } else {
@@ -283,20 +293,10 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
         }
     }
 
-    fn generate_var(&mut self, name: StrRef) -> Ty {
-        self.next_id += 1;
-        let encoded = DefId(self.next_id as u64);
-        log::debug!("generate var {name:?} {encoded:?}");
-        let bounds = TypeVarBounds::new(TypeVar { name, def: encoded }, TypeBounds::default());
-        let var = bounds.as_type();
-        self.vars.insert(encoded, bounds);
-        var
-    }
-
-    fn check_doc_type_expr(&mut self, m: &Module, s: ast::Expr) -> Option<Ty> {
+    fn check_type_expr(&mut self, m: &Module, s: ast::Expr) -> Option<Ty> {
         log::debug!("check doc type expr: {s:?}");
         match s {
-            ast::Expr::Ident(i) => self.check_doc_type_ident(m, i.get().as_str()),
+            ast::Expr::Ident(i) => self.check_type_ident(m, i.get().as_str()),
             ast::Expr::FuncCall(c) => match c.callee() {
                 ast::Expr::Ident(i) => {
                     let name = i.get().as_str();
@@ -306,7 +306,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
                                 return None;
                             };
 
-                            Ty::Array(self.check_doc_type_expr(m, pos)?.into())
+                            Ty::Array(self.check_type_expr(m, pos)?.into())
                         }),
                         "tag" => Some({
                             let ast::Arg::Pos(ast::Expr::Str(s)) = c.args().items().next()? else {
@@ -340,7 +340,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
                                 pos.push(Ty::Any);
                             }
                             ast::Param::Named(e) => {
-                                let exp = self.check_doc_type_expr(m, e.expr()).unwrap_or(Ty::Any);
+                                let exp = self.check_type_expr(m, e.expr()).unwrap_or(Ty::Any);
                                 named.insert(e.name().into(), exp);
                             }
                             // todo: spread left/right
@@ -356,7 +356,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
                         }
                     }
 
-                    let body = self.check_doc_type_expr(m, c.body())?;
+                    let body = self.check_type_expr(m, c.body())?;
                     let sig = SigTy::new(pos, named, rest, Some(body)).into();
 
                     Some(Ty::Func(sig))
