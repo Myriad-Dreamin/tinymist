@@ -187,7 +187,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
 
     pub fn check_var_docs(mut self, docs: String) -> Option<DocString> {
         let converted = convert_docs(self.ctx.world(), &docs).ok()?;
-        let converted = identify_var_docs(&converted).ok()?;
+        let converted = identify_var_docs(converted).ok()?;
         let module = self.ctx.module_by_str(docs)?;
 
         let res_ty = converted

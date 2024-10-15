@@ -26,7 +26,7 @@ pub struct TidyVarDocs {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyModuleDocs {
-    pub docs: String,
+    pub docs: EcoString,
 }
 
 pub fn identify_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
@@ -141,7 +141,7 @@ pub fn identify_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
     })
 }
 
-pub fn identify_var_docs(converted: &str) -> StrResult<TidyVarDocs> {
+pub fn identify_var_docs(converted: EcoString) -> StrResult<TidyVarDocs> {
     let lines = converted.lines().collect::<Vec<_>>();
 
     let mut return_ty = None;
@@ -171,16 +171,14 @@ pub fn identify_var_docs(converted: &str) -> StrResult<TidyVarDocs> {
 
     let docs = match break_line {
         Some(line_no) => (lines[..line_no]).iter().copied().join("\n").into(),
-        None => converted.to_owned().into(),
+        None => converted,
     };
 
     Ok(TidyVarDocs { docs, return_ty })
 }
 
-pub fn identify_tidy_module_docs(converted: &str) -> StrResult<TidyModuleDocs> {
-    Ok(TidyModuleDocs {
-        docs: converted.to_owned(),
-    })
+pub fn identify_tidy_module_docs(docs: EcoString) -> StrResult<TidyModuleDocs> {
+    Ok(TidyModuleDocs { docs })
 }
 
 fn match_brace(trim_start: &str) -> Option<(&str, &str)> {
@@ -232,7 +230,7 @@ mod tests {
     }
 
     fn var(s: &str) -> String {
-        let f = super::identify_var_docs(s).unwrap();
+        let f = super::identify_var_docs(s.into()).unwrap();
         let mut res = format!(">> docs:\n{}\n<< docs", f.docs);
         if let Some(t) = f.return_ty {
             res.push_str(&format!("\n>>return\n{t}\n<<return"));

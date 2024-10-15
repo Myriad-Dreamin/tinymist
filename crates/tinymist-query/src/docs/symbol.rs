@@ -54,32 +54,35 @@ impl fmt::Display for DocStringKind {
     }
 }
 
-/// Docs about a symbol.
+/// Documentation about a symbol.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum SymbolDocs {
-    /// Docs about a function.
+    /// Documentation about a function.
     #[serde(rename = "func")]
     Function(Box<SignatureDocs>),
-    /// Docs about a variable.
+    /// Documentation about a variable.
     #[serde(rename = "var")]
     Variable(TidyVarDocs),
-    /// Docs about a module.
+    /// Documentation about a module.
     #[serde(rename = "module")]
     Module(TidyModuleDocs),
-    /// Other kinds of docs.
+    /// Other kinds of documentation.
     #[serde(rename = "plain")]
-    Plain(EcoString),
+    Plain {
+        /// The content of the documentation.
+        docs: EcoString,
+    },
 }
 
 impl SymbolDocs {
-    /// Get the markdown representation of the docs.
+    /// Get the markdown representation of the documentation.
     pub fn docs(&self) -> &str {
         match self {
             Self::Function(docs) => docs.docs.as_str(),
             Self::Variable(docs) => docs.docs.as_str(),
             Self::Module(docs) => docs.docs.as_str(),
-            Self::Plain(docs) => docs.as_str(),
+            Self::Plain { docs } => docs.as_str(),
         }
     }
 }
@@ -101,7 +104,8 @@ pub(crate) fn symbol_docs(
     if let Some(docs) = &docs {
         match convert_docs(ctx.world(), docs) {
             Ok(content) => {
-                let docs = identify_docs(kind, &content).unwrap_or(SymbolDocs::Plain(content));
+                let docs = identify_docs(kind, content.clone())
+                    .unwrap_or(SymbolDocs::Plain { docs: content });
                 return Ok(docs);
             }
             Err(e) => {
@@ -114,7 +118,7 @@ pub(crate) fn symbol_docs(
         }
     }
 
-    Ok(SymbolDocs::Plain("".into()))
+    Ok(SymbolDocs::Plain { docs: "".into() })
 }
 
 /// Describes a primary function signature.
@@ -359,14 +363,13 @@ pub(crate) fn convert_docs(world: &LspWorld, content: &str) -> StrResult<EcoStri
     Ok(conv)
 }
 
-pub(crate) fn identify_docs(kind: DocStringKind, content: &str) -> StrResult<SymbolDocs> {
+pub(crate) fn identify_docs(kind: DocStringKind, docs: EcoString) -> StrResult<SymbolDocs> {
     match kind {
         DocStringKind::Function => Err(eco_format!("must be already handled")),
-        DocStringKind::Variable => identify_var_docs(content).map(SymbolDocs::Variable),
-        DocStringKind::Constant => identify_var_docs(content).map(SymbolDocs::Variable),
-        DocStringKind::Module => identify_tidy_module_docs(content).map(SymbolDocs::Module),
-        DocStringKind::Struct => Ok(SymbolDocs::Plain(content.into())),
-        DocStringKind::Reference => Ok(SymbolDocs::Plain(content.into())),
-        // _ => Err(eco_format!("unknown kind {kind}")),
+        DocStringKind::Variable => identify_var_docs(docs).map(SymbolDocs::Variable),
+        DocStringKind::Constant => identify_var_docs(docs).map(SymbolDocs::Variable),
+        DocStringKind::Module => identify_tidy_module_docs(docs).map(SymbolDocs::Module),
+        DocStringKind::Struct => Ok(SymbolDocs::Plain { docs }),
+        DocStringKind::Reference => Ok(SymbolDocs::Plain { docs }),
     }
 }
