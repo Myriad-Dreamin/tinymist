@@ -23,12 +23,12 @@ use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{FileId, Span, VirtualPath};
 use typst::World;
 
-pub(crate) use self::tidy::*;
 use crate::analysis::analyze_dyn_signature;
 use crate::syntax::{find_docs_of, get_non_strict_def_target, IdentRef};
 use crate::ty::Ty;
 use crate::upstream::truncated_doc_repr;
 use crate::AnalysisContext;
+pub(crate) use tidy::*;
 
 /// Information about a package.
 #[derive(Debug, Serialize, Deserialize)]
@@ -52,6 +52,13 @@ impl From<(PathBuf, PackageSpec)> for PackageInfo {
             version: spec.version.to_string(),
         }
     }
+}
+
+/// Kind of a docstring.
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+pub enum DocStringKind {
+    /// A docstring for a function.
+    Function,
 }
 
 /// Docs about a symbol.

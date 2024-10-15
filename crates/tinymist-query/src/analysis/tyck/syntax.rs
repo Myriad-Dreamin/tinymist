@@ -3,7 +3,7 @@
 use std::{collections::BTreeMap, sync::LazyLock};
 
 use typst::{
-    foundations::{IntoValue, Module, Str, Type, Value},
+    foundations::Value,
     syntax::{
         ast::{self, AstNode},
         LinkedNode, SyntaxKind,
@@ -11,21 +11,9 @@ use typst::{
 };
 
 use super::*;
-use crate::{
-    adt::interner::Interned,
-    docs::{convert_docs, identify_func_docs},
-    syntax::{find_docs_of, get_non_strict_def_target},
-    ty::*,
-};
+use crate::{adt::interner::Interned, ty::*};
 
-#[derive(Debug)]
-struct ParamDoc {
-    // docs: String,
-    ty: Option<Ty>,
-    // default: Option<String>,
-}
-
-type ParamDocs = HashMap<String, ParamDoc>;
+static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);
 
 impl<'a, 'w> TypeChecker<'a, 'w> {
     pub(crate) fn check_syntax(&mut self, root: LinkedNode) -> Option<Ty> {
@@ -383,50 +371,11 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     }
 
     fn check_closure(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
+        let dostring = self.check_closure_docs(&root);
+        let dostring = dostring.as_ref().unwrap_or(&EMPTY_DOCSTRING);
         let closure: ast::Closure = root.cast()?;
 
-        let docs = None.or_else(|| {
-            // use parent of params, todo: reliable way to get the def target
-            let def = get_non_strict_def_target(root.clone())?;
-            find_docs_of(&self.source, def)
-        });
-
-        let parsed = docs.and_then(|docs| {
-            let documenting_id = closure
-                .name()
-                .and_then(|n| self.get_def_id(n.span(), &to_ident_ref(&root, n)?))?;
-
-            let converted = convert_docs(self.ctx.world(), &docs).ok()?;
-            let converted = identify_func_docs(&converted).ok()?;
-            let module = self.ctx.module_by_str(docs)?;
-
-            // Wrap a docs scope
-            self.with_docs_scope(|this| {
-                this.documenting_id = Some(documenting_id);
-                let mut params = ParamDocs::new();
-                for param in converted.params.into_iter() {
-                    params.insert(
-                        param.name,
-                        ParamDoc {
-                            // docs: param.docs,
-                            ty: this.check_doc_types(&module, param.types),
-                            // default: param.default,
-                        },
-                    );
-                }
-
-                Some((
-                    Some(converted.docs),
-                    params,
-                    converted
-                        .return_ty
-                        .map(|ty| this.check_doc_types(&module, ty)),
-                ))
-            })
-        });
-        let (_docs, param_docs, _ret) = parsed.unwrap_or_default();
-
-        log::debug!("check closure: {:?} -> {param_docs:#?}", closure.name());
+        log::debug!("check closure: {:?} -> {dostring:#?}", closure.name());
 
         let mut pos = vec![];
         let mut named = BTreeMap::new();
@@ -436,16 +385,14 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         for param in closure.params().children() {
             match param {
                 ast::Param::Pos(pattern) => {
-                    pos.push(self.check_pattern(pattern, Ty::Any, &param_docs, root.clone()));
+                    pos.push(self.check_pattern(pattern, Ty::Any, dostring, root.clone()));
                 }
                 ast::Param::Named(e) => {
                     let name = e.name().get();
                     let exp = self.check_expr_in(e.expr().span(), root.clone());
                     let v = self.get_var(e.name().span(), to_ident_ref(&root, e.name())?)?;
-                    let anno = param_docs.get(name.as_str()).and_then(|p| p.ty.clone());
-                    log::debug!("check closure param: {name} with {exp:?} and annotation {anno:?}");
-                    if let Some(anno) = anno {
-                        self.constrain(&v, &anno);
+                    if let Some(anno) = dostring.var_ty(name.as_str()) {
+                        self.constrain(&v, anno);
                     }
                     // todo: this is less efficient than v.lbs.push(exp), we may have some idea to
                     // optimize it, so I put a todo here.
@@ -458,9 +405,8 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     if let Some(e) = a.sink_ident() {
                         let exp = Ty::Builtin(BuiltinTy::Args);
                         let v = self.get_var(e.span(), to_ident_ref(&root, e)?)?;
-                        let anno = param_docs.get(e.get().as_str()).and_then(|p| p.ty.clone());
-                        if let Some(anno) = anno {
-                            self.constrain(&v, &anno);
+                        if let Some(anno) = dostring.var_ty(e.get().as_str()) {
+                            self.constrain(&v, anno);
                         }
                         self.constrain(&exp, &v);
                         rest = Some(v);
@@ -471,6 +417,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         }
 
         let body = self.check_expr_in(closure.body().span(), root);
+        let _ = dostring.res_ty;
 
         let named: Vec<(Interned<str>, Ty)> = named.into_iter().collect();
 
@@ -521,7 +468,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     .map(|init| self.check_expr_in(init.span(), root.clone()))
                     .unwrap_or_else(|| Ty::Builtin(BuiltinTy::Infer));
 
-                self.check_pattern(pattern, value, &ParamDocs::default(), root.clone());
+                self.check_pattern(pattern, value, &EMPTY_DOCSTRING, root.clone());
             }
         }
 
@@ -637,7 +584,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         &mut self,
         pattern: ast::Pattern<'_>,
         value: Ty,
-        param_docs: &ParamDocs,
+        param_docs: &DocString,
         root: LinkedNode<'_>,
     ) -> Ty {
         self.check_pattern_(pattern, value, param_docs, root)
@@ -648,18 +595,16 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         &mut self,
         pattern: ast::Pattern<'_>,
         value: Ty,
-        param_docs: &ParamDocs,
+        param_docs: &DocString,
         root: LinkedNode<'_>,
     ) -> Option<Ty> {
         Some(match pattern {
             ast::Pattern::Normal(ast::Expr::Ident(ident)) => {
                 let v = self.get_var(ident.span(), to_ident_ref(&root, ident)?)?;
-                let anno = param_docs
-                    .get(ident.get().as_str())
-                    .and_then(|p| p.ty.clone());
+                let anno = param_docs.var_ty(ident.get().as_str());
                 log::debug!("check pattern: {ident:?} with {value:?} and annotation {anno:?}");
                 if let Some(anno) = anno {
-                    self.constrain(&v, &anno);
+                    self.constrain(&v, anno);
                 }
                 self.constrain(&value, &v);
                 v
@@ -672,156 +617,5 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             // todo: pattern
             ast::Pattern::Destructuring(_destruct) => Ty::Any,
         })
-    }
-
-    fn check_doc_types(&mut self, m: &Module, strs: String) -> Option<Ty> {
-        let mut types = vec![];
-        for name in strs.split(",").map(|e| e.trim()) {
-            let Some(ty) = self.check_doc_type_ident(m, name) else {
-                continue;
-            };
-            types.push(ty);
-        }
-
-        Some(Ty::from_types(types.into_iter()))
-    }
-
-    fn check_doc_type_ident(&mut self, m: &Module, name: &str) -> Option<Ty> {
-        static TYPE_REPRS: LazyLock<HashMap<&'static str, Ty>> = LazyLock::new(|| {
-            let values = Vec::from_iter(
-                [
-                    Value::None,
-                    Value::Auto,
-                    // Value::Bool(Default::default()),
-                    Value::Int(Default::default()),
-                    Value::Float(Default::default()),
-                    Value::Length(Default::default()),
-                    Value::Angle(Default::default()),
-                    Value::Ratio(Default::default()),
-                    Value::Relative(Default::default()),
-                    Value::Fraction(Default::default()),
-                    Value::Str(Default::default()),
-                ]
-                .map(|v| v.ty())
-                .into_iter()
-                .chain([
-                    Type::of::<typst::visualize::Color>(),
-                    Type::of::<typst::visualize::Gradient>(),
-                    Type::of::<typst::visualize::Pattern>(),
-                    Type::of::<typst::symbols::Symbol>(),
-                    Type::of::<typst::foundations::Version>(),
-                    Type::of::<typst::foundations::Bytes>(),
-                    Type::of::<typst::foundations::Label>(),
-                    Type::of::<typst::foundations::Datetime>(),
-                    Type::of::<typst::foundations::Duration>(),
-                    Type::of::<typst::foundations::Content>(),
-                    Type::of::<typst::foundations::Styles>(),
-                    Type::of::<typst::foundations::Array>(),
-                    Type::of::<typst::foundations::Dict>(),
-                    Type::of::<typst::foundations::Func>(),
-                    Type::of::<typst::foundations::Args>(),
-                    Type::of::<typst::foundations::Type>(),
-                    Type::of::<typst::foundations::Module>(),
-                ]),
-            );
-
-            let shorts = values
-                .clone()
-                .into_iter()
-                .map(|ty| (ty.short_name(), Ty::Builtin(BuiltinTy::Type(ty))));
-            let longs = values
-                .into_iter()
-                .map(|ty| (ty.long_name(), Ty::Builtin(BuiltinTy::Type(ty))));
-            let builtins = [
-                ("any", Ty::Any),
-                ("bool", Ty::Boolean(None)),
-                ("boolean", Ty::Boolean(None)),
-                ("false", Ty::Boolean(Some(false))),
-                ("true", Ty::Boolean(Some(true))),
-            ];
-            HashMap::from_iter(shorts.chain(longs).chain(builtins))
-        });
-
-        let builtin_ty = TYPE_REPRS.get(name).cloned();
-        builtin_ty.or_else(|| self.check_doc_type_anno(m, name))
-    }
-
-    fn check_doc_type_anno(&mut self, m: &Module, name: &str) -> Option<Ty> {
-        if let Some(v) = self.docs_scope.get(name) {
-            return v.clone();
-        }
-
-        let v = m.scope().get(name)?;
-        log::debug!("check doc type annotation: {name:?}");
-        if let Value::Content(c) = v {
-            let anno = c.clone().unpack::<typst::text::RawElem>().ok()?;
-            let text = anno.text().clone().into_value().cast::<Str>().ok()?;
-            let code = typst::syntax::parse_code(&text.as_str().replace('\'', "θ"));
-            let mut exprs = code.cast::<ast::Code>()?.exprs();
-            let ret = self.check_doc_type_expr(m, exprs.next()?);
-            self.docs_scope.insert(name.into(), ret.clone());
-            ret
-        } else {
-            None
-        }
-    }
-
-    fn check_doc_type_expr(&mut self, m: &Module, s: ast::Expr) -> Option<Ty> {
-        log::debug!("check doc type expr: {s:?}");
-        match s {
-            ast::Expr::Ident(i) => self.check_doc_type_ident(m, i.get().as_str()),
-            ast::Expr::Closure(c) => {
-                log::debug!("check doc closure annotation: {c:?}");
-                let mut pos = vec![];
-                let mut named = BTreeMap::new();
-                let mut rest = None;
-
-                for param in c.params().children() {
-                    match param {
-                        ast::Param::Pos(ast::Pattern::Normal(ast::Expr::Ident(i))) => {
-                            let base_ty = self.docs_scope.get(i.get().as_str()).cloned();
-                            pos.push(base_ty.flatten().unwrap_or(Ty::Any));
-                        }
-                        ast::Param::Pos(_) => {
-                            pos.push(Ty::Any);
-                        }
-                        ast::Param::Named(e) => {
-                            let exp = self.check_doc_type_expr(m, e.expr()).unwrap_or(Ty::Any);
-                            named.insert(e.name().into(), exp);
-                        }
-                        // todo: spread left/right
-                        ast::Param::Spread(s) => {
-                            let Some(i) = s.sink_ident() else {
-                                continue;
-                            };
-                            let name = i.get().clone();
-                            let rest_ty = self
-                                .docs_scope
-                                .get(i.get().as_str())
-                                .cloned()
-                                .flatten()
-                                .unwrap_or_else(|| {
-                                    self.generate_var(
-                                        name.as_str().into(),
-                                        self.documenting_id.unwrap(),
-                                    )
-                                });
-                            self.docs_scope.insert(name, Some(rest_ty.clone()));
-                            rest = Some(rest_ty);
-                        }
-                    }
-                }
-
-                let body = self.check_doc_type_expr(m, c.body())?;
-                let sig = SigTy::new(pos, named, rest, Some(body)).into();
-
-                Some(Ty::Func(sig))
-            }
-            ast::Expr::Dict(d) => {
-                log::debug!("check doc dict annotation: {d:?}");
-                None
-            }
-            _ => None,
-        }
     }
 }
