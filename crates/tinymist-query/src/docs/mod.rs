@@ -9,7 +9,6 @@ use std::ops::Range;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use comemo::Track;
 use ecow::{eco_vec, EcoString, EcoVec};
 use indexmap::IndexSet;
 use itertools::Itertools;
@@ -19,14 +18,12 @@ use serde::{Deserialize, Serialize};
 use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
 use tinymist_world::LspWorld;
 use typst::diag::{eco_format, StrResult};
-use typst::engine::Route;
-use typst::eval::Tracer;
 use typst::foundations::{Bytes, Module, Value};
 use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{FileId, Span, VirtualPath};
 use typst::World;
 
-use self::tidy::*;
+pub(crate) use self::tidy::*;
 use crate::analysis::analyze_dyn_signature;
 use crate::syntax::{find_docs_of, get_non_strict_def_target, IdentRef};
 use crate::ty::Ty;
@@ -238,25 +235,15 @@ pub fn get_manifest(world: &LspWorld, toml_id: FileId) -> StrResult<PackageManif
         .map_err(|err| eco_format!("package manifest is malformed ({})", err.message()))
 }
 
-struct ScanSymbolCtx<'a> {
-    world: &'a LspWorld,
+struct ScanSymbolCtx<'a, 'w> {
+    ctx: &'a mut AnalysisContext<'w>,
     for_spec: Option<&'a PackageSpec>,
     aliases: &'a mut HashMap<FileId, Vec<String>>,
     extras: &'a mut Vec<SymbolInfo>,
     root: FileId,
 }
 
-impl ScanSymbolCtx<'_> {
-    fn module(&mut self, fid: FileId) -> StrResult<Module> {
-        let source = self.world.source(fid).map_err(|e| eco_format!("{e}"))?;
-        let route = Route::default();
-        let mut tracer = Tracer::default();
-        let w: &dyn typst::World = self.world;
-
-        typst::eval::eval(w.track(), route.track(), tracer.track_mut(), &source)
-            .map_err(|e| eco_format!("{e:?}"))
-    }
-
+impl ScanSymbolCtx<'_, '_> {
     fn module_sym(&mut self, path: EcoVec<&str>, module: Module) -> SymbolInfo {
         let key = module.name().to_owned();
         let site = Some(self.root);
@@ -271,7 +258,7 @@ impl ScanSymbolCtx<'_> {
         site: Option<&FileId>,
         val: &Value,
     ) -> SymbolInfo {
-        let mut head = create_head(self.world, key, val);
+        let mut head = create_head(self.ctx, key, val);
 
         if !matches!(&val, Value::Module(..)) {
             if let Some((span, mod_fid)) = head.span.and_then(Span::id).zip(site) {
@@ -321,7 +308,7 @@ impl ScanSymbolCtx<'_> {
             if fid.package() == self.for_spec {
                 let av = self.aliases.entry(fid).or_default();
                 if av.is_empty() {
-                    let m = self.module(fid);
+                    let m = self.ctx.module_by_id(fid);
                     let mut path = path.clone();
                     path.push("-");
                     path.push(key);
@@ -341,9 +328,9 @@ impl ScanSymbolCtx<'_> {
 }
 
 /// List all symbols in a package.
-pub fn list_symbols(world: &LspWorld, spec: &PackageInfo) -> StrResult<SymbolsInfo> {
+pub fn list_symbols(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<SymbolsInfo> {
     let toml_id = get_manifest_id(spec)?;
-    let manifest = get_manifest(world, toml_id)?;
+    let manifest = get_manifest(ctx.world(), toml_id)?;
 
     let for_spec = PackageSpec {
         namespace: spec.namespace.clone(),
@@ -355,14 +342,17 @@ pub fn list_symbols(world: &LspWorld, spec: &PackageInfo) -> StrResult<SymbolsIn
     let entry_point = toml_id.join(&manifest.package.entrypoint);
 
     let mut scan_ctx = ScanSymbolCtx {
-        world,
+        ctx,
         root: entry_point,
         for_spec: Some(&for_spec),
         aliases: &mut aliases,
         extras: &mut extras,
     };
 
-    let src = scan_ctx.module(entry_point)?;
+    let src = scan_ctx
+        .ctx
+        .module_by_id(entry_point)
+        .map_err(|e| eco_format!("failed to get module by id {entry_point:?}: {e:?}"))?;
     let mut symbols = scan_ctx.module_sym(eco_vec![], src);
 
     let module_uses = aliases
@@ -403,7 +393,7 @@ static DOCS_CONVERT_ID: std::sync::LazyLock<Mutex<FileId>> = std::sync::LazyLock
     Mutex::new(FileId::new(None, VirtualPath::new("__tinymist_docs__.typ")))
 });
 
-fn convert_docs(world: &LspWorld, content: &str) -> StrResult<EcoString> {
+pub(crate) fn convert_docs(world: &LspWorld, content: &str) -> StrResult<EcoString> {
     static DOCS_LIB: std::sync::LazyLock<Arc<typlite::scopes::Scopes<typlite::value::Value>>> =
         std::sync::LazyLock::new(library::lib);
 
@@ -430,7 +420,7 @@ fn convert_docs(world: &LspWorld, content: &str) -> StrResult<EcoString> {
 
 fn identify_docs(kind: &str, content: &str) -> StrResult<Docs> {
     match kind {
-        "function" => identify_tidy_func_docs(content).map(Docs::Function),
+        "function" => identify_func_docs(content).map(Docs::Function),
         "variable" => identify_tidy_var_docs(content).map(Docs::Variable),
         "module" => identify_tidy_module_docs(content).map(Docs::Module),
         _ => Err(eco_format!("unknown kind {kind}")),
@@ -578,7 +568,7 @@ pub fn generate_md_docs(
     };
 
     let mut md = String::new();
-    let SymbolsInfo { root, module_uses } = list_symbols(world, spec)?;
+    let SymbolsInfo { root, module_uses } = list_symbols(ctx, spec)?;
 
     log::debug!("module_uses: {module_uses:#?}");
 
@@ -897,14 +887,14 @@ fn kind_of(val: &Value) -> EcoString {
     .into()
 }
 
-fn create_head(world: &LspWorld, k: &str, v: &Value) -> SymbolInfoHead {
+fn create_head(world: &mut AnalysisContext, k: &str, v: &Value) -> SymbolInfoHead {
     let kind = kind_of(v);
     let (docs, name_range, fid, span) = match v {
         Value::Func(f) => {
             let mut span = None;
             let mut name_range = None;
             let docs = None.or_else(|| {
-                let source = world.source(f.span().id()?).ok()?;
+                let source = world.source_by_id(f.span().id()?).ok()?;
                 let node = source.find(f.span())?;
                 log::debug!("node: {k} -> {:?}", node.parent());
                 // use parent of params, todo: reliable way to get the def target

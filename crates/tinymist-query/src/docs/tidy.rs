@@ -28,7 +28,7 @@ pub struct TidyModuleDocs {
     pub docs: String,
 }
 
-pub fn identify_tidy_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
+pub fn identify_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
     let lines = converted.lines().collect::<Vec<_>>();
 
     let mut matching_return_ty = true;
@@ -213,7 +213,7 @@ mod tests {
     use super::TidyParamDocs;
 
     fn func(s: &str) -> String {
-        let f = super::identify_tidy_func_docs(s).unwrap();
+        let f = super::identify_func_docs(s).unwrap();
         let mut res = format!(">> docs:\n{}\n<< docs", f.docs);
         if let Some(t) = f.return_ty {
             res.push_str(&format!("\n>>return\n{t}\n<<return"));

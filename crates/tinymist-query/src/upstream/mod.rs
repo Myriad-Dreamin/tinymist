@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fmt::Write};
 
+use comemo::Tracked;
 use ecow::{eco_format, EcoString};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -10,7 +11,7 @@ use typst::{
     introspection::MetadataElem,
     syntax::Span,
     text::{FontInfo, FontStyle},
-    Library,
+    Library, World,
 };
 
 mod tooltip;
@@ -429,7 +430,7 @@ pub fn truncated_doc_repr(value: &Value) -> EcoString {
 }
 
 /// Run a function with a VM instance in the world
-pub fn with_vm<T>(world: &dyn typst::World, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
+pub fn with_vm<T>(world: Tracked<dyn World + '_>, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
     use comemo::Track;
     use typst::engine::*;
     use typst::eval::*;
@@ -440,7 +441,7 @@ pub fn with_vm<T>(world: &dyn typst::World, f: impl FnOnce(&mut typst::eval::Vm)
     let introspector = Introspector::default();
     let mut tracer = Tracer::new();
     let engine = Engine {
-        world: world.track(),
+        world,
         route: Route::default(),
         introspector: introspector.track(),
         locator: &mut locator,

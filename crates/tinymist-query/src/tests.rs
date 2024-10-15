@@ -34,7 +34,7 @@ type CompileDriver<C> = CompileDriverImpl<C, tinymist_world::LspCompilerFeat>;
 struct WrapWorld<'a>(&'a mut LspWorld);
 
 impl<'a> AnalysisResources for WrapWorld<'a> {
-    fn world(&self) -> &dyn typst::World {
+    fn world(&self) -> &LspWorld {
         self.0
     }
 

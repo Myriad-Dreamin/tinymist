@@ -2,6 +2,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use ecow::EcoString;
 use once_cell::sync::Lazy;
 use reflexo::vector::ir::DefId;
 use typst::{
@@ -43,6 +44,9 @@ pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Ar
         def_use_info,
         info: &mut info,
         externals: HashMap::new(),
+        docs_scope: HashMap::new(),
+        documenting_id: None,
+        generated: HashMap::new(),
         mode: InterpretMode::Markup,
     };
     let lnk = LinkedNode::new(source.root());
@@ -70,6 +74,9 @@ struct TypeChecker<'a, 'w> {
     def_use_info: Arc<DefUseInfo>,
 
     info: &'a mut TypeScheme,
+    docs_scope: HashMap<EcoString, Option<Ty>>,
+    documenting_id: Option<DefId>,
+    generated: HashMap<DefId, u32>,
     externals: HashMap<DefId, Option<Ty>>,
     mode: InterpretMode,
 }
@@ -106,11 +113,25 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         w
     }
 
+    fn get_def_id(&mut self, s: Span, r: &IdentRef) -> Option<DefId> {
+        self.def_use_info
+            .get_ref(r)
+            .or_else(|| Some(self.def_use_info.get_def(s.id()?, r)?.0))
+    }
+
+    fn generate_var(&mut self, name: StrRef, id: DefId) -> Ty {
+        let next_id = self.generated.entry(id).or_insert(0);
+        *next_id += 1;
+        let encoded = DefId((id.0 + 1) * 0x100_0000_0000 + (*next_id as u64));
+        log::debug!("generate var {name:?} {encoded:?}");
+        let bounds = TypeVarBounds::new(TypeVar { name, def: encoded }, TypeBounds::default());
+        let var = bounds.as_type();
+        self.info.vars.insert(encoded, bounds);
+        var
+    }
+
     fn get_var(&mut self, s: Span, r: IdentRef) -> Option<Ty> {
-        let def_id = self
-            .def_use_info
-            .get_ref(&r)
-            .or_else(|| Some(self.def_use_info.get_def(s.id()?, &r)?.0))?;
+        let def_id = self.get_def_id(s, &r)?;
 
         // todo: false positive of clippy
         #[allow(clippy::map_entry)]
@@ -132,6 +153,13 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let var = self.info.vars.get_mut(&def_id).unwrap();
         TypeScheme::witness_(s, var.as_type(), &mut self.info.mapping);
         Some(var.as_type())
+    }
+
+    fn with_docs_scope<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let res = f(self);
+        self.docs_scope.clear();
+        self.documenting_id = None;
+        res
     }
 
     fn import_ty(&mut self, def_id: DefId) -> Option<Ty> {

@@ -1,13 +1,16 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{collections::HashSet, ops::Deref};
 
-use comemo::Tracked;
+use comemo::{Track, Tracked};
 use once_cell::sync::OnceCell;
 use reflexo::hash::{hash128, FxDashMap};
 use reflexo::{debug_loc::DataSource, ImmutPath};
-use typst::diag::{eco_format, FileError, FileResult, PackageError};
-use typst::eval::Eval;
-use typst::foundations::{self, Bytes, Func, Styles};
+use tinymist_world::LspWorld;
+use tinymist_world::DETACHED_ENTRY;
+use typst::diag::{eco_format, At, FileError, FileResult, PackageError, SourceResult};
+use typst::engine::Route;
+use typst::eval::{Eval, Tracer};
+use typst::foundations::{self, Bytes, Func, Module, Styles};
 use typst::layout::Position;
 use typst::syntax::{package::PackageSpec, Span, VirtualPath};
 use typst::{model::Document, text::Font};
@@ -148,7 +151,7 @@ impl ModuleAnalysisCache {
 /// The resources for analysis.
 pub trait AnalysisResources {
     /// Get the world surface for Typst compiler.
-    fn world(&self) -> &dyn World;
+    fn world(&self) -> &LspWorld;
 
     /// Resolve the real path for a package spec.
     fn resolve(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError>;
@@ -226,7 +229,7 @@ impl<'w> AnalysisContext<'w> {
     }
 
     /// Get the world surface for Typst compiler.
-    pub fn world(&self) -> &'w dyn World {
+    pub fn world(&self) -> &'w LspWorld {
         self.resources.world()
     }
 
@@ -281,6 +284,19 @@ impl<'w> AnalysisContext<'w> {
         }
     }
 
+    /// Get file's id by its path
+    pub fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
+        // todo: source in packages
+        let relative_path = p.strip_prefix(&self.root).map_err(|_| {
+            FileError::Other(Some(eco_format!(
+                "not in root, path is {p:?}, root is {:?}",
+                self.root
+            )))
+        })?;
+
+        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
+    }
+
     /// Resolve the real path for a file id.
     pub fn path_for_id(&self, id: TypstFileId) -> Result<PathBuf, FileError> {
         if id.vpath().as_rootless_path() == Path::new("-") {
@@ -319,24 +335,36 @@ impl<'w> AnalysisContext<'w> {
         self.get(id).unwrap().source(self, id)
     }
 
-    /// Get the fileId from its path
-    pub fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
-        // todo: source in packages
-        let relative_path = p.strip_prefix(&self.root).map_err(|_| {
-            FileError::Other(Some(eco_format!(
-                "not in root, path is {p:?}, root is {:?}",
-                self.root
-            )))
-        })?;
-
-        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
-    }
-
     /// Get the source of a file by file path.
     pub fn source_by_path(&mut self, p: &Path) -> FileResult<Source> {
         // todo: source in packages
         let id = self.file_id_by_path(p)?;
         self.source_by_id(id)
+    }
+
+    /// Get a module by file id.
+    pub fn module_by_id(&mut self, fid: TypstFileId) -> SourceResult<Module> {
+        let source = self.source_by_id(fid).at(Span::detached())?;
+        self.module_by_src(source)
+    }
+
+    /// Get a module by string.
+    pub fn module_by_str(&mut self, rr: String) -> Option<Module> {
+        let src = Source::new(*DETACHED_ENTRY, rr);
+        self.module_by_src(src).ok()
+    }
+
+    /// Get (Create) a module by source.
+    pub fn module_by_src(&mut self, source: Source) -> SourceResult<Module> {
+        let route = Route::default();
+        let mut tracer = Tracer::default();
+
+        typst::eval::eval(
+            (self.world() as &dyn World).track(),
+            route.track(),
+            tracer.track_mut(),
+            &source,
+        )
     }
 
     /// Get a syntax object at a position.
@@ -517,7 +545,7 @@ impl<'w> AnalysisContext<'w> {
     pub fn import_info(&mut self, source: Source) -> Option<Arc<ImportInfo>> {
         use comemo::Track;
         let w = self.resources.world();
-        let w = w.track();
+        let w = (w as &dyn World).track();
 
         let token = &self.analysis.workers.import;
         token.enter(|| import_info(w, source))
@@ -582,13 +610,13 @@ impl<'w> AnalysisContext<'w> {
     ) -> Option<Arc<BibInfo>> {
         use comemo::Track;
         let w = self.resources.world();
-        let w = w.track();
+        let w = (w as &dyn World).track();
 
         bib_info(w, span, bib_paths.collect())
     }
 
     pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
-        crate::upstream::with_vm(self.world(), f)
+        crate::upstream::with_vm((self.world() as &dyn World).track(), f)
     }
 
     pub(crate) fn const_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
