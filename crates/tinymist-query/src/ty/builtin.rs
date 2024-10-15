@@ -223,7 +223,7 @@ pub enum BuiltinTy {
     Outset,
     Radius,
 
-    Tag(StrRef, Option<Interned<PackageId>>),
+    Tag(Box<(StrRef, Option<Interned<PackageId>>)>),
     Type(typst::foundations::Type),
     Element(typst::foundations::Element),
     Path(PathPreference),
@@ -259,11 +259,12 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::Radius => write!(f, "Radius"),
             BuiltinTy::Type(ty) => write!(f, "Type({})", ty.long_name()),
             BuiltinTy::Element(e) => e.fmt(f),
-            BuiltinTy::Tag(tag, id) => {
+            BuiltinTy::Tag(tag) => {
+                let (name, id) = tag.as_ref();
                 if let Some(id) = id {
-                    write!(f, "Tag({tag:?}) of {id:?}")
+                    write!(f, "Tag({name:?}) of {id:?}")
                 } else {
-                    write!(f, "Tag({tag:?})")
+                    write!(f, "Tag({name:?})")
                 }
             }
             BuiltinTy::Path(p) => write!(f, "Path({p:?})"),
@@ -335,12 +336,13 @@ impl BuiltinTy {
             BuiltinTy::Radius => "radius",
             BuiltinTy::Type(ty) => ty.short_name(),
             BuiltinTy::Element(ty) => ty.name(),
-            BuiltinTy::Tag(name, id) => {
+            BuiltinTy::Tag(tag) => {
+                let (name, id) = tag.as_ref();
                 return if let Some(id) = id {
                     format!("tag {name} of {id:?}")
                 } else {
                     format!("tag {name}")
-                }
+                };
             }
             BuiltinTy::Path(s) => match s {
                 PathPreference::None => "[any]",
