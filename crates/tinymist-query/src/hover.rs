@@ -196,19 +196,9 @@ fn star_tooltip(
 
     let mut names = scope.iter().map(|(name, _)| name).collect::<Vec<_>>();
     names.sort();
-    let mut items = String::new();
-    items.push_str("let (");
-    for name in &names {
-        items.push_str(name);
-        items.push_str(", ");
-    }
-    items.push_str(") = ..");
+    let items = typst::foundations::repr::separated_list(&names, "and");
 
-    results.push(MarkedString::LanguageString(LanguageString {
-        language: "typc".to_owned(),
-        value: items,
-    }));
-
+    results.push(MarkedString::String(format!("This star imports {items}")));
     Some(LspHoverContents::Array(results))
 }
 
