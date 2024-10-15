@@ -607,7 +607,7 @@ pub static FLOW_RADIUS_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
 mod tests {
     use reflexo::vector::ir::DefId;
 
-    use super::*;
+    use super::{SigTy, Ty, TypeVar};
 
     // todo: map function
     // Technical Note for implementing a map function:
@@ -618,8 +618,9 @@ mod tests {
         let u = Ty::Var(TypeVar::new("u".into(), DefId(0)));
         let v = Ty::Var(TypeVar::new("v".into(), DefId(1)));
         let mapper_fn =
-            Ty::Func(SigTy::new([u], Option::None, Option::None, Some(v.clone())).into());
-        let map_fn = Ty::Func(SigTy::new([mapper_fn], Option::None, Option::None, Some(v)).into());
+            Ty::Func(SigTy::new([u].into_iter(), None, None, None, Some(v.clone())).into());
+        let map_fn =
+            Ty::Func(SigTy::new([mapper_fn].into_iter(), None, None, None, Some(v)).into());
         let _ = map_fn;
         // println!("{map_fn:?}");
     }

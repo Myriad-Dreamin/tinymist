@@ -368,7 +368,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
         }
 
-        let args = ArgsTy::new(args_res, named, None, None);
+        let args = ArgsTy::new(args_res.into_iter(), named, None, None, None);
 
         Some(Ty::Args(args.into()))
     }
@@ -444,7 +444,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             self.weaken(rest);
         }
 
-        let sig = SigTy::new(pos, named, rest, Some(res_ty)).into();
+        let sig = SigTy::new(pos.into_iter(), named, rest, Some(res_ty), None).into();
         let sig = Ty::Func(sig);
         if defaults.is_empty() {
             return Some(sig);
@@ -453,7 +453,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let defaults: Vec<(Interned<str>, Ty)> = defaults.into_iter().collect();
         let with_defaults = SigWithTy {
             sig: sig.into(),
-            with: ArgsTy::new(vec![], defaults, None, None).into(),
+            with: ArgsTy::new([].into_iter(), defaults, None, None, None).into(),
         };
         Some(Ty::With(with_defaults.into()))
     }
