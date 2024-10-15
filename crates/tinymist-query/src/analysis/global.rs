@@ -19,7 +19,7 @@ use typst_shim::syntax::LinkedNodeExt;
 use crate::adt::interner::Interned;
 use crate::analysis::{
     analyze_bib, analyze_dyn_signature, analyze_expr_, analyze_import_, post_type_check, BibInfo,
-    DefUseInfo, DefinitionLink, IdentRef, ImportInfo, PathPreference, SigTy, Signature,
+    DefUseInfo, DefinitionLink, DocString, IdentRef, ImportInfo, PathPreference, SigTy, Signature,
     SignatureTarget, Ty, TypeScheme,
 };
 use crate::docs::DocStringKind;
@@ -33,8 +33,6 @@ use crate::{
     lsp_to_typst, path_to_url, typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange,
     VersionedDocument,
 };
-
-use super::DocString;
 
 /// The analysis data holds globally.
 #[derive(Default)]
