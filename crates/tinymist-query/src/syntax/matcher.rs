@@ -243,6 +243,10 @@ impl<'a> DefTarget<'a> {
     }
 
     pub fn name_range(&self) -> Option<Range<usize>> {
+        self.name().map(|node| node.range())
+    }
+
+    pub fn name(&self) -> Option<LinkedNode> {
         match self {
             DefTarget::Let(node) => {
                 let lb: ast::LetBinding<'_> = node.cast()?;
@@ -254,7 +258,7 @@ impl<'a> DefTarget<'a> {
                     _ => return None,
                 };
 
-                Some(names.range())
+                Some(names)
             }
             DefTarget::Import(_node) => {
                 // let ident = node.cast::<ast::ImportItem>()?;

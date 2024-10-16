@@ -397,7 +397,15 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                             name,
                             docs: param_doc.docs.clone().unwrap_or_default(),
                             cano_type: (),
-                            default: param_doc.default.clone(),
+                            default: None,
+                            attrs: ParamAttrs::positional(),
+                        });
+                    } else {
+                        pos_docs.push(TypelessParamDocs {
+                            name: "_".into(),
+                            docs: Default::default(),
+                            cano_type: (),
+                            default: None,
                             attrs: ParamAttrs::positional(),
                         });
                     }
@@ -422,7 +430,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                             name: name.clone(),
                             docs: param_doc.docs.clone().unwrap_or_default(),
                             cano_type: (),
-                            default: param_doc.default.clone(),
+                            default: Some(e.expr().to_untyped().clone().into_text()),
                             attrs: ParamAttrs::named(),
                         },
                     );
@@ -445,7 +453,16 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                             name: e.get().as_str().into(),
                             docs: param_doc.docs.clone().unwrap_or_default(),
                             cano_type: (),
-                            default: param_doc.default.clone(),
+                            default: None,
+                            attrs: ParamAttrs::variadic(),
+                        });
+                    } else {
+                        rest = Some(Ty::Builtin(BuiltinTy::Args));
+                        rest_docs = Some(TypelessParamDocs {
+                            name: "_".into(),
+                            docs: Default::default(),
+                            cano_type: (),
+                            default: None,
                             attrs: ParamAttrs::variadic(),
                         });
                     }

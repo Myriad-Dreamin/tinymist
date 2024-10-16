@@ -259,19 +259,24 @@ fn analyze_type_signature(
             let node = source.find(f.span())?;
             let def = get_non_strict_def_target(node.parent()?.clone())?;
             let type_info = ctx.type_check(&source)?;
-            let ty = type_info.type_of_span(def.node().span())?;
+            let ty = type_info.type_of_span(def.name()?.span())?;
             Some((type_info, ty))
         }
     }?;
-    log::debug!("check type signature of ty: {ty:?}");
 
     // todo multiple sources
     let mut srcs = ty.sources();
     srcs.sort();
+    log::debug!("check type signature of ty: {ty:?} => {srcs:?}");
     let type_var = srcs.into_iter().next()?;
     match type_var {
         TypeSources::Var(v) => {
-            let sig_ty = ty.sig_repr(true, &mut PostTypeChecker::new(ctx, &type_info))?;
+            let mut ty_ctx = PostTypeChecker::new(ctx, &type_info);
+            let sig_ty = Ty::Func(ty.sig_repr(true, &mut ty_ctx)?);
+            let sig_ty = type_info.simplify(sig_ty, false);
+            let Ty::Func(sig_ty) = sig_ty else {
+                panic!("expected function type, got {sig_ty:?}");
+            };
 
             let docstring = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
                 Some(UntypedSymbolDocs::Function(sig)) => sig,
@@ -281,6 +286,10 @@ fn analyze_type_signature(
             let mut param_specs = Vec::new();
             let mut has_fill_or_size_or_stroke = false;
             let mut _broken = false;
+
+            if docstring.pos.len() != sig_ty.positional_params().len() {
+                panic!("positional params mismatch: {docstring:#?} != {sig_ty:#?}");
+            }
 
             for (doc, ty) in docstring.pos.iter().zip(sig_ty.positional_params()) {
                 let default = doc.default.clone();

@@ -103,8 +103,6 @@ pub struct VarDoc {
     pub docs: Option<EcoString>,
     /// The type of the variable
     pub ty: Option<Ty>,
-    /// The default value of the variable
-    pub default: Option<EcoString>,
 }
 
 pub(crate) fn compute_docstring(
@@ -154,7 +152,6 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
                 VarDoc {
                     docs: Some(param.docs),
                     ty: self.check_type_strings(&module, &param.types),
-                    default: param.default,
                 },
             );
         }
