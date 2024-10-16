@@ -27,7 +27,6 @@ use super::{
     TypeInterface, VarDoc,
 };
 
-// pub fn analyze_signature
 /// Attributes of a function parameter.
 #[derive(Debug, Clone, Copy)]
 pub struct ParamAttrs {
