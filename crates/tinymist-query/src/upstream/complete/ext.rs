@@ -601,16 +601,16 @@ pub fn param_completions<'a>(
             log::debug!("pos_param_completion_to: {:?}", pos);
 
             if let Some(pos) = pos {
-                if set && !pos.attr.settable {
+                if set && !pos.attrs.settable {
                     break 'pos_check;
                 }
 
-                if let Some(docs) = pos.docstring().and_then(|d| d.docs.as_ref()) {
+                if let Some(docs) = pos.docs {
                     doc = Some(plain_docs_sentence(docs));
                 }
 
-                if pos.attr.positional {
-                    type_completion(ctx, pos.ty(), doc.as_deref());
+                if pos.attrs.positional {
+                    type_completion(ctx, pos.ty, doc.as_deref());
                 }
             }
         }
@@ -636,13 +636,8 @@ pub fn param_completions<'a>(
 
         let _d = OnceCell::new();
         let docs = || {
-            _d.get_or_init(|| {
-                param
-                    .docstring
-                    .and_then(|d| d.docs.as_deref())
-                    .map(plain_docs_sentence)
-            })
-            .clone()
+            _d.get_or_init(|| param.docs.map(|d| plain_docs_sentence(d.as_str())))
+                .clone()
         };
 
         if param.attrs.named {
@@ -998,14 +993,11 @@ pub fn named_param_value_completions<'a>(
     let Some(param) = primary_sig.get_named(name) else {
         return;
     };
-    if !param.attr.named {
+    if !param.attrs.named {
         return;
     }
 
-    let doc = param
-        .docstring()
-        .and_then(|d| d.docs.as_deref())
-        .map(plain_docs_sentence);
+    let doc = param.docs.map(|d| plain_docs_sentence(d.as_str()));
 
     // static analysis
     if let Some(ty) = ty {
@@ -1019,14 +1011,13 @@ pub fn named_param_value_completions<'a>(
         completed = true;
     }
 
-    let ty = param.ty();
-    if !matches!(ty, Ty::Any) {
-        type_completion(ctx, ty, doc.as_deref());
+    if !matches!(param.ty, Ty::Any) {
+        type_completion(ctx, param.ty, doc.as_deref());
         completed = true;
     }
 
     if !completed {
-        if let Some(expr) = param.docstring().and_then(|d| d.default.as_ref()) {
+        if let Some(expr) = param.default {
             ctx.completions.push(Completion {
                 kind: CompletionKind::Constant,
                 label: expr.clone(),

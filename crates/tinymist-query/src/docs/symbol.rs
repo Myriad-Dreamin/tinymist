@@ -14,7 +14,7 @@ use typst::{
 };
 
 use super::tidy::*;
-use crate::analysis::{analyze_dyn_signature, ParamSpecLong};
+use crate::analysis::{analyze_dyn_signature, ParamSpec};
 use crate::docs::library;
 use crate::syntax::IdentRef;
 use crate::{ty::Ty, AnalysisContext};
@@ -169,7 +169,7 @@ impl fmt::Display for SignatureDocs {
             let mut name_prints = vec![];
             for v in self.named.values() {
                 let ty = v.cano_type.as_ref().map(|t| &t.0);
-                name_prints.push((v.name.clone(), ty, v.expr.clone()))
+                name_prints.push((v.name.clone(), ty, v.default.clone()))
             }
             name_prints.sort();
             for (k, t, v) in name_prints {
@@ -203,11 +203,11 @@ pub struct ParamDocs {
     /// The parameter's name.
     pub name: String,
     /// Documentation for the parameter.
-    pub docs: String,
+    pub docs: EcoString,
     /// Inferred type of the parameter.
     pub cano_type: TypeRepr,
     /// The parameter's default name as value.
-    pub expr: Option<EcoString>,
+    pub default: Option<EcoString>,
     /// Is the parameter positional?
     pub positional: bool,
     /// Is the parameter named?
@@ -222,16 +222,12 @@ pub struct ParamDocs {
 }
 
 impl ParamDocs {
-    fn new(param: ParamSpecLong, ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> Self {
+    fn new(param: ParamSpec, ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> Self {
         Self {
             name: param.name.as_ref().to_owned(),
-            docs: param
-                .docstring
-                .and_then(|d| d.docs.as_deref())
-                .unwrap_or_default()
-                .to_owned(),
+            docs: param.docs.cloned().unwrap_or_default(),
             cano_type: format_ty(ty.or(Some(param.ty)), doc_ty),
-            expr: param.docstring.and_then(|d| d.default.clone()),
+            default: param.default.cloned(),
             positional: param.attrs.positional,
             named: param.attrs.named,
             variadic: param.attrs.variadic,

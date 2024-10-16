@@ -215,7 +215,7 @@ fn inlay_hint(
                             continue;
                         };
 
-                        let name = info.param.name();
+                        let name = &info.param_name;
                         if name.is_empty() {
                             continue;
                         }

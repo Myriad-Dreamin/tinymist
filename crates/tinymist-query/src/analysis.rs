@@ -457,10 +457,7 @@ mod signature_tests {
                     f,
                     " {}: {},",
                     param.name,
-                    param
-                        .docstring
-                        .and_then(|d| d.default.as_deref())
-                        .unwrap_or_default()
+                    param.default.map(|s| s.as_str()).unwrap_or_default()
                 )?;
             }
             if let Some(name) = primary_sig.rest_name() {

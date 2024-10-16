@@ -2,7 +2,7 @@
 
 use typst::syntax::SyntaxNode;
 
-use super::{ParamSpecShort, Signature};
+use super::{Signature, StrRef};
 use crate::{
     analysis::{analyze_signature, PrimarySignature, SignatureTarget},
     prelude::*,
@@ -26,8 +26,8 @@ pub struct CallParamInfo {
     pub kind: ParamKind,
     /// Whether the parameter is a content block.
     pub is_content_block: bool,
-    /// The parameter's specification.
-    pub param: ParamSpecShort,
+    /// The name of the parameter.
+    pub param_name: StrRef,
 }
 
 /// Describes a function call.
@@ -131,8 +131,7 @@ pub fn analyze_call_no_cache(
                     CallParamInfo {
                         kind,
                         is_content_block,
-                        param: param.clone(),
-                        // types: eco_vec![],
+                        param_name: param.name.clone(),
                     },
                 );
             }
@@ -165,8 +164,7 @@ pub fn analyze_call_no_cache(
                     CallParamInfo {
                         kind: ParamKind::Rest,
                         is_content_block,
-                        param: rest,
-                        // types: eco_vec![],
+                        param_name: rest.name.clone(),
                     },
                 );
             }
@@ -217,8 +215,7 @@ pub fn analyze_call_no_cache(
                         CallParamInfo {
                             kind: ParamKind::Named,
                             is_content_block: false,
-                            param: param.clone(),
-                            // types: eco_vec![],
+                            param_name: param.name.clone(),
                         },
                     );
                 }
