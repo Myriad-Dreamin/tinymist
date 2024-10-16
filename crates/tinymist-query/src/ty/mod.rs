@@ -106,7 +106,7 @@ mod tests {
         let named = named.iter().map(|(n, t)| ((*n).into(), var_ins(t)));
         let rest = rest.map(var_ins);
         let ret = ret.map(var_ins);
-        SigTy::new(pos, named, rest, ret).into()
+        SigTy::new(pos, named, None, rest, ret).into()
     }
 
     // args*, (keys: values)*, ...rest -> ret

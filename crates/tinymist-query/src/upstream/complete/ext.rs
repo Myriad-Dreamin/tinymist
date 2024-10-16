@@ -597,7 +597,7 @@ pub fn param_completions<'a>(
         let mut doc = None;
 
         if let Some(pos_index) = pos_index {
-            let pos = primary_sig.pos.get(pos_index);
+            let pos = primary_sig.get_pos(pos_index);
             log::debug!("pos_param_completion_to: {:?}", pos);
 
             if let Some(pos) = pos {
@@ -605,10 +605,12 @@ pub fn param_completions<'a>(
                     break 'pos_check;
                 }
 
-                doc = Some(plain_docs_sentence(&pos.docs));
+                if let Some(docs) = &pos.docs {
+                    doc = Some(plain_docs_sentence(docs));
+                }
 
                 if pos.positional {
-                    type_completion(ctx, &pos.base_type, doc.as_deref());
+                    type_completion(ctx, &pos.ty, doc.as_deref());
                 }
             }
         }
@@ -618,7 +620,8 @@ pub fn param_completions<'a>(
         }
     }
 
-    for (name, param) in &primary_sig.named {
+    for param in primary_sig.named() {
+        let name = &param.name;
         if ctx.seen_field(name.as_ref().into()) {
             continue;
         }
@@ -632,7 +635,10 @@ pub fn param_completions<'a>(
         }
 
         let _d = OnceCell::new();
-        let docs = || Some(_d.get_or_init(|| plain_docs_sentence(&param.docs)).clone());
+        let docs = || {
+            _d.get_or_init(|| param.docs.as_ref().map(|d| plain_docs_sentence(d.as_str())))
+                .clone()
+        };
 
         if param.named {
             let compl = Completion {
@@ -644,7 +650,7 @@ pub fn param_completions<'a>(
                 command: Some("tinymist.triggerNamedCompletion"),
                 ..Completion::default()
             };
-            match param.base_type {
+            match param.ty {
                 Ty::Builtin(BuiltinTy::TextSize) => {
                     for size_template in &[
                         "10.5pt", "12pt", "9pt", "14pt", "8pt", "16pt", "18pt", "20pt", "22pt",
@@ -674,7 +680,7 @@ pub fn param_completions<'a>(
         }
 
         if param.positional {
-            type_completion(ctx, &param.base_type, docs().as_deref());
+            type_completion(ctx, &param.ty, docs().as_deref());
         }
     }
 
@@ -984,14 +990,14 @@ pub fn named_param_value_completions<'a>(
 
     let primary_sig = signature.primary();
 
-    let Some(param) = primary_sig.named.get(name) else {
+    let Some(param) = primary_sig.get_named(name) else {
         return;
     };
     if !param.named {
         return;
     }
 
-    let doc = Some(plain_docs_sentence(&param.docs));
+    let doc = param.docs.as_ref().map(|d| plain_docs_sentence(d.as_str()));
 
     // static analysis
     if let Some(ty) = ty {
@@ -1005,13 +1011,13 @@ pub fn named_param_value_completions<'a>(
         completed = true;
     }
 
-    if !matches!(param.base_type, Ty::Any) {
-        type_completion(ctx, &param.base_type, doc.as_deref());
+    if !matches!(param.ty, Ty::Any) {
+        type_completion(ctx, &param.ty, doc.as_deref());
         completed = true;
     }
 
     if !completed {
-        if let Some(expr) = &param.expr {
+        if let Some(expr) = &param.default {
             ctx.completions.push(Completion {
                 kind: CompletionKind::Constant,
                 label: expr.clone(),

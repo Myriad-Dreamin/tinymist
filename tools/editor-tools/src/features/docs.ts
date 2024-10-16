@@ -605,7 +605,7 @@ function MakeDoc(root: DocElement) {
   interface DocParam {
     name: string;
     cano_type: [string, string];
-    expr?: string;
+    default?: string;
   }
 
   function FuncItem(v: DocElement) {
@@ -761,9 +761,9 @@ function MakeDoc(root: DocElement) {
         sigTypeHighlighted(param.cano_type, paramTitle);
       }
 
-      if (param.expr) {
+      if (param.default) {
         paramTitle.push(codeHl("op", " = "));
-        paramTitle.push(code(param.expr));
+        paramTitle.push(code(param.default));
       }
 
       if (kind == "pos") {

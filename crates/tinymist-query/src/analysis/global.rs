@@ -463,6 +463,15 @@ impl<'w> AnalysisContext<'w> {
     /// Get the signature of a function.
     pub fn signature(&self, func: &SignatureTarget) -> Option<Signature> {
         match func {
+            SignatureTarget::Def(source, r) => {
+                // todo: check performance on peeking signature source frequently
+                let cache_key = (source, r.range.start);
+                self.analysis
+                    .caches
+                    .static_signatures
+                    .get(&hash128(&cache_key))
+                    .and_then(|slot| (cache_key.1 == slot.2).then_some(slot.3.clone()))
+            }
             SignatureTarget::Syntax(source, node) => {
                 // todo: check performance on peeking signature source frequently
                 let cache_key = (source, node.offset());
@@ -488,6 +497,16 @@ impl<'w> AnalysisContext<'w> {
         compute: impl FnOnce() -> Signature,
     ) -> Signature {
         match func {
+            SignatureTarget::Def(source, r) => {
+                let cache_key = (source, r.range.start);
+                let h = hash128(&cache_key);
+                let slot = self.analysis.caches.static_signatures.entry(h);
+                let slot = slot.or_insert_with(|| {
+                    let sig = compute();
+                    (self.lifetime, cache_key.0, cache_key.1, sig)
+                });
+                slot.3.clone()
+            }
             SignatureTarget::Syntax(source, node) => {
                 let cache_key = (source, node.offset());
                 self.analysis

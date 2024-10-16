@@ -215,7 +215,8 @@ fn inlay_hint(
                             continue;
                         };
 
-                        if info.param.name.is_empty() {
+                        let name = &info.param_name;
+                        if name.is_empty() {
                             continue;
                         }
 
@@ -257,9 +258,9 @@ fn inlay_hint(
                             typst_to_lsp::offset_to_position(pos, self.encoding, self.source);
 
                         let label = InlayHintLabel::String(if info.kind == ParamKind::Rest {
-                            format!("..{}:", info.param.name)
+                            format!("..{name}:")
                         } else {
-                            format!("{}:", info.param.name)
+                            format!("{name}:")
                         });
 
                         self.hints.push(InlayHint {

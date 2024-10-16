@@ -373,7 +373,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
                     }
 
                     let body = self.check_type_expr(m, c.body())?;
-                    let sig = SigTy::new(pos, named, rest, Some(body)).into();
+                    let sig = SigTy::new(pos.into_iter(), named, None, rest, Some(body)).into();
 
                     Some(Ty::Func(sig))
                 });

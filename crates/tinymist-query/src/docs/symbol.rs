@@ -169,7 +169,7 @@ impl fmt::Display for SignatureDocs {
             let mut name_prints = vec![];
             for v in self.named.values() {
                 let ty = v.cano_type.as_ref().map(|t| &t.0);
-                name_prints.push((v.name.clone(), ty, v.expr.clone()))
+                name_prints.push((v.name.clone(), ty, v.default.clone()))
             }
             name_prints.sort();
             for (k, t, v) in name_prints {
@@ -203,11 +203,11 @@ pub struct ParamDocs {
     /// The parameter's name.
     pub name: String,
     /// Documentation for the parameter.
-    pub docs: String,
+    pub docs: EcoString,
     /// Inferred type of the parameter.
     pub cano_type: TypeRepr,
     /// The parameter's default name as value.
-    pub expr: Option<EcoString>,
+    pub default: Option<EcoString>,
     /// Is the parameter positional?
     pub positional: bool,
     /// Is the parameter named?
@@ -225,9 +225,9 @@ impl ParamDocs {
     fn new(param: &ParamSpec, ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> Self {
         Self {
             name: param.name.as_ref().to_owned(),
-            docs: param.docs.as_ref().to_owned(),
-            cano_type: format_ty(ty.or(Some(&param.base_type)), doc_ty),
-            expr: param.expr.clone(),
+            docs: param.docs.clone().unwrap_or_default(),
+            cano_type: format_ty(ty.or(Some(&param.ty)), doc_ty),
+            default: param.default.clone(),
             positional: param.positional,
             named: param.named,
             variadic: param.variadic,
@@ -288,19 +288,18 @@ pub(crate) fn signature_docs(
 
     let pos_in = sig
         .primary()
-        .pos
+        .pos()
         .iter()
         .enumerate()
         .map(|(i, pos)| (pos, type_sig.as_ref().and_then(|sig| sig.pos(i))));
     let named_in = sig
         .primary()
-        .named
+        .named()
         .iter()
-        .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.named(x.0))));
+        .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.named(&x.name))));
     let rest_in = sig
         .primary()
-        .rest
-        .as_ref()
+        .rest()
         .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.rest_param())));
 
     let ret_in = type_sig
@@ -312,9 +311,9 @@ pub(crate) fn signature_docs(
         .map(|(param, ty)| ParamDocs::new(param, ty, doc_ty.as_mut()))
         .collect();
     let named = named_in
-        .map(|((name, param), ty)| {
+        .map(|(param, ty)| {
             (
-                name.as_ref().to_owned(),
+                param.name.as_ref().to_owned(),
                 ParamDocs::new(param, ty, doc_ty.as_mut()),
             )
         })

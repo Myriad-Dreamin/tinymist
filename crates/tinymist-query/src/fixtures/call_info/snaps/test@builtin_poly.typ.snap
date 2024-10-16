@@ -3,6 +3,6 @@ source: crates/tinymist-query/src/analysis.rs
 expression: CallSnapshot(result.as_deref())
 input_file: crates/tinymist-query/src/fixtures/call_info/builtin_poly.typ
 ---
-255 -> CallParamInfo { kind: Positional, is_content_block: false, param: ParamSpec { name: "red", docs: "The red component.", base_type: (Type(integer) | Type(ratio)), expr: None, positional: true, named: false, variadic: false, settable: false } }
-255 -> CallParamInfo { kind: Positional, is_content_block: false, param: ParamSpec { name: "green", docs: "The green component.", base_type: (Type(integer) | Type(ratio)), expr: None, positional: true, named: false, variadic: false, settable: false } }
-255 -> CallParamInfo { kind: Positional, is_content_block: false, param: ParamSpec { name: "blue", docs: "The blue component.", base_type: (Type(integer) | Type(ratio)), expr: None, positional: true, named: false, variadic: false, settable: false } }
+255 -> CallParamInfo { kind: Positional, is_content_block: false, param_name: "red" }
+255 -> CallParamInfo { kind: Positional, is_content_block: false, param_name: "green" }
+255 -> CallParamInfo { kind: Positional, is_content_block: false, param_name: "blue" }
