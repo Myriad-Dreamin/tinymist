@@ -3,4 +3,4 @@ source: crates/tinymist-query/src/analysis.rs
 expression: CallSnapshot(result.as_deref())
 input_file: crates/tinymist-query/src/fixtures/call_info/user_named_with2.typ
 ---
-y: 1 -> CallParamInfo { kind: Named, is_content_block: false, param: ParamSpecShort { name: "y", offset: 1, attr: ParamAttrs { positional: false, named: true, variadic: false, settable: true } } }
+y: 1 -> CallParamInfo { kind: Named, is_content_block: false, param_name: "y" }
