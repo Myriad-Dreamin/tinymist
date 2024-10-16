@@ -1,0 +1,8 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+assertion_line: 506
+expression: CallSnapshot(result.as_deref())
+input_file: crates/tinymist-query/src/fixtures/call_info/user.typ
+---
+1 -> CallParamInfo { kind: Positional, is_content_block: false, param_name: "x" }
+1 -> CallParamInfo { kind: Positional, is_content_block: false, param_name: "y" }
