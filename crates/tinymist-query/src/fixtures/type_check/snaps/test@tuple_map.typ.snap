@@ -4,17 +4,12 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/tuple_map.typ
 ---
 "a" = (1, )
-"b" = (Type(string), )
-"f" = (( ⪯ (Type(bytes) | Type(float) | Type(integer) | Type(label) | Type(string) | Type(type) | Type(version)))) => Type(string)
-"x" = Any
+"b" = (Any, )
+"f" = Undef
 ---
 5..6 -> @a
 20..21 -> @f
-24..25 -> @x
-29..32 -> Type(string)
-29..35 -> Type(string)
-33..34 -> @x
 42..43 -> @b
 46..47 -> @a
-46..54 -> (Type(string), )
+46..54 -> (Any, )
 52..53 -> @f
