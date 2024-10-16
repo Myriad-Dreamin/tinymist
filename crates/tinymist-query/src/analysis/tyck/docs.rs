@@ -326,7 +326,10 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
                                 return None;
                             };
                             let pkg_id = PackageId::try_from(self.fid).ok();
-                            Ty::Builtin(BuiltinTy::Tag(s.get().into(), pkg_id.map(From::from)))
+                            Ty::Builtin(BuiltinTy::Tag(Box::new((
+                                s.get().into(),
+                                pkg_id.map(From::from),
+                            ))))
                         }),
                         _ => None,
                     }
