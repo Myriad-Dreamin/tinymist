@@ -561,6 +561,19 @@ impl SigTy {
         })
     }
 
+    /// Any constructor
+    pub fn any() -> Interned<SigTy> {
+        let rest = Ty::Array(Interned::new(Ty::Any));
+        Interned::new(Self {
+            inputs: Interned::new(vec![rest]),
+            body: Some(Ty::Any),
+            names: NameBone::empty(),
+            name_started: 0,
+            spread_left: false,
+            spread_right: true,
+        })
+    }
+
     /// Unary constructor
     #[comemo::memoize]
     pub fn unary(inp: Ty, ret: Ty) -> Interned<SigTy> {
@@ -1041,6 +1054,10 @@ impl TyCtxMut for TypeScheme {
 
     fn type_of_func(&mut self, _func: &typst::foundations::Func) -> Option<Interned<SigTy>> {
         None
+    }
+
+    fn type_of_value(&mut self, _val: &Value) -> Ty {
+        Ty::Any
     }
 }
 

@@ -9,11 +9,13 @@ use super::{
 use crate::ty::*;
 
 mod apply;
+mod convert;
 mod docs;
 mod select;
 mod syntax;
 
 pub(crate) use apply::*;
+pub(crate) use convert::*;
 pub(crate) use docs::*;
 pub(crate) use select::*;
 
@@ -77,7 +79,11 @@ impl<'a, 'w> TyCtxMut for TypeChecker<'a, 'w> {
     }
 
     fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>> {
-        Some(self.ctx.signature_dyn(func.clone()).type_sig())
+        Some(self.ctx.type_of_func(func.clone()).type_sig())
+    }
+
+    fn type_of_value(&mut self, val: &Value) -> Ty {
+        self.ctx.type_of_value(val)
     }
 }
 

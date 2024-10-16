@@ -5,4 +5,3 @@ pub use typst::foundations::Value;
 
 pub use super::builtin::*;
 pub use super::def::*;
-pub use crate::analysis::AnalysisContext;
