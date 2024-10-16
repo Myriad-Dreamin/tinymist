@@ -78,14 +78,12 @@ impl SemanticRequest for SignatureHelpRequest {
 
         label.push('(');
         let pos = pos
+            .iter()
             .enumerate()
             .map(|(i, pos)| (pos, type_sig.as_ref().and_then(|sig| sig.pos(i))));
-        let named = named.into_iter().map(|x| {
-            (
-                x.clone(),
-                type_sig.as_ref().and_then(|sig| sig.named(x.name)),
-            )
-        });
+        let named = named
+            .iter()
+            .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.named(&x.name))));
         let rest = rest
             .into_iter()
             .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.rest_param())));
@@ -93,7 +91,7 @@ impl SemanticRequest for SignatureHelpRequest {
         let mut real_offset = 0;
         let focus_name = OnceCell::new();
         for (i, (param, ty)) in pos.chain(named).chain(rest).enumerate() {
-            if is_set && !param.attrs.settable {
+            if is_set && !param.settable {
                 continue;
             }
 
@@ -107,7 +105,7 @@ impl SemanticRequest for SignatureHelpRequest {
                 ParamTarget::Named(name) => {
                     let focus_name = focus_name
                         .get_or_init(|| Interned::new_str(&name.get().clone().into_text()));
-                    if focus_name == param.name {
+                    if focus_name == &param.name {
                         active_parameter = Some(real_offset);
                     }
                 }
@@ -122,7 +120,7 @@ impl SemanticRequest for SignatureHelpRequest {
             label.push_str(&format!(
                 "{}: {}",
                 param.name,
-                ty.unwrap_or(param.ty)
+                ty.unwrap_or(&param.ty)
                     .describe()
                     .as_deref()
                     .unwrap_or("any")
@@ -130,7 +128,7 @@ impl SemanticRequest for SignatureHelpRequest {
 
             params.push(LspParamInfo {
                 label: lsp_types::ParameterLabel::Simple(format!("{}:", param.name)),
-                documentation: param.docs.map(|docs| {
+                documentation: param.docs.as_ref().map(|docs| {
                     Documentation::MarkupContent(MarkupContent {
                         value: docs.as_ref().into(),
                         kind: MarkupKind::Markdown,

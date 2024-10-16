@@ -449,19 +449,18 @@ mod signature_tests {
             };
 
             writeln!(f, "fn(")?;
-            for name in primary_sig.pos_names() {
-                writeln!(f, " {name},")?;
+            for param in primary_sig.pos() {
+                writeln!(f, " {},", param.name)?;
             }
             for param in primary_sig.named() {
-                writeln!(
-                    f,
-                    " {}: {},",
-                    param.name,
-                    param.default.map(|s| s.as_str()).unwrap_or_default()
-                )?;
+                if let Some(expr) = &param.default {
+                    writeln!(f, " {}: {},", param.name, expr)?;
+                } else {
+                    writeln!(f, " {},", param.name)?;
+                }
             }
-            if let Some(name) = primary_sig.rest_name() {
-                writeln!(f, " ...{name}, ")?;
+            if let Some(param) = primary_sig.rest() {
+                writeln!(f, " ...{}, ", param.name)?;
             }
             write!(f, ")")?;
 

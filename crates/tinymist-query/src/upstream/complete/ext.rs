@@ -601,16 +601,16 @@ pub fn param_completions<'a>(
             log::debug!("pos_param_completion_to: {:?}", pos);
 
             if let Some(pos) = pos {
-                if set && !pos.attrs.settable {
+                if set && !pos.settable {
                     break 'pos_check;
                 }
 
-                if let Some(docs) = pos.docs {
+                if let Some(docs) = &pos.docs {
                     doc = Some(plain_docs_sentence(docs));
                 }
 
-                if pos.attrs.positional {
-                    type_completion(ctx, pos.ty, doc.as_deref());
+                if pos.positional {
+                    type_completion(ctx, &pos.ty, doc.as_deref());
                 }
             }
         }
@@ -621,26 +621,26 @@ pub fn param_completions<'a>(
     }
 
     for param in primary_sig.named() {
-        let name = param.name;
+        let name = &param.name;
         if ctx.seen_field(name.as_ref().into()) {
             continue;
         }
         log::debug!(
             "pos_named_param_completion_to({set:?}): {name:?} {:?}",
-            param.attrs.settable
+            param.settable
         );
 
-        if set && !param.attrs.settable {
+        if set && !param.settable {
             continue;
         }
 
         let _d = OnceCell::new();
         let docs = || {
-            _d.get_or_init(|| param.docs.map(|d| plain_docs_sentence(d.as_str())))
+            _d.get_or_init(|| param.docs.as_ref().map(|d| plain_docs_sentence(d.as_str())))
                 .clone()
         };
 
-        if param.attrs.named {
+        if param.named {
             let compl = Completion {
                 kind: CompletionKind::Field,
                 label: param.name.as_ref().into(),
@@ -679,8 +679,8 @@ pub fn param_completions<'a>(
             ctx.completions.push(compl);
         }
 
-        if param.attrs.positional {
-            type_completion(ctx, param.ty, docs().as_deref());
+        if param.positional {
+            type_completion(ctx, &param.ty, docs().as_deref());
         }
     }
 
@@ -993,11 +993,11 @@ pub fn named_param_value_completions<'a>(
     let Some(param) = primary_sig.get_named(name) else {
         return;
     };
-    if !param.attrs.named {
+    if !param.named {
         return;
     }
 
-    let doc = param.docs.map(|d| plain_docs_sentence(d.as_str()));
+    let doc = param.docs.as_ref().map(|d| plain_docs_sentence(d.as_str()));
 
     // static analysis
     if let Some(ty) = ty {
@@ -1012,12 +1012,12 @@ pub fn named_param_value_completions<'a>(
     }
 
     if !matches!(param.ty, Ty::Any) {
-        type_completion(ctx, param.ty, doc.as_deref());
+        type_completion(ctx, &param.ty, doc.as_deref());
         completed = true;
     }
 
     if !completed {
-        if let Some(expr) = param.default {
+        if let Some(expr) = &param.default {
             ctx.completions.push(Completion {
                 kind: CompletionKind::Constant,
                 label: expr.clone(),

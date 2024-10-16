@@ -98,9 +98,9 @@ pub fn analyze_call_no_cache(
         fn advance(&mut self, info: &mut CallInfo, arg: Option<SyntaxNode>) {
             let (kind, param) = match self.state {
                 PosState::Init => {
-                    if !self.signature.pos_names().is_empty() {
+                    if !self.signature.pos().is_empty() {
                         self.state = PosState::Pos(0);
-                    } else if self.signature.rest_name().is_some() {
+                    } else if self.signature.has_spread_right() {
                         self.state = PosState::Variadic;
                     } else {
                         self.state = PosState::Final;
@@ -111,7 +111,7 @@ pub fn analyze_call_no_cache(
                 PosState::Pos(i) => {
                     if i + 1 < self.signature.pos_size() {
                         self.state = PosState::Pos(i + 1);
-                    } else if self.signature.rest_name().is_some() {
+                    } else if self.signature.has_spread_right() {
                         self.state = PosState::Variadic;
                     } else {
                         self.state = PosState::Final;
@@ -119,7 +119,7 @@ pub fn analyze_call_no_cache(
 
                     (ParamKind::Positional, self.signature.get_pos(i).unwrap())
                 }
-                PosState::Variadic => (ParamKind::Rest, self.signature.get_rest().unwrap()),
+                PosState::Variadic => (ParamKind::Rest, self.signature.rest().unwrap()),
                 PosState::Final => return,
             };
 
@@ -142,7 +142,7 @@ pub fn analyze_call_no_cache(
                 PosState::Init => unreachable!(),
                 // todo: not precise
                 PosState::Pos(..) => {
-                    if self.signature.rest_name().is_some() {
+                    if self.signature.has_spread_right() {
                         self.state = PosState::Variadic;
                     } else {
                         self.state = PosState::Final;
@@ -152,7 +152,7 @@ pub fn analyze_call_no_cache(
                 PosState::Final => return,
             };
 
-            let Some(rest) = self.signature.get_rest() else {
+            let Some(rest) = self.signature.rest() else {
                 return;
             };
 

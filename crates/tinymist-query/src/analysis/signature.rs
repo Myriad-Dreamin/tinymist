@@ -16,20 +16,25 @@ use typst_shim::syntax::LinkedNodeExt;
 use typst_shim::utils::LazyHash;
 
 use crate::adt::interner::Interned;
-use crate::analysis::{resolve_callee, DocString};
+use crate::analysis::resolve_callee;
 use crate::syntax::{get_def_target, get_deref_target, DefTarget};
 use crate::ty::SigTy;
 use crate::upstream::truncated_repr;
 use crate::AnalysisContext;
 
-use super::{
-    find_definition, DefinitionLink, IdentRef, LexicalKind, LexicalVarKind, StrRef, Ty,
-    TypeInterface, VarDoc,
-};
+use super::{find_definition, DefinitionLink, IdentRef, LexicalKind, LexicalVarKind, StrRef, Ty};
 
-/// Attributes of a function parameter.
-#[derive(Debug, Clone, Copy)]
-pub struct ParamAttrs {
+/// Describes a function parameter.
+#[derive(Debug, Clone)]
+pub struct ParamSpec {
+    /// The name of the parameter.
+    pub name: StrRef,
+    /// The docstring of the parameter.
+    pub docs: Option<EcoString>,
+    /// The default value of the variable
+    pub default: Option<EcoString>,
+    /// The type of the parameter.
+    pub ty: Ty,
     /// Is the parameter positional?
     pub positional: bool,
     /// Is the parameter named?
@@ -41,21 +46,6 @@ pub struct ParamAttrs {
     pub variadic: bool,
     /// Is the parameter settable with a set rule?
     pub settable: bool,
-}
-
-/// Describes a function parameter.
-#[derive(Debug, Clone)]
-pub struct ParamSpec<'a> {
-    /// The name of the parameter.
-    pub name: &'a StrRef,
-    /// The docstring of the parameter.
-    pub docs: Option<&'a EcoString>,
-    /// The default value of the variable
-    pub default: Option<&'a EcoString>,
-    /// The type of the parameter.
-    pub ty: &'a Ty,
-    /// The attributes of the parameter.
-    pub attrs: ParamAttrs,
 }
 
 /// Describes a function signature.
@@ -94,12 +84,10 @@ impl Signature {
 /// Describes a primary function signature.
 #[derive(Debug, Clone)]
 pub struct PrimarySignature {
-    /// Documentation for the function.
-    pub docs: DocString,
-    /// The attributes of the parameters.
-    pub attrs: Vec<ParamAttrs>,
-    /// The name of positional and rest parameters.
-    pub pos_rest_names: Vec<Interned<str>>,
+    /// The documentation of the function
+    pub docs: Option<EcoString>,
+    /// The documentation of the parameter.
+    pub param_specs: Vec<ParamSpec>,
     /// Whether the function has fill, stroke, or size parameters.
     pub has_fill_or_size_or_stroke: bool,
     /// The signature type.
@@ -118,23 +106,9 @@ impl PrimarySignature {
         self.sig_ty.name_started as usize
     }
 
-    /// Returns names of positional parameters of the function.
-    pub fn pos_names(&self) -> &[StrRef] {
-        &self.pos_rest_names[..self.pos_size()]
-    }
-
     /// Returns the positional parameters of the function.
-    pub fn pos(&self) -> impl Iterator<Item = ParamSpec> {
-        self.pos_names().iter().enumerate().map(|(i, name)| {
-            let docstring = self.docs.get_var(name);
-            ParamSpec {
-                name,
-                docs: docstring.and_then(|x| x.docs.as_ref()),
-                default: docstring.and_then(|x| x.default.as_ref()),
-                ty: self.sig_ty.pos(i).unwrap(),
-                attrs: self.attrs[i],
-            }
-        })
+    pub fn pos(&self) -> &[ParamSpec] {
+        &self.param_specs[..self.pos_size()]
     }
 
     /// Returns the names of the named parameter of the function.
@@ -143,84 +117,29 @@ impl PrimarySignature {
     }
 
     /// Returns the named parameters of the function.
-    pub fn named(&self) -> impl Iterator<Item = ParamSpec> {
-        self.named_names().iter().enumerate().map(move |(i, name)| {
-            let docstring = self.docs.get_var(name);
-            ParamSpec {
-                name,
-                docs: docstring.and_then(|x| x.docs.as_ref()),
-                default: docstring.and_then(|x| x.default.as_ref()),
-                ty: self.sig_ty.field_by_bone_offset(i).unwrap(),
-                attrs: self.attrs[i + self.pos_size()],
-            }
-        })
+    pub fn named(&self) -> &[ParamSpec] {
+        &self.param_specs[self.pos_size()..self.pos_size() + self.sig_ty.names.names.len()]
     }
 
     /// Returns the name of the rest parameter of the function.
-    pub fn rest_name(&self) -> Option<&StrRef> {
-        (self.pos_rest_names.len() > self.sig_ty.name_started as usize)
-            .then(|| self.pos_rest_names.last().unwrap())
+    pub fn has_spread_right(&self) -> bool {
+        self.sig_ty.spread_right
     }
 
     /// Returns the rest parameter of the function.
-    pub fn rest(&self) -> Option<ParamSpec> {
-        let name = self.rest_name()?;
-        let docstring = self.docs.get_var(name);
-        Some(ParamSpec {
-            name,
-            docs: docstring.and_then(|x| x.docs.as_ref()),
-            default: docstring.and_then(|x| x.default.as_ref()),
-            ty: self.sig_ty.rest_param().unwrap(),
-            attrs: self.attrs[self.pos_size() + self.sig_ty.names.names.len()],
-        })
+    pub fn rest(&self) -> Option<&ParamSpec> {
+        self.has_spread_right()
+            .then(|| &self.param_specs[self.pos_size() + self.sig_ty.names.names.len()])
     }
 
     /// Returns the positional parameters of the function.
-    pub fn get_pos(&self, offset: usize) -> Option<ParamSpec> {
-        (offset < self.pos_size()).then(|| {
-            let name = &self.pos_names()[offset];
-            let docstring = self.docs.get_var(name);
-            ParamSpec {
-                name,
-                docs: docstring.and_then(|x| x.docs.as_ref()),
-                default: docstring.and_then(|x| x.default.as_ref()),
-                ty: self.sig_ty.pos(offset).unwrap(),
-                attrs: self.attrs[offset],
-            }
-        })
+    pub fn get_pos(&self, offset: usize) -> Option<&ParamSpec> {
+        self.pos().get(offset)
     }
 
     /// Returns the named parameters of the function.
-    pub fn get_named(&self, name: &StrRef) -> Option<ParamSpec> {
-        let offset = self.sig_ty.names.find(name)?;
-        let name = &self.named_names()[offset];
-
-        let offset = self.sig_ty.name_started as usize + offset;
-
-        let docstring = self.docs.get_var(name);
-        Some(ParamSpec {
-            name,
-            docs: docstring.and_then(|x| x.docs.as_ref()),
-            default: docstring.and_then(|x| x.default.as_ref()),
-            ty: self.sig_ty.field_by_bone_offset(offset).unwrap(),
-            attrs: self.attrs[offset],
-        })
-    }
-
-    /// Returns the rest parameter of the function.
-    pub fn get_rest(&self) -> Option<ParamSpec> {
-        (self.pos_rest_names.len() > self.sig_ty.name_started as usize).then(|| {
-            let offset = self.pos_rest_names.len();
-            let name = self.rest_name().unwrap();
-            let docstring = self.docs.get_var(name);
-            ParamSpec {
-                name,
-                docs: docstring.and_then(|x| x.docs.as_ref()),
-                default: docstring.and_then(|x| x.default.as_ref()),
-                ty: self.sig_ty.rest_param().unwrap(),
-                attrs: self.attrs[offset],
-            }
-        })
+    pub fn get_named(&self, name: &StrRef) -> Option<&ParamSpec> {
+        self.named().get(self.sig_ty.names.find(name)?)
     }
 }
 
@@ -403,14 +322,14 @@ fn resolve_callee_v2(
 }
 
 fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
-    let mut docs = DocString::default();
-    let mut pos = vec![];
-    let mut named_vec = Vec::new();
-    let mut pos_names = vec![];
-    let mut named_attrs = BTreeMap::new();
-    let mut pos_attrs = Vec::new();
+    let mut pos_tys = vec![];
+    let mut named_tys = Vec::new();
     let mut rest_ty = None;
-    let mut rest_attr = None;
+
+    let mut named_specs = BTreeMap::new();
+    let mut param_specs = Vec::new();
+    let mut rest_spec = None;
+
     let mut broken = false;
     let mut has_fill = false;
     let mut has_stroke = false;
@@ -418,15 +337,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
 
     let mut add_param = |param: ParamSpec| {
         let name = param.name.clone();
-        docs.vars.insert(
-            name.clone(),
-            VarDoc {
-                docs: param.docs.cloned(),
-                ty: Some(param.ty.clone()),
-                default: param.default.cloned(),
-            },
-        );
-        if param.attrs.named {
+        if param.named {
             match param.name.as_ref() {
                 "fill" => {
                     has_fill = true;
@@ -439,22 +350,21 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
                 }
                 _ => {}
             }
-            named_vec.push((name.clone(), param.ty.clone()));
-            named_attrs.insert(name.clone(), param.attrs);
+            named_tys.push((name.clone(), param.ty.clone()));
+            named_specs.insert(name.clone(), param.clone());
         }
 
-        if param.attrs.variadic {
+        if param.variadic {
             if rest_ty.is_some() {
                 broken = true;
             } else {
                 rest_ty = Some(param.ty.clone());
-                pos_names.push(name);
-                rest_attr = Some(param.attrs);
+                rest_spec = Some(param);
             }
-        } else if param.attrs.positional {
-            pos_names.push(name);
-            pos_attrs.push(param.attrs);
-            pos.push(param.ty.clone());
+        } else if param.positional {
+            // todo: we have some params that are both positional and named
+            pos_tys.push(param.ty.clone());
+            param_specs.push(param);
         }
     };
 
@@ -468,16 +378,14 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         Repr::Element(..) | Repr::Native(..) => {
             for p in func.params().unwrap() {
                 add_param(ParamSpec {
-                    name: &p.name.into(),
-                    docs: Some(&p.docs.into()),
-                    default: p.default.map(|d| truncated_repr(&d())).as_ref(),
-                    ty: &Ty::from_param_site(&func, p),
-                    attrs: ParamAttrs {
-                        positional: p.positional,
-                        named: p.named,
-                        variadic: p.variadic,
-                        settable: p.settable,
-                    },
+                    name: p.name.into(),
+                    docs: Some(p.docs.into()),
+                    default: p.default.map(|d| truncated_repr(&d())),
+                    ty: Ty::from_param_site(&func, p),
+                    positional: p.positional,
+                    named: p.named,
+                    variadic: p.variadic,
+                    settable: p.settable,
                 });
             }
 
@@ -485,24 +393,18 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         }
     };
 
-    let sig_ty = SigTy::new(pos.into_iter(), named_vec, None, rest_ty, ret_ty);
+    let sig_ty = SigTy::new(pos_tys.into_iter(), named_tys, None, rest_ty, ret_ty);
 
     for name in &sig_ty.names.names {
-        pos_attrs.push(*named_attrs.get(name).unwrap_or(&ParamAttrs {
-            positional: false,
-            named: true,
-            variadic: false,
-            settable: false,
-        }));
+        param_specs.push(named_specs.get(name).unwrap().clone());
     }
-    if let Some(attr) = rest_attr {
-        pos_attrs.push(attr);
+    if let Some(doc) = rest_spec {
+        param_specs.push(doc);
     }
 
     Arc::new(PrimarySignature {
-        docs,
-        attrs: pos_attrs,
-        pos_rest_names: pos_names,
+        docs: func.docs().map(From::from),
+        param_specs,
         has_fill_or_size_or_stroke: has_fill || has_stroke || has_size,
         sig_ty: sig_ty.into(),
         _broken: broken,
@@ -523,47 +425,41 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>, add_param: &mut impl FnM
             ast::Param::Pos(e) => {
                 let name = format!("{}", PatternDisplay(&e));
                 add_param(ParamSpec {
-                    name: &name.as_str().into(),
+                    name: name.as_str().into(),
                     docs: None,
                     default: None,
-                    ty: &Ty::Any,
-                    attrs: ParamAttrs {
-                        positional: true,
-                        named: false,
-                        variadic: false,
-                        settable: false,
-                    },
+                    ty: Ty::Any,
+                    positional: true,
+                    named: false,
+                    variadic: false,
+                    settable: false,
                 });
             }
             // todo: pattern
             ast::Param::Named(n) => {
                 let expr = unwrap_expr(n.expr()).to_untyped().clone().into_text();
                 add_param(ParamSpec {
-                    name: &n.name().get().into(),
-                    docs: Some(&eco_format!("Default value: {expr}")),
-                    default: Some(&expr),
-                    ty: &Ty::Any,
-                    attrs: ParamAttrs {
-                        positional: false,
-                        named: true,
-                        variadic: false,
-                        settable: true,
-                    },
+                    name: n.name().get().into(),
+                    docs: Some(eco_format!("Default value: {expr}")),
+                    default: Some(expr),
+                    ty: Ty::Any,
+                    positional: false,
+                    named: true,
+                    variadic: false,
+                    settable: true,
                 });
             }
             ast::Param::Spread(n) => {
                 let ident = n.sink_ident().map(|e| e.as_str());
                 add_param(ParamSpec {
-                    name: &ident.unwrap_or_default().into(),
+                    name: ident.unwrap_or_default().into(),
                     docs: None,
                     default: None,
-                    ty: &Ty::Any,
-                    attrs: ParamAttrs {
-                        positional: true,
-                        named: false,
-                        variadic: true,
-                        settable: false,
-                    },
+                    ty: Ty::Any,
+                    positional: true,
+                    named: false,
+                    variadic: true,
+                    settable: false,
                 });
             }
         }

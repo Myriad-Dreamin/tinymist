@@ -222,16 +222,16 @@ pub struct ParamDocs {
 }
 
 impl ParamDocs {
-    fn new(param: ParamSpec, ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> Self {
+    fn new(param: &ParamSpec, ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> Self {
         Self {
             name: param.name.as_ref().to_owned(),
-            docs: param.docs.cloned().unwrap_or_default(),
-            cano_type: format_ty(ty.or(Some(param.ty)), doc_ty),
-            default: param.default.cloned(),
-            positional: param.attrs.positional,
-            named: param.attrs.named,
-            variadic: param.attrs.variadic,
-            settable: param.attrs.settable,
+            docs: param.docs.clone().unwrap_or_default(),
+            cano_type: format_ty(ty.or(Some(&param.ty)), doc_ty),
+            default: param.default.clone(),
+            positional: param.positional,
+            named: param.named,
+            variadic: param.variadic,
+            settable: param.settable,
         }
     }
 }
@@ -289,14 +289,14 @@ pub(crate) fn signature_docs(
     let pos_in = sig
         .primary()
         .pos()
+        .iter()
         .enumerate()
         .map(|(i, pos)| (pos, type_sig.as_ref().and_then(|sig| sig.pos(i))));
-    let named_in = sig.primary().named().map(|x| {
-        (
-            x.clone(),
-            type_sig.as_ref().and_then(|sig| sig.named(x.name)),
-        )
-    });
+    let named_in = sig
+        .primary()
+        .named()
+        .iter()
+        .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.named(&x.name))));
     let rest_in = sig
         .primary()
         .rest()
