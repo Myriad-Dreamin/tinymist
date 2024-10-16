@@ -21,7 +21,7 @@ use typst::{
 use super::PackageId;
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
-    analysis::BuiltinTy,
+    analysis::{BuiltinTy, DocString},
 };
 
 pub(crate) use super::{TyCtx, TyCtxMut};
@@ -951,6 +951,8 @@ impl IfTy {
 pub struct TypeScheme {
     /// The typing on definitions
     pub vars: HashMap<DefId, TypeVarBounds>,
+    /// The checked documentation of definitions
+    pub var_docs: HashMap<DefId, Arc<DocString>>,
     /// The local binding of the type variable
     pub local_binds: snapshot_map::SnapshotMap<DefId, Ty>,
     /// The typing on syntax structures
@@ -975,6 +977,7 @@ impl TypeScheme {
     pub fn type_of_def(&self, def: DefId) -> Option<Ty> {
         Some(self.simplify(self.vars.get(&def).map(|e| e.as_type())?, false))
     }
+
     /// Get the type of a syntax structure
     pub fn type_of_span(&self, site: Span) -> Option<Ty> {
         self.mapping

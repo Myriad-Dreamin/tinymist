@@ -130,7 +130,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         var
     }
 
-    fn get_var(&mut self, s: Span, r: IdentRef) -> Option<Ty> {
+    fn get_var(&mut self, s: Span, r: IdentRef) -> Option<Interned<TypeVar>> {
         let def_id = self.get_def_id(s, &r)?;
 
         // todo: false positive of clippy
@@ -150,9 +150,9 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             );
         }
 
-        let var = self.info.vars.get_mut(&def_id).unwrap();
-        TypeScheme::witness_(s, var.as_type(), &mut self.info.mapping);
-        Some(var.as_type())
+        let var = self.info.vars.get(&def_id).unwrap().var.clone();
+        TypeScheme::witness_(s, Ty::Var(var.clone()), &mut self.info.mapping);
+        Some(var)
     }
 
     fn import_ty(&mut self, def_id: DefId) -> Option<Ty> {

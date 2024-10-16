@@ -609,7 +609,7 @@ function MakeDoc(root: DocElement) {
   }
 
   function FuncItem(v: DocElement) {
-    const sig = v.data.signature;
+    const sig = v.data?.parsed_docs as DocSignature | undefined;
 
     const export_again = v.data.export_again
       ? [kwHl("external"), code(" ")]
@@ -621,8 +621,9 @@ function MakeDoc(root: DocElement) {
       },
       code(v.data.name)
     );
-    let funcTitle = [...export_again, name, "("];
+    let funcTitle = [...export_again, name];
     if (sig) {
+      funcTitle.push(code("("));
       // funcTitle.push(...sig.pos.map((e: DocParam) => code(e.name)));
       for (let i = 0; i < sig.pos.length; i++) {
         if (i > 0) {
@@ -637,11 +638,11 @@ function MakeDoc(root: DocElement) {
         }
         funcTitle.push(code(".."));
       }
-    }
-    funcTitle.push(code(")"));
-    if (v.data.parsed_docs?.return_ty) {
-      funcTitle.push(code(" -> "));
-      typeHighlighted(v.data.parsed_docs.return_ty, funcTitle);
+      funcTitle.push(code(")"));
+      if (sig.ret_ty) {
+        funcTitle.push(code(" -> "));
+        typeHighlighted(sig.ret_ty[0], funcTitle);
+      }
     }
 
     return div(
@@ -668,8 +669,7 @@ function MakeDoc(root: DocElement) {
   }
 
   function SigDocs(v: DocElement): ChildDom[] {
-    const sig: DocSignature = v.data.signature;
-    const parsed_docs = v.data.parsed_docs;
+    const sig = v.data.parsed_docs as DocSignature;
     const res: ChildDom[] = [];
 
     if (!sig) {
@@ -677,14 +677,15 @@ function MakeDoc(root: DocElement) {
     }
 
     const docsMapping = new Map<string, any>();
-    // for (const doc of parsed_docs) {
-    //   docsMapping.set(doc.name, doc.contents.join(""));
-    // }
     // return_ty
-    if (parsed_docs?.params) {
-      for (const param of parsed_docs.params) {
-        docsMapping.set(param.name, param);
-      }
+    for (const param of sig.pos) {
+      docsMapping.set(param.name, param);
+    }
+    for (const param of Object.values(sig.named)) {
+      docsMapping.set(param.name, param);
+    }
+    if (sig.rest) {
+      docsMapping.set(sig.rest.name, sig.rest);
     }
     if (v.data.renderedParams) {
       for (const p of Object.values(v.data.renderedParams)) {
@@ -710,9 +711,9 @@ function MakeDoc(root: DocElement) {
       })),
     ];
 
-    if (parsed_docs?.return_ty || sig.ret_ty) {
+    if (sig.ret_ty) {
       let paramTitle = [codeHl("op", "-> ")];
-      sigTypeHighlighted(parsed_docs?.return_ty, sig.ret_ty, paramTitle);
+      sigTypeHighlighted(sig.ret_ty, paramTitle);
 
       res.push(h3("Resultant"));
       res.push(
@@ -754,10 +755,10 @@ function MakeDoc(root: DocElement) {
           param.name
         ),
       ];
-      if (docsMeta?.types || param.cano_type) {
+      if (param.cano_type) {
         paramTitle.push(code(": "));
         // paramTitle += `: ${docsMeta.types}`;
-        sigTypeHighlighted(docsMeta?.types, param.cano_type, paramTitle);
+        sigTypeHighlighted(param.cano_type, paramTitle);
       }
 
       if (param.expr) {
@@ -796,7 +797,7 @@ function MakeDoc(root: DocElement) {
   }
 
   function SigPreview(v: DocElement): ChildDom[] {
-    const sig = v.data.signature;
+    const sig = v.data.parsed_docs as DocSignature;
     if (!sig) {
       return [];
     }
@@ -861,9 +862,9 @@ function MakeDoc(root: DocElement) {
       );
     }
     sigTitle.push(code(")"));
-    if (v.data.parsed_docs?.return_ty) {
+    if (sig.ret_ty) {
       sigTitle.push(code(" -> "));
-      typeHighlighted(v.data.parsed_docs.return_ty, sigTitle);
+      typeHighlighted(sig.ret_ty[0], sigTitle);
     }
     sigTitle.push(code(";"));
 
@@ -913,13 +914,14 @@ function MakeDoc(root: DocElement) {
 }
 
 function sigTypeHighlighted(
-  types: string | undefined,
   inferred: [string, string] | undefined,
   target: ChildDom[]
 ) {
-  if (types) {
-    typeHighlighted(types, target);
-  } else if (inferred) {
+  // todo: determine whether it is inferred
+  // if (types) {
+  //   typeHighlighted(types, target);
+  // } else
+  if (inferred) {
     const rendered: ChildDom[] = [];
     typeHighlighted(inferred[0], rendered, "|");
     const infer = span(

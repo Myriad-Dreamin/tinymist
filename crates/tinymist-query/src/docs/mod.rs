@@ -1,20 +1,17 @@
 //! Documentation generation utilities.
 
-mod docstring;
 mod library;
 mod module;
 mod package;
-mod signature;
+mod symbol;
 mod tidy;
 
-use ecow::EcoString;
 use reflexo::path::unix_slash;
 use typst::{foundations::Value, syntax::FileId};
 
-pub use docstring::*;
 pub use module::*;
 pub use package::*;
-pub use signature::*;
+pub use symbol::*;
 pub(crate) use tidy::*;
 
 fn file_id_repr(k: FileId) -> String {
@@ -25,13 +22,12 @@ fn file_id_repr(k: FileId) -> String {
     }
 }
 
-fn kind_of(val: &Value) -> EcoString {
+fn kind_of(val: &Value) -> DocStringKind {
     match val {
-        Value::Module(_) => "module",
-        Value::Type(_) => "struct",
-        Value::Func(_) => "function",
-        Value::Label(_) => "reference",
-        _ => "constant",
+        Value::Module(_) => DocStringKind::Module,
+        Value::Type(_) => DocStringKind::Struct,
+        Value::Func(_) => DocStringKind::Function,
+        Value::Label(_) => DocStringKind::Reference,
+        _ => DocStringKind::Constant,
     }
-    .into()
 }
