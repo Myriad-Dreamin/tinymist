@@ -150,6 +150,7 @@ function initClient(context: ExtensionContext, config: Record<string, any>) {
         for (const content of hover.contents) {
           if (content instanceof vscode.MarkdownString) {
             content.isTrusted = trustedCommands;
+            content.supportHtml = true;
           }
         }
         return hover;

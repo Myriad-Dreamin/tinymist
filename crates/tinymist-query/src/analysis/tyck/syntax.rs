@@ -482,6 +482,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 named: named_docs,
                 rest: rest_docs,
                 ret_ty: (),
+                def_docs: Default::default(),
             }))),
         );
 

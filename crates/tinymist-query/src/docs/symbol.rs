@@ -1,13 +1,13 @@
 use core::fmt;
 use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use ecow::{eco_format, EcoString};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
 use tinymist_world::LspWorld;
-use typst::foundations::{Bytes, Value};
+use typst::foundations::{Bytes, Func, Value};
 use typst::{
     diag::StrResult,
     syntax::{FileId, VirtualPath},
@@ -17,6 +17,7 @@ use super::tidy::*;
 use crate::analysis::{ParamAttrs, ParamSpec};
 use crate::docs::library;
 use crate::ty::Interned;
+use crate::upstream::plain_docs_sentence;
 use crate::{ty::Ty, AnalysisContext};
 
 type TypeRepr = Option<(/* short */ String, /* long */ String)>;
@@ -137,6 +138,66 @@ pub struct SignatureDocsT<T> {
     pub rest: Option<ParamDocsT<T>>,
     /// The return type.
     pub ret_ty: T,
+    /// The full documentation for the signature.
+    #[serde(skip)]
+    pub def_docs: OnceLock<String>,
+}
+
+impl SignatureDocsT<TypeRepr> {
+    /// Get full documentation for the signature.
+    pub fn def_docs(&self) -> &String {
+        self.def_docs
+            .get_or_init(|| plain_docs_sentence(&format!("{}", DefDocs(self))).into())
+    }
+}
+
+struct DefDocs<'a>(&'a SignatureDocs);
+
+impl fmt::Display for DefDocs<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let docs = self.0;
+        let base_docs = docs.docs.trim();
+
+        let has_params_docs = !docs.pos.is_empty() || !docs.named.is_empty() || docs.rest.is_some();
+
+        if !base_docs.is_empty() {
+            f.write_str(base_docs)?;
+
+            if has_params_docs {
+                f.write_str("\n\n")?;
+            }
+        }
+
+        if has_params_docs {
+            f.write_str("## Parameters")?;
+
+            for p in &docs.pos {
+                write!(f, "\n\n@positional `{}`", p.name)?;
+                if !p.docs.is_empty() {
+                    f.write_str(" — ")?;
+                    f.write_str(&p.docs)?;
+                }
+            }
+
+            for (name, p) in &docs.named {
+                write!(f, "\n\n@named `{name}`")?;
+                if !p.docs.is_empty() {
+                    f.write_str(" — ")?;
+                    f.write_str(&p.docs)?;
+                }
+            }
+
+            if let Some(rest) = &docs.rest {
+                write!(f, "\n\n@rest `{}`", rest.name)?;
+                if !rest.docs.is_empty() {
+                    f.write_str(" — ")?;
+                    f.write_str(&rest.docs)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// Documentation about a signature.
@@ -250,28 +311,7 @@ pub(crate) fn signature_docs(
     runtime_fn: &Value,
     mut doc_ty: Option<ShowTypeRepr>,
 ) -> Option<SignatureDocs> {
-    let func = match runtime_fn {
-        Value::Func(f) => f,
-        _ => return None,
-    };
-
-    // todo: documenting with bindings
-    use typst::foundations::func::Repr;
-    let mut func = func;
-    loop {
-        match func.inner() {
-            Repr::Element(..) | Repr::Native(..) => {
-                break;
-            }
-            Repr::With(w) => {
-                func = &w.0;
-            }
-            Repr::Closure(..) => {
-                break;
-            }
-        }
-    }
-
+    let func = runtime_fn.clone().cast::<Func>().ok()?;
     let sig = ctx.signature_dyn(func.clone());
     let type_sig = sig.type_sig().clone();
 
@@ -311,6 +351,7 @@ pub(crate) fn signature_docs(
         named,
         rest,
         ret_ty,
+        def_docs: OnceLock::new(),
     })
 }
 
@@ -342,7 +383,7 @@ pub(crate) fn convert_docs(world: &LspWorld, content: &str) -> StrResult<EcoStri
         .convert()
         .map_err(|e| eco_format!("failed to convert to markdown: {e}"))?;
 
-    Ok(conv)
+    Ok(conv.replace("```example", "```typ"))
 }
 
 pub(crate) fn identify_docs(kind: DocStringKind, docs: EcoString) -> StrResult<SymbolDocs> {
