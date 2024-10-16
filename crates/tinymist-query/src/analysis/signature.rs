@@ -282,6 +282,7 @@ fn analyze_type_signature(
                 panic!("expected function type, got {sig_ty:?}");
             };
 
+            // todo: this will affect inlay hint: _var_with
             let (_var_with, docstring) = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
                 Some(UntypedSymbolDocs::Function(sig)) => (vec![], Either::Left(sig.as_ref())),
                 Some(UntypedSymbolDocs::Variable(d)) => find_alias_stack(&mut ty_ctx, &v, d)?,

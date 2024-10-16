@@ -38,6 +38,10 @@ impl<'a, T: ApplyChecker> ApplySigChecker<'a, T> {
 
 impl<'a, T: ApplyChecker> SigChecker for ApplySigChecker<'a, T> {
     fn check(&mut self, cano_sig: Sig, ctx: &mut super::SigCheckContext, pol: bool) -> Option<()> {
+        let (cano_sig, is_partialize) = match cano_sig {
+            Sig::Partialize(sig) => (*sig, true),
+            sig => (sig, false),
+        };
         // Bind the arguments to the canonical signature.
         let partial_sig = if ctx.args.is_empty() {
             cano_sig
@@ -48,6 +52,12 @@ impl<'a, T: ApplyChecker> SigChecker for ApplySigChecker<'a, T> {
                 at: &ctx.at,
             }
         };
+        let partial_sig = if is_partialize {
+            Sig::Partialize(&partial_sig)
+        } else {
+            partial_sig
+        };
+
         self.0.apply(partial_sig, self.1, pol);
         Some(())
     }

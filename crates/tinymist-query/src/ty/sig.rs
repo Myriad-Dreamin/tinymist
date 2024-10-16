@@ -315,6 +315,11 @@ impl<'a, 'b> BoundChecker for MethodDriver<'a, 'b> {
                     // todo: general select operator
                 }
             }
+            Ty::With(w) => {
+                self.0.ctx.args.push(w.with.clone());
+                w.sig.bounds(pol, self);
+                self.0.ctx.args.pop();
+            }
             Ty::Tuple(..) => self.array_method(ty, pol),
             Ty::Array(..) => self.array_method(ty, pol),
             // todo: general select operator

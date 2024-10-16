@@ -3,7 +3,6 @@ source: crates/tinymist-query/src/analysis.rs
 expression: SignatureSnapshot(result.as_ref())
 input_file: crates/tinymist-query/src/fixtures/signature/user_with.typ
 ---
-with 1, 
 fn(
  u,
  v,
