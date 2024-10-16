@@ -19,8 +19,7 @@ use typst::{model::Document, text::Font};
 use crate::analysis::prelude::*;
 use crate::analysis::{
     analyze_bib, analyze_expr_, analyze_import_, analyze_signature, post_type_check, BibInfo,
-    DefUseInfo, DefinitionLink, DocString, ImportInfo, PathPreference, Signature, SignatureTarget,
-    Ty, TypeScheme,
+    DefUseInfo, DocString, ImportInfo, PathPreference, Signature, SignatureTarget, Ty, TypeScheme,
 };
 use crate::docs::{DocStringKind, SignatureDocs};
 use crate::syntax::{
@@ -574,15 +573,8 @@ impl<'w> AnalysisContext<'w> {
         res
     }
 
-    pub(crate) fn signature_docs(
-        &mut self,
-        source: &Source,
-        def_ident: Option<&IdentRef>,
-        runtime_fn: &Value,
-    ) -> Option<SignatureDocs> {
-        let def_use = self.def_use(source.clone())?;
-        let ty_chk = self.type_check(source)?;
-        crate::docs::signature_docs(self, Some(&(def_use, ty_chk)), def_ident, runtime_fn, None)
+    pub(crate) fn signature_docs(&mut self, runtime_fn: &Value) -> Option<SignatureDocs> {
+        crate::docs::signature_docs(self, runtime_fn, None)
     }
 
     pub(crate) fn compute_docstring(
@@ -737,28 +729,6 @@ impl<'w> AnalysisContext<'w> {
 
     pub(crate) fn type_of(&mut self, rr: &SyntaxNode) -> Option<Ty> {
         self.type_of_span(rr.span())
-    }
-
-    pub(crate) fn user_type_of_ident(
-        &mut self,
-        source: &Source,
-        def_fid: TypstFileId,
-        def_ident: &IdentRef,
-    ) -> Option<Ty> {
-        let ty_chk = self.type_check(source)?;
-        let def_use = self.def_use(source.clone())?;
-
-        let (def_id, _) = def_use.get_def(def_fid, def_ident)?;
-        ty_chk.type_of_def(def_id)
-    }
-
-    pub(crate) fn user_type_of_def(&mut self, source: &Source, def: &DefinitionLink) -> Option<Ty> {
-        let def_at = def.def_at.clone()?;
-        let def_ident = IdentRef {
-            name: def.name.clone(),
-            range: def_at.1,
-        };
-        self.user_type_of_ident(source, def_at.0, &def_ident)
     }
 
     pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {

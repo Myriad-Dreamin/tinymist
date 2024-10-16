@@ -251,10 +251,7 @@ fn def_tooltip(
             Some(LspHoverContents::Array(results))
         }
         LexicalKind::Var(LexicalVarKind::Function) => {
-            let sig = lnk
-                .value
-                .as_ref()
-                .and_then(|e| ctx.signature_docs(source, lnk.to_ident_ref().as_ref(), e));
+            let sig = lnk.value.as_ref().and_then(|e| ctx.signature_docs(e));
 
             results.push(MarkedString::LanguageString(LanguageString {
                 language: "typc".to_owned(),

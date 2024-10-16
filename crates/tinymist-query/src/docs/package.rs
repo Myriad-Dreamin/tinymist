@@ -13,7 +13,6 @@ use typst::syntax::{FileId, Span, VirtualPath};
 use typst::World;
 
 use crate::docs::{file_id_repr, module_docs, symbol_docs, SymbolDocs, SymbolsInfo};
-use crate::syntax::IdentRef;
 use crate::ty::Ty;
 use crate::AnalysisContext;
 
@@ -112,15 +111,6 @@ pub fn package_docs(
 
             log::debug!("module: {primary} -- {parent_ident}");
 
-            let type_info = None.or_else(|| {
-                let file_id = fid?;
-                let src = world.source(file_id).ok()?;
-                let def_use = ctx.def_use(src.clone())?;
-                let ty_chck = ctx.type_check(&src)?;
-                Some((def_use, ty_chck))
-            });
-            let type_info = type_info.as_ref();
-
             let persist_fid = fid.map(|f| file_ids.insert_full(f).0);
 
             #[derive(Serialize)]
@@ -157,15 +147,9 @@ pub fn package_docs(
                 });
                 sym.head.loc = span;
 
-                let def_ident = sym.head.name_range.as_ref().map(|range| IdentRef {
-                    name: sym.head.name.clone(),
-                    range: range.clone(),
-                });
                 let docs = symbol_docs(
                     ctx,
-                    type_info,
                     sym.head.kind,
-                    def_ident.as_ref(),
                     sym.head.value.as_ref(),
                     sym.head.docs.as_deref(),
                     Some(&mut doc_ty),

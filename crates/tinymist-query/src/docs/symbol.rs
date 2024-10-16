@@ -16,7 +16,6 @@ use typst::{
 use super::tidy::*;
 use crate::analysis::{ParamAttrs, ParamSpec};
 use crate::docs::library;
-use crate::syntax::IdentRef;
 use crate::ty::Interned;
 use crate::{ty::Ty, AnalysisContext};
 
@@ -95,14 +94,12 @@ impl<T> SymbolDocsT<T> {
 
 pub(crate) fn symbol_docs(
     ctx: &mut AnalysisContext,
-    type_info: Option<&TypeInfo>,
     kind: DocStringKind,
-    def_ident: Option<&IdentRef>,
     sym_value: Option<&Value>,
     docs: Option<&str>,
     doc_ty: Option<ShowTypeRepr>,
 ) -> Result<SymbolDocs, String> {
-    let signature = sym_value.and_then(|e| signature_docs(ctx, type_info, def_ident, e, doc_ty));
+    let signature = sym_value.and_then(|e| signature_docs(ctx, e, doc_ty));
     if let Some(signature) = signature {
         return Ok(SymbolDocs::Function(Box::new(signature)));
     }
@@ -237,8 +234,6 @@ impl ParamDocs {
     }
 }
 
-type TypeInfo = (Arc<crate::analysis::DefUseInfo>, Arc<crate::ty::TypeScheme>);
-
 fn format_ty(ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> TypeRepr {
     match doc_ty {
         Some(doc_ty) => doc_ty(ty),
@@ -250,8 +245,6 @@ fn format_ty(ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> TypeRepr {
 
 pub(crate) fn signature_docs(
     ctx: &mut AnalysisContext,
-    type_info: Option<&TypeInfo>,
-    def_ident: Option<&IdentRef>,
     runtime_fn: &Value,
     mut doc_ty: Option<ShowTypeRepr>,
 ) -> Option<SignatureDocs> {
@@ -278,35 +271,22 @@ pub(crate) fn signature_docs(
     }
 
     let sig = ctx.signature_dyn(func.clone());
-    let def_id = type_info.and_then(|(def_use, _)| {
-        let def_fid = func.span().id()?;
-        let (def_id, _) = def_use.get_def(def_fid, def_ident?)?;
-        Some(def_id)
-    });
-    let docstring = type_info.and_then(|(_, ty_chk)| ty_chk.var_docs.get(&def_id?));
-    let type_sig = type_info.and_then(|(_, ty_chk)| ty_chk.type_of_def(def_id?));
-    let type_sig = type_sig.and_then(|type_sig| type_sig.sig_repr(true));
+    let type_sig = sig.type_sig().clone();
 
     let pos_in = sig
         .primary()
         .pos()
         .iter()
         .enumerate()
-        .map(|(i, pos)| (pos, type_sig.as_ref().and_then(|sig| sig.pos(i))));
+        .map(|(i, pos)| (pos, type_sig.pos(i)));
     let named_in = sig
         .primary()
         .named()
         .iter()
-        .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.named(&x.name))));
-    let rest_in = sig
-        .primary()
-        .rest()
-        .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.rest_param())));
+        .map(|x| (x, type_sig.named(&x.name)));
+    let rest_in = sig.primary().rest().map(|x| (x, type_sig.rest_param()));
 
-    let ret_in = type_sig
-        .as_ref()
-        .and_then(|sig| sig.body.as_ref())
-        .or_else(|| sig.primary().sig_ty.body.as_ref());
+    let ret_in = type_sig.body.as_ref();
 
     let pos = pos_in
         .map(|(param, ty)| ParamDocs::new(param, ty, doc_ty.as_mut()))
@@ -324,7 +304,7 @@ pub(crate) fn signature_docs(
     let ret_ty = format_ty(ret_in, doc_ty.as_mut());
 
     Some(SignatureDocs {
-        docs: docstring.map(|x| x.docs().clone()).unwrap_or_default(),
+        docs: sig.primary().docs.clone().unwrap_or_default(),
         pos,
         named,
         rest,
