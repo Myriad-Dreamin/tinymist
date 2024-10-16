@@ -211,6 +211,7 @@ pub struct PartialSignature {
 }
 
 /// The language object that the signature is being analyzed for.
+#[derive(Debug, Clone)]
 pub enum SignatureTarget<'a> {
     /// A static node without knowing the function at runtime.
     Def(Source, IdentRef),
@@ -226,11 +227,11 @@ pub(crate) fn analyze_signature(
     ctx: &mut AnalysisContext,
     callee_node: SignatureTarget,
 ) -> Option<Signature> {
-    if let Some(sig) = ctx.get_signature(&callee_node) {
-        return Some(sig);
-    }
-
-    analyze_type_signature(ctx, &callee_node).or_else(|| analyze_dyn_signature(ctx, &callee_node))
+    ctx.compute_signature(callee_node.clone(), |ctx| {
+        log::debug!("analyzing signature for {callee_node:?}");
+        analyze_type_signature(ctx, &callee_node)
+            .or_else(|| analyze_dyn_signature(ctx, &callee_node))
+    })
 }
 
 fn analyze_type_signature(
@@ -355,12 +356,7 @@ fn analyze_dyn_signature(
         func = f.0.clone();
     }
 
-    let signature = ctx
-        .compute_signature(SignatureTarget::Runtime(func.clone()), || {
-            Signature::Primary(analyze_dyn_signature_inner(func))
-        })
-        .primary()
-        .clone();
+    let signature = analyze_dyn_signature_inner(func);
     log::trace!("got signature {signature:?}");
 
     if with_stack.is_empty() {
