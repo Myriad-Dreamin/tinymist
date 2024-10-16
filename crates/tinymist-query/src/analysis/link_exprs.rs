@@ -1,12 +1,9 @@
 //! Analyze color expressions in a source file.
-use std::ops::Range;
 
-use typst::syntax::{
-    ast::{self, AstNode},
-    LinkedNode, Source, SyntaxKind,
-};
+use lsp_types::Url;
 
-use crate::prelude::*;
+use super::prelude::*;
+use crate::path_to_url;
 
 /// Get link expressions from a source.
 pub fn get_link_exprs(ctx: &mut AnalysisContext, src: &Source) -> Option<Vec<(Range<usize>, Url)>> {

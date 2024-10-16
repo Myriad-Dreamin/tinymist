@@ -1,12 +1,7 @@
 //! Type checking at select site
 
-use typst::syntax::Span;
-
-use crate::analysis::SelectChecker;
-use crate::analysis::Ty;
-
 use super::*;
-use crate::adt::interner::Interned;
+use crate::analysis::SelectChecker;
 
 #[derive(BindTyCtx)]
 #[bind(base)]

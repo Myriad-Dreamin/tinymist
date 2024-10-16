@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::{collections::HashSet, ops::Deref};
 
 use comemo::{Track, Tracked};
+use lsp_types::Url;
 use once_cell::sync::OnceCell;
 use reflexo::hash::{hash128, FxDashMap};
 use reflexo::{debug_loc::DataSource, ImmutPath};
@@ -10,19 +11,18 @@ use tinymist_world::DETACHED_ENTRY;
 use typst::diag::{eco_format, At, FileError, FileResult, PackageError, SourceResult};
 use typst::engine::Route;
 use typst::eval::{Eval, Tracer};
-use typst::foundations::{self, Bytes, Func, Module, Styles};
+use typst::foundations::{Bytes, Module, Styles};
 use typst::layout::Position;
 use typst::syntax::{package::PackageSpec, Span, VirtualPath};
 use typst::{model::Document, text::Font};
-use typst_shim::syntax::LinkedNodeExt;
 
+use crate::analysis::prelude::*;
 use crate::analysis::{
     analyze_bib, analyze_expr_, analyze_import_, analyze_signature, post_type_check, BibInfo,
-    DefUseInfo, DefinitionLink, DocString, IdentRef, ImportInfo, PathPreference, Signature,
-    SignatureTarget, Ty, TypeScheme,
+    DefUseInfo, DefinitionLink, DocString, ImportInfo, PathPreference, Signature, SignatureTarget,
+    Ty, TypeScheme,
 };
 use crate::docs::{DocStringKind, SignatureDocs};
-use crate::prelude::*;
 use crate::syntax::{
     construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
     scan_workspace_files, DerefTarget, LexicalHierarchy, ModuleDependency,
@@ -86,7 +86,7 @@ pub struct AnalysisGlobalCaches {
     type_check: FxDashMap<u128, (u64, Option<Arc<TypeScheme>>)>,
     static_signatures: FxDashMap<u128, (u64, Source, usize, Option<Signature>)>,
     docstrings: FxDashMap<u128, Option<Arc<DocString>>>,
-    signatures: FxDashMap<u128, (u64, foundations::Func, Option<Signature>)>,
+    signatures: FxDashMap<u128, (u64, Func, Option<Signature>)>,
 }
 
 /// A cache for all level of analysis results of a module.
@@ -103,25 +103,11 @@ pub struct AnalysisCaches {
 /// You should not holds across requests, because source code may change.
 #[derive(Default)]
 pub struct ModuleAnalysisCache {
-    file: OnceCell<FileResult<Bytes>>,
-    source: OnceCell<FileResult<Source>>,
     def_use: OnceCell<Option<Arc<DefUseInfo>>>,
     type_check: OnceCell<Option<Arc<TypeScheme>>>,
 }
 
 impl ModuleAnalysisCache {
-    /// Get the bytes content of a file.
-    pub fn file(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Bytes> {
-        self.file.get_or_init(|| ctx.world().file(file_id)).clone()
-    }
-
-    /// Get the source of a file.
-    pub fn source(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Source> {
-        self.source
-            .get_or_init(|| ctx.world().source(file_id))
-            .clone()
-    }
-
     /// Try to get the def-use information of a file.
     pub fn def_use(&self) -> Option<Arc<DefUseInfo>> {
         self.def_use.get().cloned().flatten()
@@ -325,26 +311,23 @@ impl<'w> AnalysisContext<'w> {
     }
 
     /// Get the content of a file by file id.
-    pub fn file_by_id(&mut self, id: TypstFileId) -> FileResult<Bytes> {
-        self.get_mut(id);
-        self.get(id).unwrap().file(self, id)
+    pub fn file_by_id(&self, id: TypstFileId) -> FileResult<Bytes> {
+        self.world().file(id)
     }
 
     /// Get the source of a file by file id.
-    pub fn source_by_id(&mut self, id: TypstFileId) -> FileResult<Source> {
-        self.get_mut(id);
-        self.get(id).unwrap().source(self, id)
+    pub fn source_by_id(&self, id: TypstFileId) -> FileResult<Source> {
+        self.world().source(id)
     }
 
     /// Get the source of a file by file path.
-    pub fn source_by_path(&mut self, p: &Path) -> FileResult<Source> {
-        // todo: source in packages
-        let id = self.file_id_by_path(p)?;
-        self.source_by_id(id)
+    pub fn source_by_path(&self, p: &Path) -> FileResult<Source> {
+        // todo: source cache
+        self.source_by_id(self.file_id_by_path(p)?)
     }
 
     /// Get a module by file id.
-    pub fn module_by_id(&mut self, fid: TypstFileId) -> SourceResult<Module> {
+    pub fn module_by_id(&self, fid: TypstFileId) -> SourceResult<Module> {
         let source = self.source_by_id(fid).at(Span::detached())?;
         self.module_by_src(source)
     }
@@ -370,7 +353,7 @@ impl<'w> AnalysisContext<'w> {
 
     /// Get a syntax object at a position.
     pub fn deref_syntax_at<'s>(
-        &mut self,
+        &self,
         source: &'s Source,
         position: LspPosition,
         shift: usize,
@@ -381,7 +364,7 @@ impl<'w> AnalysisContext<'w> {
 
     /// Get a syntax object at a position.
     pub fn deref_syntax_at_<'s>(
-        &mut self,
+        &self,
         source: &'s Source,
         position: LspPosition,
         shift: usize,
@@ -396,11 +379,6 @@ impl<'w> AnalysisContext<'w> {
     /// Get the module-level analysis cache of a file.
     pub fn get(&self, file_id: TypstFileId) -> Option<&ModuleAnalysisCache> {
         self.caches.modules.get(&file_id)
-    }
-
-    /// Get the module-level analysis cache of a file.
-    pub fn get_mut(&mut self, file_id: TypstFileId) -> &ModuleAnalysisCache {
-        self.caches.modules.entry(file_id).or_default()
     }
 
     /// Fork a new context for searching in the workspace.

@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
 use super::{Sig, SigChecker, SigSurfaceKind, TyCtx};
-use crate::ty::def::*;
+use crate::ty::prelude::*;
 
 pub trait ApplyChecker: TyCtx {
     fn apply(&mut self, sig: Sig, arguments: &Interned<ArgsTy>, pol: bool);

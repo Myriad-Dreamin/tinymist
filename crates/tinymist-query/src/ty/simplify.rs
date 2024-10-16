@@ -1,11 +1,9 @@
 #![allow(unused)]
 
-use std::collections::HashSet;
-
 use ecow::EcoVec;
 use reflexo::hash::hash128;
 
-use crate::{analysis::*, ty::def::*};
+use crate::ty::prelude::*;
 
 #[derive(Default)]
 struct CompactTy {

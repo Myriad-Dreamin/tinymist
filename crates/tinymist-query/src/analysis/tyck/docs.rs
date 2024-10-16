@@ -1,15 +1,12 @@
-use std::{collections::BTreeMap, sync::LazyLock};
-
 use reflexo::TakeAs;
 use typst::foundations::{IntoValue, Module, Str, Type};
 
+use super::*;
 use crate::{
     adt::snapshot_map::SnapshotMap,
     docs::{convert_docs, identify_func_docs, identify_var_docs, DocStringKind},
     syntax::{find_docs_of, get_non_strict_def_target},
 };
-
-use super::*;
 
 const DOC_VARS: u64 = 0;
 

@@ -52,7 +52,7 @@ impl SemanticRequest for SignatureHelpRequest {
         let Some(Value::Func(function)) = def_link.value else {
             return None;
         };
-        trace!("got function {function:?}");
+        log::trace!("got function {function:?}");
 
         let mut function = &function;
         use typst::foundations::func::Repr;
@@ -151,7 +151,7 @@ impl SemanticRequest for SignatureHelpRequest {
                 active_parameter.map(|x| x.min(sig.primary().pos_size().saturating_sub(1)));
         }
 
-        trace!("got signature info {label} {params:?}");
+        log::trace!("got signature info {label} {params:?}");
 
         Some(SignatureHelp {
             signatures: vec![SignatureInformation {

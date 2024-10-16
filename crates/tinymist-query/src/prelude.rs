@@ -7,7 +7,7 @@ pub use std::{
 
 pub use ecow::EcoVec;
 pub use itertools::{Format, Itertools};
-pub use log::{error, trace};
+pub use log::error;
 pub use lsp_types::{
     request::GotoDeclarationResponse, CodeAction, CodeActionKind, CodeActionOrCommand, CodeLens,
     ColorInformation, ColorPresentation, CompletionResponse, DiagnosticRelatedInformation,
@@ -21,11 +21,11 @@ pub use lsp_types::{
 pub use reflexo::vector::ir::DefId;
 pub use serde_json::Value as JsonValue;
 pub use typst::diag::{EcoString, FileResult, Tracepoint};
-pub use typst::foundations::{Func, Value};
+pub use typst::foundations::Value;
 pub use typst::syntax::FileId as TypstFileId;
 pub use typst::syntax::{
     ast::{self, AstNode},
-    LinkedNode, Source, Spanned, SyntaxKind, SyntaxNode,
+    LinkedNode, Source, Spanned, SyntaxKind,
 };
 pub use typst::World;
 

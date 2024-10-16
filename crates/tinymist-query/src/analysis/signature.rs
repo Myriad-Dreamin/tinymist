@@ -1,27 +1,10 @@
 //! Analysis of function signatures.
-use core::fmt;
-use std::collections::BTreeMap;
-use std::sync::Arc;
 
-use ecow::{eco_format, eco_vec, EcoString, EcoVec};
-use serde::{Deserialize, Serialize};
-use typst::foundations::ParamInfo;
-use typst::syntax::Source;
-use typst::{
-    foundations::{Closure, Func, Value},
-    syntax::{
-        ast::{self, AstNode},
-        LinkedNode, SyntaxKind,
-    },
-};
-use typst_shim::utils::LazyHash;
+use typst::foundations::{Closure, ParamInfo};
 
-use super::{IdentRef, StrRef};
-use crate::adt::interner::Interned;
-use crate::analysis::{resolve_callee, AnalysisContext};
+use super::{prelude::*, resolve_callee, SigTy};
 use crate::docs::UntypedSymbolDocs;
 use crate::syntax::get_non_strict_def_target;
-use crate::ty::{SigTy, Ty};
 use crate::upstream::truncated_repr;
 
 /// Describes a function parameter.

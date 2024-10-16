@@ -1,25 +1,14 @@
 //! Infer more than the principal type of some expression.
 
-use std::collections::HashMap;
-
 use hashbrown::HashSet;
 use tinymist_derive::BindTyCtx;
-use typst::{
-    foundations::Func,
-    syntax::{
-        ast::{self, AstNode},
-        LinkedNode, Span, SyntaxKind,
-    },
-};
 
-use crate::{
-    adt::interner::Interned,
-    analysis::{ArgsTy, Sig, SigChecker, SigSurfaceKind, TypeBounds},
-    syntax::{get_check_target, get_check_target_by_context, CheckTarget, ParamTarget},
-    AnalysisContext,
+use super::prelude::*;
+use super::{
+    ArgsTy, FieldTy, Sig, SigChecker, SigShape, SigSurfaceKind, SigTy, Ty, TyCtx, TyCtxMut,
+    TypeBounds, TypeScheme, TypeVar,
 };
-
-use super::{FieldTy, SigShape, SigTy, Ty, TyCtx, TyCtxMut, TypeScheme, TypeVar};
+use crate::syntax::{get_check_target, get_check_target_by_context, CheckTarget, ParamTarget};
 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.

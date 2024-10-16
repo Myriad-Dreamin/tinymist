@@ -1,4 +1,5 @@
-use crate::{analysis::*, ty::def::*};
+use super::{Sig, SigShape, TyMutator};
+use crate::ty::prelude::*;
 
 impl<'a> Sig<'a> {
     pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, ctx: &mut impl TyCtxMut) -> Option<Ty> {
@@ -57,9 +58,9 @@ mod tests {
     use insta::{assert_debug_snapshot, assert_snapshot};
     use tinymist_derive::BindTyCtx;
 
+    use super::{Interned, Ty, TyCtx, TypeBounds, TypeScheme, TypeVar};
     use crate::ty::tests::*;
-
-    use super::{ApplyChecker, Interned, Ty, TyCtx, TypeBounds, TypeScheme, TypeVar};
+    use crate::ty::ApplyChecker;
     #[test]
     fn test_ty() {
         use super::*;

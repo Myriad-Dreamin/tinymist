@@ -1,13 +1,9 @@
 //! Type checking at apply site
 
-use typst::syntax::{ast, Span};
-
-use crate::analysis::Ty;
-use crate::ty::Sig;
-use crate::{analysis::ApplyChecker, ty::ArgsTy};
-
 use super::*;
 use crate::adt::interner::Interned;
+use crate::ty::Sig;
+use crate::{analysis::ApplyChecker, ty::ArgsTy};
 
 #[derive(BindTyCtx)]
 #[bind(base)]

@@ -1,28 +1,12 @@
 //! Type checking on source file
 
-use std::{collections::HashMap, sync::Arc};
-
-use ecow::EcoString;
-use once_cell::sync::Lazy;
-use reflexo::vector::ir::DefId;
-use typst::{
-    foundations::{Func, Value},
-    syntax::{
-        ast::{self, AstNode},
-        LinkedNode, Source, Span, SyntaxKind,
-    },
-};
-
-use crate::{
-    adt::interner::Interned,
-    analysis::{Ty, *},
-};
-use crate::{analysis::TypeScheme, ty::TypeInterface, AnalysisContext};
+use tinymist_derive::BindTyCtx;
 
 use super::{
-    resolve_global_value, BuiltinTy, DefUseInfo, FlowVarKind, IdentRef, TypeBounds, TypeVar,
-    TypeVarBounds,
+    prelude::*, resolve_global_value, BuiltinTy, DefUseInfo, FlowVarKind, TyCtxMut, TypeBounds,
+    TypeScheme, TypeVar, TypeVarBounds,
 };
+use crate::ty::*;
 
 mod apply;
 mod docs;
@@ -180,11 +164,16 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     }
 
     fn constrain(&mut self, lhs: &Ty, rhs: &Ty) {
-        static FLOW_STROKE_DICT_TYPE: Lazy<Ty> = Lazy::new(|| Ty::Dict(FLOW_STROKE_DICT.clone()));
-        static FLOW_MARGIN_DICT_TYPE: Lazy<Ty> = Lazy::new(|| Ty::Dict(FLOW_MARGIN_DICT.clone()));
-        static FLOW_INSET_DICT_TYPE: Lazy<Ty> = Lazy::new(|| Ty::Dict(FLOW_INSET_DICT.clone()));
-        static FLOW_OUTSET_DICT_TYPE: Lazy<Ty> = Lazy::new(|| Ty::Dict(FLOW_OUTSET_DICT.clone()));
-        static FLOW_RADIUS_DICT_TYPE: Lazy<Ty> = Lazy::new(|| Ty::Dict(FLOW_RADIUS_DICT.clone()));
+        static FLOW_STROKE_DICT_TYPE: LazyLock<Ty> =
+            LazyLock::new(|| Ty::Dict(FLOW_STROKE_DICT.clone()));
+        static FLOW_MARGIN_DICT_TYPE: LazyLock<Ty> =
+            LazyLock::new(|| Ty::Dict(FLOW_MARGIN_DICT.clone()));
+        static FLOW_INSET_DICT_TYPE: LazyLock<Ty> =
+            LazyLock::new(|| Ty::Dict(FLOW_INSET_DICT.clone()));
+        static FLOW_OUTSET_DICT_TYPE: LazyLock<Ty> =
+            LazyLock::new(|| Ty::Dict(FLOW_OUTSET_DICT.clone()));
+        static FLOW_RADIUS_DICT_TYPE: LazyLock<Ty> =
+            LazyLock::new(|| Ty::Dict(FLOW_RADIUS_DICT.clone()));
 
         fn is_ty(ty: &Ty) -> bool {
             match ty {

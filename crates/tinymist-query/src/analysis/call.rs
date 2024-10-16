@@ -1,12 +1,8 @@
 //! Hybrid analysis for function calls.
 
-use typst::syntax::SyntaxNode;
-
+use super::prelude::*;
 use super::{Signature, StrRef};
-use crate::{
-    analysis::{analyze_signature, PrimarySignature, SignatureTarget},
-    prelude::*,
-};
+use crate::analysis::{analyze_signature, PrimarySignature, SignatureTarget};
 
 /// Describes kind of a parameter.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,7 +43,7 @@ pub fn analyze_call(
     source: Source,
     node: LinkedNode,
 ) -> Option<Arc<CallInfo>> {
-    trace!("func call found: {:?}", node);
+    log::trace!("func call found: {:?}", node);
     let f = node.cast::<ast::FuncCall>()?;
 
     let callee = f.callee();
@@ -74,7 +70,7 @@ pub fn analyze_call_no_cache(
     args: ast::Args<'_>,
 ) -> Option<CallInfo> {
     let signature = analyze_signature(ctx, SignatureTarget::SyntaxFast(source, callee_node))?;
-    trace!("got signature {signature:?}");
+    log::trace!("got signature {signature:?}");
 
     let mut info = CallInfo {
         arg_mapping: HashMap::new(),
