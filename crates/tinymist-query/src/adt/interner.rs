@@ -19,7 +19,7 @@ use std::{
     fmt::{self, Debug, Display},
     hash::{BuildHasherDefault, Hash, Hasher},
     ops::Deref,
-    sync::OnceLock,
+    sync::{LazyLock, OnceLock},
 };
 
 use dashmap::{DashMap, SharedValue};
@@ -92,6 +92,13 @@ impl Interned<str> {
                     .clone(),
             },
         }
+    }
+}
+
+static EMPTY: LazyLock<Interned<str>> = LazyLock::new(|| Interned::new_str(""));
+impl Default for Interned<str> {
+    fn default() -> Self {
+        EMPTY.clone()
     }
 }
 
@@ -248,6 +255,32 @@ impl PartialEq for Interned<str> {
 }
 
 impl Eq for Interned<str> {}
+
+impl serde::Serialize for Interned<str> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.arc.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Interned<str> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct StrVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for StrVisitor {
+            type Value = Interned<str>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a string")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Ok(Interned::new_str(v))
+            }
+        }
+
+        deserializer.deserialize_str(StrVisitor)
+    }
+}
 
 impl<T: Internable + ?Sized> Hash for Interned<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {

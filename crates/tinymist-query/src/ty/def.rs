@@ -21,7 +21,8 @@ use typst::{
 use super::PackageId;
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
-    analysis::{BuiltinTy, DocString},
+    analysis::BuiltinTy,
+    docs::UntypedSymbolDocs,
 };
 
 pub(crate) use super::{TyCtx, TyCtxMut};
@@ -960,7 +961,7 @@ pub struct TypeScheme {
     /// The typing on definitions
     pub vars: HashMap<DefId, TypeVarBounds>,
     /// The checked documentation of definitions
-    pub var_docs: HashMap<DefId, Arc<DocString>>,
+    pub var_docs: HashMap<DefId, Arc<UntypedSymbolDocs>>,
     /// The local binding of the type variable
     pub local_binds: snapshot_map::SnapshotMap<DefId, Ty>,
     /// The typing on syntax structures

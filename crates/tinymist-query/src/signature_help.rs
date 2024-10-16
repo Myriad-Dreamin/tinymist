@@ -3,7 +3,7 @@ use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     adt::interner::Interned,
-    analysis::{analyze_dyn_signature, find_definition},
+    analysis::find_definition,
     prelude::*,
     syntax::{get_check_target, get_deref_target, CheckTarget, ParamTarget},
     DocTooltip, LspParamInfo, SemanticRequest,
@@ -62,7 +62,7 @@ impl SemanticRequest for SignatureHelpRequest {
             function = &inner.0;
         }
 
-        let sig = analyze_dyn_signature(ctx, function.clone());
+        let sig = ctx.signature_dyn(function.clone());
         let pos = sig.primary().pos();
         let named = sig.primary().named();
         let rest = sig.primary().rest();
@@ -91,7 +91,7 @@ impl SemanticRequest for SignatureHelpRequest {
         let mut real_offset = 0;
         let focus_name = OnceCell::new();
         for (i, (param, ty)) in pos.chain(named).chain(rest).enumerate() {
-            if is_set && !param.settable {
+            if is_set && !param.attrs.settable {
                 continue;
             }
 

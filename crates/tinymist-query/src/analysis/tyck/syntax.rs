@@ -12,9 +12,14 @@ use typst::{
 };
 
 use super::*;
-use crate::{adt::interner::Interned, ty::*};
+use crate::{
+    adt::interner::Interned,
+    docs::{DocStringKind, SignatureDocsT, TypelessParamDocs, UntypedSymbolDocs},
+    ty::*,
+};
 
 static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);
+static EMPTY_VAR_DOC: LazyLock<VarDoc> = LazyLock::new(VarDoc::default);
 
 impl<'a, 'w> TypeChecker<'a, 'w> {
     pub(crate) fn check_syntax(&mut self, root: LinkedNode) -> Option<Ty> {
@@ -374,11 +379,19 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     }
 
     fn check_closure(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let docstring = self.check_func_docs(&root);
-        let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
         let closure: ast::Closure = root.cast()?;
+        let def_id = closure
+            .name()
+            .and_then(|n| self.get_def_id(n.span(), &to_ident_ref(&root, n)?))?;
+
+        let docstring = self.check_docstring(&root, DocStringKind::Function, def_id);
+        let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
         log::debug!("check closure: {:?} -> {docstring:#?}", closure.name());
+
+        let mut pos_docs = vec![];
+        let mut named_docs = BTreeMap::new();
+        let mut rest_docs = None;
 
         let mut pos = vec![];
         let mut named = BTreeMap::new();
@@ -389,6 +402,18 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             match param {
                 ast::Param::Pos(pattern) => {
                     pos.push(self.check_pattern(pattern, Ty::Any, docstring, root.clone()));
+                    if let ast::Pattern::Normal(ast::Expr::Ident(ident)) = pattern {
+                        let name = ident.get().into();
+
+                        let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
+                        pos_docs.push(TypelessParamDocs {
+                            name,
+                            docs: param_doc.docs.clone().unwrap_or_default(),
+                            cano_type: (),
+                            default: param_doc.default.clone(),
+                            attrs: ParamAttrs::positional(),
+                        });
+                    }
                 }
                 ast::Param::Named(e) => {
                     let name = e.name().get().into();
@@ -401,7 +426,19 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     // optimize it, so I put a todo here.
                     self.constrain(&exp, &v);
                     named.insert(name.clone(), v);
-                    defaults.insert(name, exp);
+                    defaults.insert(name.clone(), exp);
+
+                    let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
+                    named_docs.insert(
+                        name.clone(),
+                        TypelessParamDocs {
+                            name: name.clone(),
+                            docs: param_doc.docs.clone().unwrap_or_default(),
+                            cano_type: (),
+                            default: param_doc.default.clone(),
+                            attrs: ParamAttrs::named(),
+                        },
+                    );
                 }
                 // todo: spread left/right
                 ast::Param::Spread(a) => {
@@ -413,14 +450,35 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                         }
                         self.constrain(&exp, &v);
                         rest = Some(v);
+
+                        let param_doc = docstring
+                            .get_var(&e.get().as_str().into())
+                            .unwrap_or(&EMPTY_VAR_DOC);
+                        rest_docs = Some(TypelessParamDocs {
+                            name: e.get().as_str().into(),
+                            docs: param_doc.docs.clone().unwrap_or_default(),
+                            cano_type: (),
+                            default: param_doc.default.clone(),
+                            attrs: ParamAttrs::variadic(),
+                        });
                     }
                     // todo: ..(args)
                 }
             }
         }
 
+        self.info.var_docs.insert(
+            def_id,
+            Arc::new(UntypedSymbolDocs::Function(Box::new(SignatureDocsT {
+                docs: docstring.docs.clone().unwrap_or_default(),
+                pos: pos_docs,
+                named: named_docs,
+                rest: rest_docs,
+                ret_ty: (),
+            }))),
+        );
+
         let body = self.check_expr_in(closure.body().span(), root);
-        // let res_ty = docstring.res_ty.clone().unwrap_or(body);
         let res_ty = if let Some(annotated) = &docstring.res_ty {
             self.constrain(&body, annotated);
             Ty::Let(Interned::new(TypeBounds {

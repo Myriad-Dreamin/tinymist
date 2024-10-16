@@ -10,6 +10,43 @@ impl Ty {
         matches!(self, Ty::Union(_) | Ty::Let(_) | Ty::Var(_))
     }
 
+    /// Get the sources of the given type.
+    pub fn sources(&self) -> Vec<Interned<TypeVar>> {
+        let mut results = vec![];
+        fn collect(ty: &Ty, results: &mut Vec<Interned<TypeVar>>) {
+            use Ty::*;
+            match ty {
+                Any | Boolean(_) | If(..) | Builtin(..) | Value(..) => {}
+                Dict(..) | Array(..) | Tuple(..) | Func(..) | Args(..) => {}
+                Unary(..) | Binary(..) => {}
+                Field(ty) => {
+                    collect(&ty.field, results);
+                }
+                Union(ty) => {
+                    for ty in ty.iter() {
+                        collect(ty, results);
+                    }
+                }
+                Let(ty) => {
+                    for ty in ty.ubs.iter() {
+                        collect(ty, results);
+                    }
+                    for ty in ty.lbs.iter() {
+                        collect(ty, results);
+                    }
+                }
+                Var(ty) => {
+                    results.push(ty.clone());
+                }
+                With(ty) => collect(&ty.sig, results),
+                Select(ty) => collect(&ty.ty, results),
+            }
+        }
+
+        collect(self, &mut results);
+        results
+    }
+
     /// Profile the bounds of the given type.
     pub fn bounds(&self, pol: bool, checker: &mut impl BoundChecker) {
         BoundCheckContext.ty(self, pol, checker);

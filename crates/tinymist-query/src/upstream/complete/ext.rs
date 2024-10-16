@@ -12,7 +12,7 @@ use typst::visualize::Color;
 
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::adt::interner::Interned;
-use crate::analysis::{analyze_dyn_signature, resolve_call_target, BuiltinTy, PathPreference, Ty};
+use crate::analysis::{resolve_call_target, BuiltinTy, PathPreference, Ty};
 use crate::syntax::{param_index_at_leaf, CheckTarget};
 use crate::upstream::complete::complete_code;
 use crate::upstream::plain_docs_sentence;
@@ -61,7 +61,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         let types = (|| {
             let id = self.root.span().id()?;
             let src = self.ctx.source_by_id(id).ok()?;
-            self.ctx.type_check(src)
+            self.ctx.type_check(&src)
         })();
         let types = types.as_ref();
 
@@ -462,7 +462,7 @@ fn describe_value(ctx: &mut AnalysisContext, v: &Value) -> EcoString {
                 f = &with_f.0;
             }
 
-            let sig = analyze_dyn_signature(ctx, f.clone());
+            let sig = ctx.signature_dyn(f.clone());
             sig.primary()
                 .ty()
                 .describe()
@@ -580,7 +580,7 @@ pub fn param_completions<'a>(
     let pos_index =
         param_index_at_leaf(&ctx.leaf, &func, args).map(|i| if this.is_some() { i + 1 } else { i });
 
-    let signature = analyze_dyn_signature(ctx.ctx, func.clone());
+    let signature = ctx.ctx.signature_dyn(func.clone());
 
     let leaf_type = ctx.ctx.literal_type_of_node(ctx.leaf.clone());
     log::debug!("pos_param_completion_by_type: {:?}", leaf_type);
@@ -601,7 +601,7 @@ pub fn param_completions<'a>(
             log::debug!("pos_param_completion_to: {:?}", pos);
 
             if let Some(pos) = pos {
-                if set && !pos.settable {
+                if set && !pos.attrs.settable {
                     break 'pos_check;
                 }
 
@@ -609,7 +609,7 @@ pub fn param_completions<'a>(
                     doc = Some(plain_docs_sentence(docs));
                 }
 
-                if pos.positional {
+                if pos.attrs.positional {
                     type_completion(ctx, &pos.ty, doc.as_deref());
                 }
             }
@@ -627,10 +627,10 @@ pub fn param_completions<'a>(
         }
         log::debug!(
             "pos_named_param_completion_to({set:?}): {name:?} {:?}",
-            param.settable
+            param.attrs.settable
         );
 
-        if set && !param.settable {
+        if set && !param.attrs.settable {
             continue;
         }
 
@@ -640,7 +640,7 @@ pub fn param_completions<'a>(
                 .clone()
         };
 
-        if param.named {
+        if param.attrs.named {
             let compl = Completion {
                 kind: CompletionKind::Field,
                 label: param.name.as_ref().into(),
@@ -679,7 +679,7 @@ pub fn param_completions<'a>(
             ctx.completions.push(compl);
         }
 
-        if param.positional {
+        if param.attrs.positional {
             type_completion(ctx, &param.ty, docs().as_deref());
         }
     }
@@ -986,14 +986,14 @@ pub fn named_param_value_completions<'a>(
         func = f.0.clone();
     }
 
-    let signature = analyze_dyn_signature(ctx.ctx, func.clone());
+    let signature = ctx.ctx.signature_dyn(func.clone());
 
     let primary_sig = signature.primary();
 
     let Some(param) = primary_sig.get_named(name) else {
         return;
     };
-    if !param.named {
+    if !param.attrs.named {
         return;
     }
 

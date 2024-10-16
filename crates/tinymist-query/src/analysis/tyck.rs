@@ -93,7 +93,7 @@ impl<'a, 'w> TyCtxMut for TypeChecker<'a, 'w> {
     }
 
     fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>> {
-        self.ctx.type_of_func(func)
+        Some(self.ctx.signature_dyn(func.clone()).type_sig())
     }
 }
 
@@ -167,7 +167,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         let source = self.ctx.source_by_id(def_id).ok()?;
         let ext_def_use_info = self.ctx.def_use(source.clone())?;
-        let ext_type_info = self.ctx.type_check(source)?;
+        let ext_type_info = self.ctx.type_check(&source)?;
         let (ext_def_id, _) = ext_def_use_info.get_def(
             def_id,
             &IdentRef {

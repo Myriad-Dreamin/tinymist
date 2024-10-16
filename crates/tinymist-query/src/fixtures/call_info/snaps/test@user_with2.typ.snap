@@ -3,4 +3,4 @@ source: crates/tinymist-query/src/analysis.rs
 expression: CallSnapshot(result.as_deref())
 input_file: crates/tinymist-query/src/fixtures/call_info/user_with2.typ
 ---
-
+<nil>

@@ -14,9 +14,10 @@ use typst::{
 };
 
 use super::tidy::*;
-use crate::analysis::{analyze_dyn_signature, ParamSpec};
+use crate::analysis::{ParamAttrs, ParamSpec};
 use crate::docs::library;
 use crate::syntax::IdentRef;
+use crate::ty::Interned;
 use crate::{ty::Ty, AnalysisContext};
 
 type TypeRepr = Option<(/* short */ String, /* long */ String)>;
@@ -54,13 +55,18 @@ impl fmt::Display for DocStringKind {
     }
 }
 
+/// Documentation about a symbol (without type information).
+pub type UntypedSymbolDocs = SymbolDocsT<()>;
+/// Documentation about a symbol.
+pub type SymbolDocs = SymbolDocsT<TypeRepr>;
+
 /// Documentation about a symbol.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
-pub enum SymbolDocs {
+pub enum SymbolDocsT<T> {
     /// Documentation about a function.
     #[serde(rename = "func")]
-    Function(Box<SignatureDocs>),
+    Function(Box<SignatureDocsT<T>>),
     /// Documentation about a variable.
     #[serde(rename = "var")]
     Variable(TidyVarDocs),
@@ -75,14 +81,14 @@ pub enum SymbolDocs {
     },
 }
 
-impl SymbolDocs {
+impl<T> SymbolDocsT<T> {
     /// Get the markdown representation of the documentation.
-    pub fn docs(&self) -> &str {
+    pub fn docs(&self) -> &EcoString {
         match self {
-            Self::Function(docs) => docs.docs.as_str(),
-            Self::Variable(docs) => docs.docs.as_str(),
-            Self::Module(docs) => docs.docs.as_str(),
-            Self::Plain { docs } => docs.as_str(),
+            Self::Function(docs) => &docs.docs,
+            Self::Variable(docs) => &docs.docs,
+            Self::Module(docs) => &docs.docs,
+            Self::Plain { docs } => docs,
         }
     }
 }
@@ -123,20 +129,21 @@ pub(crate) fn symbol_docs(
 
 /// Describes a primary function signature.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SignatureDocs {
+pub struct SignatureDocsT<T> {
     /// Documentation for the function.
     pub docs: EcoString,
-    // pub return_ty: Option<EcoString>,
-    // pub params: Vec<TidyParamDocs>,
     /// The positional parameters.
-    pub pos: Vec<ParamDocs>,
+    pub pos: Vec<ParamDocsT<T>>,
     /// The named parameters.
-    pub named: BTreeMap<String, ParamDocs>,
+    pub named: BTreeMap<Interned<str>, ParamDocsT<T>>,
     /// The rest parameter.
-    pub rest: Option<ParamDocs>,
+    pub rest: Option<ParamDocsT<T>>,
     /// The return type.
-    pub ret_ty: TypeRepr,
+    pub ret_ty: T,
 }
+
+/// Documentation about a signature.
+pub type SignatureDocs = SignatureDocsT<TypeRepr>;
 
 impl fmt::Display for SignatureDocs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -197,41 +204,35 @@ impl fmt::Display for SignatureDocs {
     }
 }
 
+/// Documentation about a parameter (without type information).
+pub type TypelessParamDocs = ParamDocsT<()>;
+/// Documentation about a parameter.
+pub type ParamDocs = ParamDocsT<TypeRepr>;
+
 /// Describes a function parameter.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParamDocs {
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ParamDocsT<T> {
     /// The parameter's name.
-    pub name: String,
+    pub name: Interned<str>,
     /// Documentation for the parameter.
     pub docs: EcoString,
     /// Inferred type of the parameter.
-    pub cano_type: TypeRepr,
+    pub cano_type: T,
     /// The parameter's default name as value.
     pub default: Option<EcoString>,
-    /// Is the parameter positional?
-    pub positional: bool,
-    /// Is the parameter named?
-    ///
-    /// Can be true even if `positional` is true if the parameter can be given
-    /// in both variants.
-    pub named: bool,
-    /// Can the parameter be given any number of times?
-    pub variadic: bool,
-    /// Is the parameter settable with a set rule?
-    pub settable: bool,
+    /// The attribute of the parameter.
+    #[serde(flatten)]
+    pub attrs: ParamAttrs,
 }
 
 impl ParamDocs {
     fn new(param: &ParamSpec, ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> Self {
         Self {
-            name: param.name.as_ref().to_owned(),
+            name: param.name.as_ref().into(),
             docs: param.docs.clone().unwrap_or_default(),
             cano_type: format_ty(ty.or(Some(&param.ty)), doc_ty),
             default: param.default.clone(),
-            positional: param.positional,
-            named: param.named,
-            variadic: param.variadic,
-            settable: param.settable,
+            attrs: param.attrs,
         }
     }
 }
@@ -276,7 +277,7 @@ pub(crate) fn signature_docs(
         }
     }
 
-    let sig = analyze_dyn_signature(ctx, func.clone());
+    let sig = ctx.signature_dyn(func.clone());
     let def_id = type_info.and_then(|(def_use, _)| {
         let def_fid = func.span().id()?;
         let (def_id, _) = def_use.get_def(def_fid, def_ident?)?;
@@ -313,7 +314,7 @@ pub(crate) fn signature_docs(
     let named = named_in
         .map(|(param, ty)| {
             (
-                param.name.as_ref().to_owned(),
+                param.name.clone(),
                 ParamDocs::new(param, ty, doc_ty.as_mut()),
             )
         })
@@ -323,7 +324,7 @@ pub(crate) fn signature_docs(
     let ret_ty = format_ty(ret_in, doc_ty.as_mut());
 
     Some(SignatureDocs {
-        docs: docstring.and_then(|x| x.docs.clone()).unwrap_or_default(),
+        docs: docstring.map(|x| x.docs().clone()).unwrap_or_default(),
         pos,
         named,
         rest,

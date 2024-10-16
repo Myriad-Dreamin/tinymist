@@ -116,7 +116,7 @@ pub fn package_docs(
                 let file_id = fid?;
                 let src = world.source(file_id).ok()?;
                 let def_use = ctx.def_use(src.clone())?;
-                let ty_chck = ctx.type_check(src)?;
+                let ty_chck = ctx.type_check(&src)?;
                 Some((def_use, ty_chck))
             });
             let type_info = type_info.as_ref();
