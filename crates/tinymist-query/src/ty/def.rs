@@ -1161,6 +1161,13 @@ mod tests {
     use insta::{assert_debug_snapshot, assert_snapshot};
 
     use crate::ty::tests::*;
+
+    #[test]
+    fn test_ty_size() {
+        use super::*;
+        assert!(size_of::<Ty>() == 16);
+    }
+
     #[test]
     fn test_ty() {
         use super::*;
