@@ -63,15 +63,13 @@ impl SemanticRequest for SignatureHelpRequest {
         }
 
         let sig = analyze_dyn_signature(ctx, function.clone());
-        let pos = &sig.primary().pos;
-        let mut named = sig.primary().named.values().collect::<Vec<_>>();
-        let rest = &sig.primary().rest;
+        let pos = sig.primary().pos();
+        let named = sig.primary().named();
+        let rest = sig.primary().rest();
 
         let type_sig = type_sig.and_then(|type_sig| type_sig.sig_repr(true));
 
         log::info!("got type signature {type_sig:?}");
-
-        named.sort_by_key(|x| &x.name);
 
         let mut active_parameter = None;
 
@@ -80,20 +78,22 @@ impl SemanticRequest for SignatureHelpRequest {
 
         label.push('(');
         let pos = pos
-            .iter()
             .enumerate()
             .map(|(i, pos)| (pos, type_sig.as_ref().and_then(|sig| sig.pos(i))));
-        let named = named
-            .into_iter()
-            .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.named(&x.name))));
+        let named = named.into_iter().map(|x| {
+            (
+                x.clone(),
+                type_sig.as_ref().and_then(|sig| sig.named(x.name)),
+            )
+        });
         let rest = rest
-            .iter()
+            .into_iter()
             .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.rest_param())));
 
         let mut real_offset = 0;
         let focus_name = OnceCell::new();
         for (i, (param, ty)) in pos.chain(named).chain(rest).enumerate() {
-            if is_set && !param.settable {
+            if is_set && !param.attrs.settable {
                 continue;
             }
 
@@ -107,7 +107,7 @@ impl SemanticRequest for SignatureHelpRequest {
                 ParamTarget::Named(name) => {
                     let focus_name = focus_name
                         .get_or_init(|| Interned::new_str(&name.get().clone().into_text()));
-                    if focus_name == &param.name {
+                    if focus_name == param.name {
                         active_parameter = Some(real_offset);
                     }
                 }
@@ -122,7 +122,7 @@ impl SemanticRequest for SignatureHelpRequest {
             label.push_str(&format!(
                 "{}: {}",
                 param.name,
-                ty.unwrap_or(&param.base_type)
+                ty.unwrap_or(param.ty)
                     .describe()
                     .as_deref()
                     .unwrap_or("any")
@@ -130,21 +130,19 @@ impl SemanticRequest for SignatureHelpRequest {
 
             params.push(LspParamInfo {
                 label: lsp_types::ParameterLabel::Simple(format!("{}:", param.name)),
-                documentation: if !param.docs.is_empty() {
-                    Some(Documentation::MarkupContent(MarkupContent {
-                        value: param.docs.clone().into(),
+                documentation: param.docs().map(|docs| {
+                    Documentation::MarkupContent(MarkupContent {
+                        value: docs.as_ref().into(),
                         kind: MarkupKind::Markdown,
-                    }))
-                } else {
-                    None
-                },
+                    })
+                }),
             });
         }
         label.push(')');
         let ret = type_sig
             .as_ref()
             .and_then(|sig| sig.body.as_ref())
-            .or_else(|| sig.primary().ret_ty.as_ref());
+            .or_else(|| sig.primary().sig_ty.body.as_ref());
         if let Some(ret_ty) = ret {
             label.push_str(" -> ");
             label.push_str(ret_ty.describe().as_deref().unwrap_or("any"));
@@ -152,7 +150,7 @@ impl SemanticRequest for SignatureHelpRequest {
 
         if matches!(target, ParamTarget::Positional { .. }) {
             active_parameter =
-                active_parameter.map(|x| x.min(sig.primary().pos.len().saturating_sub(1)));
+                active_parameter.map(|x| x.min(sig.primary().pos_size().saturating_sub(1)));
         }
 
         trace!("got signature info {label} {params:?}");

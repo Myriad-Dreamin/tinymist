@@ -14,7 +14,7 @@ use typst::{
 };
 
 use super::tidy::*;
-use crate::analysis::{analyze_dyn_signature, ParamSpec};
+use crate::analysis::{analyze_dyn_signature, ParamSpecLong};
 use crate::docs::library;
 use crate::syntax::IdentRef;
 use crate::{ty::Ty, AnalysisContext};
@@ -222,16 +222,20 @@ pub struct ParamDocs {
 }
 
 impl ParamDocs {
-    fn new(param: &ParamSpec, ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> Self {
+    fn new(param: ParamSpecLong, ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> Self {
         Self {
             name: param.name.as_ref().to_owned(),
-            docs: param.docs.as_ref().to_owned(),
-            cano_type: format_ty(ty.or(Some(&param.base_type)), doc_ty),
-            expr: param.expr.clone(),
-            positional: param.positional,
-            named: param.named,
-            variadic: param.variadic,
-            settable: param.settable,
+            docs: param
+                .docstring
+                .and_then(|d| d.docs.as_deref())
+                .unwrap_or_default()
+                .to_owned(),
+            cano_type: format_ty(ty.or(Some(param.ty)), doc_ty),
+            expr: param.docstring.and_then(|d| d.default.clone()),
+            positional: param.attrs.positional,
+            named: param.attrs.named,
+            variadic: param.attrs.variadic,
+            settable: param.attrs.settable,
         }
     }
 }
@@ -288,19 +292,18 @@ pub(crate) fn signature_docs(
 
     let pos_in = sig
         .primary()
-        .pos
-        .iter()
+        .pos()
         .enumerate()
         .map(|(i, pos)| (pos, type_sig.as_ref().and_then(|sig| sig.pos(i))));
-    let named_in = sig
-        .primary()
-        .named
-        .iter()
-        .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.named(x.0))));
+    let named_in = sig.primary().named().map(|x| {
+        (
+            x.clone(),
+            type_sig.as_ref().and_then(|sig| sig.named(x.name)),
+        )
+    });
     let rest_in = sig
         .primary()
-        .rest
-        .as_ref()
+        .rest()
         .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.rest_param())));
 
     let ret_in = type_sig
@@ -312,9 +315,9 @@ pub(crate) fn signature_docs(
         .map(|(param, ty)| ParamDocs::new(param, ty, doc_ty.as_mut()))
         .collect();
     let named = named_in
-        .map(|((name, param), ty)| {
+        .map(|(param, ty)| {
             (
-                name.as_ref().to_owned(),
+                param.name.as_ref().to_owned(),
                 ParamDocs::new(param, ty, doc_ty.as_mut()),
             )
         })

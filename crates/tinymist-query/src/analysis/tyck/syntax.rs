@@ -444,7 +444,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             self.weaken(rest);
         }
 
-        let sig = SigTy::new(pos.into_iter(), named, rest, Some(res_ty), None).into();
+        let sig = SigTy::new(pos.into_iter(), named, None, rest, Some(res_ty)).into();
         let sig = Ty::Func(sig);
         if defaults.is_empty() {
             return Some(sig);

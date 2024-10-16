@@ -612,20 +612,28 @@ impl SigTy {
 
     /// Create a function type
     pub fn new(
-        pos: impl IntoIterator<Item = Ty>,
+        pos: impl ExactSizeIterator<Item = Ty>,
         named: impl IntoIterator<Item = (StrRef, Ty)>,
-        rest: Option<Ty>,
+        rest_left: Option<Ty>,
+        rest_right: Option<Ty>,
         ret_ty: Option<Ty>,
     ) -> Self {
         let named = named
             .into_iter()
             .map(|(name, ty)| (name, ty, Span::detached()))
             .collect::<Vec<_>>();
-        let (names, types) = RecordTy::shape_fields(named);
-        let spread_right = rest.is_some();
+        let (names, mut named_types) = RecordTy::shape_fields(named);
+        let spread_left = rest_left.is_some();
+        let spread_right = rest_right.is_some();
 
-        let name_started = if spread_right { 1 } else { 0 } + types.len();
-        let types = pos.into_iter().chain(types).chain(rest).collect::<Vec<_>>();
+        let name_started = if spread_right { 1 } else { 0 } + named_types.len();
+        let mut types = Vec::with_capacity(
+            pos.len() + named_types.len() + spread_left as usize + spread_right as usize,
+        );
+        types.extend(pos);
+        types.append(&mut named_types);
+        types.extend(rest_left);
+        types.extend(rest_right);
 
         let name_started = (types.len() - name_started) as u32;
 
@@ -634,7 +642,7 @@ impl SigTy {
             body: ret_ty,
             names: Interned::new(names),
             name_started,
-            spread_left: false,
+            spread_left,
             spread_right,
         }
     }
@@ -1161,6 +1169,12 @@ mod tests {
     use insta::{assert_debug_snapshot, assert_snapshot};
 
     use crate::ty::tests::*;
+    #[test]
+    fn test_ty_size() {
+        use super::*;
+        assert!(size_of::<Ty>() == 16);
+    }
+
     #[test]
     fn test_ty() {
         use super::*;

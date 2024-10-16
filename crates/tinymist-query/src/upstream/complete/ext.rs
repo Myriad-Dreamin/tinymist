@@ -597,18 +597,20 @@ pub fn param_completions<'a>(
         let mut doc = None;
 
         if let Some(pos_index) = pos_index {
-            let pos = primary_sig.pos.get(pos_index);
+            let pos = primary_sig.get_pos(pos_index);
             log::debug!("pos_param_completion_to: {:?}", pos);
 
             if let Some(pos) = pos {
-                if set && !pos.settable {
+                if set && !pos.attr.settable {
                     break 'pos_check;
                 }
 
-                doc = Some(plain_docs_sentence(&pos.docs));
+                if let Some(docs) = pos.docstring().and_then(|d| d.docs.as_ref()) {
+                    doc = Some(plain_docs_sentence(docs));
+                }
 
-                if pos.positional {
-                    type_completion(ctx, &pos.base_type, doc.as_deref());
+                if pos.attr.positional {
+                    type_completion(ctx, pos.ty(), doc.as_deref());
                 }
             }
         }
@@ -618,23 +620,32 @@ pub fn param_completions<'a>(
         }
     }
 
-    for (name, param) in &primary_sig.named {
+    for param in primary_sig.named() {
+        let name = param.name;
         if ctx.seen_field(name.as_ref().into()) {
             continue;
         }
         log::debug!(
             "pos_named_param_completion_to({set:?}): {name:?} {:?}",
-            param.settable
+            param.attrs.settable
         );
 
-        if set && !param.settable {
+        if set && !param.attrs.settable {
             continue;
         }
 
         let _d = OnceCell::new();
-        let docs = || Some(_d.get_or_init(|| plain_docs_sentence(&param.docs)).clone());
+        let docs = || {
+            _d.get_or_init(|| {
+                param
+                    .docstring
+                    .and_then(|d| d.docs.as_deref())
+                    .map(plain_docs_sentence)
+            })
+            .clone()
+        };
 
-        if param.named {
+        if param.attrs.named {
             let compl = Completion {
                 kind: CompletionKind::Field,
                 label: param.name.as_ref().into(),
@@ -644,7 +655,7 @@ pub fn param_completions<'a>(
                 command: Some("tinymist.triggerNamedCompletion"),
                 ..Completion::default()
             };
-            match param.base_type {
+            match param.ty {
                 Ty::Builtin(BuiltinTy::TextSize) => {
                     for size_template in &[
                         "10.5pt", "12pt", "9pt", "14pt", "8pt", "16pt", "18pt", "20pt", "22pt",
@@ -673,8 +684,8 @@ pub fn param_completions<'a>(
             ctx.completions.push(compl);
         }
 
-        if param.positional {
-            type_completion(ctx, &param.base_type, docs().as_deref());
+        if param.attrs.positional {
+            type_completion(ctx, param.ty, docs().as_deref());
         }
     }
 
@@ -984,14 +995,17 @@ pub fn named_param_value_completions<'a>(
 
     let primary_sig = signature.primary();
 
-    let Some(param) = primary_sig.named.get(name) else {
+    let Some(param) = primary_sig.get_named(name) else {
         return;
     };
-    if !param.named {
+    if !param.attr.named {
         return;
     }
 
-    let doc = Some(plain_docs_sentence(&param.docs));
+    let doc = param
+        .docstring()
+        .and_then(|d| d.docs.as_deref())
+        .map(plain_docs_sentence);
 
     // static analysis
     if let Some(ty) = ty {
@@ -1005,13 +1019,14 @@ pub fn named_param_value_completions<'a>(
         completed = true;
     }
 
-    if !matches!(param.base_type, Ty::Any) {
-        type_completion(ctx, &param.base_type, doc.as_deref());
+    let ty = param.ty();
+    if !matches!(ty, Ty::Any) {
+        type_completion(ctx, ty, doc.as_deref());
         completed = true;
     }
 
     if !completed {
-        if let Some(expr) = &param.expr {
+        if let Some(expr) = param.docstring().and_then(|d| d.default.as_ref()) {
             ctx.completions.push(Completion {
                 kind: CompletionKind::Constant,
                 label: expr.clone(),

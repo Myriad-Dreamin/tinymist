@@ -449,14 +449,22 @@ mod signature_tests {
             };
 
             writeln!(f, "fn(")?;
-            for param in primary_sig.pos.iter() {
-                writeln!(f, " {},", param.name)?;
+            for name in primary_sig.pos_names() {
+                writeln!(f, " {name},")?;
             }
-            for (name, param) in primary_sig.named.iter() {
-                writeln!(f, " {}: {},", name, param.expr.clone().unwrap_or_default())?;
+            for param in primary_sig.named() {
+                writeln!(
+                    f,
+                    " {}: {},",
+                    param.name,
+                    param
+                        .docstring
+                        .and_then(|d| d.default.as_deref())
+                        .unwrap_or_default()
+                )?;
             }
-            if let Some(primary_sig) = &primary_sig.rest {
-                writeln!(f, " ...{}, ", primary_sig.name)?;
+            if let Some(name) = primary_sig.rest_name() {
+                writeln!(f, " ...{name}, ")?;
             }
             write!(f, ")")?;
 

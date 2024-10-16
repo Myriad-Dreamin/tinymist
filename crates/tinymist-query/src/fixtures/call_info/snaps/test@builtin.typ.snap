@@ -3,4 +3,4 @@ source: crates/tinymist-query/src/analysis.rs
 expression: CallSnapshot(result.as_deref())
 input_file: crates/tinymist-query/src/fixtures/call_info/builtin.typ
 ---
-1 -> CallParamInfo { kind: Positional, is_content_block: false, param: ParamSpec { name: "angle", docs: "The angle whose sine to calculate.", base_type: (Type(angle) | Type(float) | Type(integer)), expr: None, positional: true, named: false, variadic: false, settable: false } }
+1 -> CallParamInfo { kind: Positional, is_content_block: false, param: ParamSpecShort { name: "angle", offset: 0, attr: ParamAttrs { positional: true, named: false, variadic: false, settable: false } } }
