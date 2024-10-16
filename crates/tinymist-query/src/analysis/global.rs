@@ -103,25 +103,11 @@ pub struct AnalysisCaches {
 /// You should not holds across requests, because source code may change.
 #[derive(Default)]
 pub struct ModuleAnalysisCache {
-    file: OnceCell<FileResult<Bytes>>,
-    source: OnceCell<FileResult<Source>>,
     def_use: OnceCell<Option<Arc<DefUseInfo>>>,
     type_check: OnceCell<Option<Arc<TypeScheme>>>,
 }
 
 impl ModuleAnalysisCache {
-    /// Get the bytes content of a file.
-    pub fn file(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Bytes> {
-        self.file.get_or_init(|| ctx.world().file(file_id)).clone()
-    }
-
-    /// Get the source of a file.
-    pub fn source(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Source> {
-        self.source
-            .get_or_init(|| ctx.world().source(file_id))
-            .clone()
-    }
-
     /// Try to get the def-use information of a file.
     pub fn def_use(&self) -> Option<Arc<DefUseInfo>> {
         self.def_use.get().cloned().flatten()
@@ -325,26 +311,23 @@ impl<'w> AnalysisContext<'w> {
     }
 
     /// Get the content of a file by file id.
-    pub fn file_by_id(&mut self, id: TypstFileId) -> FileResult<Bytes> {
-        self.get_mut(id);
-        self.get(id).unwrap().file(self, id)
+    pub fn file_by_id(&self, id: TypstFileId) -> FileResult<Bytes> {
+        self.world().file(id)
     }
 
     /// Get the source of a file by file id.
-    pub fn source_by_id(&mut self, id: TypstFileId) -> FileResult<Source> {
-        self.get_mut(id);
-        self.get(id).unwrap().source(self, id)
+    pub fn source_by_id(&self, id: TypstFileId) -> FileResult<Source> {
+        self.world().source(id)
     }
 
     /// Get the source of a file by file path.
-    pub fn source_by_path(&mut self, p: &Path) -> FileResult<Source> {
-        // todo: source in packages
-        let id = self.file_id_by_path(p)?;
-        self.source_by_id(id)
+    pub fn source_by_path(&self, p: &Path) -> FileResult<Source> {
+        // todo: source cache
+        self.source_by_id(self.file_id_by_path(p)?)
     }
 
     /// Get a module by file id.
-    pub fn module_by_id(&mut self, fid: TypstFileId) -> SourceResult<Module> {
+    pub fn module_by_id(&self, fid: TypstFileId) -> SourceResult<Module> {
         let source = self.source_by_id(fid).at(Span::detached())?;
         self.module_by_src(source)
     }
@@ -370,7 +353,7 @@ impl<'w> AnalysisContext<'w> {
 
     /// Get a syntax object at a position.
     pub fn deref_syntax_at<'s>(
-        &mut self,
+        &self,
         source: &'s Source,
         position: LspPosition,
         shift: usize,
@@ -381,7 +364,7 @@ impl<'w> AnalysisContext<'w> {
 
     /// Get a syntax object at a position.
     pub fn deref_syntax_at_<'s>(
-        &mut self,
+        &self,
         source: &'s Source,
         position: LspPosition,
         shift: usize,
@@ -396,11 +379,6 @@ impl<'w> AnalysisContext<'w> {
     /// Get the module-level analysis cache of a file.
     pub fn get(&self, file_id: TypstFileId) -> Option<&ModuleAnalysisCache> {
         self.caches.modules.get(&file_id)
-    }
-
-    /// Get the module-level analysis cache of a file.
-    pub fn get_mut(&mut self, file_id: TypstFileId) -> &ModuleAnalysisCache {
-        self.caches.modules.entry(file_id).or_default()
     }
 
     /// Fork a new context for searching in the workspace.
