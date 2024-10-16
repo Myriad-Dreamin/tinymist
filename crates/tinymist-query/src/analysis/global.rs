@@ -84,9 +84,9 @@ pub struct AnalysisGlobalCaches {
     clear_lifetime: AtomicU64,
     def_use: FxDashMap<u128, (u64, Option<Arc<DefUseInfo>>)>,
     type_check: FxDashMap<u128, (u64, Option<Arc<TypeScheme>>)>,
-    static_signatures: FxDashMap<u128, (u64, Source, usize, Signature)>,
+    static_signatures: FxDashMap<u128, (u64, Source, usize, Option<Signature>)>,
     docstrings: FxDashMap<u128, Option<Arc<DocString>>>,
-    signatures: FxDashMap<u128, (u64, foundations::Func, Signature)>,
+    signatures: FxDashMap<u128, (u64, foundations::Func, Option<Signature>)>,
 }
 
 /// A cache for all level of analysis results of a module.
@@ -465,8 +465,59 @@ impl<'w> AnalysisContext<'w> {
         analyze_signature(self, SignatureTarget::Runtime(func)).unwrap()
     }
 
+    /// Compute the signature of a function.
+    pub fn compute_signature(
+        &mut self,
+        func: SignatureTarget,
+        compute: impl FnOnce(&mut Self) -> Option<Signature>,
+    ) -> Option<Signature> {
+        if let Some(sig) = self.get_signature(&func) {
+            return Some(sig);
+        }
+        let res = compute(self);
+        match func {
+            SignatureTarget::Def(source, r) => {
+                let cache_key = (source, r.range.start);
+                let h = hash128(&cache_key);
+                let slot = self.analysis.caches.static_signatures.entry(h);
+                let slot = slot.or_insert_with(|| (self.lifetime, cache_key.0, cache_key.1, res));
+                slot.3.clone()
+            }
+            SignatureTarget::SyntaxFast(source, node) => {
+                let cache_key = (source, node.offset(), true);
+                self.analysis
+                    .caches
+                    .static_signatures
+                    .entry(hash128(&cache_key))
+                    .or_insert_with(|| (self.lifetime, cache_key.0, cache_key.1, res))
+                    .3
+                    .clone()
+            }
+            SignatureTarget::Syntax(source, node) => {
+                let cache_key = (source, node.offset());
+                self.analysis
+                    .caches
+                    .static_signatures
+                    .entry(hash128(&cache_key))
+                    .or_insert_with(|| (self.lifetime, cache_key.0, cache_key.1, res))
+                    .3
+                    .clone()
+            }
+            SignatureTarget::Runtime(rt) => {
+                let key = hash128(&rt);
+                self.analysis
+                    .caches
+                    .signatures
+                    .entry(key)
+                    .or_insert_with(|| (self.lifetime, rt, res))
+                    .2
+                    .clone()
+            }
+        }
+    }
+
     /// Get the signature of a function.
-    pub fn get_signature(&self, func: &SignatureTarget) -> Option<Signature> {
+    fn get_signature(&self, func: &SignatureTarget) -> Option<Signature> {
         match func {
             SignatureTarget::Def(source, r) => {
                 // todo: check performance on peeking signature source frequently
@@ -502,56 +553,7 @@ impl<'w> AnalysisContext<'w> {
                 .get(&hash128(rt))
                 .and_then(|slot| (rt == &slot.1).then_some(slot.2.clone())),
         }
-    }
-
-    /// Compute the signature of a function.
-    pub fn compute_signature(
-        &self,
-        func: SignatureTarget,
-        compute: impl FnOnce() -> Signature,
-    ) -> Signature {
-        match func {
-            SignatureTarget::Def(source, r) => {
-                let cache_key = (source, r.range.start);
-                let h = hash128(&cache_key);
-                let slot = self.analysis.caches.static_signatures.entry(h);
-                let slot = slot.or_insert_with(|| {
-                    let sig = compute();
-                    (self.lifetime, cache_key.0, cache_key.1, sig)
-                });
-                slot.3.clone()
-            }
-            SignatureTarget::SyntaxFast(source, node) => {
-                let cache_key = (source, node.offset(), true);
-                self.analysis
-                    .caches
-                    .static_signatures
-                    .entry(hash128(&cache_key))
-                    .or_insert_with(|| (self.lifetime, cache_key.0, cache_key.1, compute()))
-                    .3
-                    .clone()
-            }
-            SignatureTarget::Syntax(source, node) => {
-                let cache_key = (source, node.offset());
-                self.analysis
-                    .caches
-                    .static_signatures
-                    .entry(hash128(&cache_key))
-                    .or_insert_with(|| (self.lifetime, cache_key.0, cache_key.1, compute()))
-                    .3
-                    .clone()
-            }
-            SignatureTarget::Runtime(rt) => {
-                let key = hash128(&rt);
-                self.analysis
-                    .caches
-                    .signatures
-                    .entry(key)
-                    .or_insert_with(|| (self.lifetime, rt, compute()))
-                    .2
-                    .clone()
-            }
-        }
+        .flatten()
     }
 
     pub(crate) fn signature_docs(
