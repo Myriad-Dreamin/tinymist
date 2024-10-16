@@ -111,14 +111,19 @@ impl PrimarySignature {
         &self.param_specs[..self.pos_size()]
     }
 
-    /// Returns the names of the named parameter of the function.
-    pub fn named_names(&self) -> &[StrRef] {
-        &self.sig_ty.names.names
+    /// Returns the positional parameters of the function.
+    pub fn get_pos(&self, offset: usize) -> Option<&ParamSpec> {
+        self.pos().get(offset)
     }
 
     /// Returns the named parameters of the function.
     pub fn named(&self) -> &[ParamSpec] {
         &self.param_specs[self.pos_size()..self.pos_size() + self.sig_ty.names.names.len()]
+    }
+
+    /// Returns the named parameters of the function.
+    pub fn get_named(&self, name: &StrRef) -> Option<&ParamSpec> {
+        self.named().get(self.sig_ty.names.find(name)?)
     }
 
     /// Returns the name of the rest parameter of the function.
@@ -130,16 +135,6 @@ impl PrimarySignature {
     pub fn rest(&self) -> Option<&ParamSpec> {
         self.has_spread_right()
             .then(|| &self.param_specs[self.pos_size() + self.sig_ty.names.names.len()])
-    }
-
-    /// Returns the positional parameters of the function.
-    pub fn get_pos(&self, offset: usize) -> Option<&ParamSpec> {
-        self.pos().get(offset)
-    }
-
-    /// Returns the named parameters of the function.
-    pub fn get_named(&self, name: &StrRef) -> Option<&ParamSpec> {
-        self.named().get(self.sig_ty.names.find(name)?)
     }
 }
 
