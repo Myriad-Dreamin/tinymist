@@ -26,6 +26,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - run: git submodule update --init --recursive
+      - name: Make directories
+        run: |
+          if [ ! -d "${XDG_DATA_HOME:-$HOME/.local/share}" ]; then
+            echo "Creating data directory: ${XDG_DATA_HOME:-$HOME/.local/share}"
+            mkdir -p ${XDG_DATA_HOME:-$HOME/.local/share}
+          else
+            echo "Data directory already exists: ${XDG_DATA_HOME:-$HOME/.local/share}"
+          fi
+          if [ ! -d "${XDG_CACHE_HOME:-$HOME/.cache}" ]; then
+            echo "Creating cache directory: ${XDG_CACHE_HOME:-$HOME/.cache}"
+            mkdir -p ${XDG_CACHE_HOME:-$HOME/.cache}
+          else
+            echo "Cache directory already exists: ${XDG_CACHE_HOME:-$HOME/.cache}"
+          fi
       - name: Download font assets
         # use fonts in stable releases
         run: |
