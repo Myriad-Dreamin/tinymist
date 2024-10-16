@@ -68,7 +68,7 @@ pub enum SymbolDocsT<T> {
     Function(Box<SignatureDocsT<T>>),
     /// Documentation about a variable.
     #[serde(rename = "var")]
-    Variable(TidyVarDocs),
+    Variable(TidyVarDocsT<T>),
     /// Documentation about a module.
     #[serde(rename = "module")]
     Module(TidyModuleDocs),
@@ -139,6 +139,8 @@ pub struct SignatureDocsT<T> {
     pub ret_ty: T,
 }
 
+/// Documentation about a signature.
+pub type UntypedSignatureDocs = SignatureDocsT<()>;
 /// Documentation about a signature.
 pub type SignatureDocs = SignatureDocsT<TypeRepr>;
 

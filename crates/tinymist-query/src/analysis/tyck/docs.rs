@@ -175,7 +175,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
 
         let res_ty = converted
             .return_ty
-            .and_then(|ty| self.check_type_strings(&module, &ty));
+            .and_then(|ty| self.check_type_strings(&module, &ty.0));
 
         Some(DocString {
             docs: Some(converted.docs),

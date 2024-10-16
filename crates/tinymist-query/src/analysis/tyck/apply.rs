@@ -10,6 +10,7 @@ use crate::{analysis::ApplyChecker, ty::ArgsTy};
 pub struct ApplyTypeChecker<'a, 'b, 'w> {
     pub(super) base: &'a mut TypeChecker<'b, 'w>,
     pub call_site: Span,
+    pub call_raw_for_with: Option<Ty>,
     pub args: Option<ast::Args<'a>>,
     pub resultant: Vec<Ty>,
 }
@@ -59,6 +60,7 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
                                             base,
                                             call_site: Span::detached(),
                                             args: None,
+                                            call_raw_for_with: None,
                                             resultant: vec![],
                                         };
                                         p0.call(&args, true, &mut mapper);
@@ -74,6 +76,7 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
                                     base,
                                     call_site: Span::detached(),
                                     args: None,
+                                    call_raw_for_with: None,
                                     resultant: vec![],
                                 };
                                 p0.call(&args, true, &mut mapper);
@@ -153,36 +156,14 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
         }
 
         if is_partialize {
-            let Some(sig) = callee else {
-                log::warn!("Partialize is not implemented yet {sig:?}");
-                return;
-            };
-            self.resultant
-                .push(Ty::With(SigWithTy::new(sig.into(), args.clone())));
+            log::debug!("Partialize location {sig:?} a.k.a {callee:?}");
+            if let Some(Ty::Select(call_raw_for_with)) = self.call_raw_for_with.take() {
+                self.resultant.push(Ty::With(SigWithTy::new(
+                    call_raw_for_with.ty.clone(),
+                    args.clone(),
+                )));
+            }
         }
-
-        //            let f = v.as_ref();
-        //            let mut pos = f.pos.iter();
-        //            // let mut named = f.named.clone();
-        //            // let mut rest = f.rest.clone();
-
-        //            for pos_in in args.start_match() {
-        //                let pos_ty = pos.next().unwrap_or(&FlowType::Any);
-        //                self.constrain(pos_in, pos_ty);
-        //            }
-
-        //            for (name, named_in) in &args.named {
-        //                let named_ty = f.named.iter().find(|(n, _)| n ==
-        //    name).map(|(_, ty)| ty);             if let Some(named_ty) =
-        //    named_ty {                 self.constrain(named_in,
-        //    named_ty);             }
-        //            }'
-
-        //    todo: hold signature
-        //     self.info.witness_at_least(
-        //         callee_span,
-        //         FlowType::Value(TypeIns::new(Value::Func(f.clone()))),
-        //     );
     }
 }
 

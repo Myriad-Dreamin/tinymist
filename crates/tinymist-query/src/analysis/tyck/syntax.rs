@@ -2,7 +2,9 @@
 
 use super::*;
 use crate::analysis::ParamAttrs;
-use crate::docs::{DocStringKind, SignatureDocsT, TypelessParamDocs, UntypedSymbolDocs};
+use crate::docs::{
+    DocStringKind, SignatureDocsT, TidyVarDocsT, TypelessParamDocs, UntypedSymbolDocs,
+};
 use crate::ty::*;
 
 static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);
@@ -331,6 +333,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 base: self,
                 call_site: func_call.callee().span(),
                 args: Some(func_call.args()),
+                call_raw_for_with: Some(callee.clone()),
                 resultant: vec![],
             };
             callee.call(&args, true, &mut worker);
@@ -549,6 +552,21 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 let value = docstring.res_ty.clone().unwrap_or(value);
 
                 self.check_pattern(pattern, value, docstring, root.clone());
+
+                if let ast::Pattern::Normal(ast::Expr::Ident(ident)) = pattern {
+                    let def_id = Some(ident)
+                        .and_then(|n| self.get_def_id(n.span(), &to_ident_ref(&root, n)?));
+
+                    if let Some(def_id) = def_id {
+                        self.info.var_docs.insert(
+                            def_id,
+                            Arc::new(UntypedSymbolDocs::Variable(TidyVarDocsT {
+                                docs: docstring.docs.clone().unwrap_or_default(),
+                                return_ty: (),
+                            })),
+                        );
+                    }
+                }
             }
         }
 
@@ -572,6 +590,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 base: self,
                 call_site: set_rule.target().span(),
                 args: Some(set_rule.args()),
+                call_raw_for_with: Some(callee.clone()),
                 resultant: vec![],
             };
             callee.call(&args, true, &mut worker);

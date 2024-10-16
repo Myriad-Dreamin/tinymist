@@ -18,10 +18,15 @@ pub struct TidyFuncDocs {
     pub params: Vec<TidyParamDocs>,
 }
 
+/// Documentation about a variable (without type information).
+pub type UntypedVarDocs = TidyVarDocsT<()>;
+/// Documentation about a variable.
+pub type TidyVarDocs = TidyVarDocsT<Option<(String, String)>>;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TidyVarDocs {
+pub struct TidyVarDocsT<T> {
     pub docs: EcoString,
-    pub return_ty: Option<String>,
+    pub return_ty: T,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,7 +169,8 @@ pub fn identify_var_docs(converted: EcoString) -> StrResult<TidyVarDocs> {
             break;
         };
 
-        return_ty = Some(w.trim().to_string());
+        // todo: convert me
+        return_ty = Some((w.trim().into(), String::new()));
         break_line = Some(i);
         break;
     }
@@ -233,7 +239,7 @@ mod tests {
         let f = super::identify_var_docs(s.into()).unwrap();
         let mut res = format!(">> docs:\n{}\n<< docs", f.docs);
         if let Some(t) = f.return_ty {
-            res.push_str(&format!("\n>>return\n{t}\n<<return"));
+            res.push_str(&format!("\n>>return\n{}\n<<return", t.0));
         }
         res
     }

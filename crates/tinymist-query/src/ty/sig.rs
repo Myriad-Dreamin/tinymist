@@ -112,7 +112,6 @@ impl Ty {
 
         impl<C: TyCtxMut> SigChecker for SigReprDriver<'_, C> {
             fn check(&mut self, sig: Sig, _ctx: &mut SigCheckContext, _pol: bool) -> Option<()> {
-                // todo: bind type context
                 let sig = sig.shape(self.0)?;
                 *self.1 = Some(sig.sig.clone());
                 Some(())
