@@ -145,7 +145,7 @@ impl<'a, 'w> TyCtxMut for PostTypeCheckWorker<'a, 'w> {
     }
 
     fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>> {
-        self.ctx.type_of_func(func)
+        Some(self.ctx.signature_dyn(func.clone()).type_sig())
     }
 }
 

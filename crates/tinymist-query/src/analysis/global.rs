@@ -16,10 +16,9 @@ use typst::syntax::{package::PackageSpec, Span, VirtualPath};
 use typst::{model::Document, text::Font};
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::adt::interner::Interned;
 use crate::analysis::{
-    analyze_bib, analyze_dyn_signature, analyze_expr_, analyze_import_, post_type_check, BibInfo,
-    DefUseInfo, DefinitionLink, DocString, IdentRef, ImportInfo, PathPreference, SigTy, Signature,
+    analyze_bib, analyze_expr_, analyze_import_, analyze_signature, post_type_check, BibInfo,
+    DefUseInfo, DefinitionLink, DocString, IdentRef, ImportInfo, PathPreference, Signature,
     SignatureTarget, Ty, TypeScheme,
 };
 use crate::docs::{DocStringKind, SignatureDocs};
@@ -460,12 +459,27 @@ impl<'w> AnalysisContext<'w> {
 
         Some(self.to_lsp_range(position, &source))
     }
+
+    pub(crate) fn signature_dyn(&mut self, func: Func) -> Signature {
+        log::debug!("check runtime func {func:?}");
+        analyze_signature(self, SignatureTarget::Runtime(func)).unwrap()
+    }
+
     /// Get the signature of a function.
-    pub fn signature(&self, func: &SignatureTarget) -> Option<Signature> {
+    pub fn get_signature(&self, func: &SignatureTarget) -> Option<Signature> {
         match func {
             SignatureTarget::Def(source, r) => {
                 // todo: check performance on peeking signature source frequently
                 let cache_key = (source, r.range.start);
+                self.analysis
+                    .caches
+                    .static_signatures
+                    .get(&hash128(&cache_key))
+                    .and_then(|slot| (cache_key.1 == slot.2).then_some(slot.3.clone()))
+            }
+            SignatureTarget::SyntaxFast(source, node) => {
+                // todo: check performance on peeking signature source frequently
+                let cache_key = (source, node.offset(), true);
                 self.analysis
                     .caches
                     .static_signatures
@@ -507,6 +521,16 @@ impl<'w> AnalysisContext<'w> {
                 });
                 slot.3.clone()
             }
+            SignatureTarget::SyntaxFast(source, node) => {
+                let cache_key = (source, node.offset(), true);
+                self.analysis
+                    .caches
+                    .static_signatures
+                    .entry(hash128(&cache_key))
+                    .or_insert_with(|| (self.lifetime, cache_key.0, cache_key.1, compute()))
+                    .3
+                    .clone()
+            }
             SignatureTarget::Syntax(source, node) => {
                 let cache_key = (source, node.offset());
                 self.analysis
@@ -537,7 +561,7 @@ impl<'w> AnalysisContext<'w> {
         runtime_fn: &Value,
     ) -> Option<SignatureDocs> {
         let def_use = self.def_use(source.clone())?;
-        let ty_chk = self.type_check(source.clone())?;
+        let ty_chk = self.type_check(source)?;
         crate::docs::signature_docs(self, Some(&(def_use, ty_chk)), def_ident, runtime_fn, None)
     }
 
@@ -560,7 +584,7 @@ impl<'w> AnalysisContext<'w> {
     }
 
     /// Get the type check information of a source file.
-    pub(crate) fn type_check(&mut self, source: Source) -> Option<Arc<TypeScheme>> {
+    pub(crate) fn type_check(&mut self, source: &Source) -> Option<Arc<TypeScheme>> {
         let fid = source.id();
 
         if let Some(res) = self.caches.modules.entry(fid).or_default().type_check() {
@@ -574,7 +598,7 @@ impl<'w> AnalysisContext<'w> {
         let res = if let Some(res) = self.analysis.caches.type_check.get(&h) {
             res.1.clone()
         } else {
-            let res = crate::analysis::type_check(self, source);
+            let res = crate::analysis::type_check(self, source.clone());
             self.analysis
                 .caches
                 .type_check
@@ -691,18 +715,13 @@ impl<'w> AnalysisContext<'w> {
         self.type_of_span(rr.span())
     }
 
-    pub(crate) fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>> {
-        log::debug!("check runtime func {func:?}");
-        Some(analyze_dyn_signature(self, func.clone()).type_sig())
-    }
-
     pub(crate) fn user_type_of_ident(
         &mut self,
         source: &Source,
         def_fid: TypstFileId,
         def_ident: &IdentRef,
     ) -> Option<Ty> {
-        let ty_chk = self.type_check(source.clone())?;
+        let ty_chk = self.type_check(source)?;
         let def_use = self.def_use(source.clone())?;
 
         let (def_id, _) = def_use.get_def(def_fid, def_ident)?;
@@ -721,14 +740,17 @@ impl<'w> AnalysisContext<'w> {
     pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {
         let id = s.id()?;
         let source = self.source_by_id(id).ok()?;
-        let ty_chk = self.type_check(source)?;
-        ty_chk.type_of_span(s)
+        self.type_of_span_(&source, s)
+    }
+
+    pub(crate) fn type_of_span_(&mut self, source: &Source, s: Span) -> Option<Ty> {
+        self.type_check(source)?.type_of_span(s)
     }
 
     pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<Ty> {
         let id = k.span().id()?;
         let source = self.source_by_id(id).ok()?;
-        let ty_chk = self.type_check(source.clone())?;
+        let ty_chk = self.type_check(&source)?;
 
         post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.type_of_span(k.span()))
     }

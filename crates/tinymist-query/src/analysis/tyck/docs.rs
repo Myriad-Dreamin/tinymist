@@ -14,15 +14,6 @@ use super::*;
 const DOC_VARS: u64 = 0;
 
 impl<'a, 'w> TypeChecker<'a, 'w> {
-    pub fn check_func_docs(&mut self, root: &LinkedNode) -> Option<Arc<DocString>> {
-        let closure = root.cast::<ast::Closure>()?;
-        let documenting_id = closure
-            .name()
-            .and_then(|n| self.get_def_id(n.span(), &to_ident_ref(root, n)?))?;
-
-        self.check_docstring(root, DocStringKind::Function, documenting_id)
-    }
-
     pub fn check_var_docs(&mut self, root: &LinkedNode) -> Option<Arc<DocString>> {
         let lb = root.cast::<ast::LetBinding>()?;
         let first = lb.kind().bindings();
@@ -45,9 +36,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let docs = find_docs_of(&self.source, def)?;
 
         let docstring = self.ctx.compute_docstring(root.span().id()?, docs, kind)?;
-        let res = Arc::new(docstring.take().rename_based_on(base_id, self));
-        self.info.var_docs.insert(base_id, res.clone());
-        Some(res)
+        Some(Arc::new(docstring.take().rename_based_on(base_id, self)))
     }
 }
 

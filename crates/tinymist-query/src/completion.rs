@@ -113,7 +113,7 @@ impl StatefulRequest for CompletionRequest {
             Some(DerefTarget::Normal(SyntaxKind::Str, cano_expr)) => {
                 let parent = cano_expr.parent()?;
                 if matches!(parent.kind(), SyntaxKind::Named | SyntaxKind::Args) {
-                    let ty_chk = ctx.type_check(source.clone());
+                    let ty_chk = ctx.type_check(&source);
                     if let Some(ty_chk) = ty_chk {
                         let ty = ty_chk.type_of_span(cano_expr.span());
                         log::debug!("check string ty: {ty:?}");
