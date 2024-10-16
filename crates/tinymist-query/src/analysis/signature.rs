@@ -1,8 +1,8 @@
 //! Analysis of function signatures.
 
-use typst::foundations::{Closure, ParamInfo};
+use typst::foundations::{self, Closure, ParamInfo};
 
-use super::{prelude::*, resolve_callee, SigTy};
+use super::{prelude::*, resolve_callee, BuiltinTy, SigTy, TypeSources};
 use crate::docs::UntypedSymbolDocs;
 use crate::syntax::get_non_strict_def_target;
 use crate::upstream::truncated_repr;
@@ -204,6 +204,8 @@ pub enum SignatureTarget<'a> {
     Syntax(Source, LinkedNode<'a>),
     /// A function that is known at runtime.
     Runtime(Func),
+    /// A function that is known at runtime.
+    Convert(Func),
 }
 
 pub(crate) fn analyze_signature(
@@ -222,7 +224,7 @@ fn analyze_type_signature(
     callee_node: &SignatureTarget<'_>,
 ) -> Option<Signature> {
     let (type_info, ty) = match callee_node {
-        SignatureTarget::Def(..) => None,
+        SignatureTarget::Def(..) | SignatureTarget::Convert(..) => None,
         SignatureTarget::SyntaxFast(source, node) | SignatureTarget::Syntax(source, node) => {
             let type_info = ctx.type_check(source)?;
             let ty = type_info.type_of_span(node.span())?;
@@ -237,73 +239,99 @@ fn analyze_type_signature(
             Some((type_info, ty))
         }
     }?;
-    let type_var = ty.sources().into_iter().next()?;
-    let sig_ty = ty.sig_repr(true)?;
+    log::debug!("check type signature of ty: {ty:?}");
 
-    let docstring = match type_info.var_docs.get(&type_var.def).map(|x| x.as_ref()) {
-        Some(UntypedSymbolDocs::Function(sig)) => sig,
-        _ => return None,
-    };
+    // todo multiple sources
+    let mut srcs = ty.sources();
+    srcs.sort();
+    let type_var = srcs.into_iter().next()?;
+    match type_var {
+        TypeSources::Var(v) => {
+            let sig_ty = ty.sig_repr(true)?;
 
-    let mut param_specs = Vec::new();
-    let mut has_fill_or_size_or_stroke = false;
-    let mut _broken = false;
+            let docstring = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
+                Some(UntypedSymbolDocs::Function(sig)) => sig,
+                _ => return None,
+            };
 
-    for (doc, ty) in docstring.pos.iter().zip(sig_ty.positional_params()) {
-        let default = doc.default.clone();
-        let ty = ty.clone();
+            let mut param_specs = Vec::new();
+            let mut has_fill_or_size_or_stroke = false;
+            let mut _broken = false;
 
-        let name = doc.name.clone();
-        if matches!(name.as_ref(), "fill" | "stroke" | "size") {
-            has_fill_or_size_or_stroke = true;
+            for (doc, ty) in docstring.pos.iter().zip(sig_ty.positional_params()) {
+                let default = doc.default.clone();
+                let ty = ty.clone();
+
+                let name = doc.name.clone();
+                if matches!(name.as_ref(), "fill" | "stroke" | "size") {
+                    has_fill_or_size_or_stroke = true;
+                }
+
+                param_specs.push(ParamSpec {
+                    name,
+                    docs: Some(doc.docs.clone()),
+                    default,
+                    ty,
+                    attrs: ParamAttrs::positional(),
+                });
+            }
+
+            for (name, ty) in sig_ty.named_params() {
+                let doc = docstring.named.get(name).unwrap();
+                let default = doc.default.clone();
+                let ty = ty.clone();
+
+                if matches!(name.as_ref(), "fill" | "stroke" | "size") {
+                    has_fill_or_size_or_stroke = true;
+                }
+
+                param_specs.push(ParamSpec {
+                    name: name.clone(),
+                    docs: Some(doc.docs.clone()),
+                    default,
+                    ty,
+                    attrs: ParamAttrs::named(),
+                });
+            }
+
+            if let Some(doc) = docstring.rest.as_ref() {
+                let default = doc.default.clone();
+
+                param_specs.push(ParamSpec {
+                    name: doc.name.clone(),
+                    docs: Some(doc.docs.clone()),
+                    default,
+                    ty: sig_ty.rest_param().cloned().unwrap_or(Ty::Any),
+                    attrs: ParamAttrs::variadic(),
+                });
+            }
+
+            Some(Signature::Primary(Arc::new(PrimarySignature {
+                docs: Some(docstring.docs.clone()),
+                param_specs,
+                has_fill_or_size_or_stroke,
+                sig_ty,
+                _broken,
+            })))
         }
-
-        param_specs.push(ParamSpec {
-            name,
-            docs: Some(doc.docs.clone()),
-            default,
-            ty,
-            attrs: ParamAttrs::positional(),
-        });
-    }
-
-    for (name, ty) in sig_ty.named_params() {
-        let doc = docstring.named.get(name).unwrap();
-        let default = doc.default.clone();
-        let ty = ty.clone();
-
-        if matches!(name.as_ref(), "fill" | "stroke" | "size") {
-            has_fill_or_size_or_stroke = true;
+        TypeSources::Builtin(BuiltinTy::Type(ty)) => {
+            let cons = ty.constructor().ok()?;
+            Some(ctx.type_of_func(cons))
         }
-
-        param_specs.push(ParamSpec {
-            name: name.clone(),
-            docs: Some(doc.docs.clone()),
-            default,
-            ty,
-            attrs: ParamAttrs::named(),
-        });
+        TypeSources::Builtin(BuiltinTy::Element(ty)) => {
+            let cons: Func = ty.into();
+            Some(ctx.type_of_func(cons))
+        }
+        TypeSources::Builtin(..) => None,
+        TypeSources::Ins(i) => match &i.val {
+            foundations::Value::Func(f) => Some(ctx.type_of_func(f.clone())),
+            foundations::Value::Type(f) => {
+                let cons = f.constructor().ok()?;
+                Some(ctx.type_of_func(cons))
+            }
+            _ => None,
+        },
     }
-
-    if let Some(doc) = docstring.rest.as_ref() {
-        let default = doc.default.clone();
-
-        param_specs.push(ParamSpec {
-            name: doc.name.clone(),
-            docs: Some(doc.docs.clone()),
-            default,
-            ty: sig_ty.rest_param().cloned().unwrap_or(Ty::Any),
-            attrs: ParamAttrs::variadic(),
-        });
-    }
-
-    Some(Signature::Primary(Arc::new(PrimarySignature {
-        docs: Some(docstring.docs.clone()),
-        param_specs,
-        has_fill_or_size_or_stroke,
-        sig_ty,
-        _broken,
-    })))
 }
 
 fn analyze_dyn_signature(
@@ -318,7 +346,7 @@ fn analyze_dyn_signature(
             log::debug!("got function {func:?}");
             func
         }
-        SignatureTarget::Runtime(func) => func.clone(),
+        SignatureTarget::Convert(func) | SignatureTarget::Runtime(func) => func.clone(),
     };
 
     use typst::foundations::func::Repr;

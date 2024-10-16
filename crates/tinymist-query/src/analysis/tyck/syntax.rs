@@ -305,13 +305,13 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let select_site = field_access.target().span();
         let ty = self.check_expr_in(select_site, root.clone());
         let field = Interned::new_str(field_access.field().get());
+        log::debug!("field access: {field_access:?} => {ty:?}.{field:?}");
 
         // todo: move this to base
         let base = Ty::Select(SelectTy::new(ty.clone().into(), field.clone()));
         let mut worker = SelectFieldChecker {
             base: self,
             select_site,
-            key: &field,
             resultant: vec![base],
         };
         ty.select(&field, true, &mut worker);

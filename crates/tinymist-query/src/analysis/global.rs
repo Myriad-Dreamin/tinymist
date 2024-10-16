@@ -71,6 +71,8 @@ impl Analysis {
     pub fn clear_cache(&self) {
         self.caches.signatures.clear();
         self.caches.static_signatures.clear();
+        self.caches.docstrings.clear();
+        self.caches.terms.clear();
         self.caches.def_use.clear();
         self.caches.type_check.clear();
     }
@@ -85,8 +87,9 @@ pub struct AnalysisGlobalCaches {
     def_use: FxDashMap<u128, (u64, Option<Arc<DefUseInfo>>)>,
     type_check: FxDashMap<u128, (u64, Option<Arc<TypeScheme>>)>,
     static_signatures: FxDashMap<u128, (u64, Source, usize, Option<Signature>)>,
-    docstrings: FxDashMap<u128, Option<Arc<DocString>>>,
+    docstrings: FxDashMap<u128, (u64, Option<Arc<DocString>>)>,
     signatures: FxDashMap<u128, (u64, Func, Option<Signature>)>,
+    terms: FxDashMap<u128, (u64, Value, Ty)>,
 }
 
 /// A cache for all level of analysis results of a module.
@@ -376,11 +379,6 @@ impl<'w> AnalysisContext<'w> {
         Some((cursor, get_deref_target(node, cursor)))
     }
 
-    /// Get the module-level analysis cache of a file.
-    pub fn get(&self, file_id: TypstFileId) -> Option<&ModuleAnalysisCache> {
-        self.caches.modules.get(&file_id)
-    }
-
     /// Fork a new context for searching in the workspace.
     pub fn fork_for_search<'s>(&'s mut self) -> SearchCtx<'s, 'w> {
         SearchCtx {
@@ -443,6 +441,11 @@ impl<'w> AnalysisContext<'w> {
         analyze_signature(self, SignatureTarget::Runtime(func)).unwrap()
     }
 
+    pub(crate) fn type_of_func(&mut self, func: Func) -> Signature {
+        log::debug!("convert runtime func {func:?}");
+        analyze_signature(self, SignatureTarget::Convert(func)).unwrap()
+    }
+
     /// Compute the signature of a function.
     pub fn compute_signature(
         &mut self,
@@ -450,7 +453,7 @@ impl<'w> AnalysisContext<'w> {
         compute: impl FnOnce(&mut Self) -> Option<Signature>,
     ) -> Option<Signature> {
         if let Some(sig) = self.get_signature(&func) {
-            return Some(sig);
+            return sig;
         }
         let res = compute(self);
         match func {
@@ -481,21 +484,27 @@ impl<'w> AnalysisContext<'w> {
                     .3
                     .clone()
             }
-            SignatureTarget::Runtime(rt) => {
-                let key = hash128(&rt);
-                self.analysis
-                    .caches
-                    .signatures
-                    .entry(key)
-                    .or_insert_with(|| (self.lifetime, rt, res))
-                    .2
-                    .clone()
-            }
+            SignatureTarget::Convert(rt) => self
+                .analysis
+                .caches
+                .signatures
+                .entry(hash128(&(&rt, true)))
+                .or_insert_with(|| (self.lifetime, rt, res))
+                .2
+                .clone(),
+            SignatureTarget::Runtime(rt) => self
+                .analysis
+                .caches
+                .signatures
+                .entry(hash128(&rt))
+                .or_insert_with(|| (self.lifetime, rt, res))
+                .2
+                .clone(),
         }
     }
 
     /// Get the signature of a function.
-    fn get_signature(&self, func: &SignatureTarget) -> Option<Signature> {
+    fn get_signature(&self, func: &SignatureTarget) -> Option<Option<Signature>> {
         match func {
             SignatureTarget::Def(source, r) => {
                 // todo: check performance on peeking signature source frequently
@@ -524,6 +533,12 @@ impl<'w> AnalysisContext<'w> {
                     .get(&hash128(&cache_key))
                     .and_then(|slot| (cache_key.1 == slot.2).then_some(slot.3.clone()))
             }
+            SignatureTarget::Convert(rt) => self
+                .analysis
+                .caches
+                .signatures
+                .get(&hash128(&(&rt, true)))
+                .and_then(|slot| (rt == &slot.1).then_some(slot.2.clone())),
             SignatureTarget::Runtime(rt) => self
                 .analysis
                 .caches
@@ -531,7 +546,32 @@ impl<'w> AnalysisContext<'w> {
                 .get(&hash128(rt))
                 .and_then(|slot| (rt == &slot.1).then_some(slot.2.clone())),
         }
-        .flatten()
+    }
+
+    pub(crate) fn type_of_value(&mut self, val: &Value) -> Ty {
+        log::debug!("convert runtime value {val:?}");
+
+        // todo: check performance on peeking signature source frequently
+        let cache_key = val;
+        let cached = self
+            .analysis
+            .caches
+            .terms
+            .get(&hash128(&cache_key))
+            .and_then(|slot| (cache_key == &slot.1).then_some(slot.2.clone()));
+        if let Some(cached) = cached {
+            return cached;
+        }
+
+        let res = crate::analysis::term_value(self, val);
+
+        self.analysis
+            .caches
+            .terms
+            .entry(hash128(&cache_key))
+            .or_insert_with(|| (self.lifetime, cache_key.clone(), res.clone()));
+
+        res
     }
 
     pub(crate) fn signature_docs(
@@ -553,10 +593,13 @@ impl<'w> AnalysisContext<'w> {
     ) -> Option<Arc<DocString>> {
         let h = hash128(&(&fid, &docs, &kind));
         let res = if let Some(res) = self.analysis.caches.docstrings.get(&h) {
-            res.clone()
+            res.1.clone()
         } else {
             let res = crate::analysis::tyck::compute_docstring(self, fid, docs, kind).map(Arc::new);
-            self.analysis.caches.docstrings.insert(h, res.clone());
+            self.analysis
+                .caches
+                .docstrings
+                .insert(h, (self.lifetime, res.clone()));
             res
         };
 
@@ -608,6 +651,7 @@ impl<'w> AnalysisContext<'w> {
     /// Get the def-use information of a source file.
     pub fn def_use(&mut self, source: Source) -> Option<Arc<DefUseInfo>> {
         let mut search_ctx = self.fork_for_search();
+
         Self::def_use_(&mut search_ctx, source)
     }
 
@@ -799,6 +843,14 @@ impl<'w> AnalysisContext<'w> {
             .caches
             .static_signatures
             .retain(|_, (l, _, _, _)| lifetime - *l < 60);
+        self.analysis
+            .caches
+            .terms
+            .retain(|_, (l, _, _)| lifetime - *l < 60);
+        self.analysis
+            .caches
+            .docstrings
+            .retain(|_, (l, _)| lifetime - *l < 60);
         self.analysis
             .caches
             .signatures

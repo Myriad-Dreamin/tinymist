@@ -3,4 +3,4 @@ source: crates/tinymist-query/src/analysis.rs
 expression: CallSnapshot(result.as_deref())
 input_file: crates/tinymist-query/src/fixtures/call_info/builtin_poly2.typ
 ---
-<nil>
+"#fff" -> CallParamInfo { kind: Positional, is_content_block: false, param_name: "red" }

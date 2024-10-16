@@ -1,7 +1,16 @@
+use typst::foundations;
+
 use crate::ty::prelude::*;
 
 pub trait BoundChecker: TyCtx {
     fn collect(&mut self, ty: &Ty, pol: bool);
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TypeSources {
+    Var(Interned<TypeVar>),
+    Ins(Interned<InsTy>),
+    Builtin(BuiltinTy),
 }
 
 impl Ty {
@@ -11,12 +20,12 @@ impl Ty {
     }
 
     /// Get the sources of the given type.
-    pub fn sources(&self) -> Vec<Interned<TypeVar>> {
+    pub fn sources(&self) -> Vec<TypeSources> {
         let mut results = vec![];
-        fn collect(ty: &Ty, results: &mut Vec<Interned<TypeVar>>) {
+        fn collect(ty: &Ty, results: &mut Vec<TypeSources>) {
             use Ty::*;
             match ty {
-                Any | Boolean(_) | If(..) | Builtin(..) | Value(..) => {}
+                Any | Boolean(_) | If(..) => {}
                 Dict(..) | Array(..) | Tuple(..) | Func(..) | Args(..) => {}
                 Unary(..) | Binary(..) => {}
                 Field(ty) => {
@@ -36,8 +45,18 @@ impl Ty {
                     }
                 }
                 Var(ty) => {
-                    results.push(ty.clone());
+                    results.push(TypeSources::Var(ty.clone()));
                 }
+                Builtin(ty @ (BuiltinTy::Type(..) | BuiltinTy::Element(..))) => {
+                    results.push(TypeSources::Builtin(ty.clone()));
+                }
+                Builtin(..) => {}
+                Value(ty) => match &ty.val {
+                    foundations::Value::Type(..) | foundations::Value::Func(..) => {
+                        results.push(TypeSources::Ins(ty.clone()));
+                    }
+                    _ => {}
+                },
                 With(ty) => collect(&ty.sig, results),
                 Select(ty) => collect(&ty.ty, results),
             }

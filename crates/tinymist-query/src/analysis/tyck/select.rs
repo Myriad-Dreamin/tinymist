@@ -8,7 +8,6 @@ use crate::analysis::SelectChecker;
 pub struct SelectFieldChecker<'a, 'b, 'w> {
     pub(super) base: &'a mut TypeChecker<'b, 'w>,
     pub select_site: Span,
-    pub key: &'a Interned<str>,
     pub resultant: Vec<Ty>,
 }
 
@@ -22,11 +21,12 @@ impl<'a, 'b, 'w> SelectChecker for SelectFieldChecker<'a, 'b, 'w> {
             self.base.info.witness_at_least(self.select_site, ins);
         }
 
-        let Some(IfaceShape { iface }) = iface.shape(Some(self.base.ctx)) else {
+        let Some(IfaceShape { iface }) = iface.shape(self.base) else {
             return;
         };
 
-        let res = iface.field_by_name(self.key);
+        let res = iface.field_by_name(key);
+        log::debug!("selecting field real: {key:?} -> {res:?}");
         if let Some(res) = res {
             self.resultant.push(res.clone());
         }

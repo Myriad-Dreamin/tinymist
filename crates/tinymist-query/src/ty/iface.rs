@@ -1,4 +1,4 @@
-use typst::foundations::Dict;
+use typst::foundations::{Dict, Module};
 
 use super::BoundChecker;
 use crate::ty::prelude::*;
@@ -18,6 +18,10 @@ pub enum Iface<'a> {
         val: &'a Dict,
         at: &'a Ty,
     },
+    Module {
+        val: &'a Module,
+        at: &'a Ty,
+    },
     ArrayCons(&'a TyRef),
     Partialize(&'a Iface<'a>),
 }
@@ -34,11 +38,12 @@ impl<'a> Iface<'a> {
             Iface::Type { val, .. } => Ty::Builtin(BuiltinTy::Type(*val)),
             Iface::Element { val, .. } => Ty::Builtin(BuiltinTy::Element(*val)),
             Iface::Value { at, .. } => at.clone(),
+            Iface::Module { at, .. } => at.clone(),
             Iface::Partialize(..) => return None,
         })
     }
 
-    pub fn shape(self, _ctx: Option<&mut AnalysisContext>) -> Option<IfaceShape> {
+    pub fn shape(self, ctx: &mut impl TyCtxMut) -> Option<IfaceShape> {
         log::debug!("iface shape: {self:?}");
 
         let record_ins = match self {
@@ -50,7 +55,8 @@ impl<'a> Iface<'a> {
             Iface::Partialize(..) => return None,
             Iface::Element { .. } => return None,
             Iface::Type { .. } => return None,
-            Iface::Value { .. } => return None,
+            Iface::Value { val, at: _ } => ctx.type_of_dict(val),
+            Iface::Module { val, at: _ } => ctx.type_of_module(val),
         };
 
         Some(IfaceShape { iface: record_ins })
@@ -142,10 +148,13 @@ impl<'a> IfaceCheckDriver<'a> {
             Ty::Value(v) => {
                 if self.value_as_iface() {
                     match &v.val {
-                        // Value::Func(f) => {
-                        //     self.checker
-                        //         .check(Iface::Value { val: f, at: ty }, &mut self.ctx, pol);
-                        // }
+                        Value::Module(t) => {
+                            self.checker.check(
+                                Iface::Module { val: t, at: ty },
+                                &mut self.ctx,
+                                pol,
+                            );
+                        }
                         Value::Dict(d) => {
                             self.checker
                                 .check(Iface::Value { val: d, at: ty }, &mut self.ctx, pol);

@@ -21,7 +21,7 @@ pub(crate) use iface::*;
 pub(crate) use mutate::*;
 pub(crate) use select::*;
 pub(crate) use sig::*;
-use typst::foundations::Func;
+use typst::foundations::{self, Func, Module, Value};
 
 /// A type context.
 pub trait TyCtx {
@@ -53,6 +53,24 @@ pub trait TyCtxMut: TyCtx {
     fn bind_local(&mut self, var: &Interned<TypeVar>, ty: Ty);
     /// Get the type of a runtime function.
     fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>>;
+    /// Get the type of a runtime value.
+    fn type_of_value(&mut self, val: &Value) -> Ty;
+    /// Get the type of a runtime dict.
+    fn type_of_dict(&mut self, dict: &foundations::Dict) -> Interned<RecordTy> {
+        let ty = self.type_of_value(&Value::Dict(dict.clone()));
+        let Ty::Dict(ty) = ty else {
+            panic!("expected dict type, found {ty:?}");
+        };
+        ty
+    }
+    /// Get the type of a runtime module.
+    fn type_of_module(&mut self, module: &Module) -> Interned<RecordTy> {
+        let ty = self.type_of_value(&Value::Module(module.clone()));
+        let Ty::Dict(ty) = ty else {
+            panic!("expected dict type, found {ty:?}");
+        };
+        ty
+    }
 }
 
 impl TyCtx for () {
@@ -74,6 +92,9 @@ impl TyCtxMut for () {
     fn bind_local(&mut self, _var: &Interned<TypeVar>, _ty: Ty) {}
     fn type_of_func(&mut self, _func: &Func) -> Option<Interned<SigTy>> {
         None
+    }
+    fn type_of_value(&mut self, _val: &Value) -> Ty {
+        Ty::Any
     }
 }
 
