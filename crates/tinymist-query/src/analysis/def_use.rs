@@ -1,8 +1,5 @@
 //! Static analysis for def-use relations.
 
-use std::{collections::HashMap, ops::Range, sync::Arc};
-
-use ecow::{EcoString, EcoVec};
 use reflexo::hash::hash128;
 
 use super::{prelude::*, ImportInfo};

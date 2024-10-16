@@ -1,4 +1,4 @@
-use crate::ty::def::*;
+use crate::ty::prelude::*;
 
 pub trait BoundChecker: TyCtx {
     fn collect(&mut self, ty: &Ty, pol: bool);

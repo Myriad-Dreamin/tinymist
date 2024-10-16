@@ -84,7 +84,7 @@ impl SyntaxRequest for FoldingRangeRequest {
         }
 
         if false {
-            trace!("FoldingRangeRequest(line_folding_only={line_folding_only}) symbols: {symbols:#?} results: {results:#?}");
+            log::trace!("FoldingRangeRequest(line_folding_only={line_folding_only}) symbols: {symbols:#?} results: {results:#?}");
         }
 
         Some(results)
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn test() {
         snapshot_testing("folding_range", &|world, path| {
-            let mut r = |line_folding_only| {
+            let r = |line_folding_only| {
                 let request = FoldingRangeRequest {
                     path: path.clone(),
                     line_folding_only,

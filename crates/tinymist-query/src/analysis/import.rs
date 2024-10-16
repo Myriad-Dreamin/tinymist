@@ -1,15 +1,8 @@
 //! Import analysis
 
-use ecow::EcoVec;
-use typst::{foundations::Value, syntax::LinkedNode, World};
-use typst_shim::syntax::LinkedNodeExt;
-
-use crate::{
-    analysis::analyze_import_,
-    syntax::{find_expr_in_import, resolve_id_by_path},
-};
-
-pub use super::prelude::*;
+use super::prelude::*;
+use crate::analysis::analyze_import_;
+use crate::syntax::{find_expr_in_import, resolve_id_by_path};
 
 /// The import information of a source file.
 #[derive(Default)]

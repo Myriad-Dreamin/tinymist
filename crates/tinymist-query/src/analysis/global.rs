@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::{collections::HashSet, ops::Deref};
 
 use comemo::{Track, Tracked};
+use lsp_types::Url;
 use once_cell::sync::OnceCell;
 use reflexo::hash::{hash128, FxDashMap};
 use reflexo::{debug_loc::DataSource, ImmutPath};
@@ -10,19 +11,18 @@ use tinymist_world::DETACHED_ENTRY;
 use typst::diag::{eco_format, At, FileError, FileResult, PackageError, SourceResult};
 use typst::engine::Route;
 use typst::eval::{Eval, Tracer};
-use typst::foundations::{self, Bytes, Func, Module, Styles};
+use typst::foundations::{Bytes, Module, Styles};
 use typst::layout::Position;
 use typst::syntax::{package::PackageSpec, Span, VirtualPath};
 use typst::{model::Document, text::Font};
-use typst_shim::syntax::LinkedNodeExt;
 
+use crate::analysis::prelude::*;
 use crate::analysis::{
     analyze_bib, analyze_expr_, analyze_import_, analyze_signature, post_type_check, BibInfo,
-    DefUseInfo, DefinitionLink, DocString, IdentRef, ImportInfo, PathPreference, Signature,
-    SignatureTarget, Ty, TypeScheme,
+    DefUseInfo, DefinitionLink, DocString, ImportInfo, PathPreference, Signature, SignatureTarget,
+    Ty, TypeScheme,
 };
 use crate::docs::{DocStringKind, SignatureDocs};
-use crate::prelude::*;
 use crate::syntax::{
     construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
     scan_workspace_files, DerefTarget, LexicalHierarchy, ModuleDependency,
@@ -86,7 +86,7 @@ pub struct AnalysisGlobalCaches {
     type_check: FxDashMap<u128, (u64, Option<Arc<TypeScheme>>)>,
     static_signatures: FxDashMap<u128, (u64, Source, usize, Option<Signature>)>,
     docstrings: FxDashMap<u128, Option<Arc<DocString>>>,
-    signatures: FxDashMap<u128, (u64, foundations::Func, Option<Signature>)>,
+    signatures: FxDashMap<u128, (u64, Func, Option<Signature>)>,
 }
 
 /// A cache for all level of analysis results of a module.

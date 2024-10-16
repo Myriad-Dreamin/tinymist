@@ -1,24 +1,12 @@
 //! Linked definition analysis
 
-use std::ops::Range;
-
-use log::debug;
-use once_cell::sync::Lazy;
 use typst::foundations::{IntoValue, Label, Selector, Type};
 use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
-use typst::syntax::FileId as TypstFileId;
-use typst::{foundations::Value, syntax::Span};
-use typst_shim::syntax::LinkedNodeExt;
 
 use super::prelude::*;
-use crate::{
-    prelude::*,
-    syntax::{
-        find_source_by_expr, get_deref_target, DerefTarget, IdentRef, LexicalKind, LexicalModKind,
-        LexicalVarKind,
-    },
-};
+use crate::syntax::{find_source_by_expr, get_deref_target, DerefTarget};
+use crate::VersionedDocument;
 
 /// A linked definition in the source code
 pub struct DefinitionLink {
@@ -145,7 +133,7 @@ fn find_ident_definition(
             }
         }
         _ => {
-            debug!("unsupported kind {kind:?}", kind = use_site.kind());
+            log::debug!("unsupported kind {kind:?}", kind = use_site.kind());
             None
         }
     };
@@ -369,7 +357,7 @@ fn identify_call_convention(target: DynCallTarget) -> CallConvention {
 }
 
 fn is_with_func(func_ptr: &Func) -> bool {
-    static WITH_FUNC: Lazy<Option<&'static Func>> = Lazy::new(|| {
+    static WITH_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
         let fn_ty = Type::of::<Func>();
         let Some(Value::Func(f)) = fn_ty.scope().get("with") else {
             return None;
@@ -381,7 +369,7 @@ fn is_with_func(func_ptr: &Func) -> bool {
 }
 
 fn is_where_func(func_ptr: &Func) -> bool {
-    static WITH_FUNC: Lazy<Option<&'static Func>> = Lazy::new(|| {
+    static WITH_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
         let fn_ty = Type::of::<Func>();
         let Some(Value::Func(f)) = fn_ty.scope().get("where") else {
             return None;
@@ -521,7 +509,7 @@ fn value_to_def(
     name: impl FnOnce() -> Option<EcoString>,
     name_range: Option<Range<usize>>,
 ) -> Option<DefinitionLink> {
-    let mut def_at = |span: Span| {
+    let def_at = |span: Span| {
         span.id().and_then(|fid| {
             let source = ctx.source_by_id(fid).ok()?;
             Some((fid, source.find(span)?.range()))

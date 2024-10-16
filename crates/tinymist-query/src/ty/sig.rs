@@ -1,6 +1,7 @@
 use typst::foundations::{Func, Value};
 
-use crate::{analysis::*, ty::def::*};
+use super::BoundChecker;
+use crate::ty::prelude::*;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Sig<'a> {

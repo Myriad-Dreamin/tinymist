@@ -1,22 +1,9 @@
 //! Type checking on source file
 
-use std::{collections::BTreeMap, sync::LazyLock};
-
-use ecow::eco_vec;
-use typst::{
-    foundations::Value,
-    syntax::{
-        ast::{self, AstNode},
-        LinkedNode, SyntaxKind,
-    },
-};
-
 use super::*;
-use crate::{
-    adt::interner::Interned,
-    docs::{DocStringKind, SignatureDocsT, TypelessParamDocs, UntypedSymbolDocs},
-    ty::*,
-};
+use crate::analysis::ParamAttrs;
+use crate::docs::{DocStringKind, SignatureDocsT, TypelessParamDocs, UntypedSymbolDocs};
+use crate::ty::*;
 
 static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);
 static EMPTY_VAR_DOC: LazyLock<VarDoc> = LazyLock::new(VarDoc::default);

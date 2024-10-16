@@ -1,6 +1,7 @@
-use typst::foundations::{Dict, Value};
+use typst::foundations::Dict;
 
-use crate::{analysis::*, ty::def::*};
+use super::BoundChecker;
+use crate::ty::prelude::*;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Iface<'a> {
