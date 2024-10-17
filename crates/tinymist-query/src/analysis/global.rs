@@ -21,7 +21,7 @@ use crate::analysis::{
     analyze_bib, analyze_expr_, analyze_import_, analyze_signature, post_type_check, BibInfo,
     DefUseInfo, DocString, ImportInfo, PathPreference, Signature, SignatureTarget, Ty, TypeScheme,
 };
-use crate::docs::{DocStringKind, SignatureDocs};
+use crate::docs::{DocStringKind, SignatureDocs, VarDocs};
 use crate::syntax::{
     construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
     scan_workspace_files, DerefTarget, LexicalHierarchy, ModuleDependency,
@@ -571,6 +571,10 @@ impl<'w> AnalysisContext<'w> {
             .or_insert_with(|| (self.lifetime, cache_key.clone(), res.clone()));
 
         res
+    }
+
+    pub(crate) fn variable_docs(&mut self, pos: &LinkedNode) -> Option<VarDocs> {
+        crate::docs::variable_docs(self, pos)
     }
 
     pub(crate) fn signature_docs(&mut self, runtime_fn: &Value) -> Option<SignatureDocs> {

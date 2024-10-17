@@ -259,7 +259,8 @@ fn def_tooltip(
                     "let {name}({params}){result};",
                     name = lnk.name,
                     params = ParamTooltip(sig.as_ref()),
-                    result = ResultTooltip(&lnk.name, sig.as_ref())
+                    result =
+                        ResultTooltip(&lnk.name, sig.as_ref().and_then(|sig| sig.ret_ty.as_ref()))
                 ),
             }));
 
@@ -276,6 +277,8 @@ fn def_tooltip(
         }
         LexicalKind::Var(LexicalVarKind::Variable) => {
             let deref_node = deref_target.node();
+            let sig = ctx.variable_docs(deref_target.node());
+
             // todo: check sensible length, value highlighting
             if let Some(values) = expr_tooltip(ctx.world(), deref_node) {
                 match values {
@@ -293,10 +296,19 @@ fn def_tooltip(
 
             results.push(MarkedString::LanguageString(LanguageString {
                 language: "typc".to_owned(),
-                value: format!("let {name};", name = lnk.name),
+                value: format!(
+                    "let {name}{result};",
+                    name = lnk.name,
+                    result = ResultTooltip(
+                        &lnk.name,
+                        sig.as_ref().and_then(|sig| sig.return_ty.as_ref())
+                    )
+                ),
             }));
 
-            if let Some(doc) = DocTooltip::get(ctx, &lnk) {
+            if let Some(doc) = sig {
+                results.push(MarkedString::String(doc.def_docs().clone()));
+            } else if let Some(doc) = DocTooltip::get(ctx, &lnk) {
                 results.push(MarkedString::String(doc));
             }
 
@@ -361,22 +373,18 @@ impl fmt::Display for ParamTooltip<'_> {
     }
 }
 
-struct ResultTooltip<'a>(&'a str, Option<&'a SignatureDocs>);
+struct ResultTooltip<'a>(&'a str, Option<&'a (String, String)>);
 
 impl fmt::Display for ResultTooltip<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Some(sig) = self.1 else {
+        let Some((short, _)) = self.1 else {
             return Ok(());
         };
-        if let Some((short, _)) = &sig.ret_ty {
-            if short == self.0 {
-                return Ok(());
-            }
-
-            write!(f, " = {short}")
-        } else {
-            Ok(())
+        if short == self.0 {
+            return Ok(());
         }
+
+        write!(f, " = {short}")
     }
 }
 

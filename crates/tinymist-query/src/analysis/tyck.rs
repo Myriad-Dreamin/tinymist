@@ -120,9 +120,19 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         var
     }
 
-    fn get_var(&mut self, s: Span, r: IdentRef) -> Option<Interned<TypeVar>> {
+    fn get_var(&mut self, root: &LinkedNode<'_>, ident: ast::Ident) -> Option<Interned<TypeVar>> {
+        let s = ident.span();
+        let r = to_ident_ref(root, ident)?;
         let def_id = self.get_def_id(s, &r)?;
+        self.get_var_by_id(s, r.name.as_ref().into(), def_id)
+    }
 
+    fn get_var_by_id(
+        &mut self,
+        s: Span,
+        name: Interned<str>,
+        def_id: DefId,
+    ) -> Option<Interned<TypeVar>> {
         // todo: false positive of clippy
         #[allow(clippy::map_entry)]
         if !self.info.vars.contains_key(&def_id) {
@@ -130,13 +140,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             let init_expr = self.init_var(def);
             self.info.vars.insert(
                 def_id,
-                TypeVarBounds::new(
-                    TypeVar {
-                        name: r.name.as_str().into(),
-                        def: def_id,
-                    },
-                    init_expr,
-                ),
+                TypeVarBounds::new(TypeVar { name, def: def_id }, init_expr),
             );
         }
 

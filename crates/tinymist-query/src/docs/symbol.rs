@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
 use tinymist_world::LspWorld;
 use typst::foundations::{Bytes, Func, Value};
+use typst::syntax::LinkedNode;
 use typst::{
     diag::StrResult,
     syntax::{FileId, VirtualPath},
@@ -16,7 +17,7 @@ use typst::{
 use super::tidy::*;
 use crate::analysis::{ParamAttrs, ParamSpec};
 use crate::docs::library;
-use crate::ty::Interned;
+use crate::ty::{DocSource, Interned};
 use crate::upstream::plain_docs_sentence;
 use crate::{ty::Ty, AnalysisContext};
 
@@ -69,7 +70,7 @@ pub enum SymbolDocsT<T> {
     Function(Box<SignatureDocsT<T>>),
     /// Documentation about a variable.
     #[serde(rename = "var")]
-    Variable(TidyVarDocsT<T>),
+    Variable(VarDocsT<T>),
     /// Documentation about a module.
     #[serde(rename = "module")]
     Module(TidyModuleDocs),
@@ -303,6 +304,42 @@ fn format_ty(ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> TypeRepr {
         None => ty
             .and_then(|ty| ty.describe())
             .map(|short| (short, format!("{ty:?}"))),
+    }
+}
+
+pub(crate) fn variable_docs(ctx: &mut AnalysisContext, pos: &LinkedNode) -> Option<VarDocs> {
+    let source = ctx.source_by_id(pos.span().id()?).ok()?;
+    let type_info = ctx.type_check(&source)?;
+    let ty = type_info.type_of_span(pos.span())?;
+
+    // todo multiple sources
+    let mut srcs = ty.sources();
+    srcs.sort();
+    log::info!("check variable docs of ty: {ty:?} => {srcs:?}");
+    let doc_source = srcs.into_iter().next()?;
+
+    let return_ty = ty.describe().map(|short| (short, format!("{ty:?}")));
+    match doc_source {
+        DocSource::Var(var) => {
+            let docs = type_info
+                .var_docs
+                .get(&var.def)
+                .map(|docs| docs.docs().clone());
+            Some(VarDocs {
+                docs: docs.unwrap_or_default(),
+                return_ty,
+                def_docs: OnceLock::new(),
+            })
+        }
+        DocSource::Ins(ins) => ins.syntax.as_ref().map(|src| {
+            let docs = src.doc.as_ref().into();
+            VarDocs {
+                docs,
+                return_ty,
+                def_docs: OnceLock::new(),
+            }
+        }),
+        _ => None,
     }
 }
 

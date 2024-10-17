@@ -273,7 +273,14 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
             continue;
         }
         if matches!(n.kind(), SyntaxKind::Named) {
-            n = n.children().last().unwrap();
+            if match_ident {
+                n = n
+                    .children()
+                    .find(|n| matches!(n.kind(), SyntaxKind::Ident))
+                    .unwrap();
+            } else {
+                n = n.children().last().unwrap();
+            }
             continue;
         }
         if match_ident {

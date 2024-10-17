@@ -1,10 +1,15 @@
+use std::sync::OnceLock;
+
 use reflexo::TakeAs;
 use typst::foundations::{IntoValue, Module, Str, Type};
 
 use super::*;
 use crate::{
     adt::snapshot_map::SnapshotMap,
-    docs::{convert_docs, identify_func_docs, identify_var_docs, DocStringKind},
+    docs::{
+        convert_docs, identify_func_docs, identify_var_docs, DocStringKind, UntypedSymbolDocs,
+        VarDocsT,
+    },
     syntax::{find_docs_of, get_non_strict_def_target},
 };
 
@@ -100,9 +105,20 @@ impl DocString {
 #[derive(Debug, Clone, Default)]
 pub struct VarDoc {
     /// The documentation of the variable
-    pub docs: Option<EcoString>,
+    pub docs: EcoString,
     /// The type of the variable
     pub ty: Option<Ty>,
+}
+
+impl VarDoc {
+    /// Convert the variable doc to an untyped version
+    pub fn to_untyped(&self) -> Arc<UntypedSymbolDocs> {
+        Arc::new(UntypedSymbolDocs::Variable(VarDocsT {
+            docs: self.docs.clone(),
+            return_ty: (),
+            def_docs: OnceLock::new(),
+        }))
+    }
 }
 
 pub(crate) fn compute_docstring(
@@ -150,7 +166,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
             params.insert(
                 param.name.into(),
                 VarDoc {
-                    docs: Some(param.docs),
+                    docs: param.docs,
                     ty: self.check_type_strings(&module, &param.types),
                 },
             );
