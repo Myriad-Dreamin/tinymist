@@ -112,7 +112,6 @@ impl Ty {
 
         impl<C: TyCtxMut> SigChecker for SigReprDriver<'_, C> {
             fn check(&mut self, sig: Sig, _ctx: &mut SigCheckContext, _pol: bool) -> Option<()> {
-                // todo: bind type context
                 let sig = sig.shape(self.0)?;
                 *self.1 = Some(sig.sig.clone());
                 Some(())
@@ -315,6 +314,11 @@ impl<'a, 'b> BoundChecker for MethodDriver<'a, 'b> {
                 } else {
                     // todo: general select operator
                 }
+            }
+            Ty::With(w) => {
+                self.0.ctx.args.push(w.with.clone());
+                w.sig.bounds(pol, self);
+                self.0.ctx.args.pop();
             }
             Ty::Tuple(..) => self.array_method(ty, pol),
             Ty::Array(..) => self.array_method(ty, pol),

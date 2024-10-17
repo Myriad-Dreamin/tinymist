@@ -103,8 +103,6 @@ pub struct VarDoc {
     pub docs: Option<EcoString>,
     /// The type of the variable
     pub ty: Option<Ty>,
-    /// The default value of the variable
-    pub default: Option<EcoString>,
 }
 
 pub(crate) fn compute_docstring(
@@ -154,7 +152,6 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
                 VarDoc {
                     docs: Some(param.docs),
                     ty: self.check_type_strings(&module, &param.types),
-                    default: param.default,
                 },
             );
         }
@@ -178,7 +175,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
 
         let res_ty = converted
             .return_ty
-            .and_then(|ty| self.check_type_strings(&module, &ty));
+            .and_then(|ty| self.check_type_strings(&module, &ty.0));
 
         Some(DocString {
             docs: Some(converted.docs),

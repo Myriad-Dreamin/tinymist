@@ -94,7 +94,7 @@ fn check_signature<'a>(
 
 pub(crate) struct PostTypeChecker<'a, 'w> {
     ctx: &'a mut AnalysisContext<'w>,
-    info: &'a TypeScheme,
+    pub info: &'a TypeScheme,
     checked: HashMap<Span, Option<Ty>>,
     locals: TypeScheme,
 }

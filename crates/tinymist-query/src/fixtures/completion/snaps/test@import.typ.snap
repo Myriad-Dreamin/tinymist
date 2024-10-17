@@ -12,7 +12,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import.typ
     "kind": 3,
     "label": "aab",
     "labelDetails": {
-     "description": "() => any"
+     "description": "() => 1"
     },
     "textEdit": {
      "newText": "aab(${1:})",
@@ -32,7 +32,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import.typ
     "kind": 3,
     "label": "aac",
     "labelDetails": {
-     "description": "() => any"
+     "description": "() => 1"
     },
     "textEdit": {
      "newText": "aac(${1:})",
@@ -57,7 +57,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import.typ
     "kind": 3,
     "label": "aac",
     "labelDetails": {
-     "description": "() => any"
+     "description": "() => 1"
     },
     "textEdit": {
      "newText": "aac(${1:})",

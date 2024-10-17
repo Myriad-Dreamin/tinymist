@@ -1,16 +1,46 @@
-use typst::foundations;
+use typst::foundations::{self, Func};
 
 use crate::ty::prelude::*;
 
-pub trait BoundChecker: TyCtx {
+pub trait BoundChecker: Sized + TyCtx {
     fn collect(&mut self, ty: &Ty, pol: bool);
+
+    fn check_var(&mut self, u: &Interned<TypeVar>, pol: bool) {
+        self.check_var_rec(u, pol);
+    }
+
+    fn check_var_rec(&mut self, u: &Interned<TypeVar>, pol: bool) {
+        let Some(w) = self.global_bounds(u, pol) else {
+            return;
+        };
+        let mut ctx = BoundCheckContext;
+        ctx.tys(w.ubs.iter(), pol, self);
+        ctx.tys(w.lbs.iter(), !pol, self);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum TypeSources {
+pub enum DocSource {
     Var(Interned<TypeVar>),
     Ins(Interned<InsTy>),
     Builtin(BuiltinTy),
+}
+
+impl DocSource {
+    /// Regard doc source as function.
+    pub fn as_func(&self) -> Option<Func> {
+        match self {
+            Self::Var(..) => None,
+            Self::Builtin(BuiltinTy::Type(ty)) => Some(ty.constructor().ok()?),
+            Self::Builtin(BuiltinTy::Element(ty)) => Some((*ty).into()),
+            Self::Builtin(..) => None,
+            Self::Ins(i) => match &i.val {
+                foundations::Value::Func(f) => Some(f.clone()),
+                foundations::Value::Type(f) => Some(f.constructor().ok()?),
+                _ => None,
+            },
+        }
+    }
 }
 
 impl Ty {
@@ -19,13 +49,33 @@ impl Ty {
         matches!(self, Ty::Union(_) | Ty::Let(_) | Ty::Var(_))
     }
 
+    /// Convert type to doc source
+    pub fn as_source(&self) -> Option<DocSource> {
+        match self {
+            Ty::Builtin(ty @ (BuiltinTy::Type(..) | BuiltinTy::Element(..))) => {
+                Some(DocSource::Builtin(ty.clone()))
+            }
+            Ty::Value(ty) => match &ty.val {
+                foundations::Value::Type(..) | foundations::Value::Func(..) => {
+                    Some(DocSource::Ins(ty.clone()))
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     /// Get the sources of the given type.
-    pub fn sources(&self) -> Vec<TypeSources> {
+    pub fn sources(&self) -> Vec<DocSource> {
         let mut results = vec![];
-        fn collect(ty: &Ty, results: &mut Vec<TypeSources>) {
+        fn collect(ty: &Ty, results: &mut Vec<DocSource>) {
             use Ty::*;
+            if let Some(src) = ty.as_source() {
+                results.push(src);
+                return;
+            }
             match ty {
-                Any | Boolean(_) | If(..) => {}
+                Any | Boolean(_) | If(..) | Builtin(..) | Value(..) => {}
                 Dict(..) | Array(..) | Tuple(..) | Func(..) | Args(..) => {}
                 Unary(..) | Binary(..) => {}
                 Field(ty) => {
@@ -45,18 +95,8 @@ impl Ty {
                     }
                 }
                 Var(ty) => {
-                    results.push(TypeSources::Var(ty.clone()));
+                    results.push(DocSource::Var(ty.clone()));
                 }
-                Builtin(ty @ (BuiltinTy::Type(..) | BuiltinTy::Element(..))) => {
-                    results.push(TypeSources::Builtin(ty.clone()));
-                }
-                Builtin(..) => {}
-                Value(ty) => match &ty.val {
-                    foundations::Value::Type(..) | foundations::Value::Func(..) => {
-                        results.push(TypeSources::Ins(ty.clone()));
-                    }
-                    _ => {}
-                },
                 With(ty) => collect(&ty.sig, results),
                 Select(ty) => collect(&ty.ty, results),
             }
@@ -90,13 +130,7 @@ impl BoundCheckContext {
                 self.tys(u.ubs.iter(), pol, checker);
                 self.tys(u.lbs.iter(), !pol, checker);
             }
-            Ty::Var(u) => {
-                let Some(w) = checker.global_bounds(u, pol) else {
-                    return;
-                };
-                self.tys(w.ubs.iter(), pol, checker);
-                self.tys(w.lbs.iter(), !pol, checker);
-            }
+            Ty::Var(u) => checker.check_var(u, pol),
             // todo: calculate these operators
             // Ty::Select(_) => {}
             // Ty::Unary(_) => {}

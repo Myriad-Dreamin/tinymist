@@ -1,11 +1,15 @@
 //! Analysis of function signatures.
 
-use typst::foundations::{self, Closure, ParamInfo};
+use itertools::Either;
+use tinymist_derive::BindTyCtx;
+use typst::foundations::{Closure, ParamInfo};
 
-use super::{prelude::*, resolve_callee, BuiltinTy, SigTy, TypeSources};
+use super::{prelude::*, resolve_callee, BoundChecker, DocSource, SigTy, TypeVar};
 use crate::analysis::PostTypeChecker;
-use crate::docs::UntypedSymbolDocs;
+use crate::docs::{UntypedSignatureDocs, UntypedSymbolDocs, UntypedVarDocs};
 use crate::syntax::get_non_strict_def_target;
+use crate::ty::TyCtx;
+use crate::ty::TypeBounds;
 use crate::upstream::truncated_repr;
 
 /// Describes a function parameter.
@@ -259,28 +263,44 @@ fn analyze_type_signature(
             let node = source.find(f.span())?;
             let def = get_non_strict_def_target(node.parent()?.clone())?;
             let type_info = ctx.type_check(&source)?;
-            let ty = type_info.type_of_span(def.node().span())?;
+            let ty = type_info.type_of_span(def.name()?.span())?;
             Some((type_info, ty))
         }
     }?;
-    log::debug!("check type signature of ty: {ty:?}");
 
     // todo multiple sources
     let mut srcs = ty.sources();
     srcs.sort();
+    log::debug!("check type signature of ty: {ty:?} => {srcs:?}");
     let type_var = srcs.into_iter().next()?;
     match type_var {
-        TypeSources::Var(v) => {
-            let sig_ty = ty.sig_repr(true, &mut PostTypeChecker::new(ctx, &type_info))?;
+        DocSource::Var(v) => {
+            let mut ty_ctx = PostTypeChecker::new(ctx, &type_info);
+            let sig_ty = Ty::Func(ty.sig_repr(true, &mut ty_ctx)?);
+            let sig_ty = type_info.simplify(sig_ty, false);
+            let Ty::Func(sig_ty) = sig_ty else {
+                panic!("expected function type, got {sig_ty:?}");
+            };
 
-            let docstring = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
-                Some(UntypedSymbolDocs::Function(sig)) => sig,
+            // todo: this will affect inlay hint: _var_with
+            let (_var_with, docstring) = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
+                Some(UntypedSymbolDocs::Function(sig)) => (vec![], Either::Left(sig.as_ref())),
+                Some(UntypedSymbolDocs::Variable(d)) => find_alias_stack(&mut ty_ctx, &v, d)?,
                 _ => return None,
+            };
+
+            let docstring = match docstring {
+                Either::Left(docstring) => docstring,
+                Either::Right(f) => return Some(ctx.type_of_func(f)),
             };
 
             let mut param_specs = Vec::new();
             let mut has_fill_or_size_or_stroke = false;
             let mut _broken = false;
+
+            if docstring.pos.len() != sig_ty.positional_params().len() {
+                panic!("positional params mismatch: {docstring:#?} != {sig_ty:#?}");
+            }
 
             for (doc, ty) in docstring.pos.iter().zip(sig_ty.positional_params()) {
                 let default = doc.default.clone();
@@ -338,23 +358,99 @@ fn analyze_type_signature(
                 _broken,
             })))
         }
-        TypeSources::Builtin(BuiltinTy::Type(ty)) => {
-            let cons = ty.constructor().ok()?;
-            Some(ctx.type_of_func(cons))
+        src @ (DocSource::Builtin(..) | DocSource::Ins(..)) => {
+            Some(ctx.type_of_func(src.as_func()?))
         }
-        TypeSources::Builtin(BuiltinTy::Element(ty)) => {
-            let cons: Func = ty.into();
-            Some(ctx.type_of_func(cons))
+    }
+}
+
+fn find_alias_stack<'a>(
+    ctx: &'a mut PostTypeChecker,
+    v: &Interned<TypeVar>,
+    d: &'a UntypedVarDocs,
+) -> Option<(
+    Vec<&'a UntypedVarDocs>,
+    Either<&'a UntypedSignatureDocs, Func>,
+)> {
+    let mut checker = AliasStackChecker {
+        ctx,
+        stack: vec![d],
+        res: None,
+        checking_with: true,
+    };
+    Ty::Var(v.clone()).bounds(true, &mut checker);
+
+    checker.res.map(|res| (checker.stack, res))
+}
+
+#[derive(BindTyCtx)]
+#[bind(ctx)]
+struct AliasStackChecker<'a, 'b, 'w> {
+    ctx: &'a mut PostTypeChecker<'b, 'w>,
+    stack: Vec<&'a UntypedVarDocs>,
+    res: Option<Either<&'a UntypedSignatureDocs, Func>>,
+    checking_with: bool,
+}
+
+impl<'a, 'b, 'w> BoundChecker for AliasStackChecker<'a, 'b, 'w> {
+    fn check_var(&mut self, u: &Interned<TypeVar>, pol: bool) {
+        log::debug!("collecting var {u:?} {pol:?}");
+        if self.res.is_some() {
+            return;
         }
-        TypeSources::Builtin(..) => None,
-        TypeSources::Ins(i) => match &i.val {
-            foundations::Value::Func(f) => Some(ctx.type_of_func(f.clone())),
-            foundations::Value::Type(f) => {
-                let cons = f.constructor().ok()?;
-                Some(ctx.type_of_func(cons))
+
+        if self.checking_with {
+            self.check_var_rec(u, pol);
+            return;
+        }
+
+        let docs = self.ctx.info.var_docs.get(&u.def).map(|x| x.as_ref());
+
+        log::debug!("collecting var {u:?} {pol:?} => {docs:?}");
+        // todo: bind builtin functions
+        match docs {
+            Some(UntypedSymbolDocs::Function(sig)) => {
+                self.res = Some(Either::Left(sig));
             }
-            _ => None,
-        },
+            Some(UntypedSymbolDocs::Variable(d)) => {
+                self.checking_with = true;
+                self.stack.push(d);
+                self.check_var_rec(u, pol);
+                self.stack.pop();
+                self.checking_with = false;
+            }
+            _ => {}
+        }
+    }
+
+    fn collect(&mut self, ty: &Ty, pol: bool) {
+        if self.res.is_some() {
+            return;
+        }
+
+        match (self.checking_with, ty) {
+            (true, Ty::With(w)) => {
+                log::debug!("collecting with {ty:?} {pol:?}");
+                self.checking_with = false;
+                w.sig.bounds(pol, self);
+                self.checking_with = true;
+            }
+            (false, ty) => {
+                if let Some(src) = ty.as_source() {
+                    match src {
+                        DocSource::Var(u) => {
+                            self.check_var(&u, pol);
+                        }
+                        src @ (DocSource::Builtin(..) | DocSource::Ins(..)) => {
+                            if let Some(f) = src.as_func() {
+                                self.res = Some(Either::Right(f));
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }
 
