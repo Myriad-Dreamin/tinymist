@@ -18,19 +18,23 @@ use typst::{model::Document, text::Font};
 
 use crate::analysis::prelude::*;
 use crate::analysis::{
-    analyze_bib, analyze_expr_, analyze_import_, analyze_signature, post_type_check, BibInfo,
-    DefUseInfo, DocString, ImportInfo, PathPreference, Signature, SignatureTarget, Ty, TypeScheme,
+    analyze_bib, analyze_expr_, analyze_import2_, analyze_import_, analyze_signature,
+    post_type_check, BibInfo, DefUseInfo, DocString, ImportInfo, PathPreference, Signature,
+    SignatureTarget, Ty, TypeScheme,
 };
 use crate::docs::{DocStringKind, SignatureDocs, VarDocs};
 use crate::syntax::{
-    construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
-    scan_workspace_files, DerefTarget, LexicalHierarchy, ModuleDependency,
+    construct_module_dependencies, expr_of, find_expr_in_import, get_deref_target,
+    resolve_id_by_path, scan_workspace_files, DerefTarget, ExprInfo, LexicalHierarchy,
+    ModuleDependency,
 };
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
     lsp_to_typst, path_to_url, typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange,
     VersionedDocument,
 };
+
+use super::analyze_expr2_;
 
 /// The analysis data holds globally.
 #[derive(Default)]
@@ -646,8 +650,14 @@ impl<'w> AnalysisContext<'w> {
         token.enter(|| import_info(w, source))
     }
 
+    /// Get the expression of a source file.
+    pub(crate) fn expr_of(&mut self, source: Source) -> Arc<ExprInfo> {
+        expr_of(self, source)
+    }
+
     /// Get the def-use information of a source file.
     pub fn def_use(&mut self, source: Source) -> Option<Arc<DefUseInfo>> {
+        let _ = Self::expr_of;
         let mut search_ctx = self.fork_for_search();
 
         Self::def_use_(&mut search_ctx, source)
@@ -768,15 +778,27 @@ impl<'w> AnalysisContext<'w> {
     }
 
     /// Try to load a module from the current source file.
-    pub fn analyze_import(&mut self, source: &LinkedNode) -> Option<Value> {
+    pub fn analyze_import(&self, source: &LinkedNode) -> Option<Value> {
         let token = &self.analysis.workers.import;
         token.enter(|| analyze_import_(self.world(), source))
+    }
+
+    /// Try to load a module from the current source file.
+    pub fn analyze_import2(&self, source: &SyntaxNode) -> (Option<Value>, Option<Value>) {
+        let token = &self.analysis.workers.import;
+        token.enter(|| analyze_import2_(self.world(), source))
     }
 
     /// Try to determine a set of possible values for an expression.
     pub fn analyze_expr(&mut self, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
         let token = &self.analysis.workers.expression;
         token.enter(|| analyze_expr_(self.world(), node))
+    }
+
+    /// Try to load a module from the current source file.
+    pub fn analyze_expr2(&self, source: &SyntaxNode) -> EcoVec<(Value, Option<Styles>)> {
+        let token = &self.analysis.workers.expression;
+        token.enter(|| analyze_expr2_(self.world(), source))
     }
 
     /// Describe the item under the cursor.

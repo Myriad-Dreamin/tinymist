@@ -274,6 +274,59 @@ mod document_tests {
 }
 
 #[cfg(test)]
+mod expr_tests {
+
+    use crate::syntax::expr::expr_of;
+    use crate::syntax::{Decl, RefExpr};
+    use crate::tests::*;
+
+    #[test]
+    fn scope() {
+        snapshot_testing("expr_of", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let result: std::sync::Arc<crate::syntax::ExprInfo> = expr_of(ctx, source.clone());
+            let mut resolves = result.resolves.iter().collect::<Vec<_>>();
+            resolves.sort_by(|x, y| {
+                x.0.name().cmp(y.0.name()).then_with(|| {
+                    x.0.span()
+                        .zip(y.0.span())
+                        .map_or(std::cmp::Ordering::Equal, |(x, y)| {
+                            x.number().cmp(&y.number())
+                        })
+                })
+            });
+            let show_decl = |node: &Decl| {
+                let range = node
+                    .span()
+                    .and_then(|s| source.range(s))
+                    .unwrap_or_default();
+                let fid = if let Some(fid) = node.file_id() {
+                    format!(" in {fid:?}")
+                } else {
+                    "".to_string()
+                };
+                format!("{node}@{range:?}{fid}")
+            };
+            let resolves = resolves
+                .into_iter()
+                .map(|(_, expr)| {
+                    let RefExpr { ident, of, val } = expr.as_ref();
+
+                    format!(
+                        "{} -> {}, val: {val:?}",
+                        show_decl(ident),
+                        of.as_ref().map(show_decl).unwrap_or_default()
+                    )
+                })
+                .collect::<Vec<_>>();
+
+            assert_snapshot!(resolves.join("\n"));
+        });
+    }
+}
+
+#[cfg(test)]
 mod lexical_hierarchy_tests {
     use std::collections::HashMap;
 

@@ -5,6 +5,7 @@ pub use std::{
     sync::Arc,
 };
 
+pub use ecow::eco_vec;
 pub use ecow::EcoVec;
 pub use itertools::{Format, Itertools};
 pub use log::error;

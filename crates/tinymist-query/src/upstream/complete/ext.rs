@@ -745,6 +745,8 @@ fn type_completion(
             BuiltinTy::Clause => return None,
             BuiltinTy::Undef => return None,
             BuiltinTy::Space => return None,
+            BuiltinTy::Break => return None,
+            BuiltinTy::Continue => return None,
             BuiltinTy::Content => return None,
             BuiltinTy::Infer => return None,
             BuiltinTy::FlowNone => return None,

@@ -15,6 +15,8 @@ pub(crate) mod module;
 pub use module::*;
 pub(crate) mod comment;
 pub use comment::*;
+pub(crate) mod expr;
+pub(crate) use expr::*;
 
 use core::fmt;
 use std::ops::Range;

@@ -1,0 +1,6 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "resolves.join(\"\\n\")"
+input_file: crates/tinymist-query/src/fixtures/expr_of/import_by_ident.typ
+---
+Ident("f")@41..42 in \s2.typ -> Ident("f")@0..0 in \derive.typ, val: None

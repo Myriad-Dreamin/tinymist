@@ -7,11 +7,22 @@ use typst::eval::Vm;
 use typst::foundations::{Context, Label, Scopes, Styles, Value};
 use typst::introspection::Introspector;
 use typst::model::{BibliographyElem, Document};
-use typst::syntax::{ast, LinkedNode, Span, SyntaxKind};
+use typst::syntax::{ast, LinkedNode, Span, SyntaxKind, SyntaxNode};
 use typst::World;
 
 /// Try to determine a set of possible values for an expression.
 pub fn analyze_expr_(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
+    if let Some(parent) = node.parent() {
+        if parent.kind() == SyntaxKind::FieldAccess && node.index() > 0 {
+            return analyze_expr_(world, parent);
+        }
+    }
+
+    analyze_expr2_(world, node.get())
+}
+
+/// Try to determine a set of possible values for an expression.
+pub fn analyze_expr2_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Option<Styles>)> {
     let Some(expr) = node.cast::<ast::Expr>() else {
         return eco_vec![];
     };
@@ -27,13 +38,7 @@ pub fn analyze_expr_(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Opt
         _ => {
             if node.kind() == SyntaxKind::Contextual {
                 if let Some(child) = node.children().last() {
-                    return analyze_expr_(world, &child);
-                }
-            }
-
-            if let Some(parent) = node.parent() {
-                if parent.kind() == SyntaxKind::FieldAccess && node.index() > 0 {
-                    return analyze_expr_(world, parent);
+                    return analyze_expr2_(world, child);
                 }
             }
 
@@ -75,6 +80,41 @@ pub fn analyze_import_(world: &dyn World, source: &LinkedNode) -> Option<Value> 
     typst::eval::import(&mut vm, source, source_span, true)
         .ok()
         .map(Value::Module)
+}
+
+/// Try to load a module from the current source file.
+pub fn analyze_import2_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>, Option<Value>) {
+    let source_span = source.span();
+    let Some((source, _)) = analyze_expr2_(world, source).into_iter().next() else {
+        return (None, None);
+    };
+    if source.scope().is_some() {
+        return (Some(source), None);
+    }
+
+    let mut locator = Locator::default();
+    let introspector = Introspector::default();
+    let mut tracer = Tracer::new();
+    let engine = Engine {
+        world: world.track(),
+        route: Route::default(),
+        introspector: introspector.track(),
+        locator: &mut locator,
+        tracer: tracer.track_mut(),
+    };
+
+    let context = Context::none();
+    let mut vm = Vm::new(
+        engine,
+        context.track(),
+        Scopes::new(Some(world.library())),
+        Span::detached(),
+    );
+    let module = typst::eval::import(&mut vm, source.clone(), source_span, true)
+        .ok()
+        .map(Value::Module);
+
+    (Some(source), module)
 }
 
 /// A label with a description and details.
