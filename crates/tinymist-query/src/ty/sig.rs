@@ -97,7 +97,7 @@ impl Ty {
     }
 
     /// Get the signature representation of the given type.
-    pub fn sig_repr(&self, pol: bool) -> Option<Interned<SigTy>> {
+    pub fn sig_repr(&self, pol: bool, ctx: &mut impl TyCtxMut) -> Option<Interned<SigTy>> {
         // todo: union sig
         // let mut pos = vec![];
         // let mut named = HashMap::new();
@@ -108,12 +108,12 @@ impl Ty {
 
         #[derive(BindTyCtx)]
         #[bind(0)]
-        struct SigReprDriver<'a, C: TyCtx>(&'a C, &'a mut Option<Interned<SigTy>>);
+        struct SigReprDriver<'a, C: TyCtxMut>(&'a mut C, &'a mut Option<Interned<SigTy>>);
 
-        impl<C: TyCtx> SigChecker for SigReprDriver<'_, C> {
+        impl<C: TyCtxMut> SigChecker for SigReprDriver<'_, C> {
             fn check(&mut self, sig: Sig, _ctx: &mut SigCheckContext, _pol: bool) -> Option<()> {
                 // todo: bind type context
-                let sig = sig.shape(&mut ())?;
+                let sig = sig.shape(self.0)?;
                 *self.1 = Some(sig.sig.clone());
                 Some(())
             }
@@ -123,7 +123,7 @@ impl Ty {
             pol,
             SigSurfaceKind::Call,
             // todo: bind type context
-            &mut SigReprDriver(&(), &mut primary),
+            &mut SigReprDriver(ctx, &mut primary),
         );
 
         primary

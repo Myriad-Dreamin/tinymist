@@ -3,6 +3,7 @@
 use typst::foundations::{self, Closure, ParamInfo};
 
 use super::{prelude::*, resolve_callee, BuiltinTy, SigTy, TypeSources};
+use crate::analysis::PostTypeChecker;
 use crate::docs::UntypedSymbolDocs;
 use crate::syntax::get_non_strict_def_target;
 use crate::upstream::truncated_repr;
@@ -104,6 +105,13 @@ impl Signature {
         }
     }
 
+    /// Returns the all parameters of the function.
+    pub(crate) fn params(&self) -> impl Iterator<Item = (&ParamSpec, Option<&Ty>)> {
+        let primary = self.primary().params();
+        // todo: with stack
+        primary
+    }
+
     pub(crate) fn type_sig(&self) -> Interned<SigTy> {
         let primary = self.primary().sig_ty.clone();
         // todo: with stack
@@ -165,6 +173,22 @@ impl PrimarySignature {
     pub fn rest(&self) -> Option<&ParamSpec> {
         self.has_spread_right()
             .then(|| &self.param_specs[self.pos_size() + self.sig_ty.names.names.len()])
+    }
+
+    /// Returns the all parameters of the function.
+    pub fn params(&self) -> impl Iterator<Item = (&ParamSpec, Option<&Ty>)> {
+        let pos = self.pos();
+        let named = self.named();
+        let rest = self.rest();
+        let type_sig = &self.sig_ty;
+        let pos = pos
+            .iter()
+            .enumerate()
+            .map(|(i, pos)| (pos, type_sig.pos(i)));
+        let named = named.iter().map(|x| (x, type_sig.named(&x.name)));
+        let rest = rest.into_iter().map(|x| (x, type_sig.rest_param()));
+
+        pos.chain(named).chain(rest)
     }
 }
 
@@ -247,7 +271,7 @@ fn analyze_type_signature(
     let type_var = srcs.into_iter().next()?;
     match type_var {
         TypeSources::Var(v) => {
-            let sig_ty = ty.sig_repr(true)?;
+            let sig_ty = ty.sig_repr(true, &mut PostTypeChecker::new(ctx, &type_info))?;
 
             let docstring = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
                 Some(UntypedSymbolDocs::Function(sig)) => sig,

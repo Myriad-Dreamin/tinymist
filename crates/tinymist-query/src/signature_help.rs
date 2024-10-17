@@ -43,8 +43,6 @@ impl SemanticRequest for SignatureHelpRequest {
 
         let def_link = find_definition(ctx, source.clone(), None, deref_target)?;
 
-        let type_sig = ctx.user_type_of_def(&source, &def_link);
-
         let documentation = DocTooltip::get(ctx, &def_link)
             .as_deref()
             .map(markdown_docs);
@@ -63,13 +61,8 @@ impl SemanticRequest for SignatureHelpRequest {
         }
 
         let sig = ctx.signature_dyn(function.clone());
-        let pos = sig.primary().pos();
-        let named = sig.primary().named();
-        let rest = sig.primary().rest();
 
-        let type_sig = type_sig.and_then(|type_sig| type_sig.sig_repr(true));
-
-        log::info!("got type signature {type_sig:?}");
+        log::debug!("got signature {sig:?}");
 
         let mut active_parameter = None;
 
@@ -77,20 +70,10 @@ impl SemanticRequest for SignatureHelpRequest {
         let mut params = Vec::new();
 
         label.push('(');
-        let pos = pos
-            .iter()
-            .enumerate()
-            .map(|(i, pos)| (pos, type_sig.as_ref().and_then(|sig| sig.pos(i))));
-        let named = named
-            .iter()
-            .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.named(&x.name))));
-        let rest = rest
-            .into_iter()
-            .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.rest_param())));
 
         let mut real_offset = 0;
         let focus_name = OnceCell::new();
-        for (i, (param, ty)) in pos.chain(named).chain(rest).enumerate() {
+        for (i, (param, ty)) in sig.params().enumerate() {
             if is_set && !param.attrs.settable {
                 continue;
             }
@@ -137,10 +120,7 @@ impl SemanticRequest for SignatureHelpRequest {
             });
         }
         label.push(')');
-        let ret = type_sig
-            .as_ref()
-            .and_then(|sig| sig.body.as_ref())
-            .or_else(|| sig.primary().sig_ty.body.as_ref());
+        let ret = sig.type_sig().body.clone();
         if let Some(ret_ty) = ret {
             label.push_str(" -> ");
             label.push_str(ret_ty.describe().as_deref().unwrap_or("any"));

@@ -13,18 +13,11 @@ use crate::syntax::{get_check_target, get_check_target_by_context, CheckTarget, 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.
 pub(crate) fn post_type_check(
-    _ctx: &mut AnalysisContext,
+    ctx: &mut AnalysisContext,
     info: &TypeScheme,
     node: LinkedNode,
 ) -> Option<Ty> {
-    let mut worker = PostTypeCheckWorker {
-        ctx: _ctx,
-        checked: HashMap::new(),
-        locals: TypeScheme::default(),
-        info,
-    };
-
-    worker.check(&node)
+    PostTypeChecker::new(ctx, info).check(&node)
 }
 
 #[derive(Default)]
@@ -54,7 +47,7 @@ impl SignatureReceiver {
 fn check_signature<'a>(
     receiver: &'a mut SignatureReceiver,
     target: &'a ParamTarget,
-) -> impl FnMut(&mut PostTypeCheckWorker, Sig, &[Interned<ArgsTy>], bool) -> Option<()> + 'a {
+) -> impl FnMut(&mut PostTypeChecker, Sig, &[Interned<ArgsTy>], bool) -> Option<()> + 'a {
     move |worker, sig, args, pol| {
         let SigShape { sig: sig_ins, .. } = sig.shape(worker)?;
 
@@ -99,16 +92,14 @@ fn check_signature<'a>(
     }
 }
 
-// #[derive(BindTyCtx)]
-// #[bind(info)]
-struct PostTypeCheckWorker<'a, 'w> {
+pub(crate) struct PostTypeChecker<'a, 'w> {
     ctx: &'a mut AnalysisContext<'w>,
-    checked: HashMap<Span, Option<Ty>>,
     info: &'a TypeScheme,
+    checked: HashMap<Span, Option<Ty>>,
     locals: TypeScheme,
 }
 
-impl<'a, 'w> TyCtx for PostTypeCheckWorker<'a, 'w> {
+impl<'a, 'w> TyCtx for PostTypeChecker<'a, 'w> {
     fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<TypeBounds> {
         self.info.global_bounds(var, pol)
     }
@@ -118,7 +109,7 @@ impl<'a, 'w> TyCtx for PostTypeCheckWorker<'a, 'w> {
     }
 }
 
-impl<'a, 'w> TyCtxMut for PostTypeCheckWorker<'a, 'w> {
+impl<'a, 'w> TyCtxMut for PostTypeChecker<'a, 'w> {
     type Snap = <TypeScheme as TyCtxMut>::Snap;
 
     fn start_scope(&mut self) -> Self::Snap {
@@ -142,7 +133,16 @@ impl<'a, 'w> TyCtxMut for PostTypeCheckWorker<'a, 'w> {
     }
 }
 
-impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
+impl<'a, 'w> PostTypeChecker<'a, 'w> {
+    pub fn new(ctx: &'a mut AnalysisContext<'w>, info: &'a TypeScheme) -> Self {
+        Self {
+            ctx,
+            info,
+            checked: HashMap::new(),
+            locals: TypeScheme::default(),
+        }
+    }
+
     fn check(&mut self, node: &LinkedNode) -> Option<Ty> {
         let span = node.span();
         if let Some(ty) = self.checked.get(&span) {
@@ -341,7 +341,7 @@ impl<'a, 'w> PostTypeCheckWorker<'a, 'w> {
 trait PostSigChecker {
     fn check(
         &mut self,
-        checker: &mut PostTypeCheckWorker,
+        checker: &mut PostTypeChecker,
         sig: Sig,
         args: &[Interned<ArgsTy>],
         pol: bool,
@@ -350,11 +350,11 @@ trait PostSigChecker {
 
 impl<T> PostSigChecker for T
 where
-    T: FnMut(&mut PostTypeCheckWorker, Sig, &[Interned<ArgsTy>], bool) -> Option<()>,
+    T: FnMut(&mut PostTypeChecker, Sig, &[Interned<ArgsTy>], bool) -> Option<()>,
 {
     fn check(
         &mut self,
-        checker: &mut PostTypeCheckWorker,
+        checker: &mut PostTypeChecker,
         sig: Sig,
         args: &[Interned<ArgsTy>],
         pol: bool,
@@ -365,7 +365,7 @@ where
 
 #[derive(BindTyCtx)]
 #[bind(0)]
-struct PostSigCheckWorker<'x, 'a, 'w, T>(&'x mut PostTypeCheckWorker<'a, 'w>, &'x mut T);
+struct PostSigCheckWorker<'x, 'a, 'w, T>(&'x mut PostTypeChecker<'a, 'w>, &'x mut T);
 
 impl<'x, 'a, 'w, T: PostSigChecker> SigChecker for PostSigCheckWorker<'x, 'a, 'w, T> {
     fn check(
