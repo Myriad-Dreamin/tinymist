@@ -119,6 +119,10 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         return;
       }
       const bindDocument = activeEditor.document;
+      if (bindDocument.languageId !== "typst") {
+        vscode.window.showWarningMessage("Can't launch preview from outside the document");
+        return;
+      }
       return launchImpl({
         kind,
         context,
