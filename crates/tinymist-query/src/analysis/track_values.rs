@@ -89,7 +89,7 @@ pub fn analyze_import2_(world: &dyn World, source: &SyntaxNode) -> (Option<Value
         return (None, None);
     };
     if source.scope().is_some() {
-        return (Some(source), None);
+        return (Some(source.clone()), Some(source));
     }
 
     let mut locator = Locator::default();

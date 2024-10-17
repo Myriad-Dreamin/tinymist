@@ -1,6 +1,12 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
-expression: "resolves.join(\"\\n\")"
+expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/import_by_ident.typ
 ---
-Ident("f")@41..42 in \s2.typ -> Ident("f")@0..0 in \derive.typ, val: None
+= resolves
+ModuleImport(..)@1..23 in \s2.typ -> Def(Module), val: Some(Module { name: "derive", scope: Scope {"base": Module { name: "base", scope: Scope {"f": Func(f)}, content: Sequence [] }}, content: Sequence [] })
+ModuleImport(..)@25..39 in \s2.typ -> Def(Module), val: Some(Module { name: "base", scope: Scope {"f": Func(f)}, content: Sequence [] })
+Ident("f")@41..42 in \s2.typ -> Ident("f")@0..0 in \base.typ, val: Some(Func(f))
+= exports
+base -> Type(Module { name: "derive", scope: Scope {"base": Module { name: "base", scope: Scope {"f": Func(f)}, content: Sequence [] }}, content: Sequence [] }.base)
+f -> Type(Module { name: "base", scope: Scope {"f": Func(f)}, content: Sequence [] }.f)
