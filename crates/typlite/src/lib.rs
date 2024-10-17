@@ -499,10 +499,8 @@ impl TypliteWorker {
         func(Args::new(self, c.args()))
     }
 
-    fn contextual(&self, node: &SyntaxNode) -> Result<Value> {
-        let _ = node;
-
-        Ok(Value::None)
+    fn contextual(&mut self, node: &SyntaxNode) -> Result<Value> {
+        self.render(node, false)
     }
 
     fn include(&self, node: &SyntaxNode) -> Result<Value> {

@@ -256,14 +256,15 @@ fn def_tooltip(
             results.push(MarkedString::LanguageString(LanguageString {
                 language: "typc".to_owned(),
                 value: format!(
-                    "let {name}({params});",
+                    "let {name}({params}){result};",
                     name = lnk.name,
-                    params = ParamTooltip(sig.as_ref())
+                    params = ParamTooltip(sig.as_ref()),
+                    result = ResultTooltip(&lnk.name, sig.as_ref())
                 ),
             }));
 
-            if let Some(doc) = DocTooltip::get(ctx, &lnk) {
-                results.push(MarkedString::String(doc));
+            if let Some(doc) = sig {
+                results.push(MarkedString::String(doc.def_docs().into()));
             }
 
             if let Some(link) = ExternalDocLink::get(ctx, &lnk) {
@@ -357,6 +358,25 @@ impl fmt::Display for ParamTooltip<'_> {
             return Ok(());
         };
         sig.fmt(f)
+    }
+}
+
+struct ResultTooltip<'a>(&'a str, Option<&'a SignatureDocs>);
+
+impl fmt::Display for ResultTooltip<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Some(sig) = self.1 else {
+            return Ok(());
+        };
+        if let Some((short, _)) = &sig.ret_ty {
+            if short == self.0 {
+                return Ok(());
+            }
+
+            write!(f, " = {short}")
+        } else {
+            Ok(())
+        }
     }
 }
 
