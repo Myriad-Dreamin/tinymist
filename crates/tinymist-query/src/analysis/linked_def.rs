@@ -97,14 +97,8 @@ fn find_ident_definition(
     // Lexical reference
     let ident_store = use_site.clone();
     let ident_ref = match ident_store.cast::<ast::Expr>()? {
-        ast::Expr::Ident(e) => Some(IdentRef {
-            name: e.get().clone(),
-            range: use_site.range(),
-        }),
-        ast::Expr::MathIdent(e) => Some(IdentRef {
-            name: e.get().clone(),
-            range: use_site.range(),
-        }),
+        ast::Expr::Ident(e) => e.span(),
+        ast::Expr::MathIdent(e) => e.span(),
         ast::Expr::FieldAccess(s) => {
             proj.push(s.field());
 
@@ -117,42 +111,42 @@ fn find_ident_definition(
             match i {
                 ast::Expr::Ident(e) => {
                     use_site = use_site.find(e.span())?;
-                    Some(IdentRef {
-                        name: e.get().clone(),
-                        range: use_site.range(),
-                    })
+                    e.span()
                 }
                 ast::Expr::MathIdent(e) => {
                     use_site = use_site.find(e.span())?;
-                    Some(IdentRef {
-                        name: e.get().clone(),
-                        range: use_site.range(),
-                    })
+                    e.span()
                 }
-                _ => None,
+                _ => Span::detached(),
             }
         }
         _ => {
             log::debug!("unsupported kind {kind:?}", kind = use_site.kind());
-            None
+            Span::detached()
         }
     };
 
     // Syntactic definition
     let source_id = source.id();
     let def_use = ctx.def_use(source);
-    let def_info = ident_ref
-        .as_ref()
-        .zip(def_use.as_ref())
-        .and_then(|(ident_ref, def_use)| {
-            let def_id = def_use.get_ref(ident_ref);
-            let def_id = def_id.or_else(|| Some(def_use.get_def(source_id, ident_ref)?.0))?;
+    // let def_info = ident_ref
+    //     .as_ref()
+    //     .zip(def_use.as_ref())
+    //     .and_then(|(ident_ref, def_use)| {
+    //         let def_id = def_use.get_ref(ident_ref);
+    //         let def_id = def_id.or_else(|| Some(def_use.get_def(source_id,
+    // ident_ref)?.0))?;
 
-            def_use.get_def_by_id(def_id)
-        });
+    //         def_use.get_def_by_id(def_id)
+    //     });
+    let def_info = if ident_ref.is_detached() {
+        None
+    } else {
+        def_use.resolves.get(&ident_ref).cloned()
+    };
 
     // Global definition
-    let Some((def_fid, def)) = def_info else {
+    let Some(def_info) = def_info else {
         return resolve_global_value(ctx, use_site.clone(), false).and_then(move |f| {
             value_to_def(ctx, f, || Some(use_site.get().clone().into_text()), None)
         });

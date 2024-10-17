@@ -66,7 +66,7 @@ pub enum DefKind {
     Func,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Decl {
     Ident(Interned<DeclIdent>),
     Label(Interned<DeclIdent>),
@@ -81,7 +81,7 @@ impl From<Decl> for Expr {
     }
 }
 
-impl fmt::Display for Decl {
+impl fmt::Debug for Decl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Decl::Ident(ident) => write!(f, "Ident({:?})", ident.name),
@@ -535,6 +535,7 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
             _ => None,
         };
         if let Some(decl) = &decl {
+            println!("inserting: {decl:?}");
             self.scope_mut()
                 .insert(decl.name().clone(), decl.clone().into());
         }
@@ -552,6 +553,7 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
                     log::debug!("checking wildcard: {val:?}");
                     match val {
                         Some(Value::Module(m)) => {
+                            println!("inserting 3: {m:?}");
                             self.scopes.push(ExprScope::Module(m));
                         }
                         Some(Value::Func(f)) => {
@@ -608,6 +610,7 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
                             }
                             .into(),
                         );
+                        println!("inserting 2: {new:?}");
                         self.scope_mut()
                             .insert(new.name().clone(), Expr::Select(old_select));
                         imported.push((old, Expr::Decl(new.into())));
@@ -774,17 +777,19 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
     }
 
     fn check_for_loop(&mut self, typed: ast::ForLoop) -> Expr {
-        let pattern = self.check_pattern(typed.pattern());
-        let iter = self.check(typed.iterable());
-        let body = self.check(typed.body());
-        Expr::ForLoop(
-            ForExpr {
-                pattern,
-                iter,
-                body,
-            }
-            .into(),
-        )
+        self.with_scope(|this| {
+            let pattern = this.check_pattern(typed.pattern());
+            let iter = this.check(typed.iterable());
+            let body = this.check(typed.body());
+            Expr::ForLoop(
+                ForExpr {
+                    pattern,
+                    iter,
+                    body,
+                }
+                .into(),
+            )
+        })
     }
 
     fn check_markup(&mut self, m: ast::Markup) -> Expr {
@@ -850,6 +855,7 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
     fn resolve_ident(&mut self, decl: Decl, code: InterpretMode) -> Expr {
         let r: Interned<RefExpr> = self.resolve_ident_(decl, code).into();
         let s = r.ident.span().unwrap();
+        println!("resolve_ident 1: {r:?}");
         self.info.resolves.insert(s, r.clone());
         Expr::Ref(r)
     }
@@ -873,22 +879,30 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
                 }
                 ExprScope::Module(module) => {
                     let v = module.scope().get(&name);
-
-                    if let Some(fid) = module.file_id() {
-                        (
-                            Some(Expr::Decl(Self::alloc_external(fid, name.clone()).into())),
-                            v,
-                        )
-                    } else {
-                        (None, v)
+                    if v.is_none() {
+                        continue;
                     }
+
+                    let decl = v.and_then(|_| {
+                        Some(Expr::Decl(
+                            Self::alloc_external(module.file_id()?, name.clone()).into(),
+                        ))
+                    });
+
+                    (decl, v)
                 }
                 ExprScope::Func(func) => {
                     let v = func.scope().unwrap().get(&name);
+                    if v.is_none() {
+                        continue;
+                    }
                     (None, v)
                 }
                 ExprScope::Type(ty) => {
                     let v = ty.scope().get(&name);
+                    if v.is_none() {
+                        continue;
+                    }
                     (None, v)
                 }
             };

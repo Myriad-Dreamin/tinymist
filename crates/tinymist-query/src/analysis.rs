@@ -8,8 +8,6 @@ pub mod color_exprs;
 pub use color_exprs::*;
 pub mod link_exprs;
 pub use link_exprs::*;
-pub mod def_use;
-pub use def_use::*;
 pub mod import;
 pub use import::*;
 pub mod linked_def;
@@ -308,7 +306,7 @@ mod expr_tests {
                     } else {
                         "".to_string()
                     };
-                    format!("{decl}@{range:?}{fid}")
+                    format!("{decl:?}@{range:?}{fid}")
                 }
                 _ => format!("{node:?}"),
             };
@@ -347,80 +345,9 @@ mod expr_tests {
 
 #[cfg(test)]
 mod lexical_hierarchy_tests {
-    use std::collections::HashMap;
 
-    use def_use::DefUseInfo;
-    use lexical_hierarchy::LexicalKind;
-    use reflexo::path::unix_slash;
-    use reflexo::vector::ir::DefId;
-
-    use crate::analysis::def_use;
-    // use crate::prelude::*;
-    use crate::syntax::{lexical_hierarchy, IdentDef, IdentRef};
+    use crate::syntax::lexical_hierarchy;
     use crate::tests::*;
-
-    /// A snapshot of the def-use information for testing.
-    pub struct DefUseSnapshot<'a>(pub &'a DefUseInfo);
-
-    impl<'a> Serialize for DefUseSnapshot<'a> {
-        fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            use serde::ser::SerializeMap;
-            // HashMap<IdentRef, DefId>
-            let mut references: HashMap<DefId, Vec<IdentRef>> = {
-                let mut map = HashMap::new();
-                for (k, v) in &self.0.ident_refs {
-                    map.entry(*v).or_insert_with(Vec::new).push(k.clone());
-                }
-                map
-            };
-            // sort
-            for (_, v) in references.iter_mut() {
-                v.sort();
-            }
-
-            #[derive(Serialize)]
-            struct DefUseEntry<'a> {
-                def: &'a IdentDef,
-                refs: &'a Vec<IdentRef>,
-            }
-
-            let mut state = serializer.serialize_map(None)?;
-            for (k, (ident_ref, ident_def)) in self.0.ident_defs.as_slice().iter().enumerate() {
-                let id = DefId(k as u64);
-
-                let empty_ref = Vec::new();
-                let entry = DefUseEntry {
-                    def: ident_def,
-                    refs: references.get(&id).unwrap_or(&empty_ref),
-                };
-
-                state.serialize_entry(
-                    &format!(
-                        "{}@{}",
-                        ident_ref.1,
-                        unix_slash(ident_ref.0.vpath().as_rootless_path())
-                    ),
-                    &entry,
-                )?;
-            }
-
-            if !self.0.undefined_refs.is_empty() {
-                let mut undefined_refs = self.0.undefined_refs.clone();
-                undefined_refs.sort();
-                let entry = DefUseEntry {
-                    def: &IdentDef {
-                        name: "<nil>".into(),
-                        kind: LexicalKind::Block,
-                        range: 0..0,
-                    },
-                    refs: &undefined_refs,
-                };
-                state.serialize_entry("<nil>", &entry)?;
-            }
-
-            state.end()
-        }
-    }
 
     #[test]
     fn scope() {
@@ -434,23 +361,6 @@ mod lexical_hierarchy_tests {
 
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
-    }
-
-    #[test]
-    fn test_def_use() {
-        fn def_use(set: &str) {
-            snapshot_testing(set, &|ctx, path| {
-                let source = ctx.source_by_path(&path).unwrap();
-
-                let result = ctx.def_use(source);
-                let result = result.as_deref().map(DefUseSnapshot);
-
-                assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
-            });
-        }
-
-        def_use("lexical_hierarchy");
-        def_use("def_use");
     }
 }
 

@@ -1,0 +1,12 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "snap.join(\"\\n\")"
+input_file: crates/tinymist-query/src/fixtures/expr_of/param_scope.typ
+---
+= resolves
+Ident("term")@5..9 in \s0.typ -> Def(Func), val: None
+Ident("term")@10..14 in \s0.typ -> Def(Var), val: None
+Ident("term")@18..22 in \s0.typ -> Ident("term")@10..14 in \s0.typ, val: None
+Ident("term")@25..29 in \s0.typ -> Ident("term")@5..9 in \s0.typ, val: None
+= exports
+term -> Ident("term")@5..9 in \s0.typ

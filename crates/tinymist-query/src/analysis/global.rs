@@ -19,14 +19,13 @@ use typst::{model::Document, text::Font};
 use crate::analysis::prelude::*;
 use crate::analysis::{
     analyze_bib, analyze_expr_, analyze_import2_, analyze_import_, analyze_signature,
-    post_type_check, BibInfo, DefUseInfo, DocString, ImportInfo, PathPreference, Signature,
-    SignatureTarget, Ty, TypeScheme,
+    post_type_check, BibInfo, DocString, ImportInfo, PathPreference, Signature, SignatureTarget,
+    Ty, TypeScheme,
 };
 use crate::docs::{DocStringKind, SignatureDocs, VarDocs};
 use crate::syntax::{
-    construct_module_dependencies, expr_of, find_expr_in_import, get_deref_target,
-    resolve_id_by_path, scan_workspace_files, DerefTarget, ExprInfo, LexicalHierarchy,
-    ModuleDependency,
+    construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
+    scan_workspace_files, DerefTarget, ExprInfo, LexicalHierarchy, ModuleDependency,
 };
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
@@ -76,7 +75,7 @@ impl Analysis {
         self.caches.static_signatures.clear();
         self.caches.docstrings.clear();
         self.caches.terms.clear();
-        self.caches.def_use.clear();
+        self.caches.expr_stage.clear();
         self.caches.type_check.clear();
     }
 }
@@ -87,7 +86,7 @@ impl Analysis {
 pub struct AnalysisGlobalCaches {
     lifetime: AtomicU64,
     clear_lifetime: AtomicU64,
-    def_use: FxDashMap<u128, (u64, Option<Arc<DefUseInfo>>)>,
+    expr_stage: FxDashMap<u128, (u64, Arc<ExprInfo>)>,
     type_check: FxDashMap<u128, (u64, Option<Arc<TypeScheme>>)>,
     static_signatures: FxDashMap<u128, (u64, Source, usize, Option<Signature>)>,
     docstrings: FxDashMap<u128, (u64, Option<Arc<DocString>>)>,
@@ -109,22 +108,19 @@ pub struct AnalysisCaches {
 /// You should not holds across requests, because source code may change.
 #[derive(Default)]
 pub struct ModuleAnalysisCache {
-    def_use: OnceCell<Option<Arc<DefUseInfo>>>,
+    expr_stage: OnceCell<Arc<ExprInfo>>,
     type_check: OnceCell<Option<Arc<TypeScheme>>>,
 }
 
 impl ModuleAnalysisCache {
-    /// Try to get the def-use information of a file.
-    pub fn def_use(&self) -> Option<Arc<DefUseInfo>> {
-        self.def_use.get().cloned().flatten()
+    /// Try to get the expression information of a file.
+    pub fn expr_stage(&self) -> Option<Arc<ExprInfo>> {
+        self.expr_stage.get().cloned()
     }
 
-    /// Compute the def-use information of a file.
-    pub(crate) fn compute_def_use(
-        &self,
-        f: impl FnOnce() -> Option<Arc<DefUseInfo>>,
-    ) -> Option<Arc<DefUseInfo>> {
-        self.def_use.get_or_init(f).clone()
+    /// Compute the expression information of a file.
+    pub(crate) fn compute_expr(&self, f: impl FnOnce() -> Arc<ExprInfo>) -> Arc<ExprInfo> {
+        self.expr_stage.get_or_init(f).clone()
     }
 
     /// Try to get the type check information of a file.
@@ -616,9 +612,10 @@ impl<'w> AnalysisContext<'w> {
             return Some(res);
         }
 
-        let def_use = self.def_use(source.clone())?;
+        let expr_info = self.expr_of(source.clone());
 
-        let h = hash128(&(&source, &def_use));
+        // todo: recursive hash
+        let h = hash128(&(&source, &expr_info));
 
         let res = if let Some(res) = self.analysis.caches.type_check.get(&h) {
             res.1.clone()
@@ -650,61 +647,33 @@ impl<'w> AnalysisContext<'w> {
         token.enter(|| import_info(w, source))
     }
 
-    /// Get the expression of a source file.
+    /// Get the expression information of a source file.
     pub(crate) fn expr_of(&mut self, source: Source) -> Arc<ExprInfo> {
-        expr_of(self, source)
-    }
-
-    /// Get the def-use information of a source file.
-    pub fn def_use(&mut self, source: Source) -> Option<Arc<DefUseInfo>> {
-        let _ = Self::expr_of;
-        let mut search_ctx = self.fork_for_search();
-
-        Self::def_use_(&mut search_ctx, source)
-    }
-
-    /// Get the def-use information of a source file.
-    pub fn def_use_(ctx: &mut SearchCtx<'_, 'w>, source: Source) -> Option<Arc<DefUseInfo>> {
+        //
         let fid = source.id();
 
-        if let Some(res) = ctx.ctx.caches.modules.entry(fid).or_default().def_use() {
-            return Some(res);
+        if let Some(res) = self.caches.modules.entry(fid).or_default().expr_stage() {
+            return res;
         }
 
-        if !ctx.searched.insert(fid) {
-            return None;
-        }
+        let h = hash128(&source);
 
-        let l = def_use_lexical_hierarchy(source.clone())?;
-        let m = ctx.ctx.import_info(source.clone())?;
-        let deps = m
-            .imports
-            .iter()
-            .flat_map(|e| e.1)
-            .map(|e| Self::def_use_(ctx, e.clone()))
-            .collect::<Vec<_>>();
-
-        let key = (&source, &l, &m, deps);
-        let h = hash128(&key);
-
-        let res = if let Some(res) = ctx.ctx.analysis.caches.def_use.get(&h) {
+        let res = if let Some(res) = self.analysis.caches.expr_stage.get(&h) {
             res.1.clone()
         } else {
-            let res = crate::analysis::get_def_use_inner(ctx, source, l, m);
-            ctx.ctx
-                .analysis
+            let res = crate::syntax::expr_of(self, source);
+            self.analysis
                 .caches
-                .def_use
-                .insert(h, (ctx.ctx.lifetime, res.clone()));
+                .expr_stage
+                .insert(h, (self.lifetime, res.clone()));
             res
         };
 
-        ctx.ctx
-            .caches
+        self.caches
             .modules
             .entry(fid)
             .or_default()
-            .compute_def_use(|| res.clone());
+            .compute_expr(|| res.clone());
         res
     }
 
@@ -855,7 +824,7 @@ impl<'w> AnalysisContext<'w> {
             .retain(|_, (l, _, _)| lifetime - *l < 60);
         self.analysis
             .caches
-            .def_use
+            .expr_stage
             .retain(|_, (l, _)| lifetime - *l < 60);
         self.analysis
             .caches
