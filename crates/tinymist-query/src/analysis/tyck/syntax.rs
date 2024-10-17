@@ -2,9 +2,7 @@
 
 use super::*;
 use crate::analysis::ParamAttrs;
-use crate::docs::{
-    DocStringKind, SignatureDocsT, TidyVarDocsT, TypelessParamDocs, UntypedSymbolDocs,
-};
+use crate::docs::{DocStringKind, SignatureDocsT, TypelessParamDocs, UntypedSymbolDocs};
 use crate::ty::*;
 
 static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);
@@ -177,19 +175,11 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     }
 
     fn check_ident(&mut self, root: LinkedNode<'_>, mode: InterpretMode) -> Option<Ty> {
-        let ident: ast::Ident = root.cast()?;
-        let ident_ref = IdentRef {
-            name: ident.get().clone(),
-            range: root.range(),
-        };
-
-        self.get_var(root.span(), ident_ref)
-            .map(Ty::Var)
-            .or_else(|| {
-                let s = root.span();
-                let v = resolve_global_value(self.ctx, root, mode == InterpretMode::Math)?;
-                Some(Ty::Value(InsTy::new_at(v, s)))
-            })
+        self.get_var(&root, root.cast()?).map(Ty::Var).or_else(|| {
+            let s = root.span();
+            let v = resolve_global_value(self.ctx, root, mode == InterpretMode::Math)?;
+            Some(Ty::Value(InsTy::new_at(v, s)))
+        })
     }
 
     fn check_array(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
@@ -372,9 +362,10 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let closure: ast::Closure = root.cast()?;
         let def_id = closure
             .name()
-            .and_then(|n| self.get_def_id(n.span(), &to_ident_ref(&root, n)?))?;
+            .and_then(|n| self.get_def_id(n.span(), &to_ident_ref(&root, n)?));
 
-        let docstring = self.check_docstring(&root, DocStringKind::Function, def_id);
+        let docstring =
+            def_id.and_then(|def_id| self.check_docstring(&root, DocStringKind::Function, def_id));
         let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
         log::debug!("check closure: {:?} -> {docstring:#?}", closure.name());
@@ -398,7 +389,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                         let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
                         pos_docs.push(TypelessParamDocs {
                             name,
-                            docs: param_doc.docs.clone().unwrap_or_default(),
+                            docs: param_doc.docs.clone(),
                             cano_type: (),
                             default: None,
                             attrs: ParamAttrs::positional(),
@@ -414,9 +405,10 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     }
                 }
                 ast::Param::Named(e) => {
-                    let name = e.name().get().into();
                     let exp = self.check_expr_in(e.expr().span(), root.clone());
-                    let v = Ty::Var(self.get_var(e.name().span(), to_ident_ref(&root, e.name())?)?);
+                    let var = self.get_var(&root, e.name())?;
+                    let name = var.name.clone();
+                    let v = Ty::Var(var.clone());
                     if let Some(annotated) = docstring.var_ty(&name) {
                         self.constrain(&v, annotated);
                     }
@@ -431,30 +423,35 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                         name.clone(),
                         TypelessParamDocs {
                             name: name.clone(),
-                            docs: param_doc.docs.clone().unwrap_or_default(),
+                            docs: param_doc.docs.clone(),
                             cano_type: (),
                             default: Some(e.expr().to_untyped().clone().into_text()),
                             attrs: ParamAttrs::named(),
                         },
                     );
+                    self.info.var_docs.insert(var.def, param_doc.to_untyped());
                 }
                 // todo: spread left/right
                 ast::Param::Spread(a) => {
                     if let Some(e) = a.sink_ident() {
+                        let var = self.get_var(&root, e)?;
+                        let name = var.name.clone();
+                        let param_doc = docstring
+                            .get_var(&var.name.clone())
+                            .unwrap_or(&EMPTY_VAR_DOC);
+                        self.info.var_docs.insert(var.def, param_doc.to_untyped());
+
                         let exp = Ty::Builtin(BuiltinTy::Args);
-                        let v = Ty::Var(self.get_var(e.span(), to_ident_ref(&root, e)?)?);
-                        if let Some(annotated) = docstring.var_ty(&e.get().as_str().into()) {
+                        let v = Ty::Var(var);
+                        if let Some(annotated) = docstring.var_ty(&name) {
                             self.constrain(&v, annotated);
                         }
                         self.constrain(&exp, &v);
                         rest = Some(v);
 
-                        let param_doc = docstring
-                            .get_var(&e.get().as_str().into())
-                            .unwrap_or(&EMPTY_VAR_DOC);
                         rest_docs = Some(TypelessParamDocs {
-                            name: e.get().as_str().into(),
-                            docs: param_doc.docs.clone().unwrap_or_default(),
+                            name,
+                            docs: param_doc.docs.clone(),
                             cano_type: (),
                             default: None,
                             attrs: ParamAttrs::variadic(),
@@ -474,17 +471,20 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
         }
 
-        self.info.var_docs.insert(
-            def_id,
-            Arc::new(UntypedSymbolDocs::Function(Box::new(SignatureDocsT {
-                docs: docstring.docs.clone().unwrap_or_default(),
-                pos: pos_docs,
-                named: named_docs,
-                rest: rest_docs,
-                ret_ty: (),
-                def_docs: Default::default(),
-            }))),
-        );
+        // todo: arrow function docs
+        if let Some(def_id) = def_id {
+            self.info.var_docs.insert(
+                def_id,
+                Arc::new(UntypedSymbolDocs::Function(Box::new(SignatureDocsT {
+                    docs: docstring.docs.clone().unwrap_or_default(),
+                    pos: pos_docs,
+                    named: named_docs,
+                    rest: rest_docs,
+                    ret_ty: (),
+                    def_docs: Default::default(),
+                }))),
+            );
+        }
 
         let body = self.check_expr_in(closure.body().span(), root);
         let res_ty = if let Some(annotated) = &docstring.res_ty {
@@ -535,7 +535,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                     .map(|init| self.check_expr_in(init.span(), root.clone()))
                     .unwrap_or_else(|| Ty::Builtin(BuiltinTy::Infer));
 
-                let v = Ty::Var(self.get_var(c.span(), to_ident_ref(&root, c)?)?);
+                let v = Ty::Var(self.get_var(&root, c)?);
                 self.constrain(&value, &v);
                 // todo lbs is the lexical signature.
             }
@@ -553,21 +553,6 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
                 let value = docstring.res_ty.clone().unwrap_or(value);
 
                 self.check_pattern(pattern, value, docstring, root.clone());
-
-                if let ast::Pattern::Normal(ast::Expr::Ident(ident)) = pattern {
-                    let def_id = Some(ident)
-                        .and_then(|n| self.get_def_id(n.span(), &to_ident_ref(&root, n)?));
-
-                    if let Some(def_id) = def_id {
-                        self.info.var_docs.insert(
-                            def_id,
-                            Arc::new(UntypedSymbolDocs::Variable(TidyVarDocsT {
-                                docs: docstring.docs.clone().unwrap_or_default(),
-                                return_ty: (),
-                            })),
-                        );
-                    }
-                }
             }
         }
 
@@ -701,14 +686,17 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     ) -> Option<Ty> {
         Some(match pattern {
             ast::Pattern::Normal(ast::Expr::Ident(ident)) => {
-                let var = self.get_var(ident.span(), to_ident_ref(&root, ident)?)?;
-                let annotated = docs.var_ty(&var.name);
+                let var = self.get_var(&root, ident)?;
+                let def_id = var.def;
+                let docstring = docs.get_var(&var.name).unwrap_or(&EMPTY_VAR_DOC);
                 let var = Ty::Var(var);
-                log::debug!("check pattern: {ident:?} with {value:?} and annotation {annotated:?}");
-                if let Some(annotated) = annotated {
+                log::debug!("check pattern: {ident:?} with {value:?} and docs {docstring:?}");
+                if let Some(annotated) = docstring.ty.as_ref() {
                     self.constrain(&var, annotated);
                 }
                 self.constrain(&value, &var);
+
+                self.info.var_docs.insert(def_id, docstring.to_untyped());
                 var
             }
             ast::Pattern::Normal(_) => Ty::Any,

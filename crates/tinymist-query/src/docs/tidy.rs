@@ -1,7 +1,11 @@
+use std::sync::OnceLock;
+
 use ecow::EcoString;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use typst::diag::StrResult;
+
+use crate::upstream::plain_docs_sentence;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyParamDocs {
@@ -19,14 +23,23 @@ pub struct TidyFuncDocs {
 }
 
 /// Documentation about a variable (without type information).
-pub type UntypedVarDocs = TidyVarDocsT<()>;
+pub type UntypedVarDocs = VarDocsT<()>;
 /// Documentation about a variable.
-pub type TidyVarDocs = TidyVarDocsT<Option<(String, String)>>;
+pub type VarDocs = VarDocsT<Option<(String, String)>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TidyVarDocsT<T> {
+pub struct VarDocsT<T> {
     pub docs: EcoString,
     pub return_ty: T,
+    #[serde(skip)]
+    pub def_docs: OnceLock<String>,
+}
+
+impl VarDocs {
+    pub fn def_docs(&self) -> &String {
+        self.def_docs
+            .get_or_init(|| plain_docs_sentence(&self.docs).into())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,7 +159,7 @@ pub fn identify_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
     })
 }
 
-pub fn identify_var_docs(converted: EcoString) -> StrResult<TidyVarDocs> {
+pub fn identify_var_docs(converted: EcoString) -> StrResult<VarDocs> {
     let lines = converted.lines().collect::<Vec<_>>();
 
     let mut return_ty = None;
@@ -180,7 +193,11 @@ pub fn identify_var_docs(converted: EcoString) -> StrResult<TidyVarDocs> {
         None => converted,
     };
 
-    Ok(TidyVarDocs { docs, return_ty })
+    Ok(VarDocs {
+        docs,
+        return_ty,
+        def_docs: OnceLock::new(),
+    })
 }
 
 pub fn identify_tidy_module_docs(docs: EcoString) -> StrResult<TidyModuleDocs> {
