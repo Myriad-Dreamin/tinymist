@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "snap.join(\"\\n\")"
+input_file: crates/tinymist-query/src/fixtures/expr_of/base2.typ
+---
+= resolves
+ModuleImport(..)@1..21 in \s0.typ -> Def(Module), val: None
+Ident("y")@27..28 in \s0.typ -> Def(Var), val: None
+= exports
+y -> Ident("y")@27..28 in \s0.typ

@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "snap.join(\"\\n\")"
+input_file: crates/tinymist-query/src/fixtures/expr_of/import_ident_alias.typ
+---
+= resolves
+ModuleImport(..)@26..53 in \s0.typ -> Def(Module), val: None
+Ident("base")@8..18 in \s0.typ -> Def(Module), val: None
+Ident("base")@20..24 in \s0.typ -> Ident("base")@8..18 in \s0.typ, val: None
+Ident("base")@55..59 in \s0.typ -> Ident("base")@8..18 in \s0.typ, val: None
+Ident("foo")@50..53 in \s0.typ -> Ident("x")@45..46 in \s0.typ, val: None
+Ident("foo")@62..65 in \s0.typ -> Select(SelectExpr { lhs: Decl(ModuleImport(..)), key: Ident("x") }), val: None
+Ident("x")@45..46 in \s0.typ -> Select(SelectExpr { lhs: Decl(ModuleImport(..)), key: Ident("x") }), val: None
+= exports
+base -> Ident("base")@8..18 in \s0.typ
+foo -> Select(SelectExpr { lhs: Decl(ModuleImport(..)), key: Ident("x") })

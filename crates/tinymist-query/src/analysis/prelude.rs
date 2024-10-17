@@ -17,10 +17,9 @@ pub use typst_shim::syntax::LinkedNodeExt;
 pub use typst_shim::utils::LazyHash;
 
 pub use super::AnalysisContext;
-pub use super::SearchCtx;
 pub(crate) use super::StrRef;
 pub(crate) use crate::adt::interner::Interned;
 pub(crate) use crate::syntax::{
-    IdentDef, IdentRef, LexicalHierarchy, LexicalKind, LexicalModKind, LexicalVarKind, ModSrc,
+    IdentRef, LexicalHierarchy, LexicalKind, LexicalModKind, LexicalVarKind, ModSrc,
 };
 pub use crate::ty::Ty;
