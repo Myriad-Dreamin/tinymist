@@ -88,7 +88,7 @@ fn is_mark(sk: SyntaxKind) -> bool {
 }
 
 /// A mode in which a text document is interpreted.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum InterpretMode {
     /// The position is in a comment.

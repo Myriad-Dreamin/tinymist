@@ -1,0 +1,6 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "resolves.join(\"\\n\")"
+input_file: crates/tinymist-query/src/fixtures/expr_of/import.typ
+---
+Ident("base")@20..24 in \s0.typ -> Ident("base")@8..18 in \s0.typ, val: None
