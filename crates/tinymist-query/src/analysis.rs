@@ -277,7 +277,7 @@ mod document_tests {
 mod expr_tests {
 
     use crate::syntax::expr::expr_of;
-    use crate::syntax::{Decl, RefExpr};
+    use crate::syntax::{Expr, RefExpr};
     use crate::tests::*;
 
     #[test]
@@ -288,40 +288,59 @@ mod expr_tests {
             let result: std::sync::Arc<crate::syntax::ExprInfo> = expr_of(ctx, source.clone());
             let mut resolves = result.resolves.iter().collect::<Vec<_>>();
             resolves.sort_by(|x, y| {
-                x.0.name().cmp(y.0.name()).then_with(|| {
-                    x.0.span()
-                        .zip(y.0.span())
+                x.1.ident.name().cmp(y.1.ident.name()).then_with(|| {
+                    x.1.ident
+                        .span()
+                        .zip(y.1.ident.span())
                         .map_or(std::cmp::Ordering::Equal, |(x, y)| {
                             x.number().cmp(&y.number())
                         })
                 })
             });
-            let show_decl = |node: &Decl| {
-                let range = node
-                    .span()
-                    .and_then(|s| source.range(s))
-                    .unwrap_or_default();
-                let fid = if let Some(fid) = node.file_id() {
-                    format!(" in {fid:?}")
-                } else {
-                    "".to_string()
-                };
-                format!("{node}@{range:?}{fid}")
+            let show_expr = |node: &Expr| match node {
+                Expr::Decl(decl) => {
+                    let range = decl
+                        .span()
+                        .and_then(|s| source.range(s))
+                        .unwrap_or_default();
+                    let fid = if let Some(fid) = decl.file_id() {
+                        format!(" in {fid:?}")
+                    } else {
+                        "".to_string()
+                    };
+                    format!("{decl}@{range:?}{fid}")
+                }
+                _ => format!("{node:?}"),
             };
-            let resolves = resolves
+            let mut resolves = resolves
                 .into_iter()
                 .map(|(_, expr)| {
                     let RefExpr { ident, of, val } = expr.as_ref();
 
                     format!(
                         "{} -> {}, val: {val:?}",
-                        show_decl(ident),
-                        of.as_ref().map(show_decl).unwrap_or_default()
+                        show_expr(&Expr::Decl(ident.clone().into())),
+                        of.as_ref().map(show_expr).unwrap_or_default()
                     )
                 })
                 .collect::<Vec<_>>();
+            let mut exports = result.exports.iter().collect::<Vec<_>>();
+            exports.sort_by(|x, y| x.0.cmp(y.0));
+            let mut exports = exports
+                .into_iter()
+                .map(|(ident, node)| {
+                    let node = show_expr(node);
+                    format!("{ident} -> {node}",)
+                })
+                .collect::<Vec<_>>();
 
-            assert_snapshot!(resolves.join("\n"));
+            let mut snap = vec![];
+            snap.push("= resolves".to_owned());
+            snap.append(&mut resolves);
+            snap.push("= exports".to_owned());
+            snap.append(&mut exports);
+
+            assert_snapshot!(snap.join("\n"));
         });
     }
 }

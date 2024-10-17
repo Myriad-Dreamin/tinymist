@@ -1,6 +1,13 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
-expression: "resolves.join(\"\\n\")"
+expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/func.typ
 ---
+= resolves
+Ident("a")@19..20 in \s0.typ -> Def(Var), val: None
 Ident("a")@24..25 in \s0.typ -> Ident("a")@19..20 in \s0.typ, val: None
+Ident("f")@17..18 in \s0.typ -> Def(Func), val: None
+Ident("x")@5..6 in \s0.typ -> Def(Var), val: None
+= exports
+f -> Ident("f")@17..18 in \s0.typ
+x -> Ident("x")@5..6 in \s0.typ
