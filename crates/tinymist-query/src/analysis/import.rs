@@ -90,7 +90,7 @@ impl<'a, 'w> ImportCollector<'a, 'w> {
                                 .and_then(find_expr_in_import);
                             let val = exp
                                 .as_ref()
-                                .and_then(|exp| analyze_import_(self.ctx.deref(), exp));
+                                .and_then(|exp| analyze_import_(self.ctx.deref(), exp).1);
 
                             match val {
                                 Some(Value::Module(m)) => {

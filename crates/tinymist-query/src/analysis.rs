@@ -277,7 +277,7 @@ mod document_tests {
 #[cfg(test)]
 mod expr_tests {
 
-    use crate::syntax::{expr_of, Expr, RefExpr};
+    use crate::syntax::{Expr, RefExpr};
     use crate::tests::*;
 
     #[test]
@@ -285,7 +285,7 @@ mod expr_tests {
         snapshot_testing("expr_of", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let result = expr_of(ctx.shared_(), source.clone());
+            let result = ctx.shared_().expr_stage(&source);
             let mut resolves = result.resolves.iter().collect::<Vec<_>>();
             resolves.sort_by(|x, y| {
                 x.1.ident.name().cmp(y.1.ident.name()).then_with(|| {
