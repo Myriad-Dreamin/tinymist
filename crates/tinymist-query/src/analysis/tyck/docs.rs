@@ -17,13 +17,14 @@ const DOC_VARS: u64 = 0;
 
 impl<'a, 'w> TypeChecker<'a, 'w> {
     pub fn check_var_docs(&mut self, root: &LinkedNode) -> Option<Arc<DocString>> {
-        let lb = root.cast::<ast::LetBinding>()?;
-        let first = lb.kind().bindings();
-        let documenting_id = first
-            .first()
-            .and_then(|n| self.get_def_id(n.span(), &to_ident_ref(root, *n)?))?;
+        // let lb = root.cast::<ast::LetBinding>()?;
+        // let first = lb.kind().bindings();
+        // let documenting_id = first
+        //     .first()
+        //     .and_then(|n| self.get_def_id(n.span(), &to_ident_ref(root, *n)?))?;
 
-        self.check_docstring(root, DocStringKind::Variable, documenting_id)
+        // self.check_docstring(root, DocStringKind::Variable, documenting_id)
+        todo!()
     }
 
     pub fn check_docstring(
@@ -48,7 +49,7 @@ pub struct DocString {
     /// The documentation of the item
     pub docs: Option<EcoString>,
     /// The typing on definitions
-    pub var_bounds: HashMap<DefId, TypeVarBounds>,
+    pub var_bounds: HashMap<DeclExpr, TypeVarBounds>,
     /// The variable doc associated with the item
     pub vars: BTreeMap<StrRef, VarDoc>,
     /// The type of the resultant type
@@ -149,7 +150,7 @@ struct DocsChecker<'a, 'w> {
     fid: TypstFileId,
     ctx: &'a AnalysisContext<'w>,
     /// The typing on definitions
-    vars: HashMap<DefId, TypeVarBounds>,
+    vars: HashMap<DeclExpr, TypeVarBounds>,
     globals: HashMap<EcoString, Option<Ty>>,
     locals: SnapshotMap<EcoString, Ty>,
     next_id: u32,
@@ -202,13 +203,14 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
     }
 
     fn generate_var(&mut self, name: StrRef) -> Ty {
-        self.next_id += 1;
-        let encoded = DefId(self.next_id as u64);
-        log::debug!("generate var {name:?} {encoded:?}");
-        let bounds = TypeVarBounds::new(TypeVar { name, def: encoded }, TypeBounds::default());
-        let var = bounds.as_type();
-        self.vars.insert(encoded, bounds);
-        var
+        // self.next_id += 1;
+        // let encoded = DefId(self.next_id as u64);
+        // log::debug!("generate var {name:?} {encoded:?}");
+        // let bounds = TypeVarBounds::new(TypeVar { name, def: encoded },
+        // TypeBounds::default()); let var = bounds.as_type();
+        // self.vars.insert(encoded, bounds);
+        // var
+        todo!()
     }
 
     fn check_type_strings(&mut self, m: &Module, strs: &str) -> Option<Ty> {
@@ -391,7 +393,7 @@ impl<'a, 'w> DocsChecker<'a, 'w> {
 
 struct IdRenamer<'a, 'b, 'w> {
     base: &'a mut TypeChecker<'b, 'w>,
-    var_bounds: &'a HashMap<DefId, TypeVarBounds>,
+    var_bounds: &'a HashMap<DeclExpr, TypeVarBounds>,
     base_id: DefId,
     offset: u64,
 }

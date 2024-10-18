@@ -4,18 +4,20 @@ use typst::foundations::{IntoValue, Label, Selector, Type};
 use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
 
-use super::prelude::*;
-use crate::syntax::{find_source_by_expr, get_deref_target, DerefTarget};
+use super::{prelude::*, BuiltinTy};
+use crate::syntax::{
+    find_source_by_expr, get_deref_target, Decl, DefKind, DerefTarget, Expr, ExprInfo,
+};
 use crate::VersionedDocument;
 
 /// A linked definition in the source code
 pub struct DefinitionLink {
     /// The kind of the definition.
-    pub kind: LexicalKind,
+    pub kind: DefKind,
     /// A possible instance of the definition.
     pub value: Option<Value>,
     /// The name of the definition.
-    pub name: EcoString,
+    pub name: Interned<str>,
     /// The location of the definition.
     pub def_at: Option<(TypstFileId, Range<usize>)>,
     /// The range of the name of the definition.
@@ -26,7 +28,7 @@ impl DefinitionLink {
     /// Convert the definition to an identifier reference.
     pub fn to_ident_ref(&self) -> Option<IdentRef> {
         Some(IdentRef {
-            name: self.name.clone(),
+            name: self.name.as_ref().into(),
             range: self.name_range.clone()?,
         })
     }
@@ -52,8 +54,8 @@ pub fn find_definition(
             let import_node = parent.cast::<ast::ModuleImport>()?;
             let source = find_source_by_expr(ctx.world(), def_fid, import_node.source())?;
             Some(DefinitionLink {
-                kind: LexicalKind::Mod(LexicalModKind::PathVar),
-                name: EcoString::new(),
+                kind: DefKind::PathStem,
+                name: Interned::default(),
                 value: None,
                 def_at: Some((source.id(), LinkedNode::new(source.root()).range())),
                 name_range: None,
@@ -65,8 +67,8 @@ pub fn find_definition(
             let include_node = parent.cast::<ast::ModuleInclude>()?;
             let source = find_source_by_expr(ctx.world(), def_fid, include_node.source())?;
             Some(DefinitionLink {
-                kind: LexicalKind::Mod(LexicalModKind::PathInclude),
-                name: EcoString::new(),
+                kind: DefKind::ModuleInclude,
+                name: Interned::default(),
                 value: None,
                 def_at: Some((source.id(), (LinkedNode::new(source.root())).range())),
                 name_range: None,
@@ -127,91 +129,100 @@ fn find_ident_definition(
     };
 
     // Syntactic definition
-    let source_id = source.id();
-    let def_use = ctx.def_use(source);
-    // let def_info = ident_ref
-    //     .as_ref()
-    //     .zip(def_use.as_ref())
-    //     .and_then(|(ident_ref, def_use)| {
-    //         let def_id = def_use.get_ref(ident_ref);
-    //         let def_id = def_id.or_else(|| Some(def_use.get_def(source_id,
-    // ident_ref)?.0))?;
-
-    //         def_use.get_def_by_id(def_id)
-    //     });
-    let def_info = if ident_ref.is_detached() {
-        None
-    } else {
-        def_use.resolves.get(&ident_ref).cloned()
-    };
+    let mut def_worker = DefResolver::new(ctx, source.id())?;
+    let expr = def_worker.of_span(ident_ref);
 
     // Global definition
-    let Some(def_info) = def_info else {
+    let Some(of) = expr else {
         return resolve_global_value(ctx, use_site.clone(), false).and_then(move |f| {
-            value_to_def(ctx, f, || Some(use_site.get().clone().into_text()), None)
+            value_to_def(
+                ctx,
+                f,
+                || Some(use_site.get().clone().into_text().into()),
+                None,
+            )
         });
     };
 
-    match &def.kind {
-        LexicalKind::Var(LexicalVarKind::BibKey)
-        | LexicalKind::Heading(..)
-        | LexicalKind::Block => unreachable!(),
-        LexicalKind::Mod(
-            LexicalModKind::Module(..) | LexicalModKind::PathVar | LexicalModKind::ModuleAlias,
-        ) => {
+    let def = of.def.as_ref();
+    let ty = of.ty.as_ref();
+    let val = ty.and_then(|ty| match ty {
+        Ty::Value(v) => Some(v.val.clone()),
+        Ty::Builtin(BuiltinTy::Type(ty)) => Some(Value::Type(*ty)),
+        Ty::Builtin(BuiltinTy::Element(e)) => Some(Value::Func((*e).into())),
+        _ => None,
+    });
+    let kind = def.map(|d| d.kind()).or_else(|| ty.map(|ty| ty.kind()))?;
+    let span = def.and_then(|e| e.span());
+    let def_fid = span.and_then(Span::id).or_else(|| match &val {
+        Some(Value::Func(f)) => f.span().id(),
+        _ => None,
+    });
+    let name = def.map(|d| d.name().clone()).unwrap_or_default();
+
+    let def_source = ctx.source_by_id(def_fid?).ok()?;
+    let root = LinkedNode::new(def_source.root());
+    let def_name = root.find(span?)?;
+    let def_range = def_source.range(span?)?;
+    match kind {
+        DefKind::Module | DefKind::PathStem => {
             if !proj.is_empty() {
                 proj.reverse();
-                let m = ctx.module_ins_at(def_fid, def.range.start + 1)?;
+                // let def_fid = def_fid?;
+                // let m = ctx.module_ins_at(def_fid, def.range.start + 1)?;
+                let m = val?;
                 let val = project_value(&m, proj.as_slice())?;
 
                 // todo: name range
-                let name = proj.last().map(|e| e.get().clone());
+                let name = proj.last().map(|e| e.get().into());
                 return value_to_def(ctx, val.clone(), || name, None);
             }
 
             Some(DefinitionLink {
-                kind: def.kind.clone(),
-                name: def.name.clone(),
-                value: None,
-                def_at: Some((def_fid, def.range.clone())),
-                name_range: Some(def.range.clone()),
+                kind,
+                name: name.clone(),
+                value: val,
+                def_at: Some((def_fid?, def_range.clone())),
+                name_range: Some(def_range),
             })
         }
-        LexicalKind::Var(
-            LexicalVarKind::Variable
-            | LexicalVarKind::ValRef
-            | LexicalVarKind::Label
-            | LexicalVarKind::LabelRef,
-        )
-        | LexicalKind::Mod(
-            LexicalModKind::PathInclude | LexicalModKind::Alias { .. } | LexicalModKind::Ident,
-        ) => Some(DefinitionLink {
-            kind: def.kind.clone(),
-            name: def.name.clone(),
-            value: None,
-            def_at: Some((def_fid, def.range.clone())),
-            name_range: Some(def.range.clone()),
+        DefKind::Constant
+        | DefKind::IdentRef
+        | DefKind::Label
+        | DefKind::Ref
+        | DefKind::StrName
+        | DefKind::Var => Some(DefinitionLink {
+            kind,
+            name: name.clone(),
+            value: val,
+            def_at: Some((def_fid?, def_range.clone())),
+            name_range: Some(def_range),
         }),
-        LexicalKind::Var(LexicalVarKind::Function) => {
-            let def_source = ctx.source_by_id(def_fid).ok()?;
-            let root = LinkedNode::new(def_source.root());
-            let def_name = root.leaf_at_compat(def.range.start + 1)?;
-            log::info!("def_name for function: {def_name:?}", def_name = def_name);
+        DefKind::Func => {
+            log::info!("def_name for function: {def_name:?}");
             let values = ctx.analyze_expr(&def_name);
             let func = values.into_iter().find(|v| matches!(v.0, Value::Func(..)));
             log::info!("okay for function: {func:?}");
 
             Some(DefinitionLink {
-                kind: def.kind.clone(),
-                name: def.name.clone(),
+                kind,
+                name: name.clone(),
                 value: func.map(|v| v.0),
                 // value: None,
-                def_at: Some((def_fid, def.range.clone())),
-                name_range: Some(def.range.clone()),
+                def_at: Some((def_fid?, def_range.clone())),
+                name_range: Some(def_range),
             })
         }
-        LexicalKind::Mod(LexicalModKind::Star) => {
-            log::info!("unimplemented star import {ident_ref:?}");
+        DefKind::ModuleImport
+        | DefKind::Spread
+        | DefKind::Export
+        | DefKind::ImportAlias
+        | DefKind::Import => {
+            log::info!("unimplemented import {kind:?}");
+            None
+        }
+        DefKind::BibKey | DefKind::ModuleInclude => {
+            log::info!("unimplemented kind {kind:?}");
             None
         }
     }
@@ -244,7 +255,7 @@ fn find_bib_definition(
     log::debug!("find_bib_definition: {key} => {entry:?}");
     let entry = entry?;
     Some(DefinitionLink {
-        kind: LexicalKind::Var(LexicalVarKind::BibKey),
+        kind: DefKind::BibKey,
         name: key.into(),
         value: None,
         def_at: Some((entry.file_id, entry.span.clone())),
@@ -289,7 +300,7 @@ fn find_ref_definition(
     };
 
     Some(DefinitionLink {
-        kind: LexicalKind::Var(LexicalVarKind::Label),
+        kind: DefKind::Label,
         name: ref_node.into(),
         value: Some(Value::Content(elem)),
         def_at,
@@ -413,7 +424,7 @@ fn resolve_callee_(
         let deref_target = get_deref_target(node, cursor)?;
         let def = find_definition(ctx, source.clone(), None, deref_target)?;
         match def.kind {
-            LexicalKind::Var(LexicalVarKind::Function) => match def.value {
+            DefKind::Func => match def.value {
                 Some(Value::Func(f)) => Some(f),
                 _ => None,
             },
@@ -500,7 +511,7 @@ pub(crate) fn resolve_global_value(
 fn value_to_def(
     ctx: &mut AnalysisContext,
     value: Value,
-    name: impl FnOnce() -> Option<EcoString>,
+    name: impl FnOnce() -> Option<Interned<str>>,
     name_range: Option<Range<usize>>,
 ) -> Option<DefinitionLink> {
     let def_at = |span: Span| {
@@ -515,7 +526,7 @@ fn value_to_def(
             let name = func.name().map(|e| e.into()).or_else(name)?;
             let span = func.span();
             DefinitionLink {
-                kind: LexicalKind::Var(LexicalVarKind::Function),
+                kind: DefKind::Func,
                 name,
                 value: Some(Value::Func(func)),
                 def_at: def_at(span),
@@ -523,9 +534,9 @@ fn value_to_def(
             }
         }
         Value::Module(module) => {
-            let name = module.name().clone();
+            let name = module.name().into();
             DefinitionLink {
-                kind: LexicalKind::Var(LexicalVarKind::Variable),
+                kind: DefKind::Var,
                 name,
                 value: None,
                 def_at: None,
@@ -535,7 +546,7 @@ fn value_to_def(
         _v => {
             let name = name()?;
             DefinitionLink {
-                kind: LexicalKind::Mod(LexicalModKind::PathVar),
+                kind: DefKind::PathStem,
                 name,
                 value: None,
                 def_at: None,
@@ -543,4 +554,88 @@ fn value_to_def(
             }
         }
     })
+}
+
+struct DefResolver<'a, 'w> {
+    ctx: &'a mut AnalysisContext<'w>,
+    ei: Arc<ExprInfo>,
+}
+
+impl<'a, 'w> DefResolver<'a, 'w> {
+    fn new(ctx: &'a mut AnalysisContext<'w>, id: TypstFileId) -> Option<Self> {
+        let ei = ctx.expr_stage(ctx.source_by_id(id).ok()?);
+        Some(Self { ctx, ei })
+    }
+
+    fn of_span(&mut self, span: Span) -> Option<ExprLoc> {
+        if span.is_detached() {
+            return None;
+        }
+
+        let expr = self.ei.resolves.get(&span).cloned()?;
+        match (&expr.of, &expr.val) {
+            (Some(expr), ty) => self.of_expr(expr, ty.as_ref()),
+            (None, Some(ty)) => Some(ExprLoc {
+                def: None,
+                ty: Some(ty.clone()),
+            }),
+            (None, None) => None,
+        }
+    }
+
+    fn of_expr(&mut self, expr: &Expr, ty: Option<&Ty>) -> Option<ExprLoc> {
+        println!("of_expr: {expr:?}");
+
+        match expr {
+            Expr::Decl(decl) => self.of_decl(decl, ty),
+            _ => None,
+        }
+    }
+
+    fn of_decl(&mut self, expr: &Interned<Decl>, ty: Option<&Ty>) -> Option<ExprLoc> {
+        println!("of_decl: {expr:?}");
+
+        match expr.as_ref() {
+            Decl::Export { name, fid } => {
+                let new_file = self
+                    .ctx
+                    .source_by_id(*fid)
+                    .ok()
+                    .map(|f| self.ctx.expr_stage(f));
+                match new_file {
+                    Some(new_file) => self.of_export(new_file, name, ty),
+                    None => None,
+                }
+            }
+            Decl::Import { at, .. } | Decl::ImportAlias { at, .. } => {
+                let mut next = self.of_span(*at).unwrap_or_else(|| ExprLoc {
+                    def: Some(expr.clone()),
+                    ty: ty.cloned(),
+                });
+                next.def = next.def.or_else(|| Some(expr.clone()));
+                next.ty = next.ty.or_else(|| ty.cloned());
+                Some(next)
+            }
+            _ => Some(ExprLoc {
+                def: Some(expr.clone()),
+                ty: ty.cloned(),
+            }),
+        }
+    }
+
+    fn of_export(
+        &mut self,
+        ei: Arc<ExprInfo>,
+        name: &Interned<str>,
+        ty: Option<&Ty>,
+    ) -> Option<ExprLoc> {
+        self.ei = ei;
+        let expr = &self.ei.exports.get(name)?.clone();
+        self.of_expr(expr, ty)
+    }
+}
+
+struct ExprLoc {
+    def: Option<Interned<Decl>>,
+    ty: Option<Ty>,
 }
