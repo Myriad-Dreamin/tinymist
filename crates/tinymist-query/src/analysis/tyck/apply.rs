@@ -7,14 +7,14 @@ use crate::{analysis::ApplyChecker, ty::ArgsTy};
 
 #[derive(BindTyCtx)]
 #[bind(base)]
-pub struct ApplyTypeChecker<'a, 'b, 'w> {
-    pub(super) base: &'a mut TypeChecker<'b, 'w>,
+pub struct ApplyTypeChecker<'a, 'b> {
+    pub(super) base: &'a mut TypeChecker<'b>,
     pub call_site: Span,
     pub call_raw_for_with: Option<Ty>,
     pub resultant: Vec<Ty>,
 }
 
-impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
+impl<'a, 'b> ApplyChecker for ApplyTypeChecker<'a, 'b> {
     fn apply(&mut self, sig: Sig, args: &Interned<ArgsTy>, pol: bool) {
         let (sig, is_partialize) = match sig {
             Sig::Partialize(sig) => (*sig, true),
@@ -174,12 +174,12 @@ impl<T: FnMut(&mut TypeChecker, Sig, bool)> TupleCheckDriver for T {
 
 #[derive(BindTyCtx)]
 #[bind(base)]
-pub struct TupleChecker<'a, 'b, 'w> {
-    pub(super) base: &'a mut TypeChecker<'b, 'w>,
+pub struct TupleChecker<'a, 'b> {
+    pub(super) base: &'a mut TypeChecker<'b>,
     driver: &'a mut dyn TupleCheckDriver,
 }
 
-impl<'a, 'b, 'w> ApplyChecker for TupleChecker<'a, 'b, 'w> {
+impl<'a, 'b> ApplyChecker for TupleChecker<'a, 'b> {
     fn apply(&mut self, sig: Sig, _args: &Interned<ArgsTy>, pol: bool) {
         self.driver.check(self.base, sig, pol);
     }

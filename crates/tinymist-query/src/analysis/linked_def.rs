@@ -4,7 +4,7 @@ use typst::foundations::{IntoValue, Label, Selector, Type};
 use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
 
-use super::{prelude::*, BuiltinTy};
+use super::{prelude::*, BuiltinTy, SharedContext};
 use crate::syntax::{
     find_source_by_expr, get_deref_target, Decl, DefKind, DerefTarget, Expr, ExprInfo,
 };
@@ -37,7 +37,7 @@ impl DefinitionLink {
 // todo: field definition
 /// Finds the definition of a symbol.
 pub fn find_definition(
-    ctx: &mut AnalysisContext<'_>,
+    ctx: &Arc<SharedContext>,
     source: Source,
     document: Option<&VersionedDocument>,
     deref_target: DerefTarget<'_>,
@@ -52,7 +52,7 @@ pub fn find_definition(
             let parent = path.parent()?;
             let def_fid = parent.span().id()?;
             let import_node = parent.cast::<ast::ModuleImport>()?;
-            let source = find_source_by_expr(ctx.world(), def_fid, import_node.source())?;
+            let source = find_source_by_expr(&ctx.world, def_fid, import_node.source())?;
             Some(DefinitionLink {
                 kind: DefKind::PathStem,
                 name: Interned::default(),
@@ -65,7 +65,7 @@ pub fn find_definition(
             let parent = path.parent()?;
             let def_fid = parent.span().id()?;
             let include_node = parent.cast::<ast::ModuleInclude>()?;
-            let source = find_source_by_expr(ctx.world(), def_fid, include_node.source())?;
+            let source = find_source_by_expr(&ctx.world, def_fid, include_node.source())?;
             Some(DefinitionLink {
                 kind: DefKind::ModuleInclude,
                 name: Interned::default(),
@@ -91,7 +91,7 @@ pub fn find_definition(
 }
 
 fn find_ident_definition(
-    ctx: &mut AnalysisContext<'_>,
+    ctx: &Arc<SharedContext>,
     source: Source,
     mut use_site: LinkedNode,
 ) -> Option<DefinitionLink> {
@@ -134,7 +134,7 @@ fn find_ident_definition(
 
     // Global definition
     let Some(of) = expr else {
-        return resolve_global_value(ctx, use_site.clone(), false).and_then(move |f| {
+        return resolve_global_value(ctx, use_site.get(), false).and_then(move |f| {
             value_to_def(
                 ctx,
                 f,
@@ -200,7 +200,7 @@ fn find_ident_definition(
         }),
         DefKind::Func => {
             log::info!("def_name for function: {def_name:?}");
-            let values = ctx.analyze_expr(&def_name);
+            let values = ctx.analyze_expr2(def_name.get());
             let func = values.into_iter().find(|v| matches!(v.0, Value::Func(..)));
             log::info!("okay for function: {func:?}");
 
@@ -239,7 +239,7 @@ fn project_value<'a>(m: &'a Value, proj: &[ast::Ident<'_>]) -> Option<&'a Value>
 }
 
 fn find_bib_definition(
-    ctx: &mut AnalysisContext,
+    ctx: &Arc<SharedContext>,
     introspector: &Introspector,
     key: &str,
 ) -> Option<DefinitionLink> {
@@ -265,7 +265,7 @@ fn find_bib_definition(
 }
 
 fn find_ref_definition(
-    ctx: &mut AnalysisContext,
+    ctx: &Arc<SharedContext>,
     introspector: &Introspector,
     ref_node: &str,
     is_label: bool,
@@ -401,20 +401,20 @@ fn is_same_native_func(x: Option<&Func>, y: &Func) -> bool {
 // todo: merge me with resolve_callee
 /// Resolve a call target to a function or a method with a this.
 pub fn resolve_call_target(
-    ctx: &mut AnalysisContext,
-    callee: &LinkedNode,
+    ctx: &Arc<SharedContext>,
+    callee: &SyntaxNode,
 ) -> Option<CallConvention> {
     resolve_callee_(ctx, callee, true).map(identify_call_convention)
 }
 
 /// Resolve a callee expression to a function.
-pub fn resolve_callee(ctx: &mut AnalysisContext, callee: &LinkedNode) -> Option<Func> {
+pub fn resolve_callee(ctx: &Arc<SharedContext>, callee: &SyntaxNode) -> Option<Func> {
     resolve_callee_(ctx, callee, false).map(|e| e.func_ptr)
 }
 
 fn resolve_callee_(
-    ctx: &mut AnalysisContext,
-    callee: &LinkedNode,
+    ctx: &Arc<SharedContext>,
+    callee: &SyntaxNode,
     resolve_this: bool,
 ) -> Option<DynCallTarget> {
     None.or_else(|| {
@@ -432,7 +432,7 @@ fn resolve_callee_(
         }
     })
     .or_else(|| {
-        resolve_global_value(ctx, callee.clone(), false).and_then(|v| match v {
+        resolve_global_value(ctx, callee, false).and_then(|v| match v {
             Value::Func(f) => Some(f),
             _ => None,
         })
@@ -442,7 +442,7 @@ fn resolve_callee_(
         this: None,
     })
     .or_else(|| {
-        let values = ctx.analyze_expr(callee);
+        let values = ctx.analyze_expr2(callee);
 
         if let Some(func) = values.into_iter().find_map(|v| match v.0 {
             Value::Func(f) => Some(f),
@@ -461,7 +461,7 @@ fn resolve_callee_(
             } {
                 let target = access.target();
                 let field = access.field().get();
-                let values = ctx.analyze_expr(&callee.find(target.span())?);
+                let values = ctx.analyze_expr2(target.to_untyped());
                 if let Some((this, func_ptr)) = values.into_iter().find_map(|(this, _styles)| {
                     if let Some(Value::Func(f)) = this.ty().scope().get(field) {
                         return Some((this, f.clone()));
@@ -483,11 +483,11 @@ fn resolve_callee_(
 
 // todo: math scope
 pub(crate) fn resolve_global_value(
-    ctx: &AnalysisContext,
-    callee: LinkedNode,
+    ctx: &Arc<SharedContext>,
+    callee: &SyntaxNode,
     is_math: bool,
 ) -> Option<Value> {
-    let lib = ctx.world().library();
+    let lib = ctx.world.library();
     let scope = if is_math {
         lib.math.scope()
     } else {
@@ -509,7 +509,7 @@ pub(crate) fn resolve_global_value(
 }
 
 fn value_to_def(
-    ctx: &mut AnalysisContext,
+    ctx: &Arc<SharedContext>,
     value: Value,
     name: impl FnOnce() -> Option<Interned<str>>,
     name_range: Option<Range<usize>>,
@@ -556,14 +556,14 @@ fn value_to_def(
     })
 }
 
-struct DefResolver<'a, 'w> {
-    ctx: &'a mut AnalysisContext<'w>,
+struct DefResolver<'a> {
+    ctx: &'a Arc<SharedContext>,
     ei: Arc<ExprInfo>,
 }
 
-impl<'a, 'w> DefResolver<'a, 'w> {
-    fn new(ctx: &'a mut AnalysisContext<'w>, id: TypstFileId) -> Option<Self> {
-        let ei = ctx.expr_stage(ctx.source_by_id(id).ok()?);
+impl<'a> DefResolver<'a> {
+    fn new(ctx: &'a Arc<SharedContext>, id: TypstFileId) -> Option<Self> {
+        let ei = ctx.expr_stage(&ctx.source_by_id(id).ok()?);
         Some(Self { ctx, ei })
     }
 
@@ -584,7 +584,7 @@ impl<'a, 'w> DefResolver<'a, 'w> {
     }
 
     fn of_expr(&mut self, expr: &Expr, ty: Option<&Ty>) -> Option<ExprLoc> {
-        println!("of_expr: {expr:?}");
+        log::debug!("of_expr: {expr:?}");
 
         match expr {
             Expr::Decl(decl) => self.of_decl(decl, ty),
@@ -593,7 +593,7 @@ impl<'a, 'w> DefResolver<'a, 'w> {
     }
 
     fn of_decl(&mut self, expr: &Interned<Decl>, ty: Option<&Ty>) -> Option<ExprLoc> {
-        println!("of_decl: {expr:?}");
+        log::debug!("of_decl: {expr:?}");
 
         match expr.as_ref() {
             Decl::Export { name, fid } => {
@@ -601,7 +601,7 @@ impl<'a, 'w> DefResolver<'a, 'w> {
                     .ctx
                     .source_by_id(*fid)
                     .ok()
-                    .map(|f| self.ctx.expr_stage(f));
+                    .map(|f| self.ctx.expr_stage(&f));
                 match new_file {
                     Some(new_file) => self.of_export(new_file, name, ty),
                     None => None,

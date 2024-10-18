@@ -1,7 +1,8 @@
 use core::fmt;
 use std::{collections::BTreeMap, path::Path};
 
-use rustc_hash::FxHashMap;
+use parking_lot::Mutex;
+use std::collections::HashSet;
 use typst::{
     foundations::{Element, Func, Module, Type, Value},
     model::{EmphElem, EnumElem, HeadingElem, ListElem, StrongElem},
@@ -11,6 +12,7 @@ use typst::{
 
 use crate::{
     adt::interner::impl_internable,
+    analysis::SharedContext,
     prelude::*,
     ty::{BuiltinTy, InsTy, Interned, SelectTy, Ty},
 };
@@ -324,6 +326,7 @@ pub type BinExpr = BinInst<Expr>;
 pub struct ExprInfo {
     pub fid: TypstFileId,
     pub resolves: HashMap<Span, Interned<RefExpr>>,
+    pub imports: HashSet<TypstFileId>,
     pub exports: BTreeMap<Interned<str>, Expr>,
     pub root: Expr,
 }
@@ -334,25 +337,28 @@ impl std::hash::Hash for ExprInfo {
     }
 }
 
-pub(crate) fn expr_of(ctx: &AnalysisContext, source: Source) -> Arc<ExprInfo> {
+pub(crate) fn expr_of(ctx: Arc<SharedContext>, source: Source) -> Arc<ExprInfo> {
+    let library = ctx.world.library.clone();
     let mut w = ExprWorker {
         ctx,
-        library: &ctx.world().library,
+        library: &library,
         mode: InterpretMode::Markup,
+        imports: HashSet::new(),
         scopes: vec![],
-        info: ExprInfo {
-            fid: source.id(),
-            resolves: HashMap::default(),
-            exports: BTreeMap::default(),
-            root: none_expr(),
-        },
+        resolves: Arc::new(Mutex::new(vec![])),
+        buffer: vec![],
     };
     let _ = w.scope_mut();
     let root = source.root().cast::<ast::Markup>().unwrap();
     let root = w.check_in_mode(root.exprs(), InterpretMode::Markup);
-    w.info.root = root;
-    w.info.exports = w.summarize_scope();
-    Arc::new(w.info)
+    let info = ExprInfo {
+        fid: source.id(),
+        resolves: w.summarize_resolves(),
+        exports: w.summarize_scope(),
+        imports: w.imports,
+        root,
+    };
+    Arc::new(info)
 }
 
 type LexicalScope = BTreeMap<Interned<str>, Expr>;
@@ -365,15 +371,19 @@ enum ExprScope {
     Type(Type),
 }
 
-struct ExprWorker<'a, 'w> {
-    ctx: &'a AnalysisContext<'w>,
+type ResolveVec = Vec<(Span, Interned<RefExpr>)>;
+
+struct ExprWorker<'w> {
+    ctx: Arc<SharedContext>,
     library: &'w Library,
     mode: InterpretMode,
+    imports: HashSet<TypstFileId>,
+    resolves: Arc<Mutex<ResolveVec>>,
+    buffer: ResolveVec,
     scopes: Vec<ExprScope>,
-    info: ExprInfo,
 }
 
-impl<'a, 'w> ExprWorker<'a, 'w> {
+impl<'w> ExprWorker<'w> {
     fn with_scope<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         let len = self.scopes.len();
         self.scopes.push(ExprScope::Lexical(BTreeMap::new()));
@@ -399,6 +409,13 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
         } else {
             unreachable!()
         }
+    }
+
+    fn summarize_resolves(&mut self) -> HashMap<Span, Interned<RefExpr>> {
+        let mut resolves = self.resolves.lock();
+        let global_resolves: Vec<_> = std::mem::take(resolves.as_mut());
+        let buffer = std::mem::take(&mut self.buffer);
+        HashMap::from_iter(global_resolves.into_iter().chain(buffer))
     }
 
     fn summarize_scope(&mut self) -> BTreeMap<Interned<str>, Expr> {
@@ -691,6 +708,14 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
 
         let (src, val) = self.ctx.analyze_import2(source);
 
+        // Prefetch Type Check Information
+        if let Some(Value::Module(m)) = &val {
+            if let Some(f) = m.file_id() {
+                self.ctx.prefetch_type_check(f);
+                self.imports.insert(f);
+            }
+        }
+
         let decl = match (typed.new_name(), src) {
             (Some(ident), _) => Some(Decl::module(ident)),
             (None, Some(Value::Str(i))) if typed.imports().is_none() => {
@@ -733,7 +758,7 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
                         }
                         Some(_) => {}
                         None => {
-                            log::warn!(
+                            log::debug!(
                                 "cannot analyze import on: {typed:?}, in file {:?}",
                                 typed.span().id()
                             );
@@ -1003,13 +1028,13 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
 
     fn resolve_as(&mut self, r: Interned<RefExpr>) {
         let s = r.ident.span().unwrap();
-        self.info.resolves.insert(s, r.clone());
+        self.buffer.push((s, r.clone()));
     }
 
     fn resolve_ident(&mut self, decl: DeclExpr, code: InterpretMode) -> Expr {
         let r: Interned<RefExpr> = self.resolve_ident_(decl, code).into();
         let s = r.ident.span().unwrap();
-        self.info.resolves.insert(s, r.clone());
+        self.buffer.push((s, r.clone()));
         Expr::Ref(r)
     }
 

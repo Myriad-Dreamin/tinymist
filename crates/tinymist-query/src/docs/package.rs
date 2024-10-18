@@ -30,6 +30,9 @@ pub fn package_docs(
 
     let for_spec = toml_id.package().unwrap();
     let entry_point = toml_id.join(&manifest.package.entrypoint);
+
+    ctx.preload_package(entry_point);
+
     let SymbolsInfo { root, module_uses } = module_docs(ctx, entry_point)?;
 
     log::debug!("module_uses: {module_uses:#?}");

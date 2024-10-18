@@ -42,7 +42,12 @@ impl StatefulRequest for RenameRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
 
-        let lnk = find_definition(ctx, source.clone(), doc.as_ref(), deref_target.clone())?;
+        let lnk = find_definition(
+            ctx.shared(),
+            source.clone(),
+            doc.as_ref(),
+            deref_target.clone(),
+        )?;
 
         prepare_renaming(ctx, &deref_target, &lnk)?;
 
