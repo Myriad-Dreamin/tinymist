@@ -612,7 +612,7 @@ impl<'w> AnalysisContext<'w> {
             return Some(res);
         }
 
-        let expr_info = self.expr_of(source.clone());
+        let expr_info = self.expr_stage(source.clone());
 
         // todo: recursive hash
         let h = hash128(&(&source, &expr_info));
@@ -648,7 +648,7 @@ impl<'w> AnalysisContext<'w> {
     }
 
     /// Get the expression information of a source file.
-    pub(crate) fn expr_of(&mut self, source: Source) -> Arc<ExprInfo> {
+    pub(crate) fn expr_stage(&mut self, source: Source) -> Arc<ExprInfo> {
         //
         let fid = source.id();
 

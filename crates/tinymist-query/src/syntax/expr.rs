@@ -1,6 +1,7 @@
 use core::fmt;
 use std::{collections::BTreeMap, path::Path};
 
+use rustc_hash::FxHashMap;
 use typst::{
     foundations::{Element, Func, Module, Type, Value},
     model::{EmphElem, EnumElem, HeadingElem, ListElem, StrongElem},
@@ -21,11 +22,11 @@ pub enum Expr {
     /// A sequence of expressions
     Seq(Interned<EcoVec<Expr>>),
     /// A array literal
-    Array(Interned<EcoVec<Expr>>),
+    Array(Interned<EcoVec<ArgExpr>>),
     /// A dict literal
-    Dict(Interned<EcoVec<Expr>>),
+    Dict(Interned<EcoVec<ArgExpr>>),
     /// An args literal
-    Args(Interned<EcoVec<Expr>>),
+    Args(Interned<EcoVec<ArgExpr>>),
     /// An args literal
     Pattern(Interned<Pattern>),
     /// A element literal
@@ -45,8 +46,6 @@ pub enum Expr {
     Ref(Interned<RefExpr>),
     ContentRef(Interned<ContentRefExpr>),
     Select(Interned<SelectExpr>),
-    Deselect(Interned<SelectExpr>),
-    Destruct(Interned<DestructExpr>),
     Import(Interned<ImportExpr>),
     Include(Interned<IncludeExpr>),
     Contextual(Interned<Expr>),
@@ -54,25 +53,234 @@ pub enum Expr {
     WhileLoop(Interned<WhileExpr>),
     ForLoop(Interned<ForExpr>),
     Type(Ty),
-    Decl(Interned<Decl>),
+    Decl(DeclExpr),
     Star,
-    Def(DefKind),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DefKind {
-    Var,
-    Module,
+    Export,
     Func,
+    ImportAlias,
+    Constant,
+    Var,
+    BibKey,
+    IdentRef,
+    Module,
+    Import,
+    Label,
+    Ref,
+    StrName,
+    PathStem,
+    ModuleImport,
+    ModuleInclude,
+    Spread,
 }
+
+pub type DeclExpr = Interned<Decl>;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Decl {
-    Ident(Interned<DeclIdent>),
-    Label(Interned<DeclIdent>),
+    Export {
+        name: Interned<str>,
+        fid: TypstFileId,
+    },
+    Func {
+        name: Interned<str>,
+        at: Span,
+    },
+    ImportAlias {
+        name: Interned<str>,
+        at: Span,
+    },
+    Var {
+        name: Interned<str>,
+        at: Span,
+    },
+    IdentRef {
+        name: Interned<str>,
+        at: Span,
+    },
+    Module {
+        name: Interned<str>,
+        at: Span,
+    },
+    Import {
+        name: Interned<str>,
+        at: Span,
+    },
+    Ref {
+        name: Interned<str>,
+        at: Box<SyntaxNode>,
+    },
+    Label {
+        name: Interned<str>,
+        at: Box<SyntaxNode>,
+    },
+    StrName {
+        name: Interned<str>,
+        at: Box<SyntaxNode>,
+    },
+    PathStem {
+        name: Interned<str>,
+        at: Box<SyntaxNode>,
+    },
     ModuleImport(Span),
     Closure(Span),
     Spread(Span),
+}
+
+impl Decl {
+    pub fn external(fid: TypstFileId, name: Interned<str>) -> Self {
+        Self::Export { fid, name }
+    }
+
+    pub fn func(ident: ast::Ident) -> Self {
+        Self::Func {
+            name: ident.get().into(),
+            at: ident.span(),
+        }
+    }
+
+    pub fn var(ident: ast::Ident) -> Self {
+        Self::Var {
+            name: ident.get().into(),
+            at: ident.span(),
+        }
+    }
+
+    pub fn import_alias(ident: ast::Ident) -> Self {
+        Self::ImportAlias {
+            name: ident.get().into(),
+            at: ident.span(),
+        }
+    }
+
+    pub fn ident_ref(ident: ast::Ident) -> Self {
+        Self::IdentRef {
+            name: ident.get().into(),
+            at: ident.span(),
+        }
+    }
+
+    pub fn math_ident_ref(ident: ast::MathIdent) -> Self {
+        Self::IdentRef {
+            name: ident.get().into(),
+            at: ident.span(),
+        }
+    }
+
+    pub fn module(ident: ast::Ident) -> Self {
+        Self::Module {
+            name: ident.get().into(),
+            at: ident.span(),
+        }
+    }
+
+    pub fn import(ident: ast::Ident) -> Self {
+        Self::Import {
+            name: ident.get().into(),
+            at: ident.span(),
+        }
+    }
+
+    pub fn label(ident: ast::Label) -> Self {
+        Self::Label {
+            name: ident.get().into(),
+            at: Box::new(ident.to_untyped().clone()),
+        }
+    }
+
+    pub fn ref_(ident: ast::Ref) -> Self {
+        Self::Ref {
+            name: ident.target().into(),
+            at: Box::new(ident.to_untyped().clone()),
+        }
+    }
+
+    fn str_name(s: SyntaxNode, name: &str) -> Decl {
+        Self::StrName {
+            name: name.into(),
+            at: Box::new(s),
+        }
+    }
+
+    pub fn path_stem(s: SyntaxNode, name: &str) -> Self {
+        Self::PathStem {
+            name: name.into(),
+            at: Box::new(s),
+        }
+    }
+
+    pub fn name(&self) -> &Interned<str> {
+        match self {
+            Decl::Export { name, .. }
+            | Decl::Func { name, .. }
+            | Decl::Var { name, .. }
+            | Decl::ImportAlias { name, .. }
+            | Decl::IdentRef { name, .. }
+            | Decl::Module { name, .. }
+            | Decl::Import { name, .. }
+            | Decl::Label { name, .. }
+            | Decl::Ref { name, .. }
+            | Decl::StrName { name, .. }
+            | Decl::PathStem { name, .. } => name,
+            Decl::ModuleImport(..) | Decl::Closure(..) | Decl::Spread(..) => Interned::empty(),
+        }
+    }
+
+    pub fn kind(&self) -> DefKind {
+        match self {
+            Decl::Export { .. } => DefKind::Export,
+            Decl::Func { .. } => DefKind::Func,
+            Decl::Closure(..) => DefKind::Func,
+            Decl::ImportAlias { .. } => DefKind::ImportAlias,
+            Decl::Var { .. } => DefKind::Var,
+            Decl::IdentRef { .. } => DefKind::IdentRef,
+            Decl::Module { .. } => DefKind::Module,
+            Decl::Import { .. } => DefKind::Import,
+            Decl::Label { .. } => DefKind::Label,
+            Decl::Ref { .. } => DefKind::Ref,
+            Decl::StrName { .. } => DefKind::StrName,
+            Decl::PathStem { .. } => DefKind::PathStem,
+            Decl::ModuleImport(..) => DefKind::ModuleImport,
+            Decl::Spread(..) => DefKind::Spread,
+        }
+    }
+
+    pub fn file_id(&self) -> Option<TypstFileId> {
+        match self {
+            Decl::Export { fid, .. } => Some(*fid),
+            that => that.span()?.id(),
+        }
+    }
+
+    pub fn span(&self) -> Option<Span> {
+        match self {
+            Decl::Export { .. } => None,
+            Decl::ModuleImport(at)
+            | Decl::Closure(at)
+            | Decl::Spread(at)
+            | Decl::Func { at, .. }
+            | Decl::Var { at, .. }
+            | Decl::ImportAlias { at, .. }
+            | Decl::IdentRef { at, .. }
+            | Decl::Module { at, .. }
+            | Decl::Import { at, .. } => Some(*at),
+            Decl::Label { at, .. }
+            | Decl::Ref { at, .. }
+            | Decl::StrName { at, .. }
+            | Decl::PathStem { at, .. } => Some(at.span()),
+        }
+    }
+
+    fn as_def(this: &Interned<Self>, val: Option<Ty>) -> Interned<RefExpr> {
+        Interned::new(RefExpr {
+            ident: this.clone(),
+            of: Some(this.clone().into()),
+            val,
+        })
+    }
 }
 
 impl From<Decl> for Expr {
@@ -81,11 +289,27 @@ impl From<Decl> for Expr {
     }
 }
 
+impl From<DeclExpr> for Expr {
+    fn from(decl: DeclExpr) -> Self {
+        Expr::Decl(decl)
+    }
+}
+
 impl fmt::Debug for Decl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Decl::Ident(ident) => write!(f, "Ident({:?})", ident.name),
-            Decl::Label(ident) => write!(f, "Label({:?})", ident.name),
+            // Decl::Ident(ident) => write!(f, "Ident({:?})", ident.name),
+            Decl::Export { name, fid } => write!(f, "Export({name:?}, {fid:?})"),
+            Decl::Func { name, .. } => write!(f, "Func({name:?})"),
+            Decl::Var { name, .. } => write!(f, "Var({name:?})"),
+            Decl::ImportAlias { name, .. } => write!(f, "ImportAlias({name:?})"),
+            Decl::IdentRef { name, .. } => write!(f, "IdentRef({name:?})"),
+            Decl::Module { name, .. } => write!(f, "Module({name:?})"),
+            Decl::Import { name, .. } => write!(f, "Import({name:?})"),
+            Decl::Label { name, .. } => write!(f, "Label({name:?})"),
+            Decl::Ref { name, .. } => write!(f, "Ref({name:?})"),
+            Decl::StrName { name, at } => write!(f, "StrName({name:?}, {at:?})"),
+            Decl::PathStem { name, at } => write!(f, "PathStem({name:?}, {at:?})"),
             Decl::ModuleImport(..) => write!(f, "ModuleImport(..)"),
             Decl::Closure(..) => write!(f, "Closure(..)"),
             Decl::Spread(..) => write!(f, "Spread(..)"),
@@ -93,53 +317,12 @@ impl fmt::Debug for Decl {
     }
 }
 
-impl Decl {
-    pub fn name(&self) -> &Interned<str> {
-        match self {
-            Decl::Ident(ident) | Decl::Label(ident) => &ident.name,
-            Decl::ModuleImport(_) | Decl::Closure(_) | Decl::Spread(_) => Interned::empty(),
-        }
-    }
-
-    pub fn file_id(&self) -> Option<TypstFileId> {
-        if let Some(s) = self.span() {
-            return s.id();
-        }
-        match self {
-            Decl::Ident(ident) | Decl::Label(ident) => match &ident.at {
-                IdentAt::Export(fid) => Some(*fid),
-                _ => None,
-            },
-            Decl::ModuleImport(..) | Decl::Closure(..) | Decl::Spread(..) => None,
-        }
-    }
-
-    pub fn span(&self) -> Option<Span> {
-        match self {
-            Decl::Ident(ident) | Decl::Label(ident) => Some(match &ident.at {
-                IdentAt::Label(s) | IdentAt::Ref(s) | IdentAt::Span(s) => *s,
-                IdentAt::Str(s) | IdentAt::PathStem(s) => s.span(),
-                IdentAt::Export(..) => return None,
-            }),
-            Decl::ModuleImport(s) | Decl::Closure(s) | Decl::Spread(s) => Some(*s),
-        }
-    }
-
-    fn as_def(&self, def: DefKind, val: Option<Ty>) -> Interned<RefExpr> {
-        let exp = RefExpr {
-            ident: self.clone(),
-            of: Some(Expr::Def(def)),
-            val,
-        };
-        Interned::new(exp)
-    }
-}
-
-type UnExpr = UnInst<Expr>;
-type BinExpr = BinInst<Expr>;
+pub type UnExpr = UnInst<Expr>;
+pub type BinExpr = BinInst<Expr>;
 
 #[derive(Debug)]
 pub struct ExprInfo {
+    pub fid: TypstFileId,
     pub resolves: HashMap<Span, Interned<RefExpr>>,
     pub exports: BTreeMap<Interned<str>, Expr>,
     pub root: Expr,
@@ -158,6 +341,7 @@ pub(crate) fn expr_of(ctx: &AnalysisContext, source: Source) -> Arc<ExprInfo> {
         mode: InterpretMode::Markup,
         scopes: vec![],
         info: ExprInfo {
+            fid: source.id(),
             resolves: HashMap::default(),
             exports: BTreeMap::default(),
             root: none_expr(),
@@ -215,38 +399,6 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
         } else {
             unreachable!()
         }
-    }
-
-    fn alloc_ident(ident: ast::Ident) -> Decl {
-        let ident = DeclIdent {
-            name: ident.get().into(),
-            at: IdentAt::Span(ident.span()),
-        };
-        Decl::Ident(ident.into())
-    }
-
-    fn alloc_str_key(&self, s: SyntaxNode, name: &str) -> Decl {
-        let ident = DeclIdent {
-            name: name.into(),
-            at: IdentAt::Str(Box::new(s)),
-        };
-        Decl::Ident(ident.into())
-    }
-
-    fn alloc_path_stem(&self, s: SyntaxNode, name: &str) -> Decl {
-        let ident = DeclIdent {
-            name: name.into(),
-            at: IdentAt::PathStem(Box::new(s)),
-        };
-        Decl::Ident(ident.into())
-    }
-
-    fn alloc_external(fid: TypstFileId, name: Interned<str>) -> Decl {
-        let ident = DeclIdent {
-            name,
-            at: IdentAt::Export(fid),
-        };
-        Decl::Ident(ident.into())
     }
 
     fn summarize_scope(&mut self) -> BTreeMap<Interned<str>, Expr> {
@@ -378,11 +530,7 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
     }
 
     fn check_label(&mut self, ident: ast::Label) -> Expr {
-        let ident = DeclIdent {
-            name: ident.get().into(),
-            at: IdentAt::Label(ident.span()),
-        };
-        Expr::Decl(Decl::Label(ident.into()).into())
+        Expr::Decl(Decl::label(ident).into())
     }
 
     fn check_element<'b>(
@@ -413,46 +561,59 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
 
     fn check_closure(&mut self, typed: ast::Closure) -> Expr {
         let decl = match typed.name() {
-            Some(name) => Self::alloc_ident(name),
-            None => Decl::Closure(typed.span()),
+            Some(name) => Decl::func(name).into(),
+            None => Decl::Closure(typed.span()).into(),
         };
-        self.resolve_as(decl.as_def(DefKind::Func, None));
+        self.resolve_as(Decl::as_def(&decl, None));
 
         let (params, body) = self.with_scope(|this| {
             this.scope_mut()
                 .insert(decl.name().clone(), decl.clone().into());
-            let mut params = eco_vec![];
+            let mut inputs = eco_vec![];
+            let mut names = eco_vec![];
+            let mut spread_left = None;
+            let mut spread_right = None;
             for arg in typed.params().children() {
                 match arg {
                     ast::Param::Pos(arg) => {
-                        params.push(this.check_pattern(arg));
+                        inputs.push(this.check_pattern(arg));
                     }
                     ast::Param::Named(arg) => {
-                        let key = Self::alloc_ident(arg.name());
+                        let key: DeclExpr = Decl::var(arg.name()).into();
                         let val = this.check(arg.expr());
-                        params.push(Expr::Deselect(SelectExpr::new(key.clone(), val)));
+                        names.push((key.clone(), val));
 
-                        this.resolve_as(key.as_def(DefKind::Var, None));
+                        this.resolve_as(Decl::as_def(&key, None));
                         this.scope_mut().insert(key.name().clone(), key.into());
                     }
                     ast::Param::Spread(s) => {
-                        let spreaded = this.check(s.expr());
-                        let inst = UnInst::new(UnaryOp::Spread, spreaded);
-                        params.push(Expr::Unary(inst));
-
-                        let decl = if let Some(ident) = s.sink_ident() {
-                            Self::alloc_ident(ident)
+                        let decl: DeclExpr = if let Some(ident) = s.sink_ident() {
+                            Decl::var(ident).into()
                         } else {
-                            Decl::Spread(s.span())
+                            Decl::Spread(s.span()).into()
                         };
 
-                        this.resolve_as(decl.as_def(DefKind::Var, None));
+                        let spreaded = this.check(s.expr());
+                        if inputs.is_empty() {
+                            spread_left = Some((decl.clone(), spreaded));
+                        } else {
+                            spread_right = Some((decl.clone(), spreaded));
+                        }
+
+                        this.resolve_as(Decl::as_def(&decl, None));
                         this.scope_mut().insert(decl.name().clone(), decl.into());
                     }
                 }
             }
 
-            (params, this.check(typed.body()))
+            let pattern = Pattern {
+                pos: inputs,
+                named: names,
+                spread_left,
+                spread_right,
+            };
+
+            (pattern.into(), this.check(typed.body()))
         });
 
         self.scope_mut()
@@ -477,23 +638,29 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
                             inputs.push(self.check_pattern(p));
                         }
                         ast::DestructuringItem::Named(n) => {
-                            let key = Self::alloc_ident(n.name());
+                            let key = Decl::var(n.name()).into();
                             let val = self.check_pattern_expr(n.expr());
                             names.push((key, val));
                         }
                         ast::DestructuringItem::Spread(s) => {
-                            if inputs.is_empty() {
-                                spread_left = Some(self.check_pattern_expr(s.expr()));
+                            let decl: DeclExpr = if let Some(ident) = s.sink_ident() {
+                                Decl::var(ident).into()
                             } else {
-                                spread_right = Some(self.check_pattern_expr(s.expr()));
+                                Decl::Spread(s.span()).into()
+                            };
+
+                            if inputs.is_empty() {
+                                spread_left = Some((decl, self.check_pattern_expr(s.expr())));
+                            } else {
+                                spread_right = Some((decl, self.check_pattern_expr(s.expr())));
                             }
                         }
                     }
                 }
 
                 let pattern = Pattern {
-                    inputs,
-                    names,
+                    pos: inputs,
+                    named: names,
                     spread_left,
                     spread_right,
                 };
@@ -506,11 +673,11 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
     fn check_pattern_expr(&mut self, typed: ast::Expr) -> Expr {
         match typed {
             ast::Expr::Ident(ident) => {
-                let decl = Self::alloc_ident(ident);
-                self.resolve_as(decl.as_def(DefKind::Var, None));
+                let decl = Decl::var(ident).into();
+                self.resolve_as(Decl::as_def(&decl, None));
                 self.scope_mut()
                     .insert(decl.name().clone(), decl.clone().into());
-                Expr::Decl(decl.into())
+                Expr::Decl(decl)
             }
             ast::Expr::Parenthesized(parenthesized) => self.check_pattern(parenthesized.pattern()),
             ast::Expr::Closure(c) => self.check_closure(c),
@@ -525,23 +692,24 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
         let (src, val) = self.ctx.analyze_import2(source);
 
         let decl = match (typed.new_name(), src) {
-            (Some(ident), _) => Some(Self::alloc_ident(ident)),
+            (Some(ident), _) => Some(Decl::module(ident)),
             (None, Some(Value::Str(i))) if typed.imports().is_none() => {
                 let i = Path::new(i.as_str());
                 let name = i.file_stem().and_then(|s| s.to_str());
                 // Some(self.alloc_path_end(s))
-                name.map(|name| self.alloc_path_stem(source.clone(), name))
+                name.map(|name| Decl::path_stem(source.clone(), name))
             }
             _ => None,
         };
         if let Some(decl) = &decl {
-            println!("inserting: {decl:?}");
             self.scope_mut()
                 .insert(decl.name().clone(), decl.clone().into());
         }
-        let decl = decl.unwrap_or_else(|| Decl::ModuleImport(typed.span()));
-        self.resolve_as(decl.as_def(
-            DefKind::Module,
+        let decl = decl
+            .unwrap_or_else(|| Decl::ModuleImport(typed.span()))
+            .into();
+        self.resolve_as(Decl::as_def(
+            &decl,
             val.clone().map(|val| Ty::Value(InsTy::new(val))),
         ));
 
@@ -553,7 +721,6 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
                     log::debug!("checking wildcard: {val:?}");
                     match val {
                         Some(Value::Module(m)) => {
-                            println!("inserting 3: {m:?}");
                             self.scopes.push(ExprScope::Module(m));
                         }
                         Some(Value::Func(f)) => {
@@ -577,31 +744,22 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
                 }
                 ast::Imports::Items(items) => {
                     let mut imported = eco_vec![];
-                    let module = Expr::Decl(decl.clone().into());
+                    let module = Expr::Decl(decl.clone());
 
                     for item in items.iter() {
-                        let (old, new, is_renamed) = match item {
+                        let (old, rename) = match item {
                             ast::ImportItem::Simple(ident) => {
-                                let old = Self::alloc_ident(ident);
-                                (old.clone(), old, false)
+                                let old: DeclExpr = Decl::import(ident).into();
+                                (old, None)
                             }
                             ast::ImportItem::Renamed(renamed) => {
-                                let old_name = Self::alloc_ident(renamed.original_name());
-                                let new_name = Self::alloc_ident(renamed.new_name());
-                                (old_name, new_name, true)
+                                let old: DeclExpr = Decl::import(renamed.original_name()).into();
+                                let new: DeclExpr = Decl::import_alias(renamed.new_name()).into();
+                                (old, Some(new))
                             }
                         };
+
                         let old_select = SelectExpr::new(old.clone(), module.clone());
-                        if is_renamed {
-                            self.resolve_as(
-                                RefExpr {
-                                    ident: new.clone(),
-                                    of: Some(Expr::Decl(old.clone().into())),
-                                    val: None,
-                                }
-                                .into(),
-                            );
-                        }
                         self.resolve_as(
                             RefExpr {
                                 ident: old.clone(),
@@ -610,16 +768,27 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
                             }
                             .into(),
                         );
-                        println!("inserting 2: {new:?}");
-                        self.scope_mut()
-                            .insert(new.name().clone(), Expr::Select(old_select));
-                        imported.push((old, Expr::Decl(new.into())));
+
+                        if let Some(new) = &rename {
+                            let rename_ref = RefExpr {
+                                ident: new.clone(),
+                                of: Some(Expr::Decl(old.clone())),
+                                val: None,
+                            };
+                            self.resolve_as(rename_ref.into());
+                        }
+
+                        let new = rename.unwrap_or_else(|| old.clone());
+                        let new_name = new.name().clone();
+                        let new_expr = Expr::Decl(new);
+                        self.scope_mut().insert(new_name, new_expr.clone());
+                        imported.push((old, new_expr));
                     }
 
                     pattern = Expr::Pattern(
                         Pattern {
-                            inputs: eco_vec![],
-                            names: imported,
+                            pos: eco_vec![],
+                            named: imported,
                             spread_left: None,
                             spread_right: None,
                         }
@@ -644,12 +813,10 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
         for item in typed.items() {
             match item {
                 ast::ArrayItem::Pos(item) => {
-                    items.push(self.check(item));
+                    items.push(ArgExpr::Pos(self.check(item)));
                 }
                 ast::ArrayItem::Spread(s) => {
-                    let spreaded = self.check(s.expr());
-                    let inst = UnInst::new(UnaryOp::Spread, spreaded);
-                    items.push(Expr::Unary(inst));
+                    items.push(ArgExpr::Spread(self.check(s.expr())));
                 }
             }
         }
@@ -662,9 +829,9 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
         for item in typed.items() {
             match item {
                 ast::DictItem::Named(item) => {
-                    let key = Self::alloc_ident(item.name());
+                    let key = Decl::ident_ref(item.name()).into();
                     let val = self.check(item.expr());
-                    items.push(Expr::Deselect(SelectExpr::new(key, val)));
+                    items.push(ArgExpr::Named(Box::new((key, val))));
                 }
                 ast::DictItem::Keyed(item) => {
                     let key = item.key().to_untyped();
@@ -676,14 +843,12 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
                     let Some(analyzed) = analyzed else {
                         continue;
                     };
-                    let key = self.alloc_str_key(key.clone(), analyzed);
+                    let key = Decl::str_name(key.clone(), analyzed).into();
                     let val = self.check(item.expr());
-                    items.push(Expr::Deselect(SelectExpr::new(key, val)));
+                    items.push(ArgExpr::Named(Box::new((key, val))));
                 }
                 ast::DictItem::Spread(s) => {
-                    let spreaded = self.check(s.expr());
-                    let inst = UnInst::new(UnaryOp::Spread, spreaded);
-                    items.push(Expr::Unary(inst));
+                    items.push(ArgExpr::Spread(self.check(s.expr())));
                 }
             }
         }
@@ -696,17 +861,15 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
         for arg in typed.items() {
             match arg {
                 ast::Arg::Pos(arg) => {
-                    args.push(self.check(arg));
+                    args.push(ArgExpr::Pos(self.check(arg)));
                 }
                 ast::Arg::Named(arg) => {
-                    let key = Self::alloc_ident(arg.name());
+                    let key = Decl::ident_ref(arg.name()).into();
                     let val = self.check(arg.expr());
-                    args.push(Expr::Deselect(SelectExpr::new(key, val)));
+                    args.push(ArgExpr::Named(Box::new((key, val))));
                 }
                 ast::Arg::Spread(s) => {
-                    let spreaded = self.check(s.expr());
-                    let inst = UnInst::new(UnaryOp::Spread, spreaded);
-                    args.push(Expr::Unary(inst));
+                    args.push(ArgExpr::Spread(self.check(s.expr())));
                 }
             }
         }
@@ -738,7 +901,7 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
 
     fn check_field_access(&mut self, typed: ast::FieldAccess) -> Expr {
         let lhs = self.check(typed.target());
-        let rhs = Self::alloc_ident(typed.field());
+        let rhs = Decl::ident_ref(typed.field()).into();
         Expr::Select(SelectExpr { lhs, key: rhs }.into())
     }
 
@@ -820,13 +983,10 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
     }
 
     fn check_ref(&mut self, r: ast::Ref) -> Expr {
-        let ident = DeclIdent {
-            name: r.target().into(),
-            at: IdentAt::Ref(r.span()),
-        };
+        let ident = Decl::ref_(r).into();
         let body = r.supplement().map(|s| self.check(ast::Expr::Content(s)));
         let ref_expr = ContentRefExpr {
-            ident: Decl::Label(ident.into()),
+            ident,
             of: None,
             body,
         };
@@ -834,17 +994,11 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
     }
 
     fn check_ident(&mut self, ident: ast::Ident) -> Expr {
-        let decl = Self::alloc_ident(ident);
-        self.resolve_ident(decl, InterpretMode::Code)
+        self.resolve_ident(Decl::ident_ref(ident).into(), InterpretMode::Code)
     }
 
     fn check_math_ident(&mut self, ident: ast::MathIdent) -> Expr {
-        let ident = DeclIdent {
-            name: ident.get().into(),
-            at: IdentAt::Span(ident.span()),
-        };
-        let decl = Decl::Ident(ident.into());
-        self.resolve_ident(decl, InterpretMode::Code)
+        self.resolve_ident(Decl::math_ident_ref(ident).into(), InterpretMode::Code)
     }
 
     fn resolve_as(&mut self, r: Interned<RefExpr>) {
@@ -852,15 +1006,14 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
         self.info.resolves.insert(s, r.clone());
     }
 
-    fn resolve_ident(&mut self, decl: Decl, code: InterpretMode) -> Expr {
+    fn resolve_ident(&mut self, decl: DeclExpr, code: InterpretMode) -> Expr {
         let r: Interned<RefExpr> = self.resolve_ident_(decl, code).into();
         let s = r.ident.span().unwrap();
-        println!("resolve_ident 1: {r:?}");
         self.info.resolves.insert(s, r.clone());
         Expr::Ref(r)
     }
 
-    fn resolve_ident_(&mut self, decl: Decl, code: InterpretMode) -> RefExpr {
+    fn resolve_ident_(&mut self, decl: DeclExpr, code: InterpretMode) -> RefExpr {
         let name = decl.name().clone();
 
         let mut ref_expr = RefExpr {
@@ -883,11 +1036,8 @@ impl<'a, 'w> ExprWorker<'a, 'w> {
                         continue;
                     }
 
-                    let decl = v.and_then(|_| {
-                        Some(Expr::Decl(
-                            Self::alloc_external(module.file_id()?, name.clone()).into(),
-                        ))
-                    });
+                    let decl = v
+                        .and_then(|_| Some(Decl::external(module.file_id()?, name.clone()).into()));
 
                     (decl, v)
                 }
@@ -933,37 +1083,23 @@ fn none_expr() -> Expr {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ArgExpr {
+    Pos(Expr),
+    Named(Box<(DeclExpr, Expr)>),
+    Spread(Expr),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Pattern {
-    inputs: EcoVec<Expr>,
-    names: EcoVec<(Decl, Expr)>,
-    spread_left: Option<Expr>,
-    spread_right: Option<Expr>,
+    pub pos: EcoVec<Expr>,
+    pub named: EcoVec<(DeclExpr, Expr)>,
+    pub spread_left: Option<(DeclExpr, Expr)>,
+    pub spread_right: Option<(DeclExpr, Expr)>,
 }
 
 impl Pattern {}
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct DeclNameless {
-    info: Span,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct DeclIdent {
-    name: Interned<str>,
-    at: IdentAt,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum IdentAt {
-    Export(TypstFileId),
-    Span(Span),
-    Label(Span),
-    Ref(Span),
-    Str(Box<SyntaxNode>),
-    PathStem(Box<SyntaxNode>),
-}
-
-impl_internable!(Decl, DeclIdent, DeclNameless,);
+impl_internable!(Decl,);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ContentSeqExpr {
@@ -972,26 +1108,26 @@ pub struct ContentSeqExpr {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RefExpr {
-    pub ident: Decl,
+    pub ident: DeclExpr,
     pub of: Option<Expr>,
     pub val: Option<Ty>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ContentRefExpr {
-    pub ident: Decl,
-    pub of: Option<Decl>,
+    pub ident: DeclExpr,
+    pub of: Option<DeclExpr>,
     pub body: Option<Expr>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SelectExpr {
     pub lhs: Expr,
-    pub key: Decl,
+    pub key: DeclExpr,
 }
 
 impl SelectExpr {
-    pub fn new(key: Decl, lhs: Expr) -> Interned<Self> {
+    pub fn new(key: DeclExpr, lhs: Expr) -> Interned<Self> {
         Interned::new(Self { key, lhs })
     }
 }
@@ -1010,8 +1146,8 @@ pub struct ApplyExpr {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FuncExpr {
-    pub decl: Decl,
-    pub params: EcoVec<Expr>,
+    pub decl: DeclExpr,
+    pub params: Interned<Pattern>,
     pub body: Expr,
 }
 
@@ -1035,14 +1171,8 @@ pub struct SetExpr {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct DestructExpr {
-    pub lhs: Expr,
-    pub rhs: EcoVec<(Decl, Expr)>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ImportExpr {
-    pub decl: Decl,
+    pub decl: DeclExpr,
     pub pattern: Expr,
 }
 
@@ -1194,7 +1324,6 @@ impl_internable!(
     RefExpr,
     ContentRefExpr,
     SelectExpr,
-    DestructExpr,
     ImportExpr,
     IncludeExpr,
     IfExpr,
@@ -1206,6 +1335,7 @@ impl_internable!(
     SetExpr,
     Pattern,
     EcoVec<(Decl, Expr)>,
+    EcoVec<ArgExpr>,
     EcoVec<Expr>,
     UnInst<Expr>,
     BinInst<Expr>,

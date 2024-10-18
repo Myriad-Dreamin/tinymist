@@ -76,7 +76,7 @@ impl Ty {
             }
             match ty {
                 Any | Boolean(_) | If(..) | Builtin(..) | Value(..) => {}
-                Dict(..) | Array(..) | Tuple(..) | Func(..) | Args(..) => {}
+                Dict(..) | Array(..) | Tuple(..) | Func(..) | Args(..) | Pattern(..) => {}
                 Unary(..) | Binary(..) => {}
                 Field(ty) => {
                     collect(&ty.field, results);

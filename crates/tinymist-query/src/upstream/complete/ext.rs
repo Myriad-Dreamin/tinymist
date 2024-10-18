@@ -912,6 +912,7 @@ fn type_completion(
                 ctx.value_completion(Some(e.name().into()), &Value::Func((*e).into()), true, docs);
             }
         },
+        Ty::Pattern(_) => return None,
         Ty::Args(_) => return None,
         Ty::Func(_) => return None,
         Ty::With(_) => return None,

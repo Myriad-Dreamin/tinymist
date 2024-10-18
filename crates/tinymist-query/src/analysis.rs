@@ -274,8 +274,7 @@ mod document_tests {
 #[cfg(test)]
 mod expr_tests {
 
-    use crate::syntax::expr::expr_of;
-    use crate::syntax::{Expr, RefExpr};
+    use crate::syntax::{expr_of, Expr, RefExpr};
     use crate::tests::*;
 
     #[test]
@@ -317,7 +316,7 @@ mod expr_tests {
 
                     format!(
                         "{} -> {}, val: {val:?}",
-                        show_expr(&Expr::Decl(ident.clone().into())),
+                        show_expr(&Expr::Decl(ident.clone())),
                         of.as_ref().map(show_expr).unwrap_or_default()
                     )
                 })

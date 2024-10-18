@@ -15,6 +15,7 @@ pub trait TyMutator {
             Tuple(e) => Some(Tuple(self.mutate_vec(e, pol)?)),
             Func(f) => Some(Func(self.mutate_func(f, pol)?.into())),
             Args(args) => Some(Args(self.mutate_func(args, pol)?.into())),
+            Pattern(args) => Some(Pattern(self.mutate_func(args, pol)?.into())),
             Field(f) => Some(Field(self.mutate_field(f, pol)?.into())),
             Select(s) => Some(Select(self.mutate_select(s, pol)?.into())),
             With(w) => Some(With(self.mutate_with_sig(w, pol)?.into())),
@@ -99,7 +100,7 @@ pub trait TyMutator {
     }
 
     fn mutate_unary(&mut self, ty: &Interned<TypeUnary>, pol: bool) -> Option<TypeUnary> {
-        let lhs = self.mutate(ty.lhs.as_ref(), pol)?.into();
+        let lhs = self.mutate(&ty.lhs, pol)?;
 
         Some(TypeUnary { lhs, op: ty.op })
     }
@@ -114,8 +115,8 @@ pub trait TyMutator {
             return None;
         }
 
-        let lhs = x.map(Interned::new).unwrap_or_else(|| lhs.clone());
-        let rhs = y.map(Interned::new).unwrap_or_else(|| rhs.clone());
+        let lhs = x.unwrap_or_else(|| lhs.clone());
+        let rhs = y.unwrap_or_else(|| rhs.clone());
 
         Some(TypeBinary {
             operands: (lhs, rhs),

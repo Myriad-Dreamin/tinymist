@@ -2,262 +2,208 @@
 
 use super::*;
 use crate::analysis::ParamAttrs;
-use crate::docs::{DocStringKind, SignatureDocsT, TypelessParamDocs, UntypedSymbolDocs};
+use crate::docs::{SignatureDocsT, TypelessParamDocs, UntypedSymbolDocs};
+use crate::syntax::expr::*;
 use crate::ty::*;
 
 static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);
 static EMPTY_VAR_DOC: LazyLock<VarDoc> = LazyLock::new(VarDoc::default);
 
 impl<'a, 'w> TypeChecker<'a, 'w> {
-    pub(crate) fn check_syntax(&mut self, root: LinkedNode) -> Option<Ty> {
-        Some(match root.kind() {
-            SyntaxKind::Markup => return self.check_in_mode(root, InterpretMode::Markup),
-            SyntaxKind::Math => return self.check_in_mode(root, InterpretMode::Math),
-            SyntaxKind::Code => return self.check_in_mode(root, InterpretMode::Code),
-            SyntaxKind::CodeBlock => return self.check_in_mode(root, InterpretMode::Code),
-            SyntaxKind::ContentBlock => return self.check_in_mode(root, InterpretMode::Markup),
-
-            // todo: space effect
-            SyntaxKind::Space => Ty::Builtin(BuiltinTy::Space),
-            SyntaxKind::Parbreak => Ty::Builtin(BuiltinTy::Space),
-
-            SyntaxKind::Text => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::Linebreak => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::Escape => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::Shorthand => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::SmartQuote => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::Raw => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::RawLang => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::RawDelim => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::RawTrimmed => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::Link => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::Label => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::Ref => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::RefMarker => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::HeadingMarker => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::EnumMarker => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::ListMarker => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::TermMarker => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::MathAlignPoint => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::MathPrimes => Ty::Builtin(BuiltinTy::Content),
-            SyntaxKind::MathShorthand => Ty::Builtin(BuiltinTy::Content),
-
-            SyntaxKind::Strong => return self.check_children(root),
-            SyntaxKind::Emph => return self.check_children(root),
-            SyntaxKind::Heading => return self.check_children(root),
-            SyntaxKind::ListItem => return self.check_children(root),
-            SyntaxKind::EnumItem => return self.check_children(root),
-            SyntaxKind::TermItem => return self.check_children(root),
-            SyntaxKind::Equation => return self.check_children(root),
-            SyntaxKind::MathDelimited => return self.check_children(root),
-            SyntaxKind::MathAttach => return self.check_children(root),
-            SyntaxKind::MathFrac => return self.check_children(root),
-            SyntaxKind::MathRoot => return self.check_children(root),
-
-            SyntaxKind::LoopBreak => Ty::Builtin(BuiltinTy::None),
-            SyntaxKind::LoopContinue => Ty::Builtin(BuiltinTy::None),
-            SyntaxKind::FuncReturn => Ty::Builtin(BuiltinTy::None),
-            SyntaxKind::Error => Ty::Builtin(BuiltinTy::None),
-            SyntaxKind::End => Ty::Builtin(BuiltinTy::None),
-
-            SyntaxKind::None => Ty::Builtin(BuiltinTy::None),
-            SyntaxKind::Auto => Ty::Builtin(BuiltinTy::Auto),
-            SyntaxKind::Break => Ty::Builtin(BuiltinTy::FlowNone),
-            SyntaxKind::Continue => Ty::Builtin(BuiltinTy::FlowNone),
-            SyntaxKind::Return => Ty::Builtin(BuiltinTy::FlowNone),
-            SyntaxKind::Ident => return self.check_ident(root, InterpretMode::Code),
-            SyntaxKind::MathIdent => return self.check_ident(root, InterpretMode::Math),
-            SyntaxKind::Bool
-            | SyntaxKind::Int
-            | SyntaxKind::Float
-            | SyntaxKind::Numeric
-            | SyntaxKind::Str => {
-                return self
-                    .ctx
-                    .mini_eval(root.cast()?)
-                    .map(|v| (Ty::Value(InsTy::new(v))))
-            }
-            SyntaxKind::Parenthesized => return self.check_children(root),
-            SyntaxKind::Array => return self.check_array(root),
-            SyntaxKind::Dict => return self.check_dict(root),
-            SyntaxKind::Unary => return self.check_unary(root),
-            SyntaxKind::Binary => return self.check_binary(root),
-            SyntaxKind::FieldAccess => return self.check_field_access(root),
-            SyntaxKind::FuncCall => return self.check_func_call(root),
-            SyntaxKind::Args => return self.check_args(root),
-            SyntaxKind::Closure => return self.check_closure(root),
-            SyntaxKind::LetBinding => return self.check_let(root),
-            SyntaxKind::SetRule => return self.check_set(root),
-            SyntaxKind::ShowRule => return self.check_show(root),
-            SyntaxKind::Contextual => return self.check_contextual(root),
-            SyntaxKind::Conditional => return self.check_conditional(root),
-            SyntaxKind::WhileLoop => return self.check_while_loop(root),
-            SyntaxKind::ForLoop => return self.check_for_loop(root),
-            SyntaxKind::ModuleImport => return self.check_module_import(root),
-            SyntaxKind::ModuleInclude => return self.check_module_include(root),
-            SyntaxKind::Destructuring => return self.check_destructuring(root),
-            SyntaxKind::DestructAssignment => return self.check_destruct_assign(root),
-
-            // Rest all are clauses
-            SyntaxKind::LineComment => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::BlockComment => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Named => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Keyed => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Spread => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Params => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::ImportItems => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::ImportItemPath => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::RenamedImportItem => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Hash => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::LeftBrace => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::RightBrace => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::LeftBracket => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::RightBracket => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::LeftParen => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::RightParen => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Comma => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Semicolon => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Colon => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Star => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Underscore => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Dollar => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Plus => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Minus => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Slash => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Hat => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Prime => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Dot => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Eq => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::EqEq => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::ExclEq => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Lt => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::LtEq => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Gt => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::GtEq => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::PlusEq => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::HyphEq => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::StarEq => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::SlashEq => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Dots => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Arrow => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Root => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Not => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::And => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Or => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Let => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Set => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Show => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Context => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::If => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Else => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::For => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::In => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::While => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Import => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::Include => Ty::Builtin(BuiltinTy::Clause),
-            SyntaxKind::As => Ty::Builtin(BuiltinTy::Clause),
+    pub(crate) fn check_syntax(&mut self, root: &Expr) -> Option<Ty> {
+        Some(match root {
+            Expr::Seq(seq) => self.check_seq(seq),
+            Expr::Array(array) => self.check_array(array),
+            Expr::Dict(dict) => self.check_dict(dict),
+            Expr::Args(args) => self.check_args(args),
+            Expr::Pattern(pattern) => self.check_pattern(pattern),
+            Expr::Element(element) => self.check_element(element),
+            Expr::Unary(unary) => self.check_unary(unary),
+            Expr::Binary(binary) => self.check_binary(binary),
+            Expr::Apply(apply) => self.check_apply(apply),
+            Expr::Func(func) => self.check_func(func),
+            Expr::Let(let_expr) => self.check_let(let_expr),
+            Expr::Show(show) => self.check_show(show),
+            Expr::Set(set) => self.check_set(set),
+            Expr::Ref(reference) => self.check_ref(reference),
+            Expr::ContentRef(content_ref) => self.check_content_ref(content_ref),
+            Expr::Select(select) => self.check_select(select),
+            Expr::Import(import) => self.check_import(import),
+            Expr::Include(include) => self.check_include(include),
+            Expr::Contextual(contextual) => self.check_contextual(contextual),
+            Expr::Conditional(conditional) => self.check_conditional(conditional),
+            Expr::WhileLoop(while_loop) => self.check_while_loop(while_loop),
+            Expr::ForLoop(for_loop) => self.check_for_loop(for_loop),
+            Expr::Type(ty) => self.check_type(ty),
+            Expr::Decl(decl) => self.check_decl(decl),
+            Expr::Star => self.check_star(),
+            // SyntaxKind::None => Ty::Builtin(BuiltinTy::None),
+            // SyntaxKind::Auto => Ty::Builtin(BuiltinTy::Auto),
+            // SyntaxKind::Break => Ty::Builtin(BuiltinTy::FlowNone),
+            // SyntaxKind::Continue => Ty::Builtin(BuiltinTy::FlowNone),
+            // SyntaxKind::Return => Ty::Builtin(BuiltinTy::FlowNone),
+            // SyntaxKind::Ident => return self.check_ident(root, InterpretMode::Code),
+            // SyntaxKind::MathIdent => return self.check_ident(root, InterpretMode::Math),
+            // SyntaxKind::Parenthesized => return self.check_children(root),
+            // SyntaxKind::Array => return self.check_array(root),
+            // SyntaxKind::Dict => return self.check_dict(root),
+            // SyntaxKind::Unary => return self.check_unary(root),
+            // SyntaxKind::Binary => return self.check_binary(root),
+            // SyntaxKind::FieldAccess => return self.check_field_access(root),
+            // SyntaxKind::FuncCall => return self.check_func_call(root),
+            // SyntaxKind::Args => return self.check_args(root),
+            // SyntaxKind::Closure => return self.check_closure(root),
+            // SyntaxKind::LetBinding => return self.check_let(root),
+            // SyntaxKind::SetRule => return self.check_set(root),
+            // SyntaxKind::ShowRule => return self.check_show(root),
+            // SyntaxKind::Contextual => return self.check_contextual(root),
+            // SyntaxKind::Conditional => return self.check_conditional(root),
+            // SyntaxKind::WhileLoop => return self.check_while_loop(root),
+            // SyntaxKind::ForLoop => return self.check_for_loop(root),
+            // SyntaxKind::ModuleImport => return self.check_module_import(root),
+            // SyntaxKind::ModuleInclude => return self.check_module_include(root),
+            // SyntaxKind::Destructuring => return self.check_destructuring(root),
+            // SyntaxKind::DestructAssignment => return self.check_destruct_assign(root),
         })
     }
-
-    fn check_in_mode(&mut self, root: LinkedNode, into_mode: InterpretMode) -> Option<Ty> {
-        let mode = self.mode;
-        self.mode = into_mode;
-        let res = self.check_children(root);
-        self.mode = mode;
-        res
-    }
-
-    fn check_children(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
+    fn check_seq(&mut self, seq: &Interned<EcoVec<Expr>>) -> Ty {
         let mut joiner = Joiner::default();
 
-        for child in root.children() {
+        for child in seq.iter() {
             joiner.join(self.check(child));
         }
-        Some(joiner.finalize())
+
+        joiner.finalize()
     }
 
-    fn check_ident(&mut self, root: LinkedNode<'_>, mode: InterpretMode) -> Option<Ty> {
-        self.get_var(&root, root.cast()?).map(Ty::Var).or_else(|| {
-            let s = root.span();
-            let v = resolve_global_value(self.ctx, root, mode == InterpretMode::Math)?;
-            Some(Ty::Value(InsTy::new_at(v, s)))
-        })
-    }
-
-    fn check_array(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let _arr: ast::Array = root.cast()?;
-
+    fn check_array(&mut self, array: &Interned<EcoVec<ArgExpr>>) -> Ty {
         let mut elements = Vec::new();
 
-        for elem in root.children() {
-            let ty = self.check(elem);
-            if matches!(ty, Ty::Builtin(BuiltinTy::Clause | BuiltinTy::Space)) {
-                continue;
+        for elem in array.iter() {
+            match elem {
+                ArgExpr::Pos(p) => {
+                    elements.push(self.check(p));
+                }
+                ArgExpr::Spread(..) => {
+                    // todo: handle spread args
+                }
+                ArgExpr::Named(..) => unreachable!(),
             }
-            elements.push(ty);
         }
 
-        Some(Ty::Tuple(elements.into()))
+        Ty::Tuple(elements.into())
     }
 
-    fn check_dict(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let dict: ast::Dict = root.cast()?;
-
+    fn check_dict(&mut self, dict: &Interned<EcoVec<ArgExpr>>) -> Ty {
         let mut fields = Vec::new();
 
-        for field in dict.items() {
-            match field {
-                ast::DictItem::Named(n) => {
-                    let name = n.name().into();
-                    let value = self.check_expr_in(n.expr().span(), root.clone());
-                    fields.push((name, value, n.span()));
+        for elem in dict.iter() {
+            match elem {
+                ArgExpr::Named(n) => {
+                    let (name, value) = n.as_ref();
+                    let name = name.name().clone();
+                    let val = self.check(value);
+                    fields.push((name, val));
                 }
-                ast::DictItem::Keyed(k) => {
-                    let key = self.ctx.const_eval(k.key());
-                    if let Some(Value::Str(key)) = key {
-                        let value = self.check_expr_in(k.expr().span(), root.clone());
-                        fields.push((key.into(), value, k.span()));
-                    }
+                ArgExpr::Spread(..) => {
+                    // todo: handle spread args
                 }
-                // todo: var dict union
-                ast::DictItem::Spread(_s) => {}
+                ArgExpr::Pos(..) => unreachable!(),
             }
         }
 
-        Some(Ty::Dict(RecordTy::new(fields)))
+        Ty::Dict(RecordTy::new(fields))
     }
 
-    fn check_unary(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let unary: ast::Unary = root.cast()?;
+    fn check_args(&mut self, args: &Interned<EcoVec<ArgExpr>>) -> Ty {
+        let mut args_res = Vec::new();
+        let mut named = vec![];
 
-        if let Some(constant) = self.ctx.mini_eval(ast::Expr::Unary(unary)) {
-            return Some(Ty::Value(InsTy::new(constant)));
+        for arg in args.iter() {
+            match arg {
+                ArgExpr::Pos(p) => {
+                    args_res.push(self.check(p));
+                }
+                ArgExpr::Named(n) => {
+                    let (name, value) = n.as_ref();
+                    let name = name.name().clone();
+                    let val = self.check(value);
+                    named.push((name, val));
+                }
+                ArgExpr::Spread(..) => {
+                    // todo: handle spread args
+                }
+            }
         }
 
-        let op = unary.op();
+        let args = ArgsTy::new(args_res.into_iter(), named, None, None, None);
 
-        let lhs = self.check_expr_in(unary.expr().span(), root).into();
-        let op = match op {
-            ast::UnOp::Pos => UnaryOp::Pos,
-            ast::UnOp::Neg => UnaryOp::Neg,
-            ast::UnOp::Not => UnaryOp::Not,
-        };
-
-        Some(Ty::Unary(TypeUnary::new(op, lhs)))
+        Ty::Args(args.into())
     }
 
-    fn check_binary(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let binary: ast::Binary = root.cast()?;
+    fn check_pattern(&mut self, pattern: &Interned<Pattern>) -> Ty {
+        let pos = pattern
+            .pos
+            .iter()
+            .map(|p| self.check(p))
+            .collect::<Vec<_>>();
+        let named = pattern
+            .named
+            .iter()
+            .map(|(n, v)| (n.name().clone(), self.check(v)))
+            .collect::<Vec<_>>();
+        let spread_left = pattern.spread_left.as_ref().map(|p| self.check(&p.1));
+        let spread_right = pattern.spread_right.as_ref().map(|p| self.check(&p.1));
 
-        if let Some(constant) = self.ctx.mini_eval(ast::Expr::Binary(binary)) {
-            return Some(Ty::Value(InsTy::new(constant)));
+        // pattern: ast::Pattern<'_>,
+        // value: Ty,
+        // docs: &DocString,
+        // root: LinkedNode<'_>,
+
+        // let var = self.get_var(&root, ident)?;
+        // let def_id = var.def;
+        // let docstring = docs.get_var(&var.name).unwrap_or(&EMPTY_VAR_DOC);
+        // let var = Ty::Var(var);
+        // log::debug!("check pattern: {ident:?} with {value:?} and docs
+        // {docstring:?}"); if let Some(annotated) = docstring.ty.as_ref() {
+        //     self.constrain(&var, annotated);
+        // }
+        // self.constrain(&value, &var);
+
+        // self.info.var_docs.insert(def_id, docstring.to_untyped());
+        // var
+
+        let args = PatternTy::new(pos.into_iter(), named, spread_left, spread_right, None);
+        Ty::Pattern(args.into())
+    }
+
+    fn check_element(&mut self, element: &Interned<ElementExpr>) -> Ty {
+        for content in element.content.iter() {
+            self.check(content);
         }
 
-        let op = binary.op();
-        let lhs_span = binary.lhs().span();
-        let lhs = self.check_expr_in(lhs_span, root.clone());
-        let rhs_span = binary.rhs().span();
-        let rhs = self.check_expr_in(rhs_span, root);
+        Ty::Builtin(BuiltinTy::Element(element.elem))
+    }
+
+    fn check_unary(&mut self, unary: &Interned<UnExpr>) -> Ty {
+        // if let Some(constant) = self.ctx.mini_eval(ast::Expr::Unary(unary)) {
+        //     return Some(Ty::Value(InsTy::new(constant)));
+        // }
+
+        let op = unary.op;
+        let lhs = self.check(&unary.lhs);
+        Ty::Unary(TypeUnary::new(op, lhs))
+    }
+
+    fn check_binary(&mut self, binary: &Interned<BinExpr>) -> Ty {
+        // if let Some(constant) = self.ctx.mini_eval(ast::Expr::Binary(binary)) {
+        //     return Some(Ty::Value(InsTy::new(constant)));
+        // }
+
+        let op = binary.op;
+        let [lhs, rhs] = binary.operands();
+        let lhs = self.check(lhs);
+        let rhs = self.check(rhs);
 
         match op {
             ast::BinOp::Add | ast::BinOp::Sub | ast::BinOp::Mul | ast::BinOp::Div => {}
@@ -288,18 +234,16 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }
         }
 
-        let res = Ty::Binary(TypeBinary::new(op, lhs.into(), rhs.into()));
-
-        Some(res)
+        Ty::Binary(TypeBinary::new(op, lhs, rhs))
     }
 
-    fn check_field_access(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let field_access: ast::FieldAccess = root.cast()?;
+    fn check_select(&mut self, select: &Interned<SelectExpr>) -> Ty {
+        // let field_access: ast::FieldAccess = root.cast()?;
 
-        let select_site = field_access.target().span();
-        let ty = self.check_expr_in(select_site, root.clone());
-        let field = Interned::new_str(field_access.field().get());
-        log::debug!("field access: {field_access:?} => {ty:?}.{field:?}");
+        let select_site = select.key.span().unwrap_or_else(Span::detached);
+        let ty = self.check(&select.lhs);
+        let field = select.key.name().clone();
+        log::debug!("field access: {select:?} => {ty:?}.{field:?}");
 
         // todo: move this to base
         let base = Ty::Select(SelectTy::new(ty.clone().into(), field.clone()));
@@ -309,68 +253,44 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             resultant: vec![base],
         };
         ty.select(&field, true, &mut worker);
-        Some(Ty::from_types(worker.resultant.into_iter()))
+        Ty::from_types(worker.resultant.into_iter())
     }
 
-    fn check_func_call(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let func_call: ast::FuncCall = root.cast()?;
-
-        let args = self.check_expr_in(func_call.args().span(), root.clone());
-        let callee = self.check_expr_in(func_call.callee().span(), root.clone());
+    fn check_apply(&mut self, apply: &Interned<ApplyExpr>) -> Ty {
+        let args = self.check(&apply.args);
+        let callee = self.check(&apply.callee);
 
         log::debug!("func_call: {callee:?} with {args:?}");
 
         if let Ty::Args(args) = args {
             let mut worker = ApplyTypeChecker {
                 base: self,
-                call_site: func_call.callee().span(),
-                args: Some(func_call.args()),
+                // call_site: func_call.callee().span(),
+                // todo: callee span
+                call_site: Span::detached(),
                 call_raw_for_with: Some(callee.clone()),
                 resultant: vec![],
             };
             callee.call(&args, true, &mut worker);
-            return Some(Ty::from_types(worker.resultant.into_iter()));
+            return Ty::from_types(worker.resultant.into_iter());
         }
 
-        None
+        Ty::Any
     }
 
-    fn check_args(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let args: ast::Args = root.cast()?;
+    fn check_func(&mut self, func: &Interned<FuncExpr>) -> Ty {
+        // let closure: ast::Closure = root.cast()?;
+        // let def_id = closure
+        //     .name()
+        //     .and_then(|n| self.get_def_id(n.span(), &to_ident_ref(&root, n)?));
+        let def_id = func.decl.clone();
 
-        let mut args_res = Vec::new();
-        let mut named = vec![];
-
-        for arg in args.items() {
-            match arg {
-                ast::Arg::Pos(e) => {
-                    args_res.push(self.check_expr_in(e.span(), root.clone()));
-                }
-                ast::Arg::Named(n) => {
-                    let value = self.check_expr_in(n.expr().span(), root.clone());
-                    named.push((n.name().into(), value));
-                }
-                // todo
-                ast::Arg::Spread(_w) => {}
-            }
-        }
-
-        let args = ArgsTy::new(args_res.into_iter(), named, None, None, None);
-
-        Some(Ty::Args(args.into()))
-    }
-
-    fn check_closure(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let closure: ast::Closure = root.cast()?;
-        let def_id = closure
-            .name()
-            .and_then(|n| self.get_def_id(n.span(), &to_ident_ref(&root, n)?));
-
-        let docstring =
-            def_id.and_then(|def_id| self.check_docstring(&root, DocStringKind::Function, def_id));
+        // todo: docstring
+        // let docstring = self.check_docstring(&root, DocStringKind::Function, def_id);
+        let docstring = None::<Arc<DocString>>;
         let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
-        log::debug!("check closure: {:?} -> {docstring:#?}", closure.name());
+        log::debug!("check closure: {:?} -> {docstring:#?}", def_id.name());
 
         let mut pos_docs = vec![];
         let mut named_docs = BTreeMap::new();
@@ -381,114 +301,105 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let mut defaults = BTreeMap::new();
         let mut rest = None;
 
-        for param in closure.params().children() {
-            match param {
-                ast::Param::Pos(pattern) => {
-                    pos.push(self.check_pattern(pattern, Ty::Any, docstring, root.clone()));
-                    if let ast::Pattern::Normal(ast::Expr::Ident(ident)) = pattern {
-                        let name = ident.get().into();
+        for exp in func.params.pos.iter() {
+            // pos.push(self.check_pattern(pattern, Ty::Any, docstring, root.clone()));
+            pos.push(self.check(exp));
+            if let Expr::Decl(ident) = exp {
+                let name = ident.name().clone();
 
-                        let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
-                        pos_docs.push(TypelessParamDocs {
-                            name,
-                            docs: param_doc.docs.clone(),
-                            cano_type: (),
-                            default: None,
-                            attrs: ParamAttrs::positional(),
-                        });
-                    } else {
-                        pos_docs.push(TypelessParamDocs {
-                            name: "_".into(),
-                            docs: Default::default(),
-                            cano_type: (),
-                            default: None,
-                            attrs: ParamAttrs::positional(),
-                        });
-                    }
-                }
-                ast::Param::Named(e) => {
-                    let exp = self.check_expr_in(e.expr().span(), root.clone());
-                    let var = self.get_var(&root, e.name())?;
-                    let name = var.name.clone();
-                    let v = Ty::Var(var.clone());
-                    if let Some(annotated) = docstring.var_ty(&name) {
-                        self.constrain(&v, annotated);
-                    }
-                    // todo: this is less efficient than v.lbs.push(exp), we may have some idea to
-                    // optimize it, so I put a todo here.
-                    self.constrain(&exp, &v);
-                    named.insert(name.clone(), v);
-                    defaults.insert(name.clone(), exp);
-
-                    let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
-                    named_docs.insert(
-                        name.clone(),
-                        TypelessParamDocs {
-                            name: name.clone(),
-                            docs: param_doc.docs.clone(),
-                            cano_type: (),
-                            default: Some(e.expr().to_untyped().clone().into_text()),
-                            attrs: ParamAttrs::named(),
-                        },
-                    );
-                    self.info.var_docs.insert(var.def, param_doc.to_untyped());
-                }
-                // todo: spread left/right
-                ast::Param::Spread(a) => {
-                    if let Some(e) = a.sink_ident() {
-                        let var = self.get_var(&root, e)?;
-                        let name = var.name.clone();
-                        let param_doc = docstring
-                            .get_var(&var.name.clone())
-                            .unwrap_or(&EMPTY_VAR_DOC);
-                        self.info.var_docs.insert(var.def, param_doc.to_untyped());
-
-                        let exp = Ty::Builtin(BuiltinTy::Args);
-                        let v = Ty::Var(var);
-                        if let Some(annotated) = docstring.var_ty(&name) {
-                            self.constrain(&v, annotated);
-                        }
-                        self.constrain(&exp, &v);
-                        rest = Some(v);
-
-                        rest_docs = Some(TypelessParamDocs {
-                            name,
-                            docs: param_doc.docs.clone(),
-                            cano_type: (),
-                            default: None,
-                            attrs: ParamAttrs::variadic(),
-                        });
-                    } else {
-                        rest = Some(Ty::Builtin(BuiltinTy::Args));
-                        rest_docs = Some(TypelessParamDocs {
-                            name: "_".into(),
-                            docs: Default::default(),
-                            cano_type: (),
-                            default: None,
-                            attrs: ParamAttrs::variadic(),
-                        });
-                    }
-                    // todo: ..(args)
-                }
+                let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
+                pos_docs.push(TypelessParamDocs {
+                    name,
+                    docs: param_doc.docs.clone(),
+                    cano_type: (),
+                    default: None,
+                    attrs: ParamAttrs::positional(),
+                });
+            } else {
+                pos_docs.push(TypelessParamDocs {
+                    name: "_".into(),
+                    docs: Default::default(),
+                    cano_type: (),
+                    default: None,
+                    attrs: ParamAttrs::positional(),
+                });
             }
         }
 
-        // todo: arrow function docs
-        if let Some(def_id) = def_id {
-            self.info.var_docs.insert(
-                def_id,
-                Arc::new(UntypedSymbolDocs::Function(Box::new(SignatureDocsT {
-                    docs: docstring.docs.clone().unwrap_or_default(),
-                    pos: pos_docs,
-                    named: named_docs,
-                    rest: rest_docs,
-                    ret_ty: (),
-                    def_docs: Default::default(),
-                }))),
+        for (decl, exp) in func.params.named.iter() {
+            let name = decl.name().clone();
+            let exp = self.check(exp);
+            let var = self.get_var(decl);
+            let v = Ty::Var(var.clone());
+            if let Some(annotated) = docstring.var_ty(&name) {
+                self.constrain(&v, annotated);
+            }
+            // todo: this is less efficient than v.lbs.push(exp), we may have some idea to
+            // optimize it, so I put a todo here.
+            self.constrain(&exp, &v);
+            named.insert(name.clone(), v);
+            defaults.insert(name.clone(), exp);
+
+            let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
+            named_docs.insert(
+                name.clone(),
+                TypelessParamDocs {
+                    name: name.clone(),
+                    docs: param_doc.docs.clone(),
+                    cano_type: (),
+                    // default: Some(e.expr().to_untyped().clone().into_text()),
+                    // todo
+                    default: None,
+                    attrs: ParamAttrs::named(),
+                },
             );
+            self.info
+                .var_docs
+                .insert(decl.clone(), param_doc.to_untyped());
         }
 
-        let body = self.check_expr_in(closure.body().span(), root);
+        // todo: spread left/right
+        if let Some((decl, _exp)) = &func.params.spread_right {
+            let var = self.get_var(decl);
+            let name = var.name.clone();
+            let param_doc = docstring
+                .get_var(&var.name.clone())
+                .unwrap_or(&EMPTY_VAR_DOC);
+            self.info
+                .var_docs
+                .insert(decl.clone(), param_doc.to_untyped());
+
+            let exp = Ty::Builtin(BuiltinTy::Args);
+            let v = Ty::Var(var);
+            if let Some(annotated) = docstring.var_ty(&name) {
+                self.constrain(&v, annotated);
+            }
+            self.constrain(&exp, &v);
+            rest = Some(v);
+
+            rest_docs = Some(TypelessParamDocs {
+                name,
+                docs: param_doc.docs.clone(),
+                cano_type: (),
+                default: None,
+                attrs: ParamAttrs::variadic(),
+            });
+            // todo: ..(args)
+        }
+
+        self.info.var_docs.insert(
+            def_id,
+            Arc::new(UntypedSymbolDocs::Function(Box::new(SignatureDocsT {
+                docs: docstring.docs.clone().unwrap_or_default(),
+                pos: pos_docs,
+                named: named_docs,
+                rest: rest_docs,
+                ret_ty: (),
+                def_docs: Default::default(),
+            }))),
+        );
+
+        let body = self.check(&func.body);
         let res_ty = if let Some(annotated) = &docstring.res_ty {
             self.constrain(&body, annotated);
             Ty::Let(Interned::new(TypeBounds {
@@ -515,7 +426,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let sig = SigTy::new(pos.into_iter(), named, None, rest, Some(res_ty)).into();
         let sig = Ty::Func(sig);
         if defaults.is_empty() {
-            return Some(sig);
+            return sig;
         }
 
         let defaults: Vec<(Interned<str>, Ty)> = defaults.into_iter().collect();
@@ -523,191 +434,133 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             sig: sig.into(),
             with: ArgsTy::new([].into_iter(), defaults, None, None, None).into(),
         };
-        Some(Ty::With(with_defaults.into()))
+        Ty::With(with_defaults.into())
     }
 
-    fn check_let(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let let_binding: ast::LetBinding = root.cast()?;
+    fn check_let(&mut self, let_expr: &Interned<LetExpr>) -> Ty {
+        // pub pattern: Expr,
+        // pub body: Expr,
 
-        match let_binding.kind() {
-            ast::LetBindingKind::Closure(c) => {
-                // let _name = let_binding.name().get().to_string();
-                let value = let_binding
-                    .init()
-                    .map(|init| self.check_expr_in(init.span(), root.clone()))
-                    .unwrap_or_else(|| Ty::Builtin(BuiltinTy::Infer));
+        // todo: docstring
+        // let docstring = self.check_var_docs(&root);
+        // let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
-                let v = Ty::Var(self.get_var(&root, c)?);
-                self.constrain(&value, &v);
-                // todo lbs is the lexical signature.
-            }
-            ast::LetBindingKind::Normal(pattern) => {
-                let docstring = self.check_var_docs(&root);
-                let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
+        let value = self.check(&let_expr.body);
+        // todo
+        // if let Some(annotated) = &docstring.res_ty {
+        //     self.constrain(&value, annotated);
+        // }
+        // let value = docstring.res_ty.clone().unwrap_or(value);
 
-                let value = let_binding
-                    .init()
-                    .map(|init| self.check_expr_in(init.span(), root.clone()))
-                    .unwrap_or_else(|| Ty::Builtin(BuiltinTy::Infer));
-                if let Some(annotated) = &docstring.res_ty {
-                    self.constrain(&value, annotated);
-                }
-                let value = docstring.res_ty.clone().unwrap_or(value);
+        let pat = self.check(&let_expr.pattern);
+        self.constrain(&value, &pat);
 
-                self.check_pattern(pattern, value, docstring, root.clone());
-            }
-        }
+        // self.check_pattern(pattern, value, docstring, root.clone());
 
-        Some(Ty::Any)
+        Ty::Builtin(BuiltinTy::None)
+    }
+
+    fn check_show(&mut self, show: &Interned<ShowExpr>) -> Ty {
+        let _selector = show.selector.as_ref().map(|sel| self.check(sel));
+        // todo: infer it type by selector
+        let _transform = self.check(&show.edit);
+
+        Ty::Builtin(BuiltinTy::None)
     }
 
     // todo: merge with func call, and regard difference (may be here)
-    fn check_set(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let set_rule: ast::SetRule = root.cast()?;
-
-        let callee = self.check_expr_in(set_rule.target().span(), root.clone());
-        let args = self.check_expr_in(set_rule.args().span(), root.clone());
-        let _cond = set_rule
-            .condition()
-            .map(|cond| self.check_expr_in(cond.span(), root.clone()));
+    fn check_set(&mut self, set: &Interned<SetExpr>) -> Ty {
+        let callee = self.check(&set.target);
+        let args = self.check(&set.args);
+        let _cond = set.cond.as_ref().map(|cond| self.check(cond));
 
         log::debug!("set rule: {callee:?} with {args:?}");
 
         if let Ty::Args(args) = args {
             let mut worker = ApplyTypeChecker {
                 base: self,
-                call_site: set_rule.target().span(),
-                args: Some(set_rule.args()),
+                // todo: call site
+                call_site: Span::detached(),
+                // call_site: set_rule.target().span(),
                 call_raw_for_with: Some(callee.clone()),
                 resultant: vec![],
             };
             callee.call(&args, true, &mut worker);
-            return Some(Ty::from_types(worker.resultant.into_iter()));
+            return Ty::from_types(worker.resultant.into_iter());
         }
 
-        None
+        Ty::Any
     }
 
-    fn check_show(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let show_rule: ast::ShowRule = root.cast()?;
+    fn check_ref(&mut self, r: &Interned<RefExpr>) -> Ty {
+        let s = r.ident.span();
+        let of = r.of.as_ref().map(|of| self.check(of));
+        let of = of.or_else(|| r.val.clone());
+        if let Some((s, of)) = s.zip(of.as_ref()) {
+            self.info.witness_at_most(s, of.clone());
+        }
 
-        let _selector = show_rule
-            .selector()
-            .map(|sel| self.check_expr_in(sel.span(), root.clone()));
-        let t = show_rule.transform();
-        // todo: infer it type by selector
-        let _transform = self.check_expr_in(t.span(), root.clone());
-
-        Some(Ty::Any)
+        of.unwrap_or(Ty::Any)
     }
 
-    // currently we do nothing on contextual
-    fn check_contextual(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let contextual: ast::Contextual = root.cast()?;
-
-        let body = self.check_expr_in(contextual.body().span(), root);
-
-        Some(Ty::Unary(TypeUnary::new(UnaryOp::Context, body.into())))
+    fn check_content_ref(&mut self, content_ref: &Interned<ContentRefExpr>) -> Ty {
+        if let Some(body) = content_ref.body.as_ref() {
+            self.check(body);
+        }
+        Ty::Builtin(BuiltinTy::Content)
     }
 
-    fn check_conditional(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let conditional: ast::Conditional = root.cast()?;
-
-        let cond = self.check_expr_in(conditional.condition().span(), root.clone());
-        let then = self.check_expr_in(conditional.if_body().span(), root.clone());
-        let else_ = conditional
-            .else_body()
-            .map(|else_body| self.check_expr_in(else_body.span(), root.clone()))
-            .unwrap_or(Ty::Builtin(BuiltinTy::None));
-
-        Some(Ty::If(IfTy::new(cond.into(), then.into(), else_.into())))
+    fn check_import(&mut self, _import: &Interned<ImportExpr>) -> Ty {
+        Ty::Builtin(BuiltinTy::None)
     }
 
-    fn check_while_loop(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let while_loop: ast::WhileLoop = root.cast()?;
-
-        let _cond = self.check_expr_in(while_loop.condition().span(), root.clone());
-        let _body = self.check_expr_in(while_loop.body().span(), root);
-
-        Some(Ty::Any)
+    fn check_include(&mut self, _include: &Interned<IncludeExpr>) -> Ty {
+        Ty::Builtin(BuiltinTy::Content)
     }
 
-    fn check_for_loop(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let for_loop: ast::ForLoop = root.cast()?;
+    fn check_contextual(&mut self, expr: &Interned<Expr>) -> Ty {
+        let body = self.check(expr);
 
-        let _iter = self.check_expr_in(for_loop.iterable().span(), root.clone());
-        let _pattern = self.check_expr_in(for_loop.pattern().span(), root.clone());
-        let _body = self.check_expr_in(for_loop.body().span(), root);
-
-        Some(Ty::Any)
+        Ty::Unary(TypeUnary::new(UnaryOp::Context, body))
     }
 
-    fn check_module_import(&mut self, root: LinkedNode<'_>) -> Option<Ty> {
-        let _module_import: ast::ModuleImport = root.cast()?;
+    fn check_conditional(&mut self, i: &Interned<IfExpr>) -> Ty {
+        let cond = self.check(&i.cond);
+        let then = self.check(&i.then);
+        let else_ = self.check(&i.else_);
 
-        // check all import items
-
-        Some(Ty::Builtin(BuiltinTy::None))
+        Ty::If(IfTy::new(cond.into(), then.into(), else_.into()))
     }
 
-    fn check_module_include(&mut self, _root: LinkedNode<'_>) -> Option<Ty> {
-        Some(Ty::Builtin(BuiltinTy::Content))
+    fn check_while_loop(&mut self, while_loop: &Interned<WhileExpr>) -> Ty {
+        let _cond = self.check(&while_loop.cond);
+        let _body = self.check(&while_loop.body);
+
+        Ty::Any
     }
 
-    fn check_destructuring(&mut self, _root: LinkedNode<'_>) -> Option<Ty> {
-        Some(Ty::Any)
+    fn check_for_loop(&mut self, for_loop: &Interned<ForExpr>) -> Ty {
+        let _iter = self.check(&for_loop.iter);
+        let _pattern = self.check(&for_loop.pattern);
+        let _body = self.check(&for_loop.body);
+
+        Ty::Any
     }
 
-    fn check_destruct_assign(&mut self, _root: LinkedNode<'_>) -> Option<Ty> {
-        Some(Ty::Builtin(BuiltinTy::None))
+    fn check_type(&mut self, ty: &Ty) -> Ty {
+        ty.clone()
     }
 
-    fn check_expr_in(&mut self, span: Span, root: LinkedNode<'_>) -> Ty {
-        root.find(span)
-            .map(|node| self.check(node))
-            .unwrap_or(Ty::Builtin(BuiltinTy::Undef))
+    fn check_decl(&mut self, decl: &Interned<Decl>) -> Ty {
+        // self.get_var(&root, root.cast()?).map(Ty::Var).or_else(|| {
+        //     let s = root.span();
+        //     let v = resolve_global_value(self.ctx, root, mode ==
+        // InterpretMode::Math)?;     Some(Ty::Value(InsTy::new_at(v, s)))
+        // })
+        Ty::Any
     }
 
-    fn check_pattern(
-        &mut self,
-        pattern: ast::Pattern<'_>,
-        value: Ty,
-        docs: &DocString,
-        root: LinkedNode<'_>,
-    ) -> Ty {
-        self.check_pattern_(pattern, value, docs, root)
-            .unwrap_or(Ty::Builtin(BuiltinTy::Undef))
-    }
-
-    fn check_pattern_(
-        &mut self,
-        pattern: ast::Pattern<'_>,
-        value: Ty,
-        docs: &DocString,
-        root: LinkedNode<'_>,
-    ) -> Option<Ty> {
-        Some(match pattern {
-            ast::Pattern::Normal(ast::Expr::Ident(ident)) => {
-                let var = self.get_var(&root, ident)?;
-                let def_id = var.def;
-                let docstring = docs.get_var(&var.name).unwrap_or(&EMPTY_VAR_DOC);
-                let var = Ty::Var(var);
-                log::debug!("check pattern: {ident:?} with {value:?} and docs {docstring:?}");
-                if let Some(annotated) = docstring.ty.as_ref() {
-                    self.constrain(&var, annotated);
-                }
-                self.constrain(&value, &var);
-
-                self.info.var_docs.insert(def_id, docstring.to_untyped());
-                var
-            }
-            ast::Pattern::Normal(_) => Ty::Any,
-            ast::Pattern::Placeholder(_) => Ty::Any,
-            ast::Pattern::Parenthesized(exp) => {
-                self.check_pattern(exp.pattern(), value, docs, root)
-            }
-            // todo: pattern
-            ast::Pattern::Destructuring(_destruct) => Ty::Any,
-        })
+    fn check_star(&mut self) -> Ty {
+        Ty::Any
     }
 }

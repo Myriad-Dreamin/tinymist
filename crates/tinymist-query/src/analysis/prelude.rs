@@ -19,7 +19,5 @@ pub use typst_shim::utils::LazyHash;
 pub use super::AnalysisContext;
 pub(crate) use super::StrRef;
 pub(crate) use crate::adt::interner::Interned;
-pub(crate) use crate::syntax::{
-    IdentRef, LexicalHierarchy, LexicalKind, LexicalModKind, LexicalVarKind, ModSrc,
-};
+pub(crate) use crate::syntax::{IdentRef, LexicalHierarchy, LexicalKind, LexicalModKind, ModSrc};
 pub use crate::ty::Ty;

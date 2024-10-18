@@ -11,14 +11,11 @@ pub struct ApplyTypeChecker<'a, 'b, 'w> {
     pub(super) base: &'a mut TypeChecker<'b, 'w>,
     pub call_site: Span,
     pub call_raw_for_with: Option<Ty>,
-    pub args: Option<ast::Args<'a>>,
     pub resultant: Vec<Ty>,
 }
 
 impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
     fn apply(&mut self, sig: Sig, args: &Interned<ArgsTy>, pol: bool) {
-        let _ = self.args;
-
         let (sig, is_partialize) = match sig {
             Sig::Partialize(sig) => (*sig, true),
             sig => (sig, false),
@@ -36,7 +33,7 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
                 if *val == typst::foundations::Type::of::<typst::foundations::Type>() {
                     if let Some(p0) = args.pos(0) {
                         self.resultant
-                            .push(Ty::Unary(TypeUnary::new(UnaryOp::TypeOf, p0.into())));
+                            .push(Ty::Unary(TypeUnary::new(UnaryOp::TypeOf, p0.clone())));
                     }
                 }
             }
@@ -59,7 +56,6 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
                                         let mut mapper = ApplyTypeChecker {
                                             base,
                                             call_site: Span::detached(),
-                                            args: None,
                                             call_raw_for_with: None,
                                             resultant: vec![],
                                         };
@@ -75,7 +71,6 @@ impl<'a, 'b, 'w> ApplyChecker for ApplyTypeChecker<'a, 'b, 'w> {
                                 let mut mapper = ApplyTypeChecker {
                                     base,
                                     call_site: Span::detached(),
-                                    args: None,
                                     call_raw_for_with: None,
                                     resultant: vec![],
                                 };
