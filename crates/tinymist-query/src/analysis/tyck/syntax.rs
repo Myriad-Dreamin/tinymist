@@ -9,7 +9,7 @@ use crate::ty::*;
 static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);
 static EMPTY_VAR_DOC: LazyLock<VarDoc> = LazyLock::new(VarDoc::default);
 
-impl<'a, 'w> TypeChecker<'a, 'w> {
+impl<'a> TypeChecker<'a> {
     pub(crate) fn check_syntax(&mut self, root: &Expr) -> Option<Ty> {
         Some(match root {
             Expr::Seq(seq) => self.check_seq(seq),
@@ -37,33 +37,6 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             Expr::Type(ty) => self.check_type(ty),
             Expr::Decl(decl) => self.check_decl(decl),
             Expr::Star => self.check_star(),
-            // SyntaxKind::None => Ty::Builtin(BuiltinTy::None),
-            // SyntaxKind::Auto => Ty::Builtin(BuiltinTy::Auto),
-            // SyntaxKind::Break => Ty::Builtin(BuiltinTy::FlowNone),
-            // SyntaxKind::Continue => Ty::Builtin(BuiltinTy::FlowNone),
-            // SyntaxKind::Return => Ty::Builtin(BuiltinTy::FlowNone),
-            // SyntaxKind::Ident => return self.check_ident(root, InterpretMode::Code),
-            // SyntaxKind::MathIdent => return self.check_ident(root, InterpretMode::Math),
-            // SyntaxKind::Parenthesized => return self.check_children(root),
-            // SyntaxKind::Array => return self.check_array(root),
-            // SyntaxKind::Dict => return self.check_dict(root),
-            // SyntaxKind::Unary => return self.check_unary(root),
-            // SyntaxKind::Binary => return self.check_binary(root),
-            // SyntaxKind::FieldAccess => return self.check_field_access(root),
-            // SyntaxKind::FuncCall => return self.check_func_call(root),
-            // SyntaxKind::Args => return self.check_args(root),
-            // SyntaxKind::Closure => return self.check_closure(root),
-            // SyntaxKind::LetBinding => return self.check_let(root),
-            // SyntaxKind::SetRule => return self.check_set(root),
-            // SyntaxKind::ShowRule => return self.check_show(root),
-            // SyntaxKind::Contextual => return self.check_contextual(root),
-            // SyntaxKind::Conditional => return self.check_conditional(root),
-            // SyntaxKind::WhileLoop => return self.check_while_loop(root),
-            // SyntaxKind::ForLoop => return self.check_for_loop(root),
-            // SyntaxKind::ModuleImport => return self.check_module_import(root),
-            // SyntaxKind::ModuleInclude => return self.check_module_include(root),
-            // SyntaxKind::Destructuring => return self.check_destructuring(root),
-            // SyntaxKind::DestructAssignment => return self.check_destruct_assign(root),
         })
     }
     fn check_seq(&mut self, seq: &Interned<EcoVec<Expr>>) -> Ty {
@@ -399,7 +372,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             }))),
         );
 
-        let body = self.check(&func.body);
+        let body = self.check_defer(&func.body);
         let res_ty = if let Some(annotated) = &docstring.res_ty {
             self.constrain(&body, annotated);
             Ty::Let(Interned::new(TypeBounds {
@@ -445,7 +418,10 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         // let docstring = self.check_var_docs(&root);
         // let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
-        let value = self.check(&let_expr.body);
+        let value = match &let_expr.body {
+            Some(expr) => self.check_defer(expr),
+            None => Ty::Builtin(BuiltinTy::None),
+        };
         // todo
         // if let Some(annotated) = &docstring.res_ty {
         //     self.constrain(&value, annotated);
@@ -463,7 +439,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
     fn check_show(&mut self, show: &Interned<ShowExpr>) -> Ty {
         let _selector = show.selector.as_ref().map(|sel| self.check(sel));
         // todo: infer it type by selector
-        let _transform = self.check(&show.edit);
+        let _transform = self.check_defer(&show.edit);
 
         Ty::Builtin(BuiltinTy::None)
     }
