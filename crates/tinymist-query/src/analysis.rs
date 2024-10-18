@@ -43,7 +43,8 @@ mod type_check_tests {
         snapshot_testing("type_check", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let result = type_check(ctx, source.clone());
+            let result = ctx.expr_stage(&source);
+            let result = type_check(ctx.shared_(), result);
             let result = result
                 .as_deref()
                 .map(|e| format!("{:#?}", TypeCheckSnapshot(&source, e)));
@@ -116,8 +117,9 @@ mod post_type_check_tests {
             let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
-            let result = type_check(ctx, source.clone());
-            let literal_type = result.and_then(|info| post_type_check(ctx, &info, node));
+            let result = ctx.expr_stage(&source);
+            let result = type_check(ctx.shared_(), result);
+            let literal_type = result.and_then(|info| post_type_check(ctx.shared_(), &info, node));
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),
@@ -152,8 +154,9 @@ mod type_describe_tests {
             let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
-            let result = type_check(ctx, source.clone());
-            let literal_type = result.and_then(|info| post_type_check(ctx, &info, node));
+            let result = ctx.expr_stage(&source);
+            let result = type_check(ctx.shared_(), result);
+            let literal_type = result.and_then(|info| post_type_check(ctx.shared_(), &info, node));
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),
@@ -187,7 +190,7 @@ mod module_tests {
                 ids
             }
 
-            let dependencies = construct_module_dependencies(ctx);
+            let dependencies = construct_module_dependencies(&mut ctx.local);
 
             let mut dependencies = dependencies
                 .into_iter()
@@ -282,7 +285,7 @@ mod expr_tests {
         snapshot_testing("expr_of", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let result: std::sync::Arc<crate::syntax::ExprInfo> = expr_of(ctx, source.clone());
+            let result = expr_of(ctx.shared_(), source.clone());
             let mut resolves = result.resolves.iter().collect::<Vec<_>>();
             resolves.sort_by(|x, y| {
                 x.1.ident.name().cmp(y.1.ident.name()).then_with(|| {
@@ -391,8 +394,8 @@ mod signature_tests {
             let callee_node = callee_node.node();
 
             let result = analyze_signature(
-                ctx,
-                SignatureTarget::Syntax(source.clone(), callee_node.clone()),
+                ctx.shared(),
+                SignatureTarget::Syntax(source.clone(), callee_node.get().clone()),
             );
 
             assert_snapshot!(SignatureSnapshot(result.as_ref()));

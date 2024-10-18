@@ -30,7 +30,7 @@ pub use typst::syntax::{
 };
 pub use typst::World;
 
-pub use crate::analysis::AnalysisContext;
+pub use crate::analysis::{AnalysisContext, LocalContext, SharedContext};
 pub use crate::lsp_typst_boundary::{
     lsp_to_typst, path_to_url, typst_to_lsp, LspDiagnostic, LspRange, LspSeverity,
     PositionEncoding, TypstDiagnostic, TypstSeverity, TypstSpan,

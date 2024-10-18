@@ -185,7 +185,7 @@ fn star_tooltip(
 
     let mi: ast::ModuleImport = leaf.cast()?;
     let source = mi.source();
-    let module = ctx.analyze_import(&leaf.find(source.span())?);
+    let module = ctx.analyze_import2(source.to_untyped()).1;
     log::debug!("star import: {source:?} => {:?}", module.is_some());
 
     let i = module?;
@@ -226,7 +226,7 @@ fn def_tooltip(
 
     let deref_target = get_deref_target(leaf.clone(), cursor)?;
 
-    let lnk = find_definition(ctx, source.clone(), document, deref_target.clone())?;
+    let lnk = find_definition(ctx.shared(), source.clone(), document, deref_target.clone())?;
 
     let mut results = vec![];
     let mut actions = vec![];

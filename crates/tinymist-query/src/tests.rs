@@ -84,7 +84,7 @@ pub fn run_with_ctx<T>(
     let mut w = w.snapshot();
     let w = WrapWorld(&mut w);
     let a = Analysis::default();
-    let mut ctx = AnalysisContext::new(root, &w, &a);
+    let mut ctx = AnalysisContext::new(root, &w, Arc::new(a));
     ctx.test_completion_files(Vec::new);
     ctx.test_files(|| paths);
     f(&mut ctx, p)

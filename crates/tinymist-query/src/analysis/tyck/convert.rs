@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn term_value(ctx: &mut AnalysisContext, value: &Value) -> Ty {
+pub fn term_value(ctx: &Arc<SharedContext>, value: &Value) -> Ty {
     match value {
         Value::Array(a) => {
             let values = a.iter().map(term_value_rec).collect::<Vec<_>>();

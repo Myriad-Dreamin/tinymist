@@ -3,7 +3,7 @@
 use hashbrown::HashSet;
 use tinymist_derive::BindTyCtx;
 
-use super::prelude::*;
+use super::{prelude::*, SharedContext};
 use super::{
     ArgsTy, FieldTy, Sig, SigChecker, SigShape, SigSurfaceKind, SigTy, Ty, TyCtx, TyCtxMut,
     TypeBounds, TypeScheme, TypeVar,
@@ -13,7 +13,7 @@ use crate::syntax::{get_check_target, get_check_target_by_context, CheckTarget, 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.
 pub(crate) fn post_type_check(
-    ctx: &mut AnalysisContext,
+    ctx: Arc<SharedContext>,
     info: &TypeScheme,
     node: LinkedNode,
 ) -> Option<Ty> {
@@ -92,14 +92,14 @@ fn check_signature<'a>(
     }
 }
 
-pub(crate) struct PostTypeChecker<'a, 'w> {
-    ctx: &'a mut AnalysisContext<'w>,
+pub(crate) struct PostTypeChecker<'a> {
+    ctx: Arc<SharedContext>,
     pub info: &'a TypeScheme,
     checked: HashMap<Span, Option<Ty>>,
     locals: TypeScheme,
 }
 
-impl<'a, 'w> TyCtx for PostTypeChecker<'a, 'w> {
+impl<'a> TyCtx for PostTypeChecker<'a> {
     fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<TypeBounds> {
         self.info.global_bounds(var, pol)
     }
@@ -109,7 +109,7 @@ impl<'a, 'w> TyCtx for PostTypeChecker<'a, 'w> {
     }
 }
 
-impl<'a, 'w> TyCtxMut for PostTypeChecker<'a, 'w> {
+impl<'a> TyCtxMut for PostTypeChecker<'a> {
     type Snap = <TypeScheme as TyCtxMut>::Snap;
 
     fn start_scope(&mut self) -> Self::Snap {
@@ -133,8 +133,8 @@ impl<'a, 'w> TyCtxMut for PostTypeChecker<'a, 'w> {
     }
 }
 
-impl<'a, 'w> PostTypeChecker<'a, 'w> {
-    pub fn new(ctx: &'a mut AnalysisContext<'w>, info: &'a TypeScheme) -> Self {
+impl<'a> PostTypeChecker<'a> {
+    pub fn new(ctx: Arc<SharedContext>, info: &'a TypeScheme) -> Self {
         Self {
             ctx,
             info,
@@ -365,9 +365,9 @@ where
 
 #[derive(BindTyCtx)]
 #[bind(0)]
-struct PostSigCheckWorker<'x, 'a, 'w, T>(&'x mut PostTypeChecker<'a, 'w>, &'x mut T);
+struct PostSigCheckWorker<'x, 'a, T>(&'x mut PostTypeChecker<'a>, &'x mut T);
 
-impl<'x, 'a, 'w, T: PostSigChecker> SigChecker for PostSigCheckWorker<'x, 'a, 'w, T> {
+impl<'x, 'a, T: PostSigChecker> SigChecker for PostSigCheckWorker<'x, 'a, T> {
     fn check(
         &mut self,
         sig: Sig,

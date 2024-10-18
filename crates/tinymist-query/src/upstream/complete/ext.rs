@@ -88,7 +88,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                     let anaylyze = node.children().find(|child| child.is::<ast::Expr>());
                     let analyzed = anaylyze
                         .as_ref()
-                        .and_then(|source| self.ctx.analyze_import(source));
+                        .and_then(|source| self.ctx.analyze_import2(source).1);
                     if analyzed.is_none() {
                         log::debug!("failed to analyze import: {:?}", anaylyze);
                     }
@@ -561,7 +561,7 @@ pub fn param_completions<'a>(
     let Some(cc) = ctx
         .root
         .find(callee.span())
-        .and_then(|callee| resolve_call_target(ctx.ctx, &callee))
+        .and_then(|callee| resolve_call_target(ctx.ctx.shared(), &callee))
     else {
         return;
     };
@@ -962,7 +962,7 @@ pub fn named_param_value_completions<'a>(
     let Some(cc) = ctx
         .root
         .find(callee.span())
-        .and_then(|callee| resolve_call_target(ctx.ctx, &callee))
+        .and_then(|callee| resolve_call_target(ctx.ctx.shared(), &callee))
     else {
         // static analysis
         if let Some(ty) = ty {
@@ -1131,7 +1131,7 @@ pub fn complete_path(
     let has_root = path.has_root();
 
     let src_path = id.vpath();
-    let base = src_path.resolve(&ctx.root)?;
+    let base = src_path.resolve(&ctx.local.root)?;
     let dst_path = src_path.join(path);
     let mut compl_path = dst_path.as_rootless_path();
     if !compl_path.is_dir() {
@@ -1144,7 +1144,7 @@ pub fn complete_path(
         return None;
     }
 
-    let dirs = ctx.root.clone();
+    let dirs = ctx.local.root.clone();
     log::debug!("compl_dirs: {dirs:?}");
     // find directory or files in the path
     let mut folder_completions = vec![];
@@ -1163,7 +1163,7 @@ pub fn complete_path(
 
         let label = if has_root {
             // diff with root
-            let w = path.strip_prefix(&ctx.root).ok()?;
+            let w = path.strip_prefix(&ctx.local.root).ok()?;
             eco_format!("/{}", unix_slash(w))
         } else {
             let base = base.parent()?;

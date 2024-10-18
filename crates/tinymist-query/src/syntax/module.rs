@@ -20,13 +20,13 @@ pub struct ModuleDependency {
 /// [`AnalysisContext::source_files`], and find the dependencies and dependents
 /// of each file.
 pub fn construct_module_dependencies(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
 ) -> HashMap<TypstFileId, ModuleDependency> {
     let mut dependencies = HashMap::new();
     let mut dependents = HashMap::new();
 
     for file_id in ctx.source_files().clone() {
-        let source = match ctx.source_by_id(file_id) {
+        let source = match ctx.shared.source_by_id(file_id) {
             Ok(source) => source,
             Err(err) => {
                 static WARN_ONCE: Once = Once::new();
@@ -38,7 +38,7 @@ pub fn construct_module_dependencies(
         };
 
         let file_id = source.id();
-        let Some(import) = ctx.import_info(source) else {
+        let Some(import) = ctx.shared.import_info(source) else {
             continue;
         };
 
