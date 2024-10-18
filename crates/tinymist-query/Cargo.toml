@@ -40,6 +40,8 @@ ecow.workspace = true
 siphasher.workspace = true
 chrono.workspace = true
 rayon.workspace = true
+rpds.workspace = true
+tokio.workspace = true
 
 typst.workspace = true
 

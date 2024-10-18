@@ -13,7 +13,7 @@ use typst_shim::syntax::LinkedNodeExt;
 use typst_shim::utils::{round_2, Numeric};
 
 use super::{plain_docs_sentence, summarize_font_family, truncated_repr};
-use crate::analysis::{analyze_expr_, analyze_labels, DynLabel};
+use crate::analysis::{analyze_expr, analyze_labels, DynLabel};
 
 /// Describe the item under the cursor.
 ///
@@ -59,7 +59,7 @@ pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
         return None;
     }
 
-    let values = analyze_expr_(world, ancestor);
+    let values = analyze_expr(world, ancestor);
 
     if let [(value, _)] = values.as_slice() {
         if let Some(docs) = value.docs() {

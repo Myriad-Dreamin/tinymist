@@ -1,13 +1,14 @@
 use core::fmt;
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, ops::DerefMut};
 
 use parking_lot::Mutex;
+use rpds::RedBlackTreeMapSync;
 use std::collections::HashSet;
+use tinymist_analysis::import::resolve_id_by_path;
 use typst::{
     foundations::{Element, Func, Module, Type, Value},
     model::{EmphElem, EnumElem, HeadingElem, ListElem, StrongElem},
     syntax::{Span, SyntaxNode},
-    Library,
 };
 
 use crate::{
@@ -322,12 +323,23 @@ impl fmt::Debug for Decl {
 pub type UnExpr = UnInst<Expr>;
 pub type BinExpr = BinInst<Expr>;
 
+pub struct DeferredExpr(pub ScopedDeferred<Expr>);
+
+impl fmt::Debug for DeferredExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DeferredExpr")
+    }
+}
+
+pub type ExportMap = BTreeMap<Interned<str>, Expr>;
+
 #[derive(Debug)]
 pub struct ExprInfo {
     pub fid: TypstFileId,
     pub resolves: HashMap<Span, Interned<RefExpr>>,
+    pub scopes: HashMap<Span, DeferredExpr>,
     pub imports: HashSet<TypstFileId>,
-    pub exports: BTreeMap<Interned<str>, Expr>,
+    pub exports: LexicalScope,
     pub root: Expr,
 }
 
@@ -337,33 +349,63 @@ impl std::hash::Hash for ExprInfo {
     }
 }
 
-pub(crate) fn expr_of(ctx: Arc<SharedContext>, source: Source) -> Arc<ExprInfo> {
-    let library = ctx.world.library.clone();
-    let mut w = ExprWorker {
-        ctx,
-        library: &library,
-        mode: InterpretMode::Markup,
-        imports: HashSet::new(),
-        scopes: vec![],
-        resolves: Arc::new(Mutex::new(vec![])),
-        buffer: vec![],
-    };
-    let _ = w.scope_mut();
-    let root = source.root().cast::<ast::Markup>().unwrap();
-    let root = w.check_in_mode(root.exprs(), InterpretMode::Markup);
+pub(crate) fn expr_of(
+    ctx: Arc<SharedContext>,
+    source: Source,
+    f: impl FnOnce(LexicalScope) + Send + Sync,
+) -> Arc<ExprInfo> {
+    log::info!(
+        "expr_of: {:?} in thread {:?}",
+        source.id(),
+        rayon::current_thread_index()
+    );
+    let defers_base = Arc::new(Mutex::new(HashMap::new()));
+    let defers = defers_base.clone();
+
+    let imports_base = Arc::new(Mutex::new(HashSet::new()));
+    let imports = imports_base.clone();
+
+    let resolves_base = Arc::new(Mutex::new(vec![]));
+    let resolves = resolves_base.clone();
+
+    let (exports, root) = rayon::scope(|s| {
+        let mut w = ExprWorker {
+            fid: source.id(),
+            scope: s,
+            ctx,
+            mode: InterpretMode::Markup,
+            imports,
+            defers,
+            import_buffer: Vec::new(),
+            scopes: eco_vec![],
+            last: ExprScope::Lexical(RedBlackTreeMapSync::default()),
+            resolves,
+            buffer: vec![],
+        };
+        let root = source.root().cast::<ast::Markup>().unwrap();
+        let root = w.check_in_mode(root.exprs(), InterpretMode::Markup);
+        w.collect_buffer();
+        let scopes = w.summarize_scope();
+        f(scopes.clone());
+
+        (scopes, root)
+    });
+
     let info = ExprInfo {
         fid: source.id(),
-        resolves: w.summarize_resolves(),
-        exports: w.summarize_scope(),
-        imports: w.imports,
+        resolves: HashMap::from_iter(std::mem::take(resolves_base.lock().deref_mut())),
+        imports: HashSet::from_iter(std::mem::take(imports_base.lock().deref_mut())),
+        exports,
+        scopes: std::mem::take(defers_base.lock().deref_mut()),
         root,
     };
+    log::info!("expr of end {:?}", source.id());
     Arc::new(info)
 }
 
-type LexicalScope = BTreeMap<Interned<str>, Expr>;
+pub type LexicalScope = rpds::RedBlackTreeMapSync<Interned<str>, Expr>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum ExprScope {
     Lexical(LexicalScope),
     Module(Module),
@@ -373,37 +415,47 @@ enum ExprScope {
 
 type ResolveVec = Vec<(Span, Interned<RefExpr>)>;
 
-struct ExprWorker<'w> {
+pub(crate) struct ExprWorker<'a, 's> {
+    fid: TypstFileId,
+    scope: &'a rayon::Scope<'s>,
     ctx: Arc<SharedContext>,
-    library: &'w Library,
     mode: InterpretMode,
-    imports: HashSet<TypstFileId>,
+    imports: Arc<Mutex<HashSet<TypstFileId>>>,
+    import_buffer: Vec<TypstFileId>,
+    defers: Arc<Mutex<HashMap<Span, DeferredExpr>>>,
     resolves: Arc<Mutex<ResolveVec>>,
     buffer: ResolveVec,
-    scopes: Vec<ExprScope>,
+    scopes: EcoVec<ExprScope>,
+    last: ExprScope,
 }
 
-impl<'w> ExprWorker<'w> {
+impl<'a, 's> ExprWorker<'a, 's> {
     fn with_scope<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        self.scopes.push(std::mem::replace(
+            &mut self.last,
+            ExprScope::Lexical(RedBlackTreeMapSync::default()),
+        ));
         let len = self.scopes.len();
-        self.scopes.push(ExprScope::Lexical(BTreeMap::new()));
         let result = f(self);
         self.scopes.truncate(len);
+        self.last = self.scopes.pop().unwrap();
         result
     }
 
     #[must_use]
     fn scope_mut(&mut self) -> &mut LexicalScope {
-        if matches!(self.scopes.last(), Some(ExprScope::Lexical(_))) {
+        if matches!(self.last, ExprScope::Lexical(_)) {
             return self.lexical_scope_unchecked();
         }
-        let scope = BTreeMap::new();
-        self.scopes.push(ExprScope::Lexical(scope));
+        self.scopes.push(std::mem::replace(
+            &mut self.last,
+            ExprScope::Lexical(RedBlackTreeMapSync::default()),
+        ));
         self.lexical_scope_unchecked()
     }
 
     fn lexical_scope_unchecked(&mut self) -> &mut LexicalScope {
-        let scope = self.scopes.last_mut().unwrap();
+        let scope = &mut self.last;
         if let ExprScope::Lexical(scope) = scope {
             scope
         } else {
@@ -411,27 +463,22 @@ impl<'w> ExprWorker<'w> {
         }
     }
 
-    fn summarize_resolves(&mut self) -> HashMap<Span, Interned<RefExpr>> {
-        let mut resolves = self.resolves.lock();
-        let global_resolves: Vec<_> = std::mem::take(resolves.as_mut());
-        let buffer = std::mem::take(&mut self.buffer);
-        HashMap::from_iter(global_resolves.into_iter().chain(buffer))
-    }
-
-    fn summarize_scope(&mut self) -> BTreeMap<Interned<str>, Expr> {
+    fn summarize_scope(&mut self) -> LexicalScope {
         log::debug!("summarize_scope: {:?}", self.scopes);
-        let mut exports = BTreeMap::new();
+        let mut exports = LexicalScope::default();
         for scope in std::mem::take(&mut self.scopes).into_iter() {
             match scope {
-                ExprScope::Lexical(mut scope) => {
-                    exports.append(&mut scope);
+                ExprScope::Lexical(scope) => {
+                    for (name, expr) in scope.iter() {
+                        exports.insert_mut(name.clone(), expr.clone());
+                    }
                 }
                 ExprScope::Module(module) => {
                     log::debug!("imported: {module:?}");
                     let v = Interned::new(Ty::Value(InsTy::new(Value::Module(module.clone()))));
                     for (name, _) in module.scope().iter() {
                         let name: Interned<str> = name.into();
-                        exports.insert(name.clone(), select_of(v.clone(), name));
+                        exports.insert_mut(name.clone(), select_of(v.clone(), name));
                     }
                 }
                 ExprScope::Func(func) => {
@@ -439,7 +486,7 @@ impl<'w> ExprWorker<'w> {
                         let v = Interned::new(Ty::Value(InsTy::new(Value::Func(func.clone()))));
                         for (name, _) in scope.iter() {
                             let name: Interned<str> = name.into();
-                            exports.insert(name.clone(), select_of(v.clone(), name));
+                            exports.insert_mut(name.clone(), select_of(v.clone(), name));
                         }
                     }
                 }
@@ -447,7 +494,7 @@ impl<'w> ExprWorker<'w> {
                     let v = Interned::new(Ty::Value(InsTy::new(Value::Type(ty))));
                     for (name, _) in ty.scope().iter() {
                         let name: Interned<str> = name.into();
-                        exports.insert(name.clone(), select_of(v.clone(), name));
+                        exports.insert_mut(name.clone(), select_of(v.clone(), name));
                     }
                 }
             }
@@ -565,11 +612,7 @@ impl<'w> ExprWorker<'w> {
                 typed.init().map_or_else(none_expr, |expr| self.check(expr))
             }
             ast::LetBindingKind::Normal(p) => {
-                let body = match typed.init() {
-                    Some(expr) => self.check(expr),
-                    None => Expr::Type(Ty::Builtin(BuiltinTy::None)),
-                };
-
+                let body = typed.init().map(|e| self.defer(e));
                 let pattern = self.check_pattern(p);
                 Expr::Let(LetExpr { pattern, body }.into())
             }
@@ -585,7 +628,7 @@ impl<'w> ExprWorker<'w> {
 
         let (params, body) = self.with_scope(|this| {
             this.scope_mut()
-                .insert(decl.name().clone(), decl.clone().into());
+                .insert_mut(decl.name().clone(), decl.clone().into());
             let mut inputs = eco_vec![];
             let mut names = eco_vec![];
             let mut spread_left = None;
@@ -601,7 +644,7 @@ impl<'w> ExprWorker<'w> {
                         names.push((key.clone(), val));
 
                         this.resolve_as(Decl::as_def(&key, None));
-                        this.scope_mut().insert(key.name().clone(), key.into());
+                        this.scope_mut().insert_mut(key.name().clone(), key.into());
                     }
                     ast::Param::Spread(s) => {
                         let decl: DeclExpr = if let Some(ident) = s.sink_ident() {
@@ -618,7 +661,8 @@ impl<'w> ExprWorker<'w> {
                         }
 
                         this.resolve_as(Decl::as_def(&decl, None));
-                        this.scope_mut().insert(decl.name().clone(), decl.into());
+                        this.scope_mut()
+                            .insert_mut(decl.name().clone(), decl.into());
                     }
                 }
             }
@@ -630,11 +674,11 @@ impl<'w> ExprWorker<'w> {
                 spread_right,
             };
 
-            (pattern.into(), this.check(typed.body()))
+            (pattern.into(), this.defer(typed.body()))
         });
 
         self.scope_mut()
-            .insert(decl.name().clone(), decl.clone().into());
+            .insert_mut(decl.name().clone(), decl.clone().into());
         Expr::Func(FuncExpr { decl, params, body }.into())
     }
 
@@ -693,7 +737,7 @@ impl<'w> ExprWorker<'w> {
                 let decl = Decl::var(ident).into();
                 self.resolve_as(Decl::as_def(&decl, None));
                 self.scope_mut()
-                    .insert(decl.name().clone(), decl.clone().into());
+                    .insert_mut(decl.name().clone(), decl.clone().into());
                 Expr::Decl(decl)
             }
             ast::Expr::Parenthesized(parenthesized) => self.check_pattern(parenthesized.pattern()),
@@ -703,32 +747,30 @@ impl<'w> ExprWorker<'w> {
     }
 
     fn check_module_import(&mut self, typed: ast::ModuleImport) -> Expr {
-        let source = typed.source().to_untyped();
+        let source = typed.source();
         log::debug!("checking import: {source:?}");
 
-        let (src, val) = self.ctx.analyze_import2(source);
+        let (src, val) = self.check_module_path(source);
 
         // Prefetch Type Check Information
-        if let Some(Value::Module(m)) = &val {
-            if let Some(f) = m.file_id() {
-                self.ctx.prefetch_type_check(f);
-                self.imports.insert(f);
-            }
+        if let Some(f) = src {
+            self.ctx.prefetch_type_check(f);
+            self.import_buffer.push(f);
         }
 
         let decl = match (typed.new_name(), src) {
             (Some(ident), _) => Some(Decl::module(ident)),
-            (None, Some(Value::Str(i))) if typed.imports().is_none() => {
-                let i = Path::new(i.as_str());
+            (None, Some(fid)) if typed.imports().is_none() => {
+                let i = fid.vpath().as_rooted_path();
                 let name = i.file_stem().and_then(|s| s.to_str());
                 // Some(self.alloc_path_end(s))
-                name.map(|name| Decl::path_stem(source.clone(), name))
+                name.map(|name| Decl::path_stem(source.to_untyped().clone(), name))
             }
             _ => None,
         };
         if let Some(decl) = &decl {
             self.scope_mut()
-                .insert(decl.name().clone(), decl.clone().into());
+                .insert_mut(decl.name().clone(), decl.clone().into());
         }
         let decl = decl
             .unwrap_or_else(|| Decl::ModuleImport(typed.span()))
@@ -757,6 +799,13 @@ impl<'w> ExprWorker<'w> {
                             self.scopes.push(ExprScope::Type(s));
                         }
                         Some(_) => {}
+                        None if src.is_some() => {
+                            let source = self.ctx.source_by_id(src.unwrap());
+                            if let Ok(source) = source {
+                                self.scopes
+                                    .push(ExprScope::Lexical(self.ctx.exports_of(source)));
+                            }
+                        }
                         None => {
                             log::debug!(
                                 "cannot analyze import on: {typed:?}, in file {:?}",
@@ -806,7 +855,7 @@ impl<'w> ExprWorker<'w> {
                         let new = rename.unwrap_or_else(|| old.clone());
                         let new_name = new.name().clone();
                         let new_expr = Expr::Decl(new);
-                        self.scope_mut().insert(new_name, new_expr.clone());
+                        self.scope_mut().insert_mut(new_name, new_expr.clone());
                         imported.push((old, new_expr));
                     }
 
@@ -826,6 +875,27 @@ impl<'w> ExprWorker<'w> {
         };
 
         Expr::Import(ImportExpr { decl, pattern }.into())
+    }
+
+    fn check_module_path(&mut self, source: ast::Expr) -> (Option<TypstFileId>, Option<Value>) {
+        match source {
+            // todo: analyze ident import
+            ast::Expr::Str(s) => {
+                let id = resolve_id_by_path(&self.ctx.world, self.fid, s.get().as_str());
+                (id, None)
+            }
+            _source => {
+                let (src, val) = self.ctx.analyze_import(source.to_untyped());
+                let fid = match (src, val.as_ref()) {
+                    (_, Some(Value::Module(m))) => m.file_id(),
+                    (Some(Value::Str(m)), _) => {
+                        resolve_id_by_path(&self.ctx.world, self.fid, m.as_str())
+                    }
+                    _ => None,
+                };
+                (fid, val)
+            }
+        }
     }
 
     fn check_module_include(&mut self, typed: ast::ModuleInclude) -> Expr {
@@ -945,7 +1015,7 @@ impl<'w> ExprWorker<'w> {
 
     fn check_show(&mut self, typed: ast::ShowRule) -> Expr {
         let selector = typed.selector().map(|s| self.check(s));
-        let edit = self.check(typed.transform());
+        let edit = self.defer(typed.transform());
         Expr::Show(ShowExpr { selector, edit }.into())
     }
 
@@ -1088,14 +1158,60 @@ impl<'w> ExprWorker<'w> {
         }
 
         let scope = match code {
-            InterpretMode::Math => self.library.math.scope(),
-            InterpretMode::Markup | InterpretMode::Code => self.library.global.scope(),
+            InterpretMode::Math => self.ctx.world.library.math.scope(),
+            InterpretMode::Markup | InterpretMode::Code => self.ctx.world.library.global.scope(),
             _ => return ref_expr,
         };
 
         let val = scope.get(&name);
         ref_expr.val = val.map(|v| Ty::Value(InsTy::new(v.clone())));
         ref_expr
+    }
+
+    fn defer(&self, s: ast::Expr) -> DeferExpr {
+        let s = s.to_untyped().clone();
+        let fid = self.fid;
+        let ctx = self.ctx.clone();
+        let mode = self.mode;
+        let imports = self.imports.clone();
+        let defers = self.defers.clone();
+        let resolves = self.resolves.clone();
+        let scopes = self.scopes.clone();
+        let last = self.last.clone();
+
+        let at = s.span();
+        self.defers.lock().insert(
+            at,
+            DeferredExpr(ScopedDeferred::new(self.scope, move |t| {
+                let mut new = ExprWorker {
+                    fid,
+                    scope: t,
+                    ctx,
+                    mode,
+                    imports,
+                    import_buffer: vec![],
+                    defers,
+                    resolves,
+                    buffer: vec![],
+                    scopes,
+                    last,
+                };
+
+                let ret = new.check(s.cast().unwrap());
+                new.collect_buffer();
+                ret
+            })),
+        );
+
+        DeferExpr { span: at }
+    }
+
+    fn collect_buffer(&mut self) {
+        let mut resolves = self.resolves.lock();
+        resolves.extend(self.buffer.drain(..));
+        drop(resolves);
+        let mut imports = self.imports.lock();
+        imports.extend(self.import_buffer.drain(..));
     }
 }
 
@@ -1158,6 +1274,11 @@ impl SelectExpr {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DeferExpr {
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ElementExpr {
     pub elem: Element,
     pub content: EcoVec<Expr>,
@@ -1173,19 +1294,19 @@ pub struct ApplyExpr {
 pub struct FuncExpr {
     pub decl: DeclExpr,
     pub params: Interned<Pattern>,
-    pub body: Expr,
+    pub body: DeferExpr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LetExpr {
     pub pattern: Expr,
-    pub body: Expr,
+    pub body: Option<DeferExpr>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ShowExpr {
     pub selector: Option<Expr>,
-    pub edit: Expr,
+    pub edit: DeferExpr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -1366,3 +1487,56 @@ impl_internable!(
     BinInst<Expr>,
     ApplyExpr,
 );
+use std::sync::Arc;
+
+use once_cell::sync::OnceCell;
+
+/// A value that is lazily executed on another thread.
+///
+/// Execution will be started in the background and can be waited on.
+pub struct ScopedDeferred<T>(Arc<OnceCell<T>>);
+
+impl<T: Send + Sync + 'static> ScopedDeferred<T> {
+    /// Creates a new deferred value.
+    ///
+    /// The closure will be called on a secondary thread such that the value
+    /// can be initialized in parallel.
+    pub fn new<'scope, F>(s: &rayon::Scope<'scope>, f: F) -> Self
+    where
+        F: FnOnce(&rayon::Scope<'scope>) -> T + Send + Sync + 'static,
+    {
+        let inner = Arc::new(OnceCell::new());
+        let cloned = Arc::clone(&inner);
+        s.spawn(move |s: &rayon::Scope<'scope>| {
+            // Initialize the value if it hasn't been initialized yet.
+            // We do this to avoid panicking in case it was set externally.
+            cloned.get_or_init(|| f(s));
+        });
+        Self(inner)
+    }
+
+    /// Waits on the value to be initialized.
+    ///
+    /// If the value has already been initialized, this will return
+    /// immediately. Otherwise, this will block until the value is
+    /// initialized in another thread.
+    pub fn wait(&self) -> &T {
+        // Fast path if the value is already available. We don't want to yield
+        // to rayon in that case.
+        if let Some(value) = self.0.get() {
+            return value;
+        }
+
+        // Ensure that we yield to give the deferred value a chance to compute
+        // single-threaded platforms (for WASM compatibility).
+        while let Some(rayon::Yield::Executed) = rayon::yield_now() {}
+
+        self.0.wait()
+    }
+}
+
+impl<T> Clone for ScopedDeferred<T> {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
+    }
+}
