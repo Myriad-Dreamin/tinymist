@@ -143,6 +143,8 @@ pub struct LspArgs {
 pub enum QueryCommands {
     /// Get the documentation for a specific package.
     PackageDocs(PackageDocsArgs),
+    /// Check a specific package.
+    CheckPackage(PackageDocsArgs),
 }
 
 #[derive(Debug, Clone, clap::Parser)]

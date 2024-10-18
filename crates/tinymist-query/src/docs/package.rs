@@ -16,6 +16,17 @@ use crate::docs::{file_id_repr, module_docs, symbol_docs, SymbolDocs, SymbolsInf
 use crate::ty::Ty;
 use crate::AnalysisContext;
 
+/// Check Package.
+pub fn check_package(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<()> {
+    let toml_id = get_manifest_id(spec)?;
+    let manifest = get_manifest(ctx.world(), toml_id)?;
+
+    let entry_point = toml_id.join(&manifest.package.entrypoint);
+
+    ctx.shared_().preload_package(entry_point);
+    Ok(())
+}
+
 /// Generate full documents in markdown format
 pub fn package_docs(
     ctx: &mut AnalysisContext,
