@@ -62,11 +62,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 * Made elementary select checker in https://github.com/Myriad-Dreamin/tinymist/pull/668
 * Made elementary tuple method checker in https://github.com/Myriad-Dreamin/tinymist/pull/669
 * Checking call types with default bindings in https://github.com/Myriad-Dreamin/tinymist/pull/671 and https://github.com/Myriad-Dreamin/tinymist/pull/675
+* Performing type induction on runtime values in https://github.com/Myriad-Dreamin/tinymist/pull/694
 
 ### Type Checking (Docstring)
 
 * Reading and checking type annotations in docstring in https://github.com/Myriad-Dreamin/tinymist/pull/679, https://github.com/Myriad-Dreamin/tinymist/pull/680, and https://github.com/Myriad-Dreamin/tinymist/pull/681
-* Performing type induction on runtime values in https://github.com/Myriad-Dreamin/tinymist/pull/694
 
 ### Misc
 
