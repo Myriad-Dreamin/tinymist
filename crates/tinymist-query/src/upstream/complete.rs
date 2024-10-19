@@ -357,6 +357,14 @@ fn math_completions(ctx: &mut CompletionContext) {
 
 /// Complete field accesses.
 fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
+    // Used to determine whether trivia nodes are allowed before '.'.
+    // During an inline expression in markup mode trivia nodes exit the inline
+    // expression.
+    let in_markup: bool = matches!(
+        ctx.leaf.parent_kind(),
+        None | Some(SyntaxKind::Markup) | Some(SyntaxKind::Ref)
+    );
+
     // Behind an expression plus dot: "emoji.|".
     if_chain! {
         if ctx.leaf.kind() == SyntaxKind::Dot
@@ -364,6 +372,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
                 && ctx.leaf.text() == ".");
         if ctx.leaf.range().end == ctx.cursor;
         if let Some(prev) = ctx.leaf.prev_sibling();
+        if !in_markup || prev.range().end == ctx.leaf.range().start;
         if prev.is::<ast::Expr>();
         if prev.parent_kind() != Some(SyntaxKind::Markup) ||
            prev.prev_sibling_kind() == Some(SyntaxKind::Hash);

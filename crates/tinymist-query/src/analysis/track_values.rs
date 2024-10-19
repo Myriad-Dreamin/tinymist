@@ -46,6 +46,7 @@ pub fn analyze_expr_(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Opt
 
 /// Try to load a module from the current source file.
 pub fn analyze_import_(world: &dyn World, source: &LinkedNode) -> Option<Value> {
+    // Use span in the node for resolving imports with relative paths.
     let source_span = source.span();
     let (source, _) = analyze_expr_(world, source).into_iter().next()?;
     if source.scope().is_some() {
@@ -70,6 +71,7 @@ pub fn analyze_import_(world: &dyn World, source: &LinkedNode) -> Option<Value> 
         Scopes::new(Some(world.library())),
         Span::detached(),
     );
+
     typst::eval::import(&mut vm, source, source_span, true)
         .ok()
         .map(Value::Module)
@@ -129,7 +131,7 @@ pub fn analyze_labels(document: &Document) -> (Vec<DynLabel>, usize) {
     // Bibliography keys.
     for (key, detail) in BibliographyElem::keys(document.introspector.track()) {
         output.push(DynLabel {
-            label: Label::new(&*key),
+            label: Label::new(key.as_str()),
             label_desc: detail.clone(),
             detail: detail.clone(),
             bib_title: detail,
