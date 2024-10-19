@@ -9,8 +9,8 @@ use reflexo::{debug_loc::DataSource, ImmutPath};
 use tinymist_world::LspWorld;
 use tinymist_world::DETACHED_ENTRY;
 use typst::diag::{eco_format, At, FileError, FileResult, PackageError, SourceResult};
-use typst::engine::Route;
-use typst::eval::{Eval, Tracer};
+use typst::engine::{Route, Sink, Traced};
+use typst::eval::Eval;
 use typst::foundations::{Bytes, Module, Styles};
 use typst::layout::Position;
 use typst::syntax::{package::PackageSpec, Span, VirtualPath};
@@ -343,12 +343,14 @@ impl<'w> AnalysisContext<'w> {
     /// Get (Create) a module by source.
     pub fn module_by_src(&self, source: Source) -> SourceResult<Module> {
         let route = Route::default();
-        let mut tracer = Tracer::default();
+        let traced = Traced::default();
+        let mut sink = Sink::default();
 
         typst::eval::eval(
             (self.world() as &dyn World).track(),
+            traced.track(),
+            sink.track_mut(),
             route.track(),
-            tracer.track_mut(),
             &source,
         )
     }

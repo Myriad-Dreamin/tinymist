@@ -357,6 +357,14 @@ fn math_completions(ctx: &mut CompletionContext) {
 
 /// Complete field accesses.
 fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
+    // Used to determine whether trivia nodes are allowed before '.'.
+    // During an inline expression in markup mode trivia nodes exit the inline
+    // expression.
+    let in_markup: bool = matches!(
+        ctx.leaf.parent_kind(),
+        None | Some(SyntaxKind::Markup) | Some(SyntaxKind::Ref)
+    );
+
     // Behind an expression plus dot: "emoji.|".
     if_chain! {
         if ctx.leaf.kind() == SyntaxKind::Dot
@@ -364,6 +372,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
                 && ctx.leaf.text() == ".");
         if ctx.leaf.range().end == ctx.cursor;
         if let Some(prev) = ctx.leaf.prev_sibling();
+        if !in_markup || prev.range().end == ctx.leaf.range().start;
         if prev.is::<ast::Expr>();
         if prev.parent_kind() != Some(SyntaxKind::Markup) ||
            prev.prev_sibling_kind() == Some(SyntaxKind::Hash);
@@ -395,12 +404,12 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
 
 /// Add completions for all fields on a value.
 fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: &Option<Styles>) {
-    for (name, value) in value.ty().scope().iter() {
+    for (name, value, _) in value.ty().scope().iter() {
         ctx.value_completion(Some(name.clone()), value, true, None);
     }
 
     if let Some(scope) = value.scope() {
-        for (name, value) in scope.iter() {
+        for (name, value, _) in scope.iter() {
             ctx.value_completion(Some(name.clone()), value, true, None);
         }
     }
@@ -448,9 +457,9 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                 for param in elem.params().iter().filter(|param| !param.required) {
                     if let Some(value) = elem
                         .field_id(param.name)
-                        .and_then(|id| elem.field_from_styles(id, StyleChain::new(styles)))
+                        .map(|id| elem.field_from_styles(id, StyleChain::new(styles)))
                     {
-                        ctx.value_completion(Some(param.name.into()), &value, false, None);
+                        ctx.value_completion(Some(param.name.into()), &value.unwrap(), false, None);
                     }
                 }
             }
@@ -552,7 +561,7 @@ fn import_item_completions<'a>(
         ctx.snippet_completion("*", "*", "Import everything.");
     }
 
-    for (name, value) in scope.iter() {
+    for (name, value, _) in scope.iter() {
         if existing
             .iter()
             .all(|item| item.original_name().as_str() != name)

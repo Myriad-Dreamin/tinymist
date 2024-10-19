@@ -7,12 +7,12 @@ use base64::Engine;
 use hyper::service::service_fn;
 use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
 use lsp_server::RequestId;
-use reflexo_typst::{typst::prelude::EcoVec, CompileEnv, Compiler, TypstDict};
+use reflexo_typst::{CompileEnv, Compiler, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_lsp::{just_future, LspClient, SchedulableResponse};
 use tinymist_world::LspWorld;
-use typst::{eval::Tracer, syntax::Span, World};
+use typst::{syntax::Span, World};
 
 use crate::{internal_error, LanguageState};
 
@@ -162,14 +162,13 @@ async fn trace_main(
     req_id: RequestId,
 ) -> ! {
     let mut env = CompileEnv {
-        tracer: Some(Tracer::default()),
         ..Default::default()
     };
     typst_timing::enable();
-    let mut errors = EcoVec::new();
-    if let Err(e) = std::marker::PhantomData.compile(w, &mut env) {
-        errors = e;
-    }
+    let diags = match std::marker::PhantomData.compile(w, &mut env) {
+        Ok(res) => res.warnings,
+        Err(errors) => errors,
+    };
     let mut writer = std::io::BufWriter::new(Vec::new());
     let _ = typst_timing::export_json(&mut writer, |span| {
         resolve_span(w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
@@ -177,10 +176,8 @@ async fn trace_main(
 
     let timings = writer.into_inner().unwrap();
 
-    let warnings = env.tracer.map(|e| e.warnings());
-
     let diagnostics = state.primary().handle.run_analysis(w, |ctx| {
-        tinymist_query::convert_diagnostics(ctx, warnings.iter().flatten().chain(errors.iter()))
+        tinymist_query::convert_diagnostics(ctx, diags.iter())
     });
 
     let diagnostics = diagnostics.unwrap_or_default();

@@ -13,7 +13,6 @@ use anyhow::bail;
 use clap::Parser;
 use clap_builder::CommandFactory;
 use clap_complete::generate;
-use comemo::Prehashed;
 use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;
@@ -27,6 +26,7 @@ use sync_lsp::{
 use tinymist::{CompileConfig, Config, LanguageState, RegularInit, SuperInit, UserActionTask};
 use tinymist_query::docs::PackageInfo;
 use typst::foundations::IntoValue;
+use typst_shim::utils::LazyHash;
 
 use crate::args::*;
 
@@ -149,7 +149,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
         bail!("input file is not within the root path: {input:?} not in {root_path:?}");
     }
 
-    let inputs = Arc::new(Prehashed::new(if args.compile.inputs.is_empty() {
+    let inputs = Arc::new(LazyHash::new(if args.compile.inputs.is_empty() {
         TypstDict::default()
     } else {
         let pairs = args.compile.inputs.iter();

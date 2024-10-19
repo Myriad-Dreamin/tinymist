@@ -135,13 +135,13 @@ impl CompileHandler {
         &self,
         world: &LspWorld,
         errors: EcoVec<SourceDiagnostic>,
-        warnings: Option<EcoVec<SourceDiagnostic>>,
+        warnings: EcoVec<SourceDiagnostic>,
     ) {
         let revision = world.revision().get();
         trace!("notify diagnostics({revision}): {errors:#?} {warnings:#?}");
 
         let diagnostics = self.run_analysis(world, |ctx| {
-            tinymist_query::convert_diagnostics(ctx, errors.iter().chain(warnings.iter().flatten()))
+            tinymist_query::convert_diagnostics(ctx, errors.iter().chain(warnings.iter()))
         });
 
         match diagnostics {
@@ -291,9 +291,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
                 TinymistCompileStatusEnum::CompileSuccess
             }
             CompileReport::Stage(_, _, _) => TinymistCompileStatusEnum::Compiling,
-            CompileReport::CompileSuccess(_, _, _) | CompileReport::CompileWarning(_, _, _) => {
-                TinymistCompileStatusEnum::CompileSuccess
-            }
+            CompileReport::CompileSuccess(_, _, _) => TinymistCompileStatusEnum::CompileSuccess,
             CompileReport::CompileError(_, _, _) | CompileReport::ExportError(_, _, _) => {
                 TinymistCompileStatusEnum::CompileError
             }
@@ -311,9 +309,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
             let status = match _rep {
                 CompileReport::Suspend => CompileStatus::CompileSuccess,
                 CompileReport::Stage(_, _, _) => CompileStatus::Compiling,
-                CompileReport::CompileSuccess(_, _, _) | CompileReport::CompileWarning(_, _, _) => {
-                    CompileStatus::CompileSuccess
-                }
+                CompileReport::CompileSuccess(_, _, _) => CompileStatus::CompileSuccess,
                 CompileReport::CompileError(_, _, _) | CompileReport::ExportError(_, _, _) => {
                     CompileStatus::CompileError
                 }
@@ -340,7 +336,7 @@ impl CompilationHandle<LspCompilerFeat> for CompileHandler {
         self.notify_diagnostics(
             &snap.world,
             snap.doc.clone().err().unwrap_or_default(),
-            snap.env.tracer.as_ref().map(|e| e.clone().warnings()),
+            snap.warnings.clone(),
         );
 
         self.export.signal(snap, snap.signal);
