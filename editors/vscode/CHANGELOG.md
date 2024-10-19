@@ -65,7 +65,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Type Checking (Docstring)
 
-* Reading and checking type annotations in docstring (Part. 1) in https://github.com/Myriad-Dreamin/tinymist/pull/679, https://github.com/Myriad-Dreamin/tinymist/pull/680, and https://github.com/Myriad-Dreamin/tinymist/pull/681
+* Reading and checking type annotations in docstring in https://github.com/Myriad-Dreamin/tinymist/pull/679, https://github.com/Myriad-Dreamin/tinymist/pull/680, and https://github.com/Myriad-Dreamin/tinymist/pull/681
 * Performing type induction on runtime values in https://github.com/Myriad-Dreamin/tinymist/pull/694
 
 ### Misc
