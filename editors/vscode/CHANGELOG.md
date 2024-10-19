@@ -30,7 +30,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 * Recording and using span where the label is attached in https://github.com/Myriad-Dreamin/tinymist/pull/641
   * Make go to definition more accurate.
-* Go to definition of module members in https://github.com/Myriad-Dreamin/tinymist/pull/644
+* Added support to go to definition of module members in https://github.com/Myriad-Dreamin/tinymist/pull/644
 
 ### Rename
 
@@ -62,19 +62,19 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 * Made elementary select checker in https://github.com/Myriad-Dreamin/tinymist/pull/668
 * Made elementary tuple method checker in https://github.com/Myriad-Dreamin/tinymist/pull/669
 * Checking call types with default bindings in https://github.com/Myriad-Dreamin/tinymist/pull/671 and https://github.com/Myriad-Dreamin/tinymist/pull/675
+* Performing type induction on runtime values in https://github.com/Myriad-Dreamin/tinymist/pull/694
 
 ### Type Checking (Docstring)
 
-* Reading and checking type annotations in docstring (Part. 1) in https://github.com/Myriad-Dreamin/tinymist/pull/679, https://github.com/Myriad-Dreamin/tinymist/pull/680, and https://github.com/Myriad-Dreamin/tinymist/pull/681
-* feat: type induction on runtime values in https://github.com/Myriad-Dreamin/tinymist/pull/694
+* Reading and checking type annotations in docstring in https://github.com/Myriad-Dreamin/tinymist/pull/679, https://github.com/Myriad-Dreamin/tinymist/pull/680, and https://github.com/Myriad-Dreamin/tinymist/pull/681
 
 ### Misc
 
-* dev: refactor analysis structure in https://github.com/Myriad-Dreamin/tinymist/pull/674
-* docs: fix typos in readme by @hougesen in https://github.com/Myriad-Dreamin/tinymist/pull/662
+* Refactored analysis structure in https://github.com/Myriad-Dreamin/tinymist/pull/674
+* Fixed typos in readme by @hougesen in https://github.com/Myriad-Dreamin/tinymist/pull/662
 * Incorporated with static function signature analysis in https://github.com/Myriad-Dreamin/tinymist/pull/688, https://github.com/Myriad-Dreamin/tinymist/pull/692, https://github.com/Myriad-Dreamin/tinymist/pull/696, and https://github.com/Myriad-Dreamin/tinymist/pull/699
 
-**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.32...v0.11.34
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.32...v0.12.0
 
 ## v0.11.32 - [2024-10-10]
 
