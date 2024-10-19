@@ -27,7 +27,7 @@ pub fn term_value(ctx: &mut AnalysisContext, value: &Value) -> Ty {
             let values = m
                 .scope()
                 .iter()
-                .map(|(k, v)| (k.into(), term_value_rec(v), Span::detached()))
+                .map(|(k, v, _)| (k.into(), term_value_rec(v), Span::detached()))
                 .collect();
             Ty::Dict(RecordTy::new(values))
         }
@@ -40,6 +40,7 @@ pub fn term_value(ctx: &mut AnalysisContext, value: &Value) -> Ty {
         | Value::Bool(..)
         | Value::Int(..)
         | Value::Float(..)
+        | Value::Decimal(..)
         | Value::Length(..)
         | Value::Angle(..)
         | Value::Ratio(..)
@@ -75,6 +76,7 @@ pub fn term_value_rec(value: &Value) -> Ty {
         | Value::Bool(..)
         | Value::Int(..)
         | Value::Float(..)
+        | Value::Decimal(..)
         | Value::Length(..)
         | Value::Angle(..)
         | Value::Ratio(..)

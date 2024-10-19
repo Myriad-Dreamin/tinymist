@@ -446,7 +446,6 @@ pub fn with_vm<T>(world: Tracked<dyn World + '_>, f: impl FnOnce(&mut typst::eva
         introspector: introspector.track(),
         traced: traced.track(),
         sink: sink.track_mut(),
-        route: Route::default(),
     };
 
     let context = Context::none();

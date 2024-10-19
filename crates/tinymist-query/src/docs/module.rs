@@ -176,7 +176,7 @@ impl ScanSymbolCtx<'_, '_> {
 
                 let symbols = module.scope().iter();
                 let symbols = symbols
-                    .map(|(k, v)| {
+                    .map(|(k, v, _)| {
                         let mut path = path.clone();
                         path.push(k);
                         self.sym(k, path.clone(), Some(&fid), v)
