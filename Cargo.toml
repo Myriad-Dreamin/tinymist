@@ -110,7 +110,7 @@ typst-pdf = "0.12.0"
 typst-syntax = "0.12.0"
 typst-assets = "0.12.0"
 typstfmt_lib = { git = "https://github.com/astrale-sharp/typstfmt", tag = "0.2.7" }
-typstyle = { git = "https://github.com/paran3xus/typstyle", tag = "tinymist-typst-0.12-rc1", default-features = false }
+typstyle = { version = "0.12.0", default-features = false }
 typlite = { path = "./crates/typlite" }
 typst-shim = { path = "./crates/typst-shim", features = ["nightly"] }
 
@@ -194,11 +194,11 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "
 # typst-render = { path = "../typst/crates/typst-render" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "04decf13f9569bb19e01f7258c3b6b0633a066fa" }
-reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "04decf13f9569bb19e01f7258c3b6b0633a066fa" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "04decf13f9569bb19e01f7258c3b6b0633a066fa" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "04decf13f9569bb19e01f7258c3b6b0633a066fa" }
-reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "04decf13f9569bb19e01f7258c3b6b0633a066fa" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "5b79e34ad52d0418e22e88966e52d984a9fde110" }
+# reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "5b79e34ad52d0418e22e88966e52d984a9fde110" }
+# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "5b79e34ad52d0418e22e88966e52d984a9fde110" }
+# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "5b79e34ad52d0418e22e88966e52d984a9fde110" }
+# reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "5b79e34ad52d0418e22e88966e52d984a9fde110" }
 
 # typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
 # reflexo = { path = "../typst.ts/crates/reflexo/" }

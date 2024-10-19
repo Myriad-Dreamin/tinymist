@@ -215,7 +215,7 @@ impl LanguageState {
                 .map_err(z_internal_error)?;
 
             log::debug!("sym doc: {sym_doc:?}");
-            Some(trait_symbol_fonts(&sym_doc, &symbols_ref))
+            Some(trait_symbol_fonts(&sym_doc.output, &symbols_ref))
         };
 
         let mut glyph_def = String::new();
