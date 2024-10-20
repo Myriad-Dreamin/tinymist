@@ -165,7 +165,7 @@ fn find_ident_definition(
     let def_name = root.find(span?)?;
     let def_range = def_source.range(span?)?;
     match kind {
-        DefKind::Module | DefKind::PathStem => {
+        DefKind::ModuleAlias | DefKind::PathStem => {
             if !proj.is_empty() {
                 proj.reverse();
                 // let def_fid = def_fid?;
@@ -217,7 +217,8 @@ fn find_ident_definition(
         | DefKind::Spread
         | DefKind::Export
         | DefKind::ImportAlias
-        | DefKind::Import => {
+        | DefKind::Import
+        | DefKind::Module => {
             log::info!("unimplemented import {kind:?}");
             None
         }

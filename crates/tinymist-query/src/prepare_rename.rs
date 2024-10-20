@@ -92,7 +92,7 @@ pub(crate) fn prepare_renaming(
         // LexicalKind::Mod(Module(ModSrc::Expr(..))) => None,
         Var => var_rename(),
         Func => validate_fn_renaming(lnk).map(|_| (name.to_string(), None)),
-        ModuleImport | ModuleInclude | Module | PathStem => {
+        ModuleImport | ModuleInclude | ModuleAlias | PathStem => {
             let node = deref_target.node().get().clone();
             let path = node.cast::<ast::Str>()?;
             let name = path.get().to_string();
@@ -100,7 +100,7 @@ pub(crate) fn prepare_renaming(
         }
         // todo: label renaming, bibkey renaming
         BibKey | Label | Ref => None,
-        Export | ImportAlias | Constant | IdentRef | Import | StrName | Spread => None,
+        Export | ImportAlias | Module | Constant | IdentRef | Import | StrName | Spread => None,
     }
 }
 

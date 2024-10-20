@@ -288,10 +288,10 @@ mod expr_tests {
             let result = ctx.shared_().expr_stage(&source);
             let mut resolves = result.resolves.iter().collect::<Vec<_>>();
             resolves.sort_by(|x, y| {
-                x.1.ident.name().cmp(y.1.ident.name()).then_with(|| {
-                    x.1.ident
+                x.1.decl.name().cmp(y.1.decl.name()).then_with(|| {
+                    x.1.decl
                         .span()
-                        .zip(y.1.ident.span())
+                        .zip(y.1.decl.span())
                         .map_or(std::cmp::Ordering::Equal, |(x, y)| {
                             x.number().cmp(&y.number())
                         })
@@ -315,7 +315,11 @@ mod expr_tests {
             let mut resolves = resolves
                 .into_iter()
                 .map(|(_, expr)| {
-                    let RefExpr { ident, of, val } = expr.as_ref();
+                    let RefExpr {
+                        decl: ident,
+                        of,
+                        val,
+                    } = expr.as_ref();
 
                     format!(
                         "{} -> {}, val: {val:?}",

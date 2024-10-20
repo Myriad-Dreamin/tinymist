@@ -60,7 +60,7 @@ impl<'a> TypeChecker<'a> {
                 ArgExpr::Spread(..) => {
                     // todo: handle spread args
                 }
-                ArgExpr::Named(..) => unreachable!(),
+                ArgExpr::NamedRt(..) | ArgExpr::Named(..) => unreachable!(),
             }
         }
 
@@ -77,6 +77,9 @@ impl<'a> TypeChecker<'a> {
                     let name = name.name().clone();
                     let val = self.check(value);
                     fields.push((name, val));
+                }
+                ArgExpr::NamedRt(_n) => {
+                    // todo: handle non constant keys
                 }
                 ArgExpr::Spread(..) => {
                     // todo: handle spread args
@@ -102,6 +105,9 @@ impl<'a> TypeChecker<'a> {
                     let name = name.name().clone();
                     let val = self.check(value);
                     named.push((name, val));
+                }
+                ArgExpr::NamedRt(_n) => {
+                    // todo: handle non constant keys
                 }
                 ArgExpr::Spread(..) => {
                     // todo: handle spread args
@@ -469,7 +475,7 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_ref(&mut self, r: &Interned<RefExpr>) -> Ty {
-        let s = r.ident.span();
+        let s = r.decl.span();
         let of = r.of.as_ref().map(|of| self.check(of));
         let of = of.or_else(|| r.val.clone());
         if let Some((s, of)) = s.zip(of.as_ref()) {

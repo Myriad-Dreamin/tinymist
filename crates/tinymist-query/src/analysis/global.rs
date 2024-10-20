@@ -9,7 +9,6 @@ use reflexo::hash::{hash128, FxDashMap};
 use reflexo::{debug_loc::DataSource, ImmutPath};
 use tinymist_world::LspWorld;
 use tinymist_world::DETACHED_ENTRY;
-use tokio::sync::oneshot;
 use typst::diag::{eco_format, At, FileError, FileResult, PackageError, SourceResult};
 use typst::engine::{Route, Sink, Traced};
 use typst::eval::Eval;
@@ -91,7 +90,7 @@ type DeferredCompute<T> = Arc<OnceCell<T>>;
 pub struct AnalysisGlobalCaches {
     lifetime: AtomicU64,
     clear_lifetime: AtomicU64,
-    expr_stage: CacheMap<(u64, Arc<ExprInfo>)>,
+    expr_stage: CacheMap<(u64, DeferredCompute<Arc<ExprInfo>>)>,
     type_check: CacheMap<(u64, DeferredCompute<Option<Arc<TypeScheme>>>)>,
     static_signatures: CacheMap<(u64, Source, Span, DeferredCompute<Option<Signature>>)>,
     docstrings: CacheMap<(u64, Option<Arc<DocString>>)>,
@@ -528,16 +527,12 @@ impl<'w> AnalysisContext<'w> {
 
     /// Try to load a module from the current source file.
     pub fn analyze_import2(&self, source: &SyntaxNode) -> (Option<Value>, Option<Value>) {
-        let token = &self.analysis.workers.import;
-        let world = self.world();
-        token.enter(|| analyze_import_(world, source))
+        self.shared().analyze_import(source)
     }
 
     /// Try to load a module from the current source file.
     pub fn analyze_expr2(&self, source: &SyntaxNode) -> EcoVec<(Value, Option<Styles>)> {
-        let token = &self.analysis.workers.expression;
-        let world = self.world();
-        token.enter(|| analyze_expr_(world, source))
+        self.shared().analyze_expr2(source)
     }
 
     /// Describe the item under the cursor.
@@ -737,48 +732,37 @@ impl SharedContext {
 
     /// Get the expression information of a source file.
     pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> Arc<ExprInfo> {
-        self.expr_stage_(source, |_| {})
-    }
-
-    /// Get the expression information of a source file.
-    pub(crate) fn expr_stage_(
-        self: &Arc<Self>,
-        source: &Source,
-        f: impl FnOnce(LexicalScope) + Send + Sync,
-    ) -> Arc<ExprInfo> {
         use crate::syntax::expr_of;
-        use dashmap::mapref::entry::Entry;
 
-        let entry = self.analysis.caches.expr_stage.entry(hash128(&source));
-        match entry {
-            Entry::Occupied(entry) => {
-                let res = entry.get().1.clone();
-                f(res.exports.clone());
-                res
-            }
-            Entry::Vacant(entry) => {
-                let this = self.clone();
-                let source = source.clone();
-                let res = entry.insert((self.lifetime, expr_of(this.clone(), source.clone(), f)));
-                res.1.clone()
-            }
-        }
+        let res = {
+            let entry = self.analysis.caches.expr_stage.entry(hash128(&source));
+            let res = entry.or_insert_with(|| (self.lifetime, DeferredCompute::default()));
+            res.1.clone()
+        };
+        res.get_or_init(|| expr_of(self.clone(), source.clone()))
+            .clone()
     }
 
     pub(crate) fn exports_of(self: &Arc<Self>, source: Source) -> LexicalScope {
-        if let Some(expr_info) = self.analysis.caches.expr_stage.get(&hash128(&source)) {
-            return expr_info.1.exports.clone();
-        }
+        self.expr_stage(&source).exports.clone()
 
-        let (tx, rx) = oneshot::channel();
-        let this = self.clone();
-        let source = source.clone();
-        rayon::spawn(move || {
-            this.expr_stage_(&source, |e| {
-                tx.send(e).unwrap_or_default();
-            });
-        });
-        rx.blocking_recv().unwrap_or_default()
+        // {
+        //     let entry =
+        // self.analysis.caches.expr_stage.get(&hash128(&source));
+        //     if let Some(expr_info) = entry.and_then(|e| e.1.get().cloned()) {
+        //         return expr_info.exports.clone();
+        //     }
+        // }
+
+        // let (tx, rx) = oneshot::channel();
+        // let this = self.clone();
+        // let source = source.clone();
+        // rayon::spawn(move || {
+        //     this.expr_stage_(&source, |e| {
+        //         tx.send(e).unwrap_or_default();
+        //     });
+        // });
+        // rx.blocking_recv().unwrap_or_default()
     }
 
     /// Get the type check information of a source file.
@@ -786,9 +770,11 @@ impl SharedContext {
         use crate::analysis::type_check;
         // todo: recursive hash
         let expr_info = self.expr_stage(source);
-        let entry = self.analysis.caches.type_check.entry(hash128(&expr_info));
-        let entry = entry.or_insert_with(|| (self.lifetime, Arc::default()));
-        let res = entry.1.clone();
+        let res = {
+            let entry = self.analysis.caches.type_check.entry(hash128(&expr_info));
+            let res = entry.or_insert_with(|| (self.lifetime, Arc::default()));
+            res.1.clone()
+        };
         res.get_or_init(|| {
             log::debug!("real type check {:?}", source.id());
             type_check(self.clone(), expr_info)

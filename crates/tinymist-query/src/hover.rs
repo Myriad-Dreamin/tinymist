@@ -318,6 +318,7 @@ fn def_tooltip(
         | DefKind::ImportAlias
         | DefKind::Constant
         | DefKind::IdentRef
+        | DefKind::ModuleAlias
         | DefKind::Module
         | DefKind::Import
         | DefKind::Ref
