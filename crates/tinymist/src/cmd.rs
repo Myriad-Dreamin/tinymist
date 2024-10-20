@@ -650,12 +650,12 @@ impl LanguageState {
             });
             let entry = entry.map_err(|e| internal_error(e.to_string()))?;
 
-            let w = &snap.world.task(TaskInputs {
+            let w = snap.world.task(TaskInputs {
                 entry: Some(entry),
                 inputs: None,
             });
 
-            let res = handle.run_analysis(w, |a| {
+            let res = handle.run_analysis(&w, |a| {
                 tinymist_query::docs::check_package(a, &info)
                     .map_err(map_string_err("failed to generate docs"))
                     .map_err(z_internal_error)
