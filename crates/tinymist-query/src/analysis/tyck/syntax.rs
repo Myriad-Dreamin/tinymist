@@ -39,7 +39,7 @@ impl<'a> TypeChecker<'a> {
             Expr::Star => self.check_star(),
         })
     }
-    fn check_seq(&mut self, seq: &Interned<EcoVec<Expr>>) -> Ty {
+    fn check_seq(&mut self, seq: &Interned<Vec<Expr>>) -> Ty {
         let mut joiner = Joiner::default();
 
         for child in seq.iter() {
@@ -49,7 +49,7 @@ impl<'a> TypeChecker<'a> {
         joiner.finalize()
     }
 
-    fn check_array(&mut self, array: &Interned<EcoVec<ArgExpr>>) -> Ty {
+    fn check_array(&mut self, array: &Interned<Vec<ArgExpr>>) -> Ty {
         let mut elements = Vec::new();
 
         for elem in array.iter() {
@@ -67,7 +67,7 @@ impl<'a> TypeChecker<'a> {
         Ty::Tuple(elements.into())
     }
 
-    fn check_dict(&mut self, dict: &Interned<EcoVec<ArgExpr>>) -> Ty {
+    fn check_dict(&mut self, dict: &Interned<Vec<ArgExpr>>) -> Ty {
         let mut fields = Vec::new();
 
         for elem in dict.iter() {
@@ -88,7 +88,7 @@ impl<'a> TypeChecker<'a> {
         Ty::Dict(RecordTy::new(fields))
     }
 
-    fn check_args(&mut self, args: &Interned<EcoVec<ArgExpr>>) -> Ty {
+    fn check_args(&mut self, args: &Interned<Vec<ArgExpr>>) -> Ty {
         let mut args_res = Vec::new();
         let mut named = vec![];
 

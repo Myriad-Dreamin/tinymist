@@ -4287,7 +4287,6 @@ dependencies = [
  "tinymist-analysis",
  "tinymist-derive",
  "tinymist-world",
- "tokio",
  "toml 0.8.19",
  "triomphe",
  "ttf-parser 0.20.0",
