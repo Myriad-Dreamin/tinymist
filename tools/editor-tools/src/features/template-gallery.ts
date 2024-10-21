@@ -2,6 +2,7 @@
 import van, { ChildDom, State } from "vanjs-core";
 import { requestSavePackageData, requestInitTemplate } from "../vscode";
 import { AddIcon, HeartIcon } from "../icons";
+import { base64Decode } from "../utils";
 const { div, input, button, a, span } = van.tags;
 
 // const isDarkMode = () =>
@@ -274,7 +275,7 @@ export const TemplateGallery = () => {
     JSON.parse(
       favoritePlaceholders.startsWith(":")
         ? favoriteState
-        : atob(favoritePlaceholders)
+        : base64Decode(favoritePlaceholders)
     )
   );
   van.derive(async () => {

@@ -3,6 +3,7 @@ import * as path from "path";
 import { readFile, writeFile } from "fs/promises";
 import { tinymist } from "./lsp";
 import { extensionState, ExtensionContext } from "./state";
+import { base64Encode } from "./util";
 
 async function loadHTMLFile(context: ExtensionContext, relativePath: string) {
   const filePath = path.resolve(context.extensionPath, relativePath);
@@ -355,7 +356,7 @@ async function editorToolAt(
     case "template-gallery":
       const userPackageData = getUserPackageData(context);
       const packageData = JSON.stringify(userPackageData.data);
-      html = html.replace(":[[preview:FavoritePlaceholder]]:", btoa(packageData));
+      html = html.replace(":[[preview:FavoritePlaceholder]]:", base64Encode(packageData));
       break;
     case "tracing": {
       const focusingFile = extensionState.getFocusingFile();
@@ -380,7 +381,7 @@ async function editorToolAt(
     }
     case "summary": {
       const fontsExportConfigure = getFontsExportConfigure(context);
-      const fontsExportConfigureData = JSON.stringify(fontsExportConfigure.data);
+      const fontsExportConfig = JSON.stringify(fontsExportConfigure.data);
       const [docMetrics, serverInfo] = await fetchSummaryInfo();
 
       if (!docMetrics || !serverInfo) {
@@ -395,9 +396,9 @@ async function editorToolAt(
         return;
       }
 
-      html = html.replace(":[[preview:FontsExportConfigure]]:", btoa(fontsExportConfigureData));
-      html = html.replace(":[[preview:DocumentMetrics]]:", btoa(docMetrics));
-      html = html.replace(":[[preview:ServerInfo]]:", btoa(serverInfo));
+      html = html.replace(":[[preview:FontsExportConfigure]]:", base64Encode(fontsExportConfig));
+      html = html.replace(":[[preview:DocumentMetrics]]:", base64Encode(docMetrics));
+      html = html.replace(":[[preview:ServerInfo]]:", base64Encode(serverInfo));
       break;
     }
     case "symbol-view": {
@@ -411,11 +412,11 @@ async function editorToolAt(
       }
 
       const symbolInfo = JSON.stringify(result);
-      html = html.replace(":[[preview:SymbolInformation]]:", btoa(symbolInfo));
+      html = html.replace(":[[preview:SymbolInformation]]:", base64Encode(symbolInfo));
       break;
     }
     case "docs": {
-      html = html.replace(":[[preview:DocContent]]:", btoa(encodeURIComponent(opts.content)));
+      html = html.replace(":[[preview:DocContent]]:", base64Encode(opts.content));
       break;
     }
   }

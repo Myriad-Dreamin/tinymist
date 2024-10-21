@@ -6,6 +6,7 @@ import {
   traceData as traceReport,
 } from "../vscode";
 import { startModal } from "../components/modal";
+import { base64Decode } from "../utils";
 const { div, h2, button, iframe, code, br, span } = van.tags;
 
 const ORIGIN = "https://ui.perfetto.dev";
@@ -151,7 +152,7 @@ export const Tracing = () => {
           "s, with ",
           code(
             {
-              title: decodeStream(rep.stderr),
+              title: base64Decode(rep.stderr),
               style: "text-decoration: underline",
             },
             "logging"
@@ -182,10 +183,6 @@ export const Tracing = () => {
     })
   );
 };
-
-function decodeStream(stderr: string): string {
-  return atob(stderr);
-}
 
 function diffPath(root: string, main: string): ChildDom {
   if (main.startsWith(root)) {
