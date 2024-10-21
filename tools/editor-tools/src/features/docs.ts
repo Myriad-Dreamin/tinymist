@@ -1,3 +1,4 @@
+import { base64Decode } from "../utils";
 import "./docs.css";
 import van, { State, ChildDom } from "vanjs-core";
 const { div, h1, h2, h3, code, a, p, i, span, strong } = van.tags;
@@ -18,7 +19,7 @@ export const Docs = () => {
   van.derive(async () => {
     const inp = favoritePlaceholders.startsWith(":")
       ? docsMock
-      : decodeURIComponent(atob(favoritePlaceholders));
+      : base64Decode(favoritePlaceholders);
     if (!inp) {
       return;
     }
