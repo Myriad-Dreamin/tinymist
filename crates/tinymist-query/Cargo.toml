@@ -39,6 +39,8 @@ indexmap.workspace = true
 ecow.workspace = true
 siphasher.workspace = true
 chrono.workspace = true
+rayon.workspace = true
+rpds.workspace = true
 
 typst.workspace = true
 

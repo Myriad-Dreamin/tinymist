@@ -8,8 +8,6 @@ pub mod color_exprs;
 pub use color_exprs::*;
 pub mod link_exprs;
 pub use link_exprs::*;
-pub mod def_use;
-pub use def_use::*;
 pub mod import;
 pub use import::*;
 pub mod linked_def;
@@ -45,7 +43,8 @@ mod type_check_tests {
         snapshot_testing("type_check", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let result = type_check(ctx, source.clone());
+            let result = ctx.expr_stage(&source);
+            let result = type_check(ctx.shared_(), result);
             let result = result
                 .as_deref()
                 .map(|e| format!("{:#?}", TypeCheckSnapshot(&source, e)));
@@ -118,8 +117,9 @@ mod post_type_check_tests {
             let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
-            let result = type_check(ctx, source.clone());
-            let literal_type = result.and_then(|info| post_type_check(ctx, &info, node));
+            let result = ctx.expr_stage(&source);
+            let result = type_check(ctx.shared_(), result);
+            let literal_type = result.and_then(|info| post_type_check(ctx.shared_(), &info, node));
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),
@@ -154,8 +154,9 @@ mod type_describe_tests {
             let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
-            let result = type_check(ctx, source.clone());
-            let literal_type = result.and_then(|info| post_type_check(ctx, &info, node));
+            let result = ctx.expr_stage(&source);
+            let result = type_check(ctx.shared_(), result);
+            let literal_type = result.and_then(|info| post_type_check(ctx.shared_(), &info, node));
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),
@@ -189,7 +190,7 @@ mod module_tests {
                 ids
             }
 
-            let dependencies = construct_module_dependencies(ctx);
+            let dependencies = construct_module_dependencies(&mut ctx.local);
 
             let mut dependencies = dependencies
                 .into_iter()
@@ -251,104 +252,110 @@ mod matcher_tests {
 }
 
 #[cfg(test)]
-mod document_tests {
+mod expr_tests {
 
-    use crate::syntax::find_docs_before;
+    use typst::syntax::Source;
+
+    use crate::syntax::{Expr, RefExpr};
     use crate::tests::*;
 
+    trait ShowExpr {
+        fn show_expr(&self, expr: &Expr) -> String;
+    }
+
+    impl ShowExpr for Source {
+        fn show_expr(&self, node: &Expr) -> String {
+            match node {
+                Expr::Decl(decl) => {
+                    let range = decl.span().and_then(|s| self.range(s)).unwrap_or_default();
+                    let fid = if let Some(fid) = decl.file_id() {
+                        format!(" in {fid:?}")
+                    } else {
+                        "".to_string()
+                    };
+                    format!("{decl:?}@{range:?}{fid}")
+                }
+                _ => format!("{node:?}"),
+            }
+        }
+    }
+
     #[test]
-    fn test() {
+    fn docs() {
         snapshot_testing("docs", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let pos = ctx
-                .to_typst_pos(find_test_position(&source), &source)
-                .unwrap();
+            let result = ctx.shared_().expr_stage(&source);
+            let mut docstrings = result.docstrings.iter().collect::<Vec<_>>();
+            docstrings.sort_by(|x, y| x.0.weak_cmp(y.0));
+            let mut docstrings = docstrings
+                .into_iter()
+                .map(|(ident, expr)| {
+                    format!(
+                        "{} -> {expr:?}",
+                        source.show_expr(&Expr::Decl(ident.clone())),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let mut snap = vec![];
+            snap.push("= docstings".to_owned());
+            snap.append(&mut docstrings);
 
-            let result = find_docs_before(&source, pos);
-            let result = result.as_deref().unwrap_or("<nil>");
+            assert_snapshot!(snap.join("\n"));
+        });
+    }
 
-            assert_snapshot!(result);
+    #[test]
+    fn scope() {
+        snapshot_testing("expr_of", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let result = ctx.shared_().expr_stage(&source);
+            let mut resolves = result.resolves.iter().collect::<Vec<_>>();
+            resolves.sort_by(|x, y| x.1.decl.weak_cmp(&y.1.decl));
+
+            let mut resolves = resolves
+                .into_iter()
+                .map(|(_, expr)| {
+                    let RefExpr {
+                        decl: ident,
+                        of,
+                        val,
+                    } = expr.as_ref();
+
+                    format!(
+                        "{} -> {}, val: {val:?}",
+                        source.show_expr(&Expr::Decl(ident.clone())),
+                        of.as_ref().map(|e| source.show_expr(e)).unwrap_or_default()
+                    )
+                })
+                .collect::<Vec<_>>();
+            let mut exports = result.exports.iter().collect::<Vec<_>>();
+            exports.sort_by(|x, y| x.0.cmp(y.0));
+            let mut exports = exports
+                .into_iter()
+                .map(|(ident, node)| {
+                    let node = source.show_expr(node);
+                    format!("{ident} -> {node}",)
+                })
+                .collect::<Vec<_>>();
+
+            let mut snap = vec![];
+            snap.push("= resolves".to_owned());
+            snap.append(&mut resolves);
+            snap.push("= exports".to_owned());
+            snap.append(&mut exports);
+
+            assert_snapshot!(snap.join("\n"));
         });
     }
 }
 
 #[cfg(test)]
 mod lexical_hierarchy_tests {
-    use std::collections::HashMap;
 
-    use def_use::DefUseInfo;
-    use lexical_hierarchy::LexicalKind;
-    use reflexo::path::unix_slash;
-    use reflexo::vector::ir::DefId;
-
-    use crate::analysis::def_use;
-    // use crate::prelude::*;
-    use crate::syntax::{lexical_hierarchy, IdentDef, IdentRef};
+    use crate::syntax::lexical_hierarchy;
     use crate::tests::*;
-
-    /// A snapshot of the def-use information for testing.
-    pub struct DefUseSnapshot<'a>(pub &'a DefUseInfo);
-
-    impl<'a> Serialize for DefUseSnapshot<'a> {
-        fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            use serde::ser::SerializeMap;
-            // HashMap<IdentRef, DefId>
-            let mut references: HashMap<DefId, Vec<IdentRef>> = {
-                let mut map = HashMap::new();
-                for (k, v) in &self.0.ident_refs {
-                    map.entry(*v).or_insert_with(Vec::new).push(k.clone());
-                }
-                map
-            };
-            // sort
-            for (_, v) in references.iter_mut() {
-                v.sort();
-            }
-
-            #[derive(Serialize)]
-            struct DefUseEntry<'a> {
-                def: &'a IdentDef,
-                refs: &'a Vec<IdentRef>,
-            }
-
-            let mut state = serializer.serialize_map(None)?;
-            for (k, (ident_ref, ident_def)) in self.0.ident_defs.as_slice().iter().enumerate() {
-                let id = DefId(k as u64);
-
-                let empty_ref = Vec::new();
-                let entry = DefUseEntry {
-                    def: ident_def,
-                    refs: references.get(&id).unwrap_or(&empty_ref),
-                };
-
-                state.serialize_entry(
-                    &format!(
-                        "{}@{}",
-                        ident_ref.1,
-                        unix_slash(ident_ref.0.vpath().as_rootless_path())
-                    ),
-                    &entry,
-                )?;
-            }
-
-            if !self.0.undefined_refs.is_empty() {
-                let mut undefined_refs = self.0.undefined_refs.clone();
-                undefined_refs.sort();
-                let entry = DefUseEntry {
-                    def: &IdentDef {
-                        name: "<nil>".into(),
-                        kind: LexicalKind::Block,
-                        range: 0..0,
-                    },
-                    refs: &undefined_refs,
-                };
-                state.serialize_entry("<nil>", &entry)?;
-            }
-
-            state.end()
-        }
-    }
 
     #[test]
     fn scope() {
@@ -362,23 +369,6 @@ mod lexical_hierarchy_tests {
 
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
-    }
-
-    #[test]
-    fn test_def_use() {
-        fn def_use(set: &str) {
-            snapshot_testing(set, &|ctx, path| {
-                let source = ctx.source_by_path(&path).unwrap();
-
-                let result = ctx.def_use(source);
-                let result = result.as_deref().map(DefUseSnapshot);
-
-                assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
-            });
-        }
-
-        def_use("lexical_hierarchy");
-        def_use("def_use");
     }
 }
 
@@ -410,8 +400,8 @@ mod signature_tests {
             let callee_node = callee_node.node();
 
             let result = analyze_signature(
-                ctx,
-                SignatureTarget::Syntax(source.clone(), callee_node.clone()),
+                ctx.shared(),
+                SignatureTarget::Syntax(source.clone(), callee_node.get().clone()),
             );
 
             assert_snapshot!(SignatureSnapshot(result.as_ref()));

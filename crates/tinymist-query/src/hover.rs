@@ -7,7 +7,7 @@ use crate::{
     docs::SignatureDocs,
     jump_from_cursor,
     prelude::*,
-    syntax::{find_docs_before, get_deref_target, LexicalKind, LexicalVarKind},
+    syntax::{find_docs_before, get_deref_target, DefKind},
     ty::PathPreference,
     upstream::{expr_tooltip, plain_docs_sentence, route_of_value, truncated_repr, Tooltip},
     LspHoverContents, StatefulRequest,
@@ -185,7 +185,7 @@ fn star_tooltip(
 
     let mi: ast::ModuleImport = leaf.cast()?;
     let source = mi.source();
-    let module = ctx.analyze_import(&leaf.find(source.span())?);
+    let module = ctx.analyze_import2(source.to_untyped()).1;
     log::debug!("star import: {source:?} => {:?}", module.is_some());
 
     let i = module?;
@@ -226,18 +226,13 @@ fn def_tooltip(
 
     let deref_target = get_deref_target(leaf.clone(), cursor)?;
 
-    let lnk = find_definition(ctx, source.clone(), document, deref_target.clone())?;
+    let lnk = find_definition(ctx.shared(), source.clone(), document, deref_target.clone())?;
 
     let mut results = vec![];
     let mut actions = vec![];
 
     match lnk.kind {
-        LexicalKind::Mod(_)
-        | LexicalKind::Var(LexicalVarKind::LabelRef)
-        | LexicalKind::Var(LexicalVarKind::ValRef)
-        | LexicalKind::Block
-        | LexicalKind::Heading(..) => None,
-        LexicalKind::Var(LexicalVarKind::Label) => {
+        DefKind::Label => {
             results.push(MarkedString::String(format!("Label: {}\n", lnk.name)));
             if let Some(c) = lnk.value.as_ref() {
                 let c = truncated_repr(c);
@@ -245,12 +240,12 @@ fn def_tooltip(
             }
             Some(LspHoverContents::Array(results))
         }
-        LexicalKind::Var(LexicalVarKind::BibKey) => {
+        DefKind::BibKey => {
             results.push(MarkedString::String(format!("Bibliography: @{}", lnk.name)));
 
             Some(LspHoverContents::Array(results))
         }
-        LexicalKind::Var(LexicalVarKind::Function) => {
+        DefKind::Func => {
             let sig = lnk.value.as_ref().and_then(|e| ctx.signature_docs(e));
 
             results.push(MarkedString::LanguageString(LanguageString {
@@ -275,7 +270,7 @@ fn def_tooltip(
             render_actions(&mut results, actions);
             Some(LspHoverContents::Array(results))
         }
-        LexicalKind::Var(LexicalVarKind::Variable) => {
+        DefKind::PathStem | DefKind::Var => {
             let deref_node = deref_target.node();
             let sig = ctx.variable_docs(deref_target.node());
 
@@ -319,6 +314,18 @@ fn def_tooltip(
             render_actions(&mut results, actions);
             Some(LspHoverContents::Array(results))
         }
+        DefKind::Export
+        | DefKind::ImportAlias
+        | DefKind::Constant
+        | DefKind::IdentRef
+        | DefKind::ModuleAlias
+        | DefKind::Module
+        | DefKind::Import
+        | DefKind::Ref
+        | DefKind::StrName
+        | DefKind::ModuleImport
+        | DefKind::ModuleInclude
+        | DefKind::Spread => None,
     }
 }
 

@@ -164,6 +164,9 @@ impl TypeDescriber {
             Ty::Args(..) => {
                 return "args".to_string();
             }
+            Ty::Pattern(..) => {
+                return "pattern".to_string();
+            }
             Ty::Select(..) => {
                 return "any".to_string();
             }

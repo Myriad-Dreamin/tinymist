@@ -1,7 +1,7 @@
 use crate::{
     analysis::{find_definition, DefinitionLink},
     prelude::*,
-    syntax::DerefTarget,
+    syntax::{DefKind, DerefTarget},
 };
 use log::debug;
 
@@ -47,7 +47,12 @@ impl StatefulRequest for PrepareRenameRequest {
         }
 
         let origin_selection_range = ctx.to_lsp_range(deref_target.node().range(), &source);
-        let lnk = find_definition(ctx, source.clone(), doc.as_ref(), deref_target.clone())?;
+        let lnk = find_definition(
+            ctx.shared(),
+            source.clone(),
+            doc.as_ref(),
+            deref_target.clone(),
+        )?;
 
         let (name, range) = prepare_renaming(ctx, &deref_target, &lnk)?;
 
@@ -77,25 +82,25 @@ pub(crate) fn prepare_renaming(
     let var_rename = || Some((name.to_string(), None));
 
     debug!("prepare_rename: {name}");
-    use crate::syntax::{LexicalKind, LexicalModKind::*, LexicalVarKind::*, ModSrc};
+    use DefKind::*;
     match lnk.kind {
         // Cannot rename headings or blocks
-        LexicalKind::Heading(_) | LexicalKind::Block => None,
+        // LexicalKind::Heading(_) | LexicalKind::Block => None,
         // Cannot rename module star
-        LexicalKind::Mod(Star) => None,
+        // LexicalKind::Mod(Star) => None,
         // Cannot rename expression import
-        LexicalKind::Mod(Module(ModSrc::Expr(..))) => None,
-        // todo: label renaming, bibkey renaming
-        LexicalKind::Var(LabelRef | Label | BibKey) => None,
-        LexicalKind::Var(Variable | ValRef) => var_rename(),
-        LexicalKind::Mod(ModuleAlias | Ident | Alias { .. }) => var_rename(),
-        LexicalKind::Var(Function) => validate_fn_renaming(lnk).map(|_| (name.to_string(), None)),
-        LexicalKind::Mod(PathInclude | PathVar | Module(ModSrc::Path(..))) => {
+        // LexicalKind::Mod(Module(ModSrc::Expr(..))) => None,
+        Var => var_rename(),
+        Func => validate_fn_renaming(lnk).map(|_| (name.to_string(), None)),
+        ModuleImport | ModuleInclude | ModuleAlias | PathStem => {
             let node = deref_target.node().get().clone();
             let path = node.cast::<ast::Str>()?;
             let name = path.get().to_string();
             Some((name, None))
         }
+        // todo: label renaming, bibkey renaming
+        BibKey | Label | Ref => None,
+        Export | ImportAlias | Module | Constant | IdentRef | Import | StrName | Spread => None,
     }
 }
 

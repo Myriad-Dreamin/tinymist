@@ -41,7 +41,7 @@ impl SemanticRequest for SignatureHelpRequest {
 
         let deref_target = get_deref_target(callee, cursor)?;
 
-        let def_link = find_definition(ctx, source.clone(), None, deref_target)?;
+        let def_link = find_definition(ctx.shared(), source.clone(), None, deref_target)?;
 
         let documentation = DocTooltip::get(ctx, &def_link)
             .as_deref()
@@ -66,7 +66,7 @@ impl SemanticRequest for SignatureHelpRequest {
 
         let mut active_parameter = None;
 
-        let mut label = def_link.name.clone();
+        let mut label = def_link.name.as_ref().to_owned();
         let mut params = Vec::new();
 
         label.push('(');

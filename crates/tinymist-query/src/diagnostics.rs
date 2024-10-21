@@ -32,7 +32,7 @@ fn convert_diagnostic(
         let source = ctx.world().source(id)?;
         lsp_range = diagnostic_range(&source, span, ctx.position_encoding());
     } else {
-        uri = path_to_url(&ctx.root)?;
+        uri = path_to_url(&ctx.local.root)?;
         lsp_range = LspRange::default();
     };
 

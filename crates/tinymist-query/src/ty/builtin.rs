@@ -1,10 +1,11 @@
 use core::fmt;
 
 use crate::prelude::*;
+use crate::syntax::DefKind;
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use strum::{EnumIter, IntoEnumIterator};
-use typst::{foundations::CastInfo, syntax::Span};
+use typst::foundations::CastInfo;
 use typst::{
     foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
     layout::Length,
@@ -200,6 +201,8 @@ pub enum BuiltinTy {
     Content,
     Space,
     None,
+    Break,
+    Continue,
     Infer,
     FlowNone,
     Auto,
@@ -237,6 +240,8 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::Content => f.write_str("Content"),
             BuiltinTy::Space => f.write_str("Space"),
             BuiltinTy::None => f.write_str("None"),
+            BuiltinTy::Break => f.write_str("Break"),
+            BuiltinTy::Continue => f.write_str("Continue"),
             BuiltinTy::Infer => f.write_str("Infer"),
             BuiltinTy::FlowNone => f.write_str("FlowNone"),
             BuiltinTy::Auto => f.write_str("Auto"),
@@ -314,6 +319,8 @@ impl BuiltinTy {
             BuiltinTy::Content => "content",
             BuiltinTy::Space => "content",
             BuiltinTy::None => "none",
+            BuiltinTy::Break => "break",
+            BuiltinTy::Continue => "continue",
             BuiltinTy::Infer => "any",
             BuiltinTy::FlowNone => "none",
             BuiltinTy::Auto => "auto",
@@ -362,6 +369,42 @@ impl BuiltinTy {
         };
 
         res.to_string()
+    }
+
+    pub fn kind(&self) -> DefKind {
+        match self {
+            BuiltinTy::Clause => DefKind::Constant,
+            BuiltinTy::Undef => DefKind::Constant,
+            BuiltinTy::Content => DefKind::Constant,
+            BuiltinTy::Space => DefKind::Constant,
+            BuiltinTy::None => DefKind::Constant,
+            BuiltinTy::Break => DefKind::Constant,
+            BuiltinTy::Continue => DefKind::Constant,
+            BuiltinTy::Infer => DefKind::Constant,
+            BuiltinTy::FlowNone => DefKind::Constant,
+            BuiltinTy::Auto => DefKind::Constant,
+
+            BuiltinTy::Args => DefKind::Constant,
+            BuiltinTy::Color => DefKind::Constant,
+            BuiltinTy::TextSize => DefKind::Constant,
+            BuiltinTy::TextFont => DefKind::Constant,
+            BuiltinTy::TextLang => DefKind::Constant,
+            BuiltinTy::TextRegion => DefKind::Constant,
+            BuiltinTy::Dir => DefKind::Constant,
+            BuiltinTy::Length => DefKind::Constant,
+            BuiltinTy::Float => DefKind::Constant,
+            BuiltinTy::CiteLabel => DefKind::Constant,
+            BuiltinTy::RefLabel => DefKind::Constant,
+            BuiltinTy::Stroke => DefKind::Constant,
+            BuiltinTy::Margin => DefKind::Constant,
+            BuiltinTy::Inset => DefKind::Constant,
+            BuiltinTy::Outset => DefKind::Constant,
+            BuiltinTy::Radius => DefKind::Constant,
+            BuiltinTy::Type(_) => DefKind::Func,
+            BuiltinTy::Element(_) => DefKind::Func,
+            BuiltinTy::Tag(_) => DefKind::Constant,
+            BuiltinTy::Path(_) => DefKind::Constant,
+        }
     }
 }
 
@@ -420,7 +463,6 @@ macro_rules! flow_record {
                 (
                     $name.into(),
                     $ty,
-                    Span::detached(),
                 ),
             )*
         ])
@@ -607,7 +649,9 @@ pub static FLOW_RADIUS_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
 
 #[cfg(test)]
 mod tests {
-    use reflexo::vector::ir::DefId;
+    use reflexo_typst::DETACHED_ENTRY;
+
+    use crate::syntax::Decl;
 
     use super::{SigTy, Ty, TypeVar};
 
@@ -617,8 +661,15 @@ mod tests {
     // instantiate a `v` as the return type of the map function.
     #[test]
     fn test_map() {
-        let u = Ty::Var(TypeVar::new("u".into(), DefId(0)));
-        let v = Ty::Var(TypeVar::new("v".into(), DefId(1)));
+        let fid = *DETACHED_ENTRY;
+        let u = Ty::Var(TypeVar::new(
+            "u".into(),
+            Decl::external(fid, "u".into()).into(),
+        ));
+        let v = Ty::Var(TypeVar::new(
+            "v".into(),
+            Decl::external(fid, "v".into()).into(),
+        ));
         let mapper_fn =
             Ty::Func(SigTy::new([u].into_iter(), None, None, None, Some(v.clone())).into());
         let map_fn =

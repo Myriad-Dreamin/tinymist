@@ -3,10 +3,13 @@
 use tinymist_derive::BindTyCtx;
 
 use super::{
-    prelude::*, resolve_global_value, BuiltinTy, DefUseInfo, FlowVarKind, TyCtxMut, TypeBounds,
-    TypeScheme, TypeVar, TypeVarBounds,
+    prelude::*, BuiltinTy, FlowVarKind, SharedContext, TyCtxMut, TypeBounds, TypeScheme, TypeVar,
+    TypeVarBounds,
 };
-use crate::ty::*;
+use crate::{
+    syntax::{Decl, DeclExpr, DeferExpr, Expr, ExprInfo, UnaryOp},
+    ty::*,
+};
 
 mod apply;
 mod convert;
@@ -16,54 +19,42 @@ mod syntax;
 
 pub(crate) use apply::*;
 pub(crate) use convert::*;
-pub(crate) use docs::*;
 pub(crate) use select::*;
 
 /// Type checking at the source unit level.
-pub(crate) fn type_check(ctx: &mut AnalysisContext, source: Source) -> Option<Arc<TypeScheme>> {
+pub(crate) fn type_check(
+    ctx: Arc<SharedContext>,
+    expr_info: Arc<ExprInfo>,
+) -> Option<Arc<TypeScheme>> {
     let mut info = TypeScheme::default();
 
     // Retrieve def-use information for the source.
-    let def_use_info = ctx.def_use(source.clone())?;
+    let root = expr_info.root.clone();
 
-    let mut type_checker = TypeChecker {
+    let mut checker = TypeChecker {
         ctx,
-        source: source.clone(),
-        def_use_info,
+        ei: expr_info,
         info: &mut info,
-        externals: HashMap::new(),
-        mode: InterpretMode::Markup,
     };
-    let lnk = LinkedNode::new(source.root());
 
     let type_check_start = std::time::Instant::now();
-    type_checker.check(lnk);
+    checker.check(&root);
     let elapsed = type_check_start.elapsed();
-    log::info!("Type checking on {:?} took {elapsed:?}", source.id());
+    log::debug!("Type checking on {:?} took {elapsed:?}", checker.ei.fid);
 
     Some(Arc::new(info))
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum InterpretMode {
-    Markup,
-    Code,
-    Math,
-}
-
 #[derive(BindTyCtx)]
 #[bind(info)]
-struct TypeChecker<'a, 'w> {
-    ctx: &'a mut AnalysisContext<'w>,
-    source: Source,
-    def_use_info: Arc<DefUseInfo>,
+struct TypeChecker<'a> {
+    ctx: Arc<SharedContext>,
+    ei: Arc<ExprInfo>,
 
     info: &'a mut TypeScheme,
-    externals: HashMap<DefId, Option<Ty>>,
-    mode: InterpretMode,
 }
 
-impl<'a, 'w> TyCtxMut for TypeChecker<'a, 'w> {
+impl<'a> TyCtxMut for TypeChecker<'a> {
     type Snap = <TypeScheme as TyCtxMut>::Snap;
 
     fn start_scope(&mut self) -> Self::Snap {
@@ -87,90 +78,87 @@ impl<'a, 'w> TyCtxMut for TypeChecker<'a, 'w> {
     }
 }
 
-impl<'a, 'w> TypeChecker<'a, 'w> {
-    fn check(&mut self, root: LinkedNode) -> Ty {
-        let should_record = matches!(root.kind(), SyntaxKind::FuncCall).then(|| root.span());
-        let w = self.check_syntax(root).unwrap_or(Ty::undef());
-
-        if let Some(s) = should_record {
-            self.info.witness_at_least(s, w.clone());
-        }
-
-        w
+impl<'a> TypeChecker<'a> {
+    fn check(&mut self, root: &Expr) -> Ty {
+        self.check_syntax(root).unwrap_or(Ty::undef())
     }
 
-    fn get_def_id(&mut self, s: Span, r: &IdentRef) -> Option<DefId> {
-        self.def_use_info
-            .get_ref(r)
-            .or_else(|| Some(self.def_use_info.get_def(s.id()?, r)?.0))
-    }
-
-    fn copy_based_on(&mut self, fr: &TypeVarBounds, offset: u64, id: DefId) -> Ty {
-        let encoded = DefId((id.0 + 1) * 0x100_0000_0000 + offset + fr.id().0);
+    fn copy_doc_vars(
+        &mut self,
+        fr: &TypeVarBounds,
+        var: &Interned<TypeVar>,
+        base: &Interned<Decl>,
+    ) -> Ty {
+        let mut gen_var = var.as_ref().clone();
+        let encoded = Interned::new(Decl::Docs {
+            base: base.clone(),
+            var: var.clone(),
+        });
+        gen_var.def = encoded.clone();
         log::debug!("copy var {fr:?} as {encoded:?}");
-        let bounds = TypeVarBounds::new(
-            TypeVar {
-                name: fr.name().clone(),
-                def: encoded,
-            },
-            fr.bounds.bounds().read().clone(),
-        );
+        let bounds = TypeVarBounds::new(gen_var, fr.bounds.bounds().read().clone());
         let var = bounds.as_type();
         self.info.vars.insert(encoded, bounds);
         var
     }
 
-    fn get_var(&mut self, root: &LinkedNode<'_>, ident: ast::Ident) -> Option<Interned<TypeVar>> {
-        let s = ident.span();
-        let r = to_ident_ref(root, ident)?;
-        let def_id = self.get_def_id(s, &r)?;
-        self.get_var_by_id(s, r.name.as_ref().into(), def_id)
+    fn get_var(&mut self, decl: &DeclExpr) -> Interned<TypeVar> {
+        let var = match decl.as_ref() {
+            Decl::Export { fid, name } => {
+                if let Some(var) = self.info.vars.get(decl) {
+                    var.var.clone()
+                } else {
+                    let def = self.import_ty(*fid, name);
+                    let init_expr = self.init_var(def);
+                    let name = name.clone();
+                    let def = decl.clone();
+
+                    let var_with_bounds = TypeVarBounds::new(TypeVar { name, def }, init_expr);
+                    let var = var_with_bounds.var.clone();
+
+                    self.info.vars.insert(decl.clone(), var_with_bounds);
+                    var
+                }
+            }
+            _ => {
+                let entry = self.info.vars.entry(decl.clone()).or_insert_with(|| {
+                    let name = decl.name().clone();
+                    let decl = decl.clone();
+                    TypeVarBounds::new(TypeVar { name, def: decl }, TypeBounds::default())
+                });
+
+                entry.var.clone()
+            }
+        };
+        if let Some(s) = decl.span() {
+            // todo: record decl types
+            // let should_record = matches!(root.kind(), SyntaxKind::FuncCall).then(||
+            // root.span());
+            // if let Some(s) = should_record {
+            //     self.info.witness_at_least(s, w.clone());
+            // }
+
+            TypeScheme::witness_(s, Ty::Var(var.clone()), &mut self.info.mapping);
+        }
+        var
     }
 
-    fn get_var_by_id(
-        &mut self,
-        s: Span,
-        name: Interned<str>,
-        def_id: DefId,
-    ) -> Option<Interned<TypeVar>> {
-        // todo: false positive of clippy
-        #[allow(clippy::map_entry)]
-        if !self.info.vars.contains_key(&def_id) {
-            let def = self.import_ty(def_id);
-            let init_expr = self.init_var(def);
-            self.info.vars.insert(
-                def_id,
-                TypeVarBounds::new(TypeVar { name, def: def_id }, init_expr),
-            );
-        }
+    fn import_ty(&mut self, fid: TypstFileId, name: &Interned<str>) -> Option<Ty> {
+        log::debug!("import_ty {name} from {fid:?}");
 
-        let var = self.info.vars.get(&def_id).unwrap().var.clone();
-        TypeScheme::witness_(s, Ty::Var(var.clone()), &mut self.info.mapping);
-        Some(var)
-    }
-
-    fn import_ty(&mut self, def_id: DefId) -> Option<Ty> {
-        if let Some(ty) = self.externals.get(&def_id) {
-            return ty.clone();
-        }
-
-        let (def_id, def_pos) = self.def_use_info.get_def_by_id(def_id)?;
-        if def_id == self.source.id() {
-            return None;
-        }
-
-        let source = self.ctx.source_by_id(def_id).ok()?;
-        let ext_def_use_info = self.ctx.def_use(source.clone())?;
+        let source = self.ctx.source_by_id(fid).ok()?;
+        let ext_def_use_info = self.ctx.expr_stage(&source);
         let ext_type_info = self.ctx.type_check(&source)?;
-        let (ext_def_id, _) = ext_def_use_info.get_def(
-            def_id,
-            &IdentRef {
-                name: def_pos.name.clone(),
-                range: def_pos.range.clone(),
-            },
-        )?;
-        let ext_ty = ext_type_info.vars.get(&ext_def_id)?.as_type();
-        Some(ext_type_info.simplify(ext_ty, false))
+        let ext_def = ext_def_use_info.exports.get(name)?;
+
+        // todo: rest expressions
+        match ext_def {
+            Expr::Decl(decl) => {
+                let ext_ty = ext_type_info.vars.get(decl)?.as_type();
+                Some(ext_type_info.simplify(ext_ty, false))
+            }
+            _ => None,
+        }
     }
 
     fn constrain(&mut self, lhs: &Ty, rhs: &Ty) {
@@ -355,11 +343,11 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
         let rhs = if expected_in {
             match container {
                 Ty::Tuple(elements) => Ty::Union(elements.clone()),
-                _ => Ty::Unary(TypeUnary::new(UnaryOp::ElementOf, container.into())),
+                _ => Ty::Unary(TypeUnary::new(UnaryOp::ElementOf, container.clone())),
             }
         } else {
             // todo: remove not element of
-            Ty::Unary(TypeUnary::new(UnaryOp::NotElementOf, container.into()))
+            Ty::Unary(TypeUnary::new(UnaryOp::NotElementOf, container.clone()))
         };
 
         self.constrain(elem, &rhs);
@@ -415,7 +403,7 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
             Ty::Field(v) => {
                 self.weaken(&v.field);
             }
-            Ty::Func(v) | Ty::Args(v) => {
+            Ty::Func(v) | Ty::Args(v) | Ty::Pattern(v) => {
                 for ty in v.inputs() {
                     self.weaken(ty);
                 }
@@ -482,13 +470,11 @@ impl<'a, 'w> TypeChecker<'a, 'w> {
 
         c.clone()
     }
-}
 
-fn to_ident_ref(root: &LinkedNode, c: ast::Ident) -> Option<IdentRef> {
-    Some(IdentRef {
-        name: c.get().clone(),
-        range: root.find(c.span())?.range(),
-    })
+    fn check_defer(&mut self, expr: &DeferExpr) -> Ty {
+        let expr = self.ei.scopes.get(&expr.span).unwrap();
+        self.check(&expr.clone())
+    }
 }
 
 struct Joiner {
@@ -546,6 +532,8 @@ impl Joiner {
             (Ty::With(..), _) => self.definite = Ty::undef(),
             (Ty::Args(w), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Args(w),
             (Ty::Args(..), _) => self.definite = Ty::undef(),
+            (Ty::Pattern(w), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Pattern(w),
+            (Ty::Pattern(..), _) => self.definite = Ty::undef(),
             (Ty::Select(w), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Select(w),
             (Ty::Select(..), _) => self.definite = Ty::undef(),
             (Ty::Unary(w), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Unary(w),

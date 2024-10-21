@@ -66,7 +66,7 @@ type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
 pub struct CompileHandler {
     pub(crate) diag_group: String,
-    pub(crate) analysis: Analysis,
+    pub(crate) analysis: Arc<Analysis>,
     pub(crate) periscope: PeriscopeRenderer,
 
     #[cfg(feature = "preview")]

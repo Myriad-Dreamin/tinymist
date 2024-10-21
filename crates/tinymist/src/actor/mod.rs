@@ -104,12 +104,12 @@ impl LanguageState {
             intr_tx: intr_tx.clone(),
             export: export.clone(),
             editor_tx: self.editor_tx.clone(),
-            analysis: Analysis {
+            analysis: Arc::new(Analysis {
                 position_encoding,
                 enable_periscope,
                 caches: Default::default(),
                 workers: Default::default(),
-            },
+            }),
             periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
 
             notified_revision: parking_lot::Mutex::new(0),

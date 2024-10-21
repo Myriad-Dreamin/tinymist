@@ -1,0 +1,14 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "snap.join(\"\\n\")"
+input_file: crates/tinymist-query/src/fixtures/expr_of/import_star.typ
+---
+= resolves
+ModuleImport(..)@26..46 in \s1.typ -> Def(Module), val: Some(Module { name: "base", scope: Scope {"x": 1}, content: Sequence [Sequence [], SpaceElem, Text(1)] })
+Ident("base")@8..18 in \s1.typ -> Def(Module), val: Some(Module { name: "base", scope: Scope {"x": 1}, content: Sequence [Sequence [], SpaceElem, Text(1)] })
+Ident("base")@20..24 in \s1.typ -> Ident("base")@8..18 in \s1.typ, val: None
+Ident("base")@48..52 in \s1.typ -> Ident("base")@8..18 in \s1.typ, val: None
+Ident("x")@55..56 in \s1.typ -> Ident("x")@0..0 in \base.typ, val: Some(1)
+= exports
+base -> Ident("base")@8..18 in \s1.typ
+x -> Type(Module { name: "base", scope: Scope {"x": 1}, content: Sequence [Sequence [], SpaceElem, Text(1)] }.x)
