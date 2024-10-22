@@ -925,7 +925,7 @@ const ifStatement = (): textmate.Grammar => {
   const ifStatement: textmate.Pattern = {
     name: "meta.expr.if.typst",
     begin: lookAhead(/(else\s+)?(if\b(?!-))/),
-    end: /(?<=\}|\])(?!\s*(else)\b(?!-))|(?<=else)(?!\s*(?:if\b(?!-)|[\[\{]))|(?=[;\}\]\)\n]|$)/,
+    end: /(?<=\}|\])(?!\s*(else)\b(?!-)|[\[\{])|(?<=else)(?!\s*(?:if\b(?!-)|[\[\{]))|(?=[;\}\]\)\n]|$)/,
     patterns: [
       { include: "#comments" },
       { include: "#ifClause" },
@@ -966,24 +966,12 @@ const forStatement = (): textmate.Grammar => {
   const forStatement: textmate.Pattern = {
     name: "meta.expr.for.typst",
     begin: lookAhead(/(for\b(?!-))\s*/),
-    end: /(?<=[\}\]])(?=\s*[\n\S;\}\]\)])(?!\s*[\{\[])|(?=[;\}\]\)\n]|$)/,
+    end: /(?<=[\}\]])(?![\{\[])|(?=[;\}\]\)\n]|$)/,
     patterns: [
-      /// Matches any comments
-      {
-        include: "#comments",
-      },
-      /// Matches for clause
-      {
-        include: "#forClause",
-      },
-      /// Matches a code block after the for clause
-      {
-        include: "#codeBlock",
-      },
-      /// Matches a content block after the for clause
-      {
-        include: "#contentBlock",
-      },
+      { include: "#comments" },
+      { include: "#forClause" },
+      { include: "#codeBlock" },
+      { include: "#contentBlock" },
     ],
   };
 
@@ -996,14 +984,7 @@ const forStatement = (): textmate.Grammar => {
         name: "keyword.control.loop.typst",
       },
     },
-    patterns: [
-      {
-        include: "#comments",
-      },
-      {
-        include: "#expression",
-      },
-    ],
+    patterns: [{ include: "#expression" }],
   };
 
   return {
@@ -1019,24 +1000,12 @@ const whileStatement = (): textmate.Grammar => {
   const whileStatement: textmate.Pattern = {
     name: "meta.expr.while.typst",
     begin: lookAhead(/(while\b(?!-))/),
-    end: /(?<=\}|\])|(?=[;\}\]\)\n]|$)/,
+    end: /(?<=[\}\]])(?![\{\[])|(?=[;\}\]\)\n]|$)/,
     patterns: [
-      /// Matches any comments
-      {
-        include: "#comments",
-      },
-      /// Matches while clause
-      {
-        include: "#whileClause",
-      },
-      /// Matches a code block after the while clause
-      {
-        include: "#codeBlock",
-      },
-      /// Matches a content block after the while clause
-      {
-        include: "#contentBlock",
-      },
+      { include: "#comments" },
+      { include: "#whileClause" },
+      { include: "#codeBlock" },
+      { include: "#contentBlock" },
     ],
   };
 
@@ -1049,14 +1018,7 @@ const whileStatement = (): textmate.Grammar => {
         name: "keyword.control.loop.typst",
       },
     },
-    patterns: [
-      {
-        include: "#comments",
-      },
-      {
-        include: "#expression",
-      },
-    ],
+    patterns: [{ include: "#expression" }],
   };
 
   return {
