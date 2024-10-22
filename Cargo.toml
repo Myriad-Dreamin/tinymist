@@ -194,15 +194,17 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 # typst-render = { path = "../typst/crates/typst-render" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "5b79e34ad52d0418e22e88966e52d984a9fde110" }
-# reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "5b79e34ad52d0418e22e88966e52d984a9fde110" }
-# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "5b79e34ad52d0418e22e88966e52d984a9fde110" }
-# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "5b79e34ad52d0418e22e88966e52d984a9fde110" }
-# reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "5b79e34ad52d0418e22e88966e52d984a9fde110" }
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "c52a054ca31989e13eddc6f2cffb6db2ba5faa5d" }
+reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "c52a054ca31989e13eddc6f2cffb6db2ba5faa5d" }
+reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "c52a054ca31989e13eddc6f2cffb6db2ba5faa5d" }
+reflexo-typst2vec = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "c52a054ca31989e13eddc6f2cffb6db2ba5faa5d" }
+reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "c52a054ca31989e13eddc6f2cffb6db2ba5faa5d" }
+reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "c52a054ca31989e13eddc6f2cffb6db2ba5faa5d" }
 
-# typst-ts-svg-exporter = { path = "../typst.ts/exporter/svg" }
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
 # reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
-# typst-ts-core = { path = "../typst.ts/core" }
-# typst-ts-compiler = { path = "../typst.ts/compiler" }
+# reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
+# reflexo-typst2vec = { path = "../typst.ts/crates/conversion/typst2vec/" }
+# reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
+# reflexo-typst-shim = { path = "../typst.ts/crates/reflexo-typst-shim/" }
 # typstyle = { path = "../typstyle" }
