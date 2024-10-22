@@ -1,7 +1,7 @@
 >#{if}
 #^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.curly.typst
-#  ^^ source.typst meta.expr.if.typst
+#  ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #    ^ source.typst meta.brace.curly.typst
 >
 >test

@@ -1,1 +1,0 @@
-#let _fn(T, fn-args: "T[]") = (..fn-args) => any;
