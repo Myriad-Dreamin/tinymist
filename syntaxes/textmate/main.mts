@@ -1032,19 +1032,16 @@ const whileStatement = (): textmate.Grammar => {
 const contextStatement: textmate.Pattern = {
   name: "meta.expr.context.typst",
   begin: /(context\b(?!-))\s*/,
-  end: /(?=[\n;\}\]\)])/,
+  end: exprEndReg,
   beginCaptures: {
     "1": {
       name: "keyword.control.other.typst",
     },
   },
   patterns: [
-    {
-      include: "#comments",
-    },
-    {
-      include: "#expression",
-    },
+    { include: "#codeBlock" },
+    { include: "#contentBlock" },
+    { include: "#expression" },
   ],
 };
 
