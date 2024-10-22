@@ -118,6 +118,23 @@ return {
 
 See [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md) for references.
 
+### Configuring Language Server for COC
+
+To configure language server for [coc.nvim](https://github.com/neoclide/coc.nvim), you can edit the `coc-settings.json` by executing `:CocConfig`:
+
+```json
+"languageserver": {
+  "tinymist": {
+    "command": "tinymist",
+    "filetypes": ["typst"],
+    "settings": {
+      "exportPdf": "onType",
+      "outputPath" = "$root/target/$dir/$name",
+    }
+  }
+}
+```
+
 ### Configuring Folding Range for Neovim Client
 
 Enable LSP-based folding range with `kevinhwang91/nvim-ufo`:
