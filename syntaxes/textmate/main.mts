@@ -918,7 +918,6 @@ const letStatement = (): textmate.Grammar => {
   };
 };
 
-// todo: #if [] == [] [] {}
 /**
  * Matches a (strict grammar) if in markup context.
  */
@@ -926,108 +925,31 @@ const ifStatement = (): textmate.Grammar => {
   const ifStatement: textmate.Pattern = {
     name: "meta.expr.if.typst",
     begin: lookAhead(/(else\s+)?(if\b(?!-))/),
-    end: /(?<=\}|\])(?!\s*else\b(?!-))|(?=[;\}\]\)\n]|$)/,
+    end: /(?<=\}|\])(?!\s*(else)\b(?!-))|(?<=else)(?!\s*(?:if\b(?!-)|[\[\{]))|(?=[;\}\]\)\n]|$)/,
     patterns: [
-      /// Matches any comments
-      {
-        include: "#comments",
-      },
-      // todo
-      /// Matches if clause with a code block expression
-      /// Matches if clause
-      {
-        include: "#ifClause",
-      },
-      /// Matches else clause
-      {
-        include: "#elseClause",
-      },
-      /// Matches else content clause
-      {
-        include: "#elseContentClause",
-      },
-      /// Matches a code block after the if clause
-      {
-        include: "#codeBlock",
-      },
-      /// Matches a content block after the if clause
-      {
-        include: "#contentBlock",
-      },
+      { include: "#comments" },
+      { include: "#ifClause" },
+      { include: "#elseClause" },
+      { include: "#codeBlock" },
+      { include: "#contentBlock" },
     ],
   };
 
   const ifClause: textmate.Pattern = {
     //   name: "meta.if.clause.typst",
-    begin: /(?:(\belse)\s+)?(\bif)\s+/,
+    begin: /(\bif)\s+/,
     end: exprEndReg,
     beginCaptures: {
       "1": {
         name: "keyword.control.conditional.typst",
       },
-      "2": {
-        name: "keyword.control.conditional.typst",
-      },
     },
-    patterns: [
-      {
-        include: "#comments",
-      },
-      {
-        include: "#expression",
-      },
-    ],
+    patterns: [{ include: "#expression" }],
   };
 
   const elseClause: textmate.Pattern = {
-    //   name: "meta.else.clause.typst",
-    begin: /(\belse)\s*(\{)/,
-    end: /\}/,
-    beginCaptures: {
-      "1": {
-        name: "keyword.control.conditional.typst",
-      },
-      "2": {
-        name: "meta.brace.curly.typst",
-      },
-    },
-    endCaptures: {
-      "0": {
-        name: "meta.brace.curly.typst",
-      },
-    },
-    patterns: [
-      {
-        include: "#code",
-      },
-    ],
-  };
-
-  const elseContentClause: textmate.Pattern = {
-    //   name: "meta.else.clause.typst",
-    begin: /(\belse)\s*(\[)/,
-    end: /\]/,
-    beginCaptures: {
-      "1": {
-        name: "keyword.control.conditional.typst",
-      },
-      "2": {
-        name: "meta.brace.square.typst",
-      },
-    },
-    endCaptures: {
-      "0": {
-        name: "meta.brace.square.typst",
-      },
-    },
-    patterns: [
-      {
-        include: "#code",
-      },
-      {
-        include: "#markupBrace",
-      },
-    ],
+    match: /\belse\b(?!-)/,
+    name: "keyword.control.conditional.typst",
   };
 
   return {
@@ -1035,7 +957,6 @@ const ifStatement = (): textmate.Grammar => {
       ifStatement,
       ifClause,
       elseClause,
-      elseContentClause,
     },
   };
 };

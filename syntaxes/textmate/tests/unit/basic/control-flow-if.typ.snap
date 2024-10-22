@@ -331,7 +331,7 @@
 #                             ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #                                 ^ source.typst meta.expr.if.typst
 #                                  ^ source.typst meta.expr.if.typst meta.brace.square.typst
-#                                   ^^^^ source.typst meta.expr.if.typst variable.other.readwrite.typst
+#                                   ^^^^ source.typst meta.expr.if.typst
 #                                       ^ source.typst meta.expr.if.typst meta.brace.square.typst
 >  if content == type [Nope] else [ve.]
 #^^ source.typst
@@ -350,8 +350,7 @@
 #                            ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #                                ^ source.typst meta.expr.if.typst
 #                                 ^ source.typst meta.expr.if.typst meta.brace.square.typst
-#                                  ^^ source.typst meta.expr.if.typst variable.other.readwrite.typst
-#                                    ^ source.typst meta.expr.if.typst keyword.operator.accessor.typst
+#                                  ^^^ source.typst meta.expr.if.typst
 #                                     ^ source.typst meta.expr.if.typst meta.brace.square.typst
 >}
 #^ source.typst meta.brace.curly.typst

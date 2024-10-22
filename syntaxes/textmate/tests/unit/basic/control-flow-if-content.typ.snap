@@ -163,3 +163,18 @@
 >1
 #^^ source.typst
 >
+>A#if false {} else thing
+#^ source.typst
+# ^ source.typst keyword.control.hash.typst
+#  ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#    ^ source.typst meta.expr.if.typst
+#     ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#          ^ source.typst meta.expr.if.typst
+#           ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#            ^ source.typst meta.expr.if.typst meta.brace.curly.typst
+#             ^ source.typst meta.expr.if.typst
+#              ^^^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
+#                  ^^^^^^^ source.typst
+>
+>
+>
