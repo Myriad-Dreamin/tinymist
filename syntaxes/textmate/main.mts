@@ -937,10 +937,10 @@ const ifStatement = (): textmate.Grammar => {
 
   const ifClause: textmate.Pattern = {
     //   name: "meta.if.clause.typst",
-    begin: /(\bif)\s+/,
+    begin: /\bif\b(?!-)/,
     end: exprEndReg,
     beginCaptures: {
-      "1": {
+      "0": {
         name: "keyword.control.conditional.typst",
       },
     },
@@ -1031,18 +1031,14 @@ const whileStatement = (): textmate.Grammar => {
 
 const contextStatement: textmate.Pattern = {
   name: "meta.expr.context.typst",
-  begin: /(context\b(?!-))\s*/,
-  end: exprEndReg,
+  begin: /\bcontext\b(?!-)/,
+  end: /(?<=[\}\]])|(?<!\bcontext\s*)(?=[\{\[])|(?=[;\}\]\)\n]|$)/,
   beginCaptures: {
-    "1": {
+    "0": {
       name: "keyword.control.other.typst",
     },
   },
-  patterns: [
-    { include: "#codeBlock" },
-    { include: "#contentBlock" },
-    { include: "#expression" },
-  ],
+  patterns: [{ include: "#expression" }],
 };
 
 const setStatement = (): textmate.Grammar => {
