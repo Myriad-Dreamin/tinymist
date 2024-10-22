@@ -1,0 +1,7 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "snap.join(\"\\n\")"
+input_file: crates/tinymist-query/src/fixtures/docs/param_in_init.typ
+---
+= docstings
+Func("f")@20..21 in \s0.typ -> DocString { docs: Some("Docs for f."), var_bounds: {}, vars: {}, res_ty: None }

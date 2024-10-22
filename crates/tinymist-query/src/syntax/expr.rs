@@ -7,35 +7,37 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::HashSet;
 use tinymist_analysis::import::resolve_id_by_path;
 use typst::{
-    foundations::{Element, Func, Module, Type, Value},
-    model::{EmphElem, EnumElem, HeadingElem, ListElem, StrongElem},
+    foundations::{Element, Func, Module, NativeElement, Type, Value},
+    model::{EmphElem, EnumElem, HeadingElem, ListElem, StrongElem, TermsElem},
     syntax::{Span, SyntaxNode},
 };
 
 use crate::{
     adt::interner::impl_internable,
     analysis::SharedContext,
+    docs::DocStringKind,
     prelude::*,
-    ty::{BuiltinTy, InsTy, Interned, SelectTy, Ty},
+    syntax::find_module_level_docs,
+    ty::{BuiltinTy, InsTy, Interned, SelectTy, Ty, TypeVar},
 };
 
-use super::InterpretMode;
+use super::{compute_docstring, DocCommentMatcher, DocString, InterpretMode};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     /// A sequence of expressions
     Seq(Interned<Vec<Expr>>),
-    /// A array literal
+    /// An array literal
     Array(Interned<Vec<ArgExpr>>),
     /// A dict literal
     Dict(Interned<Vec<ArgExpr>>),
     /// An args literal
     Args(Interned<Vec<ArgExpr>>),
-    /// An args literal
+    /// A pattern
     Pattern(Interned<Pattern>),
-    /// A element literal
+    /// An element literal
     Element(Interned<ElementExpr>),
-    /// A unary operation
+    /// An unary operation
     Unary(Interned<UnExpr>),
     /// A binary operation
     Binary(Interned<BinExpr>),
@@ -45,19 +47,33 @@ pub enum Expr {
     Func(Interned<FuncExpr>),
     /// A let
     Let(Interned<LetExpr>),
+    /// A show
     Show(Interned<ShowExpr>),
+    /// A set
     Set(Interned<SetExpr>),
+    /// A reference
     Ref(Interned<RefExpr>),
+    /// A content reference
     ContentRef(Interned<ContentRefExpr>),
+    /// A select
     Select(Interned<SelectExpr>),
+    /// An import
     Import(Interned<ImportExpr>),
+    /// An include
     Include(Interned<IncludeExpr>),
+    /// A contextual
     Contextual(Interned<Expr>),
+    /// A conditional
     Conditional(Interned<IfExpr>),
+    /// A while loop
     WhileLoop(Interned<WhileExpr>),
+    /// A for loop
     ForLoop(Interned<ForExpr>),
+    /// A type
     Type(Ty),
+    /// A declaration
     Decl(DeclExpr),
+    /// A star import
     Star,
 }
 
@@ -68,27 +84,33 @@ impl fmt::Display for Expr {
 }
 
 pub(crate) fn expr_of(ctx: Arc<SharedContext>, source: Source) -> Arc<ExprInfo> {
-    log::debug!(
-        "expr_of: {:?} in thread {:?}",
-        source.id(),
-        rayon::current_thread_index()
-    );
-
-    let imports_base = Arc::new(Mutex::new(FxHashSet::default()));
-    let imports = imports_base.clone();
+    log::debug!("expr_of: {:?}", source.id());
 
     let resolves_base = Arc::new(Mutex::new(vec![]));
     let resolves = resolves_base.clone();
 
+    // todo: cache docs capture
+    let docstrings_base = Arc::new(Mutex::new(FxHashMap::default()));
+    let docstrings = docstrings_base.clone();
+
     let scopes_base = Arc::new(Mutex::new(FxHashMap::default()));
     let scopes = scopes_base.clone();
 
-    let (exports, root) = rayon::scope(|s| {
+    let imports_base = Arc::new(Mutex::new(FxHashSet::default()));
+    let imports = imports_base.clone();
+
+    let module_docstring = Arc::new(
+        find_module_level_docs(&source)
+            .and_then(|docs| compute_docstring(&ctx, source.id(), docs, DocStringKind::Module))
+            .unwrap_or_default(),
+    );
+
+    let (exports, root) = {
         let mut w = ExprWorker {
             fid: source.id(),
-            _scope: s,
             ctx,
             imports,
+            docstrings,
             scopes,
             import_buffer: Vec::new(),
             lexical: LexicalContext {
@@ -98,17 +120,20 @@ pub(crate) fn expr_of(ctx: Arc<SharedContext>, source: Source) -> Arc<ExprInfo> 
             },
             resolves,
             buffer: vec![],
+            comment_matcher: DocCommentMatcher::default(),
         };
         let root = source.root().cast::<ast::Markup>().unwrap();
-        let root = w.check_in_mode(root.exprs(), InterpretMode::Markup);
+        let root = w.check_in_mode(root.to_untyped().children(), InterpretMode::Markup);
         w.collect_buffer();
 
         (w.summarize_scope(), root)
-    });
+    };
 
     let info = ExprInfo {
         fid: source.id(),
         resolves: HashMap::from_iter(std::mem::take(resolves_base.lock().deref_mut())),
+        module_docstring,
+        docstrings: std::mem::take(docstrings_base.lock().deref_mut()),
         imports: HashSet::from_iter(std::mem::take(imports_base.lock().deref_mut())),
         exports,
         scopes: std::mem::take(scopes_base.lock().deref_mut()),
@@ -123,6 +148,8 @@ pub(crate) fn expr_of(ctx: Arc<SharedContext>, source: Source) -> Arc<ExprInfo> 
 pub struct ExprInfo {
     pub fid: TypstFileId,
     pub resolves: FxHashMap<Span, Interned<RefExpr>>,
+    pub module_docstring: Arc<DocString>,
+    pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
     pub scopes: FxHashMap<Span, Expr>,
     pub imports: FxHashSet<TypstFileId>,
     pub exports: LexicalScope,
@@ -199,6 +226,7 @@ impl ExprScope {
 }
 
 type ResolveVec = Vec<(Span, Interned<RefExpr>)>;
+type SyntaxNodeChildren<'a> = std::slice::Iter<'a, SyntaxNode>;
 
 #[derive(Debug, Clone)]
 struct LexicalContext {
@@ -207,19 +235,21 @@ struct LexicalContext {
     last: ExprScope,
 }
 
-pub(crate) struct ExprWorker<'a, 's> {
+pub(crate) struct ExprWorker {
     fid: TypstFileId,
-    _scope: &'a rayon::Scope<'s>,
     ctx: Arc<SharedContext>,
     imports: Arc<Mutex<FxHashSet<TypstFileId>>>,
     import_buffer: Vec<TypstFileId>,
+    docstrings: Arc<Mutex<FxHashMap<DeclExpr, Arc<DocString>>>>,
     scopes: Arc<Mutex<FxHashMap<Span, Expr>>>,
     resolves: Arc<Mutex<ResolveVec>>,
     buffer: ResolveVec,
     lexical: LexicalContext,
+
+    comment_matcher: DocCommentMatcher,
 }
 
-impl<'a, 's> ExprWorker<'a, 's> {
+impl ExprWorker {
     fn with_scope<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         self.lexical.scopes.push(std::mem::replace(
             &mut self.lexical.last,
@@ -250,6 +280,17 @@ impl<'a, 's> ExprWorker<'a, 's> {
             scope
         } else {
             unreachable!()
+        }
+    }
+
+    fn check_docstring(&mut self, decl: &DeclExpr, kind: DocStringKind) {
+        if let Some(docs) = self.comment_matcher.collect() {
+            let docstring = compute_docstring(&self.ctx, self.fid, docs, kind);
+            if let Some(docstring) = docstring {
+                self.docstrings
+                    .lock()
+                    .insert(decl.clone(), Arc::new(docstring));
+            }
         }
     }
 
@@ -303,8 +344,8 @@ impl<'a, 's> ExprWorker<'a, 's> {
             Numeric(numeric) => Expr::Type(Ty::Value(InsTy::new(Value::numeric(numeric.get())))),
             Str(s) => Expr::Type(Ty::Value(InsTy::new(Value::Str(s.get().into())))),
 
-            Equation(equation) => self.check_math(equation.body()),
-            Math(math) => self.check_math(math),
+            Equation(equation) => self.check_math(equation.body().to_untyped().children()),
+            Math(math) => self.check_math(math.to_untyped().children()),
             Code(code_block) => self.check_code(code_block.body()),
             Content(c) => self.check_markup(c.body()),
 
@@ -352,33 +393,49 @@ impl<'a, 's> ExprWorker<'a, 's> {
             Escape(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
             Shorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
             SmartQuote(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
-            Strong(e) => self.check_element(Element::of::<StrongElem>(), e.body().exprs()),
-            Emph(e) => self.check_element(Element::of::<EmphElem>(), e.body().exprs()),
-            Heading(e) => self.check_element(Element::of::<HeadingElem>(), e.body().exprs()),
-            List(e) => self.check_element(Element::of::<ListElem>(), e.body().exprs()),
-            Enum(e) => self.check_element(Element::of::<EnumElem>(), e.body().exprs()),
-            Term(t) => self.check_element(
-                Element::of::<EnumElem>(),
-                t.term().exprs().chain(t.description().exprs()),
-            ),
+
+            Strong(e) => {
+                let body = self.check_inline_markup(e.body());
+                self.check_element::<StrongElem>(eco_vec![body])
+            }
+            Emph(e) => {
+                let body = self.check_inline_markup(e.body());
+                self.check_element::<EmphElem>(eco_vec![body])
+            }
+            Heading(e) => {
+                let body = self.check_markup(e.body());
+                self.check_element::<HeadingElem>(eco_vec![body])
+            }
+            List(e) => {
+                let body = self.check_markup(e.body());
+                self.check_element::<ListElem>(eco_vec![body])
+            }
+            Enum(e) => {
+                let body = self.check_markup(e.body());
+                self.check_element::<EnumElem>(eco_vec![body])
+            }
+            Term(t) => {
+                let term = self.check_markup(t.term());
+                let description = self.check_markup(t.description());
+                self.check_element::<TermsElem>(eco_vec![term, description])
+            }
 
             MathAlignPoint(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
             MathShorthand(..) => Expr::Type(Ty::Builtin(BuiltinTy::Content)),
             MathDelimited(math_delimited) => {
-                self.check_in_mode(math_delimited.body().exprs(), InterpretMode::Math)
+                self.check_math(math_delimited.body().to_untyped().children())
             }
-            MathAttach(ma) => self.check_in_mode(
-                [
-                    ma.base(),
-                    ma.bottom().unwrap_or_default(),
-                    ma.top().unwrap_or_default(),
-                ]
-                .into_iter(),
-                InterpretMode::Math,
-            ),
+            MathAttach(ma) => {
+                let base = ma.base().to_untyped().clone();
+                let bottom = ma.bottom().unwrap_or_default().to_untyped().clone();
+                let top = ma.top().unwrap_or_default().to_untyped().clone();
+                self.check_math([base, bottom, top].iter())
+            }
             MathPrimes(..) => Expr::Type(Ty::Builtin(BuiltinTy::None)),
             MathFrac(mf) => {
-                self.check_in_mode([mf.num(), mf.denom()].into_iter(), InterpretMode::Math)
+                let num = mf.num().to_untyped().clone();
+                let denom = mf.denom().to_untyped().clone();
+                self.check_math([num, denom].iter())
             }
             MathRoot(mr) => self.check(mr.radicand()),
         }
@@ -388,15 +445,8 @@ impl<'a, 's> ExprWorker<'a, 's> {
         Expr::Decl(Decl::label(ident).into())
     }
 
-    fn check_element<'b>(
-        &mut self,
-        elem: Element,
-        root: impl Iterator<Item = ast::Expr<'b>>,
-    ) -> Expr {
-        let mut content = EcoVec::with_capacity(2);
-        for b in root.filter(|e| !matches!(e, ast::Expr::Space(..))) {
-            content.push(self.check(b));
-        }
+    fn check_element<T: NativeElement>(&mut self, content: EcoVec<Expr>) -> Expr {
+        let elem = Element::of::<T>();
         Expr::Element(ElementExpr { elem, content }.into())
     }
 
@@ -406,9 +456,16 @@ impl<'a, 's> ExprWorker<'a, 's> {
                 typed.init().map_or_else(none_expr, |expr| self.check(expr))
             }
             ast::LetBindingKind::Normal(p) => {
-                let body = typed.init().map(|e| self.defer(e));
+                let span = p.span();
+                let decl = Decl::Pattern(span).into();
+                self.check_docstring(&decl, DocStringKind::Variable);
                 let pattern = self.check_pattern(p);
-                Expr::Let(LetExpr { pattern, body }.into())
+                let body = typed.init().map(|e| self.defer(e));
+                Expr::Let(Interned::new(LetExpr {
+                    span,
+                    pattern,
+                    body,
+                }))
             }
         }
     }
@@ -418,6 +475,7 @@ impl<'a, 's> ExprWorker<'a, 's> {
             Some(name) => Decl::func(name).into(),
             None => Decl::Closure(typed.span()).into(),
         };
+        self.check_docstring(&decl, DocStringKind::Function);
         self.resolve_as(Decl::as_def(&decl, None));
 
         let (params, body) = self.with_scope(|this| {
@@ -899,29 +957,37 @@ impl<'a, 's> ExprWorker<'a, 's> {
         })
     }
 
+    fn check_inline_markup(&mut self, m: ast::Markup) -> Expr {
+        self.check_in_mode(m.to_untyped().children(), InterpretMode::Markup)
+    }
+
     fn check_markup(&mut self, m: ast::Markup) -> Expr {
-        self.with_scope(|this| this.check_in_mode(m.exprs(), InterpretMode::Markup))
+        self.with_scope(|this| this.check_inline_markup(m))
     }
 
     fn check_code(&mut self, m: ast::Code) -> Expr {
-        self.with_scope(|this| this.check_in_mode(m.exprs(), InterpretMode::Code))
+        self.with_scope(|this| this.check_in_mode(m.to_untyped().children(), InterpretMode::Code))
     }
 
-    fn check_math(&mut self, m: ast::Math) -> Expr {
-        self.with_scope(|this| this.check_in_mode(m.exprs(), InterpretMode::Math))
+    fn check_math(&mut self, root: SyntaxNodeChildren) -> Expr {
+        self.check_in_mode(root, InterpretMode::Math)
     }
 
-    fn check_in_mode<'b>(
-        &mut self,
-        root: impl Iterator<Item = ast::Expr<'b>>,
-        mode: InterpretMode,
-    ) -> Expr {
+    fn check_in_mode(&mut self, root: SyntaxNodeChildren, mode: InterpretMode) -> Expr {
         let old_mode = self.lexical.mode;
         self.lexical.mode = mode;
 
+        // collect all comments before the definition
+        self.comment_matcher.reset();
+
         let mut children = Vec::with_capacity(4);
-        for b in root.filter(|e| !matches!(e, ast::Expr::Space(..))) {
-            children.push(self.check(b));
+        for n in root {
+            if let Some(expr) = n.cast::<ast::Expr>() {
+                children.push(self.check(expr));
+                self.comment_matcher.reset();
+                continue;
+            }
+            self.comment_matcher.process(n);
         }
 
         self.lexical.mode = old_mode;
@@ -1186,7 +1252,13 @@ pub enum Decl {
     },
     ModuleImport(Span),
     Closure(Span),
+    Pattern(Span),
     Spread(Span),
+    Docs {
+        base: Interned<Decl>,
+        var: Interned<TypeVar>,
+    },
+    Generated(DefId),
 }
 
 impl Decl {
@@ -1286,6 +1358,7 @@ impl Decl {
                 | Decl::ModuleImport(..)
                 | Decl::Closure(..)
                 | Decl::Spread(..)
+                | Decl::Generated(..)
         )
     }
 
@@ -1303,7 +1376,12 @@ impl Decl {
             | Decl::StrName { name, .. }
             | Decl::Module { name, .. }
             | Decl::PathStem { name, .. } => name,
-            Decl::ModuleImport(..) | Decl::Closure(..) | Decl::Spread(..) => Interned::empty(),
+            Decl::Docs { var, .. } => &var.name,
+            Decl::ModuleImport(..)
+            | Decl::Closure(..)
+            | Decl::Pattern(..)
+            | Decl::Spread(..)
+            | Decl::Generated(..) => Interned::empty(),
         }
     }
 
@@ -1314,6 +1392,7 @@ impl Decl {
             Decl::Closure(..) => DefKind::Func,
             Decl::ImportAlias { .. } => DefKind::ImportAlias,
             Decl::Var { .. } => DefKind::Var,
+            Decl::Generated(..) => DefKind::Var,
             Decl::IdentRef { .. } => DefKind::IdentRef,
             Decl::Module { .. } => DefKind::Module,
             Decl::ModuleAlias { .. } => DefKind::ModuleAlias,
@@ -1323,6 +1402,8 @@ impl Decl {
             Decl::StrName { .. } => DefKind::StrName,
             Decl::PathStem { .. } => DefKind::PathStem,
             Decl::ModuleImport(..) => DefKind::ModuleImport,
+            Decl::Pattern(..) => DefKind::Var,
+            Decl::Docs { .. } => DefKind::Var,
             Decl::Spread(..) => DefKind::Spread,
         }
     }
@@ -1338,7 +1419,10 @@ impl Decl {
     pub fn span(&self) -> Option<Span> {
         match self {
             Decl::Export { .. } | Decl::Module { .. } => None,
+            Decl::Docs { .. } => None,
+            Decl::Generated(..) => None,
             Decl::ModuleImport(at)
+            | Decl::Pattern(at)
             | Decl::Closure(at)
             | Decl::Spread(at)
             | Decl::Func { at, .. }
@@ -1352,6 +1436,15 @@ impl Decl {
             | Decl::StrName { at, .. }
             | Decl::PathStem { at, .. } => Some(at.span()),
         }
+    }
+
+    pub fn weak_cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.name().cmp(other.name()).then_with(|| {
+            let span_pair = self.span().zip(other.span());
+            span_pair.map_or(std::cmp::Ordering::Equal, |(x, y)| {
+                x.number().cmp(&y.number())
+            })
+        })
     }
 
     fn as_def(this: &Interned<Self>, val: Option<Ty>) -> Interned<RefExpr> {
@@ -1391,9 +1484,12 @@ impl fmt::Debug for Decl {
             Decl::Ref { name, .. } => write!(f, "Ref({name:?})"),
             Decl::StrName { name, at } => write!(f, "StrName({name:?}, {at:?})"),
             Decl::PathStem { name, at } => write!(f, "PathStem({name:?}, {at:?})"),
+            Decl::Docs { base, var } => write!(f, "Docs({base:?}, {var:?})"),
             Decl::ModuleImport(..) => write!(f, "ModuleImport(..)"),
             Decl::Closure(..) => write!(f, "Closure(..)"),
             Decl::Spread(..) => write!(f, "Spread(..)"),
+            Decl::Pattern(..) => write!(f, "Pattern(..)"),
+            Decl::Generated(id) => write!(f, "Generated({id:?})"),
         }
     }
 }
@@ -1480,6 +1576,8 @@ pub struct FuncExpr {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LetExpr {
+    /// Span of the pattern
+    pub span: Span,
     pub pattern: Expr,
     pub body: Option<DeferExpr>,
 }

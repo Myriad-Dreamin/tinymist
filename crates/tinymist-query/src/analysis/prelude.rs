@@ -7,7 +7,6 @@ pub use std::sync::{Arc, LazyLock};
 
 pub use comemo::Track;
 pub use ecow::*;
-pub use reflexo::vector::ir::DefId;
 pub use serde::{Deserialize, Serialize};
 pub use typst::foundations::{Func, Value};
 pub use typst::syntax::ast::{self, AstNode};

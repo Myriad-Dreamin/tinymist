@@ -252,57 +252,22 @@ mod matcher_tests {
 }
 
 #[cfg(test)]
-mod document_tests {
-
-    use crate::syntax::find_docs_before;
-    use crate::tests::*;
-
-    #[test]
-    fn test() {
-        snapshot_testing("docs", &|ctx, path| {
-            let source = ctx.source_by_path(&path).unwrap();
-
-            let pos = ctx
-                .to_typst_pos(find_test_position(&source), &source)
-                .unwrap();
-
-            let result = find_docs_before(&source, pos);
-            let result = result.as_deref().unwrap_or("<nil>");
-
-            assert_snapshot!(result);
-        });
-    }
-}
-
-#[cfg(test)]
 mod expr_tests {
+
+    use typst::syntax::Source;
 
     use crate::syntax::{Expr, RefExpr};
     use crate::tests::*;
 
-    #[test]
-    fn scope() {
-        snapshot_testing("expr_of", &|ctx, path| {
-            let source = ctx.source_by_path(&path).unwrap();
+    trait ShowExpr {
+        fn show_expr(&self, expr: &Expr) -> String;
+    }
 
-            let result = ctx.shared_().expr_stage(&source);
-            let mut resolves = result.resolves.iter().collect::<Vec<_>>();
-            resolves.sort_by(|x, y| {
-                x.1.decl.name().cmp(y.1.decl.name()).then_with(|| {
-                    x.1.decl
-                        .span()
-                        .zip(y.1.decl.span())
-                        .map_or(std::cmp::Ordering::Equal, |(x, y)| {
-                            x.number().cmp(&y.number())
-                        })
-                })
-            });
-            let show_expr = |node: &Expr| match node {
+    impl ShowExpr for Source {
+        fn show_expr(&self, node: &Expr) -> String {
+            match node {
                 Expr::Decl(decl) => {
-                    let range = decl
-                        .span()
-                        .and_then(|s| source.range(s))
-                        .unwrap_or_default();
+                    let range = decl.span().and_then(|s| self.range(s)).unwrap_or_default();
                     let fid = if let Some(fid) = decl.file_id() {
                         format!(" in {fid:?}")
                     } else {
@@ -311,7 +276,44 @@ mod expr_tests {
                     format!("{decl:?}@{range:?}{fid}")
                 }
                 _ => format!("{node:?}"),
-            };
+            }
+        }
+    }
+
+    #[test]
+    fn docs() {
+        snapshot_testing("docs", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let result = ctx.shared_().expr_stage(&source);
+            let mut docstrings = result.docstrings.iter().collect::<Vec<_>>();
+            docstrings.sort_by(|x, y| x.0.weak_cmp(y.0));
+            let mut docstrings = docstrings
+                .into_iter()
+                .map(|(ident, expr)| {
+                    format!(
+                        "{} -> {expr:?}",
+                        source.show_expr(&Expr::Decl(ident.clone())),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let mut snap = vec![];
+            snap.push("= docstings".to_owned());
+            snap.append(&mut docstrings);
+
+            assert_snapshot!(snap.join("\n"));
+        });
+    }
+
+    #[test]
+    fn scope() {
+        snapshot_testing("expr_of", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let result = ctx.shared_().expr_stage(&source);
+            let mut resolves = result.resolves.iter().collect::<Vec<_>>();
+            resolves.sort_by(|x, y| x.1.decl.weak_cmp(&y.1.decl));
+
             let mut resolves = resolves
                 .into_iter()
                 .map(|(_, expr)| {
@@ -323,8 +325,8 @@ mod expr_tests {
 
                     format!(
                         "{} -> {}, val: {val:?}",
-                        show_expr(&Expr::Decl(ident.clone())),
-                        of.as_ref().map(show_expr).unwrap_or_default()
+                        source.show_expr(&Expr::Decl(ident.clone())),
+                        of.as_ref().map(|e| source.show_expr(e)).unwrap_or_default()
                     )
                 })
                 .collect::<Vec<_>>();
@@ -333,7 +335,7 @@ mod expr_tests {
             let mut exports = exports
                 .into_iter()
                 .map(|(ident, node)| {
-                    let node = show_expr(node);
+                    let node = source.show_expr(node);
                     format!("{ident} -> {node}",)
                 })
                 .collect::<Vec<_>>();

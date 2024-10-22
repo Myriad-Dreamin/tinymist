@@ -4270,7 +4270,6 @@ dependencies = [
  "parking_lot",
  "pathdiff",
  "percent-encoding",
- "rayon",
  "reflexo",
  "reflexo-typst",
  "regex",

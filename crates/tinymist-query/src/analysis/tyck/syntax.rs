@@ -3,7 +3,7 @@
 use super::*;
 use crate::analysis::ParamAttrs;
 use crate::docs::{SignatureDocsT, TypelessParamDocs, UntypedSymbolDocs};
-use crate::syntax::expr::*;
+use crate::syntax::{expr::*, DocString, VarDoc};
 use crate::ty::*;
 
 static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);
@@ -258,15 +258,9 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_func(&mut self, func: &Interned<FuncExpr>) -> Ty {
-        // let closure: ast::Closure = root.cast()?;
-        // let def_id = closure
-        //     .name()
-        //     .and_then(|n| self.get_def_id(n.span(), &to_ident_ref(&root, n)?));
         let def_id = func.decl.clone();
 
-        // todo: docstring
-        // let docstring = self.check_docstring(&root, DocStringKind::Function, def_id);
-        let docstring = None::<Arc<DocString>>;
+        let docstring = self.check_docstring(&def_id);
         let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
         log::debug!("check closure: {:?} -> {docstring:#?}", def_id.name());
@@ -280,6 +274,7 @@ impl<'a> TypeChecker<'a> {
         let mut defaults = BTreeMap::new();
         let mut rest = None;
 
+        // todo: combine with check_pattern
         for exp in func.params.pos.iter() {
             // pos.push(self.check_pattern(pattern, Ty::Any, docstring, root.clone()));
             pos.push(self.check(exp));
@@ -417,27 +412,22 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_let(&mut self, let_expr: &Interned<LetExpr>) -> Ty {
-        // pub pattern: Expr,
-        // pub body: Expr,
-
-        // todo: docstring
-        // let docstring = self.check_var_docs(&root);
-        // let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
+        let docstring = self.check_docstring(&Decl::Pattern(let_expr.span).into());
+        let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
         let value = match &let_expr.body {
             Some(expr) => self.check_defer(expr),
             None => Ty::Builtin(BuiltinTy::None),
         };
-        // todo
-        // if let Some(annotated) = &docstring.res_ty {
-        //     self.constrain(&value, annotated);
-        // }
-        // let value = docstring.res_ty.clone().unwrap_or(value);
+        if let Some(annotated) = &docstring.res_ty {
+            self.constrain(&value, annotated);
+        }
+        let value = docstring.res_ty.clone().unwrap_or(value);
 
+        // todo: check pattern with docstring
+        // self.check_pattern(pattern, value, docstring, root.clone());
         let pat = self.check(&let_expr.pattern);
         self.constrain(&value, &pat);
-
-        // self.check_pattern(pattern, value, docstring, root.clone());
 
         Ty::Builtin(BuiltinTy::None)
     }
