@@ -865,7 +865,7 @@ const letStatement = (): textmate.Grammar => {
         },
         patterns: [
           {
-            include: "#funcParams",
+            include: "#patternOrArgsBody",
           },
         ],
       },
@@ -882,7 +882,7 @@ const letStatement = (): textmate.Grammar => {
             name: "meta.brace.round.typst",
           },
         },
-        patterns: [{ include: "#patternBindingItems" }],
+        patterns: [{ include: "#patternOrArgsBody" }],
       },
       {
         include: "#identifier",
@@ -1216,89 +1216,17 @@ const callArgs: textmate.Pattern = {
       name: "meta.brace.round.typst",
     },
   },
-  patterns: [
-    {
-      match: /,/,
-      name: "punctuation.separator.comma.typst",
-    },
-    {
-      include: "#expression",
-    },
-  ],
+  patterns: [{ include: "#patternOrArgsBody" }],
 };
 
-const funcRestParam: textmate.Pattern = {
-  match: /(\.\.)(\b[\p{XID_Start}_][\p{XID_Continue}_\-]*)?/u,
-  // debugging
-  // - name: meta.parameter.binding.typst
-  captures: {
-    "1": {
-      name: "keyword.operator.spread.typst",
-    },
-    "2": {
-      name: "variable.other.readwrite.typst",
-    },
-  },
-};
-
-const patternBindingItems: textmate.Pattern = {
+const patternOrArgsBody: textmate.Pattern = {
   patterns: [
     { include: "#comments" },
-    /// rest binding
-    {
-      include: "#funcRestParam",
-    },
-    /// recursive binding
-    {
-      begin: /\(/,
-      end: /\)/,
-      beginCaptures: {
-        "0": {
-          name: "meta.brace.round.typst",
-        },
-      },
-      endCaptures: {
-        "0": {
-          name: "meta.brace.round.typst",
-        },
-      },
-      patterns: [
-        {
-          include: "#patternBindingItems",
-        },
-      ],
-    },
-    /// parameter binding
-    {
-      include: "#primitiveTypes",
-    },
-    {
-      include: "#identifier",
-    },
-    {
-      match: /:/,
-      name: "punctuation.separator.colon.typst",
-    },
     {
       match: /,/,
       name: "punctuation.separator.comma.typst",
     },
-  ],
-};
-
-const funcParams: textmate.Pattern = {
-  patterns: [
-    {
-      include: "#patternBindingItems",
-    },
-    {
-      match: /:/,
-      name: "punctuation.separator.colon.typst",
-    },
-    {
-      match: /,/,
-      name: "punctuation.separator.comma.typst",
-    },
+    { include: "#expression" },
   ],
 };
 
@@ -1397,7 +1325,7 @@ const arrowFunc: textmate.Pattern = {
           },
           patterns: [
             {
-              include: "#funcParams",
+              include: "#patternOrArgsBody",
             },
           ],
         },
@@ -1476,9 +1404,7 @@ export const typst: textmate.Grammar = {
     // todo: distinguish strict and non-strict for markup and code mode.
     // funcCallOrPropAccess: funcCallOrPropAccess(false),
     callArgs,
-    funcRestParam,
-    funcParams,
-    patternBindingItems,
+    patternOrArgsBody,
     codeBlock,
     contentBlock,
     arrowFunc,
