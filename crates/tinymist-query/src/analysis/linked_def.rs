@@ -153,19 +153,22 @@ fn find_ident_definition(
         _ => None,
     });
     let kind = def.map(|d| d.kind()).or_else(|| ty.map(|ty| ty.kind()))?;
-    let span = def.and_then(|e| e.span());
-    let def_fid = span.and_then(Span::id).or_else(|| match &val {
+    let def_fid = def.and_then(|e| e.file_id()).or_else(|| match &val {
         Some(Value::Func(f)) => f.span().id(),
+        Some(Value::Module(f)) => f.file_id(),
         _ => None,
     });
     let name = def.map(|d| d.name().clone()).unwrap_or_default();
 
-    let def_source = ctx.source_by_id(def_fid?).ok()?;
-    let root = LinkedNode::new(def_source.root());
-    let def_name = root.find(span?)?;
-    let def_range = def_source.range(span?)?;
+    let def_at = def_fid.and_then(|fid| {
+        let def_source = ctx.source_by_id(fid).ok()?;
+        let root = LinkedNode::new(def_source.root());
+        let def_node = None.or_else(|| root.find(def?.span()?)).unwrap_or(root);
+        Some((fid, def_node.range()))
+    });
+
     match kind {
-        DefKind::ModuleAlias | DefKind::PathStem => {
+        DefKind::ModuleAlias | DefKind::PathStem | DefKind::Module => {
             if !proj.is_empty() {
                 proj.reverse();
                 // let def_fid = def_fid?;
@@ -182,8 +185,10 @@ fn find_ident_definition(
                 kind,
                 name: name.clone(),
                 value: val,
-                def_at: Some((def_fid?, def_range.clone())),
-                name_range: Some(def_range),
+                def_at,
+                // todo: path stem
+                // name_range: Some(def_range),
+                name_range: None,
             })
         }
         DefKind::Constant
@@ -195,30 +200,39 @@ fn find_ident_definition(
             kind,
             name: name.clone(),
             value: val,
-            def_at: Some((def_fid?, def_range.clone())),
-            name_range: Some(def_range),
+            // todo: correct name range
+            name_range: def_at.as_ref().map(|(_, r)| r.clone()),
+            def_at,
         }),
         DefKind::Func => {
-            log::info!("def_name for function: {def_name:?}");
-            let values = ctx.analyze_expr2(def_name.get());
-            let func = values.into_iter().find(|v| matches!(v.0, Value::Func(..)));
-            log::info!("okay for function: {func:?}");
+            let value = def_fid.and_then(|fid| {
+                let def_source = ctx.source_by_id(fid).ok()?;
+                let root = LinkedNode::new(def_source.root());
+                let def_name = root.find(def?.span()?)?;
+
+                log::info!("def_name for function: {def_name:?}");
+                let values = ctx.analyze_expr2(def_name.get());
+                let func = values
+                    .into_iter()
+                    .find(|v| matches!(v.0, Value::Func(..)))?;
+                log::info!("okay for function: {func:?}");
+                Some(func.0)
+            });
 
             Some(DefinitionLink {
                 kind,
                 name: name.clone(),
-                value: func.map(|v| v.0),
-                // value: None,
-                def_at: Some((def_fid?, def_range.clone())),
-                name_range: Some(def_range),
+                value,
+                // todo: correct name range
+                name_range: def_at.as_ref().map(|(_, r)| r.clone()),
+                def_at,
             })
         }
         DefKind::ModuleImport
         | DefKind::Spread
         | DefKind::Export
         | DefKind::ImportAlias
-        | DefKind::Import
-        | DefKind::Module => {
+        | DefKind::Import => {
             log::info!("unimplemented import {kind:?}");
             None
         }
@@ -588,6 +602,7 @@ impl DefResolver {
 
         match expr {
             Expr::Decl(decl) => self.of_decl(decl, ty),
+            Expr::Ref(r) => self.of_expr(r.of.as_ref()?, r.val.as_ref().or(ty)),
             _ => None,
         }
     }
