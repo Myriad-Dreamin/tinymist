@@ -158,7 +158,7 @@ impl<'a> DocsChecker<'a> {
 
     fn generate_var(&mut self, name: StrRef) -> Ty {
         self.next_id += 1;
-        let encoded = Interned::new(Decl::Generated(DefId(self.next_id as u64)));
+        let encoded = Interned::new(Decl::generated(DefId(self.next_id as u64)));
         log::debug!("generate var {name:?} {encoded:?}");
         let var = TypeVar {
             name,

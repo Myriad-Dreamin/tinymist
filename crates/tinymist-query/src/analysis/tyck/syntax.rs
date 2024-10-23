@@ -3,7 +3,7 @@
 use super::*;
 use crate::analysis::ParamAttrs;
 use crate::docs::{SignatureDocsT, TypelessParamDocs, UntypedSymbolDocs};
-use crate::syntax::{expr::*, DocString, VarDoc};
+use crate::syntax::{def::*, DocString, VarDoc};
 use crate::ty::*;
 
 static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);
@@ -412,7 +412,7 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_let(&mut self, let_expr: &Interned<LetExpr>) -> Ty {
-        let docstring = self.check_docstring(&Decl::Pattern(let_expr.span).into());
+        let docstring = self.check_docstring(&Decl::pattern(let_expr.span).into());
         let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
         let value = match &let_expr.body {

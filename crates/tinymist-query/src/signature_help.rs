@@ -47,7 +47,7 @@ impl SemanticRequest for SignatureHelpRequest {
             .as_deref()
             .map(markdown_docs);
 
-        let Some(Value::Func(function)) = def_link.value else {
+        let Some(Value::Func(function)) = def_link.value() else {
             return None;
         };
         log::trace!("got function {function:?}");

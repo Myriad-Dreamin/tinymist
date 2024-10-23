@@ -90,10 +90,7 @@ impl<'a> TypeChecker<'a> {
         base: &Interned<Decl>,
     ) -> Ty {
         let mut gen_var = var.as_ref().clone();
-        let encoded = Interned::new(Decl::Docs {
-            base: base.clone(),
-            var: var.clone(),
-        });
+        let encoded = Interned::new(Decl::docs(base.clone(), var.clone()));
         gen_var.def = encoded.clone();
         log::debug!("copy var {fr:?} as {encoded:?}");
         let bounds = TypeVarBounds::new(gen_var, fr.bounds.bounds().read().clone());

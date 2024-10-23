@@ -167,6 +167,16 @@ impl Ty {
         Ty::Builtin(BuiltinTy::Undef)
     }
 
+    /// Get value repr of the type
+    pub fn value(&self) -> Option<Value> {
+        match self {
+            Ty::Value(v) => Some(v.val.clone()),
+            Ty::Builtin(BuiltinTy::Element(v)) => Some(Value::Func((*v).into())),
+            Ty::Builtin(BuiltinTy::Type(ty)) => Some(Value::Type(*ty)),
+            _ => None,
+        }
+    }
+
     /// Get the type of the type node
     pub fn kind(&self) -> DefKind {
         match self {

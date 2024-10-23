@@ -64,12 +64,12 @@ impl StatefulRequest for PrepareRenameRequest {
 }
 
 pub(crate) fn prepare_renaming(
-    _ctx: &mut AnalysisContext,
+    ctx: &mut AnalysisContext,
     deref_target: &DerefTarget,
     lnk: &DefinitionLink,
 ) -> Option<(String, Option<LspRange>)> {
     let name = lnk.name.clone();
-    let (def_fid, _def_range) = lnk.def_at.clone()?;
+    let (def_fid, _def_range) = lnk.def_at(ctx).clone()?;
 
     if def_fid.package().is_some() {
         debug!(
@@ -91,7 +91,7 @@ pub(crate) fn prepare_renaming(
         // Cannot rename expression import
         // LexicalKind::Mod(Module(ModSrc::Expr(..))) => None,
         Var => var_rename(),
-        Func => validate_fn_renaming(lnk).map(|_| (name.to_string(), None)),
+        Func | Closure => validate_fn_renaming(lnk).map(|_| (name.to_string(), None)),
         ModuleImport | ModuleInclude | ModuleAlias | PathStem => {
             let node = deref_target.node().get().clone();
             let path = node.cast::<ast::Str>()?;
@@ -101,18 +101,20 @@ pub(crate) fn prepare_renaming(
         // todo: label renaming, bibkey renaming
         BibKey | Label | Ref => None,
         Export | ImportAlias | Module | Constant | IdentRef | Import | StrName | Spread => None,
+        Pattern | Generated | Docs => None,
     }
 }
 
 fn validate_fn_renaming(lnk: &DefinitionLink) -> Option<()> {
     use typst::foundations::func::Repr;
-    let mut f = match &lnk.value {
+    let value = lnk.value();
+    let mut f = match &value {
         None => return Some(()),
         Some(Value::Func(f)) => f,
         Some(..) => {
             log::info!(
                 "prepare_rename: not a function on function definition site: {:?}",
-                lnk.value
+                lnk.term
             );
             return None;
         }

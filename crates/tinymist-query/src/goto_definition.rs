@@ -37,7 +37,7 @@ impl StatefulRequest for GotoDefinitionRequest {
 
         let def = find_definition(ctx.shared(), source.clone(), doc.as_ref(), deref_target)?;
 
-        let (fid, def_range) = def.def_at?;
+        let (fid, def_range) = def.def_at(ctx)?;
 
         let uri = ctx.uri_for_id(fid).ok()?;
 

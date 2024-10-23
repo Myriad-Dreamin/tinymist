@@ -18,3 +18,5 @@ pub(crate) mod expr;
 pub use expr::*;
 pub(crate) mod docs;
 pub use docs::*;
+pub(crate) mod def;
+pub use def::*;
