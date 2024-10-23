@@ -24,16 +24,6 @@ pub struct DefinitionLink {
     pub name_range: Option<Range<usize>>,
 }
 
-impl DefinitionLink {
-    /// Convert the definition to an identifier reference.
-    pub fn to_ident_ref(&self) -> Option<IdentRef> {
-        Some(IdentRef {
-            name: self.name.as_ref().into(),
-            range: self.name_range.clone()?,
-        })
-    }
-}
-
 // todo: field definition
 /// Finds the definition of a symbol.
 pub fn find_definition(
@@ -211,7 +201,7 @@ fn find_ident_definition(
                 let def_name = root.find(def?.span()?)?;
 
                 log::info!("def_name for function: {def_name:?}");
-                let values = ctx.analyze_expr2(def_name.get());
+                let values = ctx.analyze_expr(def_name.get());
                 let func = values
                     .into_iter()
                     .find(|v| matches!(v.0, Value::Func(..)))?;
@@ -457,7 +447,7 @@ fn resolve_callee_(
         this: None,
     })
     .or_else(|| {
-        let values = ctx.analyze_expr2(callee);
+        let values = ctx.analyze_expr(callee);
 
         if let Some(func) = values.into_iter().find_map(|v| match v.0 {
             Value::Func(f) => Some(f),
@@ -476,7 +466,7 @@ fn resolve_callee_(
             } {
                 let target = access.target();
                 let field = access.field().get();
-                let values = ctx.analyze_expr2(target.to_untyped());
+                let values = ctx.analyze_expr(target.to_untyped());
                 if let Some((this, func_ptr)) = values.into_iter().find_map(|(this, _styles)| {
                     if let Some(Value::Func(f)) = this.ty().scope().get(field) {
                         return Some((this, f.clone()));

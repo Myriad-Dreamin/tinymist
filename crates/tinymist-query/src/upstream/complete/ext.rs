@@ -88,7 +88,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                     let anaylyze = node.children().find(|child| child.is::<ast::Expr>());
                     let analyzed = anaylyze
                         .as_ref()
-                        .and_then(|source| self.ctx.analyze_import2(source).1);
+                        .and_then(|source| self.ctx.analyze_import(source).1);
                     if analyzed.is_none() {
                         log::debug!("failed to analyze import: {:?}", anaylyze);
                     }

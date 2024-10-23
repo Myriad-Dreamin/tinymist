@@ -1,7 +1,7 @@
 pub use core::fmt;
 pub use std::collections::{BTreeMap, HashMap};
 pub use std::hash::{Hash, Hasher};
-pub use std::ops::{Deref, Range};
+pub use std::ops::Range;
 pub use std::path::{Path, PathBuf};
 pub use std::sync::{Arc, LazyLock};
 
@@ -18,5 +18,4 @@ pub use typst_shim::utils::LazyHash;
 pub use super::AnalysisContext;
 pub(crate) use super::StrRef;
 pub(crate) use crate::adt::interner::Interned;
-pub(crate) use crate::syntax::{IdentRef, LexicalHierarchy, LexicalKind, LexicalModKind, ModSrc};
 pub use crate::ty::Ty;

@@ -376,7 +376,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
         if prev.is::<ast::Expr>();
         if prev.parent_kind() != Some(SyntaxKind::Markup) ||
            prev.prev_sibling_kind() == Some(SyntaxKind::Hash);
-        if let Some((value, styles)) = ctx.ctx.analyze_expr2(&prev).into_iter().next();
+        if let Some((value, styles)) = ctx.ctx.analyze_expr(&prev).into_iter().next();
         then {
             ctx.from = ctx.cursor;
             field_access_completions(ctx, &value, &styles);
@@ -391,7 +391,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
         if prev.kind() == SyntaxKind::Dot;
         if let Some(prev_prev) = prev.prev_sibling();
         if prev_prev.is::<ast::Expr>();
-        if let Some((value, styles)) = ctx.ctx.analyze_expr2(&prev_prev).into_iter().next();
+        if let Some((value, styles)) = ctx.ctx.analyze_expr(&prev_prev).into_iter().next();
         then {
             ctx.from = ctx.leaf.offset();
             field_access_completions(ctx, &value, &styles);
@@ -552,7 +552,7 @@ fn import_item_completions<'a>(
     existing: ast::ImportItems<'a>,
     source: &LinkedNode,
 ) {
-    let Some(value) = ctx.ctx.analyze_import2(source).1 else {
+    let Some(value) = ctx.ctx.analyze_import(source).1 else {
         return;
     };
     let Some(scope) = value.scope() else { return };

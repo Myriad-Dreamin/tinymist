@@ -19,8 +19,8 @@ use typst::{model::Document, text::Font};
 
 use crate::analysis::prelude::*;
 use crate::analysis::{
-    analyze_bib, analyze_import_, analyze_signature, post_type_check, BibInfo, ImportInfo,
-    PathPreference, Signature, SignatureTarget, Ty, TypeScheme,
+    analyze_bib, analyze_import_, analyze_signature, post_type_check, BibInfo, PathPreference,
+    Signature, SignatureTarget, Ty, TypeScheme,
 };
 use crate::docs::{SignatureDocs, VarDocs};
 use crate::syntax::{
@@ -252,16 +252,6 @@ impl<'w> AnalysisContext<'w> {
         self.local.module_dependencies()
     }
 
-    /// Get the expression information of a source file.
-    pub(crate) fn expr_stage(&mut self, source: &Source) -> Arc<ExprInfo> {
-        self.local.expr_stage(source)
-    }
-
-    /// Get the type check information of a source file.
-    pub(crate) fn type_check(&mut self, source: &Source) -> Option<Arc<TypeScheme>> {
-        self.local.type_check(source)
-    }
-
     /// Get file's id by its path
     pub fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
         // todo: source in packages
@@ -395,6 +385,16 @@ impl<'w> AnalysisContext<'w> {
         Some(self.to_lsp_range(position, &source))
     }
 
+    /// Get the expression information of a source file.
+    pub(crate) fn expr_stage(&mut self, source: &Source) -> Arc<ExprInfo> {
+        self.local.expr_stage(source)
+    }
+
+    /// Get the type check information of a source file.
+    pub(crate) fn type_check(&mut self, source: &Source) -> Option<Arc<TypeScheme>> {
+        self.local.type_check(source)
+    }
+
     pub(crate) fn signature_dyn(&mut self, func: Func) -> Signature {
         log::debug!("check runtime func {func:?}");
         analyze_signature(self.shared(), SignatureTarget::Runtime(func)).unwrap()
@@ -406,18 +406,6 @@ impl<'w> AnalysisContext<'w> {
 
     pub(crate) fn signature_docs(&mut self, runtime_fn: &Value) -> Option<SignatureDocs> {
         crate::docs::signature_docs(self, runtime_fn, None)
-    }
-
-    /// Get the import information of a source file.
-    pub fn import_info(&mut self, source: Source) -> Option<Arc<ImportInfo>> {
-        let token = &self.analysis.workers.import;
-        let w = self.resources.world();
-        token.enter(|| {
-            use comemo::Track;
-            let w = (w as &dyn World).track();
-
-            import_info(w, source)
-        })
     }
 
     /// Get bib info of a source file.
@@ -476,18 +464,17 @@ impl<'w> AnalysisContext<'w> {
         let mod_exp = find_expr_in_import(def_root.leaf_at_compat(cursor)?)?;
         let mod_import = mod_exp.parent()?.clone();
         let mod_import_node = mod_import.cast::<ast::ModuleImport>()?;
-        self.analyze_import2(mod_import_node.source().to_untyped())
-            .1
+        self.analyze_import(mod_import_node.source().to_untyped()).1
     }
 
     /// Try to load a module from the current source file.
-    pub fn analyze_import2(&self, source: &SyntaxNode) -> (Option<Value>, Option<Value>) {
+    pub fn analyze_import(&self, source: &SyntaxNode) -> (Option<Value>, Option<Value>) {
         self.shared().analyze_import(source)
     }
 
     /// Try to load a module from the current source file.
-    pub fn analyze_expr2(&self, source: &SyntaxNode) -> EcoVec<(Value, Option<Styles>)> {
-        self.shared().analyze_expr2(source)
+    pub fn analyze_expr(&self, source: &SyntaxNode) -> EcoVec<(Value, Option<Styles>)> {
+        self.shared().analyze_expr(source)
     }
 
     /// Describe the item under the cursor.
@@ -733,17 +720,6 @@ impl SharedContext {
         .clone()
     }
 
-    /// Get the import information of a source file.
-    pub fn import_info(&self, source: Source) -> Option<Arc<ImportInfo>> {
-        let token = &self.analysis.workers.import;
-        token.enter(|| {
-            use comemo::Track;
-            let w = &self.world;
-            let w = (w as &dyn World).track();
-            import_info(w, source)
-        })
-    }
-
     /// Try to load a module from the current source file.
     pub fn analyze_import(&self, source: &SyntaxNode) -> (Option<Value>, Option<Value>) {
         if let Some(v) = source.cast::<ast::Expr>().and_then(Self::const_eval) {
@@ -754,7 +730,7 @@ impl SharedContext {
     }
 
     /// Try to load a module from the current source file.
-    pub fn analyze_expr2(&self, source: &SyntaxNode) -> EcoVec<(Value, Option<Styles>)> {
+    pub fn analyze_expr(&self, source: &SyntaxNode) -> EcoVec<(Value, Option<Styles>)> {
         let token = &self.analysis.workers.expression;
         token.enter(|| analyze_expr_(&self.world, source))
     }
@@ -913,17 +889,6 @@ fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
     }
 
     cursor.min(text.len())
-}
-
-#[comemo::memoize]
-fn def_use_lexical_hierarchy(source: Source) -> Option<EcoVec<LexicalHierarchy>> {
-    crate::syntax::get_lexical_hierarchy(source, crate::syntax::LexicalScopeKind::DefUse)
-}
-
-#[comemo::memoize]
-fn import_info(w: Tracked<dyn World + '_>, source: Source) -> Option<Arc<ImportInfo>> {
-    let l = def_use_lexical_hierarchy(source.clone())?;
-    crate::analysis::get_import_info(w, source, l)
 }
 
 #[comemo::memoize]

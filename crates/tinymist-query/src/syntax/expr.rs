@@ -619,7 +619,7 @@ impl ExprWorker {
         let src = self.eval_expr(source, InterpretMode::Code);
         let src_expr = self.fold_expr_and_val(src).or_else(|| {
             self.ctx
-                .analyze_expr2(source.to_untyped())
+                .analyze_expr(source.to_untyped())
                 .into_iter()
                 .find_map(|(v, _)| match v {
                     Value::Str(s) => Some(Expr::Type(Ty::Value(InsTy::new(Value::Str(s))))),

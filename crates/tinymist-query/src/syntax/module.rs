@@ -38,17 +38,15 @@ pub fn construct_module_dependencies(
         };
 
         let file_id = source.id();
-        let Some(import) = ctx.shared.import_info(source) else {
-            continue;
-        };
+        let ei = ctx.shared.expr_stage(&source);
 
         dependencies
             .entry(file_id)
             .or_insert_with(|| ModuleDependency {
-                dependencies: import.deps.clone(),
+                dependencies: ei.imports.iter().cloned().collect(),
                 dependents: EcoVec::default(),
             });
-        for dep in import.deps.clone() {
+        for dep in ei.imports.clone() {
             dependents
                 .entry(dep)
                 .or_insert_with(EcoVec::new)

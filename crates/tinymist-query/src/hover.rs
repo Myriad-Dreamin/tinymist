@@ -185,7 +185,7 @@ fn star_tooltip(
 
     let mi: ast::ModuleImport = leaf.cast()?;
     let source = mi.source();
-    let module = ctx.analyze_import2(source.to_untyped()).1;
+    let module = ctx.analyze_import(source.to_untyped()).1;
     log::debug!("star import: {source:?} => {:?}", module.is_some());
 
     let i = module?;
