@@ -649,7 +649,6 @@ pub static FLOW_RADIUS_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
 
 #[cfg(test)]
 mod tests {
-    use reflexo_typst::DETACHED_ENTRY;
 
     use crate::syntax::Decl;
 
@@ -661,15 +660,8 @@ mod tests {
     // instantiate a `v` as the return type of the map function.
     #[test]
     fn test_map() {
-        let fid = *DETACHED_ENTRY;
-        let u = Ty::Var(TypeVar::new(
-            "u".into(),
-            Decl::external(fid, "u".into()).into(),
-        ));
-        let v = Ty::Var(TypeVar::new(
-            "v".into(),
-            Decl::external(fid, "v".into()).into(),
-        ));
+        let u = Ty::Var(TypeVar::new("u".into(), Decl::lit("u").into()));
+        let v = Ty::Var(TypeVar::new("v".into(), Decl::lit("v").into()));
         let mapper_fn =
             Ty::Func(SigTy::new([u].into_iter(), None, None, None, Some(v.clone())).into());
         let map_fn =

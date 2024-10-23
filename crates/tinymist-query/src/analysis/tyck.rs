@@ -103,33 +103,40 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn get_var(&mut self, decl: &DeclExpr) -> Interned<TypeVar> {
-        let var = match decl.as_ref() {
-            Decl::Export { fid, name } => {
-                if let Some(var) = self.info.vars.get(decl) {
-                    var.var.clone()
-                } else {
-                    let def = self.import_ty(*fid, name);
-                    let init_expr = self.init_var(def);
-                    let name = name.clone();
-                    let def = decl.clone();
+        let entry = self.info.vars.entry(decl.clone()).or_insert_with(|| {
+            let name = decl.name().clone();
+            let decl = decl.clone();
 
-                    let var_with_bounds = TypeVarBounds::new(TypeVar { name, def }, init_expr);
-                    let var = var_with_bounds.var.clone();
-
-                    self.info.vars.insert(decl.clone(), var_with_bounds);
-                    var
+            // Check External variables
+            let init = decl.file_id().and_then(|fid| {
+                if fid == self.ei.fid {
+                    return None;
                 }
-            }
-            _ => {
-                let entry = self.info.vars.entry(decl.clone()).or_insert_with(|| {
-                    let name = decl.name().clone();
-                    let decl = decl.clone();
-                    TypeVarBounds::new(TypeVar { name, def: decl }, TypeBounds::default())
-                });
 
-                entry.var.clone()
-            }
-        };
+                log::debug!("import_ty {name} from {fid:?}");
+
+                let source = self.ctx.source_by_id(fid).ok()?;
+                let ext_def_use_info = self.ctx.expr_stage(&source);
+                let ext_type_info = self.ctx.type_check(&source)?;
+                let ext_def = ext_def_use_info.exports.get(&name)?;
+
+                // todo: rest expressions
+                let def = match ext_def {
+                    Expr::Decl(decl) => {
+                        let ext_ty = ext_type_info.vars.get(decl)?.as_type();
+                        ext_type_info.simplify(ext_ty, false)
+                    }
+                    _ => return None,
+                };
+
+                Some(ext_type_info.to_bounds(def))
+            });
+
+            TypeVarBounds::new(TypeVar { name, def: decl }, init.unwrap_or_default())
+        });
+
+        let var = entry.var.clone();
+
         if let Some(s) = decl.span() {
             // todo: record decl types
             // let should_record = matches!(root.kind(), SyntaxKind::FuncCall).then(||
@@ -141,24 +148,6 @@ impl<'a> TypeChecker<'a> {
             TypeScheme::witness_(s, Ty::Var(var.clone()), &mut self.info.mapping);
         }
         var
-    }
-
-    fn import_ty(&mut self, fid: TypstFileId, name: &Interned<str>) -> Option<Ty> {
-        log::debug!("import_ty {name} from {fid:?}");
-
-        let source = self.ctx.source_by_id(fid).ok()?;
-        let ext_def_use_info = self.ctx.expr_stage(&source);
-        let ext_type_info = self.ctx.type_check(&source)?;
-        let ext_def = ext_def_use_info.exports.get(name)?;
-
-        // todo: rest expressions
-        match ext_def {
-            Expr::Decl(decl) => {
-                let ext_ty = ext_type_info.vars.get(decl)?.as_type();
-                Some(ext_type_info.simplify(ext_ty, false))
-            }
-            _ => None,
-        }
     }
 
     fn constrain(&mut self, lhs: &Ty, rhs: &Ty) {
@@ -363,36 +352,6 @@ impl<'a> TypeChecker<'a> {
         }
     }
 
-    fn init_var(&mut self, def: Option<Ty>) -> TypeBounds {
-        let mut store = TypeBounds::default();
-
-        let Some(def) = def else {
-            return store;
-        };
-
-        match def {
-            Ty::Var(v) => {
-                let w = self.info.vars.get(&v.def).unwrap();
-                match &w.bounds {
-                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
-                        let w = w.read();
-                        store.lbs.extend(w.lbs.iter().cloned());
-                        store.ubs.extend(w.ubs.iter().cloned());
-                    }
-                }
-            }
-            Ty::Let(v) => {
-                store.lbs.extend(v.lbs.iter().cloned());
-                store.ubs.extend(v.ubs.iter().cloned());
-            }
-            _ => {
-                store.ubs.push(def);
-            }
-        }
-
-        store
-    }
-
     fn weaken(&mut self, v: &Ty) {
         match v {
             Ty::Var(v) => {
@@ -472,7 +431,7 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_defer(&mut self, expr: &DeferExpr) -> Ty {
-        let expr = self.ei.scopes.get(&expr.span).unwrap();
+        let expr = self.ei.exprs.get(&expr.span).unwrap();
         self.check(&expr.clone())
     }
 }

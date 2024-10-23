@@ -557,15 +557,14 @@ fn value_to_def(
     })
 }
 
-struct DefResolver<'a> {
-    ctx: &'a Arc<SharedContext>,
+struct DefResolver {
     ei: Arc<ExprInfo>,
 }
 
-impl<'a> DefResolver<'a> {
-    fn new(ctx: &'a Arc<SharedContext>, id: TypstFileId) -> Option<Self> {
+impl DefResolver {
+    fn new(ctx: &Arc<SharedContext>, id: TypstFileId) -> Option<Self> {
         let ei = ctx.expr_stage(&ctx.source_by_id(id).ok()?);
-        Some(Self { ctx, ei })
+        Some(Self { ei })
     }
 
     fn of_span(&mut self, span: Span) -> Option<ExprLoc> {
@@ -597,17 +596,6 @@ impl<'a> DefResolver<'a> {
         log::debug!("of_decl: {expr:?}");
 
         match expr.as_ref() {
-            Decl::Export { name, fid } => {
-                let new_file = self
-                    .ctx
-                    .source_by_id(*fid)
-                    .ok()
-                    .map(|f| self.ctx.expr_stage(&f));
-                match new_file {
-                    Some(new_file) => self.of_export(new_file, name, ty),
-                    None => None,
-                }
-            }
             Decl::Import { at, .. } | Decl::ImportAlias { at, .. } => {
                 let mut next = self.of_span(*at).unwrap_or_else(|| ExprLoc {
                     def: Some(expr.clone()),
@@ -622,17 +610,6 @@ impl<'a> DefResolver<'a> {
                 ty: ty.cloned(),
             }),
         }
-    }
-
-    fn of_export(
-        &mut self,
-        ei: Arc<ExprInfo>,
-        name: &Interned<str>,
-        ty: Option<&Ty>,
-    ) -> Option<ExprLoc> {
-        self.ei = ei;
-        let expr = &self.ei.exports.get(name)?.clone();
-        self.of_expr(expr, ty)
     }
 }
 

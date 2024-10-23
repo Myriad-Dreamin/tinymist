@@ -103,11 +103,9 @@ mod tests {
     use super::*;
     use crate::adt::interner::Interned;
     use crate::syntax::Decl;
-    use reflexo_typst::DETACHED_ENTRY;
 
     pub fn var_ins(s: &str) -> Ty {
-        let fid = *DETACHED_ENTRY;
-        Ty::Var(TypeVar::new(s.into(), Decl::external(fid, s.into()).into()))
+        Ty::Var(TypeVar::new(s.into(), Decl::lit(s).into()))
     }
 
     pub fn str_sig(

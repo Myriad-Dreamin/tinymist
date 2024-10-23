@@ -93,8 +93,8 @@ pub(crate) fn expr_of(ctx: Arc<SharedContext>, source: Source) -> Arc<ExprInfo> 
     let docstrings_base = Arc::new(Mutex::new(FxHashMap::default()));
     let docstrings = docstrings_base.clone();
 
-    let scopes_base = Arc::new(Mutex::new(FxHashMap::default()));
-    let scopes = scopes_base.clone();
+    let exprs_base = Arc::new(Mutex::new(FxHashMap::default()));
+    let exprs = exprs_base.clone();
 
     let imports_base = Arc::new(Mutex::new(FxHashSet::default()));
     let imports = imports_base.clone();
@@ -111,7 +111,7 @@ pub(crate) fn expr_of(ctx: Arc<SharedContext>, source: Source) -> Arc<ExprInfo> 
             ctx,
             imports,
             docstrings,
-            scopes,
+            exprs,
             import_buffer: Vec::new(),
             lexical: LexicalContext {
                 mode: InterpretMode::Markup,
@@ -136,7 +136,7 @@ pub(crate) fn expr_of(ctx: Arc<SharedContext>, source: Source) -> Arc<ExprInfo> 
         docstrings: std::mem::take(docstrings_base.lock().deref_mut()),
         imports: HashSet::from_iter(std::mem::take(imports_base.lock().deref_mut())),
         exports,
-        scopes: std::mem::take(scopes_base.lock().deref_mut()),
+        exprs: std::mem::take(exprs_base.lock().deref_mut()),
         root,
     };
     log::debug!("expr_of end {:?}", source.id());
@@ -150,7 +150,7 @@ pub struct ExprInfo {
     pub resolves: FxHashMap<Span, Interned<RefExpr>>,
     pub module_docstring: Arc<DocString>,
     pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
-    pub scopes: FxHashMap<Span, Expr>,
+    pub exprs: FxHashMap<Span, Expr>,
     pub imports: FxHashSet<TypstFileId>,
     pub exports: LexicalScope,
     pub root: Expr,
@@ -178,7 +178,7 @@ impl ExprInfo {
         std::fs::create_dir_all(scopes.parent().unwrap()).unwrap();
         {
             let mut scopes = std::fs::File::create(scopes).unwrap();
-            for (s, e) in self.scopes.iter() {
+            for (s, e) in self.exprs.iter() {
                 writeln!(scopes, "{s:?} -> {e}").unwrap();
             }
         }
@@ -202,6 +202,10 @@ enum ExprScope {
 }
 
 impl ExprScope {
+    fn empty() -> Self {
+        ExprScope::Lexical(LexicalScope::default())
+    }
+
     fn get(&self, name: &Interned<str>) -> (Option<Expr>, Option<Ty>) {
         let (of, val) = match self {
             ExprScope::Lexical(scope) => {
@@ -210,9 +214,10 @@ impl ExprScope {
             }
             ExprScope::Module(module) => {
                 let v = module.scope().get(name);
-                let decl =
-                    v.and_then(|_| Some(Decl::external(module.file_id()?, name.clone()).into()));
-                (decl, v)
+                // let decl =
+                //     v.and_then(|_| Some(Decl::external(module.file_id()?,
+                // name.clone()).into()));
+                (None, v)
             }
             ExprScope::Func(func) => (None, func.scope().unwrap().get(name)),
             ExprScope::Type(ty) => (None, ty.scope().get(name)),
@@ -222,6 +227,40 @@ impl ExprScope {
         // ref_expr.val = val.map(|v| Ty::Value(InsTy::new(v.clone())));
         // return ref_expr;
         (of, val.cloned().map(|val| Ty::Value(InsTy::new(val))))
+    }
+
+    fn merge_into(&self, exports: &mut LexicalScope) {
+        match self {
+            ExprScope::Lexical(scope) => {
+                for (name, expr) in scope.iter() {
+                    exports.insert_mut(name.clone(), expr.clone());
+                }
+            }
+            ExprScope::Module(module) => {
+                log::debug!("imported: {module:?}");
+                let v = Interned::new(Ty::Value(InsTy::new(Value::Module(module.clone()))));
+                for (name, _, _) in module.scope().iter() {
+                    let name: Interned<str> = name.into();
+                    exports.insert_mut(name.clone(), select_of(v.clone(), name));
+                }
+            }
+            ExprScope::Func(func) => {
+                if let Some(scope) = func.scope() {
+                    let v = Interned::new(Ty::Value(InsTy::new(Value::Func(func.clone()))));
+                    for (name, _, _) in scope.iter() {
+                        let name: Interned<str> = name.into();
+                        exports.insert_mut(name.clone(), select_of(v.clone(), name));
+                    }
+                }
+            }
+            ExprScope::Type(ty) => {
+                let v = Interned::new(Ty::Value(InsTy::new(Value::Type(*ty))));
+                for (name, _, _) in ty.scope().iter() {
+                    let name: Interned<str> = name.into();
+                    exports.insert_mut(name.clone(), select_of(v.clone(), name));
+                }
+            }
+        }
     }
 }
 
@@ -241,7 +280,7 @@ pub(crate) struct ExprWorker {
     imports: Arc<Mutex<FxHashSet<TypstFileId>>>,
     import_buffer: Vec<TypstFileId>,
     docstrings: Arc<Mutex<FxHashMap<DeclExpr, Arc<DocString>>>>,
-    scopes: Arc<Mutex<FxHashMap<Span, Expr>>>,
+    exprs: Arc<Mutex<FxHashMap<Span, Expr>>>,
     resolves: Arc<Mutex<ResolveVec>>,
     buffer: ResolveVec,
     lexical: LexicalContext,
@@ -294,46 +333,22 @@ impl ExprWorker {
         }
     }
 
-    fn summarize_scope(&mut self) -> LexicalScope {
-        log::debug!("summarize_scope: {:?}", self.lexical.scopes);
+    fn summarize_scope(&self) -> LexicalScope {
         let mut exports = LexicalScope::default();
-        for scope in std::mem::take(&mut self.lexical.scopes).into_iter() {
-            match scope {
-                ExprScope::Lexical(scope) => {
-                    for (name, expr) in scope.iter() {
-                        exports.insert_mut(name.clone(), expr.clone());
-                    }
-                }
-                ExprScope::Module(module) => {
-                    log::debug!("imported: {module:?}");
-                    let v = Interned::new(Ty::Value(InsTy::new(Value::Module(module.clone()))));
-                    for (name, _, _) in module.scope().iter() {
-                        let name: Interned<str> = name.into();
-                        exports.insert_mut(name.clone(), select_of(v.clone(), name));
-                    }
-                }
-                ExprScope::Func(func) => {
-                    if let Some(scope) = func.scope() {
-                        let v = Interned::new(Ty::Value(InsTy::new(Value::Func(func.clone()))));
-                        for (name, _, _) in scope.iter() {
-                            let name: Interned<str> = name.into();
-                            exports.insert_mut(name.clone(), select_of(v.clone(), name));
-                        }
-                    }
-                }
-                ExprScope::Type(ty) => {
-                    let v = Interned::new(Ty::Value(InsTy::new(Value::Type(ty))));
-                    for (name, _, _) in ty.scope().iter() {
-                        let name: Interned<str> = name.into();
-                        exports.insert_mut(name.clone(), select_of(v.clone(), name));
-                    }
-                }
-            }
+        for scope in std::iter::once(&self.lexical.last).chain(self.lexical.scopes.iter()) {
+            scope.merge_into(&mut exports);
         }
         exports
     }
 
     fn check(&mut self, m: ast::Expr) -> Expr {
+        let s = m.span();
+        let ret = self.do_check(m);
+        self.exprs.lock().insert(s, ret.clone());
+        ret
+    }
+
+    fn do_check(&mut self, m: ast::Expr) -> Expr {
         use ast::Expr::*;
         match m {
             None(_) => Expr::Type(Ty::Builtin(BuiltinTy::None)),
@@ -695,105 +710,52 @@ impl ExprWorker {
 
         let pattern;
 
+        let scope = if let Some(fid) = &fid {
+            let source = self.ctx.source_by_id(*fid);
+            if let Ok(source) = source {
+                Some(ExprScope::Lexical(self.ctx.exports_of(source)))
+            } else {
+                None
+            }
+        } else {
+            match &mod_expr {
+                Some(Expr::Type(Ty::Value(v))) => match &v.val {
+                    Value::Module(m) => Some(ExprScope::Module(m.clone())),
+                    Value::Func(f) => {
+                        if f.scope().is_some() {
+                            Some(ExprScope::Func(f.clone()))
+                        } else {
+                            None
+                        }
+                    }
+                    Value::Type(s) => Some(ExprScope::Type(*s)),
+                    _ => None,
+                },
+                _ => None,
+            }
+        };
+
+        let scope = if let Some(scope) = scope {
+            scope
+        } else {
+            log::warn!(
+                "cannot analyze import on: {typed:?}, expr {mod_expr:?}, in file {:?}",
+                typed.span().id()
+            );
+            ExprScope::empty()
+        };
+
         if let Some(imports) = typed.imports() {
             match imports {
                 ast::Imports::Wildcard => {
                     log::debug!("checking wildcard: {mod_expr:?}");
-
-                    let scope = if let Some(fid) = &fid {
-                        let source = self.ctx.source_by_id(*fid);
-                        if let Ok(source) = source {
-                            Some(ExprScope::Lexical(self.ctx.exports_of(source)))
-                        } else {
-                            None
-                        }
-                    } else {
-                        match &mod_expr {
-                            Some(Expr::Type(Ty::Value(v))) => match &v.val {
-                                Value::Module(m) => Some(ExprScope::Module(m.clone())),
-                                Value::Func(f) => {
-                                    if f.scope().is_some() {
-                                        Some(ExprScope::Func(f.clone()))
-                                    } else {
-                                        None
-                                    }
-                                }
-                                Value::Type(s) => Some(ExprScope::Type(*s)),
-                                _ => None,
-                            },
-                            _ => None,
-                        }
-                    };
-
-                    if let Some(scope) = scope {
-                        self.lexical.scopes.push(scope);
-                    } else {
-                        log::warn!(
-                            "cannot analyze import on: {typed:?}, expr {mod_expr:?}, in file {:?}",
-                            typed.span().id()
-                        );
-                    }
+                    self.lexical.scopes.push(scope);
 
                     pattern = Expr::Star;
                 }
                 ast::Imports::Items(items) => {
-                    let mut imported = eco_vec![];
                     let module = Expr::Decl(decl.clone());
-
-                    for item in items.iter() {
-                        let (path, old, rename) = match item {
-                            ast::ImportItem::Simple(path) => {
-                                let old: DeclExpr = Decl::import(path.name()).into();
-                                (path, old, None)
-                            }
-                            ast::ImportItem::Renamed(renamed) => {
-                                let path = renamed.path();
-                                let old: DeclExpr = Decl::import(path.name()).into();
-                                let new: DeclExpr = Decl::import_alias(renamed.new_name()).into();
-                                (path, old, Some(new))
-                            }
-                        };
-
-                        let mut sel = module.clone();
-                        for seg in path.iter() {
-                            let seg = Decl::ident_ref(seg).into();
-                            sel = Expr::Select(SelectExpr::new(seg, sel));
-                        }
-
-                        self.resolve_as(
-                            RefExpr {
-                                decl: old.clone(),
-                                of: Some(sel),
-                                val: None,
-                            }
-                            .into(),
-                        );
-
-                        if let Some(new) = &rename {
-                            let rename_ref = RefExpr {
-                                decl: new.clone(),
-                                of: Some(Expr::Decl(old.clone())),
-                                val: None,
-                            };
-                            self.resolve_as(rename_ref.into());
-                        }
-
-                        let new = rename.unwrap_or_else(|| old.clone());
-                        let new_name = new.name().clone();
-                        let new_expr = Expr::Decl(new);
-                        self.scope_mut().insert_mut(new_name, new_expr.clone());
-                        imported.push((old, new_expr));
-                    }
-
-                    pattern = Expr::Pattern(
-                        Pattern {
-                            pos: eco_vec![],
-                            named: imported,
-                            spread_left: None,
-                            spread_right: None,
-                        }
-                        .into(),
-                    );
+                    pattern = self.import_decls(&scope, module, items);
                 }
             }
         } else {
@@ -801,6 +763,74 @@ impl ExprWorker {
         };
 
         Expr::Import(ImportExpr { decl, pattern }.into())
+    }
+
+    fn import_decls(&mut self, scope: &ExprScope, module: Expr, items: ast::ImportItems) -> Expr {
+        let mut imported = eco_vec![];
+        log::debug!("scope {scope:?}");
+
+        for item in items.iter() {
+            let (path_ast, old, rename) = match item {
+                ast::ImportItem::Simple(path) => {
+                    let old: DeclExpr = Decl::import(path.name()).into();
+                    (path, old, None)
+                }
+                ast::ImportItem::Renamed(renamed) => {
+                    let path = renamed.path();
+                    let old: DeclExpr = Decl::import(path.name()).into();
+                    let new: DeclExpr = Decl::import_alias(renamed.new_name()).into();
+                    (path, old, Some(new))
+                }
+            };
+
+            let mut path = Vec::with_capacity(1);
+            for seg in path_ast.iter() {
+                let seg = Interned::new(Decl::ident_ref(seg));
+                path.push(seg);
+            }
+            // todo: import path
+            let (mut of, val) = match path.last().map(|d| d.name()) {
+                Some(name) => scope.get(name),
+                None => (None, None),
+            };
+
+            log::debug!("path {path:?} -> {of:?} {val:?}");
+            if of.is_none() && val.is_none() {
+                let mut sel = module.clone();
+                for seg in path.into_iter() {
+                    sel = Expr::Select(SelectExpr::new(seg, sel));
+                }
+                of = Some(sel)
+            }
+
+            {
+                let decl = old.clone();
+                let val = val.clone();
+                self.resolve_as(RefExpr { decl, of, val }.into());
+            }
+            if let Some(new) = &rename {
+                let decl = new.clone();
+                let of = Some(Expr::Decl(old.clone()));
+                let val = val.clone();
+                self.resolve_as(RefExpr { decl, of, val }.into());
+            }
+
+            let new = rename.unwrap_or_else(|| old.clone());
+            let new_name = new.name().clone();
+            let new_expr = Expr::Decl(new);
+            self.scope_mut().insert_mut(new_name, new_expr.clone());
+            imported.push((old, new_expr));
+        }
+
+        Expr::Pattern(
+            Pattern {
+                pos: eco_vec![],
+                named: imported,
+                spread_left: None,
+                spread_right: None,
+            }
+            .into(),
+        )
     }
 
     fn check_module_include(&mut self, typed: ast::ModuleInclude) -> Expr {
@@ -1035,8 +1065,7 @@ impl ExprWorker {
         let span = expr.span();
 
         let new = self;
-        let ret = new.check(expr.cast().unwrap());
-        new.scopes.lock().insert(expr.span(), ret);
+        new.check(expr.cast().unwrap());
 
         // let fid = self.fid;
         // let ctx = self.ctx.clone();
@@ -1202,10 +1231,6 @@ pub type DeclExpr = Interned<Decl>;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Decl {
-    Export {
-        name: Interned<str>,
-        fid: TypstFileId,
-    },
     Func {
         name: Interned<str>,
         at: Span,
@@ -1262,15 +1287,16 @@ pub enum Decl {
 }
 
 impl Decl {
-    pub fn external(fid: TypstFileId, name: Interned<str>) -> Self {
-        Self::Export { fid, name }
-    }
-
     pub fn func(ident: ast::Ident) -> Self {
         Self::Func {
             name: ident.get().into(),
             at: ident.span(),
         }
+    }
+
+    pub fn lit(name: &str) -> Self {
+        let ident = SyntaxNode::leaf(typst::syntax::SyntaxKind::Ident, name);
+        Self::var(ident.cast().unwrap())
     }
 
     pub fn var(ident: ast::Ident) -> Self {
@@ -1364,8 +1390,7 @@ impl Decl {
 
     pub fn name(&self) -> &Interned<str> {
         match self {
-            Decl::Export { name, .. }
-            | Decl::Func { name, .. }
+            Decl::Func { name, .. }
             | Decl::Var { name, .. }
             | Decl::ImportAlias { name, .. }
             | Decl::IdentRef { name, .. }
@@ -1387,7 +1412,6 @@ impl Decl {
 
     pub fn kind(&self) -> DefKind {
         match self {
-            Decl::Export { .. } => DefKind::Export,
             Decl::Func { .. } => DefKind::Func,
             Decl::Closure(..) => DefKind::Func,
             Decl::ImportAlias { .. } => DefKind::ImportAlias,
@@ -1410,7 +1434,6 @@ impl Decl {
 
     pub fn file_id(&self) -> Option<TypstFileId> {
         match self {
-            Decl::Export { fid, .. } => Some(*fid),
             Decl::Module { fid, .. } => Some(*fid),
             that => that.span()?.id(),
         }
@@ -1418,7 +1441,7 @@ impl Decl {
 
     pub fn span(&self) -> Option<Span> {
         match self {
-            Decl::Export { .. } | Decl::Module { .. } => None,
+            Decl::Module { .. } => None,
             Decl::Docs { .. } => None,
             Decl::Generated(..) => None,
             Decl::ModuleImport(at)
@@ -1471,8 +1494,6 @@ impl From<DeclExpr> for Expr {
 impl fmt::Debug for Decl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            // Decl::Ident(ident) => write!(f, "Ident({:?})", ident.name),
-            Decl::Export { name, fid } => write!(f, "Export({name:?}, {fid:?})"),
             Decl::Func { name, .. } => write!(f, "Func({name:?})"),
             Decl::Var { name, .. } => write!(f, "Var({name:?})"),
             Decl::ImportAlias { name, .. } => write!(f, "ImportAlias({name:?})"),

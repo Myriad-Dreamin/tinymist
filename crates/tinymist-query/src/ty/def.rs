@@ -1008,7 +1008,7 @@ impl TypeScheme {
     //     Some(self.simplify(self.vars.get(&def).map(|e| e.as_type())?, false))
     // }
 
-    /// Get the type of a syntax structure
+    /// Gets the type of a syntax structure
     pub fn type_of_span(&self, site: Span) -> Option<Ty> {
         self.mapping
             .get(&site)
@@ -1017,16 +1017,16 @@ impl TypeScheme {
     }
 
     // todo: distinguish at least, at most
-    /// Witness a lower-bound type on a syntax structure
+    /// Witnesses a lower-bound type on a syntax structure
     pub fn witness_at_least(&mut self, site: Span, ty: Ty) {
         Self::witness_(site, ty, &mut self.mapping);
     }
-    /// Witness a upper-bound type on a syntax structure
+    /// Witnesses a upper-bound type on a syntax structure
     pub fn witness_at_most(&mut self, site: Span, ty: Ty) {
         Self::witness_(site, ty, &mut self.mapping);
     }
 
-    /// Witness a type
+    /// Witnesses a type
     pub fn witness_(site: Span, ty: Ty, mapping: &mut HashMap<Span, Vec<Ty>>) {
         if site.is_detached() {
             return;
@@ -1042,6 +1042,32 @@ impl TypeScheme {
                 e.insert(vec![ty]);
             }
         }
+    }
+
+    /// Converts a type to a type with bounds
+    pub fn to_bounds(&self, def: Ty) -> TypeBounds {
+        let mut store = TypeBounds::default();
+        match def {
+            Ty::Var(v) => {
+                let w = self.vars.get(&v.def).unwrap();
+                match &w.bounds {
+                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
+                        let w = w.read();
+                        store.lbs.extend(w.lbs.iter().cloned());
+                        store.ubs.extend(w.ubs.iter().cloned());
+                    }
+                }
+            }
+            Ty::Let(v) => {
+                store.lbs.extend(v.lbs.iter().cloned());
+                store.ubs.extend(v.ubs.iter().cloned());
+            }
+            _ => {
+                store.ubs.push(def);
+            }
+        }
+
+        store
     }
 }
 
