@@ -4,13 +4,13 @@ expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/import_ident_alias.typ
 ---
 = resolves
-ModuleImport(..)@26..53 in \s0.typ -> Def(Module), val: None
-Ident("base")@8..18 in \s0.typ -> Def(Module), val: None
-Ident("base")@20..24 in \s0.typ -> Ident("base")@8..18 in \s0.typ, val: None
-Ident("base")@55..59 in \s0.typ -> Ident("base")@8..18 in \s0.typ, val: None
-Ident("foo")@50..53 in \s0.typ -> Ident("x")@45..46 in \s0.typ, val: None
-Ident("foo")@62..65 in \s0.typ -> Select(SelectExpr { lhs: Decl(ModuleImport(..)), key: Ident("x") }), val: None
-Ident("x")@45..46 in \s0.typ -> Select(SelectExpr { lhs: Decl(ModuleImport(..)), key: Ident("x") }), val: None
+ModuleImport(..)@26..53 in \s0.typ -> Module("base", \base.typ)@0..0 in \base.typ, val: None
+PathStem("base", Str: "\"base.typ\"")@8..18 in \s0.typ -> Module("base", \base.typ)@0..0 in \base.typ, val: None
+IdentRef("base")@20..24 in \s0.typ -> Ref(RefExpr { decl: PathStem("base", Str: "\"base.typ\""), of: Some(Decl(Module("base", \base.typ))), val: None }), val: None
+IdentRef("base")@55..59 in \s0.typ -> Ref(RefExpr { decl: PathStem("base", Str: "\"base.typ\""), of: Some(Decl(Module("base", \base.typ))), val: None }), val: None
+ImportAlias("foo")@50..53 in \s0.typ -> Import("x")@45..46 in \s0.typ, val: None
+IdentRef("foo")@62..65 in \s0.typ -> ImportAlias("foo")@50..53 in \s0.typ, val: None
+Import("x")@45..46 in \s0.typ -> Select(SelectExpr { lhs: Decl(ModuleImport(..)), key: IdentRef("x") }), val: None
 = exports
-base -> Ident("base")@8..18 in \s0.typ
-foo -> Select(SelectExpr { lhs: Decl(ModuleImport(..)), key: Ident("x") })
+base -> Ref(RefExpr { decl: PathStem("base", Str: "\"base.typ\""), of: Some(Decl(Module("base", \base.typ))), val: None })
+foo -> ImportAlias("foo")@50..53 in \s0.typ

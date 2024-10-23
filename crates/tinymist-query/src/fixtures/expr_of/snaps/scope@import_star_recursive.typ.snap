@@ -4,9 +4,9 @@ expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/import_star_recursive.typ
 ---
 = resolves
-ModuleImport(..)@1..22 in \s2.typ -> Def(Module), val: Some(Module { name: "base2", scope: Scope {"x": 1, "y": 2}, content: Sequence [Sequence [], Sequence []] })
-Ident("x")@24..25 in \s2.typ -> Ident("x")@0..0 in \base2.typ, val: Some(1)
-Ident("y")@28..29 in \s2.typ -> Ident("y")@0..0 in \base2.typ, val: Some(2)
+ModuleImport(..)@1..22 in \s2.typ -> Module("base2", \base2.typ)@0..0 in \base2.typ, val: None
+IdentRef("x")@24..25 in \s2.typ -> Var("x")@0..0 in \base.typ, val: None
+IdentRef("y")@28..29 in \s2.typ -> Var("y")@0..0 in \base2.typ, val: None
 = exports
-x -> Type(Module { name: "base2", scope: Scope {"x": 1, "y": 2}, content: Sequence [Sequence [], Sequence []] }.x)
-y -> Type(Module { name: "base2", scope: Scope {"x": 1, "y": 2}, content: Sequence [Sequence [], Sequence []] }.y)
+x -> Var("x")@0..0 in \base.typ
+y -> Var("y")@0..0 in \base2.typ

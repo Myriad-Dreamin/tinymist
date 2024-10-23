@@ -4,7 +4,7 @@ expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/base2.typ
 ---
 = resolves
-ModuleImport(..)@1..21 in \s0.typ -> Def(Module), val: None
-Ident("y")@27..28 in \s0.typ -> Def(Var), val: None
+ModuleImport(..)@1..21 in \s0.typ -> Module("base", \base.typ)@0..0 in \base.typ, val: None
+Var("y")@27..28 in \s0.typ -> Var("y")@27..28 in \s0.typ, val: None
 = exports
-y -> Ident("y")@27..28 in \s0.typ
+y -> Var("y")@27..28 in \s0.typ

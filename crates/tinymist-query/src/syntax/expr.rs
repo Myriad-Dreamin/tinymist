@@ -471,11 +471,13 @@ impl ExprWorker {
                 typed.init().map_or_else(none_expr, |expr| self.check(expr))
             }
             ast::LetBindingKind::Normal(p) => {
+                // Check init expression before pattern checking
+                let body = typed.init().map(|e| self.defer(e));
+
                 let span = p.span();
                 let decl = Decl::Pattern(span).into();
                 self.check_docstring(&decl, DocStringKind::Variable);
                 let pattern = self.check_pattern(p);
-                let body = typed.init().map(|e| self.defer(e));
                 Expr::Let(Interned::new(LetExpr {
                     span,
                     pattern,

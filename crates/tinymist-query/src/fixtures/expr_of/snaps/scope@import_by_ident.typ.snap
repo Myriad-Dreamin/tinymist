@@ -4,9 +4,9 @@ expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/import_by_ident.typ
 ---
 = resolves
-ModuleImport(..)@1..23 in \s2.typ -> Def(Module), val: Some(Module { name: "derive", scope: Scope {"base": Module { name: "base", scope: Scope {"f": Func(f)}, content: Sequence [] }}, content: Sequence [] })
-ModuleImport(..)@25..39 in \s2.typ -> Def(Module), val: Some(Module { name: "base", scope: Scope {"f": Func(f)}, content: Sequence [] })
-Ident("f")@41..42 in \s2.typ -> Ident("f")@0..0 in \base.typ, val: Some(Func(f))
+ModuleImport(..)@1..23 in \s2.typ -> Module("derive", \derive.typ)@0..0 in \derive.typ, val: None
+ModuleImport(..)@25..39 in \s2.typ -> Module("base", \base.typ)@0..0 in \base.typ, val: None
+IdentRef("f")@41..42 in \s2.typ -> Func("f")@0..0 in \base.typ, val: None
 = exports
-base -> Type(Module { name: "derive", scope: Scope {"base": Module { name: "base", scope: Scope {"f": Func(f)}, content: Sequence [] }}, content: Sequence [] }.base)
-f -> Type(Module { name: "base", scope: Scope {"f": Func(f)}, content: Sequence [] }.f)
+base -> Ref(RefExpr { decl: PathStem("base", Str: "\"base.typ\""), of: Some(Decl(Module("base", \base.typ))), val: None })
+f -> Func("f")@0..0 in \base.typ
