@@ -648,24 +648,22 @@ impl ExprWorker {
             }?;
 
             let fid = resolve_id_by_path(&self.ctx.world, self.fid, src_str)?;
-            let name = Path::new(src_str).file_stem().and_then(|s| s.to_str());
+            let name = if src_str.starts_with('@') {
+                fid.package().map(|p| p.name.as_str())
+            } else {
+                Path::new(src_str).file_stem().and_then(|s| s.to_str())
+            };
             let name = name.unwrap_or_default().into();
             Some(Expr::Decl(Decl::module(name, fid).into()))
         });
 
         let decl = typed.new_name().map(Decl::module_alias).or_else(|| {
             typed.imports().is_none().then(|| {
-                let src_str = src_expr.as_ref()?;
-                let src_str = match src_str {
-                    Expr::Type(Ty::Value(val)) => match &val.val {
-                        Value::Str(s) => Some(s.as_str()),
-                        _ => None,
-                    },
-                    _ => None,
-                }?;
-
-                let i = Path::new(src_str);
-                let name = i.file_stem().and_then(|s| s.to_str())?;
+                let name = match mod_expr.as_ref()? {
+                    Expr::Decl(d) if matches!(d.as_ref(), Decl::Module { .. }) => d.name().clone(),
+                    _ => return None,
+                };
+                // todo: package stem
                 Some(Decl::path_stem(source.to_untyped().clone(), name))
             })?
         });
@@ -738,7 +736,7 @@ impl ExprWorker {
         let scope = if let Some(scope) = scope {
             scope
         } else {
-            log::warn!(
+            log::debug!(
                 "cannot analyze import on: {typed:?}, expr {mod_expr:?}, in file {:?}",
                 typed.span().id()
             );
@@ -767,7 +765,7 @@ impl ExprWorker {
 
     fn import_decls(&mut self, scope: &ExprScope, module: Expr, items: ast::ImportItems) -> Expr {
         let mut imported = eco_vec![];
-        log::debug!("scope {scope:?}");
+        log::debug!("import scope {scope:?}");
 
         for item in items.iter() {
             let (path_ast, old, rename) = match item {
@@ -1366,9 +1364,9 @@ impl Decl {
         }
     }
 
-    pub fn path_stem(s: SyntaxNode, name: &str) -> Self {
+    pub fn path_stem(s: SyntaxNode, name: Interned<str>) -> Self {
         Self::PathStem {
-            name: name.into(),
+            name,
             at: Box::new(s),
         }
     }
