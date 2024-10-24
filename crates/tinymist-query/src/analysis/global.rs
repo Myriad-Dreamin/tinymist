@@ -227,6 +227,15 @@ impl<'w> AnalysisContext<'w> {
         self.local.shared.clone()
     }
 
+    /// Fork a new context for searching in the workspace.
+    pub fn fork_for_search<'s>(&'s mut self) -> SearchCtx<'s, 'w> {
+        SearchCtx {
+            ctx: self,
+            searched: Default::default(),
+            worklist: Default::default(),
+        }
+    }
+
     #[cfg(test)]
     pub fn test_completion_files(&mut self, f: impl FnOnce() -> Vec<PathBuf>) {
         self.local.test_completion_files(f);
@@ -955,9 +964,9 @@ fn find_loc(
 }
 
 /// The context for searching in the workspace.
-pub struct SearchCtx<'b, 'w> {
+pub struct SearchCtx<'a, 'w> {
     /// The inner analysis context.
-    pub ctx: &'b mut AnalysisContext<'w>,
+    pub ctx: &'a mut AnalysisContext<'w>,
     /// The set of files that have been searched.
     pub searched: HashSet<TypstFileId>,
     /// The files that need to be searched.

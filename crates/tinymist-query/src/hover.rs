@@ -463,7 +463,7 @@ impl DocTooltip {
             }
         };
 
-        let (fid, def_range) = lnk.def_at(ctx).clone()?;
+        let (fid, def_range) = lnk.def_at(ctx.shared()).clone()?;
 
         let src = ctx.source_by_id(fid).ok()?;
         find_docs_before(&src, def_range.start)

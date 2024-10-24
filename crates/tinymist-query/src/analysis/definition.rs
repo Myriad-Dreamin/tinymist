@@ -36,7 +36,7 @@ impl Definition {
 
     /// The location of the definition.
     // todo: cache
-    pub(crate) fn def_at(&self, ctx: &mut AnalysisContext) -> Option<(TypstFileId, Range<usize>)> {
+    pub(crate) fn def_at(&self, ctx: &SharedContext) -> Option<(TypstFileId, Range<usize>)> {
         let fid = self.decl.file_id()?;
         let span = self.decl.span();
         let range = span.and_then(|s| ctx.source_by_id(fid).ok()?.range(s));
@@ -45,7 +45,7 @@ impl Definition {
 
     // todo: name range
     /// The range of the name of the definition.
-    pub(crate) fn name_range(&self, ctx: &mut AnalysisContext) -> Option<Range<usize>> {
+    pub(crate) fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>> {
         if !self.decl.is_def() {
             return None;
         }

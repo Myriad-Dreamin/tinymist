@@ -69,7 +69,7 @@ pub(crate) fn prepare_renaming(
     lnk: &Definition,
 ) -> Option<(String, Option<LspRange>)> {
     let name = lnk.name().clone();
-    let (def_fid, _def_range) = lnk.def_at(ctx).clone()?;
+    let (def_fid, _def_range) = lnk.def_at(ctx.shared()).clone()?;
 
     if def_fid.package().is_some() {
         debug!(

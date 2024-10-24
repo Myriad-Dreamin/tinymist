@@ -101,6 +101,21 @@ impl std::hash::Hash for ExprInfo {
 }
 
 impl ExprInfo {
+    pub fn get_refs(
+        &self,
+        decl: Interned<Decl>,
+    ) -> impl Iterator<Item = (&Span, &Interned<RefExpr>)> {
+        let of = Some(Expr::Decl(decl.clone()));
+        self.resolves
+            .iter()
+            .filter(move |(_, r)| r.decl == decl || r.of == of)
+    }
+
+    pub fn is_exported(&self, decl: &Interned<Decl>) -> bool {
+        let of = Expr::Decl(decl.clone());
+        self.exports.get(decl.name()).map_or(false, |e| *e == of)
+    }
+
     #[allow(dead_code)]
     fn show(&self) {
         use std::io::Write;
