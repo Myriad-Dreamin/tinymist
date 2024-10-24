@@ -43,7 +43,7 @@ impl SemanticTokenContext {
     }
 
     /// Get the semantic tokens for a source.
-    pub fn get_semantic_tokens_full(&self, source: &Source) -> (Vec<SemanticToken>, String) {
+    pub fn semantic_tokens_full(&self, source: &Source) -> (Vec<SemanticToken>, String) {
         let root = LinkedNode::new(source.root());
 
         let mut tokenizer = Tokenizer::new(
@@ -59,7 +59,7 @@ impl SemanticTokenContext {
     }
 
     /// Get the semantic tokens delta for a source.
-    pub fn try_semantic_tokens_delta_from_result_id(
+    pub fn semantic_tokens_delta(
         &self,
         source: &Source,
         result_id: &str,
@@ -67,7 +67,7 @@ impl SemanticTokenContext {
         let cached = self.cache.write().try_take_result(result_id);
 
         // this call will overwrite the cache, so need to read from cache first
-        let (tokens, result_id) = self.get_semantic_tokens_full(source);
+        let (tokens, result_id) = self.semantic_tokens_full(source);
 
         match cached {
             Some(cached) => (Ok(token_delta(&cached, &tokens)), result_id),

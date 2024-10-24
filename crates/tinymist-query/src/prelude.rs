@@ -35,4 +35,4 @@ pub use crate::lsp_typst_boundary::{
     lsp_to_typst, path_to_url, typst_to_lsp, LspDiagnostic, LspRange, LspSeverity,
     PositionEncoding, TypstDiagnostic, TypstSeverity, TypstSpan,
 };
-pub use crate::{StatefulRequest, VersionedDocument};
+pub use crate::{SemanticRequest, StatefulRequest, VersionedDocument};

@@ -29,8 +29,8 @@ use crate::syntax::{
 };
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
-    lsp_to_typst, path_to_url, typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange,
-    VersionedDocument,
+    lsp_to_typst, path_to_url, typst_to_lsp, LspPosition, LspRange, PositionEncoding,
+    SemanticTokenContext, TypstRange, VersionedDocument,
 };
 
 use super::analyze_expr_;
@@ -46,6 +46,8 @@ pub struct Analysis {
     pub caches: AnalysisGlobalCaches,
     /// The global caches for analysis.
     pub workers: AnalysisGlobalWorkers,
+    /// The semantic token context.
+    pub tokens_ctx: SemanticTokenContext,
 }
 
 impl Analysis {
