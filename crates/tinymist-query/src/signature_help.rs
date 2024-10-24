@@ -66,7 +66,7 @@ impl SemanticRequest for SignatureHelpRequest {
 
         let mut active_parameter = None;
 
-        let mut label = def_link.name.as_ref().to_owned();
+        let mut label = def_link.name().as_ref().to_owned();
         let mut params = Vec::new();
 
         label.push('(');

@@ -1,7 +1,7 @@
 use crate::{
-    analysis::{find_definition, DefinitionLink},
+    analysis::{find_definition, Definition},
     prelude::*,
-    syntax::{DefKind, DerefTarget},
+    syntax::{Decl, DerefTarget},
 };
 use log::debug;
 
@@ -66,9 +66,9 @@ impl StatefulRequest for PrepareRenameRequest {
 pub(crate) fn prepare_renaming(
     ctx: &mut AnalysisContext,
     deref_target: &DerefTarget,
-    lnk: &DefinitionLink,
+    lnk: &Definition,
 ) -> Option<(String, Option<LspRange>)> {
-    let name = lnk.name.clone();
+    let name = lnk.name().clone();
     let (def_fid, _def_range) = lnk.def_at(ctx).clone()?;
 
     if def_fid.package().is_some() {
@@ -82,30 +82,31 @@ pub(crate) fn prepare_renaming(
     let var_rename = || Some((name.to_string(), None));
 
     debug!("prepare_rename: {name}");
-    use DefKind::*;
-    match lnk.kind {
+    use Decl::*;
+    match lnk.decl.as_ref() {
         // Cannot rename headings or blocks
         // LexicalKind::Heading(_) | LexicalKind::Block => None,
         // Cannot rename module star
         // LexicalKind::Mod(Star) => None,
         // Cannot rename expression import
         // LexicalKind::Mod(Module(ModSrc::Expr(..))) => None,
-        Var => var_rename(),
-        Func | Closure => validate_fn_renaming(lnk).map(|_| (name.to_string(), None)),
-        ModuleImport | ModuleInclude | ModuleAlias | PathStem => {
+        Var(..) => var_rename(),
+        Func(..) | Closure(..) => validate_fn_renaming(lnk).map(|_| (name.to_string(), None)),
+        ModuleImport(..) | IncludePath(..) | ModuleAlias(..) | PathStem(..) => {
             let node = deref_target.node().get().clone();
             let path = node.cast::<ast::Str>()?;
             let name = path.get().to_string();
             Some((name, None))
         }
         // todo: label renaming, bibkey renaming
-        BibKey | Label | Ref => None,
-        Export | ImportAlias | Module | Constant | IdentRef | Import | StrName | Spread => None,
-        Pattern | Generated | Docs => None,
+        BibEntry(..) | Label(..) | Ref(..) => None,
+        ImportAlias(..) | Module(..) | Constant(..) | IdentRef(..) | Import(..) | StrName(..)
+        | Spread(..) => None,
+        Pattern(..) | Content(..) | Generated(..) | Docs(..) => None,
     }
 }
 
-fn validate_fn_renaming(lnk: &DefinitionLink) -> Option<()> {
+fn validate_fn_renaming(lnk: &Definition) -> Option<()> {
     use typst::foundations::func::Repr;
     let value = lnk.value();
     let mut f = match &value {

@@ -3,11 +3,11 @@ use core::fmt;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
-    analysis::{find_definition, get_link_exprs_in, DefinitionLink},
+    analysis::{find_definition, get_link_exprs_in, Definition},
     docs::SignatureDocs,
     jump_from_cursor,
     prelude::*,
-    syntax::{find_docs_before, get_deref_target, DefKind},
+    syntax::{find_docs_before, get_deref_target, Decl},
     ty::PathPreference,
     upstream::{expr_tooltip, plain_docs_sentence, route_of_value, truncated_repr, Tooltip},
     LspHoverContents, StatefulRequest,
@@ -231,9 +231,10 @@ fn def_tooltip(
     let mut results = vec![];
     let mut actions = vec![];
 
-    match lnk.kind {
-        DefKind::Label => {
-            results.push(MarkedString::String(format!("Label: {}\n", lnk.name)));
+    use Decl::*;
+    match lnk.decl.as_ref() {
+        Label(..) => {
+            results.push(MarkedString::String(format!("Label: {}\n", lnk.name())));
             // todo: type repr
             if let Some(c) = lnk.term.as_ref().and_then(|v| v.value()) {
                 let c = truncated_repr(&c);
@@ -241,12 +242,15 @@ fn def_tooltip(
             }
             Some(LspHoverContents::Array(results))
         }
-        DefKind::BibKey => {
-            results.push(MarkedString::String(format!("Bibliography: @{}", lnk.name)));
+        BibEntry(..) => {
+            results.push(MarkedString::String(format!(
+                "Bibliography: @{}",
+                lnk.name()
+            )));
 
             Some(LspHoverContents::Array(results))
         }
-        DefKind::Func | DefKind::Closure => {
+        Func(..) | Closure(..) => {
             let sig = lnk.term.as_ref().and_then(|e| {
                 // todo: type docs
                 ctx.signature_docs(&e.value()?)
@@ -256,10 +260,10 @@ fn def_tooltip(
                 language: "typc".to_owned(),
                 value: format!(
                     "let {name}({params}){result};",
-                    name = lnk.name,
+                    name = lnk.name(),
                     params = ParamTooltip(sig.as_ref()),
                     result =
-                        ResultTooltip(&lnk.name, sig.as_ref().and_then(|sig| sig.ret_ty.as_ref()))
+                        ResultTooltip(lnk.name(), sig.as_ref().and_then(|sig| sig.ret_ty.as_ref()))
                 ),
             }));
 
@@ -274,7 +278,7 @@ fn def_tooltip(
             render_actions(&mut results, actions);
             Some(LspHoverContents::Array(results))
         }
-        DefKind::PathStem | DefKind::Var => {
+        PathStem(..) | Var(..) => {
             let deref_node = deref_target.node();
             let sig = ctx.variable_docs(deref_target.node());
 
@@ -297,9 +301,9 @@ fn def_tooltip(
                 language: "typc".to_owned(),
                 value: format!(
                     "let {name}{result};",
-                    name = lnk.name,
+                    name = lnk.name(),
                     result = ResultTooltip(
-                        &lnk.name,
+                        lnk.name(),
                         sig.as_ref().and_then(|sig| sig.return_ty.as_ref())
                     )
                 ),
@@ -318,21 +322,9 @@ fn def_tooltip(
             render_actions(&mut results, actions);
             Some(LspHoverContents::Array(results))
         }
-        DefKind::Export
-        | DefKind::Pattern
-        | DefKind::Docs
-        | DefKind::Generated
-        | DefKind::ImportAlias
-        | DefKind::Constant
-        | DefKind::IdentRef
-        | DefKind::ModuleAlias
-        | DefKind::Module
-        | DefKind::Import
-        | DefKind::Ref
-        | DefKind::StrName
-        | DefKind::ModuleImport
-        | DefKind::ModuleInclude
-        | DefKind::Spread => None,
+        Pattern(..) | Docs(..) | Generated(..) | ImportAlias(..) | Constant(..) | IdentRef(..)
+        | ModuleAlias(..) | Module(..) | Import(..) | Ref(..) | StrName(..) | ModuleImport(..)
+        | Content(..) | IncludePath(..) | Spread(..) => None,
     }
 }
 
@@ -405,11 +397,11 @@ impl fmt::Display for ResultTooltip<'_> {
 struct ExternalDocLink;
 
 impl ExternalDocLink {
-    fn get(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<CommandLink> {
+    fn get(ctx: &mut AnalysisContext, lnk: &Definition) -> Option<CommandLink> {
         self::ExternalDocLink::get_inner(ctx, lnk)
     }
 
-    fn get_inner(_ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<CommandLink> {
+    fn get_inner(_ctx: &mut AnalysisContext, lnk: &Definition) -> Option<CommandLink> {
         let value = lnk.value();
 
         if matches!(value, Some(Value::Func(..))) {
@@ -423,7 +415,7 @@ impl ExternalDocLink {
 }
 
 impl ExternalDocLink {
-    fn builtin_func_tooltip(base: &str, lnk: &DefinitionLink) -> Option<CommandLink> {
+    fn builtin_func_tooltip(base: &str, lnk: &Definition) -> Option<CommandLink> {
         let Some(Value::Func(func)) = lnk.value() else {
             return None;
         };
@@ -459,11 +451,11 @@ impl ExternalDocLink {
 pub(crate) struct DocTooltip;
 
 impl DocTooltip {
-    pub fn get(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<String> {
+    pub fn get(ctx: &mut AnalysisContext, lnk: &Definition) -> Option<String> {
         self::DocTooltip::get_inner(ctx, lnk).map(|s| "\n\n".to_owned() + &s)
     }
 
-    fn get_inner(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<String> {
+    fn get_inner(ctx: &mut AnalysisContext, lnk: &Definition) -> Option<String> {
         let value = lnk.value();
         if matches!(value, Some(Value::Func(..))) {
             if let Some(builtin) = Self::builtin_func_tooltip(lnk) {
@@ -479,7 +471,7 @@ impl DocTooltip {
 }
 
 impl DocTooltip {
-    fn builtin_func_tooltip(lnk: &DefinitionLink) -> Option<&'_ str> {
+    fn builtin_func_tooltip(lnk: &Definition) -> Option<&'_ str> {
         let value = lnk.value();
         let Some(Value::Func(func)) = &value else {
             return None;

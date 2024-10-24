@@ -1,5 +1,5 @@
 use core::fmt;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::Range};
 
 use reflexo_typst::package::PackageSpec;
 use tinymist_derive::DeclEnum;
@@ -151,31 +151,6 @@ fn select_of(source: Interned<Ty>, name: Interned<str>) -> Expr {
     Expr::Type(Ty::Select(SelectTy::new(source, name)))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum DefKind {
-    Export,
-    Func,
-    ImportAlias,
-    Constant,
-    Var,
-    BibKey,
-    IdentRef,
-    Module,
-    ModuleAlias,
-    Import,
-    Label,
-    Ref,
-    StrName,
-    PathStem,
-    ModuleImport,
-    ModuleInclude,
-    Spread,
-    Closure,
-    Pattern,
-    Docs,
-    Generated,
-}
-
 pub type DeclExpr = Interned<Decl>;
 
 #[derive(Clone, PartialEq, Eq, Hash, DeclEnum)]
@@ -186,15 +161,19 @@ pub enum Decl {
     IdentRef(SpannedDecl),
     Module(ModuleDecl),
     ModuleAlias(SpannedDecl),
-    PathStem(SyntaxDecl),
+    PathStem(SpannedDecl),
+    IncludePath(SpannedDecl),
     Import(SpannedDecl),
-    Ref(SyntaxDecl),
-    Label(SyntaxDecl),
-    StrName(SyntaxDecl),
+    Ref(SpannedDecl),
+    Label(SpannedDecl),
+    StrName(SpannedDecl),
     ModuleImport(SpanDecl),
     Closure(SpanDecl),
     Pattern(SpanDecl),
     Spread(SpanDecl),
+    Content(SpanDecl),
+    Constant(SpanDecl),
+    BibEntry(NameRangeDecl),
     Docs(DocsDecl),
     Generated(GeneratedDecl),
 }
@@ -267,24 +246,24 @@ impl Decl {
         })
     }
 
-    pub fn label(ident: ast::Label) -> Self {
-        Self::Label(SyntaxDecl {
-            name: ident.get().into(),
-            at: Box::new(ident.to_untyped().clone()),
+    pub fn label(name: &str, at: Span) -> Self {
+        Self::Label(SpannedDecl {
+            name: name.into(),
+            at,
         })
     }
 
     pub fn ref_(ident: ast::Ref) -> Self {
-        Self::Ref(SyntaxDecl {
+        Self::Ref(SpannedDecl {
             name: ident.target().into(),
-            at: Box::new(ident.to_untyped().clone()),
+            at: ident.span(),
         })
     }
 
     pub fn str_name(s: SyntaxNode, name: &str) -> Decl {
-        Self::StrName(SyntaxDecl {
+        Self::StrName(SpannedDecl {
             name: name.into(),
-            at: Box::new(s),
+            at: s.span(),
         })
     }
 
@@ -301,10 +280,11 @@ impl Decl {
     }
 
     pub fn path_stem(s: SyntaxNode, name: Interned<str>) -> Self {
-        Self::PathStem(SyntaxDecl {
-            name,
-            at: Box::new(s),
-        })
+        Self::PathStem(SpannedDecl { name, at: s.span() })
+    }
+
+    pub fn include_path(s: SyntaxNode, name: Interned<str>) -> Self {
+        Self::IncludePath(SpannedDecl { name, at: s.span() })
     }
 
     pub fn module_import(s: Span) -> Self {
@@ -323,6 +303,14 @@ impl Decl {
         Self::Spread(SpanDecl(s))
     }
 
+    pub fn content(s: Span) -> Self {
+        Self::Content(SpanDecl(s))
+    }
+
+    pub fn constant(s: Span) -> Self {
+        Self::Constant(SpanDecl(s))
+    }
+
     pub fn docs(base: Interned<Decl>, var: Interned<TypeVar>) -> Self {
         Self::Docs(DocsDecl { base, var })
     }
@@ -331,16 +319,25 @@ impl Decl {
         Self::Generated(GeneratedDecl(def_id))
     }
 
+    pub fn bib_entry(name: Interned<str>, fid: TypstFileId, range: Range<usize>) -> Self {
+        Self::BibEntry(NameRangeDecl {
+            name,
+            at: Box::new((fid, range)),
+        })
+    }
+
     pub(crate) fn is_def(&self) -> bool {
         matches!(
             self,
-            Self::Func { .. }
-                | Self::Var { .. }
-                | Self::Label { .. }
-                | Self::StrName { .. }
-                | Self::Module { .. }
-                | Self::ModuleImport(..)
+            Self::Func(..)
                 | Self::Closure(..)
+                | Self::Var(..)
+                | Self::Label(..)
+                | Self::StrName(..)
+                | Self::Module(..)
+                | Self::ModuleImport(..)
+                | Self::PathStem(..)
+                | Self::IncludePath(..)
                 | Self::Spread(..)
                 | Self::Generated(..)
         )
@@ -406,22 +403,22 @@ impl fmt::Debug for SpannedDecl {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct SyntaxDecl {
+pub struct NameRangeDecl {
     name: Interned<str>,
-    at: Box<SyntaxNode>,
+    at: Box<(TypstFileId, Range<usize>)>,
 }
 
-impl SyntaxDecl {
+impl NameRangeDecl {
     fn name(&self) -> &Interned<str> {
         &self.name
     }
 
     fn span(&self) -> Option<Span> {
-        Some(self.at.span())
+        None
     }
 }
 
-impl fmt::Debug for SyntaxDecl {
+impl fmt::Debug for NameRangeDecl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.name.as_ref())
     }

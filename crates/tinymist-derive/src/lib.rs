@@ -82,12 +82,6 @@ pub fn gen_decl_enum(input: TokenStream) -> TokenStream {
                     #(Self::#names(x) => x.span()),*
                 }
             }
-
-            pub fn kind(&self) -> DefKind {
-                match self {
-                    #(Self::#names(..) => DefKind::#names),*
-                }
-            }
         }
 
         impl fmt::Debug for Decl {

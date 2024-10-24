@@ -22,7 +22,7 @@ use crate::{
     adt::{interner::impl_internable, snapshot_map},
     analysis::BuiltinTy,
     docs::UntypedSymbolDocs,
-    syntax::{DeclExpr, DefKind, UnaryOp},
+    syntax::{DeclExpr, UnaryOp},
 };
 
 pub(crate) use super::{TyCtx, TyCtxMut};
@@ -174,37 +174,6 @@ impl Ty {
             Ty::Builtin(BuiltinTy::Element(v)) => Some(Value::Func((*v).into())),
             Ty::Builtin(BuiltinTy::Type(ty)) => Some(Value::Type(*ty)),
             _ => None,
-        }
-    }
-
-    /// Get the type of the type node
-    pub fn kind(&self) -> DefKind {
-        match self {
-            Ty::Any => DefKind::Constant,
-            Ty::Builtin(t) => t.kind(),
-            Ty::Value(v) => match v.val {
-                Value::Func(..) => DefKind::Func,
-                Value::Module(..) => DefKind::Module,
-                Value::Type(..) => DefKind::Func,
-                Value::Label(..) => DefKind::Label,
-                _ => DefKind::Constant,
-            },
-            Ty::Field(..) => DefKind::Constant,
-            Ty::Union(..) => DefKind::Constant,
-            Ty::Let(..) => DefKind::Constant,
-            Ty::Var(..) => DefKind::Var,
-            Ty::Dict(..) => DefKind::Constant,
-            Ty::Array(..) => DefKind::Constant,
-            Ty::Tuple(..) => DefKind::Constant,
-            Ty::Func(..) => DefKind::Func,
-            Ty::Args(..) => DefKind::Constant,
-            Ty::Pattern(..) => DefKind::Constant,
-            Ty::With(..) => DefKind::Func,
-            Ty::Select(..) => DefKind::Constant,
-            Ty::Unary(..) => DefKind::Constant,
-            Ty::Binary(..) => DefKind::Constant,
-            Ty::If(..) => DefKind::Constant,
-            Ty::Boolean(..) => DefKind::Constant,
         }
     }
 }

@@ -5,66 +5,54 @@ use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
 
 use super::{prelude::*, BuiltinTy, InsTy, SharedContext};
-use crate::syntax::{get_deref_target, Decl, DeclExpr, DefKind, DerefTarget, Expr, ExprInfo};
+use crate::syntax::{get_deref_target, Decl, DeclExpr, DerefTarget, Expr, ExprInfo};
 use crate::VersionedDocument;
 
 /// A linked definition in the source code
 #[derive(Debug)]
-pub struct DefinitionLink {
-    /// The decl of the definition.
-    pub decl: Option<DeclExpr>,
+pub struct Definition {
+    /// The declaration identifier of the definition.
+    pub decl: DeclExpr,
     /// A possible instance of the definition.
     pub term: Option<Ty>,
-    /// The kind of the definition.
-    pub kind: DefKind,
-    /// The name of the definition.
-    pub name: Interned<str>,
 }
 
-impl DefinitionLink {
+impl Definition {
     /// Creates a definition
-    pub fn new(decl: Option<DeclExpr>, term: Option<Ty>) -> Self {
-        let name = decl.as_ref().map(|d| d.name().clone()).unwrap_or_default();
-        let kind = decl
-            .as_ref()
-            .map(|d| d.kind())
-            .or_else(|| term.as_ref().map(|ty| ty.kind()))
-            .unwrap();
-        Self {
-            decl,
-            term,
-            kind,
-            name,
-        }
+    pub fn new(decl: DeclExpr, term: Option<Ty>) -> Self {
+        Self { decl, term }
     }
 
     /// Creates a definition according to some term
-    pub fn new_term(decl: Interned<str>, term: Ty) -> Self {
-        let decl = Decl::lit_(decl);
-        Self::new(Some(decl.into()), Some(term))
+    pub fn new_var(name: Interned<str>, term: Ty) -> Self {
+        let decl = Decl::lit_(name);
+        Self::new(decl.into(), Some(term))
+    }
+
+    /// The name of the definition.
+    pub fn name(&self) -> &Interned<str> {
+        self.decl.name()
     }
 
     /// The location of the definition.
+    // todo: cache
     pub(crate) fn def_at(&self, ctx: &mut AnalysisContext) -> Option<(TypstFileId, Range<usize>)> {
-        let decl = self.decl.as_ref()?;
-        let fid = decl.file_id()?;
-        // todo: cache
-        let src = ctx.source_by_id(fid).ok()?;
-        Some((fid, src.range(decl.span()?)?))
+        let fid = self.decl.file_id()?;
+        let span = self.decl.span();
+        let range = span.and_then(|s| ctx.source_by_id(fid).ok()?.range(s));
+        Some((fid, range.unwrap_or_default()))
     }
 
     // todo: name range
     /// The range of the name of the definition.
     pub(crate) fn name_range(&self, ctx: &mut AnalysisContext) -> Option<Range<usize>> {
-        let decl = self.decl.as_ref()?;
-        if !decl.is_def() {
+        if !self.decl.is_def() {
             return None;
         }
 
-        let fid = decl.file_id()?;
-        // todo: cache
+        let fid = self.decl.file_id()?;
         let src = ctx.source_by_id(fid).ok()?;
-        src.range(decl.span()?)
+        src.range(self.decl.span()?)
     }
 
     pub(crate) fn value(&self) -> Option<Value> {
@@ -79,60 +67,41 @@ pub fn find_definition(
     source: Source,
     document: Option<&VersionedDocument>,
     deref_target: DerefTarget<'_>,
-) -> Option<DefinitionLink> {
+) -> Option<Definition> {
     match deref_target {
         // todi: field access
         DerefTarget::VarAccess(node) | DerefTarget::Callee(node) => {
             find_ident_definition(ctx, source, node)
         }
-        // todo: better support (rename import path?)
         DerefTarget::ImportPath(path) => {
             let parent = path.parent()?;
-            // let def_fid = parent.span().id()?;
             let import_node = parent.cast::<ast::ModuleImport>()?;
-            // let source = find_source_by_expr(&ctx.world, def_fid, import_node.source())?;
 
             let n = import_node.source().to_untyped();
             let name = Decl::calc_path_stem(n.text());
             let decl = Decl::path_stem(n.clone(), name);
-
-            // kind: DefKind::PathStem,
-            // name: Interned::default(),
-            // value: None,
-            // def_at: Some((source.id(), LinkedNode::new(source.root()).range())),
-            // name_range: None,
-            Some(DefinitionLink::new(Some(decl.into()), None))
+            Some(Definition::new(decl.into(), None))
         }
         DerefTarget::IncludePath(path) => {
             let parent = path.parent()?;
-            // let def_fid = parent.span().id()?;
             let include_node = parent.cast::<ast::ModuleInclude>()?;
-            // let source = find_source_by_expr(&ctx.world, def_fid,
-            // include_node.source())?;
 
-            // Some(DefinitionLink {
-            //     kind: DefKind::ModuleInclude,
-            //     name: Interned::default(),
-            //     value: None,
-            //     def_at: Some((source.id(), (LinkedNode::new(source.root())).range())),
-            //     name_range: None,
-            // })
             let n = include_node.source().to_untyped();
             let name = Decl::calc_path_stem(n.text());
-            let decl = Decl::path_stem(n.clone(), name);
-            Some(DefinitionLink::new(Some(decl.into()), None))
+            let decl = Decl::include_path(n.clone(), name);
+            Some(Definition::new(decl.into(), None))
         }
         DerefTarget::Label(r) | DerefTarget::Ref(r) => {
             let ref_expr: ast::Expr = r.cast()?;
-            let (ref_node, is_label) = match ref_expr {
-                ast::Expr::Ref(r) => (r.target(), false),
-                ast::Expr::Label(r) => (r.get(), true),
+            let name = match ref_expr {
+                ast::Expr::Ref(r) => r.target(),
+                ast::Expr::Label(r) => r.get(),
                 _ => return None,
             };
 
             let introspector = &document?.document.introspector;
-            find_bib_definition(ctx, introspector, ref_node)
-                .or_else(|| find_ref_definition(ctx, introspector, ref_node, is_label, r.span()))
+            find_bib_definition(ctx, introspector, name)
+                .or_else(|| find_ref_definition(introspector, name, ref_expr))
         }
         DerefTarget::Normal(..) => None,
     }
@@ -142,7 +111,7 @@ fn find_ident_definition(
     ctx: &Arc<SharedContext>,
     source: Source,
     mut use_site: LinkedNode,
-) -> Option<DefinitionLink> {
+) -> Option<Definition> {
     let mut proj = vec![];
     // Lexical reference
     let ident_store = use_site.clone();
@@ -187,12 +156,11 @@ fn find_ident_definition(
         });
     };
 
-    let def = of.def.as_ref();
-    let ty = of.ty.as_ref();
-    let kind = def.map(|d| d.kind()).or_else(|| ty.map(|ty| ty.kind()))?;
+    let ty = of.term.as_ref();
 
-    match kind {
-        DefKind::ModuleAlias | DefKind::PathStem | DefKind::Module => {
+    use Decl::*;
+    match of.decl.as_ref() {
+        ModuleAlias(..) | PathStem(..) | Module(..) => {
             if !proj.is_empty() {
                 let val = ty.and_then(|ty| match ty {
                     Ty::Value(v) => Some(v.val.clone()),
@@ -212,32 +180,9 @@ fn find_ident_definition(
                 return value_to_def(val.clone(), || name, None);
             }
 
-            Some(DefinitionLink::new(def.cloned(), ty.cloned()))
+            Some(of)
         }
-        // DefKind::Closure | DefKind::Func => {
-        // let value = def_fid.and_then(|fid| {
-        //     let def_source = ctx.source_by_id(fid).ok()?;
-        //     let root = LinkedNode::new(def_source.root());
-        //     let def_name = root.find(def?.span()?)?;
-
-        //     log::info!("def_name for function: {def_name:?}");
-        //     let values = ctx.analyze_expr(def_name.get());
-        //     let func = values
-        //         .into_iter()
-        //         .find(|v| matches!(v.0, Value::Func(..)))?;
-        //     log::info!("okay for function: {func:?}");
-        //     Some(func.0)
-        // });
-
-        // Some(DefinitionLink {
-        //     kind,
-        //     name: name.clone(),
-        //     value,
-        //     // todo: correct name range
-        //     name_range: def_at.as_ref().map(|(_, r)| r.clone()),
-        //     def_at,
-        // })
-        _ => Some(DefinitionLink::new(def.cloned(), ty.cloned())),
+        _ => Some(of),
     }
 }
 
@@ -255,7 +200,7 @@ fn find_bib_definition(
     ctx: &Arc<SharedContext>,
     introspector: &Introspector,
     key: &str,
-) -> Option<DefinitionLink> {
+) -> Option<Definition> {
     let bib_elem = BibliographyElem::find(introspector.track()).ok()?;
     let Value::Array(arr) = bib_elem.path().clone().into_value() else {
         return None;
@@ -264,63 +209,40 @@ fn find_bib_definition(
     let bib_paths = arr.into_iter().map(Value::cast).flat_map(|e| e.ok());
     let bib_info = ctx.analyze_bib(bib_elem.span(), bib_paths)?;
 
-    let entry = bib_info.entries.get(key);
+    let entry = bib_info.entries.get(key)?;
     log::debug!("find_bib_definition: {key} => {entry:?}");
-    let entry = entry?;
-    // Some(DefinitionLink {
-    //     kind: DefKind::BibKey,
-    //     name: key.into(),
-    //     value: None,
-    //     def_at: Some((entry.file_id, entry.span.clone())),
-    //     // todo: rename with regard to string format: yaml-key/bib etc.
-    //     name_range: Some(entry.span.clone()),
-    // })
-    todo!()
+
+    // todo: rename with regard to string format: yaml-key/bib etc.
+    let decl = Decl::bib_entry(key.into(), entry.file_id, entry.span.clone());
+    Some(Definition::new(decl.into(), None))
 }
 
 fn find_ref_definition(
-    ctx: &Arc<SharedContext>,
     introspector: &Introspector,
-    ref_node: &str,
-    is_label: bool,
-    span: Span,
-) -> Option<DefinitionLink> {
-    let label = Label::new(ref_node);
+    name: &str,
+    ref_expr: ast::Expr,
+) -> Option<Definition> {
+    let label = Label::new(name);
     let sel = Selector::Label(label);
-    let elem = introspector.query_first(&sel)?;
 
     // if it is a label, we put the selection range to itself
-    let (def_at, name_range) = if is_label {
-        let fid = span.id()?;
-        let source = ctx.source_by_id(fid).ok()?;
-        let rng = source.range(span)?;
-
-        let name_range = rng.start + 1..rng.end - 1;
-        let name_range = (name_range.start <= name_range.end).then_some(name_range);
-        (Some((fid, rng)), name_range)
-    } else {
-        let span = elem.labelled_at();
-        let span = if !span.is_detached() {
-            span
-        } else {
-            // otherwise, it is estimated to the span of the pointed content
-            elem.span()
-        };
-        let fid = span.id()?;
-        let source = ctx.source_by_id(fid).ok()?;
-        let rng = source.range(span)?;
-
-        (Some((fid, rng)), None)
+    let (decl, ty) = match ref_expr {
+        ast::Expr::Label(label) => (Decl::label(name, label.span()), None),
+        ast::Expr::Ref(..) => {
+            let elem = introspector.query_first(&sel)?;
+            let span = elem.labelled_at();
+            let decl = if !span.is_detached() {
+                Decl::label(name, span)
+            } else {
+                // otherwise, it is estimated to the span of the pointed content
+                Decl::content(elem.span())
+            };
+            (decl, Some(Ty::Value(InsTy::new(Value::Content(elem)))))
+        }
+        _ => return None,
     };
 
-    // Some(DefinitionLink {
-    //     kind: DefKind::Label,
-    //     name: ref_node.into(),
-    //     value: Some(Value::Content(elem)),
-    //     def_at,
-    //     name_range,
-    // })
-    todo!()
+    Some(Definition::new(decl.into(), ty))
 }
 
 /// The target of a dynamic call.
@@ -525,7 +447,7 @@ fn value_to_def(
     value: Value,
     name: impl FnOnce() -> Option<Interned<str>>,
     name_range: Option<Range<usize>>,
-) -> Option<DefinitionLink> {
+) -> Option<Definition> {
     let val = Ty::Value(InsTy::new(value.clone()));
 
     Some(match value {
@@ -535,13 +457,13 @@ fn value_to_def(
             s.synthesize(func.span());
 
             let decl = Decl::func(s.cast().unwrap());
-            DefinitionLink::new(Some(decl.into()), Some(val))
+            Definition::new(decl.into(), Some(val))
         }
-        Value::Module(module) => DefinitionLink::new_term(module.name().into(), val),
+        Value::Module(module) => Definition::new_var(module.name().into(), val),
         _v => {
             // todo name_range
             let _ = name_range;
-            DefinitionLink::new_term(name()?, val)
+            Definition::new_var(name()?, val)
         }
     })
 }
@@ -556,7 +478,7 @@ impl DefResolver {
         Some(Self { ei })
     }
 
-    fn of_span(&mut self, span: Span) -> Option<ExprLoc> {
+    fn of_span(&mut self, span: Span) -> Option<Definition> {
         if span.is_detached() {
             return None;
         }
@@ -564,47 +486,135 @@ impl DefResolver {
         let expr = self.ei.resolves.get(&span).cloned()?;
         match (&expr.of, &expr.val) {
             (Some(expr), ty) => self.of_expr(expr, ty.as_ref()),
-            (None, Some(ty)) => Some(ExprLoc {
-                def: None,
-                ty: Some(ty.clone()),
-            }),
+            (None, Some(term)) => self.of_term(term),
             (None, None) => None,
         }
     }
 
-    fn of_expr(&mut self, expr: &Expr, ty: Option<&Ty>) -> Option<ExprLoc> {
+    fn of_expr(&mut self, expr: &Expr, term: Option<&Ty>) -> Option<Definition> {
         log::debug!("of_expr: {expr:?}");
 
         match expr {
-            Expr::Decl(decl) => self.of_decl(decl, ty),
-            Expr::Ref(r) => self.of_expr(r.of.as_ref()?, r.val.as_ref().or(ty)),
+            Expr::Decl(decl) => self.of_decl(decl, term),
+            Expr::Ref(r) => self.of_expr(r.of.as_ref()?, r.val.as_ref().or(term)),
             _ => None,
         }
     }
 
-    fn of_decl(&mut self, expr: &Interned<Decl>, ty: Option<&Ty>) -> Option<ExprLoc> {
-        log::debug!("of_decl: {expr:?}");
+    fn of_term(&mut self, term: &Ty) -> Option<Definition> {
+        // Get the type of the type node
+        // pub fn kind(&self) -> DeclKind {
+        //     match self {
+        //         Ty::Any => DeclKind::Constant,
+        //         Ty::Builtin(t) => t.kind(),
+        //         Ty::Value(v) => match v.val {
+        //             Value::Func(..) => DeclKind::Func,
+        //             Value::Module(..) => DeclKind::Module,
+        //             Value::Type(..) => DeclKind::Func,
+        //             Value::Label(..) => DeclKind::Label,
+        //             _ => DeclKind::Constant,
+        //         },
+        //         Ty::Field(..) => DeclKind::Constant,
+        //         Ty::Union(..) => DeclKind::Constant,
+        //         Ty::Let(..) => DeclKind::Constant,
+        //         Ty::Var(..) => DeclKind::Var,
+        //         Ty::Dict(..) => DeclKind::Constant,
+        //         Ty::Array(..) => DeclKind::Constant,
+        //         Ty::Tuple(..) => DeclKind::Constant,
+        //         Ty::Func(..) => DeclKind::Func,
+        //         Ty::Args(..) => DeclKind::Constant,
+        //         Ty::Pattern(..) => DeclKind::Constant,
+        //         Ty::With(..) => DeclKind::Func,
+        //         Ty::Select(..) => DeclKind::Constant,
+        //         Ty::Unary(..) => DeclKind::Constant,
+        //         Ty::Binary(..) => DeclKind::Constant,
+        //         Ty::If(..) => DeclKind::Constant,
+        //         Ty::Boolean(..) => DeclKind::Constant,
+        //     }
+        // }
+        // todo: def can be undefined?
+        // DefKind::Closure | DefKind::Func => {
+        // let value = def_fid.and_then(|fid| {
+        //     let def_source = ctx.source_by_id(fid).ok()?;
+        //     let root = LinkedNode::new(def_source.root());
+        //     let def_name = root.find(def?.span()?)?;
 
-        match expr.as_ref() {
-            Decl::Import(..) | Decl::ImportAlias(..) => {
-                let at = expr.span().unwrap();
-                let mut next = self.of_span(at).unwrap_or_else(|| ExprLoc {
-                    def: Some(expr.clone()),
-                    ty: ty.cloned(),
-                });
-                next.def = next.def.or_else(|| Some(expr.clone()));
-                next.ty = next.ty.or_else(|| ty.cloned());
-                Some(next)
-            }
-            _ => Some(ExprLoc {
-                def: Some(expr.clone()),
-                ty: ty.cloned(),
-            }),
-        }
+        //     log::info!("def_name for function: {def_name:?}");
+        //     let values = ctx.analyze_expr(def_name.get());
+        //     let func = values
+        //         .into_iter()
+        //         .find(|v| matches!(v.0, Value::Func(..)))?;
+        //     log::info!("okay for function: {func:?}");
+        //     Some(func.0)
+        // });
+
+        // pub fn kind(&self) -> DeclKind {
+        //     match self {
+        //         BuiltinTy::Clause => DeclKind::Constant,
+        //         BuiltinTy::Undef => DeclKind::Constant,
+        //         BuiltinTy::Content => DeclKind::Constant,
+        //         BuiltinTy::Space => DeclKind::Constant,
+        //         BuiltinTy::None => DeclKind::Constant,
+        //         BuiltinTy::Break => DeclKind::Constant,
+        //         BuiltinTy::Continue => DeclKind::Constant,
+        //         BuiltinTy::Infer => DeclKind::Constant,
+        //         BuiltinTy::FlowNone => DeclKind::Constant,
+        //         BuiltinTy::Auto => DeclKind::Constant,
+
+        //         BuiltinTy::Args => DeclKind::Constant,
+        //         BuiltinTy::Color => DeclKind::Constant,
+        //         BuiltinTy::TextSize => DeclKind::Constant,
+        //         BuiltinTy::TextFont => DeclKind::Constant,
+        //         BuiltinTy::TextLang => DeclKind::Constant,
+        //         BuiltinTy::TextRegion => DeclKind::Constant,
+        //         BuiltinTy::Dir => DeclKind::Constant,
+        //         BuiltinTy::Length => DeclKind::Constant,
+        //         BuiltinTy::Float => DeclKind::Constant,
+        //         BuiltinTy::CiteLabel => DeclKind::Constant,
+        //         BuiltinTy::RefLabel => DeclKind::Constant,
+        //         BuiltinTy::Stroke => DeclKind::Constant,
+        //         BuiltinTy::Margin => DeclKind::Constant,
+        //         BuiltinTy::Inset => DeclKind::Constant,
+        //         BuiltinTy::Outset => DeclKind::Constant,
+        //         BuiltinTy::Radius => DeclKind::Constant,
+        //         BuiltinTy::Type(_) => DeclKind::Func,
+        //         BuiltinTy::Element(_) => DeclKind::Func,
+        //         BuiltinTy::Tag(_) => DeclKind::Constant,
+        //         BuiltinTy::Path(_) => DeclKind::Constant,
+        //     }
+        // }
+
+        // Some(DefinitionLink {
+        //     kind,
+        //     name: name.clone(),
+        //     value,
+        //     // todo: correct name range
+        //     name_range: def_at.as_ref().map(|(_, r)| r.clone()),
+        //     def_at,
+        // })
+        todo!()
     }
-}
 
-struct ExprLoc {
-    def: Option<Interned<Decl>>,
-    ty: Option<Ty>,
+    fn of_decl(&mut self, decl: &Interned<Decl>, term: Option<&Ty>) -> Option<Definition> {
+        log::debug!("of_decl: {decl:?}");
+
+        // todo:
+        // match expr.as_ref() {
+        //     Decl::Import(..) | Decl::ImportAlias(..) => {
+        //         let at = expr.span().unwrap();
+        //         let mut next = self.of_span(at).unwrap_or_else(|| ExprLoc {
+        //             def: Some(expr.clone()),
+        //             ty: ty.cloned(),
+        //         });
+        //         next.def = next.def.or_else(|| Some(expr.clone()));
+        //         next.ty = next.ty.or_else(|| ty.cloned());
+        //         Some(next)
+        //     }
+        //     _ => Some(ExprLoc {
+        //         def: Some(expr.clone()),
+        //         ty: ty.cloned(),
+        //     }),
+        // }
+        Some(Definition::new(decl.clone(), term.cloned()))
+    }
 }

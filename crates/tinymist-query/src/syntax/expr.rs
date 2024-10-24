@@ -323,7 +323,7 @@ impl ExprWorker {
     }
 
     fn check_label(&mut self, ident: ast::Label) -> Expr {
-        Expr::Decl(Decl::label(ident).into())
+        Expr::Decl(Decl::label(ident.get(), ident.span()).into())
     }
 
     fn check_element<T: NativeElement>(&mut self, content: EcoVec<Expr>) -> Expr {
@@ -667,11 +667,12 @@ impl ExprWorker {
             {
                 let decl = old.clone();
                 let val = val.clone();
+                let of = of.clone();
                 self.resolve_as(RefExpr { decl, of, val }.into());
             }
             if let Some(new) = &rename {
                 let decl = new.clone();
-                let of = Some(Expr::Decl(old.clone()));
+                // let of = Some(Expr::Decl(old.clone()));
                 let val = val.clone();
                 self.resolve_as(RefExpr { decl, of, val }.into());
             }
