@@ -227,6 +227,19 @@ const common: textmate.Pattern = {
   ],
 };
 
+// These two markup are buggy
+const ENABLE_BOLD_ITALIC = false;
+const boldItalicMarkup = ENABLE_BOLD_ITALIC
+  ? [
+      {
+        include: "#markupBold",
+      },
+      {
+        include: "#markupItalic",
+      },
+    ]
+  : [];
+
 const markup: textmate.Pattern = {
   patterns: [
     {
@@ -267,9 +280,7 @@ const markup: textmate.Pattern = {
     //   name: "constant.symbol.typst",
     //   match: /:([a-zA-Z0-9]+:)+/,
     // },
-    //       # These two markup are buggy
-    //       # - include: '#markupBold'
-    //       # - include: '#markupItalic'
+    ...boldItalicMarkup,
     {
       name: "markup.underline.link.typst",
       match: /https?:\/\/[0-9a-zA-Z~\/%#&='',;\.\+\?\-\_]*/,
@@ -678,13 +689,18 @@ const comments: textmate.Pattern = {
 };
 
 const markupAnnotate = (ch: string, style: string): textmate.Pattern => {
-  const MARKUP_BOUNDARY = `[\\W_\\p{Han}\\p{Hangul}\\p{Katakana}\\p{Hiragana}]`;
-  const notationAtBound = `(^${ch}|${ch}$|((?<=${MARKUP_BOUNDARY})${ch})|(${ch}(?=${MARKUP_BOUNDARY})))`;
+  const MARKUP_BOUNDARY = `[\\W\\p{Han}\\p{Hangul}\\p{Katakana}\\p{Hiragana}]`;
+  const notationAtBound = `(?:(^${ch}|${ch}$|((?<=${MARKUP_BOUNDARY})${ch})|(${ch}(?=${MARKUP_BOUNDARY}))))`;
   return {
     name: `markup.${style}.typst`,
-    begin: new RegExp(notationAtBound),
-    end: new RegExp(notationAtBound + `\\n|(?=\\])`),
-    captures: {
+    begin: notationAtBound,
+    end: new RegExp(notationAtBound + `|\\n|(?=\\])`),
+    beginCaptures: {
+      "0": {
+        name: `punctuation.definition.${style}.typst`,
+      },
+    },
+    endCaptures: {
       "0": {
         name: `punctuation.definition.${style}.typst`,
       },
