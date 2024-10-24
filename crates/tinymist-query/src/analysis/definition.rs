@@ -599,22 +599,12 @@ impl DefResolver {
         log::debug!("of_decl: {decl:?}");
 
         // todo:
-        // match expr.as_ref() {
-        //     Decl::Import(..) | Decl::ImportAlias(..) => {
-        //         let at = expr.span().unwrap();
-        //         let mut next = self.of_span(at).unwrap_or_else(|| ExprLoc {
-        //             def: Some(expr.clone()),
-        //             ty: ty.cloned(),
-        //         });
-        //         next.def = next.def.or_else(|| Some(expr.clone()));
-        //         next.ty = next.ty.or_else(|| ty.cloned());
-        //         Some(next)
-        //     }
-        //     _ => Some(ExprLoc {
-        //         def: Some(expr.clone()),
-        //         ty: ty.cloned(),
-        //     }),
-        // }
-        Some(Definition::new(decl.clone(), term.cloned()))
+        match decl.as_ref() {
+            Decl::Import(..) | Decl::ImportAlias(..) => {
+                let next = self.of_span(decl.span().unwrap());
+                Some(next.unwrap_or_else(|| Definition::new(decl.clone(), term.cloned())))
+            }
+            _ => Some(Definition::new(decl.clone(), term.cloned())),
+        }
     }
 }
