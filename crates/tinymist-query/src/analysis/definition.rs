@@ -449,6 +449,20 @@ fn value_to_def(
     name_range: Option<Range<usize>>,
 ) -> Option<Definition> {
     let val = Ty::Value(InsTy::new(value.clone()));
+    // DefKind::Closure | DefKind::Func => {
+    // let value = def_fid.and_then(|fid| {
+    //     let def_source = ctx.source_by_id(fid).ok()?;
+    //     let root = LinkedNode::new(def_source.root());
+    //     let def_name = root.find(def?.span()?)?;
+
+    //     log::info!("def_name for function: {def_name:?}");
+    //     let values = ctx.analyze_expr(def_name.get());
+    //     let func = values
+    //         .into_iter()
+    //         .find(|v| matches!(v.0, Value::Func(..)))?;
+    //     log::info!("okay for function: {func:?}");
+    //     Some(func.0)
+    // });
 
     Some(match value {
         Value::Func(func) => {
@@ -502,97 +516,21 @@ impl DefResolver {
     }
 
     fn of_term(&mut self, term: &Ty) -> Option<Definition> {
+        log::debug!("of_term: {term:?}");
+
         // Get the type of the type node
-        // pub fn kind(&self) -> DeclKind {
-        //     match self {
-        //         Ty::Any => DeclKind::Constant,
-        //         Ty::Builtin(t) => t.kind(),
-        //         Ty::Value(v) => match v.val {
-        //             Value::Func(..) => DeclKind::Func,
-        //             Value::Module(..) => DeclKind::Module,
-        //             Value::Type(..) => DeclKind::Func,
-        //             Value::Label(..) => DeclKind::Label,
-        //             _ => DeclKind::Constant,
-        //         },
-        //         Ty::Field(..) => DeclKind::Constant,
-        //         Ty::Union(..) => DeclKind::Constant,
-        //         Ty::Let(..) => DeclKind::Constant,
-        //         Ty::Var(..) => DeclKind::Var,
-        //         Ty::Dict(..) => DeclKind::Constant,
-        //         Ty::Array(..) => DeclKind::Constant,
-        //         Ty::Tuple(..) => DeclKind::Constant,
-        //         Ty::Func(..) => DeclKind::Func,
-        //         Ty::Args(..) => DeclKind::Constant,
-        //         Ty::Pattern(..) => DeclKind::Constant,
-        //         Ty::With(..) => DeclKind::Func,
-        //         Ty::Select(..) => DeclKind::Constant,
-        //         Ty::Unary(..) => DeclKind::Constant,
-        //         Ty::Binary(..) => DeclKind::Constant,
-        //         Ty::If(..) => DeclKind::Constant,
-        //         Ty::Boolean(..) => DeclKind::Constant,
-        //     }
-        // }
-        // todo: def can be undefined?
-        // DefKind::Closure | DefKind::Func => {
-        // let value = def_fid.and_then(|fid| {
-        //     let def_source = ctx.source_by_id(fid).ok()?;
-        //     let root = LinkedNode::new(def_source.root());
-        //     let def_name = root.find(def?.span()?)?;
+        let better_def = match term {
+            Ty::Value(v) => value_to_def(v.val.clone(), || None, None),
+            // Ty::Var(..) => DeclKind::Var,
+            // Ty::Func(..) => DeclKind::Func,
+            // Ty::With(..) => DeclKind::Func,
+            _ => None,
+        };
 
-        //     log::info!("def_name for function: {def_name:?}");
-        //     let values = ctx.analyze_expr(def_name.get());
-        //     let func = values
-        //         .into_iter()
-        //         .find(|v| matches!(v.0, Value::Func(..)))?;
-        //     log::info!("okay for function: {func:?}");
-        //     Some(func.0)
-        // });
-
-        // pub fn kind(&self) -> DeclKind {
-        //     match self {
-        //         BuiltinTy::Clause => DeclKind::Constant,
-        //         BuiltinTy::Undef => DeclKind::Constant,
-        //         BuiltinTy::Content => DeclKind::Constant,
-        //         BuiltinTy::Space => DeclKind::Constant,
-        //         BuiltinTy::None => DeclKind::Constant,
-        //         BuiltinTy::Break => DeclKind::Constant,
-        //         BuiltinTy::Continue => DeclKind::Constant,
-        //         BuiltinTy::Infer => DeclKind::Constant,
-        //         BuiltinTy::FlowNone => DeclKind::Constant,
-        //         BuiltinTy::Auto => DeclKind::Constant,
-
-        //         BuiltinTy::Args => DeclKind::Constant,
-        //         BuiltinTy::Color => DeclKind::Constant,
-        //         BuiltinTy::TextSize => DeclKind::Constant,
-        //         BuiltinTy::TextFont => DeclKind::Constant,
-        //         BuiltinTy::TextLang => DeclKind::Constant,
-        //         BuiltinTy::TextRegion => DeclKind::Constant,
-        //         BuiltinTy::Dir => DeclKind::Constant,
-        //         BuiltinTy::Length => DeclKind::Constant,
-        //         BuiltinTy::Float => DeclKind::Constant,
-        //         BuiltinTy::CiteLabel => DeclKind::Constant,
-        //         BuiltinTy::RefLabel => DeclKind::Constant,
-        //         BuiltinTy::Stroke => DeclKind::Constant,
-        //         BuiltinTy::Margin => DeclKind::Constant,
-        //         BuiltinTy::Inset => DeclKind::Constant,
-        //         BuiltinTy::Outset => DeclKind::Constant,
-        //         BuiltinTy::Radius => DeclKind::Constant,
-        //         BuiltinTy::Type(_) => DeclKind::Func,
-        //         BuiltinTy::Element(_) => DeclKind::Func,
-        //         BuiltinTy::Tag(_) => DeclKind::Constant,
-        //         BuiltinTy::Path(_) => DeclKind::Constant,
-        //     }
-        // }
-
-        // Some(DefinitionLink {
-        //     kind,
-        //     name: name.clone(),
-        //     value,
-        //     // todo: correct name range
-        //     name_range: def_at.as_ref().map(|(_, r)| r.clone()),
-        //     def_at,
-        // })
-        todo!()
+        better_def.or_else(|| {
+            let constant = Decl::constant(Span::detached());
+            Some(Definition::new(constant.into(), Some(term.clone())))
+        })
     }
 
     fn of_decl(&mut self, decl: &Interned<Decl>, term: Option<&Ty>) -> Option<Definition> {
