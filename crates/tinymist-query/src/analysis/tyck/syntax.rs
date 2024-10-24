@@ -466,7 +466,7 @@ impl<'a> TypeChecker<'a> {
 
     fn check_ref(&mut self, r: &Interned<RefExpr>) -> Ty {
         let s = r.decl.span();
-        let of = r.of.as_ref().map(|of| self.check(of));
+        let of = r.root.as_ref().map(|of| self.check(of));
         let of = of.or_else(|| r.val.clone());
         if let Some((s, of)) = s.zip(of.as_ref()) {
             self.info.witness_at_most(s, of.clone());

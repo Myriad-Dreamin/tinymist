@@ -484,7 +484,7 @@ impl DefResolver {
         }
 
         let expr = self.ei.resolves.get(&span).cloned()?;
-        match (&expr.of, &expr.val) {
+        match (&expr.root, &expr.val) {
             (Some(expr), ty) => self.of_expr(expr, ty.as_ref()),
             (None, Some(term)) => self.of_term(term),
             (None, None) => None,
@@ -496,7 +496,7 @@ impl DefResolver {
 
         match expr {
             Expr::Decl(decl) => self.of_decl(decl, term),
-            Expr::Ref(r) => self.of_expr(r.of.as_ref()?, r.val.as_ref().or(term)),
+            Expr::Ref(r) => self.of_expr(r.root.as_ref()?, r.val.as_ref().or(term)),
             _ => None,
         }
     }

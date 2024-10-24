@@ -108,7 +108,7 @@ impl ExprInfo {
         let of = Some(Expr::Decl(decl.clone()));
         self.resolves
             .iter()
-            .filter(move |(_, r)| r.decl == decl || r.of == of)
+            .filter(move |(_, r)| r.decl == decl || r.root == of)
     }
 
     pub fn is_exported(&self, decl: &Interned<Decl>) -> bool {
@@ -550,7 +550,8 @@ impl ExprWorker {
         let decl = Interned::new(decl.unwrap_or_else(|| Decl::module_import(typed.span())));
         let mod_ref = RefExpr {
             decl: decl.clone(),
-            of: mod_expr.clone(),
+            step: mod_expr.clone(),
+            root: mod_expr.clone(),
             val: None,
         };
         log::debug!("create import variable: {mod_ref:?}");
@@ -665,38 +666,43 @@ impl ExprWorker {
                 path.push(seg);
             }
             // todo: import path
-            let (mut of, val) = match path.last().map(|d| d.name()) {
+            let (mut root, val) = match path.last().map(|d| d.name()) {
                 Some(name) => scope.get(name),
                 None => (None, None),
             };
 
-            log::debug!("path {path:?} -> {of:?} {val:?}");
-            if of.is_none() && val.is_none() {
+            log::debug!("path {path:?} -> {root:?} {val:?}");
+            if root.is_none() && val.is_none() {
                 let mut sel = module.clone();
                 for seg in path.into_iter() {
                     sel = Expr::Select(SelectExpr::new(seg, sel));
                 }
-                of = Some(sel)
+                root = Some(sel)
             }
 
-            {
-                let decl = old.clone();
-                let val = val.clone();
-                let of = of.clone();
-                self.resolve_as(RefExpr { decl, of, val }.into());
-            }
+            let mut ref_expr = Interned::new(RefExpr {
+                decl: old.clone(),
+                root: root.clone(),
+                step: root.clone(),
+                val: val.clone(),
+            });
+            self.resolve_as(ref_expr.clone());
+
             if let Some(new) = &rename {
-                let decl = new.clone();
-                // let of = Some(Expr::Decl(old.clone()));
-                let val = val.clone();
-                self.resolve_as(RefExpr { decl, of, val }.into());
+                ref_expr = Interned::new(RefExpr {
+                    decl: new.clone(),
+                    root: root.clone(),
+                    step: Some(old.clone().into()),
+                    val: val.clone(),
+                });
+                self.resolve_as(ref_expr.clone());
             }
 
-            let new = rename.unwrap_or_else(|| old.clone());
-            let new_name = new.name().clone();
-            let new_expr = Expr::Decl(new);
-            self.scope_mut().insert_mut(new_name, new_expr.clone());
-            imported.push((old, new_expr));
+            // final resolves
+            let name = rename.as_ref().unwrap_or(&old).name().clone();
+            let expr = Expr::Ref(ref_expr);
+            self.scope_mut().insert_mut(name, expr.clone());
+            imported.push((old, expr));
         }
 
         Expr::Pattern(
@@ -933,8 +939,22 @@ impl ExprWorker {
     }
 
     fn resolve_ident_(&mut self, decl: DeclExpr, mode: InterpretMode) -> RefExpr {
-        let (of, val) = self.eval_ident(decl.name(), mode);
-        RefExpr { decl, of, val }
+        let (step, val) = self.eval_ident(decl.name(), mode);
+
+        match step {
+            Some(Expr::Ref(r)) => RefExpr {
+                decl,
+                root: r.root.clone(),
+                step: Some(r.decl.clone().into()),
+                val,
+            },
+            step => RefExpr {
+                decl,
+                root: step.clone(),
+                step,
+                val,
+            },
+        }
     }
 
     fn defer(&mut self, expr: ast::Expr) -> DeferExpr {
@@ -1062,7 +1082,7 @@ impl ExprWorker {
             }
             Some(Expr::Ref(r)) => {
                 log::debug!("folding ref: {r:?}");
-                self.fold_expr_and_val((r.of.clone(), r.val.clone()))
+                self.fold_expr_and_val((r.root.clone(), r.val.clone()))
             }
             Some(expr) => {
                 log::debug!("folding expr: {expr:?}");

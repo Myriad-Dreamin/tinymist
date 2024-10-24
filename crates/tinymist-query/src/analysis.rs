@@ -120,14 +120,20 @@ mod expr_tests {
                 .map(|(_, expr)| {
                     let RefExpr {
                         decl: ident,
-                        of,
+                        step,
+                        root,
                         val,
                     } = expr.as_ref();
 
                     format!(
-                        "{} -> {}, val: {val:?}",
+                        "{} -> {}, root {}, val: {val:?}",
                         source.show_expr(&Expr::Decl(ident.clone())),
-                        of.as_ref().map(|e| source.show_expr(e)).unwrap_or_default()
+                        step.as_ref()
+                            .map(|e| source.show_expr(e))
+                            .unwrap_or_default(),
+                        root.as_ref()
+                            .map(|e| source.show_expr(e))
+                            .unwrap_or_default()
                     )
                 })
                 .collect::<Vec<_>>();

@@ -360,9 +360,11 @@ impl Decl {
     }
 
     pub fn as_def(this: &Interned<Self>, val: Option<Ty>) -> Interned<RefExpr> {
+        let def: Expr = this.clone().into();
         Interned::new(RefExpr {
             decl: this.clone(),
-            of: Some(this.clone().into()),
+            step: Some(def.clone()),
+            root: Some(def),
             val,
         })
     }
@@ -539,7 +541,8 @@ pub struct ContentSeqExpr {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RefExpr {
     pub decl: DeclExpr,
-    pub of: Option<Expr>,
+    pub step: Option<Expr>,
+    pub root: Option<Expr>,
     pub val: Option<Ty>,
 }
 
@@ -1003,8 +1006,12 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
 
     fn write_ref(&mut self, r: &Interned<RefExpr>) -> fmt::Result {
         write!(self.f, "ref({:?}", r.decl)?;
-        if let Some(of) = &r.of {
-            self.f.write_str(", ")?;
+        if let Some(step) = &r.step {
+            self.f.write_str(", step = ")?;
+            self.write_expr(step)?;
+        }
+        if let Some(of) = &r.root {
+            self.f.write_str(", root = ")?;
             self.write_expr(of)?;
         }
         if let Some(val) = &r.val {
