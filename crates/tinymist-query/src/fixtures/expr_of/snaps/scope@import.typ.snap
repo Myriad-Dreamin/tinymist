@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "snap.join(\"\\n\")"
+input_file: crates/tinymist-query/src/fixtures/expr_of/import.typ
+---
+= resolves
+PathStem("base", Str: "\"base.typ\"")@8..18 in \s0.typ -> Module("base", \base.typ)@0..0 in \base.typ, val: None
+IdentRef("base")@20..24 in \s0.typ -> Ref(RefExpr { decl: PathStem("base", Str: "\"base.typ\""), of: Some(Decl(Module("base", \base.typ))), val: None }), val: None
+= exports
+base -> Ref(RefExpr { decl: PathStem("base", Str: "\"base.typ\""), of: Some(Decl(Module("base", \base.typ))), val: None })

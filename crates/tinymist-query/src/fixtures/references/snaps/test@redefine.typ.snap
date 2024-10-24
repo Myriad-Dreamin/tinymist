@@ -4,6 +4,7 @@ expression: "JsonRepr::new_pure(result)"
 input_file: crates/tinymist-query/src/fixtures/references/redefine.typ
 ---
 [
+ "/s0.typ@0:23:0:24",
  "/s0.typ@3:2:3:3",
  "/s0.typ@3:6:3:7",
  "/s0.typ@6:12:6:13",

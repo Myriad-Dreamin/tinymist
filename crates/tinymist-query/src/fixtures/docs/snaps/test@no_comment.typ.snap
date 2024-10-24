@@ -1,6 +1,0 @@
----
-source: crates/tinymist-query/src/analysis.rs
-expression: "result.as_deref().unwrap_or(\"<nil>\")"
-input_file: crates/tinymist-query/src/fixtures/document/no_comment.typ
----
-<nil>

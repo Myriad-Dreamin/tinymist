@@ -3,11 +3,4 @@ source: crates/tinymist-query/src/goto_definition.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/goto_definition/module_select.typ
 ---
-[
- {
-  "originSelectionRange": "1:2:1:12",
-  "targetRange": "0:6:0:9",
-  "targetSelectionRange": "0:6:0:9",
-  "targetUri": "variable.typ"
- }
-]
+null

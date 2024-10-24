@@ -66,6 +66,7 @@ hashbrown = { version = "0.14", features = [
     "inline-more",
 ], default-features = false }
 indexmap = "2.1.0"
+rpds = "1"
 
 # Data/Text Format and Processing
 biblatex = "0.9"

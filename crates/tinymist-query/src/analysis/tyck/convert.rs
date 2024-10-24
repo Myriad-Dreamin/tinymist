@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn term_value(ctx: &mut AnalysisContext, value: &Value) -> Ty {
+pub fn term_value(ctx: &Arc<SharedContext>, value: &Value) -> Ty {
     match value {
         Value::Array(a) => {
             let values = a.iter().map(term_value_rec).collect::<Vec<_>>();
@@ -12,14 +12,14 @@ pub fn term_value(ctx: &mut AnalysisContext, value: &Value) -> Ty {
             // todo: create infer variables for plugin functions
             let values = p
                 .iter()
-                .map(|k| (k.as_str().into(), Ty::Func(SigTy::any()), Span::detached()))
+                .map(|k| (k.as_str().into(), Ty::Func(SigTy::any())))
                 .collect();
             Ty::Dict(RecordTy::new(values))
         }
         Value::Dict(d) => {
             let values = d
                 .iter()
-                .map(|(k, v)| (k.as_str().into(), term_value_rec(v), Span::detached()))
+                .map(|(k, v)| (k.as_str().into(), term_value_rec(v)))
                 .collect();
             Ty::Dict(RecordTy::new(values))
         }
@@ -27,7 +27,7 @@ pub fn term_value(ctx: &mut AnalysisContext, value: &Value) -> Ty {
             let values = m
                 .scope()
                 .iter()
-                .map(|(k, v, _)| (k.into(), term_value_rec(v), Span::detached()))
+                .map(|(k, v, _)| (k.into(), term_value_rec(v)))
                 .collect();
             Ty::Dict(RecordTy::new(values))
         }

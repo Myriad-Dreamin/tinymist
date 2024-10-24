@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
-expression: result
+expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/docs/not_attach2.typ
 ---
-<nil>
+= docstings

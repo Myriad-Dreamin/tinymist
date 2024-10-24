@@ -35,9 +35,9 @@ impl StatefulRequest for GotoDefinitionRequest {
         let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
         let origin_selection_range = ctx.to_lsp_range(deref_target.node().range(), &source);
 
-        let def = find_definition(ctx, source.clone(), doc.as_ref(), deref_target)?;
+        let def = find_definition(ctx.shared(), source.clone(), doc.as_ref(), deref_target)?;
 
-        let (fid, def_range) = def.def_at?;
+        let (fid, def_range) = def.def_at(ctx.shared())?;
 
         let uri = ctx.uri_for_id(fid).ok()?;
 

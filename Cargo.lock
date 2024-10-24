@@ -4266,6 +4266,7 @@ dependencies = [
  "reflexo",
  "reflexo-typst",
  "regex",
+ "rpds",
  "rust_iso3166",
  "rust_iso639",
  "rustc-hash 2.0.0",

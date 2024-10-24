@@ -552,7 +552,7 @@ fn import_item_completions<'a>(
     existing: ast::ImportItems<'a>,
     source: &LinkedNode,
 ) {
-    let Some(value) = ctx.ctx.analyze_import(source) else {
+    let Some(value) = ctx.ctx.analyze_import(source).1 else {
         return;
     };
     let Some(scope) = value.scope() else { return };

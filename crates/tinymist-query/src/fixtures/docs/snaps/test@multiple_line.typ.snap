@@ -1,7 +1,0 @@
----
-source: crates/tinymist-query/src/analysis.rs
-expression: result
-input_file: crates/tinymist-query/src/fixtures/docs/multiple_line.typ
----
-This is X.
-Note: this is not Y.

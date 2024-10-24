@@ -16,7 +16,6 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sync_lsp::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_query::analysis::Analysis;
 use tokio::sync::{mpsc, oneshot};
 use typst::layout::{Frame, FrameItem, Point, Position};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind, VirtualPath};
@@ -539,7 +538,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             // export_tx,
             export: Default::default(),
             editor_tx,
-            analysis: Analysis::default(),
+            analysis: Arc::default(),
             periscope: tinymist_render::PeriscopeRenderer::default(),
             notified_revision: parking_lot::Mutex::new(0),
         });

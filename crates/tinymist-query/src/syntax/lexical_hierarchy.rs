@@ -1,21 +1,15 @@
-use std::{
-    ops::{Deref, Range},
-    path::Path,
-};
+use std::ops::{Deref, Range};
 
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use ecow::{eco_vec, EcoString, EcoVec};
 use log::info;
 use lsp_types::SymbolKind;
 use serde::{Deserialize, Serialize};
 use typst::syntax::{
-    ast::{self, AstNode},
-    package::PackageSpec,
+    ast::{self},
     LinkedNode, Source, SyntaxKind,
 };
 use typst_shim::utils::LazyHash;
-
-use super::IdentRef;
 
 pub(crate) fn get_lexical_hierarchy(
     source: Source,
@@ -54,40 +48,6 @@ pub(crate) fn get_lexical_hierarchy(
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ModSrc {
-    /// `import cetz.draw ...`
-    ///  ^^^^^^^^^^^^^^^^^^^^
-    Expr(Box<IdentRef>),
-    /// `import "" ...`
-    ///  ^^^^^^^^^^^^^
-    Path(Box<str>),
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub enum LexicalModKind {
-    /// See [`ModSrc`]
-    Module(ModSrc),
-    /// `import "foo" as bar;`
-    ///                  ^^^
-    ModuleAlias,
-    /// `import "foo.typ"`
-    ///          ^^^
-    PathVar,
-    /// `include "foo.typ"`
-    ///           ^^^
-    PathInclude,
-    /// `import "foo": bar`
-    ///                ^^^
-    Ident,
-    /// `import "foo": bar as baz`
-    ///                ^^^^^^^^^^
-    Alias { target: Box<IdentRef> },
-    /// `import "foo": *`
-    ///                ^
-    Star,
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LexicalVarKind {
     /// `#foo`
     ///   ^^^
@@ -113,7 +73,6 @@ pub enum LexicalVarKind {
 pub enum LexicalKind {
     Heading(i16),
     Var(LexicalVarKind),
-    Mod(LexicalModKind),
     Block,
 }
 
@@ -122,50 +81,12 @@ impl LexicalKind {
         LexicalKind::Var(LexicalVarKind::Label)
     }
 
-    const fn label_ref() -> LexicalKind {
-        LexicalKind::Var(LexicalVarKind::LabelRef)
-    }
-
-    const fn val_ref() -> LexicalKind {
-        LexicalKind::Var(LexicalVarKind::ValRef)
-    }
-
     const fn function() -> LexicalKind {
         LexicalKind::Var(LexicalVarKind::Function)
     }
 
     const fn variable() -> LexicalKind {
         LexicalKind::Var(LexicalVarKind::Variable)
-    }
-
-    const fn module_as() -> LexicalKind {
-        LexicalKind::Mod(LexicalModKind::ModuleAlias)
-    }
-
-    const fn module_path() -> LexicalKind {
-        LexicalKind::Mod(LexicalModKind::PathVar)
-    }
-
-    const fn module_import() -> LexicalKind {
-        LexicalKind::Mod(LexicalModKind::Ident)
-    }
-
-    const fn module_star() -> LexicalKind {
-        LexicalKind::Mod(LexicalModKind::Star)
-    }
-
-    fn module_expr(path: Box<IdentRef>) -> LexicalKind {
-        LexicalKind::Mod(LexicalModKind::Module(ModSrc::Expr(path)))
-    }
-
-    fn module(path: Box<str>) -> LexicalKind {
-        LexicalKind::Mod(LexicalModKind::Module(ModSrc::Path(path)))
-    }
-
-    fn module_import_alias(alias: IdentRef) -> LexicalKind {
-        LexicalKind::Mod(LexicalModKind::Alias {
-            target: Box::new(alias),
-        })
     }
 }
 
@@ -178,7 +99,7 @@ impl TryFrom<LexicalKind> for SymbolKind {
             LexicalKind::Var(LexicalVarKind::Variable) => Ok(SymbolKind::VARIABLE),
             LexicalKind::Var(LexicalVarKind::Function) => Ok(SymbolKind::FUNCTION),
             LexicalKind::Var(LexicalVarKind::Label) => Ok(SymbolKind::CONSTANT),
-            LexicalKind::Var(..) | LexicalKind::Mod(..) | LexicalKind::Block => Err(()),
+            LexicalKind::Var(..) | LexicalKind::Block => Err(()),
         }
     }
 }
@@ -188,20 +109,11 @@ pub(crate) enum LexicalScopeKind {
     #[default]
     Symbol,
     Braced,
-    DefUse,
 }
 
 impl LexicalScopeKind {
     fn affect_symbol(&self) -> bool {
-        matches!(self, Self::DefUse | Self::Symbol)
-    }
-
-    fn affect_ref(&self) -> bool {
-        matches!(self, Self::DefUse)
-    }
-
-    fn affect_import(&self) -> bool {
-        matches!(self, Self::DefUse)
+        matches!(self, Self::Symbol)
     }
 
     fn affect_markup(&self) -> bool {
@@ -209,7 +121,7 @@ impl LexicalScopeKind {
     }
 
     fn affect_block(&self) -> bool {
-        matches!(self, Self::DefUse | Self::Braced)
+        matches!(self, Self::Braced)
     }
 
     fn affect_expr(&self) -> bool {
@@ -309,7 +221,6 @@ enum IdentContext {
     Ref,
     Func,
     Var,
-    ModImport,
     Params,
 }
 
@@ -321,14 +232,6 @@ struct LexicalHierarchyWorker {
 }
 
 impl LexicalHierarchyWorker {
-    fn push_leaf(&mut self, symbol: LexicalInfo) {
-        let current = &mut self.stack.last_mut().unwrap().1;
-        current.push(LexicalHierarchy {
-            info: symbol,
-            children: None,
-        });
-    }
-
     fn symbreak(&mut self) {
         let (symbol, children) = self.stack.pop().unwrap();
         let current = &mut self.stack.last_mut().unwrap().1;
@@ -378,9 +281,7 @@ impl LexicalHierarchyWorker {
             self.stack.push((symbol, eco_vec![]));
             let stack_height = self.stack.len();
 
-            if node.kind() == SyntaxKind::ModuleImport {
-                self.get_symbols_in_import(node)?;
-            } else {
+            if node.kind() != SyntaxKind::ModuleImport {
                 for child in node.children() {
                     self.get_symbols(child)?;
                 }
@@ -415,13 +316,8 @@ impl LexicalHierarchyWorker {
 
                     // reverse order for correct symbol affection
                     let name_offset = pattern.as_ref().map(|e| e.offset());
-                    if self.g == LexicalScopeKind::DefUse {
-                        self.get_symbols_in_first_expr(node.children().rev(), name_offset)?;
-                        self.get_symbols_in_opt_with(pattern, IdentContext::Var)?;
-                    } else {
-                        self.get_symbols_in_opt_with(pattern, IdentContext::Var)?;
-                        self.get_symbols_in_first_expr(node.children().rev(), name_offset)?;
-                    }
+                    self.get_symbols_in_opt_with(pattern, IdentContext::Var)?;
+                    self.get_symbols_in_first_expr(node.children().rev(), name_offset)?;
                 }
                 SyntaxKind::ForLoop => {
                     let pattern = node.children().find(|n| n.is::<ast::Pattern>());
@@ -448,14 +344,7 @@ impl LexicalHierarchyWorker {
                         .rev()
                         .find(|n| n.cast::<ast::Expr>().is_some());
                     if let Some(body) = body {
-                        let symbol = if self.g == LexicalScopeKind::DefUse {
-                            // DefUse mode does not nest symbols inside of functions
-                            LexicalInfo {
-                                name: EcoString::new(),
-                                kind: LexicalKind::Block,
-                                range: body.range(),
-                            }
-                        } else if current == self.stack.last().unwrap().1.len() {
+                        let symbol = if current == self.stack.last().unwrap().1.len() {
                             // Closure has no updated symbol stack
                             LexicalInfo {
                                 name: "<anonymous>".into(),
@@ -472,36 +361,11 @@ impl LexicalHierarchyWorker {
                         self.stack.push((symbol, eco_vec![]));
                         let stack_height = self.stack.len();
 
-                        if self.g == LexicalScopeKind::DefUse {
-                            let param = node.children().find(|n| n.kind() == SyntaxKind::Params);
-                            self.get_symbols_in_opt_with(param, IdentContext::Params)?;
-                        }
-
                         self.get_symbols_with(body, IdentContext::Ref)?;
                         while stack_height <= self.stack.len() {
                             self.symbreak();
                         }
                     }
-                }
-                SyntaxKind::RenamedImportItem if self.g.affect_import() => {
-                    let src = node
-                        .cast::<ast::RenamedImportItem>()
-                        .ok_or_else(|| anyhow!("cast to renamed import item failed: {:?}", node))?;
-
-                    let origin_name = src.new_name();
-                    let origin_name_node = node.find(origin_name.span()).context("no pos")?;
-
-                    let target_name = src.original_name();
-                    let target_name_node = node.find(target_name.span()).context("no pos")?;
-
-                    self.push_leaf(LexicalInfo {
-                        name: origin_name.get().clone(),
-                        kind: LexicalKind::module_import_alias(IdentRef {
-                            name: target_name.get().clone(),
-                            range: target_name_node.range(),
-                        }),
-                        range: origin_name_node.range(),
-                    });
                 }
                 SyntaxKind::FieldAccess => {
                     self.get_symbols_in_first_expr(node.children(), None)?;
@@ -594,20 +458,14 @@ impl LexicalHierarchyWorker {
 
                 (name, LexicalKind::label())
             }
-            SyntaxKind::RefMarker if self.g.affect_ref() => {
-                let name = node.text().trim_start_matches('@').into();
-                (name, LexicalKind::label_ref())
-            }
             SyntaxKind::Ident if self.g.affect_symbol() => {
                 let ast_node = node
                     .cast::<ast::Ident>()
                     .ok_or_else(|| anyhow!("cast to ast node failed: {:?}", node))?;
                 let name = ast_node.get().clone();
                 let kind = match self.ident_context {
-                    IdentContext::Ref if self.g.affect_ref() => LexicalKind::val_ref(),
                     IdentContext::Func => LexicalKind::function(),
                     IdentContext::Var | IdentContext::Params => LexicalKind::variable(),
-                    IdentContext::ModImport => LexicalKind::module_import(),
                     _ => return Ok(None),
                 };
 
@@ -629,30 +487,6 @@ impl LexicalHierarchyWorker {
                 if self.g.affect_expr() =>
             {
                 (EcoString::new(), LexicalKind::Block)
-            }
-            SyntaxKind::ModuleImport if self.g.affect_import() => {
-                let src = node
-                    .cast::<ast::ModuleImport>()
-                    .ok_or_else(|| anyhow!("cast to module import failed: {:?}", node))?
-                    .source();
-
-                match src {
-                    ast::Expr::Str(e) => {
-                        let e = e.get();
-                        (EcoString::new(), LexicalKind::module(e.as_ref().into()))
-                    }
-                    src => {
-                        let e = node
-                            .find(src.span())
-                            .ok_or_else(|| anyhow!("find expression failed: {:?}", src))?;
-                        let e = IdentRef {
-                            name: EcoString::new(),
-                            range: e.range(),
-                        };
-
-                        (EcoString::new(), LexicalKind::module_expr(e.into()))
-                    }
-                }
             }
             SyntaxKind::Markup => {
                 let name = node.get().to_owned().into_text();
@@ -679,96 +513,6 @@ impl LexicalHierarchyWorker {
             kind,
             range: node.range(),
         }))
-    }
-
-    fn get_symbols_in_import(&mut self, node: LinkedNode) -> anyhow::Result<()> {
-        // todo: other kind
-        if self.g != LexicalScopeKind::DefUse {
-            return Ok(());
-        }
-
-        let import_node = node.cast::<ast::ModuleImport>().context("not a import")?;
-        let v = import_node.source();
-        let v_linked = node.find(v.span()).context("no source pos")?;
-        match v {
-            ast::Expr::Str(..) => {}
-            _ => {
-                self.get_symbols_with(v_linked.clone(), IdentContext::Ref)?;
-            }
-        }
-
-        let imports = import_node.imports();
-        if let Some(name) = import_node.new_name() {
-            // push `import "foo" as bar;`
-            //                       ^^^
-            let import_node = node.find(name.span()).context("no pos")?;
-            self.push_leaf(LexicalInfo {
-                name: name.get().clone(),
-                kind: LexicalKind::module_as(),
-                range: import_node.range(),
-            });
-
-            // note: we can have both:
-            // `import "foo" as bar;`
-            // `import "foo": bar as baz;`
-        } else if imports.is_none() {
-            let v = import_node.source();
-            match v {
-                ast::Expr::Str(e) => {
-                    let e = e.get();
-
-                    let name = if e.starts_with('@') {
-                        let spec = e
-                            .parse::<PackageSpec>()
-                            .map_err(|e| anyhow!("parse package spec failed: {:?}", e))?;
-                        spec.name.clone()
-                    } else {
-                        let e = Path::new(e.as_ref())
-                            .file_name()
-                            .context("no file name")?
-                            .to_string_lossy();
-                        let e = e.as_ref();
-                        e.strip_suffix(".typ").context("no suffix")?.into()
-                    };
-
-                    // return (e == name).then_some(ImportRef::Path(v));
-                    self.push_leaf(LexicalInfo {
-                        name,
-                        kind: LexicalKind::module_path(),
-                        range: v_linked.range(),
-                    });
-                }
-                _ => {
-                    // todo: import expr?
-                }
-            }
-            return Ok(());
-        };
-
-        let Some(imports) = imports else {
-            return Ok(());
-        };
-
-        match imports {
-            ast::Imports::Wildcard => {
-                let wildcard = node
-                    .children()
-                    .find(|node| node.kind() == SyntaxKind::Star)
-                    .context("no star")?;
-                let v = node.find(wildcard.span()).context("no pos")?;
-                self.push_leaf(LexicalInfo {
-                    name: "*".into(),
-                    kind: LexicalKind::module_star(),
-                    range: v.range(),
-                });
-            }
-            ast::Imports::Items(items) => {
-                let n = node.find(items.span()).context("no pos")?;
-                self.get_symbols_with(n, IdentContext::ModImport)?;
-            }
-        }
-
-        Ok(())
     }
 }
 

@@ -42,7 +42,12 @@ impl StatefulRequest for RenameRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
 
-        let lnk = find_definition(ctx, source.clone(), doc.as_ref(), deref_target.clone())?;
+        let lnk = find_definition(
+            ctx.shared(),
+            source.clone(),
+            doc.as_ref(),
+            deref_target.clone(),
+        )?;
 
         prepare_renaming(ctx, &deref_target, &lnk)?;
 
@@ -57,7 +62,7 @@ impl StatefulRequest for RenameRequest {
                     self.new_name
                 };
 
-                let def_fid = lnk.def_at?.0;
+                let def_fid = lnk.def_at(ctx.shared())?.0;
                 let old_path = ctx.path_for_id(def_fid).ok()?;
 
                 let rename_loc = Path::new(ref_path_str.as_str());
@@ -97,13 +102,13 @@ impl StatefulRequest for RenameRequest {
 
                 let mut edits = HashMap::new();
 
-                let (def_fid, _def_range) = lnk.def_at?;
+                let (def_fid, _def_range) = lnk.def_at(ctx.shared())?;
                 let def_loc = {
                     let def_source = ctx.source_by_id(def_fid).ok()?;
 
                     let uri = ctx.uri_for_id(def_fid).ok()?;
 
-                    let Some(range) = lnk.name_range else {
+                    let Some(range) = lnk.name_range(ctx.shared()) else {
                         log::warn!("rename: no name range");
                         return None;
                     };
@@ -147,18 +152,22 @@ pub(crate) fn do_rename_file(
         let ref_src = ctx.source_by_id(*ref_fid).ok()?;
         let uri = ctx.uri_for_id(*ref_fid).ok()?;
 
-        let Some(import_info) = ctx.import_info(ref_src.clone()) else {
-            continue;
-        };
+        let import_info = ctx.expr_stage(&ref_src);
 
         let edits = edits.entry(uri).or_default();
-        for (rng, importing_src) in &import_info.imports {
-            let importing = importing_src.as_ref().map(|s| s.id());
-            if importing.map_or(true, |i| i != def_fid) {
-                continue;
-            }
-            log::debug!("import: {rng:?} -> {importing:?} v.s. {def_fid:?}");
-            rename_importer(ctx, &ref_src, rng.clone(), &diff, edits);
+        for rng in &import_info.imports {
+            let _ = diff;
+            let _ = edits;
+            let _ = rng;
+            let _ = rename_importer;
+
+            // let importing = importing_src.as_ref().map(|s| s.id());
+            // if importing.map_or(true, |i| i != def_fid) {
+            //     continue;
+            // }
+            // log::debug!("import: {rng:?} -> {importing:?} v.s. {def_fid:?}");
+            // rename_importer(ctx, &ref_src, rng.clone(), &diff, edits);
+            todo!()
         }
     }
 
