@@ -27,10 +27,11 @@ impl SemanticRequest for SemanticTokensDeltaRequest {
     /// document.
     fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
+        let ei = ctx.expr_stage(&source);
 
         let token_ctx = &ctx.analysis.tokens_ctx;
         let (tokens, result_id) =
-            token_ctx.semantic_tokens_delta(&source, &self.previous_result_id);
+            token_ctx.semantic_tokens_delta(&source, ei, &self.previous_result_id);
 
         match tokens {
             Ok(edits) => Some(
