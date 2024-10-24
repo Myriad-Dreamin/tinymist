@@ -113,7 +113,10 @@ impl ExprInfo {
 
     pub fn is_exported(&self, decl: &Interned<Decl>) -> bool {
         let of = Expr::Decl(decl.clone());
-        self.exports.get(decl.name()).map_or(false, |e| *e == of)
+        self.exports.get(decl.name()).map_or(false, |e| match e {
+            Expr::Ref(r) => r.root == Some(of),
+            e => *e == of,
+        })
     }
 
     #[allow(dead_code)]
@@ -680,20 +683,21 @@ impl ExprWorker {
                 root = Some(sel)
             }
 
+            let (root, step) = extract_ref(root);
             let mut ref_expr = Interned::new(RefExpr {
                 decl: old.clone(),
-                root: root.clone(),
-                step: root.clone(),
-                val: val.clone(),
+                root,
+                step,
+                val,
             });
             self.resolve_as(ref_expr.clone());
 
             if let Some(new) = &rename {
                 ref_expr = Interned::new(RefExpr {
                     decl: new.clone(),
-                    root: root.clone(),
-                    step: Some(old.clone().into()),
-                    val: val.clone(),
+                    root: ref_expr.root.clone(),
+                    step: Some(ref_expr.decl.clone().into()),
+                    val: ref_expr.val.clone(),
                 });
                 self.resolve_as(ref_expr.clone());
             }
@@ -940,20 +944,13 @@ impl ExprWorker {
 
     fn resolve_ident_(&mut self, decl: DeclExpr, mode: InterpretMode) -> RefExpr {
         let (step, val) = self.eval_ident(decl.name(), mode);
+        let (root, step) = extract_ref(step);
 
-        match step {
-            Some(Expr::Ref(r)) => RefExpr {
-                decl,
-                root: r.root.clone(),
-                step: Some(r.decl.clone().into()),
-                val,
-            },
-            step => RefExpr {
-                decl,
-                root: step.clone(),
-                step,
-                val,
-            },
+        RefExpr {
+            decl,
+            root,
+            step,
+            val,
         }
     }
 
@@ -1090,6 +1087,13 @@ impl ExprWorker {
             }
             _ => None,
         }
+    }
+}
+
+fn extract_ref(step: Option<Expr>) -> (Option<Expr>, Option<Expr>) {
+    match step {
+        Some(Expr::Ref(r)) => (r.root.clone(), Some(r.decl.clone().into())),
+        step => (step.clone(), step),
     }
 }
 
