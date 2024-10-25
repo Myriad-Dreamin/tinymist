@@ -439,6 +439,10 @@ impl<'a> ExprWorker<'a> {
                 }
             }
 
+            if inputs.is_empty() {
+                spread_right = spread_left.take();
+            }
+
             let pattern = Pattern {
                 pos: inputs,
                 named: names,
@@ -489,6 +493,10 @@ impl<'a> ExprWorker<'a> {
                             }
                         }
                     }
+                }
+
+                if inputs.is_empty() {
+                    spread_right = spread_left.take();
                 }
 
                 let pattern = Pattern {

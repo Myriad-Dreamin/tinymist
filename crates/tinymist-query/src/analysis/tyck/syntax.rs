@@ -265,7 +265,7 @@ impl<'a> TypeChecker<'a> {
         let docstring = self.check_docstring(&def_id);
         let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
-        log::debug!("check closure: {:?} -> {docstring:#?}", def_id.name());
+        log::debug!("check closure: {func:?} with docs {docstring:#?}");
 
         let mut pos_docs = vec![];
         let mut named_docs = BTreeMap::new();
