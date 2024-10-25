@@ -320,8 +320,8 @@ fn def_tooltip(
             Some(LspHoverContents::Array(results))
         }
         Pattern(..) | Docs(..) | Generated(..) | ImportAlias(..) | Constant(..) | IdentRef(..)
-        | ModuleAlias(..) | Module(..) | Import(..) | Ref(..) | StrName(..) | ModuleImport(..)
-        | Content(..) | IncludePath(..) | Spread(..) => None,
+        | ModuleAlias(..) | Module(..) | Import(..) | ContentRef(..) | StrName(..)
+        | ModuleImport(..) | Content(..) | IncludePath(..) | Spread(..) => None,
     }
 }
 

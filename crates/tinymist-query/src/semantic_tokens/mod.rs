@@ -448,7 +448,7 @@ fn token_from_decl_expr(expr: &Expr, term: Option<&Ty>, modifier: &mut ModifierS
             IdentRef(..) => TokenType::Interpolated,
             IncludePath(..) => TokenType::Interpolated,
             Import(..) => TokenType::Interpolated,
-            Ref(..) => TokenType::Interpolated,
+            ContentRef(..) => TokenType::Interpolated,
             Label(..) => TokenType::Interpolated,
             StrName(..) => TokenType::Interpolated,
             ModuleImport(..) => TokenType::Interpolated,

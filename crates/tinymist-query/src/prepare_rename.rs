@@ -94,7 +94,7 @@ pub(crate) fn prepare_renaming(
             Some((name, None))
         }
         // todo: label renaming, bibkey renaming
-        BibEntry(..) | Label(..) | Ref(..) => None,
+        BibEntry(..) | Label(..) | ContentRef(..) => None,
         ImportAlias(..) | Module(..) | Constant(..) | IdentRef(..) | Import(..) | StrName(..)
         | Spread(..) => None,
         Pattern(..) | Content(..) | Generated(..) | Docs(..) => None,

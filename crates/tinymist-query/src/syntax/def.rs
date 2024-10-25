@@ -177,7 +177,7 @@ pub enum Decl {
     PathStem(SpannedDecl),
     IncludePath(SpannedDecl),
     Import(SpannedDecl),
-    Ref(SpannedDecl),
+    ContentRef(SpannedDecl),
     Label(SpannedDecl),
     StrName(SpannedDecl),
     ModuleImport(SpanDecl),
@@ -267,7 +267,7 @@ impl Decl {
     }
 
     pub fn ref_(ident: ast::Ref) -> Self {
-        Self::Ref(SpannedDecl {
+        Self::ContentRef(SpannedDecl {
             name: ident.target().into(),
             at: ident.span(),
         })

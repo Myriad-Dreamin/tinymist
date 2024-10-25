@@ -127,7 +127,12 @@ impl ExprInfo {
         let of = Some(Expr::Decl(decl.clone()));
         self.resolves
             .iter()
-            .filter(move |(_, r)| r.decl == decl || r.root == of)
+            .filter(move |(_, r)| match (decl.as_ref(), r.decl.as_ref()) {
+                (Decl::Label(..), Decl::Label(..)) => r.decl == decl,
+                (Decl::Label(..), Decl::ContentRef(..)) => r.decl.name() == decl.name(),
+                (Decl::Label(..), _) => false,
+                _ => r.decl == decl || r.root == of,
+            })
     }
 
     pub fn is_exported(&self, decl: &Interned<Decl>) -> bool {
@@ -922,13 +927,22 @@ impl<'a> ExprWorker<'a> {
     }
 
     fn check_ref(&mut self, r: ast::Ref) -> Expr {
-        let ident = Decl::ref_(r).into();
+        let ident = Interned::new(Decl::ref_(r));
         let body = r.supplement().map(|s| self.check(ast::Expr::Content(s)));
         let ref_expr = ContentRefExpr {
-            ident,
+            ident: ident.clone(),
             of: None,
             body,
         };
+        self.resolve_as(
+            RefExpr {
+                decl: ident,
+                step: None,
+                root: None,
+                val: None,
+            }
+            .into(),
+        );
         Expr::ContentRef(ref_expr.into())
     }
 
