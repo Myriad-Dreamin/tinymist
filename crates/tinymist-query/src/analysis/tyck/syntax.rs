@@ -260,6 +260,7 @@ impl<'a> TypeChecker<'a> {
 
     fn check_func(&mut self, func: &Interned<FuncExpr>) -> Ty {
         let def_id = func.decl.clone();
+        let var = Ty::Var(self.get_var(&def_id));
 
         let docstring = self.check_docstring(&def_id);
         let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
@@ -399,17 +400,19 @@ impl<'a> TypeChecker<'a> {
         }
 
         let sig = SigTy::new(pos.into_iter(), named, None, rest, Some(res_ty)).into();
-        let sig = Ty::Func(sig);
-        if defaults.is_empty() {
-            return sig;
-        }
-
-        let defaults: Vec<(Interned<str>, Ty)> = defaults.into_iter().collect();
-        let with_defaults = SigWithTy {
-            sig: sig.into(),
-            with: ArgsTy::new([].into_iter(), defaults, None, None, None).into(),
+        let sig = if defaults.is_empty() {
+            Ty::Func(sig)
+        } else {
+            let defaults: Vec<(Interned<str>, Ty)> = defaults.into_iter().collect();
+            let with_defaults = SigWithTy {
+                sig: Ty::Func(sig).into(),
+                with: ArgsTy::new([].into_iter(), defaults, None, None, None).into(),
+            };
+            Ty::With(with_defaults.into())
         };
-        Ty::With(with_defaults.into())
+
+        self.constrain(&sig, &var);
+        sig
     }
 
     fn check_let(&mut self, let_expr: &Interned<LetExpr>) -> Ty {
@@ -525,12 +528,7 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_decl(&mut self, decl: &Interned<Decl>) -> Ty {
-        // self.get_var(&root, root.cast()?).map(Ty::Var).or_else(|| {
-        //     let s = root.span();
-        //     let v = resolve_global_value(self.ctx, root, mode ==
-        // InterpretMode::Math)?;     Some(Ty::Value(InsTy::new_at(v, s)))
-        // })
-        Ty::Any
+        Ty::Var(self.get_var(decl))
     }
 
     fn check_star(&mut self) -> Ty {

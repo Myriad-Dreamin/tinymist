@@ -107,6 +107,7 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn get_var(&mut self, decl: &DeclExpr) -> Interned<TypeVar> {
+        log::debug!("get_var {decl:?}");
         let entry = self.info.vars.entry(decl.clone()).or_insert_with(|| {
             let name = decl.name().clone();
             let decl = decl.clone();
