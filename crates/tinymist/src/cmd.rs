@@ -624,45 +624,4 @@ impl LanguageState {
             res.map_err(internal_error)?
         })
     }
-
-    /// Check package
-    pub fn check_package(
-        &mut self,
-        info: PackageInfo,
-    ) -> LspResult<impl Future<Output = LspResult<()>>> {
-        let handle: std::sync::Arc<actor::typ_client::CompileHandler> =
-            self.primary().handle.clone();
-        let snap = handle.snapshot().map_err(z_internal_error)?;
-        Ok(async move {
-            let snap = snap.receive().await.map_err(z_internal_error)?;
-            let w = snap.world.as_ref();
-
-            let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
-                let toml_id = tinymist_query::docs::get_manifest_id(&info)?;
-                let toml_path = w.path_for_id(toml_id)?;
-                let pkg_root = toml_path.parent().ok_or_else(|| {
-                    eco_format!("cannot get package root (parent of {toml_path:?})")
-                })?;
-
-                let manifest = tinymist_query::docs::get_manifest(w, toml_id)?;
-                let entry_point = toml_id.join(&manifest.package.entrypoint);
-
-                Ok(EntryState::new_rooted(pkg_root.into(), Some(entry_point)))
-            });
-            let entry = entry.map_err(|e| internal_error(e.to_string()))?;
-
-            let w = snap.world.task(TaskInputs {
-                entry: Some(entry),
-                inputs: None,
-            });
-
-            let res = handle.run_analysis(&w, |a| {
-                tinymist_query::docs::check_package(a, &info)
-                    .map_err(map_string_err("failed to generate docs"))
-                    .map_err(z_internal_error)
-            });
-
-            res.map_err(internal_error)?
-        })
-    }
 }

@@ -34,8 +34,6 @@ pub enum TokenType {
     Number,
     Function,
     Decorator,
-    Type,
-    Namespace,
     // Custom types
     Bool,
     Punctuation,
@@ -74,8 +72,6 @@ impl From<TokenType> for SemanticTokenType {
             Number => Self::NUMBER,
             Function => Self::FUNCTION,
             Decorator => Self::DECORATOR,
-            Type => Self::TYPE,
-            Namespace => Self::NAMESPACE,
             Bool => BOOL,
             Punctuation => PUNCTUATION,
             Escape => ESCAPE,
@@ -105,17 +101,14 @@ pub enum Modifier {
     Strong,
     Emph,
     Math,
-    ReadOnly,
-    Static,
-    DefaultLibrary,
 }
 
 impl Modifier {
-    pub const fn index(self) -> u8 {
+    pub fn index(self) -> u8 {
         self as u8
     }
 
-    pub const fn bitmask(self) -> u32 {
+    pub fn bitmask(self) -> u32 {
         0b1 << self.index()
     }
 }
@@ -128,9 +121,6 @@ impl From<Modifier> for SemanticTokenModifier {
             Strong => STRONG,
             Emph => EMPH,
             Math => MATH,
-            ReadOnly => Self::READONLY,
-            Static => Self::STATIC,
-            DefaultLibrary => Self::DEFAULT_LIBRARY,
         }
     }
 }

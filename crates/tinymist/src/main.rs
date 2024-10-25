@@ -277,21 +277,6 @@ pub fn query_main(cmds: QueryCommands) -> anyhow::Result<()> {
                     let output_path = Path::new(&args.output);
                     std::fs::write(output_path, res).map_err(internal_error)?;
                 }
-                QueryCommands::CheckPackage(args) => {
-                    let pkg = PackageSpec::from_str(&args.id).unwrap();
-                    let path = args.path.map(PathBuf::from);
-                    let path = path
-                        .unwrap_or_else(|| w.world.registry.resolve(&pkg).unwrap().as_ref().into());
-
-                    state
-                        .check_package(PackageInfo {
-                            path,
-                            namespace: pkg.namespace,
-                            name: pkg.name,
-                            version: pkg.version.to_string(),
-                        })?
-                        .await?;
-                }
             };
 
             LspResult::Ok(())

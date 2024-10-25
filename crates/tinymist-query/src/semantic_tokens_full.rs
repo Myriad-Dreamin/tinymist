@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, SemanticTokenContext};
 
 /// The [`textDocument/semanticTokens/full`] request is sent from the client to
 /// the server to resolve the semantic tokens of a given file.
@@ -22,15 +22,14 @@ pub struct SemanticTokensFullRequest {
     pub path: PathBuf,
 }
 
-impl SemanticRequest for SemanticTokensFullRequest {
-    type Response = SemanticTokensResult;
-
+impl SemanticTokensFullRequest {
     /// Handles the request to compute the semantic tokens for a given document.
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
-        let source = ctx.source_by_path(&self.path).ok()?;
-        let ei = ctx.expr_stage(&source);
-        let token_ctx = &ctx.analysis.tokens_ctx;
-        let (tokens, result_id) = token_ctx.semantic_tokens_full(&source, ei);
+    pub fn request(
+        self,
+        ctx: &SemanticTokenContext,
+        source: Source,
+    ) -> Option<SemanticTokensResult> {
+        let (tokens, result_id) = ctx.get_semantic_tokens_full(&source);
 
         Some(
             SemanticTokens {
@@ -132,9 +131,13 @@ mod tests {
     #[test]
     fn test() {
         snapshot_testing("semantic_tokens", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
             let request = SemanticTokensFullRequest { path: path.clone() };
 
-            let mut result = request.request(ctx).unwrap();
+            let cache = SemanticTokenContext::default();
+
+            let mut result = request.request(&cache, source).unwrap();
             if let SemanticTokensResult::Tokens(tokens) = &mut result {
                 tokens.result_id.take();
             }
