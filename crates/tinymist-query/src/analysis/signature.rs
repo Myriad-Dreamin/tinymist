@@ -225,7 +225,7 @@ pub struct PartialSignature {
 #[derive(Debug, Clone)]
 pub enum SignatureTarget {
     /// A static node without knowing the function at runtime.
-    Def(Definition),
+    Def(Option<Source>, Definition),
     /// A static node without knowing the function at runtime.
     SyntaxFast(Source, Span),
     /// A static node without knowing the function at runtime.
@@ -258,11 +258,9 @@ fn analyze_type_signature(
             let ty = type_info.type_of_span(*span)?;
             Some((type_info, ty))
         }
-        SignatureTarget::Def(def) => {
+        SignatureTarget::Def(source, def) => {
             let span = def.decl.span();
-            let fid = span.id()?;
-            let source = ctx.source_by_id(fid).ok()?;
-            let type_info = ctx.type_check(&source)?;
+            let type_info = ctx.type_check(source.as_ref()?)?;
             let ty = type_info.type_of_span(span)?;
             Some((type_info, ty))
         }
@@ -467,7 +465,7 @@ fn analyze_dyn_signature(
     callee_node: &SignatureTarget,
 ) -> Option<Signature> {
     let func = match callee_node {
-        SignatureTarget::Def(def) => def.value()?.to_func()?,
+        SignatureTarget::Def(_source, def) => def.value()?.to_func()?,
         SignatureTarget::SyntaxFast(..) => return None,
         SignatureTarget::Syntax(source, span) => {
             let target = ctx.deref_syntax(source, *span)?;

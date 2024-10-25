@@ -680,7 +680,8 @@ impl SharedContext {
 
     pub(crate) fn signature_def(self: &Arc<Self>, def: Definition) -> Option<Signature> {
         log::debug!("check definition func {def:?}");
-        analyze_signature(self, SignatureTarget::Def(def))
+        let source = def.decl.file_id().and_then(|f| self.source_by_id(f).ok());
+        analyze_signature(self, SignatureTarget::Def(source, def))
     }
 
     pub(crate) fn signature_dyn(self: &Arc<Self>, func: Func) -> Signature {
@@ -804,11 +805,11 @@ impl SharedContext {
         compute: impl FnOnce(&Arc<Self>) -> Option<Signature> + Send + Sync + 'static,
     ) -> Option<Signature> {
         let res = match func {
-            SignatureTarget::Def(d) => self
+            SignatureTarget::Def(src, d) => self
                 .analysis
                 .caches
                 .def_signatures
-                .entry(hash128(&d))
+                .entry(hash128(&(src, d.clone())))
                 .or_insert_with(|| (self.lifetime, d, Arc::default()))
                 .2
                 .clone(),

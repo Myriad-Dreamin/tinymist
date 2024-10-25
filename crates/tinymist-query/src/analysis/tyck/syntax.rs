@@ -287,20 +287,12 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_unary(&mut self, unary: &Interned<UnExpr>) -> Ty {
-        // if let Some(constant) = self.ctx.mini_eval(ast::Expr::Unary(unary)) {
-        //     return Some(Ty::Value(InsTy::new(constant)));
-        // }
-
         let op = unary.op;
         let lhs = self.check(&unary.lhs);
         Ty::Unary(TypeUnary::new(op, lhs))
     }
 
     fn check_binary(&mut self, binary: &Interned<BinExpr>) -> Ty {
-        // if let Some(constant) = self.ctx.mini_eval(ast::Expr::Binary(binary)) {
-        //     return Some(Ty::Value(InsTy::new(constant)));
-        // }
-
         let op = binary.op;
         let [lhs, rhs] = binary.operands();
         let lhs = self.check(lhs);
@@ -339,8 +331,6 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_select(&mut self, select: &Interned<SelectExpr>) -> Ty {
-        // let field_access: ast::FieldAccess = root.cast()?;
-
         let select_site = select.span;
         let ty = self.check(&select.lhs);
         let field = select.key.name().clone();
