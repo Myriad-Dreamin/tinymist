@@ -213,6 +213,7 @@ pub enum BuiltinTy {
     TextLang,
     TextRegion,
 
+    Label,
     CiteLabel,
     RefLabel,
     Dir,
@@ -253,6 +254,7 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::TextRegion => write!(f, "TextRegion"),
             BuiltinTy::Dir => write!(f, "Dir"),
             BuiltinTy::Length => write!(f, "Length"),
+            BuiltinTy::Label => write!(f, "Label"),
             BuiltinTy::CiteLabel => write!(f, "CiteLabel"),
             BuiltinTy::RefLabel => write!(f, "RefLabel"),
             BuiltinTy::Float => write!(f, "Float"),
@@ -333,6 +335,7 @@ impl BuiltinTy {
             BuiltinTy::Dir => "dir",
             BuiltinTy::Length => "length",
             BuiltinTy::Float => "float",
+            BuiltinTy::Label => "label",
             BuiltinTy::CiteLabel => "cite-label",
             BuiltinTy::RefLabel => "ref-label",
             BuiltinTy::Stroke => "stroke",

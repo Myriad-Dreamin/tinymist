@@ -533,7 +533,12 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_decl(&mut self, decl: &Interned<Decl>) -> Ty {
-        Ty::Var(self.get_var(decl))
+        let v = Ty::Var(self.get_var(decl));
+        if let Decl::Label(..) = decl.as_ref() {
+            self.constrain(&v, &Ty::Builtin(BuiltinTy::Label));
+        }
+
+        v
     }
 
     fn check_star(&mut self) -> Ty {

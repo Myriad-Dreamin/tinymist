@@ -281,8 +281,9 @@ impl<'w> AnalysisContext<'w> {
         let source = self.source_by_id(id).ok()?;
         let ty_chk = self.type_check(&source)?;
 
-        post_type_check(self.shared_(), &ty_chk, k.clone())
-            .or_else(|| ty_chk.type_of_span(k.span()))
+        let ty = post_type_check(self.shared_(), &ty_chk, k.clone())
+            .or_else(|| ty_chk.type_of_span(k.span()))?;
+        Some(ty_chk.simplify(ty, false))
     }
 
     /// Get module import at location.
@@ -676,7 +677,12 @@ impl SharedContext {
         definition(self, source, doc, deref_target)
     }
 
-    /// Try to load a module from the current source file.
+    /// Try to find imported target from the current source file.
+    /// This function will try to resolves target statically.
+    ///
+    /// ## Returns
+    /// The first value is the resolved source.
+    /// The second value is the resolved scope.
     pub fn analyze_import(&self, source: &SyntaxNode) -> (Option<Value>, Option<Value>) {
         if let Some(v) = source.cast::<ast::Expr>().and_then(Self::const_eval) {
             return (Some(v), None);
@@ -757,6 +763,22 @@ impl SharedContext {
             route.track(),
             &source,
         )
+    }
+
+    /// Try to load a module from the current source file.
+    pub fn module_by_syntax(&self, source: &SyntaxNode) -> Option<Value> {
+        let (src, scope) = self.analyze_import(source);
+        if let Some(scope) = scope {
+            return Some(scope);
+        }
+
+        match src {
+            Some(Value::Str(s)) => {
+                let id = resolve_id_by_path(&self.world, source.span().id()?, s.as_str())?;
+                self.module_by_id(id).ok().map(Value::Module)
+            }
+            _ => None,
+        }
     }
 
     /// Compute the signature of a function.
