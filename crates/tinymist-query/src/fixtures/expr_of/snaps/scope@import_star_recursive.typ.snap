@@ -4,10 +4,10 @@ expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/import_star_recursive.typ
 ---
 = resolves
-ModuleImport(..)@1..22 in \s2.typ -> Module(base2)@0..0 in \base2.typ, root Module(base2)@0..0 in \base2.typ, val: None
-ImportPath(base2)@8..19 in \s2.typ -> Module(base2)@0..0 in \base2.typ, root Module(base2)@0..0 in \base2.typ, val: None
-IdentRef(x)@24..25 in \s2.typ -> Var(x)@0..0 in \base.typ, root Var(x)@0..0 in \base.typ, val: None
-IdentRef(y)@28..29 in \s2.typ -> Var(y)@0..0 in \base2.typ, root Var(y)@0..0 in \base2.typ, val: None
+ModuleImport(..)@1..22 in /s2.typ -> Module(base2)@0..0 in /base2.typ, root Module(base2)@0..0 in /base2.typ, val: None
+ImportPath(base2)@8..19 in /s2.typ -> Module(base2)@0..0 in /base2.typ, root Module(base2)@0..0 in /base2.typ, val: None
+IdentRef(x)@24..25 in /s2.typ -> Var(x)@0..0 in /base.typ, root Var(x)@0..0 in /base.typ, val: None
+IdentRef(y)@28..29 in /s2.typ -> Var(y)@0..0 in /base2.typ, root Var(y)@0..0 in /base2.typ, val: None
 = exports
-x -> Var(x)@0..0 in \base.typ
-y -> Var(y)@0..0 in \base2.typ
+x -> Var(x)@0..0 in /base.typ
+y -> Var(y)@0..0 in /base2.typ

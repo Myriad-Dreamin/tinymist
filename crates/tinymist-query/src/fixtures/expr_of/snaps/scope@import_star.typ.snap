@@ -4,12 +4,12 @@ expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/import_star.typ
 ---
 = resolves
-ModuleImport(..)@26..46 in \s1.typ -> Module(base)@0..0 in \base.typ, root Module(base)@0..0 in \base.typ, val: None
-PathStem(base)@8..18 in \s1.typ -> Module(base)@0..0 in \base.typ, root Module(base)@0..0 in \base.typ, val: None
-IdentRef(base)@20..24 in \s1.typ -> PathStem(base)@8..18 in \s1.typ, root Module(base)@0..0 in \base.typ, val: None
-ImportPath(base)@33..43 in \s1.typ -> Module(base)@0..0 in \base.typ, root Module(base)@0..0 in \base.typ, val: None
-IdentRef(base)@48..52 in \s1.typ -> PathStem(base)@8..18 in \s1.typ, root Module(base)@0..0 in \base.typ, val: None
-IdentRef(x)@55..56 in \s1.typ -> Var(x)@0..0 in \base.typ, root Var(x)@0..0 in \base.typ, val: None
+ModuleImport(..)@26..46 in /s1.typ -> Module(base)@0..0 in /base.typ, root Module(base)@0..0 in /base.typ, val: None
+PathStem(base)@8..18 in /s1.typ -> Module(base)@0..0 in /base.typ, root Module(base)@0..0 in /base.typ, val: None
+IdentRef(base)@20..24 in /s1.typ -> PathStem(base)@8..18 in /s1.typ, root Module(base)@0..0 in /base.typ, val: None
+ImportPath(base)@33..43 in /s1.typ -> Module(base)@0..0 in /base.typ, root Module(base)@0..0 in /base.typ, val: None
+IdentRef(base)@48..52 in /s1.typ -> PathStem(base)@8..18 in /s1.typ, root Module(base)@0..0 in /base.typ, val: None
+IdentRef(x)@55..56 in /s1.typ -> Var(x)@0..0 in /base.typ, root Var(x)@0..0 in /base.typ, val: None
 = exports
 base -> ref(PathStem(base), step = Module(base), root = Module(base))
-x -> Var(x)@0..0 in \base.typ
+x -> Var(x)@0..0 in /base.typ

@@ -71,6 +71,7 @@ mod matcher_tests {
 #[cfg(test)]
 mod expr_tests {
 
+    use reflexo::path::unix_slash;
     use typst::syntax::Source;
 
     use crate::syntax::{Expr, RefExpr};
@@ -86,7 +87,11 @@ mod expr_tests {
                 Expr::Decl(decl) => {
                     let range = self.range(decl.span()).unwrap_or_default();
                     let fid = if let Some(fid) = decl.file_id() {
-                        format!(" in {fid:?}")
+                        let vpath = fid.vpath().as_rooted_path();
+                        match fid.package() {
+                            Some(package) => format!(" in {package:?}{}", unix_slash(vpath)),
+                            None => format!(" in {}", unix_slash(vpath)),
+                        }
                     } else {
                         "".to_string()
                     };

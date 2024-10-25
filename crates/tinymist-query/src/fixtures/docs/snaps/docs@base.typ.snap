@@ -4,4 +4,4 @@ expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/docs/base.typ
 ---
 = docstings
-Pattern(..)@19..20 in \s0.typ -> DocString { docs: Some("This is X."), var_bounds: {}, vars: {}, res_ty: None }
+Pattern(..)@19..20 in /s0.typ -> DocString { docs: Some("This is X."), var_bounds: {}, vars: {}, res_ty: None }

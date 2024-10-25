@@ -4,10 +4,10 @@ expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/func.typ
 ---
 = resolves
-Var(a)@19..20 in \s0.typ -> Var(a)@19..20 in \s0.typ, root Var(a)@19..20 in \s0.typ, val: None
-IdentRef(a)@24..25 in \s0.typ -> Var(a)@19..20 in \s0.typ, root Var(a)@19..20 in \s0.typ, val: None
-Func(f)@17..18 in \s0.typ -> Func(f)@17..18 in \s0.typ, root Func(f)@17..18 in \s0.typ, val: None
-Var(x)@5..6 in \s0.typ -> Var(x)@5..6 in \s0.typ, root Var(x)@5..6 in \s0.typ, val: None
+Var(a)@19..20 in /s0.typ -> Var(a)@19..20 in /s0.typ, root Var(a)@19..20 in /s0.typ, val: None
+IdentRef(a)@24..25 in /s0.typ -> Var(a)@19..20 in /s0.typ, root Var(a)@19..20 in /s0.typ, val: None
+Func(f)@17..18 in /s0.typ -> Func(f)@17..18 in /s0.typ, root Func(f)@17..18 in /s0.typ, val: None
+Var(x)@5..6 in /s0.typ -> Var(x)@5..6 in /s0.typ, root Var(x)@5..6 in /s0.typ, val: None
 = exports
-f -> Func(f)@17..18 in \s0.typ
-x -> Var(x)@5..6 in \s0.typ
+f -> Func(f)@17..18 in /s0.typ
+x -> Var(x)@5..6 in /s0.typ
