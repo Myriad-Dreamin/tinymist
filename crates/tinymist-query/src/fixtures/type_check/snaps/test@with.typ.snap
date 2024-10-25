@@ -5,7 +5,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/with.typ
 ---
 "f" = (Any) => Any
 "g" = ((Any) => Any).with(..(1) => any)
-"x" = ( ⪰ Any | Type(integer) | Type(integer))
+"x" = ( ⪰ Type(integer) | Type(integer))
 "x" = 1
 ---
 5..6 -> @f
@@ -16,5 +16,5 @@ input_file: crates/tinymist-query/src/fixtures/type_check/with.typ
 24..30 -> (@x) => @x
 24..33 -> (@f).with(..(1) => any)
 40..41 -> @x
-44..45 -> (Any | @g)
+44..45 -> @g
 44..47 -> 1

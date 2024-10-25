@@ -38,7 +38,7 @@ impl SemanticRequest for SymbolRequest {
 
         // todo! need compilation for iter_dependencies
 
-        for path in ctx.resources.dependencies() {
+        for path in ctx.dependencies() {
             let Ok(source) = ctx.source_by_path(&path) else {
                 continue;
             };

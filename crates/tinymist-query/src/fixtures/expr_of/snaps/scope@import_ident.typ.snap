@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "snap.join(\"\\n\")"
+input_file: crates/tinymist-query/src/fixtures/expr_of/import_ident.typ
+---
+= resolves
+ModuleImport(..)@26..46 in /s0.typ -> Module(base)@0..0 in /base.typ, root Module(base)@0..0 in /base.typ, val: None
+PathStem(base)@8..18 in /s0.typ -> Module(base)@0..0 in /base.typ, root Module(base)@0..0 in /base.typ, val: None
+IdentRef(base)@20..24 in /s0.typ -> PathStem(base)@8..18 in /s0.typ, root Module(base)@0..0 in /base.typ, val: None
+ImportPath(base)@33..43 in /s0.typ -> Module(base)@0..0 in /base.typ, root Module(base)@0..0 in /base.typ, val: None
+IdentRef(base)@48..52 in /s0.typ -> PathStem(base)@8..18 in /s0.typ, root Module(base)@0..0 in /base.typ, val: None
+Import(x)@45..46 in /s0.typ -> (ModuleImport(..)).IdentRef(x), root (ModuleImport(..)).IdentRef(x), val: None
+IdentRef(x)@55..56 in /s0.typ -> Import(x)@45..46 in /s0.typ, root (ModuleImport(..)).IdentRef(x), val: None
+= exports
+base -> ref(PathStem(base), step = Module(base), root = Module(base))
+x -> ref(Import(x), step = (ModuleImport(..)).IdentRef(x), root = (ModuleImport(..)).IdentRef(x))

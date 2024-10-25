@@ -4,7 +4,7 @@ use itertools::Either;
 use tinymist_derive::BindTyCtx;
 use typst::foundations::{Closure, ParamInfo};
 
-use super::{prelude::*, resolve_callee, BoundChecker, DocSource, SigTy, TypeVar};
+use super::{prelude::*, BoundChecker, Definition, DocSource, SharedContext, SigTy, TypeVar};
 use crate::analysis::PostTypeChecker;
 use crate::docs::{UntypedSignatureDocs, UntypedSymbolDocs, UntypedVarDocs};
 use crate::syntax::get_non_strict_def_target;
@@ -223,13 +223,13 @@ pub struct PartialSignature {
 
 /// The language object that the signature is being analyzed for.
 #[derive(Debug, Clone)]
-pub enum SignatureTarget<'a> {
+pub enum SignatureTarget {
     /// A static node without knowing the function at runtime.
-    Def(Source, IdentRef),
+    Def(Option<Source>, Definition),
     /// A static node without knowing the function at runtime.
-    SyntaxFast(Source, LinkedNode<'a>),
+    SyntaxFast(Source, Span),
     /// A static node without knowing the function at runtime.
-    Syntax(Source, LinkedNode<'a>),
+    Syntax(Source, Span),
     /// A function that is known at runtime.
     Runtime(Func),
     /// A function that is known at runtime.
@@ -237,10 +237,10 @@ pub enum SignatureTarget<'a> {
 }
 
 pub(crate) fn analyze_signature(
-    ctx: &mut AnalysisContext,
+    ctx: &Arc<SharedContext>,
     callee_node: SignatureTarget,
 ) -> Option<Signature> {
-    ctx.compute_signature(callee_node.clone(), |ctx| {
+    ctx.compute_signature(callee_node.clone(), move |ctx| {
         log::debug!("analyzing signature for {callee_node:?}");
         analyze_type_signature(ctx, &callee_node)
             .or_else(|| analyze_dyn_signature(ctx, &callee_node))
@@ -248,14 +248,20 @@ pub(crate) fn analyze_signature(
 }
 
 fn analyze_type_signature(
-    ctx: &mut AnalysisContext,
-    callee_node: &SignatureTarget<'_>,
+    ctx: &Arc<SharedContext>,
+    callee_node: &SignatureTarget,
 ) -> Option<Signature> {
     let (type_info, ty) = match callee_node {
-        SignatureTarget::Def(..) | SignatureTarget::Convert(..) => None,
-        SignatureTarget::SyntaxFast(source, node) | SignatureTarget::Syntax(source, node) => {
+        SignatureTarget::Convert(..) => return None,
+        SignatureTarget::SyntaxFast(source, span) | SignatureTarget::Syntax(source, span) => {
             let type_info = ctx.type_check(source)?;
-            let ty = type_info.type_of_span(node.span())?;
+            let ty = type_info.type_of_span(*span)?;
+            Some((type_info, ty))
+        }
+        SignatureTarget::Def(source, def) => {
+            let span = def.decl.span();
+            let type_info = ctx.type_check(source.as_ref()?)?;
+            let ty = type_info.type_of_span(span)?;
             Some((type_info, ty))
         }
         SignatureTarget::Runtime(f) => {
@@ -275,7 +281,7 @@ fn analyze_type_signature(
     let type_var = srcs.into_iter().next()?;
     match type_var {
         DocSource::Var(v) => {
-            let mut ty_ctx = PostTypeChecker::new(ctx, &type_info);
+            let mut ty_ctx = PostTypeChecker::new(ctx.clone(), &type_info);
             let sig_ty = Ty::Func(ty.sig_repr(true, &mut ty_ctx)?);
             let sig_ty = type_info.simplify(sig_ty, false);
             let Ty::Func(sig_ty) = sig_ty else {
@@ -385,14 +391,14 @@ fn find_alias_stack<'a>(
 
 #[derive(BindTyCtx)]
 #[bind(ctx)]
-struct AliasStackChecker<'a, 'b, 'w> {
-    ctx: &'a mut PostTypeChecker<'b, 'w>,
+struct AliasStackChecker<'a, 'b> {
+    ctx: &'a mut PostTypeChecker<'b>,
     stack: Vec<&'a UntypedVarDocs>,
     res: Option<Either<&'a UntypedSignatureDocs, Func>>,
     checking_with: bool,
 }
 
-impl<'a, 'b, 'w> BoundChecker for AliasStackChecker<'a, 'b, 'w> {
+impl<'a, 'b> BoundChecker for AliasStackChecker<'a, 'b> {
     fn check_var(&mut self, u: &Interned<TypeVar>, pol: bool) {
         log::debug!("collecting var {u:?} {pol:?}");
         if self.res.is_some() {
@@ -455,16 +461,16 @@ impl<'a, 'b, 'w> BoundChecker for AliasStackChecker<'a, 'b, 'w> {
 }
 
 fn analyze_dyn_signature(
-    ctx: &mut AnalysisContext,
-    callee_node: &SignatureTarget<'_>,
+    ctx: &Arc<SharedContext>,
+    callee_node: &SignatureTarget,
 ) -> Option<Signature> {
     let func = match callee_node {
-        SignatureTarget::Def(..) => return None,
+        SignatureTarget::Def(_source, def) => def.value()?.to_func()?,
         SignatureTarget::SyntaxFast(..) => return None,
-        SignatureTarget::Syntax(_, node) => {
-            let func = resolve_callee(ctx, node)?;
-            log::debug!("got function {func:?}");
-            func
+        SignatureTarget::Syntax(source, span) => {
+            let target = ctx.deref_syntax(source, *span)?;
+            let def = ctx.definition(source, None, target)?;
+            def.value()?.to_func()?
         }
         SignatureTarget::Convert(func) | SignatureTarget::Runtime(func) => func.clone(),
     };

@@ -22,18 +22,13 @@
 //!
 //! The [`CompileHandler`] will push information to other actors.
 
-use std::{
-    collections::HashMap,
-    ops::Deref,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{collections::HashMap, ops::Deref, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, bail};
 use log::{error, info, trace};
 use reflexo_typst::{
-    debug_loc::DataSource, error::prelude::*, typst::prelude::*, vfs::notify::MemoryEvent,
-    world::EntryState, CompileReport, EntryReader, Error, ImmutPath, TaskInputs, TypstFont,
+    error::prelude::*, typst::prelude::*, vfs::notify::MemoryEvent, world::EntryState,
+    CompileReport, EntryReader, Error, ImmutPath, TaskInputs,
 };
 use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
@@ -43,12 +38,7 @@ use tinymist_query::{
 };
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{mpsc, oneshot};
-use typst::{
-    diag::{PackageError, SourceDiagnostic},
-    layout::Position,
-    syntax::package::PackageSpec,
-    World as TypstWorld,
-};
+use typst::{diag::SourceDiagnostic, layout::Position, World as TypstWorld};
 
 use super::{
     editor::{DocVersion, EditorRequest, TinymistCompileStatusEnum},
@@ -66,7 +56,7 @@ type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 
 pub struct CompileHandler {
     pub(crate) diag_group: String,
-    pub(crate) analysis: Analysis,
+    pub(crate) analysis: Arc<Analysis>,
     pub(crate) periscope: PeriscopeRenderer,
 
     #[cfg(feature = "preview")]
@@ -203,44 +193,9 @@ impl CompileHandler {
             anyhow!("failed to get source: {err}")
         })?;
 
-        struct WrapWorld<'a>(&'a LspWorld, &'a PeriscopeRenderer);
+        struct Resource<'a>(&'a PeriscopeRenderer);
 
-        impl<'a> AnalysisResources for WrapWorld<'a> {
-            fn world(&self) -> &LspWorld {
-                self.0
-            }
-
-            fn resolve(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError> {
-                use reflexo_typst::world::package::PackageRegistry;
-                self.0.registry.resolve(spec)
-            }
-
-            fn dependencies(&self) -> EcoVec<ImmutPath> {
-                use reflexo_typst::WorldDeps;
-                let mut deps = EcoVec::new();
-                self.0.iter_dependencies(&mut |dep| {
-                    deps.push(dep);
-                });
-
-                deps
-            }
-
-            /// Resolve extra font information.
-            fn font_info(&self, font: TypstFont) -> Option<Arc<DataSource>> {
-                self.0.font_resolver.describe_font(&font)
-            }
-
-            /// Get the local packages and their descriptions.
-            fn local_packages(&self) -> EcoVec<PackageSpec> {
-                crate::tool::package::list_package_by_namespace(
-                    &self.0.registry,
-                    eco_format!("local"),
-                )
-                .into_iter()
-                .map(|(_, spec)| spec)
-                .collect()
-            }
-
+        impl<'a> AnalysisResources for Resource<'a> {
             /// Resolve periscope image at the given position.
             fn periscope_at(
                 &self,
@@ -248,13 +203,13 @@ impl CompileHandler {
                 doc: VersionedDocument,
                 pos: Position,
             ) -> Option<String> {
-                self.1.render_marked(ctx, doc, pos)
+                self.0.render_marked(ctx, doc, pos)
             }
         }
 
-        let w = WrapWorld(w, &self.periscope);
+        let r = Resource(&self.periscope);
 
-        let mut analysis = self.analysis.snapshot(root, &w);
+        let mut analysis = self.analysis.snapshot(root, w.clone(), &r);
         Ok(f(&mut analysis))
     }
 

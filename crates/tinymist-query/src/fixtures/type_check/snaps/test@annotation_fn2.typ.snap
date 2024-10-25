@@ -3,8 +3,8 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/annotation_fn2.typ
 ---
-"args" = Args
 "args" = Any
+"args" = Args
 "fn" = Any
 "fn-wrapper" = (( ⪯ (Type(function) | (...: Any) => Any)), ...: ( ⪯ Any)) => None
 ---

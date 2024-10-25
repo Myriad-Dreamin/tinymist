@@ -1,7 +1,7 @@
 use crate::{
-    analysis::{find_definition, DefinitionLink},
+    analysis::Definition,
     prelude::*,
-    syntax::DerefTarget,
+    syntax::{Decl, DerefTarget},
 };
 use log::debug;
 
@@ -47,9 +47,9 @@ impl StatefulRequest for PrepareRenameRequest {
         }
 
         let origin_selection_range = ctx.to_lsp_range(deref_target.node().range(), &source);
-        let lnk = find_definition(ctx, source.clone(), doc.as_ref(), deref_target.clone())?;
+        let def = ctx.definition(&source, doc.as_ref(), deref_target.clone())?;
 
-        let (name, range) = prepare_renaming(ctx, &deref_target, &lnk)?;
+        let (name, range) = prepare_renaming(ctx, &deref_target, &def)?;
 
         Some(PrepareRenameResponse::RangeWithPlaceholder {
             range: range.unwrap_or(origin_selection_range),
@@ -59,12 +59,12 @@ impl StatefulRequest for PrepareRenameRequest {
 }
 
 pub(crate) fn prepare_renaming(
-    _ctx: &mut AnalysisContext,
+    ctx: &mut AnalysisContext,
     deref_target: &DerefTarget,
-    lnk: &DefinitionLink,
+    def: &Definition,
 ) -> Option<(String, Option<LspRange>)> {
-    let name = lnk.name.clone();
-    let (def_fid, _def_range) = lnk.def_at.clone()?;
+    let name = def.name().clone();
+    let (def_fid, _def_range) = def.def_at(ctx.shared()).clone()?;
 
     if def_fid.package().is_some() {
         debug!(
@@ -76,38 +76,43 @@ pub(crate) fn prepare_renaming(
 
     let var_rename = || Some((name.to_string(), None));
 
-    debug!("prepare_rename: {name}");
-    use crate::syntax::{LexicalKind, LexicalModKind::*, LexicalVarKind::*, ModSrc};
-    match lnk.kind {
+    log::debug!("prepare_rename: {name}");
+    use Decl::*;
+    match def.decl.as_ref() {
         // Cannot rename headings or blocks
-        LexicalKind::Heading(_) | LexicalKind::Block => None,
+        // LexicalKind::Heading(_) | LexicalKind::Block => None,
         // Cannot rename module star
-        LexicalKind::Mod(Star) => None,
+        // LexicalKind::Mod(Star) => None,
         // Cannot rename expression import
-        LexicalKind::Mod(Module(ModSrc::Expr(..))) => None,
-        // todo: label renaming, bibkey renaming
-        LexicalKind::Var(LabelRef | Label | BibKey) => None,
-        LexicalKind::Var(Variable | ValRef) => var_rename(),
-        LexicalKind::Mod(ModuleAlias | Ident | Alias { .. }) => var_rename(),
-        LexicalKind::Var(Function) => validate_fn_renaming(lnk).map(|_| (name.to_string(), None)),
-        LexicalKind::Mod(PathInclude | PathVar | Module(ModSrc::Path(..))) => {
+        // LexicalKind::Mod(Module(ModSrc::Expr(..))) => None,
+        Var(..) => var_rename(),
+        Func(..) | Closure(..) => validate_fn_renaming(def).map(|_| (name.to_string(), None)),
+        Module(..) | ModuleAlias(..) | PathStem(..) | ImportPath(..) | IncludePath(..)
+        | ModuleImport(..) => {
             let node = deref_target.node().get().clone();
             let path = node.cast::<ast::Str>()?;
             let name = path.get().to_string();
             Some((name, None))
         }
+        // todo: label renaming, bibkey renaming
+        BibEntry(..) | Label(..) | ContentRef(..) => None,
+        ImportAlias(..) | Constant(..) | IdentRef(..) | Import(..) | StrName(..) | Spread(..) => {
+            None
+        }
+        Pattern(..) | Content(..) | Generated(..) | Docs(..) => None,
     }
 }
 
-fn validate_fn_renaming(lnk: &DefinitionLink) -> Option<()> {
+fn validate_fn_renaming(def: &Definition) -> Option<()> {
     use typst::foundations::func::Repr;
-    let mut f = match &lnk.value {
+    let value = def.value();
+    let mut f = match &value {
         None => return Some(()),
         Some(Value::Func(f)) => f,
         Some(..) => {
             log::info!(
                 "prepare_rename: not a function on function definition site: {:?}",
-                lnk.value
+                def.term
             );
             return None;
         }

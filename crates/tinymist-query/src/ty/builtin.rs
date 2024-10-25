@@ -4,7 +4,7 @@ use crate::prelude::*;
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use strum::{EnumIter, IntoEnumIterator};
-use typst::{foundations::CastInfo, syntax::Span};
+use typst::foundations::CastInfo;
 use typst::{
     foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
     layout::Length,
@@ -200,6 +200,8 @@ pub enum BuiltinTy {
     Content,
     Space,
     None,
+    Break,
+    Continue,
     Infer,
     FlowNone,
     Auto,
@@ -211,6 +213,7 @@ pub enum BuiltinTy {
     TextLang,
     TextRegion,
 
+    Label,
     CiteLabel,
     RefLabel,
     Dir,
@@ -237,6 +240,8 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::Content => f.write_str("Content"),
             BuiltinTy::Space => f.write_str("Space"),
             BuiltinTy::None => f.write_str("None"),
+            BuiltinTy::Break => f.write_str("Break"),
+            BuiltinTy::Continue => f.write_str("Continue"),
             BuiltinTy::Infer => f.write_str("Infer"),
             BuiltinTy::FlowNone => f.write_str("FlowNone"),
             BuiltinTy::Auto => f.write_str("Auto"),
@@ -249,6 +254,7 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::TextRegion => write!(f, "TextRegion"),
             BuiltinTy::Dir => write!(f, "Dir"),
             BuiltinTy::Length => write!(f, "Length"),
+            BuiltinTy::Label => write!(f, "Label"),
             BuiltinTy::CiteLabel => write!(f, "CiteLabel"),
             BuiltinTy::RefLabel => write!(f, "RefLabel"),
             BuiltinTy::Float => write!(f, "Float"),
@@ -314,6 +320,8 @@ impl BuiltinTy {
             BuiltinTy::Content => "content",
             BuiltinTy::Space => "content",
             BuiltinTy::None => "none",
+            BuiltinTy::Break => "break",
+            BuiltinTy::Continue => "continue",
             BuiltinTy::Infer => "any",
             BuiltinTy::FlowNone => "none",
             BuiltinTy::Auto => "auto",
@@ -327,6 +335,7 @@ impl BuiltinTy {
             BuiltinTy::Dir => "dir",
             BuiltinTy::Length => "length",
             BuiltinTy::Float => "float",
+            BuiltinTy::Label => "label",
             BuiltinTy::CiteLabel => "cite-label",
             BuiltinTy::RefLabel => "ref-label",
             BuiltinTy::Stroke => "stroke",
@@ -420,7 +429,6 @@ macro_rules! flow_record {
                 (
                     $name.into(),
                     $ty,
-                    Span::detached(),
                 ),
             )*
         ])
@@ -607,7 +615,8 @@ pub static FLOW_RADIUS_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
 
 #[cfg(test)]
 mod tests {
-    use reflexo::vector::ir::DefId;
+
+    use crate::syntax::Decl;
 
     use super::{SigTy, Ty, TypeVar};
 
@@ -617,8 +626,8 @@ mod tests {
     // instantiate a `v` as the return type of the map function.
     #[test]
     fn test_map() {
-        let u = Ty::Var(TypeVar::new("u".into(), DefId(0)));
-        let v = Ty::Var(TypeVar::new("v".into(), DefId(1)));
+        let u = Ty::Var(TypeVar::new("u".into(), Decl::lit("u").into()));
+        let v = Ty::Var(TypeVar::new("v".into(), Decl::lit("v").into()));
         let mapper_fn =
             Ty::Func(SigTy::new([u].into_iter(), None, None, None, Some(v.clone())).into());
         let map_fn =

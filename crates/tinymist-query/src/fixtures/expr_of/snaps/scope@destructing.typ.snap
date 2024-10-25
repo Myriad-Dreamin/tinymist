@@ -1,0 +1,15 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "snap.join(\"\\n\")"
+input_file: crates/tinymist-query/src/fixtures/expr_of/destructing.typ
+---
+= resolves
+Var(a)@6..7 in /s0.typ -> Var(a)@6..7 in /s0.typ, root Var(a)@6..7 in /s0.typ, val: None
+Var(a)@28..29 in /s0.typ -> Var(a)@28..29 in /s0.typ, root Var(a)@28..29 in /s0.typ, val: None
+IdentRef(a)@40..41 in /s0.typ -> Var(a)@6..7 in /s0.typ, root Var(a)@6..7 in /s0.typ, val: None
+Var(b)@9..10 in /s0.typ -> Var(b)@9..10 in /s0.typ, root Var(b)@9..10 in /s0.typ, val: None
+Var(b)@31..32 in /s0.typ -> Var(b)@31..32 in /s0.typ, root Var(b)@31..32 in /s0.typ, val: None
+IdentRef(b)@37..38 in /s0.typ -> Var(b)@9..10 in /s0.typ, root Var(b)@9..10 in /s0.typ, val: None
+= exports
+a -> Var(a)@28..29 in /s0.typ
+b -> Var(b)@31..32 in /s0.typ

@@ -69,7 +69,10 @@ pub fn analyze_call_no_cache(
     callee_node: LinkedNode,
     args: ast::Args<'_>,
 ) -> Option<CallInfo> {
-    let signature = analyze_signature(ctx, SignatureTarget::SyntaxFast(source, callee_node))?;
+    let signature = analyze_signature(
+        ctx.shared(),
+        SignatureTarget::SyntaxFast(source, callee_node.span()),
+    )?;
     log::trace!("got signature {signature:?}");
 
     let mut info = CallInfo {

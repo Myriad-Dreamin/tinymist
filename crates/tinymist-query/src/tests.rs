@@ -6,21 +6,19 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use ecow::EcoVec;
 use once_cell::sync::Lazy;
-use reflexo_typst::package::{PackageRegistry, PackageSpec};
 use reflexo_typst::world::EntryState;
-use reflexo_typst::{CompileDriverImpl, EntryManager, EntryReader, ShadowApi, WorldDeps};
+use reflexo_typst::{CompileDriverImpl, EntryManager, EntryReader, ShadowApi};
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_world::CompileFontArgs;
+use typst::foundations::Bytes;
 use typst::syntax::ast::{self, AstNode};
 use typst::syntax::{FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath};
-use typst::{diag::PackageError, foundations::Bytes};
 
 pub use insta::assert_snapshot;
 pub use serde::Serialize;
 pub use serde_json::json;
-pub use tinymist_world::{LspUniverse, LspUniverseBuilder, LspWorld};
+pub use tinymist_world::{LspUniverse, LspUniverseBuilder};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
@@ -31,26 +29,7 @@ use crate::{
 
 type CompileDriver<C> = CompileDriverImpl<C, tinymist_world::LspCompilerFeat>;
 
-struct WrapWorld<'a>(&'a mut LspWorld);
-
-impl<'a> AnalysisResources for WrapWorld<'a> {
-    fn world(&self) -> &LspWorld {
-        self.0
-    }
-
-    fn resolve(&self, spec: &PackageSpec) -> Result<std::sync::Arc<Path>, PackageError> {
-        self.0.registry.resolve(spec)
-    }
-
-    fn dependencies(&self) -> EcoVec<reflexo::ImmutPath> {
-        let mut v = EcoVec::new();
-        self.0.iter_dependencies(&mut |p| {
-            v.push(p);
-        });
-
-        v
-    }
-}
+impl AnalysisResources for () {}
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) {
     let mut settings = insta::Settings::new();
@@ -81,10 +60,8 @@ pub fn run_with_ctx<T>(
         .into_iter()
         .map(|p| TypstFileId::new(None, VirtualPath::new(p.strip_prefix(&root).unwrap())))
         .collect::<Vec<_>>();
-    let mut w = w.snapshot();
-    let w = WrapWorld(&mut w);
-    let a = Analysis::default();
-    let mut ctx = AnalysisContext::new(root, &w, &a);
+
+    let mut ctx = Arc::new(Analysis::default()).snapshot(root, w.snapshot(), &());
     ctx.test_completion_files(Vec::new);
     ctx.test_files(|| paths);
     f(&mut ctx, p)

@@ -1,19 +1,18 @@
-use std::ops::Range;
-
 use lsp_types::{
     DocumentChangeOperation, DocumentChanges, OneOf, OptionalVersionedTextDocumentIdentifier,
     RenameFile, TextDocumentEdit,
 };
 use reflexo::path::{unix_slash, PathClean};
-use typst::foundations::{Repr, Str};
-use typst_shim::syntax::LinkedNodeExt;
+use typst::{
+    foundations::{Repr, Str},
+    syntax::Span,
+};
 
 use crate::{
-    analysis::find_definition,
     find_references,
     prelude::*,
     prepare_renaming,
-    syntax::{deref_expr, DerefTarget},
+    syntax::{deref_expr, node_ancestors, Decl, DerefTarget},
 };
 
 /// The [`textDocument/rename`] request is sent from the client to the server to
@@ -42,22 +41,21 @@ impl StatefulRequest for RenameRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
 
-        let lnk = find_definition(ctx, source.clone(), doc.as_ref(), deref_target.clone())?;
+        let def = ctx.definition(&source, doc.as_ref(), deref_target.clone())?;
 
-        prepare_renaming(ctx, &deref_target, &lnk)?;
+        prepare_renaming(ctx, &deref_target, &def)?;
 
         match deref_target {
             // todo: abs path
             DerefTarget::ImportPath(path) | DerefTarget::IncludePath(path) => {
                 let ref_path_str = path.cast::<ast::Str>()?.get();
-
                 let new_path_str = if !self.new_name.ends_with(".typ") {
                     self.new_name + ".typ"
                 } else {
                     self.new_name
                 };
 
-                let def_fid = lnk.def_at?.0;
+                let def_fid = def.def_at(ctx.shared())?.0;
                 let old_path = ctx.path_for_id(def_fid).ok()?;
 
                 let rename_loc = Path::new(ref_path_str.as_str());
@@ -93,28 +91,11 @@ impl StatefulRequest for RenameRequest {
                 })
             }
             _ => {
-                let references = find_references(ctx, source.clone(), doc.as_ref(), deref_target)?;
+                let references = find_references(ctx, &source, doc.as_ref(), deref_target)?;
 
                 let mut edits = HashMap::new();
 
-                let (def_fid, _def_range) = lnk.def_at?;
-                let def_loc = {
-                    let def_source = ctx.source_by_id(def_fid).ok()?;
-
-                    let uri = ctx.uri_for_id(def_fid).ok()?;
-
-                    let Some(range) = lnk.name_range else {
-                        log::warn!("rename: no name range");
-                        return None;
-                    };
-
-                    LspLocation {
-                        uri,
-                        range: ctx.to_lsp_range(range, &def_source),
-                    }
-                };
-
-                for i in (Some(def_loc).into_iter()).chain(references) {
+                for i in references {
                     let uri = i.uri;
                     let range = i.range;
                     let edits = edits.entry(uri).or_insert_with(Vec::new);
@@ -147,18 +128,23 @@ pub(crate) fn do_rename_file(
         let ref_src = ctx.source_by_id(*ref_fid).ok()?;
         let uri = ctx.uri_for_id(*ref_fid).ok()?;
 
-        let Some(import_info) = ctx.import_info(ref_src.clone()) else {
-            continue;
-        };
+        let import_info = ctx.expr_stage(&ref_src);
 
         let edits = edits.entry(uri).or_default();
-        for (rng, importing_src) in &import_info.imports {
-            let importing = importing_src.as_ref().map(|s| s.id());
+        for (span, r) in &import_info.resolves {
+            if !matches!(
+                r.decl.as_ref(),
+                Decl::ImportPath(..) | Decl::IncludePath(..) | Decl::PathStem(..)
+            ) {
+                continue;
+            }
+            let importing = r.root.as_ref()?.file_id();
+
             if importing.map_or(true, |i| i != def_fid) {
                 continue;
             }
-            log::debug!("import: {rng:?} -> {importing:?} v.s. {def_fid:?}");
-            rename_importer(ctx, &ref_src, rng.clone(), &diff, edits);
+            log::debug!("import: {span:?} -> {importing:?} v.s. {def_fid:?}");
+            rename_importer(ctx, &ref_src, *span, &diff, edits);
         }
     }
 
@@ -183,18 +169,21 @@ pub(crate) fn edits_to_document_changes(
 fn rename_importer(
     ctx: &AnalysisContext,
     src: &Source,
-    rng: Range<usize>,
+    span: Span,
     diff: &Path,
     edits: &mut Vec<TextEdit>,
 ) -> Option<()> {
     let root = LinkedNode::new(src.root());
-    let import_node = root.leaf_at_compat(rng.start + 1).and_then(deref_expr)?;
-
-    let (import_path, has_path_var) = match import_node.cast::<ast::Expr>()? {
-        ast::Expr::Import(i) => (i.source(), i.new_name().is_none() && i.imports().is_none()),
-        ast::Expr::Include(i) => (i.source(), false),
-        _ => return None,
-    };
+    let import_node = root.find(span).and_then(deref_expr)?;
+    let (import_path, has_path_var) = node_ancestors(&import_node).find_map(|import_node| {
+        match import_node.cast::<ast::Expr>()? {
+            ast::Expr::Import(i) => {
+                Some((i.source(), i.new_name().is_none() && i.imports().is_none()))
+            }
+            ast::Expr::Include(i) => Some((i.source(), false)),
+            _ => None,
+        }
+    })?;
 
     let new_text = match import_path {
         ast::Expr::Str(s) => {

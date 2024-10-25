@@ -10,6 +10,7 @@
 mod adt;
 pub mod analysis;
 pub mod docs;
+pub mod package;
 pub mod syntax;
 pub mod ty;
 mod upstream;
@@ -298,8 +299,8 @@ mod polymorphic {
                 Self::DocumentSymbol(..) => ContextFreeUnique,
                 Self::WorkspaceLabel(..) => Mergeable,
                 Self::Symbol(..) => Mergeable,
-                Self::SemanticTokensFull(..) => ContextFreeUnique,
-                Self::SemanticTokensDelta(..) => ContextFreeUnique,
+                Self::SemanticTokensFull(..) => PinnedFirst,
+                Self::SemanticTokensDelta(..) => PinnedFirst,
                 Self::Formatting(..) => ContextFreeUnique,
                 Self::FoldingRange(..) => ContextFreeUnique,
                 Self::SelectionRange(..) => ContextFreeUnique,

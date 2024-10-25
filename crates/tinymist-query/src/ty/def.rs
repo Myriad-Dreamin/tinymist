@@ -4,7 +4,6 @@
 
 use core::fmt;
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
     hash::{Hash, Hasher},
     sync::Arc,
 };
@@ -12,7 +11,7 @@ use std::{
 use ecow::EcoVec;
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
-use reflexo::vector::ir::DefId;
+use rustc_hash::{FxHashMap, FxHashSet};
 use typst::{
     foundations::Value,
     syntax::{ast, Span, SyntaxKind, SyntaxNode},
@@ -23,6 +22,7 @@ use crate::{
     adt::{interner::impl_internable, snapshot_map},
     analysis::BuiltinTy,
     docs::UntypedSymbolDocs,
+    syntax::{DeclExpr, UnaryOp},
 };
 
 pub(crate) use super::{TyCtx, TyCtxMut};
@@ -73,6 +73,8 @@ pub enum Ty {
     Func(Interned<SigTy>),
     /// An argument type
     Args(Interned<ArgsTy>),
+    /// An argument type
+    Pattern(Interned<PatternTy>),
 
     // Type operations
     /// A partially applied function type
@@ -94,6 +96,7 @@ impl fmt::Debug for Ty {
             Ty::Builtin(t) => write!(f, "{t:?}"),
             Ty::Args(a) => write!(f, "&({a:?})"),
             Ty::Func(s) => write!(f, "{s:?}"),
+            Ty::Pattern(s) => write!(f, "{s:?}"),
             Ty::Dict(r) => write!(f, "{r:?}"),
             Ty::Array(a) => write!(f, "Array<{a:?}>"),
             Ty::Tuple(t) => {
@@ -162,6 +165,16 @@ impl Ty {
     /// A that type is annotated if the syntax structure causes an type error
     pub const fn undef() -> Self {
         Ty::Builtin(BuiltinTy::Undef)
+    }
+
+    /// Get value repr of the type
+    pub fn value(&self) -> Option<Value> {
+        match self {
+            Ty::Value(v) => Some(v.val.clone()),
+            Ty::Builtin(BuiltinTy::Element(v)) => Some(Value::Func((*v).into())),
+            Ty::Builtin(BuiltinTy::Type(ty)) => Some(Value::Type(*ty)),
+            _ => None,
+        }
     }
 }
 
@@ -431,14 +444,13 @@ pub struct TypeVar {
     /// The name of the type variable
     pub name: StrRef,
     /// The definition id of the type variable
-    pub def: DefId,
+    pub def: DeclExpr,
 }
 
 impl Ord for TypeVar {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.name
-            .cmp(&other.name)
-            .then_with(|| self.def.0.cmp(&other.def.0))
+        // todo: buggy
+        self.def.weak_cmp(&other.def)
     }
 }
 
@@ -456,18 +468,13 @@ impl fmt::Debug for TypeVar {
 
 impl TypeVar {
     /// Create a type variable
-    pub fn new(name: StrRef, def: DefId) -> Interned<Self> {
+    pub fn new(name: StrRef, def: DeclExpr) -> Interned<Self> {
         Interned::new(Self { name, def })
     }
 
     /// Get the name of the type variable
     pub fn name(&self) -> StrRef {
         self.name.clone()
-    }
-
-    /// Get the definition id of the type variable
-    pub fn id(&self) -> DefId {
-        self.def
     }
 }
 
@@ -482,18 +489,18 @@ pub struct RecordTy {
 
 impl RecordTy {
     /// Shape the fields of a record
-    pub fn shape_fields(mut fields: Vec<(StrRef, Ty, Span)>) -> (NameBone, Vec<Ty>) {
+    pub fn shape_fields(mut fields: Vec<(StrRef, Ty)>) -> (NameBone, Vec<Ty>) {
         fields.sort_by(|a, b| a.0.cmp(&b.0));
         let names = NameBone {
             names: fields.iter().map(|e| e.0.clone()).collect(),
         };
-        let types = fields.into_iter().map(|(_, ty, _)| ty).collect::<Vec<_>>();
+        let types = fields.into_iter().map(|(_, ty)| ty).collect::<Vec<_>>();
 
         (names, types)
     }
 
     /// Create a record type
-    pub fn new(fields: Vec<(StrRef, Ty, Span)>) -> Interned<Self> {
+    pub fn new(fields: Vec<(StrRef, Ty)>) -> Interned<Self> {
         let (names, types) = Self::shape_fields(fields);
         Interned::new(Self {
             types: Interned::new(types),
@@ -624,6 +631,11 @@ impl SigTy {
         })
     }
 
+    pub(crate) fn with_body(mut self, res_ty: Ty) -> Self {
+        self.body = Some(res_ty);
+        self
+    }
+
     /// Create a function type
     pub fn new(
         pos: impl ExactSizeIterator<Item = Ty>,
@@ -632,10 +644,7 @@ impl SigTy {
         rest_right: Option<Ty>,
         ret_ty: Option<Ty>,
     ) -> Self {
-        let named = named
-            .into_iter()
-            .map(|(name, ty)| (name, ty, Span::detached()))
-            .collect::<Vec<_>>();
+        let named = named.into_iter().collect::<Vec<_>>();
         let (names, mut named_types) = RecordTy::shape_fields(named);
         let spread_left = rest_left.is_some();
         let spread_right = rest_right.is_some();
@@ -799,6 +808,9 @@ impl fmt::Debug for SigTy {
 /// A function argument type
 pub type ArgsTy = SigTy;
 
+/// A pattern type
+pub type PatternTy = SigTy;
+
 /// A type with partially applied arguments
 #[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SigWithTy {
@@ -843,37 +855,11 @@ impl fmt::Debug for SelectTy {
     }
 }
 
-/// The kind of unary operation
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub enum UnaryOp {
-    /// The (arithmetic) positive operation
-    /// `+t`
-    Pos,
-    /// The (arithmetic) negate operation
-    /// `-t`
-    Neg,
-    /// The (logical) not operation
-    /// `not t`
-    Not,
-    /// The typst context operation
-    /// `context t`
-    Context,
-    /// The not element of operation
-    /// `not in t`
-    NotElementOf,
-    /// The element of operation
-    /// `in t`
-    ElementOf,
-    /// The type of operation
-    /// `type(t)`
-    TypeOf,
-}
-
 /// A unary operation type
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct TypeUnary {
     /// The operand of the unary operation
-    pub lhs: TyRef,
+    pub lhs: Ty,
     /// The kind of the unary operation
     pub op: UnaryOp,
 }
@@ -896,12 +882,12 @@ impl Ord for TypeUnary {
 
 impl TypeUnary {
     /// Create a unary operation type
-    pub fn new(op: UnaryOp, lhs: TyRef) -> Interned<Self> {
+    pub fn new(op: UnaryOp, lhs: Ty) -> Interned<Self> {
         Interned::new(Self { lhs, op })
     }
 
     /// Get the operands of the unary operation
-    pub fn operands(&self) -> [&TyRef; 1] {
+    pub fn operands(&self) -> [&Ty; 1] {
         [&self.lhs]
     }
 }
@@ -913,7 +899,7 @@ pub type BinaryOp = ast::BinOp;
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct TypeBinary {
     /// The operands of the binary operation
-    pub operands: (TyRef, TyRef),
+    pub operands: (Ty, Ty),
     /// The kind of the binary operation
     pub op: BinaryOp,
 }
@@ -936,7 +922,7 @@ impl Ord for TypeBinary {
 
 impl TypeBinary {
     /// Create a binary operation type
-    pub fn new(op: BinaryOp, lhs: TyRef, rhs: TyRef) -> Interned<Self> {
+    pub fn new(op: BinaryOp, lhs: Ty, rhs: Ty) -> Interned<Self> {
         Interned::new(Self {
             operands: (lhs, rhs),
             op,
@@ -944,7 +930,7 @@ impl TypeBinary {
     }
 
     /// Get the operands of the binary operation
-    pub fn operands(&self) -> [&TyRef; 2] {
+    pub fn operands(&self) -> [&Ty; 2] {
         [&self.operands.0, &self.operands.1]
     }
 }
@@ -972,13 +958,13 @@ impl IfTy {
 #[derive(Default)]
 pub struct TypeScheme {
     /// The typing on definitions
-    pub vars: HashMap<DefId, TypeVarBounds>,
+    pub vars: FxHashMap<DeclExpr, TypeVarBounds>,
     /// The checked documentation of definitions
-    pub var_docs: HashMap<DefId, Arc<UntypedSymbolDocs>>,
+    pub var_docs: FxHashMap<DeclExpr, Arc<UntypedSymbolDocs>>,
     /// The local binding of the type variable
-    pub local_binds: snapshot_map::SnapshotMap<DefId, Ty>,
+    pub local_binds: snapshot_map::SnapshotMap<DeclExpr, Ty>,
     /// The typing on syntax structures
-    pub mapping: HashMap<Span, Vec<Ty>>,
+    pub mapping: FxHashMap<Span, FxHashSet<Ty>>,
 
     pub(super) cano_cache: Mutex<TypeCanoStore>,
 }
@@ -995,12 +981,12 @@ impl TyCtx for TypeScheme {
 }
 
 impl TypeScheme {
-    /// Get the type of a definition
-    pub fn type_of_def(&self, def: DefId) -> Option<Ty> {
-        Some(self.simplify(self.vars.get(&def).map(|e| e.as_type())?, false))
-    }
+    // Get the type of a definition
+    // pub fn type_of_def(&self, def: DefId) -> Option<Ty> {
+    //     Some(self.simplify(self.vars.get(&def).map(|e| e.as_type())?, false))
+    // }
 
-    /// Get the type of a syntax structure
+    /// Gets the type of a syntax structure
     pub fn type_of_span(&self, site: Span) -> Option<Ty> {
         self.mapping
             .get(&site)
@@ -1009,31 +995,49 @@ impl TypeScheme {
     }
 
     // todo: distinguish at least, at most
-    /// Witness a lower-bound type on a syntax structure
+    /// Witnesses a lower-bound type on a syntax structure
     pub fn witness_at_least(&mut self, site: Span, ty: Ty) {
         Self::witness_(site, ty, &mut self.mapping);
     }
-    /// Witness a upper-bound type on a syntax structure
+    /// Witnesses a upper-bound type on a syntax structure
     pub fn witness_at_most(&mut self, site: Span, ty: Ty) {
         Self::witness_(site, ty, &mut self.mapping);
     }
 
-    /// Witness a type
-    pub fn witness_(site: Span, ty: Ty, mapping: &mut HashMap<Span, Vec<Ty>>) {
+    /// Witnesses a type
+    pub fn witness_(site: Span, ty: Ty, mapping: &mut FxHashMap<Span, FxHashSet<Ty>>) {
         if site.is_detached() {
             return;
         }
 
         // todo: intersect/union
-        let site_store = mapping.entry(site);
-        match site_store {
-            Entry::Occupied(e) => {
-                e.into_mut().push(ty);
+        mapping.entry(site).or_default().insert(ty);
+    }
+
+    /// Converts a type to a type with bounds
+    pub fn to_bounds(&self, def: Ty) -> TypeBounds {
+        let mut store = TypeBounds::default();
+        match def {
+            Ty::Var(v) => {
+                let w = self.vars.get(&v.def).unwrap();
+                match &w.bounds {
+                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
+                        let w = w.read();
+                        store.lbs.extend(w.lbs.iter().cloned());
+                        store.ubs.extend(w.ubs.iter().cloned());
+                    }
+                }
             }
-            Entry::Vacant(e) => {
-                e.insert(vec![ty]);
+            Ty::Let(v) => {
+                store.lbs.extend(v.lbs.iter().cloned());
+                store.ubs.extend(v.ubs.iter().cloned());
+            }
+            _ => {
+                store.ubs.push(def);
             }
         }
+
+        store
     }
 }
 
@@ -1049,7 +1053,7 @@ impl TyCtxMut for TypeScheme {
     }
 
     fn bind_local(&mut self, var: &Interned<TypeVar>, ty: Ty) {
-        self.local_binds.insert(var.def, ty);
+        self.local_binds.insert(var.def.clone(), ty);
     }
 
     fn type_of_func(&mut self, _func: &typst::foundations::Func) -> Option<Interned<SigTy>> {
@@ -1089,10 +1093,6 @@ impl TypeVarBounds {
     pub fn name(&self) -> &StrRef {
         &self.var.name
     }
-    /// Get the definition id of the type variable
-    pub fn id(&self) -> DefId {
-        self.var.def
-    }
 
     /// Get self as a type
     pub fn as_type(&self) -> Ty {
@@ -1131,10 +1131,10 @@ impl FlowVarKind {
 
 #[derive(Default)]
 pub(super) struct TypeCanoStore {
-    pub cano_cache: HashMap<(Ty, bool), Ty>,
-    pub cano_local_cache: HashMap<(DefId, bool), Ty>,
-    pub negatives: HashSet<DefId>,
-    pub positives: HashSet<DefId>,
+    pub cano_cache: FxHashMap<(Ty, bool), Ty>,
+    pub cano_local_cache: FxHashMap<(DeclExpr, bool), Ty>,
+    pub negatives: FxHashSet<DeclExpr>,
+    pub positives: FxHashSet<DeclExpr>,
 }
 
 impl_internable!(Ty,);

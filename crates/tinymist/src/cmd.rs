@@ -537,10 +537,11 @@ impl LanguageState {
         let snap = self.primary().snapshot().map_err(z_internal_error)?;
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
-            let packages = tool::package::list_package_by_namespace(&snap.world.registry, ns)
-                .into_iter()
-                .map(PackageInfo::from)
-                .collect::<Vec<_>>();
+            let packages =
+                tinymist_query::package::list_package_by_namespace(&snap.world.registry, ns)
+                    .into_iter()
+                    .map(PackageInfo::from)
+                    .collect::<Vec<_>>();
 
             serde_json::to_value(packages).map_err(|e| internal_error(e.to_string()))
         })

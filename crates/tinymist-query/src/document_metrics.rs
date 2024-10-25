@@ -235,7 +235,7 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
         let font_info = std::mem::take(&mut self.font_info)
             .into_iter()
             .map(|(font, font_info_value)| {
-                let extra = self.ctx.resources.font_info(font.clone());
+                let extra = self.ctx.font_info(font.clone());
                 let info = &font.info();
                 DocumentFontInfo {
                     name: info.family.clone(),

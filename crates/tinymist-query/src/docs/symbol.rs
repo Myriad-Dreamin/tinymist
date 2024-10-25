@@ -7,7 +7,7 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
 use tinymist_world::LspWorld;
-use typst::foundations::{Bytes, Func, Value};
+use typst::foundations::{Bytes, Value};
 use typst::syntax::LinkedNode;
 use typst::{
     diag::StrResult,
@@ -15,7 +15,7 @@ use typst::{
 };
 
 use super::tidy::*;
-use crate::analysis::{ParamAttrs, ParamSpec};
+use crate::analysis::{ParamAttrs, ParamSpec, Signature, ToFunc};
 use crate::docs::library;
 use crate::ty::{DocSource, Interned};
 use crate::upstream::plain_docs_sentence;
@@ -101,7 +101,8 @@ pub(crate) fn symbol_docs(
     docs: Option<&str>,
     doc_ty: Option<ShowTypeRepr>,
 ) -> Result<SymbolDocs, String> {
-    let signature = sym_value.and_then(|e| signature_docs(ctx, e, doc_ty));
+    let signature =
+        sym_value.and_then(|e| signature_docs(&ctx.signature_dyn(e.to_func()?), doc_ty));
     if let Some(signature) = signature {
         return Ok(SymbolDocs::Function(Box::new(signature)));
     }
@@ -344,12 +345,9 @@ pub(crate) fn variable_docs(ctx: &mut AnalysisContext, pos: &LinkedNode) -> Opti
 }
 
 pub(crate) fn signature_docs(
-    ctx: &mut AnalysisContext,
-    runtime_fn: &Value,
+    sig: &Signature,
     mut doc_ty: Option<ShowTypeRepr>,
 ) -> Option<SignatureDocs> {
-    let func = runtime_fn.clone().cast::<Func>().ok()?;
-    let sig = ctx.signature_dyn(func.clone());
     let type_sig = sig.type_sig().clone();
 
     let pos_in = sig

@@ -102,6 +102,12 @@ impl Default for Interned<str> {
     }
 }
 
+impl Interned<str> {
+    pub fn empty() -> &'static Self {
+        &EMPTY
+    }
+}
+
 impl From<&str> for Interned<str> {
     fn from(s: &str) -> Self {
         Interned::new_str(s)

@@ -5,14 +5,18 @@ input_file: crates/tinymist-query/src/fixtures/type_check/confusing-name.typ
 ---
 "date" = Any
 "info" = Any
-"master-cover" = ((Any, "x": Any) => TypeBinary { operands: (Any, TypeBinary { operands: ({"submit-date": 0}, Any), op: Add }), op: Assign }).with(..("x": (Any) => Any) => any)
+"master-cover" = ((Any, "x": Any) => TypeBinary { operands: (Any, TypeBinary { operands: ({"submit-date": 0}, Any), op: Add }), op: Assign }).with(..("x": Any) => any)
 "x" = (Any) => Any
+"x" = Any
+"x" = Any
 "x" = Any
 ---
 5..6 -> @x
 7..11 -> @date
 15..19 -> @date
 15..29 -> Any
+37..38 -> @x
+40..41 -> @x
 57..69 -> @master-cover
 70..74 -> @info
 76..77 -> @x
@@ -22,4 +26,5 @@ input_file: crates/tinymist-query/src/fixtures/type_check/confusing-name.typ
 121..122 -> @x
 121..140 -> Any
 123..131 -> Type(datetime)
+123..137 -> Type(datetime)
 123..139 -> Any
