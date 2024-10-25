@@ -533,41 +533,7 @@ impl<'a> ExprWorker<'a> {
     fn check_module_import(&mut self, typed: ast::ModuleImport) -> Expr {
         let source = typed.source();
         log::debug!("checking import: {source:?}");
-        let src = self.eval_expr(source, InterpretMode::Code);
-        let src_expr = self.fold_expr_and_val(src).or_else(|| {
-            self.ctx
-                .analyze_expr(source.to_untyped())
-                .into_iter()
-                .find_map(|(v, _)| match v {
-                    Value::Str(s) => Some(Expr::Type(Ty::Value(InsTy::new(Value::Str(s))))),
-                    _ => None,
-                })
-        });
-
-        let mod_expr = src_expr.as_ref().and_then(|src_expr| {
-            log::debug!("checking import source: {src_expr:?}");
-            let src_str = match src_expr {
-                Expr::Type(Ty::Value(val)) => {
-                    if val.val.scope().is_some() {
-                        return Some(src_expr.clone());
-                    }
-
-                    match &val.val {
-                        Value::Str(s) => Some(s.as_str()),
-                        _ => None,
-                    }
-                }
-                Expr::Decl(d) if matches!(d.as_ref(), Decl::Module { .. }) => {
-                    return Some(src_expr.clone())
-                }
-
-                _ => None,
-            }?;
-
-            let fid = resolve_id_by_path(&self.ctx.world, self.fid, src_str)?;
-            let name = Decl::calc_path_stem(src_str);
-            Some(Expr::Decl(Decl::module(name, fid).into()))
-        });
+        let mod_expr = self.check_import(typed.source(), true);
 
         let decl = typed.new_name().map(Decl::module_alias).or_else(|| {
             typed.imports().is_none().then(|| {
@@ -670,6 +636,57 @@ impl<'a> ExprWorker<'a> {
         Expr::Import(ImportExpr { decl }.into())
     }
 
+    fn check_import(&mut self, source: ast::Expr, is_import: bool) -> Option<Expr> {
+        let src = self.eval_expr(source, InterpretMode::Code);
+        let src_expr = self.fold_expr_and_val(src).or_else(|| {
+            self.ctx
+                .analyze_expr(source.to_untyped())
+                .into_iter()
+                .find_map(|(v, _)| match v {
+                    Value::Str(s) => Some(Expr::Type(Ty::Value(InsTy::new(Value::Str(s))))),
+                    _ => None,
+                })
+        })?;
+
+        log::debug!("checking import source: {src_expr:?}");
+        let src_str = match &src_expr {
+            Expr::Type(Ty::Value(val)) => {
+                if val.val.scope().is_some() {
+                    return Some(src_expr.clone());
+                }
+
+                match &val.val {
+                    Value::Str(s) => Some(s.as_str()),
+                    _ => None,
+                }
+            }
+            Expr::Decl(d) if matches!(d.as_ref(), Decl::Module { .. }) => {
+                return Some(src_expr.clone())
+            }
+
+            _ => None,
+        }?;
+
+        let fid = resolve_id_by_path(&self.ctx.world, self.fid, src_str)?;
+        let name = Decl::calc_path_stem(src_str);
+        let module = Expr::Decl(Decl::module(name.clone(), fid).into());
+
+        let import_path = if is_import {
+            Decl::import_path(source.span(), name)
+        } else {
+            Decl::include_path(source.span(), name)
+        };
+
+        let ref_expr = RefExpr {
+            decl: import_path.into(),
+            step: Some(module.clone()),
+            root: Some(module.clone()),
+            val: None,
+        };
+        self.resolve_as(ref_expr.into());
+        Some(module)
+    }
+
     fn import_decls(&mut self, scope: &ExprScope, module: Expr, items: ast::ImportItems) {
         log::debug!("import scope {scope:?}");
 
@@ -734,6 +751,7 @@ impl<'a> ExprWorker<'a> {
     }
 
     fn check_module_include(&mut self, typed: ast::ModuleInclude) -> Expr {
+        let _mod_expr = self.check_import(typed.source(), false);
         let source = self.check(typed.source());
         Expr::Include(IncludeExpr { source }.into())
     }

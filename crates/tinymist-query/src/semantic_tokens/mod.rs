@@ -446,6 +446,7 @@ fn token_from_decl_expr(expr: &Expr, term: Option<&Ty>, modifier: &mut ModifierS
             PathStem(..) => ns(modifier),
             ImportAlias(..) => TokenType::Interpolated,
             IdentRef(..) => TokenType::Interpolated,
+            ImportPath(..) => TokenType::Interpolated,
             IncludePath(..) => TokenType::Interpolated,
             Import(..) => TokenType::Interpolated,
             ContentRef(..) => TokenType::Interpolated,

@@ -79,6 +79,13 @@ impl Expr {
             _ => Span::detached(),
         }
     }
+
+    pub(crate) fn file_id(&self) -> Option<TypstFileId> {
+        match self {
+            Expr::Decl(d) => d.file_id(),
+            _ => self.span().id(),
+        }
+    }
 }
 
 impl fmt::Display for Expr {
@@ -175,6 +182,7 @@ pub enum Decl {
     Module(ModuleDecl),
     ModuleAlias(SpannedDecl),
     PathStem(SpannedDecl),
+    ImportPath(SpannedDecl),
     IncludePath(SpannedDecl),
     Import(SpannedDecl),
     ContentRef(SpannedDecl),
@@ -296,8 +304,12 @@ impl Decl {
         Self::PathStem(SpannedDecl { name, at: s.span() })
     }
 
-    pub fn include_path(s: SyntaxNode, name: Interned<str>) -> Self {
-        Self::IncludePath(SpannedDecl { name, at: s.span() })
+    pub fn import_path(s: Span, name: Interned<str>) -> Self {
+        Self::ImportPath(SpannedDecl { name, at: s })
+    }
+
+    pub fn include_path(s: Span, name: Interned<str>) -> Self {
+        Self::IncludePath(SpannedDecl { name, at: s })
     }
 
     pub fn module_import(s: Span) -> Self {
@@ -350,6 +362,7 @@ impl Decl {
                 | Self::Module(..)
                 | Self::ModuleImport(..)
                 | Self::PathStem(..)
+                | Self::ImportPath(..)
                 | Self::IncludePath(..)
                 | Self::Spread(..)
                 | Self::Generated(..)

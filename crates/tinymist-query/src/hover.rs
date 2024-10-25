@@ -226,17 +226,17 @@ fn def_tooltip(
 
     let deref_target = get_deref_target(leaf.clone(), cursor)?;
 
-    let lnk = ctx.definition(source, document, deref_target.clone())?;
+    let def = ctx.definition(source, document, deref_target.clone())?;
 
     let mut results = vec![];
     let mut actions = vec![];
 
     use Decl::*;
-    match lnk.decl.as_ref() {
+    match def.decl.as_ref() {
         Label(..) => {
-            results.push(MarkedString::String(format!("Label: {}\n", lnk.name())));
+            results.push(MarkedString::String(format!("Label: {}\n", def.name())));
             // todo: type repr
-            if let Some(c) = lnk.term.as_ref().and_then(|v| v.value()) {
+            if let Some(c) = def.term.as_ref().and_then(|v| v.value()) {
                 let c = truncated_repr(&c);
                 results.push(MarkedString::String(format!("{c}")));
             }
@@ -245,22 +245,22 @@ fn def_tooltip(
         BibEntry(..) => {
             results.push(MarkedString::String(format!(
                 "Bibliography: @{}",
-                lnk.name()
+                def.name()
             )));
 
             Some(LspHoverContents::Array(results))
         }
         Func(..) | Closure(..) => {
-            let sig = ctx.signature_docs(&lnk);
+            let sig = ctx.signature_docs(&def);
 
             results.push(MarkedString::LanguageString(LanguageString {
                 language: "typc".to_owned(),
                 value: format!(
                     "let {name}({params}){result};",
-                    name = lnk.name(),
+                    name = def.name(),
                     params = ParamTooltip(sig.as_ref()),
                     result =
-                        ResultTooltip(lnk.name(), sig.as_ref().and_then(|sig| sig.ret_ty.as_ref()))
+                        ResultTooltip(def.name(), sig.as_ref().and_then(|sig| sig.ret_ty.as_ref()))
                 ),
             }));
 
@@ -268,7 +268,7 @@ fn def_tooltip(
                 results.push(MarkedString::String(doc.def_docs().into()));
             }
 
-            if let Some(link) = ExternalDocLink::get(ctx, &lnk) {
+            if let Some(link) = ExternalDocLink::get(ctx, &def) {
                 actions.push(link);
             }
 
@@ -298,9 +298,9 @@ fn def_tooltip(
                 language: "typc".to_owned(),
                 value: format!(
                     "let {name}{result};",
-                    name = lnk.name(),
+                    name = def.name(),
                     result = ResultTooltip(
-                        lnk.name(),
+                        def.name(),
                         sig.as_ref().and_then(|sig| sig.return_ty.as_ref())
                     )
                 ),
@@ -308,11 +308,11 @@ fn def_tooltip(
 
             if let Some(doc) = sig {
                 results.push(MarkedString::String(doc.def_docs().clone()));
-            } else if let Some(doc) = DocTooltip::get(ctx, &lnk) {
+            } else if let Some(doc) = DocTooltip::get(ctx, &def) {
                 results.push(MarkedString::String(doc));
             }
 
-            if let Some(link) = ExternalDocLink::get(ctx, &lnk) {
+            if let Some(link) = ExternalDocLink::get(ctx, &def) {
                 actions.push(link);
             }
 
@@ -321,7 +321,7 @@ fn def_tooltip(
         }
         Pattern(..) | Docs(..) | Generated(..) | ImportAlias(..) | Constant(..) | IdentRef(..)
         | ModuleAlias(..) | Module(..) | Import(..) | ContentRef(..) | StrName(..)
-        | ModuleImport(..) | Content(..) | IncludePath(..) | Spread(..) => None,
+        | ModuleImport(..) | Content(..) | ImportPath(..) | IncludePath(..) | Spread(..) => None,
     }
 }
 
@@ -394,15 +394,15 @@ impl fmt::Display for ResultTooltip<'_> {
 struct ExternalDocLink;
 
 impl ExternalDocLink {
-    fn get(ctx: &mut AnalysisContext, lnk: &Definition) -> Option<CommandLink> {
-        self::ExternalDocLink::get_inner(ctx, lnk)
+    fn get(ctx: &mut AnalysisContext, def: &Definition) -> Option<CommandLink> {
+        self::ExternalDocLink::get_inner(ctx, def)
     }
 
-    fn get_inner(_ctx: &mut AnalysisContext, lnk: &Definition) -> Option<CommandLink> {
-        let value = lnk.value();
+    fn get_inner(_ctx: &mut AnalysisContext, def: &Definition) -> Option<CommandLink> {
+        let value = def.value();
 
         if matches!(value, Some(Value::Func(..))) {
-            if let Some(builtin) = Self::builtin_func_tooltip("https://typst.app/docs/", lnk) {
+            if let Some(builtin) = Self::builtin_func_tooltip("https://typst.app/docs/", def) {
                 return Some(builtin);
             }
         };
@@ -412,8 +412,8 @@ impl ExternalDocLink {
 }
 
 impl ExternalDocLink {
-    fn builtin_func_tooltip(base: &str, lnk: &Definition) -> Option<CommandLink> {
-        let Some(Value::Func(func)) = lnk.value() else {
+    fn builtin_func_tooltip(base: &str, def: &Definition) -> Option<CommandLink> {
+        let Some(Value::Func(func)) = def.value() else {
             return None;
         };
 
@@ -448,19 +448,19 @@ impl ExternalDocLink {
 pub(crate) struct DocTooltip;
 
 impl DocTooltip {
-    pub fn get(ctx: &mut AnalysisContext, lnk: &Definition) -> Option<String> {
-        self::DocTooltip::get_inner(ctx, lnk).map(|s| "\n\n".to_owned() + &s)
+    pub fn get(ctx: &mut AnalysisContext, def: &Definition) -> Option<String> {
+        self::DocTooltip::get_inner(ctx, def).map(|s| "\n\n".to_owned() + &s)
     }
 
-    fn get_inner(ctx: &mut AnalysisContext, lnk: &Definition) -> Option<String> {
-        let value = lnk.value();
+    fn get_inner(ctx: &mut AnalysisContext, def: &Definition) -> Option<String> {
+        let value = def.value();
         if matches!(value, Some(Value::Func(..))) {
-            if let Some(builtin) = Self::builtin_func_tooltip(lnk) {
+            if let Some(builtin) = Self::builtin_func_tooltip(def) {
                 return Some(plain_docs_sentence(builtin).into());
             }
         };
 
-        let (fid, def_range) = lnk.def_at(ctx.shared()).clone()?;
+        let (fid, def_range) = def.def_at(ctx.shared()).clone()?;
 
         let src = ctx.source_by_id(fid).ok()?;
         find_docs_before(&src, def_range.start)
@@ -468,8 +468,8 @@ impl DocTooltip {
 }
 
 impl DocTooltip {
-    fn builtin_func_tooltip(lnk: &Definition) -> Option<&'_ str> {
-        let value = lnk.value();
+    fn builtin_func_tooltip(def: &Definition) -> Option<&'_ str> {
+        let value = def.value();
         let Some(Value::Func(func)) = &value else {
             return None;
         };

@@ -66,23 +66,8 @@ pub fn definition(
         DerefTarget::VarAccess(node) | DerefTarget::Callee(node) => {
             find_ident_definition(ctx, source, node)
         }
-        DerefTarget::ImportPath(path) => {
-            let parent = path.parent()?;
-            let import_node = parent.cast::<ast::ModuleImport>()?;
-
-            let n = import_node.source().to_untyped();
-            let name = Decl::calc_path_stem(n.text());
-            let decl = Decl::path_stem(n.clone(), name);
-            Some(Definition::new(decl.into(), None))
-        }
-        DerefTarget::IncludePath(path) => {
-            let parent = path.parent()?;
-            let include_node = parent.cast::<ast::ModuleInclude>()?;
-
-            let n = include_node.source().to_untyped();
-            let name = Decl::calc_path_stem(n.text());
-            let decl = Decl::include_path(n.clone(), name);
-            Some(Definition::new(decl.into(), None))
+        DerefTarget::ImportPath(path) | DerefTarget::IncludePath(path) => {
+            DefResolver::new(ctx, source)?.of_span(path.span())
         }
         DerefTarget::Label(r) | DerefTarget::Ref(r) => {
             let ref_expr: ast::Expr = r.cast()?;
@@ -133,7 +118,7 @@ fn find_ident_definition(
     };
 
     // Syntactic definition
-    let mut def_worker = DefResolver::new(ctx, source.id())?;
+    let mut def_worker = DefResolver::new(ctx, source)?;
     let expr = def_worker.of_span(ident_ref)?;
 
     let ty = expr.term.as_ref();
@@ -387,8 +372,8 @@ struct DefResolver {
 }
 
 impl DefResolver {
-    fn new(ctx: &Arc<SharedContext>, id: TypstFileId) -> Option<Self> {
-        let ei = ctx.expr_stage(&ctx.source_by_id(id).ok()?);
+    fn new(ctx: &Arc<SharedContext>, source: &Source) -> Option<Self> {
+        let ei = ctx.expr_stage(source);
         Some(Self { ei })
     }
 

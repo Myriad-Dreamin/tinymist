@@ -1,18 +1,18 @@
-use std::ops::Range;
-
 use lsp_types::{
     DocumentChangeOperation, DocumentChanges, OneOf, OptionalVersionedTextDocumentIdentifier,
     RenameFile, TextDocumentEdit,
 };
 use reflexo::path::{unix_slash, PathClean};
-use typst::foundations::{Repr, Str};
-use typst_shim::syntax::LinkedNodeExt;
+use typst::{
+    foundations::{Repr, Str},
+    syntax::Span,
+};
 
 use crate::{
     find_references,
     prelude::*,
     prepare_renaming,
-    syntax::{deref_expr, DerefTarget},
+    syntax::{deref_expr, node_ancestors, Decl, DerefTarget},
 };
 
 /// The [`textDocument/rename`] request is sent from the client to the server to
@@ -41,22 +41,21 @@ impl StatefulRequest for RenameRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
 
-        let lnk = ctx.definition(&source, doc.as_ref(), deref_target.clone())?;
+        let def = ctx.definition(&source, doc.as_ref(), deref_target.clone())?;
 
-        prepare_renaming(ctx, &deref_target, &lnk)?;
+        prepare_renaming(ctx, &deref_target, &def)?;
 
         match deref_target {
             // todo: abs path
             DerefTarget::ImportPath(path) | DerefTarget::IncludePath(path) => {
                 let ref_path_str = path.cast::<ast::Str>()?.get();
-
                 let new_path_str = if !self.new_name.ends_with(".typ") {
                     self.new_name + ".typ"
                 } else {
                     self.new_name
                 };
 
-                let def_fid = lnk.def_at(ctx.shared())?.0;
+                let def_fid = def.def_at(ctx.shared())?.0;
                 let old_path = ctx.path_for_id(def_fid).ok()?;
 
                 let rename_loc = Path::new(ref_path_str.as_str());
@@ -132,19 +131,20 @@ pub(crate) fn do_rename_file(
         let import_info = ctx.expr_stage(&ref_src);
 
         let edits = edits.entry(uri).or_default();
-        for rng in &import_info.imports {
-            let _ = diff;
-            let _ = edits;
-            let _ = rng;
-            let _ = rename_importer;
+        for (span, r) in &import_info.resolves {
+            if !matches!(
+                r.decl.as_ref(),
+                Decl::ImportPath(..) | Decl::IncludePath(..) | Decl::PathStem(..)
+            ) {
+                continue;
+            }
+            let importing = r.root.as_ref()?.file_id();
 
-            // let importing = importing_src.as_ref().map(|s| s.id());
-            // if importing.map_or(true, |i| i != def_fid) {
-            //     continue;
-            // }
-            // log::debug!("import: {rng:?} -> {importing:?} v.s. {def_fid:?}");
-            // rename_importer(ctx, &ref_src, rng.clone(), &diff, edits);
-            todo!()
+            if importing.map_or(true, |i| i != def_fid) {
+                continue;
+            }
+            log::debug!("import: {span:?} -> {importing:?} v.s. {def_fid:?}");
+            rename_importer(ctx, &ref_src, *span, &diff, edits);
         }
     }
 
@@ -169,18 +169,21 @@ pub(crate) fn edits_to_document_changes(
 fn rename_importer(
     ctx: &AnalysisContext,
     src: &Source,
-    rng: Range<usize>,
+    span: Span,
     diff: &Path,
     edits: &mut Vec<TextEdit>,
 ) -> Option<()> {
     let root = LinkedNode::new(src.root());
-    let import_node = root.leaf_at_compat(rng.start + 1).and_then(deref_expr)?;
-
-    let (import_path, has_path_var) = match import_node.cast::<ast::Expr>()? {
-        ast::Expr::Import(i) => (i.source(), i.new_name().is_none() && i.imports().is_none()),
-        ast::Expr::Include(i) => (i.source(), false),
-        _ => return None,
-    };
+    let import_node = root.find(span).and_then(deref_expr)?;
+    let (import_path, has_path_var) = node_ancestors(&import_node).find_map(|import_node| {
+        match import_node.cast::<ast::Expr>()? {
+            ast::Expr::Import(i) => {
+                Some((i.source(), i.new_name().is_none() && i.imports().is_none()))
+            }
+            ast::Expr::Include(i) => Some((i.source(), false)),
+            _ => None,
+        }
+    })?;
 
     let new_text = match import_path {
         ast::Expr::Str(s) => {
