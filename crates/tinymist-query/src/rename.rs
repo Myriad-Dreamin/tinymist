@@ -9,7 +9,6 @@ use typst::foundations::{Repr, Str};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
-    analysis::find_definition,
     find_references,
     prelude::*,
     prepare_renaming,
@@ -42,12 +41,7 @@ impl StatefulRequest for RenameRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
 
-        let lnk = find_definition(
-            ctx.shared(),
-            source.clone(),
-            doc.as_ref(),
-            deref_target.clone(),
-        )?;
+        let lnk = ctx.definition(source.clone(), doc.as_ref(), deref_target.clone())?;
 
         prepare_renaming(ctx, &deref_target, &lnk)?;
 
@@ -223,7 +217,7 @@ mod tests {
 
     #[test]
     fn test() {
-        snapshot_testing("rename", &|world, path| {
+        snapshot_testing("playground", &|world, path| {
             let source = world.source_by_path(&path).unwrap();
 
             let request = RenameRequest {

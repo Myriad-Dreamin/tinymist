@@ -2,7 +2,7 @@ use log::debug;
 use typst::syntax::Span;
 
 use crate::{
-    analysis::{find_definition, Definition, SearchCtx},
+    analysis::{Definition, SearchCtx},
     prelude::*,
     syntax::{DerefTarget, RefExpr},
     ty::Interned,
@@ -53,7 +53,7 @@ pub(crate) fn find_references(
         }
     };
 
-    let def = find_definition(ctx.shared(), source, doc, target)?;
+    let def = ctx.definition(source, doc, target)?;
 
     let worker = ReferencesWorker {
         ctx: ctx.fork_for_search(),
@@ -79,7 +79,7 @@ impl<'a, 'w> ReferencesWorker<'a, 'w> {
     fn label_root(mut self) -> Option<Vec<LspLocation>> {
         let mut ids = vec![];
 
-        for dep in self.ctx.ctx.resources.dependencies() {
+        for dep in self.ctx.ctx.dependencies() {
             if let Ok(ref_fid) = self.ctx.ctx.file_id_by_path(&dep) {
                 ids.push(ref_fid);
             }

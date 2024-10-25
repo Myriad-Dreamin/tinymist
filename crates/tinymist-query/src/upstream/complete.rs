@@ -10,6 +10,7 @@ use typst::model::Document;
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
+use typst::World;
 use typst_shim::{syntax::LinkedNodeExt, utils::hash128};
 use unscanny::Scanner;
 
@@ -948,8 +949,8 @@ fn code_completions(ctx: &mut CompletionContext, hash: bool) {
 }
 
 /// Context for autocompletion.
-pub struct CompletionContext<'a, 'w> {
-    pub ctx: &'a mut AnalysisContext<'w>,
+pub struct CompletionContext<'a, 'b> {
+    pub ctx: &'a mut AnalysisContext<'b>,
     pub document: Option<&'a Document>,
     pub text: &'a str,
     pub before: &'a str,
@@ -1043,7 +1044,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
     /// Add completions for all font families.
     fn font_completions(&mut self) {
         let equation = self.before_window(25).contains("equation");
-        for (family, iter) in self.world().book().families() {
+        for (family, iter) in self.world().clone().book().families() {
             let detail = summarize_font_family(iter);
             if !equation || family.contains("Math") {
                 self.value_completion(
@@ -1058,14 +1059,10 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
     /// Add completions for all available packages.
     fn package_completions(&mut self, all_versions: bool) {
-        let mut packages: Vec<_> = self
-            .world()
-            .packages()
-            .iter()
-            .map(|e| (&e.0, e.1.clone()))
-            .collect();
+        let w = self.world().clone();
+        let mut packages: Vec<_> = w.packages().iter().map(|e| (&e.0, e.1.clone())).collect();
         // local_packages to references and add them to the packages
-        let local_packages_refs = self.ctx.resources.local_packages();
+        let local_packages_refs = self.ctx.local_packages();
         packages.extend(
             local_packages_refs
                 .iter()

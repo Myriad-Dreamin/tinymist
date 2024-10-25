@@ -55,7 +55,7 @@ impl Definition {
 
 // todo: field definition
 /// Finds the definition of a symbol.
-pub fn find_definition(
+pub fn definition(
     ctx: &Arc<SharedContext>,
     source: Source,
     document: Option<&VersionedDocument>,
@@ -352,7 +352,7 @@ fn resolve_callee_(
         let node = source.find(callee.span())?;
         let cursor = node.offset();
         let deref_target = get_deref_target(node, cursor)?;
-        let def = find_definition(ctx, source.clone(), None, deref_target)?;
+        let def = ctx.definition(source.clone(), None, deref_target)?;
         match def.term.and_then(|val| val.value()) {
             Some(Value::Func(f)) => Some(f),
             Some(Value::Type(ty)) => ty.constructor().ok(),

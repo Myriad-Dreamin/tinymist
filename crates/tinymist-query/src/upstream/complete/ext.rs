@@ -4,6 +4,7 @@ use ecow::{eco_format, EcoString};
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
 use once_cell::sync::OnceCell;
 use reflexo::path::{unix_slash, PathClean};
+use tinymist_world::LspWorld;
 use typst::foundations::{AutoValue, Func, Label, NoneValue, Repr, Type, Value};
 use typst::layout::{Dir, Length};
 use typst::syntax::ast::AstNode;
@@ -20,7 +21,7 @@ use crate::upstream::plain_docs_sentence;
 use crate::{completion_kind, prelude::*, LspCompletion};
 
 impl<'a, 'w> CompletionContext<'a, 'w> {
-    pub fn world(&self) -> &'w dyn typst::World {
+    pub fn world(&self) -> &LspWorld {
         self.ctx.world()
     }
 

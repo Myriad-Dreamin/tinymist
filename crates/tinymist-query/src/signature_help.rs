@@ -3,7 +3,6 @@ use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     adt::interner::Interned,
-    analysis::find_definition,
     prelude::*,
     syntax::{get_check_target, get_deref_target, CheckTarget, ParamTarget},
     DocTooltip, LspParamInfo, SemanticRequest,
@@ -41,7 +40,7 @@ impl SemanticRequest for SignatureHelpRequest {
 
         let deref_target = get_deref_target(callee, cursor)?;
 
-        let def_link = find_definition(ctx.shared(), source.clone(), None, deref_target)?;
+        let def_link = ctx.definition(source.clone(), None, deref_target)?;
 
         let documentation = DocTooltip::get(ctx, &def_link)
             .as_deref()

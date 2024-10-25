@@ -1,5 +1,5 @@
 use crate::{
-    analysis::{find_definition, Definition},
+    analysis::Definition,
     prelude::*,
     syntax::{Decl, DerefTarget},
 };
@@ -47,12 +47,7 @@ impl StatefulRequest for PrepareRenameRequest {
         }
 
         let origin_selection_range = ctx.to_lsp_range(deref_target.node().range(), &source);
-        let lnk = find_definition(
-            ctx.shared(),
-            source.clone(),
-            doc.as_ref(),
-            deref_target.clone(),
-        )?;
+        let lnk = ctx.definition(source.clone(), doc.as_ref(), deref_target.clone())?;
 
         let (name, range) = prepare_renaming(ctx, &deref_target, &lnk)?;
 

@@ -3,7 +3,7 @@ use core::fmt;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
-    analysis::{find_definition, get_link_exprs_in, Definition},
+    analysis::{get_link_exprs_in, Definition},
     docs::SignatureDocs,
     jump_from_cursor,
     prelude::*,
@@ -226,7 +226,7 @@ fn def_tooltip(
 
     let deref_target = get_deref_target(leaf.clone(), cursor)?;
 
-    let lnk = find_definition(ctx.shared(), source.clone(), document, deref_target.clone())?;
+    let lnk = ctx.definition(source.clone(), document, deref_target.clone())?;
 
     let mut results = vec![];
     let mut actions = vec![];
