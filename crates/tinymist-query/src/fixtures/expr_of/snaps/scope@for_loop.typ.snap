@@ -4,8 +4,8 @@ expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/for_loop.typ
 ---
 = resolves
-Var("i")@5..6 in \s0.typ -> Var("i")@5..6 in \s0.typ, val: None
-Var("i")@18..19 in \s0.typ -> Var("i")@18..19 in \s0.typ, val: None
-IdentRef("i")@28..29 in \s0.typ -> Var("i")@18..19 in \s0.typ, val: None
-IdentRef("i")@40..41 in \s0.typ -> Var("i")@5..6 in \s0.typ, val: None
+Var(i)@5..6 in \s0.typ -> Var(i)@5..6 in \s0.typ, root Var(i)@5..6 in \s0.typ, val: None
+Var(i)@18..19 in \s0.typ -> Var(i)@18..19 in \s0.typ, root Var(i)@18..19 in \s0.typ, val: None
+IdentRef(i)@28..29 in \s0.typ -> Var(i)@18..19 in \s0.typ, root Var(i)@18..19 in \s0.typ, val: None
+IdentRef(i)@40..41 in \s0.typ -> Var(i)@5..6 in \s0.typ, root Var(i)@5..6 in \s0.typ, val: None
 = exports

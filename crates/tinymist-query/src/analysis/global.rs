@@ -26,6 +26,7 @@ use crate::docs::{SignatureDocs, VarDocs};
 use crate::syntax::{
     construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
     scan_workspace_files, DerefTarget, ExprInfo, LexicalHierarchy, LexicalScope, ModuleDependency,
+    Processing,
 };
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
@@ -681,6 +682,16 @@ impl SharedContext {
 
     /// Get the expression information of a source file.
     pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> Arc<ExprInfo> {
+        let mut route = Processing::default();
+        self.expr_stage_(source, &mut route)
+    }
+
+    /// Get the expression information of a source file.
+    pub(crate) fn expr_stage_(
+        self: &Arc<Self>,
+        source: &Source,
+        route: &mut Processing<LexicalScope>,
+    ) -> Arc<ExprInfo> {
         use crate::syntax::expr_of;
 
         let res = {
@@ -688,34 +699,34 @@ impl SharedContext {
             let res = entry.or_insert_with(|| (self.lifetime, DeferredCompute::default()));
             res.1.clone()
         };
-        res.get_or_init(|| expr_of(self.clone(), source.clone()))
+        res.get_or_init(|| expr_of(self.clone(), source.clone(), route))
             .clone()
     }
 
-    pub(crate) fn exports_of(self: &Arc<Self>, source: Source) -> LexicalScope {
-        self.expr_stage(&source).exports.clone()
+    pub(crate) fn exports_of(
+        self: &Arc<Self>,
+        source: Source,
+        route: &mut Processing<LexicalScope>,
+    ) -> LexicalScope {
+        if let Some(s) = route.get(&source.id()) {
+            return s.clone();
+        }
 
-        // {
-        //     let entry =
-        // self.analysis.caches.expr_stage.get(&hash128(&source));
-        //     if let Some(expr_info) = entry.and_then(|e| e.1.get().cloned()) {
-        //         return expr_info.exports.clone();
-        //     }
-        // }
-
-        // let (tx, rx) = oneshot::channel();
-        // let this = self.clone();
-        // let source = source.clone();
-        // rayon::spawn(move || {
-        //     this.expr_stage_(&source, |e| {
-        //         tx.send(e).unwrap_or_default();
-        //     });
-        // });
-        // rx.blocking_recv().unwrap_or_default()
+        self.expr_stage_(&source, route).exports.clone()
     }
 
     /// Get the type check information of a source file.
     pub(crate) fn type_check(self: &Arc<Self>, source: &Source) -> Option<Arc<TypeScheme>> {
+        let mut route = Processing::default();
+        self.type_check_(source, &mut route)
+    }
+
+    /// Get the type check information of a source file.
+    pub(crate) fn type_check_(
+        self: &Arc<Self>,
+        source: &Source,
+        route: &mut Processing<Arc<TypeScheme>>,
+    ) -> Option<Arc<TypeScheme>> {
         use crate::analysis::type_check;
         // todo: recursive hash
         let expr_info = self.expr_stage(source);
@@ -724,11 +735,8 @@ impl SharedContext {
             let res = entry.or_insert_with(|| (self.lifetime, Arc::default()));
             res.1.clone()
         };
-        res.get_or_init(|| {
-            log::debug!("real type check {:?}", source.id());
-            type_check(self.clone(), expr_info)
-        })
-        .clone()
+        res.get_or_init(|| type_check(self.clone(), expr_info, route))
+            .clone()
     }
 
     /// Try to load a module from the current source file.

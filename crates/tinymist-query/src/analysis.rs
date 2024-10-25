@@ -219,7 +219,6 @@ mod type_check_tests {
 
     use typst::syntax::Source;
 
-    use crate::analysis::*;
     use crate::tests::*;
 
     use super::{Ty, TypeScheme};
@@ -229,8 +228,7 @@ mod type_check_tests {
         snapshot_testing("type_check", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let result = ctx.expr_stage(&source);
-            let result = type_check(ctx.shared_(), result);
+            let result = ctx.type_check(&source);
             let result = result
                 .as_deref()
                 .map(|e| format!("{:#?}", TypeCheckSnapshot(&source, e)));
@@ -303,8 +301,7 @@ mod post_type_check_tests {
             let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
-            let result = ctx.expr_stage(&source);
-            let result = type_check(ctx.shared_(), result);
+            let result = ctx.type_check(&source);
             let literal_type = result.and_then(|info| post_type_check(ctx.shared_(), &info, node));
 
             with_settings!({
@@ -340,8 +337,7 @@ mod type_describe_tests {
             let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
-            let result = ctx.expr_stage(&source);
-            let result = type_check(ctx.shared_(), result);
+            let result = ctx.type_check(&source);
             let literal_type = result.and_then(|info| post_type_check(ctx.shared_(), &info, node));
 
             with_settings!({

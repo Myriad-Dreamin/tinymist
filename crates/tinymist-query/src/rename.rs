@@ -102,24 +102,7 @@ impl StatefulRequest for RenameRequest {
 
                 let mut edits = HashMap::new();
 
-                let (def_fid, _def_range) = lnk.def_at(ctx.shared())?;
-                let def_loc = {
-                    let def_source = ctx.source_by_id(def_fid).ok()?;
-
-                    let uri = ctx.uri_for_id(def_fid).ok()?;
-
-                    let Some(range) = lnk.name_range(ctx.shared()) else {
-                        log::warn!("rename: no name range");
-                        return None;
-                    };
-
-                    LspLocation {
-                        uri,
-                        range: ctx.to_lsp_range(range, &def_source),
-                    }
-                };
-
-                for i in (Some(def_loc).into_iter()).chain(references) {
+                for i in references {
                     let uri = i.uri;
                     let range = i.range;
                     let edits = edits.entry(uri).or_insert_with(Vec::new);

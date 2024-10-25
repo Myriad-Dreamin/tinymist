@@ -7,7 +7,7 @@ use super::{
     TypeVarBounds,
 };
 use crate::{
-    syntax::{Decl, DeclExpr, DeferExpr, Expr, ExprInfo, UnaryOp},
+    syntax::{Decl, DeclExpr, DeferExpr, Expr, ExprInfo, Processing, UnaryOp},
     ty::*,
 };
 
@@ -25,8 +25,11 @@ pub(crate) use select::*;
 pub(crate) fn type_check(
     ctx: Arc<SharedContext>,
     expr_info: Arc<ExprInfo>,
+    route: &mut Processing<Arc<TypeScheme>>,
 ) -> Option<Arc<TypeScheme>> {
     let mut info = TypeScheme::default();
+
+    route.insert(expr_info.fid, Arc::new(TypeScheme::default()));
 
     // Retrieve def-use information for the source.
     let root = expr_info.root.clone();
@@ -35,12 +38,15 @@ pub(crate) fn type_check(
         ctx,
         ei: expr_info,
         info: &mut info,
+        route,
     };
 
     let type_check_start = std::time::Instant::now();
     checker.check(&root);
     let elapsed = type_check_start.elapsed();
     log::debug!("Type checking on {:?} took {elapsed:?}", checker.ei.fid);
+
+    checker.route.remove(&checker.ei.fid);
 
     Some(Arc::new(info))
 }
@@ -52,6 +58,7 @@ struct TypeChecker<'a> {
     ei: Arc<ExprInfo>,
 
     info: &'a mut TypeScheme,
+    route: &'a mut Processing<Arc<TypeScheme>>,
 }
 
 impl<'a> TyCtxMut for TypeChecker<'a> {
@@ -114,7 +121,12 @@ impl<'a> TypeChecker<'a> {
 
                 let source = self.ctx.source_by_id(fid).ok()?;
                 let ext_def_use_info = self.ctx.expr_stage(&source);
-                let ext_type_info = self.ctx.type_check(&source)?;
+                // todo: check types in cycle
+                let ext_type_info = if let Some(route) = self.route.get(&source.id()) {
+                    route.clone()
+                } else {
+                    self.ctx.type_check_(&source, self.route)?
+                };
                 let ext_def = ext_def_use_info.exports.get(&name)?;
 
                 // todo: rest expressions

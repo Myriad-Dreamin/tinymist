@@ -43,16 +43,9 @@ impl Definition {
         Some((fid, range.unwrap_or_default()))
     }
 
-    // todo: name range
     /// The range of the name of the definition.
-    pub(crate) fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>> {
-        if !self.decl.is_def() {
-            return None;
-        }
-
-        let fid = self.decl.file_id()?;
-        let src = ctx.source_by_id(fid).ok()?;
-        src.range(self.decl.span()?)
+    pub fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>> {
+        self.decl.name_range(ctx)
     }
 
     pub(crate) fn value(&self) -> Option<Value> {

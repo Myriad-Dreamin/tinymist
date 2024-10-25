@@ -10,12 +10,15 @@ use typst::{
 
 use crate::{
     adt::interner::impl_internable,
+    analysis::SharedContext,
     prelude::*,
     ty::{InsTy, Interned, SelectTy, Ty, TypeVar},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
+    /// A deferred expression
+    Defer(DeferExpr),
     /// A sequence of expressions
     Seq(Interned<Vec<Expr>>),
     /// An array literal
@@ -350,6 +353,23 @@ impl Decl {
         }
     }
 
+    // todo: name range
+    /// The range of the name of the definition.
+    pub fn name_range(&self, ctx: &SharedContext) -> Option<Range<usize>> {
+        if !self.is_def() {
+            return None;
+        }
+
+        let fid = self.file_id()?;
+        let src = ctx.source_by_id(fid).ok()?;
+        src.range(self.span()?)
+    }
+
+    pub fn must_span(&self) -> Span {
+        self.span()
+            .unwrap_or_else(|| panic!("Decl {self:?} has no span"))
+    }
+
     pub fn weak_cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.name().cmp(other.name()).then_with(|| {
             let span_pair = self.span().zip(other.span());
@@ -460,7 +480,7 @@ impl DocsDecl {
     }
 
     fn span(&self) -> Option<Span> {
-        None
+        Some(Span::detached())
     }
 }
 
@@ -570,6 +590,12 @@ pub struct DeferExpr {
     pub span: Span,
 }
 
+impl From<DeferExpr> for Expr {
+    fn from(defer: DeferExpr) -> Self {
+        Expr::Defer(defer)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ElementExpr {
     pub elem: Element,
@@ -586,7 +612,7 @@ pub struct ApplyExpr {
 pub struct FuncExpr {
     pub decl: DeclExpr,
     pub params: Interned<Pattern>,
-    pub body: DeferExpr,
+    pub body: Expr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -594,13 +620,13 @@ pub struct LetExpr {
     /// Span of the pattern
     pub span: Span,
     pub pattern: Expr,
-    pub body: Option<DeferExpr>,
+    pub body: Option<Expr>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ShowExpr {
     pub selector: Option<Expr>,
-    pub edit: DeferExpr,
+    pub edit: Expr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -798,6 +824,7 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
 
     fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
+            Expr::Defer(..) => write!(self.f, "defer(..)"),
             Expr::Seq(s) => self.write_seq(s),
             Expr::Array(a) => self.write_array(a),
             Expr::Dict(d) => self.write_dict(d),
@@ -971,14 +998,17 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
     fn write_func(&mut self, func: &Interned<FuncExpr>) -> fmt::Result {
         write!(self.f, "func[{:?}](", func.decl)?;
         self.write_pattern(&func.params)?;
-        write!(self.f, " = {:?})", func.body.span)
+        write!(self.f, " = ")?;
+        self.write_expr(&func.body)?;
+        write!(self.f, ")")
     }
 
     fn write_let(&mut self, l: &Interned<LetExpr>) -> fmt::Result {
         write!(self.f, "let(")?;
         self.write_expr(&l.pattern)?;
         if let Some(body) = &l.body {
-            write!(self.f, " = {:?}", body.span)?;
+            write!(self.f, " = ")?;
+            self.write_expr(body)?;
         }
         write!(self.f, ")")
     }
@@ -989,7 +1019,8 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
             self.write_expr(selector)?;
             self.f.write_str(", ")?;
         }
-        write!(self.f, "{:?})", s.edit.span)
+        self.write_expr(&s.edit)?;
+        write!(self.f, ")")
     }
 
     fn write_set(&mut self, s: &Interned<SetExpr>) -> fmt::Result {

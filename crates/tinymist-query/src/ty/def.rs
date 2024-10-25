@@ -452,10 +452,9 @@ impl Ord for TypeVar {
         self.name.cmp(&other.name).then_with(|| {
             // todo: buggy
             self.def
-                .span()
-                .unwrap()
+                .must_span()
                 .number()
-                .cmp(&other.def.span().unwrap().number())
+                .cmp(&other.def.must_span().number())
         })
     }
 }

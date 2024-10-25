@@ -21,7 +21,13 @@ use crate::{
 
 use super::{compute_docstring, def::*, DocCommentMatcher, DocString, InterpretMode};
 
-pub(crate) fn expr_of(ctx: Arc<SharedContext>, source: Source) -> Arc<ExprInfo> {
+pub type Processing<T> = FxHashMap<TypstFileId, T>;
+
+pub(crate) fn expr_of(
+    ctx: Arc<SharedContext>,
+    source: Source,
+    route: &mut Processing<LexicalScope>,
+) -> Arc<ExprInfo> {
     log::debug!("expr_of: {:?}", source.id());
 
     let resolves_base = Arc::new(Mutex::new(vec![]));
@@ -58,13 +64,25 @@ pub(crate) fn expr_of(ctx: Arc<SharedContext>, source: Source) -> Arc<ExprInfo> 
             },
             resolves,
             buffer: vec![],
+            defers: vec![],
             comment_matcher: DocCommentMatcher::default(),
+            route,
         };
+
+        w.route.insert(w.fid, LexicalScope::default());
         let root = source.root().cast::<ast::Markup>().unwrap();
         let root = w.check_in_mode(root.to_untyped().children(), InterpretMode::Markup);
+        let root_scope = w.summarize_scope();
+        w.route.insert(w.fid, root_scope.clone());
+
+        while let Some((node, lexical)) = w.defers.pop() {
+            w.lexical = lexical;
+            w.check(node.cast::<ast::Expr>().unwrap());
+        }
+
         w.collect_buffer();
 
-        (w.summarize_scope(), root)
+        (root_scope, root)
     };
 
     let info = ExprInfo {
@@ -79,6 +97,7 @@ pub(crate) fn expr_of(ctx: Arc<SharedContext>, source: Source) -> Arc<ExprInfo> 
     };
     log::debug!("expr_of end {:?}", source.id());
 
+    route.remove(&info.fid);
     Arc::new(info)
 }
 
@@ -158,7 +177,7 @@ struct LexicalContext {
     last: ExprScope,
 }
 
-pub(crate) struct ExprWorker {
+pub(crate) struct ExprWorker<'a> {
     fid: TypstFileId,
     ctx: Arc<SharedContext>,
     imports: Arc<Mutex<FxHashSet<TypstFileId>>>,
@@ -168,11 +187,13 @@ pub(crate) struct ExprWorker {
     resolves: Arc<Mutex<ResolveVec>>,
     buffer: ResolveVec,
     lexical: LexicalContext,
+    defers: Vec<(SyntaxNode, LexicalContext)>,
 
+    route: &'a mut Processing<LexicalScope>,
     comment_matcher: DocCommentMatcher,
 }
 
-impl ExprWorker {
+impl<'a> ExprWorker<'a> {
     fn with_scope<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         self.lexical.scopes.push(std::mem::replace(
             &mut self.lexical.last,
@@ -268,9 +289,7 @@ impl ExprWorker {
             DestructAssign(destruct_assignment) => self.check_destruct_assign(destruct_assignment),
             Set(set_rule) => self.check_set(set_rule),
             Show(show_rule) => self.check_show(show_rule),
-            Contextual(contextual) => {
-                Expr::Unary(UnInst::new(UnaryOp::Context, self.check(contextual.body())))
-            }
+            Contextual(c) => Expr::Unary(UnInst::new(UnaryOp::Context, self.defer(c.body()))),
             Conditional(conditional) => self.check_conditional(conditional),
             While(while_loop) => self.check_while_loop(while_loop),
             For(for_loop) => self.check_for_loop(for_loop),
@@ -593,7 +612,7 @@ impl ExprWorker {
         let scope = if let Some(fid) = &fid {
             let source = self.ctx.source_by_id(*fid);
             if let Ok(source) = source {
-                Some(ExprScope::Lexical(self.ctx.exports_of(source)))
+                Some(ExprScope::Lexical(self.ctx.exports_of(source, self.route)))
             } else {
                 None
             }
@@ -845,7 +864,7 @@ impl ExprWorker {
 
     fn check_conditional(&mut self, typed: ast::Conditional) -> Expr {
         let cond = self.check(typed.condition());
-        let then = self.check(typed.if_body());
+        let then = self.defer(typed.if_body());
         let else_ = typed
             .else_body()
             .map_or_else(none_expr, |expr| self.check(expr));
@@ -854,7 +873,7 @@ impl ExprWorker {
 
     fn check_while_loop(&mut self, typed: ast::WhileLoop) -> Expr {
         let cond = self.check(typed.condition());
-        let body = self.check(typed.body());
+        let body = self.defer(typed.body());
         Expr::WhileLoop(WhileExpr { cond, body }.into())
     }
 
@@ -862,7 +881,7 @@ impl ExprWorker {
         self.with_scope(|this| {
             let pattern = this.check_pattern(typed.pattern());
             let iter = this.check(typed.iterable());
-            let body = this.check(typed.body());
+            let body = this.defer(typed.body());
             Expr::ForLoop(
                 ForExpr {
                     pattern,
@@ -954,39 +973,14 @@ impl ExprWorker {
         }
     }
 
-    fn defer(&mut self, expr: ast::Expr) -> DeferExpr {
+    fn defer(&mut self, expr: ast::Expr) -> Expr {
         let expr = expr.to_untyped().clone();
         let span = expr.span();
 
-        let new = self;
-        new.check(expr.cast().unwrap());
+        let lexical = self.lexical.clone();
+        self.defers.push((expr, lexical));
 
-        // let fid = self.fid;
-        // let ctx = self.ctx.clone();
-        // let imports = self.imports.clone();
-        // let resolves = self.resolves.clone();
-        // let scopes = self.scopes.clone();
-        // let lexical = self.lexical.clone();
-
-        // self.scope.spawn(move |t| {
-        //     let mut new = ExprWorker {
-        //         fid,
-        //         scope: t,
-        //         ctx,
-        //         imports,
-        //         scopes,
-        //         resolves,
-        //         lexical,
-        //         import_buffer: vec![],
-        //         buffer: vec![],
-        //     };
-
-        //     let ret = new.check(expr.cast().unwrap());
-        //     new.collect_buffer();
-        //     new.scopes.lock().insert(expr.span(), ret);
-        // });
-
-        DeferExpr { span }
+        DeferExpr { span }.into()
     }
 
     fn collect_buffer(&mut self) {

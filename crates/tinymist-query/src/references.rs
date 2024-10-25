@@ -128,6 +128,7 @@ impl<'a, 'w> ReferencesWorker<'a, 'w> {
 
     fn push_ranges<'b>(&mut self, s: &Source, u: &Url, rs: impl Iterator<Item = &'b Span>) {
         self.references.extend(rs.filter_map(|span| {
+            // todo: this is not necessary a name span
             let range = self.ctx.ctx.to_lsp_range(s.range(*span)?, s);
             Some(LspLocation {
                 uri: u.clone(),

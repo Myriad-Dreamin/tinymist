@@ -12,6 +12,7 @@ static EMPTY_VAR_DOC: LazyLock<VarDoc> = LazyLock::new(VarDoc::default);
 impl<'a> TypeChecker<'a> {
     pub(crate) fn check_syntax(&mut self, root: &Expr) -> Option<Ty> {
         Some(match root {
+            Expr::Defer(d) => self.check_defer(d),
             Expr::Seq(seq) => self.check_seq(seq),
             Expr::Array(array) => self.check_array(array),
             Expr::Dict(dict) => self.check_dict(dict),
@@ -373,7 +374,7 @@ impl<'a> TypeChecker<'a> {
             }))),
         );
 
-        let body = self.check_defer(&func.body);
+        let body = self.check(&func.body);
         let res_ty = if let Some(annotated) = &docstring.res_ty {
             self.constrain(&body, annotated);
             Ty::Let(Interned::new(TypeBounds {
@@ -416,7 +417,7 @@ impl<'a> TypeChecker<'a> {
         let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
         let value = match &let_expr.body {
-            Some(expr) => self.check_defer(expr),
+            Some(expr) => self.check(expr),
             None => Ty::Builtin(BuiltinTy::None),
         };
         if let Some(annotated) = &docstring.res_ty {
@@ -435,7 +436,7 @@ impl<'a> TypeChecker<'a> {
     fn check_show(&mut self, show: &Interned<ShowExpr>) -> Ty {
         let _selector = show.selector.as_ref().map(|sel| self.check(sel));
         // todo: infer it type by selector
-        let _transform = self.check_defer(&show.edit);
+        let _transform = self.check(&show.edit);
 
         Ty::Builtin(BuiltinTy::None)
     }
