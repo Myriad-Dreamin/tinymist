@@ -9,11 +9,13 @@ input_file: crates/tinymist-query/src/fixtures/type_check/confusing-name.typ
 "x" = (Any) => Any
 "x" = Any
 "x" = Any
+"x" = Any
 ---
 5..6 -> @x
 7..11 -> @date
 15..19 -> @date
 15..29 -> Any
+37..38 -> @x
 40..41 -> @x
 57..69 -> @master-cover
 70..74 -> @info

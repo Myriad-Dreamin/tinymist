@@ -97,6 +97,7 @@ pub struct AnalysisGlobalCaches {
     clear_lifetime: AtomicU64,
     expr_stage: CacheMap<(u64, DeferredCompute<Arc<ExprInfo>>)>,
     type_check: CacheMap<(u64, DeferredCompute<Option<Arc<TypeScheme>>>)>,
+    def_signatures: CacheMap<(u64, Definition, DeferredCompute<Option<Signature>>)>,
     static_signatures: CacheMap<(u64, Source, Span, DeferredCompute<Option<Signature>>)>,
     signatures: CacheMap<(u64, Func, DeferredCompute<Option<Signature>>)>,
     terms: CacheMap<(u64, Value, Ty)>,
@@ -232,17 +233,8 @@ impl<'w> AnalysisContext<'w> {
         }
     }
 
-    pub(crate) fn signature_dyn(&mut self, func: Func) -> Signature {
-        log::debug!("check runtime func {func:?}");
-        analyze_signature(self.shared(), SignatureTarget::Runtime(func)).unwrap()
-    }
-
     pub(crate) fn variable_docs(&mut self, pos: &LinkedNode) -> Option<VarDocs> {
         crate::docs::variable_docs(self, pos)
-    }
-
-    pub(crate) fn signature_docs(&mut self, runtime_fn: &Value) -> Option<SignatureDocs> {
-        crate::docs::signature_docs(self, runtime_fn, None)
     }
 
     pub(crate) fn preload_package(&self, entry_point: TypstFileId) {
@@ -317,6 +309,10 @@ impl<'w> AnalysisContext<'w> {
             break;
         }
 
+        self.analysis
+            .caches
+            .def_signatures
+            .retain(|_, (l, _, _)| lifetime - *l < 60);
         self.analysis
             .caches
             .static_signatures
@@ -536,6 +532,13 @@ impl SharedContext {
     }
 
     /// Get a syntax object at a position.
+    pub fn deref_syntax<'s>(&self, source: &'s Source, span: Span) -> Option<DerefTarget<'s>> {
+        let node = LinkedNode::new(source.root()).find(span)?;
+        let cursor = node.offset() + 1;
+        get_deref_target(node, cursor)
+    }
+
+    /// Get a syntax object at a position.
     pub fn deref_syntax_at<'s>(
         &self,
         source: &'s Source,
@@ -670,11 +673,26 @@ impl SharedContext {
 
     pub(crate) fn definition(
         self: &Arc<Self>,
-        source: Source,
+        source: &Source,
         doc: Option<&VersionedDocument>,
         deref_target: DerefTarget,
     ) -> Option<Definition> {
         definition(self, source, doc, deref_target)
+    }
+
+    pub(crate) fn signature_def(self: &Arc<Self>, def: Definition) -> Option<Signature> {
+        log::debug!("check definition func {def:?}");
+        analyze_signature(self, SignatureTarget::Def(def))
+    }
+
+    pub(crate) fn signature_dyn(self: &Arc<Self>, func: Func) -> Signature {
+        log::debug!("check runtime func {func:?}");
+        analyze_signature(self, SignatureTarget::Runtime(func)).unwrap()
+    }
+
+    pub(crate) fn signature_docs(self: &Arc<Self>, def: &Definition) -> Option<SignatureDocs> {
+        let sig = self.signature_def(def.clone())?;
+        crate::docs::signature_docs(&sig, None)
     }
 
     /// Try to find imported target from the current source file.
@@ -788,8 +806,16 @@ impl SharedContext {
         compute: impl FnOnce(&Arc<Self>) -> Option<Signature> + Send + Sync + 'static,
     ) -> Option<Signature> {
         let res = match func {
-            SignatureTarget::SyntaxFast(source, node) => {
-                let cache_key = (source, node.span(), true);
+            SignatureTarget::Def(d) => self
+                .analysis
+                .caches
+                .def_signatures
+                .entry(hash128(&d))
+                .or_insert_with(|| (self.lifetime, d, Arc::default()))
+                .2
+                .clone(),
+            SignatureTarget::SyntaxFast(source, span) => {
+                let cache_key = (source, span, true);
                 self.analysis
                     .caches
                     .static_signatures
@@ -798,8 +824,8 @@ impl SharedContext {
                     .3
                     .clone()
             }
-            SignatureTarget::Syntax(source, node) => {
-                let cache_key = (source, node.span());
+            SignatureTarget::Syntax(source, span) => {
+                let cache_key = (source, span);
                 self.analysis
                     .caches
                     .static_signatures

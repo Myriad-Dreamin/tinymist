@@ -134,6 +134,10 @@ impl<'a> TypeChecker<'a> {
                 let def = match ext_def {
                     Expr::Decl(decl) => {
                         let ext_ty = ext_type_info.vars.get(decl)?.as_type();
+                        if let Some(ext_docs) = ext_type_info.var_docs.get(decl) {
+                            self.info.var_docs.insert(decl.clone(), ext_docs.clone());
+                        }
+
                         ext_type_info.simplify(ext_ty, false)
                     }
                     _ => return None,

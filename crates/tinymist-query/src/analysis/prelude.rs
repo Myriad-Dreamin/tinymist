@@ -15,7 +15,7 @@ pub use typst::World;
 pub use typst_shim::syntax::LinkedNodeExt;
 pub use typst_shim::utils::LazyHash;
 
-pub use super::AnalysisContext;
 pub(crate) use super::StrRef;
+pub(crate) use super::{AnalysisContext, ToFunc};
 pub(crate) use crate::adt::interner::Interned;
 pub use crate::ty::Ty;

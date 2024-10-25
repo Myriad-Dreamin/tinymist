@@ -17,7 +17,8 @@ impl<'a> TypeChecker<'a> {
             Expr::Array(array) => self.check_array(array),
             Expr::Dict(dict) => self.check_dict(dict),
             Expr::Args(args) => self.check_args(args),
-            Expr::Pattern(pattern) => self.check_pattern(pattern),
+            // todo: check pattern correctly
+            Expr::Pattern(pattern) => self.check_pattern_exp(pattern),
             Expr::Element(element) => self.check_element(element),
             Expr::Unary(unary) => self.check_unary(unary),
             Expr::Binary(binary) => self.check_binary(binary),
@@ -121,40 +122,160 @@ impl<'a> TypeChecker<'a> {
         Ty::Args(args.into())
     }
 
-    fn check_pattern(&mut self, pattern: &Interned<Pattern>) -> Ty {
-        let pos = pattern
-            .pos
-            .iter()
-            .map(|p| self.check(p))
-            .collect::<Vec<_>>();
-        let named = pattern
-            .named
-            .iter()
-            .map(|(n, v)| (n.name().clone(), self.check(v)))
-            .collect::<Vec<_>>();
-        let spread_left = pattern.spread_left.as_ref().map(|p| self.check(&p.1));
-        let spread_right = pattern.spread_right.as_ref().map(|p| self.check(&p.1));
+    fn check_pattern_exp(&mut self, pattern: &Interned<Pattern>) -> Ty {
+        self.check_pattern(None, pattern, &EMPTY_DOCSTRING)
+    }
 
-        // pattern: ast::Pattern<'_>,
-        // value: Ty,
-        // docs: &DocString,
-        // root: LinkedNode<'_>,
+    fn check_pattern(
+        &mut self,
+        base: Option<&Interned<Decl>>,
+        pattern: &Interned<Pattern>,
+        docstring: &DocString,
+    ) -> Ty {
+        // todo: recursive doc constructing
+        match pattern.as_ref() {
+            Pattern::Expr(e) => self.check(e),
+            Pattern::Simple(decl) => {
+                let ret = self.check_decl(decl);
+                let var_doc = docstring.as_var();
 
-        // let var = self.get_var(&root, ident)?;
-        // let def_id = var.def;
-        // let docstring = docs.get_var(&var.name).unwrap_or(&EMPTY_VAR_DOC);
-        // let var = Ty::Var(var);
-        // log::debug!("check pattern: {ident:?} with {value:?} and docs
-        // {docstring:?}"); if let Some(annotated) = docstring.ty.as_ref() {
-        //     self.constrain(&var, annotated);
-        // }
-        // self.constrain(&value, &var);
+                if let Some(annotated) = var_doc.ty.as_ref() {
+                    self.constrain(&ret, annotated);
+                }
+                self.info
+                    .var_docs
+                    .insert(decl.clone(), var_doc.to_untyped());
 
-        // self.info.var_docs.insert(def_id, docstring.to_untyped());
-        // var
+                ret
+            }
+            Pattern::Sig(sig) => Ty::Pattern(self.check_pattern_sig(base, sig, docstring).0.into()),
+        }
+    }
 
-        let args = PatternTy::new(pos.into_iter(), named, spread_left, spread_right, None);
-        Ty::Pattern(args.into())
+    fn check_pattern_sig(
+        &mut self,
+        base: Option<&Interned<Decl>>,
+        pattern: &PatternSig,
+        docstring: &DocString,
+    ) -> (PatternTy, BTreeMap<Interned<str>, Ty>) {
+        let mut pos_docs = vec![];
+        let mut named_docs = BTreeMap::new();
+        let mut rest_docs = None;
+
+        let mut pos = vec![];
+        let mut named = BTreeMap::new();
+        let mut defaults = BTreeMap::new();
+        let mut rest = None;
+
+        // todo: combine with check_pattern
+        for exp in pattern.pos.iter() {
+            // pos.push(self.check_pattern(pattern, Ty::Any, docstring, root.clone()));
+            let res = self.check_pattern_exp(exp);
+            if let Pattern::Simple(ident) = exp.as_ref() {
+                let name = ident.name().clone();
+
+                let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
+                if let Some(annotated) = docstring.var_ty(&name) {
+                    self.constrain(&res, annotated);
+                }
+                pos_docs.push(TypelessParamDocs {
+                    name,
+                    docs: param_doc.docs.clone(),
+                    cano_type: (),
+                    default: None,
+                    attrs: ParamAttrs::positional(),
+                });
+            } else {
+                pos_docs.push(TypelessParamDocs {
+                    name: "_".into(),
+                    docs: Default::default(),
+                    cano_type: (),
+                    default: None,
+                    attrs: ParamAttrs::positional(),
+                });
+            }
+            pos.push(res);
+        }
+
+        for (decl, exp) in pattern.named.iter() {
+            let name = decl.name().clone();
+            let res = self.check_pattern_exp(exp);
+            let var = self.get_var(decl);
+            let v = Ty::Var(var.clone());
+            if let Some(annotated) = docstring.var_ty(&name) {
+                self.constrain(&v, annotated);
+            }
+            // todo: this is less efficient than v.lbs.push(exp), we may have some idea to
+            // optimize it, so I put a todo here.
+            self.constrain(&res, &v);
+            named.insert(name.clone(), v);
+            defaults.insert(name.clone(), res);
+
+            let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
+            named_docs.insert(
+                name.clone(),
+                TypelessParamDocs {
+                    name: name.clone(),
+                    docs: param_doc.docs.clone(),
+                    cano_type: (),
+                    default: Some(eco_format!("{exp}")),
+                    attrs: ParamAttrs::named(),
+                },
+            );
+            self.info
+                .var_docs
+                .insert(decl.clone(), param_doc.to_untyped());
+        }
+
+        // todo: spread left/right
+        if let Some((decl, _exp)) = &pattern.spread_right {
+            let var = self.get_var(decl);
+            let name = var.name.clone();
+            let param_doc = docstring
+                .get_var(&var.name.clone())
+                .unwrap_or(&EMPTY_VAR_DOC);
+            self.info
+                .var_docs
+                .insert(decl.clone(), param_doc.to_untyped());
+
+            let exp = Ty::Builtin(BuiltinTy::Args);
+            let v = Ty::Var(var);
+            if let Some(annotated) = docstring.var_ty(&name) {
+                self.constrain(&v, annotated);
+            }
+            self.constrain(&exp, &v);
+            rest = Some(v);
+
+            rest_docs = Some(TypelessParamDocs {
+                name,
+                docs: param_doc.docs.clone(),
+                cano_type: (),
+                default: None,
+                attrs: ParamAttrs::variadic(),
+            });
+            // todo: ..(args)
+        }
+
+        let named: Vec<(Interned<str>, Ty)> = named.into_iter().collect();
+
+        if let Some(base) = base {
+            self.info.var_docs.insert(
+                base.clone(),
+                Arc::new(UntypedSymbolDocs::Function(Box::new(SignatureDocsT {
+                    docs: docstring.docs.clone().unwrap_or_default(),
+                    pos: pos_docs,
+                    named: named_docs,
+                    rest: rest_docs,
+                    ret_ty: (),
+                    def_docs: Default::default(),
+                }))),
+            );
+        }
+
+        (
+            PatternTy::new(pos.into_iter(), named, None, rest, None),
+            defaults,
+        )
     }
 
     fn check_element(&mut self, element: &Interned<ElementExpr>) -> Ty {
@@ -267,117 +388,7 @@ impl<'a> TypeChecker<'a> {
 
         log::debug!("check closure: {func:?} with docs {docstring:#?}");
 
-        let mut pos_docs = vec![];
-        let mut named_docs = BTreeMap::new();
-        let mut rest_docs = None;
-
-        let mut pos = vec![];
-        let mut named = BTreeMap::new();
-        let mut defaults = BTreeMap::new();
-        let mut rest = None;
-
-        // todo: combine with check_pattern
-        for exp in func.params.pos.iter() {
-            // pos.push(self.check_pattern(pattern, Ty::Any, docstring, root.clone()));
-            let res = self.check(exp);
-            if let Expr::Decl(ident) = exp {
-                let name = ident.name().clone();
-
-                let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
-                if let Some(annotated) = docstring.var_ty(&name) {
-                    self.constrain(&res, annotated);
-                }
-                pos_docs.push(TypelessParamDocs {
-                    name,
-                    docs: param_doc.docs.clone(),
-                    cano_type: (),
-                    default: None,
-                    attrs: ParamAttrs::positional(),
-                });
-            } else {
-                pos_docs.push(TypelessParamDocs {
-                    name: "_".into(),
-                    docs: Default::default(),
-                    cano_type: (),
-                    default: None,
-                    attrs: ParamAttrs::positional(),
-                });
-            }
-            pos.push(res);
-        }
-
-        for (decl, exp) in func.params.named.iter() {
-            let name = decl.name().clone();
-            let exp = self.check(exp);
-            let var = self.get_var(decl);
-            let v = Ty::Var(var.clone());
-            if let Some(annotated) = docstring.var_ty(&name) {
-                self.constrain(&v, annotated);
-            }
-            // todo: this is less efficient than v.lbs.push(exp), we may have some idea to
-            // optimize it, so I put a todo here.
-            self.constrain(&exp, &v);
-            named.insert(name.clone(), v);
-            defaults.insert(name.clone(), exp);
-
-            let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
-            named_docs.insert(
-                name.clone(),
-                TypelessParamDocs {
-                    name: name.clone(),
-                    docs: param_doc.docs.clone(),
-                    cano_type: (),
-                    // default: Some(e.expr().to_untyped().clone().into_text()),
-                    // todo
-                    default: None,
-                    attrs: ParamAttrs::named(),
-                },
-            );
-            self.info
-                .var_docs
-                .insert(decl.clone(), param_doc.to_untyped());
-        }
-
-        // todo: spread left/right
-        if let Some((decl, _exp)) = &func.params.spread_right {
-            let var = self.get_var(decl);
-            let name = var.name.clone();
-            let param_doc = docstring
-                .get_var(&var.name.clone())
-                .unwrap_or(&EMPTY_VAR_DOC);
-            self.info
-                .var_docs
-                .insert(decl.clone(), param_doc.to_untyped());
-
-            let exp = Ty::Builtin(BuiltinTy::Args);
-            let v = Ty::Var(var);
-            if let Some(annotated) = docstring.var_ty(&name) {
-                self.constrain(&v, annotated);
-            }
-            self.constrain(&exp, &v);
-            rest = Some(v);
-
-            rest_docs = Some(TypelessParamDocs {
-                name,
-                docs: param_doc.docs.clone(),
-                cano_type: (),
-                default: None,
-                attrs: ParamAttrs::variadic(),
-            });
-            // todo: ..(args)
-        }
-
-        self.info.var_docs.insert(
-            def_id,
-            Arc::new(UntypedSymbolDocs::Function(Box::new(SignatureDocsT {
-                docs: docstring.docs.clone().unwrap_or_default(),
-                pos: pos_docs,
-                named: named_docs,
-                rest: rest_docs,
-                ret_ty: (),
-                def_docs: Default::default(),
-            }))),
-        );
+        let (sig, defaults) = self.check_pattern_sig(Some(&def_id), &func.params, docstring);
 
         let body = self.check(&func.body);
         let res_ty = if let Some(annotated) = &docstring.res_ty {
@@ -390,20 +401,12 @@ impl<'a> TypeChecker<'a> {
             body
         };
 
-        let named: Vec<(Interned<str>, Ty)> = named.into_iter().collect();
-
         // freeze the signature
-        for pos in pos.iter() {
-            self.weaken(pos);
-        }
-        for (_, named) in named.iter() {
-            self.weaken(named);
-        }
-        if let Some(rest) = &rest {
-            self.weaken(rest);
+        for inp in sig.inputs.iter() {
+            self.weaken(inp);
         }
 
-        let sig = SigTy::new(pos.into_iter(), named, None, rest, Some(res_ty)).into();
+        let sig = sig.with_body(res_ty).into();
         let sig = if defaults.is_empty() {
             Ty::Func(sig)
         } else {
@@ -420,21 +423,20 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_let(&mut self, let_expr: &Interned<LetExpr>) -> Ty {
+        // todo: consistent pattern docs
         let docstring = self.check_docstring(&Decl::pattern(let_expr.span).into());
         let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
-        let value = match &let_expr.body {
+        let term = match &let_expr.body {
             Some(expr) => self.check(expr),
             None => Ty::Builtin(BuiltinTy::None),
         };
         if let Some(annotated) = &docstring.res_ty {
-            self.constrain(&value, annotated);
+            self.constrain(&term, annotated);
         }
-        let value = docstring.res_ty.clone().unwrap_or(value);
+        let value = docstring.res_ty.clone().unwrap_or(term);
 
-        // todo: check pattern with docstring
-        // self.check_pattern(pattern, value, docstring, root.clone());
-        let pat = self.check(&let_expr.pattern);
+        let pat = self.check_pattern(None, &let_expr.pattern, docstring);
         self.constrain(&value, &pat);
 
         Ty::Builtin(BuiltinTy::None)
@@ -522,7 +524,7 @@ impl<'a> TypeChecker<'a> {
 
     fn check_for_loop(&mut self, for_loop: &Interned<ForExpr>) -> Ty {
         let _iter = self.check(&for_loop.iter);
-        let _pattern = self.check(&for_loop.pattern);
+        let _pattern = self.check_pattern_exp(&for_loop.pattern);
         let _body = self.check(&for_loop.body);
 
         Ty::Any

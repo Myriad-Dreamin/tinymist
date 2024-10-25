@@ -412,7 +412,7 @@ impl<'a> ExprWorker<'a> {
                     }
                     ast::Param::Named(arg) => {
                         let key: DeclExpr = Decl::var(arg.name()).into();
-                        let val = this.check(arg.expr());
+                        let val = Pattern::Expr(this.check(arg.expr())).into();
                         names.push((key.clone(), val));
 
                         this.resolve_as(Decl::as_def(&key, None));
@@ -425,7 +425,7 @@ impl<'a> ExprWorker<'a> {
                             Decl::spread(s.span()).into()
                         };
 
-                        let spreaded = this.check(s.expr());
+                        let spreaded = Pattern::Expr(this.check(s.expr())).into();
                         if inputs.is_empty() {
                             spread_left = Some((decl.clone(), spreaded));
                         } else {
@@ -443,14 +443,14 @@ impl<'a> ExprWorker<'a> {
                 spread_right = spread_left.take();
             }
 
-            let pattern = Pattern {
+            let pattern = PatternSig {
                 pos: inputs,
                 named: names,
                 spread_left,
                 spread_right,
             };
 
-            (pattern.into(), this.defer(typed.body()))
+            (pattern, this.defer(typed.body()))
         });
 
         self.scope_mut()
@@ -458,10 +458,10 @@ impl<'a> ExprWorker<'a> {
         Expr::Func(FuncExpr { decl, params, body }.into())
     }
 
-    fn check_pattern(&mut self, typed: ast::Pattern) -> Expr {
+    fn check_pattern(&mut self, typed: ast::Pattern) -> Interned<Pattern> {
         match typed {
             ast::Pattern::Normal(expr) => self.check_pattern_expr(expr),
-            ast::Pattern::Placeholder(..) => Expr::Star,
+            ast::Pattern::Placeholder(..) => Pattern::Expr(Expr::Star).into(),
             ast::Pattern::Parenthesized(p) => self.check_pattern(p.pattern()),
             ast::Pattern::Destructuring(d) => {
                 let mut inputs = eco_vec![];
@@ -499,30 +499,29 @@ impl<'a> ExprWorker<'a> {
                     spread_right = spread_left.take();
                 }
 
-                let pattern = Pattern {
+                let pattern = PatternSig {
                     pos: inputs,
                     named: names,
                     spread_left,
                     spread_right,
                 };
 
-                Expr::Pattern(pattern.into())
+                Pattern::Sig(Box::new(pattern)).into()
             }
         }
     }
 
-    fn check_pattern_expr(&mut self, typed: ast::Expr) -> Expr {
+    fn check_pattern_expr(&mut self, typed: ast::Expr) -> Interned<Pattern> {
         match typed {
             ast::Expr::Ident(ident) => {
                 let decl = Decl::var(ident).into();
                 self.resolve_as(Decl::as_def(&decl, None));
                 self.scope_mut()
                     .insert_mut(decl.name().clone(), decl.clone().into());
-                Expr::Decl(decl)
+                Pattern::Simple(decl).into()
             }
             ast::Expr::Parenthesized(parenthesized) => self.check_pattern(parenthesized.pattern()),
-            ast::Expr::Closure(c) => self.check_closure(c),
-            _ => self.check(typed),
+            _ => Pattern::Expr(self.check(typed)).into(),
         }
     }
 
@@ -615,8 +614,6 @@ impl<'a> ExprWorker<'a> {
             self.import_buffer.push(f);
         }
 
-        let pattern;
-
         let scope = if let Some(fid) = &fid {
             let source = self.ctx.source_by_id(*fid);
             if let Ok(source) = source {
@@ -657,23 +654,18 @@ impl<'a> ExprWorker<'a> {
                 ast::Imports::Wildcard => {
                     log::debug!("checking wildcard: {mod_expr:?}");
                     self.lexical.scopes.push(scope);
-
-                    pattern = Expr::Star;
                 }
                 ast::Imports::Items(items) => {
                     let module = Expr::Decl(decl.clone());
-                    pattern = self.import_decls(&scope, module, items);
+                    self.import_decls(&scope, module, items);
                 }
             }
-        } else {
-            pattern = none_expr();
         };
 
-        Expr::Import(ImportExpr { decl, pattern }.into())
+        Expr::Import(ImportExpr { decl }.into())
     }
 
-    fn import_decls(&mut self, scope: &ExprScope, module: Expr, items: ast::ImportItems) -> Expr {
-        let mut imported = eco_vec![];
+    fn import_decls(&mut self, scope: &ExprScope, module: Expr, items: ast::ImportItems) {
         log::debug!("import scope {scope:?}");
 
         for item in items.iter() {
@@ -733,18 +725,7 @@ impl<'a> ExprWorker<'a> {
             let name = rename.as_ref().unwrap_or(&old).name().clone();
             let expr = Expr::Ref(ref_expr);
             self.scope_mut().insert_mut(name, expr.clone());
-            imported.push((old, expr));
         }
-
-        Expr::Pattern(
-            Pattern {
-                pos: eco_vec![],
-                named: imported,
-                spread_left: None,
-                spread_right: None,
-            }
-            .into(),
-        )
     }
 
     fn check_module_include(&mut self, typed: ast::ModuleInclude) -> Expr {
@@ -839,7 +820,7 @@ impl<'a> ExprWorker<'a> {
     }
 
     fn check_destruct_assign(&mut self, typed: ast::DestructAssignment) -> Expr {
-        let pat = self.check_pattern(typed.pattern());
+        let pat = Expr::Pattern(self.check_pattern(typed.pattern()));
         let val = self.check(typed.value());
         let inst = BinInst::new(ast::BinOp::Assign, pat, val);
         Expr::Binary(inst)

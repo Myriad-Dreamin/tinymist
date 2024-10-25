@@ -33,6 +33,13 @@ pub struct DocString {
 }
 
 impl DocString {
+    pub fn as_var(&self) -> VarDoc {
+        VarDoc {
+            docs: self.docs.clone().unwrap_or_default(),
+            ty: self.res_ty.clone(),
+        }
+    }
+
     /// Get the documentation of a variable associated with the item
     pub fn get_var(&self, name: &StrRef) -> Option<&VarDoc> {
         self.vars.get(name)

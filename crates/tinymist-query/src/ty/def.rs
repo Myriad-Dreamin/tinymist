@@ -631,6 +631,11 @@ impl SigTy {
         })
     }
 
+    pub(crate) fn with_body(mut self, res_ty: Ty) -> Self {
+        self.body = Some(res_ty);
+        self
+    }
+
     /// Create a function type
     pub fn new(
         pos: impl ExactSizeIterator<Item = Ty>,

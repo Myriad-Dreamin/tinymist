@@ -24,6 +24,22 @@ mod prelude;
 mod global;
 pub use global::*;
 
+use typst::foundations::{Func, Value};
+
+pub(crate) trait ToFunc {
+    fn to_func(&self) -> Option<Func>;
+}
+
+impl ToFunc for Value {
+    fn to_func(&self) -> Option<Func> {
+        match self {
+            Value::Func(f) => Some(f.clone()),
+            Value::Type(t) => t.constructor().ok(),
+            _ => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod matcher_tests {
 
@@ -380,7 +396,7 @@ mod signature_tests {
 
             let result = analyze_signature(
                 ctx.shared(),
-                SignatureTarget::Syntax(source.clone(), callee_node.get().clone()),
+                SignatureTarget::Syntax(source.clone(), callee_node.span()),
             );
 
             assert_snapshot!(SignatureSnapshot(result.as_ref()));

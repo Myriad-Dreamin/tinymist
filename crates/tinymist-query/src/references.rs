@@ -32,7 +32,7 @@ impl StatefulRequest for ReferencesRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
 
-        let locations = find_references(ctx, source.clone(), doc.as_ref(), deref_target)?;
+        let locations = find_references(ctx, &source, doc.as_ref(), deref_target)?;
 
         debug!("references: {locations:?}");
         Some(locations)
@@ -41,7 +41,7 @@ impl StatefulRequest for ReferencesRequest {
 
 pub(crate) fn find_references(
     ctx: &mut AnalysisContext,
-    source: Source,
+    source: &Source,
     doc: Option<&VersionedDocument>,
     target: DerefTarget<'_>,
 ) -> Option<Vec<LspLocation>> {

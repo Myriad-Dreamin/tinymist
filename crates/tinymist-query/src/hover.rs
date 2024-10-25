@@ -226,7 +226,7 @@ fn def_tooltip(
 
     let deref_target = get_deref_target(leaf.clone(), cursor)?;
 
-    let lnk = ctx.definition(source.clone(), document, deref_target.clone())?;
+    let lnk = ctx.definition(source, document, deref_target.clone())?;
 
     let mut results = vec![];
     let mut actions = vec![];
@@ -251,10 +251,7 @@ fn def_tooltip(
             Some(LspHoverContents::Array(results))
         }
         Func(..) | Closure(..) => {
-            let sig = lnk.term.as_ref().and_then(|e| {
-                // todo: type docs
-                ctx.signature_docs(&e.value()?)
-            });
+            let sig = ctx.signature_docs(&lnk);
 
             results.push(MarkedString::LanguageString(LanguageString {
                 language: "typc".to_owned(),

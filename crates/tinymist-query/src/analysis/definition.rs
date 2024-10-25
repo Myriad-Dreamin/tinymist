@@ -9,7 +9,7 @@ use crate::syntax::{get_deref_target, Decl, DeclExpr, DerefTarget, Expr, ExprInf
 use crate::VersionedDocument;
 
 /// A linked definition in the source code
-#[derive(Debug)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Definition {
     /// The declaration identifier of the definition.
     pub decl: DeclExpr,
@@ -57,7 +57,7 @@ impl Definition {
 /// Finds the definition of a symbol.
 pub fn definition(
     ctx: &Arc<SharedContext>,
-    source: Source,
+    source: &Source,
     document: Option<&VersionedDocument>,
     deref_target: DerefTarget<'_>,
 ) -> Option<Definition> {
@@ -102,8 +102,8 @@ pub fn definition(
 
 fn find_ident_definition(
     ctx: &Arc<SharedContext>,
-    source: Source,
-    mut use_site: LinkedNode,
+    source: &Source,
+    use_site: LinkedNode,
 ) -> Option<Definition> {
     let mut proj = vec![];
     // Lexical reference
@@ -121,14 +121,8 @@ fn find_ident_definition(
             }
 
             match i {
-                ast::Expr::Ident(e) => {
-                    use_site = use_site.find(e.span())?;
-                    e.span()
-                }
-                ast::Expr::MathIdent(e) => {
-                    use_site = use_site.find(e.span())?;
-                    e.span()
-                }
+                ast::Expr::Ident(e) => e.span(),
+                ast::Expr::MathIdent(e) => e.span(),
                 _ => Span::detached(),
             }
         }
@@ -140,19 +134,12 @@ fn find_ident_definition(
 
     // Syntactic definition
     let mut def_worker = DefResolver::new(ctx, source.id())?;
-    let expr = def_worker.of_span(ident_ref);
+    let expr = def_worker.of_span(ident_ref)?;
 
-    // Global definition
-    let Some(of) = expr else {
-        return resolve_global_value(ctx, use_site.get(), false).and_then(move |f| {
-            value_to_def(f, || Some(use_site.get().clone().into_text().into()), None)
-        });
-    };
-
-    let ty = of.term.as_ref();
+    let ty = expr.term.as_ref();
 
     use Decl::*;
-    match of.decl.as_ref() {
+    match expr.decl.as_ref() {
         ModuleAlias(..) | PathStem(..) | Module(..) => {
             if !proj.is_empty() {
                 let val = ty.and_then(|ty| match ty {
@@ -173,9 +160,9 @@ fn find_ident_definition(
                 return value_to_def(val.clone(), || name, None);
             }
 
-            Some(of)
+            Some(expr)
         }
-        _ => Some(of),
+        _ => Some(expr),
     }
 }
 
@@ -238,15 +225,6 @@ fn find_ref_definition(
     Some(Definition::new(decl.into(), ty))
 }
 
-/// The target of a dynamic call.
-#[derive(Debug, Clone)]
-pub struct DynCallTarget {
-    /// The function pointer.
-    pub func_ptr: Func,
-    /// The this pointer.
-    pub this: Option<Value>,
-}
-
 /// The call of a function with calling convention identified.
 #[derive(Debug, Clone)]
 pub enum CallConvention {
@@ -282,37 +260,58 @@ impl CallConvention {
     }
 }
 
-fn identify_call_convention(target: DynCallTarget) -> CallConvention {
-    match target.this {
-        Some(Value::Func(func)) if is_with_func(&target.func_ptr) => CallConvention::With(func),
-        Some(Value::Func(func)) if is_where_func(&target.func_ptr) => CallConvention::Where(func),
-        Some(this) => CallConvention::Method(this, target.func_ptr),
-        None => CallConvention::Static(target.func_ptr),
-    }
-}
+/// Resolve a call target to a function or a method with a this.
+pub fn resolve_call_target(ctx: &Arc<SharedContext>, node: &SyntaxNode) -> Option<CallConvention> {
+    let callee = (|| {
+        let source = ctx.source_by_id(node.span().id()?).ok()?;
+        let node = source.find(node.span())?;
+        let cursor = node.offset();
+        let deref_target = get_deref_target(node, cursor)?;
+        let def = ctx.definition(&source, None, deref_target)?;
+        let func_ptr = match def.term.and_then(|val| val.value()) {
+            Some(Value::Func(f)) => Some(f),
+            Some(Value::Type(ty)) => ty.constructor().ok(),
+            _ => None,
+        }?;
 
-fn is_with_func(func_ptr: &Func) -> bool {
-    static WITH_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
-        let fn_ty = Type::of::<Func>();
-        let Some(Value::Func(f)) = fn_ty.scope().get("with") else {
-            return None;
+        Some((None, func_ptr))
+    })();
+    let callee = callee.or_else(|| {
+        let values = ctx.analyze_expr(node);
+
+        if let Some(access) = node.cast::<ast::FieldAccess>() {
+            let target = access.target();
+            let field = access.field().get();
+            let values = ctx.analyze_expr(target.to_untyped());
+            if let Some((this, func_ptr)) = values.into_iter().find_map(|(this, _styles)| {
+                if let Some(Value::Func(f)) = this.ty().scope().get(field) {
+                    return Some((this, f.clone()));
+                }
+
+                None
+            }) {
+                return Some((Some(this), func_ptr));
+            }
+        }
+
+        if let Some(func) = values.into_iter().find_map(|v| v.0.to_func()) {
+            return Some((None, func));
         };
-        Some(f)
-    });
 
-    is_same_native_func(*WITH_FUNC, func_ptr)
-}
+        None
+    })?;
 
-fn is_where_func(func_ptr: &Func) -> bool {
-    static WITH_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
-        let fn_ty = Type::of::<Func>();
-        let Some(Value::Func(f)) = fn_ty.scope().get("where") else {
-            return None;
-        };
-        Some(f)
-    });
-
-    is_same_native_func(*WITH_FUNC, func_ptr)
+    let (this, func_ptr) = callee;
+    Some(match this {
+        Some(Value::Func(func)) if is_same_native_func(*WITH_FUNC, &func_ptr) => {
+            CallConvention::With(func)
+        }
+        Some(Value::Func(func)) if is_same_native_func(*WHERE_FUNC, &func_ptr) => {
+            CallConvention::Where(func)
+        }
+        Some(this) => CallConvention::Method(this, func_ptr),
+        None => CallConvention::Static(func_ptr),
+    })
 }
 
 fn is_same_native_func(x: Option<&Func>, y: &Func) -> bool {
@@ -328,113 +327,21 @@ fn is_same_native_func(x: Option<&Func>, y: &Func) -> bool {
     }
 }
 
-// todo: merge me with resolve_callee
-/// Resolve a call target to a function or a method with a this.
-pub fn resolve_call_target(
-    ctx: &Arc<SharedContext>,
-    callee: &SyntaxNode,
-) -> Option<CallConvention> {
-    resolve_callee_(ctx, callee, true).map(identify_call_convention)
-}
-
-/// Resolve a callee expression to a function.
-pub fn resolve_callee(ctx: &Arc<SharedContext>, callee: &SyntaxNode) -> Option<Func> {
-    resolve_callee_(ctx, callee, false).map(|e| e.func_ptr)
-}
-
-fn resolve_callee_(
-    ctx: &Arc<SharedContext>,
-    callee: &SyntaxNode,
-    resolve_this: bool,
-) -> Option<DynCallTarget> {
-    None.or_else(|| {
-        let source = ctx.source_by_id(callee.span().id()?).ok()?;
-        let node = source.find(callee.span())?;
-        let cursor = node.offset();
-        let deref_target = get_deref_target(node, cursor)?;
-        let def = ctx.definition(source.clone(), None, deref_target)?;
-        match def.term.and_then(|val| val.value()) {
-            Some(Value::Func(f)) => Some(f),
-            Some(Value::Type(ty)) => ty.constructor().ok(),
-            _ => None,
-        }
-    })
-    .or_else(|| {
-        resolve_global_value(ctx, callee, false).and_then(|v| match v {
-            Value::Func(f) => Some(f),
-            _ => None,
-        })
-    })
-    .map(|e| DynCallTarget {
-        func_ptr: e,
-        this: None,
-    })
-    .or_else(|| {
-        let values = ctx.analyze_expr(callee);
-
-        if let Some(func) = values.into_iter().find_map(|v| match v.0 {
-            Value::Func(f) => Some(f),
-            _ => None,
-        }) {
-            return Some(DynCallTarget {
-                func_ptr: func,
-                this: None,
-            });
-        };
-
-        if resolve_this {
-            if let Some(access) = match callee.cast::<ast::Expr>() {
-                Some(ast::Expr::FieldAccess(access)) => Some(access),
-                _ => None,
-            } {
-                let target = access.target();
-                let field = access.field().get();
-                let values = ctx.analyze_expr(target.to_untyped());
-                if let Some((this, func_ptr)) = values.into_iter().find_map(|(this, _styles)| {
-                    if let Some(Value::Func(f)) = this.ty().scope().get(field) {
-                        return Some((this, f.clone()));
-                    }
-
-                    None
-                }) {
-                    return Some(DynCallTarget {
-                        func_ptr,
-                        this: Some(this),
-                    });
-                }
-            }
-        }
-
-        None
-    })
-}
-
-// todo: math scope
-pub(crate) fn resolve_global_value(
-    ctx: &Arc<SharedContext>,
-    callee: &SyntaxNode,
-    is_math: bool,
-) -> Option<Value> {
-    let lib = ctx.world.library();
-    let scope = if is_math {
-        lib.math.scope()
-    } else {
-        lib.global.scope()
+static WITH_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
+    let fn_ty = Type::of::<Func>();
+    let Some(Value::Func(f)) = fn_ty.scope().get("with") else {
+        return None;
     };
-    let v = match callee.cast::<ast::Expr>()? {
-        ast::Expr::Ident(ident) => scope.get(&ident)?,
-        ast::Expr::FieldAccess(access) => match access.target() {
-            ast::Expr::Ident(target) => match scope.get(&target)? {
-                Value::Module(module) => module.field(&access.field()).ok()?,
-                Value::Func(func) => func.field(&access.field()).ok()?,
-                _ => return None,
-            },
-            _ => return None,
-        },
-        _ => return None,
+    Some(f)
+});
+
+static WHERE_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
+    let fn_ty = Type::of::<Func>();
+    let Some(Value::Func(f)) = fn_ty.scope().get("where") else {
+        return None;
     };
-    Some(v.clone())
-}
+    Some(f)
+});
 
 fn value_to_def(
     value: Value,

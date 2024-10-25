@@ -4,7 +4,7 @@ use itertools::Either;
 use tinymist_derive::BindTyCtx;
 use typst::foundations::{Closure, ParamInfo};
 
-use super::{prelude::*, resolve_callee, BoundChecker, DocSource, SharedContext, SigTy, TypeVar};
+use super::{prelude::*, BoundChecker, Definition, DocSource, SharedContext, SigTy, TypeVar};
 use crate::analysis::PostTypeChecker;
 use crate::docs::{UntypedSignatureDocs, UntypedSymbolDocs, UntypedVarDocs};
 use crate::syntax::get_non_strict_def_target;
@@ -225,9 +225,11 @@ pub struct PartialSignature {
 #[derive(Debug, Clone)]
 pub enum SignatureTarget {
     /// A static node without knowing the function at runtime.
-    SyntaxFast(Source, SyntaxNode),
+    Def(Definition),
     /// A static node without knowing the function at runtime.
-    Syntax(Source, SyntaxNode),
+    SyntaxFast(Source, Span),
+    /// A static node without knowing the function at runtime.
+    Syntax(Source, Span),
     /// A function that is known at runtime.
     Runtime(Func),
     /// A function that is known at runtime.
@@ -250,10 +252,18 @@ fn analyze_type_signature(
     callee_node: &SignatureTarget,
 ) -> Option<Signature> {
     let (type_info, ty) = match callee_node {
-        SignatureTarget::Convert(..) => None,
-        SignatureTarget::SyntaxFast(source, node) | SignatureTarget::Syntax(source, node) => {
+        SignatureTarget::Convert(..) => return None,
+        SignatureTarget::SyntaxFast(source, span) | SignatureTarget::Syntax(source, span) => {
             let type_info = ctx.type_check(source)?;
-            let ty = type_info.type_of_span(node.span())?;
+            let ty = type_info.type_of_span(*span)?;
+            Some((type_info, ty))
+        }
+        SignatureTarget::Def(def) => {
+            let span = def.decl.span();
+            let fid = span.id()?;
+            let source = ctx.source_by_id(fid).ok()?;
+            let type_info = ctx.type_check(&source)?;
+            let ty = type_info.type_of_span(span)?;
             Some((type_info, ty))
         }
         SignatureTarget::Runtime(f) => {
@@ -457,11 +467,12 @@ fn analyze_dyn_signature(
     callee_node: &SignatureTarget,
 ) -> Option<Signature> {
     let func = match callee_node {
+        SignatureTarget::Def(def) => def.value()?.to_func()?,
         SignatureTarget::SyntaxFast(..) => return None,
-        SignatureTarget::Syntax(_, node) => {
-            let func = resolve_callee(ctx, node)?;
-            log::debug!("got function {func:?}");
-            func
+        SignatureTarget::Syntax(source, span) => {
+            let target = ctx.deref_syntax(source, *span)?;
+            let def = ctx.definition(source, None, target)?;
+            def.value()?.to_func()?
         }
         SignatureTarget::Convert(func) | SignatureTarget::Runtime(func) => func.clone(),
     };

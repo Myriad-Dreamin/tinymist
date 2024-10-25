@@ -41,7 +41,7 @@ impl StatefulRequest for RenameRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
 
-        let lnk = ctx.definition(source.clone(), doc.as_ref(), deref_target.clone())?;
+        let lnk = ctx.definition(&source, doc.as_ref(), deref_target.clone())?;
 
         prepare_renaming(ctx, &deref_target, &lnk)?;
 
@@ -92,7 +92,7 @@ impl StatefulRequest for RenameRequest {
                 })
             }
             _ => {
-                let references = find_references(ctx, source.clone(), doc.as_ref(), deref_target)?;
+                let references = find_references(ctx, &source, doc.as_ref(), deref_target)?;
 
                 let mut edits = HashMap::new();
 
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn test() {
-        snapshot_testing("playground", &|world, path| {
+        snapshot_testing("rename", &|world, path| {
             let source = world.source_by_path(&path).unwrap();
 
             let request = RenameRequest {

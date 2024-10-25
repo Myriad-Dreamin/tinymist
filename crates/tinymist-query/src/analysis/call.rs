@@ -71,7 +71,7 @@ pub fn analyze_call_no_cache(
 ) -> Option<CallInfo> {
     let signature = analyze_signature(
         ctx.shared(),
-        SignatureTarget::SyntaxFast(source, callee_node.get().clone()),
+        SignatureTarget::SyntaxFast(source, callee_node.span()),
     )?;
     log::trace!("got signature {signature:?}");
 

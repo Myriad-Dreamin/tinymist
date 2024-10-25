@@ -378,7 +378,13 @@ impl Decl {
     pub fn weak_cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.name()
             .cmp(other.name())
-            .then_with(|| self.span().number().cmp(&other.span().number()))
+            .then_with(|| match (self, other) {
+                (Self::Generated(l), Self::Generated(r)) => l.0 .0.cmp(&r.0 .0),
+                (Self::Docs(l), Self::Docs(r)) => {
+                    l.var.cmp(&r.var).then_with(|| l.base.weak_cmp(&r.base))
+                }
+                _ => self.span().number().cmp(&other.span().number()),
+            })
     }
 
     pub fn as_def(this: &Interned<Self>, val: Option<Ty>) -> Interned<RefExpr> {
@@ -544,11 +550,24 @@ pub enum ArgExpr {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Pattern {
-    pub pos: EcoVec<Expr>,
-    pub named: EcoVec<(DeclExpr, Expr)>,
-    pub spread_left: Option<(DeclExpr, Expr)>,
-    pub spread_right: Option<(DeclExpr, Expr)>,
+pub enum Pattern {
+    Expr(Expr),
+    Simple(Interned<Decl>),
+    Sig(Box<PatternSig>),
+}
+
+impl fmt::Display for Pattern {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        ExprFormatter::new(f).write_pattern(self)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PatternSig {
+    pub pos: EcoVec<Interned<Pattern>>,
+    pub named: EcoVec<(DeclExpr, Interned<Pattern>)>,
+    pub spread_left: Option<(DeclExpr, Interned<Pattern>)>,
+    pub spread_right: Option<(DeclExpr, Interned<Pattern>)>,
 }
 
 impl Pattern {}
@@ -619,7 +638,7 @@ pub struct ApplyExpr {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FuncExpr {
     pub decl: DeclExpr,
-    pub params: Interned<Pattern>,
+    pub params: PatternSig,
     pub body: Expr,
 }
 
@@ -627,7 +646,7 @@ pub struct FuncExpr {
 pub struct LetExpr {
     /// Span of the pattern
     pub span: Span,
-    pub pattern: Expr,
+    pub pattern: Interned<Pattern>,
     pub body: Option<Expr>,
 }
 
@@ -647,7 +666,6 @@ pub struct SetExpr {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ImportExpr {
     pub decl: DeclExpr,
-    pub pattern: Expr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -670,7 +688,7 @@ pub struct WhileExpr {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ForExpr {
-    pub pattern: Expr,
+    pub pattern: Interned<Pattern>,
     pub iter: Expr,
     pub body: Expr,
 }
@@ -936,30 +954,38 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
         }
     }
 
-    fn write_pattern(&mut self, p: &Interned<Pattern>) -> fmt::Result {
+    fn write_pattern(&mut self, p: &Pattern) -> fmt::Result {
+        match p {
+            Pattern::Expr(e) => self.write_expr(e),
+            Pattern::Simple(s) => self.write_decl(s),
+            Pattern::Sig(p) => self.write_pattern_sig(p),
+        }
+    }
+
+    fn write_pattern_sig(&mut self, p: &PatternSig) -> fmt::Result {
         self.f.write_str("pat(\n")?;
         self.indent += 1;
         for pos in &p.pos {
             self.write_indent()?;
-            self.write_expr(pos)?;
+            self.write_pattern(pos)?;
             self.f.write_str(",\n")?;
         }
         for (name, pat) in &p.named {
             self.write_indent()?;
             write!(self.f, "{name:?} = ")?;
-            self.write_expr(pat)?;
+            self.write_pattern(pat)?;
             self.f.write_str(",\n")?;
         }
         if let Some((k, rest)) = &p.spread_left {
             self.write_indent()?;
             write!(self.f, "..{k:?}: ")?;
-            self.write_expr(rest)?;
+            self.write_pattern(rest)?;
             self.f.write_str(",\n")?;
         }
         if let Some((k, rest)) = &p.spread_right {
             self.write_indent()?;
             write!(self.f, "..{k:?}: ")?;
-            self.write_expr(rest)?;
+            self.write_pattern(rest)?;
             self.f.write_str(",\n")?;
         }
         self.indent -= 1;
@@ -1005,7 +1031,7 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
 
     fn write_func(&mut self, func: &Interned<FuncExpr>) -> fmt::Result {
         write!(self.f, "func[{:?}](", func.decl)?;
-        self.write_pattern(&func.params)?;
+        self.write_pattern_sig(&func.params)?;
         write!(self.f, " = ")?;
         self.write_expr(&func.body)?;
         write!(self.f, ")")
@@ -1013,7 +1039,7 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
 
     fn write_let(&mut self, l: &Interned<LetExpr>) -> fmt::Result {
         write!(self.f, "let(")?;
-        self.write_expr(&l.pattern)?;
+        self.write_pattern(&l.pattern)?;
         if let Some(body) = &l.body {
             write!(self.f, " = ")?;
             self.write_expr(body)?;
@@ -1081,7 +1107,6 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
     fn write_import(&mut self, i: &Interned<ImportExpr>) -> fmt::Result {
         self.f.write_str("import(")?;
         self.write_decl(&i.decl)?;
-        self.write_expr(&i.pattern)?;
         self.f.write_str(")")
     }
 
@@ -1117,7 +1142,7 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
 
     fn write_for_loop(&mut self, f: &Interned<ForExpr>) -> fmt::Result {
         self.f.write_str("for(")?;
-        self.write_expr(&f.pattern)?;
+        self.write_pattern(&f.pattern)?;
         self.f.write_str(", ")?;
         self.write_expr(&f.iter)?;
         self.f.write_str(", ")?;
@@ -1126,7 +1151,9 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
     }
 
     fn write_type(&mut self, t: &Ty) -> fmt::Result {
-        write!(self.f, "{t:?}")
+        let formatted = t.describe();
+        let formatted = formatted.as_deref().unwrap_or("any");
+        self.f.write_str(formatted)
     }
 
     fn write_star(&mut self) -> fmt::Result {
