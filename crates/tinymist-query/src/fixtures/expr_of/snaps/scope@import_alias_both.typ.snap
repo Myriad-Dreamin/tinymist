@@ -8,9 +8,9 @@ PathStem(base)@8..18 in \s0.typ -> Module(base)@0..0 in \base.typ, root Module(b
 IdentRef(base)@20..24 in \s0.typ -> PathStem(base)@8..18 in \s0.typ, root Module(base)@0..0 in \base.typ, val: None
 IdentRef(base)@62..66 in \s0.typ -> PathStem(base)@8..18 in \s0.typ, root Module(base)@0..0 in \base.typ, val: None
 ModuleAlias(foo)@47..50 in \s0.typ -> Module(base)@0..0 in \base.typ, root Module(base)@0..0 in \base.typ, val: None
-ImportAlias(foo)@57..60 in \s0.typ -> Import(x)@52..53 in \s0.typ, root Select(SelectExpr { lhs: Decl(ModuleAlias(foo)), key: IdentRef(x) }), val: None
-IdentRef(foo)@69..72 in \s0.typ -> ImportAlias(foo)@57..60 in \s0.typ, root Select(SelectExpr { lhs: Decl(ModuleAlias(foo)), key: IdentRef(x) }), val: None
-Import(x)@52..53 in \s0.typ -> Select(SelectExpr { lhs: Decl(ModuleAlias(foo)), key: IdentRef(x) }), root Select(SelectExpr { lhs: Decl(ModuleAlias(foo)), key: IdentRef(x) }), val: None
+ImportAlias(foo)@57..60 in \s0.typ -> Import(x)@52..53 in \s0.typ, root (ModuleAlias(foo)).IdentRef(x), val: None
+IdentRef(foo)@69..72 in \s0.typ -> ImportAlias(foo)@57..60 in \s0.typ, root (ModuleAlias(foo)).IdentRef(x), val: None
+Import(x)@52..53 in \s0.typ -> (ModuleAlias(foo)).IdentRef(x), root (ModuleAlias(foo)).IdentRef(x), val: None
 = exports
-base -> Ref(RefExpr { decl: PathStem(base), step: Some(Decl(Module(base))), root: Some(Decl(Module(base))), val: None })
-foo -> Ref(RefExpr { decl: ImportAlias(foo), step: Some(Decl(Import(x))), root: Some(Select(SelectExpr { lhs: Decl(ModuleAlias(foo)), key: IdentRef(x) })), val: None })
+base -> ref(PathStem(base), step = Module(base), root = Module(base))
+foo -> ref(ImportAlias(foo), step = Import(x), root = (ModuleAlias(foo)).IdentRef(x))

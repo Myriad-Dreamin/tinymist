@@ -839,14 +839,16 @@ impl<'a> ExprWorker<'a> {
 
     fn check_field_access(&mut self, typed: ast::FieldAccess) -> Expr {
         let lhs = self.check(typed.target());
-        let rhs = Decl::ident_ref(typed.field()).into();
-        Expr::Select(SelectExpr { lhs, key: rhs }.into())
+        let key = Decl::ident_ref(typed.field()).into();
+        let span = typed.span();
+        Expr::Select(SelectExpr { lhs, key, span }.into())
     }
 
     fn check_func_call(&mut self, typed: ast::FuncCall) -> Expr {
         let callee = self.check(typed.callee());
         let args = self.check_args(typed.args());
-        Expr::Apply(ApplyExpr { callee, args }.into())
+        let span = typed.span();
+        Expr::Apply(ApplyExpr { callee, args, span }.into())
     }
 
     fn check_set(&mut self, typed: ast::SetRule) -> Expr {
@@ -950,13 +952,13 @@ impl<'a> ExprWorker<'a> {
     }
 
     fn resolve_as(&mut self, r: Interned<RefExpr>) {
-        let s = r.decl.span().unwrap();
+        let s = r.decl.span();
         self.buffer.push((s, r.clone()));
     }
 
     fn resolve_ident(&mut self, decl: DeclExpr, mode: InterpretMode) -> Expr {
         let r: Interned<RefExpr> = self.resolve_ident_(decl, mode).into();
-        let s = r.decl.span().unwrap();
+        let s = r.decl.span();
         self.buffer.push((s, r.clone()));
         Expr::Ref(r)
     }

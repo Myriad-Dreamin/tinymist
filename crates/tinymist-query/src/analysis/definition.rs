@@ -39,8 +39,8 @@ impl Definition {
     pub(crate) fn def_at(&self, ctx: &SharedContext) -> Option<(TypstFileId, Range<usize>)> {
         let fid = self.decl.file_id()?;
         let span = self.decl.span();
-        let range = span.and_then(|s| ctx.source_by_id(fid).ok()?.range(s));
-        Some((fid, range.unwrap_or_default()))
+        let range = (!span.is_detached()).then(|| ctx.source_by_id(fid).ok()?.range(span));
+        Some((fid, range.flatten().unwrap_or_default()))
     }
 
     /// The range of the name of the definition.
@@ -532,7 +532,7 @@ impl DefResolver {
         // todo:
         match decl.as_ref() {
             Decl::Import(..) | Decl::ImportAlias(..) => {
-                let next = self.of_span(decl.span().unwrap());
+                let next = self.of_span(decl.span());
                 Some(next.unwrap_or_else(|| Definition::new(decl.clone(), term.cloned())))
             }
             _ => Some(Definition::new(decl.clone(), term.cloned())),

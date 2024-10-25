@@ -70,6 +70,16 @@ pub enum Expr {
     /// A star import
     Star,
 }
+impl Expr {
+    pub(crate) fn span(&self) -> Span {
+        match self {
+            Expr::Decl(d) => d.span(),
+            Expr::Select(a) => a.span,
+            Expr::Apply(a) => a.span,
+            _ => Span::detached(),
+        }
+    }
+}
 
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -349,7 +359,7 @@ impl Decl {
     pub fn file_id(&self) -> Option<TypstFileId> {
         match self {
             Self::Module(ModuleDecl { fid, .. }) => Some(*fid),
-            that => that.span()?.id(),
+            that => that.span().id(),
         }
     }
 
@@ -362,21 +372,13 @@ impl Decl {
 
         let fid = self.file_id()?;
         let src = ctx.source_by_id(fid).ok()?;
-        src.range(self.span()?)
-    }
-
-    pub fn must_span(&self) -> Span {
-        self.span()
-            .unwrap_or_else(|| panic!("Decl {self:?} has no span"))
+        src.range(self.span())
     }
 
     pub fn weak_cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.name().cmp(other.name()).then_with(|| {
-            let span_pair = self.span().zip(other.span());
-            span_pair.map_or(std::cmp::Ordering::Equal, |(x, y)| {
-                x.number().cmp(&y.number())
-            })
-        })
+        self.name()
+            .cmp(other.name())
+            .then_with(|| self.span().number().cmp(&other.span().number()))
     }
 
     pub fn as_def(this: &Interned<Self>, val: Option<Ty>) -> Interned<RefExpr> {
@@ -413,8 +415,8 @@ impl SpannedDecl {
         &self.name
     }
 
-    fn span(&self) -> Option<Span> {
-        Some(self.at)
+    fn span(&self) -> Span {
+        self.at
     }
 }
 
@@ -435,8 +437,8 @@ impl NameRangeDecl {
         &self.name
     }
 
-    fn span(&self) -> Option<Span> {
-        None
+    fn span(&self) -> Span {
+        Span::detached()
     }
 }
 
@@ -457,8 +459,8 @@ impl ModuleDecl {
         &self.name
     }
 
-    fn span(&self) -> Option<Span> {
-        None
+    fn span(&self) -> Span {
+        Span::detached()
     }
 }
 
@@ -479,8 +481,8 @@ impl DocsDecl {
         Interned::empty()
     }
 
-    fn span(&self) -> Option<Span> {
-        Some(Span::detached())
+    fn span(&self) -> Span {
+        Span::detached()
     }
 }
 
@@ -498,8 +500,8 @@ impl SpanDecl {
         Interned::empty()
     }
 
-    fn span(&self) -> Option<Span> {
-        Some(self.0)
+    fn span(&self) -> Span {
+        self.0
     }
 }
 
@@ -517,8 +519,8 @@ impl GeneratedDecl {
         Interned::empty()
     }
 
-    fn span(&self) -> Option<Span> {
-        None
+    fn span(&self) -> Span {
+        Span::detached()
     }
 }
 
@@ -577,11 +579,16 @@ pub struct ContentRefExpr {
 pub struct SelectExpr {
     pub lhs: Expr,
     pub key: DeclExpr,
+    pub span: Span,
 }
 
 impl SelectExpr {
     pub fn new(key: DeclExpr, lhs: Expr) -> Interned<Self> {
-        Interned::new(Self { key, lhs })
+        Interned::new(Self {
+            key,
+            lhs,
+            span: Span::detached(),
+        })
     }
 }
 
@@ -606,6 +613,7 @@ pub struct ElementExpr {
 pub struct ApplyExpr {
     pub callee: Expr,
     pub args: Expr,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -1,7 +1,6 @@
 #![allow(unused)]
 
 use ecow::EcoVec;
-use reflexo::hash::hash128;
 
 use crate::{syntax::DeclExpr, ty::prelude::*};
 
@@ -42,12 +41,12 @@ impl TypeScheme {
 struct TypeSimplifier<'a, 'b> {
     principal: bool,
 
-    vars: &'a HashMap<DeclExpr, TypeVarBounds>,
+    vars: &'a FxHashMap<DeclExpr, TypeVarBounds>,
 
-    cano_cache: &'b mut HashMap<(Ty, bool), Ty>,
-    cano_local_cache: &'b mut HashMap<(DeclExpr, bool), Ty>,
-    negatives: &'b mut HashSet<DeclExpr>,
-    positives: &'b mut HashSet<DeclExpr>,
+    cano_cache: &'b mut FxHashMap<(Ty, bool), Ty>,
+    cano_local_cache: &'b mut FxHashMap<(DeclExpr, bool), Ty>,
+    negatives: &'b mut FxHashSet<DeclExpr>,
+    positives: &'b mut FxHashSet<DeclExpr>,
 }
 
 impl<'a, 'b> TypeSimplifier<'a, 'b> {

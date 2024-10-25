@@ -8,5 +8,5 @@ ModuleImport(..)@1..23 in \s2.typ -> Module(derive)@0..0 in \derive.typ, root Mo
 ModuleImport(..)@25..39 in \s2.typ -> Module(base)@0..0 in \base.typ, root Module(base)@0..0 in \base.typ, val: None
 IdentRef(f)@41..42 in \s2.typ -> Func(f)@0..0 in \base.typ, root Func(f)@0..0 in \base.typ, val: None
 = exports
-base -> Ref(RefExpr { decl: PathStem(base), step: Some(Decl(Module(base))), root: Some(Decl(Module(base))), val: None })
+base -> ref(PathStem(base), step = Module(base), root = Module(base))
 f -> Func(f)@0..0 in \base.typ

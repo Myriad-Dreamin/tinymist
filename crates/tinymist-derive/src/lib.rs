@@ -77,7 +77,7 @@ pub fn gen_decl_enum(input: TokenStream) -> TokenStream {
                 }
             }
 
-            pub fn span(&self) -> Option<Span> {
+            pub fn span(&self) -> Span {
                 match self {
                     #(Self::#names(x) => x.span()),*
                 }

@@ -220,10 +220,10 @@ impl<'a> TypeChecker<'a> {
     fn check_select(&mut self, select: &Interned<SelectExpr>) -> Ty {
         // let field_access: ast::FieldAccess = root.cast()?;
 
-        let select_site = select.key.span().unwrap_or_else(Span::detached);
+        let select_site = select.span;
         let ty = self.check(&select.lhs);
         let field = select.key.name().clone();
-        log::debug!("field access: {select:?} => {ty:?}.{field:?}");
+        log::debug!("field access: {select:?}[{select_site:?}] => {ty:?}.{field:?}");
 
         // todo: move this to base
         let base = Ty::Select(SelectTy::new(ty.clone().into(), field.clone()));
@@ -245,14 +245,14 @@ impl<'a> TypeChecker<'a> {
         if let Ty::Args(args) = args {
             let mut worker = ApplyTypeChecker {
                 base: self,
-                // call_site: func_call.callee().span(),
-                // todo: callee span
-                call_site: Span::detached(),
+                call_site: apply.callee.span(),
                 call_raw_for_with: Some(callee.clone()),
                 resultant: vec![],
             };
             callee.call(&args, true, &mut worker);
-            return Ty::from_types(worker.resultant.into_iter());
+            let res = Ty::from_types(worker.resultant.into_iter());
+            self.info.witness_at_least(apply.span, res.clone());
+            return res;
         }
 
         Ty::Any
@@ -279,11 +279,14 @@ impl<'a> TypeChecker<'a> {
         // todo: combine with check_pattern
         for exp in func.params.pos.iter() {
             // pos.push(self.check_pattern(pattern, Ty::Any, docstring, root.clone()));
-            pos.push(self.check(exp));
+            let res = self.check(exp);
             if let Expr::Decl(ident) = exp {
                 let name = ident.name().clone();
 
                 let param_doc = docstring.get_var(&name).unwrap_or(&EMPTY_VAR_DOC);
+                if let Some(annotated) = docstring.var_ty(&name) {
+                    self.constrain(&res, annotated);
+                }
                 pos_docs.push(TypelessParamDocs {
                     name,
                     docs: param_doc.docs.clone(),
@@ -300,6 +303,7 @@ impl<'a> TypeChecker<'a> {
                     attrs: ParamAttrs::positional(),
                 });
             }
+            pos.push(res);
         }
 
         for (decl, exp) in func.params.named.iter() {
@@ -470,6 +474,7 @@ impl<'a> TypeChecker<'a> {
 
     fn check_ref(&mut self, r: &Interned<RefExpr>) -> Ty {
         let s = r.decl.span();
+        let s = (!s.is_detached()).then_some(s);
         let of = r.root.as_ref().map(|of| self.check(of));
         let of = of.or_else(|| r.val.clone());
         if let Some((s, of)) = s.zip(of.as_ref()) {

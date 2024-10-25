@@ -14,5 +14,5 @@ input_file: crates/tinymist-query/src/fixtures/type_check/fn_named2.typ
 25..28 -> @val
 32..33 -> @a
 39..40 -> @x
-43..46 -> (Any | @foo)
+43..46 -> @foo
 43..48 -> @val

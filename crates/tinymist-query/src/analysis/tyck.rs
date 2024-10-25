@@ -147,7 +147,8 @@ impl<'a> TypeChecker<'a> {
 
         let var = entry.var.clone();
 
-        if let Some(s) = decl.span() {
+        let s = decl.span();
+        if !s.is_detached() {
             // todo: record decl types
             // let should_record = matches!(root.kind(), SyntaxKind::FuncCall).then(||
             // root.span());

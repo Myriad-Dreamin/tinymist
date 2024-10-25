@@ -68,7 +68,7 @@ mod expr_tests {
         fn show_expr(&self, node: &Expr) -> String {
             match node {
                 Expr::Decl(decl) => {
-                    let range = decl.span().and_then(|s| self.range(s)).unwrap_or_default();
+                    let range = self.range(decl.span()).unwrap_or_default();
                     let fid = if let Some(fid) = decl.file_id() {
                         format!(" in {fid:?}")
                     } else {
@@ -76,7 +76,7 @@ mod expr_tests {
                     };
                     format!("{decl:?}@{range:?}{fid}")
                 }
-                _ => format!("{node:?}"),
+                _ => format!("{node}"),
             }
         }
     }

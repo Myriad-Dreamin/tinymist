@@ -4,7 +4,6 @@
 
 use core::fmt;
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
     hash::{Hash, Hasher},
     sync::Arc,
 };
@@ -12,6 +11,7 @@ use std::{
 use ecow::EcoVec;
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
+use rustc_hash::{FxHashMap, FxHashSet};
 use typst::{
     foundations::Value,
     syntax::{ast, Span, SyntaxKind, SyntaxNode},
@@ -449,13 +449,8 @@ pub struct TypeVar {
 
 impl Ord for TypeVar {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.name.cmp(&other.name).then_with(|| {
-            // todo: buggy
-            self.def
-                .must_span()
-                .number()
-                .cmp(&other.def.must_span().number())
-        })
+        // todo: buggy
+        self.def.weak_cmp(&other.def)
     }
 }
 
@@ -958,13 +953,13 @@ impl IfTy {
 #[derive(Default)]
 pub struct TypeScheme {
     /// The typing on definitions
-    pub vars: HashMap<DeclExpr, TypeVarBounds>,
+    pub vars: FxHashMap<DeclExpr, TypeVarBounds>,
     /// The checked documentation of definitions
-    pub var_docs: HashMap<DeclExpr, Arc<UntypedSymbolDocs>>,
+    pub var_docs: FxHashMap<DeclExpr, Arc<UntypedSymbolDocs>>,
     /// The local binding of the type variable
     pub local_binds: snapshot_map::SnapshotMap<DeclExpr, Ty>,
     /// The typing on syntax structures
-    pub mapping: HashMap<Span, Vec<Ty>>,
+    pub mapping: FxHashMap<Span, FxHashSet<Ty>>,
 
     pub(super) cano_cache: Mutex<TypeCanoStore>,
 }
@@ -1005,21 +1000,13 @@ impl TypeScheme {
     }
 
     /// Witnesses a type
-    pub fn witness_(site: Span, ty: Ty, mapping: &mut HashMap<Span, Vec<Ty>>) {
+    pub fn witness_(site: Span, ty: Ty, mapping: &mut FxHashMap<Span, FxHashSet<Ty>>) {
         if site.is_detached() {
             return;
         }
 
         // todo: intersect/union
-        let site_store = mapping.entry(site);
-        match site_store {
-            Entry::Occupied(e) => {
-                e.into_mut().push(ty);
-            }
-            Entry::Vacant(e) => {
-                e.insert(vec![ty]);
-            }
-        }
+        mapping.entry(site).or_default().insert(ty);
     }
 
     /// Converts a type to a type with bounds
@@ -1139,10 +1126,10 @@ impl FlowVarKind {
 
 #[derive(Default)]
 pub(super) struct TypeCanoStore {
-    pub cano_cache: HashMap<(Ty, bool), Ty>,
-    pub cano_local_cache: HashMap<(DeclExpr, bool), Ty>,
-    pub negatives: HashSet<DeclExpr>,
-    pub positives: HashSet<DeclExpr>,
+    pub cano_cache: FxHashMap<(Ty, bool), Ty>,
+    pub cano_local_cache: FxHashMap<(DeclExpr, bool), Ty>,
+    pub negatives: FxHashSet<DeclExpr>,
+    pub positives: FxHashSet<DeclExpr>,
 }
 
 impl_internable!(Ty,);
