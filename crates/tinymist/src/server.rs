@@ -1,4 +1,4 @@
-//! tinymist LSP server
+//! tinymist's language server
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

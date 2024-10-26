@@ -48,7 +48,7 @@ Note: With that configuration, if you’re seeing a file that is not reachable b
 
 == Extra Settings
 <extra-settings>
-To configure LSP server, you can edit the `language-server.tinymist` section. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
+To configure language server, you can edit the `language-server.tinymist` section. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
 
 ```toml
 [language-server.tinymist]

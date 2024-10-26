@@ -2,13 +2,18 @@
   "name": "tinymist",
   "version": "0.12.0",
   "description": "An integrated language service for Typst",
+  "keywords": [
+    "typst",
+    "lsp",
+    "language-server"
+  ],
   "categories": [
     "Programming Languages",
     "Formatters"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/Myriad-Dreamin/tinymist"
+    "url": "https://github.com/Myriad-Dreamin/tinymist.git"
   },
   "displayName": "Tinymist Typst",
   "author": "Myriad-Dreamin",
@@ -815,12 +820,12 @@
     "commands": [
       {
         "command": "tinymist.exportCurrentPdf",
-        "title": "Export the currently open file as PDF",
+        "title": "Export the Opened File as PDF",
         "category": "Typst"
       },
       {
         "command": "tinymist.pinMainToCurrent",
-        "title": "Pin the main file to the currently opened document",
+        "title": "Pin the Main file to the Opening Document",
         "category": "Typst"
       },
       {
@@ -842,28 +847,28 @@
       {
         "command": "tinymist.showLog",
         "title": "Tinymist: Show Log",
-        "description": "Show log of LSP Server",
+        "description": "Show log of the language server",
         "category": "Typst",
         "icon": "$(list-flat)"
       },
       {
         "command": "tinymist.clearCache",
-        "title": "Clear all cached resources",
+        "title": "Clear all Cached Resources",
         "category": "Typst"
       },
       {
         "command": "tinymist.initTemplate",
-        "title": "Initialize a new Typst project based on a template",
+        "title": "Initialize a New Typst Project based on a Template",
         "category": "Typst"
       },
       {
         "command": "tinymist.initTemplateInPlace",
-        "title": "Insert the content of template entry in place",
+        "title": "Insert the Content of Template Entry in Place",
         "category": "Typst"
       },
       {
         "command": "tinymist.showTemplateGallery",
-        "title": "Show available Typst templates (gallery) for picking up a template to initialize",
+        "title": "Show Available Typst Templates (Gallery) for Picking up a Template to Initialize",
         "category": "Typst"
       },
       {
@@ -894,39 +899,40 @@
       {
         "command": "tinymist.syncLabel",
         "title": "Scan workspace and collect all labels again",
-        "icon": "$(extensions-sync-enabled)"
+        "icon": "$(extensions-sync-enabled)",
+        "category": "Typst"
       },
       {
         "command": "typst-preview.preview",
-        "title": "Typst Preview: Preview current file",
+        "title": "Typst Preview: Preview Opened File",
         "description": "Launch typst-preview server",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.browser",
-        "title": "Typst Preview: Preview current file in browser",
+        "title": "Typst Preview: Preview Opened File in Browser",
         "description": "Launch typst-preview server and open the preview in your browser",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.preview-slide",
-        "title": "Typst Preview: Preview current file in slide mode",
+        "title": "Typst Preview: Preview Opened File in Slide Mode",
         "description": "Launch typst-preview server in slide mode",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.browser-slide",
-        "title": "Typst Preview: Preview current file in browser and slide mode",
+        "title": "Typst Preview: Preview Opened file in Browser and Slide Mode",
         "description": "Launch typst-preview server in slide mode and open the preview in your browser",
         "icon": "$(open-preview)",
         "when": "resourceLangId == typst && editorTextFocus"
       },
       {
         "command": "typst-preview.sync",
-        "title": "Typst Preview: Sync preview with current cursor",
+        "title": "Typst Preview: Sync Preview with Current Cursor",
         "description": "Scroll preview to current cursor position",
         "icon": "$(sync)",
         "when": "resourceLangId == typst && editorTextFocus"

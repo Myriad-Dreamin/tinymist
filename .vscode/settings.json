@@ -2,5 +2,8 @@
     "eslint.format.enable": true,
     "eslint.workingDirectories": [
         "editors/vscode"
-    ]
+    ],
+    "tinymist.fontPaths": [
+        "assets/fonts"
+    ],
 }
