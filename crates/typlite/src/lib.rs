@@ -305,9 +305,13 @@ impl TypliteWorker {
     }
 
     fn render_inner(&mut self, node: &SyntaxNode, is_dark: bool) -> Result<String> {
-        let color = if is_dark { "#c0caf5" } else { "#000000" };
+        let color = if is_dark {
+            r##"#set text(rgb("#c0caf5"))"##
+        } else {
+            ""
+        };
         let main = Bytes::from(eco_format!(
-            r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em), fill: rgb("#ffffff00"));#set text(rgb("{color}"))
+            r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em), fill: rgb("#ffffff00"));{color}
 {}"##,
             node.clone().into_text()
         ).as_bytes().to_owned());
@@ -318,6 +322,7 @@ impl TypliteWorker {
             entry: Some(entry),
             inputs: None,
         });
+        world.source_db.take_state();
         world.map_shadow_by_id(main_id, main).unwrap();
 
         let document = typst::compile(&world)
