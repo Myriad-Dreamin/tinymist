@@ -24,7 +24,7 @@ fn conv_(s: &str, for_docs: bool) -> EcoString {
         EntryState::new_rooted(cwd.as_path().into(), Some(main.id())),
         font_resolver.unwrap(),
         Default::default(),
-        Default::default()
+        Default::default(),
     )
     .unwrap();
     universe
@@ -36,7 +36,7 @@ fn conv_(s: &str, for_docs: bool) -> EcoString {
     let res = converter.convert().unwrap();
     static REG: OnceLock<Regex> = OnceLock::new();
     let reg = REG.get_or_init(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
-    let res = reg.replace(&res, |_captures: &regex::Captures| {
+    let res = reg.replace_all(&res, |_captures: &regex::Captures| {
         // let hash = _captures.get(1).unwrap().as_str();
         // format!(
         //     "data:image-hash/svg+xml;base64,siphash128:{:x}",
@@ -93,7 +93,11 @@ Some inlined raw `a`, ```c b```
 $
 1/2 + 1/3 = 5/6
 $
-        "###), @r###"<p align="center"><img src="data:image-hash/svg+xml;base64,redacted" alt="typst-block" /></p>"###);
+        "###), @r###"
+
+    <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="data:image-hash/svg+xml;base64,redacted"><img style="vertical-align: -0.35em" width="100%" alt="typst-block" src="data:image-hash/svg+xml;base64,redacted"/></picture></p>
+            
+    "###);
 }
 
 #[test]
