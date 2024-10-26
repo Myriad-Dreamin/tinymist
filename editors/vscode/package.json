@@ -941,7 +941,7 @@
         },
         {
           "command": "typst-preview.preview",
-          "when": "resourceLangId == typst && editorTextFocus",
+          "when": "resourceLangId == typst",
           "group": "navigation"
         }
       ],

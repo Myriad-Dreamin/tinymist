@@ -34,6 +34,7 @@ export function previewPreload(context: vscode.ExtensionContext) {
 }
 
 let launchImpl: typeof launchPreviewLsp;
+let activeEditor: vscode.TextEditor | undefined;
 export function previewActivate(context: vscode.ExtensionContext, isCompat: boolean) {
   // https://github.com/microsoft/vscode-extension-samples/blob/4721ef0c450f36b5bce2ecd5be4f0352ed9e28ab/webview-view-sample/src/extension.ts#L3
   getPreviewHtmlCompat(context).then((html) => {
@@ -65,6 +66,15 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       "typst-preview",
       new TypstPreviewSerializer(context),
     ),
+  );
+
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor((editor: vscode.TextEditor | undefined) => {
+      const langId = editor?.document.languageId;
+      if (langId === "typst") {
+        activeEditor = editor;
+      }
+    }),
   );
 
   context.subscriptions.push(
@@ -113,7 +123,6 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
   launchImpl = isCompat ? launchPreviewCompat : launchPreviewLsp;
   function launch(kind: "browser" | "webview", mode: "doc" | "slide", isDev = false) {
     return async () => {
-      const activeEditor = vscode.window.activeTextEditor;
       if (!activeEditor) {
         vscode.window.showWarningMessage("No active editor");
         return;
