@@ -75,7 +75,7 @@ Extra features:
 ## Versioning and Release Cycle
 
 Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
-- If a version is suffixed with `-rcN` (<picture><source media="(prefers-color-scheme: dark)" srcset="./assets/images/introduction.typ-inlined0.svg"><img alt="typst-block" src="./assets/images/introduction.typ-inlined1.svg"/></picture>), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
+- If a version is suffixed with `-rcN` (<picture><source media="(prefers-color-scheme: dark)" srcset="./assets/images/introduction.typ-inlined0.svg"><img style="vertical-align: -0.35em" alt="typst-block" src="./assets/images/introduction.typ-inlined1.svg"/></picture>), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
 - If the `PATCH` number is odd, e.g. `0.11.1` and `0.12.3`, it means this version is a nightly release. The nightly release will use both [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main) and [typst](https://github.com/typst/typst/tree/main) at **main branch**. They will be published as prerelease version to the marketplace.
 - Otherwise, if the `PATCH` number is even, e.g. `0.11.0` and `0.12.2`, it means this version is a regular release. The regular release will always use the recent stable version of tinymist and typst.
 

@@ -295,7 +295,7 @@ impl TypliteWorker {
         let light = self.render_inner(node, false)?;
         if inline {
             Ok(Value::Content(eco_format!(
-                r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img alt="typst-block" src="data:image/svg+xml;base64,{light}"/></picture>"#
+                r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img style="vertical-align: -0.35em" alt="typst-block" src="data:image/svg+xml;base64,{light}"/></picture>"#
             )))
         } else {
             Ok(Value::Content(eco_format!(
