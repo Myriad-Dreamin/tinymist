@@ -1,6 +1,8 @@
 >#for i
 #^ source.typst keyword.control.hash.typst
-# ^^^^^ source.typst meta.expr.for.typst
+# ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
+#    ^ source.typst meta.expr.for.typst
+#     ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 >#for i in
 #^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
@@ -185,8 +187,6 @@
 #                  ^ source.typst meta.expr.for.typst
 #                   ^ source.typst meta.expr.for.typst meta.brace.curly.typst
 #                    ^ source.typst meta.expr.for.typst meta.brace.curly.typst
-#                     ^ source.typst meta.expr.for.typst
-#                      ^ source.typst meta.expr.for.typst meta.brace.curly.typst
-#                       ^ source.typst meta.expr.for.typst meta.brace.curly.typst
+#                     ^^^^ source.typst
 >1
 #^^ source.typst

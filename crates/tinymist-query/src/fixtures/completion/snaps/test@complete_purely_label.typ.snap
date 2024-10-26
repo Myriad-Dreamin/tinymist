@@ -14,6 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/complete_purely_label.
     "labelDetails": {
      "description": "H2"
     },
+    "sortText": "001",
     "textEdit": {
      "newText": "test>",
      "range": {

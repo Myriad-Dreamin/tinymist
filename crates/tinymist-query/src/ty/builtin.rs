@@ -1,19 +1,19 @@
 use core::fmt;
 
+use crate::prelude::*;
 use once_cell::sync::Lazy;
 use regex::RegexSet;
-use typst::{foundations::CastInfo, syntax::Span};
+use strum::{EnumIter, IntoEnumIterator};
+use typst::foundations::CastInfo;
 use typst::{
     foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
     layout::Length,
 };
 
-use crate::{adt::interner::Interned, ty::*};
+use crate::ty::*;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, EnumIter)]
 pub enum PathPreference {
-    None,
-    Special,
     Source,
     Csv,
     Image,
@@ -25,6 +25,8 @@ pub enum PathPreference {
     Bibliography,
     RawTheme,
     RawSyntax,
+    Special,
+    None,
 }
 
 impl PathPreference {
@@ -33,7 +35,8 @@ impl PathPreference {
             Lazy::new(|| RegexSet::new([r"^typ$", r"^typc$"]).unwrap());
         static IMAGE_REGSET: Lazy<RegexSet> = Lazy::new(|| {
             RegexSet::new([
-                r"^png$", r"^webp$", r"^jpg$", r"^jpeg$", r"^svg$", r"^svgz$",
+                r"^ico$", r"^bmp$", r"^png$", r"^webp$", r"^jpg$", r"^jpeg$", r"^jfif$", r"^tiff$",
+                r"^gif$", r"^svg$", r"^svgz$",
             ])
             .unwrap()
         });
@@ -70,8 +73,6 @@ impl PathPreference {
         });
 
         match self {
-            PathPreference::None => &ALL_REGSET,
-            PathPreference::Special => &ALL_SPECIAL_REGSET,
             PathPreference::Source => &SOURCE_REGSET,
             PathPreference::Csv => &CSV_REGSET,
             PathPreference::Image => &IMAGE_REGSET,
@@ -83,7 +84,14 @@ impl PathPreference {
             PathPreference::Bibliography => &BIB_REGSET,
             PathPreference::RawTheme => &RAW_THEME_REGSET,
             PathPreference::RawSyntax => &RAW_SYNTAX_REGSET,
+            PathPreference::Special => &ALL_SPECIAL_REGSET,
+            PathPreference::None => &ALL_REGSET,
         }
+    }
+
+    pub fn from_ext(path: &str) -> Option<Self> {
+        let path = std::path::Path::new(path).extension()?.to_str()?;
+        PathPreference::iter().find(|p| p.ext_matcher().is_match(path))
     }
 }
 
@@ -149,13 +157,51 @@ impl<'a> Iterator for UnionIter<'a> {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq)]
+// todo: we can write some proto files for builtin sigs
+#[derive(Debug, Clone, Copy)]
+pub enum BuiltinSig<'a> {
+    /// Map a function over a tuple.
+    TupleMap(&'a Ty),
+    /// Get element of a tuple.
+    TupleAt(&'a Ty),
+}
+
+/// A package identifier.
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PackageId {
+    pub namespace: StrRef,
+    pub name: StrRef,
+}
+
+impl fmt::Debug for PackageId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "@{}/{}", self.namespace, self.name)
+    }
+}
+
+impl TryFrom<TypstFileId> for PackageId {
+    type Error = ();
+
+    fn try_from(value: TypstFileId) -> Result<Self, Self::Error> {
+        let Some(spec) = value.package() else {
+            return Err(());
+        };
+        Ok(PackageId {
+            namespace: spec.namespace.as_str().into(),
+            name: spec.name.as_str().into(),
+        })
+    }
+}
+
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BuiltinTy {
     Clause,
     Undef,
     Content,
     Space,
     None,
+    Break,
+    Continue,
     Infer,
     FlowNone,
     Auto,
@@ -167,6 +213,7 @@ pub enum BuiltinTy {
     TextLang,
     TextRegion,
 
+    Label,
     CiteLabel,
     RefLabel,
     Dir,
@@ -179,6 +226,7 @@ pub enum BuiltinTy {
     Outset,
     Radius,
 
+    Tag(Box<(StrRef, Option<Interned<PackageId>>)>),
     Type(typst::foundations::Type),
     Element(typst::foundations::Element),
     Path(PathPreference),
@@ -192,6 +240,8 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::Content => f.write_str("Content"),
             BuiltinTy::Space => f.write_str("Space"),
             BuiltinTy::None => f.write_str("None"),
+            BuiltinTy::Break => f.write_str("Break"),
+            BuiltinTy::Continue => f.write_str("Continue"),
             BuiltinTy::Infer => f.write_str("Infer"),
             BuiltinTy::FlowNone => f.write_str("FlowNone"),
             BuiltinTy::Auto => f.write_str("Auto"),
@@ -204,6 +254,7 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::TextRegion => write!(f, "TextRegion"),
             BuiltinTy::Dir => write!(f, "Dir"),
             BuiltinTy::Length => write!(f, "Length"),
+            BuiltinTy::Label => write!(f, "Label"),
             BuiltinTy::CiteLabel => write!(f, "CiteLabel"),
             BuiltinTy::RefLabel => write!(f, "RefLabel"),
             BuiltinTy::Float => write!(f, "Float"),
@@ -214,6 +265,14 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::Radius => write!(f, "Radius"),
             BuiltinTy::Type(ty) => write!(f, "Type({})", ty.long_name()),
             BuiltinTy::Element(e) => e.fmt(f),
+            BuiltinTy::Tag(tag) => {
+                let (name, id) = tag.as_ref();
+                if let Some(id) = id {
+                    write!(f, "Tag({name:?}) of {id:?}")
+                } else {
+                    write!(f, "Tag({name:?})")
+                }
+            }
             BuiltinTy::Path(p) => write!(f, "Path({p:?})"),
         }
     }
@@ -254,18 +313,20 @@ impl BuiltinTy {
         BuiltinTy::Type(builtin).literally()
     }
 
-    pub(crate) fn describe(&self) -> &'static str {
-        match self {
+    pub(crate) fn describe(&self) -> String {
+        let res = match self {
             BuiltinTy::Clause => "any",
             BuiltinTy::Undef => "any",
             BuiltinTy::Content => "content",
             BuiltinTy::Space => "content",
             BuiltinTy::None => "none",
+            BuiltinTy::Break => "break",
+            BuiltinTy::Continue => "continue",
             BuiltinTy::Infer => "any",
             BuiltinTy::FlowNone => "none",
             BuiltinTy::Auto => "auto",
 
-            BuiltinTy::Args => "args",
+            BuiltinTy::Args => "arguments",
             BuiltinTy::Color => "color",
             BuiltinTy::TextSize => "text.size",
             BuiltinTy::TextFont => "text.font",
@@ -274,6 +335,7 @@ impl BuiltinTy {
             BuiltinTy::Dir => "dir",
             BuiltinTy::Length => "length",
             BuiltinTy::Float => "float",
+            BuiltinTy::Label => "label",
             BuiltinTy::CiteLabel => "cite-label",
             BuiltinTy::RefLabel => "ref-label",
             BuiltinTy::Stroke => "stroke",
@@ -283,6 +345,14 @@ impl BuiltinTy {
             BuiltinTy::Radius => "radius",
             BuiltinTy::Type(ty) => ty.short_name(),
             BuiltinTy::Element(ty) => ty.name(),
+            BuiltinTy::Tag(tag) => {
+                let (name, id) = tag.as_ref();
+                return if let Some(id) = id {
+                    format!("tag {name} of {id:?}")
+                } else {
+                    format!("tag {name}")
+                };
+            }
             BuiltinTy::Path(s) => match s {
                 PathPreference::None => "[any]",
                 PathPreference::Special => "[any]",
@@ -298,7 +368,9 @@ impl BuiltinTy {
                 PathPreference::RawTheme => "[theme]",
                 PathPreference::RawSyntax => "[syntax]",
             },
-        }
+        };
+
+        res.to_string()
     }
 }
 
@@ -357,7 +429,6 @@ macro_rules! flow_record {
                 (
                     $name.into(),
                     $ty,
-                    Span::detached(),
                 ),
             )*
         ])
@@ -544,9 +615,10 @@ pub static FLOW_RADIUS_DICT: Lazy<Interned<RecordTy>> = Lazy::new(|| {
 
 #[cfg(test)]
 mod tests {
-    use reflexo::vector::ir::DefId;
 
-    use super::*;
+    use crate::syntax::Decl;
+
+    use super::{SigTy, Ty, TypeVar};
 
     // todo: map function
     // Technical Note for implementing a map function:
@@ -554,11 +626,12 @@ mod tests {
     // instantiate a `v` as the return type of the map function.
     #[test]
     fn test_map() {
-        let u = Ty::Var(TypeVar::new("u".into(), DefId(0)));
-        let v = Ty::Var(TypeVar::new("v".into(), DefId(1)));
+        let u = Ty::Var(TypeVar::new("u".into(), Decl::lit("u").into()));
+        let v = Ty::Var(TypeVar::new("v".into(), Decl::lit("v").into()));
         let mapper_fn =
-            Ty::Func(SigTy::new([u], Option::None, Option::None, Some(v.clone())).into());
-        let map_fn = Ty::Func(SigTy::new([mapper_fn], Option::None, Option::None, Some(v)).into());
+            Ty::Func(SigTy::new([u].into_iter(), None, None, None, Some(v.clone())).into());
+        let map_fn =
+            Ty::Func(SigTy::new([mapper_fn].into_iter(), None, None, None, Some(v)).into());
         let _ = map_fn;
         // println!("{map_fn:?}");
     }

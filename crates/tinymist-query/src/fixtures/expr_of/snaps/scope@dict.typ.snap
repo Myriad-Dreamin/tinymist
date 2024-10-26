@@ -1,0 +1,13 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "snap.join(\"\\n\")"
+input_file: crates/tinymist-query/src/fixtures/expr_of/dict.typ
+---
+= resolves
+Var(x)@17..18 in /s0.typ -> Var(x)@17..18 in /s0.typ, root Var(x)@17..18 in /s0.typ, val: None
+Var(z)@5..6 in /s0.typ -> Var(z)@5..6 in /s0.typ, root Var(z)@5..6 in /s0.typ, val: None
+IdentRef(z)@28..29 in /s0.typ -> Var(z)@5..6 in /s0.typ, root Var(z)@5..6 in /s0.typ, val: None
+IdentRef(z)@40..41 in /s0.typ -> Var(z)@5..6 in /s0.typ, root Var(z)@5..6 in /s0.typ, val: None
+= exports
+x -> Var(x)@17..18 in /s0.typ
+z -> Var(z)@5..6 in /s0.typ

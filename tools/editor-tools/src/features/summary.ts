@@ -7,6 +7,7 @@ import {
 } from "../vscode";
 import { CopyIcon } from "../icons";
 import { startModal } from "../components/modal";
+import { base64Decode, base64Encode } from "../utils";
 const { div, a, span, code, br, button, form, textarea, label, input } =
   van.tags;
 
@@ -14,7 +15,7 @@ interface ServerInfo {
   root: string;
   fontPaths: string[];
   inputs: Record<string, string>;
-  estimatedMemoryUsage: Record<string, number>;
+  stats: Record<string, string>;
 }
 
 type ServerInfoMap = Record<string, ServerInfo>;
@@ -24,14 +25,14 @@ export const Summary = () => {
   const docMetrics = van.state<DocumentMetrics>(
     documentMetricsData.startsWith(":")
       ? DOC_MOCK
-      : JSON.parse(atob(documentMetricsData))
+      : JSON.parse(base64Decode(documentMetricsData))
   );
   console.log("docMetrics", docMetrics);
   const serverInfoData = `:[[preview:ServerInfo]]:`;
   const serverInfos = van.state<ServerInfoMap>(
     serverInfoData.startsWith(":")
       ? SERVER_INFO_MOCK
-      : JSON.parse(atob(serverInfoData))
+      : JSON.parse(base64Decode(serverInfoData))
   );
   console.log("serverInfos", serverInfos);
 
@@ -152,9 +153,12 @@ export const Summary = () => {
         )
       );
 
-      for (const [key, usage] of Object.entries(val.estimatedMemoryUsage)) {
+      for (const [key, htmlContent] of Object.entries(val.stats)) {
         res.push(
-          div(a(code(`memoryUsage (${key})`)), ": ", code(humanSize(usage)))
+          div(
+            div({ href: "javascript:void(0)" }, code(key)),
+            div({ innerHTML: htmlContent })
+          )
         );
       }
     }
@@ -458,7 +462,7 @@ const fontsExportPannel = ({ fonts, sources }: fontsExportPannelProps) => {
     ":"
   )
     ? fontsExportDefaultConfigure
-    : JSON.parse(atob(savedConfigureData));
+    : JSON.parse(base64Decode(savedConfigureData));
 
   const exportFormat = van.state<fontsExportFormat>(savedConfigure.format);
   const locationFilter = van.state<fontLocation[]>(
@@ -480,7 +484,7 @@ const fontsExportPannel = ({ fonts, sources }: fontsExportPannelProps) => {
       json: jsonConfigure.val,
     };
 
-    savedConfigureData = btoa(JSON.stringify(configure));
+    savedConfigureData = base64Encode(JSON.stringify(configure));
     requestSaveFontsExportConfigure(configure);
   });
 
@@ -889,19 +893,9 @@ const SERVER_INFO_MOCK: ServerInfoMap = {
       theme: "dark",
       context: '{"preview":true}',
     },
-    estimatedMemoryUsage: {},
+    stats: {},
   },
 };
-
-function humanSize(size: number) {
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let unit = 0;
-  while (size >= 768 && unit < units.length) {
-    size /= 1024;
-    unit++;
-  }
-  return `${size.toFixed(2)} ${units[unit]}`;
-}
 
 function almost(value: number, target: number, threshold = 0.01) {
   return Math.abs(value - target) < threshold;

@@ -1,7 +1,29 @@
-use crate::{adt::interner::Interned, ty::def::*};
+use crate::ty::def::*;
 
-pub trait MutateDriver {
-    fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty>;
+pub trait TyMutator {
+    fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
+        self.mutate_rec(ty, pol)
+    }
+    fn mutate_rec(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
+        use Ty::*;
+        match ty {
+            Value(..) | Any | Boolean(..) | Builtin(..) => None,
+            Union(v) => Some(Union(self.mutate_vec(v, pol)?)),
+            Var(..) | Let(..) => None,
+            Array(e) => Some(Array(self.mutate(e, pol)?.into())),
+            Dict(r) => Some(Dict(self.mutate_record(r, pol)?.into())),
+            Tuple(e) => Some(Tuple(self.mutate_vec(e, pol)?)),
+            Func(f) => Some(Func(self.mutate_func(f, pol)?.into())),
+            Args(args) => Some(Args(self.mutate_func(args, pol)?.into())),
+            Pattern(args) => Some(Pattern(self.mutate_func(args, pol)?.into())),
+            Field(f) => Some(Field(self.mutate_field(f, pol)?.into())),
+            Select(s) => Some(Select(self.mutate_select(s, pol)?.into())),
+            With(w) => Some(With(self.mutate_with_sig(w, pol)?.into())),
+            Unary(u) => Some(Unary(self.mutate_unary(u, pol)?.into())),
+            Binary(b) => Some(Binary(self.mutate_binary(b, pol)?.into())),
+            If(i) => Some(If(self.mutate_if(i, pol)?.into())),
+        }
+    }
 
     fn mutate_vec(&mut self, ty: &[Ty], pol: bool) -> Option<Interned<Vec<Ty>>> {
         let mut mutated = false;
@@ -49,6 +71,13 @@ pub trait MutateDriver {
         })
     }
 
+    fn mutate_field(&mut self, f: &Interned<FieldTy>, pol: bool) -> Option<FieldTy> {
+        let field = self.mutate(&f.field, pol)?;
+        let mut f = f.as_ref().clone();
+        f.field = field;
+        Some(f)
+    }
+
     fn mutate_record(&mut self, ty: &Interned<RecordTy>, pol: bool) -> Option<RecordTy> {
         let types = self.mutate_vec(&ty.types, pol)?;
 
@@ -71,7 +100,7 @@ pub trait MutateDriver {
     }
 
     fn mutate_unary(&mut self, ty: &Interned<TypeUnary>, pol: bool) -> Option<TypeUnary> {
-        let lhs = self.mutate(ty.lhs.as_ref(), pol)?.into();
+        let lhs = self.mutate(&ty.lhs, pol)?;
 
         Some(TypeUnary { lhs, op: ty.op })
     }
@@ -86,8 +115,8 @@ pub trait MutateDriver {
             return None;
         }
 
-        let lhs = x.map(Interned::new).unwrap_or_else(|| lhs.clone());
-        let rhs = y.map(Interned::new).unwrap_or_else(|| rhs.clone());
+        let lhs = x.unwrap_or_else(|| lhs.clone());
+        let rhs = y.unwrap_or_else(|| rhs.clone());
 
         Some(TypeBinary {
             operands: (lhs, rhs),
@@ -121,7 +150,7 @@ pub trait MutateDriver {
     }
 }
 
-impl<T> MutateDriver for T
+impl<T> TyMutator for T
 where
     T: FnMut(&Ty, bool) -> Option<Ty>,
 {
@@ -132,37 +161,7 @@ where
 
 impl Ty {
     /// Mutate the given type.
-    pub fn mutate(&self, pol: bool, checker: &mut impl MutateDriver) -> Option<Ty> {
-        let mut worker = Mutator;
-        worker.ty(self, pol, checker)
-    }
-}
-
-struct Mutator;
-
-impl Mutator {
-    fn ty(&mut self, ty: &Ty, pol: bool, mutator: &mut impl MutateDriver) -> Option<Ty> {
-        use Ty::*;
-        match ty {
-            Value(..) | Any | Boolean(..) | Builtin(..) => mutator.mutate(ty, pol),
-            Union(v) => Some(Union(mutator.mutate_vec(v, pol)?)),
-            Var(..) | Let(..) => mutator.mutate(ty, pol),
-            Array(e) => Some(Array(mutator.mutate(e, pol)?.into())),
-            Dict(r) => Some(Dict(mutator.mutate_record(r, pol)?.into())),
-            Tuple(e) => Some(Tuple(mutator.mutate_vec(e, pol)?)),
-            Func(f) => Some(Func(mutator.mutate_func(f, pol)?.into())),
-            Args(args) => Some(Args(mutator.mutate_func(args, pol)?.into())),
-            Field(f) => {
-                let field = f.field.mutate(pol, mutator)?;
-                let mut f = f.as_ref().clone();
-                f.field = field;
-                Some(Field(f.into()))
-            }
-            Select(s) => Some(Select(mutator.mutate_select(s, pol)?.into())),
-            With(w) => Some(With(mutator.mutate_with_sig(w, pol)?.into())),
-            Unary(u) => Some(Unary(mutator.mutate_unary(u, pol)?.into())),
-            Binary(b) => Some(Binary(mutator.mutate_binary(b, pol)?.into())),
-            If(i) => Some(If(mutator.mutate_if(i, pol)?.into())),
-        }
+    pub fn mutate(&self, pol: bool, checker: &mut impl TyMutator) -> Option<Ty> {
+        checker.mutate(self, pol)
     }
 }

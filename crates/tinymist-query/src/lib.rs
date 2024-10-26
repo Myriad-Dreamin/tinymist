@@ -10,6 +10,7 @@
 mod adt;
 pub mod analysis;
 pub mod docs;
+pub mod package;
 pub mod syntax;
 pub mod ty;
 mod upstream;
@@ -35,6 +36,8 @@ mod document_highlight;
 pub use document_highlight::*;
 mod document_symbol;
 pub use document_symbol::*;
+mod document_link;
+pub use document_link::*;
 mod workspace_label;
 pub use workspace_label::*;
 mod document_metrics;
@@ -51,6 +54,8 @@ mod inlay_hint;
 pub use inlay_hint::*;
 mod jump;
 pub use jump::*;
+mod will_rename_files;
+pub use will_rename_files::*;
 mod rename;
 pub use rename::*;
 mod selection_range;
@@ -244,6 +249,7 @@ mod polymorphic {
         References(ReferencesRequest),
         InlayHint(InlayHintRequest),
         DocumentColor(DocumentColorRequest),
+        DocumentLink(DocumentLinkRequest),
         DocumentHighlight(DocumentHighlightRequest),
         ColorPresentation(ColorPresentationRequest),
         CodeAction(CodeActionRequest),
@@ -251,6 +257,7 @@ mod polymorphic {
         Completion(CompletionRequest),
         SignatureHelp(SignatureHelpRequest),
         Rename(RenameRequest),
+        WillRenameFiles(WillRenameFilesRequest),
         PrepareRename(PrepareRenameRequest),
         DocumentSymbol(DocumentSymbolRequest),
         Symbol(SymbolRequest),
@@ -279,6 +286,7 @@ mod polymorphic {
                 Self::References(..) => PinnedFirst,
                 Self::InlayHint(..) => Unique,
                 Self::DocumentColor(..) => PinnedFirst,
+                Self::DocumentLink(..) => PinnedFirst,
                 Self::DocumentHighlight(..) => PinnedFirst,
                 Self::ColorPresentation(..) => ContextFreeUnique,
                 Self::CodeAction(..) => Unique,
@@ -286,12 +294,13 @@ mod polymorphic {
                 Self::Completion(..) => Mergeable,
                 Self::SignatureHelp(..) => PinnedFirst,
                 Self::Rename(..) => Mergeable,
+                Self::WillRenameFiles(..) => Mergeable,
                 Self::PrepareRename(..) => Mergeable,
                 Self::DocumentSymbol(..) => ContextFreeUnique,
                 Self::WorkspaceLabel(..) => Mergeable,
                 Self::Symbol(..) => Mergeable,
-                Self::SemanticTokensFull(..) => ContextFreeUnique,
-                Self::SemanticTokensDelta(..) => ContextFreeUnique,
+                Self::SemanticTokensFull(..) => PinnedFirst,
+                Self::SemanticTokensDelta(..) => PinnedFirst,
                 Self::Formatting(..) => ContextFreeUnique,
                 Self::FoldingRange(..) => ContextFreeUnique,
                 Self::SelectionRange(..) => ContextFreeUnique,
@@ -313,6 +322,7 @@ mod polymorphic {
                 Self::References(req) => &req.path,
                 Self::InlayHint(req) => &req.path,
                 Self::DocumentColor(req) => &req.path,
+                Self::DocumentLink(req) => &req.path,
                 Self::DocumentHighlight(req) => &req.path,
                 Self::ColorPresentation(req) => &req.path,
                 Self::CodeAction(req) => &req.path,
@@ -320,6 +330,7 @@ mod polymorphic {
                 Self::Completion(req) => &req.path,
                 Self::SignatureHelp(req) => &req.path,
                 Self::Rename(req) => &req.path,
+                Self::WillRenameFiles(..) => return None,
                 Self::PrepareRename(req) => &req.path,
                 Self::DocumentSymbol(req) => &req.path,
                 Self::Symbol(..) => return None,
@@ -348,6 +359,7 @@ mod polymorphic {
         References(Option<Vec<LspLocation>>),
         InlayHint(Option<Vec<InlayHint>>),
         DocumentColor(Option<Vec<ColorInformation>>),
+        DocumentLink(Option<Vec<DocumentLink>>),
         DocumentHighlight(Option<Vec<DocumentHighlight>>),
         ColorPresentation(Option<Vec<ColorPresentation>>),
         CodeAction(Option<Vec<CodeActionOrCommand>>),
@@ -356,6 +368,7 @@ mod polymorphic {
         SignatureHelp(Option<SignatureHelp>),
         PrepareRename(Option<PrepareRenameResponse>),
         Rename(Option<WorkspaceEdit>),
+        WillRenameFiles(Option<WorkspaceEdit>),
         DocumentSymbol(Option<DocumentSymbolResponse>),
         Symbol(Option<Vec<SymbolInformation>>),
         WorkspaceLabel(Option<Vec<SymbolInformation>>),
@@ -382,6 +395,7 @@ mod polymorphic {
                 Self::References(res) => serde_json::to_value(res),
                 Self::InlayHint(res) => serde_json::to_value(res),
                 Self::DocumentColor(res) => serde_json::to_value(res),
+                Self::DocumentLink(res) => serde_json::to_value(res),
                 Self::DocumentHighlight(res) => serde_json::to_value(res),
                 Self::ColorPresentation(res) => serde_json::to_value(res),
                 Self::CodeAction(res) => serde_json::to_value(res),
@@ -390,6 +404,7 @@ mod polymorphic {
                 Self::SignatureHelp(res) => serde_json::to_value(res),
                 Self::PrepareRename(res) => serde_json::to_value(res),
                 Self::Rename(res) => serde_json::to_value(res),
+                Self::WillRenameFiles(res) => serde_json::to_value(res),
                 Self::DocumentSymbol(res) => serde_json::to_value(res),
                 Self::Symbol(res) => serde_json::to_value(res),
                 Self::WorkspaceLabel(res) => serde_json::to_value(res),

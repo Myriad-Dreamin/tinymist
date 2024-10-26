@@ -14,7 +14,8 @@ To enable LSP, you must install `tinymist`. You can find `tinymist` by:
 
 - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
 
-- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases). \
+- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases). 
+
   If you are using the latest version of
   [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then
   you can use command `typst-ts-lsp-download-binary` to download the latest
@@ -92,9 +93,9 @@ autocmd BufNewFile,BufRead *.typ setfiletype typst
 
 ## Extra Settings
 
-### Configuring LSP Server
+### Configuring Language Server
 
-To configure LSP server, you can edit the `opts.servers.tinymist.settings`. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
+To configure language server, you can edit the `opts.servers.tinymist.settings`. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
 
 ```lua
 return {
@@ -117,13 +118,30 @@ return {
 
 See [Tinymist Server Configuration](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md) for references.
 
+### Configuring Language Server for COC
+
+To configure language server for [coc.nvim](https://github.com/neoclide/coc.nvim), you can edit the `coc-settings.json` by executing `:CocConfig`:
+
+```json
+"languageserver": {
+  "tinymist": {
+    "command": "tinymist",
+    "filetypes": ["typst"],
+    "settings": {
+      "exportPdf": "onType",
+      "outputPath" = "$root/target/$dir/$name",
+    }
+  }
+}
+```
+
 ### Configuring Folding Range for Neovim Client
 
 Enable LSP-based folding range with `kevinhwang91/nvim-ufo`:
 
 ```lua
 return {
-  { -- configure LSP servers
+  { -- configure language servers
     "neovim/nvim-lspconfig",
     dependencies = "kevinhwang91/nvim-ufo", -- enable LSP-based folds
   },

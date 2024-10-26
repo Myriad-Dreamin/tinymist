@@ -6,7 +6,8 @@ input_file: crates/tinymist-query/src/fixtures/goto_definition/inside_import_ali
 [
  {
   "originSelectionRange": "2:43:2:45",
-  "targetRange": "2:43:2:45",
-  "targetSelectionRange": "2:43:2:45"
+  "targetRange": "0:5:0:6",
+  "targetSelectionRange": "0:5:0:6",
+  "targetUri": "base.typ"
  }
 ]

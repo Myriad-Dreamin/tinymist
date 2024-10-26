@@ -1,46 +1,20 @@
 //! Analysis of function signatures.
-use core::fmt;
-use std::{borrow::Cow, collections::HashMap, ops::Range, sync::Arc};
 
-use ecow::{eco_format, eco_vec, EcoString, EcoVec};
-use itertools::Itertools;
-use log::trace;
-use typst::syntax::{FileId as TypstFileId, Source};
-use typst::{
-    foundations::{CastInfo, Closure, Func, ParamInfo, Repr, Value},
-    syntax::{
-        ast::{self, AstNode},
-        LinkedNode, Span, SyntaxKind,
-    },
-};
-use typst_shim::syntax::LinkedNodeExt;
-use typst_shim::utils::LazyHash;
+use itertools::Either;
+use tinymist_derive::BindTyCtx;
+use typst::foundations::{Closure, ParamInfo};
 
-use crate::adt::interner::Interned;
-use crate::analysis::resolve_callee;
-use crate::syntax::{get_def_target, get_deref_target, DefTarget};
-use crate::ty::SigTy;
-use crate::AnalysisContext;
-
-use super::{find_definition, DefinitionLink, LexicalKind, LexicalVarKind, Ty};
-
-// pub fn analyze_signature
+use super::{prelude::*, BoundChecker, Definition, DocSource, SharedContext, SigTy, TypeVar};
+use crate::analysis::PostTypeChecker;
+use crate::docs::{UntypedSignatureDocs, UntypedSymbolDocs, UntypedVarDocs};
+use crate::syntax::get_non_strict_def_target;
+use crate::ty::TyCtx;
+use crate::ty::TypeBounds;
+use crate::upstream::truncated_repr;
 
 /// Describes a function parameter.
-#[derive(Debug, Clone)]
-pub struct ParamSpec {
-    /// The parameter's name.
-    pub name: Interned<str>,
-    /// Documentation for the parameter.
-    pub docs: Cow<'static, str>,
-    /// Inferred type of the parameter.
-    pub(crate) base_type: Ty,
-    /// The parameter's default name as type.
-    pub type_repr: Option<EcoString>,
-    /// The parameter's default name as value.
-    pub expr: Option<EcoString>,
-    /// Creates an instance of the parameter's default value.
-    pub default: Option<fn() -> Value>,
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+pub struct ParamAttrs {
     /// Is the parameter positional?
     pub positional: bool,
     /// Is the parameter named?
@@ -54,21 +28,59 @@ pub struct ParamSpec {
     pub settable: bool,
 }
 
-impl ParamSpec {
-    fn from_static(f: &Func, p: &ParamInfo) -> Arc<Self> {
-        Arc::new(Self {
-            name: p.name.into(),
-            docs: Cow::Borrowed(p.docs),
-            base_type: Ty::from_param_site(f, p),
-            type_repr: Some(eco_format!("{}", TypeExpr(&p.input))),
-            expr: None,
-            default: p.default,
-            positional: p.positional,
-            named: p.named,
-            variadic: p.variadic,
-            settable: p.settable,
-        })
+impl ParamAttrs {
+    pub(crate) fn positional() -> ParamAttrs {
+        ParamAttrs {
+            positional: true,
+            named: false,
+            variadic: false,
+            settable: false,
+        }
     }
+
+    pub(crate) fn named() -> ParamAttrs {
+        ParamAttrs {
+            positional: false,
+            named: true,
+            variadic: false,
+            settable: false,
+        }
+    }
+
+    pub(crate) fn variadic() -> ParamAttrs {
+        ParamAttrs {
+            positional: true,
+            named: false,
+            variadic: true,
+            settable: false,
+        }
+    }
+}
+
+impl From<&ParamInfo> for ParamAttrs {
+    fn from(param: &ParamInfo) -> Self {
+        ParamAttrs {
+            positional: param.positional,
+            named: param.named,
+            variadic: param.variadic,
+            settable: param.settable,
+        }
+    }
+}
+
+/// Describes a function parameter.
+#[derive(Debug, Clone)]
+pub struct ParamSpec {
+    /// The name of the parameter.
+    pub name: StrRef,
+    /// The docstring of the parameter.
+    pub docs: Option<EcoString>,
+    /// The default value of the variable
+    pub default: Option<EcoString>,
+    /// The type of the parameter.
+    pub ty: Ty,
+    /// The attributes of the parameter.
+    pub attrs: ParamAttrs,
 }
 
 /// Describes a function signature.
@@ -97,6 +109,13 @@ impl Signature {
         }
     }
 
+    /// Returns the all parameters of the function.
+    pub(crate) fn params(&self) -> impl Iterator<Item = (&ParamSpec, Option<&Ty>)> {
+        let primary = self.primary().params();
+        // todo: with stack
+        primary
+    }
+
     pub(crate) fn type_sig(&self) -> Interned<SigTy> {
         let primary = self.primary().sig_ty.clone();
         // todo: with stack
@@ -107,17 +126,13 @@ impl Signature {
 /// Describes a primary function signature.
 #[derive(Debug, Clone)]
 pub struct PrimarySignature {
-    /// The positional parameters.
-    pub pos: Vec<Arc<ParamSpec>>,
-    /// The named parameters.
-    pub named: HashMap<Interned<str>, Arc<ParamSpec>>,
+    /// The documentation of the function
+    pub docs: Option<EcoString>,
+    /// The documentation of the parameter.
+    pub param_specs: Vec<ParamSpec>,
     /// Whether the function has fill, stroke, or size parameters.
     pub has_fill_or_size_or_stroke: bool,
-    /// The rest parameter.
-    pub rest: Option<Arc<ParamSpec>>,
-    /// The return type.
-    pub(crate) ret_ty: Option<Ty>,
-    /// The signature type.
+    /// The associated signature type.
     pub(crate) sig_ty: Interned<SigTy>,
     _broken: bool,
 }
@@ -126,6 +141,58 @@ impl PrimarySignature {
     /// Returns the type representation of the function.
     pub(crate) fn ty(&self) -> Ty {
         Ty::Func(self.sig_ty.clone())
+    }
+
+    /// Returns the number of positional parameters of the function.
+    pub fn pos_size(&self) -> usize {
+        self.sig_ty.name_started as usize
+    }
+
+    /// Returns the positional parameters of the function.
+    pub fn pos(&self) -> &[ParamSpec] {
+        &self.param_specs[..self.pos_size()]
+    }
+
+    /// Returns the positional parameters of the function.
+    pub fn get_pos(&self, offset: usize) -> Option<&ParamSpec> {
+        self.pos().get(offset)
+    }
+
+    /// Returns the named parameters of the function.
+    pub fn named(&self) -> &[ParamSpec] {
+        &self.param_specs[self.pos_size()..self.pos_size() + self.sig_ty.names.names.len()]
+    }
+
+    /// Returns the named parameters of the function.
+    pub fn get_named(&self, name: &StrRef) -> Option<&ParamSpec> {
+        self.named().get(self.sig_ty.names.find(name)?)
+    }
+
+    /// Returns the name of the rest parameter of the function.
+    pub fn has_spread_right(&self) -> bool {
+        self.sig_ty.spread_right
+    }
+
+    /// Returns the rest parameter of the function.
+    pub fn rest(&self) -> Option<&ParamSpec> {
+        self.has_spread_right()
+            .then(|| &self.param_specs[self.pos_size() + self.sig_ty.names.names.len()])
+    }
+
+    /// Returns the all parameters of the function.
+    pub fn params(&self) -> impl Iterator<Item = (&ParamSpec, Option<&Ty>)> {
+        let pos = self.pos();
+        let named = self.named();
+        let rest = self.rest();
+        let type_sig = &self.sig_ty;
+        let pos = pos
+            .iter()
+            .enumerate()
+            .map(|(i, pos)| (pos, type_sig.pos(i)));
+        let named = named.iter().map(|x| (x, type_sig.named(&x.name)));
+        let rest = rest.into_iter().map(|x| (x, type_sig.rest_param()));
+
+        pos.chain(named).chain(rest)
     }
 }
 
@@ -138,20 +205,9 @@ pub struct ArgInfo {
     pub value: Option<Value>,
 }
 
-/// Describes a span.
-#[derive(Debug, Clone)]
-pub enum SpanInfo {
-    /// Unresolved raw span
-    Span(Span),
-    /// Resolved span
-    Range((TypstFileId, Range<usize>)),
-}
-
 /// Describes a function argument list.
 #[derive(Debug, Clone)]
 pub struct ArgsInfo {
-    /// The span of the argument list.
-    pub span: Option<SpanInfo>,
     /// The arguments.
     pub items: EcoVec<ArgInfo>,
 }
@@ -166,49 +222,257 @@ pub struct PartialSignature {
 }
 
 /// The language object that the signature is being analyzed for.
-pub enum SignatureTarget<'a> {
+#[derive(Debug, Clone)]
+pub enum SignatureTarget {
     /// A static node without knowing the function at runtime.
-    Syntax(Source, LinkedNode<'a>),
+    Def(Option<Source>, Definition),
+    /// A static node without knowing the function at runtime.
+    SyntaxFast(Source, Span),
+    /// A static node without knowing the function at runtime.
+    Syntax(Source, Span),
     /// A function that is known at runtime.
     Runtime(Func),
-}
-
-pub(crate) fn analyze_dyn_signature(ctx: &mut AnalysisContext, func: Func) -> Signature {
-    ctx.compute_signature(SignatureTarget::Runtime(func.clone()), || {
-        Signature::Primary(analyze_dyn_signature_inner(func))
-    })
+    /// A function that is known at runtime.
+    Convert(Func),
 }
 
 pub(crate) fn analyze_signature(
-    ctx: &mut AnalysisContext,
+    ctx: &Arc<SharedContext>,
     callee_node: SignatureTarget,
 ) -> Option<Signature> {
-    if let Some(sig) = ctx.signature(&callee_node) {
-        return Some(sig);
+    ctx.compute_signature(callee_node.clone(), move |ctx| {
+        log::debug!("analyzing signature for {callee_node:?}");
+        analyze_type_signature(ctx, &callee_node)
+            .or_else(|| analyze_dyn_signature(ctx, &callee_node))
+    })
+}
+
+fn analyze_type_signature(
+    ctx: &Arc<SharedContext>,
+    callee_node: &SignatureTarget,
+) -> Option<Signature> {
+    let (type_info, ty) = match callee_node {
+        SignatureTarget::Convert(..) => return None,
+        SignatureTarget::SyntaxFast(source, span) | SignatureTarget::Syntax(source, span) => {
+            let type_info = ctx.type_check(source)?;
+            let ty = type_info.type_of_span(*span)?;
+            Some((type_info, ty))
+        }
+        SignatureTarget::Def(source, def) => {
+            let span = def.decl.span();
+            let type_info = ctx.type_check(source.as_ref()?)?;
+            let ty = type_info.type_of_span(span)?;
+            Some((type_info, ty))
+        }
+        SignatureTarget::Runtime(f) => {
+            let source = ctx.source_by_id(f.span().id()?).ok()?;
+            let node = source.find(f.span())?;
+            let def = get_non_strict_def_target(node.parent()?.clone())?;
+            let type_info = ctx.type_check(&source)?;
+            let ty = type_info.type_of_span(def.name()?.span())?;
+            Some((type_info, ty))
+        }
+    }?;
+
+    // todo multiple sources
+    let mut srcs = ty.sources();
+    srcs.sort();
+    log::debug!("check type signature of ty: {ty:?} => {srcs:?}");
+    let type_var = srcs.into_iter().next()?;
+    match type_var {
+        DocSource::Var(v) => {
+            let mut ty_ctx = PostTypeChecker::new(ctx.clone(), &type_info);
+            let sig_ty = Ty::Func(ty.sig_repr(true, &mut ty_ctx)?);
+            let sig_ty = type_info.simplify(sig_ty, false);
+            let Ty::Func(sig_ty) = sig_ty else {
+                panic!("expected function type, got {sig_ty:?}");
+            };
+
+            // todo: this will affect inlay hint: _var_with
+            let (_var_with, docstring) = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
+                Some(UntypedSymbolDocs::Function(sig)) => (vec![], Either::Left(sig.as_ref())),
+                Some(UntypedSymbolDocs::Variable(d)) => find_alias_stack(&mut ty_ctx, &v, d)?,
+                _ => return None,
+            };
+
+            let docstring = match docstring {
+                Either::Left(docstring) => docstring,
+                Either::Right(f) => return Some(ctx.type_of_func(f)),
+            };
+
+            let mut param_specs = Vec::new();
+            let mut has_fill_or_size_or_stroke = false;
+            let mut _broken = false;
+
+            if docstring.pos.len() != sig_ty.positional_params().len() {
+                panic!("positional params mismatch: {docstring:#?} != {sig_ty:#?}");
+            }
+
+            for (doc, ty) in docstring.pos.iter().zip(sig_ty.positional_params()) {
+                let default = doc.default.clone();
+                let ty = ty.clone();
+
+                let name = doc.name.clone();
+                if matches!(name.as_ref(), "fill" | "stroke" | "size") {
+                    has_fill_or_size_or_stroke = true;
+                }
+
+                param_specs.push(ParamSpec {
+                    name,
+                    docs: Some(doc.docs.clone()),
+                    default,
+                    ty,
+                    attrs: ParamAttrs::positional(),
+                });
+            }
+
+            for (name, ty) in sig_ty.named_params() {
+                let doc = docstring.named.get(name).unwrap();
+                let default = doc.default.clone();
+                let ty = ty.clone();
+
+                if matches!(name.as_ref(), "fill" | "stroke" | "size") {
+                    has_fill_or_size_or_stroke = true;
+                }
+
+                param_specs.push(ParamSpec {
+                    name: name.clone(),
+                    docs: Some(doc.docs.clone()),
+                    default,
+                    ty,
+                    attrs: ParamAttrs::named(),
+                });
+            }
+
+            if let Some(doc) = docstring.rest.as_ref() {
+                let default = doc.default.clone();
+
+                param_specs.push(ParamSpec {
+                    name: doc.name.clone(),
+                    docs: Some(doc.docs.clone()),
+                    default,
+                    ty: sig_ty.rest_param().cloned().unwrap_or(Ty::Any),
+                    attrs: ParamAttrs::variadic(),
+                });
+            }
+
+            Some(Signature::Primary(Arc::new(PrimarySignature {
+                docs: Some(docstring.docs.clone()),
+                param_specs,
+                has_fill_or_size_or_stroke,
+                sig_ty,
+                _broken,
+            })))
+        }
+        src @ (DocSource::Builtin(..) | DocSource::Ins(..)) => {
+            Some(ctx.type_of_func(src.as_func()?))
+        }
+    }
+}
+
+fn find_alias_stack<'a>(
+    ctx: &'a mut PostTypeChecker,
+    v: &Interned<TypeVar>,
+    d: &'a UntypedVarDocs,
+) -> Option<(
+    Vec<&'a UntypedVarDocs>,
+    Either<&'a UntypedSignatureDocs, Func>,
+)> {
+    let mut checker = AliasStackChecker {
+        ctx,
+        stack: vec![d],
+        res: None,
+        checking_with: true,
+    };
+    Ty::Var(v.clone()).bounds(true, &mut checker);
+
+    checker.res.map(|res| (checker.stack, res))
+}
+
+#[derive(BindTyCtx)]
+#[bind(ctx)]
+struct AliasStackChecker<'a, 'b> {
+    ctx: &'a mut PostTypeChecker<'b>,
+    stack: Vec<&'a UntypedVarDocs>,
+    res: Option<Either<&'a UntypedSignatureDocs, Func>>,
+    checking_with: bool,
+}
+
+impl<'a, 'b> BoundChecker for AliasStackChecker<'a, 'b> {
+    fn check_var(&mut self, u: &Interned<TypeVar>, pol: bool) {
+        log::debug!("collecting var {u:?} {pol:?}");
+        if self.res.is_some() {
+            return;
+        }
+
+        if self.checking_with {
+            self.check_var_rec(u, pol);
+            return;
+        }
+
+        let docs = self.ctx.info.var_docs.get(&u.def).map(|x| x.as_ref());
+
+        log::debug!("collecting var {u:?} {pol:?} => {docs:?}");
+        // todo: bind builtin functions
+        match docs {
+            Some(UntypedSymbolDocs::Function(sig)) => {
+                self.res = Some(Either::Left(sig));
+            }
+            Some(UntypedSymbolDocs::Variable(d)) => {
+                self.checking_with = true;
+                self.stack.push(d);
+                self.check_var_rec(u, pol);
+                self.stack.pop();
+                self.checking_with = false;
+            }
+            _ => {}
+        }
     }
 
-    let func = match callee_node {
-        SignatureTarget::Syntax(source, node) => {
-            let _ = resolve_callee_v2;
-            let _ = source;
-
-            // let res = resolve_callee_v2(ctx, node)?;
-
-            // let func = match res {
-            //     TryResolveCalleeResult::Syntax(lnk) => {
-            //         println!("Syntax {:?}", lnk.name);
-
-            //         return analyze_static_signature(ctx, source, lnk);
-            //     }
-            //     TryResolveCalleeResult::Runtime(func) => func,
-            // };
-
-            let func = resolve_callee(ctx, &node)?;
-
-            log::debug!("got function {func:?}");
-            func
+    fn collect(&mut self, ty: &Ty, pol: bool) {
+        if self.res.is_some() {
+            return;
         }
-        SignatureTarget::Runtime(func) => func,
+
+        match (self.checking_with, ty) {
+            (true, Ty::With(w)) => {
+                log::debug!("collecting with {ty:?} {pol:?}");
+                self.checking_with = false;
+                w.sig.bounds(pol, self);
+                self.checking_with = true;
+            }
+            (false, ty) => {
+                if let Some(src) = ty.as_source() {
+                    match src {
+                        DocSource::Var(u) => {
+                            self.check_var(&u, pol);
+                        }
+                        src @ (DocSource::Builtin(..) | DocSource::Ins(..)) => {
+                            if let Some(f) = src.as_func() {
+                                self.res = Some(Either::Right(f));
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn analyze_dyn_signature(
+    ctx: &Arc<SharedContext>,
+    callee_node: &SignatureTarget,
+) -> Option<Signature> {
+    let func = match callee_node {
+        SignatureTarget::Def(_source, def) => def.value()?.to_func()?,
+        SignatureTarget::SyntaxFast(..) => return None,
+        SignatureTarget::Syntax(source, span) => {
+            let target = ctx.deref_syntax(source, *span)?;
+            let def = ctx.definition(source, None, target)?;
+            def.value()?.to_func()?
+        }
+        SignatureTarget::Convert(func) | SignatureTarget::Runtime(func) => func.clone(),
     };
 
     use typst::foundations::func::Repr;
@@ -216,7 +480,6 @@ pub(crate) fn analyze_signature(
     let mut func = func;
     while let Repr::With(f) = func.inner() {
         with_stack.push(ArgsInfo {
-            span: None,
             items: f
                 .1
                 .items
@@ -230,234 +493,138 @@ pub(crate) fn analyze_signature(
         func = f.0.clone();
     }
 
-    let signature = ctx
-        .compute_signature(SignatureTarget::Runtime(func.clone()), || {
-            Signature::Primary(analyze_dyn_signature_inner(func))
-        })
-        .primary()
-        .clone();
-    trace!("got signature {signature:?}");
+    let signature = analyze_dyn_signature_inner(func);
+    log::trace!("got signature {signature:?}");
 
     if with_stack.is_empty() {
         return Some(Signature::Primary(signature));
     }
-
     Some(Signature::Partial(Arc::new(PartialSignature {
         signature,
         with_stack,
     })))
 }
 
-// fn analyze_static_signature(
-//     ctx: &mut AnalysisContext<'_>,
-//     source: Source,
-//     lnk: DefinitionLink,
-// ) -> Option<Signature> {
-//     let def_at = lnk.def_at?;
-//     let def_source = if def_at.0 == source.id() {
-//         source.clone()
-//     } else {
-//         ctx.source_by_id(def_at.0).ok()?
-//     };
-
-//     let root = LinkedNode::new(def_source.root());
-//     let def_node = root.leaf_at_compat(def_at.1.start + 1)?;
-//     let def_node = get_def_target(def_node)?;
-//     let def_node = match def_node {
-//         DefTarget::Let(node) => node,
-//         DefTarget::Import(_) => return None,
-//     };
-
-//     println!("def_node {def_node:?}");
-
-//     None
-// }
-
-#[allow(dead_code)]
-enum TryResolveCalleeResult {
-    Syntax(DefinitionLink),
-    Runtime(Func),
-}
-
-/// Resolve a callee expression to a function but prefer to keep static.
-fn resolve_callee_v2(
-    ctx: &mut AnalysisContext,
-    callee: LinkedNode,
-) -> Option<TryResolveCalleeResult> {
-    let source = ctx.source_by_id(callee.span().id()?).ok()?;
-    let node = source.find(callee.span())?;
-    let cursor = node.offset();
-    let deref_target = get_deref_target(node, cursor)?;
-    let def = find_definition(ctx, source.clone(), None, deref_target)?;
-    if let LexicalKind::Var(LexicalVarKind::Function) = def.kind {
-        if let Some(Value::Func(f)) = def.value {
-            return Some(TryResolveCalleeResult::Runtime(f));
-        }
-    }
-
-    if let Some(def_at) = &def.def_at {
-        let def_source = if def_at.0 == source.id() {
-            source.clone()
-        } else {
-            ctx.source_by_id(def_at.0).ok()?
-        };
-
-        let _t = ctx.type_check(source)?;
-
-        let root = LinkedNode::new(def_source.root());
-        let def_node = root.leaf_at_compat(def_at.1.start + 1)?;
-        let def_node = get_def_target(def_node)?;
-        let _def_node = match def_node {
-            DefTarget::Let(node) => node,
-            DefTarget::Import(_) => return None,
-        };
-    }
-
-    Some(TryResolveCalleeResult::Syntax(def))
-}
-
 fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
-    use typst::foundations::func::Repr;
-    let (params, ret_ty) = match func.inner() {
-        Repr::With(..) => unreachable!(),
-        Repr::Closure(c) => (analyze_closure_signature(c.clone()), None),
-        Repr::Element(..) | Repr::Native(..) => {
-            let ret_ty = func.returns().map(|r| Ty::from_return_site(&func, r));
-            let params = func.params().unwrap();
-            (
-                params
-                    .iter()
-                    .map(|p| ParamSpec::from_static(&func, p))
-                    .collect(),
-                ret_ty,
-            )
+    let mut pos_tys = vec![];
+    let mut named_tys = Vec::new();
+    let mut rest_ty = None;
+
+    let mut named_specs = BTreeMap::new();
+    let mut param_specs = Vec::new();
+    let mut rest_spec = None;
+
+    let mut broken = false;
+    let mut has_fill_or_size_or_stroke = false;
+
+    let mut add_param = |param: ParamSpec| {
+        let name = param.name.clone();
+        if param.attrs.named {
+            if matches!(name.as_ref(), "fill" | "stroke" | "size") {
+                has_fill_or_size_or_stroke = true;
+            }
+            named_tys.push((name.clone(), param.ty.clone()));
+            named_specs.insert(name.clone(), param.clone());
+        }
+
+        if param.attrs.variadic {
+            if rest_ty.is_some() {
+                broken = true;
+            } else {
+                rest_ty = Some(param.ty.clone());
+                rest_spec = Some(param);
+            }
+        } else if param.attrs.positional {
+            // todo: we have some params that are both positional and named
+            pos_tys.push(param.ty.clone());
+            param_specs.push(param);
         }
     };
 
-    let mut pos = vec![];
-    let mut named = HashMap::new();
-    let mut rest = None;
-    let mut broken = false;
-    let mut has_fill = false;
-    let mut has_stroke = false;
-    let mut has_size = false;
-
-    for param in params.into_iter() {
-        if param.named {
-            match param.name.as_ref() {
-                "fill" => {
-                    has_fill = true;
-                }
-                "stroke" => {
-                    has_stroke = true;
-                }
-                "size" => {
-                    has_size = true;
-                }
-                _ => {}
-            }
-            named.insert(param.name.clone(), param.clone());
+    use typst::foundations::func::Repr;
+    let ret_ty = match func.inner() {
+        Repr::With(..) => unreachable!(),
+        Repr::Closure(c) => {
+            analyze_closure_signature(c.clone(), &mut add_param);
+            None
         }
-
-        if param.variadic {
-            if rest.is_some() {
-                broken = true;
-            } else {
-                rest = Some(param.clone());
+        Repr::Element(..) | Repr::Native(..) => {
+            for p in func.params().unwrap() {
+                add_param(ParamSpec {
+                    name: p.name.into(),
+                    docs: Some(p.docs.into()),
+                    default: p.default.map(|d| truncated_repr(&d())),
+                    ty: Ty::from_param_site(&func, p),
+                    attrs: p.into(),
+                });
             }
-        } else if param.positional {
-            pos.push(param);
+
+            func.returns().map(|r| Ty::from_return_site(&func, r))
         }
+    };
+
+    let sig_ty = SigTy::new(pos_tys.into_iter(), named_tys, None, rest_ty, ret_ty);
+
+    for name in &sig_ty.names.names {
+        param_specs.push(named_specs.get(name).unwrap().clone());
+    }
+    if let Some(doc) = rest_spec {
+        param_specs.push(doc);
     }
 
-    let mut named_vec: Vec<(Interned<str>, Ty)> = named
-        .iter()
-        .map(|e| (e.0.clone(), e.1.base_type.clone()))
-        .collect::<Vec<_>>();
-
-    named_vec.sort_by(|a, b| a.0.cmp(&b.0));
-
-    let sig_ty = SigTy::new(
-        pos.iter().map(|e| e.base_type.clone()),
-        named_vec,
-        rest.as_ref().map(|e| e.base_type.clone()),
-        ret_ty.clone(),
-    );
     Arc::new(PrimarySignature {
-        pos,
-        named,
-        rest,
-        ret_ty,
-        has_fill_or_size_or_stroke: has_fill || has_stroke || has_size,
+        docs: func.docs().map(From::from),
+        param_specs,
+        has_fill_or_size_or_stroke,
         sig_ty: sig_ty.into(),
         _broken: broken,
     })
 }
 
-fn analyze_closure_signature(c: Arc<LazyHash<Closure>>) -> Vec<Arc<ParamSpec>> {
-    let mut params = vec![];
-
-    trace!("closure signature for: {:?}", c.node.kind());
+fn analyze_closure_signature(c: Arc<LazyHash<Closure>>, add_param: &mut impl FnMut(ParamSpec)) {
+    log::trace!("closure signature for: {:?}", c.node.kind());
 
     let closure = &c.node;
     let closure_ast = match closure.kind() {
         SyntaxKind::Closure => closure.cast::<ast::Closure>().unwrap(),
-        _ => return params,
+        _ => return,
     };
 
     for param in closure_ast.params().children() {
         match param {
             ast::Param::Pos(e) => {
                 let name = format!("{}", PatternDisplay(&e));
-
-                params.push(Arc::new(ParamSpec {
+                add_param(ParamSpec {
                     name: name.as_str().into(),
-                    base_type: Ty::Any,
-                    type_repr: None,
-                    expr: None,
+                    docs: None,
                     default: None,
-                    positional: true,
-                    named: false,
-                    variadic: false,
-                    settable: false,
-                    docs: Cow::Borrowed(""),
-                }));
+                    ty: Ty::Any,
+                    attrs: ParamAttrs::positional(),
+                });
             }
             // todo: pattern
             ast::Param::Named(n) => {
                 let expr = unwrap_expr(n.expr()).to_untyped().clone().into_text();
-                params.push(Arc::new(ParamSpec {
-                    name: n.name().into(),
-                    base_type: Ty::Any,
-                    type_repr: Some(expr.clone()),
-                    expr: Some(expr.clone()),
-                    default: None,
-                    positional: false,
-                    named: true,
-                    variadic: false,
-                    settable: true,
-                    docs: Cow::Owned("Default value: ".to_owned() + expr.as_str()),
-                }));
+                add_param(ParamSpec {
+                    name: n.name().get().into(),
+                    docs: Some(eco_format!("Default value: {expr}")),
+                    default: Some(expr),
+                    ty: Ty::Any,
+                    attrs: ParamAttrs::named(),
+                });
             }
             ast::Param::Spread(n) => {
                 let ident = n.sink_ident().map(|e| e.as_str());
-                params.push(Arc::new(ParamSpec {
+                add_param(ParamSpec {
                     name: ident.unwrap_or_default().into(),
-                    base_type: Ty::Any,
-                    type_repr: None,
-                    expr: None,
+                    docs: None,
                     default: None,
-                    positional: true,
-                    named: false,
-                    variadic: true,
-                    settable: false,
-                    docs: Cow::Borrowed(""),
-                }));
+                    ty: Ty::Any,
+                    attrs: ParamAttrs::variadic(),
+                });
             }
         }
     }
-
-    params
 }
 
 struct PatternDisplay<'a>(&'a ast::Pattern<'a>);
@@ -508,24 +675,4 @@ fn unwrap_expr(mut e: ast::Expr) -> ast::Expr {
     }
 
     e
-}
-
-struct TypeExpr<'a>(&'a CastInfo);
-
-impl<'a> fmt::Display for TypeExpr<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self.0 {
-            CastInfo::Any => "any",
-            CastInfo::Value(v, _doc) => return write!(f, "{}", v.repr()),
-            CastInfo::Type(v) => {
-                f.write_str(v.short_name())?;
-                return Ok(());
-            }
-            CastInfo::Union(v) => {
-                let mut values = v.iter().map(|e| TypeExpr(e).to_string());
-                f.write_str(&values.join(" | "))?;
-                return Ok(());
-            }
-        })
-    }
 }

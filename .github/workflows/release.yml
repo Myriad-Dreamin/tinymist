@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - main
+      - 'nightly/*'
     tags:
       - "*"
   pull_request:
     types: [opened, synchronize]
     branches:
       - main
+      - 'nightly/*'
   workflow_dispatch:
 
 env:
@@ -69,77 +71,85 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       target: ${{ matrix.platform }}-${{ matrix.arch }}
+      isRelease: ${{ (startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))) }}
+      isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8'))))) || (!startsWith(github.ref, 'refs/tags/') && matrix.regular_build == 'true')) }}
     steps:
+      - name: "Print Env"
+        run: |
+          echo "Running on ${{ matrix.os }}"
+          echo "Target: ${{ env.target }}"
+          echo "Is Release: ${{ fromJson(env.isRelease) }}"
+          echo "Is Nightly: ${{ fromJson(env.isNightly) }}"
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 16
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+          node-version: 22
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Install deps
         run: yarn install
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Build typst-preview vscode extension
         run: |
           yarn
           yarn run compile
         working-directory: ./contrib/typst-preview/editors/vscode
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Build tinymist vscode extension
         run: |
           yarn
           yarn run compile
         working-directory: ./editors/vscode
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust-target }}
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Install llvm
-        if: matrix.platform == 'linux' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: matrix.platform == 'linux' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         run: |
           sudo apt-get update
           sudo apt-get install llvm
       - name: Install AArch64 target toolchain
-        if: matrix.rust-target == 'aarch64-unknown-linux-gnu' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: matrix.rust-target == 'aarch64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         run: |
           sudo apt-get update
           sudo apt-get install gcc-aarch64-linux-gnu
       - name: Install ARM target toolchain
-        if: matrix.rust-target == 'arm-unknown-linux-gnueabihf' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: matrix.rust-target == 'arm-unknown-linux-gnueabihf' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         run: |
           sudo apt-get update
           sudo apt-get install gcc-arm-linux-gnueabihf
       - name: Run rust-cache
         uses: Swatinem/rust-cache@v2
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
       - name: Build tinymist binary
         shell: pwsh
         run: |
           cargo build --profile=gh-release -p tinymist --target ${{ matrix.rust-target }}
         if: startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true'
       - name: Rename debug symbols for windows
-        if: matrix.platform == 'win32' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: matrix.platform == 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         run: |
           cd target/${{ matrix.rust-target }}/gh-release
           cp tinymist.pdb tinymist-${{ env.target }}.pdb
       - name: Split debug symbols for linux
-        if: matrix.platform == 'linux' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: matrix.platform == 'linux' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         run: |
           cd target/${{ matrix.rust-target }}/gh-release
           llvm-objcopy --compress-debug-sections --only-keep-debug "tinymist" "tinymist-${{ env.target }}.debug"
           llvm-objcopy --strip-debug --add-gnu-debuglink="tinymist-${{ env.target }}.debug" "tinymist"
       - name: Collect debug symbols for mac
-        if: matrix.platform == 'darwin' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: matrix.platform == 'darwin' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         run: |
           dsymutil -f "target/${{ matrix.rust-target }}/gh-release/tinymist"
           mv "target/${{ matrix.rust-target }}/gh-release/tinymist.dwarf" "target/${{ matrix.rust-target }}/gh-release/tinymist-${{ env.target }}.dwarf"
       - name: Copy binary to output directory
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
         shell: pwsh
         run: |
           cp "target/${{ matrix.rust-target }}/gh-release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "editors/vscode/out/"
@@ -148,49 +158,49 @@ jobs:
       - name: Test tinymist
         run: |
           cargo test --profile=gh-release --workspace --target ${{ matrix.rust-target }}
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && (matrix.platform == 'linux') && (matrix.arch == 'x64')
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly)) && (matrix.platform == 'linux') && (matrix.arch == 'x64')
       - name: Upload split debug symbols for windows
-        if: matrix.platform == 'win32' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: matrix.platform == 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.pdb
           path: target/${{ matrix.rust-target }}/gh-release/tinymist-${{ env.target }}.pdb
       - name: Upload split debug symbols for linux
-        if: matrix.platform == 'linux' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: matrix.platform == 'linux' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.debug
           path: target/${{ matrix.rust-target }}/gh-release/tinymist-${{ env.target }}.debug
           compression-level: 0
       - name: Upload split debug symbols for mac
-        if: matrix.platform == 'darwin' && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: matrix.platform == 'darwin' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.dwarf
           path: target/${{ matrix.rust-target }}/gh-release/tinymist-${{ env.target }}.dwarf
       - name: Upload binary artifact
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}
           path: tinymist-${{ env.target }}${{ fromJSON('["", ".exe"]')[matrix.platform == 'win32'] }}
       - name: Package typst-preview extension
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && !contains(github.ref, 'rc')
+        if: fromJson(env.isRelease)
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./contrib/typst-preview/editors/vscode
       - name: Package tinymist extension
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && !contains(github.ref, 'rc')
+        if: fromJson(env.isRelease)
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
         working-directory: ./editors/vscode
-      - name: Package typst-preview extension (Pre Release)
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && contains(github.ref, 'rc')
+      - name: Package typst-preview extension (Nightly)
+        if: fromJson(env.isNightly)
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix --pre-release
         working-directory: ./contrib/typst-preview/editors/vscode
-      - name: Package tinymist extension (Pre Release)
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && contains(github.ref, 'rc')
+      - name: Package tinymist extension (Nightly)
+        if: fromJson(env.isNightly)
         shell: pwsh
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix --pre-release
         working-directory: ./editors/vscode
@@ -199,15 +209,15 @@ jobs:
         with:
           run: yarn test
           working-directory: ./editors/vscode
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true') && (matrix.platform == 'linux') && (matrix.arch == 'x64')
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly)) && (matrix.platform == 'linux') && (matrix.arch == 'x64')
       - name: Upload typst-preview VSIX artifact
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
         uses: actions/upload-artifact@v4
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: contrib/typst-preview/editors/vscode/typst-preview-${{ env.target }}.vsix
       - name: Upload VSIX artifact
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-${{ env.target }}.vsix
@@ -230,6 +240,8 @@ jobs:
       target: alpine-x64
       RUST_TARGET: x86_64-unknown-linux-musl
       RUSTFLAGS: "-C link-arg=-fuse-ld=lld -C target-feature=-crt-static"
+      isRelease: ${{ (startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))) }}
+      isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8'))))) || (!startsWith(github.ref, 'refs/tags/') && matrix.regular_build == 'true')) }}
     steps:
       - name: Install dependencies
         run: apk add --no-cache git clang lld musl-dev nodejs npm yarn binutils
@@ -246,7 +258,6 @@ jobs:
           yarn
           yarn run compile
         working-directory: ./contrib/typst-preview/editors/vscode
-        if: (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Build tinymist vscode extension
         run: |
           yarn
@@ -277,19 +288,19 @@ jobs:
           name: tinymist-${{ env.target }}
           path: tinymist-${{ env.target }}
       - name: Package typst-preview extension
-        if: "!contains(github.ref, 'rc')"
+        if: fromJson(env.isRelease)
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./contrib/typst-preview/editors/vscode
       - name: Package extension
-        if: "!contains(github.ref, 'rc')"
+        if: fromJson(env.isRelease)
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
         working-directory: ./editors/vscode
-      - name: Package typst-preview extension (Pre Release)
-        if: "contains(github.ref, 'rc')"
+      - name: Package typst-preview extension (Nightly)
+        if: fromJson(env.isNightly)
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix --pre-release
         working-directory: ./contrib/typst-preview/editors/vscode
-      - name: Package extension (Pre Release)
-        if: "contains(github.ref, 'rc')"
+      - name: Package extension (Nightly)
+        if: fromJson(env.isNightly)
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix --pre-release
         working-directory: ./editors/vscode
       
@@ -332,28 +343,35 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs: [build]
+    env:
+      isRelease: ${{ (startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))) }}
+      isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8'))))) || (!startsWith(github.ref, 'refs/tags/') && matrix.regular_build == 'true')) }}
     if: success() && startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'rc')
     steps:
       - uses: actions/download-artifact@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Install deps
         run: yarn install
       - name: Deploy to VS Code Marketplace
-        if: "(endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8'))"
+        if: fromJson(env.isRelease)
         run: npx @vscode/vsce publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate 
         env:
           VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
       - name: Deploy to OpenVSX
-        if: "(endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8'))"
+        if: fromJson(env.isRelease)
         run: npx ovsx publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate 
         env:
           OVSX_PAT: ${{ secrets.OPENVSX_ACCESS_TOKEN }}
-      - name: Deploy to VS Code Marketplace (Pre Release)
-        if: "(endsWith(github.ref, '1') || endsWith(github.ref, '3') || endsWith(github.ref, '5') || endsWith(github.ref, '7') || endsWith(github.ref, '9'))"
+      - name: Deploy to VS Code Marketplace (Nightly)
+        if: fromJson(env.isNightly)
         run: npx @vscode/vsce publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate --pre-release
         env:
           VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
-      - name: Deploy to OpenVSX (Pre Release)
-        if: "(endsWith(github.ref, '1') || endsWith(github.ref, '3') || endsWith(github.ref, '5') || endsWith(github.ref, '7') || endsWith(github.ref, '9'))"
+      - name: Deploy to OpenVSX (Nightly)
+        if: fromJson(env.isNightly)
         run: npx ovsx publish --packagePath $(find . -type f -iname 'tinymist-*.vsix') --skip-duplicate --pre-release
         env:
           OVSX_PAT: ${{ secrets.OPENVSX_ACCESS_TOKEN }}

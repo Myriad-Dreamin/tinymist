@@ -1,47 +1,42 @@
+use std::ops::DerefMut;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Deref,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{collections::HashSet, ops::Deref};
 
-use comemo::Tracked;
-use ecow::{EcoString, EcoVec};
+use comemo::{Track, Tracked};
 use lsp_types::Url;
 use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
 use reflexo::hash::{hash128, FxDashMap};
 use reflexo::{debug_loc::DataSource, ImmutPath};
+use reflexo_typst::WorldDeps;
+use tinymist_world::LspWorld;
+use tinymist_world::DETACHED_ENTRY;
+use typst::diag::{eco_format, At, FileError, FileResult, SourceResult};
+use typst::engine::{Route, Sink, Traced};
 use typst::eval::Eval;
-use typst::foundations::{self, Func, Styles};
-use typst::syntax::{FileId, LinkedNode, SyntaxNode};
-use typst::{
-    diag::{eco_format, FileError, FileResult, PackageError},
-    foundations::Bytes,
-    syntax::{package::PackageSpec, Source, Span, VirtualPath},
-    World,
-};
-use typst::{foundations::Value, model::Document, syntax::ast, text::Font};
-use typst::{layout::Position, syntax::FileId as TypstFileId};
-use typst_shim::syntax::LinkedNodeExt;
+use typst::foundations::{Bytes, Module, Styles};
+use typst::layout::Position;
+use typst::model::Document;
+use typst::syntax::{package::PackageSpec, Span, VirtualPath};
 
-use super::{
-    analyze_bib, analyze_expr_, analyze_import_, post_type_check, BibInfo, DefUseInfo,
-    DefinitionLink, IdentRef, ImportInfo, PathPreference, SigTy, Signature, SignatureTarget, Ty,
-    TypeScheme,
+use crate::analysis::prelude::*;
+use crate::analysis::{
+    analyze_bib, analyze_import_, analyze_signature, post_type_check, BibInfo, PathPreference,
+    Signature, SignatureTarget, Ty, TypeScheme,
 };
-use crate::adt::interner::Interned;
-use crate::analysis::analyze_dyn_signature;
-use crate::path_to_url;
-use crate::syntax::{get_deref_target, resolve_id_by_path, DerefTarget};
+use crate::docs::{SignatureDocs, VarDocs};
+use crate::syntax::{
+    construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
+    scan_workspace_files, DerefTarget, ExprInfo, LexicalHierarchy, LexicalScope, ModuleDependency,
+    Processing,
+};
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
-    lsp_to_typst,
-    syntax::{
-        construct_module_dependencies, scan_workspace_files, LexicalHierarchy, ModuleDependency,
-    },
-    typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange, VersionedDocument,
+    lsp_to_typst, path_to_url, typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange,
+    VersionedDocument,
 };
+
+use super::{analyze_expr_, definition, Definition};
 
 /// The analysis data holds globally.
 #[derive(Default)]
@@ -70,21 +65,27 @@ impl Analysis {
 
     /// Get a snapshot of the analysis data.
     pub fn snapshot<'a>(
-        &'a self,
+        self: &Arc<Self>,
         root: ImmutPath,
+        world: LspWorld,
         resources: &'a dyn AnalysisResources,
     ) -> AnalysisContext<'a> {
-        AnalysisContext::new(root, resources, self)
+        AnalysisContext::new(root, world, resources, self.clone())
     }
 
     /// Clear all cached resources.
     pub fn clear_cache(&self) {
         self.caches.signatures.clear();
         self.caches.static_signatures.clear();
-        self.caches.def_use.clear();
-        self.caches.type_ck.clear();
+        self.caches.terms.clear();
+        self.caches.expr_stage.clear();
+        self.caches.type_check.clear();
     }
 }
+
+type CacheMap<T> = FxDashMap<u128, T>;
+// Needed by recursive computation
+type DeferredCompute<T> = Arc<OnceCell<T>>;
 
 /// A global (compiler server spanned) cache for all level of analysis results
 /// of a module.
@@ -92,10 +93,12 @@ impl Analysis {
 pub struct AnalysisGlobalCaches {
     lifetime: AtomicU64,
     clear_lifetime: AtomicU64,
-    def_use: FxDashMap<u128, (u64, Option<Arc<DefUseInfo>>)>,
-    type_ck: FxDashMap<u128, (u64, Option<Arc<TypeScheme>>)>,
-    static_signatures: FxDashMap<u128, (u64, Source, usize, Signature)>,
-    signatures: FxDashMap<u128, (u64, foundations::Func, Signature)>,
+    expr_stage: CacheMap<(u64, DeferredCompute<Arc<ExprInfo>>)>,
+    type_check: CacheMap<(u64, DeferredCompute<Option<Arc<TypeScheme>>>)>,
+    def_signatures: CacheMap<(u64, Definition, DeferredCompute<Option<Signature>>)>,
+    static_signatures: CacheMap<(u64, Source, Span, DeferredCompute<Option<Signature>>)>,
+    signatures: CacheMap<(u64, Func, DeferredCompute<Option<Signature>>)>,
+    terms: CacheMap<(u64, Value, Ty)>,
 }
 
 /// A cache for all level of analysis results of a module.
@@ -112,73 +115,12 @@ pub struct AnalysisCaches {
 /// You should not holds across requests, because source code may change.
 #[derive(Default)]
 pub struct ModuleAnalysisCache {
-    file: OnceCell<FileResult<Bytes>>,
-    source: OnceCell<FileResult<Source>>,
-    def_use: OnceCell<Option<Arc<DefUseInfo>>>,
+    expr_stage: OnceCell<Arc<ExprInfo>>,
     type_check: OnceCell<Option<Arc<TypeScheme>>>,
-}
-
-impl ModuleAnalysisCache {
-    /// Get the bytes content of a file.
-    pub fn file(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Bytes> {
-        self.file.get_or_init(|| ctx.world().file(file_id)).clone()
-    }
-
-    /// Get the source of a file.
-    pub fn source(&self, ctx: &AnalysisContext, file_id: TypstFileId) -> FileResult<Source> {
-        self.source
-            .get_or_init(|| ctx.world().source(file_id))
-            .clone()
-    }
-
-    /// Try to get the def-use information of a file.
-    pub fn def_use(&self) -> Option<Arc<DefUseInfo>> {
-        self.def_use.get().cloned().flatten()
-    }
-
-    /// Compute the def-use information of a file.
-    pub(crate) fn compute_def_use(
-        &self,
-        f: impl FnOnce() -> Option<Arc<DefUseInfo>>,
-    ) -> Option<Arc<DefUseInfo>> {
-        self.def_use.get_or_init(f).clone()
-    }
-
-    /// Try to get the type check information of a file.
-    pub(crate) fn type_check(&self) -> Option<Arc<TypeScheme>> {
-        self.type_check.get().cloned().flatten()
-    }
-
-    /// Compute the type check information of a file.
-    pub(crate) fn compute_type_check(
-        &self,
-        f: impl FnOnce() -> Option<Arc<TypeScheme>>,
-    ) -> Option<Arc<TypeScheme>> {
-        self.type_check.get_or_init(f).clone()
-    }
 }
 
 /// The resources for analysis.
 pub trait AnalysisResources {
-    /// Get the world surface for Typst compiler.
-    fn world(&self) -> &dyn World;
-
-    /// Resolve the real path for a package spec.
-    fn resolve(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError>;
-
-    /// Get all the files in the workspace.
-    fn dependencies(&self) -> EcoVec<ImmutPath>;
-
-    /// Resolve extra font information.
-    fn font_info(&self, _font: Font) -> Option<Arc<DataSource>> {
-        None
-    }
-
-    /// Get the local packages and their descriptions.
-    fn local_packages(&self) -> EcoVec<PackageSpec> {
-        EcoVec::new()
-    }
-
     /// Resolve telescope image at the given position.
     fn periscope_at(
         &self,
@@ -203,18 +145,28 @@ pub struct AnalysisGlobalWorkers {
 
 /// The context for analyzers.
 pub struct AnalysisContext<'a> {
-    /// The root of the workspace.
-    /// This means that the analysis result won't be valid if the root directory
-    /// changes.
-    pub root: ImmutPath,
     /// The world surface for Typst compiler
     pub resources: &'a dyn AnalysisResources,
     /// The analysis data
-    pub analysis: &'a Analysis,
-    /// The caches for analysis.
+    pub analysis: Arc<Analysis>,
+    /// The caches lifetime tick for analysis.
     lifetime: u64,
-    /// Local caches for analysis.
-    caches: AnalysisCaches,
+    /// Constructed shared context
+    pub local: LocalContext,
+}
+
+impl Deref for AnalysisContext<'_> {
+    type Target = LocalContext;
+
+    fn deref(&self) -> &Self::Target {
+        &self.local
+    }
+}
+
+impl DerefMut for AnalysisContext<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.local
+    }
 }
 
 // todo: gc in new thread
@@ -226,23 +178,187 @@ impl<'w> Drop for AnalysisContext<'w> {
 
 impl<'w> AnalysisContext<'w> {
     /// Create a new analysis context.
-    pub fn new(root: ImmutPath, resources: &'w dyn AnalysisResources, a: &'w Analysis) -> Self {
-        // self.caches.lifetime += 1;
+    pub fn new(
+        root: ImmutPath,
+        world: LspWorld,
+        resources: &'w dyn AnalysisResources,
+        a: Arc<Analysis>,
+    ) -> Self {
         let lifetime = a.caches.lifetime.fetch_add(1, Ordering::SeqCst);
         Self {
-            root,
             resources,
-            analysis: a,
             lifetime,
-            caches: AnalysisCaches::default(),
+            analysis: a.clone(),
+            local: LocalContext {
+                analysis: a.clone(),
+                caches: AnalysisCaches::default(),
+                shared: Arc::new(SharedContext {
+                    root,
+                    lifetime,
+                    world,
+                    analysis: a,
+                }),
+            },
         }
     }
 
-    /// Get the world surface for Typst compiler.
-    pub fn world(&self) -> &'w dyn World {
-        self.resources.world()
+    /// Resolve extra font information.
+    pub fn font_info(&self, font: typst::text::Font) -> Option<Arc<DataSource>> {
+        self.world().font_resolver.describe_font(&font)
     }
 
+    /// Get the world surface for Typst compiler.
+    pub fn world(&self) -> &LspWorld {
+        &self.shared.world
+    }
+
+    /// Get the shared context.
+    pub fn shared(&self) -> &Arc<SharedContext> {
+        &self.local.shared
+    }
+
+    /// Get the shared context.
+    pub fn shared_(&self) -> Arc<SharedContext> {
+        self.local.shared.clone()
+    }
+
+    /// Fork a new context for searching in the workspace.
+    pub fn fork_for_search<'s>(&'s mut self) -> SearchCtx<'s, 'w> {
+        SearchCtx {
+            ctx: self,
+            searched: Default::default(),
+            worklist: Default::default(),
+        }
+    }
+
+    pub(crate) fn variable_docs(&mut self, pos: &LinkedNode) -> Option<VarDocs> {
+        crate::docs::variable_docs(self, pos)
+    }
+
+    pub(crate) fn preload_package(&self, entry_point: TypstFileId) {
+        self.shared_().preload_package(entry_point);
+    }
+
+    pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
+        crate::upstream::with_vm((self.world() as &dyn World).track(), f)
+    }
+
+    pub(crate) fn const_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
+        SharedContext::const_eval(rr)
+    }
+
+    pub(crate) fn mini_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
+        self.const_eval(rr)
+            .or_else(|| self.with_vm(|vm| rr.eval(vm).ok()))
+    }
+
+    pub(crate) fn type_of(&mut self, rr: &SyntaxNode) -> Option<Ty> {
+        self.type_of_span(rr.span())
+    }
+
+    pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {
+        let id = s.id()?;
+        let source = self.source_by_id(id).ok()?;
+        self.type_of_span_(&source, s)
+    }
+
+    pub(crate) fn type_of_span_(&mut self, source: &Source, s: Span) -> Option<Ty> {
+        self.type_check(source)?.type_of_span(s)
+    }
+
+    pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<Ty> {
+        let id = k.span().id()?;
+        let source = self.source_by_id(id).ok()?;
+        let ty_chk = self.type_check(&source)?;
+
+        let ty = post_type_check(self.shared_(), &ty_chk, k.clone())
+            .or_else(|| ty_chk.type_of_span(k.span()))?;
+        Some(ty_chk.simplify(ty, false))
+    }
+
+    /// Get module import at location.
+    pub fn module_ins_at(&mut self, def_fid: TypstFileId, cursor: usize) -> Option<Value> {
+        let def_src = self.source_by_id(def_fid).ok()?;
+        let def_root = LinkedNode::new(def_src.root());
+        let mod_exp = find_expr_in_import(def_root.leaf_at_compat(cursor)?)?;
+        let mod_import = mod_exp.parent()?.clone();
+        let mod_import_node = mod_import.cast::<ast::ModuleImport>()?;
+        self.analyze_import(mod_import_node.source().to_untyped()).1
+    }
+
+    fn gc(&self) {
+        let lifetime = self.lifetime;
+        loop {
+            let latest_clear_lifetime = self.analysis.caches.clear_lifetime.load(Ordering::Relaxed);
+            if latest_clear_lifetime >= lifetime {
+                return;
+            }
+
+            if self.analysis.caches.clear_lifetime.compare_exchange(
+                latest_clear_lifetime,
+                lifetime,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) != Ok(latest_clear_lifetime)
+            {
+                continue;
+            }
+
+            break;
+        }
+
+        self.analysis
+            .caches
+            .def_signatures
+            .retain(|_, (l, _, _)| lifetime - *l < 60);
+        self.analysis
+            .caches
+            .static_signatures
+            .retain(|_, (l, _, _, _)| lifetime - *l < 60);
+        self.analysis
+            .caches
+            .terms
+            .retain(|_, (l, _, _)| lifetime - *l < 60);
+        self.analysis
+            .caches
+            .signatures
+            .retain(|_, (l, _, _)| lifetime - *l < 60);
+        self.analysis
+            .caches
+            .expr_stage
+            .retain(|_, (l, _)| lifetime - *l < 60);
+        self.analysis
+            .caches
+            .type_check
+            .retain(|_, (l, _)| lifetime - *l < 60);
+    }
+}
+
+/// The local context for analyzers.
+pub struct LocalContext {
+    /// The analysis data
+    pub analysis: Arc<Analysis>,
+    /// Local caches for analysis.
+    pub caches: AnalysisCaches,
+    /// Constructed shared context
+    pub shared: Arc<SharedContext>,
+}
+
+impl Deref for LocalContext {
+    type Target = Arc<SharedContext>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.shared
+    }
+}
+
+impl DerefMut for LocalContext {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.shared
+    }
+}
+
+impl LocalContext {
     #[cfg(test)]
     pub fn test_completion_files(&mut self, f: impl FnOnce() -> Vec<PathBuf>) {
         self.caches.completion_files.get_or_init(f);
@@ -294,108 +410,36 @@ impl<'w> AnalysisContext<'w> {
         }
     }
 
-    /// Resolve the real path for a file id.
-    pub fn path_for_id(&self, id: TypstFileId) -> Result<PathBuf, FileError> {
-        if id.vpath().as_rootless_path() == Path::new("-") {
-            return Ok(PathBuf::from("-"));
-        }
-
-        // Determine the root path relative to which the file path
-        // will be resolved.
-        let root = match id.package() {
-            Some(spec) => self.resources.resolve(spec)?,
-            None => self.root.clone(),
-        };
-
-        // Join the path to the root. If it tries to escape, deny
-        // access. Note: It can still escape via symlinks.
-        id.vpath().resolve(&root).ok_or(FileError::AccessDenied)
+    /// Get the expression information of a source file.
+    pub(crate) fn expr_stage(&mut self, source: &Source) -> Arc<ExprInfo> {
+        let id = source.id();
+        let cache = &self.caches.modules.entry(id).or_default().expr_stage;
+        cache.get_or_init(|| self.shared.expr_stage(source)).clone()
     }
 
-    /// Resolve the uri for a file id.
-    pub fn uri_for_id(&self, id: TypstFileId) -> Result<Url, FileError> {
-        self.path_for_id(id).and_then(|e| {
-            path_to_url(&e)
-                .map_err(|e| FileError::Other(Some(eco_format!("convert to url: {e:?}"))))
-        })
+    /// Get the type check information of a source file.
+    pub(crate) fn type_check(&mut self, source: &Source) -> Option<Arc<TypeScheme>> {
+        let id = source.id();
+        let cache = &self.caches.modules.entry(id).or_default().type_check;
+        cache.get_or_init(|| self.shared.type_check(source)).clone()
     }
+}
 
-    /// Get the content of a file by file id.
-    pub fn file_by_id(&mut self, id: TypstFileId) -> FileResult<Bytes> {
-        self.get_mut(id);
-        self.get(id).unwrap().file(self, id)
-    }
+/// The shared analysis context for analyzers.
+pub struct SharedContext {
+    /// The caches lifetime tick for analysis.
+    pub lifetime: u64,
+    /// The root of the workspace.
+    /// This means that the analysis result won't be valid if the root directory
+    /// changes.
+    pub root: ImmutPath,
+    /// Get the world surface for Typst compiler.
+    pub world: LspWorld,
+    /// The analysis data
+    pub analysis: Arc<Analysis>,
+}
 
-    /// Get the source of a file by file id.
-    pub fn source_by_id(&mut self, id: TypstFileId) -> FileResult<Source> {
-        self.get_mut(id);
-        self.get(id).unwrap().source(self, id)
-    }
-
-    /// Get the fileId from its path
-    pub fn file_id_by_path(&self, p: &Path) -> FileResult<FileId> {
-        // todo: source in packages
-        let relative_path = p.strip_prefix(&self.root).map_err(|_| {
-            FileError::Other(Some(eco_format!(
-                "not in root, path is {p:?}, root is {:?}",
-                self.root
-            )))
-        })?;
-
-        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
-    }
-
-    /// Get the source of a file by file path.
-    pub fn source_by_path(&mut self, p: &Path) -> FileResult<Source> {
-        // todo: source in packages
-        let id = self.file_id_by_path(p)?;
-        self.source_by_id(id)
-    }
-
-    /// Get a syntax object at a position.
-    pub fn deref_syntax_at<'s>(
-        &mut self,
-        source: &'s Source,
-        position: LspPosition,
-        shift: usize,
-    ) -> Option<DerefTarget<'s>> {
-        let (_, deref_target) = self.deref_syntax_at_(source, position, shift)?;
-        deref_target
-    }
-
-    /// Get a syntax object at a position.
-    pub fn deref_syntax_at_<'s>(
-        &mut self,
-        source: &'s Source,
-        position: LspPosition,
-        shift: usize,
-    ) -> Option<(usize, Option<DerefTarget<'s>>)> {
-        let offset = self.to_typst_pos(position, source)?;
-        let cursor = ceil_char_boundary(source.text(), offset + shift);
-
-        let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-        Some((cursor, get_deref_target(node, cursor)))
-    }
-
-    /// Get the module-level analysis cache of a file.
-    pub fn get(&self, file_id: TypstFileId) -> Option<&ModuleAnalysisCache> {
-        self.caches.modules.get(&file_id)
-    }
-
-    /// Get the module-level analysis cache of a file.
-    pub fn get_mut(&mut self, file_id: TypstFileId) -> &ModuleAnalysisCache {
-        self.caches.modules.entry(file_id).or_default()
-    }
-
-    /// Fork a new context for searching in the workspace.
-    pub fn fork_for_search<'s>(&'s mut self) -> SearchCtx<'s, 'w> {
-        SearchCtx {
-            ctx: self,
-            searched: Default::default(),
-            worklist: Default::default(),
-        }
-    }
-
+impl SharedContext {
     /// Get the position encoding during session.
     pub(crate) fn position_encoding(&self) -> PositionEncoding {
         self.analysis.position_encoding
@@ -422,7 +466,7 @@ impl<'w> AnalysisContext<'w> {
     }
 
     /// Convert a Typst range to a LSP range.
-    pub fn to_lsp_range_(&mut self, position: TypstRange, fid: TypstFileId) -> Option<LspRange> {
+    pub fn to_lsp_range_(&self, position: TypstRange, fid: TypstFileId) -> Option<LspRange> {
         let w = fid
             .vpath()
             .as_rootless_path()
@@ -443,168 +487,262 @@ impl<'w> AnalysisContext<'w> {
 
         Some(self.to_lsp_range(position, &source))
     }
-    /// Get the signature of a function.
-    pub fn signature(&self, func: &SignatureTarget) -> Option<Signature> {
-        match func {
-            SignatureTarget::Syntax(source, node) => {
-                // todo: check performance on peeking signature source frequently
-                let cache_key = (source, node.offset());
-                self.analysis
-                    .caches
-                    .static_signatures
-                    .get(&hash128(&cache_key))
-                    .and_then(|slot| (cache_key.1 == slot.2).then_some(slot.3.clone()))
-            }
-            SignatureTarget::Runtime(rt) => self
-                .analysis
-                .caches
-                .signatures
-                .get(&hash128(rt))
-                .and_then(|slot| (rt == &slot.1).then_some(slot.2.clone())),
-        }
+
+    /// Resolve the real path for a file id.
+    pub fn path_for_id(&self, id: TypstFileId) -> Result<PathBuf, FileError> {
+        self.world.path_for_id(id)
     }
 
-    /// Compute the signature of a function.
-    pub fn compute_signature(
+    /// Resolve the uri for a file id.
+    pub fn uri_for_id(&self, id: TypstFileId) -> Result<Url, FileError> {
+        self.path_for_id(id).and_then(|e| {
+            path_to_url(&e)
+                .map_err(|e| FileError::Other(Some(eco_format!("convert to url: {e:?}"))))
+        })
+    }
+
+    /// Get file's id by its path
+    pub fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
+        // todo: source in packages
+        let root = &self.root;
+        let relative_path = p.strip_prefix(root).map_err(|_| {
+            let reason = eco_format!("access denied, path: {p:?}, root: {root:?}");
+            FileError::Other(Some(reason))
+        })?;
+
+        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
+    }
+
+    /// Get the content of a file by file id.
+    pub fn file_by_id(&self, id: TypstFileId) -> FileResult<Bytes> {
+        self.world.file(id)
+    }
+
+    /// Get the source of a file by file id.
+    pub fn source_by_id(&self, id: TypstFileId) -> FileResult<Source> {
+        self.world.source(id)
+    }
+
+    /// Get the source of a file by file path.
+    pub fn source_by_path(&self, p: &Path) -> FileResult<Source> {
+        // todo: source cache
+        self.source_by_id(self.file_id_by_path(p)?)
+    }
+
+    /// Get a syntax object at a position.
+    pub fn deref_syntax<'s>(&self, source: &'s Source, span: Span) -> Option<DerefTarget<'s>> {
+        let node = LinkedNode::new(source.root()).find(span)?;
+        let cursor = node.offset() + 1;
+        get_deref_target(node, cursor)
+    }
+
+    /// Get a syntax object at a position.
+    pub fn deref_syntax_at<'s>(
         &self,
-        func: SignatureTarget,
-        compute: impl FnOnce() -> Signature,
-    ) -> Signature {
-        match func {
-            SignatureTarget::Syntax(source, node) => {
-                let cache_key = (source, node.offset());
-                self.analysis
-                    .caches
-                    .static_signatures
-                    .entry(hash128(&cache_key))
-                    .or_insert_with(|| (self.lifetime, cache_key.0, cache_key.1, compute()))
-                    .3
-                    .clone()
-            }
-            SignatureTarget::Runtime(rt) => {
-                let key = hash128(&rt);
-                self.analysis
-                    .caches
-                    .signatures
-                    .entry(key)
-                    .or_insert_with(|| (self.lifetime, rt, compute()))
-                    .2
-                    .clone()
-            }
+        source: &'s Source,
+        position: LspPosition,
+        shift: usize,
+    ) -> Option<DerefTarget<'s>> {
+        let (_, deref_target) = self.deref_syntax_at_(source, position, shift)?;
+        deref_target
+    }
+
+    /// Get a syntax object at a position.
+    pub fn deref_syntax_at_<'s>(
+        &self,
+        source: &'s Source,
+        position: LspPosition,
+        shift: usize,
+    ) -> Option<(usize, Option<DerefTarget<'s>>)> {
+        let offset = self.to_typst_pos(position, source)?;
+        let cursor = ceil_char_boundary(source.text(), offset + shift);
+
+        let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+        Some((cursor, get_deref_target(node, cursor)))
+    }
+
+    /// Get the real definition of a compilation.
+    /// Note: must be called after compliation.
+    pub(crate) fn dependencies(&self) -> EcoVec<reflexo::ImmutPath> {
+        let mut v = EcoVec::new();
+        self.world.iter_dependencies(&mut |p| {
+            v.push(p);
+        });
+
+        v
+    }
+    /// Get the local packages and their descriptions.
+    pub fn local_packages(&self) -> EcoVec<PackageSpec> {
+        crate::package::list_package_by_namespace(&self.world.registry, eco_format!("local"))
+            .into_iter()
+            .map(|(_, spec)| spec)
+            .collect()
+    }
+
+    pub(crate) fn type_of_func(self: &Arc<Self>, func: Func) -> Signature {
+        log::debug!("convert runtime func {func:?}");
+        analyze_signature(self, SignatureTarget::Convert(func)).unwrap()
+    }
+
+    pub(crate) fn type_of_value(self: &Arc<Self>, val: &Value) -> Ty {
+        log::debug!("convert runtime value {val:?}");
+
+        // todo: check performance on peeking signature source frequently
+        let cache_key = val;
+        let cached = self
+            .analysis
+            .caches
+            .terms
+            .get(&hash128(&cache_key))
+            .and_then(|slot| (cache_key == &slot.1).then_some(slot.2.clone()));
+        if let Some(cached) = cached {
+            return cached;
         }
+
+        let res = crate::analysis::term_value(self, val);
+
+        self.analysis
+            .caches
+            .terms
+            .entry(hash128(&cache_key))
+            .or_insert_with(|| (self.lifetime, cache_key.clone(), res.clone()));
+
+        res
+    }
+
+    /// Get the expression information of a source file.
+    pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> Arc<ExprInfo> {
+        let mut route = Processing::default();
+        self.expr_stage_(source, &mut route)
+    }
+
+    /// Get the expression information of a source file.
+    pub(crate) fn expr_stage_(
+        self: &Arc<Self>,
+        source: &Source,
+        route: &mut Processing<LexicalScope>,
+    ) -> Arc<ExprInfo> {
+        use crate::syntax::expr_of;
+
+        let res = {
+            let entry = self.analysis.caches.expr_stage.entry(hash128(&source));
+            let res = entry.or_insert_with(|| (self.lifetime, DeferredCompute::default()));
+            res.1.clone()
+        };
+        res.get_or_init(|| expr_of(self.clone(), source.clone(), route))
+            .clone()
+    }
+
+    pub(crate) fn exports_of(
+        self: &Arc<Self>,
+        source: Source,
+        route: &mut Processing<LexicalScope>,
+    ) -> LexicalScope {
+        if let Some(s) = route.get(&source.id()) {
+            return s.clone();
+        }
+
+        self.expr_stage_(&source, route).exports.clone()
     }
 
     /// Get the type check information of a source file.
-    pub(crate) fn type_check(&mut self, source: Source) -> Option<Arc<TypeScheme>> {
-        let fid = source.id();
-
-        if let Some(res) = self.caches.modules.entry(fid).or_default().type_check() {
-            return Some(res);
-        }
-
-        let def_use = self.def_use(source.clone())?;
-
-        let h = hash128(&(&source, &def_use));
-
-        let res = if let Some(res) = self.analysis.caches.type_ck.get(&h) {
-            res.1.clone()
-        } else {
-            let res = crate::analysis::ty::type_check(self, source);
-            self.analysis
-                .caches
-                .type_ck
-                .insert(h, (self.lifetime, res.clone()));
-            res
-        };
-
-        self.caches
-            .modules
-            .entry(fid)
-            .or_default()
-            .compute_type_check(|| res.clone());
-
-        res
+    pub(crate) fn type_check(self: &Arc<Self>, source: &Source) -> Option<Arc<TypeScheme>> {
+        let mut route = Processing::default();
+        self.type_check_(source, &mut route)
     }
 
-    /// Get the import information of a source file.
-    pub fn import_info(&mut self, source: Source) -> Option<Arc<ImportInfo>> {
-        use comemo::Track;
-        let w = self.resources.world();
-        let w = w.track();
+    /// Get the type check information of a source file.
+    pub(crate) fn type_check_(
+        self: &Arc<Self>,
+        source: &Source,
+        route: &mut Processing<Arc<TypeScheme>>,
+    ) -> Option<Arc<TypeScheme>> {
+        use crate::analysis::type_check;
+        // todo: recursive hash
+        let expr_info = self.expr_stage(source);
+        let res = {
+            let entry = self.analysis.caches.type_check.entry(hash128(&expr_info));
+            let res = entry.or_insert_with(|| (self.lifetime, Arc::default()));
+            res.1.clone()
+        };
+        res.get_or_init(|| type_check(self.clone(), expr_info, route))
+            .clone()
+    }
 
+    pub(crate) fn definition(
+        self: &Arc<Self>,
+        source: &Source,
+        doc: Option<&VersionedDocument>,
+        deref_target: DerefTarget,
+    ) -> Option<Definition> {
+        definition(self, source, doc, deref_target)
+    }
+
+    pub(crate) fn signature_def(self: &Arc<Self>, def: Definition) -> Option<Signature> {
+        log::debug!("check definition func {def:?}");
+        let source = def.decl.file_id().and_then(|f| self.source_by_id(f).ok());
+        analyze_signature(self, SignatureTarget::Def(source, def))
+    }
+
+    pub(crate) fn signature_dyn(self: &Arc<Self>, func: Func) -> Signature {
+        log::debug!("check runtime func {func:?}");
+        analyze_signature(self, SignatureTarget::Runtime(func)).unwrap()
+    }
+
+    pub(crate) fn signature_docs(self: &Arc<Self>, def: &Definition) -> Option<SignatureDocs> {
+        let sig = self.signature_def(def.clone())?;
+        crate::docs::signature_docs(&sig, None)
+    }
+
+    /// Try to find imported target from the current source file.
+    /// This function will try to resolves target statically.
+    ///
+    /// ## Returns
+    /// The first value is the resolved source.
+    /// The second value is the resolved scope.
+    pub fn analyze_import(&self, source: &SyntaxNode) -> (Option<Value>, Option<Value>) {
+        if let Some(v) = source.cast::<ast::Expr>().and_then(Self::const_eval) {
+            return (Some(v), None);
+        }
         let token = &self.analysis.workers.import;
-        token.enter(|| import_info(w, source))
+        token.enter(|| analyze_import_(&self.world, source))
     }
 
-    /// Get the def-use information of a source file.
-    pub fn def_use(&mut self, source: Source) -> Option<Arc<DefUseInfo>> {
-        let mut search_ctx = self.fork_for_search();
-        Self::def_use_(&mut search_ctx, source)
-    }
-
-    /// Get the def-use information of a source file.
-    pub fn def_use_(ctx: &mut SearchCtx<'_, 'w>, source: Source) -> Option<Arc<DefUseInfo>> {
-        let fid = source.id();
-
-        if let Some(res) = ctx.ctx.caches.modules.entry(fid).or_default().def_use() {
-            return Some(res);
-        }
-
-        if !ctx.searched.insert(fid) {
-            return None;
-        }
-
-        let l = def_use_lexical_hierarchy(source.clone())?;
-        let m = ctx.ctx.import_info(source.clone())?;
-        let deps = m
-            .imports
-            .iter()
-            .flat_map(|e| e.1)
-            .map(|e| Self::def_use_(ctx, e.clone()))
-            .collect::<Vec<_>>();
-
-        let key = (&source, &l, &m, deps);
-        let h = hash128(&key);
-
-        let res = if let Some(res) = ctx.ctx.analysis.caches.def_use.get(&h) {
-            res.1.clone()
-        } else {
-            let res = crate::analysis::get_def_use_inner(ctx, source, l, m);
-            ctx.ctx
-                .analysis
-                .caches
-                .def_use
-                .insert(h, (ctx.ctx.lifetime, res.clone()));
-            res
-        };
-
-        ctx.ctx
-            .caches
-            .modules
-            .entry(fid)
-            .or_default()
-            .compute_def_use(|| res.clone());
-        res
+    /// Try to load a module from the current source file.
+    pub fn analyze_expr(&self, source: &SyntaxNode) -> EcoVec<(Value, Option<Styles>)> {
+        let token = &self.analysis.workers.expression;
+        token.enter(|| analyze_expr_(&self.world, source))
     }
 
     /// Get bib info of a source file.
     pub fn analyze_bib(
-        &mut self,
+        &self,
         span: Span,
         bib_paths: impl Iterator<Item = EcoString>,
     ) -> Option<Arc<BibInfo>> {
         use comemo::Track;
-        let w = self.resources.world();
-        let w = w.track();
+        let w = &self.world;
+        let w = (w as &dyn World).track();
 
         bib_info(w, span, bib_paths.collect())
     }
 
-    pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
-        crate::upstream::with_vm(self.world(), f)
+    /// Describe the item under the cursor.
+    ///
+    /// Passing a `document` (from a previous compilation) is optional, but
+    /// enhances the autocompletions. Label completions, for instance, are
+    /// only generated when the document is available.
+    pub fn tooltip(
+        &self,
+        document: Option<&Document>,
+        source: &Source,
+        cursor: usize,
+    ) -> Option<Tooltip> {
+        let token = &self.analysis.workers.tooltip;
+        token.enter(|| tooltip_(&self.world, document, source, cursor))
     }
 
-    pub(crate) fn const_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
+    pub(crate) fn const_eval(rr: ast::Expr<'_>) -> Option<Value> {
         Some(match rr {
             ast::Expr::None(_) => Value::None,
             ast::Expr::Auto(_) => Value::Auto,
@@ -617,121 +755,148 @@ impl<'w> AnalysisContext<'w> {
         })
     }
 
-    pub(crate) fn mini_eval(&self, rr: ast::Expr<'_>) -> Option<Value> {
-        self.const_eval(rr)
-            .or_else(|| self.with_vm(|vm| rr.eval(vm).ok()))
+    /// Get a module by file id.
+    pub fn module_by_id(&self, fid: TypstFileId) -> SourceResult<Module> {
+        let source = self.source_by_id(fid).at(Span::detached())?;
+        self.module_by_src(source)
     }
 
-    pub(crate) fn type_of(&mut self, rr: &SyntaxNode) -> Option<Ty> {
-        self.type_of_span(rr.span())
+    /// Get a module by string.
+    pub fn module_by_str(&self, rr: String) -> Option<Module> {
+        let src = Source::new(*DETACHED_ENTRY, rr);
+        self.module_by_src(src).ok()
     }
 
-    pub(crate) fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>> {
-        log::debug!("check runtime func {func:?}");
-        Some(analyze_dyn_signature(self, func.clone()).type_sig())
-    }
+    /// Get (Create) a module by source.
+    pub fn module_by_src(&self, source: Source) -> SourceResult<Module> {
+        let route = Route::default();
+        let traced = Traced::default();
+        let mut sink = Sink::default();
 
-    pub(crate) fn user_type_of_ident(
-        &mut self,
-        source: &Source,
-        def_fid: TypstFileId,
-        def_ident: &IdentRef,
-    ) -> Option<Ty> {
-        let ty_chk = self.type_check(source.clone())?;
-        let def_use = self.def_use(source.clone())?;
-
-        let (def_id, _) = def_use.get_def(def_fid, def_ident)?;
-        ty_chk.type_of_def(def_id)
-    }
-
-    pub(crate) fn user_type_of_def(&mut self, source: &Source, def: &DefinitionLink) -> Option<Ty> {
-        let def_at = def.def_at.clone()?;
-        let def_ident = IdentRef {
-            name: def.name.clone(),
-            range: def_at.1,
-        };
-        self.user_type_of_ident(source, def_at.0, &def_ident)
-    }
-
-    pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {
-        let id = s.id()?;
-        let source = self.source_by_id(id).ok()?;
-        let ty_chk = self.type_check(source)?;
-        ty_chk.type_of_span(s)
-    }
-
-    pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<Ty> {
-        let id = k.span().id()?;
-        let source = self.source_by_id(id).ok()?;
-        let ty_chk = self.type_check(source.clone())?;
-
-        post_type_check(self, &ty_chk, k.clone()).or_else(|| ty_chk.type_of_span(k.span()))
+        typst::eval::eval(
+            ((&self.world) as &dyn World).track(),
+            traced.track(),
+            sink.track_mut(),
+            route.track(),
+            &source,
+        )
     }
 
     /// Try to load a module from the current source file.
-    pub fn analyze_import(&mut self, source: &LinkedNode) -> Option<Value> {
-        let token = &self.analysis.workers.import;
-        token.enter(|| analyze_import_(self.world(), source))
-    }
-
-    /// Try to determine a set of possible values for an expression.
-    pub fn analyze_expr(&mut self, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
-        let token = &self.analysis.workers.expression;
-        token.enter(|| analyze_expr_(self.world(), node))
-    }
-
-    /// Describe the item under the cursor.
-    ///
-    /// Passing a `document` (from a previous compilation) is optional, but
-    /// enhances the autocompletions. Label completions, for instance, are
-    /// only generated when the document is available.
-    pub fn tooltip(
-        &mut self,
-        document: Option<&Document>,
-        source: &Source,
-        cursor: usize,
-    ) -> Option<Tooltip> {
-        let token = &self.analysis.workers.tooltip;
-        token.enter(|| tooltip_(self.world(), document, source, cursor))
-    }
-
-    fn gc(&self) {
-        let lifetime = self.lifetime;
-        loop {
-            let latest_clear_lifetime = self.analysis.caches.clear_lifetime.load(Ordering::Relaxed);
-            if latest_clear_lifetime >= lifetime {
-                return;
-            }
-
-            if self.analysis.caches.clear_lifetime.compare_exchange(
-                latest_clear_lifetime,
-                lifetime,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) != Ok(latest_clear_lifetime)
-            {
-                continue;
-            }
-
-            break;
+    pub fn module_by_syntax(&self, source: &SyntaxNode) -> Option<Value> {
+        let (src, scope) = self.analyze_import(source);
+        if let Some(scope) = scope {
+            return Some(scope);
         }
 
-        self.analysis
-            .caches
-            .static_signatures
-            .retain(|_, (l, _, _, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .signatures
-            .retain(|_, (l, _, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .def_use
-            .retain(|_, (l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .type_ck
-            .retain(|_, (l, _)| lifetime - *l < 60);
+        match src {
+            Some(Value::Str(s)) => {
+                let id = resolve_id_by_path(&self.world, source.span().id()?, s.as_str())?;
+                self.module_by_id(id).ok().map(Value::Module)
+            }
+            _ => None,
+        }
+    }
+
+    /// Compute the signature of a function.
+    pub fn compute_signature(
+        self: &Arc<Self>,
+        func: SignatureTarget,
+        compute: impl FnOnce(&Arc<Self>) -> Option<Signature> + Send + Sync + 'static,
+    ) -> Option<Signature> {
+        let res = match func {
+            SignatureTarget::Def(src, d) => self
+                .analysis
+                .caches
+                .def_signatures
+                .entry(hash128(&(src, d.clone())))
+                .or_insert_with(|| (self.lifetime, d, Arc::default()))
+                .2
+                .clone(),
+            SignatureTarget::SyntaxFast(source, span) => {
+                let cache_key = (source, span, true);
+                self.analysis
+                    .caches
+                    .static_signatures
+                    .entry(hash128(&cache_key))
+                    .or_insert_with(|| (self.lifetime, cache_key.0, cache_key.1, Arc::default()))
+                    .3
+                    .clone()
+            }
+            SignatureTarget::Syntax(source, span) => {
+                let cache_key = (source, span);
+                self.analysis
+                    .caches
+                    .static_signatures
+                    .entry(hash128(&cache_key))
+                    .or_insert_with(|| (self.lifetime, cache_key.0, cache_key.1, Arc::default()))
+                    .3
+                    .clone()
+            }
+            SignatureTarget::Convert(rt) => self
+                .analysis
+                .caches
+                .signatures
+                .entry(hash128(&(&rt, true)))
+                .or_insert_with(|| (self.lifetime, rt, Arc::default()))
+                .2
+                .clone(),
+            SignatureTarget::Runtime(rt) => self
+                .analysis
+                .caches
+                .signatures
+                .entry(hash128(&rt))
+                .or_insert_with(|| (self.lifetime, rt, Arc::default()))
+                .2
+                .clone(),
+        };
+        res.get_or_init(|| compute(self)).clone()
+    }
+
+    /// Check on a module before really needing them. But we likely use them
+    /// after a while.
+    pub(crate) fn prefetch_type_check(self: &Arc<Self>, _fid: TypstFileId) {
+        // log::debug!("prefetch type check {fid:?}");
+        // let this = self.clone();
+        // rayon::spawn(move || {
+        //     let Some(source) = this.world.source(fid).ok() else {
+        //         return;
+        //     };
+        //     this.type_check(&source);
+        //     // log::debug!("prefetch type check end {fid:?}");
+        // });
+    }
+
+    pub(crate) fn preload_package(self: Arc<Self>, entry_point: TypstFileId) {
+        log::debug!("preload package start {entry_point:?}");
+
+        #[derive(Clone)]
+        struct Preloader {
+            shared: Arc<SharedContext>,
+            analyzed: Arc<Mutex<HashSet<TypstFileId>>>,
+        }
+
+        impl Preloader {
+            fn work(&self, fid: TypstFileId) {
+                log::debug!("preload package {fid:?}");
+                let source = self.shared.source_by_id(fid).ok().unwrap();
+                let expr = self.shared.expr_stage(&source);
+                self.shared.type_check(&source);
+                expr.imports.iter().for_each(|fid| {
+                    if !self.analyzed.lock().insert(*fid) {
+                        return;
+                    }
+                    self.work(*fid);
+                })
+            }
+        }
+
+        let preloader = Preloader {
+            shared: self,
+            analyzed: Arc::default(),
+        };
+
+        preloader.work(entry_point);
     }
 }
 
@@ -742,17 +907,6 @@ fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
     }
 
     cursor.min(text.len())
-}
-
-#[comemo::memoize]
-fn def_use_lexical_hierarchy(source: Source) -> Option<EcoVec<LexicalHierarchy>> {
-    crate::syntax::get_lexical_hierarchy(source, crate::syntax::LexicalScopeKind::DefUse)
-}
-
-#[comemo::memoize]
-fn import_info(w: Tracked<dyn World + '_>, source: Source) -> Option<Arc<ImportInfo>> {
-    let l = def_use_lexical_hierarchy(source.clone())?;
-    crate::analysis::get_import_info(w, source, l)
 }
 
 #[comemo::memoize]
@@ -819,9 +973,9 @@ fn find_loc(
 }
 
 /// The context for searching in the workspace.
-pub struct SearchCtx<'b, 'w> {
+pub struct SearchCtx<'a, 'w> {
     /// The inner analysis context.
-    pub ctx: &'b mut AnalysisContext<'w>,
+    pub ctx: &'a mut AnalysisContext<'w>,
     /// The set of files that have been searched.
     pub searched: HashSet<TypstFileId>,
     /// The files that need to be searched.

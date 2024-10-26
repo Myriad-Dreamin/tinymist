@@ -20,3 +20,7 @@
 1
 # if () [] else []
 1
+
+A#if false {} else thing
+
+

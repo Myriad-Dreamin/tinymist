@@ -10,11 +10,42 @@ use typst::{
     },
 };
 
+pub fn deref_expr(mut ancestor: LinkedNode) -> Option<LinkedNode> {
+    while !ancestor.is::<ast::Expr>() {
+        ancestor = ancestor.parent()?.clone();
+    }
+    Some(ancestor)
+}
+
 pub fn deref_lvalue(mut node: LinkedNode) -> Option<LinkedNode> {
     while let Some(e) = node.cast::<ast::Parenthesized>() {
         node = node.find(e.expr().span())?;
     }
+    if let Some(e) = node.parent() {
+        if let Some(f) = e.cast::<ast::FieldAccess>() {
+            if node.span() == f.field().span() {
+                return Some(e.clone());
+            }
+        }
+    }
     Some(node)
+}
+
+pub(crate) fn find_expr_in_import(mut node: LinkedNode) -> Option<LinkedNode> {
+    while let Some(parent) = node.parent() {
+        if matches!(
+            parent.kind(),
+            SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude
+        ) {
+            return Some(node);
+        }
+        node = parent.clone();
+    }
+    None
+}
+
+pub fn node_ancestors<'a>(node: &'a LinkedNode<'a>) -> impl Iterator<Item = &'a LinkedNode<'a>> {
+    std::iter::successors(Some(node), |node| node.parent())
 }
 
 fn is_mark(sk: SyntaxKind) -> bool {
@@ -57,7 +88,7 @@ fn is_mark(sk: SyntaxKind) -> bool {
 }
 
 /// A mode in which a text document is interpreted.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum InterpretMode {
     /// The position is in a comment.
@@ -88,7 +119,7 @@ pub(crate) fn interpret_mode_at(k: SyntaxKind) -> Option<InterpretMode> {
         | RightBrace | LeftBracket | RightBracket | LeftParen | RightParen | Comma | Semicolon
         | Colon | Star | Underscore | Dollar | Plus | Minus | Slash | Hat | Prime | Dot | Eq
         | EqEq | ExclEq | Lt | LtEq | Gt | GtEq | PlusEq | HyphEq | StarEq | SlashEq | Dots
-        | Arrow | Root | Not | And | Or | None | Auto | As | Named | Keyed | Error | Eof => {
+        | Arrow | Root | Not | And | Or | None | Auto | As | Named | Keyed | Error | End => {
             return Option::None
         }
         Text | Strong | Emph | Link | Label | Ref | RefMarker | Heading | HeadingMarker
@@ -96,12 +127,12 @@ pub(crate) fn interpret_mode_at(k: SyntaxKind) -> Option<InterpretMode> {
             InterpretMode::Markup
         }
         MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes | MathFrac
-        | MathRoot => InterpretMode::Math,
+        | MathRoot | MathShorthand => InterpretMode::Math,
         Let | Set | Show | Context | If | Else | For | In | While | Break | Continue | Return
         | Import | Include | Args | Spread | Closure | Params | LetBinding | SetRule | ShowRule
         | Contextual | Conditional | WhileLoop | ForLoop | LoopBreak | ModuleImport
-        | ImportItems | RenamedImportItem | ModuleInclude | LoopContinue | FuncReturn
-        | FuncCall | Unary | Binary | Parenthesized | Dict | Array | Destructuring
+        | ImportItems | ImportItemPath | RenamedImportItem | ModuleInclude | LoopContinue
+        | FuncReturn | FuncCall | Unary | Binary | Parenthesized | Dict | Array | Destructuring
         | DestructAssignment => InterpretMode::Code,
     })
 }
@@ -161,10 +192,7 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'
     }
 
     // Move to the first ancestor that is an expression.
-    let mut ancestor = node;
-    while !ancestor.is::<ast::Expr>() {
-        ancestor = ancestor.parent()?.clone();
-    }
+    let ancestor = deref_expr(node)?;
     log::debug!("deref expr: {ancestor:?}");
 
     // Unwrap all parentheses to get the actual expression.
@@ -215,6 +243,10 @@ impl<'a> DefTarget<'a> {
     }
 
     pub fn name_range(&self) -> Option<Range<usize>> {
+        self.name().map(|node| node.range())
+    }
+
+    pub fn name(&self) -> Option<LinkedNode> {
         match self {
             DefTarget::Let(node) => {
                 let lb: ast::LetBinding<'_> = node.cast()?;
@@ -226,7 +258,7 @@ impl<'a> DefTarget<'a> {
                     _ => return None,
                 };
 
-                Some(names.range())
+                Some(names)
             }
             DefTarget::Import(_node) => {
                 // let ident = node.cast::<ast::ImportItem>()?;

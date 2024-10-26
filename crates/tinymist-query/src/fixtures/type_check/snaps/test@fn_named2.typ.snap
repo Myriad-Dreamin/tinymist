@@ -1,0 +1,18 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/fn_named2.typ
+---
+"a" = Any
+"foo" = (("a": Any) => Any).with(..("a": 1) => any)
+"val" = 1
+"x" = Any
+---
+5..8 -> @val
+18..21 -> @foo
+22..23 -> @a
+25..28 -> @val
+32..33 -> @a
+39..40 -> @x
+43..46 -> @foo
+43..48 -> @val

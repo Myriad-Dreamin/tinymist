@@ -1,0 +1,67 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (77..78)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion-pkgs/touying-utils-current-heading.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 5,
+    "label": "depth",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "depth: ${1:}",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 2
+      },
+      "start": {
+       "character": 17,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 5,
+    "label": "hierachical",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "hierachical: ${1:}",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 2
+      },
+      "start": {
+       "character": 17,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 5,
+    "label": "level",
+    "sortText": "002",
+    "textEdit": {
+     "newText": "level: ${1:}",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 2
+      },
+      "start": {
+       "character": 17,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]

@@ -14,7 +14,8 @@ To enable LSP, you must install `tinymist`. You can find `tinymist` by:
 
 - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
 
-- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases). \
+- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases). 
+
   If you are using the latest version of
   [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then
   you can use command `typst-ts-lsp-download-binary` to download the latest
@@ -47,7 +48,7 @@ your PATH and `typst-lsp` in your `PATH` to the `typst-ts-mode` entry of `eglot-
 
 ## Extra Settings
 
-### Configuring LSP Server
+### Configuring Language Server
 
 
 You can either use `eglot-workspace-configuration` or specifying launch

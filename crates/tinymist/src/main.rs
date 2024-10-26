@@ -2,21 +2,31 @@
 
 mod args;
 
-use std::{io, path::PathBuf, sync::Arc};
+use std::{
+    io,
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::Arc,
+};
 
 use anyhow::bail;
 use clap::Parser;
 use clap_builder::CommandFactory;
 use clap_complete::generate;
-use comemo::Prehashed;
 use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;
-use reflexo_typst::{typst::prelude::EcoVec, CompileEnv, Compiler, TaskInputs, TypstDict};
+use reflexo_typst::{package::PackageSpec, TaskInputs, TypstDict};
 use serde_json::Value as JsonValue;
-use sync_lsp::{transport::with_stdio_transport, LspBuilder, LspClientRoot};
-use tinymist::{CompileConfig, Config, LanguageState, LspWorld, RegularInit, SuperInit};
-use typst::{eval::Tracer, foundations::IntoValue, syntax::Span, World};
+use sync_lsp::{
+    internal_error,
+    transport::{with_stdio_transport, MirrorArgs},
+    LspBuilder, LspClientRoot, LspResult,
+};
+use tinymist::{CompileConfig, Config, LanguageState, RegularInit, SuperInit, UserActionTask};
+use tinymist_query::docs::PackageInfo;
+use typst::foundations::IntoValue;
+use typst_shim::utils::LazyHash;
 
 use crate::args::*;
 
@@ -66,8 +76,9 @@ fn main() -> anyhow::Result<()> {
 
     match args.command.unwrap_or_default() {
         Commands::Completion(args) => completion(args),
+        Commands::Query(query_cmds) => query_main(query_cmds),
         Commands::Lsp(args) => lsp_main(args),
-        Commands::TraceLsp(args) => trace_main(args),
+        Commands::TraceLsp(args) => trace_lsp_main(args),
         #[cfg(feature = "preview")]
         Commands::Preview(args) => {
             #[cfg(feature = "preview")]
@@ -91,14 +102,14 @@ pub fn completion(args: ShellCompletionArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// The main entry point for the LSP server.
+/// The main entry point for the language server.
 pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
     let pairs = LONG_VERSION.trim().split('\n');
     let pairs = pairs
         .map(|e| e.splitn(2, ":").map(|e| e.trim()).collect::<Vec<_>>())
         .collect::<Vec<_>>();
-    log::info!("tinymist LSP version information: {pairs:?}");
-    log::info!("starting LSP server: {args:#?}");
+    log::info!("tinymist version information: {pairs:?}");
+    log::info!("starting Language server: {args:#?}");
 
     let is_replay = !args.mirror.replay.is_empty();
     with_stdio_transport(args.mirror.clone(), |conn| {
@@ -115,12 +126,12 @@ pub fn lsp_main(args: LspArgs) -> anyhow::Result<()> {
         .start(conn.receiver, is_replay)
     })?;
 
-    log::info!("LSP server did shut down");
+    log::info!("language server did shut down");
     Ok(())
 }
 
 /// The main entry point for the compiler.
-pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
+pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
     let mut input = PathBuf::from(match args.compile.input {
         Some(value) => value,
         None => return Err(anyhow::anyhow!("provide a valid path")),
@@ -138,7 +149,7 @@ pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
         bail!("input file is not within the root path: {input:?} not in {root_path:?}");
     }
 
-    let inputs = Arc::new(Prehashed::new(if args.compile.inputs.is_empty() {
+    let inputs = Arc::new(LazyHash::new(if args.compile.inputs.is_empty() {
         TypstDict::default()
     } else {
         let pairs = args.compile.inputs.iter();
@@ -205,45 +216,7 @@ pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
                 inputs: Some(inputs),
             });
 
-            let mut env = CompileEnv {
-                tracer: Some(Tracer::default()),
-                ..Default::default()
-            };
-            typst_timing::enable();
-            let mut errors = EcoVec::new();
-            if let Err(e) = std::marker::PhantomData.compile(&w, &mut env) {
-                errors = e;
-            }
-            let mut writer = std::io::BufWriter::new(Vec::new());
-            let _ = typst_timing::export_json(&mut writer, |span| {
-                resolve_span(&w, span).unwrap_or_else(|| ("unknown".to_string(), 0))
-            });
-
-            let timings = String::from_utf8(writer.into_inner().unwrap()).unwrap();
-
-            let warnings = env.tracer.map(|e| e.warnings());
-
-            let diagnostics = state.primary().handle.run_analysis(&w, |ctx| {
-                tinymist_query::convert_diagnostics(
-                    ctx,
-                    warnings.iter().flatten().chain(errors.iter()),
-                )
-            });
-
-            let diagnostics = diagnostics.unwrap_or_default();
-
-            client.send_notification_(lsp_server::Notification {
-                method: "tinymistExt/diagnostics".to_owned(),
-                params: serde_json::json!(diagnostics),
-            });
-
-            client.respond(lsp_server::Response {
-                id: req_id,
-                result: Some(serde_json::json!({
-                    "tracingData": timings,
-                })),
-                error: None,
-            });
+            UserActionTask::trace_main(client, state, &w, args.rpc_kind, req_id).await
         });
 
         Ok(())
@@ -252,11 +225,65 @@ pub fn trace_main(args: CompileArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Turns a span into a (file, line) pair.
-fn resolve_span(world: &LspWorld, span: Span) -> Option<(String, u32)> {
-    let id = span.id()?;
-    let source = world.source(id).ok()?;
-    let range = source.range(span)?;
-    let line = source.byte_to_line(range.start)?;
-    Some((format!("{id:?}"), line as u32 + 1))
+/// The main entry point for language server queries.
+pub fn query_main(cmds: QueryCommands) -> anyhow::Result<()> {
+    use reflexo_typst::package::PackageRegistry;
+
+    with_stdio_transport(MirrorArgs::default(), |conn| {
+        let client_root = LspClientRoot::new(RUNTIMES.tokio_runtime.handle().clone(), conn.sender);
+        let client = client_root.weak();
+
+        // todo: roots, inputs, font_opts
+        let config = Config::default();
+
+        let mut service = LanguageState::install(LspBuilder::new(
+            SuperInit {
+                client: client.to_typed(),
+                exec_cmds: Vec::new(),
+                config,
+                err: None,
+            },
+            client.clone(),
+        ))
+        .build();
+
+        let resp = service.ready(()).unwrap();
+        let MaybeDone::Done(resp) = resp else {
+            bail!("internal error: not sync init")
+        };
+        resp.unwrap();
+
+        let state = service.state_mut().unwrap();
+
+        let snap = state.primary().snapshot().unwrap();
+        let res = RUNTIMES.tokio_runtime.block_on(async move {
+            let w = snap.receive().await.map_err(internal_error)?;
+            match cmds {
+                QueryCommands::PackageDocs(args) => {
+                    let pkg = PackageSpec::from_str(&args.id).unwrap();
+                    let path = args.path.map(PathBuf::from);
+                    let path = path
+                        .unwrap_or_else(|| w.world.registry.resolve(&pkg).unwrap().as_ref().into());
+
+                    let res = state
+                        .resource_package_docs_(PackageInfo {
+                            path,
+                            namespace: pkg.namespace,
+                            name: pkg.name,
+                            version: pkg.version.to_string(),
+                        })?
+                        .await?;
+
+                    let output_path = Path::new(&args.output);
+                    std::fs::write(output_path, res).map_err(internal_error)?;
+                }
+            };
+
+            LspResult::Ok(())
+        });
+
+        res.map_err(|e| anyhow::anyhow!("{e:?}"))
+    })?;
+
+    Ok(())
 }

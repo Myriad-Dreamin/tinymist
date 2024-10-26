@@ -1,16 +1,10 @@
 //! Analyze color expressions in a source file.
-use std::{ops::Range, str::FromStr};
+use std::str::FromStr;
 
 use lsp_types::ColorInformation;
-use typst::{
-    syntax::{
-        ast::{self, AstNode},
-        LinkedNode, Source, SyntaxKind,
-    },
-    visualize::Color,
-};
+use typst::visualize::Color;
 
-use crate::AnalysisContext;
+use super::prelude::*;
 
 /// Get color expressions from a source.
 pub fn get_color_exprs(ctx: &mut AnalysisContext, src: &Source) -> Option<Vec<ColorInformation>> {

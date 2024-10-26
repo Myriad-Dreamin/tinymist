@@ -1,9 +1,7 @@
-use std::collections::HashSet;
-
 use reflexo::hash::hash128;
 use typst::foundations::Repr;
 
-use crate::{adt::interner::Interned, analysis::*, ty::def::*};
+use crate::ty::prelude::*;
 
 impl TypeScheme {
     /// Describe the given type with the given type scheme.
@@ -157,7 +155,7 @@ impl TypeDescriber {
                 return b.to_string();
             }
             Ty::Builtin(b) => {
-                return b.describe().to_string();
+                return b.describe();
             }
             Ty::Value(v) => return v.val.repr().to_string(),
             Ty::Field(..) => {
@@ -165,6 +163,9 @@ impl TypeDescriber {
             }
             Ty::Args(..) => {
                 return "args".to_string();
+            }
+            Ty::Pattern(..) => {
+                return "pattern".to_string();
             }
             Ty::Select(..) => {
                 return "any".to_string();

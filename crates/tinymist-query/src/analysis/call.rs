@@ -1,12 +1,8 @@
 //! Hybrid analysis for function calls.
 
-use typst::syntax::SyntaxNode;
-
-use super::{ParamSpec, Signature};
-use crate::{
-    analysis::{analyze_signature, PrimarySignature, SignatureTarget},
-    prelude::*,
-};
+use super::prelude::*;
+use super::{Signature, StrRef};
+use crate::analysis::{analyze_signature, PrimarySignature, SignatureTarget};
 
 /// Describes kind of a parameter.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,9 +22,8 @@ pub struct CallParamInfo {
     pub kind: ParamKind,
     /// Whether the parameter is a content block.
     pub is_content_block: bool,
-    /// The parameter's specification.
-    pub param: Arc<ParamSpec>,
-    // types: EcoVec<()>,
+    /// The name of the parameter.
+    pub param_name: StrRef,
 }
 
 /// Describes a function call.
@@ -48,7 +43,7 @@ pub fn analyze_call(
     source: Source,
     node: LinkedNode,
 ) -> Option<Arc<CallInfo>> {
-    trace!("func call found: {:?}", node);
+    log::trace!("func call found: {:?}", node);
     let f = node.cast::<ast::FuncCall>()?;
 
     let callee = f.callee();
@@ -74,8 +69,11 @@ pub fn analyze_call_no_cache(
     callee_node: LinkedNode,
     args: ast::Args<'_>,
 ) -> Option<CallInfo> {
-    let signature = analyze_signature(ctx, SignatureTarget::Syntax(source, callee_node))?;
-    trace!("got signature {signature:?}");
+    let signature = analyze_signature(
+        ctx.shared(),
+        SignatureTarget::SyntaxFast(source, callee_node.span()),
+    )?;
+    log::trace!("got signature {signature:?}");
 
     let mut info = CallInfo {
         arg_mapping: HashMap::new(),
@@ -99,9 +97,9 @@ pub fn analyze_call_no_cache(
         fn advance(&mut self, info: &mut CallInfo, arg: Option<SyntaxNode>) {
             let (kind, param) = match self.state {
                 PosState::Init => {
-                    if !self.signature.pos.is_empty() {
+                    if !self.signature.pos().is_empty() {
                         self.state = PosState::Pos(0);
-                    } else if self.signature.rest.is_some() {
+                    } else if self.signature.has_spread_right() {
                         self.state = PosState::Variadic;
                     } else {
                         self.state = PosState::Final;
@@ -110,17 +108,17 @@ pub fn analyze_call_no_cache(
                     return;
                 }
                 PosState::Pos(i) => {
-                    if i + 1 < self.signature.pos.len() {
+                    if i + 1 < self.signature.pos_size() {
                         self.state = PosState::Pos(i + 1);
-                    } else if self.signature.rest.is_some() {
+                    } else if self.signature.has_spread_right() {
                         self.state = PosState::Variadic;
                     } else {
                         self.state = PosState::Final;
                     }
 
-                    (ParamKind::Positional, &self.signature.pos[i])
+                    (ParamKind::Positional, self.signature.get_pos(i).unwrap())
                 }
-                PosState::Variadic => (ParamKind::Rest, self.signature.rest.as_ref().unwrap()),
+                PosState::Variadic => (ParamKind::Rest, self.signature.rest().unwrap()),
                 PosState::Final => return,
             };
 
@@ -132,8 +130,7 @@ pub fn analyze_call_no_cache(
                     CallParamInfo {
                         kind,
                         is_content_block,
-                        param: param.clone(),
-                        // types: eco_vec![],
+                        param_name: param.name.clone(),
                     },
                 );
             }
@@ -144,7 +141,7 @@ pub fn analyze_call_no_cache(
                 PosState::Init => unreachable!(),
                 // todo: not precise
                 PosState::Pos(..) => {
-                    if self.signature.rest.is_some() {
+                    if self.signature.has_spread_right() {
                         self.state = PosState::Variadic;
                     } else {
                         self.state = PosState::Final;
@@ -154,7 +151,7 @@ pub fn analyze_call_no_cache(
                 PosState::Final => return,
             };
 
-            let Some(rest) = self.signature.rest.as_ref() else {
+            let Some(rest) = self.signature.rest() else {
                 return;
             };
 
@@ -166,8 +163,7 @@ pub fn analyze_call_no_cache(
                     CallParamInfo {
                         kind: ParamKind::Rest,
                         is_content_block,
-                        param: rest.clone(),
-                        // types: eco_vec![],
+                        param_name: rest.name.clone(),
                     },
                 );
             }
@@ -212,14 +208,13 @@ pub fn analyze_call_no_cache(
             ast::Arg::Named(named) => {
                 let n = named.name().get().into();
 
-                if let Some(param) = signature.primary().named.get(&n) {
+                if let Some(param) = signature.primary().get_named(&n) {
                     info.arg_mapping.insert(
                         arg_tag,
                         CallParamInfo {
                             kind: ParamKind::Named,
                             is_content_block: false,
-                            param: param.clone(),
-                            // types: eco_vec![],
+                            param_name: param.name.clone(),
                         },
                     );
                 }

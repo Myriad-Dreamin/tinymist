@@ -122,18 +122,18 @@ fn inlay_hint(
             match node.kind() {
                 // Type inlay hints
                 SyntaxKind::LetBinding => {
-                    trace!("let binding found: {:?}", node);
+                    log::trace!("let binding found: {:?}", node);
                 }
                 // Assignment inlay hints
                 SyntaxKind::Eq => {
-                    trace!("assignment found: {:?}", node);
+                    log::trace!("assignment found: {:?}", node);
                 }
                 SyntaxKind::DestructAssignment => {
-                    trace!("destruct assignment found: {:?}", node);
+                    log::trace!("destruct assignment found: {:?}", node);
                 }
                 // Parameter inlay hints
                 SyntaxKind::FuncCall => {
-                    trace!("func call found: {:?}", node);
+                    log::trace!("func call found: {:?}", node);
                     let call_info = analyze_call(self.ctx, self.source.clone(), node.clone())?;
                     log::debug!("got call_info {call_info:?}");
 
@@ -215,7 +215,8 @@ fn inlay_hint(
                             continue;
                         };
 
-                        if info.param.name.is_empty() {
+                        let name = &info.param_name;
+                        if name.is_empty() {
                             continue;
                         }
 
@@ -257,9 +258,9 @@ fn inlay_hint(
                             typst_to_lsp::offset_to_position(pos, self.encoding, self.source);
 
                         let label = InlayHintLabel::String(if info.kind == ParamKind::Rest {
-                            format!("..{}:", info.param.name)
+                            format!("..{name}:")
                         } else {
-                            format!("{}:", info.param.name)
+                            format!("{name}:")
                         });
 
                         self.hints.push(InlayHint {
@@ -277,7 +278,7 @@ fn inlay_hint(
                     // todo: union signatures
                 }
                 SyntaxKind::Set => {
-                    trace!("set rule found: {:?}", node);
+                    log::trace!("set rule found: {:?}", node);
                 }
                 _ => {}
             }

@@ -1,11 +1,9 @@
-use std::{ffi::OsStr, sync::Arc};
+use std::ffi::OsStr;
 
-use ecow::EcoVec;
 use typst::foundations::Bytes;
+use yaml_rust2::{parser::Event, parser::MarkedEventReceiver, scanner::Marker};
 
 use super::prelude::*;
-
-use yaml_rust2::{parser::Event, parser::MarkedEventReceiver, scanner::Marker};
 
 #[derive(Debug, Clone)]
 struct BibSpanned<T> {

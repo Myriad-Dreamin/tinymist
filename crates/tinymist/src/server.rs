@@ -1,4 +1,4 @@
-//! tinymist LSP server
+//! tinymist's language server
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -17,6 +17,7 @@ use reflexo_typst::{
     vfs::notify::{FileChangeSet, MemoryEvent},
     Bytes, Error, ImmutPath, TaskInputs, Time,
 };
+use request::{RegisterCapability, UnregisterCapability};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
@@ -35,6 +36,8 @@ use typst::{diag::FileResult, syntax::Source};
 use super::{init::*, *};
 use crate::actor::editor::EditorRequest;
 use crate::actor::typ_client::CompileClientActor;
+
+pub(crate) use futures::Future;
 
 pub(super) fn as_path(inp: TextDocumentIdentifier) -> PathBuf {
     as_path_(inp.uri)
@@ -219,6 +222,7 @@ impl LanguageState {
             // latency insensitive
             .with_request_::<InlayHintRequest>(State::inlay_hint)
             .with_request_::<DocumentColor>(State::document_color)
+            .with_request_::<DocumentLinkRequest>(State::document_link)
             .with_request_::<ColorPresentationRequest>(State::color_presentation)
             .with_request_::<HoverRequest>(State::hover)
             .with_request_::<CodeActionRequest>(State::code_action)
@@ -232,6 +236,7 @@ impl LanguageState {
             .with_request_::<References>(State::references)
             .with_request_::<WorkspaceSymbolRequest>(State::symbol)
             .with_request_::<OnEnter>(State::on_enter)
+            .with_request_::<WillRenameFiles>(State::will_rename_files)
             // notifications
             .with_notification::<Initialized>(State::initialized)
             .with_notification::<DidOpenTextDocument>(State::did_open)
@@ -295,6 +300,31 @@ impl LanguageState {
 }
 
 impl LanguageState {
+    // todo: handle error
+    fn register_capability(&self, registrations: Vec<Registration>) -> anyhow::Result<()> {
+        self.client.send_request_::<RegisterCapability>(
+            RegistrationParams { registrations },
+            |_, resp| {
+                if let Some(err) = resp.error {
+                    log::error!("failed to register capability: {err:?}");
+                }
+            },
+        );
+        Ok(())
+    }
+
+    fn unregister_capability(&self, unregisterations: Vec<Unregistration>) -> anyhow::Result<()> {
+        self.client.send_request_::<UnregisterCapability>(
+            UnregistrationParams { unregisterations },
+            |_, resp| {
+                if let Some(err) = resp.error {
+                    log::error!("failed to unregister capability: {err:?}");
+                }
+            },
+        );
+        Ok(())
+    }
+
     /// Registers or unregisters semantic tokens.
     fn enable_sema_token_caps(&mut self, enable: bool) -> anyhow::Result<()> {
         if !self.const_config().tokens_dynamic_registration {
@@ -306,15 +336,13 @@ impl LanguageState {
             (true, false) => {
                 trace!("registering semantic tokens");
                 let options = get_semantic_tokens_options();
-                self.client
-                    .register_capability(vec![get_semantic_tokens_registration(options)])
+                self.register_capability(vec![get_semantic_tokens_registration(options)])
                     .inspect(|_| self.sema_tokens_registered = enable)
                     .context("could not register semantic tokens")
             }
             (false, true) => {
                 trace!("unregistering semantic tokens");
-                self.client
-                    .unregister_capability(vec![get_semantic_tokens_unregistration()])
+                self.unregister_capability(vec![get_semantic_tokens_unregistration()])
                     .inspect(|_| self.sema_tokens_registered = enable)
                     .context("could not unregister semantic tokens")
             }
@@ -350,15 +378,13 @@ impl LanguageState {
         match (enable, self.formatter_registered) {
             (true, false) => {
                 trace!("registering formatter");
-                self.client
-                    .register_capability(vec![get_formatting_registration()])
+                self.register_capability(vec![get_formatting_registration()])
                     .inspect(|_| self.formatter_registered = enable)
                     .context("could not register formatter")
             }
             (false, true) => {
                 trace!("unregistering formatter");
-                self.client
-                    .unregister_capability(vec![get_formatting_unregistration()])
+                self.unregister_capability(vec![get_formatting_unregistration()])
                     .inspect(|_| self.formatter_registered = enable)
                     .context("could not unregister formatter")
             }
@@ -409,7 +435,6 @@ impl LanguageState {
             const CONFIG_METHOD_ID: &str = "workspace/didChangeConfiguration";
 
             let err = self
-                .client
                 .register_capability(vec![Registration {
                     id: CONFIG_REGISTRATION_ID.to_owned(),
                     method: CONFIG_METHOD_ID.to_owned(),
@@ -700,6 +725,11 @@ impl LanguageState {
         run_query!(req_id, self.DocumentColor(path))
     }
 
+    fn document_link(&mut self, req_id: RequestId, params: DocumentLinkParams) -> ScheduledResult {
+        let path = as_path(params.text_document);
+        run_query!(req_id, self.DocumentLink(path))
+    }
+
     fn color_presentation(
         &mut self,
         req_id: RequestId,
@@ -768,6 +798,27 @@ impl LanguageState {
     ) -> ScheduledResult {
         let (path, position) = as_path_pos(params);
         run_query!(req_id, self.OnEnter(path, position))
+    }
+
+    fn will_rename_files(
+        &mut self,
+        req_id: RequestId,
+        params: RenameFilesParams,
+    ) -> ScheduledResult {
+        log::info!("will rename files {params:?}");
+        let paths = params
+            .files
+            .iter()
+            .map(|f| {
+                Some((
+                    as_path_(Url::parse(&f.old_uri).ok()?),
+                    as_path_(Url::parse(&f.new_uri).ok()?),
+                ))
+            })
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| invalid_params("invalid urls"))?;
+
+        run_query!(req_id, self.WillRenameFiles(paths))
     }
 }
 
@@ -997,7 +1048,11 @@ impl LanguageState {
         let handle = client.handle.clone();
         let entry = query
             .associated_path()
-            .map(|path| client.config.determine_entry(Some(path.into())));
+            .map(|path| client.config.determine_entry(Some(path.into())))
+            .or_else(|| {
+                let root = client.config.determine_root(None)?;
+                Some(EntryState::new_rooted(root, Some(*DETACHED_ENTRY)))
+            });
 
         just_future(async move {
             let mut snap = snap.receive().await?;
@@ -1017,11 +1072,13 @@ impl LanguageState {
                 InlayHint(req) => handle.run_semantic(snap, req, R::InlayHint),
                 DocumentHighlight(req) => handle.run_semantic(snap, req, R::DocumentHighlight),
                 DocumentColor(req) => handle.run_semantic(snap, req, R::DocumentColor),
+                DocumentLink(req) => handle.run_semantic(snap, req, R::DocumentLink),
                 CodeAction(req) => handle.run_semantic(snap, req, R::CodeAction),
                 CodeLens(req) => handle.run_semantic(snap, req, R::CodeLens),
                 Completion(req) => handle.run_stateful(snap, req, R::Completion),
                 SignatureHelp(req) => handle.run_semantic(snap, req, R::SignatureHelp),
                 Rename(req) => handle.run_stateful(snap, req, R::Rename),
+                WillRenameFiles(req) => handle.run_stateful(snap, req, R::WillRenameFiles),
                 PrepareRename(req) => handle.run_stateful(snap, req, R::PrepareRename),
                 Symbol(req) => handle.run_semantic(snap, req, R::Symbol),
                 WorkspaceLabel(req) => handle.run_semantic(snap, req, R::WorkspaceLabel),

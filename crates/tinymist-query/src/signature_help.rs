@@ -3,7 +3,6 @@ use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     adt::interner::Interned,
-    analysis::{analyze_dyn_signature, find_definition},
     prelude::*,
     syntax::{get_check_target, get_deref_target, CheckTarget, ParamTarget},
     DocTooltip, LspParamInfo, SemanticRequest,
@@ -41,18 +40,16 @@ impl SemanticRequest for SignatureHelpRequest {
 
         let deref_target = get_deref_target(callee, cursor)?;
 
-        let def_link = find_definition(ctx, source.clone(), None, deref_target)?;
-
-        let type_sig = ctx.user_type_of_def(&source, &def_link);
+        let def_link = ctx.definition(&source, None, deref_target)?;
 
         let documentation = DocTooltip::get(ctx, &def_link)
             .as_deref()
             .map(markdown_docs);
 
-        let Some(Value::Func(function)) = def_link.value else {
+        let Some(Value::Func(function)) = def_link.value() else {
             return None;
         };
-        trace!("got function {function:?}");
+        log::trace!("got function {function:?}");
 
         let mut function = &function;
         use typst::foundations::func::Repr;
@@ -62,38 +59,21 @@ impl SemanticRequest for SignatureHelpRequest {
             function = &inner.0;
         }
 
-        let sig = analyze_dyn_signature(ctx, function.clone());
-        let pos = &sig.primary().pos;
-        let mut named = sig.primary().named.values().collect::<Vec<_>>();
-        let rest = &sig.primary().rest;
+        let sig = ctx.signature_dyn(function.clone());
 
-        let type_sig = type_sig.and_then(|type_sig| type_sig.sig_repr(true));
-
-        log::info!("got type signature {type_sig:?}");
-
-        named.sort_by_key(|x| &x.name);
+        log::debug!("got signature {sig:?}");
 
         let mut active_parameter = None;
 
-        let mut label = def_link.name.clone();
+        let mut label = def_link.name().as_ref().to_owned();
         let mut params = Vec::new();
 
         label.push('(');
-        let pos = pos
-            .iter()
-            .enumerate()
-            .map(|(i, pos)| (pos, type_sig.as_ref().and_then(|sig| sig.pos(i))));
-        let named = named
-            .into_iter()
-            .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.named(&x.name))));
-        let rest = rest
-            .iter()
-            .map(|x| (x, type_sig.as_ref().and_then(|sig| sig.rest_param())));
 
         let mut real_offset = 0;
         let focus_name = OnceCell::new();
-        for (i, (param, ty)) in pos.chain(named).chain(rest).enumerate() {
-            if is_set && !param.settable {
+        for (i, (param, ty)) in sig.params().enumerate() {
+            if is_set && !param.attrs.settable {
                 continue;
             }
 
@@ -122,7 +102,7 @@ impl SemanticRequest for SignatureHelpRequest {
             label.push_str(&format!(
                 "{}: {}",
                 param.name,
-                ty.unwrap_or(&param.base_type)
+                ty.unwrap_or(&param.ty)
                     .describe()
                     .as_deref()
                     .unwrap_or("any")
@@ -130,21 +110,16 @@ impl SemanticRequest for SignatureHelpRequest {
 
             params.push(LspParamInfo {
                 label: lsp_types::ParameterLabel::Simple(format!("{}:", param.name)),
-                documentation: if !param.docs.is_empty() {
-                    Some(Documentation::MarkupContent(MarkupContent {
-                        value: param.docs.clone().into(),
+                documentation: param.docs.as_ref().map(|docs| {
+                    Documentation::MarkupContent(MarkupContent {
+                        value: docs.as_ref().into(),
                         kind: MarkupKind::Markdown,
-                    }))
-                } else {
-                    None
-                },
+                    })
+                }),
             });
         }
         label.push(')');
-        let ret = type_sig
-            .as_ref()
-            .and_then(|sig| sig.body.as_ref())
-            .or_else(|| sig.primary().ret_ty.as_ref());
+        let ret = sig.type_sig().body.clone();
         if let Some(ret_ty) = ret {
             label.push_str(" -> ");
             label.push_str(ret_ty.describe().as_deref().unwrap_or("any"));
@@ -152,10 +127,10 @@ impl SemanticRequest for SignatureHelpRequest {
 
         if matches!(target, ParamTarget::Positional { .. }) {
             active_parameter =
-                active_parameter.map(|x| x.min(sig.primary().pos.len().saturating_sub(1)));
+                active_parameter.map(|x| x.min(sig.primary().pos_size().saturating_sub(1)));
         }
 
-        trace!("got signature info {label} {params:?}");
+        log::trace!("got signature info {label} {params:?}");
 
         Some(SignatureHelp {
             signatures: vec![SignatureInformation {

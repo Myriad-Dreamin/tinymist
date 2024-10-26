@@ -32,7 +32,7 @@ This section shows you a minimal way to setup tinymist in Neovim (LazyVim).
 + Check and restart Neovim.
 
 // todo: heading link support
-Please see #md-alter(link(<extra-settings>)[Extra Settings], () => link("#extra-settings")[Extra Settings]) for more configuration.
+Please see #md-alter(link(<neovim-extra-settings>)[Extra Settings], () => link("#extra-settings")[Extra Settings]) for more configuration.
 
 == Tips
 <tips>
@@ -72,10 +72,10 @@ autocmd BufNewFile,BufRead *.typ setfiletype typst
 ```
 
 == Extra Settings
-<extra-settings>
-=== Configuring LSP Server
-<configuring-lsp-server>
-To configure LSP server, you can edit the `opts.servers.tinymist.settings`. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
+<neovim-extra-settings>
+=== Configuring Language Server
+<neovim-configuring-language-server>
+To configure language server, you can edit the `opts.servers.tinymist.settings`. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
 
 ```lua
 return {
@@ -98,13 +98,30 @@ return {
 
 See #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md")[Tinymist Server Configuration] for references.
 
+=== Configuring Language Server for COC
+<configuring-coc-language-server>
+To configure language server for #link("https://github.com/neoclide/coc.nvim")[coc.nvim], you can edit the `coc-settings.json` by executing `:CocConfig`:
+
+```json
+"languageserver": {
+  "tinymist": {
+    "command": "tinymist",
+    "filetypes": ["typst"],
+    "settings": {
+      "exportPdf": "onType",
+      "outputPath" = "$root/target/$dir/$name",
+    }
+  }
+}
+```
+
 === Configuring Folding Range for Neovim Client
 <configuring-folding-range-for-neovim-client>
 Enable LSP-based folding range with `kevinhwang91/nvim-ufo`:
 
 ```lua
 return {
-  { -- configure LSP servers
+  { -- configure language servers
     "neovim/nvim-lspconfig",
     dependencies = "kevinhwang91/nvim-ufo", -- enable LSP-based folds
   },

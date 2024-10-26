@@ -1,7 +1,7 @@
 >#{for}
 #^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.curly.typst
-#  ^^^ source.typst meta.expr.for.typst
+#  ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
 #     ^ source.typst meta.brace.curly.typst
 >
 >test

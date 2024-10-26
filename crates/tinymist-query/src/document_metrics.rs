@@ -11,7 +11,7 @@ use typst::{
     text::TextItem,
 };
 
-use crate::{AnalysisContext, StatefulRequest, VersionedDocument};
+use crate::prelude::*;
 
 /// Span information for some content.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -162,7 +162,12 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
         match elem {
             FrameItem::Text(text) => self.work_text(text),
             FrameItem::Group(frame) => self.work_frame(&frame.frame),
-            FrameItem::Shape(..) | FrameItem::Image(..) | FrameItem::Meta(..) => Some(()),
+            FrameItem::Shape(..)
+            | FrameItem::Image(..)
+            | FrameItem::Tag(..)
+            | FrameItem::Link(..) => Some(()),
+            #[cfg(not(feature = "no-content-hint"))]
+            FrameItem::ContentHint(..) => Some(()),
         }
     }
 
@@ -230,7 +235,7 @@ impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
         let font_info = std::mem::take(&mut self.font_info)
             .into_iter()
             .map(|(font, font_info_value)| {
-                let extra = self.ctx.resources.font_info(font.clone());
+                let extra = self.ctx.font_info(font.clone());
                 let info = &font.info();
                 DocumentFontInfo {
                     name: info.family.clone(),

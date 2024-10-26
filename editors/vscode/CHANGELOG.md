@@ -4,6 +4,96 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.12.0 - [2024-10-19]
+
+### Document Link
+
+* Identifying static path references in documents in https://github.com/Myriad-Dreamin/tinymist/pull/658
+
+### Compiler
+
+* Improved code quality of `sync-lsp` in https://github.com/Myriad-Dreamin/tinymist/pull/632
+  * Removed some unwraps that some editors may not love.
+* Using `DETACHED_ENTRY` if no entry is provided in https://github.com/Myriad-Dreamin/tinymist/pull/647
+* Caching `dirs::data_dir` and `dirs::cache_dir` in https://github.com/Myriad-Dreamin/tinymist/pull/659
+
+### Editor
+
+* Supported drag and drop of files into the typst editor in https://github.com/Myriad-Dreamin/tinymist/pull/635
+* Added configuration to open exported file by system default app in https://github.com/Myriad-Dreamin/tinymist/pull/636
+
+### Profiling
+
+* Sending trace data via http instead of lsp stdio in https://github.com/Myriad-Dreamin/tinymist/pull/660
+
+### Definition
+
+* Recording and using span where the label is attached in https://github.com/Myriad-Dreamin/tinymist/pull/641
+  * Make go to definition more accurate.
+* Added support to go to definition of module members in https://github.com/Myriad-Dreamin/tinymist/pull/644
+
+### Rename
+
+* Added support to rename modules by path in https://github.com/Myriad-Dreamin/tinymist/pull/645
+* Issuing import changes request during `willRenameFiles` in https://github.com/Myriad-Dreamin/tinymist/pull/648
+
+### Preview
+
+* (Fix) Checking existence of `requestIdleCallback` before uses in https://github.com/Myriad-Dreamin/tinymist/pull/643
+
+### On Enter
+
+* Adding indent on entering in empty block maths in https://github.com/Myriad-Dreamin/tinymist/pull/646
+
+### Hover (Tooltip)
+
+* Made star import tooltip more human readable in https://github.com/Myriad-Dreamin/tinymist/pull/682
+* Rendering hover docs with converted result in https://github.com/Myriad-Dreamin/tinymist/pull/701
+* Providing parameter docs in hover tips in https://github.com/Myriad-Dreamin/tinymist/pull/702
+
+### Syntax/Semantic Highlighting
+
+* Passing `to_multiline_tokens2` checking by copilot in https://github.com/Myriad-Dreamin/tinymist/pull/639
+* (Fix) Parsing `for` clause correctly in https://github.com/Myriad-Dreamin/tinymist/pull/642
+
+### Type Checking
+
+* Implemented ord for `Ty` in https://github.com/Myriad-Dreamin/tinymist/pull/667
+* Made elementary select checker in https://github.com/Myriad-Dreamin/tinymist/pull/668
+* Made elementary tuple method checker in https://github.com/Myriad-Dreamin/tinymist/pull/669
+* Checking call types with default bindings in https://github.com/Myriad-Dreamin/tinymist/pull/671 and https://github.com/Myriad-Dreamin/tinymist/pull/675
+* Performing type induction on runtime values in https://github.com/Myriad-Dreamin/tinymist/pull/694
+
+### Type Checking (Docstring)
+
+* Reading and checking type annotations in docstring in https://github.com/Myriad-Dreamin/tinymist/pull/679, https://github.com/Myriad-Dreamin/tinymist/pull/680, and https://github.com/Myriad-Dreamin/tinymist/pull/681
+
+### Misc
+
+* Refactored analysis structure in https://github.com/Myriad-Dreamin/tinymist/pull/674
+* Fixed typos in readme by @hougesen in https://github.com/Myriad-Dreamin/tinymist/pull/662
+* Incorporated with static function signature analysis in https://github.com/Myriad-Dreamin/tinymist/pull/688, https://github.com/Myriad-Dreamin/tinymist/pull/692, https://github.com/Myriad-Dreamin/tinymist/pull/696, and https://github.com/Myriad-Dreamin/tinymist/pull/699
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.32...v0.12.0
+
+## v0.11.32 - [2024-10-10]
+
+* Fix accidentally released nightly version.
+
+## v0.11.28 - [2024-10-05]
+
+### Compiler
+
+* (Fix) Allowing keeping garbage directories in the package directory in https://github.com/Myriad-Dreamin/tinymist/pull/622
+  * The previous code asserts all directories in the package directory are typst packages, but this is not always true. Prints errors once and skips these directories.
+
+### Misc
+
+* Printing version information when starting lsp server in https://github.com/Myriad-Dreamin/tinymist/pull/614
+  * Open server log to see the version information of the server. It is usually the first line of the log.
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.22...v0.11.28
+
 ## v0.11.22 - [2024-09-20]
 
 ## (New) Tinymist Nightly

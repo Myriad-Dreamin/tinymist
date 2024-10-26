@@ -1,0 +1,21 @@
+[package]
+name = "tinymist-derive"
+description = "Provides derive for tinymist."
+categories = ["compilers"]
+keywords = ["typst"]
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+syn.workspace = true
+quote.workspace = true
+
+[lib]
+proc-macro = true
+
+[features]
+typst-preview = []

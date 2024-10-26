@@ -1,0 +1,12 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (67..68)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion-pkgs/touying-utils-fit-to-height.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": []
+ }
+]

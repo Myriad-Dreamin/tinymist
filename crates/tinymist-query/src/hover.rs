@@ -3,10 +3,12 @@ use core::fmt;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
-    analysis::{analyze_dyn_signature, find_definition, DefinitionLink, Signature},
+    analysis::{get_link_exprs_in, Definition},
+    docs::SignatureDocs,
     jump_from_cursor,
     prelude::*,
-    syntax::{find_docs_before, get_deref_target, LexicalKind, LexicalVarKind},
+    syntax::{find_docs_before, get_deref_target, Decl},
+    ty::PathPreference,
     upstream::{expr_tooltip, plain_docs_sentence, route_of_value, truncated_repr, Tooltip},
     LspHoverContents, StatefulRequest,
 };
@@ -42,7 +44,8 @@ impl StatefulRequest for HoverRequest {
         let cursor = offset + 1;
 
         let contents = def_tooltip(ctx, &source, doc.as_ref(), cursor)
-            .or_else(|| star_tooltip(ctx, &source, cursor));
+            .or_else(|| star_tooltip(ctx, &source, cursor))
+            .or_else(|| link_tooltip(ctx, &source, cursor));
 
         let contents = contents.or_else(|| {
             Some(typst_to_lsp::tooltip(
@@ -64,7 +67,7 @@ impl StatefulRequest for HoverRequest {
                     }
                     MarkedString::String(e) => e,
                 })
-                .join("\n---\n"),
+                .join("\n\n---\n"),
             LspHoverContents::Scalar(MarkedString::String(contents)) => contents,
             LspHoverContents::Scalar(MarkedString::LanguageString(contents)) => {
                 format!("```{}\n{}\n```", contents.language, contents.value)
@@ -117,6 +120,53 @@ impl StatefulRequest for HoverRequest {
     }
 }
 
+fn link_tooltip(
+    ctx: &mut AnalysisContext<'_>,
+    source: &Source,
+    cursor: usize,
+) -> Option<HoverContents> {
+    let mut node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+    while !matches!(node.kind(), SyntaxKind::FuncCall) {
+        node = node.parent()?.clone();
+    }
+
+    let mut links = get_link_exprs_in(ctx, &node)?;
+    links.retain(|link| link.0.contains(&cursor));
+    if links.is_empty() {
+        return None;
+    }
+
+    let mut results = vec![];
+    let mut actions = vec![];
+    for (_, target) in links {
+        // open file in tab or system application
+        actions.push(CommandLink {
+            title: Some("Open in Tab".to_string()),
+            command_or_links: vec![CommandOrLink::Command(Command {
+                id: "tinymist.openInternal".to_string(),
+                args: vec![JsonValue::String(target.to_string())],
+            })],
+        });
+        actions.push(CommandLink {
+            title: Some("Open Externally".to_string()),
+            command_or_links: vec![CommandOrLink::Command(Command {
+                id: "tinymist.openExternal".to_string(),
+                args: vec![JsonValue::String(target.to_string())],
+            })],
+        });
+        if let Some(kind) = PathPreference::from_ext(target.path()) {
+            let preview = format!("A `{kind:?}` file.");
+            results.push(MarkedString::String(preview));
+        }
+    }
+    render_actions(&mut results, actions);
+    if results.is_empty() {
+        return None;
+    }
+
+    Some(LspHoverContents::Array(results))
+}
+
 fn star_tooltip(
     ctx: &mut AnalysisContext,
     source: &Source,
@@ -135,34 +185,30 @@ fn star_tooltip(
 
     let mi: ast::ModuleImport = leaf.cast()?;
     let source = mi.source();
-    let module = ctx.analyze_import(&leaf.find(source.span())?);
-    log::info!("star import: {source:?} => {:?}", module.is_some());
+    let module = ctx.analyze_import(source.to_untyped()).1;
+    log::debug!("star import: {source:?} => {:?}", module.is_some());
 
     let i = module?;
     let scope = i.scope()?;
 
     let mut results = vec![];
 
-    let mut names = scope.iter().map(|(name, _)| name).collect::<Vec<_>>();
+    let mut names = scope.iter().map(|(name, _, _)| name).collect::<Vec<_>>();
     names.sort();
-    let mut items = String::new();
-    items.push_str("let (");
-    for name in &names {
-        items.push_str(name);
-        items.push_str(", ");
-    }
-    items.push_str(") = ..");
+    let items = typst::foundations::repr::separated_list(&names, "and");
 
-    results.push(MarkedString::LanguageString(LanguageString {
-        language: "typc".to_owned(),
-        value: items,
-    }));
-
+    results.push(MarkedString::String(format!("This star imports {items}")));
     Some(LspHoverContents::Array(results))
+}
+
+struct Command {
+    id: String,
+    args: Vec<JsonValue>,
 }
 
 enum CommandOrLink {
     Link(String),
+    Command(Command),
 }
 
 struct CommandLink {
@@ -180,58 +226,59 @@ fn def_tooltip(
 
     let deref_target = get_deref_target(leaf.clone(), cursor)?;
 
-    let lnk = find_definition(ctx, source.clone(), document, deref_target.clone())?;
+    let def = ctx.definition(source, document, deref_target.clone())?;
 
     let mut results = vec![];
     let mut actions = vec![];
 
-    match lnk.kind {
-        LexicalKind::Mod(_)
-        | LexicalKind::Var(LexicalVarKind::LabelRef)
-        | LexicalKind::Var(LexicalVarKind::ValRef)
-        | LexicalKind::Block
-        | LexicalKind::Heading(..) => None,
-        LexicalKind::Var(LexicalVarKind::Label) => {
-            results.push(MarkedString::String(format!("Label: {}\n", lnk.name)));
-            if let Some(c) = lnk.value.as_ref() {
-                let c = truncated_repr(c);
+    use Decl::*;
+    match def.decl.as_ref() {
+        Label(..) => {
+            results.push(MarkedString::String(format!("Label: {}\n", def.name())));
+            // todo: type repr
+            if let Some(c) = def.term.as_ref().and_then(|v| v.value()) {
+                let c = truncated_repr(&c);
                 results.push(MarkedString::String(format!("{c}")));
             }
             Some(LspHoverContents::Array(results))
         }
-        LexicalKind::Var(LexicalVarKind::BibKey) => {
-            results.push(MarkedString::String(format!("Bibliography: @{}", lnk.name)));
+        BibEntry(..) => {
+            results.push(MarkedString::String(format!(
+                "Bibliography: @{}",
+                def.name()
+            )));
 
             Some(LspHoverContents::Array(results))
         }
-        LexicalKind::Var(LexicalVarKind::Function) => {
-            let sig = if let Some(Value::Func(func)) = &lnk.value {
-                Some(analyze_dyn_signature(ctx, func.clone()))
-            } else {
-                None
-            };
+        Func(..) | Closure(..) => {
+            let sig = ctx.signature_docs(&def);
+
             results.push(MarkedString::LanguageString(LanguageString {
                 language: "typc".to_owned(),
                 value: format!(
-                    "let {name}({params});",
-                    name = lnk.name,
-                    params = ParamTooltip(sig)
+                    "let {name}({params}){result};",
+                    name = def.name(),
+                    params = ParamTooltip(sig.as_ref()),
+                    result =
+                        ResultTooltip(def.name(), sig.as_ref().and_then(|sig| sig.ret_ty.as_ref()))
                 ),
             }));
 
-            if let Some(doc) = DocTooltip::get(ctx, &lnk) {
-                results.push(MarkedString::String(doc));
+            if let Some(doc) = sig {
+                results.push(MarkedString::String(doc.def_docs().into()));
             }
 
-            if let Some(link) = ExternalDocLink::get(ctx, &lnk) {
+            if let Some(link) = ExternalDocLink::get(ctx, &def) {
                 actions.push(link);
             }
 
             render_actions(&mut results, actions);
             Some(LspHoverContents::Array(results))
         }
-        LexicalKind::Var(LexicalVarKind::Variable) => {
+        PathStem(..) | Var(..) => {
             let deref_node = deref_target.node();
+            let sig = ctx.variable_docs(deref_target.node());
+
             // todo: check sensible length, value highlighting
             if let Some(values) = expr_tooltip(ctx.world(), deref_node) {
                 match values {
@@ -249,20 +296,32 @@ fn def_tooltip(
 
             results.push(MarkedString::LanguageString(LanguageString {
                 language: "typc".to_owned(),
-                value: format!("let {name};", name = lnk.name),
+                value: format!(
+                    "let {name}{result};",
+                    name = def.name(),
+                    result = ResultTooltip(
+                        def.name(),
+                        sig.as_ref().and_then(|sig| sig.return_ty.as_ref())
+                    )
+                ),
             }));
 
-            if let Some(doc) = DocTooltip::get(ctx, &lnk) {
+            if let Some(doc) = sig {
+                results.push(MarkedString::String(doc.def_docs().clone()));
+            } else if let Some(doc) = DocTooltip::get(ctx, &def) {
                 results.push(MarkedString::String(doc));
             }
 
-            if let Some(link) = ExternalDocLink::get(ctx, &lnk) {
+            if let Some(link) = ExternalDocLink::get(ctx, &def) {
                 actions.push(link);
             }
 
             render_actions(&mut results, actions);
             Some(LspHoverContents::Array(results))
         }
+        Pattern(..) | Docs(..) | Generated(..) | ImportAlias(..) | Constant(..) | IdentRef(..)
+        | ModuleAlias(..) | Module(..) | Import(..) | ContentRef(..) | StrName(..)
+        | ModuleImport(..) | Content(..) | ImportPath(..) | IncludePath(..) | Spread(..) => None,
     }
 }
 
@@ -281,106 +340,85 @@ fn render_actions(results: &mut Vec<MarkedString>, actions: Vec<CommandLink>) {
                 .into_iter()
                 .map(|col| match col {
                     CommandOrLink::Link(link) => link,
+                    CommandOrLink::Command(command) => {
+                        let id = command.id;
+                        // <https://code.visualstudio.com/api/extension-guides/command#command-uris>
+                        if command.args.is_empty() {
+                            format!("command:{id}")
+                        } else {
+                            let args = serde_json::to_string(&command.args).unwrap();
+                            let args = percent_encoding::utf8_percent_encode(
+                                &args,
+                                percent_encoding::NON_ALPHANUMERIC,
+                            );
+                            format!("command:{id}?{args}")
+                        }
+                    }
                 })
                 .collect::<Vec<_>>()
                 .join(" ");
             format!("[{title}]({command_or_links})")
         })
         .collect::<Vec<_>>()
-        .join("___");
+        .join(" | ");
     results.push(MarkedString::String(g));
 }
 
 // todo: hover with `with_stack`
-struct ParamTooltip(Option<Signature>);
+struct ParamTooltip<'a>(Option<&'a SignatureDocs>);
 
-impl fmt::Display for ParamTooltip {
+impl fmt::Display for ParamTooltip<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Some(sig) = &self.0 else {
+        let Some(sig) = self.0 else {
             return Ok(());
         };
-        let mut is_first = true;
-        let mut write_sep = |f: &mut fmt::Formatter<'_>| {
-            if is_first {
-                is_first = false;
-                return Ok(());
-            }
-            f.write_str(", ")
+        sig.fmt(f)
+    }
+}
+
+struct ResultTooltip<'a>(&'a str, Option<&'a (String, String)>);
+
+impl fmt::Display for ResultTooltip<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Some((short, _)) = self.1 else {
+            return Ok(());
         };
-
-        let primary_sig = match sig {
-            Signature::Primary(sig) => sig,
-            Signature::Partial(sig) => {
-                let _ = sig.with_stack;
-
-                &sig.signature
-            }
-        };
-
-        for p in &primary_sig.pos {
-            write_sep(f)?;
-            write!(f, "{}", p.name)?;
-        }
-        if let Some(rest) = &primary_sig.rest {
-            write_sep(f)?;
-            write!(f, "{}", rest.name)?;
+        if short == self.0 {
+            return Ok(());
         }
 
-        if !primary_sig.named.is_empty() {
-            let mut name_prints = vec![];
-            for v in primary_sig.named.values() {
-                name_prints.push((v.name.clone(), v.type_repr.clone()))
-            }
-            name_prints.sort();
-            for (k, v) in name_prints {
-                write_sep(f)?;
-                let v = v.as_deref().unwrap_or("any");
-                let mut v = v.trim();
-                if v.starts_with('{') && v.ends_with('}') && v.len() > 30 {
-                    v = "{ ... }"
-                }
-                if v.starts_with('`') && v.ends_with('`') && v.len() > 30 {
-                    v = "raw"
-                }
-                if v.starts_with('[') && v.ends_with(']') && v.len() > 30 {
-                    v = "content"
-                }
-                write!(f, "{k}: {v}")?;
-            }
-        }
-
-        Ok(())
+        write!(f, " = {short}")
     }
 }
 
 struct ExternalDocLink;
 
 impl ExternalDocLink {
-    fn get(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<CommandLink> {
-        self::ExternalDocLink::get_inner(ctx, lnk)
+    fn get(ctx: &mut AnalysisContext, def: &Definition) -> Option<CommandLink> {
+        self::ExternalDocLink::get_inner(ctx, def)
     }
 
-    fn get_inner(_ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<CommandLink> {
-        if matches!(lnk.value, Some(Value::Func(..))) {
-            if let Some(builtin) = Self::builtin_func_tooltip("https://typst.app/docs/", lnk) {
+    fn get_inner(_ctx: &mut AnalysisContext, def: &Definition) -> Option<CommandLink> {
+        let value = def.value();
+
+        if matches!(value, Some(Value::Func(..))) {
+            if let Some(builtin) = Self::builtin_func_tooltip("https://typst.app/docs/", def) {
                 return Some(builtin);
             }
         };
 
-        lnk.value
-            .as_ref()
-            .and_then(|value| Self::builtin_value_tooltip("https://typst.app/docs/", value))
+        value.and_then(|value| Self::builtin_value_tooltip("https://typst.app/docs/", &value))
     }
 }
 
 impl ExternalDocLink {
-    fn builtin_func_tooltip(base: &str, lnk: &DefinitionLink) -> Option<CommandLink> {
-        let Some(Value::Func(func)) = &lnk.value else {
+    fn builtin_func_tooltip(base: &str, def: &Definition) -> Option<CommandLink> {
+        let Some(Value::Func(func)) = def.value() else {
             return None;
         };
 
         use typst::foundations::func::Repr;
-        let mut func = func;
+        let mut func = &func;
         loop {
             match func.inner() {
                 Repr::Element(..) | Repr::Native(..) => {
@@ -410,18 +448,19 @@ impl ExternalDocLink {
 pub(crate) struct DocTooltip;
 
 impl DocTooltip {
-    pub fn get(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<String> {
-        self::DocTooltip::get_inner(ctx, lnk).map(|s| "\n\n".to_owned() + &s)
+    pub fn get(ctx: &mut AnalysisContext, def: &Definition) -> Option<String> {
+        self::DocTooltip::get_inner(ctx, def).map(|s| "\n\n".to_owned() + &s)
     }
 
-    fn get_inner(ctx: &mut AnalysisContext, lnk: &DefinitionLink) -> Option<String> {
-        if matches!(lnk.value, Some(Value::Func(..))) {
-            if let Some(builtin) = Self::builtin_func_tooltip(lnk) {
+    fn get_inner(ctx: &mut AnalysisContext, def: &Definition) -> Option<String> {
+        let value = def.value();
+        if matches!(value, Some(Value::Func(..))) {
+            if let Some(builtin) = Self::builtin_func_tooltip(def) {
                 return Some(plain_docs_sentence(builtin).into());
             }
         };
 
-        let (fid, def_range) = lnk.def_at.clone()?;
+        let (fid, def_range) = def.def_at(ctx.shared()).clone()?;
 
         let src = ctx.source_by_id(fid).ok()?;
         find_docs_before(&src, def_range.start)
@@ -429,8 +468,9 @@ impl DocTooltip {
 }
 
 impl DocTooltip {
-    fn builtin_func_tooltip(lnk: &DefinitionLink) -> Option<&'_ str> {
-        let Some(Value::Func(func)) = &lnk.value else {
+    fn builtin_func_tooltip(def: &Definition) -> Option<&'_ str> {
+        let value = def.value();
+        let Some(Value::Func(func)) = &value else {
             return None;
         };
 

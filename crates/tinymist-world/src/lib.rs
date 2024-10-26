@@ -9,23 +9,40 @@ pub use reflexo_typst::{entry::*, font, vfs, EntryOpts, EntryState};
 use std::path::Path;
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
 
+use ::typst::utils::LazyHash;
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use clap::{builder::ValueParser, ArgAction, Parser};
-use comemo::Prehashed;
 use reflexo_typst::error::prelude::*;
 use reflexo_typst::font::system::SystemFontSearcher;
 use reflexo_typst::foundations::{Str, Value};
 use reflexo_typst::vfs::{system::SystemAccessModel, Vfs};
-use reflexo_typst::TypstDict;
+use reflexo_typst::{CompilerFeat, CompilerUniverse, CompilerWorld, TypstDict};
 use serde::{Deserialize, Serialize};
 
 pub mod https;
-use https::{
-    HttpsRegistry, SystemCompilerFeatExtend, TypstSystemUniverseExtend, TypstSystemWorldExtend,
-};
+use https::HttpsRegistry;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
+
+/// Compiler feature for LSP universe and worlds without typst.ts to implement
+/// more for tinymist. type trait of [`TypstSystemWorld`].
+#[derive(Debug, Clone, Copy)]
+pub struct SystemCompilerFeatExtend;
+
+impl CompilerFeat for SystemCompilerFeatExtend {
+    /// Uses [`FontResolverImpl`] directly.
+    type FontResolver = FontResolverImpl;
+    /// It accesses a physical file system.
+    type AccessModel = SystemAccessModel;
+    /// It performs native HTTP requests for fetching package data.
+    type Registry = HttpsRegistry;
+}
+
+/// The compiler universe in system environment.
+pub type TypstSystemUniverseExtend = CompilerUniverse<SystemCompilerFeatExtend>;
+/// The compiler world in system environment.
+pub type TypstSystemWorldExtend = CompilerWorld<SystemCompilerFeatExtend>;
 
 /// The font arguments for the compiler.
 #[derive(Debug, Clone, Default, Parser, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,7 +121,7 @@ impl CompileOnceArgs {
         LspUniverseBuilder::build(
             entry,
             Arc::new(fonts),
-            Arc::new(Prehashed::new(inputs)),
+            Arc::new(LazyHash::new(inputs)),
             cert_path,
         )
         .context("failed to create universe")
@@ -157,7 +174,7 @@ pub type LspUniverse = TypstSystemUniverseExtend;
 /// LSP world.
 pub type LspWorld = TypstSystemWorldExtend;
 /// Immutable prehashed reference to dictionary.
-pub type ImmutDict = Arc<Prehashed<TypstDict>>;
+pub type ImmutDict = Arc<LazyHash<TypstDict>>;
 
 /// Builder for LSP universe.
 pub struct LspUniverseBuilder;

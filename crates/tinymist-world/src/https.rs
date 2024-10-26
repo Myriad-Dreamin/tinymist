@@ -1,12 +1,8 @@
 //! Https registry for tinymist.
 
-pub use reflexo_typst::font::FontResolverImpl;
-
 use std::path::Path;
+use std::sync::OnceLock;
 use std::{path::PathBuf, sync::Arc};
-
-use reflexo_typst::vfs::system::SystemAccessModel;
-use reflexo_typst::{CompilerFeat, CompilerUniverse, CompilerWorld};
 
 use log::error;
 use parking_lot::Mutex;
@@ -16,26 +12,6 @@ use reflexo_typst::typst::{
     syntax::package::PackageVersion,
 };
 use reqwest::{blocking::Response, Certificate};
-use std::sync::OnceLock;
-
-/// Compiler feature for LSP universe and worlds without typst.ts to implement
-/// more for tinymist. type trait of [`TypstSystemWorld`].
-#[derive(Debug, Clone, Copy)]
-pub struct SystemCompilerFeatExtend;
-
-impl CompilerFeat for SystemCompilerFeatExtend {
-    /// Uses [`FontResolverImpl`] directly.
-    type FontResolver = FontResolverImpl;
-    /// It accesses a physical file system.
-    type AccessModel = SystemAccessModel;
-    /// It performs native HTTP requests for fetching package data.
-    type Registry = HttpsRegistry;
-}
-
-/// The compiler universe in system environment.
-pub type TypstSystemUniverseExtend = CompilerUniverse<SystemCompilerFeatExtend>;
-/// The compiler world in system environment.
-pub type TypstSystemWorldExtend = CompilerWorld<SystemCompilerFeatExtend>;
 
 /// The http registry without typst.ts to implement more for tinymist.
 pub struct HttpsRegistry {
@@ -44,6 +20,10 @@ pub struct HttpsRegistry {
     packages: OnceLock<Vec<(PackageSpec, Option<EcoString>)>>,
 
     cert_path: Option<PathBuf>,
+
+    data_dir_cache: OnceLock<Option<Arc<Path>>>,
+    cache_dir_cache: OnceLock<Option<Arc<Path>>>,
+    // package_dir_cache: RwLock<HashMap<PackageSpec, Result<Arc<Path>, PackageError>>>,
 }
 
 impl Default for HttpsRegistry {
@@ -56,6 +36,10 @@ impl Default for HttpsRegistry {
 
             // Default to None
             cert_path: None,
+
+            data_dir_cache: OnceLock::new(),
+            cache_dir_cache: OnceLock::new(),
+            // package_dir_cache: RwLock::new(HashMap::new()),
         }
     }
 }
@@ -64,15 +48,14 @@ impl HttpsRegistry {
     /// Create a new registry.
     pub fn new(cert_path: Option<PathBuf>) -> Self {
         Self {
-            notifier: Arc::new(Mutex::<DummyNotifier>::default()),
-            packages: OnceLock::new(),
             cert_path,
+            ..Default::default()
         }
     }
 
     /// Get local path option
     pub fn local_path(&self) -> Option<Box<Path>> {
-        if let Some(data_dir) = dirs::data_dir() {
+        if let Some(data_dir) = self.data_dir() {
             if data_dir.exists() {
                 return Some(data_dir.join("typst/packages").into());
             }
@@ -81,17 +64,29 @@ impl HttpsRegistry {
         None
     }
 
+    fn data_dir(&self) -> Option<&Arc<Path>> {
+        self.data_dir_cache
+            .get_or_init(|| dirs::data_dir().map(From::from))
+            .as_ref()
+    }
+
+    fn cache_dir(&self) -> Option<&Arc<Path>> {
+        self.cache_dir_cache
+            .get_or_init(|| dirs::cache_dir().map(From::from))
+            .as_ref()
+    }
+
     /// Get data & cache dir
     pub fn paths(&self) -> Vec<Box<Path>> {
         let mut res = vec![];
-        if let Some(data_dir) = dirs::data_dir() {
+        if let Some(data_dir) = self.data_dir() {
             let dir: Box<Path> = data_dir.join("typst/packages").into();
             if dir.exists() {
                 res.push(dir);
             }
         }
 
-        if let Some(cache_dir) = dirs::cache_dir() {
+        if let Some(cache_dir) = self.cache_dir() {
             let dir: Box<Path> = cache_dir.join("typst/packages").into();
             if dir.exists() {
                 res.push(dir);
@@ -103,19 +98,38 @@ impl HttpsRegistry {
 
     /// Make a package available in the on-disk cache.
     pub fn prepare_package(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError> {
+        // let cache = self.package_dir_cache.read();
+        // if let Some(dir) = cache.get(spec) {
+        //     return dir.clone();
+        // }
+
+        // drop(cache);
+        // let mut cache = self.package_dir_cache.write();
+        // if let Some(dir) = cache.get(spec) {
+        //     return dir.clone();
+        // }
+
+        // let dir = self.prepare_package_(spec);
+        // cache.insert(spec.clone(), dir.clone());
+        // dir
+        self.prepare_package_(spec)
+    }
+
+    /// Make a package available in the on-disk cache.
+    pub fn prepare_package_(&self, spec: &PackageSpec) -> Result<Arc<Path>, PackageError> {
         let subdir = format!(
             "typst/packages/{}/{}/{}",
             spec.namespace, spec.name, spec.version
         );
 
-        if let Some(data_dir) = dirs::data_dir() {
+        if let Some(data_dir) = self.data_dir() {
             let dir = data_dir.join(&subdir);
             if dir.exists() {
                 return Ok(dir.into());
             }
         }
 
-        if let Some(cache_dir) = dirs::cache_dir() {
+        if let Some(cache_dir) = self.cache_dir() {
             let dir = cache_dir.join(&subdir);
 
             // Download from network if it doesn't exist yet.
@@ -174,7 +188,7 @@ impl PackageRegistry for HttpsRegistry {
                     Ok(response) => response,
                     Err(err) => {
                         // todo: silent error
-                        error!("Failed to fetch package index: {} from {}", err, url);
+                        error!("Failed to fetch package index: {err} from {url}");
                         return vec![];
                     }
                 };
@@ -189,7 +203,7 @@ impl PackageRegistry for HttpsRegistry {
                 let index: Vec<RemotePackageIndex> = match serde_json::from_reader(reader) {
                     Ok(index) => index,
                     Err(err) => {
-                        error!("Failed to parse package index: {} from {}", err, url);
+                        error!("Failed to parse package index: {err} from {url}");
                         return vec![];
                     }
                 };

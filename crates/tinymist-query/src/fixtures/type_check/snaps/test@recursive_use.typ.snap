@@ -6,7 +6,8 @@ input_file: crates/tinymist-query/src/fixtures/type_check/recursive_use.typ
 "a" = Any
 "f" = () => Any
 ---
+0..0 -> @a
 27..28 -> @f
-33..34 -> (@a | (Any) => Any)
+33..34 -> @a
 33..37 -> Any
 35..36 -> @a

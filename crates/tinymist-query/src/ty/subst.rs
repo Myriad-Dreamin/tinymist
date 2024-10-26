@@ -1,89 +1,66 @@
-use hashbrown::HashMap;
-
-use crate::{adt::interner::Interned, analysis::*, ty::def::*};
+use super::{Sig, SigShape, TyMutator};
+use crate::ty::prelude::*;
 
 impl<'a> Sig<'a> {
-    pub fn call(
-        &self,
-        args: &Interned<ArgsTy>,
-        pol: bool,
-        ctx: Option<&mut AnalysisContext>,
-    ) -> Option<Ty> {
-        let (bound_variables, body) = self.check_bind(args, ctx)?;
+    pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, ctx: &mut impl TyCtxMut) -> Option<Ty> {
+        log::debug!("call {self:?} {args:?} {pol:?}");
+        ctx.with_scope(|ctx| {
+            let body = self.check_bind(args, ctx)?;
 
-        if bound_variables.is_empty() {
-            return body;
-        }
-
-        let body = body?;
-
-        // Substitute the bound variables in the body or just body
-        let mut checker = SubstituteChecker { bound_variables };
-        Some(checker.ty(&body, pol).unwrap_or(body))
+            // Substitute the bound variables in the body or just body
+            let mut checker = SubstituteChecker { ctx };
+            Some(checker.ty(&body, pol).unwrap_or(body))
+        })
     }
 
-    pub fn check_bind(
-        &self,
-        args: &Interned<ArgsTy>,
-        ctx: Option<&mut AnalysisContext>,
-    ) -> Option<(HashMap<DefId, Ty>, Option<Ty>)> {
+    pub fn check_bind(&self, args: &Interned<ArgsTy>, ctx: &mut impl TyCtxMut) -> Option<Ty> {
         let SigShape { sig, withs } = self.shape(ctx)?;
 
         // todo: check if the signature has free variables
         // let has_free_vars = sig.has_free_variables;
-        let has_free_vars = true;
 
-        let mut arguments = HashMap::new();
-        if has_free_vars {
-            for (arg_recv, arg_ins) in sig.matches(args, withs) {
-                if let Ty::Var(arg_recv) = arg_recv {
-                    arguments.insert(arg_recv.def, arg_ins.clone());
-                }
+        for (arg_recv, arg_ins) in sig.matches(args, withs) {
+            if let Ty::Var(arg_recv) = arg_recv {
+                log::debug!("bind {arg_recv:?} {arg_ins:?}");
+                ctx.bind_local(arg_recv, arg_ins.clone());
             }
         }
 
-        Some((arguments, sig.body.clone()))
+        sig.body.clone()
     }
 }
 
-struct SubstituteChecker {
-    bound_variables: HashMap<DefId, Ty>,
+struct SubstituteChecker<'a, T: TyCtxMut> {
+    ctx: &'a mut T,
 }
 
-impl SubstituteChecker {
+impl<'a, T: TyCtxMut> SubstituteChecker<'a, T> {
     fn ty(&mut self, body: &Ty, pol: bool) -> Option<Ty> {
         body.mutate(pol, self)
     }
 }
 
-impl MutateDriver for SubstituteChecker {
+impl<'a, T: TyCtxMut> TyMutator for SubstituteChecker<'a, T> {
     fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
         // todo: extrude the type into a polarized type
         let _ = pol;
 
-        Some(match ty {
-            // todo: substitute the bound in the type
-            Ty::Let(..) => return None,
-            Ty::Var(v) => {
-                if let Some(ty) = self.bound_variables.get(&v.def) {
-                    ty.clone()
-                } else {
-                    return None;
-                }
-            }
-            Ty::Value(..) | Ty::Any | Ty::Boolean(..) | Ty::Builtin(..) => return None,
-            _ => return None,
-        })
+        if let Ty::Var(v) = ty {
+            self.ctx.local_bind_of(v)
+        } else {
+            self.mutate_rec(ty, pol)
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use insta::{assert_debug_snapshot, assert_snapshot};
+    use tinymist_derive::BindTyCtx;
 
+    use super::{Interned, Ty, TyCtx, TypeBounds, TypeScheme, TypeVar};
     use crate::ty::tests::*;
-
-    use super::{ApplyChecker, Ty};
+    use crate::ty::ApplyChecker;
     #[test]
     fn test_ty() {
         use super::*;
@@ -92,8 +69,9 @@ mod tests {
         assert_debug_snapshot!(ty_ref, @"Clause");
     }
 
-    #[derive(Default)]
-    struct CallCollector(Vec<Ty>);
+    #[derive(Default, BindTyCtx)]
+    #[bind(0)]
+    struct CallCollector(TypeScheme, Vec<Ty>);
 
     impl ApplyChecker for CallCollector {
         fn apply(
@@ -102,9 +80,9 @@ mod tests {
             arguments: &crate::adt::interner::Interned<super::ArgsTy>,
             pol: bool,
         ) {
-            let ty = sig.call(arguments, pol, None);
+            let ty = sig.call(arguments, pol, &mut self.0);
             if let Some(ty) = ty {
-                self.0.push(ty);
+                self.1.push(ty);
             }
         }
     }
@@ -118,7 +96,7 @@ mod tests {
             let mut collector = CallCollector::default();
             sig_ty.call(&args, false, &mut collector);
 
-            collector.0.iter().fold(String::new(), |mut acc, ty| {
+            collector.1.iter().fold(String::new(), |mut acc, ty| {
                 if !acc.is_empty() {
                     acc.push_str(", ");
                 }

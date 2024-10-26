@@ -6,21 +6,19 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use ecow::EcoVec;
 use once_cell::sync::Lazy;
-use reflexo_typst::package::{PackageRegistry, PackageSpec};
 use reflexo_typst::world::EntryState;
-use reflexo_typst::{CompileDriverImpl, EntryManager, EntryReader, ShadowApi, WorldDeps};
+use reflexo_typst::{CompileDriverImpl, EntryManager, EntryReader, ShadowApi};
 use serde_json::{ser::PrettyFormatter, Serializer, Value};
 use tinymist_world::CompileFontArgs;
+use typst::foundations::Bytes;
 use typst::syntax::ast::{self, AstNode};
 use typst::syntax::{FileId as TypstFileId, LinkedNode, Source, SyntaxKind, VirtualPath};
-use typst::{diag::PackageError, foundations::Bytes};
 
 pub use insta::assert_snapshot;
 pub use serde::Serialize;
 pub use serde_json::json;
-pub use tinymist_world::{LspUniverse, LspUniverseBuilder, LspWorld};
+pub use tinymist_world::{LspUniverse, LspUniverseBuilder};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
@@ -31,26 +29,7 @@ use crate::{
 
 type CompileDriver<C> = CompileDriverImpl<C, tinymist_world::LspCompilerFeat>;
 
-struct WrapWorld<'a>(&'a mut LspWorld);
-
-impl<'a> AnalysisResources for WrapWorld<'a> {
-    fn world(&self) -> &dyn typst::World {
-        self.0
-    }
-
-    fn resolve(&self, spec: &PackageSpec) -> Result<std::sync::Arc<Path>, PackageError> {
-        self.0.registry.resolve(spec)
-    }
-
-    fn dependencies(&self) -> EcoVec<reflexo::ImmutPath> {
-        let mut v = EcoVec::new();
-        self.0.iter_dependencies(&mut |p| {
-            v.push(p);
-        });
-
-        v
-    }
-}
+impl AnalysisResources for () {}
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) {
     let mut settings = insta::Settings::new();
@@ -81,10 +60,8 @@ pub fn run_with_ctx<T>(
         .into_iter()
         .map(|p| TypstFileId::new(None, VirtualPath::new(p.strip_prefix(&root).unwrap())))
         .collect::<Vec<_>>();
-    let mut w = w.snapshot();
-    let w = WrapWorld(&mut w);
-    let a = Analysis::default();
-    let mut ctx = AnalysisContext::new(root, &w, &a);
+
+    let mut ctx = Arc::new(Analysis::default()).snapshot(root, w.snapshot(), &());
     ctx.test_completion_files(Vec::new);
     ctx.test_files(|| paths);
     f(&mut ctx, p)
@@ -114,7 +91,7 @@ pub fn compile_doc_for_test(
         return None;
     }
 
-    let doc = typst::compile(ctx.world(), &mut Default::default()).unwrap();
+    let doc = typst::compile(ctx.world()).output.unwrap();
     Some(VersionedDocument {
         version: 0,
         document: Arc::new(doc),
@@ -141,9 +118,6 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
     )
     .unwrap();
     let sources = source.split("-----");
-
-    let pw = root.join(Path::new("/main.typ"));
-    world.map_shadow(&pw, Bytes::from_static(b"")).unwrap();
 
     let mut last_pw = None;
     for (i, source) in sources.enumerate() {
@@ -276,7 +250,14 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
             continue;
         }
         if matches!(n.kind(), SyntaxKind::Named) {
-            n = n.children().last().unwrap();
+            if match_ident {
+                n = n
+                    .children()
+                    .find(|n| matches!(n.kind(), SyntaxKind::Ident))
+                    .unwrap();
+            } else {
+                n = n.children().last().unwrap();
+            }
             continue;
         }
         if match_ident {
@@ -314,6 +295,8 @@ pub static REDACT_LOC: Lazy<RedactFields> = Lazy::new(|| {
     RedactFields::from_iter([
         "location",
         "uri",
+        "oldUri",
+        "newUri",
         "range",
         "changes",
         "selectionRange",
@@ -331,11 +314,6 @@ impl JsonRepr {
         let s = serde_json::to_value(v).unwrap();
         Self(s)
     }
-
-    // pub fn new(v: impl serde::Serialize) -> Self {
-    //     let s = serde_json::to_value(v).unwrap();
-    //     Self(REDACT_URI.redact(s))
-    // }
 
     pub fn new_redacted(v: impl serde::Serialize, rm: &RedactFields) -> Self {
         let s = serde_json::to_value(v).unwrap();
@@ -387,27 +365,16 @@ impl Redact for RedactFields {
 
                     match k {
                         "changes" => {
-                            // object range => v
+                            let obj = t.as_object().unwrap();
                             m.insert(
                                 k.to_owned(),
                                 Value::Object(
-                                    t.as_object()
-                                        .unwrap()
-                                        .iter()
-                                        .map(|(k, v)| {
-                                            (
-                                                Path::new(k)
-                                                    .file_name()
-                                                    .unwrap()
-                                                    .to_str()
-                                                    .unwrap()
-                                                    .to_owned(),
-                                                v.clone(),
-                                            )
-                                        })
-                                        .collect(),
+                                    obj.iter().map(|(k, v)| (file_name(k), v.clone())).collect(),
                                 ),
                             );
+                        }
+                        "uri" | "oldUri" | "newUri" | "targetUri" => {
+                            m.insert(k.to_owned(), file_name(t.as_str().unwrap()).into());
                         }
                         "range"
                         | "selectionRange"
@@ -434,6 +401,11 @@ impl Redact for RedactFields {
             v => v,
         }
     }
+}
+
+fn file_name(k: &str) -> String {
+    let name = Path::new(k).file_name().unwrap();
+    name.to_str().unwrap().to_owned()
 }
 
 pub struct HashRepr<T>(pub T);

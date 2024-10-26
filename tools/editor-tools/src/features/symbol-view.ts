@@ -7,6 +7,7 @@ import { Detypify, DetypifySymbol, ortEnv } from "detypify-service";
 import { ContributeIcon, HelpIcon } from "../icons";
 import { startModal } from "../components/modal";
 import { requestTextEdit } from "../vscode";
+import { base64Decode } from "../utils";
 
 // The following code can make the onnxruntime-web totally offline but causes more than 10MB of bundle size.
 // @ts-ignore
@@ -369,7 +370,7 @@ export const SymbolPicker = () => {
   const symInfo = van.state<SymbolInformation>(
     symbolInformationData.startsWith(":")
       ? SYMBOL_MOCK
-      : JSON.parse(atob(symbolInformationData))
+      : JSON.parse(base64Decode(symbolInformationData))
   );
   console.log("symbolInformation", symInfo);
   const detypifyPromise = Detypify.create();

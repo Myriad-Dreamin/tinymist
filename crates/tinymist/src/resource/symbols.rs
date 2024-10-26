@@ -215,7 +215,7 @@ impl LanguageState {
                 .map_err(z_internal_error)?;
 
             log::debug!("sym doc: {sym_doc:?}");
-            Some(trait_symbol_fonts(&sym_doc, &symbols_ref))
+            Some(trait_symbol_fonts(&sym_doc.output, &symbols_ref))
         };
 
         let mut glyph_def = String::new();
@@ -347,9 +347,12 @@ fn trait_symbol_fonts(
                         continue;
                     }
                     FrameItem::Text(text) => text,
-                    FrameItem::Shape(_, _) | FrameItem::Image(_, _, _) | FrameItem::Meta(_, _) => {
-                        continue
-                    }
+                    FrameItem::Shape(_, _)
+                    | FrameItem::Image(_, _, _)
+                    | FrameItem::Link(_, _)
+                    | FrameItem::Tag(_) => continue,
+                    #[cfg(not(feature = "no-content-hint"))]
+                    FrameItem::ContentHint(_) => continue,
                 };
 
                 let font = text.font.clone();
@@ -406,7 +409,7 @@ fn populate(
             name,
             ResourceSymbolItem {
                 category,
-                unicode: ch as u32,
+                unicode: ch.char() as u32,
                 glyphs: vec![],
             },
         );
@@ -419,7 +422,7 @@ fn populate_scope(
     fallback_cat: SymCategory,
     out: &mut ResourceSymbolMap,
 ) {
-    for (k, v) in sym.iter() {
+    for (k, v, _) in sym.iter() {
         let Value::Symbol(sym) = v else {
             continue;
         };

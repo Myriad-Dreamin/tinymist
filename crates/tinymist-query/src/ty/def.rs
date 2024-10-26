@@ -4,7 +4,6 @@
 
 use core::fmt;
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
     hash::{Hash, Hasher},
     sync::Arc,
 };
@@ -12,24 +11,31 @@ use std::{
 use ecow::EcoVec;
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
-use reflexo::vector::ir::DefId;
+use rustc_hash::{FxHashMap, FxHashSet};
 use typst::{
     foundations::Value,
     syntax::{ast, Span, SyntaxKind, SyntaxNode},
 };
 
+use super::PackageId;
 use crate::{
-    adt::interner::{impl_internable, Interned},
+    adt::{interner::impl_internable, snapshot_map},
     analysis::BuiltinTy,
+    docs::UntypedSymbolDocs,
+    syntax::{DeclExpr, UnaryOp},
 };
 
+pub(crate) use super::{TyCtx, TyCtxMut};
+pub(crate) use crate::adt::interner::Interned;
+pub use tinymist_derive::BindTyCtx;
+
 /// A reference to the interned type
-pub(super) type TyRef = Interned<Ty>;
+pub(crate) type TyRef = Interned<Ty>;
 /// A reference to the interned string
-pub(super) type StrRef = Interned<str>;
+pub(crate) type StrRef = Interned<str>;
 
 /// All possible types in tinymist
-#[derive(Hash, Clone, PartialEq, Eq)]
+#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ty {
     // Simple Types
     /// A top type, whose negation is bottom type.
@@ -67,6 +73,8 @@ pub enum Ty {
     Func(Interned<SigTy>),
     /// An argument type
     Args(Interned<ArgsTy>),
+    /// An argument type
+    Pattern(Interned<PatternTy>),
 
     // Type operations
     /// A partially applied function type
@@ -88,6 +96,7 @@ impl fmt::Debug for Ty {
             Ty::Builtin(t) => write!(f, "{t:?}"),
             Ty::Args(a) => write!(f, "&({a:?})"),
             Ty::Func(s) => write!(f, "{s:?}"),
+            Ty::Pattern(s) => write!(f, "{s:?}"),
             Ty::Dict(r) => write!(f, "{r:?}"),
             Ty::Array(a) => write!(f, "Array<{a:?}>"),
             Ty::Tuple(t) => {
@@ -147,13 +156,25 @@ impl Ty {
 
     /// Create a union type from an iterator of types
     pub fn iter_union(e: impl IntoIterator<Item = Ty>) -> Self {
-        Ty::Union(Interned::new(e.into_iter().collect()))
+        let mut v: Vec<Ty> = e.into_iter().collect();
+        v.sort();
+        Ty::Union(Interned::new(v))
     }
 
     /// Create an undefined type (which will emit an error)
     /// A that type is annotated if the syntax structure causes an type error
     pub const fn undef() -> Self {
         Ty::Builtin(BuiltinTy::Undef)
+    }
+
+    /// Get value repr of the type
+    pub fn value(&self) -> Option<Value> {
+        match self {
+            Ty::Value(v) => Some(v.val.clone()),
+            Ty::Builtin(BuiltinTy::Element(v)) => Some(Value::Func((*v).into())),
+            Ty::Builtin(BuiltinTy::Type(ty)) => Some(Value::Type(*ty)),
+            _ => None,
+        }
     }
 }
 
@@ -172,7 +193,7 @@ impl fmt::Debug for TypeSigParam<'_> {
         match self {
             TypeSigParam::Pos(ty) => write!(f, "{ty:?}"),
             TypeSigParam::Named(name, ty) => write!(f, "{name:?}: {ty:?}"),
-            TypeSigParam::Rest(ty) => write!(f, "...: {ty:?}[]"),
+            TypeSigParam::Rest(ty) => write!(f, "...: {ty:?}"),
         }
     }
 }
@@ -213,7 +234,7 @@ impl TypeSource {
 }
 
 /// An ordered list of names
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NameBone {
     /// The names in the bone
     pub names: Box<[StrRef]>,
@@ -273,7 +294,7 @@ impl NameBone {
 /// A frozen type variable (bounds of some type in program)
 /// `t :> t1 | ... | tn <: f1 & ... & fn`
 /// `  lbs------------- ubs-------------`
-#[derive(Hash, Clone, PartialEq, Eq, Default)]
+#[derive(Hash, Clone, PartialEq, Eq, Default, PartialOrd, Ord)]
 pub struct TypeBounds {
     /// The lower bounds
     pub lbs: EcoVec<Ty>,
@@ -311,6 +332,10 @@ pub trait TypeInterface {
     fn interface(&self) -> impl Iterator<Item = (&StrRef, &Ty)>;
     /// Get the field by bone offset.
     fn field_by_bone_offset(&self, i: usize) -> Option<&Ty>;
+    /// Get the field by name.
+    fn field_by_name(&self, name: &StrRef) -> Option<&Ty> {
+        self.field_by_bone_offset(self.bone().find(name)?)
+    }
 }
 
 /// Extension common methods for [`TypeInterface`].
@@ -348,6 +373,20 @@ pub struct InsTy {
 /// For example, a float instance which is NaN.
 impl Eq for InsTy {}
 
+impl PartialOrd for InsTy {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for InsTy {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.val
+            .partial_cmp(&other.val)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
+
 impl InsTy {
     /// Create a instance
     pub fn new(val: Value) -> Interned<Self> {
@@ -381,7 +420,7 @@ impl InsTy {
 }
 
 /// A field type
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FieldTy {
     /// The name of the field
     pub name: StrRef,
@@ -405,14 +444,13 @@ pub struct TypeVar {
     /// The name of the type variable
     pub name: StrRef,
     /// The definition id of the type variable
-    pub def: DefId,
+    pub def: DeclExpr,
 }
 
 impl Ord for TypeVar {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.name
-            .cmp(&other.name)
-            .then_with(|| self.def.0.cmp(&other.def.0))
+        // todo: buggy
+        self.def.weak_cmp(&other.def)
     }
 }
 
@@ -430,7 +468,7 @@ impl fmt::Debug for TypeVar {
 
 impl TypeVar {
     /// Create a type variable
-    pub fn new(name: StrRef, def: DefId) -> Interned<Self> {
+    pub fn new(name: StrRef, def: DeclExpr) -> Interned<Self> {
         Interned::new(Self { name, def })
     }
 
@@ -438,15 +476,10 @@ impl TypeVar {
     pub fn name(&self) -> StrRef {
         self.name.clone()
     }
-
-    /// Get the definition id of the type variable
-    pub fn id(&self) -> DefId {
-        self.def
-    }
 }
 
 /// A record type
-#[derive(Hash, Clone, PartialEq, Eq)]
+#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RecordTy {
     /// The names of the fields
     pub names: Interned<NameBone>,
@@ -456,18 +489,18 @@ pub struct RecordTy {
 
 impl RecordTy {
     /// Shape the fields of a record
-    pub fn shape_fields(mut fields: Vec<(StrRef, Ty, Span)>) -> (NameBone, Vec<Ty>) {
+    pub fn shape_fields(mut fields: Vec<(StrRef, Ty)>) -> (NameBone, Vec<Ty>) {
         fields.sort_by(|a, b| a.0.cmp(&b.0));
         let names = NameBone {
             names: fields.iter().map(|e| e.0.clone()).collect(),
         };
-        let types = fields.into_iter().map(|(_, ty, _)| ty).collect::<Vec<_>>();
+        let types = fields.into_iter().map(|(_, ty)| ty).collect::<Vec<_>>();
 
         (names, types)
     }
 
     /// Create a record type
-    pub fn new(fields: Vec<(StrRef, Ty, Span)>) -> Interned<Self> {
+    pub fn new(fields: Vec<(StrRef, Ty)>) -> Interned<Self> {
         let (names, types) = Self::shape_fields(fields);
         Interned::new(Self {
             types: Interned::new(types),
@@ -503,7 +536,7 @@ impl fmt::Debug for RecordTy {
 }
 
 /// A typst function type
-#[derive(Hash, Clone, PartialEq, Eq)]
+#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SigTy {
     /// The input types of the function
     pub inputs: Interned<Vec<Ty>>,
@@ -523,18 +556,59 @@ impl SigTy {
     /// Array constructor
     #[comemo::memoize]
     pub fn array_cons(elem: Ty, anyify: bool) -> Interned<SigTy> {
-        let ret = if anyify {
-            Ty::Any
-        } else {
-            Ty::Array(Interned::new(elem.clone()))
-        };
+        let rest = Ty::Array(Interned::new(elem.clone()));
+        let ret = if anyify { Ty::Any } else { rest.clone() };
         Interned::new(Self {
-            inputs: Interned::new(vec![elem]),
+            inputs: Interned::new(vec![rest]),
             body: Some(ret),
             names: NameBone::empty(),
             name_started: 0,
             spread_left: false,
             spread_right: true,
+        })
+    }
+
+    /// Any constructor
+    pub fn any() -> Interned<SigTy> {
+        let rest = Ty::Array(Interned::new(Ty::Any));
+        Interned::new(Self {
+            inputs: Interned::new(vec![rest]),
+            body: Some(Ty::Any),
+            names: NameBone::empty(),
+            name_started: 0,
+            spread_left: false,
+            spread_right: true,
+        })
+    }
+
+    /// Unary constructor
+    #[comemo::memoize]
+    pub fn unary(inp: Ty, ret: Ty) -> Interned<SigTy> {
+        Interned::new(Self {
+            inputs: Interned::new(vec![inp]),
+            body: Some(ret),
+            names: NameBone::empty(),
+            name_started: 0,
+            spread_left: false,
+            spread_right: false,
+        })
+    }
+
+    /// Tuple constructor
+    #[comemo::memoize]
+    pub fn tuple_cons(elems: Interned<Vec<Ty>>, anyify: bool) -> Interned<SigTy> {
+        let ret = if anyify {
+            Ty::Any
+        } else {
+            Ty::Tuple(elems.clone())
+        };
+        Interned::new(Self {
+            inputs: elems,
+            body: Some(ret),
+            names: NameBone::empty(),
+            name_started: 0,
+            spread_left: false,
+            spread_right: false,
         })
     }
 
@@ -557,22 +631,32 @@ impl SigTy {
         })
     }
 
+    pub(crate) fn with_body(mut self, res_ty: Ty) -> Self {
+        self.body = Some(res_ty);
+        self
+    }
+
     /// Create a function type
     pub fn new(
-        pos: impl IntoIterator<Item = Ty>,
+        pos: impl ExactSizeIterator<Item = Ty>,
         named: impl IntoIterator<Item = (StrRef, Ty)>,
-        rest: Option<Ty>,
+        rest_left: Option<Ty>,
+        rest_right: Option<Ty>,
         ret_ty: Option<Ty>,
     ) -> Self {
-        let named = named
-            .into_iter()
-            .map(|(name, ty)| (name, ty, Span::detached()))
-            .collect::<Vec<_>>();
-        let (names, types) = RecordTy::shape_fields(named);
-        let spread_right = rest.is_some();
+        let named = named.into_iter().collect::<Vec<_>>();
+        let (names, mut named_types) = RecordTy::shape_fields(named);
+        let spread_left = rest_left.is_some();
+        let spread_right = rest_right.is_some();
 
-        let name_started = if spread_right { 1 } else { 0 } + types.len();
-        let types = pos.into_iter().chain(types).chain(rest).collect::<Vec<_>>();
+        let name_started = if spread_right { 1 } else { 0 } + named_types.len();
+        let mut types = Vec::with_capacity(
+            pos.len() + named_types.len() + spread_left as usize + spread_right as usize,
+        );
+        types.extend(pos);
+        types.append(&mut named_types);
+        types.extend(rest_left);
+        types.extend(rest_right);
 
         let name_started = (types.len() - name_started) as u32;
 
@@ -581,7 +665,7 @@ impl SigTy {
             body: ret_ty,
             names: Interned::new(names),
             name_started,
-            spread_left: false,
+            spread_left,
             spread_right,
         }
     }
@@ -724,8 +808,11 @@ impl fmt::Debug for SigTy {
 /// A function argument type
 pub type ArgsTy = SigTy;
 
+/// A pattern type
+pub type PatternTy = SigTy;
+
 /// A type with partially applied arguments
-#[derive(Hash, Clone, PartialEq, Eq)]
+#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SigWithTy {
     /// The signature of the function
     pub sig: TyRef,
@@ -747,7 +834,7 @@ impl fmt::Debug for SigWithTy {
 }
 
 /// A field selection type
-#[derive(Hash, Clone, PartialEq, Eq)]
+#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SelectTy {
     /// The type to select from
     pub ty: TyRef,
@@ -768,49 +855,39 @@ impl fmt::Debug for SelectTy {
     }
 }
 
-/// The kind of unary operation
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub enum UnaryOp {
-    /// The (arithmetic) positive operation
-    /// `+t`
-    Pos,
-    /// The (arithmetic) negate operation
-    /// `-t`
-    Neg,
-    /// The (logical) not operation
-    /// `not t`
-    Not,
-    /// The typst context operation
-    /// `context t`
-    Context,
-    /// The not element of operation
-    /// `not in t`
-    NotElementOf,
-    /// The element of operation
-    /// `in t`
-    ElementOf,
-    /// The type of operation
-    /// `type(t)`
-    TypeOf,
-}
-
 /// A unary operation type
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct TypeUnary {
     /// The operand of the unary operation
-    pub lhs: TyRef,
+    pub lhs: Ty,
     /// The kind of the unary operation
     pub op: UnaryOp,
 }
 
+impl PartialOrd for TypeUnary {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TypeUnary {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let op_as_int = self.op as u8;
+        let other_op_as_int = other.op as u8;
+        op_as_int
+            .cmp(&other_op_as_int)
+            .then_with(|| self.lhs.cmp(&other.lhs))
+    }
+}
+
 impl TypeUnary {
     /// Create a unary operation type
-    pub fn new(op: UnaryOp, lhs: TyRef) -> Interned<Self> {
+    pub fn new(op: UnaryOp, lhs: Ty) -> Interned<Self> {
         Interned::new(Self { lhs, op })
     }
 
     /// Get the operands of the unary operation
-    pub fn operands(&self) -> [&TyRef; 1] {
+    pub fn operands(&self) -> [&Ty; 1] {
         [&self.lhs]
     }
 }
@@ -822,14 +899,30 @@ pub type BinaryOp = ast::BinOp;
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct TypeBinary {
     /// The operands of the binary operation
-    pub operands: (TyRef, TyRef),
+    pub operands: (Ty, Ty),
     /// The kind of the binary operation
     pub op: BinaryOp,
 }
 
+impl PartialOrd for TypeBinary {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TypeBinary {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let op_as_int = self.op as u8;
+        let other_op_as_int = other.op as u8;
+        op_as_int
+            .cmp(&other_op_as_int)
+            .then_with(|| self.operands.cmp(&other.operands))
+    }
+}
+
 impl TypeBinary {
     /// Create a binary operation type
-    pub fn new(op: BinaryOp, lhs: TyRef, rhs: TyRef) -> Interned<Self> {
+    pub fn new(op: BinaryOp, lhs: Ty, rhs: Ty) -> Interned<Self> {
         Interned::new(Self {
             operands: (lhs, rhs),
             op,
@@ -837,14 +930,14 @@ impl TypeBinary {
     }
 
     /// Get the operands of the binary operation
-    pub fn operands(&self) -> [&TyRef; 2] {
+    pub fn operands(&self) -> [&Ty; 2] {
         [&self.operands.0, &self.operands.1]
     }
 }
 
 /// A conditional type
 /// `if t1 then t2 else t3`
-#[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IfTy {
     /// The condition
     pub cond: TyRef,
@@ -865,19 +958,35 @@ impl IfTy {
 #[derive(Default)]
 pub struct TypeScheme {
     /// The typing on definitions
-    pub vars: HashMap<DefId, TypeVarBounds>,
+    pub vars: FxHashMap<DeclExpr, TypeVarBounds>,
+    /// The checked documentation of definitions
+    pub var_docs: FxHashMap<DeclExpr, Arc<UntypedSymbolDocs>>,
+    /// The local binding of the type variable
+    pub local_binds: snapshot_map::SnapshotMap<DeclExpr, Ty>,
     /// The typing on syntax structures
-    pub mapping: HashMap<Span, Vec<Ty>>,
+    pub mapping: FxHashMap<Span, FxHashSet<Ty>>,
 
     pub(super) cano_cache: Mutex<TypeCanoStore>,
 }
 
-impl TypeScheme {
-    /// Get the type of a definition
-    pub fn type_of_def(&self, def: DefId) -> Option<Ty> {
-        Some(self.simplify(self.vars.get(&def).map(|e| e.as_type())?, false))
+impl TyCtx for TypeScheme {
+    fn global_bounds(&self, var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
+        let v = self.vars.get(&var.def)?;
+        Some(v.bounds.bounds().read().clone())
     }
-    /// Get the type of a syntax structure
+
+    fn local_bind_of(&self, var: &Interned<TypeVar>) -> Option<Ty> {
+        self.local_binds.get(&var.def).cloned()
+    }
+}
+
+impl TypeScheme {
+    // Get the type of a definition
+    // pub fn type_of_def(&self, def: DefId) -> Option<Ty> {
+    //     Some(self.simplify(self.vars.get(&def).map(|e| e.as_type())?, false))
+    // }
+
+    /// Gets the type of a syntax structure
     pub fn type_of_span(&self, site: Span) -> Option<Ty> {
         self.mapping
             .get(&site)
@@ -886,31 +995,73 @@ impl TypeScheme {
     }
 
     // todo: distinguish at least, at most
-    /// Witness a lower-bound type on a syntax structure
+    /// Witnesses a lower-bound type on a syntax structure
     pub fn witness_at_least(&mut self, site: Span, ty: Ty) {
         Self::witness_(site, ty, &mut self.mapping);
     }
-    /// Witness a upper-bound type on a syntax structure
+    /// Witnesses a upper-bound type on a syntax structure
     pub fn witness_at_most(&mut self, site: Span, ty: Ty) {
         Self::witness_(site, ty, &mut self.mapping);
     }
 
-    /// Witness a type
-    pub fn witness_(site: Span, ty: Ty, mapping: &mut HashMap<Span, Vec<Ty>>) {
+    /// Witnesses a type
+    pub fn witness_(site: Span, ty: Ty, mapping: &mut FxHashMap<Span, FxHashSet<Ty>>) {
         if site.is_detached() {
             return;
         }
 
         // todo: intersect/union
-        let site_store = mapping.entry(site);
-        match site_store {
-            Entry::Occupied(e) => {
-                e.into_mut().push(ty);
+        mapping.entry(site).or_default().insert(ty);
+    }
+
+    /// Converts a type to a type with bounds
+    pub fn to_bounds(&self, def: Ty) -> TypeBounds {
+        let mut store = TypeBounds::default();
+        match def {
+            Ty::Var(v) => {
+                let w = self.vars.get(&v.def).unwrap();
+                match &w.bounds {
+                    FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
+                        let w = w.read();
+                        store.lbs.extend(w.lbs.iter().cloned());
+                        store.ubs.extend(w.ubs.iter().cloned());
+                    }
+                }
             }
-            Entry::Vacant(e) => {
-                e.insert(vec![ty]);
+            Ty::Let(v) => {
+                store.lbs.extend(v.lbs.iter().cloned());
+                store.ubs.extend(v.ubs.iter().cloned());
+            }
+            _ => {
+                store.ubs.push(def);
             }
         }
+
+        store
+    }
+}
+
+impl TyCtxMut for TypeScheme {
+    type Snap = ena::undo_log::Snapshot;
+
+    fn start_scope(&mut self) -> Self::Snap {
+        self.local_binds.snapshot()
+    }
+
+    fn end_scope(&mut self, snap: Self::Snap) {
+        self.local_binds.rollback_to(snap);
+    }
+
+    fn bind_local(&mut self, var: &Interned<TypeVar>, ty: Ty) {
+        self.local_binds.insert(var.def.clone(), ty);
+    }
+
+    fn type_of_func(&mut self, _func: &typst::foundations::Func) -> Option<Interned<SigTy>> {
+        None
+    }
+
+    fn type_of_value(&mut self, _val: &Value) -> Ty {
+        Ty::Any
     }
 }
 
@@ -939,12 +1090,8 @@ impl TypeVarBounds {
     }
 
     /// Get the name of the type variable
-    pub fn name(&self) -> StrRef {
-        self.var.name.clone()
-    }
-    /// Get the definition id of the type variable
-    pub fn id(&self) -> DefId {
-        self.var.def
+    pub fn name(&self) -> &StrRef {
+        &self.var.name
     }
 
     /// Get self as a type
@@ -966,7 +1113,7 @@ impl TypeVarBounds {
 /// A type variable bounds
 #[derive(Clone)]
 pub enum FlowVarKind {
-    /// A type variable that receives both types and values (type instnaces)
+    /// A type variable that receives both types and values (type instances)
     Strong(Arc<RwLock<TypeBounds>>),
     /// A type variable that receives only types
     /// The received values will be lifted to types
@@ -984,10 +1131,10 @@ impl FlowVarKind {
 
 #[derive(Default)]
 pub(super) struct TypeCanoStore {
-    pub cano_cache: HashMap<(Ty, bool), Ty>,
-    pub cano_local_cache: HashMap<(DefId, bool), Ty>,
-    pub negatives: HashSet<DefId>,
-    pub positives: HashSet<DefId>,
+    pub cano_cache: FxHashMap<(Ty, bool), Ty>,
+    pub cano_local_cache: FxHashMap<(DeclExpr, bool), Ty>,
+    pub negatives: FxHashSet<DeclExpr>,
+    pub positives: FxHashSet<DeclExpr>,
 }
 
 impl_internable!(Ty,);
@@ -1005,6 +1152,7 @@ impl_internable!(IfTy,);
 impl_internable!(Vec<Ty>,);
 impl_internable!(TypeBounds,);
 impl_internable!(NameBone,);
+impl_internable!(PackageId,);
 impl_internable!((Ty, Ty),);
 
 struct RefDebug<'a>(&'a Ty);
@@ -1039,6 +1187,13 @@ mod tests {
     use insta::{assert_debug_snapshot, assert_snapshot};
 
     use crate::ty::tests::*;
+
+    #[test]
+    fn test_ty_size() {
+        use super::*;
+        assert!(size_of::<Ty>() == 16);
+    }
+
     #[test]
     fn test_ty() {
         use super::*;

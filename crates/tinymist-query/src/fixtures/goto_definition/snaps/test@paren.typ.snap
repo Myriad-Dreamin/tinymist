@@ -7,6 +7,7 @@ input_file: crates/tinymist-query/src/fixtures/goto_definition/paren.typ
  {
   "originSelectionRange": "1:23:1:24",
   "targetRange": "0:9:0:10",
-  "targetSelectionRange": "0:9:0:10"
+  "targetSelectionRange": "0:9:0:10",
+  "targetUri": "s0.typ"
  }
 ]

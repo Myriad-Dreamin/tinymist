@@ -6,7 +6,7 @@ Tinymist [ˈtaɪni mɪst] is an integrated language service for [Typst](https://
 It contains:
 - an analyzing library for Typst, see [tinymist-query](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query).
 - a CLI for Typst, see [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist/).
-  - which provides a language server for Typst, see [Langauge Features](https://myriad-dreamin.github.io/tinymist//feature/language.html).
+  - which provides a language server for Typst, see [Language Features](https://myriad-dreamin.github.io/tinymist//feature/language.html).
   - which provides a preview server for Typst, see [Preview Feature](https://myriad-dreamin.github.io/tinymist//feature/preview.html).
 - a VSCode extension for Typst, see [Tinymist VSCode Extension](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/).
 
@@ -18,14 +18,19 @@ It contains:
 Language service (LSP) features:
 
 - [Semantic highlighting](https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide)
-  - Also known as "syntax highlighting".
-- [Diagnostics](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#provide-diagnostics)
-  - Also known as "error checking" or "error reporting".
+  - The "semantic highlighting" is supplementary to ["syntax highlighting"](https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide).
+
+- [Code actions](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#provide-code-actions)
+  - Also known as "quick fixes" or "refactorings".
+- [Formatting (Reformatting)](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#format-source-code-in-an-editor)
+  - Provide the user with support for formatting whole documents, using [typstfmt](https://github.com/astrale-sharp/typstfmt) or [typstyle](https://github.com/Enter-tainer/typstyle).
 - [Document highlight](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#highlight-all-occurrences-of-a-symbol-in-a-document)
   - Highlight all break points in a loop context.
   - (Todo) Highlight all exit points in a function context.
   - (Todo) Highlight all captures in a closure context.
   - (Todo) Highlight all occurrences of a symbol in a document.
+- [Document links](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentLink)
+  - Renders path or link references in the document, such as `image("path.png")` or `bibliography(style: "path.csl")`.
 - [Document symbols](https://code.visualstudio.com/docs/getstarted/userinterface#_outline-view)
   - Also known as "document outline" or "table of contents" _in Typst_.
 - [Folding ranges](https://burkeholland.gitbook.io/vs-code-can-do-that/exercise-3-navigation-and-refactoring/folding-sections)
@@ -45,7 +50,7 @@ Language service (LSP) features:
   - Change the color literal's value by a color picker or its code presentation.
 - [Code Lens](https://code.visualstudio.com/blogs/2017/02/12/code-lens-roundup)
   - Should give contextual buttons along with code. For example, a button for exporting your document to various formats at the start of the document.
-- [Rename symbols](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#rename-symbols)
+- [Rename symbols and embedded paths](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#rename-symbols)
 - [Help with function and method signatures](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#help-with-function-and-method-signatures)
 - [Workspace Symbols](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-all-symbol-definitions-in-folder)
 - [Code Action](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-code-actions)
@@ -67,9 +72,14 @@ Extra features:
   - Trace execution in current document (`tinymist.profileCurrentFile`).
 
 
-## Release Cycle
+## Versioning and Release Cycle
 
-Tinymist follows the [Semantic Versioning](https://semver.org/) scheme. The version number is in the format of `MAJOR.MINOR.PATCH`. The release cycle is as follows:
+Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
+- If a version is suffixed with `-rcN` (<picture><source media="(prefers-color-scheme: dark)" srcset="./assets/images/introduction.typ-inlined0.svg"><img style="vertical-align: -0.35em" alt="typst-block" src="./assets/images/introduction.typ-inlined1.svg"/></picture>), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
+- If the `PATCH` number is odd, e.g. `0.11.1` and `0.12.3`, it means this version is a nightly release. The nightly release will use both [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main) and [typst](https://github.com/typst/typst/tree/main) at **main branch**. They will be published as prerelease version to the marketplace.
+- Otherwise, if the `PATCH` number is even, e.g. `0.11.0` and `0.12.2`, it means this version is a regular release. The regular release will always use the recent stable version of tinymist and typst.
+
+The release cycle is as follows:
 - If there is a typst version update, a new major or minor version will be released intermediately. This means tinymist will always align the minor version with typst.
 - If there is at least a bug or feature added this week, a new patch version will be released.
 
@@ -92,7 +102,7 @@ Besides published releases specific for each editors, you can also download the 
 - Regular prebuilts can be found in [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).
 - Nightly prebuilts can be found in [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions). For example, if you are seeking a nightly release for the featured [PR: build: bump version to 0.11.17-rc1](https://github.com/Myriad-Dreamin/tinymist/pull/468), you could click and go to the [action page](https://github.com/Myriad-Dreamin/tinymist/actions/runs/10120639466) run for the related commits and download the artifacts.
 
-To install extension file (the file with `.vsix` extension) manually, please <kbd>Ctrl+Shift+X</kbd> in the editor window and drop the downloaded vsix file into the opended extensions view.
+To install extension file (the file with `.vsix` extension) manually, please <kbd>Ctrl+Shift+X</kbd> in the editor window and drop the downloaded vsix file into the opened extensions view.
 
 ## Documentation
 
@@ -100,19 +110,21 @@ See [Online Documentation](https://myriad-dreamin.github.io/tinymist/).
 
 ## Packaging
 
+Stable Channel:
+
 [![Packaging status](https://repology.org/badge/vertical-allrepos/tinymist.svg)](https://repology.org/project/tinymist/versions)
+
+Nightly Channel:
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/tinymist-nightly.svg)](https://repology.org/project/tinymist-nightly/versions)
 
 ## Roadmap
 
-After development for two months, most of the features are implemented. There are still some features to be implemented, but I would like to leave them in typst v0.12.0. I'll also pick some of them to implement on my weekends. Also please feel free to contribute if you are interested in the following features.
-
-- Documentation and refactoring: It is my current focus.
 - Spell checking: There is already a branch but no suitable (default) spell checking library is found.
 - Periscope renderer: It is disabled since vscode reject to render SVGs containing foreignObjects.
 - Inlay hint: It is disabled _by default_ because of performance issues.
-- Find references of labels, dictionary fields, and named function arguments.
+- Find references of dictionary fields and named function arguments.
 - Go to definition of dictionary fields and named function arguments.
-- Autocompletion for raw language tags.
 - Improve symbol view's appearance.
 
 ## Contributing
@@ -123,4 +135,5 @@ Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for contribution guideli
 
 - Partially code is inherited from [typst-lsp](https://github.com/nvarner/typst-lsp)
 - The [integrating](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#symbol-view) **offline** handwritten-stroke recognizer is powered by [Detypify](https://detypify.quarticcat.com/).
-- The [integrating](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#preview) preview service is powered by [typst-preview](https://github.com/Enter-tainer/typst-preview).
+- The [integrating](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#preview-command) preview service is powered by [typst-preview](https://github.com/Enter-tainer/typst-preview).
+- The [integrating](https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#managing-local-packages) local package management functions are adopted from [vscode-typst-sync](https://github.com/OrangeX4/vscode-typst-sync).

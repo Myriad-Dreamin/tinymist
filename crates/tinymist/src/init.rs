@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use anyhow::bail;
 use clap::Parser;
-use comemo::Prehashed;
 use itertools::Itertools;
 use lsp_types::*;
 use once_cell::sync::{Lazy, OnceCell};
@@ -18,7 +17,7 @@ use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use typst::foundations::IntoValue;
 use typst::syntax::{FileId, VirtualPath};
-use typst_shim::utils::Deferred;
+use typst_shim::utils::{Deferred, LazyHash};
 
 // todo: svelte-language-server responds to a Goto Definition request with
 // LocationLink[] even if the client does not report the
@@ -164,6 +163,22 @@ impl Initializer for SuperInit {
             _ => None,
         };
 
+        let file_operations = const_config.notify_will_rename_files.then(|| {
+            WorkspaceFileOperationsServerCapabilities {
+                will_rename: Some(FileOperationRegistrationOptions {
+                    filters: vec![FileOperationFilter {
+                        scheme: Some("file".to_string()),
+                        pattern: FileOperationPattern {
+                            glob: "**/*.typ".to_string(),
+                            matches: Some(FileOperationPatternKind::File),
+                            options: None,
+                        },
+                    }],
+                }),
+                ..Default::default()
+            }
+        });
+
         let res = InitializeResult {
             capabilities: ServerCapabilities {
                 // todo: respect position_encoding
@@ -220,13 +235,19 @@ impl Initializer for SuperInit {
                         work_done_progress: None,
                     },
                 })),
+                document_link_provider: Some(DocumentLinkOptions {
+                    resolve_provider: None,
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
+                }),
                 folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
                 workspace: Some(WorkspaceServerCapabilities {
                     workspace_folders: Some(WorkspaceFoldersServerCapabilities {
                         supported: Some(true),
                         change_notifications: Some(OneOf::Left(true)),
                     }),
-                    ..Default::default()
+                    file_operations,
                 }),
                 document_formatting_provider,
                 inlay_hint_provider: Some(OneOf::Left(true)),
@@ -357,6 +378,8 @@ pub struct ConstConfig {
     pub position_encoding: PositionEncoding,
     /// Allow dynamic registration of configuration changes.
     pub cfg_change_registration: bool,
+    /// Allow notifying workspace/didRenameFiles
+    pub notify_will_rename_files: bool,
     /// Allow dynamic registration of semantic tokens.
     pub tokens_dynamic_registration: bool,
     /// Allow overlapping tokens.
@@ -392,6 +415,7 @@ impl From<&InitializeParams> for ConstConfig {
         };
 
         let workspace = params.capabilities.workspace.as_ref();
+        let file_operations = try_(|| workspace?.file_operations.as_ref());
         let doc = params.capabilities.text_document.as_ref();
         let sema = try_(|| doc?.semantic_tokens.as_ref());
         let fold = try_(|| doc?.folding_range.as_ref());
@@ -400,6 +424,7 @@ impl From<&InitializeParams> for ConstConfig {
         Self {
             position_encoding,
             cfg_change_registration: try_or(|| workspace?.configuration, false),
+            notify_will_rename_files: try_or(|| file_operations?.will_rename, false),
             tokens_dynamic_registration: try_or(|| sema?.dynamic_registration, false),
             tokens_overlapping_token_support: try_or(|| sema?.overlapping_token_support, false),
             tokens_multiline_token_support: try_or(|| sema?.multiline_token_support, false),
@@ -513,7 +538,7 @@ impl CompileConfig {
             self.typst_extra_args = Some(CompileExtraOpts {
                 entry: command.input.map(|e| Path::new(&e).into()),
                 root_dir: command.root,
-                inputs: Arc::new(Prehashed::new(inputs)),
+                inputs: Arc::new(LazyHash::new(inputs)),
                 font: command.font,
                 creation_timestamp: command.creation_timestamp,
                 cert: command.certification,
@@ -544,14 +569,14 @@ impl CompileConfig {
                 .into_value(),
             );
 
-            Arc::new(Prehashed::new(dict))
+            Arc::new(LazyHash::new(dict))
         };
 
         self.validate()
     }
 
     /// Determines the root directory for the entry file.
-    fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
+    pub fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
         if let Some(path) = &self.root_path {
             return Some(path.as_path().into());
         }
@@ -687,7 +712,7 @@ impl CompileConfig {
                 dict.insert(k.clone(), v.clone());
             }
 
-            Arc::new(Prehashed::new(dict))
+            Arc::new(LazyHash::new(dict))
         }
 
         let user_inputs = self.determine_user_inputs();

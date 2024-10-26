@@ -10,6 +10,12 @@ edition.workspace = true
 homepage.workspace = true
 repository.workspace = true
 
+[features]
+default = ["no-content-hint"]
+
+no-content-hint = ["reflexo-typst/no-content-hint"]
+
+
 [dependencies]
 
 anyhow.workspace = true
@@ -33,11 +39,13 @@ indexmap.workspace = true
 ecow.workspace = true
 siphasher.workspace = true
 chrono.workspace = true
+rpds.workspace = true
 
 typst.workspace = true
 
 reflexo.workspace = true
 typst-shim.workspace = true
+reflexo-typst.workspace = true
 
 lsp-types.workspace = true
 if_chain.workspace = true
@@ -55,6 +63,7 @@ base64.workspace = true
 typlite.workspace = true
 tinymist-world.workspace = true
 tinymist-analysis.workspace = true
+tinymist-derive.workspace = true
 
 [dev-dependencies]
 once_cell.workspace = true

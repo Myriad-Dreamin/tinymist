@@ -6,23 +6,232 @@ pub mod call;
 pub use call::*;
 pub mod color_exprs;
 pub use color_exprs::*;
-pub mod def_use;
-pub use def_use::*;
-pub mod import;
-pub use import::*;
-pub mod linked_def;
-pub use linked_def::*;
+pub mod link_exprs;
+pub use link_exprs::*;
+pub mod definition;
+pub use definition::*;
 pub mod signature;
 pub use signature::*;
-mod ty;
+mod post_tyck;
+mod tyck;
 pub(crate) use crate::ty::*;
-pub(crate) use ty::*;
+pub(crate) use post_tyck::*;
+pub(crate) use tyck::*;
 pub mod track_values;
 pub use track_values::*;
 mod prelude;
 
 mod global;
 pub use global::*;
+
+use typst::foundations::{Func, Value};
+
+pub(crate) trait ToFunc {
+    fn to_func(&self) -> Option<Func>;
+}
+
+impl ToFunc for Value {
+    fn to_func(&self) -> Option<Func> {
+        match self {
+            Value::Func(f) => Some(f.clone()),
+            Value::Type(t) => t.constructor().ok(),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod matcher_tests {
+
+    use typst::syntax::LinkedNode;
+    use typst_shim::syntax::LinkedNodeExt;
+
+    use crate::{syntax::get_def_target, tests::*};
+
+    #[test]
+    fn test() {
+        snapshot_testing("match_def", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+
+            let root = LinkedNode::new(source.root());
+            let node = root.leaf_at_compat(pos).unwrap();
+
+            let result = get_def_target(node).map(|e| format!("{:?}", e.node().range()));
+            let result = result.as_deref().unwrap_or("<nil>");
+
+            assert_snapshot!(result);
+        });
+    }
+}
+
+#[cfg(test)]
+mod expr_tests {
+
+    use reflexo::path::unix_slash;
+    use typst::syntax::Source;
+
+    use crate::syntax::{Expr, RefExpr};
+    use crate::tests::*;
+
+    trait ShowExpr {
+        fn show_expr(&self, expr: &Expr) -> String;
+    }
+
+    impl ShowExpr for Source {
+        fn show_expr(&self, node: &Expr) -> String {
+            match node {
+                Expr::Decl(decl) => {
+                    let range = self.range(decl.span()).unwrap_or_default();
+                    let fid = if let Some(fid) = decl.file_id() {
+                        let vpath = fid.vpath().as_rooted_path();
+                        match fid.package() {
+                            Some(package) => format!(" in {package:?}{}", unix_slash(vpath)),
+                            None => format!(" in {}", unix_slash(vpath)),
+                        }
+                    } else {
+                        "".to_string()
+                    };
+                    format!("{decl:?}@{range:?}{fid}")
+                }
+                _ => format!("{node}"),
+            }
+        }
+    }
+
+    #[test]
+    fn docs() {
+        snapshot_testing("docs", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let result = ctx.shared_().expr_stage(&source);
+            let mut docstrings = result.docstrings.iter().collect::<Vec<_>>();
+            docstrings.sort_by(|x, y| x.0.weak_cmp(y.0));
+            let mut docstrings = docstrings
+                .into_iter()
+                .map(|(ident, expr)| {
+                    format!(
+                        "{} -> {expr:?}",
+                        source.show_expr(&Expr::Decl(ident.clone())),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let mut snap = vec![];
+            snap.push("= docstings".to_owned());
+            snap.append(&mut docstrings);
+
+            assert_snapshot!(snap.join("\n"));
+        });
+    }
+
+    #[test]
+    fn scope() {
+        snapshot_testing("expr_of", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let result = ctx.shared_().expr_stage(&source);
+            let mut resolves = result.resolves.iter().collect::<Vec<_>>();
+            resolves.sort_by(|x, y| x.1.decl.weak_cmp(&y.1.decl));
+
+            let mut resolves = resolves
+                .into_iter()
+                .map(|(_, expr)| {
+                    let RefExpr {
+                        decl: ident,
+                        step,
+                        root,
+                        val,
+                    } = expr.as_ref();
+
+                    format!(
+                        "{} -> {}, root {}, val: {val:?}",
+                        source.show_expr(&Expr::Decl(ident.clone())),
+                        step.as_ref()
+                            .map(|e| source.show_expr(e))
+                            .unwrap_or_default(),
+                        root.as_ref()
+                            .map(|e| source.show_expr(e))
+                            .unwrap_or_default()
+                    )
+                })
+                .collect::<Vec<_>>();
+            let mut exports = result.exports.iter().collect::<Vec<_>>();
+            exports.sort_by(|x, y| x.0.cmp(y.0));
+            let mut exports = exports
+                .into_iter()
+                .map(|(ident, node)| {
+                    let node = source.show_expr(node);
+                    format!("{ident} -> {node}",)
+                })
+                .collect::<Vec<_>>();
+
+            let mut snap = vec![];
+            snap.push("= resolves".to_owned());
+            snap.append(&mut resolves);
+            snap.push("= exports".to_owned());
+            snap.append(&mut exports);
+
+            assert_snapshot!(snap.join("\n"));
+        });
+    }
+}
+
+#[cfg(test)]
+mod module_tests {
+    use reflexo::path::unix_slash;
+    use serde_json::json;
+
+    use crate::prelude::*;
+    use crate::syntax::module::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("modules", &|ctx, _| {
+            fn ids(ids: EcoVec<TypstFileId>) -> Vec<String> {
+                let mut ids: Vec<String> = ids
+                    .into_iter()
+                    .map(|id| unix_slash(id.vpath().as_rooted_path()))
+                    .collect();
+                ids.sort();
+                ids
+            }
+
+            let dependencies = construct_module_dependencies(&mut ctx.local);
+
+            let mut dependencies = dependencies
+                .into_iter()
+                .map(|(id, v)| {
+                    (
+                        unix_slash(id.vpath().as_rooted_path()),
+                        ids(v.dependencies),
+                        ids(v.dependents),
+                    )
+                })
+                .collect::<Vec<_>>();
+
+            dependencies.sort();
+            // remove /main.typ
+            dependencies.retain(|(p, _, _)| p != "/main.typ");
+
+            let dependencies = dependencies
+                .into_iter()
+                .map(|(id, deps, dependents)| {
+                    let mut mp = serde_json::Map::new();
+                    mp.insert("id".to_string(), json!(id));
+                    mp.insert("dependencies".to_string(), json!(deps));
+                    mp.insert("dependents".to_string(), json!(dependents));
+                    json!(mp)
+                })
+                .collect::<Vec<_>>();
+
+            assert_snapshot!(JsonRepr::new_pure(dependencies));
+        });
+    }
+}
 
 #[cfg(test)]
 mod type_check_tests {
@@ -31,7 +240,6 @@ mod type_check_tests {
 
     use typst::syntax::Source;
 
-    use crate::analysis::ty;
     use crate::tests::*;
 
     use super::{Ty, TypeScheme};
@@ -41,7 +249,7 @@ mod type_check_tests {
         snapshot_testing("type_check", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let result = ty::type_check(ctx, source.clone());
+            let result = ctx.type_check(&source);
             let result = result
                 .as_deref()
                 .map(|e| format!("{:#?}", TypeCheckSnapshot(&source, e)));
@@ -99,7 +307,7 @@ mod post_type_check_tests {
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
-    use crate::analysis::ty;
+    use crate::analysis::*;
     use crate::tests::*;
 
     #[test]
@@ -114,8 +322,8 @@ mod post_type_check_tests {
             let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
-            let result = ty::type_check(ctx, source.clone());
-            let literal_type = result.and_then(|info| ty::post_type_check(ctx, &info, node));
+            let result = ctx.type_check(&source);
+            let literal_type = result.and_then(|info| post_type_check(ctx.shared_(), &info, node));
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),
@@ -135,7 +343,7 @@ mod type_describe_tests {
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
-    use crate::analysis::ty;
+    use crate::analysis::*;
     use crate::tests::*;
 
     #[test]
@@ -150,8 +358,8 @@ mod type_describe_tests {
             let node = root.leaf_at_compat(pos + 1).unwrap();
             let text = node.get().clone().into_text();
 
-            let result = ty::type_check(ctx, source.clone());
-            let literal_type = result.and_then(|info| ty::post_type_check(ctx, &info, node));
+            let result = ctx.type_check(&source);
+            let literal_type = result.and_then(|info| post_type_check(ctx.shared_(), &info, node));
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),
@@ -161,220 +369,6 @@ mod type_describe_tests {
                 assert_snapshot!(literal_type);
             })
         });
-    }
-}
-
-#[cfg(test)]
-mod module_tests {
-    use reflexo::path::unix_slash;
-    use serde_json::json;
-
-    use crate::prelude::*;
-    use crate::syntax::module::*;
-    use crate::tests::*;
-
-    #[test]
-    fn test() {
-        snapshot_testing("modules", &|ctx, _| {
-            fn ids(ids: EcoVec<TypstFileId>) -> Vec<String> {
-                let mut ids: Vec<String> = ids
-                    .into_iter()
-                    .map(|id| unix_slash(id.vpath().as_rooted_path()))
-                    .collect();
-                ids.sort();
-                ids
-            }
-
-            let dependencies = construct_module_dependencies(ctx);
-
-            let mut dependencies = dependencies
-                .into_iter()
-                .map(|(id, v)| {
-                    (
-                        unix_slash(id.vpath().as_rooted_path()),
-                        ids(v.dependencies),
-                        ids(v.dependents),
-                    )
-                })
-                .collect::<Vec<_>>();
-
-            dependencies.sort();
-            // remove /main.typ
-            dependencies.retain(|(p, _, _)| p != "/main.typ");
-
-            let dependencies = dependencies
-                .into_iter()
-                .map(|(id, deps, dependents)| {
-                    let mut mp = serde_json::Map::new();
-                    mp.insert("id".to_string(), json!(id));
-                    mp.insert("dependencies".to_string(), json!(deps));
-                    mp.insert("dependents".to_string(), json!(dependents));
-                    json!(mp)
-                })
-                .collect::<Vec<_>>();
-
-            assert_snapshot!(JsonRepr::new_pure(dependencies));
-        });
-    }
-}
-
-#[cfg(test)]
-mod matcher_tests {
-
-    use typst::syntax::LinkedNode;
-    use typst_shim::syntax::LinkedNodeExt;
-
-    use crate::{syntax::get_def_target, tests::*};
-
-    #[test]
-    fn test() {
-        snapshot_testing("match_def", &|ctx, path| {
-            let source = ctx.source_by_path(&path).unwrap();
-
-            let pos = ctx
-                .to_typst_pos(find_test_position(&source), &source)
-                .unwrap();
-
-            let root = LinkedNode::new(source.root());
-            let node = root.leaf_at_compat(pos).unwrap();
-
-            let result = get_def_target(node).map(|e| format!("{:?}", e.node().range()));
-            let result = result.as_deref().unwrap_or("<nil>");
-
-            assert_snapshot!(result);
-        });
-    }
-}
-
-#[cfg(test)]
-mod document_tests {
-
-    use crate::syntax::find_docs_before;
-    use crate::tests::*;
-
-    #[test]
-    fn test() {
-        snapshot_testing("docs", &|ctx, path| {
-            let source = ctx.source_by_path(&path).unwrap();
-
-            let pos = ctx
-                .to_typst_pos(find_test_position(&source), &source)
-                .unwrap();
-
-            let result = find_docs_before(&source, pos);
-            let result = result.as_deref().unwrap_or("<nil>");
-
-            assert_snapshot!(result);
-        });
-    }
-}
-
-#[cfg(test)]
-mod lexical_hierarchy_tests {
-    use std::collections::HashMap;
-
-    use def_use::DefUseInfo;
-    use lexical_hierarchy::LexicalKind;
-    use reflexo::path::unix_slash;
-    use reflexo::vector::ir::DefId;
-
-    use crate::analysis::def_use;
-    // use crate::prelude::*;
-    use crate::syntax::{lexical_hierarchy, IdentDef, IdentRef};
-    use crate::tests::*;
-
-    /// A snapshot of the def-use information for testing.
-    pub struct DefUseSnapshot<'a>(pub &'a DefUseInfo);
-
-    impl<'a> Serialize for DefUseSnapshot<'a> {
-        fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            use serde::ser::SerializeMap;
-            // HashMap<IdentRef, DefId>
-            let mut references: HashMap<DefId, Vec<IdentRef>> = {
-                let mut map = HashMap::new();
-                for (k, v) in &self.0.ident_refs {
-                    map.entry(*v).or_insert_with(Vec::new).push(k.clone());
-                }
-                map
-            };
-            // sort
-            for (_, v) in references.iter_mut() {
-                v.sort();
-            }
-
-            #[derive(Serialize)]
-            struct DefUseEntry<'a> {
-                def: &'a IdentDef,
-                refs: &'a Vec<IdentRef>,
-            }
-
-            let mut state = serializer.serialize_map(None)?;
-            for (k, (ident_ref, ident_def)) in self.0.ident_defs.as_slice().iter().enumerate() {
-                let id = DefId(k as u64);
-
-                let empty_ref = Vec::new();
-                let entry = DefUseEntry {
-                    def: ident_def,
-                    refs: references.get(&id).unwrap_or(&empty_ref),
-                };
-
-                state.serialize_entry(
-                    &format!(
-                        "{}@{}",
-                        ident_ref.1,
-                        unix_slash(ident_ref.0.vpath().as_rootless_path())
-                    ),
-                    &entry,
-                )?;
-            }
-
-            if !self.0.undefined_refs.is_empty() {
-                let mut undefined_refs = self.0.undefined_refs.clone();
-                undefined_refs.sort();
-                let entry = DefUseEntry {
-                    def: &IdentDef {
-                        name: "<nil>".into(),
-                        kind: LexicalKind::Block,
-                        range: 0..0,
-                    },
-                    refs: &undefined_refs,
-                };
-                state.serialize_entry("<nil>", &entry)?;
-            }
-
-            state.end()
-        }
-    }
-
-    #[test]
-    fn scope() {
-        snapshot_testing("lexical_hierarchy", &|ctx, path| {
-            let source = ctx.source_by_path(&path).unwrap();
-
-            let result = lexical_hierarchy::get_lexical_hierarchy(
-                source,
-                lexical_hierarchy::LexicalScopeKind::DefUse,
-            );
-
-            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
-        });
-    }
-
-    #[test]
-    fn test_def_use() {
-        fn def_use(set: &str) {
-            snapshot_testing(set, &|ctx, path| {
-                let source = ctx.source_by_path(&path).unwrap();
-
-                let result = ctx.def_use(source);
-                let result = result.as_deref().map(DefUseSnapshot);
-
-                assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
-            });
-        }
-
-        def_use("lexical_hierarchy");
-        def_use("def_use");
     }
 }
 
@@ -406,8 +400,8 @@ mod signature_tests {
             let callee_node = callee_node.node();
 
             let result = analyze_signature(
-                ctx,
-                SignatureTarget::Syntax(source.clone(), callee_node.clone()),
+                ctx.shared(),
+                SignatureTarget::Syntax(source.clone(), callee_node.span()),
             );
 
             assert_snapshot!(SignatureSnapshot(result.as_ref()));
@@ -445,14 +439,18 @@ mod signature_tests {
             };
 
             writeln!(f, "fn(")?;
-            for param in primary_sig.pos.iter() {
+            for param in primary_sig.pos() {
                 writeln!(f, " {},", param.name)?;
             }
-            for (name, param) in primary_sig.named.iter() {
-                writeln!(f, " {}: {},", name, param.expr.clone().unwrap_or_default())?;
+            for param in primary_sig.named() {
+                if let Some(expr) = &param.default {
+                    writeln!(f, " {}: {},", param.name, expr)?;
+                } else {
+                    writeln!(f, " {},", param.name)?;
+                }
             }
-            if let Some(primary_sig) = &primary_sig.rest {
-                writeln!(f, " ...{}, ", primary_sig.name)?;
+            if let Some(param) = primary_sig.rest() {
+                writeln!(f, " ...{}, ", param.name)?;
             }
             write!(f, ")")?;
 

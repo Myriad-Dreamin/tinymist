@@ -13,7 +13,7 @@ pub use error::*;
 use base64::Engine;
 use scopes::Scopes;
 use tinymist_world::{base::ShadowApi, EntryReader, LspWorld};
-use typst::{eval::Tracer, foundations::Bytes, layout::Abs, World};
+use typst::{foundations::Bytes, layout::Abs, World};
 use value::{Args, Value};
 
 use ecow::{eco_format, EcoString};
@@ -119,11 +119,11 @@ impl TypliteWorker {
             RawLang | RawDelim | RawTrimmed => Err("converting clause")?,
 
             Math | MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes
-            | MathFrac | MathRoot => Err("converting math node")?,
+            | MathFrac | MathRoot | MathShorthand => Err("converting math node")?,
 
             // Error nodes
             Error => Err(node.clone().into_text().to_string())?,
-            Eof | None => Ok(Value::None),
+            None | End => Ok(Value::None),
 
             // Non-leaf nodes
             Markup => self.reduce(node),
@@ -238,6 +238,7 @@ impl TypliteWorker {
             Binary => Ok(Value::None),
             Spread => Ok(Value::None),
             ImportItems => Ok(Value::None),
+            ImportItemPath => Ok(Value::None),
             RenamedImportItem => Ok(Value::None),
             Closure => Ok(Value::None),
             Args => Ok(Value::None),
@@ -290,10 +291,27 @@ impl TypliteWorker {
     }
 
     fn render(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
-        let color = "#c0caf5";
+        let dark = self.render_inner(node, true)?;
+        let light = self.render_inner(node, false)?;
+        if inline {
+            Ok(Value::Content(eco_format!(
+                r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img style="vertical-align: -0.35em" alt="typst-block" src="data:image/svg+xml;base64,{light}"/></picture>"#
+            )))
+        } else {
+            Ok(Value::Content(eco_format!(
+                r#"<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img alt="typst-block" src="data:image/svg+xml;base64,{light}"/></picture></p>"#
+            )))
+        }
+    }
 
+    fn render_inner(&mut self, node: &SyntaxNode, is_dark: bool) -> Result<String> {
+        let color = if is_dark {
+            r##"#set text(rgb("#c0caf5"))"##
+        } else {
+            ""
+        };
         let main = Bytes::from(eco_format!(
-            r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em));#set text(rgb("{color}"))
+            r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em), fill: rgb("#ffffff00"));{color}
 {}"##,
             node.clone().into_text()
         ).as_bytes().to_owned());
@@ -304,24 +322,15 @@ impl TypliteWorker {
             entry: Some(entry),
             inputs: None,
         });
+        world.source_db.take_state();
         world.map_shadow_by_id(main_id, main).unwrap();
 
-        let mut tracer = Tracer::default();
-        let document = typst::compile(&world, &mut tracer)
+        let document = typst::compile(&world)
+            .output
             .map_err(|e| format!("compiling math node: {e:?}"))?;
 
         let svg_payload = typst_svg::svg_merged(&document, Abs::zero());
-        let base64 = base64::engine::general_purpose::STANDARD.encode(svg_payload);
-
-        if inline {
-            Ok(Value::Content(eco_format!(
-                r#"<img style="vertical-align: -0.35em" src="data:image/svg+xml;base64,{base64}" alt="typst-block" />"#
-            )))
-        } else {
-            Ok(Value::Content(eco_format!(
-                r#"<p align="center"><img src="data:image/svg+xml;base64,{base64}" alt="typst-block" /></p>"#
-            )))
-        }
+        Ok(base64::engine::general_purpose::STANDARD.encode(svg_payload))
     }
 
     fn char(arg: char) -> Result<Value> {
@@ -499,10 +508,8 @@ impl TypliteWorker {
         func(Args::new(self, c.args()))
     }
 
-    fn contextual(&self, node: &SyntaxNode) -> Result<Value> {
-        let _ = node;
-
-        Ok(Value::None)
+    fn contextual(&mut self, node: &SyntaxNode) -> Result<Value> {
+        self.render(node, false)
     }
 
     fn include(&self, node: &SyntaxNode) -> Result<Value> {

@@ -1,43 +1,34 @@
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
-use crate::{adt::interner::Interned, ty::def::*};
+use super::{Sig, SigChecker, SigSurfaceKind, TyCtx};
+use crate::ty::prelude::*;
 
-use super::{Sig, SigChecker, SigSurfaceKind};
-
-pub trait ApplyChecker {
+pub trait ApplyChecker: TyCtx {
     fn apply(&mut self, sig: Sig, arguments: &Interned<ArgsTy>, pol: bool);
-
-    fn bound_of_var(&mut self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
-        None
-    }
 }
+
+static EMPTY_ARGS: LazyLock<Interned<ArgsTy>> = LazyLock::new(|| ArgsTy::default().into());
 
 impl Ty {
     /// Call the given type with the given arguments.
-    pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, checker: &mut impl ApplyChecker) {
-        self.apply(SigSurfaceKind::Call, args, pol, checker)
+    pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, c: &mut impl ApplyChecker) {
+        ApplySigChecker(c, args).ty(self, SigSurfaceKind::Call, pol);
+    }
+
+    /// Get the tuple element type of the given type.
+    pub fn tuple_element_of(&self, pol: bool, c: &mut impl ApplyChecker) {
+        ApplySigChecker(c, &EMPTY_ARGS).ty(self, SigSurfaceKind::Array, pol);
     }
 
     /// Get the element type of the given type.
-    pub fn element_of(&self, pol: bool, checker: &mut impl ApplyChecker) {
-        static EMPTY_ARGS: Lazy<Interned<ArgsTy>> = Lazy::new(|| ArgsTy::default().into());
-
-        self.apply(SigSurfaceKind::ArrayOrDict, &EMPTY_ARGS, pol, checker)
-    }
-
-    fn apply(
-        &self,
-        surface: SigSurfaceKind,
-        args: &Interned<ArgsTy>,
-        pol: bool,
-        checker: &mut impl ApplyChecker,
-    ) {
-        let mut worker = ApplySigChecker(checker, args);
-        worker.ty(self, surface, pol);
+    pub fn element_of(&self, pol: bool, c: &mut impl ApplyChecker) {
+        ApplySigChecker(c, &EMPTY_ARGS).ty(self, SigSurfaceKind::ArrayOrDict, pol);
     }
 }
 
-pub struct ApplySigChecker<'a, T>(&'a mut T, &'a Interned<ArgsTy>);
+#[derive(BindTyCtx)]
+#[bind(0)]
+pub struct ApplySigChecker<'a, T: ApplyChecker>(&'a mut T, &'a Interned<ArgsTy>);
 
 impl<'a, T: ApplyChecker> ApplySigChecker<'a, T> {
     fn ty(&mut self, ty: &Ty, surface: SigSurfaceKind, pol: bool) {
@@ -47,6 +38,10 @@ impl<'a, T: ApplyChecker> ApplySigChecker<'a, T> {
 
 impl<'a, T: ApplyChecker> SigChecker for ApplySigChecker<'a, T> {
     fn check(&mut self, cano_sig: Sig, ctx: &mut super::SigCheckContext, pol: bool) -> Option<()> {
+        let (cano_sig, is_partialize) = match cano_sig {
+            Sig::Partialize(sig) => (*sig, true),
+            sig => (sig, false),
+        };
         // Bind the arguments to the canonical signature.
         let partial_sig = if ctx.args.is_empty() {
             cano_sig
@@ -57,11 +52,13 @@ impl<'a, T: ApplyChecker> SigChecker for ApplySigChecker<'a, T> {
                 at: &ctx.at,
             }
         };
+        let partial_sig = if is_partialize {
+            Sig::Partialize(&partial_sig)
+        } else {
+            partial_sig
+        };
+
         self.0.apply(partial_sig, self.1, pol);
         Some(())
-    }
-
-    fn check_var(&mut self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
-        self.0.bound_of_var(_var, _pol)
     }
 }

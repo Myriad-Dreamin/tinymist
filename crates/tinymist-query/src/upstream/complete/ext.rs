@@ -4,6 +4,7 @@ use ecow::{eco_format, EcoString};
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
 use once_cell::sync::OnceCell;
 use reflexo::path::{unix_slash, PathClean};
+use tinymist_world::LspWorld;
 use typst::foundations::{AutoValue, Func, Label, NoneValue, Repr, Type, Value};
 use typst::layout::{Dir, Length};
 use typst::syntax::ast::AstNode;
@@ -12,7 +13,7 @@ use typst::visualize::Color;
 
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::adt::interner::Interned;
-use crate::analysis::{analyze_dyn_signature, resolve_call_target, BuiltinTy, PathPreference, Ty};
+use crate::analysis::{resolve_call_target, BuiltinTy, PathPreference, Ty};
 use crate::syntax::{param_index_at_leaf, CheckTarget};
 use crate::upstream::complete::complete_code;
 use crate::upstream::plain_docs_sentence;
@@ -20,7 +21,7 @@ use crate::upstream::plain_docs_sentence;
 use crate::{completion_kind, prelude::*, LspCompletion};
 
 impl<'a, 'w> CompletionContext<'a, 'w> {
-    pub fn world(&self) -> &'w dyn typst::World {
+    pub fn world(&self) -> &LspWorld {
         self.ctx.world()
     }
 
@@ -61,7 +62,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         let types = (|| {
             let id = self.root.span().id()?;
             let src = self.ctx.source_by_id(id).ok()?;
-            self.ctx.type_check(src)
+            self.ctx.type_check(&src)
         })();
         let types = types.as_ref();
 
@@ -88,7 +89,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                     let anaylyze = node.children().find(|child| child.is::<ast::Expr>());
                     let analyzed = anaylyze
                         .as_ref()
-                        .and_then(|source| self.ctx.analyze_import(source));
+                        .and_then(|source| self.ctx.module_by_syntax(source));
                     if analyzed.is_none() {
                         log::debug!("failed to analyze import: {:?}", anaylyze);
                     }
@@ -137,7 +138,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                                         match item {
                                             ast::ImportItem::Simple(n) => {
                                                 filter.insert(
-                                                    n.get().clone(),
+                                                    n.name().get().clone(),
                                                     DefKind::Syntax(n.span()),
                                                 );
                                             }
@@ -154,7 +155,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                             };
 
                             if let Some(scope) = module_ins.scope() {
-                                for (name, v) in scope.iter() {
+                                for (name, v, _) in scope.iter() {
                                     let kind = value_to_completion_kind(v);
                                     let def_kind = match &import_filter {
                                         Some(import_filter) => {
@@ -248,7 +249,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         let scope = if in_math { &lib.math } else { &lib.global }
             .scope()
             .clone();
-        for (name, value) in scope.iter() {
+        for (name, value, _) in scope.iter() {
             if filter(Some(value)) && !defined.contains_key(name) {
                 defined.insert(
                     name.clone(),
@@ -462,7 +463,7 @@ fn describe_value(ctx: &mut AnalysisContext, v: &Value) -> EcoString {
                 f = &with_f.0;
             }
 
-            let sig = analyze_dyn_signature(ctx, f.clone());
+            let sig = ctx.signature_dyn(f.clone());
             sig.primary()
                 .ty()
                 .describe()
@@ -561,7 +562,7 @@ pub fn param_completions<'a>(
     let Some(cc) = ctx
         .root
         .find(callee.span())
-        .and_then(|callee| resolve_call_target(ctx.ctx, &callee))
+        .and_then(|callee| resolve_call_target(ctx.ctx.shared(), &callee))
     else {
         return;
     };
@@ -580,7 +581,7 @@ pub fn param_completions<'a>(
     let pos_index =
         param_index_at_leaf(&ctx.leaf, &func, args).map(|i| if this.is_some() { i + 1 } else { i });
 
-    let signature = analyze_dyn_signature(ctx.ctx, func.clone());
+    let signature = ctx.ctx.signature_dyn(func.clone());
 
     let leaf_type = ctx.ctx.literal_type_of_node(ctx.leaf.clone());
     log::debug!("pos_param_completion_by_type: {:?}", leaf_type);
@@ -597,18 +598,20 @@ pub fn param_completions<'a>(
         let mut doc = None;
 
         if let Some(pos_index) = pos_index {
-            let pos = primary_sig.pos.get(pos_index);
+            let pos = primary_sig.get_pos(pos_index);
             log::debug!("pos_param_completion_to: {:?}", pos);
 
             if let Some(pos) = pos {
-                if set && !pos.settable {
+                if set && !pos.attrs.settable {
                     break 'pos_check;
                 }
 
-                doc = Some(plain_docs_sentence(&pos.docs));
+                if let Some(docs) = &pos.docs {
+                    doc = Some(plain_docs_sentence(docs));
+                }
 
-                if pos.positional {
-                    type_completion(ctx, &pos.base_type, doc.as_deref());
+                if pos.attrs.positional {
+                    type_completion(ctx, &pos.ty, doc.as_deref());
                 }
             }
         }
@@ -618,23 +621,27 @@ pub fn param_completions<'a>(
         }
     }
 
-    for (name, param) in &primary_sig.named {
+    for param in primary_sig.named() {
+        let name = &param.name;
         if ctx.seen_field(name.as_ref().into()) {
             continue;
         }
         log::debug!(
             "pos_named_param_completion_to({set:?}): {name:?} {:?}",
-            param.settable
+            param.attrs.settable
         );
 
-        if set && !param.settable {
+        if set && !param.attrs.settable {
             continue;
         }
 
         let _d = OnceCell::new();
-        let docs = || Some(_d.get_or_init(|| plain_docs_sentence(&param.docs)).clone());
+        let docs = || {
+            _d.get_or_init(|| param.docs.as_ref().map(|d| plain_docs_sentence(d.as_str())))
+                .clone()
+        };
 
-        if param.named {
+        if param.attrs.named {
             let compl = Completion {
                 kind: CompletionKind::Field,
                 label: param.name.as_ref().into(),
@@ -644,7 +651,7 @@ pub fn param_completions<'a>(
                 command: Some("tinymist.triggerNamedCompletion"),
                 ..Completion::default()
             };
-            match param.base_type {
+            match param.ty {
                 Ty::Builtin(BuiltinTy::TextSize) => {
                     for size_template in &[
                         "10.5pt", "12pt", "9pt", "14pt", "8pt", "16pt", "18pt", "20pt", "22pt",
@@ -673,8 +680,8 @@ pub fn param_completions<'a>(
             ctx.completions.push(compl);
         }
 
-        if param.positional {
-            type_completion(ctx, &param.base_type, docs().as_deref());
+        if param.attrs.positional {
+            type_completion(ctx, &param.ty, docs().as_deref());
         }
     }
 
@@ -739,9 +746,12 @@ fn type_completion(
             BuiltinTy::Clause => return None,
             BuiltinTy::Undef => return None,
             BuiltinTy::Space => return None,
+            BuiltinTy::Break => return None,
+            BuiltinTy::Continue => return None,
             BuiltinTy::Content => return None,
             BuiltinTy::Infer => return None,
             BuiltinTy::FlowNone => return None,
+            BuiltinTy::Tag(..) => return None,
 
             BuiltinTy::Path(p) => {
                 let source = ctx.ctx.source_by_id(ctx.root.span().id()?).ok()?;
@@ -862,6 +872,9 @@ fn type_completion(
             BuiltinTy::Float => {
                 ctx.snippet_completion("exponential notation", "${1}e${0}", "Exponential notation");
             }
+            BuiltinTy::Label => {
+                ctx.label_completions(false);
+            }
             BuiltinTy::CiteLabel => {
                 ctx.label_completions(true);
             }
@@ -903,6 +916,7 @@ fn type_completion(
                 ctx.value_completion(Some(e.name().into()), &Value::Func((*e).into()), true, docs);
             }
         },
+        Ty::Pattern(_) => return None,
         Ty::Args(_) => return None,
         Ty::Func(_) => return None,
         Ty::With(_) => return None,
@@ -952,7 +966,7 @@ pub fn named_param_value_completions<'a>(
     let Some(cc) = ctx
         .root
         .find(callee.span())
-        .and_then(|callee| resolve_call_target(ctx.ctx, &callee))
+        .and_then(|callee| resolve_call_target(ctx.ctx.shared(), &callee))
     else {
         // static analysis
         if let Some(ty) = ty {
@@ -979,18 +993,18 @@ pub fn named_param_value_completions<'a>(
         func = f.0.clone();
     }
 
-    let signature = analyze_dyn_signature(ctx.ctx, func.clone());
+    let signature = ctx.ctx.signature_dyn(func.clone());
 
     let primary_sig = signature.primary();
 
-    let Some(param) = primary_sig.named.get(name) else {
+    let Some(param) = primary_sig.get_named(name) else {
         return;
     };
-    if !param.named {
+    if !param.attrs.named {
         return;
     }
 
-    let doc = Some(plain_docs_sentence(&param.docs));
+    let doc = param.docs.as_ref().map(|d| plain_docs_sentence(d.as_str()));
 
     // static analysis
     if let Some(ty) = ty {
@@ -1004,13 +1018,13 @@ pub fn named_param_value_completions<'a>(
         completed = true;
     }
 
-    if !matches!(param.base_type, Ty::Any) {
-        type_completion(ctx, &param.base_type, doc.as_deref());
+    if !matches!(param.ty, Ty::Any) {
+        type_completion(ctx, &param.ty, doc.as_deref());
         completed = true;
     }
 
     if !completed {
-        if let Some(expr) = &param.expr {
+        if let Some(expr) = &param.default {
             ctx.completions.push(Completion {
                 kind: CompletionKind::Constant,
                 label: expr.clone(),
@@ -1121,7 +1135,7 @@ pub fn complete_path(
     let has_root = path.has_root();
 
     let src_path = id.vpath();
-    let base = src_path.resolve(&ctx.root)?;
+    let base = src_path.resolve(&ctx.local.root)?;
     let dst_path = src_path.join(path);
     let mut compl_path = dst_path.as_rootless_path();
     if !compl_path.is_dir() {
@@ -1134,7 +1148,7 @@ pub fn complete_path(
         return None;
     }
 
-    let dirs = ctx.root.clone();
+    let dirs = ctx.local.root.clone();
     log::debug!("compl_dirs: {dirs:?}");
     // find directory or files in the path
     let mut folder_completions = vec![];
@@ -1153,7 +1167,7 @@ pub fn complete_path(
 
         let label = if has_root {
             // diff with root
-            let w = path.strip_prefix(&ctx.root).ok()?;
+            let w = path.strip_prefix(&ctx.local.root).ok()?;
             eco_format!("/{}", unix_slash(w))
         } else {
             let base = base.parent()?;

@@ -7,6 +7,7 @@ input_file: crates/tinymist-query/src/fixtures/goto_definition/import_path_inner
  {
   "originSelectionRange": "0:29:0:39",
   "targetRange": "0:0:0:0",
-  "targetSelectionRange": "0:0:0:0"
+  "targetSelectionRange": "0:0:0:0",
+  "targetUri": "base.typ"
  }
 ]

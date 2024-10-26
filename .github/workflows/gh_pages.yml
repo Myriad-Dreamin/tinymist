@@ -26,20 +26,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - run: git submodule update --init --recursive
+      - name: Make directories
+        run: |
+          if [ ! -d "${XDG_DATA_HOME:-$HOME/.local/share}" ]; then
+            echo "Creating data directory: ${XDG_DATA_HOME:-$HOME/.local/share}"
+            mkdir -p ${XDG_DATA_HOME:-$HOME/.local/share}
+          else
+            echo "Data directory already exists: ${XDG_DATA_HOME:-$HOME/.local/share}"
+          fi
+          if [ ! -d "${XDG_CACHE_HOME:-$HOME/.cache}" ]; then
+            echo "Creating cache directory: ${XDG_CACHE_HOME:-$HOME/.cache}"
+            mkdir -p ${XDG_CACHE_HOME:-$HOME/.cache}
+          else
+            echo "Cache directory already exists: ${XDG_CACHE_HOME:-$HOME/.cache}"
+          fi
       - name: Download font assets
         # use fonts in stable releases
         run: |
           mkdir -p assets/fonts/
           curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.2/font-assets.tar.gz | tar -xvz -C assets/fonts
+          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.0/charter-font-assets.tar.gz | tar -xvz -C assets/fonts
+          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.5/source-han-serif-font-assets.tar.gz | tar -xvz -C assets/fonts
       - name: Download & install shiroa
         run: |
-          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.2.0-nightly4/shiroa-x86_64-unknown-linux-gnu.tar.gz | tar -xvz
+          curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.2.0-nightly5/shiroa-x86_64-unknown-linux-gnu.tar.gz | tar -xvz
           chmod +x shiroa-x86_64-unknown-linux-gnu/bin/shiroa
           sudo cp shiroa-x86_64-unknown-linux-gnu/bin/shiroa /usr/bin/shiroa
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 22
       - name: Install deps
         run: yarn install
       - name: Build Preview Html

@@ -2,16 +2,27 @@
 
 use comemo::Track;
 use ecow::*;
-use typst::engine::{Engine, Route};
-use typst::eval::{Tracer, Vm};
+use typst::engine::{Engine, Route, Sink, Traced};
+use typst::eval::Vm;
 use typst::foundations::{Context, Label, Scopes, Styles, Value};
-use typst::introspection::{Introspector, Locator};
+use typst::introspection::Introspector;
 use typst::model::{BibliographyElem, Document};
-use typst::syntax::{ast, LinkedNode, Span, SyntaxKind};
+use typst::syntax::{ast, LinkedNode, Span, SyntaxKind, SyntaxNode};
 use typst::World;
 
 /// Try to determine a set of possible values for an expression.
-pub fn analyze_expr_(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
+pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
+    if let Some(parent) = node.parent() {
+        if parent.kind() == SyntaxKind::FieldAccess && node.index() > 0 {
+            return analyze_expr(world, parent);
+        }
+    }
+
+    analyze_expr_(world, node.get())
+}
+
+/// Try to determine a set of possible values for an expression.
+pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Option<Styles>)> {
     let Some(expr) = node.cast::<ast::Expr>() else {
         return eco_vec![];
     };
@@ -27,20 +38,11 @@ pub fn analyze_expr_(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Opt
         _ => {
             if node.kind() == SyntaxKind::Contextual {
                 if let Some(child) = node.children().last() {
-                    return analyze_expr_(world, &child);
+                    return analyze_expr_(world, child);
                 }
             }
 
-            if let Some(parent) = node.parent() {
-                if parent.kind() == SyntaxKind::FieldAccess && node.index() > 0 {
-                    return analyze_expr_(world, parent);
-                }
-            }
-
-            let mut tracer = Tracer::new();
-            tracer.inspect(node.span());
-            typst::compile(world, &mut tracer).ok();
-            return tracer.values();
+            return typst::trace(world, node.span());
         }
     };
 
@@ -48,22 +50,24 @@ pub fn analyze_expr_(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Opt
 }
 
 /// Try to load a module from the current source file.
-pub fn analyze_import_(world: &dyn World, source: &LinkedNode) -> Option<Value> {
+pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>, Option<Value>) {
     let source_span = source.span();
-    let (source, _) = analyze_expr_(world, source).into_iter().next()?;
+    let Some((source, _)) = analyze_expr_(world, source).into_iter().next() else {
+        return (None, None);
+    };
     if source.scope().is_some() {
-        return Some(source);
+        return (Some(source.clone()), Some(source));
     }
 
-    let mut locator = Locator::default();
     let introspector = Introspector::default();
-    let mut tracer = Tracer::new();
+    let traced = Traced::default();
+    let mut sink = Sink::new();
     let engine = Engine {
         world: world.track(),
         route: Route::default(),
         introspector: introspector.track(),
-        locator: &mut locator,
-        tracer: tracer.track_mut(),
+        traced: traced.track(),
+        sink: sink.track_mut(),
     };
 
     let context = Context::none();
@@ -73,9 +77,11 @@ pub fn analyze_import_(world: &dyn World, source: &LinkedNode) -> Option<Value> 
         Scopes::new(Some(world.library())),
         Span::detached(),
     );
-    typst::eval::import(&mut vm, source, source_span, true)
+    let module = typst::eval::import(&mut vm, source.clone(), source_span, true)
         .ok()
-        .map(Value::Module)
+        .map(Value::Module);
+
+    (Some(source), module)
 }
 
 /// A label with a description and details.
@@ -106,12 +112,13 @@ pub fn analyze_labels(document: &Document) -> (Vec<DynLabel>, usize) {
         let (is_derived, details) = {
             let derived = elem
                 .get_by_name("caption")
-                .or_else(|| elem.get_by_name("body"));
+                .or_else(|_| elem.get_by_name("body"));
 
             match derived {
-                Some(Value::Content(content)) => (true, content.plain_text()),
-                Some(Value::Str(s)) => (true, s.into()),
-                _ => (false, elem.plain_text()),
+                Ok(Value::Content(content)) => (true, content.plain_text()),
+                Ok(Value::Str(s)) => (true, s.into()),
+                Ok(_) => (false, elem.plain_text()),
+                Err(_) => (false, elem.plain_text()),
             }
         };
         output.push(DynLabel {
@@ -131,7 +138,7 @@ pub fn analyze_labels(document: &Document) -> (Vec<DynLabel>, usize) {
     // Bibliography keys.
     for (key, detail) in BibliographyElem::keys(document.introspector.track()) {
         output.push(DynLabel {
-            label: Label::new(&key),
+            label: Label::new(key.as_str()),
             label_desc: detail.clone(),
             detail: detail.clone(),
             bib_title: detail,

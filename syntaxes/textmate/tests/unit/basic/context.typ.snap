@@ -1,0 +1,65 @@
+>#context 1{}
+#^ source.typst keyword.control.hash.typst
+# ^^^^^^^ source.typst meta.expr.context.typst keyword.control.other.typst
+#        ^ source.typst meta.expr.context.typst
+#         ^ source.typst meta.expr.context.typst constant.numeric.integer.typst
+#          ^ source.typst meta.brace.curly.typst
+#           ^ source.typst meta.brace.curly.typst
+>#context 1;{}
+#^ source.typst keyword.control.hash.typst
+# ^^^^^^^ source.typst meta.expr.context.typst keyword.control.other.typst
+#        ^ source.typst meta.expr.context.typst
+#         ^ source.typst meta.expr.context.typst constant.numeric.integer.typst
+#          ^ source.typst punctuation.terminator.statement.typst
+#           ^^^ source.typst
+>#context {}{}
+#^ source.typst keyword.control.hash.typst
+# ^^^^^^^ source.typst meta.expr.context.typst keyword.control.other.typst
+#        ^ source.typst meta.expr.context.typst
+#         ^ source.typst meta.expr.context.typst meta.brace.curly.typst
+#          ^ source.typst meta.expr.context.typst meta.brace.curly.typst
+#           ^^^ source.typst
+>#context [][]
+#^ source.typst keyword.control.hash.typst
+# ^^^^^^^ source.typst meta.expr.context.typst keyword.control.other.typst
+#        ^ source.typst meta.expr.context.typst
+#         ^ source.typst meta.expr.context.typst meta.brace.square.typst
+#          ^ source.typst meta.expr.context.typst meta.brace.square.typst
+#           ^ source.typst meta.brace.square.typst
+#            ^ source.typst meta.brace.square.typst
+>#context {
+#^ source.typst keyword.control.hash.typst
+# ^^^^^^^ source.typst meta.expr.context.typst keyword.control.other.typst
+#        ^ source.typst meta.expr.context.typst
+#         ^ source.typst meta.expr.context.typst meta.brace.curly.typst
+>  here().page()
+#^^ source.typst meta.expr.context.typst
+#  ^^^^ source.typst meta.expr.context.typst meta.expr.call.typst entity.name.function.typst
+#      ^ source.typst meta.expr.context.typst meta.expr.call.typst meta.brace.round.typst
+#       ^ source.typst meta.expr.context.typst meta.expr.call.typst meta.brace.round.typst
+#        ^ source.typst meta.expr.context.typst meta.expr.call.typst keyword.operator.accessor.typst
+#         ^^^^ source.typst meta.expr.context.typst meta.expr.call.typst entity.name.function.typst
+#             ^ source.typst meta.expr.context.typst meta.expr.call.typst meta.brace.round.typst
+#              ^ source.typst meta.expr.context.typst meta.expr.call.typst meta.brace.round.typst
+>}{}
+#^ source.typst meta.expr.context.typst meta.brace.curly.typst
+# ^^^ source.typst
+>#context [Citation @distress on page #here().page()]{}
+#^ source.typst keyword.control.hash.typst
+# ^^^^^^^ source.typst meta.expr.context.typst keyword.control.other.typst
+#        ^ source.typst meta.expr.context.typst
+#         ^ source.typst meta.expr.context.typst meta.brace.square.typst
+#          ^^^^^^^^^ source.typst meta.expr.context.typst
+#                   ^ source.typst meta.expr.context.typst entity.other.reference.typst punctuation.definition.reference.typst
+#                    ^^^^^^^^ source.typst meta.expr.context.typst entity.other.reference.typst
+#                            ^^^^^^^^^ source.typst meta.expr.context.typst
+#                                     ^ source.typst meta.expr.context.typst entity.name.function.hash.typst
+#                                      ^^^^ source.typst meta.expr.context.typst meta.expr.call.typst entity.name.function.typst
+#                                          ^ source.typst meta.expr.context.typst meta.expr.call.typst meta.brace.round.typst
+#                                           ^ source.typst meta.expr.context.typst meta.expr.call.typst meta.brace.round.typst
+#                                            ^ source.typst meta.expr.context.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                                             ^^^^ source.typst meta.expr.context.typst meta.expr.call.typst entity.name.function.typst
+#                                                 ^ source.typst meta.expr.context.typst meta.expr.call.typst meta.brace.round.typst
+#                                                  ^ source.typst meta.expr.context.typst meta.expr.call.typst meta.brace.round.typst
+#                                                   ^ source.typst meta.expr.context.typst meta.brace.square.typst
+#                                                    ^^^ source.typst

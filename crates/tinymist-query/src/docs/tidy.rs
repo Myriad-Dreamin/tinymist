@@ -1,34 +1,53 @@
+use std::sync::OnceLock;
+
+use ecow::EcoString;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use typst::diag::StrResult;
 
+use crate::upstream::plain_docs_sentence;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyParamDocs {
-    pub name: String,
-    pub docs: String,
-    pub types: String,
-    pub default: Option<String>,
+    pub name: EcoString,
+    pub docs: EcoString,
+    pub types: EcoString,
+    pub default: Option<EcoString>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyFuncDocs {
-    pub docs: String,
-    pub return_ty: Option<String>,
+    pub docs: EcoString,
+    pub return_ty: Option<EcoString>,
     pub params: Vec<TidyParamDocs>,
 }
 
+/// Documentation about a variable (without type information).
+pub type UntypedVarDocs = VarDocsT<()>;
+/// Documentation about a variable.
+pub type VarDocs = VarDocsT<Option<(String, String)>>;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TidyVarDocs {
-    pub docs: String,
-    pub return_ty: Option<String>,
+pub struct VarDocsT<T> {
+    pub docs: EcoString,
+    pub return_ty: T,
+    #[serde(skip)]
+    pub def_docs: OnceLock<String>,
+}
+
+impl VarDocs {
+    pub fn def_docs(&self) -> &String {
+        self.def_docs
+            .get_or_init(|| plain_docs_sentence(&self.docs).into())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyModuleDocs {
-    pub docs: String,
+    pub docs: EcoString,
 }
 
-pub fn identify_tidy_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
+pub fn identify_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
     let lines = converted.lines().collect::<Vec<_>>();
 
     let mut matching_return_ty = true;
@@ -57,7 +76,7 @@ pub fn identify_tidy_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
                     continue;
                 };
 
-                return_ty = Some(w.trim().to_string());
+                return_ty = Some(w.trim().into());
                 break;
             }
 
@@ -120,7 +139,7 @@ pub fn identify_tidy_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
                 name: param_line.0,
                 types: param_line.1,
                 default: None,
-                docs: buf.into_iter().join("\n"),
+                docs: buf.into_iter().join("\n").into(),
             });
 
             break;
@@ -128,8 +147,8 @@ pub fn identify_tidy_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
     }
 
     let docs = match break_line {
-        Some(line_no) => (lines[..line_no]).iter().copied().join("\n"),
-        None => converted.to_owned(),
+        Some(line_no) => (lines[..line_no]).iter().copied().join("\n").into(),
+        None => converted.into(),
     };
 
     params.reverse();
@@ -140,7 +159,7 @@ pub fn identify_tidy_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
     })
 }
 
-pub fn identify_tidy_var_docs(converted: &str) -> StrResult<TidyVarDocs> {
+pub fn identify_var_docs(converted: EcoString) -> StrResult<VarDocs> {
     let lines = converted.lines().collect::<Vec<_>>();
 
     let mut return_ty = None;
@@ -163,23 +182,26 @@ pub fn identify_tidy_var_docs(converted: &str) -> StrResult<TidyVarDocs> {
             break;
         };
 
-        return_ty = Some(w.trim().to_string());
+        // todo: convert me
+        return_ty = Some((w.trim().into(), String::new()));
         break_line = Some(i);
         break;
     }
 
     let docs = match break_line {
-        Some(line_no) => (lines[..line_no]).iter().copied().join("\n"),
-        None => converted.to_owned(),
+        Some(line_no) => (lines[..line_no]).iter().copied().join("\n").into(),
+        None => converted,
     };
 
-    Ok(TidyVarDocs { docs, return_ty })
+    Ok(VarDocs {
+        docs,
+        return_ty,
+        def_docs: OnceLock::new(),
+    })
 }
 
-pub fn identify_tidy_module_docs(converted: &str) -> StrResult<TidyModuleDocs> {
-    Ok(TidyModuleDocs {
-        docs: converted.to_owned(),
-    })
+pub fn identify_tidy_module_docs(docs: EcoString) -> StrResult<TidyModuleDocs> {
+    Ok(TidyModuleDocs { docs })
 }
 
 fn match_brace(trim_start: &str) -> Option<(&str, &str)> {
@@ -213,7 +235,7 @@ mod tests {
     use super::TidyParamDocs;
 
     fn func(s: &str) -> String {
-        let f = super::identify_tidy_func_docs(s).unwrap();
+        let f = super::identify_func_docs(s).unwrap();
         let mut res = format!(">> docs:\n{}\n<< docs", f.docs);
         if let Some(t) = f.return_ty {
             res.push_str(&format!("\n>>return\n{t}\n<<return"));
@@ -231,10 +253,10 @@ mod tests {
     }
 
     fn var(s: &str) -> String {
-        let f = super::identify_tidy_var_docs(s).unwrap();
+        let f = super::identify_var_docs(s.into()).unwrap();
         let mut res = format!(">> docs:\n{}\n<< docs", f.docs);
         if let Some(t) = f.return_ty {
-            res.push_str(&format!("\n>>return\n{t}\n<<return"));
+            res.push_str(&format!("\n>>return\n{}\n<<return", t.0));
         }
         res
     }

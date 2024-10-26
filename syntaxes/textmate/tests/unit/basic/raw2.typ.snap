@@ -1,15 +1,15 @@
 >
 >````typ
-#^^^^ source.typst punctuation.definition.raw.begin.typst
-#    ^^^ source.typst fenced_code.block.language.typst
+#^^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#    ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
 >#(let a
-#^ source.typst meta.embedded.block.typst keyword.control.hash.typst
-# ^ source.typst meta.embedded.block.typst meta.brace.round.typst
-#  ^^^ source.typst meta.embedded.block.typst meta.expr.let.typst storage.type.typst
-#     ^ source.typst meta.embedded.block.typst meta.expr.let.typst
-#      ^ source.typst meta.embedded.block.typst meta.expr.let.typst variable.other.readwrite.typst
+#^ source.typst markup.raw.block.typst meta.embedded.block.typst keyword.control.hash.typst
+# ^ source.typst markup.raw.block.typst meta.embedded.block.typst meta.brace.round.typst
+#  ^^^ source.typst markup.raw.block.typst meta.embedded.block.typst meta.expr.let.typst storage.type.typst
+#     ^ source.typst markup.raw.block.typst meta.embedded.block.typst meta.expr.let.typst
+#      ^ source.typst markup.raw.block.typst meta.embedded.block.typst meta.expr.let.typst variable.other.readwrite.typst
 >````
-#^^^^ source.typst punctuation.definition.raw.end.typst
+#^^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
 >
 >== A
 #^^ source.typst markup.heading.typst punctuation.definition.heading.typst
@@ -24,14 +24,14 @@
 #  ^^ source.typst
 >
 >```typ
-#^^^ source.typst punctuation.definition.raw.begin.typst
-#   ^^^ source.typst fenced_code.block.language.typst
+#^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#   ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
 >#(let a
-#^ source.typst meta.embedded.block.typst keyword.control.hash.typst
-# ^ source.typst meta.embedded.block.typst meta.brace.round.typst
-#  ^^^ source.typst meta.embedded.block.typst meta.expr.let.typst storage.type.typst
-#     ^ source.typst meta.embedded.block.typst meta.expr.let.typst
-#      ^ source.typst meta.embedded.block.typst meta.expr.let.typst variable.other.readwrite.typst
+#^ source.typst markup.raw.block.typst meta.embedded.block.typst keyword.control.hash.typst
+# ^ source.typst markup.raw.block.typst meta.embedded.block.typst meta.brace.round.typst
+#  ^^^ source.typst markup.raw.block.typst meta.embedded.block.typst meta.expr.let.typst storage.type.typst
+#     ^ source.typst markup.raw.block.typst meta.embedded.block.typst meta.expr.let.typst
+#      ^ source.typst markup.raw.block.typst meta.embedded.block.typst meta.expr.let.typst variable.other.readwrite.typst
 >```
-#^^^ source.typst punctuation.definition.raw.end.typst
+#^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
 >

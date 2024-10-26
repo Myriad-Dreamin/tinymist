@@ -1,0 +1,22 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/tuple_map.typ
+---
+"" = (( ⪯ (Type(bytes) | Type(decimal) | Type(float) | Type(integer) | Type(label) | Type(string) | Type(type) | Type(version)))) => Type(string)
+"a" = (1, )
+"b" = (Type(string), )
+"f" = (( ⪯ (Type(bytes) | Type(decimal) | Type(float) | Type(integer) | Type(label) | Type(string) | Type(type) | Type(version)))) => Type(string)
+"x" = Any
+---
+5..6 -> @a
+20..21 -> @f
+24..25 -> @x
+24..35 -> @
+29..32 -> Type(string)
+29..35 -> Type(string)
+33..34 -> @x
+42..43 -> @b
+46..47 -> @a
+46..54 -> (Type(string), )
+52..53 -> @f

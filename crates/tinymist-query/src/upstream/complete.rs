@@ -10,6 +10,7 @@ use typst::model::Document;
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
+use typst::World;
 use typst_shim::{syntax::LinkedNodeExt, utils::hash128};
 use unscanny::Scanner;
 
@@ -357,6 +358,14 @@ fn math_completions(ctx: &mut CompletionContext) {
 
 /// Complete field accesses.
 fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
+    // Used to determine whether trivia nodes are allowed before '.'.
+    // During an inline expression in markup mode trivia nodes exit the inline
+    // expression.
+    let in_markup: bool = matches!(
+        ctx.leaf.parent_kind(),
+        None | Some(SyntaxKind::Markup) | Some(SyntaxKind::Ref)
+    );
+
     // Behind an expression plus dot: "emoji.|".
     if_chain! {
         if ctx.leaf.kind() == SyntaxKind::Dot
@@ -364,6 +373,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
                 && ctx.leaf.text() == ".");
         if ctx.leaf.range().end == ctx.cursor;
         if let Some(prev) = ctx.leaf.prev_sibling();
+        if !in_markup || prev.range().end == ctx.leaf.range().start;
         if prev.is::<ast::Expr>();
         if prev.parent_kind() != Some(SyntaxKind::Markup) ||
            prev.prev_sibling_kind() == Some(SyntaxKind::Hash);
@@ -395,12 +405,12 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
 
 /// Add completions for all fields on a value.
 fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: &Option<Styles>) {
-    for (name, value) in value.ty().scope().iter() {
+    for (name, value, _) in value.ty().scope().iter() {
         ctx.value_completion(Some(name.clone()), value, true, None);
     }
 
     if let Some(scope) = value.scope() {
-        for (name, value) in scope.iter() {
+        for (name, value, _) in scope.iter() {
             ctx.value_completion(Some(name.clone()), value, true, None);
         }
     }
@@ -448,9 +458,9 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                 for param in elem.params().iter().filter(|param| !param.required) {
                     if let Some(value) = elem
                         .field_id(param.name)
-                        .and_then(|id| elem.field_from_styles(id, StyleChain::new(styles)))
+                        .map(|id| elem.field_from_styles(id, StyleChain::new(styles)))
                     {
-                        ctx.value_completion(Some(param.name.into()), &value, false, None);
+                        ctx.value_completion(Some(param.name.into()), &value.unwrap(), false, None);
                     }
                 }
             }
@@ -543,7 +553,7 @@ fn import_item_completions<'a>(
     existing: ast::ImportItems<'a>,
     source: &LinkedNode,
 ) {
-    let Some(value) = ctx.ctx.analyze_import(source) else {
+    let Some(value) = ctx.ctx.analyze_import(source).1 else {
         return;
     };
     let Some(scope) = value.scope() else { return };
@@ -552,7 +562,7 @@ fn import_item_completions<'a>(
         ctx.snippet_completion("*", "*", "Import everything.");
     }
 
-    for (name, value) in scope.iter() {
+    for (name, value, _) in scope.iter() {
         if existing
             .iter()
             .all(|item| item.original_name().as_str() != name)
@@ -939,8 +949,8 @@ fn code_completions(ctx: &mut CompletionContext, hash: bool) {
 }
 
 /// Context for autocompletion.
-pub struct CompletionContext<'a, 'w> {
-    pub ctx: &'a mut AnalysisContext<'w>,
+pub struct CompletionContext<'a, 'b> {
+    pub ctx: &'a mut AnalysisContext<'b>,
     pub document: Option<&'a Document>,
     pub text: &'a str,
     pub before: &'a str,
@@ -1034,7 +1044,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
     /// Add completions for all font families.
     fn font_completions(&mut self) {
         let equation = self.before_window(25).contains("equation");
-        for (family, iter) in self.world().book().families() {
+        for (family, iter) in self.world().clone().book().families() {
             let detail = summarize_font_family(iter);
             if !equation || family.contains("Math") {
                 self.value_completion(
@@ -1049,14 +1059,10 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
 
     /// Add completions for all available packages.
     fn package_completions(&mut self, all_versions: bool) {
-        let mut packages: Vec<_> = self
-            .world()
-            .packages()
-            .iter()
-            .map(|e| (&e.0, e.1.clone()))
-            .collect();
+        let w = self.world().clone();
+        let mut packages: Vec<_> = w.packages().iter().map(|e| (&e.0, e.1.clone())).collect();
         // local_packages to references and add them to the packages
-        let local_packages_refs = self.ctx.resources.local_packages();
+        let local_packages_refs = self.ctx.local_packages();
         packages.extend(
             local_packages_refs
                 .iter()

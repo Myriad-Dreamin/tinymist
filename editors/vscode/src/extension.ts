@@ -32,7 +32,12 @@ import {
   previewProcessOutline,
 } from "./features/preview";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
-import { activeTypstEditor, DisposeList, getSensibleTextEditorColumn } from "./util";
+import {
+  activeTypstEditor,
+  DisposeList,
+  getSensibleTextEditorColumn,
+  typstDocumentSelector,
+} from "./util";
 import { client, getClient, setClient, tinymist } from "./lsp";
 import { taskActivate } from "./features/tasks";
 import { onEnterHandler } from "./lsp.on-enter";
@@ -40,6 +45,7 @@ import { extensionState } from "./state";
 import { devKitFeatureActivate } from "./features/dev-kit";
 import { labelFeatureActivate } from "./features/label";
 import { packageFeatureActivate } from "./features/package";
+import { dragAndDropActivate } from "./features/drag-and-drop";
 
 export async function activate(context: ExtensionContext): Promise<void> {
   try {
@@ -64,6 +70,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   // Sets features
   extensionState.features.preview = config.previewFeature === "enable";
   extensionState.features.devKit = isDevMode || config.devKit === "enable";
+  extensionState.features.dragAndDrop = config.dragAndDrop === "enable";
   extensionState.features.onEnter = !!config.onEnterEvent;
   // Initializes language client
   const client = initClient(context, config);
@@ -71,6 +78,9 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   // Activates features
   labelFeatureActivate(context);
   packageFeatureActivate(context);
+  if (extensionState.features.dragAndDrop) {
+    dragAndDropActivate(context);
+  }
   if (extensionState.features.task) {
     taskActivate(context);
   }
@@ -114,11 +124,11 @@ function initClient(context: ExtensionContext, config: Record<string, any>) {
     debug: run,
   };
 
+  const trustedCommands = {
+    enabledCommands: ["tinymist.openInternal", "tinymist.openExternal"],
+  };
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [
-      { scheme: "file", language: "typst" },
-      { scheme: "untitled", language: "typst" },
-    ],
+    documentSelector: typstDocumentSelector,
     initializationOptions: config,
     middleware: {
       workspace: {
@@ -130,6 +140,20 @@ function initClient(context: ExtensionContext, config: Record<string, any>) {
           }
           return substVscodeVarsInConfig(items, result);
         },
+      },
+      provideHover: async (document, position, token, next) => {
+        const hover = await next(document, position, token);
+        if (!hover) {
+          return hover;
+        }
+
+        for (const content of hover.contents) {
+          if (content instanceof vscode.MarkdownString) {
+            content.isTrusted = trustedCommands;
+            content.supportHtml = true;
+          }
+        }
+        return hover;
       },
     },
   };
@@ -245,6 +269,8 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
   // prettier-ignore
   context.subscriptions.push(
     commands.registerCommand("tinymist.onEnter", onEnterHandler),
+    commands.registerCommand("tinymist.openInternal", openInternal),
+    commands.registerCommand("tinymist.openExternal", openExternal),
 
     commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
     commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
@@ -354,6 +380,16 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
   return;
 }
 
+async function openInternal(target: string): Promise<void> {
+  const uri = Uri.parse(target);
+  await commands.executeCommand("vscode.open", uri, ViewColumn.Beside);
+}
+
+async function openExternal(target: string): Promise<void> {
+  const uri = Uri.parse(target);
+  await vscode.env.openExternal(uri);
+}
+
 async function commandExport(
   mode: "Pdf" | "Svg" | "Png",
   extraOpts?: any,
@@ -450,11 +486,22 @@ async function commandShow(kind: "Pdf" | "Svg" | "Png", extraOpts?: any): Promis
     }
   }
 
-  // here we can be sure that the pdf exists
-  await commands.executeCommand("vscode.open", exportUri, {
-    viewColumn: ViewColumn.Beside,
-    preserveFocus: true,
-  } as vscode.TextDocumentShowOptions);
+  const conf = vscode.workspace.getConfiguration("tinymist");
+  const openIn: string = conf.get("showExportFileIn", "editorTab");
+
+  switch (openIn) {
+    default:
+    case "editorTab":
+      // here we can be sure that the pdf exists
+      await commands.executeCommand("vscode.open", exportUri, {
+        viewColumn: ViewColumn.Beside,
+        preserveFocus: true,
+      } as vscode.TextDocumentShowOptions);
+      break;
+    case "systemDefault":
+      await vscode.env.openExternal(exportUri);
+      break;
+  }
 }
 
 export interface PreviewResult {

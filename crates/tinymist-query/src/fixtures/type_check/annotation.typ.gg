@@ -1,0 +1,6 @@
+/// #let fn = `('T, x: 'T, y: 'T) => 'T`
+/// #let args = `resultOf(fn)`
+///
+/// - fn (function, fn): The `fn`.
+/// - args (args, args): The `args`.
+#let fold(fn, ..args) = none

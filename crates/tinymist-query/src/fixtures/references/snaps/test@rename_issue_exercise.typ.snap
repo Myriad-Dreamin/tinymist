@@ -6,5 +6,6 @@ input_file: crates/tinymist-query/src/fixtures/references/rename_issue_exercise.
 [
  "/basic/mod.typ@0:22:0:30",
  "/basic/mod.typ@1:1:1:9",
- "/basic/writing.typ@1:1:1:9"
+ "/basic/writing.typ@1:1:1:9",
+ "/mod.typ@0:23:0:31"
 ]

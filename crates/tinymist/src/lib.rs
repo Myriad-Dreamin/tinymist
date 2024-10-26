@@ -24,6 +24,7 @@ mod init;
 mod resource;
 mod server;
 mod task;
+pub use task::UserActionTask;
 pub mod tool;
 mod utils;
 

@@ -12,7 +12,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
     "kind": 3,
     "label": "aa",
     "labelDetails": {
-     "description": "() => any"
+     "description": "() => 1"
     },
     "textEdit": {
      "newText": "aa(${1:})",
@@ -32,7 +32,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
     "kind": 3,
     "label": "aa.with",
     "labelDetails": {
-     "description": "() => any"
+     "description": "() => 1"
     },
     "textEdit": {
      "newText": "aa.with(${1:})",
@@ -52,7 +52,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
     "kind": 3,
     "label": "aab",
     "labelDetails": {
-     "description": "() => any"
+     "description": "() => 1"
     },
     "textEdit": {
      "newText": "aab(${1:})",
@@ -72,7 +72,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
     "kind": 3,
     "label": "aabc",
     "labelDetails": {
-     "description": "() => any"
+     "description": "() => 1"
     },
     "textEdit": {
      "newText": "aabc(${1:})",
@@ -92,7 +92,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
     "kind": 3,
     "label": "aac",
     "labelDetails": {
-     "description": "() => any"
+     "description": "() => 1"
     },
     "textEdit": {
      "newText": "aac(${1:})",
@@ -117,7 +117,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
     "kind": 3,
     "label": "aabc",
     "labelDetails": {
-     "description": "() => any"
+     "description": "() => 1"
     },
     "textEdit": {
      "newText": "aabc(${1:})",
@@ -137,7 +137,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star.typ
     "kind": 3,
     "label": "aac",
     "labelDetails": {
-     "description": "() => any"
+     "description": "() => 1"
     },
     "textEdit": {
      "newText": "aac(${1:})",
