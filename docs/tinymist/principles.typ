@@ -47,7 +47,6 @@ The `RenderActor`s don't do compilations, but own project-specific rendering cac
 == Multi-level Analysis
 
 he most critical features are lsp functions, built on the #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query")[tinymist-query] crate. To achieve higher concurrency, functions are classified into different levels of analysis.
-// + `query_token_cache` – `TokenRequest` – locks and accesses token cache.
 + `query_source` – `SyntaxRequest` – locks and accesses a single source unit.
 + `query_world` – `SemanticRequest` – locks and accesses multiple source units.
 + `query_state` – `StatefulRequest` – acquires to accesses a specific version of compile results.

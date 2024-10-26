@@ -24,7 +24,7 @@ To initialize a Typst project:
 🎉 If your template contains only a single file, you can also insert the template content in place with command:
 - Use command `Typst template in place` (tinymist.initTemplateInPlace) and input a template specifier for initialization.
 
-=== Configuring LSP-enhanced formatters
+=== Configuring LSP-Enhanced Formatters
 <configuring-lsp-enhanced-formatters>
 + Open settings.
 + Search for "Tinymist Formatter" and modify the value.
@@ -91,6 +91,12 @@ To configure the root path resolved for Typst compiler:
 + Open settings.
 + Search for "Tinymist Root Path" and modify the value.
 + Reload the window or restart the vscode editor to make the settings take effect. *Note:* you must provide absolute paths.
+
+=== Managing Local Packages
+
++ Use `Typst: Create Typst Local Package` command to create a local package.
++ Use `Typst: Open Typst Local Package` command to open a local package.
++ View and manage a list of available local packages in the "PACKAGE" view in the activity bar.
 
 === Compiling PDF
 <compiling-pdf>
@@ -161,6 +167,7 @@ Supported arguments:
 - `--font-path` (environment variable: `TYPST_FONT_PATHS`), Font paths, maybe overriden by `tinymist.fontPaths`.
 - `--ignore-system-fonts`: Ensures system fonts won’t be searched, maybe overriden by `tinymist.systemFonts`.
 - `--creation-timestamp` (environment variable: `SOURCE_DATE_EPOCH`): The document’s creation date formatted as a #link("https://reproducible-builds.org/specs/source-date-epoch/")[UNIX timestamp];.
+- `--cert` (environment variable: `TYPST_CERT`): Path to CA certificate file for network access, especially for downloading typst packages.
 
 *Note:* Fix entry to `main.typ` may help multiple-file projects
 but you may loss diagnostics and autocompletions in unrelated files.

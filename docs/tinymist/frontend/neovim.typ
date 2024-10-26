@@ -32,7 +32,7 @@ This section shows you a minimal way to setup tinymist in Neovim (LazyVim).
 + Check and restart Neovim.
 
 // todo: heading link support
-Please see #md-alter(link(<extra-settings>)[Extra Settings], () => link("#extra-settings")[Extra Settings]) for more configuration.
+Please see #md-alter(link(<neovim-extra-settings>)[Extra Settings], () => link("#extra-settings")[Extra Settings]) for more configuration.
 
 == Tips
 <tips>
@@ -72,10 +72,10 @@ autocmd BufNewFile,BufRead *.typ setfiletype typst
 ```
 
 == Extra Settings
-<extra-settings>
-=== Configuring LSP Server
-<configuring-lsp-server>
-To configure LSP server, you can edit the `opts.servers.tinymist.settings`. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
+<neovim-extra-settings>
+=== Configuring Language Server
+<neovim-configuring-language-server>
+To configure language server, you can edit the `opts.servers.tinymist.settings`. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
 
 ```lua
 return {
@@ -121,7 +121,7 @@ Enable LSP-based folding range with `kevinhwang91/nvim-ufo`:
 
 ```lua
 return {
-  { -- configure LSP servers
+  { -- configure language servers
     "neovim/nvim-lspconfig",
     dependencies = "kevinhwang91/nvim-ufo", -- enable LSP-based folds
   },

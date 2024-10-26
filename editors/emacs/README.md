@@ -48,7 +48,7 @@ your PATH and `typst-lsp` in your `PATH` to the `typst-ts-mode` entry of `eglot-
 
 ## Extra Settings
 
-### Configuring LSP Server
+### Configuring Language Server
 
 
 You can either use `eglot-workspace-configuration` or specifying launch

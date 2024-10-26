@@ -70,7 +70,7 @@ tinymist preview /abs-path/to/main.typ --partial-rendering
 #pro-tip[
   === VSCode:
 
-  The preview feature is also integrated into the LSP server. You can use the preview feature like when you were using it in `mgt19937.typst-preview` extension.
+  The preview feature is also integrated into the language server. You can use the preview feature like when you were using it in `mgt19937.typst-preview` extension.
 ]
 
 #pro-tip[

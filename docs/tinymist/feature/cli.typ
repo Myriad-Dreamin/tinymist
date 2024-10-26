@@ -2,7 +2,7 @@
 
 #show: book-page.with(title: "Tinymist Command Line Interface (CLI)")
 
-== Starting a LSP Server
+== Starting a Language Server
 
 To start a language server following the #link("https://microsoft.github.io/language-server-protocol/")[Language Server Protocol].
 

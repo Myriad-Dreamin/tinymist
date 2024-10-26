@@ -29,8 +29,8 @@ your PATH and `typst-lsp` in your `PATH` to the `typst-ts-mode` entry of `eglot-
 
 == Extra Settings
 <extra-settings>
-=== Configuring LSP Server
-<configuring-lsp-server>
+=== Configuring Language Server
+<configuring-language-server>
 
 You can either use `eglot-workspace-configuration` or specifying launch
 arguments for `tinymist`.

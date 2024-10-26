@@ -291,10 +291,27 @@ impl TypliteWorker {
     }
 
     fn render(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
-        let color = "#c0caf5";
+        let dark = self.render_inner(node, true)?;
+        let light = self.render_inner(node, false)?;
+        if inline {
+            Ok(Value::Content(eco_format!(
+                r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img style="vertical-align: -0.35em" alt="typst-block" src="data:image/svg+xml;base64,{light}"/></picture>"#
+            )))
+        } else {
+            Ok(Value::Content(eco_format!(
+                r#"<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img alt="typst-block" src="data:image/svg+xml;base64,{light}"/></picture></p>"#
+            )))
+        }
+    }
 
+    fn render_inner(&mut self, node: &SyntaxNode, is_dark: bool) -> Result<String> {
+        let color = if is_dark {
+            r##"#set text(rgb("#c0caf5"))"##
+        } else {
+            ""
+        };
         let main = Bytes::from(eco_format!(
-            r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em));#set text(rgb("{color}"))
+            r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em), fill: rgb("#ffffff00"));{color}
 {}"##,
             node.clone().into_text()
         ).as_bytes().to_owned());
@@ -305,6 +322,7 @@ impl TypliteWorker {
             entry: Some(entry),
             inputs: None,
         });
+        world.source_db.take_state();
         world.map_shadow_by_id(main_id, main).unwrap();
 
         let document = typst::compile(&world)
@@ -312,17 +330,7 @@ impl TypliteWorker {
             .map_err(|e| format!("compiling math node: {e:?}"))?;
 
         let svg_payload = typst_svg::svg_merged(&document, Abs::zero());
-        let base64 = base64::engine::general_purpose::STANDARD.encode(svg_payload);
-
-        if inline {
-            Ok(Value::Content(eco_format!(
-                r#"<img style="vertical-align: -0.35em" src="data:image/svg+xml;base64,{base64}" alt="typst-block" />"#
-            )))
-        } else {
-            Ok(Value::Content(eco_format!(
-                r#"<p align="center"><img src="data:image/svg+xml;base64,{base64}" alt="typst-block" /></p>"#
-            )))
-        }
+        Ok(base64::engine::general_purpose::STANDARD.encode(svg_payload))
     }
 
     fn char(arg: char) -> Result<Value> {
