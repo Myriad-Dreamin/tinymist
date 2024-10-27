@@ -73,6 +73,8 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       const langId = editor?.document.languageId;
       if (langId === "typst") {
         activeEditor = editor;
+      } else if (editor === undefined || activeEditor?.document.isClosed) {
+        activeEditor = undefined;
       }
     }),
   );
@@ -123,6 +125,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
   launchImpl = isCompat ? launchPreviewCompat : launchPreviewLsp;
   function launch(kind: "browser" | "webview", mode: "doc" | "slide", isDev = false) {
     return async () => {
+      activeEditor = activeEditor || vscode.window.activeTextEditor;
       if (!activeEditor) {
         vscode.window.showWarningMessage("No active editor");
         return;
