@@ -1,3 +1,4 @@
+use std::num::NonZeroUsize;
 use std::ops::DerefMut;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{collections::HashSet, ops::Deref};
@@ -6,9 +7,10 @@ use comemo::{Track, Tracked};
 use lsp_types::Url;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
+use reflexo::debug_loc::DataSource;
 use reflexo::hash::{hash128, FxDashMap};
-use reflexo::{debug_loc::DataSource, ImmutPath};
-use reflexo_typst::WorldDeps;
+use reflexo_typst::{EntryReader, WorldDeps};
+use rustc_hash::FxHashMap;
 use tinymist_world::LspWorld;
 use tinymist_world::DETACHED_ENTRY;
 use typst::diag::{eco_format, At, FileError, FileResult, SourceResult};
@@ -32,14 +34,14 @@ use crate::syntax::{
 };
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
-    lsp_to_typst, path_to_url, typst_to_lsp, LspPosition, LspRange, PositionEncoding, TypstRange,
-    VersionedDocument,
+    lsp_to_typst, path_to_url, typst_to_lsp, LspPosition, LspRange, PositionEncoding,
+    SemanticTokenContext, TypstRange, VersionedDocument,
 };
 
 use super::{analyze_expr_, definition, Definition};
 
 /// The analysis data holds globally.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Analysis {
     /// The position encoding for the workspace.
     pub position_encoding: PositionEncoding,
@@ -48,6 +50,9 @@ pub struct Analysis {
     /// The global caches for analysis.
     pub caches: AnalysisGlobalCaches,
     /// The global caches for analysis.
+    pub workers: Arc<AnalysisGlobalWorkers>,
+    /// The global cache grid for analysis.
+    pub cache_grid: Arc<Mutex<AnalysisGlobalCacheGrid>>,
     pub workers: AnalysisGlobalWorkers,
 }
 
@@ -65,12 +70,11 @@ impl Analysis {
 
     /// Get a snapshot of the analysis data.
     pub fn snapshot<'a>(
-        self: &Arc<Self>,
-        root: ImmutPath,
+        &self,
         world: LspWorld,
         resources: &'a dyn AnalysisResources,
     ) -> AnalysisContext<'a> {
-        AnalysisContext::new(root, world, resources, self.clone())
+        AnalysisContext::new(world, resources, self.clone())
     }
 
     /// Clear all cached resources.
@@ -78,45 +82,20 @@ impl Analysis {
         self.caches.signatures.clear();
         self.caches.static_signatures.clear();
         self.caches.terms.clear();
-        self.caches.expr_stage.clear();
-        self.caches.type_check.clear();
+        self.cache_grid.lock().clear();
     }
-}
 
-type CacheMap<T> = FxDashMap<u128, T>;
-// Needed by recursive computation
-type DeferredCompute<T> = Arc<OnceCell<T>>;
-
-/// A global (compiler server spanned) cache for all level of analysis results
-/// of a module.
-#[derive(Default)]
-pub struct AnalysisGlobalCaches {
-    lifetime: AtomicU64,
-    clear_lifetime: AtomicU64,
-    expr_stage: CacheMap<(u64, DeferredCompute<Arc<ExprInfo>>)>,
-    type_check: CacheMap<(u64, DeferredCompute<Option<Arc<TypeScheme>>>)>,
-    def_signatures: CacheMap<(u64, Definition, DeferredCompute<Option<Signature>>)>,
-    static_signatures: CacheMap<(u64, Source, Span, DeferredCompute<Option<Signature>>)>,
-    signatures: CacheMap<(u64, Func, DeferredCompute<Option<Signature>>)>,
-    terms: CacheMap<(u64, Value, Ty)>,
-}
-
-/// A cache for all level of analysis results of a module.
-#[derive(Default)]
-pub struct AnalysisCaches {
-    modules: HashMap<TypstFileId, ModuleAnalysisCache>,
-    completion_files: OnceCell<Vec<PathBuf>>,
-    root_files: OnceCell<Vec<TypstFileId>>,
-    module_deps: OnceCell<HashMap<TypstFileId, ModuleDependency>>,
-}
-
-/// A cache for module-level analysis results of a module.
-///
-/// You should not holds across requests, because source code may change.
-#[derive(Default)]
-pub struct ModuleAnalysisCache {
-    expr_stage: OnceCell<Arc<ExprInfo>>,
-    type_check: OnceCell<Option<Arc<TypeScheme>>>,
+    /// Lock the revision in main thread.
+    #[must_use]
+    pub fn lock_revision(&self) -> RevisionLock {
+        let mut grid = self.cache_grid.lock();
+        let revision = grid.revision;
+        *grid.locked_revisions.entry(revision).or_default() += 1;
+        RevisionLock {
+            grid: self.cache_grid.clone(),
+            revision,
+        }
+    }
 }
 
 /// The resources for analysis.
@@ -147,10 +126,6 @@ pub struct AnalysisGlobalWorkers {
 pub struct AnalysisContext<'a> {
     /// The world surface for Typst compiler
     pub resources: &'a dyn AnalysisResources,
-    /// The analysis data
-    pub analysis: Arc<Analysis>,
-    /// The caches lifetime tick for analysis.
-    lifetime: u64,
     /// Constructed shared context
     pub local: LocalContext,
 }
@@ -178,22 +153,15 @@ impl<'w> Drop for AnalysisContext<'w> {
 
 impl<'w> AnalysisContext<'w> {
     /// Create a new analysis context.
-    pub fn new(
-        root: ImmutPath,
-        world: LspWorld,
-        resources: &'w dyn AnalysisResources,
-        a: Arc<Analysis>,
-    ) -> Self {
+    pub fn new(world: LspWorld, resources: &'w dyn AnalysisResources, a: Analysis) -> Self {
         let lifetime = a.caches.lifetime.fetch_add(1, Ordering::SeqCst);
+        let slot = a.cache_grid.lock().find_revision(world.revision());
         Self {
             resources,
-            lifetime,
-            analysis: a.clone(),
             local: LocalContext {
-                analysis: a.clone(),
                 caches: AnalysisCaches::default(),
                 shared: Arc::new(SharedContext {
-                    root,
+                    slot,
                     lifetime,
                     world,
                     analysis: a,
@@ -263,13 +231,13 @@ impl<'w> AnalysisContext<'w> {
     }
 
     pub(crate) fn type_of_span_(&mut self, source: &Source, s: Span) -> Option<Ty> {
-        self.type_check(source)?.type_of_span(s)
+        self.type_check(source).type_of_span(s)
     }
 
     pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<Ty> {
         let id = k.span().id()?;
         let source = self.source_by_id(id).ok()?;
-        let ty_chk = self.type_check(&source)?;
+        let ty_chk = self.type_check(&source);
 
         let ty = post_type_check(self.shared_(), &ty_chk, k.clone())
             .or_else(|| ty_chk.type_of_span(k.span()))?;
@@ -323,21 +291,11 @@ impl<'w> AnalysisContext<'w> {
             .caches
             .signatures
             .retain(|_, (l, _, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .expr_stage
-            .retain(|_, (l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .type_check
-            .retain(|_, (l, _)| lifetime - *l < 60);
     }
 }
 
 /// The local context for analyzers.
 pub struct LocalContext {
-    /// The analysis data
-    pub analysis: Arc<Analysis>,
     /// Local caches for analysis.
     pub caches: AnalysisCaches,
     /// Constructed shared context
@@ -360,7 +318,7 @@ impl DerefMut for LocalContext {
 
 impl LocalContext {
     #[cfg(test)]
-    pub fn test_completion_files(&mut self, f: impl FnOnce() -> Vec<PathBuf>) {
+    pub fn test_completion_files(&mut self, f: impl FnOnce() -> Vec<TypstFileId>) {
         self.caches.completion_files.get_or_init(f);
     }
 
@@ -370,20 +328,27 @@ impl LocalContext {
     }
 
     /// Get all the source files in the workspace.
-    pub(crate) fn completion_files(&self, pref: &PathPreference) -> impl Iterator<Item = &PathBuf> {
+    pub(crate) fn completion_files(
+        &self,
+        pref: &PathPreference,
+    ) -> impl Iterator<Item = &TypstFileId> {
         let r = pref.ext_matcher();
         self.caches
             .completion_files
             .get_or_init(|| {
-                scan_workspace_files(
-                    &self.root,
-                    PathPreference::Special.ext_matcher(),
-                    |relative_path| relative_path.to_owned(),
-                )
+                if let Some(root) = self.world.workspace_root() {
+                    scan_workspace_files(&root, PathPreference::Special.ext_matcher(), |p| {
+                        TypstFileId::new(None, VirtualPath::new(p))
+                    })
+                } else {
+                    vec![]
+                }
             })
             .iter()
             .filter(move |p| {
-                p.extension()
+                p.vpath()
+                    .as_rooted_path()
+                    .extension()
                     .and_then(|p| p.to_str())
                     .is_some_and(|e| r.is_match(e))
             })
@@ -393,7 +358,7 @@ impl LocalContext {
     pub fn source_files(&self) -> &Vec<TypstFileId> {
         self.caches.root_files.get_or_init(|| {
             self.completion_files(&PathPreference::Source)
-                .map(|p| TypstFileId::new(None, VirtualPath::new(p.as_path())))
+                .copied()
                 .collect()
         })
     }
@@ -418,7 +383,7 @@ impl LocalContext {
     }
 
     /// Get the type check information of a source file.
-    pub(crate) fn type_check(&mut self, source: &Source) -> Option<Arc<TypeScheme>> {
+    pub(crate) fn type_check(&mut self, source: &Source) -> Arc<TypeScheme> {
         let id = source.id();
         let cache = &self.caches.modules.entry(id).or_default().type_check;
         cache.get_or_init(|| self.shared.type_check(source)).clone()
@@ -429,17 +394,20 @@ impl LocalContext {
 pub struct SharedContext {
     /// The caches lifetime tick for analysis.
     pub lifetime: u64,
-    /// The root of the workspace.
-    /// This means that the analysis result won't be valid if the root directory
-    /// changes.
-    pub root: ImmutPath,
     /// Get the world surface for Typst compiler.
     pub world: LspWorld,
     /// The analysis data
-    pub analysis: Arc<Analysis>,
+    pub analysis: Analysis,
+    /// The revision slot
+    slot: Arc<RevisionSlot>,
 }
 
 impl SharedContext {
+    /// Get revision of current analysis
+    pub fn revision(&self) -> usize {
+        self.slot.revision
+    }
+
     /// Get the position encoding during session.
     pub(crate) fn position_encoding(&self) -> PositionEncoding {
         self.analysis.position_encoding
@@ -504,8 +472,11 @@ impl SharedContext {
     /// Get file's id by its path
     pub fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
         // todo: source in packages
-        let root = &self.root;
-        let relative_path = p.strip_prefix(root).map_err(|_| {
+        let root = self.world.workspace_root().ok_or_else(|| {
+            let reason = eco_format!("workspace root not found");
+            FileError::Other(Some(reason))
+        })?;
+        let relative_path = p.strip_prefix(&root).map_err(|_| {
             let reason = eco_format!("access denied, path: {p:?}, root: {root:?}");
             FileError::Other(Some(reason))
         })?;
@@ -620,33 +591,29 @@ impl SharedContext {
     pub(crate) fn expr_stage_(
         self: &Arc<Self>,
         source: &Source,
-        route: &mut Processing<LexicalScope>,
+        route: &mut Processing<Option<Arc<LazyHash<LexicalScope>>>>,
     ) -> Arc<ExprInfo> {
         use crate::syntax::expr_of;
-
-        let res = {
-            let entry = self.analysis.caches.expr_stage.entry(hash128(&source));
-            let res = entry.or_insert_with(|| (self.lifetime, DeferredCompute::default()));
-            res.1.clone()
-        };
-        res.get_or_init(|| expr_of(self.clone(), source.clone(), route))
-            .clone()
+        let guard = self.query_stat(source.id(), "expr_stage");
+        self.slot.expr_stage.compute(hash128(&source), |prev| {
+            expr_of(self.clone(), source.clone(), route, guard, prev)
+        })
     }
 
     pub(crate) fn exports_of(
         self: &Arc<Self>,
-        source: Source,
-        route: &mut Processing<LexicalScope>,
-    ) -> LexicalScope {
+        source: &Source,
+        route: &mut Processing<Option<Arc<LazyHash<LexicalScope>>>>,
+    ) -> Option<Arc<LazyHash<LexicalScope>>> {
         if let Some(s) = route.get(&source.id()) {
             return s.clone();
         }
 
-        self.expr_stage_(&source, route).exports.clone()
+        Some(self.expr_stage_(source, route).exports.clone())
     }
 
     /// Get the type check information of a source file.
-    pub(crate) fn type_check(self: &Arc<Self>, source: &Source) -> Option<Arc<TypeScheme>> {
+    pub(crate) fn type_check(self: &Arc<Self>, source: &Source) -> Arc<TypeScheme> {
         let mut route = Processing::default();
         self.type_check_(source, &mut route)
     }
@@ -656,17 +623,28 @@ impl SharedContext {
         self: &Arc<Self>,
         source: &Source,
         route: &mut Processing<Arc<TypeScheme>>,
-    ) -> Option<Arc<TypeScheme>> {
+    ) -> Arc<TypeScheme> {
         use crate::analysis::type_check;
-        // todo: recursive hash
-        let expr_info = self.expr_stage(source);
-        let res = {
-            let entry = self.analysis.caches.type_check.entry(hash128(&expr_info));
-            let res = entry.or_insert_with(|| (self.lifetime, Arc::default()));
-            res.1.clone()
-        };
-        res.get_or_init(|| type_check(self.clone(), expr_info, route))
-            .clone()
+
+        let ei = self.expr_stage(source);
+        let guard = self.query_stat(source.id(), "type_check");
+        self.slot.type_check.compute(hash128(&ei), |prev| {
+            let cache_hit = prev.and_then(|prev| {
+                // todo: recursively check changed scheme type
+                if prev.revision != ei.revision {
+                    return None;
+                }
+
+                Some(prev)
+            });
+
+            if let Some(prev) = cache_hit {
+                return prev.clone();
+            }
+
+            guard.miss();
+            type_check(self.clone(), ei, route)
+        })
     }
 
     pub(crate) fn definition(
@@ -882,7 +860,7 @@ impl SharedContext {
                 let source = self.shared.source_by_id(fid).ok().unwrap();
                 let expr = self.shared.expr_stage(&source);
                 self.shared.type_check(&source);
-                expr.imports.iter().for_each(|fid| {
+                expr.imports.iter().for_each(|(fid, _)| {
                     if !self.analyzed.lock().insert(*fid) {
                         return;
                     }
@@ -897,6 +875,210 @@ impl SharedContext {
         };
 
         preloader.work(entry_point);
+    }
+}
+
+#[derive(Clone)]
+struct IncrCacheMap<K, V> {
+    revision: usize,
+    global: Arc<Mutex<FxDashMap<K, (usize, V)>>>,
+    prev: Arc<Mutex<FxHashMap<K, DeferredCompute<V>>>>,
+    next: Arc<Mutex<FxHashMap<K, DeferredCompute<V>>>>,
+}
+
+impl<K: Eq + Hash, V> Default for IncrCacheMap<K, V> {
+    fn default() -> Self {
+        Self {
+            revision: 0,
+            global: Arc::default(),
+            prev: Arc::default(),
+            next: Arc::default(),
+        }
+    }
+}
+
+impl<K, V> IncrCacheMap<K, V> {
+    fn compute(&self, key: K, compute: impl FnOnce(Option<V>) -> V) -> V
+    where
+        K: Clone + Eq + Hash,
+        V: Clone,
+    {
+        let next = self.next.lock().entry(key.clone()).or_default().clone();
+
+        next.get_or_init(|| {
+            let prev = self.prev.lock().get(&key).cloned();
+            let prev = prev.and_then(|p| p.get().cloned());
+            let prev = prev.or_else(|| {
+                let global = self.global.lock();
+                global.get(&key).map(|global| global.1.clone())
+            });
+
+            let res = compute(prev);
+
+            let global = self.global.lock();
+            let entry = global.entry(key.clone());
+            use dashmap::mapref::entry::Entry;
+            match entry {
+                Entry::Occupied(mut e) => {
+                    let (revision, _) = e.get();
+                    if *revision < self.revision {
+                        e.insert((self.revision, res.clone()));
+                    }
+                }
+                Entry::Vacant(e) => {
+                    e.insert((self.revision, res.clone()));
+                }
+            }
+
+            res
+        })
+        .clone()
+    }
+
+    fn crawl(&self, revision: usize) -> Self {
+        Self {
+            revision,
+            prev: self.next.clone(),
+            global: self.global.clone(),
+            next: Default::default(),
+        }
+    }
+}
+
+type CacheMap<T> = Arc<FxDashMap<u128, T>>;
+// Needed by recursive computation
+type DeferredCompute<T> = Arc<OnceCell<T>>;
+
+/// A global (compiler server spanned) cache for all level of analysis results
+/// of a module.
+#[derive(Default, Clone)]
+pub struct AnalysisGlobalCaches {
+    lifetime: Arc<AtomicU64>,
+    clear_lifetime: Arc<AtomicU64>,
+    def_signatures: CacheMap<(u64, Definition, DeferredCompute<Option<Signature>>)>,
+    static_signatures: CacheMap<(u64, Source, Span, DeferredCompute<Option<Signature>>)>,
+    signatures: CacheMap<(u64, Func, DeferredCompute<Option<Signature>>)>,
+    terms: CacheMap<(u64, Value, Ty)>,
+}
+
+/// A cache for all level of analysis results of a module.
+#[derive(Default)]
+pub struct AnalysisCaches {
+    modules: HashMap<TypstFileId, ModuleAnalysisCache>,
+    completion_files: OnceCell<Vec<TypstFileId>>,
+    root_files: OnceCell<Vec<TypstFileId>>,
+    module_deps: OnceCell<HashMap<TypstFileId, ModuleDependency>>,
+}
+
+/// A cache for module-level analysis results of a module.
+///
+/// You should not holds across requests, because source code may change.
+#[derive(Default)]
+pub struct ModuleAnalysisCache {
+    expr_stage: OnceCell<Arc<ExprInfo>>,
+    type_check: OnceCell<Arc<TypeScheme>>,
+}
+
+/// The grid cache for all level of analysis results of a module.
+#[derive(Default)]
+pub struct AnalysisGlobalCacheGrid {
+    revision: usize,
+    default_slot: RevisionSlot,
+    revisions: Vec<Arc<RevisionSlot>>,
+    locked_revisions: HashMap<usize, usize>,
+}
+
+impl AnalysisGlobalCacheGrid {
+    fn clear(&mut self) {
+        self.revisions.clear();
+    }
+
+    fn gc(&mut self, rev: usize) {
+        self.revisions.retain(|r| r.revision >= rev);
+        self.default_slot
+            .expr_stage
+            .global
+            .lock()
+            .retain(|_, r| r.0 + 60 >= rev);
+        self.default_slot
+            .type_check
+            .global
+            .lock()
+            .retain(|_, r| r.0 + 60 >= rev);
+    }
+
+    /// Find the last revision slot by revision number.
+    fn find_revision(&mut self, revision: NonZeroUsize) -> Arc<RevisionSlot> {
+        let slot_base = self
+            .revisions
+            .iter()
+            .filter(|e| e.revision <= revision.get())
+            .reduce(|a, b| if a.revision > b.revision { a } else { b });
+
+        if let Some(slot) = slot_base {
+            if slot.revision == revision.get() {
+                return slot.clone();
+            }
+        }
+
+        let mut slot = slot_base
+            .map(|e| RevisionSlot {
+                revision: e.revision,
+                expr_stage: e.expr_stage.crawl(revision.get()),
+                type_check: e.type_check.crawl(revision.get()),
+            })
+            .unwrap_or_else(|| self.default_slot.clone());
+
+        slot.revision = revision.get();
+        let slot = Arc::new(slot);
+        self.revisions.push(slot.clone());
+        self.revision = revision.get().max(self.revision);
+        slot
+    }
+}
+
+/// A lock for revision.
+pub struct RevisionLock {
+    grid: Arc<Mutex<AnalysisGlobalCacheGrid>>,
+    revision: usize,
+}
+
+impl Drop for RevisionLock {
+    fn drop(&mut self) {
+        let mut grid = self.grid.lock();
+        let revision_cnt = grid
+            .locked_revisions
+            .entry(self.revision)
+            .or_insert_with(|| panic!("revision {} is not locked", self.revision));
+        *revision_cnt -= 1;
+        if *revision_cnt != 0 {
+            return;
+        }
+
+        grid.locked_revisions.remove(&self.revision);
+        if grid.revision <= self.revision {
+            return;
+        }
+        let existing = grid.locked_revisions.keys().min().copied();
+        let gc_revision = existing.unwrap_or(self.revision);
+        let grid = self.grid.clone();
+
+        rayon::spawn(move || {
+            grid.lock().gc(gc_revision);
+        });
+    }
+}
+
+#[derive(Default, Clone)]
+struct RevisionSlot {
+    revision: usize,
+    expr_stage: IncrCacheMap<u128, Arc<ExprInfo>>,
+    type_check: IncrCacheMap<u128, Arc<TypeScheme>>,
+}
+
+impl Drop for RevisionSlot {
+    fn drop(&mut self) {
+        log::info!("revision {} is dropped", self.revision)
     }
 }
 

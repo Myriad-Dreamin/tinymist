@@ -26,8 +26,9 @@ pub(crate) fn type_check(
     ctx: Arc<SharedContext>,
     expr_info: Arc<ExprInfo>,
     route: &mut Processing<Arc<TypeScheme>>,
-) -> Option<Arc<TypeScheme>> {
+) -> Arc<TypeScheme> {
     let mut info = TypeScheme::default();
+    info.revision = expr_info.revision;
 
     route.insert(expr_info.fid, Arc::new(TypeScheme::default()));
 
@@ -48,7 +49,7 @@ pub(crate) fn type_check(
 
     checker.route.remove(&checker.ei.fid);
 
-    Some(Arc::new(info))
+    Arc::new(info)
 }
 
 #[derive(BindTyCtx)]
@@ -126,7 +127,7 @@ impl<'a> TypeChecker<'a> {
                 let ext_type_info = if let Some(route) = self.route.get(&source.id()) {
                     route.clone()
                 } else {
-                    self.ctx.type_check_(&source, self.route)?
+                    self.ctx.type_check_(&source, self.route)
                 };
                 let ext_def = ext_def_use_info.exports.get(&name)?;
 

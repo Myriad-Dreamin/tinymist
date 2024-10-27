@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use ecow::{eco_format, EcoString};
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
 use once_cell::sync::OnceCell;
-use reflexo::path::{unix_slash, PathClean};
+use reflexo::path::unix_slash;
 use tinymist_world::LspWorld;
 use typst::foundations::{AutoValue, Func, Label, NoneValue, Repr, Type, Value};
 use typst::layout::{Dir, Length};
@@ -62,7 +62,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         let types = (|| {
             let id = self.root.span().id()?;
             let src = self.ctx.source_by_id(id).ok()?;
-            self.ctx.type_check(&src)
+            Some(self.ctx.type_check(&src))
         })();
         let types = types.as_ref();
 
@@ -1135,7 +1135,7 @@ pub fn complete_path(
     let has_root = path.has_root();
 
     let src_path = id.vpath();
-    let base = src_path.resolve(&ctx.local.root)?;
+    let base = id;
     let dst_path = src_path.join(path);
     let mut compl_path = dst_path.as_rootless_path();
     if !compl_path.is_dir() {
@@ -1148,39 +1148,35 @@ pub fn complete_path(
         return None;
     }
 
-    let dirs = ctx.local.root.clone();
-    log::debug!("compl_dirs: {dirs:?}");
     // find directory or files in the path
-    let mut folder_completions = vec![];
+    let folder_completions = vec![];
     let mut module_completions = vec![];
     // todo: test it correctly
     for path in ctx.completion_files(p) {
         log::debug!("compl_check_path: {path:?}");
 
-        // diff with root
-        let path = dirs.join(path);
-
         // Skip self smartly
-        if path.clean() == base.clean() {
+        if *path == base {
             continue;
         }
 
         let label = if has_root {
             // diff with root
-            let w = path.strip_prefix(&ctx.local.root).ok()?;
-            eco_format!("/{}", unix_slash(w))
+            unix_slash(path.vpath().as_rooted_path())
         } else {
-            let base = base.parent()?;
-            let w = pathdiff::diff_paths(&path, base)?;
-            unix_slash(&w).into()
+            let base = base.vpath().as_rooted_path();
+            let path = path.vpath().as_rooted_path();
+            let w = pathdiff::diff_paths(path, base)?;
+            unix_slash(&w)
         };
         log::debug!("compl_label: {label:?}");
 
-        if path.is_dir() {
-            folder_completions.push((label, CompletionKind::Folder));
-        } else {
-            module_completions.push((label, CompletionKind::File));
-        }
+        module_completions.push((label, CompletionKind::File));
+
+        // todo: looks like the folder completion is broken
+        // if path.is_dir() {
+        //     folder_completions.push((label, CompletionKind::Folder));
+        // }
     }
 
     let replace_range = ctx.to_lsp_range(rng, source);
@@ -1199,7 +1195,7 @@ pub fn complete_path(
     };
 
     module_completions.sort_by(|a, b| path_priority_cmp(&a.0, &b.0));
-    folder_completions.sort_by(|a, b| path_priority_cmp(&a.0, &b.0));
+    // folder_completions.sort_by(|a, b| path_priority_cmp(&a.0, &b.0));
 
     let mut sorter = 0;
     let digits = (module_completions.len() + folder_completions.len())

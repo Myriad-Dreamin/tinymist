@@ -12,7 +12,7 @@ use reflexo::ImmutPath;
 use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
 use reflexo_typst::world::EntryState;
 use tinymist_query::analysis::Analysis;
-use tinymist_query::ExportKind;
+use tinymist_query::{ExportKind, SemanticTokenContext};
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::mpsc;
 
@@ -94,7 +94,8 @@ impl LanguageState {
         );
 
         // Create the compile handler for client consuming results.
-        let position_encoding = self.const_config().position_encoding;
+        let const_config = self.const_config();
+        let position_encoding = const_config.position_encoding;
         let enable_periscope = self.compile_config().periscope_args.is_some();
         let periscope_args = self.compile_config().periscope_args.clone();
         let handle = Arc::new(CompileHandler {
@@ -109,6 +110,12 @@ impl LanguageState {
                 enable_periscope,
                 caches: Default::default(),
                 workers: Default::default(),
+                cache_grid: Default::default(),
+                tokens_ctx: Arc::new(SemanticTokenContext::new(
+                    const_config.position_encoding,
+                    const_config.tokens_overlapping_token_support,
+                    const_config.tokens_multiline_token_support,
+                )),
             }),
             periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
 

@@ -1,9 +1,11 @@
 use std::ops::DerefMut;
 
 use parking_lot::Mutex;
+use reflexo::hash::hash128;
+use reflexo_typst::LazyHash;
 use rpds::RedBlackTreeMapSync;
-use rustc_hash::{FxHashMap, FxHashSet};
-use std::collections::HashSet;
+use rustc_hash::FxHashMap;
+use std::ops::Deref;
 use tinymist_analysis::import::resolve_id_by_path;
 use typst::{
     foundations::{Element, NativeElement, Value},
@@ -12,7 +14,7 @@ use typst::{
 };
 
 use crate::{
-    analysis::SharedContext,
+    analysis::{QueryStatGuard, SharedContext},
     docs::DocStringKind,
     prelude::*,
     syntax::find_module_level_docs,
@@ -26,9 +28,44 @@ pub type Processing<T> = FxHashMap<TypstFileId, T>;
 pub(crate) fn expr_of(
     ctx: Arc<SharedContext>,
     source: Source,
-    route: &mut Processing<LexicalScope>,
+    route: &mut Processing<Option<Arc<LazyHash<LexicalScope>>>>,
+    guard: QueryStatGuard,
+    prev: Option<Arc<ExprInfo>>,
 ) -> Arc<ExprInfo> {
     log::debug!("expr_of: {:?}", source.id());
+
+    route.insert(source.id(), None);
+
+    let cache_hit = prev.and_then(|prev| {
+        if prev.source.len_bytes() != source.len_bytes()
+            || hash128(&prev.source) != hash128(&source)
+        {
+            return None;
+        }
+        for (i, prev_exports) in &prev.imports {
+            let ei = ctx.exports_of(&ctx.source_by_id(*i).ok()?, route);
+
+            // If there is a cycle, the expression will be stable as the source is
+            // unchanged.
+            if let Some(exports) = ei {
+                if prev_exports.size() != exports.size()
+                    || hash128(&prev_exports) != hash128(&exports)
+                {
+                    return None;
+                }
+            }
+        }
+
+        Some(prev)
+    });
+
+    if let Some(prev) = cache_hit {
+        route.remove(&source.id());
+        return prev;
+    }
+    guard.miss();
+
+    let revision = ctx.revision();
 
     let resolves_base = Arc::new(Mutex::new(vec![]));
     let resolves = resolves_base.clone();
@@ -40,7 +77,7 @@ pub(crate) fn expr_of(
     let exprs_base = Arc::new(Mutex::new(FxHashMap::default()));
     let exprs = exprs_base.clone();
 
-    let imports_base = Arc::new(Mutex::new(FxHashSet::default()));
+    let imports_base = Arc::new(Mutex::new(FxHashMap::default()));
     let imports = imports_base.clone();
 
     let module_docstring = Arc::new(
@@ -69,11 +106,10 @@ pub(crate) fn expr_of(
             route,
         };
 
-        w.route.insert(w.fid, LexicalScope::default());
         let root = source.root().cast::<ast::Markup>().unwrap();
         let root = w.check_in_mode(root.to_untyped().children(), InterpretMode::Markup);
-        let root_scope = w.summarize_scope();
-        w.route.insert(w.fid, root_scope.clone());
+        let root_scope = Arc::new(LazyHash::new(w.summarize_scope()));
+        w.route.insert(w.fid, Some(root_scope.clone()));
 
         while let Some((node, lexical)) = w.defers.pop() {
             w.lexical = lexical;
@@ -87,10 +123,12 @@ pub(crate) fn expr_of(
 
     let info = ExprInfo {
         fid: source.id(),
+        revision,
+        source: source.clone(),
         resolves: HashMap::from_iter(std::mem::take(resolves_base.lock().deref_mut())),
         module_docstring,
         docstrings: std::mem::take(docstrings_base.lock().deref_mut()),
-        imports: HashSet::from_iter(std::mem::take(imports_base.lock().deref_mut())),
+        imports: HashMap::from_iter(std::mem::take(imports_base.lock().deref_mut())),
         exports,
         exprs: std::mem::take(exprs_base.lock().deref_mut()),
         root,
@@ -104,17 +142,22 @@ pub(crate) fn expr_of(
 #[derive(Debug)]
 pub struct ExprInfo {
     pub fid: TypstFileId,
+    pub revision: usize,
+    pub source: Source,
     pub resolves: FxHashMap<Span, Interned<RefExpr>>,
     pub module_docstring: Arc<DocString>,
     pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
     pub exprs: FxHashMap<Span, Expr>,
-    pub imports: FxHashSet<TypstFileId>,
-    pub exports: LexicalScope,
+    pub imports: FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>,
+    pub exports: Arc<LazyHash<LexicalScope>>,
     pub root: Expr,
 }
 
 impl std::hash::Hash for ExprInfo {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.revision.hash(state);
+        self.source.hash(state);
+        self.exports.hash(state);
         self.root.hash(state);
     }
 }
@@ -185,8 +228,8 @@ struct LexicalContext {
 pub(crate) struct ExprWorker<'a> {
     fid: TypstFileId,
     ctx: Arc<SharedContext>,
-    imports: Arc<Mutex<FxHashSet<TypstFileId>>>,
-    import_buffer: Vec<TypstFileId>,
+    imports: Arc<Mutex<FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>>>,
+    import_buffer: Vec<(TypstFileId, Arc<LazyHash<LexicalScope>>)>,
     docstrings: Arc<Mutex<FxHashMap<DeclExpr, Arc<DocString>>>>,
     exprs: Arc<Mutex<FxHashMap<Span, Expr>>>,
     resolves: Arc<Mutex<ResolveVec>>,
@@ -194,7 +237,7 @@ pub(crate) struct ExprWorker<'a> {
     lexical: LexicalContext,
     defers: Vec<(SyntaxNode, LexicalContext)>,
 
-    route: &'a mut Processing<LexicalScope>,
+    route: &'a mut Processing<Option<Arc<LazyHash<LexicalScope>>>>,
     comment_matcher: DocCommentMatcher,
 }
 
@@ -582,16 +625,10 @@ impl<'a> ExprWorker<'a> {
         if let Some(f) = fid {
             log::debug!("prefetch type check: {f:?}");
             self.ctx.prefetch_type_check(f);
-            self.import_buffer.push(f);
         }
 
         let scope = if let Some(fid) = &fid {
-            let source = self.ctx.source_by_id(*fid);
-            if let Ok(source) = source {
-                Some(ExprScope::Lexical(self.ctx.exports_of(source, self.route)))
-            } else {
-                None
-            }
+            Some(ExprScope::Lexical(self.exports_of(*fid)))
         } else {
             match &mod_expr {
                 Some(Expr::Type(Ty::Value(v))) => match &v.val {
@@ -1104,6 +1141,18 @@ impl<'a> ExprWorker<'a> {
             }
             _ => None,
         }
+    }
+
+    fn exports_of(&mut self, fid: TypstFileId) -> LexicalScope {
+        let imported = self
+            .ctx
+            .source_by_id(fid)
+            .ok()
+            .and_then(|src| self.ctx.exports_of(&src, self.route))
+            .unwrap_or_default();
+        let res = imported.as_ref().deref().clone();
+        self.import_buffer.push((fid, imported));
+        res
     }
 }
 
