@@ -250,10 +250,7 @@ mod type_check_tests {
             let source = ctx.source_by_path(&path).unwrap();
 
             let result = ctx.type_check(&source);
-            let result = result
-                .as_deref()
-                .map(|e| format!("{:#?}", TypeCheckSnapshot(&source, e)));
-            let result = result.as_deref().unwrap_or("<nil>");
+            let result = format!("{:#?}", TypeCheckSnapshot(&source, &result));
 
             assert_snapshot!(result);
         });
@@ -323,7 +320,7 @@ mod post_type_check_tests {
             let text = node.get().clone().into_text();
 
             let result = ctx.type_check(&source);
-            let literal_type = result.and_then(|info| post_type_check(ctx.shared_(), &info, node));
+            let literal_type = post_type_check(ctx.shared_(), &result, node);
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),
@@ -359,7 +356,7 @@ mod type_describe_tests {
             let text = node.get().clone().into_text();
 
             let result = ctx.type_check(&source);
-            let literal_type = result.and_then(|info| post_type_check(ctx.shared_(), &info, node));
+            let literal_type = post_type_check(ctx.shared_(), &result, node);
 
             with_settings!({
                 description => format!("Check on {text:?} ({pos:?})"),

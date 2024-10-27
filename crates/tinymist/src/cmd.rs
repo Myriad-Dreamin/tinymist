@@ -555,7 +555,10 @@ impl LanguageState {
         let handle = self.primary().handle.clone();
         let info = get_arg!(arguments[1] as PackageInfo);
 
-        let snap = self.primary().snapshot().map_err(z_internal_error)?;
+        // todo: do this in a common place
+        let rev_lock = handle.analysis.lock_revision();
+
+        let snap = handle.snapshot().map_err(z_internal_error)?;
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
             let w = snap.world.as_ref();
@@ -567,6 +570,8 @@ impl LanguageState {
                 })
                 .map_err(internal_error)?
                 .map_err(internal_error)?;
+
+            drop(rev_lock);
 
             serde_json::to_value(symbols).map_err(internal_error)
         })
@@ -591,6 +596,10 @@ impl LanguageState {
     ) -> LspResult<impl Future<Output = LspResult<String>>> {
         let handle: std::sync::Arc<actor::typ_client::CompileHandler> =
             self.primary().handle.clone();
+
+        // todo: do this in a common place
+        let rev_lock = handle.analysis.lock_revision();
+
         let snap = handle.snapshot().map_err(z_internal_error)?;
         Ok(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
@@ -620,6 +629,9 @@ impl LanguageState {
                     .map_err(map_string_err("failed to generate docs"))
                     .map_err(z_internal_error)
             });
+
+            drop(rev_lock);
+
 
             res.map_err(internal_error)?
         })

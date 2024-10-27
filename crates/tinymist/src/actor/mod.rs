@@ -94,7 +94,8 @@ impl LanguageState {
         );
 
         // Create the compile handler for client consuming results.
-        let position_encoding = self.const_config().position_encoding;
+        let const_config = self.const_config();
+        let position_encoding = const_config.position_encoding;
         let enable_periscope = self.compile_config().periscope_args.is_some();
         let periscope_args = self.compile_config().periscope_args.clone();
         let handle = Arc::new(CompileHandler {
@@ -109,6 +110,7 @@ impl LanguageState {
                 enable_periscope,
                 caches: Default::default(),
                 workers: Default::default(),
+                cache_grid: Default::default(),
             }),
             periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
 

@@ -957,6 +957,8 @@ impl IfTy {
 /// A type scheme on a group of syntax structures (typing)
 #[derive(Default)]
 pub struct TypeScheme {
+    /// The revision used
+    pub revision: usize,
     /// The typing on definitions
     pub vars: FxHashMap<DeclExpr, TypeVarBounds>,
     /// The checked documentation of definitions

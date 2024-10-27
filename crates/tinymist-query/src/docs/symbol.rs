@@ -310,7 +310,7 @@ fn format_ty(ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> TypeRepr {
 
 pub(crate) fn variable_docs(ctx: &mut AnalysisContext, pos: &LinkedNode) -> Option<VarDocs> {
     let source = ctx.source_by_id(pos.span().id()?).ok()?;
-    let type_info = ctx.type_check(&source)?;
+    let type_info = ctx.type_check(&source);
     let ty = type_info.type_of_span(pos.span())?;
 
     // todo multiple sources

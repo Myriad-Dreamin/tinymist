@@ -1,3 +1,5 @@
+use reflexo_typst::EntryReader;
+
 use crate::prelude::*;
 
 /// Stores diagnostics for files.
@@ -32,7 +34,11 @@ fn convert_diagnostic(
         let source = ctx.world().source(id)?;
         lsp_range = diagnostic_range(&source, span, ctx.position_encoding());
     } else {
-        uri = path_to_url(&ctx.local.root)?;
+        let root = ctx
+            .world
+            .workspace_root()
+            .ok_or_else(|| anyhow::anyhow!("no workspace root"))?;
+        uri = path_to_url(&root)?;
         lsp_range = LspRange::default();
     };
 

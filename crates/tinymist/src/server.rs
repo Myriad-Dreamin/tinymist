@@ -1054,6 +1054,8 @@ impl LanguageState {
                 Some(EntryState::new_rooted(root, Some(*DETACHED_ENTRY)))
             });
 
+        let rev_lock = handle.analysis.lock_revision();
+
         just_future(async move {
             let mut snap = snap.receive().await?;
             // todo: whether it is safe to inherit success_doc with changed entry
@@ -1064,7 +1066,7 @@ impl LanguageState {
                 });
             }
 
-            match query {
+            let resp = match query {
                 Hover(req) => handle.run_stateful(snap, req, R::Hover),
                 GotoDefinition(req) => handle.run_stateful(snap, req, R::GotoDefinition),
                 GotoDeclaration(req) => handle.run_semantic(snap, req, R::GotoDeclaration),
@@ -1084,7 +1086,10 @@ impl LanguageState {
                 WorkspaceLabel(req) => handle.run_semantic(snap, req, R::WorkspaceLabel),
                 DocumentMetrics(req) => handle.run_stateful(snap, req, R::DocumentMetrics),
                 _ => unreachable!(),
-            }
+            };
+
+            drop(rev_lock);
+            resp
         })
     }
 }

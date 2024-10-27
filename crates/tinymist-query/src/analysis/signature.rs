@@ -254,13 +254,13 @@ fn analyze_type_signature(
     let (type_info, ty) = match callee_node {
         SignatureTarget::Convert(..) => return None,
         SignatureTarget::SyntaxFast(source, span) | SignatureTarget::Syntax(source, span) => {
-            let type_info = ctx.type_check(source)?;
+            let type_info = ctx.type_check(source);
             let ty = type_info.type_of_span(*span)?;
             Some((type_info, ty))
         }
         SignatureTarget::Def(source, def) => {
             let span = def.decl.span();
-            let type_info = ctx.type_check(source.as_ref()?)?;
+            let type_info = ctx.type_check(source.as_ref()?);
             let ty = type_info.type_of_span(span)?;
             Some((type_info, ty))
         }
@@ -268,7 +268,7 @@ fn analyze_type_signature(
             let source = ctx.source_by_id(f.span().id()?).ok()?;
             let node = source.find(f.span())?;
             let def = get_non_strict_def_target(node.parent()?.clone())?;
-            let type_info = ctx.type_check(&source)?;
+            let type_info = ctx.type_check(&source);
             let ty = type_info.type_of_span(def.name()?.span())?;
             Some((type_info, ty))
         }

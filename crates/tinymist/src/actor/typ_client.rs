@@ -184,10 +184,6 @@ impl CompileHandler {
             error!("TypstActor: main file is not set");
             bail!("main file is not set");
         };
-        let Some(root) = w.entry_state().root() else {
-            error!("TypstActor: root is not set");
-            bail!("root is not set");
-        };
         w.source(main).map_err(|err| {
             info!("TypstActor: failed to prepare main file: {err:?}");
             anyhow!("failed to get source: {err}")
@@ -209,7 +205,7 @@ impl CompileHandler {
 
         let r = Resource(&self.periscope);
 
-        let mut analysis = self.analysis.snapshot(root, w.clone(), &r);
+        let mut analysis = self.analysis.snapshot(w.clone(), &r);
         Ok(f(&mut analysis))
     }
 
@@ -412,7 +408,7 @@ impl CompileClientActor {
         Ok(true)
     }
 
-    pub fn clear_cache(&self) {
+    pub fn clear_cache(&mut self) {
         self.handle.analysis.clear_cache();
     }
 
