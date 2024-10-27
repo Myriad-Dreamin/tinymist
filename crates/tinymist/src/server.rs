@@ -1067,7 +1067,6 @@ impl LanguageState {
             }
 
             let resp = match query {
-            match query {
                 Hover(req) => handle.run_stateful(snap, req, R::Hover),
                 GotoDefinition(req) => handle.run_stateful(snap, req, R::GotoDefinition),
                 GotoDeclaration(req) => handle.run_semantic(snap, req, R::GotoDeclaration),
