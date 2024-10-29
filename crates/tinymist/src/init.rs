@@ -501,7 +501,7 @@ impl CompileConfig {
         }
 
         self.output_path = deser_or_default!("outputPath", PathPattern);
-        self.export_pdf = deser_or_default!("outputPath", ExportMode);
+        self.export_pdf = deser_or_default!("exportPdf", ExportMode);
         self.root_path = try_(|| Some(update.get("rootPath")?.as_str()?.into()));
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
             Some("enable") => true,
