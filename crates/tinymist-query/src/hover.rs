@@ -275,7 +275,15 @@ fn def_tooltip(
             render_actions(&mut results, actions);
             Some(LspHoverContents::Array(results))
         }
-        PathStem(..) | Var(..) => {
+        ModuleAlias(..) | Module(..) | PathStem(..) | ImportPath(..) | IncludePath(..) => {
+            let id = def.decl.file_id()?;
+            let src = ctx.source_by_id(id).ok()?;
+            let ei = ctx.expr_stage(&src);
+            let docs = ei.module_docstring.docs.clone()?;
+            results.push(MarkedString::String(docs.as_str().into()));
+            Some(LspHoverContents::Array(results))
+        }
+        IdentRef(..) | ImportAlias(..) | Import(..) | Var(..) => {
             let deref_node = deref_target.node();
             let sig = ctx.variable_docs(deref_target.node());
 
@@ -319,9 +327,8 @@ fn def_tooltip(
             render_actions(&mut results, actions);
             Some(LspHoverContents::Array(results))
         }
-        Pattern(..) | Docs(..) | Generated(..) | ImportAlias(..) | Constant(..) | IdentRef(..)
-        | ModuleAlias(..) | Module(..) | Import(..) | ContentRef(..) | StrName(..)
-        | ModuleImport(..) | Content(..) | ImportPath(..) | IncludePath(..) | Spread(..) => None,
+        Pattern(..) | Docs(..) | Generated(..) | Constant(..) | ContentRef(..) | StrName(..)
+        | ModuleImport(..) | Content(..) | Spread(..) => None,
     }
 }
 
