@@ -1,10 +1,14 @@
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 
 use lsp_types::{SemanticToken, SemanticTokensEdit};
 use parking_lot::RwLock;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 
-use crate::{LspPosition, PositionEncoding};
+use crate::{
+    syntax::{Expr, ExprInfo},
+    ty::Ty,
+    LspPosition, PositionEncoding,
+};
 
 use self::delta::token_delta;
 use self::modifier_set::ModifierSet;
@@ -43,11 +47,16 @@ impl SemanticTokenContext {
     }
 
     /// Get the semantic tokens for a source.
-    pub fn get_semantic_tokens_full(&self, source: &Source) -> (Vec<SemanticToken>, String) {
+    pub fn semantic_tokens_full(
+        &self,
+        source: &Source,
+        ei: Arc<ExprInfo>,
+    ) -> (Vec<SemanticToken>, String) {
         let root = LinkedNode::new(source.root());
 
         let mut tokenizer = Tokenizer::new(
             source.clone(),
+            ei,
             self.allow_multiline_token,
             self.position_encoding,
         );
@@ -59,15 +68,16 @@ impl SemanticTokenContext {
     }
 
     /// Get the semantic tokens delta for a source.
-    pub fn try_semantic_tokens_delta_from_result_id(
+    pub fn semantic_tokens_delta(
         &self,
         source: &Source,
+        ei: Arc<ExprInfo>,
         result_id: &str,
     ) -> (Result<Vec<SemanticTokensEdit>, Vec<SemanticToken>>, String) {
         let cached = self.cache.write().try_take_result(result_id);
 
         // this call will overwrite the cache, so need to read from cache first
-        let (tokens, result_id) = self.get_semantic_tokens_full(source);
+        let (tokens, result_id) = self.semantic_tokens_full(source, ei);
 
         match cached {
             Some(cached) => (Ok(token_delta(&cached, &tokens)), result_id),
@@ -81,6 +91,7 @@ struct Tokenizer {
     pos_offset: usize,
     output: Vec<SemanticToken>,
     source: Source,
+    ei: Arc<ExprInfo>,
     encoding: PositionEncoding,
 
     allow_multiline_token: bool,
@@ -89,12 +100,18 @@ struct Tokenizer {
 }
 
 impl Tokenizer {
-    fn new(source: Source, allow_multiline_token: bool, encoding: PositionEncoding) -> Self {
+    fn new(
+        source: Source,
+        ei: Arc<ExprInfo>,
+        allow_multiline_token: bool,
+        encoding: PositionEncoding,
+    ) -> Self {
         Self {
             curr_pos: LspPosition::new(0, 0),
             pos_offset: 0,
             output: Vec::new(),
             source,
+            ei,
             allow_multiline_token,
             encoding,
 
@@ -105,10 +122,10 @@ impl Tokenizer {
     /// Tokenize a node and its children
     fn tokenize_tree(&mut self, root: &LinkedNode, modifiers: ModifierSet) {
         let is_leaf = root.get().children().len() == 0;
-        let modifiers = modifiers | modifiers_from_node(root);
+        let mut modifiers = modifiers | modifiers_from_node(root);
 
         let range = root.range();
-        let mut token = token_from_node(root)
+        let mut token = token_from_node(&self.ei, root, &mut modifiers)
             .or_else(|| is_leaf.then_some(TokenType::Text))
             .map(|token_type| Token::new(token_type, modifiers, range.clone()));
 
@@ -319,7 +336,11 @@ fn modifiers_from_node(node: &LinkedNode) -> ModifierSet {
 /// In tokenization, returning `Some` stops recursion, while returning `None`
 /// continues and attempts to tokenize each of `node`'s children. If there are
 /// no children, `Text` is taken as the default.
-fn token_from_node(node: &LinkedNode) -> Option<TokenType> {
+fn token_from_node(
+    ei: &ExprInfo,
+    node: &LinkedNode,
+    modifier: &mut ModifierSet,
+) -> Option<TokenType> {
     use SyntaxKind::*;
 
     match node.kind() {
@@ -329,8 +350,8 @@ fn token_from_node(node: &LinkedNode) -> Option<TokenType> {
         Underscore if node.parent_kind() == Some(Emph) => Some(TokenType::Punctuation),
         Underscore if node.parent_kind() == Some(MathAttach) => Some(TokenType::Operator),
 
-        MathIdent | Ident => Some(token_from_ident(node)),
-        Hash => token_from_hashtag(node),
+        MathIdent | Ident => Some(token_from_ident(ei, node, modifier)),
+        Hash => token_from_hashtag(ei, node, modifier),
 
         LeftBrace | RightBrace | LeftBracket | RightBracket | LeftParen | RightParen | Comma
         | Semicolon | Colon => Some(TokenType::Punctuation),
@@ -359,26 +380,97 @@ fn token_from_node(node: &LinkedNode) -> Option<TokenType> {
 }
 
 // TODO: differentiate also using tokens in scope, not just context
-fn is_function_ident(ident: &LinkedNode) -> bool {
-    let Some(next) = ident.next_leaf() else {
-        return false;
+fn token_from_ident(ei: &ExprInfo, ident: &LinkedNode, modifier: &mut ModifierSet) -> TokenType {
+    let resolved = ei.resolves.get(&ident.span());
+    let context = if let Some(resolved) = resolved {
+        match (&resolved.root, &resolved.val) {
+            (Some(e), t) => Some(token_from_decl_expr(e, t.as_ref(), modifier)),
+            (_, Some(t)) => Some(token_from_term(t, modifier)),
+            _ => None,
+        }
+    } else {
+        None
     };
-    let function_call = matches!(next.kind(), SyntaxKind::LeftParen)
-        && matches!(
-            next.parent_kind(),
-            Some(SyntaxKind::Args | SyntaxKind::Params)
-        );
-    let function_content = matches!(next.kind(), SyntaxKind::LeftBracket)
-        && matches!(next.parent_kind(), Some(SyntaxKind::ContentBlock));
-    function_call || function_content
+
+    if !matches!(context, None | Some(TokenType::Interpolated)) {
+        return context.unwrap_or(TokenType::Interpolated);
+    }
+
+    let next = ident.next_leaf();
+    let next_parent = next.as_ref().and_then(|n| n.parent_kind());
+    let next_kind = next.map(|n| n.kind());
+    let lexical_function_call = matches!(next_kind, Some(SyntaxKind::LeftParen))
+        && matches!(next_parent, Some(SyntaxKind::Args | SyntaxKind::Params));
+    if lexical_function_call {
+        return TokenType::Function;
+    }
+
+    let function_content = matches!(next_kind, Some(SyntaxKind::LeftBracket))
+        && matches!(next_parent, Some(SyntaxKind::ContentBlock));
+    if function_content {
+        return TokenType::Function;
+    }
+
+    TokenType::Interpolated
 }
 
-fn token_from_ident(ident: &LinkedNode) -> TokenType {
-    if is_function_ident(ident) {
-        TokenType::Function
-    } else {
-        TokenType::Interpolated
+fn token_from_term(t: &Ty, modifier: &mut ModifierSet) -> TokenType {
+    use typst::foundations::Value::*;
+    match t {
+        Ty::Func(..) => TokenType::Function,
+        Ty::Value(v) => {
+            match &v.val {
+                Func(..) => TokenType::Function,
+                Type(..) => {
+                    *modifier = *modifier | ModifierSet::new(&[Modifier::DefaultLibrary]);
+                    TokenType::Function
+                }
+                Module(..) => ns(modifier),
+                // todo: read only modifier
+                _ => TokenType::Interpolated,
+            }
+        }
+        _ => TokenType::Interpolated,
     }
+}
+
+fn token_from_decl_expr(expr: &Expr, term: Option<&Ty>, modifier: &mut ModifierSet) -> TokenType {
+    use crate::syntax::Decl::*;
+    match expr {
+        Expr::Type(term) => token_from_term(term, modifier),
+        Expr::Decl(decl) => match decl.as_ref() {
+            Func(..) => TokenType::Function,
+            Var(..) => TokenType::Interpolated,
+            Module(..) => ns(modifier),
+            ModuleAlias(..) => ns(modifier),
+            PathStem(..) => ns(modifier),
+            ImportAlias(..) => TokenType::Interpolated,
+            IdentRef(..) => TokenType::Interpolated,
+            ImportPath(..) => TokenType::Interpolated,
+            IncludePath(..) => TokenType::Interpolated,
+            Import(..) => TokenType::Interpolated,
+            ContentRef(..) => TokenType::Interpolated,
+            Label(..) => TokenType::Interpolated,
+            StrName(..) => TokenType::Interpolated,
+            ModuleImport(..) => TokenType::Interpolated,
+            Closure(..) => TokenType::Interpolated,
+            Pattern(..) => TokenType::Interpolated,
+            Spread(..) => TokenType::Interpolated,
+            Content(..) => TokenType::Interpolated,
+            Constant(..) => TokenType::Interpolated,
+            BibEntry(..) => TokenType::Interpolated,
+            Docs(..) => TokenType::Interpolated,
+            Generated(..) => TokenType::Interpolated,
+        },
+        _ => term
+            .map(|term| token_from_term(term, modifier))
+            .unwrap_or(TokenType::Interpolated),
+    }
+}
+
+fn ns(modifier: &mut ModifierSet) -> TokenType {
+    *modifier = *modifier | ModifierSet::new(&[Modifier::Static, Modifier::ReadOnly]);
+    TokenType::Namespace
 }
 
 fn get_expr_following_hashtag<'a>(hashtag: &LinkedNode<'a>) -> Option<LinkedNode<'a>> {
@@ -388,8 +480,12 @@ fn get_expr_following_hashtag<'a>(hashtag: &LinkedNode<'a>) -> Option<LinkedNode
         .and_then(|node| node.leftmost_leaf())
 }
 
-fn token_from_hashtag(hashtag: &LinkedNode) -> Option<TokenType> {
+fn token_from_hashtag(
+    ei: &ExprInfo,
+    hashtag: &LinkedNode,
+    modifier: &mut ModifierSet,
+) -> Option<TokenType> {
     get_expr_following_hashtag(hashtag)
         .as_ref()
-        .and_then(token_from_node)
+        .and_then(|e| token_from_node(ei, e, modifier))
 }
