@@ -45,6 +45,12 @@ pub struct CompletionRequest {
     pub position: LspPosition,
     /// Whether the completion is triggered explicitly.
     pub explicit: bool,
+    /// Whether to trigger suggest completion, a.k.a. auto-completion.
+    pub trigger_suggest: bool,
+    /// Whether to trigger named parameter completion.
+    pub trigger_named_completion: bool,
+    /// Whether to trigger parameter hint, a.k.a. signature help.
+    pub trigger_parameter_hints: bool,
 }
 
 impl StatefulRequest for CompletionRequest {
@@ -131,7 +137,16 @@ impl StatefulRequest for CompletionRequest {
         let is_incomplete = false;
 
         let mut items = completion_result.or_else(|| {
-            let mut cc_ctx = CompletionContext::new(ctx, doc, &source, cursor, explicit)?;
+            let mut cc_ctx = CompletionContext::new(
+                ctx,
+                doc,
+                &source,
+                cursor,
+                explicit,
+                self.trigger_suggest,
+                self.trigger_parameter_hints,
+                self.trigger_named_completion,
+            )?;
 
             // Exclude it self from auto completion
             // e.g. `#let x = (1.);`
@@ -372,6 +387,9 @@ mod tests {
                     path: ctx.path_for_id(id).unwrap(),
                     position: ctx.to_lsp_pos(s, &source),
                     explicit: false,
+                    trigger_suggest: true,
+                    trigger_parameter_hints: true,
+                    trigger_named_completion: true,
                 };
                 results.push(request.request(ctx, doc.clone()).map(|resp| match resp {
                     CompletionResponse::List(l) => CompletionResponse::List(CompletionList {

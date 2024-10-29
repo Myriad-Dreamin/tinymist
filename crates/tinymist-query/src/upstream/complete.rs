@@ -959,6 +959,9 @@ pub struct CompletionContext<'a, 'b> {
     pub leaf: LinkedNode<'a>,
     pub cursor: usize,
     pub explicit: bool,
+    pub trigger_suggest: bool,
+    pub trigger_parameter_hints: bool,
+    pub trigger_named_completion: bool,
     pub from: usize,
     pub completions: Vec<Completion>,
     pub completions2: Vec<lsp_types::CompletionItem>,
@@ -970,12 +973,16 @@ pub struct CompletionContext<'a, 'b> {
 
 impl<'a, 'w> CompletionContext<'a, 'w> {
     /// Create a new autocompletion context.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         ctx: &'a mut AnalysisContext<'w>,
         document: Option<&'a Document>,
         source: &'a Source,
         cursor: usize,
         explicit: bool,
+        trigger_suggest: bool,
+        trigger_parameter_hints: bool,
+        trigger_named_completion: bool,
     ) -> Option<Self> {
         let text = source.text();
         let root = LinkedNode::new(source.root());
@@ -989,6 +996,9 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             root,
             leaf,
             cursor,
+            trigger_suggest,
+            trigger_parameter_hints,
+            trigger_named_completion,
             explicit,
             from: cursor,
             incomplete: true,
@@ -1032,10 +1042,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             // VS Code doesn't do that... Auto triggering suggestion only happens on typing (word
             // starts or trigger characters). However, you can use editor.action.triggerSuggest as
             // command on a suggestion to "manually" retrigger suggest after inserting one
-            //
-            // todo: only vscode and neovim (0.9.1) support this
-            command: snippet
-                .contains("${")
+            command: (self.trigger_suggest && snippet.contains("${"))
                 .then_some("editor.action.triggerSuggest"),
             ..Completion::default()
         });
@@ -1231,7 +1238,9 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         let mut command = None;
         if parens && matches!(value, Value::Func(_)) {
             if let Value::Func(func) = value {
-                command = Some("editor.action.triggerParameterHints");
+                command = self
+                    .trigger_parameter_hints
+                    .then_some("editor.action.triggerParameterHints");
                 if func
                     .params()
                     .is_some_and(|params| params.iter().all(|param| param.name == "self"))

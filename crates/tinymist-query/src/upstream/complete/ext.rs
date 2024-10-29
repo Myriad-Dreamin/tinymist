@@ -308,8 +308,9 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
                 let base = Completion {
                     kind: kind.clone(),
                     label_detail: ty_detail,
-                    // todo: only vscode and neovim (0.9.1) support this
-                    command: Some("editor.action.triggerParameterHints"),
+                    command: self
+                        .trigger_parameter_hints
+                        .then_some("editor.action.triggerParameterHints"),
                     ..Default::default()
                 };
 
@@ -648,7 +649,9 @@ pub fn param_completions<'a>(
                 apply: Some(eco_format!("{}: ${{}}", param.name)),
                 detail: docs(),
                 label_detail: None,
-                command: Some("tinymist.triggerNamedCompletion"),
+                command: ctx
+                    .trigger_named_completion
+                    .then_some("tinymist.triggerNamedCompletion"),
                 ..Completion::default()
             };
             match param.ty {
@@ -734,7 +737,9 @@ fn type_completion(
                 label: f.into(),
                 apply: Some(eco_format!("{}: ${{}}", f)),
                 detail: docs.map(Into::into),
-                command: Some("tinymist.triggerNamedCompletion"),
+                command: ctx
+                    .trigger_named_completion
+                    .then_some("tinymist.triggerNamedCompletion"),
                 ..Completion::default()
             });
         }
