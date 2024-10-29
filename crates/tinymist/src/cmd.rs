@@ -12,7 +12,7 @@ use serde_json::Value as JsonValue;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::docs::PackageInfo;
-use tinymist_query::{ExportKind, PageSelection};
+use tinymist_query::{AnalysisContext, ExportKind, PageSelection};
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 
@@ -594,6 +594,31 @@ impl LanguageState {
         &mut self,
         info: PackageInfo,
     ) -> LspResult<impl Future<Output = LspResult<String>>> {
+        self.within_package(info.clone(), move |a| {
+            tinymist_query::docs::package_docs(a, &info)
+                .map_err(map_string_err("failed to generate docs"))
+                .map_err(z_internal_error)
+        })
+    }
+
+    /// Check package
+    pub fn check_package(
+        &mut self,
+        info: PackageInfo,
+    ) -> LspResult<impl Future<Output = LspResult<()>>> {
+        self.within_package(info.clone(), move |a| {
+            tinymist_query::docs::check_package(a, &info)
+                .map_err(map_string_err("failed to check package"))
+                .map_err(z_internal_error)
+        })
+    }
+
+    /// Check within package
+    pub fn within_package<T>(
+        &mut self,
+        info: PackageInfo,
+        f: impl FnOnce(&mut AnalysisContext) -> LspResult<T> + Send + Sync,
+    ) -> LspResult<impl Future<Output = LspResult<T>>> {
         let handle: std::sync::Arc<actor::typ_client::CompileHandler> =
             self.primary().handle.clone();
 
@@ -601,6 +626,7 @@ impl LanguageState {
         let rev_lock = handle.analysis.lock_revision();
 
         let snap = handle.snapshot().map_err(z_internal_error)?;
+
         Ok(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
             let w = snap.world.as_ref();
@@ -619,21 +645,14 @@ impl LanguageState {
             });
             let entry = entry.map_err(|e| internal_error(e.to_string()))?;
 
-            let w = &snap.world.task(TaskInputs {
+            let w = snap.world.task(TaskInputs {
                 entry: Some(entry),
                 inputs: None,
             });
 
-            let res = handle.run_analysis(w, |a| {
-                tinymist_query::docs::package_docs(a, w, &info)
-                    .map_err(map_string_err("failed to generate docs"))
-                    .map_err(z_internal_error)
-            });
-
+            let res = handle.run_analysis(&w, f).map_err(internal_error)?;
             drop(rev_lock);
-
-
-            res.map_err(internal_error)?
+            res
         })
     }
 }
