@@ -12,7 +12,7 @@ use reflexo::ImmutPath;
 use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
 use reflexo_typst::world::EntryState;
 use tinymist_query::analysis::Analysis;
-use tinymist_query::ExportKind;
+use tinymist_query::{ExportKind, SemanticTokenContext};
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::mpsc;
 
@@ -111,6 +111,11 @@ impl LanguageState {
                 caches: Default::default(),
                 workers: Default::default(),
                 cache_grid: Default::default(),
+                tokens_ctx: Arc::new(SemanticTokenContext::new(
+                    const_config.position_encoding,
+                    const_config.tokens_overlapping_token_support,
+                    const_config.tokens_multiline_token_support,
+                )),
             }),
             periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
 

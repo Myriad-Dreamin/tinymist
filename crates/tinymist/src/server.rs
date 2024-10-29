@@ -24,7 +24,7 @@ use sync_lsp::*;
 use task::{CacheTask, ExportUserConfig, FormatTask, FormatUserConfig, UserActionTask};
 use tinymist_query::{
     get_semantic_tokens_options, get_semantic_tokens_registration,
-    get_semantic_tokens_unregistration, PageSelection, SemanticTokenContext,
+    get_semantic_tokens_unregistration, PageSelection,
 };
 use tinymist_query::{
     lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, OnExportRequest,
@@ -75,8 +75,6 @@ pub struct LanguageState {
     pub config: Config,
 
     // Resources
-    /// The semantic token context.
-    pub tokens_ctx: SemanticTokenContext,
     /// Source synchronized with client
     pub memory_changes: HashMap<Arc<Path>, MemoryFileMeta>,
     /// The preview state.
@@ -107,11 +105,6 @@ impl LanguageState {
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
     ) -> Self {
         let const_config = &config.const_config;
-        let tokens_ctx = SemanticTokenContext::new(
-            const_config.position_encoding,
-            const_config.tokens_overlapping_token_support,
-            const_config.tokens_multiline_token_support,
-        );
         let formatter = FormatTask::new(FormatUserConfig {
             mode: config.formatter_mode,
             width: config.formatter_print_width.unwrap_or(120),
@@ -134,7 +127,6 @@ impl LanguageState {
 
             pinning: false,
             focusing: None,
-            tokens_ctx,
             formatter,
             user_action: Default::default(),
             cache: CacheTask::default(),
@@ -1002,17 +994,6 @@ macro_rules! query_source {
     }};
 }
 
-macro_rules! query_tokens_cache {
-    ($self:ident, $method:ident, $req:expr) => {{
-        let path: ImmutPath = $req.path.clone().into();
-
-        $self.query_source(path, |source| {
-            let res = $req.request(&$self.tokens_ctx, source);
-            Ok(CompilerQueryResponse::$method(res))
-        })
-    }};
-}
-
 impl LanguageState {
     /// Perform a language query.
     pub fn query(&mut self, query: CompilerQueryRequest) -> QueryFuture {
@@ -1022,8 +1003,6 @@ impl LanguageState {
         let is_pinning = self.pinning;
         just_ok(match query {
             InteractCodeContext(req) => query_source!(self, InteractCodeContext, req)?,
-            SemanticTokensFull(req) => query_tokens_cache!(self, SemanticTokensFull, req)?,
-            SemanticTokensDelta(req) => query_tokens_cache!(self, SemanticTokensDelta, req)?,
             FoldingRange(req) => query_source!(self, FoldingRange, req)?,
             SelectionRange(req) => query_source!(self, SelectionRange, req)?,
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req)?,
@@ -1067,6 +1046,8 @@ impl LanguageState {
             }
 
             let resp = match query {
+                SemanticTokensFull(req) => handle.run_semantic(snap, req, R::SemanticTokensFull),
+                SemanticTokensDelta(req) => handle.run_semantic(snap, req, R::SemanticTokensDelta),
                 Hover(req) => handle.run_stateful(snap, req, R::Hover),
                 GotoDefinition(req) => handle.run_stateful(snap, req, R::GotoDefinition),
                 GotoDeclaration(req) => handle.run_semantic(snap, req, R::GotoDeclaration),

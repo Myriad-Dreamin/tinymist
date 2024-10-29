@@ -1,4 +1,4 @@
-use crate::{prelude::*, SemanticTokenContext};
+use crate::prelude::*;
 
 /// The [`textDocument/semanticTokens/full/delta`] request is sent from the
 /// client to the server to resolve the semantic tokens of a given file,
@@ -21,16 +21,17 @@ pub struct SemanticTokensDeltaRequest {
     pub previous_result_id: String,
 }
 
-impl SemanticTokensDeltaRequest {
+impl SemanticRequest for SemanticTokensDeltaRequest {
+    type Response = SemanticTokensFullDeltaResult;
     /// Handles the request to compute the semantic tokens delta for a given
     /// document.
-    pub fn request(
-        self,
-        ctx: &SemanticTokenContext,
-        source: Source,
-    ) -> Option<SemanticTokensFullDeltaResult> {
+    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+        let source = ctx.source_by_path(&self.path).ok()?;
+        let ei = ctx.expr_stage(&source);
+
+        let token_ctx = &ctx.analysis.tokens_ctx;
         let (tokens, result_id) =
-            ctx.try_semantic_tokens_delta_from_result_id(&source, &self.previous_result_id);
+            token_ctx.semantic_tokens_delta(&source, ei, &self.previous_result_id);
 
         match tokens {
             Ok(edits) => Some(
