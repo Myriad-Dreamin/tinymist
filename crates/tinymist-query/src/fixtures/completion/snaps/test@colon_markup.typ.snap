@@ -1,0 +1,33 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on   (22..23)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/colon_markup.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "attach",
+    "labelDetails": {
+     "description": "(content, b: content | none, bl: content | none, br: content | none, t: content | none, tl: content | none, tr: content | none) => attach"
+    },
+    "textEdit": {
+     "newText": "attach(${1:})",
+     "range": {
+      "end": {
+       "character": 2,
+       "line": 1
+      },
+      "start": {
+       "character": 1,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]

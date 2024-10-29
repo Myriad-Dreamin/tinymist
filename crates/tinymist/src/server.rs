@@ -746,10 +746,13 @@ impl LanguageState {
 
     fn completion(&mut self, req_id: RequestId, params: CompletionParams) -> ScheduledResult {
         let (path, position) = as_path_pos(params.text_document_position);
-        let explicit = params
+        let explicit = params.context.as_ref().map_or(false, |context| {
+            context.trigger_kind == CompletionTriggerKind::INVOKED
+        });
+        let trigger_character = params
             .context
-            .map(|context| context.trigger_kind == CompletionTriggerKind::INVOKED)
-            .unwrap_or(false);
+            .and_then(|c| c.trigger_character)
+            .and_then(|c| c.chars().next());
         let trigger_suggest = self.config.trigger_suggest;
         let trigger_parameter_hints = self.config.trigger_parameter_hints;
         let trigger_named_completion = self.config.trigger_named_completion;
@@ -760,6 +763,7 @@ impl LanguageState {
                 path,
                 position,
                 explicit,
+                trigger_character,
                 trigger_suggest,
                 trigger_parameter_hints,
                 trigger_named_completion
