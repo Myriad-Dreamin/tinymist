@@ -8,6 +8,8 @@ pub mod color_exprs;
 pub use color_exprs::*;
 pub mod link_exprs;
 pub use link_exprs::*;
+pub mod stats;
+pub use stats::*;
 pub mod definition;
 pub use definition::*;
 pub mod signature;

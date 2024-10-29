@@ -229,7 +229,7 @@ mod polymorphic {
         pub root: Option<PathBuf>,
         pub font_paths: Vec<PathBuf>,
         pub inputs: Dict,
-        pub estimated_memory_usage: HashMap<String, usize>,
+        pub stats: HashMap<String, String>,
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -240,7 +240,7 @@ mod polymorphic {
         ContextFreeUnique,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, strum::IntoStaticStr)]
     pub enum CompilerQueryRequest {
         OnExport(OnExportRequest),
         Hover(HoverRequest),

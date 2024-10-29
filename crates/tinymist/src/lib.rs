@@ -23,6 +23,7 @@ mod cmd;
 mod init;
 mod resource;
 mod server;
+mod stats;
 mod task;
 pub use task::UserActionTask;
 pub mod tool;

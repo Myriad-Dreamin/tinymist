@@ -33,8 +33,8 @@ use reflexo_typst::{
 use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
     analysis::{Analysis, AnalysisContext, AnalysisResources},
-    CompilerQueryResponse, DiagnosticsMap, ExportKind, SemanticRequest, ServerInfoResponse,
-    StatefulRequest, VersionedDocument,
+    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, ExportKind, SemanticRequest,
+    ServerInfoResponse, StatefulRequest, VersionedDocument,
 };
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{mpsc, oneshot};
@@ -47,6 +47,7 @@ use super::{
     },
 };
 use crate::{
+    stats::{CompilerQueryStats, QueryStatGuard},
     task::{ExportTask, ExportUserConfig},
     world::{LspCompilerFeat, LspWorld},
     CompileConfig,
@@ -57,6 +58,7 @@ type EditorSender = mpsc::UnboundedSender<EditorRequest>;
 pub struct CompileHandler {
     pub(crate) diag_group: String,
     pub(crate) analysis: Arc<Analysis>,
+    pub(crate) stats: CompilerQueryStats,
     pub(crate) periscope: PeriscopeRenderer,
 
     #[cfg(feature = "preview")]
@@ -339,6 +341,15 @@ impl CompileClientActor {
         self.handle.clone().snapshot()
     }
 
+    /// Snapshot the compiler thread for tasks
+    pub fn snapshot_with_stat(&self, q: &CompilerQueryRequest) -> ZResult<QuerySnapWithStat> {
+        let name: &'static str = q.into();
+        let path = q.associated_path();
+        let stat = self.handle.stats.query_stat(path, name);
+        let snap = self.handle.clone().snapshot()?;
+        Ok(QuerySnapWithStat { snap, stat })
+    }
+
     pub fn add_memory_changes(&self, event: MemoryEvent) {
         self.handle.add_memory_changes(event);
     }
@@ -414,6 +425,9 @@ impl CompileClientActor {
 
     pub fn collect_server_info(&self) -> QueryFuture {
         let dg = self.handle.diag_group.clone();
+        let api_stats = self.handle.stats.report();
+        let query_stats = self.handle.analysis.report_query_stats();
+        let alloc_stats = self.handle.analysis.report_alloc_stats();
 
         let snap = self.snapshot()?;
         just_future(async move {
@@ -424,11 +438,10 @@ impl CompileClientActor {
                 root: w.entry_state().root().map(|e| e.as_ref().to_owned()),
                 font_paths: w.font_resolver.font_paths().to_owned(),
                 inputs: w.inputs().as_ref().deref().clone(),
-                estimated_memory_usage: HashMap::from_iter([
-                    // todo: vfs memory usage
-                    // ("vfs".to_owned(), w.vfs.read().memory_usage()),
-                    // todo: analysis memory usage
-                    // ("analysis".to_owned(), cc.analysis.estimated_memory()),
+                stats: HashMap::from_iter([
+                    ("api".to_owned(), api_stats),
+                    ("query".to_owned(), query_stats),
+                    ("alloc".to_owned(), alloc_stats),
                 ]),
             };
 
@@ -436,6 +449,11 @@ impl CompileClientActor {
             Ok(tinymist_query::CompilerQueryResponse::ServerInfo(info))
         })
     }
+}
+
+pub struct QuerySnapWithStat {
+    pub snap: QuerySnap,
+    pub(crate) stat: QueryStatGuard,
 }
 
 pub struct QuerySnap {

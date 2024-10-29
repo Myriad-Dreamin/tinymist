@@ -146,18 +146,6 @@ pub(crate) struct LexicalHierarchy {
     pub children: Option<LazyHash<EcoVec<LexicalHierarchy>>>,
 }
 
-impl LexicalHierarchy {
-    pub fn estimated_memory(&self) -> usize {
-        std::mem::size_of::<Self>()
-            + std::mem::size_of::<LexicalInfo>()
-            + self.info.name.len()
-            + self
-                .children
-                .as_ref()
-                .map_or(0, |c| c.iter().map(|e| e.estimated_memory()).sum())
-    }
-}
-
 impl Serialize for LexicalHierarchy {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
