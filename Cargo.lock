@@ -2924,7 +2924,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.5.0-rc8"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=c52a054ca31989e13eddc6f2cffb6db2ba5faa5d#c52a054ca31989e13eddc6f2cffb6db2ba5faa5d"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=26e2eaa3696845a178df3266edc0019c77396414#26e2eaa3696845a178df3266edc0019c77396414"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -2949,7 +2949,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.5.0-rc8"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=c52a054ca31989e13eddc6f2cffb6db2ba5faa5d#c52a054ca31989e13eddc6f2cffb6db2ba5faa5d"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=26e2eaa3696845a178df3266edc0019c77396414#26e2eaa3696845a178df3266edc0019c77396414"
 dependencies = [
  "codespan-reporting",
  "comemo 0.4.0",
@@ -2977,7 +2977,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst-shim"
 version = "0.5.0-rc8"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=c52a054ca31989e13eddc6f2cffb6db2ba5faa5d#c52a054ca31989e13eddc6f2cffb6db2ba5faa5d"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=26e2eaa3696845a178df3266edc0019c77396414#26e2eaa3696845a178df3266edc0019c77396414"
 dependencies = [
  "cfg-if",
  "typst",
@@ -2987,7 +2987,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.5.0-rc8"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=c52a054ca31989e13eddc6f2cffb6db2ba5faa5d#c52a054ca31989e13eddc6f2cffb6db2ba5faa5d"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=26e2eaa3696845a178df3266edc0019c77396414#26e2eaa3696845a178df3266edc0019c77396414"
 dependencies = [
  "bitvec",
  "comemo 0.4.0",
@@ -3012,7 +3012,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.5.0-rc8"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=c52a054ca31989e13eddc6f2cffb6db2ba5faa5d#c52a054ca31989e13eddc6f2cffb6db2ba5faa5d"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=26e2eaa3696845a178df3266edc0019c77396414#26e2eaa3696845a178df3266edc0019c77396414"
 dependencies = [
  "base64 0.22.1",
  "comemo 0.4.0",
@@ -3025,7 +3025,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vfs"
 version = "0.5.0-rc8"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=c52a054ca31989e13eddc6f2cffb6db2ba5faa5d#c52a054ca31989e13eddc6f2cffb6db2ba5faa5d"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=26e2eaa3696845a178df3266edc0019c77396414#26e2eaa3696845a178df3266edc0019c77396414"
 dependencies = [
  "indexmap 2.6.0",
  "log",
@@ -3039,7 +3039,7 @@ dependencies = [
 [[package]]
 name = "reflexo-world"
 version = "0.5.0-rc8"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=c52a054ca31989e13eddc6f2cffb6db2ba5faa5d#c52a054ca31989e13eddc6f2cffb6db2ba5faa5d"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=26e2eaa3696845a178df3266edc0019c77396414#26e2eaa3696845a178df3266edc0019c77396414"
 dependencies = [
  "chrono",
  "codespan-reporting",

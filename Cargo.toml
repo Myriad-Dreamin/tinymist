@@ -195,12 +195,12 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 # typst-render = { path = "../typst/crates/typst-render" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "c52a054ca31989e13eddc6f2cffb6db2ba5faa5d" }
-reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "c52a054ca31989e13eddc6f2cffb6db2ba5faa5d" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "c52a054ca31989e13eddc6f2cffb6db2ba5faa5d" }
-reflexo-typst2vec = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "c52a054ca31989e13eddc6f2cffb6db2ba5faa5d" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "c52a054ca31989e13eddc6f2cffb6db2ba5faa5d" }
-reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "c52a054ca31989e13eddc6f2cffb6db2ba5faa5d" }
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
+reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
+reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
+reflexo-typst2vec = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
+reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
+reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
 
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
 # reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }
