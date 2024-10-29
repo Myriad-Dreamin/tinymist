@@ -29,8 +29,7 @@ use crate::analysis::{
 use crate::docs::{SignatureDocs, VarDocs};
 use crate::syntax::{
     construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
-    scan_workspace_files, DerefTarget, ExprInfo, LexicalHierarchy, LexicalScope, ModuleDependency,
-    Processing,
+    scan_workspace_files, DerefTarget, ExprInfo, LexicalScope, ModuleDependency, Processing,
 };
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
@@ -38,7 +37,7 @@ use crate::{
     SemanticTokenContext, TypstRange, VersionedDocument,
 };
 
-use super::{analyze_expr_, definition, Definition};
+use super::{analyze_expr_, definition, AllocStats, AnalysisStats, Definition, QueryStatGuard};
 
 /// The analysis data holds globally.
 #[derive(Default, Clone)]
@@ -55,20 +54,11 @@ pub struct Analysis {
     pub cache_grid: Arc<Mutex<AnalysisGlobalCacheGrid>>,
     /// The semantic token context.
     pub tokens_ctx: Arc<SemanticTokenContext>,
+    /// The statistics about the analyzers.
+    pub analysis_stats: Arc<AnalysisStats>,
 }
 
 impl Analysis {
-    /// Get estimated memory usage of the analysis data.
-    pub fn estimated_memory(&self) -> usize {
-        let _ = LexicalHierarchy::estimated_memory;
-        // todo: implement
-        // self.caches.modules.capacity() * 32
-        //     + self .caches .modules .values() .map(|v| { v.def_use_lexical_hierarchy
-        //       .output .read() .as_ref() .map_or(0, |e| e.iter().map(|e|
-        //       e.estimated_memory()).sum()) }) .sum::<usize>()
-        0
-    }
-
     /// Get a snapshot of the analysis data.
     pub fn snapshot<'a>(
         &self,
@@ -96,6 +86,16 @@ impl Analysis {
             grid: self.cache_grid.clone(),
             revision,
         }
+    }
+
+    /// Report the statistics of the analysis.
+    pub fn report_query_stats(&self) -> String {
+        self.analysis_stats.report()
+    }
+
+    /// Report the statistics of the allocation.
+    pub fn report_alloc_stats(&self) -> String {
+        AllocStats::report(self)
     }
 }
 
@@ -279,19 +279,19 @@ impl<'w> AnalysisContext<'w> {
         self.analysis
             .caches
             .def_signatures
-            .retain(|_, (l, _, _)| lifetime - *l < 60);
+            .retain(|(l, _)| lifetime - *l < 60);
         self.analysis
             .caches
             .static_signatures
-            .retain(|_, (l, _, _, _)| lifetime - *l < 60);
+            .retain(|(l, _)| lifetime - *l < 60);
         self.analysis
             .caches
             .terms
-            .retain(|_, (l, _, _)| lifetime - *l < 60);
+            .retain(|(l, _)| lifetime - *l < 60);
         self.analysis
             .caches
             .signatures
-            .retain(|_, (l, _, _)| lifetime - *l < 60);
+            .retain(|(l, _)| lifetime - *l < 60);
     }
 }
 
@@ -407,6 +407,16 @@ impl SharedContext {
     /// Get revision of current analysis
     pub fn revision(&self) -> usize {
         self.slot.revision
+    }
+
+    fn query_stat(&self, id: TypstFileId, query: &'static str) -> QueryStatGuard {
+        let stats = &self.analysis.analysis_stats.query_stats;
+        let entry = stats.entry(id).or_default();
+        let entry = entry.entry(query).or_default();
+        QueryStatGuard {
+            bucket: entry.clone(),
+            since: std::time::SystemTime::now(),
+        }
     }
 
     /// Get the position encoding during session.
@@ -565,8 +575,9 @@ impl SharedContext {
             .analysis
             .caches
             .terms
+            .m
             .get(&hash128(&cache_key))
-            .and_then(|slot| (cache_key == &slot.1).then_some(slot.2.clone()));
+            .and_then(|slot| (cache_key == &slot.1 .0).then_some(slot.1 .1.clone()));
         if let Some(cached) = cached {
             return cached;
         }
@@ -576,8 +587,9 @@ impl SharedContext {
         self.analysis
             .caches
             .terms
+            .m
             .entry(hash128(&cache_key))
-            .or_insert_with(|| (self.lifetime, cache_key.clone(), res.clone()));
+            .or_insert_with(|| (self.lifetime, (cache_key.clone(), res.clone())));
 
         res
     }
@@ -595,8 +607,9 @@ impl SharedContext {
         route: &mut Processing<Option<Arc<LazyHash<LexicalScope>>>>,
     ) -> Arc<ExprInfo> {
         use crate::syntax::expr_of;
+        let guard = self.query_stat(source.id(), "expr_stage");
         self.slot.expr_stage.compute(hash128(&source), |prev| {
-            expr_of(self.clone(), source.clone(), route, prev)
+            expr_of(self.clone(), source.clone(), route, guard, prev)
         })
     }
 
@@ -627,6 +640,7 @@ impl SharedContext {
         use crate::analysis::type_check;
 
         let ei = self.expr_stage(source);
+        let guard = self.query_stat(source.id(), "type_check");
         self.slot.type_check.compute(hash128(&ei), |prev| {
             let cache_hit = prev.and_then(|prev| {
                 // todo: recursively check changed scheme type
@@ -641,6 +655,7 @@ impl SharedContext {
                 return prev.clone();
             }
 
+            guard.miss();
             type_check(self.clone(), ei, route)
         })
     }
@@ -785,46 +800,31 @@ impl SharedContext {
                 .analysis
                 .caches
                 .def_signatures
-                .entry(hash128(&(src, d.clone())))
-                .or_insert_with(|| (self.lifetime, d, Arc::default()))
-                .2
-                .clone(),
+                .entry(hash128(&(src, d.clone())), self.lifetime),
             SignatureTarget::SyntaxFast(source, span) => {
                 let cache_key = (source, span, true);
                 self.analysis
                     .caches
                     .static_signatures
-                    .entry(hash128(&cache_key))
-                    .or_insert_with(|| (self.lifetime, cache_key.0, cache_key.1, Arc::default()))
-                    .3
-                    .clone()
+                    .entry(hash128(&cache_key), self.lifetime)
             }
             SignatureTarget::Syntax(source, span) => {
                 let cache_key = (source, span);
                 self.analysis
                     .caches
                     .static_signatures
-                    .entry(hash128(&cache_key))
-                    .or_insert_with(|| (self.lifetime, cache_key.0, cache_key.1, Arc::default()))
-                    .3
-                    .clone()
+                    .entry(hash128(&cache_key), self.lifetime)
             }
             SignatureTarget::Convert(rt) => self
                 .analysis
                 .caches
                 .signatures
-                .entry(hash128(&(&rt, true)))
-                .or_insert_with(|| (self.lifetime, rt, Arc::default()))
-                .2
-                .clone(),
+                .entry(hash128(&(&rt, true)), self.lifetime),
             SignatureTarget::Runtime(rt) => self
                 .analysis
                 .caches
                 .signatures
-                .entry(hash128(&rt))
-                .or_insert_with(|| (self.lifetime, rt, Arc::default()))
-                .2
-                .clone(),
+                .entry(hash128(&rt), self.lifetime),
         };
         res.get_or_init(|| compute(self)).clone()
     }
@@ -943,7 +943,39 @@ impl<K, V> IncrCacheMap<K, V> {
     }
 }
 
-type CacheMap<T> = Arc<FxDashMap<u128, T>>;
+#[derive(Clone)]
+struct CacheMap<T> {
+    m: Arc<FxDashMap<u128, (u64, T)>>,
+    // pub alloc: AllocStats,
+}
+
+impl<T> Default for CacheMap<T> {
+    fn default() -> Self {
+        Self {
+            m: Default::default(),
+            // alloc: Default::default(),
+        }
+    }
+}
+
+impl<T> CacheMap<T> {
+    fn clear(&self) {
+        self.m.clear();
+    }
+
+    fn retain(&self, mut f: impl FnMut(&mut (u64, T)) -> bool) {
+        self.m.retain(|_k, v| f(v));
+    }
+}
+
+impl<T: Default + Clone> CacheMap<T> {
+    fn entry(&self, k: u128, lifetime: u64) -> T {
+        let entry = self.m.entry(k);
+        let entry = entry.or_insert_with(|| (lifetime, T::default()));
+        entry.1.clone()
+    }
+}
+
 // Needed by recursive computation
 type DeferredCompute<T> = Arc<OnceCell<T>>;
 
@@ -953,10 +985,10 @@ type DeferredCompute<T> = Arc<OnceCell<T>>;
 pub struct AnalysisGlobalCaches {
     lifetime: Arc<AtomicU64>,
     clear_lifetime: Arc<AtomicU64>,
-    def_signatures: CacheMap<(u64, Definition, DeferredCompute<Option<Signature>>)>,
-    static_signatures: CacheMap<(u64, Source, Span, DeferredCompute<Option<Signature>>)>,
-    signatures: CacheMap<(u64, Func, DeferredCompute<Option<Signature>>)>,
-    terms: CacheMap<(u64, Value, Ty)>,
+    def_signatures: CacheMap<DeferredCompute<Option<Signature>>>,
+    static_signatures: CacheMap<DeferredCompute<Option<Signature>>>,
+    signatures: CacheMap<DeferredCompute<Option<Signature>>>,
+    terms: CacheMap<(Value, Ty)>,
 }
 
 /// A cache for all level of analysis results of a module.

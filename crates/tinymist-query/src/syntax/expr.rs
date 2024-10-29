@@ -14,7 +14,7 @@ use typst::{
 };
 
 use crate::{
-    analysis::SharedContext,
+    analysis::{QueryStatGuard, SharedContext},
     docs::DocStringKind,
     prelude::*,
     syntax::find_module_level_docs,
@@ -29,6 +29,7 @@ pub(crate) fn expr_of(
     ctx: Arc<SharedContext>,
     source: Source,
     route: &mut Processing<Option<Arc<LazyHash<LexicalScope>>>>,
+    guard: QueryStatGuard,
     prev: Option<Arc<ExprInfo>>,
 ) -> Arc<ExprInfo> {
     log::debug!("expr_of: {:?}", source.id());
@@ -62,6 +63,7 @@ pub(crate) fn expr_of(
         route.remove(&source.id());
         return prev;
     }
+    guard.miss();
 
     let revision = ctx.revision();
 

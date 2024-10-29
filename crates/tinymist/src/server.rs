@@ -1023,7 +1023,7 @@ impl LanguageState {
         type R = CompilerQueryResponse;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
-        let snap = client.snapshot()?;
+        let snap_stat = client.snapshot_with_stat(&query)?;
         let handle = client.handle.clone();
         let entry = query
             .associated_path()
@@ -1036,7 +1036,7 @@ impl LanguageState {
         let rev_lock = handle.analysis.lock_revision();
 
         just_future(async move {
-            let mut snap = snap.receive().await?;
+            let mut snap = snap_stat.snap.receive().await?;
             // todo: whether it is safe to inherit success_doc with changed entry
             if !is_pinning {
                 snap = snap.task(TaskInputs {
@@ -1044,6 +1044,7 @@ impl LanguageState {
                     ..Default::default()
                 });
             }
+            snap_stat.stat.snap();
 
             let resp = match query {
                 SemanticTokensFull(req) => handle.run_semantic(snap, req, R::SemanticTokensFull),

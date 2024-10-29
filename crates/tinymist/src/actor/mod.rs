@@ -105,6 +105,7 @@ impl LanguageState {
             intr_tx: intr_tx.clone(),
             export: export.clone(),
             editor_tx: self.editor_tx.clone(),
+            stats: Default::default(),
             analysis: Arc::new(Analysis {
                 position_encoding,
                 enable_periscope,
@@ -116,6 +117,7 @@ impl LanguageState {
                     const_config.tokens_overlapping_token_support,
                     const_config.tokens_multiline_token_support,
                 )),
+                analysis_stats: Default::default(),
             }),
             periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
 

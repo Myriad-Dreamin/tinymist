@@ -23,8 +23,9 @@ use std::{
 };
 
 use dashmap::{DashMap, SharedValue};
-use ecow::EcoString;
+use ecow::{EcoString, EcoVec};
 use hashbrown::{hash_map::RawEntryMut, HashMap};
+use parking_lot::Mutex;
 use rustc_hash::FxHasher;
 use triomphe::Arc;
 use typst::{foundations::Str, syntax::ast::Ident};
@@ -55,12 +56,15 @@ impl<T: Internable> Interned<T> {
             RawEntryMut::Occupied(occ) => Self {
                 arc: occ.key().clone(),
             },
-            RawEntryMut::Vacant(vac) => Self {
-                arc: vac
-                    .insert_hashed_nocheck(hash, Arc::new(obj), SharedValue::new(()))
-                    .0
-                    .clone(),
-            },
+            RawEntryMut::Vacant(vac) => {
+                T::storage().alloc().increment();
+                Self {
+                    arc: vac
+                        .insert_hashed_nocheck(hash, Arc::new(obj), SharedValue::new(()))
+                        .0
+                        .clone(),
+                }
+            }
         }
     }
 }
@@ -85,12 +89,16 @@ impl Interned<str> {
             RawEntryMut::Occupied(occ) => Self {
                 arc: occ.key().clone(),
             },
-            RawEntryMut::Vacant(vac) => Self {
-                arc: vac
-                    .insert_hashed_nocheck(hash, Arc::from(s), SharedValue::new(()))
-                    .0
-                    .clone(),
-            },
+            RawEntryMut::Vacant(vac) => {
+                str::storage().alloc().increment();
+
+                Self {
+                    arc: vac
+                        .insert_hashed_nocheck(hash, Arc::from(s), SharedValue::new(()))
+                        .0
+                        .clone(),
+                }
+            }
         }
     }
 }
@@ -200,6 +208,8 @@ impl<T: Internable + ?Sized> Interned<T> {
             RawEntryMut::Occupied(occ) => occ.remove(),
             RawEntryMut::Vacant(_) => unreachable!(),
         };
+
+        T::storage().alloc().decrement();
 
         // Shrink the backing storage if the shard is less than 50% occupied.
         if shard.len() * 2 < shard.capacity() {
@@ -331,26 +341,53 @@ impl<T: Display + Internable + ?Sized> Display for Interned<T> {
     }
 }
 
+pub(crate) static MAPS: Mutex<EcoVec<(&'static str, usize, Arc<AllocStats>)>> =
+    Mutex::new(EcoVec::new());
+
 pub struct InternStorage<T: ?Sized> {
+    alloc: OnceLock<Arc<AllocStats>>,
     map: OnceLock<InternMap<T>>,
 }
 
 #[allow(clippy::new_without_default)] // this a const fn, so it can't be default
-impl<T: ?Sized> InternStorage<T> {
+impl<T: InternSize + ?Sized> InternStorage<T> {
+    const SIZE: usize = T::INTERN_SIZE;
+
     pub const fn new() -> Self {
         Self {
+            alloc: OnceLock::new(),
             map: OnceLock::new(),
         }
     }
 }
 
 impl<T: Internable + ?Sized> InternStorage<T> {
+    fn alloc(&self) -> &Arc<AllocStats> {
+        self.alloc.get_or_init(Arc::default)
+    }
+
     fn get(&self) -> &InternMap<T> {
-        self.map.get_or_init(DashMap::default)
+        self.map.get_or_init(|| {
+            MAPS.lock()
+                .push((std::any::type_name::<T>(), Self::SIZE, self.alloc().clone()));
+            DashMap::default()
+        })
     }
 }
 
-pub trait Internable: Hash + Eq + 'static {
+pub trait InternSize {
+    const INTERN_SIZE: usize;
+}
+
+impl<T: Sized> InternSize for T {
+    const INTERN_SIZE: usize = std::mem::size_of::<T>();
+}
+
+impl InternSize for str {
+    const INTERN_SIZE: usize = std::mem::size_of::<usize>() * 2;
+}
+
+pub trait Internable: InternSize + Hash + Eq + 'static {
     fn storage() -> &'static InternStorage<Self>;
 }
 
@@ -370,5 +407,6 @@ macro_rules! _impl_internable {
 }
 
 pub use crate::_impl_internable as impl_internable;
+use crate::analysis::AllocStats;
 
 impl_internable!(str,);
