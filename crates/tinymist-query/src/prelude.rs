@@ -1,6 +1,7 @@
 pub use std::{
     collections::HashMap,
     iter,
+    ops::Range,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -26,7 +27,7 @@ pub use typst::foundations::Value;
 pub use typst::syntax::FileId as TypstFileId;
 pub use typst::syntax::{
     ast::{self, AstNode},
-    LinkedNode, Source, Spanned, SyntaxKind,
+    LinkedNode, Source, Spanned, SyntaxKind, SyntaxNode,
 };
 pub use typst::World;
 
