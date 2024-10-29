@@ -1,0 +1,12 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on   (46..47)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/colon_markup2.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": []
+ }
+]

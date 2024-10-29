@@ -187,7 +187,7 @@ fn complete_markup(ctx: &mut CompletionContext) -> bool {
     }
 
     // Anywhere: "|".
-    if ctx.explicit {
+    if !is_triggerred_by_punc(ctx.trigger_character) && ctx.explicit {
         ctx.from = ctx.cursor;
         markup_completions(ctx);
         return true;
@@ -316,14 +316,16 @@ fn complete_math(ctx: &mut CompletionContext) -> bool {
     }
 
     // Behind existing atom or identifier: "$a|$" or "$abc|$".
-    if matches!(ctx.leaf.kind(), SyntaxKind::Text | SyntaxKind::MathIdent) {
+    if !is_triggerred_by_punc(ctx.trigger_character)
+        && matches!(ctx.leaf.kind(), SyntaxKind::Text | SyntaxKind::MathIdent)
+    {
         ctx.from = ctx.leaf.offset();
         math_completions(ctx);
         return true;
     }
 
     // Anywhere: "$|$".
-    if ctx.explicit {
+    if !is_triggerred_by_punc(ctx.trigger_character) && ctx.explicit {
         ctx.from = ctx.cursor;
         math_completions(ctx);
         return true;
@@ -959,6 +961,7 @@ pub struct CompletionContext<'a, 'b> {
     pub leaf: LinkedNode<'a>,
     pub cursor: usize,
     pub explicit: bool,
+    pub trigger_character: Option<char>,
     pub trigger_suggest: bool,
     pub trigger_parameter_hints: bool,
     pub trigger_named_completion: bool,
@@ -980,6 +983,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
         source: &'a Source,
         cursor: usize,
         explicit: bool,
+        trigger_character: Option<char>,
         trigger_suggest: bool,
         trigger_parameter_hints: bool,
         trigger_named_completion: bool,
@@ -996,6 +1000,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
             root,
             leaf,
             cursor,
+            trigger_character,
             trigger_suggest,
             trigger_parameter_hints,
             trigger_named_completion,
@@ -1297,4 +1302,8 @@ fn slice_at(s: &str, mut rng: Range<usize>) -> &str {
     }
 
     &s[rng]
+}
+
+fn is_triggerred_by_punc(trigger_character: Option<char>) -> bool {
+    trigger_character.is_some_and(|c| c.is_ascii_punctuation())
 }

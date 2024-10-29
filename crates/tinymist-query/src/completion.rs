@@ -46,6 +46,8 @@ pub struct CompletionRequest {
     pub position: LspPosition,
     /// Whether the completion is triggered explicitly.
     pub explicit: bool,
+    /// The character that triggered the completion, if any.
+    pub trigger_character: Option<char>,
     /// Whether to trigger suggest completion, a.k.a. auto-completion.
     pub trigger_suggest: bool,
     /// Whether to trigger named parameter completion.
@@ -145,6 +147,7 @@ impl StatefulRequest for CompletionRequest {
                 &source,
                 cursor,
                 explicit,
+                self.trigger_character,
                 self.trigger_suggest,
                 self.trigger_parameter_hints,
                 self.trigger_named_completion,
@@ -336,6 +339,11 @@ mod tests {
 
             let docs = find_module_level_docs(&source).unwrap_or_default();
             let properties = get_test_properties(&docs);
+
+            let trigger_character = properties
+                .get("trigger_character")
+                .map(|v| v.chars().next().unwrap());
+
             let mut includes = HashSet::new();
             let mut excludes = HashSet::new();
 
@@ -389,6 +397,7 @@ mod tests {
                     path: ctx.path_for_id(id).unwrap(),
                     position: ctx.to_lsp_pos(s, &source),
                     explicit: false,
+                    trigger_character,
                     trigger_suggest: true,
                     trigger_parameter_hints: true,
                     trigger_named_completion: true,
