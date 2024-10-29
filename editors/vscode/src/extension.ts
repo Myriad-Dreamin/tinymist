@@ -67,6 +67,10 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   vscode.commands.executeCommand("setContext", "ext.tinymistActivated", true);
   // Loads configuration
   const config = loadTinymistConfig();
+  // Inform server that we support named completion callback at the client side
+  config.triggerSuggest = true;
+  config.triggerNamedCompletion = true;
+  config.triggerParameterHints = true;
   // Sets features
   extensionState.features.preview = config.previewFeature === "enable";
   extensionState.features.devKit = isDevMode || config.devKit === "enable";

@@ -272,6 +272,9 @@
     "noSystemFonts": null,
     "typstExtraArgs": [],
     "trace": { "server": "off" },
+    "triggerSuggest": true,
+    "triggerParameterHints": true,
+    "triggerNamedCompletion": true,
     "experimentalFormatterMode": "disable"
   },
   "trace": "off"

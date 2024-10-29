@@ -301,6 +301,12 @@ pub struct Config {
     pub formatter_mode: FormatterMode,
     /// Dynamic configuration for the experimental formatter.
     pub formatter_print_width: Option<u32>,
+    /// Whether to trigger suggest completion, a.k.a. auto-completion.
+    pub trigger_suggest: bool,
+    /// Whether to trigger named parameter completion.
+    pub trigger_named_completion: bool,
+    /// Whether to trigger parameter hint, a.k.a. signature help.
+    pub trigger_parameter_hints: bool,
 }
 
 impl Config {
@@ -349,12 +355,21 @@ impl Config {
     /// # Errors
     /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
+        macro_rules! deser_or_default {
+            ($key:expr, $ty:ty) => {
+                try_or_default(|| <$ty>::deserialize(update.get($key)?).ok())
+            };
+        }
+
         try_(|| SemanticTokensMode::deserialize(update.get("semanticTokens")?).ok())
             .inspect(|v| self.semantic_tokens = *v);
         try_(|| FormatterMode::deserialize(update.get("formatterMode")?).ok())
             .inspect(|v| self.formatter_mode = *v);
         try_(|| u32::deserialize(update.get("formatterPrintWidth")?).ok())
             .inspect(|v| self.formatter_print_width = Some(*v));
+        self.trigger_suggest = deser_or_default!("triggerSuggest", bool);
+        self.trigger_parameter_hints = deser_or_default!("triggerParameterHints", bool);
+        self.trigger_named_completion = deser_or_default!("triggerNamedCompletion", bool);
         self.compile.update_by_map(update)?;
         self.compile.validate()
     }
@@ -479,9 +494,14 @@ impl CompileConfig {
 
     /// Updates the configuration with a map.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
-        self.output_path =
-            try_or_default(|| PathPattern::deserialize(update.get("outputPath")?).ok());
-        self.export_pdf = try_or_default(|| ExportMode::deserialize(update.get("exportPdf")?).ok());
+        macro_rules! deser_or_default {
+            ($key:expr, $ty:ty) => {
+                try_or_default(|| <$ty>::deserialize(update.get($key)?).ok())
+            };
+        }
+
+        self.output_path = deser_or_default!("outputPath", PathPattern);
+        self.export_pdf = deser_or_default!("exportPdf", ExportMode);
         self.root_path = try_(|| Some(update.get("rootPath")?.as_str()?.into()));
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
             Some("enable") => true,
