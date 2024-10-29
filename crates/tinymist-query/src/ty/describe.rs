@@ -6,12 +6,21 @@ use crate::ty::prelude::*;
 impl TypeScheme {
     /// Describe the given type with the given type scheme.
     pub fn describe(&self, ty: &Ty) -> Option<String> {
-        let mut worker = TypeDescriber::default();
+        let mut worker: TypeDescriber = TypeDescriber::default();
         worker.describe_root(ty)
     }
 }
 
 impl Ty {
+    /// Describe the given type.
+    pub fn repr(&self) -> Option<String> {
+        let mut worker = TypeDescriber {
+            repr: true,
+            ..Default::default()
+        };
+        worker.describe_root(self)
+    }
+
     /// Describe the given type.
     pub fn describe(&self) -> Option<String> {
         let mut worker = TypeDescriber::default();
@@ -21,6 +30,7 @@ impl Ty {
 
 #[derive(Default)]
 struct TypeDescriber {
+    repr: bool,
     described: HashMap<u128, String>,
     results: HashSet<String>,
     functions: Vec<Interned<SigTy>>,
@@ -148,8 +158,11 @@ impl TypeDescriber {
             Ty::Builtin(BuiltinTy::Auto) => {
                 return "auto".to_string();
             }
+            Ty::Boolean(..) if self.repr => {
+                return "bool".to_string();
+            }
             Ty::Boolean(None) => {
-                return "boolean".to_string();
+                return "bool".to_string();
             }
             Ty::Boolean(Some(b)) => {
                 return b.to_string();
@@ -157,27 +170,19 @@ impl TypeDescriber {
             Ty::Builtin(b) => {
                 return b.describe();
             }
+            Ty::Value(v) if self.repr => return v.val.ty().short_name().to_string(),
             Ty::Value(v) => return v.val.repr().to_string(),
             Ty::Field(..) => {
                 return "field".to_string();
             }
             Ty::Args(..) => {
-                return "args".to_string();
+                return "arguments".to_string();
             }
             Ty::Pattern(..) => {
                 return "pattern".to_string();
             }
-            Ty::Select(..) => {
-                return "any".to_string();
-            }
-            Ty::Unary(..) => {
-                return "any".to_string();
-            }
-            Ty::Binary(..) => {
-                return "any".to_string();
-            }
-            Ty::If(..) => {
-                return "any".to_string();
+            Ty::Select(..) | Ty::Unary(..) | Ty::Binary(..) | Ty::If(..) => {
+                return "any".to_string()
             }
         }
 

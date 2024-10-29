@@ -7,7 +7,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/annotation_fn.typ
 "fn" = Any
 "max-repetitions" = None
 "repetitions" = None
-"touying-fn-wrapper" = ((( ⪯ Type(function)), "max-repetitions": ( ⪯ Type(integer)), "repetitions": ( ⪯ Type(integer)), ...: ( ⪯ Any)) => None).with(..("max-repetitions": None, "repetitions": None) => any)
+"touying-fn-wrapper" = ((( ⪯ Type(function)), "max-repetitions": ( ⪯ Type(int)), "repetitions": ( ⪯ Type(int)), ...: ( ⪯ Any)) => None).with(..("max-repetitions": None, "repetitions": None) => any)
 ---
 162..180 -> @touying-fn-wrapper
 181..183 -> @fn

@@ -1,0 +1,9 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/hover/value_repr.typ
+---
+{
+ "contents": "```typc\nlet reconstruct(\n  it,\n  ..new-body: arguments,\n  body-name: str = \"body\",\n  labeled: bool = true,\n  max-depth: int = 9999,\n  wrapper: () => box = Closure(..),\n) = none;\n```\n\n---\n## Parameters\n\n@positional `it`\n\n@named `body-name`\n\n@named `labeled`\n\n@named `max-depth`\n\n@named `wrapper`\n\n@rest `new-body`",
+ "range": "1:20:1:31"
+}
