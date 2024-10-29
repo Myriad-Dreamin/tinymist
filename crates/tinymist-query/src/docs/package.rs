@@ -28,11 +28,7 @@ pub fn check_package(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult
 }
 
 /// Generate full documents in markdown format
-pub fn package_docs(
-    ctx: &mut AnalysisContext,
-    world: &LspWorld,
-    spec: &PackageInfo,
-) -> StrResult<String> {
+pub fn package_docs(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<String> {
     log::info!("generate_md_docs {spec:?}");
 
     let mut md = String::new();
@@ -58,7 +54,7 @@ pub fn package_docs(
     md.push('\n');
     md.push('\n');
 
-    let manifest = get_manifest(world, toml_id)?;
+    let manifest = get_manifest(&ctx.world, toml_id)?;
 
     let meta = PackageMeta {
         namespace: spec.namespace.clone(),
@@ -148,7 +144,7 @@ pub fn package_docs(
                 let span = sym.head.span.and_then(|v| {
                     v.id().and_then(|e| {
                         let fid = file_ids.insert_full(e).0;
-                        let src = world.source(e).ok()?;
+                        let src = ctx.source_by_id(e).ok()?;
                         let rng = src.range(v)?;
                         Some((fid, rng.start, rng.end))
                     })
@@ -367,7 +363,7 @@ pub fn get_manifest(world: &LspWorld, toml_id: FileId) -> StrResult<PackageManif
 }
 
 /// Information about a package.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageInfo {
     /// The path to the package if any.
     pub path: PathBuf,
@@ -445,7 +441,6 @@ mod tests {
 
     fn test(pkg: PackageSpec) {
         run_with_sources("", |verse: &mut LspUniverse, p| {
-            let w = verse.snapshot();
             let path = verse.registry.resolve(&pkg).unwrap();
             let pi = PackageInfo {
                 path: path.as_ref().to_owned(),
@@ -454,7 +449,7 @@ mod tests {
                 version: pkg.version.to_string(),
             };
             run_with_ctx(verse, p, &|a, _p| {
-                let d = package_docs(a, &w, &pi).unwrap();
+                let d = package_docs(a, &pi).unwrap();
                 let dest = format!(
                     "../../target/{}-{}-{}.md",
                     pi.namespace, pi.name, pi.version
