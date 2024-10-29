@@ -221,7 +221,7 @@ pub fn package_docs(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<
                 if let Some(SymbolDocs::Function(sig)) = &sym.head.parsed_docs {
                     let _ = writeln!(md, "<!-- begin:sig -->");
                     let _ = writeln!(md, "```typc");
-                    let _ = writeln!(md, "let {}", sym.head.name);
+                    let _ = write!(md, "let {}", sym.head.name);
                     let _ = sig.print(&mut md);
                     let _ = writeln!(md, ";");
                     let _ = writeln!(md, "```");
