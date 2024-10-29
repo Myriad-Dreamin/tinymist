@@ -1,14 +1,7 @@
-use std::ops::Range;
-
-use ecow::EcoVec;
 use serde::Serialize;
-use typst::{
-    foundations::{Func, ParamInfo},
-    syntax::{
-        ast::{self, AstNode},
-        LinkedNode, SyntaxKind,
-    },
-};
+use typst::foundations::{Func, ParamInfo};
+
+use crate::prelude::*;
 
 pub fn deref_expr(mut ancestor: LinkedNode) -> Option<LinkedNode> {
     while !ancestor.is::<ast::Expr>() {
@@ -85,6 +78,18 @@ fn is_mark(sk: SyntaxKind) -> bool {
             | Colon
             | Hash
     )
+}
+
+pub fn is_ident_like(node: &SyntaxNode) -> bool {
+    use SyntaxKind::*;
+    let k = node.kind();
+    matches!(k, Ident | MathIdent | Underscore)
+        || (matches!(k, Error) && can_be_ident(node))
+        || k.is_keyword()
+}
+
+fn can_be_ident(node: &SyntaxNode) -> bool {
+    typst::syntax::is_ident(node.text())
 }
 
 /// A mode in which a text document is interpreted.

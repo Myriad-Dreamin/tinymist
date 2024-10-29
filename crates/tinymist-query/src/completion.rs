@@ -4,11 +4,12 @@ use lsp_types::{
 };
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
+use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     analysis::{BuiltinTy, InsTy, Ty},
     prelude::*,
-    syntax::DerefTarget,
+    syntax::{is_ident_like, DerefTarget},
     upstream::{autocomplete, complete_path, CompletionContext},
     StatefulRequest,
 };
@@ -96,13 +97,14 @@ impl StatefulRequest for CompletionRequest {
         }
 
         // Do some completion specific to the deref target
-        let mut match_ident = None;
+        let mut ident_like = None;
         let mut completion_result = None;
         let is_callee = matches!(deref_target, Some(DerefTarget::Callee(..)));
         match deref_target {
-            Some(DerefTarget::Callee(v) | DerefTarget::VarAccess(v)) => {
-                if v.is::<ast::Ident>() {
-                    match_ident = Some(v);
+            Some(DerefTarget::Callee(..) | DerefTarget::VarAccess(..)) => {
+                let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+                if is_ident_like(&node) {
+                    ident_like = Some(node);
                 }
             }
             Some(DerefTarget::ImportPath(v) | DerefTarget::IncludePath(v)) => {
@@ -169,9 +171,9 @@ impl StatefulRequest for CompletionRequest {
             let _ = ic;
 
             let replace_range;
-            if match_ident.as_ref().is_some_and(|i| i.offset() == offset) {
-                let match_ident = match_ident.unwrap();
-                let mut rng = match_ident.range();
+            if ident_like.as_ref().is_some_and(|i| i.offset() == offset) {
+                let ident_like = ident_like.unwrap();
+                let mut rng = ident_like.range();
                 let ident_prefix = source.text()[rng.start..cursor].to_string();
 
                 completions.retain(|c| {
@@ -191,7 +193,7 @@ impl StatefulRequest for CompletionRequest {
                 });
 
                 // if modifying some arguments, we need to truncate and add a comma
-                if !is_callee && cursor != rng.end && is_arg_like_context(&match_ident) {
+                if !is_callee && cursor != rng.end && is_arg_like_context(&ident_like) {
                     // extend comma
                     for c in completions.iter_mut() {
                         let apply = match &mut c.apply {

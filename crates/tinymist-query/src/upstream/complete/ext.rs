@@ -14,7 +14,7 @@ use typst::visualize::Color;
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::adt::interner::Interned;
 use crate::analysis::{resolve_call_target, BuiltinTy, PathPreference, Ty};
-use crate::syntax::{param_index_at_leaf, CheckTarget};
+use crate::syntax::{is_ident_like, param_index_at_leaf, CheckTarget};
 use crate::upstream::complete::complete_code;
 use crate::upstream::plain_docs_sentence;
 
@@ -1082,6 +1082,11 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         .ctx
         .literal_type_of_node(ctx.leaf.clone())
         .filter(|ty| !matches!(ty, Ty::Any))?;
+
+    // adjust the completion position
+    if is_ident_like(&ctx.leaf) {
+        ctx.from = ctx.leaf.offset();
+    }
 
     log::debug!("complete_type: ty  {:?} -> {ty:#?}", ctx.leaf);
 
