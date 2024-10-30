@@ -909,7 +909,7 @@ fn type_completion(
                 } else {
                     ctx.completions.push(Completion {
                         kind: CompletionKind::Syntax,
-                        label: ty.long_name().into(),
+                        label: ty.short_name().into(),
                         apply: Some(eco_format!("${{{ty}}}")),
                         detail: Some(eco_format!("A value of type {ty}.")),
                         ..Completion::default()

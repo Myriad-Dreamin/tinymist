@@ -256,7 +256,7 @@ fn def_tooltip(
             results.push(MarkedString::LanguageString(LanguageString {
                 language: "typc".to_owned(),
                 value: format!(
-                    "let {name}({params}){result};",
+                    "let {name}{params}{result};",
                     name = def.name(),
                     params = ParamTooltip(sig.as_ref()),
                     result =
@@ -372,7 +372,7 @@ impl fmt::Display for ParamTooltip<'_> {
         let Some(sig) = self.0 else {
             return Ok(());
         };
-        sig.fmt(f)
+        sig.print(f)
     }
 }
 

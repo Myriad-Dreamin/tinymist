@@ -96,7 +96,7 @@ const primitiveFunctions = {
 
 const primitiveTypes: textmate.PatternMatch = {
   match:
-    /\b(auto|any|none|false|true|str|int|float|bool|length|content)\b(?!-)/,
+    /\b(any|str|int|float|bool|length|content|array|dictionary|arguments)\b(?!-)/,
   name: "entity.name.type.primitive.typst",
 };
 
@@ -380,7 +380,12 @@ const markupEnterCode: textmate.Pattern = {
     ),
     enterExpression(
       "entity.name.type.primitive.hash.typst",
-      /(?=(?:auto|any|none|false|true|str|int|float|bool|length|content)\b(?!-))/
+      /(?=(?:any|str|int|float|bool|length|content|array|dictionary|arguments)\b(?!-))/
+    ),
+    enterExpression("keyword.other.none.hash.typst", /(?=(?:none)\b(?!-))/),
+    enterExpression(
+      "constant.language.boolean.hash.typst",
+      /(?=(?:false|true)\b(?!-))/
     ),
     enterExpression(
       "entity.name.function.hash.typst",
@@ -421,20 +426,25 @@ const floatUnit = (unit: RegExp, canDotSuff: boolean) =>
     FLOAT_OR_INT.source + (canDotSuff ? "" : "(?<!\\.)") + unit.source
   );
 
-const constants: textmate.Pattern = {
+const keywordConstants: textmate.Pattern = {
   patterns: [
     {
-      name: "constant.language.none.typst",
+      name: "keyword.other.none.typst",
       match: /(?<!\)|\]|\})\bnone\b(?!-)/,
     },
     {
-      name: "constant.language.auto.typst",
+      name: "keyword.other.auto.typst",
       match: /(?<!\)|\]|\})\bauto\b(?!-)/,
     },
     {
       name: "constant.language.boolean.typst",
-      match: /(?<!\)|\]|\})\b(true|false)\b(?!-)/,
+      match: /(?<!\)|\]|\})\b(false|true)\b(?!-)/,
     },
+  ],
+};
+
+const constants: textmate.Pattern = {
+  patterns: [
     {
       name: "constant.numeric.length.typst",
       match: floatUnit(/(mm|pt|cm|in|em)($|\b)/, false),
@@ -522,6 +532,7 @@ const expressions = (): textmate.Grammar => {
       { include: "#primitiveFunctions" },
       { include: "#primitiveTypes" },
       // todo: enable if only if for completely right grammar
+      { include: "#keywordConstants" },
       { include: "#identifier" },
       { include: "#constants" },
       {
@@ -1373,6 +1384,7 @@ export const typst: textmate.Grammar = {
     markup,
     markupEnterCode,
     code,
+    keywordConstants,
     constants,
 
     primitiveColors,

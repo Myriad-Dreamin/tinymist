@@ -4,7 +4,7 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/annotation_sum.typ
 ---
 "args" = Args
-"sum" = (...: ( ⪯ Array<Type(integer)>)) => None
+"sum" = (...: ( ⪯ Array<Type(int)>)) => None
 ---
 65..68 -> @sum
 71..75 -> @args

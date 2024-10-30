@@ -90,7 +90,7 @@ impl Expr {
 
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        ExprFormatter::new(f).write_expr(self)
+        ExprFormatter::new(f, false).write_expr(self)
     }
 }
 
@@ -571,7 +571,15 @@ pub enum Pattern {
 
 impl fmt::Display for Pattern {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        ExprFormatter::new(f).write_pattern(self)
+        ExprFormatter::new(f, false).write_pattern(self)
+    }
+}
+
+impl Pattern {
+    pub(crate) fn repr(&self) -> EcoString {
+        let mut s = EcoString::new();
+        let _ = ExprFormatter::new(&mut s, true).write_pattern(self);
+        s
     }
 }
 
@@ -847,14 +855,15 @@ impl_internable!(
     ApplyExpr,
 );
 
-struct ExprFormatter<'a, 'b> {
-    f: &'a mut fmt::Formatter<'b>,
+struct ExprFormatter<'a, T: fmt::Write> {
+    f: &'a mut T,
+    repr: bool,
     indent: usize,
 }
 
-impl<'a, 'b> ExprFormatter<'a, 'b> {
-    fn new(f: &'a mut fmt::Formatter<'b>) -> Self {
-        Self { f, indent: 0 }
+impl<'a, T: fmt::Write> ExprFormatter<'a, T> {
+    fn new(f: &'a mut T, repr: bool) -> Self {
+        Self { f, repr, indent: 0 }
     }
 
     fn write_decl(&mut self, d: &Decl) -> fmt::Result {
@@ -1043,6 +1052,10 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
     }
 
     fn write_func(&mut self, func: &Interned<FuncExpr>) -> fmt::Result {
+        if self.repr {
+            return self.write_decl(&func.decl);
+        }
+
         write!(self.f, "func[{:?}](", func.decl)?;
         self.write_pattern_sig(&func.params)?;
         write!(self.f, " = ")?;
@@ -1130,12 +1143,20 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
     }
 
     fn write_contextual(&mut self, c: &Interned<Expr>) -> fmt::Result {
+        if self.repr {
+            return self.f.write_str("content");
+        }
+
         self.f.write_str("contextual(")?;
         self.write_expr(c)?;
         self.f.write_str(")")
     }
 
     fn write_conditional(&mut self, c: &Interned<IfExpr>) -> fmt::Result {
+        if self.repr {
+            return self.f.write_str("Expr(..)");
+        }
+
         self.f.write_str("if(")?;
         self.write_expr(&c.cond)?;
         self.f.write_str(", then = ")?;
@@ -1146,6 +1167,10 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
     }
 
     fn write_while_loop(&mut self, w: &Interned<WhileExpr>) -> fmt::Result {
+        if self.repr {
+            return self.f.write_str("Expr(..)");
+        }
+
         self.f.write_str("while(")?;
         self.write_expr(&w.cond)?;
         self.f.write_str(", ")?;
@@ -1154,6 +1179,10 @@ impl<'a, 'b> ExprFormatter<'a, 'b> {
     }
 
     fn write_for_loop(&mut self, f: &Interned<ForExpr>) -> fmt::Result {
+        if self.repr {
+            return self.f.write_str("Expr(..)");
+        }
+
         self.f.write_str("for(")?;
         self.write_pattern(&f.pattern)?;
         self.f.write_str(", ")?;

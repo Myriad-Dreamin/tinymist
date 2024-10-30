@@ -207,17 +207,19 @@ pub type UntypedSignatureDocs = SignatureDocsT<()>;
 /// Documentation about a signature.
 pub type SignatureDocs = SignatureDocsT<TypeRepr>;
 
-impl fmt::Display for SignatureDocs {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl SignatureDocs {
+    /// Get the markdown representation of the documentation.
+    pub fn print(&self, f: &mut impl std::fmt::Write) -> fmt::Result {
         let mut is_first = true;
-        let mut write_sep = |f: &mut fmt::Formatter<'_>| {
+        let mut write_sep = |f: &mut dyn std::fmt::Write| {
             if is_first {
                 is_first = false;
-                return Ok(());
+                return f.write_str("\n  ");
             }
-            f.write_str(", ")
+            f.write_str(",\n  ")
         };
 
+        f.write_char('(')?;
         for p in &self.pos {
             write_sep(f)?;
             f.write_str(&p.name)?;
@@ -246,7 +248,7 @@ impl fmt::Display for SignatureDocs {
                 let v = v.as_deref().unwrap_or("any");
                 let mut v = v.trim();
                 if v.starts_with('{') && v.ends_with('}') && v.len() > 30 {
-                    v = "{ ... }"
+                    v = "{ .. }"
                 }
                 if v.starts_with('`') && v.ends_with('`') && v.len() > 30 {
                     v = "raw"
@@ -258,9 +260,17 @@ impl fmt::Display for SignatureDocs {
                 if let Some(t) = t {
                     write!(f, ": {t}")?;
                 }
-                write!(f, " = {v}")?;
+                if v.contains('\n') {
+                    write!(f, " = {}", v.replace("\n", "\n  "))?;
+                } else {
+                    write!(f, " = {v}")?;
+                }
             }
         }
+        if !is_first {
+            f.write_str(",\n")?;
+        }
+        f.write_char(')')?;
 
         Ok(())
     }
@@ -303,7 +313,7 @@ fn format_ty(ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> TypeRepr {
     match doc_ty {
         Some(doc_ty) => doc_ty(ty),
         None => ty
-            .and_then(|ty| ty.describe())
+            .and_then(|ty| ty.repr())
             .map(|short| (short, format!("{ty:?}"))),
     }
 }

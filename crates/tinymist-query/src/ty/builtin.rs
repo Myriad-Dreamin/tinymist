@@ -263,7 +263,7 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::Inset => write!(f, "Inset"),
             BuiltinTy::Outset => write!(f, "Outset"),
             BuiltinTy::Radius => write!(f, "Radius"),
-            BuiltinTy::Type(ty) => write!(f, "Type({})", ty.long_name()),
+            BuiltinTy::Type(ty) => write!(f, "Type({})", ty.short_name()),
             BuiltinTy::Element(e) => e.fmt(f),
             BuiltinTy::Tag(tag) => {
                 let (name, id) = tag.as_ref();

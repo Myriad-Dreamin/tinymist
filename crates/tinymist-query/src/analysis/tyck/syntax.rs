@@ -218,7 +218,7 @@ impl<'a> TypeChecker<'a> {
                     name: name.clone(),
                     docs: param_doc.docs.clone(),
                     cano_type: (),
-                    default: Some(eco_format!("{exp}")),
+                    default: Some(exp.repr()),
                     attrs: ParamAttrs::named(),
                 },
             );

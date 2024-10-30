@@ -439,6 +439,6 @@ mod tests {
 
     #[test]
     fn test_pkgs() {
-        snapshot_testing("completion-pkgs", &run(TestConfig { pkg_mode: true }));
+        snapshot_testing("pkgs", &run(TestConfig { pkg_mode: true }));
     }
 }
