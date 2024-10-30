@@ -10,7 +10,7 @@ use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{FileId, Span, VirtualPath};
 use typst::World;
 
-use crate::docs::{file_id_repr, module_docs, DefDocs, SymbolsInfo};
+use crate::docs::{file_id_repr, module_docs, DefDocs, PackageDefInfo};
 use crate::LocalContext;
 
 /// Check Package.
@@ -37,7 +37,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
 
     ctx.preload_package(entry_point);
 
-    let SymbolsInfo { root, module_uses } = module_docs(ctx, entry_point)?;
+    let PackageDefInfo { root, module_uses } = module_docs(ctx, entry_point)?;
 
     log::debug!("module_uses: {module_uses:#?}");
 
@@ -62,7 +62,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
     let package_meta = jbase64(&meta);
     let _ = writeln!(md, "<!-- begin:package {package_meta} -->");
 
-    let mut modules_to_generate = vec![(root.head.name.clone(), root)];
+    let mut modules_to_generate = vec![(root.name.clone(), root)];
     let mut generated_modules = HashSet::new();
     let mut file_ids: IndexSet<FileId> = IndexSet::new();
 
@@ -82,11 +82,11 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
     };
 
     while !modules_to_generate.is_empty() {
-        for (parent_ident, sym) in std::mem::take(&mut modules_to_generate) {
+        for (parent_ident, def) in std::mem::take(&mut modules_to_generate) {
             // parent_ident, symbols
-            let symbols = sym.children;
+            let children = def.children;
 
-            let module_val = sym.head.decl.as_ref().unwrap();
+            let module_val = def.decl.as_ref().unwrap();
             let fid = module_val.file_id();
             let aka = fid.map(&mut akas).unwrap_or_default();
 
@@ -111,15 +111,15 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
             }
             let m = jbase64(&ModuleInfo {
                 prefix: primary.as_str().into(),
-                name: sym.head.name.clone(),
+                name: def.name.clone(),
                 loc: persist_fid,
                 parent_ident: parent_ident.clone(),
                 aka,
             });
             let _ = writeln!(md, "<!-- begin:module {primary} {m} -->");
 
-            for mut sym in symbols {
-                let span = sym.head.decl.as_ref().map(|d| d.span());
+            for mut child in children {
+                let span = child.decl.as_ref().map(|d| d.span());
                 let fid_range = span.and_then(|v| {
                     v.id().and_then(|e| {
                         let fid = file_ids.insert_full(e).0;
@@ -128,13 +128,13 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                         Some((fid, rng.start, rng.end))
                     })
                 });
-                let sym_fid = sym.head.decl.as_ref().and_then(|d| d.file_id());
-                let sym_fid = sym_fid.or_else(|| span.and_then(Span::id)).or(fid);
+                let child_fid = child.decl.as_ref().and_then(|d| d.file_id());
+                let child_fid = child_fid.or_else(|| span.and_then(Span::id)).or(fid);
                 let span = fid_range.or_else(|| {
-                    let fid = sym_fid?;
+                    let fid = child_fid?;
                     Some((file_ids.insert_full(fid).0, 0, 0))
                 });
-                sym.head.loc = span;
+                child.loc = span;
                 // .ok_or_else(|| {
                 //     let err = format!("failed to convert docs in {title}").replace(
                 //         "-->", "—>", // avoid markdown comment
@@ -142,7 +142,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                 //     log::error!("{err}");
                 //     err
                 // })
-                let docs = sym.head.parsed_docs.clone();
+                let docs = child.parsed_docs.clone();
                 //             Err(e) => {
                 //                 let err = format!("failed to convert docs: {e}").replace(
                 //                     "-->", "—>", // avoid markdown comment
@@ -154,8 +154,8 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                 let convert_err = None::<EcoString>;
                 match &docs {
                     Some(docs) => {
-                        sym.head.parsed_docs = Some(docs.clone());
-                        sym.head.docs = None;
+                        child.parsed_docs = Some(docs.clone());
+                        child.docs = None;
                     }
                     None => {
                         // let err = format!("failed to convert docs in {title}:
@@ -168,53 +168,54 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                 }
 
                 let ident = if !primary.is_empty() {
-                    eco_format!("symbol-{}-{primary}.{}", sym.head.kind, sym.head.name)
+                    eco_format!("symbol-{}-{primary}.{}", child.kind, child.name)
                 } else {
-                    eco_format!("symbol-{}-{}", sym.head.kind, sym.head.name)
+                    eco_format!("symbol-{}-{}", child.kind, child.name)
                 };
-                let _ = writeln!(md, "### {}: {} in {primary}", sym.head.kind, sym.head.name);
+                let _ = writeln!(md, "### {}: {} in {primary}", child.kind, child.name);
 
-                if sym.head.export_again {
-                    if let Some(fid) = sym_fid {
+                if child.is_external {
+                    if let Some(fid) = child_fid {
                         let lnk = if fid.package() == Some(for_spec) {
                             let sub_aka = akas(fid);
                             let sub_primary = sub_aka.first().cloned().unwrap_or_default();
-                            sym.head.external_link = Some(format!(
+                            child.external_link = Some(format!(
                                 "#symbol-{}-{sub_primary}.{}",
-                                sym.head.kind, sym.head.name
+                                child.kind, child.name
                             ));
-                            format!("#{}-{}-in-{sub_primary}", sym.head.kind, sym.head.name)
+                            format!("#{}-{}-in-{sub_primary}", child.kind, child.name)
                                 .replace(".", "")
                         } else if let Some(spec) = fid.package() {
                             let lnk = format!(
                                 "https://typst.app/universe/package/{}/{}",
                                 spec.name, spec.version
                             );
-                            sym.head.external_link = Some(lnk.clone());
+                            child.external_link = Some(lnk.clone());
                             lnk
                         } else {
                             let lnk: String = "https://typst.app/docs".into();
-                            sym.head.external_link = Some(lnk.clone());
+                            child.external_link = Some(lnk.clone());
                             lnk
                         };
                         let _ = writeln!(md, "[Symbol Docs]({lnk})\n");
                     }
                 }
 
-                let head = jbase64(&sym.head);
+                let child_children = std::mem::take(&mut child.children);
+                let head = jbase64(&child);
                 let _ = writeln!(md, "<!-- begin:symbol {ident} {head} -->");
 
-                if let Some(DefDocs::Function(sig)) = &sym.head.parsed_docs {
+                if let Some(DefDocs::Function(sig)) = &child.parsed_docs {
                     let _ = writeln!(md, "<!-- begin:sig -->");
                     let _ = writeln!(md, "```typc");
-                    let _ = write!(md, "let {}", sym.head.name);
+                    let _ = write!(md, "let {}", child.name);
                     let _ = sig.print(&mut md);
                     let _ = writeln!(md, ";");
                     let _ = writeln!(md, "```");
                     let _ = writeln!(md, "<!-- end:sig -->");
                 }
 
-                match (&sym.head.parsed_docs, convert_err) {
+                match (&child.parsed_docs, convert_err) {
                     (_, Some(err)) => {
                         let err = format!("failed to convert docs in {title}: {err}").replace(
                             "-->", "—>", // avoid markdown comment
@@ -244,8 +245,8 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                     (None, None) => {}
                 }
 
-                let plain_docs = sym.head.docs.as_deref();
-                let plain_docs = plain_docs.or(sym.head.oneliner.as_deref());
+                let plain_docs = child.docs.as_deref();
+                let plain_docs = plain_docs.or(child.oneliner.as_deref());
 
                 if let Some(docs) = plain_docs {
                     let contains_code = docs.contains("```");
@@ -258,9 +259,9 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                     }
                 }
 
-                if !sym.children.is_empty() {
-                    log::debug!("sub_fid: {sym_fid:?}");
-                    match sym_fid {
+                if !child_children.is_empty() {
+                    log::debug!("sub_fid: {child_fid:?}");
+                    match child_fid {
                         Some(fid) => {
                             let aka = akas(fid);
                             let primary = aka.first().cloned().unwrap_or_default();
@@ -268,7 +269,8 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                             let _ = writeln!(md, "[Module Docs](#{link})\n");
 
                             if generated_modules.insert(fid) {
-                                modules_to_generate.push((ident.clone(), sym));
+                                child.children = child_children;
+                                modules_to_generate.push((ident.clone(), child));
                             }
                         }
                         None => {
