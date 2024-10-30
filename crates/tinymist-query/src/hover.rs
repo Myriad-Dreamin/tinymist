@@ -28,7 +28,7 @@ impl StatefulRequest for HoverRequest {
 
     fn request(
         self,
-        ctx: &mut AnalysisContext,
+        ctx: &mut LocalContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let doc_ref = doc.as_ref().map(|doc| doc.document.as_ref());
@@ -71,7 +71,7 @@ impl StatefulRequest for HoverRequest {
             }
         };
 
-        if ctx.analysis.enable_periscope {
+        if let Some(p) = ctx.analysis.periscope.clone() {
             if let Some(doc) = doc.clone() {
                 let position = jump_from_cursor(&doc.document, &source, cursor);
                 let position = position.or_else(|| {
@@ -96,7 +96,7 @@ impl StatefulRequest for HoverRequest {
                 });
 
                 log::info!("telescope position: {:?}", position);
-                let content = position.and_then(|pos| ctx.resources.periscope_at(ctx, doc, pos));
+                let content = position.and_then(|pos| p.periscope_at(ctx, doc, pos));
                 if let Some(preview_content) = content {
                     contents = format!("{preview_content}\n---\n{contents}");
                 }
@@ -111,7 +111,7 @@ impl StatefulRequest for HoverRequest {
 }
 
 fn def_tooltip(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
     source: &Source,
     document: Option<&VersionedDocument>,
     cursor: usize,
@@ -212,7 +212,7 @@ fn def_tooltip(
     }
 }
 
-fn star_tooltip(ctx: &mut AnalysisContext, mut node: &LinkedNode) -> Option<HoverContents> {
+fn star_tooltip(ctx: &mut LocalContext, mut node: &LinkedNode) -> Option<HoverContents> {
     if !matches!(node.kind(), SyntaxKind::Star) {
         return None;
     }
@@ -233,7 +233,7 @@ fn star_tooltip(ctx: &mut AnalysisContext, mut node: &LinkedNode) -> Option<Hove
 }
 
 fn link_tooltip(
-    ctx: &mut AnalysisContext<'_>,
+    ctx: &mut LocalContext,
     mut node: &LinkedNode,
     cursor: usize,
 ) -> Option<HoverContents> {

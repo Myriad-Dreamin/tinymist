@@ -35,7 +35,7 @@ impl StatefulRequest for RenameRequest {
 
     fn request(
         self,
-        ctx: &mut AnalysisContext,
+        ctx: &mut LocalContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
@@ -117,7 +117,7 @@ impl StatefulRequest for RenameRequest {
 }
 
 pub(crate) fn do_rename_file(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
     def_fid: TypstFileId,
     diff: PathBuf,
     edits: &mut HashMap<Url, Vec<TextEdit>>,
@@ -167,7 +167,7 @@ pub(crate) fn edits_to_document_changes(
 }
 
 fn rename_importer(
-    ctx: &AnalysisContext,
+    ctx: &LocalContext,
     src: &Source,
     span: Span,
     diff: &Path,

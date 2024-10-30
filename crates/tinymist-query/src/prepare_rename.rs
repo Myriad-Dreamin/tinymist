@@ -35,7 +35,7 @@ impl StatefulRequest for PrepareRenameRequest {
 
     fn request(
         self,
-        ctx: &mut AnalysisContext,
+        ctx: &mut LocalContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
@@ -59,7 +59,7 @@ impl StatefulRequest for PrepareRenameRequest {
 }
 
 pub(crate) fn prepare_renaming(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
     deref_target: &DerefTarget,
     def: &Definition,
 ) -> Option<(String, Option<LspRange>)> {

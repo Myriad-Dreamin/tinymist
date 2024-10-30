@@ -17,7 +17,7 @@ impl StatefulRequest for WillRenameFilesRequest {
 
     fn request(
         self,
-        ctx: &mut AnalysisContext,
+        ctx: &mut LocalContext,
         _doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let mut edits: HashMap<Url, Vec<TextEdit>> = HashMap::new();

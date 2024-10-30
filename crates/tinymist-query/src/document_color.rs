@@ -24,7 +24,7 @@ pub struct DocumentColorRequest {
 impl SemanticRequest for DocumentColorRequest {
     type Response = Vec<ColorInformation>;
 
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         get_color_exprs(ctx, &source)
     }

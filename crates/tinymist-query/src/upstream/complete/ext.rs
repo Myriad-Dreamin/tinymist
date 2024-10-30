@@ -20,7 +20,7 @@ use crate::upstream::plain_docs_sentence;
 
 use crate::{completion_kind, prelude::*, LspCompletion};
 
-impl<'a, 'w> CompletionContext<'a, 'w> {
+impl<'a> CompletionContext<'a> {
     pub fn world(&self) -> &LspWorld {
         self.ctx.world()
     }
@@ -456,7 +456,7 @@ impl<'a, 'w> CompletionContext<'a, 'w> {
     }
 }
 
-fn describe_value(ctx: &mut AnalysisContext, v: &Value) -> EcoString {
+fn describe_value(ctx: &mut LocalContext, v: &Value) -> EcoString {
     match v {
         Value::Func(f) => {
             let mut f = f;
@@ -555,7 +555,7 @@ pub fn value_to_completion_kind(value: &Value) -> CompletionKind {
 
 /// Add completions for the parameters of a function.
 pub fn param_completions<'a>(
-    ctx: &mut CompletionContext<'a, '_>,
+    ctx: &mut CompletionContext<'a>,
     callee: ast::Expr<'a>,
     set: bool,
     args: ast::Args<'a>,
@@ -695,7 +695,7 @@ pub fn param_completions<'a>(
 }
 
 fn type_completion(
-    ctx: &mut CompletionContext<'_, '_>,
+    ctx: &mut CompletionContext<'_>,
     infer_type: &Ty,
     docs: Option<&str>,
 ) -> Option<()> {
@@ -963,7 +963,7 @@ fn type_completion(
 
 /// Add completions for the values of a named function parameter.
 pub fn named_param_value_completions<'a>(
-    ctx: &mut CompletionContext<'a, '_>,
+    ctx: &mut CompletionContext<'a>,
     callee: ast::Expr<'a>,
     name: &Interned<str>,
     ty: Option<&Ty>,
@@ -1100,7 +1100,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
 }
 
 pub fn complete_path(
-    ctx: &AnalysisContext,
+    ctx: &LocalContext,
     v: Option<LinkedNode>,
     source: &Source,
     cursor: usize,

@@ -26,7 +26,7 @@ pub use typst::syntax::{
 };
 pub use typst::World;
 
-pub use crate::analysis::{AnalysisContext, Definition, LocalContext};
+pub use crate::analysis::{Definition, LocalContext};
 pub use crate::docs::DefDocs;
 pub use crate::lsp_typst_boundary::{
     lsp_to_typst, path_to_url, typst_to_lsp, LspDiagnostic, LspRange, LspSeverity,

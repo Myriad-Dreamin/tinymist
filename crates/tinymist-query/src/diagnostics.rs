@@ -7,7 +7,7 @@ pub type DiagnosticsMap = HashMap<Url, Vec<LspDiagnostic>>;
 
 /// Converts a list of Typst diagnostics to LSP diagnostics.
 pub fn convert_diagnostics<'a>(
-    ctx: &AnalysisContext,
+    ctx: &LocalContext,
     errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
 ) -> DiagnosticsMap {
     errors
@@ -24,7 +24,7 @@ pub fn convert_diagnostics<'a>(
 }
 
 fn convert_diagnostic(
-    ctx: &AnalysisContext,
+    ctx: &LocalContext,
     typst_diagnostic: &TypstDiagnostic,
 ) -> anyhow::Result<(Url, LspDiagnostic)> {
     let uri;
@@ -64,7 +64,7 @@ fn convert_diagnostic(
 }
 
 fn tracepoint_to_relatedinformation(
-    project: &AnalysisContext,
+    project: &LocalContext,
     tracepoint: &Spanned<Tracepoint>,
     position_encoding: PositionEncoding,
 ) -> anyhow::Result<Option<DiagnosticRelatedInformation>> {
@@ -89,7 +89,7 @@ fn tracepoint_to_relatedinformation(
 }
 
 fn diagnostic_related_information(
-    project: &AnalysisContext,
+    project: &LocalContext,
     typst_diagnostic: &TypstDiagnostic,
     position_encoding: PositionEncoding,
 ) -> anyhow::Result<Vec<DiagnosticRelatedInformation>> {

@@ -26,7 +26,7 @@ impl SemanticRequest for SemanticTokensFullRequest {
     type Response = SemanticTokensResult;
 
     /// Handles the request to compute the semantic tokens for a given document.
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let ei = ctx.expr_stage(&source);
         let token_ctx = &ctx.analysis.tokens_ctx;

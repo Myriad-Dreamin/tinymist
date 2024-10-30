@@ -12,7 +12,7 @@ use serde_json::Value as JsonValue;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::docs::PackageInfo;
-use tinymist_query::{AnalysisContext, ExportKind, PageSelection};
+use tinymist_query::{LocalContextGuard, ExportKind, PageSelection};
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 
@@ -617,7 +617,7 @@ impl LanguageState {
     pub fn within_package<T>(
         &mut self,
         info: PackageInfo,
-        f: impl FnOnce(&mut AnalysisContext) -> LspResult<T> + Send + Sync,
+        f: impl FnOnce(&mut LocalContextGuard) -> LspResult<T> + Send + Sync,
     ) -> LspResult<impl Future<Output = LspResult<T>>> {
         let handle: std::sync::Arc<actor::typ_client::CompileHandler> =
             self.primary().handle.clone();

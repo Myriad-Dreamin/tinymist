@@ -13,12 +13,12 @@ use typst::syntax::FileId;
 use crate::docs::file_id_repr;
 use crate::syntax::{Decl, DefKind, Expr, ExprInfo};
 use crate::ty::Interned;
-use crate::AnalysisContext;
+use crate::LocalContext;
 
 use super::{get_manifest_id, DefDocs, PackageInfo};
 
 /// Get documentation of symbols in a package.
-pub fn package_module_docs(ctx: &mut AnalysisContext, pkg: &PackageInfo) -> StrResult<SymbolsInfo> {
+pub fn package_module_docs(ctx: &mut LocalContext, pkg: &PackageInfo) -> StrResult<SymbolsInfo> {
     let toml_id = get_manifest_id(pkg)?;
     let manifest = ctx.get_manifest(toml_id)?;
 
@@ -27,7 +27,7 @@ pub fn package_module_docs(ctx: &mut AnalysisContext, pkg: &PackageInfo) -> StrR
 }
 
 /// Get documentation of symbols in a module.
-pub fn module_docs(ctx: &mut AnalysisContext, entry_point: FileId) -> StrResult<SymbolsInfo> {
+pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<SymbolsInfo> {
     let mut aliases = HashMap::new();
     let mut extras = vec![];
 
@@ -111,15 +111,15 @@ pub struct SymbolsInfo {
     pub module_uses: HashMap<String, EcoVec<String>>,
 }
 
-struct ScanSymbolCtx<'a, 'w> {
-    ctx: &'a mut AnalysisContext<'w>,
+struct ScanSymbolCtx<'a> {
+    ctx: &'a mut LocalContext,
     for_spec: Option<&'a PackageSpec>,
     aliases: &'a mut HashMap<FileId, Vec<String>>,
     extras: &'a mut Vec<SymbolInfo>,
     root: FileId,
 }
 
-impl ScanSymbolCtx<'_, '_> {
+impl ScanSymbolCtx<'_> {
     fn module_sym(&mut self, path: EcoVec<&str>, ei: Arc<ExprInfo>) -> SymbolInfo {
         let name = {
             let stem = ei.fid.vpath().as_rooted_path().file_stem();
@@ -256,7 +256,7 @@ impl ScanSymbolCtx<'_, '_> {
 }
 
 fn create_head(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
     k: &str,
     decl: &Interned<Decl>,
     expr: Option<&Expr>,

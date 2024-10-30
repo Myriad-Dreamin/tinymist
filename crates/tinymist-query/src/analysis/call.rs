@@ -39,7 +39,7 @@ pub struct CallInfo {
 // todo: cache call
 /// Analyzes a function call.
 pub fn analyze_call(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
     source: Source,
     node: LinkedNode,
 ) -> Option<Arc<CallInfo>> {
@@ -64,7 +64,7 @@ pub fn analyze_call(
 /// Analyzes a function call without caching the result.
 // todo: testing
 pub fn analyze_call_no_cache(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
     source: Source,
     callee_node: LinkedNode,
     args: ast::Args<'_>,

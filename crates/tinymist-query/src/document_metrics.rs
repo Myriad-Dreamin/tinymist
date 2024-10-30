@@ -100,7 +100,7 @@ impl StatefulRequest for DocumentMetricsRequest {
 
     fn request(
         self,
-        ctx: &mut AnalysisContext,
+        ctx: &mut LocalContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let doc = doc?;
@@ -134,14 +134,14 @@ struct FontInfoValue {
     first_occur_column: Option<u32>,
 }
 
-struct DocumentMetricsWorker<'a, 'w> {
-    ctx: &'a mut AnalysisContext<'w>,
+struct DocumentMetricsWorker<'a> {
+    ctx: &'a mut LocalContext,
     span_info: HashMap<Arc<DataSource>, u32>,
     span_info2: Vec<DataSource>,
     font_info: HashMap<Font, FontInfoValue>,
 }
 
-impl<'a, 'w> DocumentMetricsWorker<'a, 'w> {
+impl<'a> DocumentMetricsWorker<'a> {
     fn work(&mut self, doc: &Document) -> Option<()> {
         for page in &doc.pages {
             self.work_frame(&page.frame)?;

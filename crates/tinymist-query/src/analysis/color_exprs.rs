@@ -7,7 +7,7 @@ use typst::visualize::Color;
 use super::prelude::*;
 
 /// Get color expressions from a source.
-pub fn get_color_exprs(ctx: &mut AnalysisContext, src: &Source) -> Option<Vec<ColorInformation>> {
+pub fn get_color_exprs(ctx: &mut LocalContext, src: &Source) -> Option<Vec<ColorInformation>> {
     let mut worker = ColorExprWorker {
         ctx,
         source: src.clone(),
@@ -18,13 +18,13 @@ pub fn get_color_exprs(ctx: &mut AnalysisContext, src: &Source) -> Option<Vec<Co
     Some(worker.colors)
 }
 
-struct ColorExprWorker<'a, 'w> {
-    ctx: &'a mut AnalysisContext<'w>,
+struct ColorExprWorker<'a> {
+    ctx: &'a mut LocalContext,
     source: Source,
     colors: Vec<ColorInformation>,
 }
 
-impl<'a, 'w> ColorExprWorker<'a, 'w> {
+impl<'a> ColorExprWorker<'a> {
     fn collect_colors(&mut self, node: LinkedNode) -> Option<()> {
         match node.kind() {
             SyntaxKind::FuncCall => {

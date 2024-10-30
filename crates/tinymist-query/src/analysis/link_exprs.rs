@@ -6,14 +6,14 @@ use super::prelude::*;
 use crate::path_to_url;
 
 /// Get link expressions from a source.
-pub fn get_link_exprs(ctx: &mut AnalysisContext, src: &Source) -> Option<Vec<(Range<usize>, Url)>> {
+pub fn get_link_exprs(ctx: &mut LocalContext, src: &Source) -> Option<Vec<(Range<usize>, Url)>> {
     let root = LinkedNode::new(src.root());
     get_link_exprs_in(ctx, &root)
 }
 
 /// Get link expressions in a source node.
 pub fn get_link_exprs_in(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
     node: &LinkedNode,
 ) -> Option<Vec<(Range<usize>, Url)>> {
     let mut worker = LinkStrWorker { ctx, links: vec![] };
@@ -21,12 +21,12 @@ pub fn get_link_exprs_in(
     Some(worker.links)
 }
 
-struct LinkStrWorker<'a, 'w> {
-    ctx: &'a mut AnalysisContext<'w>,
+struct LinkStrWorker<'a> {
+    ctx: &'a mut LocalContext,
     links: Vec<(Range<usize>, Url)>,
 }
 
-impl<'a, 'w> LinkStrWorker<'a, 'w> {
+impl<'a> LinkStrWorker<'a> {
     fn collect_links(&mut self, node: &LinkedNode) -> Option<()> {
         match node.kind() {
             // SyntaxKind::Link => { }

@@ -15,7 +15,7 @@ pub mod syntax;
 pub mod ty;
 mod upstream;
 
-pub use analysis::AnalysisContext;
+pub use analysis::{LocalContext, LocalContextGuard};
 pub use upstream::with_vm;
 
 mod diagnostics;
@@ -119,7 +119,7 @@ pub trait SemanticRequest {
     type Response;
 
     /// Request the information from the given context.
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response>;
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response>;
 }
 
 /// A request handler with given (semantic) analysis context and a versioned
@@ -131,7 +131,7 @@ pub trait StatefulRequest {
     /// Request the information from the given context.
     fn request(
         self,
-        ctx: &mut AnalysisContext,
+        ctx: &mut LocalContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response>;
 }

@@ -16,7 +16,7 @@ pub struct DocumentHighlightRequest {
 impl SemanticRequest for DocumentHighlightRequest {
     type Response = Vec<DocumentHighlight>;
 
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let cursor = ctx.to_typst_pos(self.position, &source)?;
 
@@ -44,15 +44,15 @@ impl SemanticRequest for DocumentHighlightRequest {
     }
 }
 
-struct DocumentHighlightWorker<'a, 'w> {
-    ctx: &'a mut AnalysisContext<'w>,
+struct DocumentHighlightWorker<'a> {
+    ctx: &'a mut LocalContext,
     current: &'a Source,
     highlights: Vec<DocumentHighlight>,
     worklist: Vec<LinkedNode<'a>>,
 }
 
-impl<'a, 'w> DocumentHighlightWorker<'a, 'w> {
-    fn new(ctx: &'a mut AnalysisContext<'w>, current: &'a Source) -> Self {
+impl<'a> DocumentHighlightWorker<'a> {
+    fn new(ctx: &'a mut LocalContext, current: &'a Source) -> Self {
         Self {
             ctx,
             current,
@@ -138,7 +138,7 @@ impl<'a, 'w> DocumentHighlightWorker<'a, 'w> {
 }
 
 fn highlight_func_returns(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
     node: &LinkedNode,
 ) -> Option<Vec<DocumentHighlight>> {
     let _ = ctx;

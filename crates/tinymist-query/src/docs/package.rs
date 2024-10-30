@@ -11,10 +11,10 @@ use typst::syntax::{FileId, Span, VirtualPath};
 use typst::World;
 
 use crate::docs::{file_id_repr, module_docs, DefDocs, SymbolsInfo};
-use crate::AnalysisContext;
+use crate::LocalContext;
 
 /// Check Package.
-pub fn check_package(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<()> {
+pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()> {
     let toml_id = get_manifest_id(spec)?;
     let manifest = ctx.get_manifest(toml_id)?;
 
@@ -25,7 +25,7 @@ pub fn check_package(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult
 }
 
 /// Generate full documents in markdown format
-pub fn package_docs(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<String> {
+pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<String> {
     log::info!("generate_md_docs {spec:?}");
 
     let mut md = String::new();
