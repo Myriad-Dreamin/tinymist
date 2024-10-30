@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_query::docs::PackageInfo;
-use tinymist_query::{LocalContextGuard, ExportKind, PageSelection};
+use tinymist_query::package::PackageInfo;
+use tinymist_query::{ExportKind, LocalContextGuard, PageSelection};
 use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 
@@ -607,7 +607,7 @@ impl LanguageState {
         info: PackageInfo,
     ) -> LspResult<impl Future<Output = LspResult<()>>> {
         self.within_package(info.clone(), move |a| {
-            tinymist_query::docs::check_package(a, &info)
+            tinymist_query::package::check_package(a, &info)
                 .map_err(map_string_err("failed to check package"))
                 .map_err(z_internal_error)
         })
@@ -632,13 +632,13 @@ impl LanguageState {
             let w = snap.world.as_ref();
 
             let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
-                let toml_id = tinymist_query::docs::get_manifest_id(&info)?;
+                let toml_id = tinymist_query::package::get_manifest_id(&info)?;
                 let toml_path = w.path_for_id(toml_id)?;
                 let pkg_root = toml_path.parent().ok_or_else(|| {
                     eco_format!("cannot get package root (parent of {toml_path:?})")
                 })?;
 
-                let manifest = tinymist_query::docs::get_manifest(w, toml_id)?;
+                let manifest = tinymist_query::package::get_manifest(w, toml_id)?;
                 let entry_point = toml_id.join(&manifest.package.entrypoint);
 
                 Ok(EntryState::new_rooted(pkg_root.into(), Some(entry_point)))

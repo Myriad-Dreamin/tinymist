@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use reflexo_typst::{Bytes, ImmutPath, TypstFileId};
-use tinymist_query::docs::get_manifest;
+use tinymist_query::package::get_manifest;
 use typst::diag::{bail, eco_format, FileError, FileResult, StrResult};
 use typst::syntax::package::{PackageSpec, TemplateInfo};
 use typst::syntax::VirtualPath;

@@ -4,12 +4,14 @@ use itertools::Either;
 use tinymist_derive::BindTyCtx;
 use typst::foundations::{Closure, ParamInfo};
 
-use super::{prelude::*, BoundChecker, Definition, DocSource, SharedContext, SigTy, TypeVar};
+use super::{
+    prelude::*, BoundChecker, Definition, DocSource, SharedContext, SigTy, SigWithTy, TypeVar,
+};
 use crate::analysis::PostTypeChecker;
 use crate::docs::{UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
 use crate::syntax::get_non_strict_def_target;
-use crate::ty::TyCtx;
 use crate::ty::TypeBounds;
+use crate::ty::{InsTy, TyCtx};
 use crate::upstream::truncated_repr;
 
 /// Describes a function parameter.
@@ -121,6 +123,17 @@ impl Signature {
         // todo: with stack
         primary
     }
+
+    pub(crate) fn param_shift(&self, _ctx: &mut LocalContext) -> usize {
+        match self {
+            Signature::Primary(_) => 0,
+            Signature::Partial(sig) => sig
+                .with_stack
+                .iter()
+                .map(|ws| ws.items.len())
+                .sum::<usize>(),
+        }
+    }
 }
 
 /// Describes a primary function signature.
@@ -200,9 +213,9 @@ impl PrimarySignature {
 #[derive(Debug, Clone)]
 pub struct ArgInfo {
     /// The argument's name.
-    pub name: Option<EcoString>,
-    /// The argument's value.
-    pub value: Option<Value>,
+    pub name: Option<StrRef>,
+    /// The argument's term.
+    pub term: Option<Ty>,
 }
 
 /// Describes a function argument list.
@@ -289,7 +302,7 @@ fn analyze_type_signature(
             };
 
             // todo: this will affect inlay hint: _var_with
-            let (_var_with, docstring) = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
+            let (var_with, docstring) = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
                 Some(UntypedDefDocs::Function(sig)) => (vec![], Either::Left(sig.as_ref())),
                 Some(UntypedDefDocs::Variable(d)) => find_alias_stack(&mut ty_ctx, &v, d)?,
                 _ => return None,
@@ -297,7 +310,7 @@ fn analyze_type_signature(
 
             let docstring = match docstring {
                 Either::Left(docstring) => docstring,
-                Either::Right(f) => return Some(ctx.type_of_func(f)),
+                Either::Right(f) => return Some(wind_stack(var_with, ctx.type_of_func(f))),
             };
 
             let mut param_specs = Vec::new();
@@ -356,13 +369,14 @@ fn analyze_type_signature(
                 });
             }
 
-            Some(Signature::Primary(Arc::new(PrimarySignature {
+            let sig = Signature::Primary(Arc::new(PrimarySignature {
                 docs: Some(docstring.docs.clone()),
                 param_specs,
                 has_fill_or_size_or_stroke,
                 sig_ty,
                 _broken,
-            })))
+            }));
+            Some(wind_stack(var_with, sig))
         }
         src @ (DocSource::Builtin(..) | DocSource::Ins(..)) => {
             Some(ctx.type_of_func(src.as_func()?))
@@ -370,17 +384,54 @@ fn analyze_type_signature(
     }
 }
 
+fn wind_stack(var_with: Vec<WithElem>, sig: Signature) -> Signature {
+    if var_with.is_empty() {
+        return sig;
+    }
+
+    let (primary, mut base_args) = match sig {
+        Signature::Primary(primary) => (primary, eco_vec![]),
+        Signature::Partial(partial) => (partial.signature.clone(), partial.with_stack.clone()),
+    };
+
+    let mut accepting = primary.pos().iter().skip(base_args.len());
+
+    // Ignoring docs at the moment
+    for (_d, w) in var_with {
+        if let Some(w) = w {
+            let mut items = eco_vec![];
+            for pos in w.with.positional_params() {
+                let Some(arg) = accepting.next() else {
+                    break;
+                };
+                items.push(ArgInfo {
+                    name: Some(arg.name.clone()),
+                    term: Some(pos.clone()),
+                });
+            }
+            // todo: ignored spread arguments
+            if !items.is_empty() {
+                base_args.push(ArgsInfo { items });
+            }
+        }
+    }
+
+    Signature::Partial(Arc::new(PartialSignature {
+        signature: primary,
+        with_stack: base_args,
+    }))
+}
+
+type WithElem<'a> = (&'a UntypedVarDocs, Option<Interned<SigWithTy>>);
+
 fn find_alias_stack<'a>(
     ctx: &'a mut PostTypeChecker,
     v: &Interned<TypeVar>,
     d: &'a UntypedVarDocs,
-) -> Option<(
-    Vec<&'a UntypedVarDocs>,
-    Either<&'a UntypedSignatureDocs, Func>,
-)> {
+) -> Option<(Vec<WithElem<'a>>, Either<&'a UntypedSignatureDocs, Func>)> {
     let mut checker = AliasStackChecker {
         ctx,
-        stack: vec![d],
+        stack: vec![(d, None)],
         res: None,
         checking_with: true,
     };
@@ -393,7 +444,7 @@ fn find_alias_stack<'a>(
 #[bind(ctx)]
 struct AliasStackChecker<'a, 'b> {
     ctx: &'a mut PostTypeChecker<'b>,
-    stack: Vec<&'a UntypedVarDocs>,
+    stack: Vec<WithElem<'a>>,
     res: Option<Either<&'a UntypedSignatureDocs, Func>>,
     checking_with: bool,
 }
@@ -420,7 +471,7 @@ impl<'a, 'b> BoundChecker for AliasStackChecker<'a, 'b> {
             }
             Some(UntypedDefDocs::Variable(d)) => {
                 self.checking_with = true;
-                self.stack.push(d);
+                self.stack.push((d, None));
                 self.check_var_rec(u, pol);
                 self.stack.pop();
                 self.checking_with = false;
@@ -437,6 +488,7 @@ impl<'a, 'b> BoundChecker for AliasStackChecker<'a, 'b> {
         match (self.checking_with, ty) {
             (true, Ty::With(w)) => {
                 log::debug!("collecting with {ty:?} {pol:?}");
+                self.stack.last_mut().unwrap().1 = Some(w.clone());
                 self.checking_with = false;
                 w.sig.bounds(pol, self);
                 self.checking_with = true;
@@ -485,7 +537,7 @@ fn analyze_dyn_signature(
                 .iter()
                 .map(|arg| ArgInfo {
                     name: arg.name.clone().map(From::from),
-                    value: Some(arg.value.v.clone()),
+                    term: Some(Ty::Value(InsTy::new(arg.value.v.clone()))),
                 })
                 .collect(),
         });

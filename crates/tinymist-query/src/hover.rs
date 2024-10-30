@@ -196,12 +196,6 @@ fn def_tooltip(
                 results.push(MarkedString::String(doc.hover_docs().into()));
             }
 
-            // if let Some(doc) = sig {
-            //     results.push(MarkedString::String(doc.def_docs().clone()));
-            // } else if let Some(doc) = DocTooltip::get(ctx, &def) {
-            //     results.push(MarkedString::String(doc));
-            // }
-
             if let Some(link) = ExternalDocLink::get(&def) {
                 actions.push(link);
             }
@@ -294,8 +288,7 @@ fn render_actions(results: &mut Vec<MarkedString>, actions: Vec<CommandLink>) {
         return;
     }
 
-    let g = actions.into_iter().join(" | ");
-    results.push(MarkedString::String(g));
+    results.push(MarkedString::String(actions.into_iter().join(" | ")));
 }
 
 struct ExternalDocLink;
