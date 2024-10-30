@@ -1,15 +1,11 @@
-pub use std::{
-    collections::HashMap,
-    iter,
-    ops::Range,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+pub use std::collections::HashMap;
+pub use std::iter;
+pub use std::ops::Range;
+pub use std::path::{Path, PathBuf};
+pub use std::sync::{Arc, LazyLock};
 
-pub use ecow::eco_vec;
-pub use ecow::EcoVec;
+pub use ecow::{eco_vec, EcoVec};
 pub use itertools::{Format, Itertools};
-pub use log::error;
 pub use lsp_types::{
     request::GotoDeclarationResponse, CodeAction, CodeActionKind, CodeActionOrCommand, CodeLens,
     ColorInformation, ColorPresentation, CompletionResponse, DiagnosticRelatedInformation,
@@ -24,16 +20,18 @@ pub use reflexo::vector::ir::DefId;
 pub use serde_json::Value as JsonValue;
 pub use typst::diag::{EcoString, FileResult, Tracepoint};
 pub use typst::foundations::Value;
-pub use typst::syntax::FileId as TypstFileId;
+pub use typst::syntax::ast::{self, AstNode};
 pub use typst::syntax::{
-    ast::{self, AstNode},
-    LinkedNode, Source, Spanned, SyntaxKind, SyntaxNode,
+    FileId as TypstFileId, LinkedNode, Source, Spanned, SyntaxKind, SyntaxNode,
 };
 pub use typst::World;
 
-pub use crate::analysis::{AnalysisContext, LocalContext};
+pub use crate::analysis::{AnalysisContext, Definition, LocalContext};
+pub use crate::docs::DefDocs;
 pub use crate::lsp_typst_boundary::{
     lsp_to_typst, path_to_url, typst_to_lsp, LspDiagnostic, LspRange, LspSeverity,
     PositionEncoding, TypstDiagnostic, TypstSeverity, TypstSpan,
 };
+pub use crate::syntax::{get_deref_target, Decl, DefKind};
+pub(crate) use crate::ty::PathPreference;
 pub use crate::{SemanticRequest, StatefulRequest, VersionedDocument};

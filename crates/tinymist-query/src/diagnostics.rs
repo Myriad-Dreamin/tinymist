@@ -15,7 +15,7 @@ pub fn convert_diagnostics<'a>(
         .flat_map(|error| {
             convert_diagnostic(ctx, error)
                 .map_err(move |conversion_err| {
-                    error!("could not convert Typst error to diagnostic: {conversion_err:?} error to convert: {error:?}");
+                    log::error!("could not convert Typst error to diagnostic: {conversion_err:?} error to convert: {error:?}");
                 })
         })
         .collect::<Vec<_>>()
