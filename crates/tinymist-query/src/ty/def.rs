@@ -21,7 +21,7 @@ use super::PackageId;
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
     analysis::BuiltinTy,
-    docs::UntypedSymbolDocs,
+    docs::UntypedDefDocs,
     syntax::{DeclExpr, UnaryOp},
 };
 
@@ -962,7 +962,7 @@ pub struct TypeScheme {
     /// The typing on definitions
     pub vars: FxHashMap<DeclExpr, TypeVarBounds>,
     /// The checked documentation of definitions
-    pub var_docs: FxHashMap<DeclExpr, Arc<UntypedSymbolDocs>>,
+    pub var_docs: FxHashMap<DeclExpr, Arc<UntypedDefDocs>>,
     /// The local binding of the type variable
     pub local_binds: snapshot_map::SnapshotMap<DeclExpr, Ty>,
     /// The typing on syntax structures

@@ -15,9 +15,8 @@ use typst::{
 
 use crate::{
     analysis::{QueryStatGuard, SharedContext},
-    docs::DocStringKind,
     prelude::*,
-    syntax::find_module_level_docs,
+    syntax::{find_module_level_docs, DefKind},
     ty::{BuiltinTy, InsTy, Interned, Ty},
 };
 
@@ -82,7 +81,7 @@ pub(crate) fn expr_of(
 
     let module_docstring = Arc::new(
         find_module_level_docs(&source)
-            .and_then(|docs| compute_docstring(&ctx, source.id(), docs, DocStringKind::Module))
+            .and_then(|docs| compute_docstring(&ctx, source.id(), docs, DefKind::Module))
             .unwrap_or_default(),
     );
 
@@ -275,7 +274,7 @@ impl<'a> ExprWorker<'a> {
         }
     }
 
-    fn check_docstring(&mut self, decl: &DeclExpr, kind: DocStringKind) {
+    fn check_docstring(&mut self, decl: &DeclExpr, kind: DefKind) {
         if let Some(docs) = self.comment_matcher.collect() {
             let docstring = compute_docstring(&self.ctx, self.fid, docs, kind);
             if let Some(docstring) = docstring {
@@ -427,7 +426,7 @@ impl<'a> ExprWorker<'a> {
 
                 let span = p.span();
                 let decl = Decl::pattern(span).into();
-                self.check_docstring(&decl, DocStringKind::Variable);
+                self.check_docstring(&decl, DefKind::Variable);
                 let pattern = self.check_pattern(p);
                 Expr::Let(Interned::new(LetExpr {
                     span,
@@ -443,7 +442,7 @@ impl<'a> ExprWorker<'a> {
             Some(name) => Decl::func(name).into(),
             None => Decl::closure(typed.span()).into(),
         };
-        self.check_docstring(&decl, DocStringKind::Function);
+        self.check_docstring(&decl, DefKind::Function);
         self.resolve_as(Decl::as_def(&decl, None));
 
         let (params, body) = self.with_scope(|this| {

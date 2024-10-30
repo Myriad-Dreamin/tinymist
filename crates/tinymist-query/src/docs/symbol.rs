@@ -7,64 +7,32 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
 use tinymist_world::LspWorld;
-use typst::foundations::{Bytes, Value};
-use typst::syntax::LinkedNode;
+use typst::foundations::Bytes;
 use typst::{
     diag::StrResult,
-    syntax::{FileId, VirtualPath},
+    syntax::{FileId, Span, VirtualPath},
 };
 
 use super::tidy::*;
-use crate::analysis::{ParamAttrs, ParamSpec, Signature, ToFunc};
+use crate::analysis::{ParamAttrs, ParamSpec, Signature};
 use crate::docs::library;
+use crate::prelude::*;
+use crate::ty::Ty;
 use crate::ty::{DocSource, Interned};
 use crate::upstream::plain_docs_sentence;
-use crate::{ty::Ty, AnalysisContext};
 
 type TypeRepr = Option<(/* short */ String, /* long */ String)>;
 type ShowTypeRepr<'a> = &'a mut dyn FnMut(Option<&Ty>) -> TypeRepr;
 
-/// Kind of a docstring.
-#[derive(Debug, Default, Clone, Copy, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum DocStringKind {
-    /// A docstring for a any constant.
-    #[default]
-    Constant,
-    /// A docstring for a function.
-    Function,
-    /// A docstring for a variable.
-    Variable,
-    /// A docstring for a module.
-    Module,
-    /// A docstring for a struct.
-    Struct,
-    /// A docstring for a reference.
-    Reference,
-}
-
-impl fmt::Display for DocStringKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Constant => write!(f, "constant"),
-            Self::Function => write!(f, "function"),
-            Self::Variable => write!(f, "variable"),
-            Self::Module => write!(f, "module"),
-            Self::Struct => write!(f, "struct"),
-            Self::Reference => write!(f, "reference"),
-        }
-    }
-}
-
 /// Documentation about a symbol (without type information).
-pub type UntypedSymbolDocs = SymbolDocsT<()>;
+pub type UntypedDefDocs = DefDocsT<()>;
 /// Documentation about a symbol.
-pub type SymbolDocs = SymbolDocsT<TypeRepr>;
+pub type DefDocs = DefDocsT<TypeRepr>;
 
 /// Documentation about a symbol.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
-pub enum SymbolDocsT<T> {
+pub enum DefDocsT<T> {
     /// Documentation about a function.
     #[serde(rename = "func")]
     Function(Box<SignatureDocsT<T>>),
@@ -82,7 +50,7 @@ pub enum SymbolDocsT<T> {
     },
 }
 
-impl<T> SymbolDocsT<T> {
+impl<T> DefDocsT<T> {
     /// Get the markdown representation of the documentation.
     pub fn docs(&self) -> &EcoString {
         match self {
@@ -94,37 +62,14 @@ impl<T> SymbolDocsT<T> {
     }
 }
 
-pub(crate) fn symbol_docs(
-    ctx: &mut AnalysisContext,
-    kind: DocStringKind,
-    sym_value: Option<&Value>,
-    docs: Option<&str>,
-    doc_ty: Option<ShowTypeRepr>,
-) -> Result<SymbolDocs, String> {
-    let signature =
-        sym_value.and_then(|e| signature_docs(&ctx.signature_dyn(e.to_func()?), doc_ty));
-    if let Some(signature) = signature {
-        return Ok(SymbolDocs::Function(Box::new(signature)));
-    }
-
-    if let Some(docs) = &docs {
-        match convert_docs(ctx.world(), docs) {
-            Ok(content) => {
-                let docs = identify_docs(kind, content.clone())
-                    .unwrap_or(SymbolDocs::Plain { docs: content });
-                return Ok(docs);
-            }
-            Err(e) => {
-                let err = format!("failed to convert docs: {e}").replace(
-                    "-->", "—>", // avoid markdown comment
-                );
-                log::error!("{err}");
-                return Err(err);
-            }
+impl DefDocs {
+    /// Get full documentation for the signature.
+    pub fn hover_docs(&self) -> EcoString {
+        match self {
+            DefDocs::Function(docs) => docs.hover_docs().clone(),
+            _ => plain_docs_sentence(self.docs()),
         }
     }
-
-    Ok(SymbolDocs::Plain { docs: "".into() })
 }
 
 /// Describes a primary function signature.
@@ -142,20 +87,20 @@ pub struct SignatureDocsT<T> {
     pub ret_ty: T,
     /// The full documentation for the signature.
     #[serde(skip)]
-    pub def_docs: OnceLock<String>,
+    pub hover_docs: OnceLock<EcoString>,
 }
 
 impl SignatureDocsT<TypeRepr> {
     /// Get full documentation for the signature.
-    pub fn def_docs(&self) -> &String {
-        self.def_docs
-            .get_or_init(|| plain_docs_sentence(&format!("{}", DefDocs(self))).into())
+    pub fn hover_docs(&self) -> &EcoString {
+        self.hover_docs
+            .get_or_init(|| plain_docs_sentence(&format!("{}", SigDefDocs(self))))
     }
 }
 
-struct DefDocs<'a>(&'a SignatureDocs);
+struct SigDefDocs<'a>(&'a SignatureDocs);
 
-impl fmt::Display for DefDocs<'_> {
+impl fmt::Display for SigDefDocs<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let docs = self.0;
         let base_docs = docs.docs.trim();
@@ -318,10 +263,10 @@ fn format_ty(ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> TypeRepr {
     }
 }
 
-pub(crate) fn variable_docs(ctx: &mut AnalysisContext, pos: &LinkedNode) -> Option<VarDocs> {
-    let source = ctx.source_by_id(pos.span().id()?).ok()?;
+pub(crate) fn variable_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
+    let source = ctx.source_by_id(pos.id()?).ok()?;
     let type_info = ctx.type_check(&source);
-    let ty = type_info.type_of_span(pos.span())?;
+    let ty = type_info.type_of_span(pos)?;
 
     // todo multiple sources
     let mut srcs = ty.sources();
@@ -396,7 +341,7 @@ pub(crate) fn signature_docs(
         named,
         rest,
         ret_ty,
-        def_docs: OnceLock::new(),
+        hover_docs: OnceLock::new(),
     })
 }
 
@@ -429,15 +374,4 @@ pub(crate) fn convert_docs(world: &LspWorld, content: &str) -> StrResult<EcoStri
         .map_err(|e| eco_format!("failed to convert to markdown: {e}"))?;
 
     Ok(conv.replace("```example", "```typ"))
-}
-
-pub(crate) fn identify_docs(kind: DocStringKind, docs: EcoString) -> StrResult<SymbolDocs> {
-    match kind {
-        DocStringKind::Function => Err(eco_format!("must be already handled")),
-        DocStringKind::Variable => identify_var_docs(docs).map(SymbolDocs::Variable),
-        DocStringKind::Constant => identify_var_docs(docs).map(SymbolDocs::Variable),
-        DocStringKind::Module => identify_tidy_module_docs(docs).map(SymbolDocs::Module),
-        DocStringKind::Struct => Ok(SymbolDocs::Plain { docs }),
-        DocStringKind::Reference => Ok(SymbolDocs::Plain { docs }),
-    }
 }

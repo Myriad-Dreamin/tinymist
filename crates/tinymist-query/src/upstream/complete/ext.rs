@@ -464,7 +464,7 @@ fn describe_value(ctx: &mut AnalysisContext, v: &Value) -> EcoString {
                 f = &with_f.0;
             }
 
-            let sig = ctx.signature_dyn(f.clone());
+            let sig = ctx.sig_of_func(f.clone());
             sig.primary()
                 .ty()
                 .describe()
@@ -582,7 +582,7 @@ pub fn param_completions<'a>(
     let pos_index =
         param_index_at_leaf(&ctx.leaf, &func, args).map(|i| if this.is_some() { i + 1 } else { i });
 
-    let signature = ctx.ctx.signature_dyn(func.clone());
+    let signature = ctx.ctx.sig_of_func(func.clone());
 
     let leaf_type = ctx.ctx.literal_type_of_node(ctx.leaf.clone());
     log::debug!("pos_param_completion_by_type: {:?}", leaf_type);
@@ -998,7 +998,7 @@ pub fn named_param_value_completions<'a>(
         func = f.0.clone();
     }
 
-    let signature = ctx.ctx.signature_dyn(func.clone());
+    let signature = ctx.ctx.sig_of_func(func.clone());
 
     let primary_sig = signature.primary();
 

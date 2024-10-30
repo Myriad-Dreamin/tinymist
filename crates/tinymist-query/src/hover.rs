@@ -1,15 +1,15 @@
-use core::fmt;
+use core::fmt::Write;
 
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     analysis::{get_link_exprs_in, Definition},
-    docs::SignatureDocs,
+    docs::DefDocs,
     jump_from_cursor,
     prelude::*,
-    syntax::{find_docs_before, get_deref_target, Decl},
+    syntax::{get_deref_target, Decl, DefKind},
     ty::PathPreference,
-    upstream::{expr_tooltip, plain_docs_sentence, route_of_value, truncated_repr, Tooltip},
+    upstream::{expr_tooltip, route_of_value, truncated_repr, Tooltip},
     LspHoverContents, StatefulRequest,
 };
 
@@ -223,10 +223,8 @@ fn def_tooltip(
     cursor: usize,
 ) -> Option<LspHoverContents> {
     let leaf = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-
     let deref_target = get_deref_target(leaf.clone(), cursor)?;
-
-    let def = ctx.definition(source, document, deref_target.clone())?;
+    let def = ctx.def_of_syntax(source, document, deref_target.clone())?;
 
     let mut results = vec![];
     let mut actions = vec![];
@@ -250,75 +248,65 @@ fn def_tooltip(
 
             Some(LspHoverContents::Array(results))
         }
-        Func(..) | Closure(..) => {
-            let sig = ctx.signature_docs(&def);
+        _ => {
+            let sym_docs = ctx.def_docs(&def);
 
-            results.push(MarkedString::LanguageString(LanguageString {
-                language: "typc".to_owned(),
-                value: format!(
-                    "let {name}{params}{result};",
-                    name = def.name(),
-                    params = ParamTooltip(sig.as_ref()),
-                    result =
-                        ResultTooltip(def.name(), sig.as_ref().and_then(|sig| sig.ret_ty.as_ref()))
-                ),
-            }));
-
-            if let Some(doc) = sig {
-                results.push(MarkedString::String(doc.def_docs().into()));
-            }
-
-            if let Some(link) = ExternalDocLink::get(ctx, &def) {
-                actions.push(link);
-            }
-
-            render_actions(&mut results, actions);
-            Some(LspHoverContents::Array(results))
-        }
-        ModuleAlias(..) | Module(..) | PathStem(..) | ImportPath(..) | IncludePath(..) => {
-            let id = def.decl.file_id()?;
-            let src = ctx.source_by_id(id).ok()?;
-            let ei = ctx.expr_stage(&src);
-            let docs = ei.module_docstring.docs.clone()?;
-            results.push(MarkedString::String(docs.as_str().into()));
-            Some(LspHoverContents::Array(results))
-        }
-        IdentRef(..) | ImportAlias(..) | Import(..) | Var(..) => {
-            let deref_node = deref_target.node();
-            let sig = ctx.variable_docs(deref_target.node());
-
-            // todo: check sensible length, value highlighting
-            if let Some(values) = expr_tooltip(ctx.world(), deref_node) {
-                match values {
-                    Tooltip::Text(values) => {
-                        results.push(MarkedString::String(values.into()));
-                    }
-                    Tooltip::Code(values) => {
-                        results.push(MarkedString::LanguageString(LanguageString {
-                            language: "typc".to_owned(),
-                            value: values.into(),
-                        }));
+            if matches!(def.decl.kind(), DefKind::Variable | DefKind::Constant) {
+                // todo: check sensible length, value highlighting
+                if let Some(values) = expr_tooltip(ctx.world(), deref_target.node()) {
+                    match values {
+                        Tooltip::Text(values) => {
+                            results.push(MarkedString::String(values.into()));
+                        }
+                        Tooltip::Code(values) => {
+                            results.push(MarkedString::LanguageString(LanguageString {
+                                language: "typc".to_owned(),
+                                value: values.into(),
+                            }));
+                        }
                     }
                 }
             }
 
-            results.push(MarkedString::LanguageString(LanguageString {
-                language: "typc".to_owned(),
-                value: format!(
-                    "let {name}{result};",
-                    name = def.name(),
-                    result = ResultTooltip(
-                        def.name(),
-                        sig.as_ref().and_then(|sig| sig.return_ty.as_ref())
-                    )
-                ),
-            }));
+            // todo: hover with `with_stack`
 
-            if let Some(doc) = sig {
-                results.push(MarkedString::String(doc.def_docs().clone()));
-            } else if let Some(doc) = DocTooltip::get(ctx, &def) {
-                results.push(MarkedString::String(doc));
+            if matches!(
+                def.decl.kind(),
+                DefKind::Function | DefKind::Variable | DefKind::Constant
+            ) && !def.name().is_empty()
+            {
+                results.push(MarkedString::LanguageString(LanguageString {
+                    language: "typc".to_owned(),
+                    value: {
+                        let mut type_doc = String::new();
+                        type_doc.push_str("let ");
+                        type_doc.push_str(def.name());
+
+                        match &sym_docs {
+                            Some(DefDocs::Variable(docs)) => {
+                                push_result_ty(def.name(), docs.return_ty.as_ref(), &mut type_doc);
+                            }
+                            Some(DefDocs::Function(docs)) => {
+                                let _ = docs.print(&mut type_doc);
+                                push_result_ty(def.name(), docs.ret_ty.as_ref(), &mut type_doc);
+                            }
+                            _ => {}
+                        }
+                        type_doc.push(';');
+                        type_doc
+                    },
+                }));
             }
+
+            if let Some(doc) = sym_docs {
+                results.push(MarkedString::String(doc.hover_docs().into()));
+            }
+
+            // if let Some(doc) = sig {
+            //     results.push(MarkedString::String(doc.def_docs().clone()));
+            // } else if let Some(doc) = DocTooltip::get(ctx, &def) {
+            //     results.push(MarkedString::String(doc));
+            // }
 
             if let Some(link) = ExternalDocLink::get(ctx, &def) {
                 actions.push(link);
@@ -327,9 +315,18 @@ fn def_tooltip(
             render_actions(&mut results, actions);
             Some(LspHoverContents::Array(results))
         }
-        Pattern(..) | Docs(..) | Generated(..) | Constant(..) | ContentRef(..) | StrName(..)
-        | ModuleImport(..) | Content(..) | Spread(..) => None,
     }
+}
+
+fn push_result_ty(name: &str, ty_repr: Option<&(String, String)>, type_doc: &mut String) {
+    let Some((short, _)) = ty_repr else {
+        return;
+    };
+    if short == name {
+        return;
+    }
+
+    let _ = write!(type_doc, " = {short}");
 }
 
 fn render_actions(results: &mut Vec<MarkedString>, actions: Vec<CommandLink>) {
@@ -369,33 +366,6 @@ fn render_actions(results: &mut Vec<MarkedString>, actions: Vec<CommandLink>) {
         .collect::<Vec<_>>()
         .join(" | ");
     results.push(MarkedString::String(g));
-}
-
-// todo: hover with `with_stack`
-struct ParamTooltip<'a>(Option<&'a SignatureDocs>);
-
-impl fmt::Display for ParamTooltip<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Some(sig) = self.0 else {
-            return Ok(());
-        };
-        sig.print(f)
-    }
-}
-
-struct ResultTooltip<'a>(&'a str, Option<&'a (String, String)>);
-
-impl fmt::Display for ResultTooltip<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Some((short, _)) = self.1 else {
-            return Ok(());
-        };
-        if short == self.0 {
-            return Ok(());
-        }
-
-        write!(f, " = {short}")
-    }
 }
 
 struct ExternalDocLink;
@@ -449,54 +419,6 @@ impl ExternalDocLink {
             title: Some("Open docs".to_owned()),
             command_or_links: vec![CommandOrLink::Link(link)],
         })
-    }
-}
-
-pub(crate) struct DocTooltip;
-
-impl DocTooltip {
-    pub fn get(ctx: &mut AnalysisContext, def: &Definition) -> Option<String> {
-        self::DocTooltip::get_inner(ctx, def).map(|s| "\n\n".to_owned() + &s)
-    }
-
-    fn get_inner(ctx: &mut AnalysisContext, def: &Definition) -> Option<String> {
-        let value = def.value();
-        if matches!(value, Some(Value::Func(..))) {
-            if let Some(builtin) = Self::builtin_func_tooltip(def) {
-                return Some(plain_docs_sentence(builtin).into());
-            }
-        };
-
-        let (fid, def_range) = def.def_at(ctx.shared()).clone()?;
-
-        let src = ctx.source_by_id(fid).ok()?;
-        find_docs_before(&src, def_range.start)
-    }
-}
-
-impl DocTooltip {
-    fn builtin_func_tooltip(def: &Definition) -> Option<&'_ str> {
-        let value = def.value();
-        let Some(Value::Func(func)) = &value else {
-            return None;
-        };
-
-        use typst::foundations::func::Repr;
-        let mut func = func;
-        let docs = 'search: loop {
-            match func.inner() {
-                Repr::Native(n) => break 'search n.docs,
-                Repr::Element(e) => break 'search e.docs(),
-                Repr::With(w) => {
-                    func = &w.0;
-                }
-                Repr::Closure(..) => {
-                    return None;
-                }
-            }
-        };
-
-        Some(docs)
     }
 }
 

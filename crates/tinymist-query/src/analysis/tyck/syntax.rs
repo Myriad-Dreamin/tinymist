@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::analysis::ParamAttrs;
-use crate::docs::{SignatureDocsT, TypelessParamDocs, UntypedSymbolDocs};
+use crate::docs::{SignatureDocsT, TypelessParamDocs, UntypedDefDocs};
 use crate::syntax::{def::*, DocString, VarDoc};
 use crate::ty::*;
 
@@ -261,13 +261,13 @@ impl<'a> TypeChecker<'a> {
         if let Some(base) = base {
             self.info.var_docs.insert(
                 base.clone(),
-                Arc::new(UntypedSymbolDocs::Function(Box::new(SignatureDocsT {
+                Arc::new(UntypedDefDocs::Function(Box::new(SignatureDocsT {
                     docs: docstring.docs.clone().unwrap_or_default(),
                     pos: pos_docs,
                     named: named_docs,
                     rest: rest_docs,
                     ret_ty: (),
-                    def_docs: Default::default(),
+                    hover_docs: Default::default(),
                 }))),
             );
         }

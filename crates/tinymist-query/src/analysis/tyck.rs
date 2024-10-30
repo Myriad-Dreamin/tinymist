@@ -121,13 +121,13 @@ impl<'a> TypeChecker<'a> {
 
                 log::debug!("import_ty {name} from {fid:?}");
 
-                let source = self.ctx.source_by_id(fid).ok()?;
-                let ext_def_use_info = self.ctx.expr_stage(&source);
+                let ext_def_use_info = self.ctx.expr_stage_by_id(fid)?;
+                let source = &ext_def_use_info.source;
                 // todo: check types in cycle
                 let ext_type_info = if let Some(route) = self.route.get(&source.id()) {
                     route.clone()
                 } else {
-                    self.ctx.type_check_(&source, self.route)
+                    self.ctx.type_check_(source, self.route)
                 };
                 let ext_def = ext_def_use_info.exports.get(&name)?;
 

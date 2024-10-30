@@ -5,7 +5,7 @@ use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
 
 use super::{prelude::*, BuiltinTy, InsTy, SharedContext};
-use crate::syntax::{get_deref_target, Decl, DeclExpr, DerefTarget, Expr, ExprInfo};
+use crate::syntax::{Decl, DeclExpr, DerefTarget, Expr, ExprInfo};
 use crate::VersionedDocument;
 
 /// A linked definition in the source code
@@ -59,7 +59,7 @@ pub fn definition(
     ctx: &Arc<SharedContext>,
     source: &Source,
     document: Option<&VersionedDocument>,
-    deref_target: DerefTarget<'_>,
+    deref_target: DerefTarget,
 ) -> Option<Definition> {
     match deref_target {
         // todi: field access
@@ -249,10 +249,7 @@ impl CallConvention {
 pub fn resolve_call_target(ctx: &Arc<SharedContext>, node: &SyntaxNode) -> Option<CallConvention> {
     let callee = (|| {
         let source = ctx.source_by_id(node.span().id()?).ok()?;
-        let node = source.find(node.span())?;
-        let cursor = node.offset();
-        let deref_target = get_deref_target(node, cursor)?;
-        let def = ctx.definition(&source, None, deref_target)?;
+        let def = ctx.def_of_span(&source, None, node.span())?;
         let func_ptr = match def.term.and_then(|val| val.value()) {
             Some(Value::Func(f)) => Some(f),
             Some(Value::Type(ty)) => ty.constructor().ok(),

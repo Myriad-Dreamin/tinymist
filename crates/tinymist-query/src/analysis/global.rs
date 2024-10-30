@@ -13,12 +13,13 @@ use reflexo_typst::{EntryReader, WorldDeps};
 use rustc_hash::FxHashMap;
 use tinymist_world::LspWorld;
 use tinymist_world::DETACHED_ENTRY;
-use typst::diag::{eco_format, At, FileError, FileResult, SourceResult};
+use typst::diag::{eco_format, At, FileError, FileResult, SourceResult, StrResult};
 use typst::engine::{Route, Sink, Traced};
 use typst::eval::Eval;
 use typst::foundations::{Bytes, Module, Styles};
 use typst::layout::Position;
 use typst::model::Document;
+use typst::syntax::package::PackageManifest;
 use typst::syntax::{package::PackageSpec, Span, VirtualPath};
 
 use crate::analysis::prelude::*;
@@ -26,10 +27,11 @@ use crate::analysis::{
     analyze_bib, analyze_import_, analyze_signature, post_type_check, BibInfo, PathPreference,
     Signature, SignatureTarget, Ty, TypeScheme,
 };
-use crate::docs::{SignatureDocs, VarDocs};
+use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
     construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
-    scan_workspace_files, DerefTarget, ExprInfo, LexicalScope, ModuleDependency, Processing,
+    scan_workspace_files, Decl, DefKind, DerefTarget, ExprInfo, LexicalScope, ModuleDependency,
+    Processing,
 };
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
@@ -198,10 +200,6 @@ impl<'w> AnalysisContext<'w> {
             searched: Default::default(),
             worklist: Default::default(),
         }
-    }
-
-    pub(crate) fn variable_docs(&mut self, pos: &LinkedNode) -> Option<VarDocs> {
-        crate::docs::variable_docs(self, pos)
     }
 
     pub(crate) fn preload_package(&self, entry_point: TypstFileId) {
@@ -377,6 +375,11 @@ impl LocalContext {
     }
 
     /// Get the expression information of a source file.
+    pub(crate) fn expr_stage_by_id(&mut self, fid: TypstFileId) -> Option<Arc<ExprInfo>> {
+        Some(self.expr_stage(&self.source_by_id(fid).ok()?))
+    }
+
+    /// Get the expression information of a source file.
     pub(crate) fn expr_stage(&mut self, source: &Source) -> Arc<ExprInfo> {
         let id = source.id();
         let cache = &self.caches.modules.entry(id).or_default().expr_stage;
@@ -388,6 +391,29 @@ impl LocalContext {
         let id = source.id();
         let cache = &self.caches.modules.entry(id).or_default().type_check;
         cache.get_or_init(|| self.shared.type_check(source)).clone()
+    }
+
+    pub(crate) fn def_docs(&mut self, def: &Definition) -> Option<DefDocs> {
+        // let plain_docs = sym.head.docs.as_deref();
+        // let plain_docs = plain_docs.or(sym.head.oneliner.as_deref());
+        match def.decl.kind() {
+            DefKind::Function => {
+                let sig = self.sig_of_def(def.clone())?;
+                let docs = crate::docs::signature_docs(&sig, None)?;
+                Some(DefDocs::Function(Box::new(docs)))
+            }
+            DefKind::Struct | DefKind::Constant | DefKind::Variable => {
+                let docs = crate::docs::variable_docs(self, def.decl.span())?;
+                Some(DefDocs::Variable(docs))
+            }
+            DefKind::Module => {
+                let ei = self.expr_stage_by_id(def.decl.file_id()?)?;
+                Some(DefDocs::Module(TidyModuleDocs {
+                    docs: ei.module_docstring.docs.clone().unwrap_or_default(),
+                }))
+            }
+            DefKind::Reference => None,
+        }
     }
 }
 
@@ -595,6 +621,11 @@ impl SharedContext {
     }
 
     /// Get the expression information of a source file.
+    pub(crate) fn expr_stage_by_id(self: &Arc<Self>, fid: TypstFileId) -> Option<Arc<ExprInfo>> {
+        Some(self.expr_stage(&self.source_by_id(fid).ok()?))
+    }
+
+    /// Get the expression information of a source file.
     pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> Arc<ExprInfo> {
         let mut route = Processing::default();
         self.expr_stage_(source, &mut route)
@@ -660,7 +691,25 @@ impl SharedContext {
         })
     }
 
-    pub(crate) fn definition(
+    pub(crate) fn def_of_span(
+        self: &Arc<Self>,
+        source: &Source,
+        doc: Option<&VersionedDocument>,
+        span: Span,
+    ) -> Option<Definition> {
+        let target = self.deref_syntax(source, span)?;
+        definition(self, source, doc, target)
+    }
+
+    pub(crate) fn def_of_decl(&self, decl: &Interned<Decl>) -> Option<Definition> {
+        match decl.as_ref() {
+            Decl::Func(..) => Some(Definition::new(decl.clone(), None)),
+            Decl::Module(..) => None,
+            _ => None,
+        }
+    }
+
+    pub(crate) fn def_of_syntax(
         self: &Arc<Self>,
         source: &Source,
         doc: Option<&VersionedDocument>,
@@ -669,20 +718,15 @@ impl SharedContext {
         definition(self, source, doc, deref_target)
     }
 
-    pub(crate) fn signature_def(self: &Arc<Self>, def: Definition) -> Option<Signature> {
+    pub(crate) fn sig_of_def(self: &Arc<Self>, def: Definition) -> Option<Signature> {
         log::debug!("check definition func {def:?}");
         let source = def.decl.file_id().and_then(|f| self.source_by_id(f).ok());
         analyze_signature(self, SignatureTarget::Def(source, def))
     }
 
-    pub(crate) fn signature_dyn(self: &Arc<Self>, func: Func) -> Signature {
+    pub(crate) fn sig_of_func(self: &Arc<Self>, func: Func) -> Signature {
         log::debug!("check runtime func {func:?}");
         analyze_signature(self, SignatureTarget::Runtime(func)).unwrap()
-    }
-
-    pub(crate) fn signature_docs(self: &Arc<Self>, def: &Definition) -> Option<SignatureDocs> {
-        let sig = self.signature_def(def.clone())?;
-        crate::docs::signature_docs(&sig, None)
     }
 
     /// Try to find imported target from the current source file.
@@ -787,6 +831,11 @@ impl SharedContext {
             }
             _ => None,
         }
+    }
+
+    /// Get the manifest of a package by file id.
+    pub fn get_manifest(&self, toml_id: TypstFileId) -> StrResult<PackageManifest> {
+        crate::docs::get_manifest(&self.world, toml_id)
     }
 
     /// Compute the signature of a function.

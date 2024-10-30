@@ -10,10 +10,10 @@ use crate::{
     analysis::SharedContext,
     docs::{
         convert_docs, identify_func_docs, identify_tidy_module_docs, identify_var_docs,
-        DocStringKind, UntypedSymbolDocs, VarDocsT,
+        UntypedDefDocs, VarDocsT,
     },
     prelude::*,
-    syntax::Decl,
+    syntax::{Decl, DefKind},
     ty::{BuiltinTy, Interned, PackageId, SigTy, StrRef, Ty, TypeBounds, TypeVar, TypeVarBounds},
 };
 
@@ -62,8 +62,8 @@ pub struct VarDoc {
 
 impl VarDoc {
     /// Convert the variable doc to an untyped version
-    pub fn to_untyped(&self) -> Arc<UntypedSymbolDocs> {
-        Arc::new(UntypedSymbolDocs::Variable(VarDocsT {
+    pub fn to_untyped(&self) -> Arc<UntypedDefDocs> {
+        Arc::new(UntypedDefDocs::Variable(VarDocsT {
             docs: self.docs.clone(),
             return_ty: (),
             def_docs: OnceLock::new(),
@@ -75,7 +75,7 @@ pub(crate) fn compute_docstring(
     ctx: &Arc<SharedContext>,
     fid: TypstFileId,
     docs: String,
-    kind: DocStringKind,
+    kind: DefKind,
 ) -> Option<DocString> {
     let checker = DocsChecker {
         fid,
@@ -86,12 +86,12 @@ pub(crate) fn compute_docstring(
         next_id: 0,
     };
     match kind {
-        DocStringKind::Function => checker.check_func_docs(docs),
-        DocStringKind::Variable => checker.check_var_docs(docs),
-        DocStringKind::Module => checker.check_module_docs(docs),
-        DocStringKind::Constant => None,
-        DocStringKind::Struct => None,
-        DocStringKind::Reference => None,
+        DefKind::Function => checker.check_func_docs(docs),
+        DefKind::Variable => checker.check_var_docs(docs),
+        DefKind::Module => checker.check_module_docs(docs),
+        DefKind::Constant => None,
+        DefKind::Struct => None,
+        DefKind::Reference => None,
     }
 }
 

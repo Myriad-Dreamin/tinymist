@@ -2,6 +2,7 @@ use core::fmt;
 use std::{collections::BTreeMap, ops::Range};
 
 use reflexo_typst::package::PackageSpec;
+use serde::{Deserialize, Serialize};
 use tinymist_derive::DeclEnum;
 use typst::{
     foundations::{Element, Func, Module, Type, Value},
@@ -71,6 +72,12 @@ pub enum Expr {
     Star,
 }
 impl Expr {
+    pub(crate) fn repr(&self) -> EcoString {
+        let mut s = EcoString::new();
+        let _ = ExprFormatter::new(&mut s, true).write_expr(self);
+        s
+    }
+
     pub(crate) fn span(&self) -> Span {
         match self {
             Expr::Decl(d) => d.span(),
@@ -169,6 +176,38 @@ impl ExprScope {
 
 fn select_of(source: Interned<Ty>, name: Interned<str>) -> Expr {
     Expr::Type(Ty::Select(SelectTy::new(source, name)))
+}
+
+/// Kind of a definition.
+#[derive(Debug, Default, Clone, Copy, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DefKind {
+    /// A definition for some constant.
+    #[default]
+    Constant,
+    /// A definition for some function.
+    Function,
+    /// A definition for some variable.
+    Variable,
+    /// A definition for some module.
+    Module,
+    /// A definition for some struct.
+    Struct,
+    /// A definition for some reference.
+    Reference,
+}
+
+impl fmt::Display for DefKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Constant => write!(f, "constant"),
+            Self::Function => write!(f, "function"),
+            Self::Variable => write!(f, "variable"),
+            Self::Module => write!(f, "module"),
+            Self::Struct => write!(f, "struct"),
+            Self::Reference => write!(f, "reference"),
+        }
+    }
 }
 
 pub type DeclExpr = Interned<Decl>;
@@ -367,6 +406,21 @@ impl Decl {
                 | Self::Spread(..)
                 | Self::Generated(..)
         )
+    }
+
+    pub fn kind(&self) -> DefKind {
+        use Decl::*;
+        match self {
+            ModuleAlias(..) | Module(..) | PathStem(..) | ImportPath(..) | IncludePath(..) => {
+                DefKind::Module
+            }
+            // Type(_) => DocStringKind::Struct,
+            Func(..) | Closure(..) => DefKind::Function,
+            Label(..) | BibEntry(..) | ContentRef(..) => DefKind::Reference,
+            IdentRef(..) | ImportAlias(..) | Import(..) | Var(..) => DefKind::Variable,
+            Pattern(..) | Docs(..) | Generated(..) | Constant(..) | StrName(..)
+            | ModuleImport(..) | Content(..) | Spread(..) => DefKind::Constant,
+        }
     }
 
     pub fn file_id(&self) -> Option<TypstFileId> {

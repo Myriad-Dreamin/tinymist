@@ -26,6 +26,21 @@ impl Ty {
         let mut worker = TypeDescriber::default();
         worker.describe_root(self)
     }
+
+    // todo: extend this cache idea for all crate?
+    // #[allow(clippy::mutable_key_type)]
+    // let mut describe_cache = HashMap::<Ty, String>::new();
+    // let doc_ty = |ty: Option<&Ty>| {
+    //     let ty = ty?;
+    //     let short = {
+    //         describe_cache
+    //             .entry(ty.clone())
+    //             .or_insert_with(|| ty.describe().unwrap_or_else(||
+    // "unknown".to_string()))             .clone()
+    //     };
+
+    //     Some((short, format!("{ty:?}")))
+    // };
 }
 
 #[derive(Default)]
