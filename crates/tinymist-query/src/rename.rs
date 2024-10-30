@@ -41,7 +41,7 @@ impl StatefulRequest for RenameRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let deref_target = ctx.deref_syntax_at(&source, self.position, 1)?;
 
-        let def = ctx.definition(&source, doc.as_ref(), deref_target.clone())?;
+        let def = ctx.def_of_syntax(&source, doc.as_ref(), deref_target.clone())?;
 
         prepare_renaming(ctx, &deref_target, &def)?;
 

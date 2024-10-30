@@ -53,7 +53,7 @@ pub(crate) fn find_references(
         }
     };
 
-    let def = ctx.definition(source, doc, target)?;
+    let def = ctx.def_of_syntax(source, doc, target)?;
 
     let worker = ReferencesWorker {
         ctx: ctx.fork_for_search(),
@@ -103,14 +103,13 @@ impl<'a, 'w> ReferencesWorker<'a, 'w> {
 
     fn file(&mut self, ref_fid: TypstFileId) -> Option<()> {
         log::debug!("references: file: {ref_fid:?}");
-        let ref_source = self.ctx.ctx.source_by_id(ref_fid).ok()?;
-        let expr_info = self.ctx.ctx.expr_stage(&ref_source);
+        let ei = self.ctx.ctx.expr_stage_by_id(ref_fid)?;
         let uri = self.ctx.ctx.uri_for_id(ref_fid).ok()?;
 
-        let t = expr_info.get_refs(self.def.decl.clone());
-        self.push_idents(&ref_source, &uri, t);
+        let t = ei.get_refs(self.def.decl.clone());
+        self.push_idents(&ei.source, &uri, t);
 
-        if expr_info.is_exported(&self.def.decl) {
+        if ei.is_exported(&self.def.decl) {
             self.ctx.push_dependents(ref_fid);
         }
 

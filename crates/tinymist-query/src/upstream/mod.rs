@@ -424,11 +424,6 @@ pub fn truncated_repr(value: &Value) -> EcoString {
     truncated_repr_::<_10MB>(value)
 }
 
-pub fn truncated_doc_repr(value: &Value) -> EcoString {
-    const _128B: usize = 128;
-    truncated_repr_::<_128B>(value)
-}
-
 /// Run a function with a VM instance in the world
 pub fn with_vm<T>(world: Tracked<dyn World + '_>, f: impl FnOnce(&mut typst::eval::Vm) -> T) -> T {
     use comemo::Track;

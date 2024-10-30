@@ -5,21 +5,18 @@ use std::path::PathBuf;
 use ecow::{EcoString, EcoVec};
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
-use tinymist_world::LspWorld;
 use typst::diag::{eco_format, StrResult};
-use typst::foundations::Value;
 use typst::syntax::package::{PackageManifest, PackageSpec};
 use typst::syntax::{FileId, Span, VirtualPath};
 use typst::World;
 
-use crate::docs::{file_id_repr, module_docs, symbol_docs, SymbolDocs, SymbolsInfo};
-use crate::ty::Ty;
+use crate::docs::{file_id_repr, module_docs, DefDocs, SymbolsInfo};
 use crate::AnalysisContext;
 
 /// Check Package.
 pub fn check_package(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<()> {
     let toml_id = get_manifest_id(spec)?;
-    let manifest = get_manifest(ctx.world(), toml_id)?;
+    let manifest = ctx.get_manifest(toml_id)?;
 
     let entry_point = toml_id.join(&manifest.package.entrypoint);
 
@@ -33,7 +30,7 @@ pub fn package_docs(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<
 
     let mut md = String::new();
     let toml_id = get_manifest_id(spec)?;
-    let manifest = get_manifest(ctx.world(), toml_id)?;
+    let manifest = ctx.get_manifest(toml_id)?;
 
     let for_spec = toml_id.package().unwrap();
     let entry_point = toml_id.join(&manifest.package.entrypoint);
@@ -54,7 +51,7 @@ pub fn package_docs(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<
     md.push('\n');
     md.push('\n');
 
-    let manifest = get_manifest(&ctx.world, toml_id)?;
+    let manifest = ctx.get_manifest(toml_id)?;
 
     let meta = PackageMeta {
         namespace: spec.namespace.clone(),
@@ -84,32 +81,13 @@ pub fn package_docs(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<
             .clone()
     };
 
-    // todo: extend this cache idea for all crate?
-    #[allow(clippy::mutable_key_type)]
-    let mut describe_cache = HashMap::<Ty, String>::new();
-    let mut doc_ty = |ty: Option<&Ty>| {
-        let ty = ty?;
-        let short = {
-            describe_cache
-                .entry(ty.clone())
-                .or_insert_with(|| ty.describe().unwrap_or_else(|| "unknown".to_string()))
-                .clone()
-        };
-
-        Some((short, format!("{ty:?}")))
-    };
-
     while !modules_to_generate.is_empty() {
         for (parent_ident, sym) in std::mem::take(&mut modules_to_generate) {
             // parent_ident, symbols
             let symbols = sym.children;
 
-            let module_val = sym.head.value.as_ref().unwrap();
-            let module = match module_val {
-                Value::Module(m) => m,
-                _ => todo!(),
-            };
-            let fid = module.file_id();
+            let module_val = sym.head.decl.as_ref().unwrap();
+            let fid = module_val.file_id();
             let aka = fid.map(&mut akas).unwrap_or_default();
 
             // It is (primary) known to safe as a part of HTML string, so we don't have to
@@ -141,7 +119,8 @@ pub fn package_docs(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<
             let _ = writeln!(md, "<!-- begin:module {primary} {m} -->");
 
             for mut sym in symbols {
-                let span = sym.head.span.and_then(|v| {
+                let span = sym.head.decl.as_ref().map(|d| d.span());
+                let fid_range = span.and_then(|v| {
                     v.id().and_then(|e| {
                         let fid = file_ids.insert_full(e).0;
                         let src = ctx.source_by_id(e).ok()?;
@@ -149,34 +128,42 @@ pub fn package_docs(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<
                         Some((fid, rng.start, rng.end))
                     })
                 });
-                let sym_fid = sym.head.fid;
-                let sym_fid = sym_fid.or_else(|| sym.head.span.and_then(Span::id)).or(fid);
-                let span = span.or_else(|| {
+                let sym_fid = sym.head.decl.as_ref().and_then(|d| d.file_id());
+                let sym_fid = sym_fid.or_else(|| span.and_then(Span::id)).or(fid);
+                let span = fid_range.or_else(|| {
                     let fid = sym_fid?;
                     Some((file_ids.insert_full(fid).0, 0, 0))
                 });
                 sym.head.loc = span;
+                // .ok_or_else(|| {
+                //     let err = format!("failed to convert docs in {title}").replace(
+                //         "-->", "—>", // avoid markdown comment
+                //     );
+                //     log::error!("{err}");
+                //     err
+                // })
+                let docs = sym.head.parsed_docs.clone();
+                //             Err(e) => {
+                //                 let err = format!("failed to convert docs: {e}").replace(
+                //                     "-->", "—>", // avoid markdown comment
+                //                 );
+                //                 log::error!("{err}");
+                //                 return Err(err);
+                //             }
 
-                let docs = symbol_docs(
-                    ctx,
-                    sym.head.kind,
-                    sym.head.value.as_ref(),
-                    sym.head.docs.as_deref(),
-                    Some(&mut doc_ty),
-                );
-
-                let mut convert_err = None;
+                let convert_err = None::<EcoString>;
                 match &docs {
-                    Ok(docs) => {
+                    Some(docs) => {
                         sym.head.parsed_docs = Some(docs.clone());
                         sym.head.docs = None;
                     }
-                    Err(e) => {
-                        let err = format!("failed to convert docs in {title}: {e}").replace(
-                            "-->", "—>", // avoid markdown comment
-                        );
-                        log::error!("{err}");
-                        convert_err = Some(err);
+                    None => {
+                        // let err = format!("failed to convert docs in {title}:
+                        // {e}").replace(     "-->",
+                        // "—>", // avoid markdown comment
+                        // );
+                        // log::error!("{err}");
+                        // convert_err = Some(err);
                     }
                 }
 
@@ -188,8 +175,7 @@ pub fn package_docs(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<
                 let _ = writeln!(md, "### {}: {} in {primary}", sym.head.kind, sym.head.name);
 
                 if sym.head.export_again {
-                    let sub_fid = sym.head.fid;
-                    if let Some(fid) = sub_fid {
+                    if let Some(fid) = sym_fid {
                         let lnk = if fid.package() == Some(for_spec) {
                             let sub_aka = akas(fid);
                             let sub_primary = sub_aka.first().cloned().unwrap_or_default();
@@ -218,7 +204,7 @@ pub fn package_docs(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<
                 let head = jbase64(&sym.head);
                 let _ = writeln!(md, "<!-- begin:symbol {ident} {head} -->");
 
-                if let Some(SymbolDocs::Function(sig)) = &sym.head.parsed_docs {
+                if let Some(DefDocs::Function(sig)) = &sym.head.parsed_docs {
                     let _ = writeln!(md, "<!-- begin:sig -->");
                     let _ = writeln!(md, "```typc");
                     let _ = write!(md, "let {}", sym.head.name);
@@ -238,7 +224,7 @@ pub fn package_docs(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<
                     }
                     (Some(docs), _) => {
                         let _ = writeln!(md, "{}", remove_list_annotations(docs.docs()));
-                        if let SymbolDocs::Function(f) = docs {
+                        if let DefDocs::Function(f) = docs {
                             for param in f.pos.iter().chain(f.named.values()).chain(f.rest.as_ref())
                             {
                                 let _ = writeln!(md, "<!-- begin:param {} -->", param.name);
@@ -273,9 +259,8 @@ pub fn package_docs(ctx: &mut AnalysisContext, spec: &PackageInfo) -> StrResult<
                 }
 
                 if !sym.children.is_empty() {
-                    let sub_fid = sym.head.fid;
-                    log::debug!("sub_fid: {sub_fid:?}");
-                    match sub_fid {
+                    log::debug!("sub_fid: {sym_fid:?}");
+                    match sym_fid {
                         Some(fid) => {
                             let aka = akas(fid);
                             let primary = aka.first().cloned().unwrap_or_default();
@@ -352,7 +337,7 @@ pub fn get_manifest_id(spec: &PackageInfo) -> StrResult<FileId> {
 }
 
 /// Parses the manifest of the package located at `package_path`.
-pub fn get_manifest(world: &LspWorld, toml_id: FileId) -> StrResult<PackageManifest> {
+pub fn get_manifest(world: &dyn World, toml_id: FileId) -> StrResult<PackageManifest> {
     let toml_data = world
         .file(toml_id)
         .map_err(|err| eco_format!("failed to read package manifest ({})", err))?;

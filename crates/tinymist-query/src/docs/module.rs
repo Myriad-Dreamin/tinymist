@@ -1,27 +1,26 @@
 //! Module documentation.
 
 use std::collections::HashMap;
-use std::ops::Range;
+use std::sync::Arc;
 
 use ecow::{eco_vec, EcoString, EcoVec};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use typst::diag::{eco_format, StrResult};
-use typst::foundations::{Module, Value};
+use typst::diag::StrResult;
 use typst::syntax::package::PackageSpec;
-use typst::syntax::{FileId, Span};
+use typst::syntax::FileId;
 
 use crate::docs::file_id_repr;
-use crate::syntax::{find_docs_of, get_non_strict_def_target};
-use crate::upstream::truncated_doc_repr;
+use crate::syntax::{Decl, DefKind, Expr, ExprInfo};
+use crate::ty::Interned;
 use crate::AnalysisContext;
 
-use super::{get_manifest, get_manifest_id, kind_of, DocStringKind, PackageInfo, SymbolDocs};
+use super::{get_manifest_id, DefDocs, PackageInfo};
 
 /// Get documentation of symbols in a package.
 pub fn package_module_docs(ctx: &mut AnalysisContext, pkg: &PackageInfo) -> StrResult<SymbolsInfo> {
     let toml_id = get_manifest_id(pkg)?;
-    let manifest = get_manifest(ctx.world(), toml_id)?;
+    let manifest = ctx.get_manifest(toml_id)?;
 
     let entry_point = toml_id.join(&manifest.package.entrypoint);
     module_docs(ctx, entry_point)
@@ -40,11 +39,11 @@ pub fn module_docs(ctx: &mut AnalysisContext, entry_point: FileId) -> StrResult<
         extras: &mut extras,
     };
 
-    let src = scan_ctx
+    let ei = scan_ctx
         .ctx
-        .module_by_id(entry_point)
-        .map_err(|e| eco_format!("failed to get module by id {entry_point:?}: {e:?}"))?;
-    let mut symbols = scan_ctx.module_sym(eco_vec![], src);
+        .expr_stage_by_id(entry_point)
+        .ok_or("entry point not found")?;
+    let mut symbols = scan_ctx.module_sym(eco_vec![], ei);
 
     let module_uses = aliases
         .into_iter()
@@ -70,7 +69,7 @@ pub struct SymbolInfoHead {
     /// The name of the symbol.
     pub name: EcoString,
     /// The kind of the symbol.
-    pub kind: DocStringKind,
+    pub kind: DefKind,
     /// The location (file, start, end) of the symbol.
     pub loc: Option<(usize, usize, usize)>,
     /// Is the symbol reexport
@@ -80,24 +79,16 @@ pub struct SymbolInfoHead {
     /// The one-line documentation of the symbol.
     pub oneliner: Option<String>,
     /// The raw documentation of the symbol.
-    pub docs: Option<String>,
+    pub docs: Option<EcoString>,
     /// The parsed documentation of the symbol.
-    pub parsed_docs: Option<SymbolDocs>,
+    pub parsed_docs: Option<DefDocs>,
     /// The value of the symbol.
     #[serde(skip)]
     pub constant: Option<EcoString>,
-    /// The file owning the symbol.
-    #[serde(skip)]
-    pub fid: Option<FileId>,
-    /// The span of the symbol.
-    #[serde(skip)]
-    pub span: Option<Span>,
     /// The name range of the symbol.
-    #[serde(skip)]
-    pub name_range: Option<Range<usize>>,
     /// The value of the symbol.
     #[serde(skip)]
-    pub value: Option<Value>,
+    pub decl: Option<Interned<Decl>>,
 }
 
 /// Information about a symbol.
@@ -129,11 +120,59 @@ struct ScanSymbolCtx<'a, 'w> {
 }
 
 impl ScanSymbolCtx<'_, '_> {
-    fn module_sym(&mut self, path: EcoVec<&str>, module: Module) -> SymbolInfo {
-        let key = module.name().to_owned();
+    fn module_sym(&mut self, path: EcoVec<&str>, ei: Arc<ExprInfo>) -> SymbolInfo {
+        let name = {
+            let stem = ei.fid.vpath().as_rooted_path().file_stem();
+            stem.and_then(|s| Some(Interned::new_str(s.to_str()?)))
+                .unwrap_or_default()
+        };
+        let module_decl = Decl::module(name.clone(), ei.fid).into();
         let site = Some(self.root);
         let p = path.clone();
-        self.sym(&key, p, site.as_ref(), &Value::Module(module))
+        self.sym(&name, p, site.as_ref(), &module_decl, None)
+    }
+
+    fn expr(
+        &mut self,
+        key: &str,
+        path: EcoVec<&str>,
+        site: Option<&FileId>,
+        val: &Expr,
+    ) -> SymbolInfo {
+        match val {
+            Expr::Decl(d) => self.sym(key, path, site, d, Some(val)),
+            Expr::Ref(r) if r.root.is_some() => {
+                self.expr(key, path, site, r.root.as_ref().unwrap())
+            }
+            // todo: select
+            Expr::Select(..) => {
+                let mut path = path.clone();
+                path.push(key);
+                let head = SymbolInfoHead {
+                    name: key.to_string().into(),
+                    kind: DefKind::Module,
+                    ..Default::default()
+                };
+                SymbolInfo {
+                    head,
+                    children: eco_vec![],
+                }
+            }
+            // v => panic!("unexpected export: {key} -> {v}"),
+            _ => {
+                let mut path = path.clone();
+                path.push(key);
+                let head = SymbolInfoHead {
+                    name: key.to_string().into(),
+                    kind: DefKind::Constant,
+                    ..Default::default()
+                };
+                SymbolInfo {
+                    head,
+                    children: eco_vec![],
+                }
+            }
+        }
     }
 
     fn sym(
@@ -141,12 +180,13 @@ impl ScanSymbolCtx<'_, '_> {
         key: &str,
         path: EcoVec<&str>,
         site: Option<&FileId>,
-        val: &Value,
+        val: &Interned<Decl>,
+        expr: Option<&Expr>,
     ) -> SymbolInfo {
-        let mut head = create_head(self.ctx, key, val);
+        let mut head = create_head(self.ctx, key, val, expr);
 
-        if !matches!(&val, Value::Module(..)) {
-            if let Some((span, mod_fid)) = head.span.and_then(Span::id).zip(site) {
+        if !matches!(val.as_ref(), Decl::Module(..)) {
+            if let Some((span, mod_fid)) = head.decl.as_ref().and_then(|d| d.file_id()).zip(site) {
                 if span != *mod_fid {
                     head.export_again = true;
                     head.oneliner = head.docs.as_deref().map(oneliner).map(|e| e.to_owned());
@@ -155,8 +195,8 @@ impl ScanSymbolCtx<'_, '_> {
             }
         }
 
-        let children = match val {
-            Value::Module(module) => module.file_id().and_then(|fid| {
+        let children = match val.as_ref() {
+            Decl::Module(..) => val.file_id().and_then(|fid| {
                 // only generate docs for the same package
                 if fid.package() != self.for_spec {
                     return None;
@@ -174,12 +214,15 @@ impl ScanSymbolCtx<'_, '_> {
 
                 log::debug!("found module: {path:?}");
 
-                let symbols = module.scope().iter();
-                let symbols = symbols
-                    .map(|(k, v, _)| {
+                let ei = self.ctx.expr_stage_by_id(fid)?;
+
+                let symbols = ei
+                    .exports
+                    .iter()
+                    .map(|(k, v)| {
                         let mut path = path.clone();
                         path.push(k);
-                        self.sym(k, path.clone(), Some(&fid), v)
+                        self.expr(k, path.clone(), Some(&fid), v)
                     })
                     .collect();
                 Some(symbols)
@@ -188,18 +231,18 @@ impl ScanSymbolCtx<'_, '_> {
         };
 
         // Insert module that is not exported
-        if let Some(fid) = head.fid {
+        if let Some(fid) = head.decl.as_ref().and_then(|d| d.file_id()) {
             // only generate docs for the same package
             if fid.package() == self.for_spec {
                 let av = self.aliases.entry(fid).or_default();
                 if av.is_empty() {
-                    let m = self.ctx.module_by_id(fid);
+                    let src = self.ctx.expr_stage_by_id(fid);
                     let mut path = path.clone();
                     path.push("-");
                     path.push(key);
 
                     log::debug!("found internal module: {path:?}");
-                    if let Ok(m) = m {
+                    if let Some(m) = src {
                         let msym = self.module_sym(path, m);
                         self.extras.push(msym)
                     }
@@ -212,44 +255,24 @@ impl ScanSymbolCtx<'_, '_> {
     }
 }
 
-fn create_head(world: &mut AnalysisContext, k: &str, v: &Value) -> SymbolInfoHead {
-    let kind = kind_of(v);
-    let (docs, name_range, fid, span) = match v {
-        Value::Func(f) => {
-            let mut span = None;
-            let mut name_range = None;
-            let docs = None.or_else(|| {
-                let source = world.source_by_id(f.span().id()?).ok()?;
-                let node = source.find(f.span())?;
-                log::debug!("node: {k} -> {:?}", node.parent());
-                // use parent of params, todo: reliable way to get the def target
-                let def = get_non_strict_def_target(node.parent()?.clone())?;
-                span = Some(def.node().span());
-                name_range = def.name_range();
+fn create_head(
+    ctx: &mut AnalysisContext,
+    k: &str,
+    decl: &Interned<Decl>,
+    expr: Option<&Expr>,
+) -> SymbolInfoHead {
+    let kind = decl.kind();
 
-                find_docs_of(&source, def)
-            });
-
-            let s = span.or(Some(f.span()));
-
-            (docs, name_range, s.and_then(Span::id), s)
-        }
-        Value::Module(m) => (None, None, m.file_id(), None),
-        _ => Default::default(),
-    };
+    let parsed_docs = ctx.def_of_decl(decl).and_then(|def| ctx.def_docs(&def));
+    let docs = parsed_docs.as_ref().map(|d| d.docs().clone());
 
     SymbolInfoHead {
         name: k.to_string().into(),
         kind,
-        constant: None.or_else(|| match v {
-            Value::Func(_) => None,
-            t => Some(truncated_doc_repr(t)),
-        }),
+        constant: expr.map(|e| e.repr()),
         docs,
-        name_range,
-        fid,
-        span,
-        value: Some(v.clone()),
+        parsed_docs,
+        decl: Some(decl.clone()),
         ..Default::default()
     }
 }

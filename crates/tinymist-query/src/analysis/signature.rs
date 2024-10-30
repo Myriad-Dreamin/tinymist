@@ -6,7 +6,7 @@ use typst::foundations::{Closure, ParamInfo};
 
 use super::{prelude::*, BoundChecker, Definition, DocSource, SharedContext, SigTy, TypeVar};
 use crate::analysis::PostTypeChecker;
-use crate::docs::{UntypedSignatureDocs, UntypedSymbolDocs, UntypedVarDocs};
+use crate::docs::{UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
 use crate::syntax::get_non_strict_def_target;
 use crate::ty::TyCtx;
 use crate::ty::TypeBounds;
@@ -290,8 +290,8 @@ fn analyze_type_signature(
 
             // todo: this will affect inlay hint: _var_with
             let (_var_with, docstring) = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
-                Some(UntypedSymbolDocs::Function(sig)) => (vec![], Either::Left(sig.as_ref())),
-                Some(UntypedSymbolDocs::Variable(d)) => find_alias_stack(&mut ty_ctx, &v, d)?,
+                Some(UntypedDefDocs::Function(sig)) => (vec![], Either::Left(sig.as_ref())),
+                Some(UntypedDefDocs::Variable(d)) => find_alias_stack(&mut ty_ctx, &v, d)?,
                 _ => return None,
             };
 
@@ -415,10 +415,10 @@ impl<'a, 'b> BoundChecker for AliasStackChecker<'a, 'b> {
         log::debug!("collecting var {u:?} {pol:?} => {docs:?}");
         // todo: bind builtin functions
         match docs {
-            Some(UntypedSymbolDocs::Function(sig)) => {
+            Some(UntypedDefDocs::Function(sig)) => {
                 self.res = Some(Either::Left(sig));
             }
-            Some(UntypedSymbolDocs::Variable(d)) => {
+            Some(UntypedDefDocs::Variable(d)) => {
                 self.checking_with = true;
                 self.stack.push(d);
                 self.check_var_rec(u, pol);
@@ -468,8 +468,7 @@ fn analyze_dyn_signature(
         SignatureTarget::Def(_source, def) => def.value()?.to_func()?,
         SignatureTarget::SyntaxFast(..) => return None,
         SignatureTarget::Syntax(source, span) => {
-            let target = ctx.deref_syntax(source, *span)?;
-            let def = ctx.definition(source, None, target)?;
+            let def = ctx.def_of_span(source, None, *span)?;
             def.value()?.to_func()?
         }
         SignatureTarget::Convert(func) | SignatureTarget::Runtime(func) => func.clone(),
