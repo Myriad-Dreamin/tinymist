@@ -15,7 +15,7 @@ pub struct CodeLensRequest {
 impl SemanticRequest for CodeLensRequest {
     type Response = Vec<CodeLens>;
 
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
 
         let doc_start = ctx.to_lsp_range(0..0, &source);

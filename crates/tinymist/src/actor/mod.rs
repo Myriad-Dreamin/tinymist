@@ -11,10 +11,11 @@ use std::sync::Arc;
 use reflexo::ImmutPath;
 use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
 use reflexo_typst::world::EntryState;
-use tinymist_query::analysis::Analysis;
-use tinymist_query::{ExportKind, SemanticTokenContext};
+use tinymist_query::analysis::{Analysis, PeriscopeProvider};
+use tinymist_query::{ExportKind, LocalContext, SemanticTokenContext, VersionedDocument};
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::mpsc;
+use typst::layout::Position;
 
 use crate::{
     task::{ExportConfig, ExportTask, ExportUserConfig},
@@ -96,7 +97,6 @@ impl LanguageState {
         // Create the compile handler for client consuming results.
         let const_config = self.const_config();
         let position_encoding = const_config.position_encoding;
-        let enable_periscope = self.compile_config().periscope_args.is_some();
         let periscope_args = self.compile_config().periscope_args.clone();
         let handle = Arc::new(CompileHandler {
             #[cfg(feature = "preview")]
@@ -108,18 +108,20 @@ impl LanguageState {
             stats: Default::default(),
             analysis: Arc::new(Analysis {
                 position_encoding,
-                enable_periscope,
-                caches: Default::default(),
-                workers: Default::default(),
-                cache_grid: Default::default(),
+                periscope: periscope_args.map(|args| {
+                    let r = TypstPeriscopeProvider(PeriscopeRenderer::new(args));
+                    Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>
+                }),
                 tokens_ctx: Arc::new(SemanticTokenContext::new(
                     const_config.position_encoding,
                     const_config.tokens_overlapping_token_support,
                     const_config.tokens_multiline_token_support,
                 )),
-                analysis_stats: Default::default(),
+                workers: Default::default(),
+                caches: Default::default(),
+                cache_grid: Default::default(),
+                stats: Default::default(),
             }),
-            periscope: PeriscopeRenderer::new(periscope_args.unwrap_or_default()),
 
             notified_revision: parking_lot::Mutex::new(0),
         });
@@ -159,5 +161,19 @@ impl LanguageState {
         // must update them.
         client.add_memory_changes(MemoryEvent::Update(snapshot));
         client
+    }
+}
+
+struct TypstPeriscopeProvider(PeriscopeRenderer);
+
+impl PeriscopeProvider for TypstPeriscopeProvider {
+    /// Resolve periscope image at the given position.
+    fn periscope_at(
+        &self,
+        ctx: &mut LocalContext,
+        doc: VersionedDocument,
+        pos: Position,
+    ) -> Option<String> {
+        self.0.render_marked(ctx, doc, pos)
     }
 }

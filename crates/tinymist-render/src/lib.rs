@@ -9,7 +9,7 @@ use core::fmt;
 
 use base64::Engine;
 use reflexo_vec2svg::{ExportFeature, SvgExporter, SvgText};
-use tinymist_query::{AnalysisContext, FramePosition, VersionedDocument};
+use tinymist_query::{FramePosition, LocalContext, VersionedDocument};
 
 struct PeriscopeExportFeature {}
 
@@ -72,7 +72,7 @@ impl PeriscopeRenderer {
     /// Render the periscope image for the given document into markdown format.
     pub fn render_marked(
         &self,
-        ctx: &mut AnalysisContext,
+        ctx: &mut LocalContext,
         doc: VersionedDocument,
         pos: FramePosition,
     ) -> Option<String> {
@@ -93,7 +93,7 @@ impl PeriscopeRenderer {
     /// Render the periscope image for the given document.
     pub fn render(
         &self,
-        _ctx: &mut AnalysisContext,
+        _ctx: &mut LocalContext,
         doc: VersionedDocument,
         pos: FramePosition,
     ) -> Option<(String, f32, f32)> {

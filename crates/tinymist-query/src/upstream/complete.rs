@@ -17,7 +17,7 @@ use unscanny::Scanner;
 use super::{plain_docs_sentence, summarize_font_family};
 use crate::adt::interner::Interned;
 use crate::analysis::{analyze_labels, DynLabel, Ty};
-use crate::AnalysisContext;
+use crate::LocalContext;
 
 mod ext;
 pub use ext::complete_path;
@@ -551,7 +551,7 @@ fn complete_imports(ctx: &mut CompletionContext) -> bool {
 
 /// Add completions for all exports of a module.
 fn import_item_completions<'a>(
-    ctx: &mut CompletionContext<'a, '_>,
+    ctx: &mut CompletionContext<'a>,
     existing: ast::ImportItems<'a>,
     source: &LinkedNode,
 ) {
@@ -951,8 +951,8 @@ fn code_completions(ctx: &mut CompletionContext, hash: bool) {
 }
 
 /// Context for autocompletion.
-pub struct CompletionContext<'a, 'b> {
-    pub ctx: &'a mut AnalysisContext<'b>,
+pub struct CompletionContext<'a> {
+    pub ctx: &'a mut LocalContext,
     pub document: Option<&'a Document>,
     pub text: &'a str,
     pub before: &'a str,
@@ -974,11 +974,11 @@ pub struct CompletionContext<'a, 'b> {
     pub seen_fields: HashSet<Interned<str>>,
 }
 
-impl<'a, 'w> CompletionContext<'a, 'w> {
+impl<'a> CompletionContext<'a> {
     /// Create a new autocompletion context.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        ctx: &'a mut AnalysisContext<'w>,
+        ctx: &'a mut LocalContext,
         document: Option<&'a Document>,
         source: &'a Source,
         cursor: usize,

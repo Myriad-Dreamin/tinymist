@@ -1,17 +1,12 @@
-use core::fmt::Write;
+use core::fmt::{self, Write};
 
+use typst::foundations::repr::separated_list;
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::{
-    analysis::{get_link_exprs_in, Definition},
-    docs::DefDocs,
-    jump_from_cursor,
-    prelude::*,
-    syntax::{get_deref_target, Decl, DefKind},
-    ty::PathPreference,
-    upstream::{expr_tooltip, route_of_value, truncated_repr, Tooltip},
-    LspHoverContents, StatefulRequest,
-};
+use crate::analysis::get_link_exprs_in;
+use crate::jump_from_cursor;
+use crate::prelude::*;
+use crate::upstream::{expr_tooltip, route_of_value, truncated_repr, Tooltip};
 
 /// The [`textDocument/hover`] request asks the server for hover information at
 /// a given text document position.
@@ -33,7 +28,7 @@ impl StatefulRequest for HoverRequest {
 
     fn request(
         self,
-        ctx: &mut AnalysisContext,
+        ctx: &mut LocalContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let doc_ref = doc.as_ref().map(|doc| doc.document.as_ref());
@@ -43,23 +38,18 @@ impl StatefulRequest for HoverRequest {
         // the typst's cursor is 1-based, so we need to add 1 to the offset
         let cursor = offset + 1;
 
+        let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+        let range = ctx.to_lsp_range(node.range(), &source);
+
         let contents = def_tooltip(ctx, &source, doc.as_ref(), cursor)
-            .or_else(|| star_tooltip(ctx, &source, cursor))
-            .or_else(|| link_tooltip(ctx, &source, cursor));
-
-        let contents = contents.or_else(|| {
-            Some(typst_to_lsp::tooltip(
-                &ctx.tooltip(doc_ref, &source, cursor)?,
-            ))
-        })?;
-
-        let ast_node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-        let range = ctx.to_lsp_range(ast_node.range(), &source);
+            .or_else(|| star_tooltip(ctx, &node))
+            .or_else(|| link_tooltip(ctx, &node, cursor))
+            .or_else(|| Some(to_lsp_tooltip(&ctx.tooltip(doc_ref, &source, cursor)?)))?;
 
         // Neovim shows ugly hover if the hover content is in array, so we join them
         // manually with divider bars.
         let mut contents = match contents {
-            LspHoverContents::Array(contents) => contents
+            HoverContents::Array(contents) => contents
                 .into_iter()
                 .map(|e| match e {
                     MarkedString::LanguageString(e) => {
@@ -68,8 +58,8 @@ impl StatefulRequest for HoverRequest {
                     MarkedString::String(e) => e,
                 })
                 .join("\n\n---\n"),
-            LspHoverContents::Scalar(MarkedString::String(contents)) => contents,
-            LspHoverContents::Scalar(MarkedString::LanguageString(contents)) => {
+            HoverContents::Scalar(MarkedString::String(contents)) => contents,
+            HoverContents::Scalar(MarkedString::LanguageString(contents)) => {
                 format!("```{}\n{}\n```", contents.language, contents.value)
             }
             lsp_types::HoverContents::Markup(e) => {
@@ -81,7 +71,7 @@ impl StatefulRequest for HoverRequest {
             }
         };
 
-        if ctx.analysis.enable_periscope {
+        if let Some(p) = ctx.analysis.periscope.clone() {
             if let Some(doc) = doc.clone() {
                 let position = jump_from_cursor(&doc.document, &source, cursor);
                 let position = position.or_else(|| {
@@ -106,7 +96,7 @@ impl StatefulRequest for HoverRequest {
                 });
 
                 log::info!("telescope position: {:?}", position);
-                let content = position.and_then(|pos| ctx.resources.periscope_at(ctx, doc, pos));
+                let content = position.and_then(|pos| p.periscope_at(ctx, doc, pos));
                 if let Some(preview_content) = content {
                     contents = format!("{preview_content}\n---\n{contents}");
                 }
@@ -114,114 +104,18 @@ impl StatefulRequest for HoverRequest {
         }
 
         Some(Hover {
-            contents: LspHoverContents::Scalar(MarkedString::String(contents)),
+            contents: HoverContents::Scalar(MarkedString::String(contents)),
             range: Some(range),
         })
     }
 }
 
-fn link_tooltip(
-    ctx: &mut AnalysisContext<'_>,
-    source: &Source,
-    cursor: usize,
-) -> Option<HoverContents> {
-    let mut node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-    while !matches!(node.kind(), SyntaxKind::FuncCall) {
-        node = node.parent()?.clone();
-    }
-
-    let mut links = get_link_exprs_in(ctx, &node)?;
-    links.retain(|link| link.0.contains(&cursor));
-    if links.is_empty() {
-        return None;
-    }
-
-    let mut results = vec![];
-    let mut actions = vec![];
-    for (_, target) in links {
-        // open file in tab or system application
-        actions.push(CommandLink {
-            title: Some("Open in Tab".to_string()),
-            command_or_links: vec![CommandOrLink::Command(Command {
-                id: "tinymist.openInternal".to_string(),
-                args: vec![JsonValue::String(target.to_string())],
-            })],
-        });
-        actions.push(CommandLink {
-            title: Some("Open Externally".to_string()),
-            command_or_links: vec![CommandOrLink::Command(Command {
-                id: "tinymist.openExternal".to_string(),
-                args: vec![JsonValue::String(target.to_string())],
-            })],
-        });
-        if let Some(kind) = PathPreference::from_ext(target.path()) {
-            let preview = format!("A `{kind:?}` file.");
-            results.push(MarkedString::String(preview));
-        }
-    }
-    render_actions(&mut results, actions);
-    if results.is_empty() {
-        return None;
-    }
-
-    Some(LspHoverContents::Array(results))
-}
-
-fn star_tooltip(
-    ctx: &mut AnalysisContext,
-    source: &Source,
-    cursor: usize,
-) -> Option<HoverContents> {
-    let leaf = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
-
-    if !matches!(leaf.kind(), SyntaxKind::Star) {
-        return None;
-    }
-
-    let mut leaf = &leaf;
-    while !matches!(leaf.kind(), SyntaxKind::ModuleImport) {
-        leaf = leaf.parent()?;
-    }
-
-    let mi: ast::ModuleImport = leaf.cast()?;
-    let source = mi.source();
-    let module = ctx.analyze_import(source.to_untyped()).1;
-    log::debug!("star import: {source:?} => {:?}", module.is_some());
-
-    let i = module?;
-    let scope = i.scope()?;
-
-    let mut results = vec![];
-
-    let mut names = scope.iter().map(|(name, _, _)| name).collect::<Vec<_>>();
-    names.sort();
-    let items = typst::foundations::repr::separated_list(&names, "and");
-
-    results.push(MarkedString::String(format!("This star imports {items}")));
-    Some(LspHoverContents::Array(results))
-}
-
-struct Command {
-    id: String,
-    args: Vec<JsonValue>,
-}
-
-enum CommandOrLink {
-    Link(String),
-    Command(Command),
-}
-
-struct CommandLink {
-    title: Option<String>,
-    command_or_links: Vec<CommandOrLink>,
-}
-
 fn def_tooltip(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
     source: &Source,
     document: Option<&VersionedDocument>,
     cursor: usize,
-) -> Option<LspHoverContents> {
+) -> Option<HoverContents> {
     let leaf = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
     let deref_target = get_deref_target(leaf.clone(), cursor)?;
     let def = ctx.def_of_syntax(source, document, deref_target.clone())?;
@@ -238,7 +132,7 @@ fn def_tooltip(
                 let c = truncated_repr(&c);
                 results.push(MarkedString::String(format!("{c}")));
             }
-            Some(LspHoverContents::Array(results))
+            Some(HoverContents::Array(results))
         }
         BibEntry(..) => {
             results.push(MarkedString::String(format!(
@@ -246,7 +140,7 @@ fn def_tooltip(
                 def.name()
             )));
 
-            Some(LspHoverContents::Array(results))
+            Some(HoverContents::Array(results))
         }
         _ => {
             let sym_docs = ctx.def_docs(&def);
@@ -308,14 +202,80 @@ fn def_tooltip(
             //     results.push(MarkedString::String(doc));
             // }
 
-            if let Some(link) = ExternalDocLink::get(ctx, &def) {
+            if let Some(link) = ExternalDocLink::get(&def) {
                 actions.push(link);
             }
 
             render_actions(&mut results, actions);
-            Some(LspHoverContents::Array(results))
+            Some(HoverContents::Array(results))
         }
     }
+}
+
+fn star_tooltip(ctx: &mut LocalContext, mut node: &LinkedNode) -> Option<HoverContents> {
+    if !matches!(node.kind(), SyntaxKind::Star) {
+        return None;
+    }
+
+    while !matches!(node.kind(), SyntaxKind::ModuleImport) {
+        node = node.parent()?;
+    }
+
+    let import_node = node.cast::<ast::ModuleImport>()?;
+    let scope_val = ctx.analyze_import(import_node.source().to_untyped()).1?;
+
+    let scope_items = scope_val.scope()?.iter();
+    let mut names = scope_items.map(|item| item.0.as_str()).collect::<Vec<_>>();
+    names.sort();
+
+    let content = format!("This star imports {}", separated_list(&names, "and"));
+    Some(HoverContents::Scalar(MarkedString::String(content)))
+}
+
+fn link_tooltip(
+    ctx: &mut LocalContext,
+    mut node: &LinkedNode,
+    cursor: usize,
+) -> Option<HoverContents> {
+    while !matches!(node.kind(), SyntaxKind::FuncCall) {
+        node = node.parent()?;
+    }
+
+    let mut links = get_link_exprs_in(ctx, node)?;
+    links.retain(|link| link.0.contains(&cursor));
+    if links.is_empty() {
+        return None;
+    }
+
+    let mut results = vec![];
+    let mut actions = vec![];
+    for (_, target) in links {
+        // open file in tab or system application
+        actions.push(CommandLink {
+            title: Some("Open in Tab".to_string()),
+            command_or_links: vec![CommandOrLink::Command {
+                id: "tinymist.openInternal".to_string(),
+                args: vec![JsonValue::String(target.to_string())],
+            }],
+        });
+        actions.push(CommandLink {
+            title: Some("Open Externally".to_string()),
+            command_or_links: vec![CommandOrLink::Command {
+                id: "tinymist.openExternal".to_string(),
+                args: vec![JsonValue::String(target.to_string())],
+            }],
+        });
+        if let Some(kind) = PathPreference::from_ext(target.path()) {
+            let preview = format!("A `{kind:?}` file.");
+            results.push(MarkedString::String(preview));
+        }
+    }
+    render_actions(&mut results, actions);
+    if results.is_empty() {
+        return None;
+    }
+
+    Some(HoverContents::Array(results))
 }
 
 fn push_result_ty(name: &str, ty_repr: Option<&(String, String)>, type_doc: &mut String) {
@@ -334,48 +294,14 @@ fn render_actions(results: &mut Vec<MarkedString>, actions: Vec<CommandLink>) {
         return;
     }
 
-    let g = actions
-        .into_iter()
-        .map(|action| {
-            // https://github.com/rust-lang/rust-analyzer/blob/1a5bb27c018c947dab01ab70ffe1d267b0481a17/editors/code/src/client.ts#L59
-            let title = action.title.unwrap_or("".to_owned());
-            let command_or_links = action
-                .command_or_links
-                .into_iter()
-                .map(|col| match col {
-                    CommandOrLink::Link(link) => link,
-                    CommandOrLink::Command(command) => {
-                        let id = command.id;
-                        // <https://code.visualstudio.com/api/extension-guides/command#command-uris>
-                        if command.args.is_empty() {
-                            format!("command:{id}")
-                        } else {
-                            let args = serde_json::to_string(&command.args).unwrap();
-                            let args = percent_encoding::utf8_percent_encode(
-                                &args,
-                                percent_encoding::NON_ALPHANUMERIC,
-                            );
-                            format!("command:{id}?{args}")
-                        }
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" ");
-            format!("[{title}]({command_or_links})")
-        })
-        .collect::<Vec<_>>()
-        .join(" | ");
+    let g = actions.into_iter().join(" | ");
     results.push(MarkedString::String(g));
 }
 
 struct ExternalDocLink;
 
 impl ExternalDocLink {
-    fn get(ctx: &mut AnalysisContext, def: &Definition) -> Option<CommandLink> {
-        self::ExternalDocLink::get_inner(ctx, def)
-    }
-
-    fn get_inner(_ctx: &mut AnalysisContext, def: &Definition) -> Option<CommandLink> {
+    fn get(def: &Definition) -> Option<CommandLink> {
         let value = def.value();
 
         if matches!(value, Some(Value::Func(..))) {
@@ -386,9 +312,7 @@ impl ExternalDocLink {
 
         value.and_then(|value| Self::builtin_value_tooltip("https://typst.app/docs/", &value))
     }
-}
 
-impl ExternalDocLink {
     fn builtin_func_tooltip(base: &str, def: &Definition) -> Option<CommandLink> {
         let Some(Value::Func(func)) = def.value() else {
             return None;
@@ -420,6 +344,57 @@ impl ExternalDocLink {
             command_or_links: vec![CommandOrLink::Link(link)],
         })
     }
+}
+
+struct CommandLink {
+    title: Option<String>,
+    command_or_links: Vec<CommandOrLink>,
+}
+
+impl fmt::Display for CommandLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // https://github.com/rust-lang/rust-analyzer/blob/1a5bb27c018c947dab01ab70ffe1d267b0481a17/editors/code/src/client.ts#L59
+        let title = self.title.as_deref().unwrap_or("");
+        let command_or_links = self.command_or_links.iter().join(" ");
+        write!(f, "[{title}]({command_or_links})")
+    }
+}
+
+enum CommandOrLink {
+    Link(String),
+    Command { id: String, args: Vec<JsonValue> },
+}
+
+impl fmt::Display for CommandOrLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Link(link) => f.write_str(link),
+            Self::Command { id, args } => {
+                // <https://code.visualstudio.com/api/extension-guides/command#command-uris>
+                if args.is_empty() {
+                    return write!(f, "command:{id}");
+                }
+
+                let args = serde_json::to_string(&args).unwrap();
+                let args = percent_encoding::utf8_percent_encode(
+                    &args,
+                    percent_encoding::NON_ALPHANUMERIC,
+                );
+                write!(f, "command:{id}?{args}")
+            }
+        }
+    }
+}
+
+fn to_lsp_tooltip(typst_tooltip: &Tooltip) -> HoverContents {
+    let lsp_marked_string = match typst_tooltip {
+        Tooltip::Text(text) => MarkedString::String(text.to_string()),
+        Tooltip::Code(code) => MarkedString::LanguageString(LanguageString {
+            language: "typc".to_owned(),
+            value: code.to_string(),
+        }),
+    };
+    HoverContents::Scalar(lsp_marked_string)
 }
 
 #[cfg(test)]

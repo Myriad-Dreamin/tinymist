@@ -63,7 +63,7 @@ pub struct InlayHintRequest {
 impl SemanticRequest for InlayHintRequest {
     type Response = Vec<InlayHint>;
 
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let range = ctx.to_typst_range(self.range, &source)?;
 
@@ -83,22 +83,22 @@ impl SemanticRequest for InlayHintRequest {
 }
 
 fn inlay_hint(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
     source: &Source,
     range: Range<usize>,
     encoding: PositionEncoding,
 ) -> FileResult<Vec<InlayHint>> {
     const SMART: InlayHintConfig = InlayHintConfig::smart();
 
-    struct InlayHintWorker<'a, 'w> {
-        ctx: &'a mut AnalysisContext<'w>,
+    struct InlayHintWorker<'a> {
+        ctx: &'a mut LocalContext,
         source: &'a Source,
         range: Range<usize>,
         encoding: PositionEncoding,
         hints: Vec<InlayHint>,
     }
 
-    impl InlayHintWorker<'_, '_> {
+    impl InlayHintWorker<'_> {
         fn analyze(&mut self, node: LinkedNode) {
             let rng = node.range();
             if rng.start >= self.range.end || rng.end <= self.range.start {

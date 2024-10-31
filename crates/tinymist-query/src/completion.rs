@@ -61,7 +61,7 @@ impl StatefulRequest for CompletionRequest {
 
     fn request(
         self,
-        ctx: &mut AnalysisContext,
+        ctx: &mut LocalContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let doc = doc.as_ref().map(|doc| doc.document.as_ref());
@@ -331,8 +331,8 @@ mod tests {
         pkg_mode: bool,
     }
 
-    fn run(c: TestConfig) -> impl Fn(&mut AnalysisContext, PathBuf) {
-        fn test(ctx: &mut AnalysisContext, id: TypstFileId) {
+    fn run(c: TestConfig) -> impl Fn(&mut LocalContext, PathBuf) {
+        fn test(ctx: &mut LocalContext, id: TypstFileId) {
             let source = ctx.source_by_id(id).unwrap();
             let rng = find_test_range(&source);
             let text = source.text()[rng.clone()].to_string();

@@ -1,21 +1,13 @@
 use core::fmt;
 use std::collections::BTreeMap;
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 
-use ecow::{eco_format, EcoString};
-use parking_lot::Mutex;
+use ecow::EcoString;
 use serde::{Deserialize, Serialize};
-use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
-use tinymist_world::LspWorld;
-use typst::foundations::Bytes;
-use typst::{
-    diag::StrResult,
-    syntax::{FileId, Span, VirtualPath},
-};
+use typst::syntax::Span;
 
 use super::tidy::*;
 use crate::analysis::{ParamAttrs, ParamSpec, Signature};
-use crate::docs::library;
 use crate::prelude::*;
 use crate::ty::Ty;
 use crate::ty::{DocSource, Interned};
@@ -24,12 +16,12 @@ use crate::upstream::plain_docs_sentence;
 type TypeRepr = Option<(/* short */ String, /* long */ String)>;
 type ShowTypeRepr<'a> = &'a mut dyn FnMut(Option<&Ty>) -> TypeRepr;
 
-/// Documentation about a symbol (without type information).
+/// Documentation about a definition (without type information).
 pub type UntypedDefDocs = DefDocsT<()>;
-/// Documentation about a symbol.
+/// Documentation about a definition.
 pub type DefDocs = DefDocsT<TypeRepr>;
 
-/// Documentation about a symbol.
+/// Documentation about a definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum DefDocsT<T> {
@@ -263,7 +255,7 @@ fn format_ty(ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> TypeRepr {
     }
 }
 
-pub(crate) fn variable_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
+pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
     let source = ctx.source_by_id(pos.id()?).ok()?;
     let type_info = ctx.type_check(&source);
     let ty = type_info.type_of_span(pos)?;
@@ -299,10 +291,7 @@ pub(crate) fn variable_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs
     }
 }
 
-pub(crate) fn signature_docs(
-    sig: &Signature,
-    mut doc_ty: Option<ShowTypeRepr>,
-) -> Option<SignatureDocs> {
+pub(crate) fn sig_docs(sig: &Signature, mut doc_ty: Option<ShowTypeRepr>) -> Option<SignatureDocs> {
     let type_sig = sig.type_sig().clone();
 
     let pos_in = sig
@@ -343,35 +332,4 @@ pub(crate) fn signature_docs(
         ret_ty,
         hover_docs: OnceLock::new(),
     })
-}
-
-// Unfortunately, we have only 65536 possible file ids and we cannot revoke
-// them. So we share a global file id for all docs conversion.
-static DOCS_CONVERT_ID: std::sync::LazyLock<Mutex<FileId>> = std::sync::LazyLock::new(|| {
-    Mutex::new(FileId::new(None, VirtualPath::new("__tinymist_docs__.typ")))
-});
-
-pub(crate) fn convert_docs(world: &LspWorld, content: &str) -> StrResult<EcoString> {
-    static DOCS_LIB: std::sync::LazyLock<Arc<typlite::scopes::Scopes<typlite::value::Value>>> =
-        std::sync::LazyLock::new(library::lib);
-
-    let conv_id = DOCS_CONVERT_ID.lock();
-    let entry = EntryState::new_rootless(conv_id.vpath().as_rooted_path().into()).unwrap();
-    let entry = entry.select_in_workspace(*conv_id);
-
-    let mut w = world.task(TaskInputs {
-        entry: Some(entry),
-        inputs: None,
-    });
-    w.map_shadow_by_id(*conv_id, Bytes::from(content.as_bytes().to_owned()))?;
-    // todo: bad performance
-    w.source_db.take_state();
-
-    let conv = typlite::Typlite::new(Arc::new(w))
-        .with_library(DOCS_LIB.clone())
-        .annotate_elements(true)
-        .convert()
-        .map_err(|e| eco_format!("failed to convert to markdown: {e}"))?;
-
-    Ok(conv.replace("```example", "```typ"))
 }

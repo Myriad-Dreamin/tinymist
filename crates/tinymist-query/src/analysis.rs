@@ -202,7 +202,7 @@ mod module_tests {
                 ids
             }
 
-            let dependencies = construct_module_dependencies(&mut ctx.local);
+            let dependencies = construct_module_dependencies(ctx);
 
             let mut dependencies = dependencies
                 .into_iter()

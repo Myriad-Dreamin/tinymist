@@ -31,7 +31,7 @@ pub struct SymbolRequest {
 impl SemanticRequest for SymbolRequest {
     type Response = Vec<SymbolInformation>;
 
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         // todo: let typst.ts expose source
 
         let mut symbols = vec![];

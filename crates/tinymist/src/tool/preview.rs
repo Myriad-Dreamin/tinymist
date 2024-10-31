@@ -540,7 +540,6 @@ pub async fn preview_main(args: PreviewCliArgs) -> anyhow::Result<()> {
             editor_tx,
             analysis: Arc::default(),
             stats: Default::default(),
-            periscope: tinymist_render::PeriscopeRenderer::default(),
             notified_revision: parking_lot::Mutex::new(0),
         });
 

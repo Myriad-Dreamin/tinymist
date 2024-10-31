@@ -16,7 +16,7 @@ pub struct WorkspaceLabelRequest {}
 impl SemanticRequest for WorkspaceLabelRequest {
     type Response = Vec<SymbolInformation>;
 
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         // todo: let typst.ts expose source
 
         let mut symbols = vec![];

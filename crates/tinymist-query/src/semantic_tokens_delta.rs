@@ -25,7 +25,7 @@ impl SemanticRequest for SemanticTokensDeltaRequest {
     type Response = SemanticTokensFullDeltaResult;
     /// Handles the request to compute the semantic tokens delta for a given
     /// document.
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let ei = ctx.expr_stage(&source);
 

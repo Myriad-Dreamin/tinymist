@@ -28,7 +28,7 @@ impl StatefulRequest for GotoDefinitionRequest {
 
     fn request(
         self,
-        ctx: &mut AnalysisContext,
+        ctx: &mut LocalContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
@@ -38,9 +38,7 @@ impl StatefulRequest for GotoDefinitionRequest {
         let def = ctx.def_of_syntax(&source, doc.as_ref(), deref_target)?;
 
         let (fid, def_range) = def.def_at(ctx.shared())?;
-
         let uri = ctx.uri_for_id(fid).ok()?;
-
         let range = ctx.to_lsp_range_(def_range, fid)?;
 
         let res = Some(GotoDefinitionResponse::Link(vec![LocationLink {

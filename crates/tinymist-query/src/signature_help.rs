@@ -25,7 +25,7 @@ pub struct SignatureHelpRequest {
 impl SemanticRequest for SignatureHelpRequest {
     type Response = SignatureHelp;
 
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let cursor = ctx.to_typst_pos(self.position, &source)? + 1;
 
@@ -150,11 +150,11 @@ impl SemanticRequest for SignatureHelpRequest {
 pub(crate) struct DocTooltip;
 
 impl DocTooltip {
-    pub fn get(ctx: &mut AnalysisContext, def: &Definition) -> Option<String> {
+    pub fn get(ctx: &mut LocalContext, def: &Definition) -> Option<String> {
         self::DocTooltip::get_inner(ctx, def).map(|s| "\n\n".to_owned() + &s)
     }
 
-    fn get_inner(ctx: &mut AnalysisContext, def: &Definition) -> Option<String> {
+    fn get_inner(ctx: &mut LocalContext, def: &Definition) -> Option<String> {
         let value = def.value();
         if matches!(value, Some(Value::Func(..))) {
             if let Some(builtin) = Self::builtin_func_tooltip(def) {

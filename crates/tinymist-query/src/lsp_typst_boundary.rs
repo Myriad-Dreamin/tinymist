@@ -3,10 +3,7 @@
 // todo: remove this
 #![allow(missing_docs)]
 
-use std::path::{Path, PathBuf};
-
-use lsp_types::{self, Url};
-use once_cell::sync::Lazy;
+use crate::prelude::*;
 use reflexo::path::PathClean;
 
 pub type LspPosition = lsp_types::Position;
@@ -23,9 +20,6 @@ pub type TypstSpan = typst::syntax::Span;
 /// `LspRange` struct provides this range with that encoding.
 pub type LspRange = lsp_types::Range;
 pub type TypstRange = std::ops::Range<usize>;
-
-pub type TypstTooltip = crate::upstream::Tooltip;
-pub type LspHoverContents = lsp_types::HoverContents;
 
 pub type LspDiagnostic = lsp_types::Diagnostic;
 pub type TypstDiagnostic = typst::diag::SourceDiagnostic;
@@ -64,7 +58,7 @@ impl From<PositionEncoding> for lsp_types::PositionEncodingKind {
 }
 
 const UNTITLED_ROOT: &str = "/untitled";
-static EMPTY_URL: Lazy<Url> = Lazy::new(|| Url::parse("file://").unwrap());
+static EMPTY_URL: LazyLock<Url> = LazyLock::new(|| Url::parse("file://").unwrap());
 
 pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
     if let Ok(untitled) = path.strip_prefix(UNTITLED_ROOT) {
@@ -215,10 +209,6 @@ pub mod lsp_to_typst {
 }
 
 pub mod typst_to_lsp {
-
-    use lsp_types::{LanguageString, MarkedString};
-    use typst::syntax::Source;
-
     use super::*;
 
     pub fn offset_to_position(
@@ -270,23 +260,11 @@ pub mod typst_to_lsp {
 
         LspRange::new(lsp_start, lsp_end)
     }
-
-    pub fn tooltip(typst_tooltip: &TypstTooltip) -> LspHoverContents {
-        let lsp_marked_string = match typst_tooltip {
-            TypstTooltip::Text(text) => MarkedString::String(text.to_string()),
-            TypstTooltip::Code(code) => MarkedString::LanguageString(LanguageString {
-                language: "typc".to_owned(),
-                value: code.to_string(),
-            }),
-        };
-        LspHoverContents::Scalar(lsp_marked_string)
-    }
 }
 
 #[cfg(test)]
 mod test {
     use lsp_types::Position;
-    use typst::syntax::Source;
 
     use super::*;
 

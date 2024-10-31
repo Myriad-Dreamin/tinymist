@@ -74,7 +74,7 @@ pub struct CodeActionRequest {
 impl SemanticRequest for CodeActionRequest {
     type Response = Vec<CodeActionOrCommand>;
 
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let range = ctx.to_typst_range(self.range, &source)?;
         let cursor = (range.start + 1).min(source.text().len());
@@ -89,15 +89,15 @@ impl SemanticRequest for CodeActionRequest {
     }
 }
 
-struct CodeActionWorker<'a, 'w> {
-    ctx: &'a mut AnalysisContext<'w>,
+struct CodeActionWorker<'a> {
+    ctx: &'a mut LocalContext,
     actions: Vec<CodeActionOrCommand>,
     local_url: OnceCell<Option<Url>>,
     current: Source,
 }
 
-impl<'a, 'w> CodeActionWorker<'a, 'w> {
-    fn new(ctx: &'a mut AnalysisContext<'w>, current: Source) -> Self {
+impl<'a> CodeActionWorker<'a> {
+    fn new(ctx: &'a mut LocalContext, current: Source) -> Self {
         Self {
             ctx,
             actions: Vec::new(),

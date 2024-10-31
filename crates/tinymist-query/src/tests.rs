@@ -22,16 +22,13 @@ pub use tinymist_world::{LspUniverse, LspUniverseBuilder};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
-    analysis::{Analysis, AnalysisResources},
-    prelude::AnalysisContext,
-    typst_to_lsp, LspPosition, PositionEncoding, VersionedDocument,
+    analysis::Analysis, prelude::LocalContext, typst_to_lsp, LspPosition, PositionEncoding,
+    VersionedDocument,
 };
 
 type CompileDriver<C> = CompileDriverImpl<C, tinymist_world::LspCompilerFeat>;
 
-impl AnalysisResources for () {}
-
-pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) {
+pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
     let mut settings = insta::Settings::new();
     settings.set_prepend_module_to_snapshot(false);
     settings.set_snapshot_path(format!("fixtures/{name}/snaps"));
@@ -52,7 +49,7 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut AnalysisContext, PathBuf)) 
 pub fn run_with_ctx<T>(
     w: &mut LspUniverse,
     p: PathBuf,
-    f: &impl Fn(&mut AnalysisContext, PathBuf) -> T,
+    f: &impl Fn(&mut LocalContext, PathBuf) -> T,
 ) -> T {
     let root = w.workspace_root().unwrap();
     let paths = w
@@ -61,7 +58,7 @@ pub fn run_with_ctx<T>(
         .map(|p| TypstFileId::new(None, VirtualPath::new(p.strip_prefix(&root).unwrap())))
         .collect::<Vec<_>>();
 
-    let mut ctx = Arc::new(Analysis::default()).snapshot(w.snapshot(), &());
+    let mut ctx = Arc::new(Analysis::default()).snapshot(w.snapshot());
     ctx.test_completion_files(Vec::new);
     ctx.test_files(|| paths);
     f(&mut ctx, p)
@@ -79,7 +76,7 @@ pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
 }
 
 pub fn compile_doc_for_test(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
     properties: &HashMap<&str, &str>,
 ) -> Option<VersionedDocument> {
     let must_compile = properties

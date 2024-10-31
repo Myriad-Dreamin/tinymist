@@ -21,7 +21,7 @@ pub struct DocumentLinkRequest {
 impl SemanticRequest for DocumentLinkRequest {
     type Response = Vec<DocumentLink>;
 
-    fn request(self, ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let links = get_link_exprs(ctx, &source);
         links.map(|links| {

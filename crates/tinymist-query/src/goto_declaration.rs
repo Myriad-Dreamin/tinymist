@@ -30,14 +30,14 @@ pub struct GotoDeclarationRequest {
 impl SemanticRequest for GotoDeclarationRequest {
     type Response = GotoDeclarationResponse;
 
-    fn request(self, _ctx: &mut AnalysisContext) -> Option<Self::Response> {
+    fn request(self, _ctx: &mut LocalContext) -> Option<Self::Response> {
         let _ = find_declarations;
         todo!()
     }
 }
 
 fn find_declarations(
-    _ctx: &AnalysisContext,
+    _ctx: &LocalContext,
     _expr_info: Arc<crate::syntax::ExprInfo>,
     _deref_target: DerefTarget<'_>,
 ) -> Option<Vec<Range<usize>>> {

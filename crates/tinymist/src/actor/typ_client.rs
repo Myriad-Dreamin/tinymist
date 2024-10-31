@@ -32,13 +32,12 @@ use reflexo_typst::{
 };
 use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
-    analysis::{Analysis, AnalysisContext, AnalysisResources},
+    analysis::{Analysis, LocalContextGuard},
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, ExportKind, SemanticRequest,
     ServerInfoResponse, StatefulRequest, VersionedDocument,
 };
-use tinymist_render::PeriscopeRenderer;
 use tokio::sync::{mpsc, oneshot};
-use typst::{diag::SourceDiagnostic, layout::Position, World as TypstWorld};
+use typst::{diag::SourceDiagnostic, World as TypstWorld};
 
 use super::{
     editor::{DocVersion, EditorRequest, TinymistCompileStatusEnum},
@@ -59,7 +58,6 @@ pub struct CompileHandler {
     pub(crate) diag_group: String,
     pub(crate) analysis: Arc<Analysis>,
     pub(crate) stats: CompilerQueryStats,
-    pub(crate) periscope: PeriscopeRenderer,
 
     #[cfg(feature = "preview")]
     pub(crate) inner: Arc<parking_lot::RwLock<Option<Arc<typst_preview::CompileWatcher>>>>,
@@ -180,7 +178,7 @@ impl CompileHandler {
     pub fn run_analysis<T>(
         &self,
         w: &LspWorld,
-        f: impl FnOnce(&mut AnalysisContext<'_>) -> T,
+        f: impl FnOnce(&mut LocalContextGuard) -> T,
     ) -> anyhow::Result<T> {
         let Some(main) = w.main_id() else {
             error!("TypstActor: main file is not set");
@@ -191,23 +189,7 @@ impl CompileHandler {
             anyhow!("failed to get source: {err}")
         })?;
 
-        struct Resource<'a>(&'a PeriscopeRenderer);
-
-        impl<'a> AnalysisResources for Resource<'a> {
-            /// Resolve periscope image at the given position.
-            fn periscope_at(
-                &self,
-                ctx: &mut AnalysisContext,
-                doc: VersionedDocument,
-                pos: Position,
-            ) -> Option<String> {
-                self.0.render_marked(ctx, doc, pos)
-            }
-        }
-
-        let r = Resource(&self.periscope);
-
-        let mut analysis = self.analysis.snapshot(w.clone(), &r);
+        let mut analysis = self.analysis.snapshot(w.clone());
         Ok(f(&mut analysis))
     }
 

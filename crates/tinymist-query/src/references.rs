@@ -26,7 +26,7 @@ impl StatefulRequest for ReferencesRequest {
 
     fn request(
         self,
-        ctx: &mut AnalysisContext,
+        ctx: &mut LocalContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
@@ -40,7 +40,7 @@ impl StatefulRequest for ReferencesRequest {
 }
 
 pub(crate) fn find_references(
-    ctx: &mut AnalysisContext,
+    ctx: &mut LocalContext,
     source: &Source,
     doc: Option<&VersionedDocument>,
     target: DerefTarget<'_>,
@@ -69,13 +69,13 @@ pub(crate) fn find_references(
     }
 }
 
-struct ReferencesWorker<'a, 'w> {
-    ctx: SearchCtx<'a, 'w>,
+struct ReferencesWorker<'a> {
+    ctx: SearchCtx<'a>,
     references: Vec<LspLocation>,
     def: Definition,
 }
 
-impl<'a, 'w> ReferencesWorker<'a, 'w> {
+impl<'a> ReferencesWorker<'a> {
     fn label_root(mut self) -> Option<Vec<LspLocation>> {
         let mut ids = vec![];
 
