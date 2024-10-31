@@ -430,6 +430,16 @@
             "disable"
           ]
         },
+        "tinymist.renderDocs": {
+          "title": "(Experimental) Render Docs",
+          "description": "(Experimental) Whether to render typst elements in (hover) docs. In VS Code, when this feature is enabled, tinymist will store rendered results in the filesystem's temporary storage to show them in the hover content. Note: Please disable this feature if the editor doesn't support/handle image previewing in docs.",
+          "type": "string",
+          "default": "enable",
+          "enum": [
+            "enable",
+            "disable"
+          ]
+        },
         "tinymist.previewFeature": {
           "title": "Enable preview features",
           "description": "Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.",

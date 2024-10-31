@@ -9,6 +9,7 @@ interface ExtensionState {
     dragAndDrop: boolean;
     onEnter: boolean;
     preview: boolean;
+    renderDocs: boolean;
   };
   mut: {
     focusingFile: string | undefined;
@@ -25,6 +26,7 @@ export const extensionState: ExtensionState = {
     dragAndDrop: false,
     onEnter: false,
     preview: false,
+    renderDocs: false,
   },
   mut: {
     focusingFile: undefined,

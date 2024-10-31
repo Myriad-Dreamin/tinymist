@@ -91,6 +91,8 @@ use typst::{model::Document as TypstDocument, syntax::Source};
 /// The physical position in a document.
 pub type FramePosition = typst::layout::Position;
 
+pub use typlite::ColorTheme;
+
 /// A compiled document with an self-incremented logical version.
 #[derive(Debug, Clone)]
 pub struct VersionedDocument {

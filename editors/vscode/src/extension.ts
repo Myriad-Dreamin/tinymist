@@ -46,6 +46,7 @@ import { devKitFeatureActivate } from "./features/dev-kit";
 import { labelFeatureActivate } from "./features/label";
 import { packageFeatureActivate } from "./features/package";
 import { dragAndDropActivate } from "./features/drag-and-drop";
+import { HoverDummyStorage, HoverTmpStorage } from "./features/hover-storage";
 
 export async function activate(context: ExtensionContext): Promise<void> {
   try {
@@ -76,6 +77,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   extensionState.features.devKit = isDevMode || config.devKit === "enable";
   extensionState.features.dragAndDrop = config.dragAndDrop === "enable";
   extensionState.features.onEnter = !!config.onEnterEvent;
+  extensionState.features.renderDocs = config.renderDocs === "enable";
   // Initializes language client
   const client = initClient(context, config);
   setClient(client);
@@ -131,6 +133,10 @@ function initClient(context: ExtensionContext, config: Record<string, any>) {
   const trustedCommands = {
     enabledCommands: ["tinymist.openInternal", "tinymist.openExternal"],
   };
+  const hoverStorage = extensionState.features.renderDocs
+    ? new HoverTmpStorage(context)
+    : new HoverDummyStorage();
+
   const clientOptions: LanguageClientOptions = {
     documentSelector: typstDocumentSelector,
     initializationOptions: config,
@@ -151,12 +157,26 @@ function initClient(context: ExtensionContext, config: Record<string, any>) {
           return hover;
         }
 
+        const hoverHandler = await hoverStorage.startHover();
+
         for (const content of hover.contents) {
           if (content instanceof vscode.MarkdownString) {
             content.isTrusted = trustedCommands;
             content.supportHtml = true;
+
+            if (context.storageUri) {
+              content.baseUri = Uri.joinPath(context.storageUri, "tmp/");
+            }
+
+            // outline all data "data:image/svg+xml;base64," to render huge image correctly
+            content.value = content.value.replace(
+              /\"data\:image\/svg\+xml\;base64,([^\"]*)\"/g,
+              (_, content) => hoverHandler.storeImage(content),
+            );
           }
         }
+
+        await hoverHandler.finish();
         return hover;
       },
     },

@@ -36,7 +36,7 @@ use crate::syntax::{
 };
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
-    lsp_to_typst, path_to_url, typst_to_lsp, LspPosition, LspRange, PositionEncoding,
+    lsp_to_typst, path_to_url, typst_to_lsp, ColorTheme, LspPosition, LspRange, PositionEncoding,
     SemanticTokenContext, TypstRange, VersionedDocument,
 };
 
@@ -45,6 +45,8 @@ use crate::{
 pub struct Analysis {
     /// The position encoding for the workspace.
     pub position_encoding: PositionEncoding,
+    /// The editor's color theme.
+    pub color_theme: ColorTheme,
     /// The periscope provider.
     pub periscope: Option<Arc<dyn PeriscopeProvider + Send + Sync>>,
     /// The semantic token context.
