@@ -1,4 +1,4 @@
-// path: base.typ
+/// path: base.typ
 #let a(x) = a;
 -----
 #import "base.typ": *

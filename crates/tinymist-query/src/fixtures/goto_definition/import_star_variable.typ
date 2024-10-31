@@ -1,4 +1,4 @@
-// path: variable.typ
+/// path: variable.typ
 #let x = 2;
 -----
 .

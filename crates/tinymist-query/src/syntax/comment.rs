@@ -9,18 +9,21 @@ pub fn find_module_level_docs(src: &Source) -> Option<String> {
             continue;
         }
 
-        return extract_document_between(&root, 0..n.offset(), true);
+        return extract_mod_docs_between(&root, 0..n.offset(), true);
     }
 
-    extract_document_between(&root, 0..src.text().len(), true)
+    extract_mod_docs_between(&root, 0..src.text().len(), true)
 }
 
-fn extract_document_between(
+fn extract_mod_docs_between(
     node: &LinkedNode,
     rng: Range<usize>,
     first_group: bool,
 ) -> Option<String> {
-    let mut matcher = DocCommentMatcher::default();
+    let mut matcher = DocCommentMatcher {
+        strict: true,
+        ..Default::default()
+    };
     let nodes = node.children();
     'scan_comments: for n in nodes {
         let offset = n.offset();
@@ -52,6 +55,7 @@ enum RawComment {
 pub struct DocCommentMatcher {
     comments: Vec<RawComment>,
     newline_count: usize,
+    strict: bool,
 }
 
 impl DocCommentMatcher {
@@ -74,11 +78,17 @@ impl DocCommentMatcher {
             }
             SyntaxKind::LineComment => {
                 self.newline_count = 0;
-                self.comments.push(RawComment::Line(n.text().clone()));
+                let text = n.text();
+                if !self.strict || text.starts_with("///") {
+                    self.comments.push(RawComment::Line(text.clone()));
+                }
             }
             SyntaxKind::BlockComment => {
                 self.newline_count = 0;
-                self.comments.push(RawComment::Block(n.text().clone()));
+                let text = n.text();
+                if !self.strict {
+                    self.comments.push(RawComment::Block(text.clone()));
+                }
             }
             _ => {
                 self.newline_count = 0;

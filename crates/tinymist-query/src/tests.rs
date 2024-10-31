@@ -124,7 +124,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
 
         if source.starts_with("//") {
             let first_line = source.lines().next().unwrap();
-            let content = first_line.strip_prefix("//").unwrap().trim();
+            let content = first_line.trim_start_matches("/").trim();
 
             if let Some(path_attr) = content.strip_prefix("path:") {
                 source = source.strip_prefix(first_line).unwrap().trim();

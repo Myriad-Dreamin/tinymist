@@ -1,4 +1,4 @@
-// path: references.yaml
+/// path: references.yaml
 harry:
     type: Book
     title: Harry Potter and the Order of the Phoenix
@@ -15,8 +15,8 @@ electronic:
     url: http://www.techno.org/electronic-music-guide/
 
 -----
-// contains:harry,Harry Potter and the Order of the Phoenix,electronic,Ishkur's Guide to Electronic Music
-// compile:true
+/// contains:harry,Harry Potter and the Order of the Phoenix,electronic,Ishkur's Guide to Electronic Music
+/// compile: true
 
 #cite(<harry>) /* range -2..-1 */
 

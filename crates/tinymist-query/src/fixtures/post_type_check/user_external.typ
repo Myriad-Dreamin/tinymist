@@ -1,4 +1,4 @@
-// path: base.typ
+/// path: base.typ
 #let tmpl(content, font: none) = {
   set text(font: font)
 

@@ -1,7 +1,7 @@
-// path: base.typ
+/// path: base.typ
 #let f() = 1;
 -----
-// path: derive.typ
+/// path: derive.typ
 #import "base.typ"
 -----
 #import "derive.typ": *
