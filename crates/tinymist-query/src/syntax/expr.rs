@@ -158,6 +158,9 @@ impl std::hash::Hash for ExprInfo {
         self.source.hash(state);
         self.exports.hash(state);
         self.root.hash(state);
+        let mut imports = self.imports.iter().collect::<Vec<_>>();
+        imports.sort_by_key(|(k, _)| *k);
+        imports.hash(state);
     }
 }
 
