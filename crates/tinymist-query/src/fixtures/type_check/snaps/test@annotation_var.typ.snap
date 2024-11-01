@@ -5,10 +5,10 @@ input_file: crates/tinymist-query/src/fixtures/type_check/annotation_var.typ
 ---
 "x" = Any
 "y" = Any
-"" = (Any, Any) => Any
-"f" = Any
 "mapper" = (Type(function) | (Any, Any) => Any)
+"" = (Any, Any) => Any
 "x" = Any
+"f" = Any
 ---
 56..62 -> @mapper
 65..83 -> @

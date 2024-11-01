@@ -3,9 +3,9 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/fn_named2.typ
 ---
-"a" = Any
-"foo" = (("a": Any) => Any).with(..("a": 1) => any)
 "val" = 1
+"foo" = (("a": Any) => Any).with(..("a": 1) => any)
+"a" = Any
 "x" = Any
 ---
 5..8 -> @val

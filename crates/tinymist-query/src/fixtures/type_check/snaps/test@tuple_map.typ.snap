@@ -3,11 +3,11 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/tuple_map.typ
 ---
-"" = (( ⪯ (Type(bytes) | Type(decimal) | Type(float) | Type(int) | Type(label) | Type(str) | Type(type) | Type(version)))) => Type(str)
 "a" = (1, )
-"b" = (Type(str), )
 "f" = (( ⪯ (Type(bytes) | Type(decimal) | Type(float) | Type(int) | Type(label) | Type(str) | Type(type) | Type(version)))) => Type(str)
+"" = (( ⪯ (Type(bytes) | Type(decimal) | Type(float) | Type(int) | Type(label) | Type(str) | Type(type) | Type(version)))) => Type(str)
 "x" = Any
+"b" = (Type(str), )
 ---
 5..6 -> @a
 20..21 -> @f

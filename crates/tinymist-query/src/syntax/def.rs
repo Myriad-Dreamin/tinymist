@@ -443,15 +443,16 @@ impl Decl {
     }
 
     pub fn weak_cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.name()
-            .cmp(other.name())
-            .then_with(|| match (self, other) {
-                (Self::Generated(l), Self::Generated(r)) => l.0 .0.cmp(&r.0 .0),
-                (Self::Docs(l), Self::Docs(r)) => {
-                    l.var.cmp(&r.var).then_with(|| l.base.weak_cmp(&r.base))
-                }
-                _ => self.span().number().cmp(&other.span().number()),
-            })
+        let base = match (self, other) {
+            (Self::Generated(l), Self::Generated(r)) => l.0 .0.cmp(&r.0 .0),
+            (Self::Module(l), Self::Module(r)) => l.fid.cmp(&r.fid),
+            (Self::Docs(l), Self::Docs(r)) => {
+                l.var.cmp(&r.var).then_with(|| l.base.weak_cmp(&r.base))
+            }
+            _ => self.span().number().cmp(&other.span().number()),
+        };
+
+        base.then_with(|| self.name().cmp(other.name()))
     }
 
     pub fn as_def(this: &Interned<Self>, val: Option<Ty>) -> Interned<RefExpr> {
