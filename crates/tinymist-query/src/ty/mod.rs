@@ -19,6 +19,7 @@ pub(crate) use builtin::*;
 pub use def::*;
 pub(crate) use iface::*;
 pub(crate) use mutate::*;
+use reflexo_typst::TypstFileId;
 pub(crate) use select::*;
 pub(crate) use sig::*;
 use typst::foundations::{self, Func, Module, Value};
@@ -71,31 +72,8 @@ pub trait TyCtxMut: TyCtx {
         };
         ty
     }
-}
-
-impl TyCtx for () {
-    fn local_bind_of(&self, _var: &Interned<TypeVar>) -> Option<Ty> {
-        None
-    }
-    fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
-        None
-    }
-}
-impl TyCtxMut for () {
-    type Snap = ();
-
-    fn start_scope(&mut self) -> Self::Snap {
-        Self::Snap::default()
-    }
-    fn end_scope(&mut self, _snap: Self::Snap) {}
-
-    fn bind_local(&mut self, _var: &Interned<TypeVar>, _ty: Ty) {}
-    fn type_of_func(&mut self, _func: &Func) -> Option<Interned<SigTy>> {
-        None
-    }
-    fn type_of_value(&mut self, _val: &Value) -> Ty {
-        Ty::Any
-    }
+    /// Check a module item.
+    fn check_module_item(&mut self, module: TypstFileId, key: &StrRef) -> Option<Ty>;
 }
 
 #[cfg(test)]

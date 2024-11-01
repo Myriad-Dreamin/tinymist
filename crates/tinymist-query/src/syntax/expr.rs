@@ -22,12 +22,12 @@ use crate::{
 
 use super::{compute_docstring, def::*, DocCommentMatcher, DocString, InterpretMode};
 
-pub type Processing<T> = FxHashMap<TypstFileId, T>;
+pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>;
 
 pub(crate) fn expr_of(
     ctx: Arc<SharedContext>,
     source: Source,
-    route: &mut Processing<Option<Arc<LazyHash<LexicalScope>>>>,
+    route: &mut ExprRoute,
     guard: QueryStatGuard,
     prev: Option<Arc<ExprInfo>>,
 ) -> Arc<ExprInfo> {
@@ -93,30 +93,26 @@ pub(crate) fn expr_of(
             docstrings,
             exprs,
             import_buffer: Vec::new(),
-            lexical: LexicalContext {
-                mode: InterpretMode::Markup,
-                scopes: eco_vec![],
-                last: ExprScope::Lexical(RedBlackTreeMapSync::default()),
-            },
+            lexical: LexicalContext::default(),
             resolves,
             buffer: vec![],
-            defers: vec![],
+            init_stage: true,
             comment_matcher: DocCommentMatcher::default(),
             route,
         };
 
         let root = source.root().cast::<ast::Markup>().unwrap();
-        let root = w.check_in_mode(root.to_untyped().children(), InterpretMode::Markup);
+        w.check_root_scope(root.to_untyped().children());
         let root_scope = Arc::new(LazyHash::new(w.summarize_scope()));
         w.route.insert(w.fid, Some(root_scope.clone()));
 
-        while let Some((node, lexical)) = w.defers.pop() {
-            w.lexical = lexical;
-            w.check(node.cast::<ast::Expr>().unwrap());
-        }
+        w.lexical = LexicalContext::default();
+        w.buffer.clear();
+        w.import_buffer.clear();
+        let root = w.check_in_mode(root.to_untyped().children(), InterpretMode::Markup);
+        let root_scope = Arc::new(LazyHash::new(w.summarize_scope()));
 
         w.collect_buffer();
-
         (root_scope, root)
     };
 
@@ -227,6 +223,16 @@ struct LexicalContext {
     last: ExprScope,
 }
 
+impl Default for LexicalContext {
+    fn default() -> Self {
+        LexicalContext {
+            mode: InterpretMode::Markup,
+            scopes: eco_vec![],
+            last: ExprScope::Lexical(RedBlackTreeMapSync::default()),
+        }
+    }
+}
+
 pub(crate) struct ExprWorker<'a> {
     fid: TypstFileId,
     ctx: Arc<SharedContext>,
@@ -237,9 +243,9 @@ pub(crate) struct ExprWorker<'a> {
     resolves: Arc<Mutex<ResolveVec>>,
     buffer: ResolveVec,
     lexical: LexicalContext,
-    defers: Vec<(SyntaxNode, LexicalContext)>,
+    init_stage: bool,
 
-    route: &'a mut Processing<Option<Arc<LazyHash<LexicalScope>>>>,
+    route: &'a mut ExprRoute,
     comment_matcher: DocCommentMatcher,
 }
 
@@ -962,6 +968,12 @@ impl<'a> ExprWorker<'a> {
         self.check_in_mode(root, InterpretMode::Math)
     }
 
+    fn check_root_scope(&mut self, root: SyntaxNodeChildren) {
+        self.init_stage = true;
+        self.check_in_mode(root, InterpretMode::Markup);
+        self.init_stage = false;
+    }
+
     fn check_in_mode(&mut self, root: SyntaxNodeChildren, mode: InterpretMode) -> Expr {
         let old_mode = self.lexical.mode;
         self.lexical.mode = mode;
@@ -976,7 +988,9 @@ impl<'a> ExprWorker<'a> {
                 self.comment_matcher.reset();
                 continue;
             }
-            self.comment_matcher.process(n);
+            if !self.init_stage {
+                self.comment_matcher.process(n);
+            }
         }
 
         self.lexical.mode = old_mode;
@@ -1036,13 +1050,11 @@ impl<'a> ExprWorker<'a> {
     }
 
     fn defer(&mut self, expr: ast::Expr) -> Expr {
-        let expr = expr.to_untyped().clone();
-        let span = expr.span();
-
-        let lexical = self.lexical.clone();
-        self.defers.push((expr, lexical));
-
-        DeferExpr { span }.into()
+        if self.init_stage {
+            Expr::Star
+        } else {
+            self.check(expr)
+        }
     }
 
     fn collect_buffer(&mut self) {

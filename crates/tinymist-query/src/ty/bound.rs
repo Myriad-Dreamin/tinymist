@@ -98,7 +98,9 @@ impl Ty {
                     results.push(DocSource::Var(ty.clone()));
                 }
                 With(ty) => collect(&ty.sig, results),
-                Select(ty) => collect(&ty.ty, results),
+                Select(_ty) => {
+                    // collect(&ty.ty, results)
+                }
             }
         }
 

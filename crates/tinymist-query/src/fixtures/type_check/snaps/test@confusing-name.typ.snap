@@ -14,6 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/confusing-name.typ
 5..6 -> @x
 7..11 -> @date
 15..19 -> @date
+15..27 -> @v"date".display
 15..29 -> Any
 37..38 -> @x
 40..41 -> @x
@@ -26,5 +27,5 @@ input_file: crates/tinymist-query/src/fixtures/type_check/confusing-name.typ
 121..122 -> @x
 121..140 -> Any
 123..131 -> Type(datetime)
-123..137 -> Type(datetime)
+123..137 -> Type(datetime).today
 123..139 -> Any

@@ -1,5 +1,6 @@
 //! Type checking on source file
 
+use rustc_hash::FxHashMap;
 use tinymist_derive::BindTyCtx;
 
 use super::{
@@ -7,7 +8,7 @@ use super::{
     TypeVarBounds,
 };
 use crate::{
-    syntax::{Decl, DeclExpr, DeferExpr, Expr, ExprInfo, Processing, UnaryOp},
+    syntax::{Decl, DeclExpr, Expr, ExprInfo, UnaryOp},
     ty::*,
 };
 
@@ -21,45 +22,56 @@ pub(crate) use apply::*;
 pub(crate) use convert::*;
 pub(crate) use select::*;
 
+pub type TypeEnv = FxHashMap<TypstFileId, Arc<TypeScheme>>;
+
 /// Type checking at the source unit level.
 pub(crate) fn type_check(
     ctx: Arc<SharedContext>,
-    expr_info: Arc<ExprInfo>,
-    route: &mut Processing<Arc<TypeScheme>>,
+    ei: Arc<ExprInfo>,
+    route: &mut TypeEnv,
 ) -> Arc<TypeScheme> {
     let mut info = TypeScheme::default();
-    info.revision = expr_info.revision;
+    info.revision = ei.revision;
 
-    route.insert(expr_info.fid, Arc::new(TypeScheme::default()));
+    route.insert(ei.fid, Arc::new(TypeScheme::default()));
 
-    // Retrieve def-use information for the source.
-    let root = expr_info.root.clone();
+    // Retrieve expression information for the source.
+    let root = ei.root.clone();
 
     let mut checker = TypeChecker {
         ctx,
-        ei: expr_info,
-        info: &mut info,
+        ei,
+        info,
         route,
     };
 
     let type_check_start = std::time::Instant::now();
+
     checker.check(&root);
     let elapsed = type_check_start.elapsed();
     log::debug!("Type checking on {:?} took {elapsed:?}", checker.ei.fid);
 
     checker.route.remove(&checker.ei.fid);
 
-    Arc::new(info)
+    Arc::new(checker.info)
 }
 
-#[derive(BindTyCtx)]
-#[bind(info)]
-struct TypeChecker<'a> {
+pub(crate) struct TypeChecker<'a> {
     ctx: Arc<SharedContext>,
     ei: Arc<ExprInfo>,
 
-    info: &'a mut TypeScheme,
-    route: &'a mut Processing<Arc<TypeScheme>>,
+    info: TypeScheme,
+    route: &'a mut TypeEnv,
+}
+
+impl<'a> TyCtx for TypeChecker<'a> {
+    fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<TypeBounds> {
+        self.info.global_bounds(var, pol)
+    }
+
+    fn local_bind_of(&self, var: &Interned<TypeVar>) -> Option<Ty> {
+        self.info.local_bind_of(var)
+    }
 }
 
 impl<'a> TyCtxMut for TypeChecker<'a> {
@@ -83,6 +95,18 @@ impl<'a> TyCtxMut for TypeChecker<'a> {
 
     fn type_of_value(&mut self, val: &Value) -> Ty {
         self.ctx.type_of_value(val)
+    }
+
+    fn check_module_item(&mut self, fid: TypstFileId, k: &StrRef) -> Option<Ty> {
+        let ei = self.ctx.expr_stage_by_id(fid)?;
+        let item = ei.exports.get(k)?;
+        match item {
+            Expr::Decl(decl) => Some(self.check_decl(decl)),
+            Expr::Ref(r) => r.root.clone().map(|r| self.check(&r)),
+            _ => {
+                panic!("unexpected module item: {item:?}");
+            }
+        }
     }
 }
 
@@ -124,10 +148,10 @@ impl<'a> TypeChecker<'a> {
                 let ext_def_use_info = self.ctx.expr_stage_by_id(fid)?;
                 let source = &ext_def_use_info.source;
                 // todo: check types in cycle
-                let ext_type_info = if let Some(route) = self.route.get(&source.id()) {
-                    route.clone()
+                let ext_type_info = if let Some(scheme) = self.route.get(&source.id()) {
+                    scheme.clone()
                 } else {
-                    self.ctx.type_check_(source, self.route)
+                    self.ctx.clone().type_check_(source, self.route)
                 };
                 let ext_def = ext_def_use_info.exports.get(&name)?;
 
@@ -444,11 +468,6 @@ impl<'a> TypeChecker<'a> {
         }
 
         c.clone()
-    }
-
-    fn check_defer(&mut self, expr: &DeferExpr) -> Ty {
-        let expr = self.ei.exprs.get(&expr.span).unwrap();
-        self.check(&expr.clone())
     }
 }
 

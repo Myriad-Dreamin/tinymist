@@ -12,7 +12,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/fn_named4.typ
 24..27 -> @foo
 28..29 -> @c
 31..35 -> @dict
-31..37 -> {"x": 3}
+31..37 -> (3 | @v"dict".x)
 41..42 -> @c
 48..49 -> @x
 52..55 -> @foo

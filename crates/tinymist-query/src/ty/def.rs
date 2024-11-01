@@ -11,6 +11,7 @@ use std::{
 use ecow::EcoVec;
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
+use reflexo_typst::TypstFileId;
 use rustc_hash::{FxHashMap, FxHashSet};
 use typst::{
     foundations::Value,
@@ -1064,6 +1065,10 @@ impl TyCtxMut for TypeScheme {
 
     fn type_of_value(&mut self, _val: &Value) -> Ty {
         Ty::Any
+    }
+
+    fn check_module_item(&mut self, _module: TypstFileId, _key: &StrRef) -> Option<Ty> {
+        None
     }
 }
 

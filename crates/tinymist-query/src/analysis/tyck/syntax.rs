@@ -12,7 +12,6 @@ static EMPTY_VAR_DOC: LazyLock<VarDoc> = LazyLock::new(VarDoc::default);
 impl<'a> TypeChecker<'a> {
     pub(crate) fn check_syntax(&mut self, root: &Expr) -> Option<Ty> {
         Some(match root {
-            Expr::Defer(d) => self.check_defer(d),
             Expr::Seq(seq) => self.check_seq(seq),
             Expr::Array(array) => self.check_array(array),
             Expr::Dict(dict) => self.check_dict(dict),
@@ -340,11 +339,12 @@ impl<'a> TypeChecker<'a> {
         let base = Ty::Select(SelectTy::new(ty.clone().into(), field.clone()));
         let mut worker = SelectFieldChecker {
             base: self,
-            select_site,
             resultant: vec![base],
         };
         ty.select(&field, true, &mut worker);
-        Ty::from_types(worker.resultant.into_iter())
+        let res = Ty::from_types(worker.resultant.into_iter());
+        self.info.witness_at_least(select_site, res.clone());
+        res
     }
 
     fn check_apply(&mut self, apply: &Interned<ApplyExpr>) -> Ty {
@@ -524,7 +524,7 @@ impl<'a> TypeChecker<'a> {
         ty.clone()
     }
 
-    fn check_decl(&mut self, decl: &Interned<Decl>) -> Ty {
+    pub(crate) fn check_decl(&mut self, decl: &Interned<Decl>) -> Ty {
         let v = Ty::Var(self.get_var(decl));
         if let Decl::Label(..) = decl.as_ref() {
             self.constrain(&v, &Ty::Builtin(BuiltinTy::Label));

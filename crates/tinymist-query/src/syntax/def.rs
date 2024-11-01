@@ -18,8 +18,6 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
-    /// A deferred expression
-    Defer(DeferExpr),
     /// A sequence of expressions
     Seq(Interned<Vec<Expr>>),
     /// An array literal
@@ -530,8 +528,8 @@ impl fmt::Debug for NameRangeDecl {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ModuleDecl {
-    name: Interned<str>,
-    fid: TypstFileId,
+    pub name: Interned<str>,
+    pub fid: TypstFileId,
 }
 
 impl ModuleDecl {
@@ -690,17 +688,6 @@ impl SelectExpr {
             lhs,
             span: Span::detached(),
         })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct DeferExpr {
-    pub span: Span,
-}
-
-impl From<DeferExpr> for Expr {
-    fn from(defer: DeferExpr) -> Self {
-        Expr::Defer(defer)
     }
 }
 
@@ -933,7 +920,6 @@ impl<'a, T: fmt::Write> ExprFormatter<'a, T> {
 
     fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
-            Expr::Defer(..) => write!(self.f, "defer(..)"),
             Expr::Seq(s) => self.write_seq(s),
             Expr::Array(a) => self.write_array(a),
             Expr::Dict(d) => self.write_dict(d),

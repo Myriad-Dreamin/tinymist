@@ -38,9 +38,11 @@ input_file: crates/tinymist-query/src/fixtures/type_check/infer2.typ
 362..365 -> Rgb(1, 0.254902, 0.211765, 1)
 377..380 -> Rgb(1, 0.254902, 0.211765, 1)
 384..389 -> Func(table)
+384..395 -> Func(table).hline
 384..408 -> Any
 404..407 -> Rgb(1, 0.254902, 0.211765, 1)
 412..417 -> Func(table)
+412..423 -> Func(table).vline
 412..436 -> Any
 432..435 -> Rgb(1, 0.254902, 0.211765, 1)
 441..445 -> Func(text)
