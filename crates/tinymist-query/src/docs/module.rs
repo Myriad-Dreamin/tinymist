@@ -11,11 +11,12 @@ use typst::syntax::package::PackageSpec;
 use typst::syntax::FileId;
 
 use crate::docs::file_id_repr;
+use crate::package::{get_manifest_id, PackageInfo};
 use crate::syntax::{Decl, DefKind, Expr, ExprInfo};
 use crate::ty::Interned;
 use crate::LocalContext;
 
-use super::{get_manifest_id, DefDocs, PackageInfo};
+use super::DefDocs;
 
 /// Get documentation of definitions in a package.
 pub fn package_module_docs(ctx: &mut LocalContext, pkg: &PackageInfo) -> StrResult<PackageDefInfo> {

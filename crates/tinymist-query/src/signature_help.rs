@@ -3,10 +3,8 @@ use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
     adt::interner::Interned,
-    analysis::Definition,
     prelude::*,
-    syntax::{find_docs_before, get_check_target, get_deref_target, CheckTarget, ParamTarget},
-    upstream::plain_docs_sentence,
+    syntax::{get_check_target, get_deref_target, CheckTarget, ParamTarget},
     LspParamInfo, SemanticRequest,
 };
 
@@ -41,33 +39,14 @@ impl SemanticRequest for SignatureHelpRequest {
         };
 
         let deref_target = get_deref_target(callee, cursor)?;
-
-        let def_link = ctx.def_of_syntax(&source, None, deref_target)?;
-
-        let documentation = DocTooltip::get(ctx, &def_link)
-            .as_deref()
-            .map(markdown_docs);
-
-        let Some(Value::Func(function)) = def_link.value() else {
-            return None;
-        };
-        log::trace!("got function {function:?}");
-
-        let mut function = &function;
-        use typst::foundations::func::Repr;
-        let mut param_shift = 0;
-        while let Repr::With(inner) = function.inner() {
-            param_shift += inner.1.items.iter().filter(|x| x.name.is_none()).count();
-            function = &inner.0;
-        }
-
-        let sig = ctx.sig_of_func(function.clone());
-
+        let def = ctx.def_of_syntax(&source, None, deref_target)?;
+        let sig = ctx.sig_of_def(def.clone())?;
         log::debug!("got signature {sig:?}");
 
+        let param_shift = sig.param_shift(ctx);
         let mut active_parameter = None;
 
-        let mut label = def_link.name().as_ref().to_owned();
+        let mut label = def.name().as_ref().to_owned();
         let mut params = Vec::new();
 
         label.push('(');
@@ -137,61 +116,13 @@ impl SemanticRequest for SignatureHelpRequest {
         Some(SignatureHelp {
             signatures: vec![SignatureInformation {
                 label: label.to_string(),
-                documentation,
+                documentation: sig.primary().docs.as_deref().map(markdown_docs),
                 parameters: Some(params),
                 active_parameter: active_parameter.map(|x| x as u32),
             }],
             active_signature: Some(0),
             active_parameter: None,
         })
-    }
-}
-
-pub(crate) struct DocTooltip;
-
-impl DocTooltip {
-    pub fn get(ctx: &mut LocalContext, def: &Definition) -> Option<String> {
-        self::DocTooltip::get_inner(ctx, def).map(|s| "\n\n".to_owned() + &s)
-    }
-
-    fn get_inner(ctx: &mut LocalContext, def: &Definition) -> Option<String> {
-        let value = def.value();
-        if matches!(value, Some(Value::Func(..))) {
-            if let Some(builtin) = Self::builtin_func_tooltip(def) {
-                return Some(plain_docs_sentence(builtin).into());
-            }
-        };
-
-        let (fid, def_range) = def.def_at(ctx.shared()).clone()?;
-
-        let src = ctx.source_by_id(fid).ok()?;
-        find_docs_before(&src, def_range.start)
-    }
-}
-
-impl DocTooltip {
-    fn builtin_func_tooltip(def: &Definition) -> Option<&'_ str> {
-        let value = def.value();
-        let Some(Value::Func(func)) = &value else {
-            return None;
-        };
-
-        use typst::foundations::func::Repr;
-        let mut func = func;
-        let docs = 'search: loop {
-            match func.inner() {
-                Repr::Native(n) => break 'search n.docs,
-                Repr::Element(e) => break 'search e.docs(),
-                Repr::With(w) => {
-                    func = &w.0;
-                }
-                Repr::Closure(..) => {
-                    return None;
-                }
-            }
-        };
-
-        Some(docs)
     }
 }
 

@@ -813,7 +813,7 @@ impl SharedContext {
 
     /// Get the manifest of a package by file id.
     pub fn get_manifest(&self, toml_id: TypstFileId) -> StrResult<PackageManifest> {
-        crate::docs::get_manifest(&self.world, toml_id)
+        crate::package::get_manifest(&self.world, toml_id)
     }
 
     /// Compute the signature of a function.

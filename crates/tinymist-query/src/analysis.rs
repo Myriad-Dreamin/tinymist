@@ -376,7 +376,6 @@ mod signature_tests {
 
     use core::fmt;
 
-    use typst::foundations::Repr;
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
@@ -424,11 +423,9 @@ mod signature_tests {
                             if let Some(name) = &arg.name {
                                 write!(f, "{name}: ")?;
                             }
-                            write!(
-                                f,
-                                "{}, ",
-                                arg.value.as_ref().map(|v| v.repr()).unwrap_or_default()
-                            )?;
+                            let term = arg.term.as_ref();
+                            let term = term.and_then(|v| v.describe()).unwrap_or_default();
+                            write!(f, "{term}, ")?;
                         }
                         f.write_str("\n")?;
                     }

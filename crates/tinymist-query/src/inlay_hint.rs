@@ -1,11 +1,8 @@
-use std::ops::Range;
-
 use lsp_types::{InlayHintKind, InlayHintLabel};
 
 use crate::{
     analysis::{analyze_call, ParamKind},
     prelude::*,
-    SemanticRequest,
 };
 
 /// Configuration for inlay hints.
