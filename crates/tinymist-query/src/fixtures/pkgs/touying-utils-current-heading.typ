@@ -30,7 +30,7 @@
 #import "lib.typ": *
 #current-heading(/* range 0..1 */)[];
 -----
-/// contains: "body"
+/// contains: int
 #import "lib.typ": *
 #current-heading(level: /* range 0..1 */)[];
 -----
