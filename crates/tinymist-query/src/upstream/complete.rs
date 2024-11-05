@@ -634,19 +634,19 @@ fn show_rule_selector_completions(ctx: &mut CompletionContext) {
         |value| matches!(value, Value::Func(func) if func.element().is_some()),
     );
 
-    ctx.enrich("", ": ");
-
     ctx.snippet_completion(
         "text selector",
-        "\"${text}\": ${}",
+        "\"${text}\"",
         "Replace occurrences of specific text.",
     );
 
     ctx.snippet_completion(
         "regex selector",
-        "regex(\"${regex}\"): ${}",
+        "regex(\"${regex}\")",
         "Replace matches of a regular expression.",
     );
+
+    ctx.enrich("", ": ${}");
 }
 
 /// Add completions for recipes.
