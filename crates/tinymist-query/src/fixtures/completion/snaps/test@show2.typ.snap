@@ -1,0 +1,70 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (103..104)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/show2.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "raw",
+    "labelDetails": {
+     "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
+    },
+    "textEdit": {
+     "newText": "raw: ",
+     "range": {
+      "end": {
+       "character": 6,
+       "line": 1
+      },
+      "start": {
+       "character": 6,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "raw.where",
+    "labelDetails": {
+     "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
+    },
+    "textEdit": {
+     "newText": "raw.where(${1:}): ",
+     "range": {
+      "end": {
+       "character": 6,
+       "line": 1
+      },
+      "start": {
+       "character": 6,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 15,
+    "label": "regex selector",
+    "textEdit": {
+     "newText": "regex(\"${1:regex}\"): ${2:}",
+     "range": {
+      "end": {
+       "character": 6,
+       "line": 1
+      },
+      "start": {
+       "character": 6,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]
