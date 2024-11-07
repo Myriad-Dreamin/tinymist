@@ -104,7 +104,7 @@ Explanation: The documentation of the module `foo` (`foo.typ`) is `"1"`. It is n
 
 === Variable Docstring
 
-A variable appears exactly before some let statement (`#let` or `let`). BNF Syntax:
+A variable appears exactly before some let statement (the ast starting with `#let` or `let`). BNF Syntax:
 
 ```
 VAR_DOCSTRING_CONTENT ::= MARKUP { VAR_SUB_ANNOATATION } [ VAR_INIT_ANNOATATION ]
@@ -112,7 +112,7 @@ VAR_DOCSTRING_CONTENT ::= MARKUP { VAR_SUB_ANNOATATION } [ VAR_INIT_ANNOATATION 
 
 === Example 6
 
-You can use an arrow `->` following a type annotation to mark the type of the _initializer expression_ of the let statement. BNF Syntax:
+You can use an arrow `->` following a type annotation to mark the type of the _initializer expression_ of the let statement. The _initializer expression_ is the expression at the right side of the equal marker in the let statement. BNF Syntax:
 
 ```
 VAR_INIT_ANNOATATION ::= '-> ' TYPE_ANNOATATION
@@ -126,11 +126,11 @@ VAR_INIT_ANNOATATION ::= '-> ' TYPE_ANNOATATION
 Explanation: The docstring tells that the type of `{ /* code */ }` is `int`. Thus, the *resultant type* of the function `f` is also annotated as `int`.
 
 ```typ
-/// -> int
+/// -> float
 #let G = { /* code */ };
 ```
 
-Explanation: The docstring tells that the type of `{ /* code */ }` is `int`. Thus, the *type* of the variable `G` is also annotated as `int`.
+Explanation: The docstring tells that the type of `{ /* code */ }` is `float`. Thus, the *type* of the variable `G` is also annotated as `float`.
 
 === Example 7
 
@@ -153,7 +153,7 @@ Explanation: The docstring tells that the type of `x` is `int` and the documenta
 #let (x, y) = (y, x);
 ```
 
-Explanation: The docstring tells that the type of `x` at the left side is `any` and its documentation is "The swapped value from `y`." The variable at the right side of the let statement are not documented by the docstring.
+Explanation: The docstring tells that the type of `x` at the left side is `any` and its documentation is "The swapped value from `y`." The variables at the right side of the let statement are not documented by the docstring.
 
 === Examples in Docstrings
 
