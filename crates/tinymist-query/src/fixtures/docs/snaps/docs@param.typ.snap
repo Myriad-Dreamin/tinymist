@@ -4,4 +4,4 @@ expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/docs/param.typ
 ---
 = docstings
-Func(f)@20..21 in /s0.typ -> DocString { docs: Some("Docs for f."), var_bounds: {}, vars: {}, res_ty: None }
+Func(f)@21..22 in /s0.typ -> DocString { docs: Some("Docs for f."), var_bounds: {}, vars: {}, res_ty: None }
