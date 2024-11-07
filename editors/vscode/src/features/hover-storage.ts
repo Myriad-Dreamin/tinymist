@@ -23,10 +23,10 @@ export class HoverTmpStorage {
   constructor(readonly context: vscode.ExtensionContext) {}
 
   async startHover() {
-    try {
-      // This is a "workspace wide" storage for temporary hover images
-      if (this.context.storageUri) {
-        const tmpImageDir = Uri.joinPath(this.context.storageUri, "tmp/hover-images/");
+    // This is a "workspace wide" storage for temporary hover images
+    if (this.context.storageUri) {
+      const tmpImageDir = Uri.joinPath(this.context.storageUri, "tmp/hover-images/");
+      try {
         const previousEntries = await vscode.workspace.fs.readDirectory(tmpImageDir);
         let deleted = 0;
         for (const [name, type] of previousEntries) {
@@ -38,10 +38,12 @@ export class HoverTmpStorage {
         if (deleted > 0) {
           console.log(`Deleted ${deleted} hover images`);
         }
-
+      } catch {}
+      try {
+        await vscode.workspace.fs.createDirectory(tmpImageDir);
         return new HoverStorageTmpFsHandler(Uri.joinPath(this.context.storageUri, "tmp/"));
-      }
-    } catch {}
+      } catch {}
+    }
 
     return new HoverStorageDummyHandler();
   }
