@@ -1,4 +1,4 @@
-const bytes2utf8 = new TextDecoder();
+const bytes2utf8 = new TextDecoder("utf-8");
 const utf82bytes = new TextEncoder();
 
 /**
@@ -15,4 +15,8 @@ export const base64Decode = (encoded: string) =>
  * @returns Base64 encoded string
  */
 export const base64Encode = (utf8Str: string) =>
-  btoa(String.fromCharCode(...utf82bytes.encode(utf8Str)));
+  btoa(
+    Array.from(utf82bytes.encode(utf8Str), (c) => String.fromCharCode(c)).join(
+      ""
+    )
+  );
