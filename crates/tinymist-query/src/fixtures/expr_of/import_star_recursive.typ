@@ -1,8 +1,8 @@
-// path: base.typ
+/// path: base.typ
 #let x = 1;
 #x
 -----
-// path: base2.typ
+/// path: base2.typ
 #import "base.typ": *
 #let y = 2;
 -----

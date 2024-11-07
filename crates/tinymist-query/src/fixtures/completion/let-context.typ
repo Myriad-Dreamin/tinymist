@@ -1,4 +1,4 @@
-// contains: a
+/// contains: a
 
 #let a = 1;
 #let b = /* range after 1..2 */                                     #();

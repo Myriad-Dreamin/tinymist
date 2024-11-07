@@ -1,4 +1,4 @@
-// contains: aa,aab,aac,aabc
+/// contains: aa,aab,aac,aabc
 
 #let aa() = 1;
 #let aab() = 1;

@@ -1,4 +1,4 @@
-// path: themod.typ
+/// path: themod.typ
 /// = The Module (Alias)
 -----
 #import "themod.typ" as thatmod

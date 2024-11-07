@@ -1,4 +1,4 @@
-// path: base.typ
+/// path: base.typ
 #let f() = 1;
 -----
 .

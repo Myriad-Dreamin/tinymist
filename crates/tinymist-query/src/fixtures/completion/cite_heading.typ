@@ -1,10 +1,10 @@
-// path: references.bib
+/// path: references.bib
 @article{t,}
 
 -----
 
-// contains:form,test
-// compile:true
+/// contains:form,test
+/// compile: true
 
 #set heading(numbering: "1.1")
 

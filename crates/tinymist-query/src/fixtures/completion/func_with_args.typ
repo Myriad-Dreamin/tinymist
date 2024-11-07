@@ -1,4 +1,4 @@
-// contains: content,authors,font,class
+/// contains: content,authors,font,class
 
 #let tmpl(content, authors: (), font: none, class: "article") = {
   if class != "article" and class != "letter" {

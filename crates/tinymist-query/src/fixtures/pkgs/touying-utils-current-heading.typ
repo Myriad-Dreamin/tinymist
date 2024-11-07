@@ -1,5 +1,5 @@
-// path: lib.typ
-// - level (auto, int): The level
+/// path: lib.typ
+/// - level (auto, int): The level
 #let current-heading(level: auto, hierachical: true, depth: 9999) = {
   let current-page = here().page()
   if not hierachical and level != auto {
@@ -26,18 +26,18 @@
   }
 }
 -----
-// contains: level, hierachical, depth
+/// contains: level, hierachical, depth
 #import "lib.typ": *
 #current-heading(/* range 0..1 */)[];
 -----
-// contains: "body"
+/// contains: "body"
 #import "lib.typ": *
 #current-heading(level: /* range 0..1 */)[];
 -----
-// contains: false, true
+/// contains: false, true
 #import "lib.typ": *
 #current-heading(hierachical: /* range 0..1 */)[];
 -----
-// contains: 9999, 1
+/// contains: 9999, 1
 #import "lib.typ": *
 #current-heading(depth: /* range 0..1 */)[];

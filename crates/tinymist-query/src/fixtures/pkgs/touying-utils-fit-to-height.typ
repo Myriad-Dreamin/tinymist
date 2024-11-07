@@ -1,5 +1,5 @@
-// path: lib.typ
-// - level (auto, ): The level
+/// path: lib.typ
+/// - level (auto, ): The level
 #let fit-to-height(
   width: none,
   prescale-width: none,
@@ -18,14 +18,14 @@
   ]
 }
 -----
-// contains: 1
+/// contains: 1
 #import "lib.typ": *
 #fit-to-height(width: /* range 0..1 */)[];
 -----
-// contains: 1
+/// contains: 1
 #import "lib.typ": *
 #fit-to-height(prescale-width: /* range 0..1 */)[];
 -----
-// contains: 1
+/// contains: 1
 #import "lib.typ": *
 #fit-to-height(height: /* range 0..1 */)[];

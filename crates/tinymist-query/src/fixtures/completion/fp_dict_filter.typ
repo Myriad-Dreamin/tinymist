@@ -1,4 +1,4 @@
-// contains:a,ab,ac,ad
+/// contains:a,ab,ac,ad
 
 #let x = (
   a: false,

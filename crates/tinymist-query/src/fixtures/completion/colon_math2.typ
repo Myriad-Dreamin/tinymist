@@ -1,3 +1,3 @@
-// contains: attach
-// trigger_character: :
+/// contains: attach
+/// trigger_character: :
 $: /* range -1..0 */$

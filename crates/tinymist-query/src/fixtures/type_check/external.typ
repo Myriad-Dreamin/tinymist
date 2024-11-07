@@ -1,4 +1,4 @@
-// path: base.typ
+/// path: base.typ
 #let bad-instantiate(x) = {
   let y; let z; let w;
   x + y + z + w

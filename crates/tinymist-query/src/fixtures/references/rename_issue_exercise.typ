@@ -1,10 +1,10 @@
-// path: basic/writing.typ
+/// path: basic/writing.typ
 #import "mod.typ": *
 #exercise()
 -----
-// path: basic/mod.typ
+/// path: basic/mod.typ
 #import "../mod.typ": exercise
 #exercise()
 -----
-// path: mod.typ
+/// path: mod.typ
 #let /* ident after */ exercise() = [];

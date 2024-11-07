@@ -1,5 +1,5 @@
-// contains:test
-// compile:true
+/// contains:test
+/// compile: true
 
 #set heading(numbering: "1.1")
 
