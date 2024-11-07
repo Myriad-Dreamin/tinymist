@@ -1,5 +1,6 @@
 //! World implementation of typst for tinymist.
 
+pub use reflexo_typst;
 pub use reflexo_typst::config::CompileFontOpts;
 pub use reflexo_typst::error::prelude;
 pub use reflexo_typst::font::FontResolverImpl;

@@ -124,36 +124,11 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                     Some((file_ids.insert_full(fid).0, 0, 0))
                 });
                 child.loc = span;
-                // .ok_or_else(|| {
-                //     let err = format!("failed to convert docs in {title}").replace(
-                //         "-->", "—>", // avoid markdown comment
-                //     );
-                //     log::error!("{err}");
-                //     err
-                // })
-                let docs = child.parsed_docs.clone();
-                //             Err(e) => {
-                //                 let err = format!("failed to convert docs: {e}").replace(
-                //                     "-->", "—>", // avoid markdown comment
-                //                 );
-                //                 log::error!("{err}");
-                //                 return Err(err);
-                //             }
 
                 let convert_err = None::<EcoString>;
-                match &docs {
-                    Some(docs) => {
-                        child.parsed_docs = Some(docs.clone());
-                        child.docs = None;
-                    }
-                    None => {
-                        // let err = format!("failed to convert docs in {title}:
-                        // {e}").replace(     "-->",
-                        // "—>", // avoid markdown comment
-                        // );
-                        // log::error!("{err}");
-                        // convert_err = Some(err);
-                    }
+                if let Some(docs) = &child.parsed_docs {
+                    child.parsed_docs = Some(docs.clone());
+                    child.docs = None;
                 }
 
                 let ident = if !primary.is_empty() {
@@ -204,6 +179,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                     let _ = writeln!(md, "<!-- end:sig -->");
                 }
 
+                let mut printed_docs = false;
                 match (&child.parsed_docs, convert_err) {
                     (_, Some(err)) => {
                         let err = format!("failed to convert docs in {title}: {err}").replace(
@@ -212,8 +188,9 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                         let _ = writeln!(md, "<!-- convert-error: {err} -->");
                         errors.push(err);
                     }
-                    (Some(docs), _) => {
+                    (Some(docs), _) if !child.is_external => {
                         let _ = writeln!(md, "{}", remove_list_annotations(docs.docs()));
+                        printed_docs = true;
                         if let DefDocs::Function(f) = docs {
                             for param in f.pos.iter().chain(f.named.values()).chain(f.rest.as_ref())
                             {
@@ -231,20 +208,22 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                             }
                         }
                     }
-                    (None, None) => {}
+                    (_, None) => {}
                 }
 
-                let plain_docs = child.docs.as_deref();
-                let plain_docs = plain_docs.or(child.oneliner.as_deref());
+                if !printed_docs {
+                    let plain_docs = child.docs.as_deref();
+                    let plain_docs = plain_docs.or(child.oneliner.as_deref());
 
-                if let Some(docs) = plain_docs {
-                    let contains_code = docs.contains("```");
-                    if contains_code {
-                        let _ = writeln!(md, "`````typ");
-                    }
-                    let _ = writeln!(md, "{docs}");
-                    if contains_code {
-                        let _ = writeln!(md, "`````");
+                    if let Some(docs) = plain_docs {
+                        let contains_code = docs.contains("```");
+                        if contains_code {
+                            let _ = writeln!(md, "`````typ");
+                        }
+                        let _ = writeln!(md, "{docs}");
+                        if contains_code {
+                            let _ = writeln!(md, "`````");
+                        }
                     }
                 }
 

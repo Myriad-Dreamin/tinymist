@@ -1,8 +1,10 @@
 use std::{
     collections::BTreeMap,
+    ops::Deref,
     sync::{LazyLock, OnceLock},
 };
 
+use ecow::eco_format;
 use typst::foundations::{IntoValue, Module, Str, Type};
 
 use crate::{
@@ -105,11 +107,20 @@ struct DocsChecker<'a> {
     next_id: u32,
 }
 
+static EMPTY_MODULE: LazyLock<Module> =
+    LazyLock::new(|| Module::new("stub", typst::foundations::Scope::new()));
 impl<'a> DocsChecker<'a> {
     pub fn check_func_docs(mut self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(self.ctx, &docs).ok()?;
-        let converted = identify_func_docs(&converted).ok()?;
-        let module = self.ctx.module_by_str(docs)?;
+        let converted =
+            convert_docs(self.ctx, &docs).and_then(|converted| identify_func_docs(&converted));
+
+        let converted = match Self::fallback_docs(converted, &docs) {
+            Ok(c) => c,
+            Err(e) => return Some(e),
+        };
+
+        let module = self.ctx.module_by_str(docs);
+        let module = module.as_ref().unwrap_or(EMPTY_MODULE.deref());
 
         let mut params = BTreeMap::new();
         for param in converted.params.into_iter() {
@@ -117,14 +128,14 @@ impl<'a> DocsChecker<'a> {
                 param.name.into(),
                 VarDoc {
                     docs: param.docs,
-                    ty: self.check_type_strings(&module, &param.types),
+                    ty: self.check_type_strings(module, &param.types),
                 },
             );
         }
 
         let res_ty = converted
             .return_ty
-            .and_then(|ty| self.check_type_strings(&module, &ty));
+            .and_then(|ty| self.check_type_strings(module, &ty));
 
         Some(DocString {
             docs: Some(converted.docs),
@@ -135,13 +146,19 @@ impl<'a> DocsChecker<'a> {
     }
 
     pub fn check_var_docs(mut self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(self.ctx, &docs).ok()?;
-        let converted = identify_var_docs(converted).ok()?;
-        let module = self.ctx.module_by_str(docs)?;
+        let converted = convert_docs(self.ctx, &docs).and_then(identify_var_docs);
+
+        let converted = match Self::fallback_docs(converted, &docs) {
+            Ok(c) => c,
+            Err(e) => return Some(e),
+        };
+
+        let module = self.ctx.module_by_str(docs);
+        let module = module.as_ref().unwrap_or(EMPTY_MODULE.deref());
 
         let res_ty = converted
             .return_ty
-            .and_then(|ty| self.check_type_strings(&module, &ty.0));
+            .and_then(|ty| self.check_type_strings(module, &ty.0));
 
         Some(DocString {
             docs: Some(converted.docs),
@@ -152,8 +169,12 @@ impl<'a> DocsChecker<'a> {
     }
 
     pub fn check_module_docs(self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(self.ctx, &docs).ok()?;
-        let converted = identify_tidy_module_docs(converted).ok()?;
+        let converted = convert_docs(self.ctx, &docs).and_then(identify_tidy_module_docs);
+
+        let converted = match Self::fallback_docs(converted, &docs) {
+            Ok(c) => c,
+            Err(e) => return Some(e),
+        };
 
         Some(DocString {
             docs: Some(converted.docs),
@@ -161,6 +182,22 @@ impl<'a> DocsChecker<'a> {
             vars: BTreeMap::new(),
             res_ty: None,
         })
+    }
+
+    fn fallback_docs<T>(converted: Result<T, EcoString>, docs: &str) -> Result<T, DocString> {
+        match converted {
+            Ok(c) => Ok(c),
+            Err(e) => {
+                let e = e.replace("`", "\\`");
+                let fallback_docs = eco_format!("```\nfailed to parse docs: {e}\n```\n\n{docs}");
+                Err(DocString {
+                    docs: Some(fallback_docs),
+                    var_bounds: HashMap::new(),
+                    vars: BTreeMap::new(),
+                    res_ty: None,
+                })
+            }
+        }
     }
 
     fn generate_var(&mut self, name: StrRef) -> Ty {
