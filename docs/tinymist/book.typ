@@ -22,6 +22,7 @@
       - #chapter("frontend/zed.typ")[Zed]
     = Features
     - #chapter("feature/cli.typ")[Command line interface]
+    - #chapter("feature/docs.typ")[Documentation]
     - #chapter("guide/completion.typ")[Completion]
     - #chapter("feature/export.typ")[Exporting Documents]
     - #chapter("feature/preview.typ")[Document Preview]
