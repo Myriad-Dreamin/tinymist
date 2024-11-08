@@ -442,18 +442,6 @@ impl Decl {
         src.range(self.span())
     }
 
-    pub fn weak_cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.name()
-            .cmp(other.name())
-            .then_with(|| match (self, other) {
-                (Self::Generated(l), Self::Generated(r)) => l.0 .0.cmp(&r.0 .0),
-                (Self::Docs(l), Self::Docs(r)) => {
-                    l.var.cmp(&r.var).then_with(|| l.base.weak_cmp(&r.base))
-                }
-                _ => self.span().number().cmp(&other.span().number()),
-            })
-    }
-
     pub fn as_def(this: &Interned<Self>, val: Option<Ty>) -> Interned<RefExpr> {
         let def: Expr = this.clone().into();
         Interned::new(RefExpr {
@@ -462,6 +450,25 @@ impl Decl {
             root: Some(def),
             val,
         })
+    }
+}
+
+impl Ord for Decl {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let base = match (self, other) {
+            (Self::Generated(l), Self::Generated(r)) => l.0 .0.cmp(&r.0 .0),
+            (Self::Module(l), Self::Module(r)) => l.fid.cmp(&r.fid),
+            (Self::Docs(l), Self::Docs(r)) => l.var.cmp(&r.var).then_with(|| l.base.cmp(&r.base)),
+            _ => self.span().number().cmp(&other.span().number()),
+        };
+
+        base.then_with(|| self.name().cmp(other.name()))
+    }
+}
+
+impl PartialOrd for Decl {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 

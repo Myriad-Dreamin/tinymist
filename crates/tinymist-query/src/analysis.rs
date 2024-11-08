@@ -111,7 +111,7 @@ mod expr_tests {
 
             let result = ctx.shared_().expr_stage(&source);
             let mut docstrings = result.docstrings.iter().collect::<Vec<_>>();
-            docstrings.sort_by(|x, y| x.0.weak_cmp(y.0));
+            docstrings.sort_by(|x, y| x.0.cmp(y.0));
             let mut docstrings = docstrings
                 .into_iter()
                 .map(|(ident, expr)| {
@@ -136,7 +136,7 @@ mod expr_tests {
 
             let result = ctx.shared_().expr_stage(&source);
             let mut resolves = result.resolves.iter().collect::<Vec<_>>();
-            resolves.sort_by(|x, y| x.1.decl.weak_cmp(&y.1.decl));
+            resolves.sort_by(|x, y| x.1.decl.cmp(&y.1.decl));
 
             let mut resolves = resolves
                 .into_iter()
