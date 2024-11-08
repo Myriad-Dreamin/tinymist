@@ -281,7 +281,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "systemFonts",
     "typstExtraArgs",
     "compileStatus",
-    "preferredTheme",
+    "colorTheme",
     "hoverPeriscope",
 ];
 // endregion Configuration Items
@@ -474,8 +474,8 @@ pub struct CompileConfig {
     pub periscope_args: Option<PeriscopeArgs>,
     /// Typst extra arguments.
     pub typst_extra_args: Option<CompileExtraOpts>,
-    /// The preferred theme for the document.
-    pub preferred_theme: Option<String>,
+    /// The preferred color theme for the document.
+    pub color_theme: Option<String>,
     /// Whether the configuration can have a default entry path.
     pub has_default_entry_path: bool,
     /// The inputs for the language server protocol.
@@ -508,8 +508,8 @@ impl CompileConfig {
             Some("disable") | None => false,
             _ => bail!("compileStatus must be either 'enable' or 'disable'"),
         };
-        self.preferred_theme = try_(|| Some(update.get("preferredTheme")?.as_str()?.to_owned()));
-        log::info!("preferred theme: {:?} {:?}", self.preferred_theme, update);
+        self.color_theme = try_(|| Some(update.get("colorTheme")?.as_str()?.to_owned()));
+        log::info!("color theme: {:?}", self.color_theme);
 
         // periscope_args
         self.periscope_args = match update.get("hoverPeriscope") {
@@ -521,7 +521,7 @@ impl CompileConfig {
             },
         };
         if let Some(args) = self.periscope_args.as_mut() {
-            if args.invert_color == "auto" && self.preferred_theme.as_deref() == Some("dark") {
+            if args.invert_color == "auto" && self.color_theme.as_deref() == Some("dark") {
                 "always".clone_into(&mut args.invert_color);
             }
         }
@@ -583,7 +583,7 @@ impl CompileConfig {
                 "x-preview".into(),
                 serde_json::to_string(&PreviewInputs {
                     version: 1,
-                    theme: self.preferred_theme.clone().unwrap_or_default(),
+                    theme: self.color_theme.clone().unwrap_or_default(),
                 })
                 .unwrap()
                 .into_value(),

@@ -95,7 +95,7 @@ $
 $
         "###), @r###"
 
-    <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="data:image-hash/svg+xml;base64,redacted"><img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted"/></picture></p>
+    <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="data:image-hash/svg+xml;base64,redacted"><img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" /></picture></p>
             
     "###);
 }

@@ -107,7 +107,7 @@ struct DocsChecker<'a> {
 
 impl<'a> DocsChecker<'a> {
     pub fn check_func_docs(mut self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(&self.ctx.world, &docs).ok()?;
+        let converted = convert_docs(self.ctx, &docs).ok()?;
         let converted = identify_func_docs(&converted).ok()?;
         let module = self.ctx.module_by_str(docs)?;
 
@@ -135,7 +135,7 @@ impl<'a> DocsChecker<'a> {
     }
 
     pub fn check_var_docs(mut self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(&self.ctx.world, &docs).ok()?;
+        let converted = convert_docs(self.ctx, &docs).ok()?;
         let converted = identify_var_docs(converted).ok()?;
         let module = self.ctx.module_by_str(docs)?;
 
@@ -152,7 +152,7 @@ impl<'a> DocsChecker<'a> {
     }
 
     pub fn check_module_docs(self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(&self.ctx.world, &docs).ok()?;
+        let converted = convert_docs(self.ctx, &docs).ok()?;
         let converted = identify_tidy_module_docs(converted).ok()?;
 
         Some(DocString {

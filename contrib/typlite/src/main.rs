@@ -1,10 +1,5 @@
 #![doc = include_str!("../README.md")]
 
-extern crate clap;
-extern crate ecow;
-extern crate tinymist_world;
-extern crate typlite;
-
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -60,7 +55,7 @@ fn main() -> typlite::Result<()> {
 }
 
 fn lib() -> Arc<typlite::scopes::Scopes<Value>> {
-    let mut scopes = typlite::library::library();
+    let mut scopes = typlite::library::docstring_lib();
 
     // todo: how to import this function correctly?
     scopes.define("cross-link", cross_link as RawFunc);

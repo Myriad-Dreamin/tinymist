@@ -5,15 +5,22 @@ pub mod library;
 pub mod scopes;
 pub mod value;
 
-use std::fmt::Write;
+use core::fmt;
 use std::sync::Arc;
+use std::{fmt::Write, sync::LazyLock};
 
 pub use error::*;
 
 use base64::Engine;
 use scopes::Scopes;
 use tinymist_world::{base::ShadowApi, EntryReader, LspWorld};
-use typst::{foundations::Bytes, layout::Abs, World};
+use typst::foundations::IntoValue;
+use typst::{
+    foundations::{Bytes, Dict},
+    layout::Abs,
+    utils::LazyHash,
+    World,
+};
 use value::{Args, Value};
 
 use ecow::{eco_format, EcoString};
@@ -22,10 +29,20 @@ use typst_syntax::{
     FileId, Source, SyntaxKind, SyntaxNode, VirtualPath,
 };
 
+pub use typst_syntax as syntax;
+
 /// The result type for typlite.
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
 
 pub use tinymist_world::CompileOnceArgs;
+
+/// A color theme for rendering the content. The valid values can be checked in [color-scheme](https://developer.mozilla.org/en-US/docs/Web/CSS/color-scheme).
+#[derive(Debug, Default, Clone, Copy)]
+pub enum ColorTheme {
+    #[default]
+    Light,
+    Dark,
+}
 
 /// Task builder for converting a typst document to Markdown.
 pub struct Typlite {
@@ -37,6 +54,8 @@ pub struct Typlite {
     do_annotate: bool,
     /// Whether to enable GFM (GitHub Flavored Markdown) features.
     gfm: bool,
+    /// The preferred color theme
+    theme: Option<ColorTheme>,
 }
 
 impl Typlite {
@@ -50,12 +69,19 @@ impl Typlite {
             library: None,
             do_annotate: false,
             gfm: false,
+            theme: None,
         }
     }
 
     /// Set library to use for the conversion.
     pub fn with_library(mut self, library: Arc<Scopes<Value>>) -> Self {
         self.library = Some(library);
+        self
+    }
+
+    /// Set the preferred color theme.
+    pub fn with_color_theme(mut self, theme: ColorTheme) -> Self {
+        self.theme = Some(theme);
         self
     }
 
@@ -82,6 +108,7 @@ impl Typlite {
             current,
             gfm: self.gfm,
             do_annotate: self.do_annotate,
+            theme: self.theme,
             list_depth: 0,
             scopes: self
                 .library
@@ -99,6 +126,7 @@ impl Typlite {
 #[derive(Clone)]
 pub struct TypliteWorker {
     current: FileId,
+    theme: Option<ColorTheme>,
     gfm: bool,
     do_annotate: bool,
     scopes: Arc<Scopes<Value>>,
@@ -290,37 +318,84 @@ impl TypliteWorker {
         Ok(Value::Content(s))
     }
 
-    fn render(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
-        let dark = self.render_inner(node, true)?;
-        let light = self.render_inner(node, false)?;
-        if inline {
-            Ok(Value::Content(eco_format!(
-                r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img style="vertical-align: -0.35em" alt="typst-block" src="data:image/svg+xml;base64,{light}"/></picture>"#
-            )))
-        } else {
-            Ok(Value::Content(eco_format!(
-                r#"<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img alt="typst-block" src="data:image/svg+xml;base64,{light}"/></picture></p>"#
-            )))
-        }
+    pub fn render(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
+        let code = node.clone().into_text();
+        self.render_code(&code, false, "center", "", inline)
     }
 
-    fn render_inner(&mut self, node: &SyntaxNode, is_dark: bool) -> Result<String> {
-        let color = if is_dark {
-            r##"#set text(rgb("#c0caf5"))"##
+    pub fn render_code(
+        &mut self,
+        code: &str,
+        is_markup: bool,
+        align: &str,
+        extra_attrs: &str,
+        inline: bool,
+    ) -> Result<Value> {
+        let theme = self.theme;
+        let mut render = |theme| self.render_inner(code, is_markup, theme);
+
+        let mut content = EcoString::new();
+        if !inline {
+            let _ = write!(content, r#"<p align="{align}">"#);
+        }
+
+        let inline_attrs = if inline {
+            r#" style="vertical-align: -0.35em""#
         } else {
             ""
         };
-        let main = Bytes::from(eco_format!(
-            r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em), fill: rgb("#ffffff00"));{color}
-{}"##,
-            node.clone().into_text()
-        ).as_bytes().to_owned());
+        match theme {
+            Some(theme) => {
+                let data = render(theme)?;
+                let _ = write!(
+                    content,
+                    r#"<img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{data}" {extra_attrs}/>"#,
+                );
+            }
+            None => {
+                let _ = write!(
+                    content,
+                    r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{light}" {extra_attrs}/></picture>"#,
+                    dark = render(ColorTheme::Dark)?,
+                    light = render(ColorTheme::Light)?
+                );
+            }
+        }
+
+        if !inline {
+            content.push_str("</p>");
+        }
+
+        Ok(Value::Content(content))
+    }
+
+    fn render_inner(&mut self, code: &str, is_markup: bool, theme: ColorTheme) -> Result<String> {
+        static DARK_THEME_INPUT: LazyLock<Arc<LazyHash<Dict>>> = LazyLock::new(|| {
+            Arc::new(LazyHash::new(Dict::from_iter(std::iter::once((
+                "x-color-theme".into(),
+                "dark".into_value(),
+            )))))
+        });
+
+        let code = WrapCode(code, is_markup);
+        // let inputs = is_dark.then(|| DARK_THEME_INPUT.clone());
+        let inputs = match theme {
+            ColorTheme::Dark => Some(DARK_THEME_INPUT.clone()),
+            ColorTheme::Light => None,
+        };
+        let code = eco_format!(
+            r##"#set page(width: auto, height: auto, margin: (y: 0.45em, rest: 0em), fill: none);
+            #set text(fill: rgb("#c0caf5")) if sys.inputs.at("x-color-theme", default: none) == "dark";
+            {code}"##
+        );
+        let main = Bytes::from(code.as_bytes().to_owned());
+
         // let world = LiteWorld::new(main);
         let main_id = FileId::new(None, VirtualPath::new("__render__.typ"));
         let entry = self.world.entry_state().select_in_workspace(main_id);
         let mut world = self.world.task(tinymist_world::base::TaskInputs {
             entry: Some(entry),
-            inputs: None,
+            inputs,
         });
         world.source_db.take_state();
         world.map_shadow_by_id(main_id, main).unwrap();
@@ -341,7 +416,7 @@ impl TypliteWorker {
         Ok(Value::Content(node.clone().into_text()))
     }
 
-    fn value(res: Value) -> EcoString {
+    pub fn value(res: Value) -> EcoString {
         match res {
             Value::None => EcoString::new(),
             Value::Content(content) => content,
@@ -526,6 +601,25 @@ impl TypliteWorker {
     fn sub_file(mut self, src: Source) -> Result<EcoString> {
         self.current = src.id();
         self.convert(src.root())
+    }
+}
+
+struct WrapCode<'a>(&'a str, bool);
+
+impl<'a> fmt::Display for WrapCode<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let is_markup = self.1;
+        if is_markup {
+            f.write_str("#[")?;
+        } else {
+            f.write_str("#{")?;
+        }
+        f.write_str(self.0)?;
+        if is_markup {
+            f.write_str("]")
+        } else {
+            f.write_str("}")
+        }
     }
 }
 

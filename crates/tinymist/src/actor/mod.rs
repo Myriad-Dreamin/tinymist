@@ -96,7 +96,6 @@ impl LanguageState {
 
         // Create the compile handler for client consuming results.
         let const_config = self.const_config();
-        let position_encoding = const_config.position_encoding;
         let periscope_args = self.compile_config().periscope_args.clone();
         let handle = Arc::new(CompileHandler {
             #[cfg(feature = "preview")]
@@ -107,7 +106,11 @@ impl LanguageState {
             editor_tx: self.editor_tx.clone(),
             stats: Default::default(),
             analysis: Arc::new(Analysis {
-                position_encoding,
+                position_encoding: const_config.position_encoding,
+                color_theme: match self.compile_config().color_theme.as_deref() {
+                    Some("dark") => tinymist_query::ColorTheme::Dark,
+                    _ => tinymist_query::ColorTheme::Light,
+                },
                 periscope: periscope_args.map(|args| {
                     let r = TypstPeriscopeProvider(PeriscopeRenderer::new(args));
                     Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>

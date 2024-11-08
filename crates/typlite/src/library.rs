@@ -4,6 +4,9 @@ use super::*;
 use ecow::eco_format;
 use value::*;
 
+mod docstring;
+pub use docstring::docstring_lib;
+
 pub fn library() -> Scopes<Value> {
     let mut scopes = Scopes::new();
     scopes.define("link", link as RawFunc);

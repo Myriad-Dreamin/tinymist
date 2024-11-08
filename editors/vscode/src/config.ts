@@ -6,7 +6,7 @@ export function loadTinymistConfig() {
   let config: Record<string, any> = JSON.parse(
     JSON.stringify(vscode.workspace.getConfiguration("tinymist")),
   );
-  config.preferredTheme = "light";
+  config.colorTheme = "light";
 
   const keys = Object.keys(config);
   let values = keys.map((key) => config[key]);
@@ -27,7 +27,7 @@ const STR_VARIABLES = [
   "tinymist.outputPath",
 ];
 const STR_ARR_VARIABLES = ["fontPaths", "tinymist.fontPaths"];
-const PREFERRED_THEME = ["preferredTheme", "tinymist.preferredTheme"];
+const COLOR_THEME = ["colorTheme", "tinymist.colorTheme"];
 
 // todo: documentation that, typstExtraArgs won't get variable extended
 export function substVscodeVarsInConfig(
@@ -39,7 +39,7 @@ export function substVscodeVarsInConfig(
     if (!k) {
       return value;
     }
-    if (PREFERRED_THEME.includes(k)) {
+    if (COLOR_THEME.includes(k)) {
       return determineVscodeTheme();
     }
     if (STR_VARIABLES.includes(k)) {
