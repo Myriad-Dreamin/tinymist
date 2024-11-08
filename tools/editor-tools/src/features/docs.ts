@@ -612,9 +612,7 @@ function MakeDoc(root: DocElement) {
   function FuncItem(v: DocElement) {
     const sig = v.data?.parsed_docs as DocSignature | undefined;
 
-    const export_again = v.data.export_again
-      ? [kwHl("external"), code(" ")]
-      : [];
+    const is_external = v.data.is_external ? [kwHl("external"), code(" ")] : [];
     // symbol-function-src.draw.grouping-place-anchors
     const name = a(
       {
@@ -622,7 +620,7 @@ function MakeDoc(root: DocElement) {
       },
       code(v.data.name)
     );
-    let funcTitle = [...export_again, name];
+    let funcTitle = [...is_external, name];
     if (sig) {
       funcTitle.push(code("("));
       // funcTitle.push(...sig.pos.map((e: DocParam) => code(e.name)));
@@ -657,7 +655,7 @@ function MakeDoc(root: DocElement) {
         h3({ class: "doc-symbol-name" }, code(...funcTitle))
       ),
       ...SigPreview(v),
-      ...(v.data.export_again ? ShortItemDoc(v) : [ItemDoc(v), ...SigDocs(v)])
+      ...(v.data.is_external ? ShortItemDoc(v) : [ItemDoc(v), ...SigDocs(v)])
     );
   }
 
@@ -821,7 +819,7 @@ function MakeDoc(root: DocElement) {
     // }),
     // http://localhost:5173/#symbol-function-src.lib.draw-copy-anchors
     // http://localhost:5173/#symbol-function-src.draw.grouping-copy-anchors
-    const export_again = v.data.export_again
+    const is_external = v.data.is_external
       ? [
           a(
             {
@@ -835,7 +833,7 @@ function MakeDoc(root: DocElement) {
       : [];
 
     const sigTitle = [
-      ...export_again,
+      ...is_external,
       kwHl("let"),
       code(" "),
       code(fnHl(v.data.name)),
