@@ -166,7 +166,7 @@ pub fn find_test_range(s: &Source) -> Range<usize> {
     }
     let (re_base, re_len, is_after) = find_prefix(s.text(), "/* range after ", true)
         .or_else(|| find_prefix(s.text(), "/* range ", false))
-        .unwrap();
+        .unwrap_or_else(|| panic!("no range marker found in source:\n{}", s.text()));
     let re_end = re_base + re_len;
     let range_rng = re_end..(s.text()[re_end..].find(" */").unwrap() + re_end);
     let range_base = if is_after {
