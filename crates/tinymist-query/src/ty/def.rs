@@ -450,7 +450,7 @@ pub struct TypeVar {
 impl Ord for TypeVar {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // todo: buggy
-        self.def.weak_cmp(&other.def)
+        self.def.cmp(&other.def)
     }
 }
 
