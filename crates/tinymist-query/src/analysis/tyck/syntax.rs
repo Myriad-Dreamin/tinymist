@@ -12,7 +12,7 @@ static EMPTY_VAR_DOC: LazyLock<VarDoc> = LazyLock::new(VarDoc::default);
 impl<'a> TypeChecker<'a> {
     pub(crate) fn check_syntax(&mut self, root: &Expr) -> Option<Ty> {
         Some(match root {
-            Expr::Seq(seq) => self.check_seq(seq),
+            Expr::Block(seq) => self.check_block(seq),
             Expr::Array(array) => self.check_array(array),
             Expr::Dict(dict) => self.check_dict(dict),
             Expr::Args(args) => self.check_args(args),
@@ -40,7 +40,8 @@ impl<'a> TypeChecker<'a> {
             Expr::Star => self.check_star(),
         })
     }
-    fn check_seq(&mut self, seq: &Interned<Vec<Expr>>) -> Ty {
+
+    fn check_block(&mut self, seq: &Interned<Vec<Expr>>) -> Ty {
         let mut joiner = Joiner::default();
 
         for child in seq.iter() {

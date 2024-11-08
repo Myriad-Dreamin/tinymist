@@ -19,7 +19,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     /// A sequence of expressions
-    Seq(Interned<Vec<Expr>>),
+    Block(Interned<Vec<Expr>>),
     /// An array literal
     Array(Interned<Vec<ArgExpr>>),
     /// A dict literal
@@ -920,7 +920,7 @@ impl<'a, T: fmt::Write> ExprFormatter<'a, T> {
 
     fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
-            Expr::Seq(s) => self.write_seq(s),
+            Expr::Block(s) => self.write_seq(s),
             Expr::Array(a) => self.write_array(a),
             Expr::Dict(d) => self.write_dict(d),
             Expr::Args(a) => self.write_args(a),

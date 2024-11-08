@@ -926,7 +926,7 @@ impl<'a> ExprWorker<'a> {
         let then = self.defer(typed.if_body());
         let else_ = typed
             .else_body()
-            .map_or_else(none_expr, |expr| self.check(expr));
+            .map_or_else(none_expr, |expr| self.defer(expr));
         Expr::Conditional(IfExpr { cond, then, else_ }.into())
     }
 
@@ -994,7 +994,7 @@ impl<'a> ExprWorker<'a> {
         }
 
         self.lexical.mode = old_mode;
-        Expr::Seq(children.into())
+        Expr::Block(children.into())
     }
 
     fn check_ref(&mut self, r: ast::Ref) -> Expr {
