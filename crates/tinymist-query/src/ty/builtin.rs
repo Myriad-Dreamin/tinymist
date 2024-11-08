@@ -1,6 +1,5 @@
 use core::fmt;
 
-use crate::prelude::*;
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use strum::{EnumIter, IntoEnumIterator};

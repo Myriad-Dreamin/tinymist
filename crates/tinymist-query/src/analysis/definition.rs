@@ -4,8 +4,9 @@ use typst::foundations::{IntoValue, Label, Selector, Type};
 use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
 
-use super::{prelude::*, BuiltinTy, InsTy, SharedContext};
+use super::{prelude::*, InsTy, SharedContext};
 use crate::syntax::{Decl, DeclExpr, DerefTarget, Expr, ExprInfo};
+use crate::ty::DocSource;
 use crate::VersionedDocument;
 
 /// A linked definition in the source code
@@ -90,75 +91,40 @@ fn find_ident_definition(
     source: &Source,
     use_site: LinkedNode,
 ) -> Option<Definition> {
-    let mut proj = vec![];
     // Lexical reference
     let ident_store = use_site.clone();
     let ident_ref = match ident_store.cast::<ast::Expr>()? {
         ast::Expr::Ident(e) => e.span(),
         ast::Expr::MathIdent(e) => e.span(),
-        ast::Expr::FieldAccess(s) => {
-            proj.push(s.field());
-
-            let mut i = s.target();
-            while let ast::Expr::FieldAccess(f) = i {
-                proj.push(f.field());
-                i = f.target();
-            }
-
-            match i {
-                ast::Expr::Ident(e) => e.span(),
-                ast::Expr::MathIdent(e) => e.span(),
-                _ => Span::detached(),
-            }
-        }
+        ast::Expr::FieldAccess(s) => return find_field_definition(ctx, s),
         _ => {
             log::debug!("unsupported kind {kind:?}", kind = use_site.kind());
             Span::detached()
         }
     };
 
-    // Syntactic definition
-    let mut def_worker = DefResolver::new(ctx, source)?;
-    let expr = def_worker.of_span(ident_ref)?;
-
-    let ty = expr.term.as_ref();
-
-    use Decl::*;
-    match expr.decl.as_ref() {
-        ModuleAlias(..) | PathStem(..) | Module(..) => {
-            if !proj.is_empty() {
-                let val = ty.and_then(|ty| match ty {
-                    Ty::Value(v) => Some(v.val.clone()),
-                    Ty::Builtin(BuiltinTy::Type(ty)) => Some(Value::Type(*ty)),
-                    Ty::Builtin(BuiltinTy::Element(e)) => Some(Value::Func((*e).into())),
-                    _ => None,
-                });
-
-                proj.reverse();
-                // let def_fid = def_fid?;
-                // let m = ctx.module_ins_at(def_fid, def.range.start + 1)?;
-                let m = val?;
-                let val = project_value(&m, proj.as_slice())?;
-
-                // todo: name range
-                let name = proj.last().map(|e| e.get().into());
-                return value_to_def(val.clone(), || name, None);
-            }
-
-            Some(expr)
-        }
-        _ => Some(expr),
-    }
+    DefResolver::new(ctx, source)?.of_span(ident_ref)
 }
 
-fn project_value<'a>(m: &'a Value, proj: &[ast::Ident<'_>]) -> Option<&'a Value> {
-    if proj.is_empty() {
-        return Some(m);
+fn find_field_definition(ctx: &Arc<SharedContext>, fa: ast::FieldAccess<'_>) -> Option<Definition> {
+    let span = fa.span();
+    let ty = ctx.type_of_span(span)?;
+    log::debug!("find_field_definition[{span:?}]: {ty:?}");
+
+    // todo multiple sources
+    let mut srcs = ty.sources();
+    srcs.sort();
+    log::debug!("check type signature of ty: {ty:?} => {srcs:?}");
+    let type_var = srcs.into_iter().next()?;
+    match type_var {
+        DocSource::Var(v) => {
+            log::debug!("field var: {:?} {:?}", v.def, v.def.span());
+            Some(Definition::new(v.def.clone(), None))
+        }
+        _src @ (DocSource::Builtin(..) | DocSource::Ins(..)) => {
+            todo!()
+        }
     }
-    let scope = m.scope()?;
-    let (ident, proj) = proj.split_first()?;
-    let v = scope.get(ident.as_str())?;
-    project_value(v, proj)
 }
 
 fn find_bib_definition(

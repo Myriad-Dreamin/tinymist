@@ -5,7 +5,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/annotation_var.typ
 ---
 "x" = Any
 "y" = Any
-"mapper" = (Type(function) | (Any, Any) => Any)
+"mapper" = (Any, Any) => Any
 "" = (Any, Any) => Any
 "x" = Any
 "f" = Any
@@ -15,5 +15,6 @@ input_file: crates/tinymist-query/src/fixtures/type_check/annotation_var.typ
 66..67 -> @x
 69..70 -> @f
 75..76 -> @x
+75..80 -> @v"x".map
 75..83 -> Any
 81..82 -> @f

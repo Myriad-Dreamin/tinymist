@@ -31,14 +31,16 @@ use crate::analysis::{
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
     construct_module_dependencies, find_expr_in_import, get_deref_target, resolve_id_by_path,
-    scan_workspace_files, Decl, DefKind, DerefTarget, ExprInfo, LexicalScope, ModuleDependency,
-    Processing,
+    scan_workspace_files, Decl, DefKind, DerefTarget, ExprInfo, ExprRoute, LexicalScope,
+    ModuleDependency,
 };
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
     lsp_to_typst, path_to_url, typst_to_lsp, ColorTheme, LspPosition, LspRange, PositionEncoding,
     SemanticTokenContext, TypstRange, VersionedDocument,
 };
+
+use super::TypeEnv;
 
 /// The analysis data holds globally.
 #[derive(Default, Clone)]
@@ -324,30 +326,6 @@ impl LocalContext {
             .or_else(|| self.with_vm(|vm| rr.eval(vm).ok()))
     }
 
-    pub(crate) fn type_of(&mut self, rr: &SyntaxNode) -> Option<Ty> {
-        self.type_of_span(rr.span())
-    }
-
-    pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {
-        let id = s.id()?;
-        let source = self.source_by_id(id).ok()?;
-        self.type_of_span_(&source, s)
-    }
-
-    pub(crate) fn type_of_span_(&mut self, source: &Source, s: Span) -> Option<Ty> {
-        self.type_check(source).type_of_span(s)
-    }
-
-    pub(crate) fn literal_type_of_node(&mut self, k: LinkedNode) -> Option<Ty> {
-        let id = k.span().id()?;
-        let source = self.source_by_id(id).ok()?;
-        let ty_chk = self.type_check(&source);
-
-        let ty = post_type_check(self.shared_(), &ty_chk, k.clone())
-            .or_else(|| ty_chk.type_of_span(k.span()))?;
-        Some(ty_chk.simplify(ty, false))
-    }
-
     /// Get module import at location.
     pub fn module_ins_at(&mut self, def_fid: TypstFileId, cursor: usize) -> Option<Value> {
         let def_src = self.source_by_id(def_fid).ok()?;
@@ -630,7 +608,7 @@ impl SharedContext {
 
     /// Get the expression information of a source file.
     pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> Arc<ExprInfo> {
-        let mut route = Processing::default();
+        let mut route = ExprRoute::default();
         self.expr_stage_(source, &mut route)
     }
 
@@ -638,7 +616,7 @@ impl SharedContext {
     pub(crate) fn expr_stage_(
         self: &Arc<Self>,
         source: &Source,
-        route: &mut Processing<Option<Arc<LazyHash<LexicalScope>>>>,
+        route: &mut ExprRoute,
     ) -> Arc<ExprInfo> {
         use crate::syntax::expr_of;
         let guard = self.query_stat(source.id(), "expr_stage");
@@ -650,7 +628,7 @@ impl SharedContext {
     pub(crate) fn exports_of(
         self: &Arc<Self>,
         source: &Source,
-        route: &mut Processing<Option<Arc<LazyHash<LexicalScope>>>>,
+        route: &mut ExprRoute,
     ) -> Option<Arc<LazyHash<LexicalScope>>> {
         if let Some(s) = route.get(&source.id()) {
             return s.clone();
@@ -661,7 +639,7 @@ impl SharedContext {
 
     /// Get the type check information of a source file.
     pub(crate) fn type_check(self: &Arc<Self>, source: &Source) -> Arc<TypeScheme> {
-        let mut route = Processing::default();
+        let mut route = TypeEnv::default();
         self.type_check_(source, &mut route)
     }
 
@@ -669,7 +647,7 @@ impl SharedContext {
     pub(crate) fn type_check_(
         self: &Arc<Self>,
         source: &Source,
-        route: &mut Processing<Arc<TypeScheme>>,
+        route: &mut TypeEnv,
     ) -> Arc<TypeScheme> {
         use crate::analysis::type_check;
 
@@ -752,6 +730,28 @@ impl SharedContext {
         deref_target: DerefTarget,
     ) -> Option<Definition> {
         definition(self, source, doc, deref_target)
+    }
+
+    pub(crate) fn type_of(self: &Arc<Self>, rr: &SyntaxNode) -> Option<Ty> {
+        self.type_of_span(rr.span())
+    }
+
+    pub(crate) fn type_of_span(self: &Arc<Self>, s: Span) -> Option<Ty> {
+        self.type_of_span_(&self.source_by_id(s.id()?).ok()?, s)
+    }
+
+    pub(crate) fn type_of_span_(self: &Arc<Self>, source: &Source, s: Span) -> Option<Ty> {
+        self.type_check(source).type_of_span(s)
+    }
+
+    pub(crate) fn literal_type_of_node(self: &Arc<Self>, k: LinkedNode) -> Option<Ty> {
+        let id = k.span().id()?;
+        let source = self.source_by_id(id).ok()?;
+        let ty_chk = self.type_check(&source);
+
+        let ty = post_type_check(self.clone(), &ty_chk, k.clone())
+            .or_else(|| ty_chk.type_of_span(k.span()))?;
+        Some(ty_chk.simplify(ty, false))
     }
 
     pub(crate) fn sig_of_def(self: &Arc<Self>, def: Definition) -> Option<Signature> {

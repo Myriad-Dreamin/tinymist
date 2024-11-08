@@ -18,5 +18,6 @@ input_file: crates/tinymist-query/src/fixtures/type_check/tuple_map.typ
 33..34 -> @x
 42..43 -> @b
 46..47 -> @a
+46..51 -> @v"a".map
 46..54 -> (Type(str), )
 52..53 -> @f

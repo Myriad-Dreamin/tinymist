@@ -131,6 +131,10 @@ impl<'a> TyCtxMut for PostTypeChecker<'a> {
     fn type_of_value(&mut self, val: &Value) -> Ty {
         self.ctx.type_of_value(val)
     }
+
+    fn check_module_item(&mut self, _module: TypstFileId, _key: &StrRef) -> Option<Ty> {
+        None
+    }
 }
 
 impl<'a> PostTypeChecker<'a> {
