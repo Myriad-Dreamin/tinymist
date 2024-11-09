@@ -14,6 +14,7 @@
   "scripts": {
     "build:editor-tools": "cd tools/editor-tools/ && yarn run build",
     "build:preview": "cd tools/typst-preview-frontend && yarn run build && rimraf ../../crates/tinymist-assets/src/typst-preview.html && cpr ./dist/index.html ../../crates/tinymist-assets/src/typst-preview.html",
+    "maintainers": "typst query MAINTAINERS.typ \"<maintainer-meta>\" --pretty --one --field value --input=action=help",
     "docs": "shiroa serve --font-path assets/fonts -w . docs/tinymist",
     "docs:typ": "node scripts/link-docs.mjs",
     "docs:rs": "cargo doc --workspace --no-deps",
