@@ -13,8 +13,10 @@ pub use error::*;
 
 use base64::Engine;
 use scopes::Scopes;
+use tinymist_world::reflexo_typst::path::unix_slash;
 use tinymist_world::{base::ShadowApi, EntryReader, LspWorld};
 use typst::foundations::IntoValue;
+use typst::WorldExt;
 use typst::{
     foundations::{Bytes, Dict},
     layout::Abs,
@@ -108,6 +110,7 @@ impl Typlite {
             current,
             gfm: self.gfm,
             do_annotate: self.do_annotate,
+            soft_error: true,
             theme: self.theme,
             list_depth: 0,
             scopes: self
@@ -129,6 +132,7 @@ pub struct TypliteWorker {
     theme: Option<ColorTheme>,
     gfm: bool,
     do_annotate: bool,
+    soft_error: bool,
     scopes: Arc<Scopes<Value>>,
     world: Arc<LspWorld>,
     list_depth: usize,
@@ -335,9 +339,6 @@ impl TypliteWorker {
         let mut render = |theme| self.render_inner(code, is_markup, theme);
 
         let mut content = EcoString::new();
-        if !inline {
-            let _ = write!(content, r#"<p align="{align}">"#);
-        }
 
         let inline_attrs = if inline {
             r#" style="vertical-align: -0.35em""#
@@ -346,24 +347,53 @@ impl TypliteWorker {
         };
         match theme {
             Some(theme) => {
-                let data = render(theme)?;
-                let _ = write!(
-                    content,
-                    r#"<img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{data}" {extra_attrs}/>"#,
-                );
+                let data = render(theme);
+                match data {
+                    Ok(data) => {
+                        if !inline {
+                            let _ = write!(content, r#"<p align="{align}">"#);
+                        }
+                        let _ = write!(
+                            content,
+                            r#"<img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{data}" {extra_attrs}/>"#,
+                        );
+                        if !inline {
+                            content.push_str("</p>");
+                        }
+                    }
+                    Err(err) if self.soft_error => {
+                        // wrap the error in a fenced code block
+                        let err = err.to_string().replace("`", r#"\`"#);
+                        let _ = write!(content, "```\nRender Error\n{err}\n```");
+                    }
+                    Err(err) => return Err(err),
+                }
             }
             None => {
-                let _ = write!(
-                    content,
-                    r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{light}" {extra_attrs}/></picture>"#,
-                    dark = render(ColorTheme::Dark)?,
-                    light = render(ColorTheme::Light)?
-                );
-            }
-        }
+                let dark = render(ColorTheme::Dark);
+                let light = render(ColorTheme::Light);
 
-        if !inline {
-            content.push_str("</p>");
+                match (dark, light) {
+                    (Ok(dark), Ok(light)) => {
+                        if !inline {
+                            let _ = write!(content, r#"<p align="{align}">"#);
+                        }
+                        let _ = write!(
+                            content,
+                            r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{light}" {extra_attrs}/></picture>"#,
+                        );
+                        if !inline {
+                            content.push_str("</p>");
+                        }
+                    }
+                    (Err(err), _) | (_, Err(err)) if self.soft_error => {
+                        // wrap the error in a fenced code block
+                        let err = err.to_string().replace("`", r#"\`"#);
+                        let _ = write!(content, "```\nRendering Error\n{err}\n```");
+                    }
+                    (Err(err), _) | (_, Err(err)) => return Err(err),
+                }
+            }
         }
 
         Ok(Value::Content(content))
@@ -400,9 +430,63 @@ impl TypliteWorker {
         world.source_db.take_state();
         world.map_shadow_by_id(main_id, main).unwrap();
 
-        let document = typst::compile(&world)
-            .output
-            .map_err(|e| format!("compiling math node: {e:?}"))?;
+        let document = typst::compile(&world).output;
+        let document = document.map_err(|e| {
+            let mut err = String::new();
+            let _ = write!(err, "compiling node: ");
+            let write_span = |span: typst_syntax::Span, err: &mut String| {
+                let file = span.id().map(|id| match id.package() {
+                    Some(package) => {
+                        format!("{package}:{}", unix_slash(id.vpath().as_rooted_path()))
+                    }
+                    None => unix_slash(id.vpath().as_rooted_path()),
+                });
+                let range = world.range(span);
+                match (file, range) {
+                    (Some(file), Some(range)) => {
+                        let _ = write!(err, "{file:?}:{range:?}");
+                    }
+                    (Some(file), None) => {
+                        let _ = write!(err, "{file:?}");
+                    }
+                    (None, Some(range)) => {
+                        let _ = write!(err, "{range:?}");
+                    }
+                    _ => {
+                        let _ = write!(err, "unknown location");
+                    }
+                }
+            };
+
+            for s in e.iter() {
+                match s.severity {
+                    typst::diag::Severity::Error => {
+                        let _ = write!(err, "error: ");
+                    }
+                    typst::diag::Severity::Warning => {
+                        let _ = write!(err, "warning: ");
+                    }
+                }
+
+                err.push_str(&s.message);
+                err.push_str(" at ");
+                write_span(s.span, &mut err);
+
+                for hint in s.hints.iter() {
+                    err.push_str("\nHint: ");
+                    err.push_str(hint);
+                }
+
+                for trace in &s.trace {
+                    write!(err, "\nTrace: {} at ", trace.v).unwrap();
+                    write_span(trace.span, &mut err);
+                }
+
+                err.push('\n');
+            }
+
+            err
+        })?;
 
         let svg_payload = typst_svg::svg_merged(&document, Abs::zero());
         Ok(base64::engine::general_purpose::STANDARD.encode(svg_payload))
