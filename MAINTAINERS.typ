@@ -57,7 +57,7 @@
         Provide instant preview of the document being edited.
       ]
   - #vs-code-client-side-support
-    - #scope("crates/tinymist/", "crates/typst-preview/", "tools/editor-tools/")
+    - #scope("crates/tinymist/", "editors/vscode/", "tools/editor-tools/")
     - #description[
         Enrich the VS Code features with the client-side extension.
       ]
