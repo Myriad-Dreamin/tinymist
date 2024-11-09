@@ -30,6 +30,11 @@
         - #document-previewing
         - #vs-code-client-side-support
       ]
+  - Max397
+    - #github("max397574")
+    - #maintains[
+        - #editor-integration
+      ]
 ]
 
 == Features
