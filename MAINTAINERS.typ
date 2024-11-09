@@ -30,6 +30,12 @@
         - #document-previewing
         - #vs-code-client-side-support
       ]
+  - ParaN3xus
+    - #github("ParaN3xus")
+    - #email("paran3xus007@gmail.com")
+    - #maintains[
+        - #nightly-releases
+      ]
 ]
 
 == Features
