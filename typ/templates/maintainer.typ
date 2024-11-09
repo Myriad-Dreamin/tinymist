@@ -70,13 +70,42 @@
 #let cli-query(content) = {
   let action = sys.inputs.at("action", default: "")
 
-  if action == "maintainers" {
-    content.maintainers
-  } else if action == "features" {
-    content.features
-  } else {
-    content
-  }
+  let actions = (
+    help: (
+      description: "show help",
+      action: actions => {
+        for (k, v) in actions {
+          (
+            (
+              action: k,
+              description: v.description,
+              example: "<program> --input=action=" + k,
+            ),
+          )
+        }
+      },
+    ),
+    maintainers: (
+      description: "show maintainers",
+      action: actions => {
+        content.maintainers
+      },
+    ),
+    features: (
+      description: "show features",
+      action: actions => {
+        content.features
+      },
+    ),
+    all: (
+      description: "show all",
+      action: actions => {
+        content
+      },
+    ),
+  )
+
+  (actions.at(action, default: actions.all).action)(actions)
 }
 
 #let embed-query() = {

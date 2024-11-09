@@ -131,6 +131,13 @@ Nightly Channel:
 
 Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for contribution guidelines.
 
+## Maintainers
+
+Get list of maintainers from [MAINTAINERS.typ](MAINTAINERS.typ). Or programmatically by `yarn maintainers`
+
+> [!TIP]
+> You can add extra arguments for specific information. For example, `yarn maintainers --input="action=maintainers"`.
+
 ## Acknowledgements
 
 - Partially code is inherited from [typst-lsp](https://github.com/nvarner/typst-lsp)
