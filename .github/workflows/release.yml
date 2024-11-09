@@ -223,11 +223,13 @@ jobs:
           name: tinymist-${{ env.target }}.vsix
           path: editors/vscode/tinymist-${{ env.target }}.vsix
       - name: Upload Tinymist E2E Test Snapshot 
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-snapshot-${{ env.target }}
           path: target/e2e
       - name: Upload Tinymist Testing log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: tinymist-lsp-tests.${{ env.target }}.log
