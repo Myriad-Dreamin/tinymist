@@ -30,6 +30,12 @@
         - #document-previewing
         - #vs-code-client-side-support
       ]
+  - Ericoolen
+    - #github("Eric-Song-Nop")
+    - #email("EricYFSong@gmail.com")
+    - #maintains[
+        - #language-service
+      ]
 ]
 
 == Features
