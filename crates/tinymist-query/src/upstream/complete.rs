@@ -8,6 +8,8 @@ use lsp_types::TextEdit;
 use serde::{Deserialize, Serialize};
 use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::model::Document;
+use typst::symbols::sym;
+use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
 use typst::World;
@@ -36,7 +38,8 @@ pub use ext::{complete_path, CompletionFeat, PostfixSnippet};
 pub fn autocomplete(
     mut ctx: CompletionContext,
 ) -> Option<(usize, bool, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
-    let _ = complete_comments(&mut ctx)
+    let _ = complete_unicode(&mut ctx)
+        || complete_comments(&mut ctx)
         || complete_type(&mut ctx).is_none() && {
             log::debug!("continue after completing type");
             complete_labels(&mut ctx)
@@ -110,6 +113,20 @@ pub enum CompletionKind {
     File,
     /// A folder.
     Folder,
+}
+
+/// Complete for unicode characters.
+fn complete_unicode(ctx: &mut CompletionContext) -> bool {
+    if !is_triggerred_by_slah(ctx.trigger_character) {
+        return false;
+    }
+    for (name, value, _) in sym().scope().iter() {
+        if let Value::Symbol(symbol) = value {
+            ctx.unicode_completion(name.clone(), symbol.get());
+        }
+    }
+    ctx.from = ctx.cursor - 1;
+    true
 }
 
 /// Complete in comments. Or rather, don't!
@@ -974,6 +991,17 @@ impl<'a> CompletionContext<'a> {
         }
     }
 
+    /// Add a unicode completion.
+    fn unicode_completion(&mut self, label: EcoString, symbol: char) {
+        self.completions.push(Completion {
+            kind: CompletionKind::Field,
+            label,
+            apply: Some(symbol.into()),
+            detail: Some(symbol.into()),
+            ..Completion::default()
+        });
+    }
+
     /// Add a snippet completion.
     fn snippet_completion(
         &mut self,
@@ -1249,4 +1277,8 @@ fn slice_at(s: &str, mut rng: Range<usize>) -> &str {
 
 fn is_triggerred_by_punc(trigger_character: Option<char>) -> bool {
     trigger_character.is_some_and(|c| c.is_ascii_punctuation())
+}
+
+fn is_triggerred_by_slah(trigger_character: Option<char>) -> bool {
+    trigger_character.is_some_and(|c| c == '\\')
 }

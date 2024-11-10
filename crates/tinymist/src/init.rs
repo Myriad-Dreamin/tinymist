@@ -195,6 +195,7 @@ impl Initializer for SuperInit {
                         String::from(":"),
                         String::from("/"),
                         String::from("\""),
+                        String::from("\\"),
                         String::from("@"),
                     ]),
                     ..Default::default()
