@@ -133,9 +133,8 @@ impl TextExportWorker {
         match item {
             Group(g) => self.frame(&g.frame),
             Text(t) => {
-                write!(self.w, "{}", t.text.as_str())
+                write!(self.w, " {}", t.text.as_str())
             }
-            // Meta(ContentHint(c), _) => f.write_char(*c),
             Link(..) | Shape(..) | Image(..) => self.w.write_all(b"object"),
             Tag(..) => Ok(()),
         }
