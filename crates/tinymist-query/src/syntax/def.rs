@@ -16,7 +16,7 @@ use crate::{
     ty::{InsTy, Interned, SelectTy, Ty, TypeVar},
 };
 
-use super::ExprFormatter;
+use super::{ExprDescriber, ExprPrinter};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
@@ -75,7 +75,7 @@ pub enum Expr {
 impl Expr {
     pub(crate) fn repr(&self) -> EcoString {
         let mut s = EcoString::new();
-        let _ = ExprFormatter::new(&mut s, true).write_expr(self);
+        let _ = ExprDescriber::new(&mut s).write_expr(self);
         s
     }
 
@@ -98,7 +98,7 @@ impl Expr {
 
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        ExprFormatter::new(f, false).write_expr(self)
+        ExprPrinter::new(f).write_expr(self)
     }
 }
 
@@ -633,14 +633,14 @@ pub enum Pattern {
 
 impl fmt::Display for Pattern {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        ExprFormatter::new(f, false).write_pattern(self)
+        ExprPrinter::new(f).write_pattern(self)
     }
 }
 
 impl Pattern {
     pub(crate) fn repr(&self) -> EcoString {
         let mut s = EcoString::new();
-        let _ = ExprFormatter::new(&mut s, true).write_pattern(self);
+        let _ = ExprDescriber::new(&mut s).write_pattern(self);
         s
     }
 }

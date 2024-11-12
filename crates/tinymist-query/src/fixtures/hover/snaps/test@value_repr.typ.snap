@@ -4,6 +4,6 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/hover/value_repr.typ
 ---
 {
- "contents": "```typc\nlet reconstruct(\n  it,\n  ..new-body: arguments,\n  body-name: str = \"body\",\n  labeled: bool = true,\n  max-depth: int = 9999,\n  wrapper: () => box = Closure(..),\n) = none;\n```\n\n---\n## Parameters\n\n@positional `it`\n\n@named `body-name`\n\n@named `labeled`\n\n@named `max-depth`\n\n@named `wrapper`\n\n@rest `new-body`",
- "range": "1:20:1:31"
+ "contents": "```typc\nlet f(\n  x,\n  y,\n  z,\n  w01: int = 1,\n  w02: str = \"test\",\n  w03: any = 1 + 2,\n  w04 = Label(test),\n  w05: function = box,\n  w06: any = list.item,\n  w07: content = Expr(..),\n  w08: any = Expr(..),\n  w09: any = 1 + 2,\n  w10: array = (\n   1,\n   2,\n  ),\n  w11: array = (),\n  w12: dict = (:),\n  w13: dict = (a: 1),\n  w14: dict = (a: box),\n  w15: dict = (a: list.item),\n) = int;\n```\n\n---\n## Parameters\n\n@positional `x`\n\n@positional `y`\n\n@positional `z`\n\n@named `w01`\n\n@named `w02`\n\n@named `w03`\n\n@named `w04`\n\n@named `w05`\n\n@named `w06`\n\n@named `w07`\n\n@named `w08`\n\n@named `w09`\n\n@named `w10`\n\n@named `w11`\n\n@named `w12`\n\n@named `w13`\n\n@named `w14`\n\n@named `w15`",
+ "range": "23:20:23:21"
 }
