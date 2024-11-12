@@ -219,7 +219,12 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 self.transform(&i.then, pol).into(),
                 self.transform(&i.else_, pol).into(),
             )),
-            Ty::Union(v) => Ty::Union(self.transform_seq(v, pol)),
+            Ty::Union(seq) => {
+                let seq = seq.iter().map(|ty| self.transform(ty, pol));
+                let seq_no_any = seq.filter(|ty| !matches!(ty, Ty::Any));
+                let seq = seq_no_any.collect::<Vec<_>>();
+                Ty::from_types(seq.into_iter())
+            }
             Ty::Field(ty) => {
                 let mut ty = ty.as_ref().clone();
                 ty.field = self.transform(&ty.field, pol);
