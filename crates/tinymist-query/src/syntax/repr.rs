@@ -341,14 +341,12 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
 
     pub fn write_decl(&mut self, d: &Decl) -> fmt::Result {
         use DefKind::*;
-        match d.kind() {
-            Function => write!(self.f, "{}", d.name()),
-            Variable => write!(self.f, "{}", d.name()),
-            Module => write!(self.f, "{}", d.name()),
-            Constant => write!(self.f, "{d:?}"),
-            Struct => write!(self.f, "{d:?}"),
-            Reference => write!(self.f, "{d:?}"),
+        let shorter = matches!(d.kind(), Function | Variable | Module);
+        if shorter && !d.name().is_empty() {
+            return write!(self.f, "{}", d.name());
         }
+
+        write!(self.f, "{d:?}")
     }
 
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
