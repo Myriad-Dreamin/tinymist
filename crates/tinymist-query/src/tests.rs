@@ -29,6 +29,8 @@ use crate::{
 type CompileDriver<C> = CompileDriverImpl<C, tinymist_world::LspCompilerFeat>;
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
+    let name = if name.is_empty() { "playground" } else { name };
+
     let mut settings = insta::Settings::new();
     settings.set_prepend_module_to_snapshot(false);
     settings.set_snapshot_path(format!("fixtures/{name}/snaps"));
