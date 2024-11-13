@@ -3,7 +3,7 @@ use std::ops;
 use super::typst_tokens::Modifier;
 
 #[derive(Default, Clone, Copy)]
-pub struct ModifierSet(u32);
+pub(crate) struct ModifierSet(u32);
 
 impl ModifierSet {
     pub fn empty() -> Self {

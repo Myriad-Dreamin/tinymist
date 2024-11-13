@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, semantic_tokens_delta};
 
 /// The [`textDocument/semanticTokens/full/delta`] request is sent from the
 /// client to the server to resolve the semantic tokens of a given file,
@@ -29,9 +29,7 @@ impl SemanticRequest for SemanticTokensDeltaRequest {
         let source = ctx.source_by_path(&self.path).ok()?;
         let ei = ctx.expr_stage(&source);
 
-        let token_ctx = &ctx.analysis.tokens_ctx;
-        let (tokens, result_id) =
-            token_ctx.semantic_tokens_delta(&source, ei, &self.previous_result_id);
+        let (tokens, result_id) = semantic_tokens_delta(ctx, &source, ei, &self.previous_result_id);
 
         match tokens {
             Ok(edits) => Some(
