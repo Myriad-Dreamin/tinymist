@@ -397,15 +397,20 @@ fn token_from_ident(ei: &ExprInfo, ident: &LinkedNode, modifier: &mut ModifierSe
     }
 
     let next = ident.next_leaf();
+    let next_is_adjacent = next
+        .as_ref()
+        .map_or(false, |n| n.range().start == ident.range().end);
     let next_parent = next.as_ref().and_then(|n| n.parent_kind());
     let next_kind = next.map(|n| n.kind());
-    let lexical_function_call = matches!(next_kind, Some(SyntaxKind::LeftParen))
+    let lexical_function_call = next_is_adjacent
+        && matches!(next_kind, Some(SyntaxKind::LeftParen))
         && matches!(next_parent, Some(SyntaxKind::Args | SyntaxKind::Params));
     if lexical_function_call {
         return TokenType::Function;
     }
 
-    let function_content = matches!(next_kind, Some(SyntaxKind::LeftBracket))
+    let function_content = next_is_adjacent
+        && matches!(next_kind, Some(SyntaxKind::LeftBracket))
         && matches!(next_parent, Some(SyntaxKind::ContentBlock));
     if function_content {
         return TokenType::Function;
