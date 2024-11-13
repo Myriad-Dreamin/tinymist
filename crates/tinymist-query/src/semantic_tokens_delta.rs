@@ -30,7 +30,6 @@ impl SemanticRequest for SemanticTokensDeltaRequest {
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let ei = ctx.expr_stage(&source);
-        // this call will overwrite the cache, so need to read from cache first
         let (tokens, result_id) = get_semantic_tokens(ctx, &source, ei);
 
         let (tokens, result_id) = match ctx.tokens.as_ref().and_then(|t| t.previous()) {

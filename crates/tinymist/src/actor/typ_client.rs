@@ -80,7 +80,7 @@ impl CompileHandler {
         Ok(WorldSnapFut { rx })
     }
 
-    /// Snapshot the compiler thread for tasks
+    /// Snapshot the compiler thread for language queries
     pub fn query_snapshot(&self, q: Option<&CompilerQueryRequest>) -> ZResult<QuerySnapFut> {
         let fut = self.snapshot()?;
         let analysis = self.analysis.clone();
@@ -287,12 +287,12 @@ impl CompileClientActor {
         self.handle.clone().snapshot()
     }
 
-    /// Snapshot the compiler thread for tasks
+    /// Snapshot the compiler thread for language queries
     pub fn query_snapshot(&self) -> ZResult<QuerySnapFut> {
         self.handle.clone().query_snapshot(None)
     }
 
-    /// Snapshot the compiler thread for tasks
+    /// Snapshot the compiler thread for language queries
     pub fn query_snapshot_with_stat(&self, q: &CompilerQueryRequest) -> ZResult<QuerySnapWithStat> {
         let name: &'static str = q.into();
         let path = q.associated_path();
@@ -412,7 +412,7 @@ pub struct WorldSnapFut {
 }
 
 impl WorldSnapFut {
-    /// Snapshot the compiler thread for tasks
+    /// wait for the snapshot to be ready
     pub async fn receive(self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
         self.rx
             .await
@@ -427,7 +427,7 @@ pub struct QuerySnapFut {
 }
 
 impl QuerySnapFut {
-    /// Snapshot the compiler thread for tasks
+    /// wait for the snapshot to be ready
     pub async fn receive(self) -> ZResult<QuerySnap> {
         let snap = self.fut.receive().await?;
         Ok(QuerySnap {
