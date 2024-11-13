@@ -1,4 +1,6 @@
-use crate::{get_semantic_tokens, prelude::*};
+//! Types for tokens used for Typst syntax
+
+use crate::prelude::*;
 
 /// The [`textDocument/semanticTokens/full`] request is sent from the client to
 /// the server to resolve the semantic tokens of a given file.
@@ -28,16 +30,12 @@ impl SemanticRequest for SemanticTokensFullRequest {
     /// Handles the request to compute the semantic tokens for a given document.
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let ei = ctx.expr_stage(&source);
-        let (tokens, result_id) = get_semantic_tokens(ctx, &source, ei);
+        let (tokens, result_id) = ctx.cached_tokens(&source);
 
-        Some(
-            SemanticTokens {
-                result_id,
-                data: tokens.as_ref().clone(),
-            }
-            .into(),
-        )
+        Some(SemanticTokensResult::Tokens(SemanticTokens {
+            result_id,
+            data: tokens.as_ref().clone(),
+        }))
     }
 }
 

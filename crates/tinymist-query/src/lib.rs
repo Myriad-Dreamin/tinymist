@@ -60,8 +60,6 @@ mod rename;
 pub use rename::*;
 mod selection_range;
 pub use selection_range::*;
-mod semantic_tokens;
-pub use semantic_tokens::*;
 mod semantic_tokens_full;
 pub use semantic_tokens_full::*;
 mod semantic_tokens_delta;
@@ -79,8 +77,6 @@ pub use references::*;
 
 mod lsp_typst_boundary;
 pub use lsp_typst_boundary::*;
-mod lsp_features;
-pub use lsp_features::*;
 
 mod prelude;
 

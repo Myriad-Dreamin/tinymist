@@ -1,6 +1,6 @@
 use lsp_types::{SemanticToken, SemanticTokensEdit};
 
-use crate::{get_semantic_tokens, prelude::*};
+use crate::prelude::*;
 
 /// The [`textDocument/semanticTokens/full/delta`] request is sent from the
 /// client to the server to resolve the semantic tokens of a given file,
@@ -29,31 +29,25 @@ impl SemanticRequest for SemanticTokensDeltaRequest {
     /// document.
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let ei = ctx.expr_stage(&source);
-        let (tokens, result_id) = get_semantic_tokens(ctx, &source, ei);
+        let (tokens, result_id) = ctx.cached_tokens(&source);
 
-        let (tokens, result_id) = match ctx.tokens.as_ref().and_then(|t| t.previous()) {
-            Some(cached) => (Ok(token_delta(cached, &tokens)), result_id),
+        Some(match ctx.tokens.as_ref().and_then(|t| t.prev.as_ref()) {
+            Some(cached) => SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                result_id,
+                edits: token_delta(cached, &tokens),
+            }),
             None => {
                 log::warn!(
                     "No previous tokens found for delta computation in {}, prev_id: {:?}",
                     self.path.display(),
                     self.previous_result_id
                 );
-                (Err(tokens), result_id)
-            }
-        };
-
-        match tokens {
-            Ok(edits) => Some(SemanticTokensDelta { result_id, edits }.into()),
-            Err(tokens) => Some(
-                SemanticTokens {
+                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
                     result_id,
                     data: tokens.as_ref().clone(),
-                }
-                .into(),
-            ),
-        }
+                })
+            }
+        })
     }
 }
 
