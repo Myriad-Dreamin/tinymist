@@ -36,7 +36,7 @@ use crate::syntax::{
 };
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
-    lsp_to_typst, path_to_url, typst_to_lsp, ColorTheme, LspPosition, LspRange, PositionEncoding,
+    lsp_to_typst, typst_to_lsp, ColorTheme, LspPosition, LspRange, LspWorldExt, PositionEncoding,
     SemanticTokenContext, TypstRange, VersionedDocument,
 };
 
@@ -452,10 +452,7 @@ impl SharedContext {
 
     /// Resolve the uri for a file id.
     pub fn uri_for_id(&self, id: TypstFileId) -> Result<Url, FileError> {
-        self.path_for_id(id).and_then(|e| {
-            path_to_url(&e)
-                .map_err(|e| FileError::Other(Some(eco_format!("convert to url: {e:?}"))))
-        })
+        self.world.uri_for_id(id)
     }
 
     /// Get file's id by its path

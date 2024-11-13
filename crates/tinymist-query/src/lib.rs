@@ -15,7 +15,7 @@ pub mod syntax;
 pub mod ty;
 mod upstream;
 
-pub use analysis::{LocalContext, LocalContextGuard};
+pub use analysis::{LocalContext, LocalContextGuard, LspWorldExt};
 pub use upstream::with_vm;
 
 mod diagnostics;
