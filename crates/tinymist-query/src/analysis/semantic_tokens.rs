@@ -1,3 +1,5 @@
+//! Semantic tokens (highlighting) support for LSP.
+
 use std::{
     num::NonZeroUsize,
     ops::Range,
@@ -7,8 +9,10 @@ use std::{
 
 use hashbrown::HashMap;
 use lsp_types::SemanticToken;
+use lsp_types::{SemanticTokenModifier, SemanticTokenType};
 use parking_lot::Mutex;
 use reflexo::ImmutPath;
+use strum::EnumIter;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 
 use crate::{
@@ -18,15 +22,20 @@ use crate::{
     LocalContext, LspPosition, PositionEncoding,
 };
 
-use self::modifier_set::ModifierSet;
-
-mod delta;
-mod modifier_set;
-mod typst_tokens;
-pub use self::typst_tokens::{Modifier, TokenType};
-
 /// A shared semantic tokens object.
 pub type SemanticTokens = Arc<Vec<SemanticToken>>;
+
+/// Get the semantic tokens for a source.
+pub(crate) fn get_semantic_tokens(ctx: &mut LocalContext, source: &Source) -> SemanticTokens {
+    let mut tokenizer = Tokenizer::new(
+        source.clone(),
+        ctx.expr_stage(source),
+        ctx.analysis.allow_multiline_token,
+        ctx.analysis.position_encoding,
+    );
+    tokenizer.tokenize_tree(&LinkedNode::new(source.root()), ModifierSet::empty());
+    SemanticTokens::new(tokenizer.output)
+}
 
 /// A shared semantic tokens cache.
 #[derive(Default)]
@@ -88,23 +97,8 @@ pub(crate) struct SemanticTokenContext {
     _rev_lock: RevisionLock,
     cache: Arc<Mutex<SemanticTokenCache>>,
     path: ImmutPath,
-    prev: Option<SemanticTokens>,
-    next: Arc<RevisionSlot<OnceLock<SemanticTokens>>>,
-}
-
-impl SemanticTokenContext {
-    pub fn previous(&self) -> Option<&[SemanticToken]> {
-        self.prev.as_ref().map(|cached| cached.as_slice())
-    }
-
-    pub fn cache_result(&self, cached: SemanticTokens) -> String {
-        let id = self.next.revision;
-        self.next
-            .data
-            .set(cached)
-            .unwrap_or_else(|_| panic!("unexpected slot overwrite {id}"));
-        id.to_string()
-    }
+    pub prev: Option<SemanticTokens>,
+    pub next: Arc<RevisionSlot<OnceLock<SemanticTokens>>>,
 }
 
 impl Drop for SemanticTokenContext {
@@ -120,25 +114,194 @@ impl Drop for SemanticTokenContext {
     }
 }
 
-/// Get the semantic tokens for a source.
-pub(crate) fn get_semantic_tokens(
-    ctx: &mut LocalContext,
-    source: &Source,
-    ei: Arc<ExprInfo>,
-) -> (SemanticTokens, Option<String>) {
-    let root = LinkedNode::new(source.root());
+const BOOL: SemanticTokenType = SemanticTokenType::new("bool");
+const PUNCTUATION: SemanticTokenType = SemanticTokenType::new("punct");
+const ESCAPE: SemanticTokenType = SemanticTokenType::new("escape");
+const LINK: SemanticTokenType = SemanticTokenType::new("link");
+const RAW: SemanticTokenType = SemanticTokenType::new("raw");
+const LABEL: SemanticTokenType = SemanticTokenType::new("label");
+const REF: SemanticTokenType = SemanticTokenType::new("ref");
+const HEADING: SemanticTokenType = SemanticTokenType::new("heading");
+const LIST_MARKER: SemanticTokenType = SemanticTokenType::new("marker");
+const LIST_TERM: SemanticTokenType = SemanticTokenType::new("term");
+const DELIMITER: SemanticTokenType = SemanticTokenType::new("delim");
+const INTERPOLATED: SemanticTokenType = SemanticTokenType::new("pol");
+const ERROR: SemanticTokenType = SemanticTokenType::new("error");
+const TEXT: SemanticTokenType = SemanticTokenType::new("text");
 
-    let mut tokenizer = Tokenizer::new(
-        source.clone(),
-        ei,
-        ctx.analysis.allow_multiline_token,
-        ctx.analysis.position_encoding,
-    );
-    tokenizer.tokenize_tree(&root, ModifierSet::empty());
-    let output = SemanticTokens::new(tokenizer.output);
+/// Very similar to `typst_ide::Tag`, but with convenience traits, and
+/// extensible because we want to further customize highlighting
+#[derive(Clone, Copy, Eq, PartialEq, EnumIter, Default)]
+#[repr(u32)]
+pub enum TokenType {
+    // Standard LSP types
+    /// A comment token.
+    Comment,
+    /// A string token.
+    String,
+    /// A keyword token.
+    Keyword,
+    /// An operator token.
+    Operator,
+    /// A number token.
+    Number,
+    /// A function token.
+    Function,
+    /// A decorator token.
+    Decorator,
+    /// A type token.
+    Type,
+    /// A namespace token.
+    Namespace,
+    // Custom types
+    /// A boolean token.
+    Bool,
+    /// A punctuation token.
+    Punctuation,
+    /// An escape token.
+    Escape,
+    /// A link token.
+    Link,
+    /// A raw token.
+    Raw,
+    /// A label token.
+    Label,
+    /// A markup reference token.
+    Ref,
+    /// A heading token.
+    Heading,
+    /// A list marker token.
+    ListMarker,
+    /// A list term token.
+    ListTerm,
+    /// A delimiter token.
+    Delimiter,
+    /// An interpolated token.
+    Interpolated,
+    /// An error token.
+    Error,
+    /// Any text in markup without a more specific token type, possible styled.
+    ///
+    /// We perform styling (like bold and italics) via modifiers. That means
+    /// everything that should receive styling needs to be a token so we can
+    /// apply a modifier to it. This token type is mostly for that, since
+    /// text should usually not be specially styled.
+    Text,
+    /// A token that is not recognized by the lexer
+    #[default]
+    None,
+}
 
-    let result_id = ctx.tokens.as_ref().map(|t| t.cache_result(output.clone()));
-    (output, result_id)
+impl From<TokenType> for SemanticTokenType {
+    fn from(token_type: TokenType) -> Self {
+        use TokenType::*;
+
+        match token_type {
+            Comment => Self::COMMENT,
+            String => Self::STRING,
+            Keyword => Self::KEYWORD,
+            Operator => Self::OPERATOR,
+            Number => Self::NUMBER,
+            Function => Self::FUNCTION,
+            Decorator => Self::DECORATOR,
+            Type => Self::TYPE,
+            Namespace => Self::NAMESPACE,
+            Bool => BOOL,
+            Punctuation => PUNCTUATION,
+            Escape => ESCAPE,
+            Link => LINK,
+            Raw => RAW,
+            Label => LABEL,
+            Ref => REF,
+            Heading => HEADING,
+            ListMarker => LIST_MARKER,
+            ListTerm => LIST_TERM,
+            Delimiter => DELIMITER,
+            Interpolated => INTERPOLATED,
+            Error => ERROR,
+            Text => TEXT,
+            None => unreachable!(),
+        }
+    }
+}
+
+const STRONG: SemanticTokenModifier = SemanticTokenModifier::new("strong");
+const EMPH: SemanticTokenModifier = SemanticTokenModifier::new("emph");
+const MATH: SemanticTokenModifier = SemanticTokenModifier::new("math");
+
+/// A modifier to some semantic token.
+#[derive(Clone, Copy, EnumIter)]
+#[repr(u8)]
+pub enum Modifier {
+    /// Strong modifier.
+    Strong,
+    /// Emphasis modifier.
+    Emph,
+    /// Math modifier.
+    Math,
+    /// Read-only modifier.
+    ReadOnly,
+    /// Static modifier.
+    Static,
+    /// Default library modifier.
+    DefaultLibrary,
+}
+
+impl Modifier {
+    /// Get the index of the modifier.
+    pub const fn index(self) -> u8 {
+        self as u8
+    }
+
+    /// Get the bitmask of the modifier.
+    pub const fn bitmask(self) -> u32 {
+        0b1 << self.index()
+    }
+}
+
+impl From<Modifier> for SemanticTokenModifier {
+    fn from(modifier: Modifier) -> Self {
+        use Modifier::*;
+
+        match modifier {
+            Strong => STRONG,
+            Emph => EMPH,
+            Math => MATH,
+            ReadOnly => Self::READONLY,
+            Static => Self::STATIC,
+            DefaultLibrary => Self::DEFAULT_LIBRARY,
+        }
+    }
+}
+
+#[derive(Default, Clone, Copy)]
+pub(crate) struct ModifierSet(u32);
+
+impl ModifierSet {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    pub fn new(modifiers: &[Modifier]) -> Self {
+        let bits = modifiers
+            .iter()
+            .copied()
+            .map(Modifier::bitmask)
+            .fold(0, |bits, mask| bits | mask);
+        Self(bits)
+    }
+
+    pub fn bitset(self) -> u32 {
+        self.0
+    }
+}
+
+impl std::ops::BitOr for ModifierSet {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
+    }
 }
 
 pub(crate) struct Tokenizer {
@@ -548,4 +711,18 @@ fn token_from_hashtag(
     get_expr_following_hashtag(hashtag)
         .as_ref()
         .and_then(|e| token_from_node(ei, e, modifier))
+}
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::*;
+
+    #[test]
+    fn ensure_not_too_many_modifiers() {
+        // Because modifiers are encoded in a 32 bit bitmask, we can't have more than 32
+        // modifiers
+        assert!(Modifier::iter().len() <= 32);
+    }
 }

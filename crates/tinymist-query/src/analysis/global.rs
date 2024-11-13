@@ -26,8 +26,9 @@ use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, R
 use crate::analysis::prelude::*;
 use crate::analysis::{
     analyze_bib, analyze_expr_, analyze_import_, analyze_signature, definition, post_type_check,
-    AllocStats, AnalysisStats, BibInfo, Definition, PathPreference, QueryStatGuard, Signature,
-    SignatureTarget, Ty, TypeScheme,
+    AllocStats, AnalysisStats, BibInfo, Definition, PathPreference, QueryStatGuard,
+    SemanticTokenCache, SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty,
+    TypeScheme,
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
@@ -38,8 +39,7 @@ use crate::syntax::{
 use crate::upstream::{tooltip_, Tooltip};
 use crate::{
     lsp_to_typst, typst_to_lsp, ColorTheme, CompilerQueryRequest, LspPosition, LspRange,
-    LspWorldExt, PositionEncoding, SemanticTokenCache, SemanticTokenContext, TypstRange,
-    VersionedDocument,
+    LspWorldExt, PositionEncoding, TypstRange, VersionedDocument,
 };
 
 use super::TypeEnv;
@@ -369,6 +369,20 @@ impl LocalContext {
         let mod_import = mod_exp.parent()?.clone();
         let mod_import_node = mod_import.cast::<ast::ModuleImport>()?;
         self.analyze_import(mod_import_node.source().to_untyped()).1
+    }
+
+    pub(crate) fn cached_tokens(&mut self, source: &Source) -> (SemanticTokens, Option<String>) {
+        let tokens = crate::analysis::semantic_tokens::get_semantic_tokens(self, source);
+
+        let result_id = self.tokens.as_ref().map(|t| {
+            let id = t.next.revision;
+            t.next
+                .data
+                .set(tokens.clone())
+                .unwrap_or_else(|_| panic!("unexpected slot overwrite {id}"));
+            id.to_string()
+        });
+        (tokens, result_id)
     }
 
     /// Get the expression information of a source file.

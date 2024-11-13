@@ -14,6 +14,8 @@ pub mod definition;
 pub use definition::*;
 pub mod signature;
 pub use signature::*;
+pub mod semantic_tokens;
+pub use semantic_tokens::*;
 mod post_tyck;
 mod tyck;
 pub(crate) use crate::ty::*;

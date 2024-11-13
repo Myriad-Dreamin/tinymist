@@ -12,8 +12,10 @@ use reflexo_typst::world::EntryState;
 use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
+use strum::IntoEnumIterator;
 use task::FormatUserConfig;
-use tinymist_query::{get_semantic_tokens_options, PositionEncoding};
+use tinymist_query::analysis::{Modifier, TokenType};
+use tinymist_query::PositionEncoding;
 use tinymist_render::PeriscopeArgs;
 use typst::foundations::IntoValue;
 use typst::syntax::{FileId, VirtualPath};
@@ -150,7 +152,9 @@ impl Initializer for SuperInit {
         // registration
         let semantic_tokens_provider = match service.config.semantic_tokens {
             SemanticTokensMode::Enable if !const_config.tokens_dynamic_registration => {
-                Some(get_semantic_tokens_options().into())
+                Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+                    get_semantic_tokens_options(),
+                ))
             }
             _ => None,
         };
@@ -837,6 +841,20 @@ pub enum SemanticTokensMode {
     /// Enable the semantic tokens.
     #[default]
     Enable,
+}
+
+pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
+    SemanticTokensOptions {
+        legend: SemanticTokensLegend {
+            token_types: TokenType::iter()
+                .filter(|e| *e != TokenType::None)
+                .map(Into::into)
+                .collect(),
+            token_modifiers: Modifier::iter().map(Into::into).collect(),
+        },
+        full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
+        ..Default::default()
+    }
 }
 
 /// Additional options for compilation.

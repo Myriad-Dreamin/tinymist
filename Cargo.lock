@@ -4178,6 +4178,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "strum",
  "sync-lsp",
  "tinymist-assets 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-query",
