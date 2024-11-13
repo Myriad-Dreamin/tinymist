@@ -32,7 +32,7 @@ use reflexo_typst::{
 };
 use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
-    analysis::{Analysis, LocalContextGuard, RevisionLock},
+    analysis::{Analysis, AnalysisRevLock, LocalContextGuard},
     CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, ExportKind, SemanticRequest,
     ServerInfoResponse, StatefulRequest, VersionedDocument,
 };
@@ -81,10 +81,10 @@ impl CompileHandler {
     }
 
     /// Snapshot the compiler thread for tasks
-    pub fn query_snapshot(&self) -> ZResult<QuerySnapFut> {
+    pub fn query_snapshot(&self, q: Option<&CompilerQueryRequest>) -> ZResult<QuerySnapFut> {
         let fut = self.snapshot()?;
         let analysis = self.analysis.clone();
-        let rev_lock = analysis.lock_revision();
+        let rev_lock = analysis.lock_revision(q);
 
         Ok(QuerySnapFut {
             fut,
@@ -289,7 +289,7 @@ impl CompileClientActor {
 
     /// Snapshot the compiler thread for tasks
     pub fn query_snapshot(&self) -> ZResult<QuerySnapFut> {
-        self.handle.clone().query_snapshot()
+        self.handle.clone().query_snapshot(None)
     }
 
     /// Snapshot the compiler thread for tasks
@@ -297,8 +297,8 @@ impl CompileClientActor {
         let name: &'static str = q.into();
         let path = q.associated_path();
         let stat = self.handle.stats.query_stat(path, name);
-        let snap = self.handle.clone().query_snapshot()?;
-        Ok(QuerySnapWithStat { fut: snap, stat })
+        let fut = self.handle.clone().query_snapshot(Some(q))?;
+        Ok(QuerySnapWithStat { fut, stat })
     }
 
     pub fn add_memory_changes(&self, event: MemoryEvent) {
@@ -423,7 +423,7 @@ impl WorldSnapFut {
 pub struct QuerySnapFut {
     fut: WorldSnapFut,
     analysis: Arc<Analysis>,
-    rev_lock: RevisionLock,
+    rev_lock: AnalysisRevLock,
 }
 
 impl QuerySnapFut {
@@ -433,7 +433,7 @@ impl QuerySnapFut {
         Ok(QuerySnap {
             snap,
             analysis: self.analysis,
-            _rev_lock: self.rev_lock,
+            rev_lock: self.rev_lock,
         })
     }
 }
@@ -441,7 +441,7 @@ impl QuerySnapFut {
 pub struct QuerySnap {
     pub snap: CompileSnapshot<LspCompilerFeat>,
     analysis: Arc<Analysis>,
-    _rev_lock: RevisionLock,
+    rev_lock: AnalysisRevLock,
 }
 
 impl std::ops::Deref for QuerySnap {
@@ -459,7 +459,7 @@ impl QuerySnap {
     }
 
     pub fn run_stateful<T: StatefulRequest>(
-        &self,
+        self,
         query: T,
         wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
     ) -> anyhow::Result<CompilerQueryResponse> {
@@ -467,24 +467,20 @@ impl QuerySnap {
             version: self.world.revision().get(),
             document: doc.clone(),
         });
-        self.run_analysis(&self.world, |ctx| query.request(ctx, doc))
+        self.run_analysis(|ctx| query.request(ctx, doc))
             .map(wrapper)
     }
 
     pub fn run_semantic<T: SemanticRequest>(
-        &self,
+        self,
         query: T,
         wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
     ) -> anyhow::Result<CompilerQueryResponse> {
-        self.run_analysis(&self.world, |ctx| query.request(ctx))
-            .map(wrapper)
+        self.run_analysis(|ctx| query.request(ctx)).map(wrapper)
     }
 
-    pub fn run_analysis<T>(
-        &self,
-        w: &LspWorld,
-        f: impl FnOnce(&mut LocalContextGuard) -> T,
-    ) -> anyhow::Result<T> {
+    pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> anyhow::Result<T> {
+        let w = self.world.as_ref();
         let Some(main) = w.main_id() else {
             error!("TypstActor: main file is not set");
             bail!("main file is not set");
@@ -494,7 +490,7 @@ impl QuerySnap {
             anyhow::anyhow!("failed to get source: {err}")
         })?;
 
-        let mut analysis = self.analysis.snapshot(w.clone());
+        let mut analysis = self.analysis.snapshot_(w.clone(), self.rev_lock);
         Ok(f(&mut analysis))
     }
 }

@@ -552,15 +552,14 @@ impl LanguageState {
         &mut self,
         mut arguments: Vec<JsonValue>,
     ) -> AnySchedulableResponse {
-        let fut = self.primary().query_snapshot().map_err(z_internal_error)?;
+        let fut = self.primary().query_snapshot().map_err(internal_error)?;
         let info = get_arg!(arguments[1] as PackageInfo);
 
         just_future(async move {
             let snap = fut.receive().await.map_err(z_internal_error)?;
-            let w = snap.world.as_ref();
 
             let symbols = snap
-                .run_analysis(w, |a| {
+                .run_analysis(|a| {
                     tinymist_query::docs::package_module_docs(a, &info)
                         .map_err(map_string_err("failed to list symbols"))
                 })
@@ -613,7 +612,7 @@ impl LanguageState {
         info: PackageInfo,
         f: impl FnOnce(&mut LocalContextGuard) -> LspResult<T> + Send + Sync,
     ) -> LspResult<impl Future<Output = LspResult<T>>> {
-        let fut = self.primary().query_snapshot().map_err(z_internal_error)?;
+        let fut = self.primary().query_snapshot().map_err(internal_error)?;
 
         Ok(async move {
             let snap = fut.receive().await.map_err(z_internal_error)?;
@@ -633,12 +632,12 @@ impl LanguageState {
             });
             let entry = entry.map_err(|e| internal_error(e.to_string()))?;
 
-            let w = snap.world.task(TaskInputs {
+            let snap = snap.task(TaskInputs {
                 entry: Some(entry),
                 inputs: None,
             });
 
-            snap.run_analysis(&w, f).map_err(internal_error)?
+            snap.run_analysis(f).map_err(internal_error)?
         })
     }
 }

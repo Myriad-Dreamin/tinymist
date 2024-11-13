@@ -1,93 +1,144 @@
-use std::{ops::Range, sync::Arc};
+use std::{
+    num::NonZeroUsize,
+    ops::Range,
+    path::Path,
+    sync::{Arc, OnceLock},
+};
 
-use lsp_types::{SemanticToken, SemanticTokensEdit};
-use parking_lot::RwLock;
+use hashbrown::HashMap;
+use lsp_types::SemanticToken;
+use parking_lot::Mutex;
+use reflexo::ImmutPath;
 use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 
 use crate::{
+    adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot},
     syntax::{Expr, ExprInfo},
     ty::Ty,
     LocalContext, LspPosition, PositionEncoding,
 };
 
-use self::delta::token_delta;
 use self::modifier_set::ModifierSet;
-
-use self::delta::CacheInner as TokenCacheInner;
 
 mod delta;
 mod modifier_set;
 mod typst_tokens;
 pub use self::typst_tokens::{Modifier, TokenType};
 
-/// A semantic token context providing incremental semantic tokens rendering.
+/// A shared semantic tokens object.
+pub type SemanticTokens = Arc<Vec<SemanticToken>>;
+
+/// A shared semantic tokens cache.
 #[derive(Default)]
-pub struct SemanticTokenContext {
-    cache: RwLock<TokenCacheInner>,
-    /// Whether to allow overlapping tokens.
-    pub allow_overlapping_token: bool,
-    /// Whether to allow multiline tokens.
-    pub allow_multiline_token: bool,
+pub struct SemanticTokenCache {
+    next_id: usize,
+    // todo: clear cache after didClose
+    manager: HashMap<ImmutPath, RevisionManager<OnceLock<SemanticTokens>>>,
+}
+
+impl SemanticTokenCache {
+    pub(crate) fn clear(&mut self) {
+        self.next_id = 0;
+        self.manager.clear();
+    }
+
+    /// Lock the token cache with an optional previous id in *main thread*.
+    pub(crate) fn acquire(
+        cache: Arc<Mutex<Self>>,
+        p: &Path,
+        prev: Option<&str>,
+    ) -> SemanticTokenContext {
+        let that = cache.clone();
+        let mut that = that.lock();
+
+        that.next_id += 1;
+        let prev = prev.and_then(|id| {
+            id.parse::<NonZeroUsize>()
+                .inspect_err(|_| {
+                    log::warn!("invalid previous id: {id}");
+                })
+                .ok()
+        });
+        let next = NonZeroUsize::new(that.next_id).expect("id overflow");
+
+        let path = ImmutPath::from(p);
+        let manager = that.manager.entry(path.clone()).or_default();
+        let _rev_lock = manager.lock(prev.unwrap_or(next));
+        let prev = prev.and_then(|prev| {
+            manager
+                .find_revision(prev, |_| OnceLock::new())
+                .data
+                .get()
+                .cloned()
+        });
+        let next = manager.find_revision(next, |_| OnceLock::new());
+
+        SemanticTokenContext {
+            _rev_lock,
+            cache,
+            path,
+            prev,
+            next,
+        }
+    }
+}
+
+/// A semantic token context providing incremental semantic tokens rendering.
+pub(crate) struct SemanticTokenContext {
+    _rev_lock: RevisionLock,
+    cache: Arc<Mutex<SemanticTokenCache>>,
+    path: ImmutPath,
+    prev: Option<SemanticTokens>,
+    next: Arc<RevisionSlot<OnceLock<SemanticTokens>>>,
 }
 
 impl SemanticTokenContext {
-    /// Create a new semantic token context.
-    pub fn new(allow_overlapping_token: bool, allow_multiline_token: bool) -> Self {
-        Self {
-            cache: RwLock::new(TokenCacheInner::default()),
-            allow_overlapping_token,
-            allow_multiline_token,
+    pub fn previous(&self) -> Option<&[SemanticToken]> {
+        self.prev.as_ref().map(|cached| cached.as_slice())
+    }
+
+    pub fn cache_result(&self, cached: SemanticTokens) -> String {
+        let id = self.next.revision;
+        self.next
+            .data
+            .set(cached)
+            .unwrap_or_else(|_| panic!("unexpected slot overwrite {id}"));
+        id.to_string()
+    }
+}
+
+impl Drop for SemanticTokenContext {
+    fn drop(&mut self) {
+        let mut cache = self.cache.lock();
+        let manager = cache.manager.get_mut(&self.path);
+        if let Some(manager) = manager {
+            let min_rev = manager.unlock(&mut self._rev_lock);
+            if let Some(min_rev) = min_rev {
+                manager.gc(min_rev);
+            }
         }
     }
 }
 
 /// Get the semantic tokens for a source.
-pub(crate) fn semantic_tokens_full(
+pub(crate) fn get_semantic_tokens(
     ctx: &mut LocalContext,
     source: &Source,
     ei: Arc<ExprInfo>,
-) -> (Vec<SemanticToken>, String) {
+) -> (SemanticTokens, Option<String>) {
     let root = LinkedNode::new(source.root());
 
     let mut tokenizer = Tokenizer::new(
         source.clone(),
         ei,
-        ctx.analysis.tokens_ctx.allow_multiline_token,
+        ctx.analysis.allow_multiline_token,
         ctx.analysis.position_encoding,
     );
     tokenizer.tokenize_tree(&root, ModifierSet::empty());
-    let output = tokenizer.output;
+    let output = SemanticTokens::new(tokenizer.output);
 
-    let result_id = ctx
-        .analysis
-        .tokens_ctx
-        .cache
-        .write()
-        .cache_result(output.clone());
+    let result_id = ctx.tokens.as_ref().map(|t| t.cache_result(output.clone()));
     (output, result_id)
-}
-
-/// Get the semantic tokens delta for a source.
-pub(crate) fn semantic_tokens_delta(
-    ctx: &mut LocalContext,
-    source: &Source,
-    ei: Arc<ExprInfo>,
-    result_id: &str,
-) -> (Result<Vec<SemanticTokensEdit>, Vec<SemanticToken>>, String) {
-    let cached = ctx
-        .analysis
-        .tokens_ctx
-        .cache
-        .write()
-        .try_take_result(result_id);
-
-    // this call will overwrite the cache, so need to read from cache first
-    let (tokens, result_id) = semantic_tokens_full(ctx, source, ei);
-
-    match cached {
-        Some(cached) => (Ok(token_delta(&cached, &tokens)), result_id),
-        None => (Err(tokens), result_id),
-    }
 }
 
 pub(crate) struct Tokenizer {
