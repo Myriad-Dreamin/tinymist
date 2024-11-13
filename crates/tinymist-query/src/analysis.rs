@@ -26,7 +26,13 @@ mod prelude;
 mod global;
 pub use global::*;
 
+use ecow::eco_format;
+use lsp_types::Url;
+use reflexo_typst::TypstFileId;
+use typst::diag::FileError;
 use typst::foundations::{Func, Value};
+
+use crate::path_to_url;
 
 pub(crate) trait ToFunc {
     fn to_func(&self) -> Option<Func>;
@@ -39,6 +45,22 @@ impl ToFunc for Value {
             Value::Type(t) => t.constructor().ok(),
             _ => None,
         }
+    }
+}
+
+/// Extension trait for `typst::World`.
+pub trait LspWorldExt {
+    /// Resolve the uri for a file id.
+    fn uri_for_id(&self, id: TypstFileId) -> Result<Url, FileError>;
+}
+
+impl LspWorldExt for tinymist_world::LspWorld {
+    /// Resolve the uri for a file id.
+    fn uri_for_id(&self, id: TypstFileId) -> Result<Url, FileError> {
+        self.path_for_id(id).and_then(|e| {
+            path_to_url(&e)
+                .map_err(|e| FileError::Other(Some(eco_format!("convert to url: {e:?}"))))
+        })
     }
 }
 

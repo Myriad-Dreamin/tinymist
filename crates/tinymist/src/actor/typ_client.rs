@@ -130,24 +130,18 @@ impl CompileHandler {
         let revision = world.revision().get();
         trace!("notify diagnostics({revision}): {errors:#?} {warnings:#?}");
 
-        let diagnostics = self.run_analysis(world, |ctx| {
-            tinymist_query::convert_diagnostics(ctx, errors.iter().chain(warnings.iter()))
-        });
+        let diagnostics = tinymist_query::convert_diagnostics(
+            world,
+            errors.iter().chain(warnings.iter()),
+            self.analysis.position_encoding,
+        );
 
-        match diagnostics {
-            Ok(diagnostics) => {
-                let entry = world.entry_state();
-                // todo: better way to remove diagnostics
-                // todo: check all errors in this file
-                let detached = entry.is_inactive();
-                let valid = !detached;
-                self.push_diagnostics(revision, valid.then_some(diagnostics));
-            }
-            Err(err) => {
-                error!("TypstActor: failed to convert diagnostics: {:#}", err);
-                self.push_diagnostics(revision, None);
-            }
-        }
+        let entry = world.entry_state();
+        // todo: better way to remove diagnostics
+        // todo: check all errors in this file
+        let detached = entry.is_inactive();
+        let valid = !detached;
+        self.push_diagnostics(revision, valid.then_some(diagnostics));
     }
 
     pub fn run_stateful<T: StatefulRequest>(
