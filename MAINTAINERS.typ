@@ -30,6 +30,12 @@
         - #document-previewing
         - #vs-code-client-side-support
       ]
+  - Caleb Maclennan
+    - #github("alerque")
+    - #email("caleb@alerque.com")
+    - #maintains[
+       - #editor-integration
+    ]
 ]
 
 == Features
