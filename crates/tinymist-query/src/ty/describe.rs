@@ -100,8 +100,7 @@ impl TypeDescriber {
                     res.push_str(", ");
                 }
                 res.push_str("..: ");
-                res.push_str(self.describe_root(r).as_deref().unwrap_or(""));
-                res.push_str("[]");
+                res.push_str(self.describe_root(r).as_deref().unwrap_or("any"));
             }
             res.push_str(") => ");
             res.push_str(
