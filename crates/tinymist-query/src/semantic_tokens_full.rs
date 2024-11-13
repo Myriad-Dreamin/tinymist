@@ -1,5 +1,3 @@
-//! Types for tokens used for Typst syntax
-
 use crate::prelude::*;
 
 /// The [`textDocument/semanticTokens/full`] request is sent from the client to
