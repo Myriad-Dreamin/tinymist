@@ -7,7 +7,7 @@ use typst::syntax::{ast, LinkedNode, Source, SyntaxKind};
 use crate::{
     syntax::{Expr, ExprInfo},
     ty::Ty,
-    LspPosition, PositionEncoding,
+    LocalContext, LspPosition, PositionEncoding,
 };
 
 use self::delta::token_delta;
@@ -24,7 +24,6 @@ pub use self::typst_tokens::{Modifier, TokenType};
 #[derive(Default)]
 pub struct SemanticTokenContext {
     cache: RwLock<TokenCacheInner>,
-    position_encoding: PositionEncoding,
     /// Whether to allow overlapping tokens.
     pub allow_overlapping_token: bool,
     /// Whether to allow multiline tokens.
@@ -33,60 +32,65 @@ pub struct SemanticTokenContext {
 
 impl SemanticTokenContext {
     /// Create a new semantic token context.
-    pub fn new(
-        position_encoding: PositionEncoding,
-        allow_overlapping_token: bool,
-        allow_multiline_token: bool,
-    ) -> Self {
+    pub fn new(allow_overlapping_token: bool, allow_multiline_token: bool) -> Self {
         Self {
             cache: RwLock::new(TokenCacheInner::default()),
-            position_encoding,
             allow_overlapping_token,
             allow_multiline_token,
         }
     }
+}
 
-    /// Get the semantic tokens for a source.
-    pub fn semantic_tokens_full(
-        &self,
-        source: &Source,
-        ei: Arc<ExprInfo>,
-    ) -> (Vec<SemanticToken>, String) {
-        let root = LinkedNode::new(source.root());
+/// Get the semantic tokens for a source.
+pub(crate) fn semantic_tokens_full(
+    ctx: &mut LocalContext,
+    source: &Source,
+    ei: Arc<ExprInfo>,
+) -> (Vec<SemanticToken>, String) {
+    let root = LinkedNode::new(source.root());
 
-        let mut tokenizer = Tokenizer::new(
-            source.clone(),
-            ei,
-            self.allow_multiline_token,
-            self.position_encoding,
-        );
-        tokenizer.tokenize_tree(&root, ModifierSet::empty());
-        let output = tokenizer.output;
+    let mut tokenizer = Tokenizer::new(
+        source.clone(),
+        ei,
+        ctx.analysis.tokens_ctx.allow_multiline_token,
+        ctx.analysis.position_encoding,
+    );
+    tokenizer.tokenize_tree(&root, ModifierSet::empty());
+    let output = tokenizer.output;
 
-        let result_id = self.cache.write().cache_result(output.clone());
-        (output, result_id)
-    }
+    let result_id = ctx
+        .analysis
+        .tokens_ctx
+        .cache
+        .write()
+        .cache_result(output.clone());
+    (output, result_id)
+}
 
-    /// Get the semantic tokens delta for a source.
-    pub fn semantic_tokens_delta(
-        &self,
-        source: &Source,
-        ei: Arc<ExprInfo>,
-        result_id: &str,
-    ) -> (Result<Vec<SemanticTokensEdit>, Vec<SemanticToken>>, String) {
-        let cached = self.cache.write().try_take_result(result_id);
+/// Get the semantic tokens delta for a source.
+pub(crate) fn semantic_tokens_delta(
+    ctx: &mut LocalContext,
+    source: &Source,
+    ei: Arc<ExprInfo>,
+    result_id: &str,
+) -> (Result<Vec<SemanticTokensEdit>, Vec<SemanticToken>>, String) {
+    let cached = ctx
+        .analysis
+        .tokens_ctx
+        .cache
+        .write()
+        .try_take_result(result_id);
 
-        // this call will overwrite the cache, so need to read from cache first
-        let (tokens, result_id) = self.semantic_tokens_full(source, ei);
+    // this call will overwrite the cache, so need to read from cache first
+    let (tokens, result_id) = semantic_tokens_full(ctx, source, ei);
 
-        match cached {
-            Some(cached) => (Ok(token_delta(&cached, &tokens)), result_id),
-            None => (Err(tokens), result_id),
-        }
+    match cached {
+        Some(cached) => (Ok(token_delta(&cached, &tokens)), result_id),
+        None => (Err(tokens), result_id),
     }
 }
 
-struct Tokenizer {
+pub(crate) struct Tokenizer {
     curr_pos: LspPosition,
     pos_offset: usize,
     output: Vec<SemanticToken>,
@@ -100,7 +104,7 @@ struct Tokenizer {
 }
 
 impl Tokenizer {
-    fn new(
+    pub fn new(
         source: Source,
         ei: Arc<ExprInfo>,
         allow_multiline_token: bool,

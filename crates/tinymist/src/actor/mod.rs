@@ -116,7 +116,6 @@ impl LanguageState {
                     Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>
                 }),
                 tokens_ctx: Arc::new(SemanticTokenContext::new(
-                    const_config.position_encoding,
                     const_config.tokens_overlapping_token_support,
                     const_config.tokens_multiline_token_support,
                 )),
