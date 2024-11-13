@@ -1,0 +1,9 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/hover/annotate_ret.typ
+---
+{
+ "contents": "```typc\nlet _delayed-wrapper(\n  body,\n) = content;\n```\n\n---\n## Parameters\n\n@positional `body`",
+ "range": "6:20:6:36"
+}
