@@ -4,6 +4,6 @@ expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/hover/annotate_fn.typ
 ---
 {
- "contents": "```typc\nlet touying-fn-wrapper(\n  fn: (..: []) => any | function,\n  ..args: arguments,\n  max-repetitions: int | none = none,\n  repetitions: int | none = none,\n) = none;\n```\n\n---\n## Parameters\n\n@positional `fn` — The `fn`.\n\n@named `max-repetitions` — The `max-repetitions`.\n\n@named `repetitions` — The `repetitions`.\n\n@rest `args` — The `args`.",
+ "contents": "```typc\nlet touying-fn-wrapper(\n  fn: (..: any) => any | function,\n  ..args: arguments,\n  max-repetitions: int | none = none,\n  repetitions: int | none = none,\n) = none;\n```\n\n---\n## Parameters\n\n@positional `fn` — The `fn`.\n\n@named `max-repetitions` — The `max-repetitions`.\n\n@named `repetitions` — The `repetitions`.\n\n@rest `args` — The `args`.",
  "range": "8:20:8:38"
 }
