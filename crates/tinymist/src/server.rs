@@ -1040,8 +1040,7 @@ impl LanguageState {
         type R = CompilerQueryResponse;
         assert!(query.fold_feature() != FoldRequestFeature::ContextFreeUnique);
 
-        let snap_stat = client.snapshot_with_stat(&query)?;
-        let handle = client.handle.clone();
+        let fut_stat = client.query_snapshot_with_stat(&query)?;
         let entry = query
             .associated_path()
             .map(|path| client.config.determine_entry(Some(path.into())))
@@ -1050,10 +1049,8 @@ impl LanguageState {
                 Some(EntryState::new_rooted(root, Some(*DETACHED_ENTRY)))
             });
 
-        let rev_lock = handle.analysis.lock_revision();
-
         just_future(async move {
-            let mut snap = snap_stat.snap.receive().await?;
+            let mut snap = fut_stat.fut.receive().await?;
             // todo: whether it is safe to inherit success_doc with changed entry
             if !is_pinning {
                 snap = snap.task(TaskInputs {
@@ -1061,34 +1058,31 @@ impl LanguageState {
                     ..Default::default()
                 });
             }
-            snap_stat.stat.snap();
+            fut_stat.stat.snap();
 
-            let resp = match query {
-                SemanticTokensFull(req) => handle.run_semantic(snap, req, R::SemanticTokensFull),
-                SemanticTokensDelta(req) => handle.run_semantic(snap, req, R::SemanticTokensDelta),
-                Hover(req) => handle.run_stateful(snap, req, R::Hover),
-                GotoDefinition(req) => handle.run_stateful(snap, req, R::GotoDefinition),
-                GotoDeclaration(req) => handle.run_semantic(snap, req, R::GotoDeclaration),
-                References(req) => handle.run_stateful(snap, req, R::References),
-                InlayHint(req) => handle.run_semantic(snap, req, R::InlayHint),
-                DocumentHighlight(req) => handle.run_semantic(snap, req, R::DocumentHighlight),
-                DocumentColor(req) => handle.run_semantic(snap, req, R::DocumentColor),
-                DocumentLink(req) => handle.run_semantic(snap, req, R::DocumentLink),
-                CodeAction(req) => handle.run_semantic(snap, req, R::CodeAction),
-                CodeLens(req) => handle.run_semantic(snap, req, R::CodeLens),
-                Completion(req) => handle.run_stateful(snap, req, R::Completion),
-                SignatureHelp(req) => handle.run_semantic(snap, req, R::SignatureHelp),
-                Rename(req) => handle.run_stateful(snap, req, R::Rename),
-                WillRenameFiles(req) => handle.run_stateful(snap, req, R::WillRenameFiles),
-                PrepareRename(req) => handle.run_stateful(snap, req, R::PrepareRename),
-                Symbol(req) => handle.run_semantic(snap, req, R::Symbol),
-                WorkspaceLabel(req) => handle.run_semantic(snap, req, R::WorkspaceLabel),
-                DocumentMetrics(req) => handle.run_stateful(snap, req, R::DocumentMetrics),
+            match query {
+                SemanticTokensFull(req) => snap.run_semantic(req, R::SemanticTokensFull),
+                SemanticTokensDelta(req) => snap.run_semantic(req, R::SemanticTokensDelta),
+                Hover(req) => snap.run_stateful(req, R::Hover),
+                GotoDefinition(req) => snap.run_stateful(req, R::GotoDefinition),
+                GotoDeclaration(req) => snap.run_semantic(req, R::GotoDeclaration),
+                References(req) => snap.run_stateful(req, R::References),
+                InlayHint(req) => snap.run_semantic(req, R::InlayHint),
+                DocumentHighlight(req) => snap.run_semantic(req, R::DocumentHighlight),
+                DocumentColor(req) => snap.run_semantic(req, R::DocumentColor),
+                DocumentLink(req) => snap.run_semantic(req, R::DocumentLink),
+                CodeAction(req) => snap.run_semantic(req, R::CodeAction),
+                CodeLens(req) => snap.run_semantic(req, R::CodeLens),
+                Completion(req) => snap.run_stateful(req, R::Completion),
+                SignatureHelp(req) => snap.run_semantic(req, R::SignatureHelp),
+                Rename(req) => snap.run_stateful(req, R::Rename),
+                WillRenameFiles(req) => snap.run_stateful(req, R::WillRenameFiles),
+                PrepareRename(req) => snap.run_stateful(req, R::PrepareRename),
+                Symbol(req) => snap.run_semantic(req, R::Symbol),
+                WorkspaceLabel(req) => snap.run_semantic(req, R::WorkspaceLabel),
+                DocumentMetrics(req) => snap.run_stateful(req, R::DocumentMetrics),
                 _ => unreachable!(),
-            };
-
-            drop(rev_lock);
-            resp
+            }
         })
     }
 }

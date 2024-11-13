@@ -12,7 +12,7 @@ use reflexo::ImmutPath;
 use reflexo_typst::vfs::notify::{FileChangeSet, MemoryEvent};
 use reflexo_typst::world::EntryState;
 use tinymist_query::analysis::{Analysis, PeriscopeProvider};
-use tinymist_query::{ExportKind, LocalContext, SemanticTokenContext, VersionedDocument};
+use tinymist_query::{ExportKind, LocalContext, VersionedDocument};
 use tinymist_render::PeriscopeRenderer;
 use tokio::sync::mpsc;
 use typst::layout::Position;
@@ -107,6 +107,8 @@ impl LanguageState {
             stats: Default::default(),
             analysis: Arc::new(Analysis {
                 position_encoding: const_config.position_encoding,
+                allow_overlapping_token: const_config.tokens_overlapping_token_support,
+                allow_multiline_token: const_config.tokens_multiline_token_support,
                 color_theme: match self.compile_config().color_theme.as_deref() {
                     Some("dark") => tinymist_query::ColorTheme::Dark,
                     _ => tinymist_query::ColorTheme::Light,
@@ -115,14 +117,11 @@ impl LanguageState {
                     let r = TypstPeriscopeProvider(PeriscopeRenderer::new(args));
                     Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>
                 }),
-                tokens_ctx: Arc::new(SemanticTokenContext::new(
-                    const_config.tokens_overlapping_token_support,
-                    const_config.tokens_multiline_token_support,
-                )),
+                tokens_caches: Arc::default(),
                 workers: Default::default(),
                 caches: Default::default(),
-                cache_grid: Default::default(),
-                stats: Default::default(),
+                analysis_rev_cache: Arc::default(),
+                stats: Arc::default(),
             }),
 
             notified_revision: parking_lot::Mutex::new(0),
