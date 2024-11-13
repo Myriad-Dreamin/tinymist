@@ -1180,3 +1180,12 @@ fn extract_ref(step: Option<Expr>) -> (Option<Expr>, Option<Expr>) {
 fn none_expr() -> Expr {
     Expr::Type(Ty::Builtin(BuiltinTy::None))
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_expr_size() {
+        use super::*;
+        assert!(size_of::<Expr>() <= size_of::<usize>() * 2);
+    }
+}
