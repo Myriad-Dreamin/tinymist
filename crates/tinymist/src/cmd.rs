@@ -552,26 +552,20 @@ impl LanguageState {
         &mut self,
         mut arguments: Vec<JsonValue>,
     ) -> AnySchedulableResponse {
-        let handle = self.primary().handle.clone();
+        let fut = self.primary().query_snapshot().map_err(z_internal_error)?;
         let info = get_arg!(arguments[1] as PackageInfo);
 
-        // todo: do this in a common place
-        let rev_lock = handle.analysis.lock_revision();
-
-        let snap = handle.snapshot().map_err(z_internal_error)?;
         just_future(async move {
-            let snap = snap.receive().await.map_err(z_internal_error)?;
+            let snap = fut.receive().await.map_err(z_internal_error)?;
             let w = snap.world.as_ref();
 
-            let symbols = handle
+            let symbols = snap
                 .run_analysis(w, |a| {
                     tinymist_query::docs::package_module_docs(a, &info)
                         .map_err(map_string_err("failed to list symbols"))
                 })
                 .map_err(internal_error)?
                 .map_err(internal_error)?;
-
-            drop(rev_lock);
 
             serde_json::to_value(symbols).map_err(internal_error)
         })
@@ -619,16 +613,10 @@ impl LanguageState {
         info: PackageInfo,
         f: impl FnOnce(&mut LocalContextGuard) -> LspResult<T> + Send + Sync,
     ) -> LspResult<impl Future<Output = LspResult<T>>> {
-        let handle: std::sync::Arc<actor::typ_client::CompileHandler> =
-            self.primary().handle.clone();
-
-        // todo: do this in a common place
-        let rev_lock = handle.analysis.lock_revision();
-
-        let snap = handle.snapshot().map_err(z_internal_error)?;
+        let fut = self.primary().query_snapshot().map_err(z_internal_error)?;
 
         Ok(async move {
-            let snap = snap.receive().await.map_err(z_internal_error)?;
+            let snap = fut.receive().await.map_err(z_internal_error)?;
             let w = snap.world.as_ref();
 
             let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
@@ -650,9 +638,7 @@ impl LanguageState {
                 inputs: None,
             });
 
-            let res = handle.run_analysis(&w, f).map_err(internal_error)?;
-            drop(rev_lock);
-            res
+            snap.run_analysis(&w, f).map_err(internal_error)?
         })
     }
 }

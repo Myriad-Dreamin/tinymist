@@ -21,7 +21,7 @@ use crate::tool::text::FullTextDigest;
 use crate::{
     actor::{
         editor::EditorRequest,
-        typ_client::QuerySnap,
+        typ_client::WorldSnapFut,
         typ_server::{CompiledArtifact, ExportSignal},
     },
     tool::word_count,
@@ -66,7 +66,7 @@ impl ExportTask {
 
     pub fn oneshot(
         &self,
-        snap: QuerySnap,
+        snap: WorldSnapFut,
         entry: Option<EntryState>,
         kind: ExportKind,
     ) -> impl Future<Output = anyhow::Result<Option<PathBuf>>> {

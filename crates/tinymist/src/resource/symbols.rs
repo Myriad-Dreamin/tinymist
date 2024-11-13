@@ -6,7 +6,7 @@ use reflexo_typst::{
 };
 use sync_lsp::LspResult;
 
-use crate::{actor::typ_client::QuerySnap, z_internal_error};
+use crate::{actor::typ_client::WorldSnapFut, z_internal_error};
 
 pub use super::prelude::*;
 
@@ -52,7 +52,7 @@ enum SymCategory {
     Harpoon,
     Tack,
     // Lowercase Greek and Uppercase Greek
-    Greek, 
+    Greek,
     Hebrew,
     DoubleStruck,
 }
@@ -947,7 +947,7 @@ static CAT_MAP: Lazy<HashMap<&str, SymCategory>> = Lazy::new(|| {
 
 impl LanguageState {
     /// Get the all valid symbols
-    pub async fn get_symbol_resources(snap: QuerySnap) -> LspResult<JsonValue> {
+    pub async fn get_symbol_resources(snap: WorldSnapFut) -> LspResult<JsonValue> {
         let snap = snap.receive().await.map_err(z_internal_error)?;
 
         let mut symbols = ResourceSymbolMap::new();
