@@ -76,6 +76,7 @@ pub fn identify_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
                     continue;
                 };
 
+                break_line = Some(i);
                 return_ty = Some(w.trim().into());
                 break;
             }
