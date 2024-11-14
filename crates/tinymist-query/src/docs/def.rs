@@ -100,41 +100,51 @@ impl fmt::Display for SigHoverDocs<'_> {
         let docs = self.0;
         let base_docs = docs.docs.trim();
 
-        let has_params_docs = !docs.pos.is_empty() || !docs.named.is_empty() || docs.rest.is_some();
-
         if !base_docs.is_empty() {
             f.write_str(base_docs)?;
+        }
 
-            if has_params_docs {
-                f.write_str("\n\n")?;
+        fn write_param_docs(f: &mut fmt::Formatter<'_>, p: &ParamDocsT<TypeRepr>) -> fmt::Result {
+            write!(f, "\n\n### {}\n\n", p.name)?;
+
+            // p.cano_type.0
+            if let Some(t) = &p.cano_type {
+                write!(f, "```typc\ntype: {} = {}\n```\n\n", t.0, t.0)?;
+            }
+
+            let docs = p.docs.trim();
+            let docs = if docs.is_empty() {
+                "(Empty Docs)"
+            } else {
+                docs
+            };
+
+            f.write_str(docs)?;
+
+            Ok(())
+        }
+
+        if !docs.pos.is_empty() {
+            f.write_str("\n\n## Positional Parameters")?;
+
+            for p in &docs.pos {
+                write_param_docs(f, p)?;
             }
         }
 
-        if has_params_docs {
-            f.write_str("## Parameters")?;
-
-            for p in &docs.pos {
-                write!(f, "\n\n@positional `{}`", p.name)?;
-                if !p.docs.is_empty() {
-                    f.write_str(" — ")?;
-                    f.write_str(&p.docs)?;
-                }
-            }
-
-            for (name, p) in &docs.named {
-                write!(f, "\n\n@named `{name}`")?;
-                if !p.docs.is_empty() {
-                    f.write_str(" — ")?;
-                    f.write_str(&p.docs)?;
-                }
-            }
+        if docs.rest.is_some() {
+            f.write_str("\n\n## Rest Parameters")?;
 
             if let Some(rest) = &docs.rest {
-                write!(f, "\n\n@rest `{}`", rest.name)?;
-                if !rest.docs.is_empty() {
-                    f.write_str(" — ")?;
-                    f.write_str(&rest.docs)?;
-                }
+                write_param_docs(f, rest)?;
+            }
+        }
+
+        if !docs.named.is_empty() {
+            f.write_str("\n\n## Named Parameters")?;
+
+            for p in docs.named.values() {
+                write_param_docs(f, p)?;
             }
         }
 
