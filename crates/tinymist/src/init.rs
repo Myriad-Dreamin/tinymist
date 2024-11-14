@@ -150,22 +150,15 @@ impl Initializer for SuperInit {
         // Respond to the host (LSP client)
         // Register these capabilities statically if the client does not support dynamic
         // registration
-        let semantic_tokens_provider = match service.config.semantic_tokens {
-            SemanticTokensMode::Enable if !const_config.tokens_dynamic_registration => {
-                Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
-                    get_semantic_tokens_options(),
-                ))
-            }
-            _ => None,
-        };
-        let document_formatting_provider = match service.config.formatter_mode {
-            FormatterMode::Typstyle | FormatterMode::Typstfmt
-                if !const_config.doc_fmt_dynamic_registration =>
-            {
-                Some(OneOf::Left(true))
-            }
-            _ => None,
-        };
+        let semantic_tokens_provider = Some(
+            SemanticTokensServerCapabilities::SemanticTokensOptions(
+                get_semantic_tokens_options(),
+            )
+        );
+
+        let document_formatting_provider = Some(
+            OneOf::Left(true)
+        );
 
         let file_operations = const_config.notify_will_rename_files.then(|| {
             WorkspaceFileOperationsServerCapabilities {
