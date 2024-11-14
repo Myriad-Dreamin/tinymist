@@ -388,7 +388,7 @@ mod type_describe_tests {
                 description => format!("Check on {text:?} ({pos:?})"),
             }, {
                 let literal_type = literal_type.and_then(|e| e.describe())
-                    .unwrap_or_else(|| "<nil>".to_string());
+                    .unwrap_or_else(|| "<nil>".into());
                 assert_snapshot!(literal_type);
             })
         });
