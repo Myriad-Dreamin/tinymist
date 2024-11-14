@@ -818,13 +818,10 @@ impl LanguageState {
         run_query!(req_id, self.Symbol(pattern))
     }
 
-    fn on_enter(
-        &mut self,
-        req_id: RequestId,
-        params: TextDocumentPositionParams,
-    ) -> ScheduledResult {
-        let (path, position) = as_path_pos(params);
-        run_query!(req_id, self.OnEnter(path, position))
+    fn on_enter(&mut self, req_id: RequestId, params: OnEnterParams) -> ScheduledResult {
+        let path = as_path(params.text_document);
+        let range = params.range;
+        run_query!(req_id, self.OnEnter(path, range))
     }
 
     fn will_rename_files(
@@ -1119,9 +1116,22 @@ struct ExportOpts {
     page: PageSelection,
 }
 
+/// A parameter for the `experimental/onEnter` command.
+///
+/// @since 3.17.0
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OnEnterParams {
+    /// The text document.
+    pub text_document: TextDocumentIdentifier,
+
+    /// The visible document range for which `onEnter` edits should be computed.
+    pub range: Range,
+}
+
 struct OnEnter;
 impl lsp_types::request::Request for OnEnter {
-    type Params = TextDocumentPositionParams;
+    type Params = OnEnterParams;
     type Result = Option<Vec<TextEdit>>;
     const METHOD: &'static str = "experimental/onEnter";
 }

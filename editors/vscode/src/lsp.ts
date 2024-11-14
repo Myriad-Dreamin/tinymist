@@ -1,3 +1,4 @@
+import * as vscode from "vscode";
 import { LanguageClient, SymbolInformation } from "vscode-languageclient/node";
 import { spawnSync } from "child_process";
 import { resolve } from "path";
@@ -70,6 +71,99 @@ export const tinymist = {
     if (client) {
       client.outputChannel.show();
     }
+  },
+
+  /**
+   * The code is borrowed from https://github.com/rust-lang/rust-analyzer/blob/fc98e0657abf3ce07eed513e38274c89bbb2f8ad/editors/code/src/config.ts#L98
+   * Last checked time: 2024-11-14
+   *
+   * Sets up additional language configuration that's impossible to do via a
+   * separate language-configuration.json file. See [1] for more information.
+   *
+   * [1]: https://github.com/Microsoft/vscode/issues/11514#issuecomment-244707076
+   */
+  configureLang: undefined as vscode.Disposable | undefined,
+  configureLanguage(typingContinueCommentsOnNewline: boolean) {
+    // Only need to dispose of the config if there's a change
+    if (this.configureLang) {
+      this.configureLang.dispose();
+      this.configureLang = undefined;
+    }
+
+    let onEnterRules: vscode.OnEnterRule[] = [
+      {
+        // Carry indentation from the previous line
+        // if it's only whitespace
+        beforeText: /^\s+$/,
+        action: { indentAction: vscode.IndentAction.None },
+      },
+      {
+        // After the end of a function/field chain,
+        // with the semicolon on the same line
+        beforeText: /^\s+\..*;/,
+        action: { indentAction: vscode.IndentAction.Outdent },
+      },
+      {
+        // After the end of a function/field chain,
+        // with semicolon detached from the rest
+        beforeText: /^\s+;/,
+        previousLineText: /^\s+\..*/,
+        action: { indentAction: vscode.IndentAction.Outdent },
+      },
+    ];
+
+    if (typingContinueCommentsOnNewline) {
+      const indentAction = vscode.IndentAction.None;
+
+      onEnterRules = [
+        ...onEnterRules,
+        {
+          // Doc single-line comment
+          // e.g. ///|
+          beforeText: /^\s*\/{3}.*$/,
+          action: { indentAction, appendText: "/// " },
+        },
+        {
+          // Parent doc single-line comment
+          // e.g. //!|
+          beforeText: /^\s*\/{2}\!.*$/,
+          action: { indentAction, appendText: "//! " },
+        },
+        {
+          // Begins an auto-closed multi-line comment (standard or parent doc)
+          // e.g. /** | */ or /*! | */
+          beforeText: /^\s*\/\*(\*|\!)(?!\/)([^\*]|\*(?!\/))*$/,
+          afterText: /^\s*\*\/$/,
+          action: {
+            indentAction: vscode.IndentAction.IndentOutdent,
+            appendText: " * ",
+          },
+        },
+        {
+          // Begins a multi-line comment (standard or parent doc)
+          // e.g. /** ...| or /*! ...|
+          beforeText: /^\s*\/\*(\*|\!)(?!\/)([^\*]|\*(?!\/))*$/,
+          action: { indentAction, appendText: " * " },
+        },
+        {
+          // Continues a multi-line comment
+          // e.g.  * ...|
+          beforeText: /^(\ \ )*\ \*(\ ([^\*]|\*(?!\/))*)?$/,
+          action: { indentAction, appendText: "* " },
+        },
+        {
+          // Dedents after closing a multi-line comment
+          // e.g.  */|
+          beforeText: /^(\ \ )*\ \*\/\s*$/,
+          action: { indentAction, removeText: 1 },
+        },
+      ];
+    }
+
+    console.log("Setting up language configuration", typingContinueCommentsOnNewline);
+    this.configureLang = vscode.languages.setLanguageConfiguration("typst", {
+      onEnterRules,
+    });
   },
 };
 

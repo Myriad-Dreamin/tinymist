@@ -78,6 +78,19 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   extensionState.features.dragAndDrop = config.dragAndDrop === "enable";
   extensionState.features.onEnter = !!config.onEnterEvent;
   extensionState.features.renderDocs = config.renderDocs === "enable";
+
+  // Configures advanced language configuration
+  tinymist.configureLanguage(config["typingContinueCommentsOnNewline"]);
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("tinymist.typingContinueCommentsOnNewline")) {
+        const config = loadTinymistConfig();
+        // Update language configuration
+        tinymist.configureLanguage(config["typingContinueCommentsOnNewline"]);
+      }
+    }),
+  );
+
   // Initializes language client
   const client = initClient(context, config);
   setClient(client);
@@ -108,6 +121,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
     previewSetIsTinymist();
     previewActivate(context, false);
   }
+
   // Starts language client
   return await startClient(client, context);
 }
