@@ -173,6 +173,10 @@ impl LspClient {
         self.req_queue.lock().incoming.has_pending()
     }
 
+    pub fn begin_panic(&self) {
+        self.req_queue.lock().begin_panic();
+    }
+
     /// Sends a request to the client and registers a handler.
     pub fn send_request_<R: Req>(
         &self,
@@ -526,8 +530,18 @@ where
         if is_replay {
             let client = self.client.clone();
             let _ = std::thread::spawn(move || {
+                let since = std::time::Instant::now();
+                let timeout = std::env::var("REPLAY_TIMEOUT")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(60);
                 client.handle.block_on(async {
                     while client.has_pending_requests() {
+                        if since.elapsed().as_secs() > timeout {
+                            log::error!("replay timeout reached, {timeout}s");
+                            client.begin_panic();
+                        }
+
                         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                     }
                 })
