@@ -64,10 +64,12 @@ fn main() -> anyhow::Result<()> {
         env_logger::builder()
             .filter_module("tinymist", Info)
             .filter_module("typst_preview", Debug)
-            .filter_module("typst_ts", Info)
+            .filter_module("typlite", Info)
+            .filter_module("reflexo", Info)
             .filter_module("sync_lsp", Info)
-            .filter_module("typst_ts_compiler::service::compile", Info)
-            .filter_module("typst_ts_compiler::service::watch", Info)
+            .filter_module("reflexo_typst::service::compile", Info)
+            .filter_module("reflexo_typst::service::watch", Info)
+            .filter_module("reflexo_typst::diag::console", Info)
             .try_init()
     };
 
