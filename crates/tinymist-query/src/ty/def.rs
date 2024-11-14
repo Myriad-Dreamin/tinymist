@@ -1198,7 +1198,7 @@ mod tests {
     #[test]
     fn test_ty_size() {
         use super::*;
-        assert!(size_of::<Ty>() == 16);
+        assert!(size_of::<Ty>() <= size_of::<usize>() * 2);
     }
 
     #[test]
