@@ -1,5 +1,6 @@
 use core::fmt;
 
+use ecow::{eco_format, EcoString};
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use strum::{EnumIter, IntoEnumIterator};
@@ -312,7 +313,7 @@ impl BuiltinTy {
         BuiltinTy::Type(builtin).literally()
     }
 
-    pub(crate) fn describe(&self) -> String {
+    pub(crate) fn describe(&self) -> EcoString {
         let res = match self {
             BuiltinTy::Clause => "any",
             BuiltinTy::Undef => "any",
@@ -347,9 +348,9 @@ impl BuiltinTy {
             BuiltinTy::Tag(tag) => {
                 let (name, id) = tag.as_ref();
                 return if let Some(id) = id {
-                    format!("tag {name} of {id:?}")
+                    eco_format!("tag {name} of {id:?}")
                 } else {
-                    format!("tag {name}")
+                    eco_format!("tag {name}")
                 };
             }
             BuiltinTy::Path(s) => match s {
@@ -369,7 +370,7 @@ impl BuiltinTy {
             },
         };
 
-        res.to_string()
+        res.into()
     }
 }
 

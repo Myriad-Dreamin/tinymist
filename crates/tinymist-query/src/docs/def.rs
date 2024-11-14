@@ -2,7 +2,7 @@ use core::fmt;
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
-use ecow::EcoString;
+use ecow::{eco_format, EcoString};
 use serde::{Deserialize, Serialize};
 use typst::syntax::Span;
 
@@ -14,9 +14,9 @@ use crate::ty::{DocSource, Interned};
 use crate::upstream::plain_docs_sentence;
 
 type TypeRepr = Option<(
-    /* short */ String,
-    /* long */ String,
-    /* value */ String,
+    /* short */ EcoString,
+    /* long */ EcoString,
+    /* value */ EcoString,
 )>;
 
 /// Documentation about a definition (without type information).
@@ -100,41 +100,57 @@ impl fmt::Display for SigHoverDocs<'_> {
         let docs = self.0;
         let base_docs = docs.docs.trim();
 
-        let has_params_docs = !docs.pos.is_empty() || !docs.named.is_empty() || docs.rest.is_some();
-
         if !base_docs.is_empty() {
             f.write_str(base_docs)?;
+        }
 
-            if has_params_docs {
-                f.write_str("\n\n")?;
+        fn write_param_docs(
+            f: &mut fmt::Formatter<'_>,
+            p: &ParamDocsT<TypeRepr>,
+            kind: &str,
+            is_first: &mut bool,
+        ) -> fmt::Result {
+            if *is_first {
+                *is_first = false;
+                write!(f, "\n\n## {}\n\n", p.name)?;
+            } else {
+                write!(f, "\n\n## {} ({kind})\n\n", p.name)?;
+            }
+
+            // p.cano_type.0
+            if let Some(t) = &p.cano_type {
+                write!(f, "```typc\ntype: {}\n```\n\n", t.2)?;
+            }
+
+            f.write_str(p.docs.trim())?;
+
+            Ok(())
+        }
+
+        if !docs.pos.is_empty() {
+            f.write_str("\n\n# Positional Parameters")?;
+
+            let mut is_first = true;
+            for p in &docs.pos {
+                write_param_docs(f, p, "positional", &mut is_first)?;
             }
         }
 
-        if has_params_docs {
-            f.write_str("## Parameters")?;
+        if docs.rest.is_some() {
+            f.write_str("\n\n# Rest Parameters")?;
 
-            for p in &docs.pos {
-                write!(f, "\n\n@positional `{}`", p.name)?;
-                if !p.docs.is_empty() {
-                    f.write_str(" — ")?;
-                    f.write_str(&p.docs)?;
-                }
-            }
-
-            for (name, p) in &docs.named {
-                write!(f, "\n\n@named `{name}`")?;
-                if !p.docs.is_empty() {
-                    f.write_str(" — ")?;
-                    f.write_str(&p.docs)?;
-                }
-            }
-
+            let mut is_first = true;
             if let Some(rest) = &docs.rest {
-                write!(f, "\n\n@rest `{}`", rest.name)?;
-                if !rest.docs.is_empty() {
-                    f.write_str(" — ")?;
-                    f.write_str(&rest.docs)?;
-                }
+                write_param_docs(f, rest, "spread right", &mut is_first)?;
+            }
+        }
+
+        if !docs.named.is_empty() {
+            f.write_str("\n\n# Named Parameters")?;
+
+            let mut is_first = true;
+            for p in docs.named.values() {
+                write_param_docs(f, p, "named", &mut is_first)?;
             }
         }
 
@@ -219,7 +235,7 @@ impl SignatureDocs {
 /// Documentation about a variable (without type information).
 pub type UntypedVarDocs = VarDocsT<()>;
 /// Documentation about a variable.
-pub type VarDocs = VarDocsT<Option<(String, String, String)>>;
+pub type VarDocs = VarDocsT<Option<(EcoString, EcoString, EcoString)>>;
 
 /// Describes a primary pattern binding.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -276,9 +292,9 @@ impl ParamDocs {
 
 fn format_ty(ty: Option<&Ty>) -> TypeRepr {
     let ty = ty?;
-    let short = ty.repr().unwrap_or_else(|| "any".to_owned());
-    let long = format!("{ty:?}");
-    let value = ty.value_repr().unwrap_or_else(|| "".to_owned());
+    let short = ty.repr().unwrap_or_else(|| "any".into());
+    let long = eco_format!("{ty:?}");
+    let value = ty.value_repr().unwrap_or_else(|| "".into());
 
     Some((short, long, value))
 }
