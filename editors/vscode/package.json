@@ -317,6 +317,12 @@
             "Do not use semantic tokens for syntax highlighting"
           ]
         },
+        "tinymist.typingContinueCommentsOnNewline": {
+          "title": "Continue Comments on Newline",
+          "markdownDescription": "Whether to prefix newlines after comments with the corresponding comment prefix.",
+          "type": "boolean",
+          "default": true
+        },
         "tinymist.onEnterEvent": {
           "title": "Handling on enter events",
           "description": "Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter) (LSP onEnter feature) to allow automatic insertion of characters on enter, such as `///` for comments. Note: restarting the editor is required to change this setting.",
