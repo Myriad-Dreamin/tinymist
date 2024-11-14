@@ -1098,12 +1098,12 @@ impl RevisionManagerLike for AnalysisRevCache {
             .expr_stage
             .global
             .lock()
-            .retain(|_, r| r.0 + 60 >= rev);
+            .retain(|_, r| r.0 >= rev);
         self.default_slot
             .type_check
             .global
             .lock()
-            .retain(|_, r| r.0 + 60 >= rev);
+            .retain(|_, r| r.0 >= rev);
     }
 }
 
