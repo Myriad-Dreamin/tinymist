@@ -3,7 +3,10 @@ use super::*;
 pub fn term_value(ctx: &Arc<SharedContext>, value: &Value) -> Ty {
     match value {
         Value::Array(a) => {
-            let values = a.iter().map(term_value_rec).collect::<Vec<_>>();
+            let values = a
+                .iter()
+                .map(|v| term_value_rec(v, Span::detached()))
+                .collect::<Vec<_>>();
             Ty::Tuple(values.into())
         }
         // todo: term arguments
@@ -19,7 +22,7 @@ pub fn term_value(ctx: &Arc<SharedContext>, value: &Value) -> Ty {
         Value::Dict(d) => {
             let values = d
                 .iter()
-                .map(|(k, v)| (k.as_str().into(), term_value_rec(v)))
+                .map(|(k, v)| (k.as_str().into(), term_value_rec(v, Span::detached())))
                 .collect();
             Ty::Dict(RecordTy::new(values))
         }
@@ -27,7 +30,7 @@ pub fn term_value(ctx: &Arc<SharedContext>, value: &Value) -> Ty {
             let values = m
                 .scope()
                 .iter()
-                .map(|(k, v, _)| (k.into(), term_value_rec(v)))
+                .map(|(k, v, s)| (k.into(), term_value_rec(v, s)))
                 .collect();
             Ty::Dict(RecordTy::new(values))
         }
@@ -60,7 +63,7 @@ pub fn term_value(ctx: &Arc<SharedContext>, value: &Value) -> Ty {
     }
 }
 
-pub fn term_value_rec(value: &Value) -> Ty {
+pub fn term_value_rec(value: &Value, s: Span) -> Ty {
     match value {
         Value::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
         Value::Dyn(v) => Ty::Builtin(BuiltinTy::Type(v.ty())),
@@ -92,6 +95,12 @@ pub fn term_value_rec(value: &Value) -> Ty {
         | Value::Datetime(..)
         | Value::Duration(..)
         | Value::Content(..)
-        | Value::Styles(..) => Ty::Value(InsTy::new(value.clone())),
+        | Value::Styles(..) => {
+            if !s.is_detached() {
+                Ty::Value(InsTy::new_at(value.clone(), s))
+            } else {
+                Ty::Value(InsTy::new(value.clone()))
+            }
+        }
     }
 }
