@@ -147,18 +147,9 @@ impl Initializer for SuperInit {
             return (service, Err(err));
         }
 
-        // Respond to the host (LSP client)
-        // Register these capabilities statically if the client does not support dynamic
-        // registration
-        let semantic_tokens_provider = Some(
-            SemanticTokensServerCapabilities::SemanticTokensOptions(
-                get_semantic_tokens_options(),
-            )
-        );
+        let semantic_tokens_provider = Some(SemanticTokensServerCapabilities::SemanticTokensOptions(get_semantic_tokens_options(),));
 
-        let document_formatting_provider = Some(
-            OneOf::Left(true)
-        );
+        let document_formatting_provider = Some(OneOf::Left(true));
 
         let file_operations = const_config.notify_will_rename_files.then(|| {
             WorkspaceFileOperationsServerCapabilities {
