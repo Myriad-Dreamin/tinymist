@@ -147,10 +147,6 @@ impl Initializer for SuperInit {
             return (service, Err(err));
         }
 
-        let semantic_tokens_provider = Some(SemanticTokensServerCapabilities::SemanticTokensOptions(get_semantic_tokens_options(),));
-
-        let document_formatting_provider = Some(OneOf::Left(true));
-
         let file_operations = const_config.notify_will_rename_files.then(|| {
             WorkspaceFileOperationsServerCapabilities {
                 will_rename: Some(FileOperationRegistrationOptions {
@@ -205,7 +201,11 @@ impl Initializer for SuperInit {
                         ..Default::default()
                     },
                 )),
-                semantic_tokens_provider,
+                semantic_tokens_provider: Some(
+                    SemanticTokensServerCapabilities::SemanticTokensOptions(
+                        get_semantic_tokens_options(),
+                    ),
+                ),
                 execute_command_provider: Some(ExecuteCommandOptions {
                     commands: exec_cmds,
                     work_done_progress_options: WorkDoneProgressOptions {
@@ -237,7 +237,7 @@ impl Initializer for SuperInit {
                     }),
                     file_operations,
                 }),
-                document_formatting_provider,
+                document_formatting_provider: Some(OneOf::Left(true)),
                 inlay_hint_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 code_lens_provider: Some(CodeLensOptions {
