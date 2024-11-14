@@ -196,7 +196,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                             {
                                 let _ = writeln!(md, "<!-- begin:param {} -->", param.name);
                                 let ty = match &param.cano_type {
-                                    Some((short, _)) => short,
+                                    Some((short, _, _)) => short,
                                     None => "unknown",
                                 };
                                 let _ = writeln!(
