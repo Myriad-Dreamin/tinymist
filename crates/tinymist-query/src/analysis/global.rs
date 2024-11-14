@@ -218,22 +218,12 @@ impl LocalContextGuard {
             break;
         }
 
-        self.analysis
-            .caches
-            .def_signatures
-            .retain(|(l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .static_signatures
-            .retain(|(l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .terms
-            .retain(|(l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .signatures
-            .retain(|(l, _)| lifetime - *l < 60);
+        let retainer = |l: u64| lifetime.saturating_sub(l) < 60;
+        let caches = &self.analysis.caches;
+        caches.def_signatures.retain(|(l, _)| retainer(*l));
+        caches.static_signatures.retain(|(l, _)| retainer(*l));
+        caches.terms.retain(|(l, _)| retainer(*l));
+        caches.signatures.retain(|(l, _)| retainer(*l));
     }
 }
 
