@@ -10,10 +10,7 @@ use typst::foundations::{IntoValue, Module, Str, Type};
 use crate::{
     adt::snapshot_map::SnapshotMap,
     analysis::SharedContext,
-    docs::{
-        convert_docs, identify_func_docs, identify_tidy_module_docs, identify_var_docs,
-        UntypedDefDocs, VarDocsT,
-    },
+    docs::{convert_docs, identify_pat_docs, identify_tidy_module_docs, UntypedDefDocs, VarDocsT},
     prelude::*,
     syntax::{Decl, DefKind},
     ty::{BuiltinTy, Interned, PackageId, SigTy, StrRef, Ty, TypeBounds, TypeVar, TypeVarBounds},
@@ -87,13 +84,11 @@ pub(crate) fn compute_docstring(
         locals: SnapshotMap::default(),
         next_id: 0,
     };
+    use DefKind::*;
     match kind {
-        DefKind::Function => checker.check_func_docs(docs),
-        DefKind::Variable => checker.check_var_docs(docs),
-        DefKind::Module => checker.check_module_docs(docs),
-        DefKind::Constant => None,
-        DefKind::Struct => None,
-        DefKind::Reference => None,
+        Function | Variable => checker.check_pat_docs(docs),
+        Module => checker.check_module_docs(docs),
+        Constant | Struct | Reference => None,
     }
 }
 
@@ -110,9 +105,9 @@ struct DocsChecker<'a> {
 static EMPTY_MODULE: LazyLock<Module> =
     LazyLock::new(|| Module::new("stub", typst::foundations::Scope::new()));
 impl<'a> DocsChecker<'a> {
-    pub fn check_func_docs(mut self, docs: String) -> Option<DocString> {
+    pub fn check_pat_docs(mut self, docs: String) -> Option<DocString> {
         let converted =
-            convert_docs(self.ctx, &docs).and_then(|converted| identify_func_docs(&converted));
+            convert_docs(self.ctx, &docs).and_then(|converted| identify_pat_docs(&converted));
 
         let converted = match Self::fallback_docs(converted, &docs) {
             Ok(c) => c,
@@ -141,29 +136,6 @@ impl<'a> DocsChecker<'a> {
             docs: Some(converted.docs),
             var_bounds: self.vars,
             vars: params,
-            res_ty,
-        })
-    }
-
-    pub fn check_var_docs(mut self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(self.ctx, &docs).and_then(identify_var_docs);
-
-        let converted = match Self::fallback_docs(converted, &docs) {
-            Ok(c) => c,
-            Err(e) => return Some(e),
-        };
-
-        let module = self.ctx.module_by_str(docs);
-        let module = module.as_ref().unwrap_or(EMPTY_MODULE.deref());
-
-        let res_ty = converted
-            .return_ty
-            .and_then(|ty| self.check_type_strings(module, &ty.0));
-
-        Some(DocString {
-            docs: Some(converted.docs),
-            var_bounds: self.vars,
-            vars: BTreeMap::new(),
             res_ty,
         })
     }

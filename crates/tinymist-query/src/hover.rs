@@ -272,8 +272,8 @@ fn link_tooltip(
     Some(HoverContents::Array(results))
 }
 
-fn push_result_ty(name: &str, ty_repr: Option<&(String, String)>, type_doc: &mut String) {
-    let Some((short, _)) = ty_repr else {
+fn push_result_ty(name: &str, ty_repr: Option<&(String, String, String)>, type_doc: &mut String) {
+    let Some((short, _, _)) = ty_repr else {
         return;
     };
     if short == name {

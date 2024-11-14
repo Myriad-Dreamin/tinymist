@@ -21,6 +21,15 @@ impl Ty {
         worker.describe_root(self)
     }
 
+    /// Describe available value instances of the given type.
+    pub fn value_repr(&self) -> Option<String> {
+        let mut worker = TypeDescriber {
+            repr: true,
+            ..Default::default()
+        };
+        worker.describe_root(self)
+    }
+
     /// Describe the given type.
     pub fn describe(&self) -> Option<String> {
         let mut worker = TypeDescriber::default();
