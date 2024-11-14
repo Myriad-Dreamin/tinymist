@@ -161,7 +161,7 @@ impl TypeDescriber {
                 self.functions.push(f.clone());
             }
             Ty::Dict(..) => {
-                return "dict".into();
+                return "dictionary".into();
             }
             Ty::Tuple(..) => {
                 return "array".into();
