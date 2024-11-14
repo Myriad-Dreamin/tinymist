@@ -36,7 +36,7 @@ interface ResourceRoutes {
   "/dir/package": string;
   "/dir/package/local": string;
   "/package/by-namespace": PackageInfo[];
-  "/package/symbol": SymbolInfo[];
+  "/package/symbol": SymbolInfo;
   "/package/docs": string;
 }
 

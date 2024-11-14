@@ -99,10 +99,8 @@ class PackageViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   }
 
   async getPackageSymbols(element: SymbolsItem): Promise<vscode.TreeItem[]> {
-    return createPackageSymbols(
-      element.pkg,
-      await tinymist.getResource("/package/symbol", element.pkg.pkg),
-    );
+    const symbols = await tinymist.getResource("/package/symbol", element.pkg.pkg);
+    return createPackageSymbols(element.pkg, symbols.children);
   }
 
   private async getPackageActions(pkg: PackageItem): Promise<vscode.TreeItem[]> {
@@ -250,7 +248,7 @@ export class SymbolItem extends vscode.TreeItem {
 }
 
 function createPackageSymbols(pkgItem: PackageItem, bases: SymbolInfo[]): vscode.TreeItem[] {
-  const symbols = bases.map((info) => new SymbolItem(pkgItem, info));
+  const symbols = (bases || []).map((info) => new SymbolItem(pkgItem, info));
   symbols.sort((a, b) => {
     if (a.info.kind !== b.info.kind) {
       return a.info.kind.localeCompare(b.info.kind);
