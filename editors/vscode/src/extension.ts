@@ -72,7 +72,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   config.triggerSuggest = true;
   config.triggerNamedCompletion = true;
   config.triggerParameterHints = true;
-  config.supportHtmlInMarkdown = false;
+  config.supportHtmlInMarkdown = true;
   // Sets features
   extensionState.features.preview = config.previewFeature === "enable";
   extensionState.features.devKit = isDevMode || config.devKit === "enable";
