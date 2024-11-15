@@ -5,6 +5,7 @@ use parking_lot::Mutex;
 use tinymist_world::base::{EntryState, ShadowApi, TaskInputs};
 use typlite::scopes::Scopes;
 use typlite::value::Value;
+use typlite::TypliteFeat;
 use typst::foundations::Bytes;
 use typst::{
     diag::StrResult,
@@ -36,8 +37,13 @@ pub(crate) fn convert_docs(ctx: &SharedContext, content: &str) -> StrResult<EcoS
 
     let conv = typlite::Typlite::new(Arc::new(w))
         .with_library(DOCS_LIB.clone())
-        .with_color_theme(ctx.analysis.color_theme)
-        .annotate_elements(true)
+        .with_feature(TypliteFeat {
+            color_theme: Some(ctx.analysis.color_theme),
+            annotate_elem: true,
+            soft_error: true,
+            remove_html: ctx.analysis.remove_html,
+            ..Default::default()
+        })
         .convert()
         .map_err(|e| eco_format!("failed to convert to markdown: {e}"))?;
 

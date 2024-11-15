@@ -1,5 +1,5 @@
 use core::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::{
     collections::{HashMap, HashSet},
     ops::Range,
@@ -21,6 +21,8 @@ pub use serde_json::json;
 pub use tinymist_world::{LspUniverse, LspUniverseBuilder};
 use typst_shim::syntax::LinkedNodeExt;
 
+use crate::syntax::find_module_level_docs;
+use crate::LspWorldExt;
 use crate::{
     analysis::Analysis, prelude::LocalContext, typst_to_lsp, LspPosition, PositionEncoding,
     VersionedDocument,
@@ -60,7 +62,22 @@ pub fn run_with_ctx<T>(
         .map(|p| TypstFileId::new(None, VirtualPath::new(p.strip_prefix(&root).unwrap())))
         .collect::<Vec<_>>();
 
-    let mut ctx = Arc::new(Analysis::default()).snapshot(w.snapshot());
+    let w = w.snapshot();
+
+    let source = w.source_by_path(&p).ok().unwrap();
+    let docs = find_module_level_docs(&source).unwrap_or_default();
+    let properties = get_test_properties(&docs);
+    let supports_html = properties
+        .get("html")
+        .map(|v| v.trim() == "true")
+        .unwrap_or(true);
+
+    let mut ctx = Arc::new(Analysis {
+        remove_html: !supports_html,
+        ..Analysis::default()
+    })
+    .snapshot(w);
+
     ctx.test_completion_files(Vec::new);
     ctx.test_files(|| paths);
     f(&mut ctx, p)
@@ -71,8 +88,10 @@ pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
     for line in s.lines() {
         let mut line = line.splitn(2, ':');
         let key = line.next().unwrap().trim();
-        let value = line.next().unwrap().trim();
-        props.insert(key, value);
+        let Some(value) = line.next() else {
+            continue;
+        };
+        props.insert(key, value.trim());
     }
     props
 }
@@ -293,6 +312,7 @@ pub fn find_test_position_(s: &Source, offset: usize) -> LspPosition {
 pub static REDACT_LOC: Lazy<RedactFields> = Lazy::new(|| {
     RedactFields::from_iter([
         "location",
+        "contents",
         "uri",
         "oldUri",
         "newUri",
@@ -384,6 +404,18 @@ impl Redact for RedactFields {
                                 k.to_owned(),
                                 format!("{}:{}", pos(&t["start"]), pos(&t["end"])).into(),
                             );
+                        }
+                        "contents" => {
+                            let res = t.as_str().unwrap();
+                            static REG: OnceLock<regex::Regex> = OnceLock::new();
+                            let reg = REG.get_or_init(|| {
+                                regex::Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap()
+                            });
+                            let res = reg.replace_all(res, |_captures: &regex::Captures| {
+                                "data:image-hash/svg+xml;base64,redacted"
+                            });
+
+                            m.insert(k.to_owned(), res.into());
                         }
                         _ => {}
                     }

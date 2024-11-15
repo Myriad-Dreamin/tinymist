@@ -32,16 +32,14 @@ fn conv_(s: &str, for_docs: bool) -> EcoString {
         .unwrap();
     let world = universe.snapshot();
 
-    let converter = Typlite::new(Arc::new(world)).annotate_elements(for_docs);
+    let converter = Typlite::new(Arc::new(world)).with_feature(TypliteFeat {
+        annotate_elem: for_docs,
+        ..Default::default()
+    });
     let res = converter.convert().unwrap();
     static REG: OnceLock<Regex> = OnceLock::new();
     let reg = REG.get_or_init(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
     let res = reg.replace_all(&res, |_captures: &regex::Captures| {
-        // let hash = _captures.get(1).unwrap().as_str();
-        // format!(
-        //     "data:image-hash/svg+xml;base64,siphash128:{:x}",
-        //     typst_shim::utils::hash128(hash)
-        // )
         "data:image-hash/svg+xml;base64,redacted"
     });
 
