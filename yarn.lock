@@ -408,15 +408,15 @@
   resolved "https://registry.yarnpkg.com/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.5.0.tgz#3188bcb273a414b0d215fd22a58540b989b9409a"
   integrity sha512-gv3ZRaISU3fjPAgNsriBRqGWQL6quFx04YMPW/zD8XMLsU32mhCCbfbO6KZFLjvYpCZ8zyDEgqsgf+PwPaM7GQ==
 
-"@myriaddreamin/typst-ts-renderer@0.5.0-rc8":
-  version "0.5.0-rc8"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.5.0-rc8.tgz#ba164f957a1f80843793efd0b09764655180268c"
-  integrity sha512-Ct7Sx0axOXt5rvOGrqcOQv4d+M0gWrgVIx766THzkKigru3oaogBRCCCrtsKSS+Ckp836LRvTEmzcwmJFwZtjw==
+"@myriaddreamin/typst-ts-renderer@0.5.0-rc9":
+  version "0.5.0-rc9"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.5.0-rc9.tgz#c6ed3ce01c7ce61a83b396bdd39c412b56dedcd8"
+  integrity sha512-YyKvGcTmCpzzv+M54vQA8zaDfMM/PqsQrThDi9DG1D5FOKt50w8+xE5POEFPfDu5y9iVyvJ/AhkRqGyy4njkcQ==
 
-"@myriaddreamin/typst.ts@0.5.0-rc8":
-  version "0.5.0-rc8"
-  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.5.0-rc8.tgz#aec112f6bb33c766ebdb182dcb8cfa5bec2653cf"
-  integrity sha512-am/z6SAa+dnex9zmdqK1uOyBdAT6xMpGVoh2vuvnzM3XoqhnyGRtphTdJqo/yCcdjG4/P3nzS2M9TlfSIAi3pw==
+"@myriaddreamin/typst.ts@0.5.0-rc9":
+  version "0.5.0-rc9"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.5.0-rc9.tgz#0d9c4c61406b0245105544d821dae5a0a88a39fc"
+  integrity sha512-6mnxNzuEp4ALFwzuvvCTijM756G1VUnXie9TwjCb01ey3f6jv/Xh1rWNwLds2KUYAtDdaOqO7RMctOhvqdq0rg==
   dependencies:
     idb "^7.1.1"
 
@@ -3768,6 +3768,7 @@ stoppable@^1.1.0:
   integrity sha512-KXDYZ9dszj6bzvnEMRYvxgeTHU74QBFL54XKtP3nyMuJ81CFYtABZ3bAzL2EdFUaEwJOBOgENyFj3R7oTzDyyw==
 
 "string-width-cjs@npm:string-width@^4.2.0", string-width@^4.1.0, string-width@^4.2.0:
+  name string-width-cjs
   version "4.2.3"
   resolved "https://registry.yarnpkg.com/string-width/-/string-width-4.2.3.tgz#269c7117d27b05ad2e536830a8ec895ef9c6d010"
   integrity sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==
@@ -3837,6 +3838,7 @@ string_decoder@~1.1.1:
     safe-buffer "~5.1.0"
 
 "strip-ansi-cjs@npm:strip-ansi@^6.0.1", strip-ansi@^6.0.0, strip-ansi@^6.0.1:
+  name strip-ansi-cjs
   version "6.0.1"
   resolved "https://registry.yarnpkg.com/strip-ansi/-/strip-ansi-6.0.1.tgz#9e26c63d30f53443e9489495b2105d37b67a85d9"
   integrity sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==
@@ -4285,6 +4287,7 @@ workerpool@^6.5.1:
   integrity sha512-Fs4dNYcsdpYSAfVxhnl1L5zTksjvOJxtC5hzMNl+1t9B8hTJTdKDyZ5ju7ztgPy+ft9tBFXoOlDNiOT9WUXZlA==
 
 "wrap-ansi-cjs@npm:wrap-ansi@^7.0.0", wrap-ansi@^7.0.0:
+  name wrap-ansi-cjs
   version "7.0.0"
   resolved "https://registry.yarnpkg.com/wrap-ansi/-/wrap-ansi-7.0.0.tgz#67e145cff510a6a6984bdf1152911d69d2eb9e43"
   integrity sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==
