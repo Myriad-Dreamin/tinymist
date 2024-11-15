@@ -13,12 +13,12 @@
     "unlink:local": "yarn unlink @myriaddreamin/typst.ts @myriaddreamin/typst-ts-renderer"
   },
   "peerDependencies": {
-    "@myriaddreamin/typst-ts-renderer": "0.5.0-rc8",
-    "@myriaddreamin/typst.ts": "0.5.0-rc8"
+    "@myriaddreamin/typst-ts-renderer": "0.5.0-rc9",
+    "@myriaddreamin/typst.ts": "0.5.0-rc9"
   },
   "devDependencies": {
-    "@myriaddreamin/typst-ts-renderer": "0.5.0-rc8",
-    "@myriaddreamin/typst.ts": "0.5.0-rc8",
+    "@myriaddreamin/typst-ts-renderer": "0.5.0-rc9",
+    "@myriaddreamin/typst.ts": "0.5.0-rc9",
     "typescript": "^5.0.2"
   },
   "exports": {
