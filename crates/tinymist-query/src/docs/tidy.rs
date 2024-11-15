@@ -1,11 +1,7 @@
-use std::sync::OnceLock;
-
 use ecow::EcoString;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use typst::diag::StrResult;
-
-use crate::upstream::plain_docs_sentence;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyParamDocs {
@@ -16,30 +12,10 @@ pub struct TidyParamDocs {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TidyFuncDocs {
+pub struct TidyPatDocs {
     pub docs: EcoString,
     pub return_ty: Option<EcoString>,
     pub params: Vec<TidyParamDocs>,
-}
-
-/// Documentation about a variable (without type information).
-pub type UntypedVarDocs = VarDocsT<()>;
-/// Documentation about a variable.
-pub type VarDocs = VarDocsT<Option<(String, String)>>;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VarDocsT<T> {
-    pub docs: EcoString,
-    pub return_ty: T,
-    #[serde(skip)]
-    pub def_docs: OnceLock<String>,
-}
-
-impl VarDocs {
-    pub fn def_docs(&self) -> &String {
-        self.def_docs
-            .get_or_init(|| plain_docs_sentence(&self.docs).into())
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,7 +23,7 @@ pub struct TidyModuleDocs {
     pub docs: EcoString,
 }
 
-pub fn identify_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
+pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
     let lines = converted.lines().collect::<Vec<_>>();
 
     let mut matching_return_ty = true;
@@ -153,51 +129,10 @@ pub fn identify_func_docs(converted: &str) -> StrResult<TidyFuncDocs> {
     };
 
     params.reverse();
-    Ok(TidyFuncDocs {
+    Ok(TidyPatDocs {
         docs,
         return_ty,
         params,
-    })
-}
-
-pub fn identify_var_docs(converted: EcoString) -> StrResult<VarDocs> {
-    let lines = converted.lines().collect::<Vec<_>>();
-
-    let mut return_ty = None;
-    let mut break_line = None;
-
-    let mut i = lines.len();
-    loop {
-        if i == 0 {
-            break;
-        }
-        i -= 1;
-
-        let line = lines[i];
-        if line.is_empty() {
-            continue;
-        }
-
-        let Some(w) = line.trim_start().strip_prefix("->") else {
-            break_line = Some(i + 1);
-            break;
-        };
-
-        // todo: convert me
-        return_ty = Some((w.trim().into(), String::new()));
-        break_line = Some(i);
-        break;
-    }
-
-    let docs = match break_line {
-        Some(line_no) => (lines[..line_no]).iter().copied().join("\n").into(),
-        None => converted,
-    };
-
-    Ok(VarDocs {
-        docs,
-        return_ty,
-        def_docs: OnceLock::new(),
     })
 }
 
@@ -236,7 +171,7 @@ mod tests {
     use super::TidyParamDocs;
 
     fn func(s: &str) -> String {
-        let f = super::identify_func_docs(s).unwrap();
+        let f = super::identify_pat_docs(s).unwrap();
         let mut res = format!(">> docs:\n{}\n<< docs", f.docs);
         if let Some(t) = f.return_ty {
             res.push_str(&format!("\n>>return\n{t}\n<<return"));
@@ -254,10 +189,10 @@ mod tests {
     }
 
     fn var(s: &str) -> String {
-        let f = super::identify_var_docs(s.into()).unwrap();
+        let f = super::identify_pat_docs(s).unwrap();
         let mut res = format!(">> docs:\n{}\n<< docs", f.docs);
         if let Some(t) = f.return_ty {
-            res.push_str(&format!("\n>>return\n{}\n<<return", t.0));
+            res.push_str(&format!("\n>>return\n{t}\n<<return"));
         }
         res
     }

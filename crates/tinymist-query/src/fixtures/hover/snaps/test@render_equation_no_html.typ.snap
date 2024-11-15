@@ -1,0 +1,9 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/hover/render_equation_no_html.typ
+---
+{
+ "contents": "```typc\nlet lam(\n  A: type,\n  B: type,\n) = dictionary;\n```\n\n---\nLambda constructor.\n\n Typing Rule:\n\n ```typc\n$ (Γ , x : A ⊢ M : B #h(2em) Γ ⊢ a:B)/(Γ ⊢ λ (x : A) → M : π (x : A) → B) $\n```\n\n# Positional Parameters\n\n## A\n\n```typc\ntype: type\n```\n\nThe type of the argument.\n   - It can be also regarded as the condition of the proposition.\n\n## B (positional)\n\n```typc\ntype: type\n```\n\nThe type of the body.\n   - It can be also regarded as the conclusion of the proposition.",
+ "range": "14:20:14:23"
+}

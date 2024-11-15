@@ -87,6 +87,14 @@ Nightly Channel:
 
 Please read the #link("CONTRIBUTING.md")[CONTRIBUTING.md] file for contribution guidelines.
 
+== Maintainers
+
+Get list of maintainers from #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.typ")[MAINTAINERS.typ]. Or programmatically by `yarn maintainers`
+
+#note-box[
+  You can add extra arguments for specific information. For example, `yarn maintainers --input="action=maintainers"`.
+]
+
 == Acknowledgements
 
 - Partially code is inherited from #link("https://github.com/nvarner/typst-lsp")[typst-lsp]

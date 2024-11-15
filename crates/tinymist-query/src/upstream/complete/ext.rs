@@ -469,7 +469,6 @@ fn describe_value(ctx: &mut LocalContext, v: &Value) -> EcoString {
                 .ty()
                 .describe()
                 .unwrap_or_else(|| "function".into())
-                .into()
         }
         Value::Module(m) => {
             if let Some(fid) = m.file_id() {

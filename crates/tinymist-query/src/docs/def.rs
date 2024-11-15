@@ -2,7 +2,7 @@ use core::fmt;
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
-use ecow::EcoString;
+use ecow::{eco_format, EcoString};
 use serde::{Deserialize, Serialize};
 use typst::syntax::Span;
 
@@ -13,8 +13,11 @@ use crate::ty::Ty;
 use crate::ty::{DocSource, Interned};
 use crate::upstream::plain_docs_sentence;
 
-type TypeRepr = Option<(/* short */ String, /* long */ String)>;
-type ShowTypeRepr<'a> = &'a mut dyn FnMut(Option<&Ty>) -> TypeRepr;
+type TypeRepr = Option<(
+    /* short */ EcoString,
+    /* long */ EcoString,
+    /* value */ EcoString,
+)>;
 
 /// Documentation about a definition (without type information).
 pub type UntypedDefDocs = DefDocsT<()>;
@@ -86,52 +89,68 @@ impl SignatureDocsT<TypeRepr> {
     /// Get full documentation for the signature.
     pub fn hover_docs(&self) -> &EcoString {
         self.hover_docs
-            .get_or_init(|| plain_docs_sentence(&format!("{}", SigDefDocs(self))))
+            .get_or_init(|| plain_docs_sentence(&format!("{}", SigHoverDocs(self))))
     }
 }
 
-struct SigDefDocs<'a>(&'a SignatureDocs);
+struct SigHoverDocs<'a>(&'a SignatureDocs);
 
-impl fmt::Display for SigDefDocs<'_> {
+impl fmt::Display for SigHoverDocs<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let docs = self.0;
         let base_docs = docs.docs.trim();
 
-        let has_params_docs = !docs.pos.is_empty() || !docs.named.is_empty() || docs.rest.is_some();
-
         if !base_docs.is_empty() {
             f.write_str(base_docs)?;
+        }
 
-            if has_params_docs {
-                f.write_str("\n\n")?;
+        fn write_param_docs(
+            f: &mut fmt::Formatter<'_>,
+            p: &ParamDocsT<TypeRepr>,
+            kind: &str,
+            is_first: &mut bool,
+        ) -> fmt::Result {
+            if *is_first {
+                *is_first = false;
+                write!(f, "\n\n## {}\n\n", p.name)?;
+            } else {
+                write!(f, "\n\n## {} ({kind})\n\n", p.name)?;
+            }
+
+            // p.cano_type.0
+            if let Some(t) = &p.cano_type {
+                write!(f, "```typc\ntype: {}\n```\n\n", t.2)?;
+            }
+
+            f.write_str(p.docs.trim())?;
+
+            Ok(())
+        }
+
+        if !docs.pos.is_empty() {
+            f.write_str("\n\n# Positional Parameters")?;
+
+            let mut is_first = true;
+            for p in &docs.pos {
+                write_param_docs(f, p, "positional", &mut is_first)?;
             }
         }
 
-        if has_params_docs {
-            f.write_str("## Parameters")?;
+        if docs.rest.is_some() {
+            f.write_str("\n\n# Rest Parameters")?;
 
-            for p in &docs.pos {
-                write!(f, "\n\n@positional `{}`", p.name)?;
-                if !p.docs.is_empty() {
-                    f.write_str(" — ")?;
-                    f.write_str(&p.docs)?;
-                }
-            }
-
-            for (name, p) in &docs.named {
-                write!(f, "\n\n@named `{name}`")?;
-                if !p.docs.is_empty() {
-                    f.write_str(" — ")?;
-                    f.write_str(&p.docs)?;
-                }
-            }
-
+            let mut is_first = true;
             if let Some(rest) = &docs.rest {
-                write!(f, "\n\n@rest `{}`", rest.name)?;
-                if !rest.docs.is_empty() {
-                    f.write_str(" — ")?;
-                    f.write_str(&rest.docs)?;
-                }
+                write_param_docs(f, rest, "spread right", &mut is_first)?;
+            }
+        }
+
+        if !docs.named.is_empty() {
+            f.write_str("\n\n# Named Parameters")?;
+
+            let mut is_first = true;
+            for p in docs.named.values() {
+                write_param_docs(f, p, "named", &mut is_first)?;
             }
         }
 
@@ -213,6 +232,31 @@ impl SignatureDocs {
     }
 }
 
+/// Documentation about a variable (without type information).
+pub type UntypedVarDocs = VarDocsT<()>;
+/// Documentation about a variable.
+pub type VarDocs = VarDocsT<Option<(EcoString, EcoString, EcoString)>>;
+
+/// Describes a primary pattern binding.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VarDocsT<T> {
+    /// Documentation for the pattern binding.
+    pub docs: EcoString,
+    /// The inferred type of the pattern binding source.
+    pub return_ty: T,
+    /// Cached documentation for the definition.
+    #[serde(skip)]
+    pub def_docs: OnceLock<String>,
+}
+
+impl VarDocs {
+    /// Get the markdown representation of the documentation.
+    pub fn def_docs(&self) -> &String {
+        self.def_docs
+            .get_or_init(|| plain_docs_sentence(&self.docs).into())
+    }
+}
+
 /// Documentation about a parameter (without type information).
 pub type TypelessParamDocs = ParamDocsT<()>;
 /// Documentation about a parameter.
@@ -235,24 +279,24 @@ pub struct ParamDocsT<T> {
 }
 
 impl ParamDocs {
-    fn new(param: &ParamSpec, ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> Self {
+    fn new(param: &ParamSpec, ty: Option<&Ty>) -> Self {
         Self {
             name: param.name.as_ref().into(),
             docs: param.docs.clone().unwrap_or_default(),
-            cano_type: format_ty(ty.or(Some(&param.ty)), doc_ty),
+            cano_type: format_ty(ty.or(Some(&param.ty))),
             default: param.default.clone(),
             attrs: param.attrs,
         }
     }
 }
 
-fn format_ty(ty: Option<&Ty>, doc_ty: Option<&mut ShowTypeRepr>) -> TypeRepr {
-    match doc_ty {
-        Some(doc_ty) => doc_ty(ty),
-        None => ty
-            .and_then(|ty| ty.repr())
-            .map(|short| (short, format!("{ty:?}"))),
-    }
+fn format_ty(ty: Option<&Ty>) -> TypeRepr {
+    let ty = ty?;
+    let short = ty.repr().unwrap_or_else(|| "any".into());
+    let long = eco_format!("{ty:?}");
+    let value = ty.value_repr().unwrap_or_else(|| "".into());
+
+    Some((short, long, value))
 }
 
 pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
@@ -266,7 +310,7 @@ pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
     log::info!("check variable docs of ty: {ty:?} => {srcs:?}");
     let doc_source = srcs.into_iter().next()?;
 
-    let return_ty = ty.describe().map(|short| (short, format!("{ty:?}")));
+    let return_ty = format_ty(Some(&ty));
     match doc_source {
         DocSource::Var(var) => {
             let docs = type_info
@@ -291,7 +335,7 @@ pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
     }
 }
 
-pub(crate) fn sig_docs(sig: &Signature, mut doc_ty: Option<ShowTypeRepr>) -> Option<SignatureDocs> {
+pub(crate) fn sig_docs(sig: &Signature) -> Option<SignatureDocs> {
     let type_sig = sig.type_sig().clone();
 
     let pos_in = sig
@@ -310,19 +354,14 @@ pub(crate) fn sig_docs(sig: &Signature, mut doc_ty: Option<ShowTypeRepr>) -> Opt
     let ret_in = type_sig.body.as_ref();
 
     let pos = pos_in
-        .map(|(param, ty)| ParamDocs::new(param, ty, doc_ty.as_mut()))
+        .map(|(param, ty)| ParamDocs::new(param, ty))
         .collect();
     let named = named_in
-        .map(|(param, ty)| {
-            (
-                param.name.clone(),
-                ParamDocs::new(param, ty, doc_ty.as_mut()),
-            )
-        })
+        .map(|(param, ty)| (param.name.clone(), ParamDocs::new(param, ty)))
         .collect();
-    let rest = rest_in.map(|(param, ty)| ParamDocs::new(param, ty, doc_ty.as_mut()));
+    let rest = rest_in.map(|(param, ty)| ParamDocs::new(param, ty));
 
-    let ret_ty = format_ty(ret_in, doc_ty.as_mut());
+    let ret_ty = format_ty(ret_in);
 
     Some(SignatureDocs {
         docs: sig.primary().docs.clone().unwrap_or_default(),

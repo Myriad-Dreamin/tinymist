@@ -53,6 +53,8 @@ pub struct Analysis {
     pub allow_overlapping_token: bool,
     /// Whether to allow multiline semantic tokens.
     pub allow_multiline_token: bool,
+    /// Whether to remove html from markup content in responses.
+    pub remove_html: bool,
     /// The editor's color theme.
     pub color_theme: ColorTheme,
     /// The periscope provider.
@@ -218,22 +220,12 @@ impl LocalContextGuard {
             break;
         }
 
-        self.analysis
-            .caches
-            .def_signatures
-            .retain(|(l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .static_signatures
-            .retain(|(l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .terms
-            .retain(|(l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .signatures
-            .retain(|(l, _)| lifetime - *l < 60);
+        let retainer = |l: u64| lifetime.saturating_sub(l) < 60;
+        let caches = &self.analysis.caches;
+        caches.def_signatures.retain(|(l, _)| retainer(*l));
+        caches.static_signatures.retain(|(l, _)| retainer(*l));
+        caches.terms.retain(|(l, _)| retainer(*l));
+        caches.signatures.retain(|(l, _)| retainer(*l));
     }
 }
 
@@ -410,7 +402,7 @@ impl LocalContext {
         match def.decl.kind() {
             DefKind::Function => {
                 let sig = self.sig_of_def(def.clone())?;
-                let docs = crate::docs::sig_docs(&sig, None)?;
+                let docs = crate::docs::sig_docs(&sig)?;
                 Some(DefDocs::Function(Box::new(docs)))
             }
             DefKind::Struct | DefKind::Constant | DefKind::Variable => {
@@ -506,17 +498,7 @@ impl SharedContext {
 
     /// Get file's id by its path
     pub fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
-        // todo: source in packages
-        let root = self.world.workspace_root().ok_or_else(|| {
-            let reason = eco_format!("workspace root not found");
-            FileError::Other(Some(reason))
-        })?;
-        let relative_path = p.strip_prefix(&root).map_err(|_| {
-            let reason = eco_format!("access denied, path: {p:?}, root: {root:?}");
-            FileError::Other(Some(reason))
-        })?;
-
-        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
+        self.world.file_id_by_path(p)
     }
 
     /// Get the content of a file by file id.
@@ -531,8 +513,7 @@ impl SharedContext {
 
     /// Get the source of a file by file path.
     pub fn source_by_path(&self, p: &Path) -> FileResult<Source> {
-        // todo: source cache
-        self.source_by_id(self.file_id_by_path(p)?)
+        self.world.source_by_path(p)
     }
 
     /// Get a syntax object at a position.
@@ -904,6 +885,20 @@ impl SharedContext {
         res.get_or_init(|| compute(self)).clone()
     }
 
+    /// Remove html tags from markup content if necessary.
+    pub fn remove_html(&self, markup: EcoString) -> EcoString {
+        if !self.analysis.remove_html {
+            return markup;
+        }
+
+        static REMOVE_HTML_COMMENT_REGEX: LazyLock<regex::Regex> =
+            LazyLock::new(|| regex::Regex::new(r#"<!--[\s\S]*?-->"#).unwrap());
+        REMOVE_HTML_COMMENT_REGEX
+            .replace_all(&markup, "")
+            .trim()
+            .into()
+    }
+
     fn query_stat(&self, id: TypstFileId, query: &'static str) -> QueryStatGuard {
         let stats = &self.analysis.stats.query_stats;
         let entry = stats.entry(id).or_default();
@@ -1108,12 +1103,12 @@ impl RevisionManagerLike for AnalysisRevCache {
             .expr_stage
             .global
             .lock()
-            .retain(|_, r| r.0 + 60 >= rev);
+            .retain(|_, r| r.0 >= rev);
         self.default_slot
             .type_check
             .global
             .lock()
-            .retain(|_, r| r.0 + 60 >= rev);
+            .retain(|_, r| r.0 >= rev);
     }
 }
 
@@ -1131,6 +1126,7 @@ impl AnalysisRevCache {
     ) -> Arc<RevisionSlot<AnalysisRevSlot>> {
         lg.inner.access(revision);
         self.manager.find_revision(revision, |slot_base| {
+            log::info!("analysis revision {} is created", revision.get());
             slot_base
                 .map(|e| AnalysisRevSlot {
                     revision: e.revision,
@@ -1172,7 +1168,7 @@ struct AnalysisRevSlot {
 
 impl Drop for AnalysisRevSlot {
     fn drop(&mut self) {
-        log::info!("analysis revision {} is dropped", self.revision)
+        log::info!("analysis revision {} is dropped", self.revision);
     }
 }
 

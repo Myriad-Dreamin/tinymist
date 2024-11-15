@@ -47,7 +47,7 @@ pub fn figure(mut args: Args) -> Result<Value> {
 
     match (body, caption) {
         (Value::Image { path, alt }, None) => Ok(Value::Content(eco_format!("![{alt}]({path})"))),
-        (Value::Image { path, alt }, Some(caption)) if args.vm.gfm => Ok(Value::Content(
+        (Value::Image { path, alt }, Some(caption)) if args.vm.feat.gfm => Ok(Value::Content(
             eco_format!("![{caption}, {alt}]({path} {caption:?})"),
         )),
         (Value::Image { path, alt }, Some(caption)) => {

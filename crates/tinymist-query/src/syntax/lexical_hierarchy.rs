@@ -2,7 +2,6 @@ use std::ops::{Deref, Range};
 
 use anyhow::anyhow;
 use ecow::{eco_vec, EcoString, EcoVec};
-use log::info;
 use lsp_types::SymbolKind;
 use serde::{Deserialize, Serialize};
 use typst::syntax::{
@@ -42,8 +41,7 @@ pub(crate) fn get_lexical_hierarchy(
         worker.symbreak();
     }
 
-    let e = std::time::Instant::now();
-    info!("lexical hierarchy analysis took {:?}", e - b);
+    log::debug!("lexical hierarchy analysis took {:?}", b.elapsed());
     res.map(|_| worker.stack.pop().unwrap().1)
 }
 

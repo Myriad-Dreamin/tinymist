@@ -418,6 +418,23 @@ impl InsTy {
             })),
         })
     }
+
+    /// Get the span of the instance
+    pub fn span(&self) -> Span {
+        self.syntax
+            .as_ref()
+            .map(|s| s.name_node.span())
+            .or_else(|| {
+                Some(match &self.val {
+                    Value::Func(f) => f.span(),
+                    Value::Args(a) => a.span,
+                    Value::Content(c) => c.span(),
+                    // todo: module might have file id
+                    _ => return None,
+                })
+            })
+            .unwrap_or_else(Span::detached)
+    }
 }
 
 /// A field type

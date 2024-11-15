@@ -121,9 +121,12 @@ fn find_field_definition(ctx: &Arc<SharedContext>, fa: ast::FieldAccess<'_>) -> 
             log::debug!("field var: {:?} {:?}", v.def, v.def.span());
             Some(Definition::new(v.def.clone(), None))
         }
-        _src @ (DocSource::Builtin(..) | DocSource::Ins(..)) => {
-            todo!()
+        DocSource::Ins(v) if !v.span().is_detached() => {
+            let s = v.span();
+            let source = ctx.source_by_id(s.id()?).ok()?;
+            DefResolver::new(ctx, &source)?.of_span(s)
         }
+        DocSource::Builtin(..) | DocSource::Ins(..) => None,
     }
 }
 

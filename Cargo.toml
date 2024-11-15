@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.12.0"
+version = "0.12.2"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -60,7 +60,7 @@ siphasher = "1"
 comemo = "0.4"
 # We need to freeze the version of the crate, as the raw-api feature is considered unstable
 dashmap = { version = "=5.5.3", features = ["raw-api"] }
-ecow = "0.2.2"
+ecow = "0.2.3"
 ena = "0.14.2"
 hashbrown = { version = "0.14", features = [
     "inline-more",
@@ -92,15 +92,15 @@ env_logger = "0.11.3"
 log = "0.4"
 
 # Typst
-reflexo = { version = "0.5.0-rc8", default-features = false, features = [
+reflexo = { version = "0.5.0-rc9", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-world = { version = "0.5.0-rc8", features = ["system"] }
-reflexo-typst = { version = "0.5.0-rc8", features = [
+reflexo-world = { version = "0.5.0-rc9", features = ["system"] }
+reflexo-typst = { version = "0.5.0-rc9", features = [
     "system",
 ], default-features = false }
-reflexo-vec2svg = { version = "0.5.0-rc8" }
-reflexo-typst-shim = { version = "0.5.0-rc8", features = ["nightly"] }
+reflexo-vec2svg = { version = "0.5.0-rc9" }
+reflexo-typst-shim = { version = "0.5.0-rc9", features = ["nightly"] }
 
 
 typst = "0.12.0"
@@ -144,7 +144,7 @@ insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
 typst-preview = { path = "./crates/typst-preview" }
-tinymist-assets = { version = "0.12.0" }
+tinymist-assets = { version = "0.12.2" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-derive = { path = "./crates/tinymist-derive/" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/" }
@@ -195,12 +195,12 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 # typst-render = { path = "../typst/crates/typst-render" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
 
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
-reflexo-world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
-reflexo-typst2vec = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
-reflexo-typst-shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
+# world = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
+# typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
+# typst2vec = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
+# vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
+# shim = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "26e2eaa3696845a178df3266edc0019c77396414" }
 
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
 # reflexo-world = { path = "../typst.ts/crates/reflexo-world/" }

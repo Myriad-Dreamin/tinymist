@@ -275,6 +275,7 @@
     "triggerSuggest": true,
     "triggerParameterHints": true,
     "triggerNamedCompletion": true,
+    "supportHtmlInMarkdown": true,
     "experimentalFormatterMode": "disable"
   },
   "trace": "off"

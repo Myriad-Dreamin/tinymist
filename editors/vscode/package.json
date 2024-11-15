@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.12.0",
+  "version": "0.12.2",
   "description": "An integrated language service for Typst",
   "keywords": [
     "typst",
@@ -316,6 +316,12 @@
             "Use semantic tokens for syntax highlighting",
             "Do not use semantic tokens for syntax highlighting"
           ]
+        },
+        "tinymist.typingContinueCommentsOnNewline": {
+          "title": "Continue Comments on Newline",
+          "markdownDescription": "Whether to prefix newlines after comments with the corresponding comment prefix.",
+          "type": "boolean",
+          "default": true
         },
         "tinymist.onEnterEvent": {
           "title": "Handling on enter events",
