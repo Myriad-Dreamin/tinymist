@@ -162,7 +162,20 @@ impl<'a> DocsChecker<'a> {
             Ok(c) => Ok(c),
             Err(e) => {
                 let e = e.replace("`", "\\`");
-                let fallback_docs = eco_format!("```\nfailed to parse docs: {e}\n```\n\n{docs}");
+                let max_consecutive_backticks = docs
+                    .chars()
+                    .fold((0, 0), |(max, count), c| {
+                        if c == '`' {
+                            (max.max(count + 1), count + 1)
+                        } else {
+                            (max, 0)
+                        }
+                    })
+                    .0;
+                let backticks = "`".repeat((max_consecutive_backticks + 1).max(3));
+                let fallback_docs = eco_format!(
+                    "```\nfailed to parse docs: {e}\n```\n\n{backticks}typ\n{docs}\n{backticks}\n"
+                );
                 Err(DocString {
                     docs: Some(fallback_docs),
                     var_bounds: HashMap::new(),
