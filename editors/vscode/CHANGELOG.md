@@ -4,6 +4,117 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.12.2 - [2024-11-15]
+
+* Bumping typstyle to v0.12.1 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/764
+* Claiming list of maintainers in https://github.com/Myriad-Dreamin/tinymist/pull/781
+
+New maintainers to be added to the list since 2024-11-22 (in 7 days):
+- @ParaN3xus want to maintain the "Nightly Releases" feature in https://github.com/Myriad-Dreamin/tinymist/pull/783
+- @max397574 want to maintain the "Editor integration" feature in https://github.com/Myriad-Dreamin/tinymist/pull/784
+- @Eric-Song-Nop want to maintain the "Language Service" feature in https://github.com/Myriad-Dreamin/tinymist/pull/796
+- @ParaN3xus want to maintain the "Neovim integration" feature in https://github.com/Myriad-Dreamin/tinymist/pull/810
+
+### Docs
+
+* Added coc.nvim config example by @tanloong in https://github.com/Myriad-Dreamin/tinymist/pull/727
+* Maintained docs for tinymist 0.12.2 in https://github.com/Myriad-Dreamin/tinymist/pull/733 and https://github.com/Myriad-Dreamin/tinymist/pull/825
+* Updated neovim's setup section in https://github.com/Myriad-Dreamin/tinymist/pull/749
+* Added documentation about docstring in https://github.com/Myriad-Dreamin/tinymist/pull/771
+
+### Editor
+
+* {En,De}coding base-64 strings with Text{De,En}coder in https://github.com/Myriad-Dreamin/tinymist/pull/719 and https://github.com/Myriad-Dreamin/tinymist/pull/774
+* Removed outdated typst.tmLanguage.json in https://github.com/Myriad-Dreamin/tinymist/pull/725
+* Disabling unicode bracket pair autocompletion in https://github.com/Myriad-Dreamin/tinymist/pull/726
+  * This is a degradation, as discussed in https://github.com/Myriad-Dreamin/tinymist/issues/723
+* Added preview icon when clicking outside the document by @supersurviveur in https://github.com/Myriad-Dreamin/tinymist/pull/734
+
+### Compiler
+
+* Implemented expression checker in https://github.com/Myriad-Dreamin/tinymist/pull/714, https://github.com/Myriad-Dreamin/tinymist/pull/736, https://github.com/Myriad-Dreamin/tinymist/pull/756, https://github.com/Myriad-Dreamin/tinymist/pull/759, https://github.com/Myriad-Dreamin/tinymist/pull/773, https://github.com/Myriad-Dreamin/tinymist/pull/775, https://github.com/Myriad-Dreamin/tinymist/pull/777, https://github.com/Myriad-Dreamin/tinymist/pull/798, https://github.com/Myriad-Dreamin/tinymist/pull/801, https://github.com/Myriad-Dreamin/tinymist/pull/815, and https://github.com/Myriad-Dreamin/tinymist/pull/822
+  * This is a high-level IR for various analyses above AST, e.g. type checking.
+* Improved ways of checking docstring in https://github.com/Myriad-Dreamin/tinymist/pull/752, https://github.com/Myriad-Dreamin/tinymist/pull/755
+* Locking and taking snapshot {analysis,token} caches on main thread in https://github.com/Myriad-Dreamin/tinymist/pull/806, https://github.com/Myriad-Dreamin/tinymist/pull/817, and https://github.com/Myriad-Dreamin/tinymist/pull/819
+* (Fix) Rendered bitmap and svg glyphs correctly in https://github.com/Myriad-Dreamin/tinymist/pull/745
+  * This is broken by update typst to v0.12.0.
+* (Fix) Ensuring expr and type enum are not too big correctly in https://github.com/Myriad-Dreamin/tinymist/pull/811
+
+### Commands/Tools
+
+* Added `tinymist query checkPackage` command in https://github.com/Myriad-Dreamin/tinymist/pull/742
+* Showing performance statistics in summary page in https://github.com/Myriad-Dreamin/tinymist/pull/743
+* Completed symbol classification in handwriting recognizer by @summerBreeze03 in https://github.com/Myriad-Dreamin/tinymist/pull/705
+* (Fix) Corrected word count when empty line exists by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/795
+* (Fix) Corrected usage of `/package/symbol` in package view in https://github.com/Myriad-Dreamin/tinymist/pull/820
+* (Fix) Querying file type with following symbolic links when listing packages in https://github.com/Myriad-Dreamin/tinymist/pull/821
+  * Previously, some directories are not identified because they are behind symbolic links.
+
+### Docstring
+
+* Strictly matching module-level comments in https://github.com/Myriad-Dreamin/tinymist/pull/770
+  * Previously both // Docs and /// Docs at the start of some file are regarded as docs of the module (file). However, this is not great because people also usually put shebangs and license information in comments.
+
+  Example:
+  ```typ
+  // License: Apache 2.0
+  /// Some Module Docs.
+  ```
+
+  The exact docs should be `Some Module Docs`. instead of `License: Apache 2.0\nSome Module Docs`.
+* Rendering examples in docs in https://github.com/Myriad-Dreamin/tinymist/pull/772
+* Emitting errors into docs instead of causing failures in https://github.com/Myriad-Dreamin/tinymist/pull/786
+* Striping out the line containing the return type in https://github.com/Myriad-Dreamin/tinymist/pull/803
+
+### Hover (Tooltip)
+
+* Providing docs when hovering on module refs in https://github.com/Myriad-Dreamin/tinymist/pull/751
+* Improved style of hover param docs in https://github.com/Myriad-Dreamin/tinymist/pull/813
+* Conditionally rendering code in docs in https://github.com/Myriad-Dreamin/tinymist/pull/824
+
+### Completion
+
+* (Fix) Client-side controlling to whether issue completion callback in https://github.com/Myriad-Dreamin/tinymist/pull/744
+* (Fix) Matching all identifier-like nodes for completion in https://github.com/Myriad-Dreamin/tinymist/pull/747
+* Avoiding trivial completion when the trigger char is an ascii punctuation in https://github.com/Myriad-Dreamin/tinymist/pull/748
+* Added more completion tests in https://github.com/Myriad-Dreamin/tinymist/pull/776
+* Consistently enriching colon after show selectors in https://github.com/Myriad-Dreamin/tinymist/pull/785
+
+### Syntax/Semantic Highlighting
+
+* Improved syntax highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/724
+  - [parse blocks in if/for/while more consistently](https://github.com/Myriad-Dreamin/tinymist/commit/0ac36e77408930154f1f4057aedf3da45b69f2b2)
+  - [improve context expression parsing](https://github.com/Myriad-Dreamin/tinymist/commit/95dbf22c1cd08c12abd46c314c40114999108c16)
+  - [improve parameter clause parsing](https://github.com/Myriad-Dreamin/tinymist/commit/7468ba42fa12b502dddb00d5afcd31936e07282a)
+* Improved buggy bold/italic syntax highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/732
+  * This is benefitted from having the expression checker.
+* Identifying identifier kind for semantic highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/741
+* (Fix) Corrected to syntax rule to identify function identifiers by syntax in https://github.com/Myriad-Dreamin/tinymist/pull/800
+  * We were not highlighting `"#{test\n[]}"` correctly.
+* Refactored semantic tokens apis and crates in https://github.com/Myriad-Dreamin/tinymist/pull/802 and https://github.com/Myriad-Dreamin/tinymist/pull/809
+
+### Signature Help
+
+* Improved style of signature docs in https://github.com/Myriad-Dreamin/tinymist/pull/750
+
+### Preview
+
+* (Fix) bidirectionally jumping if page.fill is set in https://github.com/Myriad-Dreamin/tinymist/pull/728
+  * This is broken by update typst to v0.12.0.
+
+### On Enter
+
+* Fully supported `onEnter` edits inside comments in https://github.com/Myriad-Dreamin/tinymist/pull/823
+  * Working with selection with range for all clients.
+  * Working with selection with multiple cursors for VS Cod{e,ium} client.
+
+### Misc
+
+* Uploading test snapshot and log for debugging in https://github.com/Myriad-Dreamin/tinymist/pull/760 and https://github.com/Myriad-Dreamin/tinymist/pull/787
+* Added time limit argument to language server's replay command in https://github.com/Myriad-Dreamin/tinymist/pull/816
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.0...v0.12.2
+
 ## v0.12.0 - [2024-10-19]
 
 ### Document Link
