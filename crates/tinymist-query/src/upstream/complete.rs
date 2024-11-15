@@ -117,12 +117,19 @@ pub enum CompletionKind {
 
 /// Complete for unicode characters.
 fn complete_unicode(ctx: &mut CompletionContext) -> bool {
-    if !is_triggerred_by_slah(ctx.trigger_character) {
+    if !is_triggerred_by_slash(ctx.trigger_character) {
         return false;
     }
     for (name, value, _) in sym().scope().iter() {
         if let Value::Symbol(symbol) = value {
-            ctx.unicode_completion(name.clone(), symbol.get());
+            for (variant_name, symbol) in symbol.variants() {
+                let completion_label = if variant_name.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{name}.{variant_name}").into()
+                };
+                ctx.unicode_completion(completion_label, symbol.char());
+            }
         }
     }
     ctx.from = ctx.cursor - 1;
@@ -1279,6 +1286,6 @@ fn is_triggerred_by_punc(trigger_character: Option<char>) -> bool {
     trigger_character.is_some_and(|c| c.is_ascii_punctuation())
 }
 
-fn is_triggerred_by_slah(trigger_character: Option<char>) -> bool {
+fn is_triggerred_by_slash(trigger_character: Option<char>) -> bool {
     trigger_character.is_some_and(|c| c == '\\')
 }
