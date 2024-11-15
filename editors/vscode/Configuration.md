@@ -34,6 +34,13 @@ Enable or disable semantic tokens (LSP syntax highlighting)
   - `disable`: Do not use semantic tokens for syntax highlighting
 - **Default**: `"enable"`
 
+## `tinymist.typingContinueCommentsOnNewline`
+
+Whether to prefix newlines after comments with the corresponding comment prefix.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
 ## `tinymist.onEnterEvent`
 
 Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter) (LSP onEnter feature) to allow automatic insertion of characters on enter, such as `///` for comments. Note: restarting the editor is required to change this setting.
@@ -114,6 +121,16 @@ Configures way of opening exported files, e.g. inside of editor tabs or using sy
 ## `tinymist.dragAndDrop`
 
 Whether to handle drag-and-drop of resources into the editing typst document. Note: restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Enum**:
+  - `enable`
+  - `disable`
+- **Default**: `"enable"`
+
+## `tinymist.renderDocs`
+
+(Experimental) Whether to render typst elements in (hover) docs. In VS Code, when this feature is enabled, tinymist will store rendered results in the filesystem's temporary storage to show them in the hover content. Note: Please disable this feature if the editor doesn't support/handle image previewing in docs.
 
 - **Type**: `string`
 - **Enum**:
