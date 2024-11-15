@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## v0.12.2 - [2024-11-15]
 
-* Bumping typstyle to v0.12.1 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/764
+* Bumped typstyle to v0.12.1 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/764
 * Claiming list of maintainers in https://github.com/Myriad-Dreamin/tinymist/pull/781
 
 ### Announcement: New Maintainers
@@ -57,15 +57,6 @@ We are going to add maintainers to GitHub since 2024-11-22 (in 7 days):
 ### Docstring
 
 * Strictly matching module-level comments in https://github.com/Myriad-Dreamin/tinymist/pull/770
-  * Previously both // Docs and /// Docs at the start of some file are regarded as docs of the module (file). However, this is not great because people also usually put shebangs and license information in comments.
-
-  Example:
-  ```typ
-  // License: Apache 2.0
-  /// Some Module Docs.
-  ```
-
-  The exact docs should be `Some Module Docs`. instead of `License: Apache 2.0\nSome Module Docs`.
 * Rendering examples in docs in https://github.com/Myriad-Dreamin/tinymist/pull/772
 * Emitting errors into docs instead of causing failures in https://github.com/Myriad-Dreamin/tinymist/pull/786
 * Striping out the line containing the return type in https://github.com/Myriad-Dreamin/tinymist/pull/803
@@ -103,7 +94,7 @@ We are going to add maintainers to GitHub since 2024-11-22 (in 7 days):
 
 ### Preview
 
-* (Fix) bidirectionally jumping if page.fill is set in https://github.com/Myriad-Dreamin/tinymist/pull/728
+* (Fix) Bidirectionally jumping if page.fill is set in https://github.com/Myriad-Dreamin/tinymist/pull/728
   * This is broken by update typst to v0.12.0.
 
 ### On Enter
