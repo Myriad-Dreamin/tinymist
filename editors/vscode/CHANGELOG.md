@@ -15,7 +15,7 @@ We are going to add maintainers to GitHub since 2024-11-22 (in 7 days):
 - @ParaN3xus want to maintain the "Nightly Releases" feature in https://github.com/Myriad-Dreamin/tinymist/pull/783
 - @max397574 want to maintain the "Editor integration" feature in https://github.com/Myriad-Dreamin/tinymist/pull/784
 - @Eric-Song-Nop want to maintain the "Language Service" feature in https://github.com/Myriad-Dreamin/tinymist/pull/796
-- @ParaN3xus want to maintain the "Neovim integration" feature in https://github.com/Myriad-Dreamin/tinymist/pull/810
+- @alerque want to maintain the "Neovim integration" feature in https://github.com/Myriad-Dreamin/tinymist/pull/810
 
 *Please reply in PRs or DM @Myriad-Dreamin if you have any concerns about adding these maintainers to list.*
 
