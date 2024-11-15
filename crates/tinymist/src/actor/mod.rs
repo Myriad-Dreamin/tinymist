@@ -109,6 +109,7 @@ impl LanguageState {
                 position_encoding: const_config.position_encoding,
                 allow_overlapping_token: const_config.tokens_overlapping_token_support,
                 allow_multiline_token: const_config.tokens_multiline_token_support,
+                remove_html: self.config.remove_html,
                 color_theme: match self.compile_config().color_theme.as_deref() {
                     Some("dark") => tinymist_query::ColorTheme::Dark,
                     _ => tinymist_query::ColorTheme::Light,

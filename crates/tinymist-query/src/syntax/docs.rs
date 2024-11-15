@@ -104,6 +104,7 @@ struct DocsChecker<'a> {
 
 static EMPTY_MODULE: LazyLock<Module> =
     LazyLock::new(|| Module::new("stub", typst::foundations::Scope::new()));
+
 impl<'a> DocsChecker<'a> {
     pub fn check_pat_docs(mut self, docs: String) -> Option<DocString> {
         let converted =
@@ -122,7 +123,7 @@ impl<'a> DocsChecker<'a> {
             params.insert(
                 param.name.into(),
                 VarDoc {
-                    docs: param.docs,
+                    docs: self.ctx.remove_html(param.docs),
                     ty: self.check_type_strings(module, &param.types),
                 },
             );
@@ -133,7 +134,7 @@ impl<'a> DocsChecker<'a> {
             .and_then(|ty| self.check_type_strings(module, &ty));
 
         Some(DocString {
-            docs: Some(converted.docs),
+            docs: Some(self.ctx.remove_html(converted.docs)),
             var_bounds: self.vars,
             vars: params,
             res_ty,
@@ -149,7 +150,7 @@ impl<'a> DocsChecker<'a> {
         };
 
         Some(DocString {
-            docs: Some(converted.docs),
+            docs: Some(self.ctx.remove_html(converted.docs)),
             var_bounds: self.vars,
             vars: BTreeMap::new(),
             res_ty: None,

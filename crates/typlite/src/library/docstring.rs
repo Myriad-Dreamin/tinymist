@@ -47,12 +47,13 @@ pub fn example(mut args: Args) -> Result<Value> {
     s.push_str("```");
     s.push('\n');
 
-    // todo: render examples only if supports HTML
-    let is_code = lang == "typc";
-    let rendered = args
-        .vm
-        .render_code(&compile, !is_code, "left", r#"width="500px""#, false)?;
-    s.push_str(&TypliteWorker::value(rendered));
+    if !args.vm.feat.remove_html {
+        let is_code = lang == "typc";
+        let rendered =
+            args.vm
+                .render_code(&compile, !is_code, "left", r#"width="500px""#, false)?;
+        s.push_str(&TypliteWorker::value(rendered));
+    }
 
     Ok(Value::Content(s))
 }

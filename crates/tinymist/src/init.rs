@@ -311,6 +311,8 @@ pub struct Config {
     pub trigger_named_completion: bool,
     /// Whether to trigger parameter hint, a.k.a. signature help.
     pub trigger_parameter_hints: bool,
+    /// Whether to remove html from markup content in responses.
+    pub remove_html: bool,
 }
 
 impl Config {
@@ -374,6 +376,7 @@ impl Config {
         self.trigger_suggest = deser_or_default!("triggerSuggest", bool);
         self.trigger_parameter_hints = deser_or_default!("triggerParameterHints", bool);
         self.trigger_named_completion = deser_or_default!("triggerNamedCompletion", bool);
+        self.remove_html = !deser_or_default!("supportHtmlInMarkdown", bool);
         self.compile.update_by_map(update)?;
         self.compile.validate()
     }

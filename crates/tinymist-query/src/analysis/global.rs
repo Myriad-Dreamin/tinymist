@@ -53,6 +53,8 @@ pub struct Analysis {
     pub allow_overlapping_token: bool,
     /// Whether to allow multiline semantic tokens.
     pub allow_multiline_token: bool,
+    /// Whether to remove html from markup content in responses.
+    pub remove_html: bool,
     /// The editor's color theme.
     pub color_theme: ColorTheme,
     /// The periscope provider.
@@ -496,17 +498,7 @@ impl SharedContext {
 
     /// Get file's id by its path
     pub fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
-        // todo: source in packages
-        let root = self.world.workspace_root().ok_or_else(|| {
-            let reason = eco_format!("workspace root not found");
-            FileError::Other(Some(reason))
-        })?;
-        let relative_path = p.strip_prefix(&root).map_err(|_| {
-            let reason = eco_format!("access denied, path: {p:?}, root: {root:?}");
-            FileError::Other(Some(reason))
-        })?;
-
-        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
+        self.world.file_id_by_path(p)
     }
 
     /// Get the content of a file by file id.
@@ -521,8 +513,7 @@ impl SharedContext {
 
     /// Get the source of a file by file path.
     pub fn source_by_path(&self, p: &Path) -> FileResult<Source> {
-        // todo: source cache
-        self.source_by_id(self.file_id_by_path(p)?)
+        self.world.source_by_path(p)
     }
 
     /// Get a syntax object at a position.
@@ -892,6 +883,20 @@ impl SharedContext {
                 .entry(hash128(&rt), self.lifetime),
         };
         res.get_or_init(|| compute(self)).clone()
+    }
+
+    /// Remove html tags from markup content if necessary.
+    pub fn remove_html(&self, markup: EcoString) -> EcoString {
+        if !self.analysis.remove_html {
+            return markup;
+        }
+
+        static REMOVE_HTML_COMMENT_REGEX: LazyLock<regex::Regex> =
+            LazyLock::new(|| regex::Regex::new(r#"<!--[\s\S]*?-->"#).unwrap());
+        REMOVE_HTML_COMMENT_REGEX
+            .replace_all(&markup, "")
+            .trim()
+            .into()
     }
 
     fn query_stat(&self, id: TypstFileId, query: &'static str) -> QueryStatGuard {
