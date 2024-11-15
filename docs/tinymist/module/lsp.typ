@@ -15,21 +15,24 @@ From the directory structure of `crates/tinymist`, the `main.rs` file parses the
 
 ```rust
 match args.command.unwrap_or_default() {
+    Commands::Query(query_cmds) => query_main(query_cmds),
     Commands::Lsp(args) => lsp_main(args),
-    Commands::Compile(args) => compiler_main(args),
+    Commands::TraceLsp(args) => trace_lsp_main(args),
     Commands::Preview(args) => tokio_runtime.block_on(preview_main(args)),
     Commands::Probe => Ok(()),
 }
 ```
 
+The `query` subcommand contains the query commands, which are used to perform language queries via cli, which is convenient for debugging and profiling single query of the language server.
+
 There are three servers in the `server` directory:
-- `lsp.rs` provides the language server, initialized by `lsp_init.rs` and owns commands in `lsp_cmd.rs`.
-- `compiler.rs` provides the compiler server, initialized by `compiler_init.rs` and owns commands in `compiler_cmd.rs`.
-- `preview.rs` provides a `typst-preview` compatible preview server.
+- `lsp` provides the language server, initialized by `lsp_main` in `main.rs`.
+- `trace` provides the trace server (profiling typst programs), initialized by `trace_lsp_main` in `main.rs`.
+- `preview` provides a `typst-preview` compatible preview server, initialized by `preview_main` in `tool/preview.rs`.
 
-The long-running servers are contributed by the modules in the `server` directory.
+The long-running servers are contributed by the `LanguageState` in the `server.rs` file.
 
-They will bootstrap actors in the `actor` directory.
+They will bootstrap actors in the `actor` directory and start tasks in the `task` directory.
 
 They can construct and return resources in the `resource` directory.
 
