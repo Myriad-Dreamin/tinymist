@@ -10,20 +10,19 @@ use typst_syntax::Source;
 use super::*;
 
 fn conv_(s: &str, for_docs: bool) -> EcoString {
-    static FONT_RESOLVER: LazyLock<Result<Arc<FontResolverImpl>>> = LazyLock::new(|| {
-        Ok(Arc::new(
+    static FONT_RESOLVER: LazyLock<Arc<FontResolverImpl>> = LazyLock::new(|| {
+        Arc::new(
             LspUniverseBuilder::resolve_fonts(CompileFontArgs::default())
-                .map_err(|e| format!("{e:?}"))?,
-        ))
+                .expect("cannot resolve default fonts"),
+        )
     });
 
-    let font_resolver = FONT_RESOLVER.clone();
     let cwd = std::env::current_dir().unwrap();
     let main = Source::detached(s);
     let mut universe = LspUniverseBuilder::build(
         EntryState::new_rooted(cwd.as_path().into(), Some(main.id())),
-        font_resolver.unwrap(),
         Default::default(),
+        FONT_RESOLVER.clone(),
         Default::default(),
     )
     .unwrap();
