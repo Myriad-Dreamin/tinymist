@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/import_by_ident.typ
+snapshot_kind: text
 ---
 = resolves
 ModuleImport(..)@1..23 in /s2.typ -> Module(derive)@0..0 in /derive.typ, root Module(derive)@0..0 in /derive.typ, val: None

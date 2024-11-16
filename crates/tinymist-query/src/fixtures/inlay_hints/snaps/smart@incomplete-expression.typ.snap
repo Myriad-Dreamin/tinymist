@@ -2,5 +2,6 @@
 source: crates/tinymist-query/src/inlay_hint.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/inlay_hints/incomplete-expression.typ
+snapshot_kind: text
 ---
 []

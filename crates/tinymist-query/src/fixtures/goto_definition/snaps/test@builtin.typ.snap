@@ -2,5 +2,6 @@
 source: crates/tinymist-query/src/goto_definition.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/goto_definition/builtin.typ
+snapshot_kind: text
 ---
 null

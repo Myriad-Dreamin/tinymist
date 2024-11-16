@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/docs/base.typ
+snapshot_kind: text
 ---
 = docstings
 Pattern(..)@20..21 in /s0.typ -> DocString { docs: Some("This is X."), var_bounds: {}, vars: {}, res_ty: None }

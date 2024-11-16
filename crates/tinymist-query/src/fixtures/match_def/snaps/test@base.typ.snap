@@ -2,5 +2,6 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/match_def/base.typ
+snapshot_kind: text
 ---
 1..31

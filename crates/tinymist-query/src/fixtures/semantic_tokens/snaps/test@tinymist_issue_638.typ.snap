@@ -2,5 +2,6 @@
 source: crates/tinymist-query/src/semantic_tokens_full.rs
 expression: "serde_json::to_string(&result).unwrap()"
 input_file: crates/tinymist-query/src/fixtures/semantic_tokens/tinymist_issue_638.typ
+snapshot_kind: text
 ---
 {"data":[0,0,9,22,0,0,9,1,22,0]}

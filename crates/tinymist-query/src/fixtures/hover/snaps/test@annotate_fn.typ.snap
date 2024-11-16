@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/hover.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/hover/annotate_fn.typ
+snapshot_kind: text
 ---
 {
  "contents": "```typc\nlet touying-fn-wrapper(\n  fn: (..: any) => any | function,\n  ..args: arguments,\n  max-repetitions: int | none = none,\n  repetitions: int | none = none,\n) = none;\n```\n\n---\n\n\n# Positional Parameters\n\n## fn\n\n```typc\ntype: (..: any) => any | function\n```\n\nThe `fn`.\n\n# Rest Parameters\n\n## args\n\n```typc\ntype: arguments\n```\n\nThe `args`.\n\n# Named Parameters\n\n## max-repetitions\n\n```typc\ntype: int | none\n```\n\nThe `max-repetitions`.\n\n## repetitions (named)\n\n```typc\ntype: int | none\n```\n\nThe `repetitions`.",

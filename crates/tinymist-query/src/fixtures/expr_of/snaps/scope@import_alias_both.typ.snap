@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/import_alias_both.typ
+snapshot_kind: text
 ---
 = resolves
 PathStem(base)@8..18 in /s0.typ -> Module(base)@0..0 in /base.typ, root Module(base)@0..0 in /base.typ, val: None
