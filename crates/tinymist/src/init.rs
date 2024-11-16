@@ -261,6 +261,7 @@ impl Initializer for SuperInit {
 
 // region Configuration Items
 const CONFIG_ITEMS: &[&str] = &[
+    "tinymist",
     "outputPath",
     "exportPdf",
     "rootPath",
@@ -336,7 +337,16 @@ impl Config {
     /// Errors if the update is invalid.
     pub fn update(&mut self, update: &JsonValue) -> anyhow::Result<()> {
         if let JsonValue::Object(update) = update {
-            self.update_by_map(update)
+            let namespaced = update.get("tinymist").and_then(|m| match m {
+                JsonValue::Object(namespaced) => Some(namespaced),
+                _ => None,
+            });
+
+            self.update_by_map(update)?;
+            if let Some(namespaced) = namespaced {
+                self.update_by_map(namespaced)?;
+            }
+            Ok(())
         } else {
             bail!("got invalid configuration object {update}")
         }
@@ -987,6 +997,23 @@ mod tests {
                 ..Default::default()
             })
         );
+    }
+
+    #[test]
+    fn test_namespaced_config() {
+        let mut config = Config::default();
+
+        // Emacs uses a shared configuration object for all language servers.
+        let update = json!({
+            "exportPdf": "onSave",
+            "tinymist": {
+                "exportPdf": "onType",
+            }
+        });
+
+        config.update(&update).unwrap();
+
+        assert_eq!(config.compile.export_pdf, ExportMode::OnType);
     }
 
     #[test]
