@@ -10,6 +10,8 @@ use reflexo_typst::ImmutPath;
 use typst_kit::download::{DownloadState, Downloader};
 use typst_kit::package::PackageStorage;
 
+use crate::CompilePackageArgs;
+
 /// The https package registry for tinymist.
 pub struct HttpsRegistry {
     /// The path at which local packages (`@local` packages) are stored.
@@ -53,9 +55,21 @@ impl std::ops::Deref for HttpsRegistry {
 
 impl HttpsRegistry {
     /// Create a new registry.
-    pub fn new(cert_path: Option<PathBuf>) -> Self {
+    pub fn new(cert_path: Option<PathBuf>, package_args: Option<&CompilePackageArgs>) -> Self {
+        let local_dir = OnceLock::new();
+        if let Some(dir) = package_args.and_then(|args| args.package_path.as_deref()) {
+            let _ = local_dir.set(Some(dir.into()));
+        }
+
+        let cache_dir = OnceLock::new();
+        if let Some(dir) = package_args.and_then(|args| args.package_cache_path.as_deref()) {
+            let _ = cache_dir.set(Some(dir.into()));
+        }
+
         Self {
             cert_path,
+            local_dir,
+            cache_dir,
             ..Default::default()
         }
     }
