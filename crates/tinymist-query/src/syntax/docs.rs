@@ -13,7 +13,10 @@ use crate::{
     docs::{convert_docs, identify_pat_docs, identify_tidy_module_docs, UntypedDefDocs, VarDocsT},
     prelude::*,
     syntax::{Decl, DefKind},
-    ty::{BuiltinTy, Interned, PackageId, SigTy, StrRef, Ty, TypeBounds, TypeVar, TypeVarBounds},
+    ty::{
+        BuiltinTy, InsTy, Interned, PackageId, SigTy, StrRef, Ty, TypeBounds, TypeVar,
+        TypeVarBounds,
+    },
 };
 
 use super::DeclExpr;
@@ -298,6 +301,30 @@ impl<'a> DocsChecker<'a> {
         log::debug!("check doc type expr: {s:?}");
         match s {
             ast::Expr::Ident(i) => self.check_type_ident(m, i.get().as_str()),
+            ast::Expr::None(_)
+            | ast::Expr::Auto(_)
+            | ast::Expr::Bool(..)
+            | ast::Expr::Int(..)
+            | ast::Expr::Float(..)
+            | ast::Expr::Numeric(..)
+            | ast::Expr::Str(..) => SharedContext::const_eval(s).map(|v| Ty::Value(InsTy::new(v))),
+            ast::Expr::Binary(b) => {
+                let mut components = Vec::with_capacity(2);
+                components.push(self.check_type_expr(m, b.lhs())?);
+
+                let mut expr = b.rhs();
+                while let ast::Expr::Binary(b) = expr {
+                    if b.op() != ast::BinOp::Or {
+                        break;
+                    }
+
+                    components.push(self.check_type_expr(m, b.lhs())?);
+                    expr = b.rhs();
+                }
+
+                components.push(self.check_type_expr(m, expr)?);
+                Some(Ty::from_types(components.into_iter()))
+            }
             ast::Expr::FuncCall(c) => match c.callee() {
                 ast::Expr::Ident(i) => {
                     let name = i.get().as_str();
