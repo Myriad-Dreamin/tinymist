@@ -21,8 +21,8 @@ use reflexo_typst::vfs::{system::SystemAccessModel, Vfs};
 use reflexo_typst::{CompilerFeat, CompilerUniverse, CompilerWorld, TypstDict};
 use serde::{Deserialize, Serialize};
 
-pub mod https;
-use https::HttpsRegistry;
+pub mod package;
+use package::HttpsRegistry;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
