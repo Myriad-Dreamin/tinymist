@@ -133,12 +133,16 @@ impl LanguageState {
         let compile_handle = handle.clone();
         let cache = self.cache.clone();
         let cert_path = self.compile_config().determine_certification_path();
+        let package = self.compile_config().determine_package_opts();
 
         self.client.handle.spawn_blocking(move || {
             // Create the world
             let font_resolver = font_resolver.wait().clone();
-            let verse = LspUniverseBuilder::build(entry_.clone(), font_resolver, inputs, cert_path)
-                .expect("incorrect options");
+            let package_registry =
+                LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
+            let verse =
+                LspUniverseBuilder::build(entry_.clone(), inputs, font_resolver, package_registry)
+                    .expect("incorrect options");
 
             // Create the actor
             let server = CompileServerActor::new_with(
