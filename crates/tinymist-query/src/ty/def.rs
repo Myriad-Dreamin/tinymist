@@ -8,13 +8,14 @@ use std::{
     sync::Arc,
 };
 
-use ecow::EcoVec;
+use ecow::{EcoString, EcoVec};
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
 use reflexo_typst::TypstFileId;
 use rustc_hash::{FxHashMap, FxHashSet};
+use serde::{Deserialize, Serialize};
 use typst::{
-    foundations::Value,
+    foundations::{ParamInfo, Value},
     syntax::{ast, Span, SyntaxKind, SyntaxNode},
 };
 
@@ -49,8 +50,8 @@ pub enum Ty {
     Builtin(BuiltinTy),
     /// A possible typst instance of some type.
     Value(Interned<InsTy>),
-    /// A field type
-    Field(Interned<FieldTy>),
+    /// A parameter type
+    Param(Interned<ParamTy>),
 
     // Combination Types
     /// A union type, whose negation is intersection type.
@@ -120,7 +121,7 @@ impl fmt::Debug for Ty {
                 f.write_str(")")
             }
             Ty::Let(v) => write!(f, "({v:?})"),
-            Ty::Field(ff) => write!(f, "{:?}: {:?}", ff.name, ff.field),
+            Ty::Param(ff) => write!(f, "{:?}: {:?}", ff.name, ff.ty),
             Ty::Var(v) => v.fmt(f),
             Ty::Unary(u) => write!(f, "{u:?}"),
             Ty::Binary(b) => write!(f, "{b:?}"),
@@ -166,6 +167,39 @@ impl Ty {
     /// A that type is annotated if the syntax structure causes an type error
     pub const fn undef() -> Self {
         Ty::Builtin(BuiltinTy::Undef)
+    }
+
+    /// Get name of the type
+    pub fn name(&self) -> Interned<str> {
+        match self {
+            Ty::Var(v) => v.name.clone(),
+            ty => ty
+                .value()
+                .and_then(|v| Some(Interned::new_str(v.name()?)))
+                .unwrap_or_default(),
+        }
+    }
+
+    /// Get span of the type
+    pub fn span(&self) -> Span {
+        fn seq(u: &[Ty]) -> Option<Span> {
+            u.iter().find_map(|ty| {
+                let sub = ty.span();
+                if sub.is_detached() {
+                    return None;
+                }
+                Some(sub)
+            })
+        }
+
+        match self {
+            Ty::Var(v) => v.def.span(),
+            Ty::Let(u) => seq(&u.ubs)
+                .or_else(|| seq(&u.lbs))
+                .unwrap_or_else(Span::detached),
+            Ty::Union(u) => seq(u).unwrap_or_else(Span::detached),
+            _ => Span::detached(),
+        }
     }
 
     /// Get value repr of the type
@@ -437,21 +471,88 @@ impl InsTy {
     }
 }
 
-/// A field type
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct FieldTy {
-    /// The name of the field
-    pub name: StrRef,
-    /// The type of the field
-    pub field: Ty,
+/// Describes a function parameter.
+#[derive(
+    Debug, Clone, Copy, Hash, Serialize, Deserialize, Default, PartialEq, Eq, PartialOrd, Ord,
+)]
+pub struct ParamAttrs {
+    /// Is the parameter positional?
+    pub positional: bool,
+    /// Is the parameter named?
+    ///
+    /// Can be true even if `positional` is true if the parameter can be given
+    /// in both variants.
+    pub named: bool,
+    /// Can the parameter be given any number of times?
+    pub variadic: bool,
+    /// Is the parameter settable with a set rule?
+    pub settable: bool,
 }
 
-impl FieldTy {
+impl ParamAttrs {
+    pub(crate) fn positional() -> ParamAttrs {
+        ParamAttrs {
+            positional: true,
+            named: false,
+            variadic: false,
+            settable: false,
+        }
+    }
+
+    pub(crate) fn named() -> ParamAttrs {
+        ParamAttrs {
+            positional: false,
+            named: true,
+            variadic: false,
+            settable: false,
+        }
+    }
+
+    pub(crate) fn variadic() -> ParamAttrs {
+        ParamAttrs {
+            positional: true,
+            named: false,
+            variadic: true,
+            settable: false,
+        }
+    }
+}
+
+impl From<&ParamInfo> for ParamAttrs {
+    fn from(param: &ParamInfo) -> Self {
+        ParamAttrs {
+            positional: param.positional,
+            named: param.named,
+            variadic: param.variadic,
+            settable: param.settable,
+        }
+    }
+}
+
+/// Describes a parameter type.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ParamTy {
+    /// The name of the parameter.
+    pub name: StrRef,
+    /// The docstring of the parameter.
+    pub docs: Option<EcoString>,
+    /// The default value of the variable
+    pub default: Option<EcoString>,
+    /// The type of the parameter.
+    pub ty: Ty,
+    /// The attributes of the parameter.
+    pub attrs: ParamAttrs,
+}
+
+impl ParamTy {
     /// Create an untyped field type
-    pub fn new_untyped(name: StrRef) -> Interned<Self> {
+    pub fn new_untyped(name: StrRef, attrs: ParamAttrs) -> Interned<Self> {
         Interned::new(Self {
             name,
-            field: Ty::Any,
+            ty: Ty::Any,
+            docs: None,
+            default: None,
+            attrs,
         })
     }
 }
@@ -1163,7 +1264,7 @@ pub(super) struct TypeCanoStore {
 
 impl_internable!(Ty,);
 impl_internable!(InsTy,);
-impl_internable!(FieldTy,);
+impl_internable!(ParamTy,);
 impl_internable!(TypeSource,);
 impl_internable!(TypeVar,);
 impl_internable!(SigWithTy,);

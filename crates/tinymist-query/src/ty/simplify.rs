@@ -152,8 +152,8 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                     self.analyze(ub, pol);
                 }
             }
-            Ty::Field(v) => {
-                self.analyze(&v.field, pol);
+            Ty::Param(v) => {
+                self.analyze(&v.ty, pol);
             }
             Ty::Value(_v) => {}
             Ty::Any => {}
@@ -225,11 +225,11 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
                 let seq = seq_no_any.collect::<Vec<_>>();
                 Ty::from_types(seq.into_iter())
             }
-            Ty::Field(ty) => {
+            Ty::Param(ty) => {
                 let mut ty = ty.as_ref().clone();
-                ty.field = self.transform(&ty.field, pol);
+                ty.ty = self.transform(&ty.ty, pol);
 
-                Ty::Field(ty.into())
+                Ty::Param(ty.into())
             }
             Ty::Select(sel) => {
                 let mut sel = sel.as_ref().clone();

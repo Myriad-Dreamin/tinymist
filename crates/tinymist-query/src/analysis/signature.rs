@@ -2,88 +2,18 @@
 
 use itertools::Either;
 use tinymist_derive::BindTyCtx;
-use typst::foundations::{Closure, ParamInfo};
+use typst::foundations::Closure;
 
 use super::{
-    prelude::*, BoundChecker, Definition, DocSource, SharedContext, SigTy, SigWithTy, TypeVar,
+    prelude::*, BoundChecker, Definition, DocSource, ParamTy, SharedContext, SigTy, SigWithTy,
+    TypeScheme, TypeVar,
 };
 use crate::analysis::PostTypeChecker;
 use crate::docs::{UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
 use crate::syntax::get_non_strict_def_target;
-use crate::ty::TypeBounds;
 use crate::ty::{InsTy, TyCtx};
+use crate::ty::{ParamAttrs, TypeBounds};
 use crate::upstream::truncated_repr;
-
-/// Describes a function parameter.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
-pub struct ParamAttrs {
-    /// Is the parameter positional?
-    pub positional: bool,
-    /// Is the parameter named?
-    ///
-    /// Can be true even if `positional` is true if the parameter can be given
-    /// in both variants.
-    pub named: bool,
-    /// Can the parameter be given any number of times?
-    pub variadic: bool,
-    /// Is the parameter settable with a set rule?
-    pub settable: bool,
-}
-
-impl ParamAttrs {
-    pub(crate) fn positional() -> ParamAttrs {
-        ParamAttrs {
-            positional: true,
-            named: false,
-            variadic: false,
-            settable: false,
-        }
-    }
-
-    pub(crate) fn named() -> ParamAttrs {
-        ParamAttrs {
-            positional: false,
-            named: true,
-            variadic: false,
-            settable: false,
-        }
-    }
-
-    pub(crate) fn variadic() -> ParamAttrs {
-        ParamAttrs {
-            positional: true,
-            named: false,
-            variadic: true,
-            settable: false,
-        }
-    }
-}
-
-impl From<&ParamInfo> for ParamAttrs {
-    fn from(param: &ParamInfo) -> Self {
-        ParamAttrs {
-            positional: param.positional,
-            named: param.named,
-            variadic: param.variadic,
-            settable: param.settable,
-        }
-    }
-}
-
-/// Describes a function parameter.
-#[derive(Debug, Clone)]
-pub struct ParamSpec {
-    /// The name of the parameter.
-    pub name: StrRef,
-    /// The docstring of the parameter.
-    pub docs: Option<EcoString>,
-    /// The default value of the variable
-    pub default: Option<EcoString>,
-    /// The type of the parameter.
-    pub ty: Ty,
-    /// The attributes of the parameter.
-    pub attrs: ParamAttrs,
-}
 
 /// Describes a function signature.
 #[derive(Debug, Clone)]
@@ -112,7 +42,7 @@ impl Signature {
     }
 
     /// Returns the all parameters of the function.
-    pub(crate) fn params(&self) -> impl Iterator<Item = (&ParamSpec, Option<&Ty>)> {
+    pub(crate) fn params(&self) -> impl Iterator<Item = (&Interned<ParamTy>, Option<&Ty>)> {
         let primary = self.primary().params();
         // todo: with stack
         primary
@@ -124,7 +54,7 @@ impl Signature {
         primary
     }
 
-    pub(crate) fn param_shift(&self, _ctx: &mut LocalContext) -> usize {
+    pub(crate) fn param_shift(&self) -> usize {
         match self {
             Signature::Primary(_) => 0,
             Signature::Partial(sig) => sig
@@ -142,7 +72,7 @@ pub struct PrimarySignature {
     /// The documentation of the function
     pub docs: Option<EcoString>,
     /// The documentation of the parameter.
-    pub param_specs: Vec<ParamSpec>,
+    pub param_specs: Vec<Interned<ParamTy>>,
     /// Whether the function has fill, stroke, or size parameters.
     pub has_fill_or_size_or_stroke: bool,
     /// The associated signature type.
@@ -162,22 +92,22 @@ impl PrimarySignature {
     }
 
     /// Returns the positional parameters of the function.
-    pub fn pos(&self) -> &[ParamSpec] {
+    pub fn pos(&self) -> &[Interned<ParamTy>] {
         &self.param_specs[..self.pos_size()]
     }
 
     /// Returns the positional parameters of the function.
-    pub fn get_pos(&self, offset: usize) -> Option<&ParamSpec> {
+    pub fn get_pos(&self, offset: usize) -> Option<&Interned<ParamTy>> {
         self.pos().get(offset)
     }
 
     /// Returns the named parameters of the function.
-    pub fn named(&self) -> &[ParamSpec] {
+    pub fn named(&self) -> &[Interned<ParamTy>] {
         &self.param_specs[self.pos_size()..self.pos_size() + self.sig_ty.names.names.len()]
     }
 
     /// Returns the named parameters of the function.
-    pub fn get_named(&self, name: &StrRef) -> Option<&ParamSpec> {
+    pub fn get_named(&self, name: &StrRef) -> Option<&Interned<ParamTy>> {
         self.named().get(self.sig_ty.names.find(name)?)
     }
 
@@ -187,13 +117,13 @@ impl PrimarySignature {
     }
 
     /// Returns the rest parameter of the function.
-    pub fn rest(&self) -> Option<&ParamSpec> {
+    pub fn rest(&self) -> Option<&Interned<ParamTy>> {
         self.has_spread_right()
             .then(|| &self.param_specs[self.pos_size() + self.sig_ty.names.names.len()])
     }
 
     /// Returns the all parameters of the function.
-    pub fn params(&self) -> impl Iterator<Item = (&ParamSpec, Option<&Ty>)> {
+    pub fn params(&self) -> impl Iterator<Item = (&Interned<ParamTy>, Option<&Ty>)> {
         let pos = self.pos();
         let named = self.named();
         let rest = self.rest();
@@ -287,6 +217,14 @@ fn analyze_type_signature(
         }
     }?;
 
+    sig_of_type(ctx, &type_info, ty)
+}
+
+pub(crate) fn sig_of_type(
+    ctx: &Arc<SharedContext>,
+    type_info: &TypeScheme,
+    ty: Ty,
+) -> Option<Signature> {
     // todo multiple sources
     let mut srcs = ty.sources();
     srcs.sort();
@@ -294,7 +232,7 @@ fn analyze_type_signature(
     let type_var = srcs.into_iter().next()?;
     match type_var {
         DocSource::Var(v) => {
-            let mut ty_ctx = PostTypeChecker::new(ctx.clone(), &type_info);
+            let mut ty_ctx = PostTypeChecker::new(ctx.clone(), type_info);
             let sig_ty = Ty::Func(ty.sig_repr(true, &mut ty_ctx)?);
             let sig_ty = type_info.simplify(sig_ty, false);
             let Ty::Func(sig_ty) = sig_ty else {
@@ -330,13 +268,13 @@ fn analyze_type_signature(
                     has_fill_or_size_or_stroke = true;
                 }
 
-                param_specs.push(ParamSpec {
+                param_specs.push(Interned::new(ParamTy {
                     name,
                     docs: Some(doc.docs.clone()),
                     default,
                     ty,
                     attrs: ParamAttrs::positional(),
-                });
+                }));
             }
 
             for (name, ty) in sig_ty.named_params() {
@@ -348,25 +286,25 @@ fn analyze_type_signature(
                     has_fill_or_size_or_stroke = true;
                 }
 
-                param_specs.push(ParamSpec {
+                param_specs.push(Interned::new(ParamTy {
                     name: name.clone(),
                     docs: Some(doc.docs.clone()),
                     default,
                     ty,
                     attrs: ParamAttrs::named(),
-                });
+                }));
             }
 
             if let Some(doc) = docstring.rest.as_ref() {
                 let default = doc.default.clone();
 
-                param_specs.push(ParamSpec {
+                param_specs.push(Interned::new(ParamTy {
                     name: doc.name.clone(),
                     docs: Some(doc.docs.clone()),
                     default,
                     ty: sig_ty.rest_param().cloned().unwrap_or(Ty::Any),
                     attrs: ParamAttrs::variadic(),
-                });
+                }));
             }
 
             let sig = Signature::Primary(Arc::new(PrimarySignature {
@@ -568,7 +506,7 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
     let mut broken = false;
     let mut has_fill_or_size_or_stroke = false;
 
-    let mut add_param = |param: ParamSpec| {
+    let mut add_param = |param: Interned<ParamTy>| {
         let name = param.name.clone();
         if param.attrs.named {
             if matches!(name.as_ref(), "fill" | "stroke" | "size") {
@@ -601,13 +539,13 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         }
         Repr::Element(..) | Repr::Native(..) => {
             for p in func.params().unwrap() {
-                add_param(ParamSpec {
+                add_param(Interned::new(ParamTy {
                     name: p.name.into(),
                     docs: Some(p.docs.into()),
                     default: p.default.map(|d| truncated_repr(&d())),
                     ty: Ty::from_param_site(&func, p),
                     attrs: p.into(),
-                });
+                }));
             }
 
             func.returns().map(|r| Ty::from_return_site(&func, r))
@@ -632,7 +570,10 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
     })
 }
 
-fn analyze_closure_signature(c: Arc<LazyHash<Closure>>, add_param: &mut impl FnMut(ParamSpec)) {
+fn analyze_closure_signature(
+    c: Arc<LazyHash<Closure>>,
+    add_param: &mut impl FnMut(Interned<ParamTy>),
+) {
     log::trace!("closure signature for: {:?}", c.node.kind());
 
     let closure = &c.node;
@@ -645,34 +586,34 @@ fn analyze_closure_signature(c: Arc<LazyHash<Closure>>, add_param: &mut impl FnM
         match param {
             ast::Param::Pos(e) => {
                 let name = format!("{}", PatternDisplay(&e));
-                add_param(ParamSpec {
+                add_param(Interned::new(ParamTy {
                     name: name.as_str().into(),
                     docs: None,
                     default: None,
                     ty: Ty::Any,
                     attrs: ParamAttrs::positional(),
-                });
+                }));
             }
             // todo: pattern
             ast::Param::Named(n) => {
                 let expr = unwrap_expr(n.expr()).to_untyped().clone().into_text();
-                add_param(ParamSpec {
+                add_param(Interned::new(ParamTy {
                     name: n.name().get().into(),
                     docs: Some(eco_format!("Default value: {expr}")),
                     default: Some(expr),
                     ty: Ty::Any,
                     attrs: ParamAttrs::named(),
-                });
+                }));
             }
             ast::Param::Spread(n) => {
                 let ident = n.sink_ident().map(|e| e.as_str());
-                add_param(ParamSpec {
+                add_param(Interned::new(ParamTy {
                     name: ident.unwrap_or_default().into(),
                     docs: None,
                     default: None,
                     ty: Ty::Any,
                     attrs: ParamAttrs::variadic(),
-                });
+                }));
             }
         }
     }

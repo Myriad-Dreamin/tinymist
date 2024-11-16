@@ -717,7 +717,7 @@ fn type_completion(
             ctx.snippet_completion("false", "false", "No / Disabled.");
             ctx.snippet_completion("true", "true", "Yes / Enabled.");
         }
-        Ty::Field(f) => {
+        Ty::Param(f) => {
             let f = &f.name;
             if ctx.seen_field(f.clone()) {
                 return Some(());

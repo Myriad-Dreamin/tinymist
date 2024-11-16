@@ -199,8 +199,8 @@ impl TypeDescriber {
             Ty::Value(v) if self.value => return truncated_repr_::<181>(&v.val),
             Ty::Value(v) if self.repr => return v.val.ty().short_name().into(),
             Ty::Value(v) => return v.val.repr(),
-            Ty::Field(..) => {
-                return "field".into();
+            Ty::Param(..) => {
+                return "param".into();
             }
             Ty::Args(..) => {
                 return "arguments".into();

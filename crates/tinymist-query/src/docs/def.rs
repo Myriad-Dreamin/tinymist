@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use typst::syntax::Span;
 
 use super::tidy::*;
-use crate::analysis::{ParamAttrs, ParamSpec, Signature};
+use crate::analysis::{ParamAttrs, ParamTy, Signature};
 use crate::prelude::*;
 use crate::ty::Ty;
 use crate::ty::{DocSource, Interned};
@@ -279,7 +279,7 @@ pub struct ParamDocsT<T> {
 }
 
 impl ParamDocs {
-    fn new(param: &ParamSpec, ty: Option<&Ty>) -> Self {
+    fn new(param: &ParamTy, ty: Option<&Ty>) -> Self {
         Self {
             name: param.name.as_ref().into(),
             docs: param.docs.clone().unwrap_or_default(),
