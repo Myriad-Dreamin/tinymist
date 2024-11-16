@@ -399,8 +399,8 @@ impl<'a> TypeChecker<'a> {
                 w.weaken();
             }
             Ty::Any | Ty::Boolean(_) | Ty::Builtin(_) | Ty::Value(_) => {}
-            Ty::Field(v) => {
-                self.weaken(&v.field);
+            Ty::Param(v) => {
+                self.weaken(&v.ty);
             }
             Ty::Func(v) | Ty::Args(v) | Ty::Pattern(v) => {
                 for ty in v.inputs() {
@@ -540,8 +540,8 @@ impl Joiner {
             (Ty::Union(..), _) => self.definite = Ty::undef(),
             (Ty::Let(w), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Let(w),
             (Ty::Let(..), _) => self.definite = Ty::undef(),
-            (Ty::Field(w), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Field(w),
-            (Ty::Field(..), _) => self.definite = Ty::undef(),
+            (Ty::Param(w), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Param(w),
+            (Ty::Param(..), _) => self.definite = Ty::undef(),
             (Ty::Boolean(b), Ty::Builtin(BuiltinTy::None)) => self.definite = Ty::Boolean(b),
             (Ty::Boolean(..), _) => self.definite = Ty::undef(),
         }

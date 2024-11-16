@@ -3,9 +3,9 @@
 use hashbrown::HashSet;
 use tinymist_derive::BindTyCtx;
 
-use super::{prelude::*, SharedContext};
+use super::{prelude::*, ParamAttrs, SharedContext};
 use super::{
-    ArgsTy, FieldTy, Sig, SigChecker, SigShape, SigSurfaceKind, SigTy, Ty, TyCtx, TyCtxMut,
+    ArgsTy, ParamTy, Sig, SigChecker, SigShape, SigSurfaceKind, SigTy, Ty, TyCtx, TyCtxMut,
     TypeBounds, TypeScheme, TypeVar,
 };
 use crate::syntax::{get_check_target, get_check_target_by_context, CheckTarget, ParamTarget};
@@ -82,8 +82,8 @@ fn check_signature<'a>(
                 // names
                 for (name, _) in sig_ins.named_params() {
                     // todo: reduce fields, fields ty
-                    let field = FieldTy::new_untyped(name.clone());
-                    receiver.insert(&Ty::Field(field), !pol);
+                    let field = ParamTy::new_untyped(name.clone(), ParamAttrs::named());
+                    receiver.insert(&Ty::Param(field), !pol);
                 }
 
                 Some(())

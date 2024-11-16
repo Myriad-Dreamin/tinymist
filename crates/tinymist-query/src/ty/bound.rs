@@ -78,8 +78,9 @@ impl Ty {
                 Any | Boolean(_) | If(..) | Builtin(..) | Value(..) => {}
                 Dict(..) | Array(..) | Tuple(..) | Func(..) | Args(..) | Pattern(..) => {}
                 Unary(..) | Binary(..) => {}
-                Field(ty) => {
-                    collect(&ty.field, results);
+                Param(ty) => {
+                    // todo: doc source can be param ty
+                    collect(&ty.ty, results);
                 }
                 Union(ty) => {
                     for ty in ty.iter() {

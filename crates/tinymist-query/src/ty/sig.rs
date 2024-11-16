@@ -237,6 +237,10 @@ impl<'a> SigCheckDriver<'a> {
             Ty::Unary(_) => {}
             Ty::Binary(_) => {}
             Ty::If(_) => {}
+            Ty::Param(p) => {
+                // todo: keep type information
+                self.ty(&p.ty, pol);
+            }
             _ if ty.has_bounds() => ty.bounds(pol, self),
             _ => {}
         }

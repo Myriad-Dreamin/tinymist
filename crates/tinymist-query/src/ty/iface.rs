@@ -27,8 +27,6 @@ pub enum Iface<'a> {
         val: &'a Module,
         at: &'a Ty,
     },
-    ArrayCons(&'a TyRef),
-    Partialize(&'a Iface<'a>),
 }
 
 impl<'a> Iface<'a> {
@@ -38,11 +36,9 @@ impl<'a> Iface<'a> {
 
         match self {
             // Iface::ArrayCons(a) => SigTy::array_cons(a.as_ref().clone(), false),
-            Iface::ArrayCons(..) => None,
             Iface::Dict(d) => d.field_by_name(key).cloned(),
             // Iface::Type { val, .. } => ctx?.type_of_func(&val.constructor().ok()?)?,
             // Iface::Value { val, .. } => ctx?.type_of_func(val)?, // todo
-            Iface::Partialize(..) => None,
             Iface::Element { .. } => None,
             Iface::Type { .. } => None,
             Iface::Value { val, at: _ } => ctx.type_of_dict(val).field_by_name(key).cloned(),
