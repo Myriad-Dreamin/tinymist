@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/document_symbol.rs
 expression: "JsonRepr::new_redacted(result.unwrap(), &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/document_symbols/base.typ
+snapshot_kind: text
 ---
 [
  {

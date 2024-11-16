@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/fn_named.typ
+snapshot_kind: text
 ---
 "foo" = (("d": Any) => Any).with(..("d": 3) => any)
 "d" = ( ⪰ 3 | Type(int))

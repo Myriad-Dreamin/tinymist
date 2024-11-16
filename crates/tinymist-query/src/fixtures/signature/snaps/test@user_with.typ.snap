@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: SignatureSnapshot(result.as_ref())
 input_file: crates/tinymist-query/src/fixtures/signature/user_with.typ
+snapshot_kind: text
 ---
 with u: 1, 
 fn(

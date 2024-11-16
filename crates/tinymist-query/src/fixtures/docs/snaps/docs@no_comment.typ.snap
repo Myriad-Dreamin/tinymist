@@ -2,5 +2,6 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/docs/no_comment.typ
+snapshot_kind: text
 ---
 = docstings

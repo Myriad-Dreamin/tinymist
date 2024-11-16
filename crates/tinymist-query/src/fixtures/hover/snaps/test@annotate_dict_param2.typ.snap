@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/hover.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/hover/annotate_dict_param2.typ
+snapshot_kind: text
 ---
 {
  "contents": "```typc\nlet inherited-scope = any;\n```\n\n---\nDefinitions that are made available to the entire parsed\n         module. This parameter is only used internally.",

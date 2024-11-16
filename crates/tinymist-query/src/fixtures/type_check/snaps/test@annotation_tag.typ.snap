@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/annotation_tag.typ
+snapshot_kind: text
 ---
 "config-common" = () => None
 ---
