@@ -24,7 +24,7 @@ use sync_lsp::*;
 use task::{CacheTask, ExportUserConfig, FormatTask, FormatUserConfig, UserActionTask};
 use tinymist_query::PageSelection;
 use tinymist_query::{
-    lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, OnExportRequest,
+    lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature,
     PositionEncoding, SyntaxRequest,
 };
 use tokio::sync::mpsc;
@@ -1040,7 +1040,7 @@ impl LanguageState {
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req)?,
             OnEnter(req) => query_source!(self, OnEnter, req)?,
             ColorPresentation(req) => CompilerQueryResponse::ColorPresentation(req.request()),
-            OnExport(OnExportRequest { kind, path }) => return primary().on_export(kind, path),
+            OnExport(req) => return primary().on_export(req),
             ServerInfo(_) => return primary().collect_server_info(),
             _ => return Self::query_on(primary(), is_pinning, query),
         })

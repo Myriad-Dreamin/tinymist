@@ -500,6 +500,23 @@ async function commandShow(kind: "Pdf" | "Svg" | "Png", extraOpts?: any): Promis
     return;
   }
 
+  const conf = vscode.workspace.getConfiguration("tinymist");
+  const openIn: string = conf.get("showExportFileIn", "editorTab");
+
+  // Telling the language server to open the file instead of using
+  // ```
+  // vscode.env.openExternal(exportUri);
+  // ```
+  // , which is buggy.
+  //
+  // See https://github.com/Myriad-Dreamin/tinymist/issues/837
+  // Also see https://github.com/microsoft/vscode/issues/85930
+  const openBySystemDefault = openIn === "systemDefault";
+  if (openBySystemDefault) {
+    extraOpts = extraOpts || {};
+    extraOpts.open = true;
+  }
+
   // only create pdf if it does not exist yet
   const exportPath = await commandExport(kind, extraOpts);
 
@@ -509,37 +526,30 @@ async function commandShow(kind: "Pdf" | "Svg" | "Png", extraOpts?: any): Promis
     return;
   }
 
-  const exportUri = Uri.file(exportPath);
-
-  // find and replace exportUri
-  // todo: we may find them in tabs
-  vscode.window.tabGroups;
-
-  let uriToFind = exportUri.toString();
-  findTab: for (const editor of vscode.window.tabGroups.all) {
-    for (const tab of editor.tabs) {
-      if ((tab.input as any)?.uri?.toString() === uriToFind) {
-        await vscode.window.tabGroups.close(tab, true);
-        break findTab;
-      }
-    }
-  }
-
-  const conf = vscode.workspace.getConfiguration("tinymist");
-  const openIn: string = conf.get("showExportFileIn", "editorTab");
-
   switch (openIn) {
     default:
-    case "editorTab":
+    case "systemDefault":
+      break;
+    case "editorTab": {
+      // find and replace exportUri
+      const exportUri = Uri.file(exportPath);
+      let uriToFind = exportUri.toString();
+      findTab: for (const editor of vscode.window.tabGroups.all) {
+        for (const tab of editor.tabs) {
+          if ((tab.input as any)?.uri?.toString() === uriToFind) {
+            await vscode.window.tabGroups.close(tab, true);
+            break findTab;
+          }
+        }
+      }
+
       // here we can be sure that the pdf exists
       await commands.executeCommand("vscode.open", exportUri, {
         viewColumn: ViewColumn.Beside,
         preserveFocus: true,
       } as vscode.TextDocumentShowOptions);
       break;
-    case "systemDefault":
-      await vscode.env.openExternal(exportUri);
-      break;
+    }
   }
 }
 
