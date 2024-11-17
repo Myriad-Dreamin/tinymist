@@ -326,9 +326,16 @@ impl CompileClientActor {
         just_future(async move {
             let res = export.await?;
 
+            #[cfg(not(target_os = "windows"))]
+            let do_open = ::open::that_detached;
+            #[cfg(target_os = "windows")]
+            fn do_open(path: impl AsRef<std::ffi::OsStr>) -> std::io::Result<()> {
+                ::open::with_detached(path, "explorer")
+            }
+
             if let Some(Some(path)) = open.then_some(res.as_ref()) {
                 log::info!("open with system default apps: {path:?}");
-                if let Err(e) = ::open::that_detached(path) {
+                if let Err(e) = do_open(path) {
                     log::error!("failed to open with system default apps: {e}");
                 };
             }
