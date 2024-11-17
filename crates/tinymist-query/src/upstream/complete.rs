@@ -126,7 +126,7 @@ fn complete_unicode(ctx: &mut CompletionContext) -> bool {
                 let completion_label = if variant_name.is_empty() {
                     name.clone()
                 } else {
-                    format!("{name}.{variant_name}").into()
+                    eco_format!("{name}.{variant_name}")
                 };
                 ctx.unicode_completion(completion_label, symbol.char());
             }
