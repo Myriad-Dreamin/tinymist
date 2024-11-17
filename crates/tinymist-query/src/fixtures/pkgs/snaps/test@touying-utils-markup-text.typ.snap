@@ -3,11 +3,86 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on / (71..72)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-markup-text.typ
-snapshot_kind: text
 ---
 [
  {
   "isIncomplete": false,
-  "items": []
+  "items": [
+   {
+    "kind": 21,
+    "label": "\"md\"",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "\"md\"",
+     "range": {
+      "end": {
+       "character": 19,
+       "line": 2
+      },
+      "start": {
+       "character": 19,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 21,
+    "label": "\"typ\"",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "\"typ\"",
+     "range": {
+      "end": {
+       "character": 19,
+       "line": 2
+      },
+      "start": {
+       "character": 19,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 15,
+    "label": "str",
+    "sortText": "002",
+    "textEdit": {
+     "newText": "${1:string}",
+     "range": {
+      "end": {
+       "character": 19,
+       "line": 2
+      },
+      "start": {
+       "character": 19,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 7,
+    "label": "str",
+    "labelDetails": {
+     "description": "type"
+    },
+    "sortText": "273",
+    "textEdit": {
+     "newText": "str",
+     "range": {
+      "end": {
+       "character": 19,
+       "line": 2
+      },
+      "start": {
+       "character": 19,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
  }
 ]
