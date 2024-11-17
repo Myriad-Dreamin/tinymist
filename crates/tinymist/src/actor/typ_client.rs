@@ -326,6 +326,8 @@ impl CompileClientActor {
         just_future(async move {
             let res = export.await?;
 
+            // See https://github.com/Myriad-Dreamin/tinymist/issues/837
+            // Also see https://github.com/Byron/open-rs/issues/105
             #[cfg(not(target_os = "windows"))]
             let do_open = ::open::that_detached;
             #[cfg(target_os = "windows")]
