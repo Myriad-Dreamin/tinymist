@@ -208,8 +208,12 @@ mod polymorphic {
 
     #[derive(Debug, Clone)]
     pub struct OnExportRequest {
+        /// The path of the document to export.
         pub path: PathBuf,
+        /// The kind of the export.
         pub kind: ExportKind,
+        /// Whether to open the exported file(s) after the export is done.
+        pub open: bool,
     }
 
     #[derive(Debug, Clone)]

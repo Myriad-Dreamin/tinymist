@@ -22,7 +22,7 @@
 //!
 //! The [`CompileHandler`] will push information to other actors.
 
-use std::{collections::HashMap, ops::Deref, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 use anyhow::bail;
 use log::{error, info, trace};
@@ -33,7 +33,7 @@ use reflexo_typst::{
 use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
     analysis::{Analysis, AnalysisRevLock, LocalContextGuard},
-    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, ExportKind, SemanticRequest,
+    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, OnExportRequest, SemanticRequest,
     ServerInfoResponse, StatefulRequest, VersionedDocument,
 };
 use tokio::sync::{mpsc, oneshot};
@@ -317,13 +317,21 @@ impl CompileClientActor {
         self.handle.export.change_config(config);
     }
 
-    pub fn on_export(&self, kind: ExportKind, path: PathBuf) -> QueryFuture {
+    pub fn on_export(&self, req: OnExportRequest) -> QueryFuture {
+        let OnExportRequest { path, kind, open } = req;
         let snap = self.snapshot()?;
 
         let entry = self.config.determine_entry(Some(path.as_path().into()));
         let export = self.handle.export.oneshot(snap, Some(entry), kind);
         just_future(async move {
             let res = export.await?;
+
+            if let Some(Some(path)) = open.then_some(res.as_ref()) {
+                log::info!("open with system default apps: {path:?}");
+                if let Err(e) = ::open::that_detached(path) {
+                    log::error!("failed to open with system default apps: {e}");
+                };
+            }
 
             log::info!("CompileActor: on export end: {path:?} as {res:?}");
             Ok(tinymist_query::CompilerQueryResponse::OnExport(res))
