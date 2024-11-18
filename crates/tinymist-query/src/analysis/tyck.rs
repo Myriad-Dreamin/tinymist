@@ -2,7 +2,7 @@
 
 use std::sync::OnceLock;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use tinymist_derive::BindTyCtx;
 
 use super::{
@@ -25,20 +25,24 @@ pub(crate) use apply::*;
 pub(crate) use convert::*;
 pub(crate) use select::*;
 
-pub type TypeEnv = FxHashMap<TypstFileId, Arc<TypeScheme>>;
+#[derive(Default)]
+pub struct TypeEnv {
+    visiting: FxHashMap<TypstFileId, Arc<TypeScheme>>,
+    exprs: FxHashMap<TypstFileId, Option<Arc<ExprInfo>>>,
+}
 
 /// Type checking at the source unit level.
 pub(crate) fn type_check(
     ctx: Arc<SharedContext>,
     ei: Arc<ExprInfo>,
-    route: &mut TypeEnv,
+    env: &mut TypeEnv,
 ) -> Arc<TypeScheme> {
     let mut info = TypeScheme::default();
     info.valid = true;
     info.fid = Some(ei.fid);
     info.revision = ei.revision;
 
-    route.insert(ei.fid, Arc::new(TypeScheme::default()));
+    env.visiting.insert(ei.fid, Arc::new(TypeScheme::default()));
 
     // Retrieve expression information for the source.
     let root = ei.root.clone();
@@ -47,7 +51,8 @@ pub(crate) fn type_check(
         ctx,
         ei,
         info,
-        route,
+        env,
+        call_cache: Default::default(),
         module_exports: Default::default(),
     };
 
@@ -67,10 +72,16 @@ pub(crate) fn type_check(
     let elapsed = type_check_start.elapsed();
     log::debug!("Type checking on {:?} took {elapsed:?}", checker.ei.fid);
 
-    checker.route.remove(&checker.ei.fid);
+    checker.env.visiting.remove(&checker.ei.fid);
 
     Arc::new(checker.info)
 }
+
+type CallCacheDesc = (
+    Interned<SigTy>,
+    Interned<SigTy>,
+    Option<Vec<Interned<SigTy>>>,
+);
 
 pub(crate) struct TypeChecker<'a> {
     ctx: Arc<SharedContext>,
@@ -78,7 +89,10 @@ pub(crate) struct TypeChecker<'a> {
 
     info: TypeScheme,
     module_exports: FxHashMap<(TypstFileId, Interned<str>), OnceLock<Option<Ty>>>,
-    route: &'a mut TypeEnv,
+
+    call_cache: FxHashSet<CallCacheDesc>,
+
+    env: &'a mut TypeEnv,
 }
 
 impl<'a> TyCtx for TypeChecker<'a> {
@@ -120,7 +134,13 @@ impl<'a> TyCtxMut for TypeChecker<'a> {
             .or_default()
             .clone()
             .get_or_init(|| {
-                let ei = self.ctx.expr_stage_by_id(fid)?;
+                let ei = self
+                    .env
+                    .exprs
+                    .entry(fid)
+                    .or_insert_with(|| self.ctx.expr_stage_by_id(fid))
+                    .clone()?;
+
                 Some(self.check(ei.exports.get(k)?))
             })
             .clone()
@@ -165,10 +185,10 @@ impl<'a> TypeChecker<'a> {
                 let ext_def_use_info = self.ctx.expr_stage_by_id(fid)?;
                 let source = &ext_def_use_info.source;
                 // todo: check types in cycle
-                let ext_type_info = if let Some(scheme) = self.route.get(&source.id()) {
+                let ext_type_info = if let Some(scheme) = self.env.visiting.get(&source.id()) {
                     scheme.clone()
                 } else {
-                    self.ctx.clone().type_check_(source, self.route)
+                    self.ctx.clone().type_check_(source, self.env)
                 };
                 let ext_def = ext_def_use_info.exports.get(&name)?;
 
@@ -205,6 +225,22 @@ impl<'a> TypeChecker<'a> {
             TypeScheme::witness_(s, Ty::Var(var.clone()), &mut self.info.mapping);
         }
         var
+    }
+
+    fn constrain_call(
+        &mut self,
+        sig: &Interned<SigTy>,
+        args: &Interned<SigTy>,
+        withs: Option<&Vec<Interned<SigTy>>>,
+    ) {
+        let call_desc = (sig.clone(), args.clone(), withs.cloned());
+        if !self.call_cache.insert(call_desc) {
+            return;
+        }
+
+        for (arg_recv, arg_ins) in sig.matches(args, withs) {
+            self.constrain(arg_ins, arg_recv);
+        }
     }
 
     fn constrain(&mut self, lhs: &Ty, rhs: &Ty) {
