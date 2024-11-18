@@ -4,4 +4,4 @@ description: "Check on \":\" (34)"
 expression: literal_type
 input_file: crates/tinymist-query/src/fixtures/post_type_check/user_external_ever.typ
 ---
-( ⪯ ( ⪰ "article" | "article" | "letter" | "article" | "letter"))
+( ⪰ "article" | "article" | "letter" | "article" | "letter")

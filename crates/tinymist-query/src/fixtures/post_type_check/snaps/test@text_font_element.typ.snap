@@ -4,4 +4,4 @@ description: "Check on \"\\\"Test\\\"\" (34)"
 expression: literal_type
 input_file: crates/tinymist-query/src/fixtures/post_type_check/text_font_element.typ
 ---
-( ⪰ ( ⪯ (TextFont | Array<TextFont>)) ⪯ Array<TextFont>)
+( ⪰ (TextFont | Array<TextFont>) | TextFont)

@@ -37,8 +37,153 @@ pub(crate) fn find_expr_in_import(mut node: LinkedNode) -> Option<LinkedNode> {
     None
 }
 
-pub fn node_ancestors<'a>(node: &'a LinkedNode<'a>) -> impl Iterator<Item = &'a LinkedNode<'a>> {
+pub fn node_ancestors<'a, 'b>(
+    node: &'b LinkedNode<'a>,
+) -> impl Iterator<Item = &'b LinkedNode<'a>> {
     std::iter::successors(Some(node), |node| node.parent())
+}
+
+pub enum DecenderItem<'a> {
+    Sibling(&'a LinkedNode<'a>),
+    Parent(&'a LinkedNode<'a>, &'a LinkedNode<'a>),
+}
+
+impl<'a> DecenderItem<'a> {
+    pub fn node(&self) -> &'a LinkedNode<'a> {
+        match self {
+            DecenderItem::Sibling(node) => node,
+            DecenderItem::Parent(node, _) => node,
+        }
+    }
+}
+
+/// Find the decender nodes starting from the given position.
+pub fn node_decenders<T>(
+    node: LinkedNode,
+    mut recv: impl FnMut(DecenderItem) -> Option<T>,
+) -> Option<T> {
+    let mut ancestor = Some(node);
+    while let Some(node) = &ancestor {
+        let mut sibling = Some(node.clone());
+        while let Some(node) = &sibling {
+            if let Some(v) = recv(DecenderItem::Sibling(node)) {
+                return Some(v);
+            }
+
+            sibling = node.prev_sibling();
+        }
+
+        if let Some(parent) = node.parent() {
+            if let Some(v) = recv(DecenderItem::Parent(parent, node)) {
+                return Some(v);
+            }
+
+            ancestor = Some(parent.clone());
+            continue;
+        }
+
+        break;
+    }
+
+    None
+}
+
+pub enum DescentDecl<'a> {
+    Ident(ast::Ident<'a>),
+    ImportSource(ast::Expr<'a>),
+    ImportAll(ast::ModuleImport<'a>),
+}
+
+/// Find the descending decls starting from the given position.
+pub fn descending_decls<T>(
+    node: LinkedNode,
+    mut recv: impl FnMut(DescentDecl) -> Option<T>,
+) -> Option<T> {
+    node_decenders(node, |node| {
+        match (&node, node.node().cast::<ast::Expr>()?) {
+            (DecenderItem::Sibling(..), ast::Expr::Let(lb)) => {
+                for ident in lb.kind().bindings() {
+                    if let Some(t) = recv(DescentDecl::Ident(ident)) {
+                        return Some(t);
+                    }
+                }
+            }
+            (DecenderItem::Sibling(..), ast::Expr::Import(mi)) => {
+                // import items
+                match mi.imports()? {
+                    ast::Imports::Wildcard => {
+                        if let Some(t) = recv(DescentDecl::ImportAll(mi)) {
+                            return Some(t);
+                        }
+                    }
+                    ast::Imports::Items(e) => {
+                        for item in e.iter() {
+                            if let Some(t) = recv(DescentDecl::Ident(item.bound_name())) {
+                                return Some(t);
+                            }
+                        }
+                    }
+                }
+
+                // import it self
+                if let Some(new_name) = mi.new_name() {
+                    if let Some(t) = recv(DescentDecl::Ident(new_name)) {
+                        return Some(t);
+                    }
+                } else if mi.imports().is_none() {
+                    if let Some(t) = recv(DescentDecl::ImportSource(mi.source())) {
+                        return Some(t);
+                    }
+                }
+            }
+            (DecenderItem::Parent(node, child), ast::Expr::For(f)) => {
+                let body = node.find(f.body().span());
+                let in_body = body.is_some_and(|n| n.find(child.span()).is_some());
+                if !in_body {
+                    return None;
+                }
+
+                for ident in f.pattern().bindings() {
+                    if let Some(t) = recv(DescentDecl::Ident(ident)) {
+                        return Some(t);
+                    }
+                }
+            }
+            (DecenderItem::Parent(node, child), ast::Expr::Closure(c)) => {
+                let body = node.find(c.body().span());
+                let in_body = body.is_some_and(|n| n.find(child.span()).is_some());
+                if !in_body {
+                    return None;
+                }
+
+                for param in c.params().children() {
+                    match param {
+                        ast::Param::Pos(pattern) => {
+                            for ident in pattern.bindings() {
+                                if let Some(t) = recv(DescentDecl::Ident(ident)) {
+                                    return Some(t);
+                                }
+                            }
+                        }
+                        ast::Param::Named(n) => {
+                            if let Some(t) = recv(DescentDecl::Ident(n.name())) {
+                                return Some(t);
+                            }
+                        }
+                        ast::Param::Spread(s) => {
+                            if let Some(sink_ident) = s.sink_ident() {
+                                if let Some(t) = recv(DescentDecl::Ident(sink_ident)) {
+                                    return Some(t);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        };
+        None
+    })
 }
 
 fn is_mark(sk: SyntaxKind) -> bool {
@@ -458,22 +603,7 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
 
     let deref_node = match deref_target {
         DerefTarget::Callee(callee) => {
-            let parent = callee.parent()?;
-            let args = match parent.cast::<ast::Expr>() {
-                Some(ast::Expr::FuncCall(call)) => call.args(),
-                Some(ast::Expr::Set(set)) => set.args(),
-                _ => return None,
-            };
-            let args = parent.find(args.span())?;
-
-            let is_set = parent.kind() == SyntaxKind::SetRule;
-            let target = get_param_target(args.clone(), node, ParamKind::Call)?;
-            return Some(CheckTarget::Param {
-                callee,
-                args,
-                target,
-                is_set,
-            });
+            return get_callee_target(callee, node);
         }
         DerefTarget::ImportPath(node) | DerefTarget::IncludePath(node) => {
             return Some(CheckTarget::Normal(node));
@@ -481,7 +611,7 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
         deref_target => deref_target.node().clone(),
     };
 
-    let Some(mut node_parent) = node.parent() else {
+    let Some(mut node_parent) = node.parent().cloned() else {
         return Some(CheckTarget::Normal(node));
     };
 
@@ -489,10 +619,37 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
         let Some(p) = node_parent.parent() else {
             return Some(CheckTarget::Normal(node));
         };
-        node_parent = p;
+        node_parent = p.clone();
     }
 
     match node_parent.kind() {
+        SyntaxKind::Args => {
+            let callee = node_ancestors(&node_parent).find_map(|p| {
+                let s = match p.cast::<ast::Expr>()? {
+                    ast::Expr::FuncCall(call) => call.callee().span(),
+                    ast::Expr::Set(set) => set.target().span(),
+                    _ => return None,
+                };
+                p.find(s)
+            })?;
+
+            let node = match node.kind() {
+                SyntaxKind::Ident
+                    if matches!(
+                        node.parent_kind().zip(node.next_sibling_kind()),
+                        Some((SyntaxKind::Named, SyntaxKind::Colon))
+                    ) =>
+                {
+                    node
+                }
+                _ if matches!(node.parent_kind(), Some(SyntaxKind::Named)) => {
+                    node.parent().cloned()?
+                }
+                _ => node,
+            };
+
+            get_callee_target(callee, node)
+        }
         SyntaxKind::Array | SyntaxKind::Dict => {
             let target = get_param_target(
                 node_parent.clone(),
@@ -517,6 +674,25 @@ pub fn get_check_target(node: LinkedNode) -> Option<CheckTarget<'_>> {
         }
         _ => Some(CheckTarget::Normal(deref_node)),
     }
+}
+
+fn get_callee_target<'a>(callee: LinkedNode<'a>, node: LinkedNode<'a>) -> Option<CheckTarget<'a>> {
+    let parent = callee.parent()?;
+    let args = match parent.cast::<ast::Expr>() {
+        Some(ast::Expr::FuncCall(call)) => call.args(),
+        Some(ast::Expr::Set(set)) => set.args(),
+        _ => return None,
+    };
+    let args = parent.find(args.span())?;
+
+    let is_set = parent.kind() == SyntaxKind::SetRule;
+    let target = get_param_target(args.clone(), node, ParamKind::Call)?;
+    Some(CheckTarget::Param {
+        callee,
+        args,
+        target,
+        is_set,
+    })
 }
 
 fn get_param_target<'a>(
@@ -751,7 +927,7 @@ Text
         "###);
         assert_snapshot!(map_check(r#"#f(1, 2)   Test"#).trim(), @r###"
         #f(1, 2)   Test
-         npnppnp
+         npppppp
         "###);
         assert_snapshot!(map_check(r#"#()   Test"#).trim(), @r###"
         #()   Test

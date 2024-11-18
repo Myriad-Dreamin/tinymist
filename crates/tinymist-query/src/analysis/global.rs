@@ -792,6 +792,10 @@ impl SharedContext {
         analyze_signature(self, SignatureTarget::Runtime(func)).unwrap()
     }
 
+    pub(crate) fn sig_of_type(self: &Arc<Self>, ti: &TypeScheme, ty: Ty) -> Option<Signature> {
+        super::sig_of_type(self, ti, ty)
+    }
+
     /// Try to find imported target from the current source file.
     /// This function will try to resolves target statically.
     ///

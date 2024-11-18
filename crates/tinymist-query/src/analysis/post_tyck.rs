@@ -3,10 +3,10 @@
 use hashbrown::HashSet;
 use tinymist_derive::BindTyCtx;
 
-use super::{prelude::*, ParamAttrs, SharedContext};
+use super::{prelude::*, ParamAttrs, ParamTy, SharedContext};
 use super::{
-    ArgsTy, ParamTy, Sig, SigChecker, SigShape, SigSurfaceKind, SigTy, Ty, TyCtx, TyCtxMut,
-    TypeBounds, TypeScheme, TypeVar,
+    ArgsTy, Sig, SigChecker, SigShape, SigSurfaceKind, SigTy, Ty, TyCtx, TyCtxMut, TypeBounds,
+    TypeScheme, TypeVar,
 };
 use crate::syntax::{get_check_target, get_check_target_by_context, CheckTarget, ParamTarget};
 
@@ -17,7 +17,9 @@ pub(crate) fn post_type_check(
     info: &TypeScheme,
     node: LinkedNode,
 ) -> Option<Ty> {
-    PostTypeChecker::new(ctx, info).check(&node)
+    let mut checker = PostTypeChecker::new(ctx, info);
+    let res = checker.check(&node);
+    checker.simplify(&res?)
 }
 
 #[derive(Default)]
@@ -28,14 +30,14 @@ struct SignatureReceiver {
 }
 
 impl SignatureReceiver {
-    fn insert(&mut self, ty: &Ty, pol: bool) {
+    fn insert(&mut self, ty: Ty, pol: bool) {
         log::debug!("post check receive: {ty:?}");
         if !pol {
             if self.lbs_dedup.insert(ty.clone()) {
-                self.bounds.lbs.push(ty.clone());
+                self.bounds.lbs.push(ty);
             }
         } else if self.ubs_dedup.insert(ty.clone()) {
-            self.bounds.ubs.push(ty.clone());
+            self.bounds.ubs.push(ty);
         }
     }
 
@@ -49,13 +51,18 @@ fn check_signature<'a>(
     target: &'a ParamTarget,
 ) -> impl FnMut(&mut PostTypeChecker, Sig, &[Interned<ArgsTy>], bool) -> Option<()> + 'a {
     move |worker, sig, args, pol| {
+        let (sig, _is_partialize) = match sig {
+            Sig::Partialize(sig) => (*sig, true),
+            sig => (sig, false),
+        };
+
         let SigShape { sig: sig_ins, .. } = sig.shape(worker)?;
 
         match &target {
             ParamTarget::Named(n) => {
                 let ident = n.cast::<ast::Ident>()?;
                 let ty = sig_ins.named(&ident.into())?;
-                receiver.insert(ty, !pol);
+                receiver.insert(ty.clone(), !pol);
 
                 Some(())
             }
@@ -70,11 +77,22 @@ fn check_signature<'a>(
                 }
 
                 // truncate args
-                let c = args
+                let bound_pos = args
                     .iter()
                     .map(|args| args.positional_params().len())
                     .sum::<usize>();
-                let nth = sig_ins.pos(c + positional).or_else(|| sig_ins.rest_param());
+                let pos_idx = bound_pos + positional;
+                let nth = sig_ins.pos(pos_idx).cloned();
+                let nth = nth.or_else(|| {
+                    let rest_idx = || pos_idx.saturating_sub(sig_ins.positional_params().len());
+
+                    let rest_ty = sig_ins.rest_param()?;
+                    match rest_ty {
+                        Ty::Array(ty) => Some(ty.as_ref().clone()),
+                        Ty::Tuple(tys) => tys.get(rest_idx()).cloned(),
+                        _ => None,
+                    }
+                });
                 if let Some(nth) = nth {
                     receiver.insert(nth, !pol);
                 }
@@ -83,7 +101,7 @@ fn check_signature<'a>(
                 for (name, _) in sig_ins.named_params() {
                     // todo: reduce fields, fields ty
                     let field = ParamTy::new_untyped(name.clone(), ParamAttrs::named());
-                    receiver.insert(&Ty::Param(field), !pol);
+                    receiver.insert(Ty::Param(field), !pol);
                 }
 
                 Some(())
@@ -160,17 +178,29 @@ impl<'a> PostTypeChecker<'a> {
         ty
     }
 
+    fn simplify(&mut self, ty: &Ty) -> Option<Ty> {
+        Some(self.info.simplify(ty.clone(), false))
+    }
+
     fn check_(&mut self, node: &LinkedNode) -> Option<Ty> {
         let context = node.parent()?;
         log::debug!("post check: {:?}::{:?}", context.kind(), node.kind());
-        let checked_context = self.check_context(context, node);
-        let res = self.check_self(context, node, checked_context);
+
+        let context_ty = self.check_context(context, node);
+        let self_ty = if !matches!(node.kind(), SyntaxKind::Label | SyntaxKind::Ref) {
+            self.info.type_of_span(node.span())
+        } else {
+            None
+        };
+
+        let contextual_self_ty = self.check_target(get_check_target(node.clone()), context_ty);
         log::debug!(
-            "post check(res): {:?}::{:?} -> {res:?}",
+            "post check(res): {:?}::{:?} -> {self_ty:?}, {contextual_self_ty:?}",
             context.kind(),
             node.kind(),
         );
-        res
+
+        Ty::or(self_ty, contextual_self_ty)
     }
 
     fn check_context_or(&mut self, context: &LinkedNode, context_ty: Option<Ty>) -> Option<Ty> {
@@ -201,12 +231,46 @@ impl<'a> PostTypeChecker<'a> {
                 let callee = self.check_context_or(&callee, context_ty)?;
                 log::debug!("post check call target: ({callee:?})::{target:?} is_set: {is_set}");
 
+                let sig = self.ctx.sig_of_type(self.info, callee)?;
+                log::debug!("post check call sig: {target:?} {sig:?}");
                 let mut resp = SignatureReceiver::default();
 
-                self.check_signatures(&callee, false, &mut check_signature(&mut resp, &target));
+                match &target {
+                    ParamTarget::Named(n) => {
+                        let ident = n.cast::<ast::Ident>()?.into();
+                        let ty = sig.primary().get_named(&ident)?;
+                        // todo: losing docs
+                        resp.insert(ty.ty.clone(), false);
+                    }
+                    ParamTarget::Positional {
+                        // todo: spreads
+                        spreads: _,
+                        positional,
+                        is_spread,
+                    } => {
+                        if *is_spread {
+                            return None;
+                        }
+
+                        // truncate args
+                        let c = sig.param_shift();
+                        let nth = sig
+                            .primary()
+                            .get_pos(c + positional)
+                            .or_else(|| sig.primary().rest());
+                        if let Some(nth) = nth {
+                            resp.insert(Ty::Param(nth.clone()), false);
+                        }
+
+                        // names
+                        for field in sig.primary().named() {
+                            resp.insert(Ty::Param(field.clone()), false);
+                        }
+                    }
+                }
 
                 log::debug!("post check target iterated: {:?}", resp.bounds);
-                Some(self.info.simplify(resp.finalize(), false))
+                Some(resp.finalize())
             }
             CheckTarget::Element { container, target } => {
                 let container_ty = self.check_context_or(&container, context_ty)?;
@@ -222,7 +286,7 @@ impl<'a> PostTypeChecker<'a> {
                 );
 
                 log::debug!("post check target iterated: {:?}", resp.bounds);
-                Some(self.info.simplify(resp.finalize(), false))
+                Some(resp.finalize())
             }
             CheckTarget::Paren {
                 container,
@@ -245,7 +309,7 @@ impl<'a> PostTypeChecker<'a> {
                 );
 
                 log::debug!("post check target iterated: {:?}", resp.bounds);
-                Some(self.info.simplify(resp.finalize(), false))
+                Some(resp.finalize())
             }
             CheckTarget::Normal(target) => {
                 let ty = self.check_context_or(&target, context_ty)?;
@@ -282,28 +346,6 @@ impl<'a> PostTypeChecker<'a> {
         }
     }
 
-    fn check_self(
-        &mut self,
-        context: &LinkedNode,
-        node: &LinkedNode,
-        context_ty: Option<Ty>,
-    ) -> Option<Ty> {
-        match node.kind() {
-            SyntaxKind::Ident => {
-                let ty = self.info.type_of_span(node.span());
-                log::debug!("post check ident: {node:?} -> {ty:?}");
-                self.simplify(&ty?)
-            }
-            // todo: destructuring
-            SyntaxKind::FieldAccess => {
-                let ty = self.info.type_of_span(node.span());
-                self.simplify(&ty?)
-                    .or_else(|| self.check_context_or(context, context_ty))
-            }
-            _ => self.check_target(get_check_target(node.clone()), context_ty),
-        }
-    }
-
     fn destruct_let(&mut self, pattern: ast::Pattern, node: LinkedNode) -> Option<Ty> {
         match pattern {
             ast::Pattern::Placeholder(_) => None,
@@ -311,7 +353,7 @@ impl<'a> PostTypeChecker<'a> {
                 let ast::Expr::Ident(ident) = n else {
                     return None;
                 };
-                self.simplify(&self.info.type_of_span(ident.span())?)
+                self.info.type_of_span(ident.span())
             }
             ast::Pattern::Parenthesized(p) => {
                 self.destruct_let(p.expr().to_untyped().cast()?, node)
@@ -324,21 +366,12 @@ impl<'a> PostTypeChecker<'a> {
         }
     }
 
-    fn check_signatures(&mut self, ty: &Ty, pol: bool, checker: &mut impl PostSigChecker) {
-        let mut checker = PostSigCheckWorker(self, checker);
-        ty.sig_surface(pol, SigSurfaceKind::Call, &mut checker);
-    }
-
     fn check_element_of<T>(&mut self, ty: &Ty, pol: bool, context: &LinkedNode, checker: &mut T)
     where
         T: PostSigChecker,
     {
         let mut checker = PostSigCheckWorker(self, checker);
         ty.sig_surface(pol, sig_context_of(context), &mut checker)
-    }
-
-    fn simplify(&mut self, ty: &Ty) -> Option<Ty> {
-        Some(self.info.simplify(ty.clone(), false))
     }
 }
 

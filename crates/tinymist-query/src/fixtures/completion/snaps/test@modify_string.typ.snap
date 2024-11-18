@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: "Completion on \"\" (52..54)"
+description: "Completion on \"\" (53..55)"
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/modify_string.typ
 ---
@@ -36,14 +36,14 @@ input_file: crates/tinymist-query/src/fixtures/completion/modify_string.typ
     "label": "\"New Computer Modern\"",
     "sortText": "003",
     "textEdit": {
-     "newText": "\"New Computer Modern",
+     "newText": "New Computer Modern",
      "range": {
       "end": {
        "character": 17,
        "line": 2
       },
       "start": {
-       "character": 16,
+       "character": 17,
        "line": 2
       }
      }
