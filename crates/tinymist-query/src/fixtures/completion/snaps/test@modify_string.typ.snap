@@ -9,7 +9,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/modify_string.typ
   "isIncomplete": false,
   "items": [
    {
-    "kind": 21,
+    "kind": 6,
     "label": "\"New Computer Modern\"",
     "sortText": "003",
     "textEdit": {
@@ -32,7 +32,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/modify_string.typ
   "isIncomplete": false,
   "items": [
    {
-    "kind": 21,
+    "kind": 6,
     "label": "\"New Computer Modern\"",
     "sortText": "003",
     "textEdit": {

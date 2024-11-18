@@ -7,7 +7,6 @@ use if_chain::if_chain;
 use serde::{Deserialize, Serialize};
 use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::model::Document;
-use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
 use typst::World;
@@ -44,7 +43,6 @@ pub fn autocomplete(
                 || complete_field_accesses(&mut ctx)
                 || complete_imports(&mut ctx)
                 || complete_rules(&mut ctx)
-                || complete_params(&mut ctx)
                 || complete_markup(&mut ctx)
                 || complete_math(&mut ctx)
                 || complete_code(&mut ctx, false)
@@ -672,80 +670,6 @@ fn show_rule_recipe_completions(ctx: &mut CompletionContext) {
     ctx.scope_completions(false, |value| matches!(value, Value::Func(_)));
 }
 
-/// Complete call and set rule parameters.
-fn complete_params(ctx: &mut CompletionContext) -> bool {
-    // Ensure that we are in a function call or set rule's argument list.
-    let (callee, set, args) = if_chain! {
-        if let Some(parent) = ctx.leaf.parent();
-        if let Some(parent) = match parent.kind() {
-            SyntaxKind::Named => parent.parent(),
-            _ => Some(parent),
-        };
-        if let Some(args) = parent.get().cast::<ast::Args>();
-        if let Some(grand) = parent.parent();
-        if let Some(expr) = grand.get().cast::<ast::Expr>();
-        let set = matches!(expr, ast::Expr::Set(_));
-        if let Some(callee) = match expr {
-            ast::Expr::FuncCall(call) => Some(call.callee()),
-            ast::Expr::Set(set) => Some(set.target()),
-            _ => None,
-        };
-        then {
-            (callee, set, args)
-        } else {
-            return false;
-        }
-    };
-
-    // Find the piece of syntax that decides what we're completing.
-    let mut deciding = ctx.leaf.clone();
-    while !matches!(
-        deciding.kind(),
-        SyntaxKind::LeftParen | SyntaxKind::Comma | SyntaxKind::Colon
-    ) {
-        let Some(prev) = deciding.prev_leaf() else {
-            break;
-        };
-        deciding = prev;
-    }
-
-    // Parameter values: "func(param:|)", "func(param: |)".
-    if_chain! {
-        if deciding.kind() == SyntaxKind::Colon;
-        if let Some(prev) = deciding.prev_leaf();
-        if let Some(param) = prev.get().cast::<ast::Ident>();
-        then {
-            if let Some(next) = deciding.next_leaf() {
-                ctx.from = ctx.cursor.min(next.offset());
-            }
-            let parent = deciding.parent().unwrap();
-            log::debug!("named param parent: {:?}", parent);
-            // get type of this param
-            let ty = ctx.ctx.type_of(param.to_untyped());
-            log::debug!("named param type: {:?}", ty);
-
-            named_param_value_completions(ctx, callee, &param.into(), ty.as_ref());
-            return true;
-        }
-    }
-
-    // Parameters: "func(|)", "func(hi|)", "func(12,|)".
-    if_chain! {
-        if matches!(deciding.kind(), SyntaxKind::LeftParen | SyntaxKind::Comma);
-        if deciding.kind() != SyntaxKind::Comma || deciding.range().end <= ctx.cursor;
-        then {
-            if let Some(next) = deciding.next_leaf() {
-                ctx.from = ctx.cursor.min(next.offset());
-            }
-
-            param_completions(ctx, callee, set, args);
-            return true;
-        }
-    }
-
-    false
-}
-
 /// Complete in code mode.
 fn complete_code(ctx: &mut CompletionContext, from_type: bool) -> bool {
     if matches!(
@@ -966,6 +890,7 @@ pub struct CompletionContext<'a> {
     pub trigger_parameter_hints: bool,
     pub trigger_named_completion: bool,
     pub from: usize,
+    pub from_ty: Option<Ty>,
     pub completions: Vec<Completion>,
     pub completions2: Vec<lsp_types::CompletionItem>,
     pub incomplete: bool,
@@ -1006,6 +931,7 @@ impl<'a> CompletionContext<'a> {
             trigger_named_completion,
             explicit,
             from: cursor,
+            from_ty: None,
             incomplete: true,
             completions: vec![],
             completions2: vec![],

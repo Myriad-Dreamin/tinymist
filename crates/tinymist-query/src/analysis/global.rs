@@ -396,6 +396,26 @@ impl LocalContext {
         cache.get_or_init(|| self.shared.type_check(source)).clone()
     }
 
+    /// Get the type check information of a source file.
+    pub(crate) fn type_check_by_id(&mut self, id: TypstFileId) -> Arc<TypeScheme> {
+        let cache = &self.caches.modules.entry(id).or_default().type_check;
+        cache
+            .clone()
+            .get_or_init(|| {
+                let source = self.source_by_id(id).ok();
+                source
+                    .map(|s| self.shared.type_check(&s))
+                    .unwrap_or_default()
+            })
+            .clone()
+    }
+
+    pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {
+        let scheme = self.type_check_by_id(s.id()?);
+        let ty = scheme.type_of_span(s)?;
+        Some(scheme.simplify(ty, false))
+    }
+
     pub(crate) fn def_docs(&mut self, def: &Definition) -> Option<DefDocs> {
         // let plain_docs = sym.head.docs.as_deref();
         // let plain_docs = plain_docs.or(sym.head.oneliner.as_deref());
@@ -759,10 +779,6 @@ impl SharedContext {
         definition(self, source, doc, deref_target)
     }
 
-    pub(crate) fn type_of(self: &Arc<Self>, rr: &SyntaxNode) -> Option<Ty> {
-        self.type_of_span(rr.span())
-    }
-
     pub(crate) fn type_of_span(self: &Arc<Self>, s: Span) -> Option<Ty> {
         self.type_of_span_(&self.source_by_id(s.id()?).ok()?, s)
     }
@@ -785,11 +801,6 @@ impl SharedContext {
         log::debug!("check definition func {def:?}");
         let source = def.decl.file_id().and_then(|f| self.source_by_id(f).ok());
         analyze_signature(self, SignatureTarget::Def(source, def))
-    }
-
-    pub(crate) fn sig_of_func(self: &Arc<Self>, func: Func) -> Signature {
-        log::debug!("check runtime func {func:?}");
-        analyze_signature(self, SignatureTarget::Runtime(func)).unwrap()
     }
 
     pub(crate) fn sig_of_type(self: &Arc<Self>, ti: &TypeScheme, ty: Ty) -> Option<Signature> {

@@ -1,22 +1,22 @@
 use std::collections::BTreeMap;
 
 use ecow::{eco_format, EcoString};
+use hashbrown::HashSet;
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
-use once_cell::sync::OnceCell;
 use reflexo::path::unix_slash;
+use tinymist_derive::BindTyCtx;
 use tinymist_world::LspWorld;
-use typst::foundations::{AutoValue, Func, Label, NoneValue, Repr, Type, Value};
-use typst::layout::{Dir, Length};
+use typst::foundations::{AutoValue, Func, Label, NoneValue, Scope, Type, Value};
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, Span, SyntaxKind, SyntaxNode};
 use typst::visualize::Color;
 
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::adt::interner::Interned;
-use crate::analysis::{resolve_call_target, BuiltinTy, PathPreference, Ty};
-use crate::syntax::{is_ident_like, param_index_at_leaf, CheckTarget};
+use crate::analysis::{BuiltinTy, PathPreference, Ty};
+use crate::syntax::{descending_decls, is_ident_like, CheckTarget, DescentDecl};
+use crate::ty::{Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeBounds, TypeScheme, TypeVar};
 use crate::upstream::complete::complete_code;
-use crate::upstream::plain_docs_sentence;
 
 use crate::{completion_kind, prelude::*, LspCompletion};
 
@@ -29,10 +29,6 @@ impl<'a> CompletionContext<'a> {
         self.scope_completions_(parens, |v| v.map_or(true, &filter));
     }
 
-    pub fn strict_scope_completions(&mut self, parens: bool, filter: impl Fn(&Value) -> bool) {
-        self.scope_completions_(parens, |v| v.map_or(false, &filter));
-    }
-
     fn seen_field(&mut self, field: Interned<str>) -> bool {
         !self.seen_fields.insert(field)
     }
@@ -41,201 +37,40 @@ impl<'a> CompletionContext<'a> {
     ///
     /// Filters the global/math scope with the given filter.
     pub fn scope_completions_(&mut self, parens: bool, filter: impl Fn(Option<&Value>) -> bool) {
-        let mut defined = BTreeMap::new();
+        println!("scope completions {:?}", self.from_ty);
 
-        #[derive(Debug, Clone)]
-        enum DefKind {
-            Syntax(Span),
-            Instance(Span, Value),
-        }
-
-        let mut try_insert = |name: EcoString, kind: (CompletionKind, DefKind)| {
-            if name.is_empty() {
-                return;
-            }
-
-            if let std::collections::btree_map::Entry::Vacant(entry) = defined.entry(name) {
-                entry.insert(kind);
-            }
+        let Some(fid) = self.root.span().id() else {
+            return;
+        };
+        let Ok(src) = self.ctx.source_by_id(fid) else {
+            return;
         };
 
-        let types = (|| {
-            let id = self.root.span().id()?;
-            let src = self.ctx.source_by_id(id).ok()?;
-            Some(self.ctx.type_check(&src))
-        })();
-        let types = types.as_ref();
+        let mut defines = Defines {
+            types: self.ctx.type_check(&src),
+            defines: Default::default(),
+        };
 
-        let mut ancestor = Some(self.leaf.clone());
-        while let Some(node) = &ancestor {
-            let mut sibling = Some(node.clone());
-            while let Some(node) = &sibling {
-                if let Some(v) = node.cast::<ast::LetBinding>() {
-                    let kind = match v.kind() {
-                        ast::LetBindingKind::Closure(..) => CompletionKind::Func,
-                        ast::LetBindingKind::Normal(..) => CompletionKind::Variable,
-                    };
-                    for ident in v.kind().bindings() {
-                        try_insert(
-                            ident.get().clone(),
-                            (kind.clone(), DefKind::Syntax(ident.span())),
-                        );
-                    }
+        descending_decls(self.leaf.clone(), |node| -> Option<()> {
+            match node {
+                DescentDecl::Ident(ident) => {
+                    let ty = self.ctx.type_of_span(ident.span()).unwrap_or(Ty::Any);
+                    defines.insert_ty(ty, ident.get());
                 }
-
-                // todo: cache
-                if let Some(v) = node.cast::<ast::ModuleImport>() {
-                    let imports = v.imports();
-                    let anaylyze = node.children().find(|child| child.is::<ast::Expr>());
-                    let analyzed = anaylyze
-                        .as_ref()
-                        .and_then(|source| self.ctx.module_by_syntax(source));
-                    if analyzed.is_none() {
-                        log::debug!("failed to analyze import: {:?}", anaylyze);
-                    }
-
-                    // import it self
-                    if imports.is_none() || v.new_name().is_some() {
-                        // todo: name of import syntactically
-
-                        let name = (|| {
-                            if let Some(new_name) = v.new_name() {
-                                return Some(new_name.get().clone());
-                            }
-                            if let Some(module_ins) = &analyzed {
-                                return module_ins.name().map(From::from);
-                            }
-
-                            // todo: name of import syntactically
-                            None
-                        })();
-
-                        let def_kind = analyzed.clone().map(|module_ins| {
-                            DefKind::Instance(
-                                v.new_name()
-                                    .map(|n| n.span())
-                                    .unwrap_or_else(Span::detached),
-                                module_ins,
-                            )
-                        });
-
-                        if let Some((name, def_kind)) = name.zip(def_kind) {
-                            try_insert(name, (CompletionKind::Module, def_kind));
-                        }
-                    }
-
-                    // import items
-                    match (imports, analyzed) {
-                        (Some(..), None) => {
-                            // todo: name of import syntactically
-                        }
-                        (Some(e), Some(module_ins)) => {
-                            let import_filter = match e {
-                                ast::Imports::Wildcard => None,
-                                ast::Imports::Items(e) => {
-                                    let mut filter = HashMap::new();
-                                    for item in e.iter() {
-                                        match item {
-                                            ast::ImportItem::Simple(n) => {
-                                                filter.insert(
-                                                    n.name().get().clone(),
-                                                    DefKind::Syntax(n.span()),
-                                                );
-                                            }
-                                            ast::ImportItem::Renamed(n) => {
-                                                filter.insert(
-                                                    n.new_name().get().clone(),
-                                                    DefKind::Syntax(n.span()),
-                                                );
-                                            }
-                                        }
-                                    }
-                                    Some(filter)
-                                }
-                            };
-
-                            if let Some(scope) = module_ins.scope() {
-                                for (name, v, _) in scope.iter() {
-                                    let kind = value_to_completion_kind(v);
-                                    let def_kind = match &import_filter {
-                                        Some(import_filter) => {
-                                            let w = import_filter.get(name);
-                                            match w {
-                                                Some(DefKind::Syntax(span)) => {
-                                                    Some(DefKind::Instance(*span, v.clone()))
-                                                }
-                                                Some(DefKind::Instance(span, v)) => {
-                                                    Some(DefKind::Instance(*span, v.clone()))
-                                                }
-                                                None => None,
-                                            }
-                                        }
-                                        None => {
-                                            Some(DefKind::Instance(Span::detached(), v.clone()))
-                                        }
-                                    };
-                                    if let Some(def_kind) = def_kind {
-                                        try_insert(name.clone(), (kind, def_kind));
-                                    }
-                                }
-                            } else if let Some(filter) = import_filter {
-                                for (name, def_kind) in filter {
-                                    try_insert(name, (CompletionKind::Variable, def_kind));
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
+                DescentDecl::ImportSource(src) => {
+                    println!("scope completions import source: {src:?}");
+                    let ty = analyze_import_source(self.ctx, &defines.types, src)?;
+                    let name = ty.name().as_ref().into();
+                    defines.insert_ty(ty, &name);
                 }
-
-                sibling = node.prev_sibling();
+                // todo: cache completion items
+                DescentDecl::ImportAll(mi) => {
+                    let ty = analyze_import_source(self.ctx, &defines.types, mi.source())?;
+                    ty.iface_surface(true, &mut ScopeChecker(&mut defines, self.ctx));
+                }
             }
-
-            if let Some(parent) = node.parent() {
-                if let Some(v) = parent.cast::<ast::ForLoop>() {
-                    if node.prev_sibling_kind() != Some(SyntaxKind::In) {
-                        let pattern = v.pattern();
-                        for ident in pattern.bindings() {
-                            try_insert(
-                                ident.get().clone(),
-                                (CompletionKind::Variable, DefKind::Syntax(ident.span())),
-                            );
-                        }
-                    }
-                }
-                if let Some(v) = node.cast::<ast::Closure>() {
-                    for param in v.params().children() {
-                        match param {
-                            ast::Param::Pos(pattern) => {
-                                for ident in pattern.bindings() {
-                                    try_insert(
-                                        ident.get().clone(),
-                                        (CompletionKind::Variable, DefKind::Syntax(ident.span())),
-                                    );
-                                }
-                            }
-                            ast::Param::Named(n) => try_insert(
-                                n.name().get().clone(),
-                                (CompletionKind::Variable, DefKind::Syntax(n.name().span())),
-                            ),
-                            ast::Param::Spread(s) => {
-                                if let Some(sink_ident) = s.sink_ident() {
-                                    try_insert(
-                                        sink_ident.get().clone(),
-                                        (CompletionKind::Variable, DefKind::Syntax(s.span())),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                ancestor = Some(parent.clone());
-                continue;
-            }
-
-            break;
-        }
+            None
+        });
 
         let in_math = matches!(
             self.leaf.parent_kind(),
@@ -249,17 +84,7 @@ impl<'a> CompletionContext<'a> {
         let scope = if in_math { &lib.math } else { &lib.global }
             .scope()
             .clone();
-        for (name, value, _) in scope.iter() {
-            if filter(Some(value)) && !defined.contains_key(name) {
-                defined.insert(
-                    name.clone(),
-                    (
-                        value_to_completion_kind(value),
-                        DefKind::Instance(Span::detached(), value.clone()),
-                    ),
-                );
-            }
-        }
+        defines.insert_scope(&scope);
 
         enum SurroundingSyntax {
             Regular,
@@ -267,73 +92,66 @@ impl<'a> CompletionContext<'a> {
             SetRule,
         }
 
+        let defines = defines.defines;
+
         let surrounding_syntax = check_surrounding_syntax(&self.leaf)
             .or_else(|| check_previous_syntax(&self.leaf))
             .unwrap_or(SurroundingSyntax::Regular);
 
-        for (name, (kind, def_kind)) in defined {
+        let mut kind_checker = CompletionKindChecker {
+            symbols: HashSet::default(),
+            functions: HashSet::default(),
+        };
+
+        // we don't check literal type here for faster completion
+        for (name, ty) in defines {
+            // todo: filter ty
             if !filter(None) || name.is_empty() {
                 continue;
             }
-            let span = match def_kind {
-                DefKind::Syntax(span) => span,
-                DefKind::Instance(span, _) => span,
-            };
-            // we don't check literal type here for faster completion
-            let ty_detail = if let CompletionKind::Symbol(c) = &kind {
-                Some(symbol_label_detail(*c))
-            } else {
-                types
-                    .and_then(|types| {
-                        let ty = types.type_of_span(span)?;
-                        let ty = types.simplify(ty, false);
-                        ty.describe().map(From::from)
-                    })
-                    .or_else(|| {
-                        if let DefKind::Instance(_, v) = &def_kind {
-                            Some(describe_value(self.ctx, v))
-                        } else {
-                            None
-                        }
-                    })
-                    .or_else(|| Some("any".into()))
-            };
-            let detail = if let CompletionKind::Symbol(c) = &kind {
-                Some(symbol_detail(*c))
-            } else {
-                ty_detail.clone()
-            };
 
-            if kind == CompletionKind::Func {
+            kind_checker.check(&ty);
+
+            if let Some(ch) = kind_checker.symbols.iter().min().copied() {
+                // todo: describe all chars
+                let kind = CompletionKind::Symbol(ch);
+                self.completions.push(Completion {
+                    kind,
+                    label: name,
+                    label_detail: Some(symbol_label_detail(ch)),
+                    detail: Some(symbol_detail(ch)),
+                    ..Completion::default()
+                });
+                continue;
+            }
+
+            let label_detail = ty.describe().map(From::from).or_else(|| Some("any".into()));
+
+            log::debug!("scope completions!: {name} {ty:?} {label_detail:?}");
+            let detail = label_detail.clone();
+
+            if !kind_checker.functions.is_empty() {
                 let base = Completion {
-                    kind: kind.clone(),
-                    label_detail: ty_detail,
+                    kind: CompletionKind::Func,
+                    label_detail,
                     command: self
                         .trigger_parameter_hints
                         .then_some("editor.action.triggerParameterHints"),
                     ..Default::default()
                 };
 
-                let zero_args = match &def_kind {
-                    DefKind::Instance(_, Value::Func(func)) => func
-                        .params()
-                        .is_some_and(|params| params.iter().all(|param| param.name == "self")),
-                    _ => false,
-                };
-                let is_element = match &def_kind {
-                    DefKind::Instance(_, Value::Func(func)) => func.element().is_some(),
-                    _ => false,
-                };
-                log::debug!("is_element: {} {:?} -> {:?}", name, def_kind, is_element);
+                let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
 
-                if !zero_args && matches!(surrounding_syntax, SurroundingSyntax::Regular) {
+                log::debug!("fn_feat: {name} {ty:?} -> {fn_feat:?}");
+
+                if !fn_feat.zero_args && matches!(surrounding_syntax, SurroundingSyntax::Regular) {
                     self.completions.push(Completion {
                         label: eco_format!("{}.with", name),
                         apply: Some(eco_format!("{}.with(${{}})", name)),
                         ..base.clone()
                     });
                 }
-                if is_element && !matches!(surrounding_syntax, SurroundingSyntax::SetRule) {
+                if fn_feat.is_element && !matches!(surrounding_syntax, SurroundingSyntax::SetRule) {
                     self.completions.push(Completion {
                         label: eco_format!("{}.where", name),
                         apply: Some(eco_format!("{}.where(${{}})", name)),
@@ -344,14 +162,14 @@ impl<'a> CompletionContext<'a> {
                 let bad_instantiate = matches!(
                     surrounding_syntax,
                     SurroundingSyntax::Selector | SurroundingSyntax::SetRule
-                ) && !is_element;
+                ) && !fn_feat.is_element;
                 if !bad_instantiate {
                     if !parens {
                         self.completions.push(Completion {
                             label: name,
                             ..base
                         });
-                    } else if zero_args {
+                    } else if fn_feat.zero_args {
                         self.completions.push(Completion {
                             apply: Some(eco_format!("{}()${{}}", name)),
                             label: name,
@@ -365,29 +183,17 @@ impl<'a> CompletionContext<'a> {
                         });
                     }
                 }
-            } else if let DefKind::Instance(_, v) = def_kind {
-                let bad_instantiate = matches!(
-                    surrounding_syntax,
-                    SurroundingSyntax::Selector | SurroundingSyntax::SetRule
-                ) && !matches!(&v, Value::Func(func) if func.element().is_some());
-                if !bad_instantiate {
-                    self.value_completion_(
-                        Some(name),
-                        &v,
-                        parens,
-                        ty_detail.clone(),
-                        detail.as_deref(),
-                    );
-                }
-            } else {
-                self.completions.push(Completion {
-                    kind,
-                    label: name,
-                    label_detail: ty_detail.clone(),
-                    detail,
-                    ..Completion::default()
-                });
+                continue;
             }
+
+            let kind = ty_to_completion_kind(&ty);
+            self.completions.push(Completion {
+                kind,
+                label: name,
+                label_detail: label_detail.clone(),
+                detail,
+                ..Completion::default()
+            });
         }
 
         fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> {
@@ -456,33 +262,184 @@ impl<'a> CompletionContext<'a> {
     }
 }
 
-fn describe_value(ctx: &mut LocalContext, v: &Value) -> EcoString {
-    match v {
-        Value::Func(f) => {
-            let mut f = f;
-            while let typst::foundations::func::Repr::With(with_f) = f.inner() {
-                f = &with_f.0;
-            }
+#[derive(BindTyCtx)]
+#[bind(types)]
+struct Defines {
+    types: Arc<TypeScheme>,
+    defines: BTreeMap<EcoString, Ty>,
+}
 
-            let sig = ctx.sig_of_func(f.clone());
-            sig.primary()
-                .ty()
-                .describe()
-                .unwrap_or_else(|| "function".into())
+impl Defines {
+    fn insert(&mut self, name: EcoString, item: Ty) {
+        if name.is_empty() {
+            return;
         }
-        Value::Module(m) => {
-            if let Some(fid) = m.file_id() {
-                let package = fid.package();
-                let path = unix_slash(fid.vpath().as_rootless_path());
-                if let Some(package) = package {
-                    return eco_format!("{package}:{path}");
+
+        if let std::collections::btree_map::Entry::Vacant(entry) = self.defines.entry(name.clone())
+        {
+            entry.insert(item);
+        }
+    }
+
+    fn insert_ty(&mut self, ty: Ty, name: &EcoString) {
+        self.insert(name.clone(), ty);
+    }
+
+    fn insert_scope(&mut self, scope: &Scope) {
+        // filter(Some(value)) &&
+        for (name, value, _) in scope.iter() {
+            if !self.defines.contains_key(name) {
+                self.insert(name.clone(), Ty::Value(InsTy::new(value.clone())));
+            }
+        }
+    }
+}
+
+fn analyze_import_source(ctx: &LocalContext, types: &TypeScheme, s: ast::Expr) -> Option<Ty> {
+    if let Some(res) = types.type_of_span(s.span()) {
+        if !matches!(res.value(), Some(Value::Str(..))) {
+            let res = types.simplify(res, false);
+            println!("analyze_import_source: {res:?}");
+            return Some(res);
+        }
+    }
+
+    let m = ctx.module_by_syntax(s.to_untyped())?;
+    Some(Ty::Value(InsTy::new_at(m, s.span())))
+}
+
+#[derive(BindTyCtx)]
+#[bind(0)]
+struct ScopeChecker<'a>(&'a mut Defines, &'a mut LocalContext);
+
+impl<'a> IfaceChecker for ScopeChecker<'a> {
+    fn check(
+        &mut self,
+        sig: Iface,
+        _args: &mut crate::ty::IfaceCheckContext,
+        _pol: bool,
+    ) -> Option<()> {
+        match sig {
+            // dict is not importable
+            Iface::Dict(..) | Iface::Value { .. } => {}
+            Iface::Element { val, .. } => {
+                self.0.insert_scope(val.scope());
+            }
+            Iface::Type { val, .. } => {
+                self.0.insert_scope(val.scope());
+            }
+            Iface::Module { val, .. } => {
+                let ti = self.1.type_check_by_id(val);
+                if !ti.valid {
+                    self.0.insert_scope(self.1.module_by_id(val).ok()?.scope());
+                } else {
+                    for (name, ty) in ti.exports.iter() {
+                        // todo: Interned -> EcoString here
+                        let ty = ti.simplify(ty.clone(), false);
+                        self.0.insert(name.as_ref().into(), ty);
+                    }
                 }
-                return path.into();
             }
-
-            "module".into()
+            Iface::ModuleVal { val, .. } => {
+                self.0.insert_scope(val.scope());
+            }
         }
-        _ => v.ty().repr(),
+        None
+    }
+}
+
+struct CompletionKindChecker {
+    symbols: HashSet<char>,
+    functions: HashSet<Ty>,
+}
+impl CompletionKindChecker {
+    fn reset(&mut self) {
+        self.symbols.clear();
+        self.functions.clear();
+    }
+
+    fn check(&mut self, ty: &Ty) {
+        self.reset();
+        match ty {
+            Ty::Value(val) => match &val.val {
+                Value::Type(t) if t.constructor().is_ok() => {
+                    self.functions.insert(ty.clone());
+                }
+                Value::Func(..) => {
+                    self.functions.insert(ty.clone());
+                }
+                Value::Symbol(s) => {
+                    self.symbols.insert(s.get());
+                }
+                _ => {}
+            },
+            Ty::Func(..) | Ty::With(..) => {
+                self.functions.insert(ty.clone());
+            }
+            Ty::Builtin(BuiltinTy::TypeType(t)) if t.constructor().is_ok() => {
+                self.functions.insert(ty.clone());
+            }
+            Ty::Builtin(BuiltinTy::Element(..)) => {
+                self.functions.insert(ty.clone());
+            }
+            Ty::Let(l) => {
+                for ty in l.ubs.iter().chain(l.lbs.iter()) {
+                    self.check(ty);
+                }
+            }
+            Ty::Any | Ty::Builtin(..) => {}
+            _ => panic!("check kind {ty:?}"),
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+struct FnCompletionFeat {
+    zero_args: bool,
+    is_element: bool,
+}
+
+impl FnCompletionFeat {
+    fn check<'a>(mut self, fns: impl ExactSizeIterator<Item = &'a Ty>) -> Self {
+        for ty in fns {
+            self.check_one(ty, 0);
+        }
+
+        self
+    }
+
+    fn check_one(&mut self, ty: &Ty, pos: usize) {
+        match ty {
+            Ty::Value(val) => match &val.val {
+                Value::Type(..) => {}
+                Value::Func(sig) => {
+                    if sig.element().is_some() {
+                        self.is_element = true;
+                    }
+                    let ps = sig.params().into_iter().flatten();
+                    let pos_size = ps.filter(|s| s.positional).count();
+                    if pos_size <= pos {
+                        self.zero_args = true;
+                    }
+                }
+                _ => panic!("FnCompletionFeat check_one {val:?}"),
+            },
+            Ty::Func(sig) => self.check_sig(sig, pos),
+            Ty::With(w) => {
+                self.check_one(&w.sig, pos + w.with.positional_params().len());
+            }
+            Ty::Builtin(BuiltinTy::Element(..)) => {
+                self.is_element = true;
+            }
+            Ty::Builtin(BuiltinTy::TypeType(..)) => {}
+            _ => panic!("FnCompletionFeat check_one {ty:?}"),
+        }
+    }
+
+    fn check_sig(&mut self, sig: &SigTy, pos: usize) {
+        if pos >= sig.positional_params().len() {
+            self.zero_args = true;
+        }
     }
 }
 
@@ -494,8 +451,19 @@ fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
     let mut completions = std::mem::take(&mut ctx.completions);
     let explict = ctx.explicit;
     ctx.explicit = true;
+    let ty = Some(Ty::from_types(ctx.seen_types.iter().cloned()));
+    let from_ty = std::mem::replace(&mut ctx.from_ty, ty);
     complete_code(ctx, true);
+    ctx.from_ty = from_ty;
     ctx.explicit = explict;
+
+    // ctx.strict_scope_completions(false, |value| value.ty() == *ty);
+    // let length_ty = Type::of::<Length>();
+    // ctx.strict_scope_completions(false, |value| value.ty() == length_ty);
+    // let color_ty = Type::of::<Color>();
+    // ctx.strict_scope_completions(false, |value| value.ty() == color_ty);
+    // let ty = Type::of::<Dir>();
+    // ctx.strict_scope_completions(false, |value| value.ty() == ty);
 
     log::debug!(
         "sort_and_explicit_code_completion: {:#?} {:#?}",
@@ -542,156 +510,89 @@ fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
     log::debug!("sort_and_explicit_code_completion: {:?}", ctx.completions);
 }
 
+pub fn ty_to_completion_kind(ty: &Ty) -> CompletionKind {
+    match ty {
+        Ty::Value(ty) => value_to_completion_kind(&ty.val),
+        Ty::Func(..) | Ty::With(..) => CompletionKind::Func,
+        Ty::Any => CompletionKind::Variable,
+        Ty::Builtin(BuiltinTy::Module(..)) => CompletionKind::Module,
+        Ty::Builtin(BuiltinTy::TypeType(..)) => CompletionKind::Type,
+        Ty::Builtin(..) => CompletionKind::Variable,
+        Ty::Let(l) => l
+            .ubs
+            .iter()
+            .chain(l.lbs.iter())
+            .fold(None, |acc, ty| match acc {
+                Some(CompletionKind::Variable) => Some(CompletionKind::Variable),
+                Some(acc) => {
+                    let kind = ty_to_completion_kind(ty);
+                    if acc == kind {
+                        Some(acc)
+                    } else {
+                        Some(CompletionKind::Variable)
+                    }
+                }
+                None => Some(ty_to_completion_kind(ty)),
+            })
+            .unwrap_or(CompletionKind::Variable),
+        _ => panic!("ty_to_completion_kind {ty:?}"),
+    }
+}
+
 pub fn value_to_completion_kind(value: &Value) -> CompletionKind {
     match value {
         Value::Func(..) => CompletionKind::Func,
         Value::Module(..) => CompletionKind::Module,
         Value::Type(..) => CompletionKind::Type,
         Value::Symbol(s) => CompletionKind::Symbol(s.get()),
-        _ => CompletionKind::Constant,
+        _ => CompletionKind::Variable,
     }
 }
 
-/// Add completions for the parameters of a function.
-pub fn param_completions<'a>(
-    ctx: &mut CompletionContext<'a>,
-    callee: ast::Expr<'a>,
-    set: bool,
-    args: ast::Args<'a>,
-) {
-    let Some(cc) = ctx
-        .root
-        .find(callee.span())
-        .and_then(|callee| resolve_call_target(ctx.ctx.shared(), &callee))
-    else {
-        return;
-    };
-    // todo: regards call convention
-    let this = cc.method_this().cloned();
-    let func = cc.callee();
+// if ctx.before.ends_with(',') {
+//     ctx.enrich(" ", "");
+// }
 
-    use typst::foundations::func::Repr;
-    let mut func = func;
-    while let Repr::With(f) = func.inner() {
-        // todo: complete with positional arguments
-        // with_args.push(ArgValue::Instance(f.1.clone()));
-        func = f.0.clone();
-    }
-
-    let pos_index =
-        param_index_at_leaf(&ctx.leaf, &func, args).map(|i| if this.is_some() { i + 1 } else { i });
-
-    let signature = ctx.ctx.sig_of_func(func.clone());
-
-    let leaf_type = ctx.ctx.literal_type_of_node(ctx.leaf.clone());
-    log::debug!("pos_param_completion_by_type: {:?}", leaf_type);
-
-    for arg in args.items() {
-        if let ast::Arg::Named(named) = arg {
-            ctx.seen_field(named.name().into());
-        }
-    }
-
-    let primary_sig = signature.primary();
-
-    'pos_check: {
-        let mut doc = None;
-
-        if let Some(pos_index) = pos_index {
-            let pos = primary_sig.get_pos(pos_index);
-            log::debug!("pos_param_completion_to: {:?}", pos);
-
-            if let Some(pos) = pos {
-                if set && !pos.attrs.settable {
-                    break 'pos_check;
-                }
-
-                if let Some(docs) = &pos.docs {
-                    doc = Some(plain_docs_sentence(docs));
-                }
-
-                if pos.attrs.positional {
-                    type_completion(ctx, &pos.ty, doc.as_deref());
-                }
-            }
-        }
-
-        if let Some(leaf_type) = leaf_type {
-            type_completion(ctx, &leaf_type, doc.as_deref());
-        }
-    }
-
-    for param in primary_sig.named() {
-        let name = &param.name;
-        if ctx.seen_field(name.as_ref().into()) {
-            continue;
-        }
-        log::debug!(
-            "pos_named_param_completion_to({set:?}): {name:?} {:?}",
-            param.attrs.settable
-        );
-
-        if set && !param.attrs.settable {
-            continue;
-        }
-
-        let _d = OnceCell::new();
-        let docs = || {
-            _d.get_or_init(|| param.docs.as_ref().map(|d| plain_docs_sentence(d.as_str())))
-                .clone()
-        };
-
-        if param.attrs.named {
-            let compl = Completion {
-                kind: CompletionKind::Field,
-                label: param.name.as_ref().into(),
-                apply: Some(eco_format!("{}: ${{}}", param.name)),
-                detail: docs(),
-                label_detail: None,
-                command: ctx
-                    .trigger_named_completion
-                    .then_some("tinymist.triggerNamedCompletion"),
-                ..Completion::default()
-            };
-            match param.ty {
-                Ty::Builtin(BuiltinTy::TextSize) => {
-                    for size_template in &[
-                        "10.5pt", "12pt", "9pt", "14pt", "8pt", "16pt", "18pt", "20pt", "22pt",
-                        "24pt", "28pt",
-                    ] {
-                        let compl = compl.clone();
-                        ctx.completions.push(Completion {
-                            label: eco_format!("{}: {}", param.name, size_template),
-                            apply: None,
-                            ..compl
-                        });
-                    }
-                }
-                Ty::Builtin(BuiltinTy::Dir) => {
-                    for dir_template in &["ltr", "rtl", "ttb", "btt"] {
-                        let compl = compl.clone();
-                        ctx.completions.push(Completion {
-                            label: eco_format!("{}: {}", param.name, dir_template),
-                            apply: None,
-                            ..compl
-                        });
-                    }
-                }
-                _ => {}
-            }
-            ctx.completions.push(compl);
-        }
-
-        if param.attrs.positional {
-            type_completion(ctx, &param.ty, docs().as_deref());
-        }
-    }
-
-    sort_and_explicit_code_completion(ctx);
-    if ctx.before.ends_with(',') {
-        ctx.enrich(" ", "");
-    }
-}
+// if param.attrs.named {
+//     let compl = Completion {
+//         kind: CompletionKind::Field,
+//         label: param.name.as_ref().into(),
+//         apply: Some(eco_format!("{}: ${{}}", param.name)),
+//         detail: docs(),
+//         label_detail: None,
+//         command: ctx
+//             .trigger_named_completion
+//             .then_some("tinymist.triggerNamedCompletion"),
+//         ..Completion::default()
+//     };
+//     match param.ty {
+//         Ty::Builtin(BuiltinTy::TextSize) => {
+//             for size_template in &[
+//                 "10.5pt", "12pt", "9pt", "14pt", "8pt", "16pt", "18pt",
+// "20pt", "22pt",                 "24pt", "28pt",
+//             ] {
+//                 let compl = compl.clone();
+//                 ctx.completions.push(Completion {
+//                     label: eco_format!("{}: {}", param.name, size_template),
+//                     apply: None,
+//                     ..compl
+//                 });
+//             }
+//         }
+//         Ty::Builtin(BuiltinTy::Dir) => {
+//             for dir_template in &["ltr", "rtl", "ttb", "btt"] {
+//                 let compl = compl.clone();
+//                 ctx.completions.push(Completion {
+//                     label: eco_format!("{}: {}", param.name, dir_template),
+//                     apply: None,
+//                     ..compl
+//                 });
+//             }
+//         }
+//         _ => {}
+//     }
+//     ctx.completions.push(compl);
+// }
 
 fn type_completion(
     ctx: &mut CompletionContext<'_>,
@@ -822,8 +723,6 @@ fn type_completion(
                     "color.hsl(${h}, ${s}, ${l}, ${a})",
                     "A custom HSLA color.",
                 );
-                let color_ty = Type::of::<Color>();
-                ctx.strict_scope_completions(false, |value| value.ty() == color_ty);
             }
             BuiltinTy::TextSize => return None,
             BuiltinTy::TextLang => {
@@ -852,10 +751,7 @@ fn type_completion(
                     });
                 }
             }
-            BuiltinTy::Dir => {
-                let ty = Type::of::<Dir>();
-                ctx.strict_scope_completions(false, |value| value.ty() == ty);
-            }
+            BuiltinTy::Dir => {}
             BuiltinTy::TextFont => {
                 ctx.font_completions();
             }
@@ -881,8 +777,6 @@ fn type_completion(
                 ctx.snippet_completion("cm", "${1}cm", "Centimeter length unit.");
                 ctx.snippet_completion("in", "${1}in", "Inch length unit.");
                 ctx.snippet_completion("em", "${1}em", "Em length unit.");
-                let length_ty = Type::of::<Length>();
-                ctx.strict_scope_completions(false, |value| value.ty() == length_ty);
                 type_completion(ctx, &Ty::Builtin(BuiltinTy::Auto), docs);
             }
             BuiltinTy::Float => {
@@ -925,7 +819,6 @@ fn type_completion(
                         detail: Some(eco_format!("A value of type {ty}.")),
                         ..Completion::default()
                     });
-                    ctx.strict_scope_completions(false, |value| value.ty() == *ty);
                 }
             }
             BuiltinTy::Element(e) => {
@@ -972,90 +865,9 @@ fn type_completion(
     Some(())
 }
 
-/// Add completions for the values of a named function parameter.
-pub fn named_param_value_completions<'a>(
-    ctx: &mut CompletionContext<'a>,
-    callee: ast::Expr<'a>,
-    name: &Interned<str>,
-    ty: Option<&Ty>,
-) {
-    let Some(cc) = ctx
-        .root
-        .find(callee.span())
-        .and_then(|callee| resolve_call_target(ctx.ctx.shared(), &callee))
-    else {
-        // static analysis
-        if let Some(ty) = ty {
-            type_completion(ctx, ty, None);
-        }
-
-        return;
-    };
-    // todo: regards call convention
-    let func = cc.callee();
-
-    let leaf_type = ctx.ctx.literal_type_of_node(ctx.leaf.clone());
-    log::debug!(
-        "named_param_completion_by_type: {:?} -> {:?}",
-        ctx.leaf.kind(),
-        leaf_type
-    );
-
-    use typst::foundations::func::Repr;
-    let mut func = func;
-    while let Repr::With(f) = func.inner() {
-        // todo: complete with positional arguments
-        // with_args.push(ArgValue::Instance(f.1.clone()));
-        func = f.0.clone();
-    }
-
-    let signature = ctx.ctx.sig_of_func(func.clone());
-
-    let primary_sig = signature.primary();
-
-    let Some(param) = primary_sig.get_named(name) else {
-        return;
-    };
-    if !param.attrs.named {
-        return;
-    }
-
-    let doc = param.docs.as_ref().map(|d| plain_docs_sentence(d.as_str()));
-
-    // static analysis
-    if let Some(ty) = ty {
-        type_completion(ctx, ty, doc.as_deref());
-    }
-
-    let mut completed = false;
-    if let Some(type_sig) = leaf_type {
-        log::debug!("named_param_completion by type: {:?}", param);
-        type_completion(ctx, &type_sig, doc.as_deref());
-        completed = true;
-    }
-
-    if !matches!(param.ty, Ty::Any) {
-        type_completion(ctx, &param.ty, doc.as_deref());
-        completed = true;
-    }
-
-    if !completed {
-        if let Some(expr) = &param.default {
-            ctx.completions.push(Completion {
-                kind: CompletionKind::Constant,
-                label: expr.clone(),
-                apply: None,
-                detail: doc.map(Into::into),
-                ..Completion::default()
-            });
-        }
-    }
-
-    sort_and_explicit_code_completion(ctx);
-    if ctx.before.ends_with(':') {
-        ctx.enrich(" ", "");
-    }
-}
+// if ctx.before.ends_with(':') {
+//     ctx.enrich(" ", "");
+// }
 
 /// Complete call and set rule parameters.
 pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
@@ -1082,12 +894,17 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
                 }
             }
         }
-        Some(CheckTarget::Normal(e)) if matches!(e.kind(), SyntaxKind::Label | SyntaxKind::Ref) => {
-        }
+        Some(CheckTarget::Normal(e))
+            if matches!(
+                e.kind(),
+                SyntaxKind::Ident | SyntaxKind::Label | SyntaxKind::Ref | SyntaxKind::Str
+            ) => {}
         Some(CheckTarget::Paren { .. }) => {}
         Some(CheckTarget::Normal(..)) => return None,
         None => return None,
     }
+
+    log::debug!("ctx.leaf {:?}", ctx.leaf.clone());
 
     let ty = ctx
         .ctx

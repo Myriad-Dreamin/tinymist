@@ -27,14 +27,14 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-current-headin
     }
    },
    {
-    "kind": 7,
+    "kind": 3,
     "label": "int",
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "125",
+    "sortText": "131",
     "textEdit": {
-     "newText": "int",
+     "newText": "int(${1:})",
      "range": {
       "end": {
        "character": 24,

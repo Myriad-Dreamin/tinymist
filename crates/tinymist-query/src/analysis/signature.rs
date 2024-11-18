@@ -81,11 +81,6 @@ pub struct PrimarySignature {
 }
 
 impl PrimarySignature {
-    /// Returns the type representation of the function.
-    pub(crate) fn ty(&self) -> Ty {
-        Ty::Func(self.sig_ty.clone())
-    }
-
     /// Returns the number of positional parameters of the function.
     pub fn pos_size(&self) -> usize {
         self.sig_ty.name_started as usize

@@ -1,15 +1,15 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (65..66)
+description: Completion on / (66..67)
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/completion-pkgs/touying-utils-reconstruct.typ
+input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-reconstruct.typ
 ---
 [
  {
   "isIncomplete": false,
   "items": [
    {
-    "kind": 21,
+    "kind": 6,
     "label": "\"body\"",
     "sortText": "000",
     "textEdit": {
