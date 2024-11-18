@@ -464,6 +464,12 @@ fn analyze_dyn_signature(
         SignatureTarget::Convert(func) | SignatureTarget::Runtime(func) => func.clone(),
     };
 
+    Some(func_signature(func))
+}
+
+/// Gets the signature of a function.
+#[comemo::memoize]
+pub fn func_signature(func: Func) -> Signature {
     use typst::foundations::func::Repr;
     let mut with_stack = eco_vec![];
     let mut func = func;
@@ -482,19 +488,6 @@ fn analyze_dyn_signature(
         func = f.0.clone();
     }
 
-    let signature = analyze_dyn_signature_inner(func);
-    log::trace!("got signature {signature:?}");
-
-    if with_stack.is_empty() {
-        return Some(Signature::Primary(signature));
-    }
-    Some(Signature::Partial(Arc::new(PartialSignature {
-        signature,
-        with_stack,
-    })))
-}
-
-fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
     let mut pos_tys = vec![];
     let mut named_tys = Vec::new();
     let mut rest_ty = None;
@@ -530,7 +523,6 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         }
     };
 
-    use typst::foundations::func::Repr;
     let ret_ty = match func.inner() {
         Repr::With(..) => unreachable!(),
         Repr::Closure(c) => {
@@ -561,13 +553,24 @@ fn analyze_dyn_signature_inner(func: Func) -> Arc<PrimarySignature> {
         param_specs.push(doc);
     }
 
-    Arc::new(PrimarySignature {
+    let signature = Arc::new(PrimarySignature {
         docs: func.docs().map(From::from),
         param_specs,
         has_fill_or_size_or_stroke,
         sig_ty: sig_ty.into(),
         _broken: broken,
-    })
+    });
+
+    log::trace!("got signature {signature:?}");
+
+    if with_stack.is_empty() {
+        return Signature::Primary(signature);
+    }
+
+    Signature::Partial(Arc::new(PartialSignature {
+        signature,
+        with_stack,
+    }))
 }
 
 fn analyze_closure_signature(

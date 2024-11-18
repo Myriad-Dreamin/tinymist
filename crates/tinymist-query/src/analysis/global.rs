@@ -720,7 +720,7 @@ impl SharedContext {
             return cached;
         }
 
-        let res = crate::analysis::term_value(self, val);
+        let res = crate::analysis::term_value(val);
 
         self.analysis
             .caches

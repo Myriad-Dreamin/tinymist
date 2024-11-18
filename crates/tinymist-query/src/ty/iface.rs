@@ -60,10 +60,7 @@ impl Ty {
         // iface_kind: IfaceSurfaceKind,
         checker: &mut impl IfaceChecker,
     ) {
-        let context = IfaceCheckContext {
-            args: Vec::new(),
-            at: TyRef::new(Ty::Any),
-        };
+        let context = IfaceCheckContext { args: Vec::new() };
         let mut worker = IfaceCheckDriver {
             ctx: context,
             checker,
@@ -75,7 +72,6 @@ impl Ty {
 
 pub struct IfaceCheckContext {
     pub args: Vec<Interned<SigTy>>,
-    pub at: TyRef,
 }
 
 #[derive(BindTyCtx)]
@@ -161,6 +157,12 @@ impl<'a> IfaceCheckDriver<'a> {
                 self.checker
                     .check(Iface::Element { val: e, at: ty }, &mut self.ctx, pol);
             }
+            Ty::Builtin(BuiltinTy::Module(e)) => {
+                if let Decl::Module(m) = e.as_ref() {
+                    self.checker
+                        .check(Iface::Module { val: m.fid, at: ty }, &mut self.ctx, pol);
+                }
+            }
             // Ty::Func(sig) if self.value_as_iface() => {
             //     self.checker.check(Iface::Type(sig), &mut self.ctx, pol);
             // }
@@ -174,13 +176,7 @@ impl<'a> IfaceCheckDriver<'a> {
                 // self.check_dict_signature(sig, pol, self.checker);
                 self.checker.check(Iface::Dict(sig), &mut self.ctx, pol);
             }
-            Ty::Var(v) => match v.def.as_ref() {
-                Decl::Module(m) => {
-                    self.checker
-                        .check(Iface::Module { val: m.fid, at: ty }, &mut self.ctx, pol);
-                }
-                _ => ty.bounds(pol, self),
-            },
+            Ty::Var(..) => ty.bounds(pol, self),
             _ if ty.has_bounds() => ty.bounds(pol, self),
             _ => {}
         }
