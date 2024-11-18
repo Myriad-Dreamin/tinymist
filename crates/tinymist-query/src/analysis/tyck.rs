@@ -31,6 +31,7 @@ pub(crate) fn type_check(
     route: &mut TypeEnv,
 ) -> Arc<TypeScheme> {
     let mut info = TypeScheme::default();
+    info.valid = true;
     info.revision = ei.revision;
 
     route.insert(ei.fid, Arc::new(TypeScheme::default()));
@@ -48,6 +49,16 @@ pub(crate) fn type_check(
     let type_check_start = std::time::Instant::now();
 
     checker.check(&root);
+
+    let exports = checker
+        .ei
+        .exports
+        .clone()
+        .into_iter()
+        .map(|(k, v)| (k.clone(), checker.check(v)))
+        .collect();
+    checker.info.exports = exports;
+
     let elapsed = type_check_start.elapsed();
     log::debug!("Type checking on {:?} took {elapsed:?}", checker.ei.fid);
 
@@ -99,14 +110,7 @@ impl<'a> TyCtxMut for TypeChecker<'a> {
 
     fn check_module_item(&mut self, fid: TypstFileId, k: &StrRef) -> Option<Ty> {
         let ei = self.ctx.expr_stage_by_id(fid)?;
-        let item = ei.exports.get(k)?;
-        match item {
-            Expr::Decl(decl) => Some(self.check_decl(decl)),
-            Expr::Ref(r) => r.root.clone().map(|r| self.check(&r)),
-            _ => {
-                panic!("unexpected module item: {item:?}");
-            }
-        }
+        Some(self.check(ei.exports.get(k)?))
     }
 }
 

@@ -2,15 +2,11 @@ use ecow::{eco_format, EcoString};
 use reflexo::hash::hash128;
 use typst::foundations::Repr;
 
-use crate::{ty::prelude::*, upstream::truncated_repr_};
-
-impl TypeScheme {
-    /// Describe the given type with the given type scheme.
-    pub fn describe(&self, ty: &Ty) -> Option<EcoString> {
-        let mut worker: TypeDescriber = TypeDescriber::default();
-        worker.describe_root(ty)
-    }
-}
+use crate::{
+    analysis::{is_plain_value, term_value},
+    ty::prelude::*,
+    upstream::truncated_repr_,
+};
 
 impl Ty {
     /// Describe the given type.
@@ -196,6 +192,13 @@ impl TypeDescriber {
             Ty::Builtin(b) => {
                 return b.describe();
             }
+            Ty::Value(v) if matches!(v.val, Value::Module(..)) => {
+                let Value::Module(m) = &v.val else {
+                    return "module".into();
+                };
+                return eco_format!("module({})", m.name());
+            }
+            Ty::Value(v) if !is_plain_value(&v.val) => return self.describe(&term_value(&v.val)),
             Ty::Value(v) if self.value => return truncated_repr_::<181>(&v.val),
             Ty::Value(v) if self.repr => return v.val.ty().short_name().into(),
             Ty::Value(v) => return v.val.repr(),

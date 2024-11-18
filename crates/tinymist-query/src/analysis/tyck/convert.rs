@@ -1,6 +1,39 @@
+use crate::analysis::func_signature;
+
 use super::*;
 
-pub fn term_value(ctx: &Arc<SharedContext>, value: &Value) -> Ty {
+pub fn is_plain_value(value: &Value) -> bool {
+    matches!(
+        value,
+        Value::Label(..)
+            | Value::None
+            | Value::Auto
+            | Value::Bool(..)
+            | Value::Int(..)
+            | Value::Float(..)
+            | Value::Decimal(..)
+            | Value::Length(..)
+            | Value::Angle(..)
+            | Value::Ratio(..)
+            | Value::Relative(..)
+            | Value::Fraction(..)
+            | Value::Color(..)
+            | Value::Gradient(..)
+            | Value::Pattern(..)
+            | Value::Symbol(..)
+            | Value::Version(..)
+            | Value::Str(..)
+            | Value::Bytes(..)
+            | Value::Datetime(..)
+            | Value::Duration(..)
+            | Value::Content(..)
+            | Value::Styles(..)
+    )
+}
+
+/// Gets the type of a value.
+#[comemo::memoize]
+pub fn term_value(value: &Value) -> Ty {
     match value {
         Value::Array(a) => {
             let values = a
@@ -34,38 +67,17 @@ pub fn term_value(ctx: &Arc<SharedContext>, value: &Value) -> Ty {
                 .collect();
             Ty::Dict(RecordTy::new(values))
         }
-        Value::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
+        Value::Type(ty) => Ty::Builtin(BuiltinTy::TypeType(*ty)),
         Value::Dyn(v) => Ty::Builtin(BuiltinTy::Type(v.ty())),
-        Value::Func(func) => Ty::Func(ctx.type_of_func(func.clone()).type_sig()),
-        Value::Label(..)
-        | Value::None
-        | Value::Auto
-        | Value::Bool(..)
-        | Value::Int(..)
-        | Value::Float(..)
-        | Value::Decimal(..)
-        | Value::Length(..)
-        | Value::Angle(..)
-        | Value::Ratio(..)
-        | Value::Relative(..)
-        | Value::Fraction(..)
-        | Value::Color(..)
-        | Value::Gradient(..)
-        | Value::Pattern(..)
-        | Value::Symbol(..)
-        | Value::Version(..)
-        | Value::Str(..)
-        | Value::Bytes(..)
-        | Value::Datetime(..)
-        | Value::Duration(..)
-        | Value::Content(..)
-        | Value::Styles(..) => Ty::Value(InsTy::new(value.clone())),
+        Value::Func(func) => Ty::Func(func_signature(func.clone()).type_sig()),
+        _ if is_plain_value(value) => Ty::Value(InsTy::new(value.clone())),
+        _ => Ty::Any,
     }
 }
 
 pub fn term_value_rec(value: &Value, s: Span) -> Ty {
     match value {
-        Value::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
+        Value::Type(ty) => Ty::Builtin(BuiltinTy::TypeType(*ty)),
         Value::Dyn(v) => Ty::Builtin(BuiltinTy::Type(v.ty())),
         Value::None
         | Value::Auto

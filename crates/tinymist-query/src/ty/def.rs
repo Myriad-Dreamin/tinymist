@@ -182,6 +182,7 @@ impl Ty {
     pub fn name(&self) -> Interned<str> {
         match self {
             Ty::Var(v) => v.name.clone(),
+            Ty::Builtin(BuiltinTy::Module(m)) => m.name().clone(),
             ty => ty
                 .value()
                 .and_then(|v| Some(Interned::new_str(v.name()?)))
@@ -1085,8 +1086,12 @@ impl IfTy {
 /// A type scheme on a group of syntax structures (typing)
 #[derive(Default)]
 pub struct TypeScheme {
+    /// Whether the typing is valid
+    pub valid: bool,
     /// The revision used
     pub revision: usize,
+    /// The exported types
+    pub exports: FxHashMap<StrRef, Ty>,
     /// The typing on definitions
     pub vars: FxHashMap<DeclExpr, TypeVarBounds>,
     /// The checked documentation of definitions

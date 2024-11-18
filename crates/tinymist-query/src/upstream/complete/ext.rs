@@ -287,7 +287,7 @@ impl<'a> CompletionContext<'a> {
                     .and_then(|types| {
                         let ty = types.type_of_span(span)?;
                         let ty = types.simplify(ty, false);
-                        types.describe(&ty).map(From::from)
+                        ty.describe().map(From::from)
                     })
                     .or_else(|| {
                         if let DefKind::Instance(_, v) = &def_kind {
@@ -767,6 +767,7 @@ fn type_completion(
             BuiltinTy::Infer => return None,
             BuiltinTy::FlowNone => return None,
             BuiltinTy::Tag(..) => return None,
+            BuiltinTy::Module(..) => return None,
 
             BuiltinTy::Path(p) => {
                 let source = ctx.ctx.source_by_id(ctx.root.span().id()?).ok()?;
@@ -896,7 +897,7 @@ fn type_completion(
             BuiltinTy::RefLabel => {
                 ctx.ref_completions();
             }
-            BuiltinTy::Type(ty) => {
+            BuiltinTy::TypeType(ty) | BuiltinTy::Type(ty) => {
                 if *ty == Type::of::<NoneValue>() {
                     let docs = docs.or(Some("Nothing."));
                     type_completion(ctx, &Ty::Builtin(BuiltinTy::None), docs);
