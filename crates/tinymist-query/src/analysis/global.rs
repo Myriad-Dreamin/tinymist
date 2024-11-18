@@ -1,6 +1,7 @@
 use std::num::NonZeroUsize;
 use std::ops::DerefMut;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
 use std::{collections::HashSet, ops::Deref};
 
 use comemo::{Track, Tracked};
@@ -508,12 +509,14 @@ impl SharedContext {
 
     /// Get the source of a file by file id.
     pub fn source_by_id(&self, id: TypstFileId) -> FileResult<Source> {
-        self.world.source(id)
+        // todo: repeatedly caching
+        let src = self.slot.sources.entry(id).or_default().clone();
+        src.get_or_init(|| self.world.source(id)).clone()
     }
 
     /// Get the source of a file by file path.
     pub fn source_by_path(&self, p: &Path) -> FileResult<Source> {
-        self.world.source_by_path(p)
+        self.source_by_id(self.file_id_by_path(p)?)
     }
 
     /// Get a syntax object at a position.
@@ -1103,16 +1106,26 @@ pub struct AnalysisRevCache {
 impl RevisionManagerLike for AnalysisRevCache {
     fn gc(&mut self, rev: usize) {
         self.manager.gc(rev);
-        self.default_slot
-            .expr_stage
-            .global
-            .lock()
-            .retain(|_, r| r.0 >= rev);
-        self.default_slot
-            .type_check
-            .global
-            .lock()
-            .retain(|_, r| r.0 >= rev);
+
+        {
+            let mut max_ei = FxHashMap::default();
+            let es = self.default_slot.expr_stage.global.lock();
+            for r in es.iter() {
+                let rev: &mut usize = max_ei.entry(r.1.fid).or_default();
+                *rev = (*rev).max(r.1.revision);
+            }
+            es.retain(|_, r| r.1.revision == *max_ei.get(&r.1.fid).unwrap_or(&0));
+        }
+
+        {
+            let mut max_ti = FxHashMap::default();
+            let ts = self.default_slot.type_check.global.lock();
+            for r in ts.iter() {
+                let rev: &mut usize = max_ti.entry(r.1.fid).or_default();
+                *rev = (*rev).max(r.1.revision);
+            }
+            ts.retain(|_, r| r.1.revision == *max_ti.get(&r.1.fid).unwrap_or(&0));
+        }
     }
 }
 
@@ -1136,8 +1149,17 @@ impl AnalysisRevCache {
                     revision: e.revision,
                     expr_stage: e.data.expr_stage.crawl(revision.get()),
                     type_check: e.data.type_check.crawl(revision.get()),
+                    sources: Default::default(),
                 })
-                .unwrap_or_else(|| self.default_slot.clone())
+                .unwrap_or_else(|| {
+                    let base = self.default_slot.clone();
+                    AnalysisRevSlot {
+                        revision: revision.get(),
+                        expr_stage: base.expr_stage.clone(),
+                        type_check: base.type_check.clone(),
+                        sources: Default::default(),
+                    }
+                })
         })
     }
 }
@@ -1168,6 +1190,7 @@ struct AnalysisRevSlot {
     revision: usize,
     expr_stage: IncrCacheMap<u128, Arc<ExprInfo>>,
     type_check: IncrCacheMap<u128, Arc<TypeScheme>>,
+    sources: FxDashMap<TypstFileId, OnceLock<FileResult<Source>>>,
 }
 
 impl Drop for AnalysisRevSlot {

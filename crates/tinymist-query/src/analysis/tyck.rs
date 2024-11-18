@@ -35,6 +35,7 @@ pub(crate) fn type_check(
 ) -> Arc<TypeScheme> {
     let mut info = TypeScheme::default();
     info.valid = true;
+    info.fid = Some(ei.fid);
     info.revision = ei.revision;
 
     route.insert(ei.fid, Arc::new(TypeScheme::default()));
