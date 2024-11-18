@@ -142,9 +142,7 @@ impl<'a, 'b> ApplyChecker for ApplyTypeChecker<'a, 'b> {
         let Some(SigShape { sig, withs }) = sig.shape(self.base) else {
             return;
         };
-        for (arg_recv, arg_ins) in sig.matches(args, withs) {
-            self.base.constrain(arg_ins, arg_recv);
-        }
+        self.base.constrain_call(&sig, args, withs);
 
         if let Some(callee) = callee.clone() {
             self.base.info.witness_at_least(self.call_site, callee);

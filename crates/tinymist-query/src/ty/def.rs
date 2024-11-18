@@ -1088,6 +1088,8 @@ impl IfTy {
 pub struct TypeScheme {
     /// Whether the typing is valid
     pub valid: bool,
+    /// The belonging file id
+    pub fid: Option<TypstFileId>,
     /// The revision used
     pub revision: usize,
     /// The exported types

@@ -1,6 +1,8 @@
 //! Type checking on source file
 
-use rustc_hash::FxHashMap;
+use std::sync::OnceLock;
+
+use rustc_hash::{FxHashMap, FxHashSet};
 use tinymist_derive::BindTyCtx;
 
 use super::{
@@ -8,6 +10,7 @@ use super::{
     TypeVarBounds,
 };
 use crate::{
+    log_never,
     syntax::{Decl, DeclExpr, Expr, ExprInfo, UnaryOp},
     ty::*,
 };
@@ -22,19 +25,24 @@ pub(crate) use apply::*;
 pub(crate) use convert::*;
 pub(crate) use select::*;
 
-pub type TypeEnv = FxHashMap<TypstFileId, Arc<TypeScheme>>;
+#[derive(Default)]
+pub struct TypeEnv {
+    visiting: FxHashMap<TypstFileId, Arc<TypeScheme>>,
+    exprs: FxHashMap<TypstFileId, Option<Arc<ExprInfo>>>,
+}
 
 /// Type checking at the source unit level.
 pub(crate) fn type_check(
     ctx: Arc<SharedContext>,
     ei: Arc<ExprInfo>,
-    route: &mut TypeEnv,
+    env: &mut TypeEnv,
 ) -> Arc<TypeScheme> {
     let mut info = TypeScheme::default();
     info.valid = true;
+    info.fid = Some(ei.fid);
     info.revision = ei.revision;
 
-    route.insert(ei.fid, Arc::new(TypeScheme::default()));
+    env.visiting.insert(ei.fid, Arc::new(TypeScheme::default()));
 
     // Retrieve expression information for the source.
     let root = ei.root.clone();
@@ -43,7 +51,9 @@ pub(crate) fn type_check(
         ctx,
         ei,
         info,
-        route,
+        env,
+        call_cache: Default::default(),
+        module_exports: Default::default(),
     };
 
     let type_check_start = std::time::Instant::now();
@@ -62,17 +72,27 @@ pub(crate) fn type_check(
     let elapsed = type_check_start.elapsed();
     log::debug!("Type checking on {:?} took {elapsed:?}", checker.ei.fid);
 
-    checker.route.remove(&checker.ei.fid);
+    checker.env.visiting.remove(&checker.ei.fid);
 
     Arc::new(checker.info)
 }
+
+type CallCacheDesc = (
+    Interned<SigTy>,
+    Interned<SigTy>,
+    Option<Vec<Interned<SigTy>>>,
+);
 
 pub(crate) struct TypeChecker<'a> {
     ctx: Arc<SharedContext>,
     ei: Arc<ExprInfo>,
 
     info: TypeScheme,
-    route: &'a mut TypeEnv,
+    module_exports: FxHashMap<(TypstFileId, Interned<str>), OnceLock<Option<Ty>>>,
+
+    call_cache: FxHashSet<CallCacheDesc>,
+
+    env: &'a mut TypeEnv,
 }
 
 impl<'a> TyCtx for TypeChecker<'a> {
@@ -109,8 +129,21 @@ impl<'a> TyCtxMut for TypeChecker<'a> {
     }
 
     fn check_module_item(&mut self, fid: TypstFileId, k: &StrRef) -> Option<Ty> {
-        let ei = self.ctx.expr_stage_by_id(fid)?;
-        Some(self.check(ei.exports.get(k)?))
+        self.module_exports
+            .entry((fid, k.clone()))
+            .or_default()
+            .clone()
+            .get_or_init(|| {
+                let ei = self
+                    .env
+                    .exprs
+                    .entry(fid)
+                    .or_insert_with(|| self.ctx.expr_stage_by_id(fid))
+                    .clone()?;
+
+                Some(self.check(ei.exports.get(k)?))
+            })
+            .clone()
     }
 }
 
@@ -152,10 +185,10 @@ impl<'a> TypeChecker<'a> {
                 let ext_def_use_info = self.ctx.expr_stage_by_id(fid)?;
                 let source = &ext_def_use_info.source;
                 // todo: check types in cycle
-                let ext_type_info = if let Some(scheme) = self.route.get(&source.id()) {
+                let ext_type_info = if let Some(scheme) = self.env.visiting.get(&source.id()) {
                     scheme.clone()
                 } else {
-                    self.ctx.clone().type_check_(source, self.route)
+                    self.ctx.clone().type_check_(source, self.env)
                 };
                 let ext_def = ext_def_use_info.exports.get(&name)?;
 
@@ -194,6 +227,22 @@ impl<'a> TypeChecker<'a> {
         var
     }
 
+    fn constrain_call(
+        &mut self,
+        sig: &Interned<SigTy>,
+        args: &Interned<SigTy>,
+        withs: Option<&Vec<Interned<SigTy>>>,
+    ) {
+        let call_desc = (sig.clone(), args.clone(), withs.cloned());
+        if !self.call_cache.insert(call_desc) {
+            return;
+        }
+
+        for (arg_recv, arg_ins) in sig.matches(args, withs) {
+            self.constrain(arg_ins, arg_recv);
+        }
+    }
+
     fn constrain(&mut self, lhs: &Ty, rhs: &Ty) {
         static FLOW_STROKE_DICT_TYPE: LazyLock<Ty> =
             LazyLock::new(|| Ty::Dict(FLOW_STROKE_DICT.clone()));
@@ -230,7 +279,7 @@ impl<'a> TypeChecker<'a> {
                 let _ = w.def;
             }
             (Ty::Var(v), rhs) => {
-                log::debug!("constrain var {v:?} ⪯ {rhs:?}");
+                log_never!("constrain var {v:?} ⪯ {rhs:?}");
                 let w = self.info.vars.get_mut(&v.def).unwrap();
                 // strict constraint on upper bound
                 let bound = rhs.clone();
@@ -244,7 +293,7 @@ impl<'a> TypeChecker<'a> {
             (lhs, Ty::Var(v)) => {
                 let w = self.info.vars.get(&v.def).unwrap();
                 let bound = self.weaken_constraint(lhs, &w.bounds);
-                log::debug!("constrain var {v:?} ⪰ {bound:?}");
+                log_never!("constrain var {v:?} ⪰ {bound:?}");
                 match &w.bounds {
                     FlowVarKind::Strong(v) | FlowVarKind::Weak(v) => {
                         let mut v = v.write();
@@ -316,7 +365,7 @@ impl<'a> TypeChecker<'a> {
             }
             (Ty::Dict(lhs), Ty::Dict(rhs)) => {
                 for (key, lhs, rhs) in lhs.common_iface_fields(rhs) {
-                    log::debug!("constrain record item {key} {lhs:?} ⪯ {rhs:?}");
+                    log_never!("constrain record item {key} {lhs:?} ⪯ {rhs:?}");
                     self.constrain(lhs, rhs);
                     // if !sl.is_detached() {
                     //     self.info.witness_at_most(*sl, rhs.clone());
@@ -332,32 +381,32 @@ impl<'a> TypeChecker<'a> {
                 self.constrain(&lhs.lhs, &rhs.lhs);
             }
             (Ty::Unary(lhs), rhs) if lhs.op == UnaryOp::TypeOf && is_ty(rhs) => {
-                log::debug!("constrain type of {lhs:?} ⪯ {rhs:?}");
+                log_never!("constrain type of {lhs:?} ⪯ {rhs:?}");
 
                 self.constrain(&lhs.lhs, rhs);
             }
             (lhs, Ty::Unary(rhs)) if rhs.op == UnaryOp::TypeOf && is_ty(lhs) => {
-                log::debug!(
+                log_never!(
                     "constrain type of {lhs:?} ⪯ {rhs:?} {:?}",
                     matches!(lhs, Ty::Builtin(..))
                 );
                 self.constrain(lhs, &rhs.lhs);
             }
             (Ty::Value(lhs), rhs) => {
-                log::debug!("constrain value {lhs:?} ⪯ {rhs:?}");
+                log_never!("constrain value {lhs:?} ⪯ {rhs:?}");
                 let _ = TypeScheme::witness_at_most;
                 // if !lhs.1.is_detached() {
                 //     self.info.witness_at_most(lhs.1, rhs.clone());
                 // }
             }
             (lhs, Ty::Value(rhs)) => {
-                log::debug!("constrain value {lhs:?} ⪯ {rhs:?}");
+                log_never!("constrain value {lhs:?} ⪯ {rhs:?}");
                 // if !rhs.1.is_detached() {
                 //     self.info.witness_at_least(rhs.1, lhs.clone());
                 // }
             }
             _ => {
-                log::debug!("constrain {lhs:?} ⪯ {rhs:?}");
+                log_never!("constrain {lhs:?} ⪯ {rhs:?}");
             }
         }
     }
