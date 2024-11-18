@@ -64,6 +64,8 @@ pub struct Completion {
     pub sort_text: Option<EcoString>,
     /// The composed text used for filtering.
     pub filter_text: Option<EcoString>,
+    /// The character that should be committed when selecting this completion.
+    pub commit_char: Option<char>,
     /// The completed version of the input, possibly described with snippet
     /// syntax like `${lhs} + ${rhs}`.
     ///

@@ -1,8 +1,8 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (61..62)
+description: Completion on t (57..58)
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
+input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong.typ
 ---
 [
  {
@@ -10,20 +10,19 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
   "items": [
    {
     "kind": 3,
-    "label": "config-xxx",
+    "label": "strong",
     "labelDetails": {
-     "description": "() => any"
+     "description": "(content, delta: int) => strong"
     },
-    "sortText": "051",
     "textEdit": {
-     "newText": "config-xxx()${1:}",
+     "newText": "strong[${1:}]",
      "range": {
       "end": {
-       "character": 15,
+       "character": 26,
        "line": 2
       },
       "start": {
-       "character": 15,
+       "character": 24,
        "line": 2
       }
      }

@@ -1,29 +1,29 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (61..62)
+description: "Completion on ] (52..53)"
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
+input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong_delta2.typ
 ---
 [
  {
   "isIncomplete": false,
   "items": [
    {
-    "kind": 3,
-    "label": "config-xxx",
+    "kind": 5,
+    "label": "delta",
     "labelDetails": {
-     "description": "() => any"
+     "description": "int"
     },
-    "sortText": "051",
+    "sortText": "001",
     "textEdit": {
-     "newText": "config-xxx()${1:}",
+     "newText": "delta: ${1:}",
      "range": {
       "end": {
-       "character": 15,
+       "character": 31,
        "line": 2
       },
       "start": {
-       "character": 15,
+       "character": 31,
        "line": 2
       }
      }

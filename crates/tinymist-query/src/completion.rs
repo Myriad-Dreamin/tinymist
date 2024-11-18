@@ -243,6 +243,10 @@ impl StatefulRequest for CompletionRequest {
                     }),
                     text_edit: Some(text_edit),
                     insert_text_format: Some(InsertTextFormat::SNIPPET),
+                    commit_characters: typst_completion
+                        .commit_char
+                        .as_ref()
+                        .map(|v| vec![v.to_string()]),
                     command: typst_completion.command.as_ref().map(|c| Command {
                         command: c.to_string(),
                         ..Default::default()

@@ -11,6 +11,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_with_args.typ
    {
     "kind": 5,
     "label": "authors",
+    "labelDetails": {
+     "description": "array | str"
+    },
     "sortText": "000",
     "textEdit": {
      "newText": "authors: ${1:}",
@@ -29,6 +32,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_with_args.typ
    {
     "kind": 5,
     "label": "class",
+    "labelDetails": {
+     "description": "\"article\" | \"letter\" | str"
+    },
     "sortText": "001",
     "textEdit": {
      "newText": "class: ${1:}",
@@ -47,6 +53,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_with_args.typ
    {
     "kind": 5,
     "label": "font",
+    "labelDetails": {
+     "description": "array | none | text.font"
+    },
     "sortText": "002",
     "textEdit": {
      "newText": "font: ${1:}",
@@ -68,7 +77,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_with_args.typ
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "052",
+    "sortText": "053",
     "textEdit": {
      "newText": "content",
      "range": {

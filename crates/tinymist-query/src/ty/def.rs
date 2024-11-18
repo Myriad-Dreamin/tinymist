@@ -15,11 +15,11 @@ use reflexo_typst::TypstFileId;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use typst::{
-    foundations::{ParamInfo, Value},
+    foundations::{Content, ParamInfo, Type, Value},
     syntax::{ast, Span, SyntaxKind, SyntaxNode},
 };
 
-use super::PackageId;
+use super::{BoundPred, PackageId};
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
     analysis::BuiltinTy,
@@ -220,6 +220,24 @@ impl Ty {
             Ty::Builtin(BuiltinTy::Type(ty)) => Some(Value::Type(*ty)),
             _ => None,
         }
+    }
+
+    pub(crate) fn is_content<T: TyCtx>(&self, ctx: &T) -> bool {
+        let mut res = false;
+        self.bounds(
+            false,
+            &mut BoundPred::new(ctx, |ty: &Ty, _pol| {
+                res = res || {
+                    match ty {
+                        Ty::Value(v) => matches!(v.val, Value::Content(..)),
+                        Ty::Builtin(BuiltinTy::Content | BuiltinTy::Element(..)) => true,
+                        Ty::Builtin(BuiltinTy::Type(v)) => *v == Type::of::<Content>(),
+                        _ => false,
+                    }
+                }
+            }),
+        );
+        res
     }
 }
 
@@ -845,6 +863,21 @@ impl SigTy {
         (idx < self.name_started as usize)
             .then_some(())
             .and_then(|_| self.inputs.get(idx))
+    }
+
+    /// Get the parameter or the rest parameter at the given index
+    pub fn pos_or_rest(&self, idx: usize) -> Option<Ty> {
+        let nth = self.pos(idx).cloned();
+        nth.or_else(|| {
+            let rest_idx = || idx.saturating_sub(self.positional_params().len());
+
+            let rest_ty = self.rest_param()?;
+            match rest_ty {
+                Ty::Array(ty) => Some(ty.as_ref().clone()),
+                Ty::Tuple(tys) => tys.get(rest_idx()).cloned(),
+                _ => None,
+            }
+        })
     }
 
     /// Get the named parameters of the function

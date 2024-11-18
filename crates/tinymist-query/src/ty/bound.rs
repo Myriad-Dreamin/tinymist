@@ -21,6 +21,25 @@ pub trait BoundChecker: Sized + TyCtx {
     }
 }
 
+#[derive(BindTyCtx)]
+#[bind(0)]
+pub struct BoundPred<'a, T: TyCtx, F>(pub &'a T, pub F);
+
+impl<'a, T: TyCtx, F> BoundPred<'a, T, F> {
+    pub fn new(t: &'a T, f: F) -> Self {
+        Self(t, f)
+    }
+}
+
+impl<'a, T: TyCtx, F> BoundChecker for BoundPred<'a, T, F>
+where
+    F: FnMut(&Ty, bool),
+{
+    fn collect(&mut self, ty: &Ty, pol: bool) {
+        self.1(ty, pol);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DocSource {
     Var(Interned<TypeVar>),

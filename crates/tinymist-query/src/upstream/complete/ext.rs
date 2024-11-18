@@ -13,7 +13,7 @@ use typst::visualize::Color;
 
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::adt::interner::Interned;
-use crate::analysis::{BuiltinTy, PathPreference, Ty};
+use crate::analysis::{func_signature, BuiltinTy, PathPreference, Ty};
 use crate::syntax::{descending_decls, is_ident_like, CheckTarget, DescentDecl};
 use crate::ty::{Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeBounds, TypeScheme, TypeVar};
 use crate::upstream::complete::complete_code;
@@ -174,8 +174,13 @@ impl<'a> CompletionContext<'a> {
                             ..base
                         });
                     } else {
+                        let apply = if fn_feat.prefer_content_bracket {
+                            eco_format!("{name}[${{}}]")
+                        } else {
+                            eco_format!("{name}(${{}})")
+                        };
                         self.completions.push(Completion {
-                            apply: Some(eco_format!("{}(${{}})", name)),
+                            apply: Some(apply),
                             label: name,
                             ..base
                         });
@@ -392,6 +397,7 @@ impl CompletionKindChecker {
 #[derive(Default, Debug)]
 struct FnCompletionFeat {
     zero_args: bool,
+    prefer_content_bracket: bool,
     is_element: bool,
 }
 
@@ -408,15 +414,12 @@ impl FnCompletionFeat {
         match ty {
             Ty::Value(val) => match &val.val {
                 Value::Type(..) => {}
-                Value::Func(sig) => {
-                    if sig.element().is_some() {
+                Value::Func(func) => {
+                    if func.element().is_some() {
                         self.is_element = true;
                     }
-                    let ps = sig.params().into_iter().flatten();
-                    let pos_size = ps.filter(|s| s.positional).count();
-                    if pos_size <= pos {
-                        self.zero_args = true;
-                    }
+                    let sig = func_signature(func.clone()).type_sig();
+                    self.check_sig(&sig, pos);
                 }
                 _ => panic!("FnCompletionFeat check_one {val:?}"),
             },
@@ -424,18 +427,25 @@ impl FnCompletionFeat {
             Ty::With(w) => {
                 self.check_one(&w.sig, pos + w.with.positional_params().len());
             }
-            Ty::Builtin(BuiltinTy::Element(..)) => {
+            Ty::Builtin(BuiltinTy::Element(func)) => {
                 self.is_element = true;
+                let sig = (*func).into();
+                let sig = func_signature(sig).type_sig();
+                self.check_sig(&sig, pos);
             }
             Ty::Builtin(BuiltinTy::TypeType(..)) => {}
             _ => panic!("FnCompletionFeat check_one {ty:?}"),
         }
     }
 
-    fn check_sig(&mut self, sig: &SigTy, pos: usize) {
-        if pos >= sig.positional_params().len() {
-            self.zero_args = true;
-        }
+    // todo: sig is element
+    fn check_sig(&mut self, sig: &SigTy, idx: usize) {
+        let pos_size = sig.positional_params().len();
+        let prefer_content_bracket =
+            sig.rest_param().is_none() && sig.pos(idx).map_or(false, |ty| ty.is_content(&()));
+        self.prefer_content_bracket = self.prefer_content_bracket || prefer_content_bracket;
+        let name_size = sig.named_params().len();
+        self.zero_args = pos_size <= idx && name_size == 0;
     }
 }
 
@@ -462,8 +472,7 @@ fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
     // ctx.strict_scope_completions(false, |value| value.ty() == ty);
 
     log::debug!(
-        "sort_and_explicit_code_completion: {:#?} {:#?}",
-        completions,
+        "sort_and_explicit_code_completion: {completions:#?} {:#?}",
         ctx.completions
     );
 
@@ -617,6 +626,7 @@ fn type_completion(
         Ty::Param(p) => {
             // todo: variadic
 
+            let docs = docs.or_else(|| p.docs.as_deref());
             if p.attrs.positional {
                 type_completion(ctx, &p.ty, docs);
             }
@@ -637,12 +647,11 @@ fn type_completion(
                 return Some(());
             }
 
-            // todo: label details
-            let docs = docs.or_else(|| p.docs.as_deref());
             ctx.completions.push(Completion {
                 kind: CompletionKind::Field,
                 label: f.into(),
                 apply: Some(eco_format!("{}: ${{}}", f)),
+                label_detail: p.ty.describe(),
                 detail: docs.map(Into::into),
                 command: ctx
                     .trigger_named_completion
@@ -871,6 +880,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
 
     let check_target = get_check_target(ctx.leaf.clone());
     log::debug!("complete_type: pos {:?} -> {check_target:#?}", ctx.leaf);
+    let mut args_node = None;
 
     match check_target {
         Some(CheckTarget::Element { container, .. }) => {
@@ -889,6 +899,13 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
                     ctx.seen_field(named.name().into());
                 }
             }
+            args_node = Some(args.to_untyped().clone());
+        }
+        Some(CheckTarget::Normal(e))
+            if (matches!(e.kind(), SyntaxKind::ContentBlock)
+                && matches!(ctx.leaf.kind(), SyntaxKind::LeftBracket)) =>
+        {
+            args_node = e.parent().map(|s| s.get().clone());
         }
         Some(CheckTarget::Normal(e))
             if matches!(
@@ -920,6 +937,22 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     }
 
     sort_and_explicit_code_completion(ctx);
+
+    if let Some(c) = args_node {
+        log::debug!("content block compl: args {c:?}");
+        let is_unclosed = matches!(c.kind(), SyntaxKind::Args)
+            && c.children().fold(0i32, |acc, node| match node.kind() {
+                SyntaxKind::LeftParen => acc + 1,
+                SyntaxKind::RightParen => acc - 1,
+                SyntaxKind::Error if node.text() == "(" => acc + 1,
+                SyntaxKind::Error if node.text() == ")" => acc - 1,
+                _ => acc,
+            }) > 0;
+        if is_unclosed {
+            ctx.enrich("", ")");
+        }
+    }
+
     Some(())
 }
 

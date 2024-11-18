@@ -11,6 +11,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/half_completion.typ
    {
     "kind": 5,
     "label": "font",
+    "labelDetails": {
+     "description": "array | text.font"
+    },
     "sortText": "011",
     "textEdit": {
      "newText": "font: ${1:}, ",
@@ -34,6 +37,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/half_completion.typ
    {
     "kind": 5,
     "label": "font",
+    "labelDetails": {
+     "description": "array | text.font"
+    },
     "sortText": "011",
     "textEdit": {
      "newText": "font: ${1:}",
