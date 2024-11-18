@@ -8,6 +8,7 @@ use super::{
     TypeVarBounds,
 };
 use crate::{
+    log_never,
     syntax::{Decl, DeclExpr, Expr, ExprInfo, UnaryOp},
     ty::*,
 };
@@ -230,7 +231,7 @@ impl<'a> TypeChecker<'a> {
                 let _ = w.def;
             }
             (Ty::Var(v), rhs) => {
-                log::debug!("constrain var {v:?} ⪯ {rhs:?}");
+                log_never!("constrain var {v:?} ⪯ {rhs:?}");
                 let w = self.info.vars.get_mut(&v.def).unwrap();
                 // strict constraint on upper bound
                 let bound = rhs.clone();
@@ -244,7 +245,7 @@ impl<'a> TypeChecker<'a> {
             (lhs, Ty::Var(v)) => {
                 let w = self.info.vars.get(&v.def).unwrap();
                 let bound = self.weaken_constraint(lhs, &w.bounds);
-                log::debug!("constrain var {v:?} ⪰ {bound:?}");
+                log_never!("constrain var {v:?} ⪰ {bound:?}");
                 match &w.bounds {
                     FlowVarKind::Strong(v) | FlowVarKind::Weak(v) => {
                         let mut v = v.write();
@@ -316,7 +317,7 @@ impl<'a> TypeChecker<'a> {
             }
             (Ty::Dict(lhs), Ty::Dict(rhs)) => {
                 for (key, lhs, rhs) in lhs.common_iface_fields(rhs) {
-                    log::debug!("constrain record item {key} {lhs:?} ⪯ {rhs:?}");
+                    log_never!("constrain record item {key} {lhs:?} ⪯ {rhs:?}");
                     self.constrain(lhs, rhs);
                     // if !sl.is_detached() {
                     //     self.info.witness_at_most(*sl, rhs.clone());
@@ -332,32 +333,32 @@ impl<'a> TypeChecker<'a> {
                 self.constrain(&lhs.lhs, &rhs.lhs);
             }
             (Ty::Unary(lhs), rhs) if lhs.op == UnaryOp::TypeOf && is_ty(rhs) => {
-                log::debug!("constrain type of {lhs:?} ⪯ {rhs:?}");
+                log_never!("constrain type of {lhs:?} ⪯ {rhs:?}");
 
                 self.constrain(&lhs.lhs, rhs);
             }
             (lhs, Ty::Unary(rhs)) if rhs.op == UnaryOp::TypeOf && is_ty(lhs) => {
-                log::debug!(
+                log_never!(
                     "constrain type of {lhs:?} ⪯ {rhs:?} {:?}",
                     matches!(lhs, Ty::Builtin(..))
                 );
                 self.constrain(lhs, &rhs.lhs);
             }
             (Ty::Value(lhs), rhs) => {
-                log::debug!("constrain value {lhs:?} ⪯ {rhs:?}");
+                log_never!("constrain value {lhs:?} ⪯ {rhs:?}");
                 let _ = TypeScheme::witness_at_most;
                 // if !lhs.1.is_detached() {
                 //     self.info.witness_at_most(lhs.1, rhs.clone());
                 // }
             }
             (lhs, Ty::Value(rhs)) => {
-                log::debug!("constrain value {lhs:?} ⪯ {rhs:?}");
+                log_never!("constrain value {lhs:?} ⪯ {rhs:?}");
                 // if !rhs.1.is_detached() {
                 //     self.info.witness_at_least(rhs.1, lhs.clone());
                 // }
             }
             _ => {
-                log::debug!("constrain {lhs:?} ⪯ {rhs:?}");
+                log_never!("constrain {lhs:?} ⪯ {rhs:?}");
             }
         }
     }
