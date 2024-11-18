@@ -37,8 +37,7 @@ impl<'a> CompletionContext<'a> {
     ///
     /// Filters the global/math scope with the given filter.
     pub fn scope_completions_(&mut self, parens: bool, filter: impl Fn(Option<&Value>) -> bool) {
-        println!("scope completions {:?}", self.from_ty);
-
+        log::debug!("scope_completions: {parens}");
         let Some(fid) = self.root.span().id() else {
             return;
         };
@@ -50,27 +49,6 @@ impl<'a> CompletionContext<'a> {
             types: self.ctx.type_check(&src),
             defines: Default::default(),
         };
-
-        descending_decls(self.leaf.clone(), |node| -> Option<()> {
-            match node {
-                DescentDecl::Ident(ident) => {
-                    let ty = self.ctx.type_of_span(ident.span()).unwrap_or(Ty::Any);
-                    defines.insert_ty(ty, ident.get());
-                }
-                DescentDecl::ImportSource(src) => {
-                    println!("scope completions import source: {src:?}");
-                    let ty = analyze_import_source(self.ctx, &defines.types, src)?;
-                    let name = ty.name().as_ref().into();
-                    defines.insert_ty(ty, &name);
-                }
-                // todo: cache completion items
-                DescentDecl::ImportAll(mi) => {
-                    let ty = analyze_import_source(self.ctx, &defines.types, mi.source())?;
-                    ty.iface_surface(true, &mut ScopeChecker(&mut defines, self.ctx));
-                }
-            }
-            None
-        });
 
         let in_math = matches!(
             self.leaf.parent_kind(),
@@ -85,6 +63,26 @@ impl<'a> CompletionContext<'a> {
             .scope()
             .clone();
         defines.insert_scope(&scope);
+
+        descending_decls(self.leaf.clone(), |node| -> Option<()> {
+            match node {
+                DescentDecl::Ident(ident) => {
+                    let ty = self.ctx.type_of_span(ident.span()).unwrap_or(Ty::Any);
+                    defines.insert_ty(ty, ident.get());
+                }
+                DescentDecl::ImportSource(src) => {
+                    let ty = analyze_import_source(self.ctx, &defines.types, src)?;
+                    let name = ty.name().as_ref().into();
+                    defines.insert_ty(ty, &name);
+                }
+                // todo: cache completion items
+                DescentDecl::ImportAll(mi) => {
+                    let ty = analyze_import_source(self.ctx, &defines.types, mi.source())?;
+                    ty.iface_surface(true, &mut ScopeChecker(&mut defines, self.ctx));
+                }
+            }
+            None
+        });
 
         enum SurroundingSyntax {
             Regular,
@@ -298,9 +296,7 @@ impl Defines {
 fn analyze_import_source(ctx: &LocalContext, types: &TypeScheme, s: ast::Expr) -> Option<Ty> {
     if let Some(res) = types.type_of_span(s.span()) {
         if !matches!(res.value(), Some(Value::Str(..))) {
-            let res = types.simplify(res, false);
-            println!("analyze_import_source: {res:?}");
-            return Some(res);
+            return Some(types.simplify(res, false));
         }
     }
 

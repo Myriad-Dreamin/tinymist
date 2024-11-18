@@ -27,14 +27,14 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-cover-with-rec
     }
    },
    {
-    "kind": 7,
+    "kind": 3,
     "label": "stroke",
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "280",
+    "sortText": "289",
     "textEdit": {
-     "newText": "stroke",
+     "newText": "stroke(${1:})",
      "range": {
       "end": {
        "character": 17,
