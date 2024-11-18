@@ -1,5 +1,7 @@
 //! Type checking on source file
 
+use std::sync::OnceLock;
+
 use rustc_hash::FxHashMap;
 use tinymist_derive::BindTyCtx;
 
@@ -45,6 +47,7 @@ pub(crate) fn type_check(
         ei,
         info,
         route,
+        module_exports: Default::default(),
     };
 
     let type_check_start = std::time::Instant::now();
@@ -73,6 +76,7 @@ pub(crate) struct TypeChecker<'a> {
     ei: Arc<ExprInfo>,
 
     info: TypeScheme,
+    module_exports: FxHashMap<(TypstFileId, Interned<str>), OnceLock<Option<Ty>>>,
     route: &'a mut TypeEnv,
 }
 
@@ -110,8 +114,15 @@ impl<'a> TyCtxMut for TypeChecker<'a> {
     }
 
     fn check_module_item(&mut self, fid: TypstFileId, k: &StrRef) -> Option<Ty> {
-        let ei = self.ctx.expr_stage_by_id(fid)?;
-        Some(self.check(ei.exports.get(k)?))
+        self.module_exports
+            .entry((fid, k.clone()))
+            .or_default()
+            .clone()
+            .get_or_init(|| {
+                let ei = self.ctx.expr_stage_by_id(fid)?;
+                Some(self.check(ei.exports.get(k)?))
+            })
+            .clone()
     }
 }
 
