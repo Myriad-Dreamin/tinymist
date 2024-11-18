@@ -717,8 +717,17 @@ fn type_completion(
             ctx.snippet_completion("false", "false", "No / Disabled.");
             ctx.snippet_completion("true", "true", "Yes / Enabled.");
         }
-        Ty::Param(f) => {
-            let f = &f.name;
+        Ty::Param(p) => {
+            // todo: variadic
+
+            if p.attrs.positional {
+                type_completion(ctx, &p.ty, docs);
+            }
+            if !p.attrs.named {
+                return Some(());
+            }
+
+            let f = &p.name;
             if ctx.seen_field(f.clone()) {
                 return Some(());
             }
@@ -731,6 +740,8 @@ fn type_completion(
                 return Some(());
             }
 
+            // todo: label details
+            let docs = docs.or_else(|| p.docs.as_deref());
             ctx.completions.push(Completion {
                 kind: CompletionKind::Field,
                 label: f.into(),

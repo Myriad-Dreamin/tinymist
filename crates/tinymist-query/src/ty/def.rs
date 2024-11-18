@@ -144,6 +144,15 @@ impl Ty {
         matches!(self, Ty::Dict(..))
     }
 
+    pub(crate) fn or(ty: Option<Ty>, pos: Option<Ty>) -> Option<Ty> {
+        Some(match (ty, pos) {
+            (Some(ty), Some(pos)) => Ty::from_types([ty, pos].into_iter()),
+            (Some(ty), None) => ty,
+            (None, Some(pos)) => pos,
+            (None, None) => return None,
+        })
+    }
+
     /// Create a union type from an iterator of types
     pub fn from_types(e: impl ExactSizeIterator<Item = Ty>) -> Self {
         if e.len() == 0 {
