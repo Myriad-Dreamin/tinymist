@@ -504,8 +504,21 @@ impl CompletionKindChecker {
                     self.check(ty);
                 }
             }
-            Ty::Any | Ty::Builtin(..) => {}
-            _ => panic!("check kind {ty:?}"),
+            Ty::Any
+            | Ty::Builtin(..)
+            | Ty::Boolean(..)
+            | Ty::Param(..)
+            | Ty::Union(..)
+            | Ty::Var(..)
+            | Ty::Dict(..)
+            | Ty::Array(..)
+            | Ty::Tuple(..)
+            | Ty::Args(..)
+            | Ty::Pattern(..)
+            | Ty::Select(..)
+            | Ty::Unary(..)
+            | Ty::Binary(..)
+            | Ty::If(..) => {}
         }
     }
 }
@@ -549,27 +562,101 @@ impl FnCompletionFeat {
                     let sig = func_signature(func.clone()).type_sig();
                     self.check_sig(&sig, pos);
                 }
-                _ => panic!("FnCompletionFeat check_one {val:?}"),
+                Value::None
+                | Value::Auto
+                | Value::Bool(_)
+                | Value::Int(_)
+                | Value::Float(..)
+                | Value::Length(..)
+                | Value::Angle(..)
+                | Value::Ratio(..)
+                | Value::Relative(..)
+                | Value::Fraction(..)
+                | Value::Color(..)
+                | Value::Gradient(..)
+                | Value::Pattern(..)
+                | Value::Symbol(..)
+                | Value::Version(..)
+                | Value::Str(..)
+                | Value::Bytes(..)
+                | Value::Label(..)
+                | Value::Datetime(..)
+                | Value::Decimal(..)
+                | Value::Duration(..)
+                | Value::Content(..)
+                | Value::Styles(..)
+                | Value::Array(..)
+                | Value::Dict(..)
+                | Value::Args(..)
+                | Value::Module(..)
+                | Value::Plugin(..)
+                | Value::Dyn(..) => {}
             },
             Ty::Func(sig) => self.check_sig(sig, pos),
             Ty::With(w) => {
                 self.check_one(&w.sig, pos + w.with.positional_params().len());
             }
-            Ty::Builtin(BuiltinTy::Element(func)) => {
-                self.is_element = true;
-                let func = (*func).into();
-                let sig = func_signature(func).type_sig();
-                self.check_sig(&sig, pos);
-            }
-            Ty::Builtin(BuiltinTy::Type(ty)) => {
-                let func = ty.constructor().ok();
-                if let Some(func) = func {
+            Ty::Builtin(b) => match b {
+                BuiltinTy::Element(func) => {
+                    self.is_element = true;
+                    let func = (*func).into();
                     let sig = func_signature(func).type_sig();
                     self.check_sig(&sig, pos);
                 }
-            }
-            Ty::Builtin(BuiltinTy::TypeType(..)) => {}
-            _ => panic!("FnCompletionFeat check_one {ty:?}"),
+                BuiltinTy::Type(ty) => {
+                    let func = ty.constructor().ok();
+                    if let Some(func) = func {
+                        let sig = func_signature(func).type_sig();
+                        self.check_sig(&sig, pos);
+                    }
+                }
+                BuiltinTy::TypeType(..) => {}
+                BuiltinTy::Clause
+                | BuiltinTy::Undef
+                | BuiltinTy::Content
+                | BuiltinTy::Space
+                | BuiltinTy::None
+                | BuiltinTy::Break
+                | BuiltinTy::Continue
+                | BuiltinTy::Infer
+                | BuiltinTy::FlowNone
+                | BuiltinTy::Auto
+                | BuiltinTy::Args
+                | BuiltinTy::Color
+                | BuiltinTy::TextSize
+                | BuiltinTy::TextFont
+                | BuiltinTy::TextLang
+                | BuiltinTy::TextRegion
+                | BuiltinTy::Label
+                | BuiltinTy::CiteLabel
+                | BuiltinTy::RefLabel
+                | BuiltinTy::Dir
+                | BuiltinTy::Length
+                | BuiltinTy::Float
+                | BuiltinTy::Stroke
+                | BuiltinTy::Margin
+                | BuiltinTy::Inset
+                | BuiltinTy::Outset
+                | BuiltinTy::Radius
+                | BuiltinTy::Tag(..)
+                | BuiltinTy::Module(..)
+                | BuiltinTy::Path(..) => {}
+            },
+            Ty::Any
+            | Ty::Boolean(..)
+            | Ty::Param(..)
+            | Ty::Union(..)
+            | Ty::Let(..)
+            | Ty::Var(..)
+            | Ty::Dict(..)
+            | Ty::Array(..)
+            | Ty::Tuple(..)
+            | Ty::Args(..)
+            | Ty::Pattern(..)
+            | Ty::Select(..)
+            | Ty::Unary(..)
+            | Ty::Binary(..)
+            | Ty::If(..) => {}
         }
     }
 
@@ -646,8 +733,7 @@ fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
     }
 
     log::debug!(
-        "sort_and_explicit_code_completion after: {:#?} {:#?}",
-        completions,
+        "sort_and_explicit_code_completion after: {completions:#?} {:#?}",
         ctx.completions
     );
 
@@ -661,56 +747,80 @@ pub fn ty_to_completion_kind(ty: &Ty) -> CompletionKind {
         Ty::Value(ty) => value_to_completion_kind(&ty.val),
         Ty::Func(..) | Ty::With(..) => CompletionKind::Func,
         Ty::Any => CompletionKind::Variable,
-        Ty::Builtin(BuiltinTy::Module(..)) => CompletionKind::Module,
-        Ty::Builtin(BuiltinTy::Type(..) | BuiltinTy::TypeType(..)) => CompletionKind::Type,
-        Ty::Builtin(..) => CompletionKind::Variable,
-        Ty::Let(l) => l
-            .ubs
-            .iter()
-            .chain(l.lbs.iter())
-            .fold(None, |acc, ty| match acc {
-                Some(CompletionKind::Variable) => Some(CompletionKind::Variable),
-                Some(acc) => {
-                    let kind = ty_to_completion_kind(ty);
-                    if acc == kind {
-                        Some(acc)
-                    } else {
-                        Some(CompletionKind::Variable)
-                    }
-                }
-                None => Some(ty_to_completion_kind(ty)),
-            })
-            .unwrap_or(CompletionKind::Variable),
-        _ => panic!("ty_to_completion_kind {ty:?}"),
+        Ty::Builtin(b) => match b {
+            BuiltinTy::Module(..) => CompletionKind::Module,
+            BuiltinTy::Type(..) | BuiltinTy::TypeType(..) => CompletionKind::Type,
+            _ => CompletionKind::Variable,
+        },
+        Ty::Let(l) => fold_ty_kind(l.ubs.iter().chain(l.lbs.iter())),
+        Ty::Union(u) => fold_ty_kind(u.iter()),
+        Ty::Boolean(..)
+        | Ty::Param(..)
+        | Ty::Var(..)
+        | Ty::Dict(..)
+        | Ty::Array(..)
+        | Ty::Tuple(..)
+        | Ty::Args(..)
+        | Ty::Pattern(..)
+        | Ty::Select(..)
+        | Ty::Unary(..)
+        | Ty::Binary(..)
+        | Ty::If(..) => CompletionKind::Constant,
     }
+}
+
+fn fold_ty_kind<'a>(tys: impl Iterator<Item = &'a Ty>) -> CompletionKind {
+    tys.fold(None, |acc, ty| match acc {
+        Some(CompletionKind::Variable) => Some(CompletionKind::Variable),
+        Some(acc) => {
+            let kind = ty_to_completion_kind(ty);
+            if acc == kind {
+                Some(acc)
+            } else {
+                Some(CompletionKind::Variable)
+            }
+        }
+        None => Some(ty_to_completion_kind(ty)),
+    })
+    .unwrap_or(CompletionKind::Variable)
 }
 
 pub fn value_to_completion_kind(value: &Value) -> CompletionKind {
     match value {
         Value::Func(..) => CompletionKind::Func,
-        Value::Module(..) => CompletionKind::Module,
+        Value::Plugin(..) | Value::Module(..) => CompletionKind::Module,
         Value::Type(..) => CompletionKind::Type,
         Value::Symbol(s) => CompletionKind::Symbol(s.get()),
-        _ => CompletionKind::Variable,
+        Value::None
+        | Value::Auto
+        | Value::Bool(..)
+        | Value::Int(..)
+        | Value::Float(..)
+        | Value::Length(..)
+        | Value::Angle(..)
+        | Value::Ratio(..)
+        | Value::Relative(..)
+        | Value::Fraction(..)
+        | Value::Color(..)
+        | Value::Gradient(..)
+        | Value::Pattern(..)
+        | Value::Version(..)
+        | Value::Str(..)
+        | Value::Bytes(..)
+        | Value::Label(..)
+        | Value::Datetime(..)
+        | Value::Decimal(..)
+        | Value::Duration(..)
+        | Value::Content(..)
+        | Value::Styles(..)
+        | Value::Array(..)
+        | Value::Dict(..)
+        | Value::Args(..)
+        | Value::Dyn(..) => CompletionKind::Variable,
     }
 }
 
-// if ctx.before.ends_with(',') {
-//     ctx.enrich(" ", "");
-// }
-
 // if param.attrs.named {
-//     let compl = Completion {
-//         kind: CompletionKind::Field,
-//         label: param.name.as_ref().into(),
-//         apply: Some(eco_format!("{}: ${{}}", param.name)),
-//         detail: docs(),
-//         label_detail: None,
-//         command: ctx
-//             .trigger_named_completion
-//             .then_some("tinymist.triggerNamedCompletion"),
-//         ..Completion::default()
-//     };
 //     match param.ty {
 //         Ty::Builtin(BuiltinTy::TextSize) => {
 //             for size_template in &[
