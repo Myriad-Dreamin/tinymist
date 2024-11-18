@@ -33,17 +33,14 @@ impl<'a> CompletionContext<'a> {
         !self.seen_fields.insert(field)
     }
 
-    /// Add completions for definitions that are available at the cursor.
-    ///
-    /// Filters the global/math scope with the given filter.
-    pub fn scope_completions_(&mut self, parens: bool, filter: impl Fn(Option<&Value>) -> bool) {
-        log::debug!("scope_completions: {parens}");
-        let Some(fid) = self.root.span().id() else {
-            return;
-        };
-        let Ok(src) = self.ctx.source_by_id(fid) else {
-            return;
-        };
+    fn surrounding_syntax(&mut self) -> SurroundingSyntax {
+        check_surrounding_syntax(&self.leaf)
+            .or_else(|| check_previous_syntax(&self.leaf))
+            .unwrap_or(SurroundingSyntax::Regular)
+    }
+
+    fn defines(&mut self) -> Option<(Source, Defines)> {
+        let src = self.ctx.source_by_id(self.root.span().id()?).ok()?;
 
         let mut defines = Defines {
             types: self.ctx.type_check(&src),
@@ -84,17 +81,129 @@ impl<'a> CompletionContext<'a> {
             None
         });
 
-        enum SurroundingSyntax {
-            Regular,
-            Selector,
-            SetRule,
+        Some((src, defines))
+    }
+
+    pub fn ufcs_completions(&mut self, node: &LinkedNode, value: &Value) {
+        let _ = value;
+        let surrounding_syntax = self.surrounding_syntax();
+        if !matches!(surrounding_syntax, SurroundingSyntax::Regular) {
+            return;
         }
+
+        let Some((src, defines)) = self.defines() else {
+            return;
+        };
+
+        log::debug!("defines: {:?}", defines.defines.len());
+        let mut kind_checker = CompletionKindChecker {
+            symbols: HashSet::default(),
+            functions: HashSet::default(),
+        };
+
+        let rng = node.range();
+
+        let is_content_block = node.kind() == SyntaxKind::ContentBlock;
+
+        let lb = if is_content_block { "" } else { "(" };
+        let rb = if is_content_block { "" } else { ")" };
+
+        // we don't check literal type here for faster completion
+        for (name, ty) in defines.defines {
+            // todo: filter ty
+            if name.is_empty() {
+                continue;
+            }
+
+            kind_checker.check(&ty);
+
+            if kind_checker.symbols.iter().min().copied().is_some() {
+                continue;
+            }
+            if kind_checker.functions.is_empty() {
+                continue;
+            }
+
+            let label_detail = ty.describe().map(From::from).or_else(|| Some("any".into()));
+            let base = Completion {
+                kind: CompletionKind::Func,
+                label_detail,
+                apply: Some("".into()),
+                // range: Some(range),
+                command: self
+                    .trigger_parameter_hints
+                    .then_some("editor.action.triggerParameterHints"),
+                ..Default::default()
+            };
+            let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
+
+            log::debug!("fn_feat: {name} {ty:?} -> {fn_feat:?}");
+
+            if fn_feat.min_pos() < 1 || !fn_feat.next_arg_is_content {
+                continue;
+            }
+            log::debug!("checked ufcs: {ty:?}");
+            if fn_feat.min_pos() == 1 {
+                let before = TextEdit {
+                    range: self.ctx.to_lsp_range(rng.start..rng.start, &src),
+                    new_text: format!("{name}{lb}"),
+                };
+                let after = TextEdit {
+                    range: self.ctx.to_lsp_range(rng.end..self.from, &src),
+                    new_text: rb.into(),
+                };
+
+                self.completions.push(Completion {
+                    label: name.clone(),
+                    additional_text_edits: Some(vec![before, after]),
+                    ..base.clone()
+                });
+            }
+            if fn_feat.min_pos() > 1 || fn_feat.min_named() > 0 {
+                let node_content = node.get().clone().into_text();
+                let before = TextEdit {
+                    range: self.ctx.to_lsp_range(rng.start..self.from, &src),
+                    new_text: format!("{name}{lb}"),
+                };
+                self.completions.push(Completion {
+                    apply: if is_content_block {
+                        Some(eco_format!("(${{}}){node_content}"))
+                    } else {
+                        Some(eco_format!("${{}}, {node_content})"))
+                    },
+                    label: eco_format!("{name}("),
+                    additional_text_edits: Some(vec![before]),
+                    ..base.clone()
+                });
+                let before = TextEdit {
+                    range: self.ctx.to_lsp_range(rng.start..rng.start, &src),
+                    new_text: format!("{name}("),
+                };
+                let after = TextEdit {
+                    range: self.ctx.to_lsp_range(rng.end..self.from, &src),
+                    new_text: "".into(),
+                };
+                self.completions.push(Completion {
+                    apply: Some(eco_format!("${{}})")),
+                    label: eco_format!("{name})"),
+                    additional_text_edits: Some(vec![before, after]),
+                    ..base
+                });
+            }
+        }
+    }
+
+    /// Add completions for definitions that are available at the cursor.
+    ///
+    /// Filters the global/math scope with the given filter.
+    pub fn scope_completions_(&mut self, parens: bool, filter: impl Fn(Option<&Value>) -> bool) {
+        let Some((_, defines)) = self.defines() else {
+            return;
+        };
 
         let defines = defines.defines;
 
-        let surrounding_syntax = check_surrounding_syntax(&self.leaf)
-            .or_else(|| check_previous_syntax(&self.leaf))
-            .unwrap_or(SurroundingSyntax::Regular);
+        let surrounding_syntax = self.surrounding_syntax();
 
         let mut kind_checker = CompletionKindChecker {
             symbols: HashSet::default(),
@@ -142,7 +251,9 @@ impl<'a> CompletionContext<'a> {
 
                 log::debug!("fn_feat: {name} {ty:?} -> {fn_feat:?}");
 
-                if !fn_feat.zero_args && matches!(surrounding_syntax, SurroundingSyntax::Regular) {
+                if matches!(surrounding_syntax, SurroundingSyntax::Regular)
+                    && (fn_feat.min_pos() > 0 || fn_feat.min_named() > 0)
+                {
                     self.completions.push(Completion {
                         label: eco_format!("{}.with", name),
                         apply: Some(eco_format!("{}.with(${{}})", name)),
@@ -167,14 +278,14 @@ impl<'a> CompletionContext<'a> {
                             label: name,
                             ..base
                         });
-                    } else if fn_feat.zero_args {
+                    } else if fn_feat.min_pos() < 1 && !fn_feat.has_rest {
                         self.completions.push(Completion {
                             apply: Some(eco_format!("{}()${{}}", name)),
                             label: name,
                             ..base
                         });
                     } else {
-                        let apply = if fn_feat.prefer_content_bracket {
+                        let apply = if fn_feat.next_arg_is_content && !fn_feat.has_rest {
                             eco_format!("{name}[${{}}]")
                         } else {
                             eco_format!("{name}(${{}})")
@@ -198,71 +309,76 @@ impl<'a> CompletionContext<'a> {
                 ..Completion::default()
             });
         }
-
-        fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> {
-            use SurroundingSyntax::*;
-            let mut met_args = false;
-            while let Some(parent) = leaf.parent() {
-                log::debug!(
-                    "check_surrounding_syntax: {:?}::{:?}",
-                    parent.kind(),
-                    leaf.kind()
-                );
-                match parent.kind() {
-                    SyntaxKind::CodeBlock | SyntaxKind::ContentBlock | SyntaxKind::Equation => {
-                        return Some(Regular);
-                    }
-                    SyntaxKind::Named => {
-                        return Some(Regular);
-                    }
-                    SyntaxKind::Args => {
-                        met_args = true;
-                    }
-                    SyntaxKind::SetRule => {
-                        let rule = parent.get().cast::<ast::SetRule>()?;
-                        if met_args || encolsed_by(parent, rule.condition().map(|s| s.span()), leaf)
-                        {
-                            return Some(Regular);
-                        } else {
-                            return Some(SetRule);
-                        }
-                    }
-                    SyntaxKind::ShowRule => {
-                        let rule = parent.get().cast::<ast::ShowRule>()?;
-                        if encolsed_by(parent, Some(rule.transform().span()), leaf) {
-                            return Some(Regular);
-                        } else {
-                            return Some(Selector); // query's first argument
-                        }
-                    }
-                    _ => {}
-                }
-
-                leaf = parent;
-            }
-
-            None
-        }
-
-        fn check_previous_syntax(leaf: &LinkedNode) -> Option<SurroundingSyntax> {
-            let mut leaf = leaf.clone();
-            if leaf.kind().is_trivia() {
-                leaf = leaf.prev_sibling()?;
-            }
-            if matches!(leaf.kind(), SyntaxKind::ShowRule | SyntaxKind::SetRule) {
-                return check_surrounding_syntax(&leaf.rightmost_leaf()?);
-            }
-
-            if matches!(leaf.kind(), SyntaxKind::Show) {
-                return Some(SurroundingSyntax::Selector);
-            }
-            if matches!(leaf.kind(), SyntaxKind::Set) {
-                return Some(SurroundingSyntax::SetRule);
-            }
-
-            None
-        }
     }
+}
+
+enum SurroundingSyntax {
+    Regular,
+    Selector,
+    SetRule,
+}
+
+fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> {
+    use SurroundingSyntax::*;
+    let mut met_args = false;
+    while let Some(parent) = leaf.parent() {
+        log::debug!(
+            "check_surrounding_syntax: {:?}::{:?}",
+            parent.kind(),
+            leaf.kind()
+        );
+        match parent.kind() {
+            SyntaxKind::CodeBlock | SyntaxKind::ContentBlock | SyntaxKind::Equation => {
+                return Some(Regular);
+            }
+            SyntaxKind::Named => {
+                return Some(Regular);
+            }
+            SyntaxKind::Args => {
+                met_args = true;
+            }
+            SyntaxKind::SetRule => {
+                let rule = parent.get().cast::<ast::SetRule>()?;
+                if met_args || encolsed_by(parent, rule.condition().map(|s| s.span()), leaf) {
+                    return Some(Regular);
+                } else {
+                    return Some(SetRule);
+                }
+            }
+            SyntaxKind::ShowRule => {
+                let rule = parent.get().cast::<ast::ShowRule>()?;
+                if encolsed_by(parent, Some(rule.transform().span()), leaf) {
+                    return Some(Regular);
+                } else {
+                    return Some(Selector); // query's first argument
+                }
+            }
+            _ => {}
+        }
+
+        leaf = parent;
+    }
+
+    None
+}
+
+fn check_previous_syntax(leaf: &LinkedNode) -> Option<SurroundingSyntax> {
+    let mut leaf = leaf.clone();
+    if leaf.kind().is_trivia() {
+        leaf = leaf.prev_sibling()?;
+    }
+    if matches!(leaf.kind(), SyntaxKind::ShowRule | SyntaxKind::SetRule) {
+        return check_surrounding_syntax(&leaf.rightmost_leaf()?);
+    }
+
+    if matches!(leaf.kind(), SyntaxKind::Show) {
+        return Some(SurroundingSyntax::Selector);
+    }
+    if matches!(leaf.kind(), SyntaxKind::Set) {
+        return Some(SurroundingSyntax::SetRule);
+    }
+
+    None
 }
 
 #[derive(BindTyCtx)]
@@ -396,8 +512,10 @@ impl CompletionKindChecker {
 
 #[derive(Default, Debug)]
 struct FnCompletionFeat {
-    zero_args: bool,
-    prefer_content_bracket: bool,
+    min_pos: Option<usize>,
+    min_named: Option<usize>,
+    has_rest: bool,
+    next_arg_is_content: bool,
     is_element: bool,
 }
 
@@ -410,10 +528,20 @@ impl FnCompletionFeat {
         self
     }
 
+    fn min_pos(&self) -> usize {
+        self.min_pos.unwrap_or_default()
+    }
+
+    fn min_named(&self) -> usize {
+        self.min_named.unwrap_or_default()
+    }
+
     fn check_one(&mut self, ty: &Ty, pos: usize) {
         match ty {
             Ty::Value(val) => match &val.val {
-                Value::Type(..) => {}
+                Value::Type(ty) => {
+                    self.check_one(&Ty::Builtin(BuiltinTy::Type(*ty)), pos);
+                }
                 Value::Func(func) => {
                     if func.element().is_some() {
                         self.is_element = true;
@@ -429,9 +557,16 @@ impl FnCompletionFeat {
             }
             Ty::Builtin(BuiltinTy::Element(func)) => {
                 self.is_element = true;
-                let sig = (*func).into();
-                let sig = func_signature(sig).type_sig();
+                let func = (*func).into();
+                let sig = func_signature(func).type_sig();
                 self.check_sig(&sig, pos);
+            }
+            Ty::Builtin(BuiltinTy::Type(ty)) => {
+                let func = ty.constructor().ok();
+                if let Some(func) = func {
+                    let sig = func_signature(func).type_sig();
+                    self.check_sig(&sig, pos);
+                }
             }
             Ty::Builtin(BuiltinTy::TypeType(..)) => {}
             _ => panic!("FnCompletionFeat check_one {ty:?}"),
@@ -441,11 +576,17 @@ impl FnCompletionFeat {
     // todo: sig is element
     fn check_sig(&mut self, sig: &SigTy, idx: usize) {
         let pos_size = sig.positional_params().len();
-        let prefer_content_bracket =
-            sig.rest_param().is_none() && sig.pos(idx).map_or(false, |ty| ty.is_content(&()));
-        self.prefer_content_bracket = self.prefer_content_bracket || prefer_content_bracket;
+        self.has_rest = self.has_rest || sig.rest_param().is_some();
+        self.next_arg_is_content =
+            self.next_arg_is_content || sig.pos(idx).map_or(false, |ty| ty.is_content(&()));
         let name_size = sig.named_params().len();
-        self.zero_args = pos_size <= idx && name_size == 0;
+        let left_pos = pos_size.saturating_sub(idx);
+        self.min_pos = self
+            .min_pos
+            .map_or(Some(left_pos), |v| Some(v.min(left_pos)));
+        self.min_named = self
+            .min_named
+            .map_or(Some(name_size), |v| Some(v.min(name_size)));
     }
 }
 
@@ -521,7 +662,7 @@ pub fn ty_to_completion_kind(ty: &Ty) -> CompletionKind {
         Ty::Func(..) | Ty::With(..) => CompletionKind::Func,
         Ty::Any => CompletionKind::Variable,
         Ty::Builtin(BuiltinTy::Module(..)) => CompletionKind::Module,
-        Ty::Builtin(BuiltinTy::TypeType(..)) => CompletionKind::Type,
+        Ty::Builtin(BuiltinTy::Type(..) | BuiltinTy::TypeType(..)) => CompletionKind::Type,
         Ty::Builtin(..) => CompletionKind::Variable,
         Ty::Let(l) => l
             .ubs

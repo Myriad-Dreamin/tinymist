@@ -4,6 +4,7 @@ use std::ops::Range;
 
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
+use lsp_types::TextEdit;
 use serde::{Deserialize, Serialize};
 use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::model::Document;
@@ -15,8 +16,7 @@ use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
 use crate::adt::interner::Interned;
-use crate::analysis::{analyze_labels, DynLabel, Ty};
-use crate::LocalContext;
+use crate::analysis::{analyze_labels, DynLabel, LocalContext, Ty};
 
 mod ext;
 pub use ext::complete_path;
@@ -73,6 +73,10 @@ pub struct Completion {
     pub apply: Option<EcoString>,
     /// An optional short description, at most one sentence.
     pub detail: Option<EcoString>,
+    /// An optional array of additional text edits that are applied when
+    /// selecting this completion. Edits must not overlap with the main edit
+    /// nor with themselves.
+    pub additional_text_edits: Option<Vec<TextEdit>>,
     /// An optional command to run when the completion is selected.
     pub command: Option<&'static str>,
 }
@@ -382,7 +386,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
         if let Some((value, styles)) = ctx.ctx.analyze_expr(&prev).into_iter().next();
         then {
             ctx.from = ctx.cursor;
-            field_access_completions(ctx, &value, &styles);
+            field_access_completions(ctx, &prev, &value, &styles);
             return true;
         }
     }
@@ -397,7 +401,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
         if let Some((value, styles)) = ctx.ctx.analyze_expr(&prev_prev).into_iter().next();
         then {
             ctx.from = ctx.leaf.offset();
-            field_access_completions(ctx, &value, &styles);
+            field_access_completions(ctx,&prev_prev, &value, &styles);
             return true;
         }
     }
@@ -406,7 +410,12 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
 }
 
 /// Add completions for all fields on a value.
-fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: &Option<Styles>) {
+fn field_access_completions(
+    ctx: &mut CompletionContext,
+    node: &LinkedNode,
+    value: &Value,
+    styles: &Option<Styles>,
+) {
     for (name, value, _) in value.ty().scope().iter() {
         ctx.value_completion(Some(name.clone()), value, true, None);
     }
@@ -443,11 +452,15 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                     });
                 }
             }
+
+            ctx.ufcs_completions(node, value);
         }
         Value::Content(content) => {
             for (name, value) in content.fields() {
                 ctx.value_completion(Some(name.into()), &value, false, None);
             }
+
+            ctx.ufcs_completions(node, value);
         }
         Value::Dict(dict) => {
             for (name, value) in dict.iter() {
