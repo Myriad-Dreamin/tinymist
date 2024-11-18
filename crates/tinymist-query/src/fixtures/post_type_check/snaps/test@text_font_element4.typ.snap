@@ -3,6 +3,5 @@ source: crates/tinymist-query/src/analysis.rs
 description: "Check on \"\\\"Test\\\"\" (31)"
 expression: literal_type
 input_file: crates/tinymist-query/src/fixtures/post_type_check/text_font_element4.typ
-snapshot_kind: text
 ---
-( ⪯ TextFont)
+TextFont

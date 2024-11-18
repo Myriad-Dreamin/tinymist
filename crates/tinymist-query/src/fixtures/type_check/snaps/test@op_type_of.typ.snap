@@ -2,9 +2,8 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/op_type_of.typ
-snapshot_kind: text
 ---
-"f" = (( ⪯ Any)) => Type(none)
+"f" = (Any) => Type(none)
 "x" = Type(integer)
 ---
 5..6 -> @f

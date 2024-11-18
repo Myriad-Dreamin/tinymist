@@ -5,7 +5,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/external.typ
 ---
 "base" = Any
 "bad-instantiate" = Any
-"prefix" = (("title": ( ⪯ Any)) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, None), op: Add }, None), op: Add }, None), op: Add }).with(..("title": None) => any)
+"prefix" = (("title": Any) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, None), op: Add }, None), op: Add }, None), op: Add }).with(..("title": None) => any)
 "title" = None
 ---
 0..0 -> @bad-instantiate

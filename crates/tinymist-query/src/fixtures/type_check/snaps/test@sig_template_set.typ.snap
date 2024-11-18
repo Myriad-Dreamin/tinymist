@@ -2,13 +2,12 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/sig_template_set.typ
-snapshot_kind: text
 ---
-"tmpl" = ((Any, "authors": ( ⪯ (Type(array) | Type(str))), "class": Any, "font": ( ⪯ (TextFont | Array<TextFont>))) => Any).with(..("authors": (), "class": "article", "font": None) => any)
+"tmpl" = ((Any, "authors": (Type(array) | Type(str)), "class": Any, "font": (TextFont | Array<TextFont>)) => Any).with(..("authors": (), "class": "article", "font": None) => any)
 "content" = Any
 "authors" = ()
 "font" = None
-"class" = ( ⪰ "article" | "article" | "letter" | "article" | "letter")
+"class" = ( ⪰ "article" | "letter")
 ---
 5..9 -> @tmpl
 10..17 -> @content

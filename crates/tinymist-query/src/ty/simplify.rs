@@ -250,33 +250,43 @@ impl<'a, 'b> TypeSimplifier<'a, 'b> {
         seq.collect::<Vec<_>>().into()
     }
 
-    // todo: reduce duplication
+    #[allow(clippy::mutable_key_type)]
     fn transform_let(&mut self, w: &TypeBounds, def_id: Option<&DeclExpr>, pol: bool) -> Ty {
-        let mut lbs = EcoVec::with_capacity(w.lbs.len());
-        let mut ubs = EcoVec::with_capacity(w.ubs.len());
+        let mut lbs = HashSet::with_capacity(w.lbs.len());
+        let mut ubs = HashSet::with_capacity(w.ubs.len());
 
         log::debug!("transform let [principal={}] with {w:?}", self.principal);
 
         if !self.principal || ((pol) && !def_id.is_some_and(|i| self.negatives.contains(i))) {
             for lb in w.lbs.iter() {
-                lbs.push(self.transform(lb, pol));
+                lbs.insert(self.transform(lb, pol));
             }
         }
         if !self.principal || ((!pol) && !def_id.is_some_and(|i| self.positives.contains(i))) {
             for ub in w.ubs.iter() {
-                ubs.push(self.transform(ub, !pol));
+                ubs.insert(self.transform(ub, !pol));
             }
         }
 
         if ubs.is_empty() {
             if lbs.len() == 1 {
-                return lbs.pop().unwrap();
+                return lbs.into_iter().next().unwrap();
             }
             if lbs.is_empty() {
                 return Ty::Any;
             }
+        } else if lbs.is_empty() && ubs.len() == 1 {
+            return ubs.into_iter().next().unwrap();
         }
 
+        // todo: bad performance
+        let mut lbs: Vec<_> = lbs.into_iter().collect();
+        lbs.sort();
+        let mut ubs: Vec<_> = ubs.into_iter().collect();
+        ubs.sort();
+
+        let mut lbs = lbs.into_iter().collect();
+        let mut ubs = ubs.into_iter().collect();
         Ty::Let(TypeBounds { lbs, ubs }.into())
     }
 
