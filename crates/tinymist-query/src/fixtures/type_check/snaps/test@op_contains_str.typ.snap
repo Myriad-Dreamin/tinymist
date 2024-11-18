@@ -2,9 +2,8 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/op_contains_str.typ
-snapshot_kind: text
 ---
-"f" = (( ⪯ TypeUnary { lhs: "abc", op: ElementOf })) => Type(none)
+"f" = (TypeUnary { lhs: "abc", op: ElementOf }) => Type(none)
 "x" = Any
 ---
 5..6 -> @f

@@ -2,9 +2,8 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/annotation_sum.typ
-snapshot_kind: text
 ---
-"sum" = (...: ( ⪯ Array<Type(int)>)) => None
+"sum" = (...: Array<Type(int)>) => None
 "args" = Args
 ---
 65..68 -> @sum
