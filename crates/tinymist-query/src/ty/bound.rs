@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use typst::foundations::{self, Func};
 
 use crate::ty::prelude::*;
@@ -99,7 +101,12 @@ impl Ty {
                     results.push(DocSource::Var(ty.clone()));
                 }
                 With(ty) => collect(&ty.sig, results),
-                Select(_ty) => {
+                Select(ty) => {
+                    // todo: do this correctly
+                    if matches!(ty.select.deref(), "with" | "where") {
+                        collect(&ty.ty, results);
+                    }
+
                     // collect(&ty.ty, results)
                 }
             }
