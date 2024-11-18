@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on c( (98..100)
+description: Completion on c( (99..101)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/base.typ
 ---
@@ -14,8 +14,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
     "labelDetails": {
      "description": "() => 1"
     },
+    "sortText": "000",
     "textEdit": {
-     "newText": "aa(${1:})",
+     "newText": "aa()${1:}",
      "range": {
       "end": {
        "character": 4,
@@ -34,8 +35,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
     "labelDetails": {
      "description": "() => 1"
     },
+    "sortText": "001",
     "textEdit": {
-     "newText": "aab(${1:})",
+     "newText": "aab()${1:}",
      "range": {
       "end": {
        "character": 4,
@@ -54,8 +56,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
     "labelDetails": {
      "description": "() => 1"
     },
+    "sortText": "002",
     "textEdit": {
-     "newText": "aabc(${1:})",
+     "newText": "aabc()${1:}",
      "range": {
       "end": {
        "character": 4,
@@ -74,8 +77,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
     "labelDetails": {
      "description": "() => 1"
     },
+    "sortText": "003",
     "textEdit": {
-     "newText": "aac(${1:})",
+     "newText": "aac()${1:}",
      "range": {
       "end": {
        "character": 4,
@@ -99,8 +103,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
     "labelDetails": {
      "description": "() => 1"
     },
+    "sortText": "002",
     "textEdit": {
-     "newText": "aabc(${1:})",
+     "newText": "aabc()${1:}",
      "range": {
       "end": {
        "character": 4,
@@ -119,8 +124,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/base.typ
     "labelDetails": {
      "description": "() => 1"
     },
+    "sortText": "003",
     "textEdit": {
-     "newText": "aac(${1:})",
+     "newText": "aac()${1:}",
      "range": {
       "end": {
        "character": 4,

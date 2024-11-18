@@ -9,7 +9,7 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-markup-text.ty
   "isIncomplete": false,
   "items": [
    {
-    "kind": 21,
+    "kind": 6,
     "label": "0",
     "sortText": "000",
     "textEdit": {

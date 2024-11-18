@@ -9,7 +9,7 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-markup-text.ty
   "isIncomplete": false,
   "items": [
    {
-    "kind": 21,
+    "kind": 6,
     "label": "\"md\"",
     "sortText": "000",
     "textEdit": {
@@ -27,7 +27,7 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-markup-text.ty
     }
    },
    {
-    "kind": 21,
+    "kind": 6,
     "label": "\"typ\"",
     "sortText": "001",
     "textEdit": {
@@ -63,14 +63,14 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-markup-text.ty
     }
    },
    {
-    "kind": 7,
+    "kind": 3,
     "label": "str",
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "273",
+    "sortText": "281",
     "textEdit": {
-     "newText": "str",
+     "newText": "str(${1:})",
      "range": {
       "end": {
        "character": 19,

@@ -110,19 +110,20 @@ pub fn descending_decls<T>(
             }
             (DecenderItem::Sibling(..), ast::Expr::Import(mi)) => {
                 // import items
-                match mi.imports()? {
-                    ast::Imports::Wildcard => {
+                match mi.imports() {
+                    Some(ast::Imports::Wildcard) => {
                         if let Some(t) = recv(DescentDecl::ImportAll(mi)) {
                             return Some(t);
                         }
                     }
-                    ast::Imports::Items(e) => {
+                    Some(ast::Imports::Items(e)) => {
                         for item in e.iter() {
                             if let Some(t) = recv(DescentDecl::Ident(item.bound_name())) {
                                 return Some(t);
                             }
                         }
                     }
+                    _ => {}
                 }
 
                 // import it self
