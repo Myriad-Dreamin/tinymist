@@ -1,7 +1,6 @@
 use std::num::NonZeroUsize;
 use std::ops::DerefMut;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::OnceLock;
 use std::{collections::HashSet, ops::Deref};
 
 use comemo::{Track, Tracked};
@@ -509,9 +508,7 @@ impl SharedContext {
 
     /// Get the source of a file by file id.
     pub fn source_by_id(&self, id: TypstFileId) -> FileResult<Source> {
-        // todo: repeatedly caching
-        let src = self.slot.sources.entry(id).or_default().clone();
-        src.get_or_init(|| self.world.source(id)).clone()
+        self.world.source(id)
     }
 
     /// Get the source of a file by file path.
@@ -1149,17 +1146,8 @@ impl AnalysisRevCache {
                     revision: e.revision,
                     expr_stage: e.data.expr_stage.crawl(revision.get()),
                     type_check: e.data.type_check.crawl(revision.get()),
-                    sources: Default::default(),
                 })
-                .unwrap_or_else(|| {
-                    let base = self.default_slot.clone();
-                    AnalysisRevSlot {
-                        revision: revision.get(),
-                        expr_stage: base.expr_stage.clone(),
-                        type_check: base.type_check.clone(),
-                        sources: Default::default(),
-                    }
-                })
+                .unwrap_or_else(|| self.default_slot.clone())
         })
     }
 }
@@ -1190,7 +1178,6 @@ struct AnalysisRevSlot {
     revision: usize,
     expr_stage: IncrCacheMap<u128, Arc<ExprInfo>>,
     type_check: IncrCacheMap<u128, Arc<TypeScheme>>,
-    sources: FxDashMap<TypstFileId, OnceLock<FileResult<Source>>>,
 }
 
 impl Drop for AnalysisRevSlot {
