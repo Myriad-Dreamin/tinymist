@@ -1,0 +1,52 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (71..72)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-cover-with-rect.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 5,
+    "label": "fill",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "fill: ${1:}",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 2
+      },
+      "start": {
+       "character": 17,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 7,
+    "label": "stroke",
+    "labelDetails": {
+     "description": "type"
+    },
+    "sortText": "280",
+    "textEdit": {
+     "newText": "stroke",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 2
+      },
+      "start": {
+       "character": 17,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
