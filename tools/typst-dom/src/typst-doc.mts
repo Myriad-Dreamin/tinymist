@@ -165,7 +165,8 @@ export class TypstDocumentContext<O = any> {
   static derive(ctx: any, mode: string) {
     return ["rescale", "rerender", "postRender"].reduce(
       (acc: any, x: string) => {
-        acc[x] = ctx[`${x}$${mode}`].bind(ctx);
+        let index = x + "$" + mode;
+        acc[x] = ctx[index].bind(ctx);
         console.assert(acc[x] !== undefined, `${x}$${mode} is undefined`);
         return acc;
       },
