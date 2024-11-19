@@ -530,6 +530,9 @@ async function commandShow(kind: "Pdf" | "Svg" | "Png", extraOpts?: any): Promis
     case "systemDefault":
       break;
     default:
+      vscode.window.showWarningMessage(
+        `Unknown value of "tinymist.showExportFileIn", expected "systemDefault" or "editorTab", got "${openIn}"`,
+      );
     case "editorTab": {
       // find and replace exportUri
       const exportUri = Uri.file(exportPath);
