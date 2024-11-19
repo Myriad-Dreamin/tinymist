@@ -501,7 +501,7 @@ async function commandShow(kind: "Pdf" | "Svg" | "Png", extraOpts?: any): Promis
   }
 
   const conf = vscode.workspace.getConfiguration("tinymist");
-  const openIn: string = conf.get("showExportFileIn", "editorTab");
+  const openIn: string = conf.get("showExportFileIn") || "editorTab";
 
   // Telling the language server to open the file instead of using
   // ```
@@ -527,9 +527,12 @@ async function commandShow(kind: "Pdf" | "Svg" | "Png", extraOpts?: any): Promis
   }
 
   switch (openIn) {
-    default:
     case "systemDefault":
       break;
+    default:
+      vscode.window.showWarningMessage(
+        `Unknown value of "tinymist.showExportFileIn", expected "systemDefault" or "editorTab", got "${openIn}"`,
+      );
     case "editorTab": {
       // find and replace exportUri
       const exportUri = Uri.file(exportPath);
