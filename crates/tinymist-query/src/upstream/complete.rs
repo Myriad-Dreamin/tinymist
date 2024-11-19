@@ -20,7 +20,7 @@ use crate::analysis::{analyze_labels, DynLabel, LocalContext, Ty};
 
 mod ext;
 use ext::*;
-pub use ext::{complete_path, CompletionFeat};
+pub use ext::{complete_path, CompletionFeat, PostfixSnippet};
 
 /// Autocomplete a cursor position in a source file.
 ///
@@ -439,6 +439,8 @@ fn field_access_completions(
             None,
         );
     }
+
+    ctx.postfix_completions(node, value);
 
     match value {
         Value::Symbol(symbol) => {

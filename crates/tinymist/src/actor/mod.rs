@@ -110,7 +110,7 @@ impl LanguageState {
                 allow_overlapping_token: const_config.tokens_overlapping_token_support,
                 allow_multiline_token: const_config.tokens_multiline_token_support,
                 remove_html: !self.config.support_html_in_markdown,
-                completion_feat: self.config.completion,
+                completion_feat: self.config.completion.clone(),
                 color_theme: match self.compile_config().color_theme.as_deref() {
                     Some("dark") => tinymist_query::ColorTheme::Dark,
                     _ => tinymist_query::ColorTheme::Light,
