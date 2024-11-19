@@ -1,7 +1,7 @@
 >[\]]
-#^ source.typst
+#^ source.typst markup.content.brace.typst
 # ^^ source.typst constant.character.escape.content.typst
-#   ^^ source.typst
+#   ^ source.typst markup.content.brace.typst
 >\#1pt
 #^^ source.typst constant.character.escape.content.typst
 #  ^^^^ source.typst

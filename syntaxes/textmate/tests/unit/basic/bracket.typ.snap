@@ -29,7 +29,7 @@
 #^ source.typst keyword.control.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst
-#    ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#    ^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #        ^ source.typst meta.expr.if.typst
 #         ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #          ^ source.typst meta.expr.if.typst markup.content.brace.typst
@@ -39,7 +39,7 @@
 #                 ^ source.typst meta.expr.if.typst
 #                  ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #                    ^ source.typst meta.expr.if.typst
-#                     ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#                     ^^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #                          ^ source.typst meta.expr.if.typst
 #                           ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #                            ^ source.typst meta.expr.if.typst markup.content.brace.typst
@@ -55,7 +55,7 @@
 #^ source.typst keyword.control.hash.typst
 # ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
 #      ^ source.typst meta.expr.while.typst
-#       ^^^^^ source.typst meta.expr.while.typst entity.name.type.primitive.typst
+#       ^^^^^ source.typst meta.expr.while.typst constant.language.boolean.typst
 #            ^ source.typst meta.expr.while.typst
 #             ^ source.typst meta.expr.while.typst meta.brace.square.typst
 #              ^ source.typst meta.expr.while.typst markup.content.brace.typst
