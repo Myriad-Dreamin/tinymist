@@ -414,6 +414,7 @@ impl<'a> CompletionContext<'a> {
         let defines = defines.defines;
 
         let surrounding_syntax = self.surrounding_syntax();
+        let mode = interpret_mode_at(Some(&self.leaf));
 
         let mut kind_checker = CompletionKindChecker {
             symbols: HashSet::default(),
@@ -525,7 +526,8 @@ impl<'a> CompletionContext<'a> {
                             ..base
                         });
                     } else {
-                        let apply = if fn_feat.next_arg_is_content && !fn_feat.has_rest {
+                        let accept_content_arg = fn_feat.next_arg_is_content && !fn_feat.has_rest;
+                        let apply = if !matches!(mode, InterpretMode::Math) && accept_content_arg {
                             eco_format!("{name}[${{}}]")
                         } else {
                             eco_format!("{name}(${{}})")

@@ -265,18 +265,16 @@ pub(crate) fn interpret_mode_at_kind(k: SyntaxKind) -> Option<InterpretMode> {
         CodeBlock | Code => InterpretMode::Code,
         ContentBlock | Markup => InterpretMode::Markup,
         Equation | Math => InterpretMode::Math,
-        Ident | FieldAccess | Bool | Int | Float | Numeric | Space | Linebreak | Parbreak
-        | Escape | Shorthand | SmartQuote | RawLang | RawDelim | RawTrimmed | Hash | LeftBrace
-        | RightBrace | LeftBracket | RightBracket | LeftParen | RightParen | Comma | Semicolon
-        | Colon | Star | Underscore | Dollar | Plus | Minus | Slash | Hat | Prime | Dot | Eq
-        | EqEq | ExclEq | Lt | LtEq | Gt | GtEq | PlusEq | HyphEq | StarEq | SlashEq | Dots
-        | Arrow | Root | Not | And | Or | None | Auto | As | Named | Keyed | Error | End => {
+        Label | Text | Ident | FieldAccess | Bool | Int | Float | Numeric | Space | Linebreak
+        | Parbreak | Escape | Shorthand | SmartQuote | RawLang | RawDelim | RawTrimmed | Hash
+        | LeftBrace | RightBrace | LeftBracket | RightBracket | LeftParen | RightParen | Comma
+        | Semicolon | Colon | Star | Underscore | Dollar | Plus | Minus | Slash | Hat | Prime
+        | Dot | Eq | EqEq | ExclEq | Lt | LtEq | Gt | GtEq | PlusEq | HyphEq | StarEq | SlashEq
+        | Dots | Arrow | Root | Not | And | Or | None | Auto | As | Named | Keyed | Error | End => {
             return Option::None
         }
-        Text | Strong | Emph | Link | Label | Ref | RefMarker | Heading | HeadingMarker
-        | ListItem | ListMarker | EnumItem | EnumMarker | TermItem | TermMarker => {
-            InterpretMode::Markup
-        }
+        Strong | Emph | Link | Ref | RefMarker | Heading | HeadingMarker | ListItem
+        | ListMarker | EnumItem | EnumMarker | TermItem | TermMarker => InterpretMode::Markup,
         MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes | MathFrac
         | MathRoot | MathShorthand => InterpretMode::Math,
         Let | Set | Show | Context | If | Else | For | In | While | Break | Continue | Return
