@@ -22,28 +22,17 @@ use crate::upstream::complete::complete_code;
 use crate::{completion_kind, prelude::*, LspCompletion};
 
 /// Tinymist's completion features.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompletionFeat {
     /// Whether to enable postfix completion.
-    pub postfix: bool,
+    pub postfix: Option<bool>,
     /// Whether to enable ufcs completion.
-    pub postfix_ufcs: bool,
+    pub postfix_ufcs: Option<bool>,
     /// Whether to enable ufcs completion (left variant).
-    pub postfix_ufcs_left: bool,
+    pub postfix_ufcs_left: Option<bool>,
     /// Whether to enable ufcs completion (right variant).
-    pub postfix_ufcs_right: bool,
-}
-
-impl Default for CompletionFeat {
-    fn default() -> Self {
-        Self {
-            postfix: true,
-            postfix_ufcs: true,
-            postfix_ufcs_left: true,
-            postfix_ufcs_right: true,
-        }
-    }
+    pub postfix_ufcs_right: Option<bool>,
 }
 
 impl CompletionFeat {
@@ -51,13 +40,13 @@ impl CompletionFeat {
         self.ufcs() || self.ufcs_left() || self.ufcs_right()
     }
     pub(crate) fn ufcs(&self) -> bool {
-        self.postfix && self.postfix_ufcs
+        self.postfix.unwrap_or(true) && self.postfix_ufcs.unwrap_or(true)
     }
     pub(crate) fn ufcs_left(&self) -> bool {
-        self.postfix && self.postfix_ufcs_left
+        self.postfix.unwrap_or(true) && self.postfix_ufcs_left.unwrap_or(true)
     }
     pub(crate) fn ufcs_right(&self) -> bool {
-        self.postfix && self.postfix_ufcs_right
+        self.postfix.unwrap_or(true) && self.postfix_ufcs_right.unwrap_or(true)
     }
 }
 
