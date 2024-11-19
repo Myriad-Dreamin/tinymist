@@ -120,8 +120,8 @@ impl<'a> CompletionContext<'a> {
     }
 
     fn surrounding_syntax(&mut self) -> SurroundingSyntax {
-        check_surrounding_syntax(&self.leaf)
-            .or_else(|| check_previous_syntax(&self.leaf))
+        check_previous_syntax(&self.leaf)
+            .or_else(|| check_surrounding_syntax(&self.leaf))
             .unwrap_or(SurroundingSyntax::Regular)
     }
 
