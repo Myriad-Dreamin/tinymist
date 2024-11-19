@@ -242,6 +242,7 @@ impl StatefulRequest for CompletionRequest {
                         }
                     }),
                     text_edit: Some(text_edit),
+                    additional_text_edits: typst_completion.additional_text_edits.clone(),
                     insert_text_format: Some(InsertTextFormat::SNIPPET),
                     commit_characters: typst_completion
                         .commit_char

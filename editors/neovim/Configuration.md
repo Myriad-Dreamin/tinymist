@@ -81,3 +81,31 @@ Set the print width for the formatter, which is a **soft limit** of characters p
 
 - **Type**: `number`
 - **Default**: `120`
+
+## `completion.postfix`
+
+Whether to enable postfix code completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `completion.postfixUfcs`
+
+Whether to enable UFCS-style completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `completion.postfixUfcsLeft`
+
+Whether to enable left-variant UFCS-style completion. For example, `[A].table|` will be completed to `table(|)[A]`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `completion.postfixUfcsRight`
+
+Whether to enable right-variant UFCS-style completion. For example, `[A].table|` will be completed to `table([A], |)`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`

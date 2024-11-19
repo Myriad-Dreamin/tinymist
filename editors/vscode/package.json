@@ -446,6 +446,30 @@
             "disable"
           ]
         },
+        "tinymist.completion.postfix": {
+          "title": "Enable Postfix Code Completion",
+          "description": "Whether to enable postfix code completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.",
+          "type": "boolean",
+          "default": true
+        },
+        "tinymist.completion.postfixUfcs": {
+          "title": "Completion: Convert Field Access to Call",
+          "description": "Whether to enable UFCS-style completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.",
+          "type": "boolean",
+          "default": true
+        },
+        "tinymist.completion.postfixUfcsLeft": {
+          "title": "Completion: Convert Field Access to Call (Left Variant)",
+          "description": "Whether to enable left-variant UFCS-style completion. For example, `[A].table|` will be completed to `table(|)[A]`. Hint: Restarting the editor is required to change this setting.",
+          "type": "boolean",
+          "default": true
+        },
+        "tinymist.completion.postfixUfcsRight": {
+          "title": "Completion: Convert Field Access to Call (Right Variant)",
+          "description": "Whether to enable right-variant UFCS-style completion. For example, `[A].table|` will be completed to `table([A], |)`. Hint: Restarting the editor is required to change this setting.",
+          "type": "boolean",
+          "default": true
+        },
         "tinymist.previewFeature": {
           "title": "Enable preview features",
           "description": "Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.",
