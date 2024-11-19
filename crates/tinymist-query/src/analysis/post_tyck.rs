@@ -223,10 +223,6 @@ impl<'a> PostTypeChecker<'a> {
                 log::debug!("post check call sig: {target:?} {sig:?}");
                 let mut resp = SignatureReceiver::default();
 
-                // if set && !param.attrs.settable {
-                //     continue;
-                // }
-
                 match &target {
                     ParamTarget::Named(n) => {
                         let ident = n.cast::<ast::Ident>()?.into();
@@ -256,6 +252,10 @@ impl<'a> PostTypeChecker<'a> {
 
                         // names
                         for field in sig.primary().named() {
+                            if is_set && !field.attrs.settable {
+                                continue;
+                            }
+
                             resp.insert(Ty::Param(field.clone()), false);
                         }
                     }
