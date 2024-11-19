@@ -1,0 +1,32 @@
+>[]
+#^ source.typst markup.content.brace.typst
+# ^ source.typst markup.content.brace.typst
+>
+>[[[[]
+#^ source.typst markup.content.brace.typst
+# ^ source.typst markup.content.brace.typst
+#  ^ source.typst markup.content.brace.typst
+#   ^ source.typst markup.content.brace.typst
+#    ^ source.typst markup.content.brace.typst
+>
+>#text(red)[\[]]
+#^ source.typst entity.name.function.hash.typst
+# ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#     ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#      ^^^ source.typst meta.expr.call.typst support.type.builtin.typst
+#         ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#          ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#           ^^ source.typst meta.expr.call.typst constant.character.escape.content.typst
+#             ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#              ^ source.typst markup.content.brace.typst
+>
+>#text(red)[[]]
+#^ source.typst entity.name.function.hash.typst
+# ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#     ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#      ^^^ source.typst meta.expr.call.typst support.type.builtin.typst
+#         ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#          ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#           ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#            ^ source.typst meta.expr.call.typst meta.brace.square.typst
+#             ^ source.typst meta.expr.call.typst meta.brace.square.typst

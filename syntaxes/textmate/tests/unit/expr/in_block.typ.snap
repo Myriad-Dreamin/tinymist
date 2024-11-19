@@ -3,11 +3,11 @@
 # ^ source.typst meta.brace.curly.typst
 >  false                   and           true;
 #^^ source.typst
-#  ^^^^^ source.typst entity.name.type.primitive.typst
+#  ^^^^^ source.typst constant.language.boolean.typst
 #       ^^^^^^^^^^^^^^^^^^^ source.typst
 #                          ^^^ source.typst keyword.other.logical.typst
 #                             ^^^^^^^^^^^ source.typst
-#                                        ^^^^ source.typst entity.name.type.primitive.typst
+#                                        ^^^^ source.typst constant.language.boolean.typst
 #                                            ^ source.typst punctuation.separator.colon.typst
 >
 >  if 1 + 2                   == 3 {
@@ -39,7 +39,7 @@
 #^^ source.typst
 #  ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
 #       ^ source.typst meta.expr.while.typst
-#        ^^^^^ source.typst meta.expr.while.typst entity.name.type.primitive.typst
+#        ^^^^^ source.typst meta.expr.while.typst constant.language.boolean.typst
 #             ^^ source.typst meta.expr.while.typst
 #               ^^ source.typst meta.expr.while.typst keyword.operator.relational.typst
 #                 ^ source.typst meta.expr.while.typst
@@ -65,11 +65,11 @@
 #               ^^^^^^^^^^^^^^^^^ source.typst meta.expr.set.typst
 #                                ^^ source.typst meta.expr.set.typst keyword.control.conditional.typst
 #                                  ^^^^^^^^^^ source.typst meta.expr.set.typst
-#                                            ^^^^^ source.typst meta.expr.set.typst entity.name.type.primitive.typst
+#                                            ^^^^^ source.typst meta.expr.set.typst constant.language.boolean.typst
 >  and true
 #^^ source.typst
 #  ^^^ source.typst keyword.other.logical.typst
 #     ^ source.typst
-#      ^^^^ source.typst entity.name.type.primitive.typst
+#      ^^^^ source.typst constant.language.boolean.typst
 >}
 #^ source.typst meta.brace.curly.typst

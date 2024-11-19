@@ -28,7 +28,10 @@
 #                         ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #                          ^ source.typst meta.expr.for.typst
 #                           ^ source.typst meta.expr.for.typst meta.brace.curly.typst
-#                            ^^^^^^^ source.typst
+#                            ^ source.typst
+#                             ^ source.typst markup.content.brace.typst
+#                              ^^^ source.typst
+#                                 ^ source.typst markup.content.brace.typst
 >#for i in { range(0, 10) } { A } { A }
 #^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.for.typst keyword.control.loop.typst
@@ -54,14 +57,17 @@
 #                             ^ source.typst meta.expr.for.typst variable.other.readwrite.typst
 #                              ^ source.typst meta.expr.for.typst
 #                               ^ source.typst meta.expr.for.typst meta.brace.curly.typst
-#                                ^^^^^^^ source.typst
+#                                ^ source.typst
+#                                 ^ source.typst markup.content.brace.typst
+#                                  ^^^ source.typst
+#                                     ^ source.typst markup.content.brace.typst
 >#if { true } { A } { A }
 #^ source.typst keyword.control.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst
 #    ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #     ^ source.typst meta.expr.if.typst
-#      ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#      ^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #          ^ source.typst meta.expr.if.typst
 #           ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #            ^ source.typst meta.expr.if.typst
@@ -70,7 +76,10 @@
 #               ^ source.typst meta.expr.if.typst variable.other.readwrite.typst
 #                ^ source.typst meta.expr.if.typst
 #                 ^ source.typst meta.expr.if.typst meta.brace.curly.typst
-#                  ^^^^^^^ source.typst
+#                  ^ source.typst
+#                   ^ source.typst markup.content.brace.typst
+#                    ^^^ source.typst
+#                       ^ source.typst markup.content.brace.typst
 >
 >#for i in range(0, 10){A}{A}
 #^ source.typst keyword.control.hash.typst
@@ -122,7 +131,7 @@
 #^ source.typst keyword.control.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst meta.brace.curly.typst
-#    ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#    ^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #        ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #         ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #          ^ source.typst meta.expr.if.typst variable.other.readwrite.typst
@@ -185,7 +194,7 @@
 #   ^ source.typst meta.expr.if.typst
 #    ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #     ^ source.typst meta.expr.if.typst
-#      ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#      ^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #          ^ source.typst meta.expr.if.typst
 #           ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #            ^ source.typst meta.expr.if.typst
@@ -242,7 +251,7 @@
 #^ source.typst keyword.control.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst meta.brace.curly.typst
-#    ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#    ^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #        ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #         ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #          ^ source.typst meta.expr.if.typst variable.other.readwrite.typst

@@ -75,10 +75,10 @@ const contentBlock: textmate.Pattern = {
   },
   patterns: [
     {
-      include: "#markup",
+      include: "#contentBlock",
     },
     {
-      include: "#markupBrace",
+      include: "#markup",
     },
   ],
 };
@@ -322,6 +322,9 @@ const markup: textmate.Pattern = {
     },
     {
       include: "#markupReference",
+    },
+    {
+      include: "#markupBrace",
     },
   ],
 };
