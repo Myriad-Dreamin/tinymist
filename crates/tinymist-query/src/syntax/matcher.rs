@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use typst::foundations::{Func, ParamInfo};
 
 use crate::prelude::*;
@@ -239,7 +239,7 @@ fn can_be_ident(node: &SyntaxNode) -> bool {
 }
 
 /// A mode in which a text document is interpreted.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum InterpretMode {
     /// The position is in a comment.
@@ -256,7 +256,7 @@ pub enum InterpretMode {
     Math,
 }
 
-pub(crate) fn interpret_mode_at(k: SyntaxKind) -> Option<InterpretMode> {
+pub(crate) fn interpret_mode_at_kind(k: SyntaxKind) -> Option<InterpretMode> {
     use SyntaxKind::*;
     Some(match k {
         LineComment | BlockComment => InterpretMode::Comment,
@@ -286,6 +286,21 @@ pub(crate) fn interpret_mode_at(k: SyntaxKind) -> Option<InterpretMode> {
         | FuncReturn | FuncCall | Unary | Binary | Parenthesized | Dict | Array | Destructuring
         | DestructAssignment => InterpretMode::Code,
     })
+}
+
+pub(crate) fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode {
+    loop {
+        log::debug!("leaf for context: {leaf:?}");
+        if let Some(t) = leaf {
+            if let Some(mode) = interpret_mode_at_kind(t.kind()) {
+                break mode;
+            }
+
+            leaf = t.parent();
+        } else {
+            break InterpretMode::Markup;
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -583,7 +598,7 @@ pub fn get_check_target_by_context<'a>(
 
 fn possible_in_code_trivia(sk: SyntaxKind) -> bool {
     !matches!(
-        interpret_mode_at(sk),
+        interpret_mode_at_kind(sk),
         Some(InterpretMode::Markup | InterpretMode::Math | InterpretMode::Comment)
     )
 }

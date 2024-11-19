@@ -16,7 +16,7 @@ pub mod ty;
 mod upstream;
 
 pub use analysis::{LocalContext, LocalContextGuard, LspWorldExt};
-pub use upstream::{with_vm, CompletionFeat};
+pub use upstream::{with_vm, CompletionFeat, PostfixSnippet};
 
 mod diagnostics;
 pub use diagnostics::*;

@@ -1,13 +1,16 @@
 use std::collections::BTreeMap;
+use std::ops::Deref;
+use std::sync::OnceLock;
 
 use ecow::{eco_format, EcoString};
 use hashbrown::HashSet;
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
 use reflexo::path::unix_slash;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tinymist_derive::BindTyCtx;
 use tinymist_world::LspWorld;
-use typst::foundations::{AutoValue, Func, Label, NoneValue, Scope, Type, Value};
+use typst::foundations::{AutoValue, Content, Func, Label, NoneValue, Scope, Type, Value};
 use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, Span, SyntaxKind, SyntaxNode};
 use typst::visualize::Color;
@@ -15,14 +18,52 @@ use typst::visualize::Color;
 use super::{Completion, CompletionContext, CompletionKind};
 use crate::adt::interner::Interned;
 use crate::analysis::{func_signature, BuiltinTy, PathPreference, Ty};
-use crate::syntax::{descending_decls, is_ident_like, CheckTarget, DescentDecl};
+use crate::syntax::{
+    descending_decls, interpret_mode_at, is_ident_like, CheckTarget, DescentDecl, InterpretMode,
+};
 use crate::ty::{Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeBounds, TypeScheme, TypeVar};
 use crate::upstream::complete::complete_code;
 
 use crate::{completion_kind, prelude::*, LspCompletion};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PostfixSnippetScope {
+    /// Any "dottable" value.
+    Value,
+    /// Any value having content type.
+    Content,
+}
+
+/// A parsed snippet
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParsedSnippet {
+    node_before: EcoString,
+    node_before_before_cursor: Option<EcoString>,
+    node_after: EcoString,
+}
+
+/// A postfix completion snippet.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostfixSnippet {
+    /// The scope of the snippet.
+    pub mode: EcoVec<InterpretMode>,
+    /// The scope of the snippet.
+    pub scope: PostfixSnippetScope,
+    /// The snippet name.
+    pub label: EcoString,
+    /// The snippet name.
+    pub label_detail: Option<EcoString>,
+    /// The snippet detail.
+    pub snippet: EcoString,
+    /// The snippet description.
+    pub description: EcoString,
+    /// Lazily parsed snippet.
+    #[serde(skip)]
+    pub parsed_snippet: OnceLock<Option<ParsedSnippet>>,
+}
+
 /// Tinymist's completion features.
-#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompletionFeat {
     /// Whether to enable postfix completion.
@@ -33,20 +74,31 @@ pub struct CompletionFeat {
     pub postfix_ufcs_left: Option<bool>,
     /// Whether to enable ufcs completion (right variant).
     pub postfix_ufcs_right: Option<bool>,
+    /// Postfix snippets.
+    pub postfix_snippets: Option<EcoVec<PostfixSnippet>>,
 }
 
 impl CompletionFeat {
     pub(crate) fn any_ufcs(&self) -> bool {
         self.ufcs() || self.ufcs_left() || self.ufcs_right()
     }
+    pub(crate) fn postfix(&self) -> bool {
+        self.postfix.unwrap_or(true)
+    }
     pub(crate) fn ufcs(&self) -> bool {
-        self.postfix.unwrap_or(true) && self.postfix_ufcs.unwrap_or(true)
+        self.postfix() && self.postfix_ufcs.unwrap_or(true)
     }
     pub(crate) fn ufcs_left(&self) -> bool {
-        self.postfix.unwrap_or(true) && self.postfix_ufcs_left.unwrap_or(true)
+        self.postfix() && self.postfix_ufcs_left.unwrap_or(true)
     }
     pub(crate) fn ufcs_right(&self) -> bool {
-        self.postfix.unwrap_or(true) && self.postfix_ufcs_right.unwrap_or(true)
+        self.postfix() && self.postfix_ufcs_right.unwrap_or(true)
+    }
+
+    pub(crate) fn postfix_snippets(&self) -> &[PostfixSnippet] {
+        self.postfix_snippets
+            .as_ref()
+            .map_or(DEFAULT_POSTFIX_SNIPPET.deref(), |v| v.as_slice())
     }
 }
 
@@ -112,6 +164,122 @@ impl<'a> CompletionContext<'a> {
         });
 
         Some((src, defines))
+    }
+
+    pub fn postfix_completions(&mut self, node: &LinkedNode, value: &Value) -> Option<()> {
+        if !self.ctx.analysis.completion_feat.postfix() {
+            return None;
+        }
+        let src = self.ctx.source_by_id(self.root.span().id()?).ok()?;
+
+        let _ = node;
+
+        let surrounding_syntax = self.surrounding_syntax();
+        if !matches!(surrounding_syntax, SurroundingSyntax::Regular) {
+            return None;
+        }
+
+        let cursor_mode = interpret_mode_at(Some(node));
+        let is_content = value.ty() == Type::of::<Content>()
+            || value.ty() == Type::of::<typst::symbols::Symbol>();
+        log::debug!("post snippet is_content: {is_content}");
+
+        let rng = node.range();
+        for snippet in self.ctx.analysis.completion_feat.postfix_snippets() {
+            if !snippet.mode.contains(&cursor_mode) {
+                continue;
+            }
+
+            let scope = match snippet.scope {
+                PostfixSnippetScope::Value => true,
+                PostfixSnippetScope::Content => is_content,
+            };
+            if !scope {
+                continue;
+            }
+            log::debug!("post snippet: {}", snippet.label);
+
+            static TYPST_SNIPPET_PLACEHOLDER_RE: LazyLock<Regex> =
+                LazyLock::new(|| Regex::new(r"\$\{(.*?)\}").unwrap());
+
+            let parsed_snippet = snippet.parsed_snippet.get_or_init(|| {
+                let split = TYPST_SNIPPET_PLACEHOLDER_RE
+                    .find_iter(&snippet.snippet)
+                    .map(|s| (&s.as_str()[2..s.as_str().len() - 1], s.start(), s.end()))
+                    .collect::<Vec<_>>();
+                if split.len() > 2 {
+                    return None;
+                }
+
+                let split0 = split[0];
+                let split1 = split.get(1);
+
+                if split0.0.contains("node") {
+                    Some(ParsedSnippet {
+                        node_before: snippet.snippet[..split0.1].into(),
+                        node_before_before_cursor: None,
+                        node_after: snippet.snippet[split0.2..].into(),
+                    })
+                } else {
+                    split1.map(|split1| ParsedSnippet {
+                        node_before_before_cursor: Some(snippet.snippet[..split0.1].into()),
+                        node_before: snippet.snippet[split0.1..split1.1].into(),
+                        node_after: snippet.snippet[split1.2..].into(),
+                    })
+                }
+            });
+            log::debug!("post snippet: {} on {:?}", snippet.label, parsed_snippet);
+            // (is_left, prefix, suffix)
+            let Some(ParsedSnippet {
+                node_before,
+                node_before_before_cursor,
+                node_after,
+            }) = parsed_snippet
+            else {
+                continue;
+            };
+
+            let base = Completion {
+                kind: CompletionKind::Syntax,
+                apply: Some("".into()),
+                label: snippet.label.clone(),
+                label_detail: snippet.label_detail.clone(),
+                detail: Some(snippet.description.clone()),
+                // range: Some(range),
+                ..Default::default()
+            };
+            if let Some(node_before_before_cursor) = &node_before_before_cursor {
+                let node_content = node.get().clone().into_text();
+                let before = TextEdit {
+                    range: self.ctx.to_lsp_range(rng.start..self.from, &src),
+                    new_text: node_before_before_cursor.into(),
+                };
+
+                self.completions.push(Completion {
+                    apply: Some(eco_format!("{node_before}{node_content}{node_after}")),
+                    additional_text_edits: Some(vec![before]),
+                    ..base.clone()
+                });
+            } else {
+                let before = TextEdit {
+                    range: self.ctx.to_lsp_range(rng.start..rng.start, &src),
+                    new_text: node_before.as_ref().into(),
+                };
+                let after = TextEdit {
+                    range: self.ctx.to_lsp_range(rng.end..self.from, &src),
+                    new_text: "".into(),
+                };
+                self.completions.push(Completion {
+                    apply: Some(node_after.clone()),
+                    additional_text_edits: Some(vec![before, after]),
+                    ..base
+                });
+            }
+        }
+
+        log::debug!("ovo {:#?}", self.completions);
+
+        Some(())
     }
 
     pub fn ufcs_completions(&mut self, node: &LinkedNode, value: &Value) {
@@ -1436,6 +1604,47 @@ pub fn symbol_label_detail(ch: char) -> EcoString {
         _ => format!("\\u{{{:04x}}}", ch as u32).into(),
     }
 }
+
+static DEFAULT_POSTFIX_SNIPPET: LazyLock<Vec<PostfixSnippet>> = LazyLock::new(|| {
+    vec![
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Content,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: "aleft".into(),
+            label_detail: Some(".align left".into()),
+            snippet: "align(left, ${node})".into(),
+            description: "wrap as with align left".into(),
+            parsed_snippet: OnceLock::new(),
+        },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Value,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: "if".into(),
+            label_detail: Some(".if".into()),
+            snippet: "if ${node} { ${} }".into(),
+            description: "wrap as if expression".into(),
+            parsed_snippet: OnceLock::new(),
+        },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Value,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: "return".into(),
+            label_detail: Some(".return".into()),
+            snippet: "return ${node}".into(),
+            description: "wrap as return expression".into(),
+            parsed_snippet: OnceLock::new(),
+        },
+        PostfixSnippet {
+            scope: PostfixSnippetScope::Value,
+            mode: eco_vec![InterpretMode::Code, InterpretMode::Markup],
+            label: "let".into(),
+            label_detail: Some(".let".into()),
+            snippet: "let ${_} = ${node}".into(),
+            description: "wrap as let expression".into(),
+            parsed_snippet: OnceLock::new(),
+        },
+    ]
+});
 
 #[cfg(test)]
 
