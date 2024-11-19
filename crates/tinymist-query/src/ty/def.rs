@@ -15,7 +15,7 @@ use reflexo_typst::TypstFileId;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use typst::{
-    foundations::{Content, ParamInfo, Type, Value},
+    foundations::{Content, Element, ParamInfo, Type, Value},
     syntax::{ast, Span, SyntaxKind, SyntaxNode},
 };
 
@@ -222,21 +222,34 @@ impl Ty {
         }
     }
 
+    /// Get the type of the type
+    pub fn element(&self) -> Option<Element> {
+        match self {
+            Ty::Value(v) => match &v.val {
+                Value::Func(f) => f.element(),
+                _ => None,
+            },
+            Ty::Builtin(BuiltinTy::Element(v)) => Some(*v),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn satisfy<T: TyCtx>(&self, ctx: &T, f: impl FnMut(&Ty, bool)) {
+        self.bounds(true, &mut BoundPred::new(ctx, f));
+    }
+
     pub(crate) fn is_content<T: TyCtx>(&self, ctx: &T) -> bool {
         let mut res = false;
-        self.bounds(
-            false,
-            &mut BoundPred::new(ctx, |ty: &Ty, _pol| {
-                res = res || {
-                    match ty {
-                        Ty::Value(v) => matches!(v.val, Value::Content(..)),
-                        Ty::Builtin(BuiltinTy::Content | BuiltinTy::Element(..)) => true,
-                        Ty::Builtin(BuiltinTy::Type(v)) => *v == Type::of::<Content>(),
-                        _ => false,
-                    }
+        self.satisfy(ctx, |ty: &Ty, _pol| {
+            res = res || {
+                match ty {
+                    Ty::Value(v) => matches!(v.val, Value::Content(..)),
+                    Ty::Builtin(BuiltinTy::Content | BuiltinTy::Element(..)) => true,
+                    Ty::Builtin(BuiltinTy::Type(v)) => *v == Type::of::<Content>(),
+                    _ => false,
                 }
-            }),
-        );
+            }
+        });
         res
     }
 }

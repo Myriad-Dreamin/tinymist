@@ -107,8 +107,12 @@ impl<'a> CompletionContext<'a> {
         self.ctx.world()
     }
 
-    pub fn scope_completions(&mut self, parens: bool, filter: impl Fn(&Value) -> bool) {
-        self.scope_completions_(parens, |v| v.map_or(true, &filter));
+    pub fn scope_completions(
+        &mut self,
+        parens: bool,
+        filter: impl Fn(&Ty, &CompletionKindChecker) -> bool,
+    ) {
+        self.scope_completions_(parens, filter);
     }
 
     fn seen_field(&mut self, field: Interned<str>) -> bool {
@@ -398,7 +402,11 @@ impl<'a> CompletionContext<'a> {
     /// Add completions for definitions that are available at the cursor.
     ///
     /// Filters the global/math scope with the given filter.
-    pub fn scope_completions_(&mut self, parens: bool, filter: impl Fn(Option<&Value>) -> bool) {
+    pub fn scope_completions_(
+        &mut self,
+        parens: bool,
+        filter: impl Fn(&Ty, &CompletionKindChecker) -> bool,
+    ) {
         let Some((_, defines)) = self.defines() else {
             return;
         };
@@ -412,14 +420,44 @@ impl<'a> CompletionContext<'a> {
             functions: HashSet::default(),
         };
 
+        let filter = |ty: &Ty, c: &CompletionKindChecker| {
+            let s = match surrounding_syntax {
+                SurroundingSyntax::Regular => true,
+                SurroundingSyntax::Selector => 'selector: {
+                    for func in &c.functions {
+                        if func.element().is_some() {
+                            break 'selector true;
+                        }
+                    }
+
+                    false
+                }
+                SurroundingSyntax::SetRule => 'set_rule: {
+                    // todo: user defined elements
+                    for func in &c.functions {
+                        if let Some(elem) = func.element() {
+                            if elem.params().iter().any(|param| param.settable) {
+                                break 'set_rule true;
+                            }
+                        }
+                    }
+
+                    false
+                }
+            };
+            s && filter(ty, c)
+        };
+
         // we don't check literal type here for faster completion
         for (name, ty) in defines {
-            // todo: filter ty
-            if !filter(None) || name.is_empty() {
+            if name.is_empty() {
                 continue;
             }
 
             kind_checker.check(&ty);
+            if !filter(&ty, &kind_checker) {
+                continue;
+            }
 
             if let Some(ch) = kind_checker.symbols.iter().min().copied() {
                 // todo: describe all chars
@@ -514,6 +552,7 @@ impl<'a> CompletionContext<'a> {
     }
 }
 
+#[derive(Debug)]
 enum SurroundingSyntax {
     Regular,
     Selector,
@@ -549,6 +588,15 @@ fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> 
             }
             SyntaxKind::ShowRule => {
                 let rule = parent.get().cast::<ast::ShowRule>()?;
+                let colon = rule
+                    .to_untyped()
+                    .children()
+                    .find(|s| s.kind() == SyntaxKind::Colon);
+                if colon.is_none() {
+                    // incomplete show rule
+                    return Some(Selector);
+                }
+
                 if encolsed_by(parent, Some(rule.transform().span()), leaf) {
                     return Some(Regular);
                 } else {
@@ -667,9 +715,9 @@ impl<'a> IfaceChecker for ScopeChecker<'a> {
     }
 }
 
-struct CompletionKindChecker {
-    symbols: HashSet<char>,
-    functions: HashSet<Ty>,
+pub(crate) struct CompletionKindChecker {
+    pub(crate) symbols: HashSet<char>,
+    pub(crate) functions: HashSet<Ty>,
 }
 impl CompletionKindChecker {
     fn reset(&mut self) {
@@ -1389,8 +1437,6 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         ctx.enrich(" ", "");
     }
 
-    sort_and_explicit_code_completion(ctx);
-
     if let Some(c) = args_node {
         log::debug!("content block compl: args {c:?}");
         let is_unclosed = matches!(c.kind(), SyntaxKind::Args)
@@ -1404,6 +1450,36 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         if is_unclosed {
             ctx.enrich("", ")");
         }
+    }
+
+    let surrounding_syntax = ctx.surrounding_syntax();
+
+    match surrounding_syntax {
+        SurroundingSyntax::Regular => {}
+        SurroundingSyntax::Selector => {
+            ctx.snippet_completion(
+                "text selector",
+                "\"${text}\"",
+                "Replace occurrences of specific text.",
+            );
+
+            ctx.snippet_completion(
+                "regex selector",
+                "regex(\"${regex}\")",
+                "Replace matches of a regular expression.",
+            );
+        }
+        SurroundingSyntax::SetRule => {}
+    }
+
+    sort_and_explicit_code_completion(ctx);
+
+    match surrounding_syntax {
+        SurroundingSyntax::Regular => {}
+        SurroundingSyntax::Selector => {
+            ctx.enrich("", ": ${}");
+        }
+        SurroundingSyntax::SetRule => {}
     }
 
     Some(())

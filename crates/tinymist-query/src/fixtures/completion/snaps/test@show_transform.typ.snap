@@ -15,7 +15,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform.typ
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
     "textEdit": {
-     "newText": "raw(${1:})",
+     "newText": "raw",
      "range": {
       "end": {
        "character": 12,
@@ -75,7 +75,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform.typ
      "description": "([any], encoding: \"utf8\" | none) => bytes | str"
     },
     "textEdit": {
-     "newText": "read(${1:})",
+     "newText": "read",
      "range": {
       "end": {
        "character": 12,
@@ -96,6 +96,23 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform.typ
     },
     "textEdit": {
      "newText": "read.with(${1:})",
+     "range": {
+      "end": {
+       "character": 12,
+       "line": 1
+      },
+      "start": {
+       "character": 11,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 15,
+    "label": "replacement",
+    "textEdit": {
+     "newText": "[${1:content}]",
      "range": {
       "end": {
        "character": 12,
