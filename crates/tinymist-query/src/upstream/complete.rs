@@ -341,7 +341,7 @@ fn complete_math(ctx: &mut CompletionContext) -> bool {
 /// Add completions for math snippets.
 #[rustfmt::skip]
 fn math_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(true, |_| true);
+    ctx.scope_completions(true, |_, _| true);
 
     ctx.snippet_completion(
         "subscript",
@@ -591,25 +591,28 @@ fn import_item_completions<'a>(
 
 /// Complete set and show rules.
 fn complete_rules(ctx: &mut CompletionContext) -> bool {
-    // We don't want to complete directly behind the keyword.
-    if !ctx.leaf.kind().is_trivia() {
-        return false;
-    }
-
     let Some(prev) = ctx.leaf.prev_leaf() else {
         return false;
     };
 
     // Behind the set keyword: "set |".
     if matches!(prev.kind(), SyntaxKind::Set) {
-        ctx.from = ctx.cursor;
+        ctx.from = if ctx.leaf.kind().is_trivia() {
+            ctx.cursor
+        } else {
+            ctx.leaf.offset()
+        };
         set_rule_completions(ctx);
         return true;
     }
 
     // Behind the show keyword: "show |".
     if matches!(prev.kind(), SyntaxKind::Show) {
-        ctx.from = ctx.cursor;
+        ctx.from = if ctx.leaf.kind().is_trivia() {
+            ctx.cursor
+        } else {
+            ctx.leaf.offset()
+        };
         show_rule_selector_completions(ctx);
         return true;
     }
@@ -620,7 +623,11 @@ fn complete_rules(ctx: &mut CompletionContext) -> bool {
         if matches!(prev.kind(), SyntaxKind::Colon);
         if matches!(prev.parent_kind(), Some(SyntaxKind::ShowRule));
         then {
-            ctx.from = ctx.cursor;
+            ctx.from = if ctx.leaf.kind().is_trivia() {
+                ctx.cursor
+            } else {
+                ctx.leaf.offset()
+            };
             show_rule_recipe_completions(ctx);
             return true;
         }
@@ -631,23 +638,12 @@ fn complete_rules(ctx: &mut CompletionContext) -> bool {
 
 /// Add completions for all functions from the global scope.
 fn set_rule_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(true, |value| {
-        matches!(
-            value,
-            Value::Func(func) if func.params()
-                .unwrap_or_default()
-                .iter()
-                .any(|param| param.settable),
-        )
-    });
+    ctx.scope_completions(true, |_, _| true);
 }
 
 /// Add completions for selectors.
 fn show_rule_selector_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(
-        false,
-        |value| matches!(value, Value::Func(func) if func.element().is_some()),
-    );
+    ctx.scope_completions(false, |_, _| true);
 
     ctx.snippet_completion(
         "text selector",
@@ -684,7 +680,7 @@ fn show_rule_recipe_completions(ctx: &mut CompletionContext) {
         "Transform the element with a function.",
     );
 
-    ctx.scope_completions(false, |value| matches!(value, Value::Func(_)));
+    ctx.scope_completions(false, |_, c| !c.functions.is_empty());
 }
 
 /// Complete in code mode.
@@ -734,8 +730,10 @@ fn complete_code(ctx: &mut CompletionContext, from_type: bool) -> bool {
 /// Add completions for expression snippets.
 #[rustfmt::skip]
 fn code_completions(ctx: &mut CompletionContext, hash: bool) {
-    ctx.scope_completions(true, |value| !hash || {
-        matches!(value, Value::Symbol(_) | Value::Func(_) | Value::Type(_) | Value::Module(_))
+    ctx.scope_completions(true, |_value, _| !hash || {
+        // todo: filter code completions
+        // matches!(value, Value::Symbol(_) | Value::Func(_) | Value::Type(_) | Value::Module(_))
+        true
     });
 
     ctx.snippet_completion(
