@@ -229,7 +229,6 @@ impl<'a> CompletionContext<'a> {
                 }
             });
             log::debug!("post snippet: {} on {:?}", snippet.label, parsed_snippet);
-            // (is_left, prefix, suffix)
             let Some(ParsedSnippet {
                 node_before,
                 node_before_before_cursor,
@@ -276,8 +275,6 @@ impl<'a> CompletionContext<'a> {
                 });
             }
         }
-
-        log::debug!("ovo {:#?}", self.completions);
 
         Some(())
     }
