@@ -138,6 +138,34 @@ Whether to handle drag-and-drop of resources into the editing typst document. No
   - `disable`
 - **Default**: `"enable"`
 
+## `tinymist.completion.postfix`
+
+Whether to enable postfix code completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.completion.postfixUfcs`
+
+Whether to enable UFCS-style completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.completion.postfixUfcsLeft`
+
+Whether to enable left-variant UFCS-style completion. For example, `[A].table|` will be completed to `table(|)[A]`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.completion.postfixUfcsRight`
+
+Whether to enable right-variant UFCS-style completion. For example, `[A].table|` will be completed to `table([A], |)`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
 ## `tinymist.previewFeature`
 
 Enable or disable preview features of Typst. Note: restarting the editor is required to change this setting.

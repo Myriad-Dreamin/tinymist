@@ -4,6 +4,7 @@ use ecow::{eco_format, EcoString};
 use hashbrown::HashSet;
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat, TextEdit};
 use reflexo::path::unix_slash;
+use serde::{Deserialize, Serialize};
 use tinymist_derive::BindTyCtx;
 use tinymist_world::LspWorld;
 use typst::foundations::{AutoValue, Func, Label, NoneValue, Scope, Type, Value};
@@ -19,6 +20,46 @@ use crate::ty::{Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeBounds, TypeScheme
 use crate::upstream::complete::complete_code;
 
 use crate::{completion_kind, prelude::*, LspCompletion};
+
+/// Tinymist's completion features.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompletionFeat {
+    /// Whether to enable postfix completion.
+    pub postfix: bool,
+    /// Whether to enable ufcs completion.
+    pub postfix_ufcs: bool,
+    /// Whether to enable ufcs completion (left variant).
+    pub postfix_ufcs_left: bool,
+    /// Whether to enable ufcs completion (right variant).
+    pub postfix_ufcs_right: bool,
+}
+
+impl Default for CompletionFeat {
+    fn default() -> Self {
+        Self {
+            postfix: true,
+            postfix_ufcs: true,
+            postfix_ufcs_left: true,
+            postfix_ufcs_right: true,
+        }
+    }
+}
+
+impl CompletionFeat {
+    pub(crate) fn any_ufcs(&self) -> bool {
+        self.ufcs() || self.ufcs_left() || self.ufcs_right()
+    }
+    pub(crate) fn ufcs(&self) -> bool {
+        self.postfix && self.postfix_ufcs
+    }
+    pub(crate) fn ufcs_left(&self) -> bool {
+        self.postfix && self.postfix_ufcs_left
+    }
+    pub(crate) fn ufcs_right(&self) -> bool {
+        self.postfix && self.postfix_ufcs_right
+    }
+}
 
 impl<'a> CompletionContext<'a> {
     pub fn world(&self) -> &LspWorld {
@@ -85,6 +126,10 @@ impl<'a> CompletionContext<'a> {
     }
 
     pub fn ufcs_completions(&mut self, node: &LinkedNode, value: &Value) {
+        if !self.ctx.analysis.completion_feat.any_ufcs() {
+            return;
+        }
+
         let _ = value;
         let surrounding_syntax = self.surrounding_syntax();
         if !matches!(surrounding_syntax, SurroundingSyntax::Regular) {
@@ -143,7 +188,7 @@ impl<'a> CompletionContext<'a> {
                 continue;
             }
             log::debug!("checked ufcs: {ty:?}");
-            if fn_feat.min_pos() == 1 {
+            if self.ctx.analysis.completion_feat.ufcs() && fn_feat.min_pos() == 1 {
                 let before = TextEdit {
                     range: self.ctx.to_lsp_range(rng.start..rng.start, &src),
                     new_text: format!("{name}{lb}"),
@@ -159,7 +204,8 @@ impl<'a> CompletionContext<'a> {
                     ..base.clone()
                 });
             }
-            if fn_feat.min_pos() > 1 || fn_feat.min_named() > 0 {
+            let more_args = fn_feat.min_pos() > 1 || fn_feat.min_named() > 0;
+            if self.ctx.analysis.completion_feat.ufcs_left() && more_args {
                 let node_content = node.get().clone().into_text();
                 let before = TextEdit {
                     range: self.ctx.to_lsp_range(rng.start..self.from, &src),
@@ -175,6 +221,8 @@ impl<'a> CompletionContext<'a> {
                     additional_text_edits: Some(vec![before]),
                     ..base.clone()
                 });
+            }
+            if self.ctx.analysis.completion_feat.ufcs_right() && more_args {
                 let before = TextEdit {
                     range: self.ctx.to_lsp_range(rng.start..rng.start, &src),
                     new_text: format!("{name}("),

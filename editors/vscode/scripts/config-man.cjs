@@ -59,7 +59,8 @@ const serverSideKeys = (() => {
     }
     return strings.map((x) => `tinymist.${x}`);
 })();
-const isServerSideConfig = (key) => serverSideKeys.includes(key);
+const isServerSideConfig = (key) => serverSideKeys.includes(key) || serverSideKeys
+  .some((serverSideKey) => key.startsWith(`${serverSideKey}.`));
 const configMd = (editor, prefix) =>
   Object.keys(config)
     .map((key) => {

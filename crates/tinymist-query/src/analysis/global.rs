@@ -36,7 +36,7 @@ use crate::syntax::{
     scan_workspace_files, Decl, DefKind, DerefTarget, ExprInfo, ExprRoute, LexicalScope,
     ModuleDependency,
 };
-use crate::upstream::{tooltip_, Tooltip};
+use crate::upstream::{tooltip_, CompletionFeat, Tooltip};
 use crate::{
     lsp_to_typst, typst_to_lsp, ColorTheme, CompilerQueryRequest, LspPosition, LspRange,
     LspWorldExt, PositionEncoding, TypstRange, VersionedDocument,
@@ -55,6 +55,8 @@ pub struct Analysis {
     pub allow_multiline_token: bool,
     /// Whether to remove html from markup content in responses.
     pub remove_html: bool,
+    /// Tinymist's completion features.
+    pub completion_feat: CompletionFeat,
     /// The editor's color theme.
     pub color_theme: ColorTheme,
     /// The periscope provider.

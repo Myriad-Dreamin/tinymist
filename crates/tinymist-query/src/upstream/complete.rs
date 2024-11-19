@@ -19,8 +19,8 @@ use crate::adt::interner::Interned;
 use crate::analysis::{analyze_labels, DynLabel, LocalContext, Ty};
 
 mod ext;
-pub use ext::complete_path;
 use ext::*;
+pub use ext::{complete_path, CompletionFeat};
 
 /// Autocomplete a cursor position in a source file.
 ///
