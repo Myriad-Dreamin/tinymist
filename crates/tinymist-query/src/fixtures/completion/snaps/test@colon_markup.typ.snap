@@ -15,7 +15,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/colon_markup.typ
      "description": "(content, b: content | none, bl: content | none, br: content | none, t: content | none, tl: content | none, tr: content | none) => attach"
     },
     "textEdit": {
-     "newText": "attach(${1:})",
+     "newText": "attach[${1:}]",
      "range": {
       "end": {
        "character": 2,

@@ -11,6 +11,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_args_after.typ
    {
     "kind": 5,
     "label": "class",
+    "labelDetails": {
+     "description": "\"article\" | \"letter\" | str"
+    },
     "sortText": "000",
     "textEdit": {
      "newText": "class: ${1:}, ",

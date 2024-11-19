@@ -11,6 +11,9 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-reconstruct.ty
    {
     "kind": 5,
     "label": "body-name",
+    "labelDetails": {
+     "description": "\"body\""
+    },
     "sortText": "000",
     "textEdit": {
      "newText": "body-name: ${1:}",
@@ -29,6 +32,9 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-reconstruct.ty
    {
     "kind": 5,
     "label": "labeled",
+    "labelDetails": {
+     "description": "true"
+    },
     "sortText": "001",
     "textEdit": {
      "newText": "labeled: ${1:}",
@@ -47,6 +53,9 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-reconstruct.ty
    {
     "kind": 5,
     "label": "named",
+    "labelDetails": {
+     "description": "false"
+    },
     "sortText": "002",
     "textEdit": {
      "newText": "named: ${1:}",

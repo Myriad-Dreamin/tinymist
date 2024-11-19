@@ -81,19 +81,7 @@ fn check_signature<'a>(
                     .iter()
                     .map(|args| args.positional_params().len())
                     .sum::<usize>();
-                let pos_idx = bound_pos + positional;
-                let nth = sig_ins.pos(pos_idx).cloned();
-                let nth = nth.or_else(|| {
-                    let rest_idx = || pos_idx.saturating_sub(sig_ins.positional_params().len());
-
-                    let rest_ty = sig_ins.rest_param()?;
-                    match rest_ty {
-                        Ty::Array(ty) => Some(ty.as_ref().clone()),
-                        Ty::Tuple(tys) => tys.get(rest_idx()).cloned(),
-                        _ => None,
-                    }
-                });
-                if let Some(nth) = nth {
+                if let Some(nth) = sig_ins.pos_or_rest(bound_pos + positional) {
                     receiver.insert(nth, !pol);
                 }
 

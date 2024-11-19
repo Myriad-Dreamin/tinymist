@@ -11,6 +11,9 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
    {
     "kind": 5,
     "label": "config",
+    "labelDetails": {
+     "description": "dictionary"
+    },
     "sortText": "003",
     "textEdit": {
      "newText": "config: ${1:}",
@@ -29,6 +32,9 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
    {
     "kind": 5,
     "label": "repeat",
+    "labelDetails": {
+     "description": "auto"
+    },
     "sortText": "004",
     "textEdit": {
      "newText": "repeat: ${1:}",
@@ -50,9 +56,9 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
     "labelDetails": {
      "description": "(content, gap: length, justify: bool) => repeat"
     },
-    "sortText": "245",
+    "sortText": "250",
     "textEdit": {
-     "newText": "repeat(${1:})",
+     "newText": "repeat[${1:}]",
      "range": {
       "end": {
        "character": 7,

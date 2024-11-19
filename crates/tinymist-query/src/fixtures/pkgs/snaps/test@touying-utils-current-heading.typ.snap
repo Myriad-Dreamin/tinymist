@@ -11,6 +11,9 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-current-headin
    {
     "kind": 5,
     "label": "depth",
+    "labelDetails": {
+     "description": "9999"
+    },
     "sortText": "000",
     "textEdit": {
      "newText": "depth: ${1:}",
@@ -29,6 +32,9 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-current-headin
    {
     "kind": 5,
     "label": "hierachical",
+    "labelDetails": {
+     "description": "true"
+    },
     "sortText": "001",
     "textEdit": {
      "newText": "hierachical: ${1:}",
@@ -47,6 +53,9 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-current-headin
    {
     "kind": 5,
     "label": "level",
+    "labelDetails": {
+     "description": "auto | int"
+    },
     "sortText": "002",
     "textEdit": {
      "newText": "level: ${1:}",
