@@ -23,17 +23,17 @@ impl SemanticRequest for DocumentLinkRequest {
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
-        let links = get_link_exprs(ctx, &source);
-        links.map(|links| {
-            links
-                .into_iter()
-                .map(|(range, target)| DocumentLink {
-                    range: ctx.to_lsp_range(range, &source),
-                    target: Some(target),
-                    tooltip: None,
-                    data: None,
-                })
-                .collect()
-        })
+        let links = get_link_exprs(&source);
+        if links.objects.is_empty() {
+            return None;
+        }
+
+        let links = links.objects.iter().map(|obj| DocumentLink {
+            range: ctx.to_lsp_range(obj.range.clone(), &source),
+            target: obj.target.resolve(ctx),
+            tooltip: None,
+            data: None,
+        });
+        Some(links.collect())
     }
 }

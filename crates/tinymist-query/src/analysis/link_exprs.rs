@@ -1,32 +1,75 @@
 //! Analyze color expressions in a source file.
 
+use std::str::FromStr;
+
 use lsp_types::Url;
+use reflexo_typst::package::PackageSpec;
 
 use super::prelude::*;
-use crate::path_to_url;
 
 /// Get link expressions from a source.
-pub fn get_link_exprs(ctx: &mut LocalContext, src: &Source) -> Option<Vec<(Range<usize>, Url)>> {
+#[comemo::memoize]
+pub fn get_link_exprs(src: &Source) -> Arc<LinkInfo> {
     let root = LinkedNode::new(src.root());
-    get_link_exprs_in(ctx, &root)
+    Arc::new(get_link_exprs_in(&root).unwrap_or_default())
 }
 
 /// Get link expressions in a source node.
-pub fn get_link_exprs_in(
-    ctx: &mut LocalContext,
-    node: &LinkedNode,
-) -> Option<Vec<(Range<usize>, Url)>> {
-    let mut worker = LinkStrWorker { ctx, links: vec![] };
+pub fn get_link_exprs_in(node: &LinkedNode) -> Option<LinkInfo> {
+    let mut worker = LinkStrWorker {
+        info: LinkInfo::default(),
+    };
     worker.collect_links(node)?;
-    Some(worker.links)
+    Some(worker.info)
 }
 
-struct LinkStrWorker<'a> {
-    ctx: &'a mut LocalContext,
-    links: Vec<(Range<usize>, Url)>,
+/// A valid link target.
+pub enum LinkTarget {
+    /// A package specification.
+    Package(Box<PackageSpec>),
+    /// A URL.
+    Url(Box<Url>),
+    /// A file path.
+    Path(TypstFileId, EcoString),
 }
 
-impl<'a> LinkStrWorker<'a> {
+impl LinkTarget {
+    pub(crate) fn resolve(&self, ctx: &mut LocalContext) -> Option<Url> {
+        match self {
+            LinkTarget::Package(..) => None,
+            LinkTarget::Url(url) => Some(url.as_ref().clone()),
+            LinkTarget::Path(id, path) => {
+                // Avoid creating new ids here.
+                let base = id.vpath().join(path.as_str());
+                let root = ctx.path_for_id(id.join("/")).ok()?;
+                crate::path_to_url(&base.resolve(&root)?).ok()
+            }
+        }
+    }
+}
+
+/// A link object in a source file.
+pub struct LinkObject {
+    /// The range of the link expression.
+    pub range: Range<usize>,
+    /// The span of the link expression.
+    pub span: Span,
+    /// The target of the link.
+    pub target: LinkTarget,
+}
+
+/// Link information in a source file.
+#[derive(Default)]
+pub struct LinkInfo {
+    /// The link objects in a source file.
+    pub objects: Vec<LinkObject>,
+}
+
+struct LinkStrWorker {
+    info: LinkInfo,
+}
+
+impl LinkStrWorker {
     fn collect_links(&mut self, node: &LinkedNode) -> Option<()> {
         match node.kind() {
             // SyntaxKind::Link => { }
@@ -35,6 +78,11 @@ impl<'a> LinkStrWorker<'a> {
                 if fc.is_some() {
                     return Some(());
                 }
+            }
+            SyntaxKind::Include => {
+                let inc = node.cast::<ast::ModuleInclude>()?;
+                let path = inc.source();
+                self.analyze_path_exp(node, path);
             }
             // early exit
             k if k.is_trivia() || k.is_keyword() || k.is_error() => return Some(()),
@@ -128,32 +176,28 @@ impl<'a> LinkStrWorker<'a> {
     fn analyze_path_str(&mut self, node: &LinkedNode, s: ast::Str<'_>) -> Option<()> {
         let str_node = node.find(s.span())?;
         let str_range = str_node.range();
-        let content_range = str_range.start + 1..str_range.end - 1;
-        if content_range.is_empty() {
+        let range = str_range.start + 1..str_range.end - 1;
+        if range.is_empty() {
             return None;
         }
 
-        // Avoid creating new ids here.
+        let content = s.get();
+        if content.starts_with('@') {
+            let pkg_spec = PackageSpec::from_str(&content).ok()?;
+            self.info.objects.push(LinkObject {
+                range,
+                span: s.span(),
+                target: LinkTarget::Package(Box::new(pkg_spec)),
+            });
+            return Some(());
+        }
+
         let id = node.span().id()?;
-        let base = id.vpath().join(s.get().as_str());
-        let root = self.ctx.path_for_id(id.join("/")).ok()?;
-        let path = base.resolve(&root)?;
-        if !path.exists() {
-            return None;
-        }
-
-        self.push_path(content_range, path.as_path())
-    }
-
-    fn push_path(&mut self, range: Range<usize>, path: &Path) -> Option<()> {
-        self.push_link(range, path_to_url(path).ok()?)
-    }
-
-    fn push_link(&mut self, range: Range<usize>, target: Url) -> Option<()> {
-        // let rng = self.ctx.to_lsp_range(range, &self.source);
-
-        self.links.push((range, target));
-
+        self.info.objects.push(LinkObject {
+            range,
+            span: s.span(),
+            target: LinkTarget::Path(id, content),
+        });
         Some(())
     }
 }
