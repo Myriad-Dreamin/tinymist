@@ -22,3 +22,5 @@ pub(crate) mod def;
 pub use def::*;
 pub(crate) mod repr;
 use repr::*;
+pub(crate) mod index;
+pub use index::*;
