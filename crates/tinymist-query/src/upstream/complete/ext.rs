@@ -930,67 +930,6 @@ fn encolsed_by(parent: &LinkedNode, s: Option<Span>, leaf: &LinkedNode) -> bool 
     s.and_then(|s| parent.find(s)?.find(leaf.span())).is_some()
 }
 
-fn sort_and_explicit_code_completion(ctx: &mut CompletionContext) {
-    let mut completions = std::mem::take(&mut ctx.completions);
-    let explict = ctx.explicit;
-    ctx.explicit = true;
-    let ty = Some(Ty::from_types(ctx.seen_types.iter().cloned()));
-    let from_ty = std::mem::replace(&mut ctx.from_ty, ty);
-    complete_code(ctx, true);
-    ctx.from_ty = from_ty;
-    ctx.explicit = explict;
-
-    // ctx.strict_scope_completions(false, |value| value.ty() == *ty);
-    // let length_ty = Type::of::<Length>();
-    // ctx.strict_scope_completions(false, |value| value.ty() == length_ty);
-    // let color_ty = Type::of::<Color>();
-    // ctx.strict_scope_completions(false, |value| value.ty() == color_ty);
-    // let ty = Type::of::<Dir>();
-    // ctx.strict_scope_completions(false, |value| value.ty() == ty);
-
-    log::debug!(
-        "sort_and_explicit_code_completion: {completions:#?} {:#?}",
-        ctx.completions
-    );
-
-    completions.sort_by(|a, b| {
-        a.sort_text
-            .as_ref()
-            .cmp(&b.sort_text.as_ref())
-            .then_with(|| a.label.cmp(&b.label))
-    });
-    ctx.completions.sort_by(|a, b| {
-        a.sort_text
-            .as_ref()
-            .cmp(&b.sort_text.as_ref())
-            .then_with(|| a.label.cmp(&b.label))
-    });
-
-    // todo: this is a bit messy, we can refactor for improving maintainability
-    // The messy code will finally gone, but to help us go over the mess stage, I
-    // drop some comment here.
-    //
-    // currently, there are only path completions in ctx.completions2
-    // and type/named param/positional param completions in completions
-    // and all rest less relevant completions inctx.completions
-    for (i, compl) in ctx.completions2.iter_mut().enumerate() {
-        compl.sort_text = Some(format!("{i:03}"));
-    }
-    let sort_base = ctx.completions2.len();
-    for (i, compl) in (completions.iter_mut().chain(ctx.completions.iter_mut())).enumerate() {
-        compl.sort_text = Some(eco_format!("{i:03}", i = i + sort_base));
-    }
-
-    log::debug!(
-        "sort_and_explicit_code_completion after: {completions:#?} {:#?}",
-        ctx.completions
-    );
-
-    ctx.completions.append(&mut completions);
-
-    log::debug!("sort_and_explicit_code_completion: {:?}", ctx.completions);
-}
-
 pub fn ty_to_completion_kind(ty: &Ty) -> CompletionKind {
     match ty {
         Ty::Value(ty) => value_to_completion_kind(&ty.val),
@@ -1454,6 +1393,15 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         }
     }
 
+    let mut completions = std::mem::take(&mut ctx.completions);
+    let explict = ctx.explicit;
+    ctx.explicit = true;
+    let ty = Some(Ty::from_types(ctx.seen_types.iter().cloned()));
+    let from_ty = std::mem::replace(&mut ctx.from_ty, ty);
+    complete_code(ctx, true);
+    ctx.from_ty = from_ty;
+    ctx.explicit = explict;
+
     match scope {
         SurroundingSyntax::Regular => {}
         SurroundingSyntax::Selector => {
@@ -1491,7 +1439,55 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         SurroundingSyntax::SetRule => {}
     }
 
-    sort_and_explicit_code_completion(ctx);
+    // ctx.strict_scope_completions(false, |value| value.ty() == *ty);
+    // let length_ty = Type::of::<Length>();
+    // ctx.strict_scope_completions(false, |value| value.ty() == length_ty);
+    // let color_ty = Type::of::<Color>();
+    // ctx.strict_scope_completions(false, |value| value.ty() == color_ty);
+    // let ty = Type::of::<Dir>();
+    // ctx.strict_scope_completions(false, |value| value.ty() == ty);
+
+    log::debug!(
+        "sort_and_explicit_code_completion: {completions:#?} {:#?}",
+        ctx.completions
+    );
+
+    completions.sort_by(|a, b| {
+        a.sort_text
+            .as_ref()
+            .cmp(&b.sort_text.as_ref())
+            .then_with(|| a.label.cmp(&b.label))
+    });
+    ctx.completions.sort_by(|a, b| {
+        a.sort_text
+            .as_ref()
+            .cmp(&b.sort_text.as_ref())
+            .then_with(|| a.label.cmp(&b.label))
+    });
+
+    // todo: this is a bit messy, we can refactor for improving maintainability
+    // The messy code will finally gone, but to help us go over the mess stage, I
+    // drop some comment here.
+    //
+    // currently, there are only path completions in ctx.completions2
+    // and type/named param/positional param completions in completions
+    // and all rest less relevant completions inctx.completions
+    for (i, compl) in ctx.completions2.iter_mut().enumerate() {
+        compl.sort_text = Some(format!("{i:03}"));
+    }
+    let sort_base = ctx.completions2.len();
+    for (i, compl) in (completions.iter_mut().chain(ctx.completions.iter_mut())).enumerate() {
+        compl.sort_text = Some(eco_format!("{i:03}", i = i + sort_base));
+    }
+
+    log::debug!(
+        "sort_and_explicit_code_completion after: {completions:#?} {:#?}",
+        ctx.completions
+    );
+
+    ctx.completions.append(&mut completions);
+
+    log::debug!("sort_and_explicit_code_completion: {:?}", ctx.completions);
 
     match scope {
         SurroundingSyntax::Regular => {}
