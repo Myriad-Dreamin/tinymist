@@ -9,13 +9,11 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform.typ
   "isIncomplete": false,
   "items": [
    {
-    "kind": 3,
-    "label": "raw",
-    "labelDetails": {
-     "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
-    },
+    "kind": 15,
+    "label": "replacement",
+    "sortText": "000",
     "textEdit": {
-     "newText": "raw",
+     "newText": "[${1:content}]",
      "range": {
       "end": {
        "character": 12,
@@ -30,12 +28,13 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform.typ
    },
    {
     "kind": 3,
-    "label": "raw.where",
+    "label": "raw",
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
+    "sortText": "157",
     "textEdit": {
-     "newText": "raw.where(${1:})",
+     "newText": "raw(${1:})",
      "range": {
       "end": {
        "character": 12,
@@ -54,6 +53,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform.typ
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
+    "sortText": "158",
     "textEdit": {
      "newText": "raw.with(${1:})",
      "range": {
@@ -74,8 +74,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform.typ
     "labelDetails": {
      "description": "([any], encoding: \"utf8\" | none) => bytes | str"
     },
+    "sortText": "159",
     "textEdit": {
-     "newText": "read",
+     "newText": "read(${1:})",
      "range": {
       "end": {
        "character": 12,
@@ -94,25 +95,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform.typ
     "labelDetails": {
      "description": "([any], encoding: \"utf8\" | none) => bytes | str"
     },
+    "sortText": "160",
     "textEdit": {
      "newText": "read.with(${1:})",
-     "range": {
-      "end": {
-       "character": 12,
-       "line": 1
-      },
-      "start": {
-       "character": 11,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
-    "kind": 15,
-    "label": "replacement",
-    "textEdit": {
-     "newText": "[${1:content}]",
      "range": {
       "end": {
        "character": 12,

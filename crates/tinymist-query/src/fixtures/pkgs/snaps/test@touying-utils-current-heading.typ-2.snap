@@ -32,7 +32,7 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-current-headin
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "133",
+    "sortText": "079",
     "textEdit": {
      "newText": "int(${1:})",
      "range": {

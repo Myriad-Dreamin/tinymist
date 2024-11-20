@@ -42,7 +42,6 @@ pub fn autocomplete(
             complete_labels(&mut ctx)
                 || complete_field_accesses(&mut ctx)
                 || complete_imports(&mut ctx)
-                || complete_rules(&mut ctx)
                 || complete_markup(&mut ctx)
                 || complete_math(&mut ctx)
                 || complete_code(&mut ctx, false)
@@ -341,7 +340,7 @@ fn complete_math(ctx: &mut CompletionContext) -> bool {
 /// Add completions for math snippets.
 #[rustfmt::skip]
 fn math_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(true, |_, _| true);
+    ctx.scope_completions(true);
 
     ctx.snippet_completion(
         "subscript",
@@ -589,109 +588,20 @@ fn import_item_completions<'a>(
     }
 }
 
-/// Complete set and show rules.
-fn complete_rules(ctx: &mut CompletionContext) -> bool {
-    let Some(prev) = ctx.leaf.prev_leaf() else {
-        return false;
-    };
-
-    // Behind the set keyword: "set |".
-    if matches!(prev.kind(), SyntaxKind::Set) {
-        ctx.from = if ctx.leaf.kind().is_trivia() {
-            ctx.cursor
-        } else {
-            ctx.leaf.offset()
-        };
-        set_rule_completions(ctx);
-        return true;
-    }
-
-    // Behind the show keyword: "show |".
-    if matches!(prev.kind(), SyntaxKind::Show) {
-        ctx.from = if ctx.leaf.kind().is_trivia() {
-            ctx.cursor
-        } else {
-            ctx.leaf.offset()
-        };
-        show_rule_selector_completions(ctx);
-        return true;
-    }
-
-    // Behind a half-completed show rule: "show strong: |".
-    if_chain! {
-        if let Some(prev) = ctx.leaf.prev_leaf();
-        if matches!(prev.kind(), SyntaxKind::Colon);
-        if matches!(prev.parent_kind(), Some(SyntaxKind::ShowRule));
-        then {
-            ctx.from = if ctx.leaf.kind().is_trivia() {
-                ctx.cursor
-            } else {
-                ctx.leaf.offset()
-            };
-            show_rule_recipe_completions(ctx);
-            return true;
-        }
-    }
-
-    false
-}
-
-/// Add completions for all functions from the global scope.
-fn set_rule_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(true, |_, _| true);
-}
-
-/// Add completions for selectors.
-fn show_rule_selector_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(false, |_, _| true);
-
-    ctx.snippet_completion(
-        "text selector",
-        "\"${text}\"",
-        "Replace occurrences of specific text.",
-    );
-
-    ctx.snippet_completion(
-        "regex selector",
-        "regex(\"${regex}\")",
-        "Replace matches of a regular expression.",
-    );
-
-    ctx.enrich("", ": ${}");
-}
-
-/// Add completions for recipes.
-fn show_rule_recipe_completions(ctx: &mut CompletionContext) {
-    ctx.snippet_completion(
-        "replacement",
-        "[${content}]",
-        "Replace the selected element with content.",
-    );
-
-    ctx.snippet_completion(
-        "replacement (string)",
-        "\"${text}\"",
-        "Replace the selected element with a string of text.",
-    );
-
-    ctx.snippet_completion(
-        "transformation",
-        "element => [${content}]",
-        "Transform the element with a function.",
-    );
-
-    ctx.scope_completions(false, |_, c| !c.functions.is_empty());
-}
-
 /// Complete in code mode.
 fn complete_code(ctx: &mut CompletionContext, from_type: bool) -> bool {
+    let surrounding_syntax = ctx.surrounding_syntax();
+
     if matches!(
-        ctx.leaf.parent_kind(),
-        None | Some(SyntaxKind::Markup)
-            | Some(SyntaxKind::Math)
-            | Some(SyntaxKind::MathFrac)
-            | Some(SyntaxKind::MathAttach)
-            | Some(SyntaxKind::MathRoot)
+        (ctx.leaf.parent_kind(), surrounding_syntax),
+        (
+            None | Some(SyntaxKind::Markup)
+                | Some(SyntaxKind::Math)
+                | Some(SyntaxKind::MathFrac)
+                | Some(SyntaxKind::MathAttach)
+                | Some(SyntaxKind::MathRoot),
+            SurroundingSyntax::Regular
+        )
     ) {
         return false;
     }
@@ -730,11 +640,9 @@ fn complete_code(ctx: &mut CompletionContext, from_type: bool) -> bool {
 /// Add completions for expression snippets.
 #[rustfmt::skip]
 fn code_completions(ctx: &mut CompletionContext, hash: bool) {
-    ctx.scope_completions(true, |_value, _| !hash || {
-        // todo: filter code completions
-        // matches!(value, Value::Symbol(_) | Value::Func(_) | Value::Type(_) | Value::Module(_))
-        true
-    });
+    // todo: filter code completions
+    // matches!(value, Value::Symbol(_) | Value::Func(_) | Value::Type(_) | Value::Module(_))
+    ctx.scope_completions(true);
 
     ctx.snippet_completion(
         "function call",
