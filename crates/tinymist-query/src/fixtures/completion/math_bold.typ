@@ -1,2 +1,2 @@
-/// contains: box, box[]
+/// contains: box, box.bracket
 #b/* range 0..1 */

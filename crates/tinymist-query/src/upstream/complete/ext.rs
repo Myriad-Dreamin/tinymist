@@ -531,7 +531,7 @@ impl<'a> CompletionContext<'a> {
                         if !scope_reject_content && accept_content_arg {
                             self.completions.push(Completion {
                                 apply: Some(eco_format!("{name}[${{}}]")),
-                                label: eco_format!("{name}[]"),
+                                label: eco_format!("{name}.bracket"),
                                 ..base
                             });
                         };
