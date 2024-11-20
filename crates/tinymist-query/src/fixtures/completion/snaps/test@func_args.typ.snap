@@ -77,7 +77,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_args.typ
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "031",
+    "sortText": "034",
     "textEdit": {
      "newText": "content",
      "range": {

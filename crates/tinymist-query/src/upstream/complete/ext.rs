@@ -523,16 +523,18 @@ impl<'a> CompletionContext<'a> {
                                 surrounding_syntax,
                                 SurroundingSyntax::Selector | SurroundingSyntax::SetRule
                             );
-                        let apply = if !scope_reject_content && accept_content_arg {
-                            eco_format!("{name}[${{}}]")
-                        } else {
-                            eco_format!("{name}(${{}})")
-                        };
                         self.completions.push(Completion {
-                            apply: Some(apply),
-                            label: name,
-                            ..base
+                            apply: Some(eco_format!("{name}(${{}})")),
+                            label: name.clone(),
+                            ..base.clone()
                         });
+                        if !scope_reject_content && accept_content_arg {
+                            self.completions.push(Completion {
+                                apply: Some(eco_format!("{name}[${{}}]")),
+                                label: eco_format!("{name}[]"),
+                                ..base
+                            });
+                        };
                     }
                 }
                 continue;
@@ -1378,21 +1380,6 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         ctx.enrich(" ", "");
     }
 
-    if let Some(c) = args_node {
-        log::debug!("content block compl: args {c:?}");
-        let is_unclosed = matches!(c.kind(), SyntaxKind::Args)
-            && c.children().fold(0i32, |acc, node| match node.kind() {
-                SyntaxKind::LeftParen => acc + 1,
-                SyntaxKind::RightParen => acc - 1,
-                SyntaxKind::Error if node.text() == "(" => acc + 1,
-                SyntaxKind::Error if node.text() == ")" => acc - 1,
-                _ => acc,
-            }) > 0;
-        if is_unclosed {
-            ctx.enrich("", ")");
-        }
-    }
-
     let mut completions = std::mem::take(&mut ctx.completions);
     let explict = ctx.explicit;
     ctx.explicit = true;
@@ -1487,7 +1474,20 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
 
     ctx.completions.append(&mut completions);
 
-    log::debug!("sort_and_explicit_code_completion: {:?}", ctx.completions);
+    if let Some(c) = args_node {
+        log::debug!("content block compl: args {c:?}");
+        let is_unclosed = matches!(c.kind(), SyntaxKind::Args)
+            && c.children().fold(0i32, |acc, node| match node.kind() {
+                SyntaxKind::LeftParen => acc + 1,
+                SyntaxKind::RightParen => acc - 1,
+                SyntaxKind::Error if node.text() == "(" => acc + 1,
+                SyntaxKind::Error if node.text() == ")" => acc - 1,
+                _ => acc,
+            }) > 0;
+        if is_unclosed {
+            ctx.enrich("", ")");
+        }
+    }
 
     match scope {
         SurroundingSyntax::Regular => {}
@@ -1497,6 +1497,8 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         SurroundingSyntax::ShowTransform => {}
         SurroundingSyntax::SetRule => {}
     }
+
+    log::debug!("sort_and_explicit_code_completion: {:?}", ctx.completions);
 
     Some(())
 }

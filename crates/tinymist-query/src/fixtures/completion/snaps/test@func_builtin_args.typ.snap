@@ -35,7 +35,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_builtin_args.typ
     "labelDetails": {
      "description": "(int, content, gutter: relative) => columns"
     },
-    "sortText": "037",
+    "sortText": "040",
     "textEdit": {
      "newText": "columns(${1:})",
      "range": {

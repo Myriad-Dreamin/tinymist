@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
     "labelDetails": {
      "description": "() => any"
     },
-    "sortText": "029",
+    "sortText": "032",
     "textEdit": {
      "newText": "config-xxx()${1:}",
      "range": {
