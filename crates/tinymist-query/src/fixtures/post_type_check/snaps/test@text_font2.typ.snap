@@ -3,5 +3,6 @@ source: crates/tinymist-query/src/analysis.rs
 description: "Check on \"(\" (30)"
 expression: literal_type
 input_file: crates/tinymist-query/src/fixtures/post_type_check/text_font2.typ
+snapshot_kind: text
 ---
 TextFont

@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on   (61..62)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/let-context.typ
+snapshot_kind: text
 ---
 [
  {

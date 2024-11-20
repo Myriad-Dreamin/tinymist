@@ -906,7 +906,7 @@ mod tests {
         assert_snapshot!(map_deref(r#"#let x = 1  
 Text
 = Heading #let y = 2;  
-== Heading"#).trim(), @r###"
+== Heading"#).trim(), @r"
         #let x = 1  
          nnnnvvnnn  
         Text
@@ -914,11 +914,11 @@ Text
         = Heading #let y = 2;  
                    nnnnvvnnn   
         == Heading
-        "###);
-        assert_snapshot!(map_deref(r#"#let f(x);"#).trim(), @r###"
+        ");
+        assert_snapshot!(map_deref(r#"#let f(x);"#).trim(), @r"
         #let f(x);
          nnnnv v
-        "###);
+        ");
     }
 
     #[test]
@@ -926,7 +926,7 @@ Text
         assert_snapshot!(map_check(r#"#let x = 1  
 Text
 = Heading #let y = 2;  
-== Heading"#).trim(), @r###"
+== Heading"#).trim(), @r"
         #let x = 1  
          nnnnnnnnn  
         Text
@@ -934,36 +934,36 @@ Text
         = Heading #let y = 2;  
                    nnnnnnnnn   
         == Heading
-        "###);
-        assert_snapshot!(map_check(r#"#let f(x);"#).trim(), @r###"
+        ");
+        assert_snapshot!(map_check(r#"#let f(x);"#).trim(), @r"
         #let f(x);
          nnnnn n
-        "###);
-        assert_snapshot!(map_check(r#"#f(1, 2)   Test"#).trim(), @r###"
+        ");
+        assert_snapshot!(map_check(r#"#f(1, 2)   Test"#).trim(), @r"
         #f(1, 2)   Test
          npppppp
-        "###);
-        assert_snapshot!(map_check(r#"#()   Test"#).trim(), @r###"
+        ");
+        assert_snapshot!(map_check(r#"#()   Test"#).trim(), @r"
         #()   Test
          ee
-        "###);
-        assert_snapshot!(map_check(r#"#(1)   Test"#).trim(), @r###"
+        ");
+        assert_snapshot!(map_check(r#"#(1)   Test"#).trim(), @r"
         #(1)   Test
          PPP
-        "###);
-        assert_snapshot!(map_check(r#"#(a: 1)   Test"#).trim(), @r###"
+        ");
+        assert_snapshot!(map_check(r#"#(a: 1)   Test"#).trim(), @r"
         #(a: 1)   Test
          eeeeee
-        "###);
-        assert_snapshot!(map_check(r#"#(1, 2)   Test"#).trim(), @r###"
+        ");
+        assert_snapshot!(map_check(r#"#(1, 2)   Test"#).trim(), @r"
         #(1, 2)   Test
          eeeeee
-        "###);
+        ");
         assert_snapshot!(map_check(r#"#(1, 2)  
-  Test"#).trim(), @r###"
+  Test"#).trim(), @r"
         #(1, 2)  
          eeeeee  
           Test
-        "###);
+        ");
     }
 }

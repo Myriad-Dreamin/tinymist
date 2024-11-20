@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on u (372..373)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/func_args_after.typ
+snapshot_kind: text
 ---
 [
  {
