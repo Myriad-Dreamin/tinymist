@@ -1,0 +1,33 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (22..23)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/math_bold2.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "bold",
+    "labelDetails": {
+     "description": "(content) => content"
+    },
+    "textEdit": {
+     "newText": "bold(${1:})",
+     "range": {
+      "end": {
+       "character": 3,
+       "line": 1
+      },
+      "start": {
+       "character": 2,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]
