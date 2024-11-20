@@ -771,21 +771,10 @@ impl LanguageState {
             .context
             .and_then(|c| c.trigger_character)
             .and_then(|c| c.chars().next());
-        let trigger_suggest = self.config.trigger_suggest;
-        let trigger_parameter_hints = self.config.trigger_parameter_hints;
-        let trigger_named_completion = self.config.trigger_named_completion;
 
         run_query!(
             req_id,
-            self.Completion(
-                path,
-                position,
-                explicit,
-                trigger_character,
-                trigger_suggest,
-                trigger_parameter_hints,
-                trigger_named_completion
-            )
+            self.Completion(path, position, explicit, trigger_character)
         )
     }
 

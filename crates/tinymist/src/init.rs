@@ -293,12 +293,6 @@ pub struct Config {
     pub formatter_mode: FormatterMode,
     /// Dynamic configuration for the experimental formatter.
     pub formatter_print_width: Option<u32>,
-    /// Whether to trigger suggest completion, a.k.a. auto-completion.
-    pub trigger_suggest: bool,
-    /// Whether to trigger named parameter completion.
-    pub trigger_named_completion: bool,
-    /// Whether to trigger parameter hint, a.k.a. signature help.
-    pub trigger_parameter_hints: bool,
     /// Whether to remove html from markup content in responses.
     pub support_html_in_markdown: bool,
     /// Tinymist's completion features.
@@ -374,11 +368,11 @@ impl Config {
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
         assign_config!(formatter_mode := "formatterMode"?: FormatterMode);
         assign_config!(formatter_print_width := "formatterPrintWidth"?: Option<u32>);
-        assign_config!(trigger_suggest := "triggerSuggest"?: bool);
-        assign_config!(trigger_named_completion := "triggerNamedCompletion"?: bool);
-        assign_config!(trigger_parameter_hints := "triggerParameterHints"?: bool);
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
         assign_config!(completion := "completion"?: CompletionFeat);
+        assign_config!(completion.trigger_suggest := "triggerSuggest"?: bool);
+        assign_config!(completion.trigger_named_completion := "triggerNamedCompletion"?: bool);
+        assign_config!(completion.trigger_parameter_hints := "triggerParameterHints"?: bool);
         self.compile.update_by_map(update)?;
         self.compile.validate()
     }

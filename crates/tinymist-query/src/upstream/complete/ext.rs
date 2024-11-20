@@ -66,6 +66,13 @@ pub struct PostfixSnippet {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompletionFeat {
+    /// Whether to trigger suggest completion, a.k.a. auto-completion.
+    pub trigger_suggest: bool,
+    /// Whether to trigger named parameter completion.
+    pub trigger_named_completion: bool,
+    /// Whether to trigger parameter hint, a.k.a. signature help.
+    pub trigger_parameter_hints: bool,
+
     /// Whether to enable postfix completion.
     pub postfix: Option<bool>,
     /// Whether to enable ufcs completion.
@@ -325,9 +332,7 @@ impl<'a> CompletionContext<'a> {
                 label_detail,
                 apply: Some("".into()),
                 // range: Some(range),
-                command: self
-                    .trigger_parameter_hints
-                    .then_some("editor.action.triggerParameterHints"),
+                command: self.ctx.analysis.trigger_parameter_hints(true),
                 ..Default::default()
             };
             let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
@@ -470,9 +475,7 @@ impl<'a> CompletionContext<'a> {
                 let base = Completion {
                     kind: CompletionKind::Func,
                     label_detail,
-                    command: self
-                        .trigger_parameter_hints
-                        .then_some("editor.action.triggerParameterHints"),
+                    command: self.ctx.analysis.trigger_parameter_hints(true),
                     ..Default::default()
                 };
 
@@ -1150,9 +1153,7 @@ fn type_completion(
                 apply: Some(eco_format!("{}: ${{}}", f)),
                 label_detail: p.ty.describe(),
                 detail: docs.map(Into::into),
-                command: ctx
-                    .trigger_named_completion
-                    .then_some("tinymist.triggerNamedCompletion"),
+                command: ctx.ctx.analysis.trigger_named_completion(true),
                 ..Completion::default()
             });
         }

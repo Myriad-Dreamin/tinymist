@@ -145,6 +145,23 @@ impl Analysis {
     pub fn report_alloc_stats(&self) -> String {
         AllocStats::report(self)
     }
+
+    /// Get configured trigger suggest command.
+    pub fn trigger_suggest(&self, context: bool) -> Option<&'static str> {
+        (self.completion_feat.trigger_suggest && context).then_some("editor.action.triggerSuggest")
+    }
+
+    /// Get configured trigger parameter hints command.
+    pub fn trigger_parameter_hints(&self, context: bool) -> Option<&'static str> {
+        (self.completion_feat.trigger_parameter_hints && context)
+            .then_some("editor.action.triggerParameterHints")
+    }
+
+    /// Get configured trigger named completion command.
+    pub fn trigger_named_completion(&self, context: bool) -> Option<&'static str> {
+        (self.completion_feat.trigger_named_completion && context)
+            .then_some("tinymist.triggerNamedCompletion")
+    }
 }
 
 /// The periscope provider.
