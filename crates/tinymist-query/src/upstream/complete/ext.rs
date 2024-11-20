@@ -1562,7 +1562,11 @@ pub fn complete_path(
             // diff with root
             unix_slash(path.vpath().as_rooted_path())
         } else {
-            let base = base.vpath().as_rooted_path();
+            let base = base
+                .vpath()
+                .as_rooted_path()
+                .parent()
+                .unwrap_or(Path::new("/"));
             let path = path.vpath().as_rooted_path();
             let w = pathdiff::diff_paths(path, base)?;
             unix_slash(&w)
