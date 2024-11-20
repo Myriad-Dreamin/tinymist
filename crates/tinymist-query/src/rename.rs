@@ -3,16 +3,19 @@ use lsp_types::{
     RenameFile, TextDocumentEdit,
 };
 use reflexo::path::{unix_slash, PathClean};
+use rustc_hash::FxHashSet;
 use typst::{
     foundations::{Repr, Str},
     syntax::Span,
 };
 
 use crate::{
+    analysis::{get_link_exprs, LinkObject, LinkTarget},
     find_references,
     prelude::*,
     prepare_renaming,
-    syntax::{deref_expr, node_ancestors, Decl, DerefTarget},
+    syntax::{deref_expr, get_index_info, node_ancestors, Decl, DerefTarget, RefExpr},
+    ty::Interned,
 };
 
 /// The [`textDocument/rename`] request is sent from the client to the server to
@@ -71,7 +74,7 @@ impl StatefulRequest for RenameRequest {
                 let new_uri = path_to_url(&new_path).ok()?;
 
                 let mut edits: HashMap<Url, Vec<TextEdit>> = HashMap::new();
-                do_rename_file(ctx, def_fid, diff, &mut edits)?;
+                do_rename_file(ctx, def_fid, diff, &mut edits);
 
                 let mut document_changes = edits_to_document_changes(edits);
 
@@ -122,13 +125,57 @@ pub(crate) fn do_rename_file(
     diff: PathBuf,
     edits: &mut HashMap<Url, Vec<TextEdit>>,
 ) -> Option<()> {
-    let dep = ctx.module_dependencies().get(&def_fid)?.clone();
+    let def_path = def_fid
+        .vpath()
+        .as_rooted_path()
+        .file_name()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap_or_default()
+        .into();
+    let mut ctx = RenameFileWorker {
+        ctx,
+        def_fid,
+        def_path,
+        diff,
+        inserted: FxHashSet::default(),
+    };
+    ctx.work(edits)
+}
 
-    for ref_fid in dep.dependents.iter() {
-        let ref_src = ctx.source_by_id(*ref_fid).ok()?;
-        let uri = ctx.uri_for_id(*ref_fid).ok()?;
+struct RenameFileWorker<'a> {
+    ctx: &'a mut LocalContext,
+    def_fid: TypstFileId,
+    def_path: Interned<str>,
+    diff: PathBuf,
+    inserted: FxHashSet<Span>,
+}
 
-        let import_info = ctx.expr_stage(&ref_src);
+impl<'a> RenameFileWorker<'a> {
+    pub(crate) fn work(&mut self, edits: &mut HashMap<Url, Vec<TextEdit>>) -> Option<()> {
+        let dep = self.ctx.module_dependencies().get(&self.def_fid).cloned();
+        if let Some(dep) = dep {
+            for ref_fid in dep.dependents.iter() {
+                self.refs_in_file(*ref_fid, edits);
+            }
+        }
+
+        for ref_fid in self.ctx.source_files().clone() {
+            self.links_in_file(ref_fid, edits);
+        }
+
+        Some(())
+    }
+
+    fn refs_in_file(
+        &mut self,
+        ref_fid: TypstFileId,
+        edits: &mut HashMap<Url, Vec<TextEdit>>,
+    ) -> Option<()> {
+        let ref_src = self.ctx.source_by_id(ref_fid).ok()?;
+        let uri = self.ctx.uri_for_id(ref_fid).ok()?;
+
+        let import_info = self.ctx.expr_stage(&ref_src);
 
         let edits = edits.entry(uri).or_default();
         for (span, r) in &import_info.resolves {
@@ -138,17 +185,114 @@ pub(crate) fn do_rename_file(
             ) {
                 continue;
             }
-            let importing = r.root.as_ref()?.file_id();
 
-            if importing.map_or(true, |i| i != def_fid) {
-                continue;
+            if let Some(edit) = self.rename_module_path(*span, r, &ref_src) {
+                edits.push(edit);
             }
-            log::debug!("import: {span:?} -> {importing:?} v.s. {def_fid:?}");
-            rename_importer(ctx, &ref_src, *span, &diff, edits);
         }
+
+        Some(())
     }
 
-    Some(())
+    fn links_in_file(
+        &mut self,
+        ref_fid: TypstFileId,
+        edits: &mut HashMap<Url, Vec<TextEdit>>,
+    ) -> Option<()> {
+        let ref_src = self.ctx.source_by_id(ref_fid).ok()?;
+
+        let index = get_index_info(&ref_src);
+        if !index.paths.contains(&self.def_path) {
+            return Some(());
+        }
+
+        let uri = self.ctx.uri_for_id(ref_fid).ok()?;
+
+        let link_info = get_link_exprs(&ref_src);
+        let root = LinkedNode::new(ref_src.root());
+        let edits = edits.entry(uri).or_default();
+        for obj in &link_info.objects {
+            if !matches!(obj.target, LinkTarget::Path(..)) {
+                continue;
+            }
+            if let Some(edit) = self.rename_resource_path(obj, &root, &ref_src) {
+                edits.push(edit);
+            }
+        }
+
+        Some(())
+    }
+
+    fn rename_resource_path(
+        &mut self,
+        obj: &LinkObject,
+        root: &LinkedNode,
+        src: &Source,
+    ) -> Option<TextEdit> {
+        let r = root.find(obj.span)?;
+        self.rename_path_expr(r.clone(), r.cast()?, src, false)
+    }
+
+    fn rename_module_path(&mut self, span: Span, r: &RefExpr, src: &Source) -> Option<TextEdit> {
+        let importing = r.root.as_ref()?.file_id();
+
+        if importing.map_or(true, |i| i != self.def_fid) {
+            return None;
+        }
+        log::debug!("import: {span:?} -> {importing:?} v.s. {:?}", self.def_fid);
+        // rename_importer(self.ctx, &ref_src, *span, &self.diff, edits);
+
+        let root = LinkedNode::new(src.root());
+        let import_node = root.find(span).and_then(deref_expr)?;
+        let (import_path, has_path_var) = node_ancestors(&import_node).find_map(|import_node| {
+            match import_node.cast::<ast::Expr>()? {
+                ast::Expr::Import(i) => {
+                    Some((i.source(), i.new_name().is_none() && i.imports().is_none()))
+                }
+                ast::Expr::Include(i) => Some((i.source(), false)),
+                _ => None,
+            }
+        })?;
+
+        self.rename_path_expr(import_node.clone(), import_path, src, has_path_var)
+    }
+
+    fn rename_path_expr(
+        &mut self,
+        node: LinkedNode,
+        path: ast::Expr,
+        src: &Source,
+        has_path_var: bool,
+    ) -> Option<TextEdit> {
+        let new_text = match path {
+            ast::Expr::Str(s) => {
+                if !self.inserted.insert(s.span()) {
+                    return None;
+                }
+
+                let old_str = s.get();
+                let old_path = Path::new(old_str.as_str());
+                let new_path = old_path.join(&self.diff).clean();
+                let new_str = unix_slash(&new_path);
+
+                let path_part = Str::from(new_str).repr();
+                let need_alias = new_path.file_name() != old_path.file_name();
+
+                if has_path_var && need_alias {
+                    let alias = old_path.file_stem()?.to_str()?;
+                    format!("{path_part} as {alias}")
+                } else {
+                    path_part.to_string()
+                }
+            }
+            _ => return None,
+        };
+
+        let import_path_range = node.find(path.span())?.range();
+        let range = self.ctx.to_lsp_range(import_path_range, src);
+
+        Some(TextEdit { range, new_text })
+    }
 }
 
 pub(crate) fn edits_to_document_changes(
@@ -164,53 +308,6 @@ pub(crate) fn edits_to_document_changes(
     }
 
     document_changes
-}
-
-fn rename_importer(
-    ctx: &LocalContext,
-    src: &Source,
-    span: Span,
-    diff: &Path,
-    edits: &mut Vec<TextEdit>,
-) -> Option<()> {
-    let root = LinkedNode::new(src.root());
-    let import_node = root.find(span).and_then(deref_expr)?;
-    let (import_path, has_path_var) = node_ancestors(&import_node).find_map(|import_node| {
-        match import_node.cast::<ast::Expr>()? {
-            ast::Expr::Import(i) => {
-                Some((i.source(), i.new_name().is_none() && i.imports().is_none()))
-            }
-            ast::Expr::Include(i) => Some((i.source(), false)),
-            _ => None,
-        }
-    })?;
-
-    let new_text = match import_path {
-        ast::Expr::Str(s) => {
-            let old_str = s.get();
-            let old_path = Path::new(old_str.as_str());
-            let new_path = old_path.join(diff).clean();
-            let new_str = unix_slash(&new_path);
-
-            let path_part = Str::from(new_str).repr();
-            let need_alias = new_path.file_name() != old_path.file_name();
-
-            if has_path_var && need_alias {
-                let alias = old_path.file_stem()?.to_str()?;
-                format!("{path_part} as {alias}")
-            } else {
-                path_part.to_string()
-            }
-        }
-        _ => return None,
-    };
-
-    let import_path_range = import_node.find(import_path.span())?.range();
-    let range = ctx.to_lsp_range(import_path_range, src);
-
-    edits.push(TextEdit { range, new_text });
-
-    Some(())
 }
 
 #[cfg(test)]
