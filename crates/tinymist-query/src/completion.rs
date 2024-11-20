@@ -48,12 +48,6 @@ pub struct CompletionRequest {
     pub explicit: bool,
     /// The character that triggered the completion, if any.
     pub trigger_character: Option<char>,
-    /// Whether to trigger suggest completion, a.k.a. auto-completion.
-    pub trigger_suggest: bool,
-    /// Whether to trigger named parameter completion.
-    pub trigger_named_completion: bool,
-    /// Whether to trigger parameter hint, a.k.a. signature help.
-    pub trigger_parameter_hints: bool,
 }
 
 impl StatefulRequest for CompletionRequest {
@@ -148,9 +142,6 @@ impl StatefulRequest for CompletionRequest {
                 cursor,
                 explicit,
                 self.trigger_character,
-                self.trigger_suggest,
-                self.trigger_parameter_hints,
-                self.trigger_named_completion,
             )?;
 
             // Exclude it self from auto completion
@@ -403,9 +394,6 @@ mod tests {
                     position: ctx.to_lsp_pos(s, &source),
                     explicit: false,
                     trigger_character,
-                    trigger_suggest: true,
-                    trigger_parameter_hints: true,
-                    trigger_named_completion: true,
                 };
                 results.push(request.request(ctx, doc.clone()).map(|resp| match resp {
                     CompletionResponse::List(l) => CompletionResponse::List(CompletionList {

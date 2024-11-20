@@ -809,9 +809,6 @@ pub struct CompletionContext<'a> {
     pub cursor: usize,
     pub explicit: bool,
     pub trigger_character: Option<char>,
-    pub trigger_suggest: bool,
-    pub trigger_parameter_hints: bool,
-    pub trigger_named_completion: bool,
     pub from: usize,
     pub from_ty: Option<Ty>,
     pub completions: Vec<Completion>,
@@ -832,9 +829,6 @@ impl<'a> CompletionContext<'a> {
         cursor: usize,
         explicit: bool,
         trigger_character: Option<char>,
-        trigger_suggest: bool,
-        trigger_parameter_hints: bool,
-        trigger_named_completion: bool,
     ) -> Option<Self> {
         let text = source.text();
         let root = LinkedNode::new(source.root());
@@ -849,9 +843,6 @@ impl<'a> CompletionContext<'a> {
             leaf,
             cursor,
             trigger_character,
-            trigger_suggest,
-            trigger_parameter_hints,
-            trigger_named_completion,
             explicit,
             from: cursor,
             from_ty: None,
@@ -896,8 +887,7 @@ impl<'a> CompletionContext<'a> {
             // VS Code doesn't do that... Auto triggering suggestion only happens on typing (word
             // starts or trigger characters). However, you can use editor.action.triggerSuggest as
             // command on a suggestion to "manually" retrigger suggest after inserting one
-            command: (self.trigger_suggest && snippet.contains("${"))
-                .then_some("editor.action.triggerSuggest"),
+            command: self.ctx.analysis.trigger_suggest(snippet.contains("${")),
             ..Completion::default()
         });
     }
@@ -1092,9 +1082,7 @@ impl<'a> CompletionContext<'a> {
         let mut command = None;
         if parens && matches!(value, Value::Func(_)) {
             if let Value::Func(func) = value {
-                command = self
-                    .trigger_parameter_hints
-                    .then_some("editor.action.triggerParameterHints");
+                command = self.ctx.analysis.trigger_parameter_hints(true);
                 if func
                     .params()
                     .is_some_and(|params| params.iter().all(|param| param.name == "self"))
