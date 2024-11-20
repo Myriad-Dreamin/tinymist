@@ -107,19 +107,11 @@ impl<'a> CompletionContext<'a> {
         self.ctx.world()
     }
 
-    pub fn scope_completions(
-        &mut self,
-        parens: bool,
-        filter: impl Fn(&Ty, &CompletionKindChecker) -> bool,
-    ) {
-        self.scope_completions_(parens, filter);
-    }
-
     fn seen_field(&mut self, field: Interned<str>) -> bool {
         !self.seen_fields.insert(field)
     }
 
-    fn surrounding_syntax(&mut self) -> SurroundingSyntax {
+    pub(crate) fn surrounding_syntax(&mut self) -> SurroundingSyntax {
         check_previous_syntax(&self.leaf)
             .or_else(|| check_surrounding_syntax(&self.leaf))
             .unwrap_or(SurroundingSyntax::Regular)
@@ -402,11 +394,7 @@ impl<'a> CompletionContext<'a> {
     /// Add completions for definitions that are available at the cursor.
     ///
     /// Filters the global/math scope with the given filter.
-    pub fn scope_completions_(
-        &mut self,
-        parens: bool,
-        filter: impl Fn(&Ty, &CompletionKindChecker) -> bool,
-    ) {
+    pub fn scope_completions(&mut self, parens: bool) {
         let Some((_, defines)) = self.defines() else {
             return;
         };
@@ -421,8 +409,8 @@ impl<'a> CompletionContext<'a> {
             functions: HashSet::default(),
         };
 
-        let filter = |ty: &Ty, c: &CompletionKindChecker| {
-            let s = match surrounding_syntax {
+        let filter = |c: &CompletionKindChecker| {
+            match surrounding_syntax {
                 SurroundingSyntax::Regular => true,
                 SurroundingSyntax::Selector => 'selector: {
                     for func in &c.functions {
@@ -433,6 +421,7 @@ impl<'a> CompletionContext<'a> {
 
                     false
                 }
+                SurroundingSyntax::ShowTransform => !c.functions.is_empty(),
                 SurroundingSyntax::SetRule => 'set_rule: {
                     // todo: user defined elements
                     for func in &c.functions {
@@ -445,8 +434,7 @@ impl<'a> CompletionContext<'a> {
 
                     false
                 }
-            };
-            s && filter(ty, c)
+            }
         };
 
         // we don't check literal type here for faster completion
@@ -456,7 +444,7 @@ impl<'a> CompletionContext<'a> {
             }
 
             kind_checker.check(&ty);
-            if !filter(&ty, &kind_checker) {
+            if !filter(&kind_checker) {
                 continue;
             }
 
@@ -492,7 +480,7 @@ impl<'a> CompletionContext<'a> {
 
                 log::debug!("fn_feat: {name} {ty:?} -> {fn_feat:?}");
 
-                if matches!(surrounding_syntax, SurroundingSyntax::Regular)
+                if matches!(surrounding_syntax, SurroundingSyntax::ShowTransform)
                     && (fn_feat.min_pos() > 0 || fn_feat.min_named() > 0)
                 {
                     self.completions.push(Completion {
@@ -501,7 +489,7 @@ impl<'a> CompletionContext<'a> {
                         ..base.clone()
                     });
                 }
-                if fn_feat.is_element && !matches!(surrounding_syntax, SurroundingSyntax::SetRule) {
+                if fn_feat.is_element && matches!(surrounding_syntax, SurroundingSyntax::Selector) {
                     self.completions.push(Completion {
                         label: eco_format!("{}.where", name),
                         apply: Some(eco_format!("{}.where(${{}})", name)),
@@ -514,7 +502,7 @@ impl<'a> CompletionContext<'a> {
                     SurroundingSyntax::Selector | SurroundingSyntax::SetRule
                 ) && !fn_feat.is_element;
                 if !bad_instantiate {
-                    if !parens {
+                    if !parens || matches!(surrounding_syntax, SurroundingSyntax::Selector) {
                         self.completions.push(Completion {
                             label: name,
                             ..base
@@ -554,10 +542,11 @@ impl<'a> CompletionContext<'a> {
     }
 }
 
-#[derive(Debug)]
-enum SurroundingSyntax {
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum SurroundingSyntax {
     Regular,
     Selector,
+    ShowTransform,
     SetRule,
 }
 
@@ -594,13 +583,13 @@ fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> 
                     .to_untyped()
                     .children()
                     .find(|s| s.kind() == SyntaxKind::Colon);
-                if colon.is_none() {
+                let Some(colon) = colon.and_then(|colon| parent.find(colon.span())) else {
                     // incomplete show rule
                     return Some(Selector);
-                }
+                };
 
-                if encolsed_by(parent, Some(rule.transform().span()), leaf) {
-                    return Some(Regular);
+                if leaf.offset() >= colon.offset() {
+                    return Some(ShowTransform);
                 } else {
                     return Some(Selector); // query's first argument
                 }
@@ -1410,14 +1399,11 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         {
             args_node = e.parent().map(|s| s.get().clone());
         }
-        Some(CheckTarget::Normal(e))
-            if matches!(
-                e.kind(),
-                SyntaxKind::Ident | SyntaxKind::Label | SyntaxKind::Ref | SyntaxKind::Str
-            ) => {}
-        Some(CheckTarget::Paren { .. }) => {}
-        Some(CheckTarget::Normal(..)) => return None,
-        None => return None,
+        // todo: complete type field
+        Some(CheckTarget::Normal(e)) if matches!(e.kind(), SyntaxKind::FieldAccess) => {
+            return None;
+        }
+        Some(CheckTarget::Paren { .. } | CheckTarget::Normal(..)) | None => {}
     }
 
     log::debug!("ctx.leaf {:?}", ctx.leaf.clone());
@@ -1425,16 +1411,24 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
     let ty = ctx
         .ctx
         .literal_type_of_node(ctx.leaf.clone())
-        .filter(|ty| !matches!(ty, Ty::Any))?;
+        .filter(|ty| !matches!(ty, Ty::Any));
+
+    let scope = ctx.surrounding_syntax();
+    if matches!((scope, &ty), (SurroundingSyntax::Regular, None)) {
+        return None;
+    }
+
+    log::debug!("complete_type: {:?} -> ({scope:?}, {ty:#?})", ctx.leaf);
 
     // adjust the completion position
     if is_ident_like(&ctx.leaf) {
         ctx.from = ctx.leaf.offset();
     }
 
-    log::debug!("complete_type: ty  {:?} -> {ty:#?}", ctx.leaf);
+    if let Some(ty) = ty {
+        type_completion(ctx, &ty, None);
+    }
 
-    type_completion(ctx, &ty, None);
     if ctx.before.ends_with(',') || ctx.before.ends_with(':') {
         ctx.enrich(" ", "");
     }
@@ -1454,9 +1448,7 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         }
     }
 
-    let surrounding_syntax = ctx.surrounding_syntax();
-
-    match surrounding_syntax {
+    match scope {
         SurroundingSyntax::Regular => {}
         SurroundingSyntax::Selector => {
             ctx.snippet_completion(
@@ -1471,16 +1463,36 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
                 "Replace matches of a regular expression.",
             );
         }
+        SurroundingSyntax::ShowTransform => {
+            ctx.snippet_completion(
+                "replacement",
+                "[${content}]",
+                "Replace the selected element with content.",
+            );
+
+            ctx.snippet_completion(
+                "replacement (string)",
+                "\"${text}\"",
+                "Replace the selected element with a string of text.",
+            );
+
+            ctx.snippet_completion(
+                "transformation",
+                "element => [${content}]",
+                "Transform the element with a function.",
+            );
+        }
         SurroundingSyntax::SetRule => {}
     }
 
     sort_and_explicit_code_completion(ctx);
 
-    match surrounding_syntax {
+    match scope {
         SurroundingSyntax::Regular => {}
         SurroundingSyntax::Selector => {
             ctx.enrich("", ": ${}");
         }
+        SurroundingSyntax::ShowTransform => {}
         SurroundingSyntax::SetRule => {}
     }
 
