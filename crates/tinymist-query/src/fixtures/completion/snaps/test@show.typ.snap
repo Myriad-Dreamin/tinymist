@@ -9,30 +9,12 @@ input_file: crates/tinymist-query/src/fixtures/completion/show.typ
   "isIncomplete": false,
   "items": [
    {
-    "kind": 15,
-    "label": "regex selector",
-    "sortText": "000",
-    "textEdit": {
-     "newText": "regex(\"${1:regex}\"): ${2:}",
-     "range": {
-      "end": {
-       "character": 7,
-       "line": 1
-      },
-      "start": {
-       "character": 6,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
     "kind": 3,
     "label": "raw",
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "096",
+    "sortText": "094",
     "textEdit": {
      "newText": "raw: ${1:}",
      "range": {
@@ -53,9 +35,27 @@ input_file: crates/tinymist-query/src/fixtures/completion/show.typ
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "097",
+    "sortText": "095",
     "textEdit": {
      "newText": "raw.where(${1:}): ${2:}",
+     "range": {
+      "end": {
+       "character": 7,
+       "line": 1
+      },
+      "start": {
+       "character": 6,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 15,
+    "label": "regex selector",
+    "sortText": "100",
+    "textEdit": {
+     "newText": "regex(\"${1:regex}\"): ${2:}",
      "range": {
       "end": {
        "character": 7,
