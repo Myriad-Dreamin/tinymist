@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform3.typ
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "154",
+    "sortText": "173",
     "textEdit": {
      "newText": "raw(${1:})",
      "range": {
@@ -35,7 +35,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform3.typ
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "155",
+    "sortText": "174",
     "textEdit": {
      "newText": "raw.with(${1:})",
      "range": {
@@ -56,7 +56,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform3.typ
     "labelDetails": {
      "description": "([any], encoding: \"utf8\" | none) => bytes | str"
     },
-    "sortText": "156",
+    "sortText": "175",
     "textEdit": {
      "newText": "read(${1:})",
      "range": {
@@ -77,7 +77,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform3.typ
     "labelDetails": {
      "description": "([any], encoding: \"utf8\" | none) => bytes | str"
     },
-    "sortText": "157",
+    "sortText": "176",
     "textEdit": {
      "newText": "read.with(${1:})",
      "range": {
@@ -95,7 +95,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show_transform3.typ
    {
     "kind": 15,
     "label": "replacement",
-    "sortText": "166",
+    "sortText": "187",
     "textEdit": {
      "newText": "[${1:content}]",
      "range": {

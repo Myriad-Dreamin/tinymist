@@ -15,6 +15,26 @@ input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong.typ
      "description": "(content, delta: int) => strong"
     },
     "textEdit": {
+     "newText": "strong(${1:})",
+     "range": {
+      "end": {
+       "character": 26,
+       "line": 2
+      },
+      "start": {
+       "character": 24,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "strong[]",
+    "labelDetails": {
+     "description": "(content, delta: int) => strong"
+    },
+    "textEdit": {
      "newText": "strong[${1:}]",
      "range": {
       "end": {
