@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (26..27)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/set_block.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 3,
+    "label": "block",
+    "labelDetails": {
+     "description": "(content | none, above: auto | fraction | relative, below: auto | fraction | relative, breakable: bool, clip: bool, fill: color, height: auto | fraction | relative, inset: inset, outset: outset, radius: radius, spacing: fraction | relative, sticky: bool, stroke: stroke, width: auto | relative) => block"
+    },
+    "sortText": "003",
+    "textEdit": {
+     "newText": "block(${1:})",
+     "range": {
+      "end": {
+       "character": 6,
+       "line": 1
+      },
+      "start": {
+       "character": 5,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]

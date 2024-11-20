@@ -515,7 +515,12 @@ impl<'a> CompletionContext<'a> {
                         });
                     } else {
                         let accept_content_arg = fn_feat.next_arg_is_content && !fn_feat.has_rest;
-                        let apply = if !matches!(mode, InterpretMode::Math) && accept_content_arg {
+                        let scope_reject_content = matches!(mode, InterpretMode::Math)
+                            || matches!(
+                                surrounding_syntax,
+                                SurroundingSyntax::Selector | SurroundingSyntax::SetRule
+                            );
+                        let apply = if !scope_reject_content && accept_content_arg {
                             eco_format!("{name}[${{}}]")
                         } else {
                             eco_format!("{name}(${{}})")
@@ -1414,11 +1419,11 @@ pub(crate) fn complete_type(ctx: &mut CompletionContext) -> Option<()> {
         .filter(|ty| !matches!(ty, Ty::Any));
 
     let scope = ctx.surrounding_syntax();
+
+    log::debug!("complete_type: {:?} -> ({scope:?}, {ty:#?})", ctx.leaf);
     if matches!((scope, &ty), (SurroundingSyntax::Regular, None)) {
         return None;
     }
-
-    log::debug!("complete_type: {:?} -> ({scope:?}, {ty:#?})", ctx.leaf);
 
     // adjust the completion position
     if is_ident_like(&ctx.leaf) {

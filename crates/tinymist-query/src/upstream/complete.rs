@@ -624,10 +624,11 @@ fn complete_code(ctx: &mut CompletionContext, from_type: bool) -> bool {
     // But not within or after an expression.
     if ctx.explicit
         && (ctx.leaf.kind().is_trivia()
-            || matches!(
+            || (matches!(
                 ctx.leaf.kind(),
                 SyntaxKind::LeftParen | SyntaxKind::LeftBrace
-            ))
+            ) || (matches!(ctx.leaf.kind(), SyntaxKind::Colon)
+                && ctx.leaf.parent_kind() == Some(SyntaxKind::ShowRule))))
     {
         ctx.from = ctx.cursor;
         code_completions(ctx, false);
