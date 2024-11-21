@@ -84,7 +84,7 @@ The development in typst v0.12.0 has been finished. We'll slow down for a while 
 - Periscope renderer: It is disabled since vscode reject to render SVGs containing foreignObjects.
 - Inlay hint: It is disabled _by default_ because of performance issues.
 - Find references of dictionary fields and named function arguments.
-- A reliable ways of configuring projects's entry files and files to export across editors. See #link("https://github.com/Myriad-Dreamin/tinymist/issues/530")[GitHub Issue 530.]
+- A reliable way of configuring projects's entry files and files to export across editors. See #link("https://github.com/Myriad-Dreamin/tinymist/issues/530")[GitHub Issue 530.]
 - Improve symbol view's appearance.
 - Improve package view.
   - Navigate to symbols by clicking on the symbol name in the view.
