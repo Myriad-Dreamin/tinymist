@@ -76,12 +76,30 @@ Nightly Channel:
 
 == Roadmap
 
+The development in typst v0.12.0 has been finished. We'll slow down for a while to catch regressions and bugs by changes. We are also planning to implement the following features in typst v0.13.0 or spare time in weekend:
+
 - Spell checking: There is already a branch but no suitable (default) spell checking library is found.
+- Type checking: complete the type checker.
+- Static Linter: linting code statically according to feedback of the type checker and succeeding code analysis.
 - Periscope renderer: It is disabled since vscode reject to render SVGs containing foreignObjects.
 - Inlay hint: It is disabled _by default_ because of performance issues.
 - Find references of dictionary fields and named function arguments.
-- Go to definition of dictionary fields and named function arguments.
+- A reliable ways of configuring projects's entry files and files to export across editors. See #link("https://github.com/Myriad-Dreamin/tinymist/issues/530")[GitHub Issue 530.]
 - Improve symbol view's appearance.
+- Improve package view.
+  - Navigate to symbols by clicking on the symbol name in the view.
+  - Automatically locate the symbol item in the view when viewing local documentation.
+  - Remember the recently invoked package commands, e.g. "Open Docs of \@preview/cetz:0.3.1", "Open directory of \@preview/touying:0.5.3".
+- Improve label view.
+  - Group labels.
+  - Search labels.
+  - Keep (persist) group preferences.
+- Improve Typst Preview.
+  - Browsing mode: if no main file is specified, the preview will be in browsing mode and use the recently focused file as the main.
+  - Pin drop-down: Set the file to preview in the drop-down for clients that doesn't support passing arguments to the preview command.
+  - Render in web worker (another thread) to reduce overhead on the electron's main thread.
+
+If you are interested by any above features, please feel free to send Issues to discuss or PRs to implement to #link("https://github.com/Myriad-Dreamin/tinymist")[GitHub.]
 
 == Contributing
 
