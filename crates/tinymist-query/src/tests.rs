@@ -22,11 +22,11 @@ pub use tinymist_world::{LspUniverse, LspUniverseBuilder};
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::syntax::find_module_level_docs;
-use crate::LspWorldExt;
 use crate::{
     analysis::Analysis, prelude::LocalContext, typst_to_lsp, LspPosition, PositionEncoding,
     VersionedDocument,
 };
+use crate::{CompletionFeat, LspWorldExt};
 
 type CompileDriver<C> = CompileDriverImpl<C, tinymist_world::LspCompilerFeat>;
 
@@ -74,6 +74,13 @@ pub fn run_with_ctx<T>(
 
     let mut ctx = Arc::new(Analysis {
         remove_html: !supports_html,
+        completion_feat: CompletionFeat {
+            trigger_on_snippet_placeholders: true,
+            trigger_suggest: true,
+            trigger_parameter_hints: true,
+            trigger_suggest_and_parameter_hints: true,
+            ..Default::default()
+        },
         ..Analysis::default()
     })
     .snapshot(w);

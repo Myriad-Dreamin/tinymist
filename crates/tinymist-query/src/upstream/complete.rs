@@ -885,10 +885,7 @@ impl<'a> CompletionContext<'a> {
             apply: Some(snippet.into()),
             detail: Some(docs.into()),
             label_detail: None,
-            // VS Code doesn't do that... Auto triggering suggestion only happens on typing (word
-            // starts or trigger characters). However, you can use editor.action.triggerSuggest as
-            // command on a suggestion to "manually" retrigger suggest after inserting one
-            command: self.ctx.analysis.trigger_suggest(snippet.contains("${")),
+            command: self.ctx.analysis.trigger_on_snippet(snippet.contains("${")),
             ..Completion::default()
         });
     }

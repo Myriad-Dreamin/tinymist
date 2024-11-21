@@ -146,21 +146,34 @@ impl Analysis {
         AllocStats::report(self)
     }
 
-    /// Get configured trigger suggest command.
-    pub fn trigger_suggest(&self, context: bool) -> Option<&'static str> {
-        (self.completion_feat.trigger_suggest && context).then_some("editor.action.triggerSuggest")
-    }
-
     /// Get configured trigger parameter hints command.
     pub fn trigger_parameter_hints(&self, context: bool) -> Option<&'static str> {
         (self.completion_feat.trigger_parameter_hints && context)
             .then_some("editor.action.triggerParameterHints")
     }
 
-    /// Get configured trigger named completion command.
-    pub fn trigger_named_completion(&self, context: bool) -> Option<&'static str> {
-        (self.completion_feat.trigger_named_completion && context)
-            .then_some("tinymist.triggerNamedCompletion")
+    /// Get configured trigger after snippet command.
+    ///
+    /// > VS Code doesn't do that... Auto triggering suggestion only happens on
+    /// > typing (word starts or trigger characters). However, you can use
+    /// > editor.action.triggerSuggest as command on a suggestion to "manually"
+    /// > retrigger suggest after inserting one
+    pub fn trigger_on_snippet(&self, context: bool) -> Option<&'static str> {
+        if !self.completion_feat.trigger_on_snippet_placeholders {
+            return None;
+        }
+
+        (self.completion_feat.trigger_suggest && context).then_some("editor.action.triggerSuggest")
+    }
+
+    /// Get configured trigger on positional parameter hints command.
+    pub fn trigger_on_snippet_with_param_hint(&self, context: bool) -> Option<&'static str> {
+        if !self.completion_feat.trigger_on_snippet_placeholders {
+            return self.trigger_parameter_hints(context);
+        }
+
+        (self.completion_feat.trigger_suggest_and_parameter_hints && context)
+            .then_some("tinymist.triggerSuggestAndParameterHints")
     }
 }
 

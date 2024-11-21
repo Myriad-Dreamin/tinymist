@@ -49,7 +49,7 @@ impl<'a> Iface<'a> {
 }
 
 pub trait IfaceChecker: TyCtx {
-    fn check(&mut self, sig: Iface, args: &mut IfaceCheckContext, pol: bool) -> Option<()>;
+    fn check(&mut self, iface: Iface, ctx: &mut IfaceCheckContext, pol: bool) -> Option<()>;
 }
 
 impl Ty {
