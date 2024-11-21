@@ -175,7 +175,11 @@ impl Initializer for SuperInit {
                 // position_encoding: Some(cc.position_encoding.into()),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 signature_help_provider: Some(SignatureHelpOptions {
-                    trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
+                    trigger_characters: Some(vec![
+                        String::from("("),
+                        String::from(","),
+                        String::from(":"),
+                    ]),
                     retrigger_characters: None,
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: None,
@@ -356,13 +360,22 @@ impl Config {
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
         macro_rules! assign_config {
             ($( $field_path:ident ).+ := $bind:literal?: $ty:ty) => {
-                let v = try_(|| <$ty>::deserialize(update.get($bind)?).ok());
+                let v = try_deserialize::<$ty>(update, $bind);
                 self.$($field_path).+ = v.unwrap_or_default();
             };
             ($( $field_path:ident ).+ := $bind:literal: $ty:ty = $default_value:expr) => {
-                let v = try_(|| <$ty>::deserialize(update.get($bind)?).ok());
+                let v = try_deserialize::<$ty>(update, $bind);
                 self.$($field_path).+ = v.unwrap_or_else(|| $default_value);
             };
+        }
+
+        fn try_deserialize<T: serde::de::DeserializeOwned>(
+            map: &Map<String, JsonValue>,
+            key: &str,
+        ) -> Option<T> {
+            T::deserialize(map.get(key)?)
+                .inspect_err(|e| log::warn!("failed to deserialize {key:?}: {e}"))
+                .ok()
         }
 
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
@@ -371,8 +384,8 @@ impl Config {
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
         assign_config!(completion := "completion"?: CompletionFeat);
         assign_config!(completion.trigger_suggest := "triggerSuggest"?: bool);
-        assign_config!(completion.trigger_named_completion := "triggerNamedCompletion"?: bool);
         assign_config!(completion.trigger_parameter_hints := "triggerParameterHints"?: bool);
+        assign_config!(completion.trigger_suggest_and_parameter_hints := "triggerSuggestAndParameterHints"?: bool);
         self.compile.update_by_map(update)?;
         self.compile.validate()
     }

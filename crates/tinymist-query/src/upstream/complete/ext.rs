@@ -66,12 +66,19 @@ pub struct PostfixSnippet {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompletionFeat {
-    /// Whether to trigger suggest completion, a.k.a. auto-completion.
+    /// Whether to trigger completions on arguments (placeholders) of snippets.
+    #[serde(default)]
+    pub trigger_on_snippet_placeholders: bool,
+    /// Whether supports trigger suggest completion, a.k.a. auto-completion.
+    #[serde(default)]
     pub trigger_suggest: bool,
-    /// Whether to trigger named parameter completion.
-    pub trigger_named_completion: bool,
-    /// Whether to trigger parameter hint, a.k.a. signature help.
+    /// Whether supports trigger parameter hint, a.k.a. signature help.
+    #[serde(default)]
     pub trigger_parameter_hints: bool,
+    /// Whether supports trigger the command combining suggest and parameter
+    /// hints.
+    #[serde(default)]
+    pub trigger_suggest_and_parameter_hints: bool,
 
     /// Whether to enable postfix completion.
     pub postfix: Option<bool>,
@@ -332,7 +339,7 @@ impl<'a> CompletionContext<'a> {
                 label_detail,
                 apply: Some("".into()),
                 // range: Some(range),
-                command: self.ctx.analysis.trigger_parameter_hints(true),
+                command: self.ctx.analysis.trigger_on_snippet_with_param_hint(true),
                 ..Default::default()
             };
             let fn_feat = FnCompletionFeat::default().check(kind_checker.functions.iter());
@@ -475,7 +482,7 @@ impl<'a> CompletionContext<'a> {
                 let base = Completion {
                     kind: CompletionKind::Func,
                     label_detail,
-                    command: self.ctx.analysis.trigger_parameter_hints(true),
+                    command: self.ctx.analysis.trigger_on_snippet_with_param_hint(true),
                     ..Default::default()
                 };
 
@@ -683,11 +690,11 @@ struct ScopeChecker<'a>(&'a mut Defines, &'a mut LocalContext);
 impl<'a> IfaceChecker for ScopeChecker<'a> {
     fn check(
         &mut self,
-        sig: Iface,
-        _args: &mut crate::ty::IfaceCheckContext,
+        iface: Iface,
+        _ctx: &mut crate::ty::IfaceCheckContext,
         _pol: bool,
     ) -> Option<()> {
-        match sig {
+        match iface {
             // dict is not importable
             Iface::Dict(..) | Iface::Value { .. } => {}
             Iface::Element { val, .. } => {
@@ -1094,7 +1101,7 @@ fn type_completion(
                 apply: Some(eco_format!("{}: ${{}}", f)),
                 label_detail: p.ty.describe(),
                 detail: docs.map(Into::into),
-                command: ctx.ctx.analysis.trigger_named_completion(true),
+                command: ctx.ctx.analysis.trigger_on_snippet_with_param_hint(true),
                 ..Completion::default()
             });
         }

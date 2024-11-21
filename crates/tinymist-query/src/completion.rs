@@ -58,6 +58,15 @@ impl StatefulRequest for CompletionRequest {
         ctx: &mut LocalContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
+        // These trigger characters are for completion on positional arguments,
+        // which follows the configuration item
+        // `tinymist.completion.triggerOnSnippetPlaceholders`.
+        if matches!(self.trigger_character, Some('(' | ',' | ':'))
+            && !ctx.analysis.completion_feat.trigger_on_snippet_placeholders
+        {
+            return None;
+        }
+
         let doc = doc.as_ref().map(|doc| doc.document.as_ref());
         let source = ctx.source_by_path(&self.path).ok()?;
         let (cursor, deref_target) = ctx.deref_syntax_at_(&source, self.position, 0)?;

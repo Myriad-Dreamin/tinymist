@@ -70,7 +70,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   const config = loadTinymistConfig();
   // Inform server that we support named completion callback at the client side
   config.triggerSuggest = true;
-  config.triggerNamedCompletion = true;
+  config.triggerSuggestAndParameterHints = true;
   config.triggerParameterHints = true;
   config.supportHtmlInMarkdown = true;
   // Sets features
@@ -337,7 +337,7 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
 
     // We would like to define it at the server side, but it is not possible for now.
     // https://github.com/microsoft/language-server-protocol/issues/1117
-    commands.registerCommand("tinymist.triggerNamedCompletion", triggerNamedCompletion),
+    commands.registerCommand("tinymist.triggerSuggestAndParameterHints", triggerSuggestAndParameterHints),
   );
   // context.subscriptions.push
   const provider = new SymbolViewProvider(context);
@@ -851,7 +851,7 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
   }
 }
 
-function triggerNamedCompletion() {
+function triggerSuggestAndParameterHints() {
   vscode.commands.executeCommand("editor.action.triggerSuggest");
   vscode.commands.executeCommand("editor.action.triggerParameterHints");
 }
