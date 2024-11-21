@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/bug_cite_func_infer.typ
+snapshot_kind: text
 ---
 "cite_prose" = (RefLabel) => Element(ref)
 "labl" = Any

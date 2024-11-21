@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on / (88..89)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-reconstruct.typ
+snapshot_kind: text
 ---
 [
  {
