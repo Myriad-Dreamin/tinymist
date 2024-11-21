@@ -448,25 +448,25 @@
         },
         "tinymist.completion.triggerOnSnippetPlaceholders": {
           "title": "Trigger LSP Completion on Snippet Placeholders",
-          "description": "Whether to trigger completions on arguments (placeholders) of snippets. For example, `box` will be completed to `box(|)`, and server will request the editors (clients) to request completion after moving cursor. Hint: Restarting the editor is required to change this setting.",
+          "markdownDescription": "Whether to trigger completions on arguments (placeholders) of snippets. For example, `box` will be completed to `box(|)`, and server will request the editor (lsp client) to request completion after moving cursor to the placeholder in the snippet. Note: this has no effect if the editor doesn't support `editor.action.triggerSuggest` or `tinymist.triggerSuggestAndParameterHints` command. Hint: Restarting the editor is required to change this setting.",
           "type": "boolean",
           "default": false
         },
         "tinymist.completion.postfix": {
           "title": "Enable Postfix Code Completion",
-          "description": "Whether to enable postfix code completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.",
+          "markdownDescription": "Whether to enable postfix code completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.",
           "type": "boolean",
           "default": true
         },
         "tinymist.completion.postfixUfcs": {
           "title": "Completion: Convert Field Access to Call",
-          "description": "Whether to enable UFCS-style completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.",
+          "markdownDescription": "Whether to enable UFCS-style completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.",
           "type": "boolean",
           "default": true
         },
         "tinymist.completion.postfixUfcsLeft": {
           "title": "Completion: Convert Field Access to Call (Left Variant)",
-          "description": "Whether to enable left-variant UFCS-style completion. For example, `[A].table|` will be completed to `table(|)[A]`. Hint: Restarting the editor is required to change this setting.",
+          "markdownDescription": "Whether to enable left-variant UFCS-style completion. For example, `[A].table|` will be completed to `table(|)[A]`. Hint: Restarting the editor is required to change this setting.",
           "type": "boolean",
           "default": true
         },
