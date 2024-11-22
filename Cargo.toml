@@ -177,6 +177,22 @@ uninlined_format_args = "warn"
 missing_safety_doc = "warn"
 undocumented_unsafe_blocks = "warn"
 
+[workspace.metadata.typos.default]
+locale = "en-us"
+
+[workspace.metadata.typos.default.extend-words]
+labelled = "labelled"
+onces = "onces"
+withs = "withs"
+
+[workspace.metadata.typos.files]
+ignore-hidden = false
+extend-exclude = [
+  "/.git",
+  "fixtures",
+  "upstream",
+]
+
 [patch.crates-io]
 
 # tinymist-assets = { path = "./crates/tinymist-assets/" }
