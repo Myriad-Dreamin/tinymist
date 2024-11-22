@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/folding_range.rs
 expression: "JsonRepr::new_pure(json!({ \"false\": result_false, \"true\": result_true, }))"
 input_file: crates/tinymist-query/src/fixtures/folding_range/heading-in-multiple-content.typ
+snapshot_kind: text
 ---
 {
  "false": [

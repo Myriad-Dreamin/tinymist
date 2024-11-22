@@ -1,8 +1,9 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on c( (73..75)
+description: Completion on c( (74..76)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/import_self.typ
+snapshot_kind: text
 ---
 [
  {
@@ -12,7 +13,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_self.typ
     "kind": 9,
     "label": "base",
     "labelDetails": {
-     "description": "base.typ"
+     "description": "module(base)"
     },
     "textEdit": {
      "newText": "base",

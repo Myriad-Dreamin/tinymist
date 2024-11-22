@@ -8,7 +8,7 @@ use parking_lot::Mutex;
 use reflexo_typst::typst::prelude::*;
 use reflexo_typst::{package::PackageSpec, TypstFileId};
 use serde::{Deserialize, Serialize};
-use tinymist_world::https::HttpsRegistry;
+use tinymist_world::package::HttpsRegistry;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
 use typst::syntax::VirtualPath;
@@ -92,7 +92,7 @@ pub fn list_package_by_namespace(
     );
     for dir in registry.paths() {
         let local_path = dir.join(ns.as_str());
-        if !local_path.exists() || !local_path.is_dir() {
+        if !local_path.exists() || !local_path.is_dir_follow_links() {
             continue;
         }
         // namespace/package_name/version
@@ -105,15 +105,16 @@ pub fn list_package_by_namespace(
             let Some(package) = once_log(package, "read package name") else {
                 continue;
             };
-            if package.file_type().map_or(true, |ft| !ft.is_dir()) {
-                continue;
-            }
             if package.file_name().to_string_lossy().starts_with('.') {
                 continue;
             }
+
+            let package_path = package.path();
+            if !package_path.is_dir_follow_links() {
+                continue;
+            }
             // 3. version
-            let Some(versions) =
-                once_log(std::fs::read_dir(package.path()), "read package versions")
+            let Some(versions) = once_log(std::fs::read_dir(package_path), "read package versions")
             else {
                 continue;
             };
@@ -121,13 +122,13 @@ pub fn list_package_by_namespace(
                 let Some(version) = once_log(version, "read package version") else {
                     continue;
                 };
-                if version.file_type().map_or(true, |ft| !ft.is_dir()) {
-                    continue;
-                }
                 if version.file_name().to_string_lossy().starts_with('.') {
                     continue;
                 }
-                let path = version.path();
+                let package_version_path = version.path();
+                if !package_version_path.is_dir_follow_links() {
+                    continue;
+                }
                 let Some(version) = once_log(
                     version.file_name().to_string_lossy().parse(),
                     "parse package version",
@@ -139,12 +140,26 @@ pub fn list_package_by_namespace(
                     name: package.file_name().to_string_lossy().into(),
                     version,
                 };
-                packages.push((path, spec));
+                packages.push((package_version_path, spec));
             }
         }
     }
 
     packages
+}
+
+trait IsDirFollowLinks {
+    fn is_dir_follow_links(&self) -> bool;
+}
+
+impl IsDirFollowLinks for PathBuf {
+    fn is_dir_follow_links(&self) -> bool {
+        // Although `canonicalize` is heavy, we must use it because `symlink_metadata`
+        // is not reliable.
+        self.canonicalize()
+            .map(|meta| meta.is_dir())
+            .unwrap_or(false)
+    }
 }
 
 fn once_log<T, E: std::fmt::Display>(result: Result<T, E>, site: &'static str) -> Option<T> {

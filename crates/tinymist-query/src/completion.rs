@@ -48,12 +48,6 @@ pub struct CompletionRequest {
     pub explicit: bool,
     /// The character that triggered the completion, if any.
     pub trigger_character: Option<char>,
-    /// Whether to trigger suggest completion, a.k.a. auto-completion.
-    pub trigger_suggest: bool,
-    /// Whether to trigger named parameter completion.
-    pub trigger_named_completion: bool,
-    /// Whether to trigger parameter hint, a.k.a. signature help.
-    pub trigger_parameter_hints: bool,
 }
 
 impl StatefulRequest for CompletionRequest {
@@ -64,6 +58,15 @@ impl StatefulRequest for CompletionRequest {
         ctx: &mut LocalContext,
         doc: Option<VersionedDocument>,
     ) -> Option<Self::Response> {
+        // These trigger characters are for completion on positional arguments,
+        // which follows the configuration item
+        // `tinymist.completion.triggerOnSnippetPlaceholders`.
+        if matches!(self.trigger_character, Some('(' | ',' | ':'))
+            && !ctx.analysis.completion_feat.trigger_on_snippet_placeholders
+        {
+            return None;
+        }
+
         let doc = doc.as_ref().map(|doc| doc.document.as_ref());
         let source = ctx.source_by_path(&self.path).ok()?;
         let (cursor, deref_target) = ctx.deref_syntax_at_(&source, self.position, 0)?;
@@ -148,9 +151,6 @@ impl StatefulRequest for CompletionRequest {
                 cursor,
                 explicit,
                 self.trigger_character,
-                self.trigger_suggest,
-                self.trigger_parameter_hints,
-                self.trigger_named_completion,
             )?;
 
             // Exclude it self from auto completion
@@ -242,7 +242,12 @@ impl StatefulRequest for CompletionRequest {
                         }
                     }),
                     text_edit: Some(text_edit),
+                    additional_text_edits: typst_completion.additional_text_edits.clone(),
                     insert_text_format: Some(InsertTextFormat::SNIPPET),
+                    commit_characters: typst_completion
+                        .commit_char
+                        .as_ref()
+                        .map(|v| vec![v.to_string()]),
                     command: typst_completion.command.as_ref().map(|c| Command {
                         command: c.to_string(),
                         ..Default::default()
@@ -398,9 +403,6 @@ mod tests {
                     position: ctx.to_lsp_pos(s, &source),
                     explicit: false,
                     trigger_character,
-                    trigger_suggest: true,
-                    trigger_parameter_hints: true,
-                    trigger_named_completion: true,
                 };
                 results.push(request.request(ctx, doc.clone()).map(|resp| match resp {
                     CompletionResponse::List(l) => CompletionResponse::List(CompletionList {

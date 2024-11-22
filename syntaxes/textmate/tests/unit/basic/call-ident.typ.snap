@@ -47,27 +47,37 @@
 # ^ source.typst meta.expr.call.typst entity.name.function.typst
 #  ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #   ^ source.typst meta.expr.call.typst meta.brace.round.typst
-#    ^^^^ source.typst
+#    ^ source.typst
+#     ^ source.typst markup.content.brace.typst
+#      ^ source.typst markup.content.brace.typst
 >#f() ()
 #^ source.typst entity.name.function.hash.typst
 # ^ source.typst meta.expr.call.typst entity.name.function.typst
 #  ^ source.typst meta.expr.call.typst meta.brace.round.typst
 #   ^ source.typst meta.expr.call.typst meta.brace.round.typst
-#    ^^^^ source.typst
+#    ^ source.typst
+#     ^ source.typst markup.content.brace.typst
+#      ^ source.typst markup.content.brace.typst
 >#f ()
 #^ source.typst variable.other.readwrite.hash.typst
 # ^ source.typst variable.other.readwrite.typst
-#  ^^^^ source.typst
+#  ^ source.typst
+#   ^ source.typst markup.content.brace.typst
+#    ^ source.typst markup.content.brace.typst
 >#f []
 #^ source.typst variable.other.readwrite.hash.typst
 # ^ source.typst variable.other.readwrite.typst
-#  ^^^^ source.typst
+#  ^ source.typst
+#   ^ source.typst markup.content.brace.typst
+#    ^ source.typst markup.content.brace.typst
 >#f[] []
 #^ source.typst entity.name.function.hash.typst
 # ^ source.typst meta.expr.call.typst entity.name.function.typst
 #  ^ source.typst meta.expr.call.typst meta.brace.square.typst
 #   ^ source.typst meta.expr.call.typst meta.brace.square.typst
-#    ^^^^ source.typst
+#    ^ source.typst
+#     ^ source.typst markup.content.brace.typst
+#      ^ source.typst markup.content.brace.typst
 >
 >#(f())()
 #^ source.typst keyword.control.hash.typst
@@ -184,7 +194,9 @@
 #   ^ source.typst variable.other.readwrite.typst
 #    ^ source.typst
 #     ^ source.typst meta.brace.curly.typst
-#      ^^^^ source.typst
+#      ^ source.typst
+#       ^ source.typst markup.content.brace.typst
+#        ^ source.typst markup.content.brace.typst
 >#({ f }) ()
 #^ source.typst keyword.control.hash.typst
 # ^ source.typst meta.brace.round.typst
@@ -194,7 +206,9 @@
 #     ^ source.typst
 #      ^ source.typst meta.brace.curly.typst
 #       ^ source.typst meta.brace.round.typst
-#        ^^^^ source.typst
+#        ^ source.typst
+#         ^ source.typst markup.content.brace.typst
+#          ^ source.typst markup.content.brace.typst
 >
 >#(list./*g*/item[])
 #^ source.typst keyword.control.hash.typst

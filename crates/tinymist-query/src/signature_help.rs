@@ -43,7 +43,7 @@ impl SemanticRequest for SignatureHelpRequest {
         let sig = ctx.sig_of_def(def.clone())?;
         log::debug!("got signature {sig:?}");
 
-        let param_shift = sig.param_shift(ctx);
+        let param_shift = sig.param_shift();
         let mut active_parameter = None;
 
         let mut label = def.name().as_ref().to_owned();

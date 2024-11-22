@@ -2,11 +2,11 @@
 #^ source.typst keyword.control.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst
-#    ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#    ^^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #         ^ source.typst meta.expr.if.typst
 #          ^^^ source.typst meta.expr.if.typst keyword.other.logical.typst
 #             ^ source.typst meta.expr.if.typst
-#              ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#              ^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #                  ^ source.typst meta.expr.if.typst
 #                   ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #                    ^ source.typst meta.expr.if.typst meta.brace.curly.typst
@@ -16,7 +16,7 @@
 #   ^ source.typst meta.expr.if.typst
 #    ^^^ source.typst meta.expr.if.typst keyword.other.logical.typst
 #       ^ source.typst meta.expr.if.typst
-#        ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#        ^^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #             ^ source.typst meta.expr.if.typst
 #              ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #               ^ source.typst meta.expr.if.typst meta.brace.curly.typst
@@ -40,11 +40,11 @@
 #^ source.typst keyword.control.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #   ^ source.typst meta.expr.if.typst
-#    ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#    ^^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #         ^ source.typst meta.expr.if.typst
 #          ^^^ source.typst meta.expr.if.typst keyword.other.logical.typst
 #             ^ source.typst meta.expr.if.typst
-#              ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#              ^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #                  ^ source.typst meta.expr.if.typst
 #                   ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #                    ^ source.typst meta.expr.if.typst meta.brace.curly.typst
@@ -53,11 +53,11 @@
 #                          ^ source.typst meta.expr.if.typst
 #                           ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #                             ^ source.typst meta.expr.if.typst
-#                              ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#                              ^^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #                                   ^ source.typst meta.expr.if.typst
 #                                    ^^^ source.typst meta.expr.if.typst keyword.other.logical.typst
 #                                       ^ source.typst meta.expr.if.typst
-#                                        ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#                                        ^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #                                            ^ source.typst meta.expr.if.typst
 #                                             ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #                                              ^ source.typst meta.expr.if.typst meta.brace.curly.typst
@@ -67,7 +67,7 @@
 #   ^ source.typst meta.expr.if.typst
 #    ^^^ source.typst meta.expr.if.typst keyword.other.logical.typst
 #       ^ source.typst meta.expr.if.typst
-#        ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#        ^^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #             ^ source.typst meta.expr.if.typst
 #              ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #               ^ source.typst meta.expr.if.typst meta.brace.curly.typst
@@ -78,7 +78,7 @@
 #                        ^ source.typst meta.expr.if.typst
 #                         ^^^ source.typst meta.expr.if.typst keyword.other.logical.typst
 #                            ^ source.typst meta.expr.if.typst
-#                             ^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#                             ^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #                                 ^ source.typst meta.expr.if.typst
 #                                  ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #                                   ^ source.typst meta.expr.if.typst meta.brace.curly.typst
@@ -119,11 +119,11 @@
 #^ source.typst keyword.control.hash.typst
 # ^^^^^ source.typst meta.expr.while.typst keyword.control.loop.typst
 #      ^ source.typst meta.expr.while.typst
-#       ^^^^^ source.typst meta.expr.while.typst entity.name.type.primitive.typst
+#       ^^^^^ source.typst meta.expr.while.typst constant.language.boolean.typst
 #            ^ source.typst meta.expr.while.typst
 #             ^^^ source.typst meta.expr.while.typst keyword.other.logical.typst
 #                ^ source.typst meta.expr.while.typst
-#                 ^^^^ source.typst meta.expr.while.typst entity.name.type.primitive.typst
+#                 ^^^^ source.typst meta.expr.while.typst constant.language.boolean.typst
 #                     ^ source.typst meta.expr.while.typst
 #                      ^ source.typst meta.expr.while.typst meta.brace.curly.typst
 #                       ^ source.typst meta.expr.while.typst meta.brace.curly.typst
@@ -155,11 +155,11 @@
 #              ^ source.typst meta.expr.set.typst
 #               ^^ source.typst meta.expr.set.typst keyword.control.conditional.typst
 #                 ^ source.typst meta.expr.set.typst
-#                  ^^^^^ source.typst meta.expr.set.typst entity.name.type.primitive.typst
+#                  ^^^^^ source.typst meta.expr.set.typst constant.language.boolean.typst
 #                       ^^^ source.typst meta.expr.set.typst
 #                          ^^^ source.typst meta.expr.set.typst keyword.other.logical.typst
 #                             ^^^^ source.typst meta.expr.set.typst
-#                                 ^^^^ source.typst meta.expr.set.typst entity.name.type.primitive.typst
+#                                 ^^^^ source.typst meta.expr.set.typst constant.language.boolean.typst
 >#set text(red) if   not          true
 #^ source.typst keyword.control.hash.typst
 # ^^^ source.typst meta.expr.set.typst keyword.control.other.typst
@@ -173,5 +173,5 @@
 #                 ^^^ source.typst meta.expr.set.typst
 #                    ^^^ source.typst meta.expr.set.typst keyword.other.logical.typst
 #                       ^^^^^^^^^^ source.typst meta.expr.set.typst
-#                                 ^^^^ source.typst meta.expr.set.typst entity.name.type.primitive.typst
+#                                 ^^^^ source.typst meta.expr.set.typst constant.language.boolean.typst
 >

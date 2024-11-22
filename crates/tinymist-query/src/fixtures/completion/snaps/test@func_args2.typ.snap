@@ -1,8 +1,9 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (360..361)
+description: Completion on / (361..362)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/func_args2.typ
+snapshot_kind: text
 ---
 [
  {
@@ -11,6 +12,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_args2.typ
    {
     "kind": 5,
     "label": "class",
+    "labelDetails": {
+     "description": "\"article\" | \"letter\" | str"
+    },
     "sortText": "000",
     "textEdit": {
      "newText": " class: ${1:}",
@@ -29,6 +33,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_args2.typ
    {
     "kind": 5,
     "label": "font",
+    "labelDetails": {
+     "description": "array | none | text.font"
+    },
     "sortText": "001",
     "textEdit": {
      "newText": " font: ${1:}",

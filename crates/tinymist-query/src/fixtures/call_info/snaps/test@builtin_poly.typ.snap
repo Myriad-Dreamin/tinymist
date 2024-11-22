@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: CallSnapshot(result.as_deref())
 input_file: crates/tinymist-query/src/fixtures/call_info/builtin_poly.typ
+snapshot_kind: text
 ---
 255 -> CallParamInfo { kind: Positional, is_content_block: false, param_name: "red" }
 255 -> CallParamInfo { kind: Positional, is_content_block: false, param_name: "green" }

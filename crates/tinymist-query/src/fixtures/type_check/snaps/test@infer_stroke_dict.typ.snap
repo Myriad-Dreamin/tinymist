@@ -2,6 +2,8 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/infer_stroke_dict.typ
+snapshot_kind: text
+---
 ---
 1..5 -> Func(text)
 1..54 -> Element(text)

@@ -22,11 +22,13 @@ use typst::model::Document;
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{package::PackageSpec, Span, VirtualPath};
 
+use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
 use crate::analysis::prelude::*;
 use crate::analysis::{
     analyze_bib, analyze_expr_, analyze_import_, analyze_signature, definition, post_type_check,
-    AllocStats, AnalysisStats, BibInfo, Definition, PathPreference, QueryStatGuard, Signature,
-    SignatureTarget, Ty, TypeScheme,
+    AllocStats, AnalysisStats, BibInfo, Definition, PathPreference, QueryStatGuard,
+    SemanticTokenCache, SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty,
+    TypeScheme,
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
@@ -34,10 +36,10 @@ use crate::syntax::{
     scan_workspace_files, Decl, DefKind, DerefTarget, ExprInfo, ExprRoute, LexicalScope,
     ModuleDependency,
 };
-use crate::upstream::{tooltip_, Tooltip};
+use crate::upstream::{tooltip_, CompletionFeat, Tooltip};
 use crate::{
-    lsp_to_typst, path_to_url, typst_to_lsp, ColorTheme, LspPosition, LspRange, PositionEncoding,
-    SemanticTokenContext, TypstRange, VersionedDocument,
+    lsp_to_typst, typst_to_lsp, ColorTheme, CompilerQueryRequest, LspPosition, LspRange,
+    LspWorldExt, PositionEncoding, TypstRange, VersionedDocument,
 };
 
 use super::TypeEnv;
@@ -47,18 +49,26 @@ use super::TypeEnv;
 pub struct Analysis {
     /// The position encoding for the workspace.
     pub position_encoding: PositionEncoding,
+    /// Whether to allow overlapping semantic tokens.
+    pub allow_overlapping_token: bool,
+    /// Whether to allow multiline semantic tokens.
+    pub allow_multiline_token: bool,
+    /// Whether to remove html from markup content in responses.
+    pub remove_html: bool,
+    /// Tinymist's completion features.
+    pub completion_feat: CompletionFeat,
     /// The editor's color theme.
     pub color_theme: ColorTheme,
     /// The periscope provider.
     pub periscope: Option<Arc<dyn PeriscopeProvider + Send + Sync>>,
-    /// The semantic token context.
-    pub tokens_ctx: Arc<SemanticTokenContext>,
     /// The global worker resources for analysis.
     pub workers: Arc<AnalysisGlobalWorkers>,
+    /// The semantic token cache.
+    pub tokens_caches: Arc<Mutex<SemanticTokenCache>>,
     /// The global caches for analysis.
     pub caches: AnalysisGlobalCaches,
-    /// The global cache grid for analysis.
-    pub cache_grid: Arc<Mutex<AnalysisGlobalCacheGrid>>,
+    /// The revisioned cache for analysis.
+    pub analysis_rev_cache: Arc<Mutex<AnalysisRevCache>>,
     /// The statistics about the analyzers.
     pub stats: Arc<AnalysisStats>,
 }
@@ -66,10 +76,21 @@ pub struct Analysis {
 impl Analysis {
     /// Get a snapshot of the analysis data.
     pub fn snapshot(&self, world: LspWorld) -> LocalContextGuard {
+        self.snapshot_(world, self.lock_revision(None))
+    }
+
+    /// Get a snapshot of the analysis data.
+    pub fn snapshot_(&self, world: LspWorld, mut lg: AnalysisRevLock) -> LocalContextGuard {
         let lifetime = self.caches.lifetime.fetch_add(1, Ordering::SeqCst);
-        let slot = self.cache_grid.lock().find_revision(world.revision());
+        let slot = self
+            .analysis_rev_cache
+            .lock()
+            .find_revision(world.revision(), &lg);
+        let tokens = lg.tokens.take();
         LocalContextGuard {
+            rev_lock: lg,
             local: LocalContext {
+                tokens,
                 caches: AnalysisCaches::default(),
                 shared: Arc::new(SharedContext {
                     slot,
@@ -83,22 +104,36 @@ impl Analysis {
 
     /// Lock the revision in *main thread*.
     #[must_use]
-    pub fn lock_revision(&self) -> RevisionLock {
-        let mut grid = self.cache_grid.lock();
-        let revision = grid.revision;
-        *grid.locked_revisions.entry(revision).or_default() += 1;
-        RevisionLock {
-            grid: self.cache_grid.clone(),
-            revision,
+    pub fn lock_revision(&self, q: Option<&CompilerQueryRequest>) -> AnalysisRevLock {
+        let mut grid = self.analysis_rev_cache.lock();
+
+        AnalysisRevLock {
+            tokens: match q {
+                Some(CompilerQueryRequest::SemanticTokensFull(f)) => Some(
+                    SemanticTokenCache::acquire(self.tokens_caches.clone(), &f.path, None),
+                ),
+                Some(CompilerQueryRequest::SemanticTokensDelta(f)) => {
+                    Some(SemanticTokenCache::acquire(
+                        self.tokens_caches.clone(),
+                        &f.path,
+                        Some(&f.previous_result_id),
+                    ))
+                }
+                _ => None,
+            },
+            inner: grid.manager.lock_estimated(),
+            grid: self.analysis_rev_cache.clone(),
         }
     }
 
     /// Clear all cached resources.
     pub fn clear_cache(&self) {
         self.caches.signatures.clear();
+        self.caches.def_signatures.clear();
         self.caches.static_signatures.clear();
         self.caches.terms.clear();
-        self.cache_grid.lock().clear();
+        self.tokens_caches.lock().clear();
+        self.analysis_rev_cache.lock().clear();
     }
 
     /// Report the statistics of the analysis.
@@ -109,6 +144,36 @@ impl Analysis {
     /// Report the statistics of the allocation.
     pub fn report_alloc_stats(&self) -> String {
         AllocStats::report(self)
+    }
+
+    /// Get configured trigger parameter hints command.
+    pub fn trigger_parameter_hints(&self, context: bool) -> Option<&'static str> {
+        (self.completion_feat.trigger_parameter_hints && context)
+            .then_some("editor.action.triggerParameterHints")
+    }
+
+    /// Get configured trigger after snippet command.
+    ///
+    /// > VS Code doesn't do that... Auto triggering suggestion only happens on
+    /// > typing (word starts or trigger characters). However, you can use
+    /// > editor.action.triggerSuggest as command on a suggestion to "manually"
+    /// > retrigger suggest after inserting one
+    pub fn trigger_on_snippet(&self, context: bool) -> Option<&'static str> {
+        if !self.completion_feat.trigger_on_snippet_placeholders {
+            return None;
+        }
+
+        (self.completion_feat.trigger_suggest && context).then_some("editor.action.triggerSuggest")
+    }
+
+    /// Get configured trigger on positional parameter hints command.
+    pub fn trigger_on_snippet_with_param_hint(&self, context: bool) -> Option<&'static str> {
+        if !self.completion_feat.trigger_on_snippet_placeholders {
+            return self.trigger_parameter_hints(context);
+        }
+
+        (self.completion_feat.trigger_suggest_and_parameter_hints && context)
+            .then_some("tinymist.triggerSuggestAndParameterHints")
     }
 }
 
@@ -140,6 +205,8 @@ pub struct AnalysisGlobalWorkers {
 pub struct LocalContextGuard {
     /// Constructed local context
     pub local: LocalContext,
+    /// The revision lock
+    pub rev_lock: AnalysisRevLock,
 }
 
 impl Deref for LocalContextGuard {
@@ -185,27 +252,19 @@ impl LocalContextGuard {
             break;
         }
 
-        self.analysis
-            .caches
-            .def_signatures
-            .retain(|(l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .static_signatures
-            .retain(|(l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .terms
-            .retain(|(l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .signatures
-            .retain(|(l, _)| lifetime - *l < 60);
+        let retainer = |l: u64| lifetime.saturating_sub(l) < 60;
+        let caches = &self.analysis.caches;
+        caches.def_signatures.retain(|(l, _)| retainer(*l));
+        caches.static_signatures.retain(|(l, _)| retainer(*l));
+        caches.terms.retain(|(l, _)| retainer(*l));
+        caches.signatures.retain(|(l, _)| retainer(*l));
     }
 }
 
 /// The local context for analyzers.
 pub struct LocalContext {
+    /// The created semantic token context.
+    pub(crate) tokens: Option<SemanticTokenContext>,
     /// Local caches for analysis.
     pub caches: AnalysisCaches,
     /// The shared context
@@ -336,6 +395,20 @@ impl LocalContext {
         self.analyze_import(mod_import_node.source().to_untyped()).1
     }
 
+    pub(crate) fn cached_tokens(&mut self, source: &Source) -> (SemanticTokens, Option<String>) {
+        let tokens = crate::analysis::semantic_tokens::get_semantic_tokens(self, source);
+
+        let result_id = self.tokens.as_ref().map(|t| {
+            let id = t.next.revision;
+            t.next
+                .data
+                .set(tokens.clone())
+                .unwrap_or_else(|_| panic!("unexpected slot overwrite {id}"));
+            id.to_string()
+        });
+        (tokens, result_id)
+    }
+
     /// Get the expression information of a source file.
     pub(crate) fn expr_stage_by_id(&mut self, fid: TypstFileId) -> Option<Arc<ExprInfo>> {
         Some(self.expr_stage(&self.source_by_id(fid).ok()?))
@@ -355,13 +428,33 @@ impl LocalContext {
         cache.get_or_init(|| self.shared.type_check(source)).clone()
     }
 
+    /// Get the type check information of a source file.
+    pub(crate) fn type_check_by_id(&mut self, id: TypstFileId) -> Arc<TypeScheme> {
+        let cache = &self.caches.modules.entry(id).or_default().type_check;
+        cache
+            .clone()
+            .get_or_init(|| {
+                let source = self.source_by_id(id).ok();
+                source
+                    .map(|s| self.shared.type_check(&s))
+                    .unwrap_or_default()
+            })
+            .clone()
+    }
+
+    pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {
+        let scheme = self.type_check_by_id(s.id()?);
+        let ty = scheme.type_of_span(s)?;
+        Some(scheme.simplify(ty, false))
+    }
+
     pub(crate) fn def_docs(&mut self, def: &Definition) -> Option<DefDocs> {
         // let plain_docs = sym.head.docs.as_deref();
         // let plain_docs = plain_docs.or(sym.head.oneliner.as_deref());
         match def.decl.kind() {
             DefKind::Function => {
                 let sig = self.sig_of_def(def.clone())?;
-                let docs = crate::docs::sig_docs(&sig, None)?;
+                let docs = crate::docs::sig_docs(&sig)?;
                 Some(DefDocs::Function(Box::new(docs)))
             }
             DefKind::Struct | DefKind::Constant | DefKind::Variable => {
@@ -387,8 +480,8 @@ pub struct SharedContext {
     pub world: LspWorld,
     /// The analysis data
     pub analysis: Analysis,
-    /// The using revision slot
-    slot: Arc<RevisionSlot>,
+    /// The using analysis revision slot
+    slot: Arc<RevisionSlot<AnalysisRevSlot>>,
 }
 
 impl SharedContext {
@@ -452,25 +545,12 @@ impl SharedContext {
 
     /// Resolve the uri for a file id.
     pub fn uri_for_id(&self, id: TypstFileId) -> Result<Url, FileError> {
-        self.path_for_id(id).and_then(|e| {
-            path_to_url(&e)
-                .map_err(|e| FileError::Other(Some(eco_format!("convert to url: {e:?}"))))
-        })
+        self.world.uri_for_id(id)
     }
 
     /// Get file's id by its path
     pub fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
-        // todo: source in packages
-        let root = self.world.workspace_root().ok_or_else(|| {
-            let reason = eco_format!("workspace root not found");
-            FileError::Other(Some(reason))
-        })?;
-        let relative_path = p.strip_prefix(&root).map_err(|_| {
-            let reason = eco_format!("access denied, path: {p:?}, root: {root:?}");
-            FileError::Other(Some(reason))
-        })?;
-
-        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
+        self.world.file_id_by_path(p)
     }
 
     /// Get the content of a file by file id.
@@ -485,7 +565,6 @@ impl SharedContext {
 
     /// Get the source of a file by file path.
     pub fn source_by_path(&self, p: &Path) -> FileResult<Source> {
-        // todo: source cache
         self.source_by_id(self.file_id_by_path(p)?)
     }
 
@@ -693,7 +772,7 @@ impl SharedContext {
             return cached;
         }
 
-        let res = crate::analysis::term_value(self, val);
+        let res = crate::analysis::term_value(val);
 
         self.analysis
             .caches
@@ -732,10 +811,6 @@ impl SharedContext {
         definition(self, source, doc, deref_target)
     }
 
-    pub(crate) fn type_of(self: &Arc<Self>, rr: &SyntaxNode) -> Option<Ty> {
-        self.type_of_span(rr.span())
-    }
-
     pub(crate) fn type_of_span(self: &Arc<Self>, s: Span) -> Option<Ty> {
         self.type_of_span_(&self.source_by_id(s.id()?).ok()?, s)
     }
@@ -760,9 +835,8 @@ impl SharedContext {
         analyze_signature(self, SignatureTarget::Def(source, def))
     }
 
-    pub(crate) fn sig_of_func(self: &Arc<Self>, func: Func) -> Signature {
-        log::debug!("check runtime func {func:?}");
-        analyze_signature(self, SignatureTarget::Runtime(func)).unwrap()
+    pub(crate) fn sig_of_type(self: &Arc<Self>, ti: &TypeScheme, ty: Ty) -> Option<Signature> {
+        super::sig_of_type(self, ti, ty)
     }
 
     /// Try to find imported target from the current source file.
@@ -856,6 +930,20 @@ impl SharedContext {
                 .entry(hash128(&rt), self.lifetime),
         };
         res.get_or_init(|| compute(self)).clone()
+    }
+
+    /// Remove html tags from markup content if necessary.
+    pub fn remove_html(&self, markup: EcoString) -> EcoString {
+        if !self.analysis.remove_html {
+            return markup;
+        }
+
+        static REMOVE_HTML_COMMENT_REGEX: LazyLock<regex::Regex> =
+            LazyLock::new(|| regex::Regex::new(r#"<!--[\s\S]*?-->"#).unwrap());
+        REMOVE_HTML_COMMENT_REGEX
+            .replace_all(&markup, "")
+            .trim()
+            .into()
     }
 
     fn query_stat(&self, id: TypstFileId, query: &'static str) -> QueryStatGuard {
@@ -1050,104 +1138,94 @@ pub struct ModuleAnalysisCache {
 
 /// The grid cache for all level of analysis results of a module.
 #[derive(Default)]
-pub struct AnalysisGlobalCacheGrid {
-    revision: usize,
-    default_slot: RevisionSlot,
-    revisions: Vec<Arc<RevisionSlot>>,
-    locked_revisions: HashMap<usize, usize>,
+pub struct AnalysisRevCache {
+    default_slot: AnalysisRevSlot,
+    manager: RevisionManager<AnalysisRevSlot>,
 }
 
-impl AnalysisGlobalCacheGrid {
-    fn clear(&mut self) {
-        self.revisions.clear();
-    }
-
+impl RevisionManagerLike for AnalysisRevCache {
     fn gc(&mut self, rev: usize) {
-        self.revisions.retain(|r| r.revision >= rev);
-        self.default_slot
-            .expr_stage
-            .global
-            .lock()
-            .retain(|_, r| r.0 + 60 >= rev);
-        self.default_slot
-            .type_check
-            .global
-            .lock()
-            .retain(|_, r| r.0 + 60 >= rev);
+        self.manager.gc(rev);
+
+        {
+            let mut max_ei = FxHashMap::default();
+            let es = self.default_slot.expr_stage.global.lock();
+            for r in es.iter() {
+                let rev: &mut usize = max_ei.entry(r.1.fid).or_default();
+                *rev = (*rev).max(r.1.revision);
+            }
+            es.retain(|_, r| r.1.revision == *max_ei.get(&r.1.fid).unwrap_or(&0));
+        }
+
+        {
+            let mut max_ti = FxHashMap::default();
+            let ts = self.default_slot.type_check.global.lock();
+            for r in ts.iter() {
+                let rev: &mut usize = max_ti.entry(r.1.fid).or_default();
+                *rev = (*rev).max(r.1.revision);
+            }
+            ts.retain(|_, r| r.1.revision == *max_ti.get(&r.1.fid).unwrap_or(&0));
+        }
+    }
+}
+
+impl AnalysisRevCache {
+    fn clear(&mut self) {
+        self.manager.clear();
+        self.default_slot = Default::default();
     }
 
     /// Find the last revision slot by revision number.
-    fn find_revision(&mut self, revision: NonZeroUsize) -> Arc<RevisionSlot> {
-        let slot_base = self
-            .revisions
-            .iter()
-            .filter(|e| e.revision <= revision.get())
-            .reduce(|a, b| if a.revision > b.revision { a } else { b });
-
-        if let Some(slot) = slot_base {
-            if slot.revision == revision.get() {
-                return slot.clone();
-            }
-        }
-
-        let mut slot = slot_base
-            .map(|e| RevisionSlot {
-                revision: e.revision,
-                expr_stage: e.expr_stage.crawl(revision.get()),
-                type_check: e.type_check.crawl(revision.get()),
-            })
-            .unwrap_or_else(|| self.default_slot.clone());
-
-        slot.revision = revision.get();
-        let slot = Arc::new(slot);
-        self.revisions.push(slot.clone());
-        self.revision = revision.get().max(self.revision);
-        slot
+    fn find_revision(
+        &mut self,
+        revision: NonZeroUsize,
+        lg: &AnalysisRevLock,
+    ) -> Arc<RevisionSlot<AnalysisRevSlot>> {
+        lg.inner.access(revision);
+        self.manager.find_revision(revision, |slot_base| {
+            log::info!("analysis revision {} is created", revision.get());
+            slot_base
+                .map(|e| AnalysisRevSlot {
+                    revision: e.revision,
+                    expr_stage: e.data.expr_stage.crawl(revision.get()),
+                    type_check: e.data.type_check.crawl(revision.get()),
+                })
+                .unwrap_or_else(|| self.default_slot.clone())
+        })
     }
 }
 
 /// A lock for revision.
-pub struct RevisionLock {
-    grid: Arc<Mutex<AnalysisGlobalCacheGrid>>,
-    revision: usize,
+pub struct AnalysisRevLock {
+    inner: RevisionLock,
+    tokens: Option<SemanticTokenContext>,
+    grid: Arc<Mutex<AnalysisRevCache>>,
 }
 
-impl Drop for RevisionLock {
+impl Drop for AnalysisRevLock {
     fn drop(&mut self) {
-        let mut grid = self.grid.lock();
-        let revision_cnt = grid
-            .locked_revisions
-            .entry(self.revision)
-            .or_insert_with(|| panic!("revision {} is not locked", self.revision));
-        *revision_cnt -= 1;
-        if *revision_cnt != 0 {
-            return;
-        }
+        let mut mu = self.grid.lock();
+        let gc_revision = mu.manager.unlock(&mut self.inner);
 
-        grid.locked_revisions.remove(&self.revision);
-        if grid.revision <= self.revision {
-            return;
+        if let Some(gc_revision) = gc_revision {
+            let grid = self.grid.clone();
+            rayon::spawn(move || {
+                grid.lock().gc(gc_revision);
+            });
         }
-        let existing = grid.locked_revisions.keys().min().copied();
-        let gc_revision = existing.unwrap_or(self.revision);
-        let grid = self.grid.clone();
-
-        rayon::spawn(move || {
-            grid.lock().gc(gc_revision);
-        });
     }
 }
 
 #[derive(Default, Clone)]
-struct RevisionSlot {
+struct AnalysisRevSlot {
     revision: usize,
     expr_stage: IncrCacheMap<u128, Arc<ExprInfo>>,
     type_check: IncrCacheMap<u128, Arc<TypeScheme>>,
 }
 
-impl Drop for RevisionSlot {
+impl Drop for AnalysisRevSlot {
     fn drop(&mut self) {
-        log::info!("revision {} is dropped", self.revision)
+        log::info!("analysis revision {} is dropped", self.revision);
     }
 }
 

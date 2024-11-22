@@ -1,19 +1,42 @@
 use reflexo_typst::EntryReader;
+use tinymist_world::LspWorld;
 
-use crate::prelude::*;
+use crate::{prelude::*, LspWorldExt};
 
 /// Stores diagnostics for files.
 pub type DiagnosticsMap = HashMap<Url, Vec<LspDiagnostic>>;
 
+/// Context for converting Typst diagnostics to LSP diagnostics.
+struct LocalDiagContext<'a> {
+    /// The world surface for Typst compiler.
+    pub world: &'a LspWorld,
+    /// The position encoding for the source.
+    pub position_encoding: PositionEncoding,
+}
+
+impl std::ops::Deref for LocalDiagContext<'_> {
+    type Target = LspWorld;
+
+    fn deref(&self) -> &Self::Target {
+        self.world
+    }
+}
+
 /// Converts a list of Typst diagnostics to LSP diagnostics.
 pub fn convert_diagnostics<'a>(
-    ctx: &LocalContext,
+    world: &LspWorld,
     errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
+    position_encoding: PositionEncoding,
 ) -> DiagnosticsMap {
+    let ctx = LocalDiagContext {
+        world,
+        position_encoding,
+    };
+
     errors
         .into_iter()
         .flat_map(|error| {
-            convert_diagnostic(ctx, error)
+            convert_diagnostic(&ctx, error)
                 .map_err(move |conversion_err| {
                     log::error!("could not convert Typst error to diagnostic: {conversion_err:?} error to convert: {error:?}");
                 })
@@ -24,18 +47,17 @@ pub fn convert_diagnostics<'a>(
 }
 
 fn convert_diagnostic(
-    ctx: &LocalContext,
+    ctx: &LocalDiagContext,
     typst_diagnostic: &TypstDiagnostic,
 ) -> anyhow::Result<(Url, LspDiagnostic)> {
     let uri;
     let lsp_range;
     if let Some((id, span)) = diagnostic_span_id(typst_diagnostic) {
         uri = ctx.uri_for_id(id)?;
-        let source = ctx.world().source(id)?;
-        lsp_range = diagnostic_range(&source, span, ctx.position_encoding());
+        let source = ctx.source(id)?;
+        lsp_range = diagnostic_range(&source, span, ctx.position_encoding);
     } else {
         let root = ctx
-            .world
             .workspace_root()
             .ok_or_else(|| anyhow::anyhow!("no workspace root"))?;
         uri = path_to_url(&root)?;
@@ -48,8 +70,7 @@ fn convert_diagnostic(
     let typst_hints = &typst_diagnostic.hints;
     let lsp_message = format!("{typst_message}{}", diagnostic_hints(typst_hints));
 
-    let tracepoints =
-        diagnostic_related_information(ctx, typst_diagnostic, ctx.position_encoding())?;
+    let tracepoints = diagnostic_related_information(ctx, typst_diagnostic, ctx.position_encoding)?;
 
     let diagnostic = LspDiagnostic {
         range: lsp_range,
@@ -64,13 +85,13 @@ fn convert_diagnostic(
 }
 
 fn tracepoint_to_relatedinformation(
-    project: &LocalContext,
+    ctx: &LocalDiagContext,
     tracepoint: &Spanned<Tracepoint>,
     position_encoding: PositionEncoding,
 ) -> anyhow::Result<Option<DiagnosticRelatedInformation>> {
     if let Some(id) = tracepoint.span.id() {
-        let uri = project.uri_for_id(id)?;
-        let source = project.world().source(id)?;
+        let uri = ctx.uri_for_id(id)?;
+        let source = ctx.source(id)?;
 
         if let Some(typst_range) = source.range(tracepoint.span) {
             let lsp_range = typst_to_lsp::range(typst_range, &source, position_encoding);
@@ -89,7 +110,7 @@ fn tracepoint_to_relatedinformation(
 }
 
 fn diagnostic_related_information(
-    project: &LocalContext,
+    project: &LocalDiagContext,
     typst_diagnostic: &TypstDiagnostic,
     position_encoding: PositionEncoding,
 ) -> anyhow::Result<Vec<DiagnosticRelatedInformation>> {

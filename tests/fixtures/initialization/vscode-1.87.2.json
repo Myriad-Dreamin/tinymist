@@ -274,7 +274,8 @@
     "trace": { "server": "off" },
     "triggerSuggest": true,
     "triggerParameterHints": true,
-    "triggerNamedCompletion": true,
+    "triggerSuggestAndParameterHints": true,
+    "supportHtmlInMarkdown": true,
     "experimentalFormatterMode": "disable"
   },
   "trace": "off"

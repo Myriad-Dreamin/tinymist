@@ -22,9 +22,9 @@
 //!
 //! The [`CompileHandler`] will push information to other actors.
 
-use std::{collections::HashMap, ops::Deref, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use log::{error, info, trace};
 use reflexo_typst::{
     error::prelude::*, typst::prelude::*, vfs::notify::MemoryEvent, world::EntryState,
@@ -32,12 +32,12 @@ use reflexo_typst::{
 };
 use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
-    analysis::{Analysis, LocalContextGuard},
-    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, ExportKind, SemanticRequest,
+    analysis::{Analysis, AnalysisRevLock, LocalContextGuard},
+    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, OnExportRequest, SemanticRequest,
     ServerInfoResponse, StatefulRequest, VersionedDocument,
 };
 use tokio::sync::{mpsc, oneshot};
-use typst::{diag::SourceDiagnostic, World as TypstWorld};
+use typst::{diag::SourceDiagnostic, World};
 
 use super::{
     editor::{DocVersion, EditorRequest, TinymistCompileStatusEnum},
@@ -71,13 +71,26 @@ pub struct CompileHandler {
 
 impl CompileHandler {
     /// Snapshot the compiler thread for tasks
-    pub fn snapshot(&self) -> ZResult<QuerySnap> {
+    pub fn snapshot(&self) -> ZResult<WorldSnapFut> {
         let (tx, rx) = oneshot::channel();
         self.intr_tx
             .send(Interrupt::SnapshotRead(tx))
             .map_err(map_string_err("failed to send snapshot request"))?;
 
-        Ok(QuerySnap { rx })
+        Ok(WorldSnapFut { rx })
+    }
+
+    /// Snapshot the compiler thread for language queries
+    pub fn query_snapshot(&self, q: Option<&CompilerQueryRequest>) -> ZResult<QuerySnapFut> {
+        let fut = self.snapshot()?;
+        let analysis = self.analysis.clone();
+        let rev_lock = analysis.lock_revision(q);
+
+        Ok(QuerySnapFut {
+            fut,
+            analysis,
+            rev_lock,
+        })
     }
 
     /// Get latest artifact the compiler thread for tasks
@@ -130,67 +143,18 @@ impl CompileHandler {
         let revision = world.revision().get();
         trace!("notify diagnostics({revision}): {errors:#?} {warnings:#?}");
 
-        let diagnostics = self.run_analysis(world, |ctx| {
-            tinymist_query::convert_diagnostics(ctx, errors.iter().chain(warnings.iter()))
-        });
+        let diagnostics = tinymist_query::convert_diagnostics(
+            world,
+            errors.iter().chain(warnings.iter()),
+            self.analysis.position_encoding,
+        );
 
-        match diagnostics {
-            Ok(diagnostics) => {
-                let entry = world.entry_state();
-                // todo: better way to remove diagnostics
-                // todo: check all errors in this file
-                let detached = entry.is_inactive();
-                let valid = !detached;
-                self.push_diagnostics(revision, valid.then_some(diagnostics));
-            }
-            Err(err) => {
-                error!("TypstActor: failed to convert diagnostics: {:#}", err);
-                self.push_diagnostics(revision, None);
-            }
-        }
-    }
-
-    pub fn run_stateful<T: StatefulRequest>(
-        &self,
-        snap: CompileSnapshot<LspCompilerFeat>,
-        query: T,
-        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
-    ) -> anyhow::Result<CompilerQueryResponse> {
-        let w = &snap.world;
-        let doc = snap.success_doc.map(|doc| VersionedDocument {
-            version: w.revision().get(),
-            document: doc,
-        });
-        self.run_analysis(w, |ctx| query.request(ctx, doc))
-            .map(wrapper)
-    }
-
-    pub fn run_semantic<T: SemanticRequest>(
-        &self,
-        snap: CompileSnapshot<LspCompilerFeat>,
-        query: T,
-        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
-    ) -> anyhow::Result<CompilerQueryResponse> {
-        self.run_analysis(&snap.world, |ctx| query.request(ctx))
-            .map(wrapper)
-    }
-
-    pub fn run_analysis<T>(
-        &self,
-        w: &LspWorld,
-        f: impl FnOnce(&mut LocalContextGuard) -> T,
-    ) -> anyhow::Result<T> {
-        let Some(main) = w.main_id() else {
-            error!("TypstActor: main file is not set");
-            bail!("main file is not set");
-        };
-        w.source(main).map_err(|err| {
-            info!("TypstActor: failed to prepare main file: {err:?}");
-            anyhow!("failed to get source: {err}")
-        })?;
-
-        let mut analysis = self.analysis.snapshot(w.clone());
-        Ok(f(&mut analysis))
+        let entry = world.entry_state();
+        // todo: better way to remove diagnostics
+        // todo: check all errors in this file
+        let detached = entry.is_inactive();
+        let valid = !detached;
+        self.push_diagnostics(revision, valid.then_some(diagnostics));
     }
 
     // todo: multiple preview support
@@ -319,17 +283,22 @@ impl CompileClientActor {
     }
 
     /// Snapshot the compiler thread for tasks
-    pub fn snapshot(&self) -> ZResult<QuerySnap> {
+    pub fn snapshot(&self) -> ZResult<WorldSnapFut> {
         self.handle.clone().snapshot()
     }
 
-    /// Snapshot the compiler thread for tasks
-    pub fn snapshot_with_stat(&self, q: &CompilerQueryRequest) -> ZResult<QuerySnapWithStat> {
+    /// Snapshot the compiler thread for language queries
+    pub fn query_snapshot(&self) -> ZResult<QuerySnapFut> {
+        self.handle.clone().query_snapshot(None)
+    }
+
+    /// Snapshot the compiler thread for language queries
+    pub fn query_snapshot_with_stat(&self, q: &CompilerQueryRequest) -> ZResult<QuerySnapWithStat> {
         let name: &'static str = q.into();
         let path = q.associated_path();
         let stat = self.handle.stats.query_stat(path, name);
-        let snap = self.handle.clone().snapshot()?;
-        Ok(QuerySnapWithStat { snap, stat })
+        let fut = self.handle.clone().query_snapshot(Some(q))?;
+        Ok(QuerySnapWithStat { fut, stat })
     }
 
     pub fn add_memory_changes(&self, event: MemoryEvent) {
@@ -348,13 +317,30 @@ impl CompileClientActor {
         self.handle.export.change_config(config);
     }
 
-    pub fn on_export(&self, kind: ExportKind, path: PathBuf) -> QueryFuture {
+    pub fn on_export(&self, req: OnExportRequest) -> QueryFuture {
+        let OnExportRequest { path, kind, open } = req;
         let snap = self.snapshot()?;
 
         let entry = self.config.determine_entry(Some(path.as_path().into()));
         let export = self.handle.export.oneshot(snap, Some(entry), kind);
         just_future(async move {
             let res = export.await?;
+
+            // See https://github.com/Myriad-Dreamin/tinymist/issues/837
+            // Also see https://github.com/Byron/open-rs/issues/105
+            #[cfg(not(target_os = "windows"))]
+            let do_open = ::open::that_detached;
+            #[cfg(target_os = "windows")]
+            fn do_open(path: impl AsRef<std::ffi::OsStr>) -> std::io::Result<()> {
+                ::open::with_detached(path, "explorer")
+            }
+
+            if let Some(Some(path)) = open.then_some(res.as_ref()) {
+                log::info!("open with system default apps: {path:?}");
+                if let Err(e) = do_open(path) {
+                    log::error!("failed to open with system default apps: {e}");
+                };
+            }
 
             log::info!("CompileActor: on export end: {path:?} as {res:?}");
             Ok(tinymist_query::CompilerQueryResponse::OnExport(res))
@@ -434,20 +420,95 @@ impl CompileClientActor {
 }
 
 pub struct QuerySnapWithStat {
-    pub snap: QuerySnap,
+    pub fut: QuerySnapFut,
     pub(crate) stat: QueryStatGuard,
 }
 
-pub struct QuerySnap {
+pub struct WorldSnapFut {
     rx: oneshot::Receiver<CompileSnapshot<LspCompilerFeat>>,
 }
 
-impl QuerySnap {
-    /// Snapshot the compiler thread for tasks
+impl WorldSnapFut {
+    /// wait for the snapshot to be ready
     pub async fn receive(self) -> ZResult<CompileSnapshot<LspCompilerFeat>> {
         self.rx
             .await
             .map_err(map_string_err("failed to get snapshot"))
+    }
+}
+
+pub struct QuerySnapFut {
+    fut: WorldSnapFut,
+    analysis: Arc<Analysis>,
+    rev_lock: AnalysisRevLock,
+}
+
+impl QuerySnapFut {
+    /// wait for the snapshot to be ready
+    pub async fn receive(self) -> ZResult<QuerySnap> {
+        let snap = self.fut.receive().await?;
+        Ok(QuerySnap {
+            snap,
+            analysis: self.analysis,
+            rev_lock: self.rev_lock,
+        })
+    }
+}
+
+pub struct QuerySnap {
+    pub snap: CompileSnapshot<LspCompilerFeat>,
+    analysis: Arc<Analysis>,
+    rev_lock: AnalysisRevLock,
+}
+
+impl std::ops::Deref for QuerySnap {
+    type Target = CompileSnapshot<LspCompilerFeat>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.snap
+    }
+}
+
+impl QuerySnap {
+    pub fn task(mut self, inputs: TaskInputs) -> Self {
+        self.snap = self.snap.task(inputs);
+        self
+    }
+
+    pub fn run_stateful<T: StatefulRequest>(
+        self,
+        query: T,
+        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
+    ) -> anyhow::Result<CompilerQueryResponse> {
+        let doc = self.snap.success_doc.as_ref().map(|doc| VersionedDocument {
+            version: self.world.revision().get(),
+            document: doc.clone(),
+        });
+        self.run_analysis(|ctx| query.request(ctx, doc))
+            .map(wrapper)
+    }
+
+    pub fn run_semantic<T: SemanticRequest>(
+        self,
+        query: T,
+        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
+    ) -> anyhow::Result<CompilerQueryResponse> {
+        self.run_analysis(|ctx| query.request(ctx)).map(wrapper)
+    }
+
+    pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> anyhow::Result<T> {
+        let w = self.world.as_ref();
+        let Some(main) = w.main_id() else {
+            error!("TypstActor: main file is not set");
+            bail!("main file is not set");
+        };
+        w.source(main).map_err(|err| {
+            info!("TypstActor: failed to prepare main file: {err:?}");
+            anyhow::anyhow!("failed to get source: {err}")
+        })?;
+
+        let mut analysis = self.analysis.snapshot_(w.clone(), self.rev_lock);
+        Ok(f(&mut analysis))
     }
 }
 

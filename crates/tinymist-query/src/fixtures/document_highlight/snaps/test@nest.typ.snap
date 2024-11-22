@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/document_highlight.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/document_highlight/nest.typ
+snapshot_kind: text
 ---
 [
  {

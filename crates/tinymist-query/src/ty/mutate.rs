@@ -16,7 +16,7 @@ pub trait TyMutator {
             Func(f) => Some(Func(self.mutate_func(f, pol)?.into())),
             Args(args) => Some(Args(self.mutate_func(args, pol)?.into())),
             Pattern(args) => Some(Pattern(self.mutate_func(args, pol)?.into())),
-            Field(f) => Some(Field(self.mutate_field(f, pol)?.into())),
+            Param(f) => Some(Param(self.mutate_param(f, pol)?.into())),
             Select(s) => Some(Select(self.mutate_select(s, pol)?.into())),
             With(w) => Some(With(self.mutate_with_sig(w, pol)?.into())),
             Unary(u) => Some(Unary(self.mutate_unary(u, pol)?.into())),
@@ -71,10 +71,10 @@ pub trait TyMutator {
         })
     }
 
-    fn mutate_field(&mut self, f: &Interned<FieldTy>, pol: bool) -> Option<FieldTy> {
-        let field = self.mutate(&f.field, pol)?;
+    fn mutate_param(&mut self, f: &Interned<ParamTy>, pol: bool) -> Option<ParamTy> {
+        let ty = self.mutate(&f.ty, pol)?;
         let mut f = f.as_ref().clone();
-        f.field = field;
+        f.ty = ty;
         Some(f)
     }
 

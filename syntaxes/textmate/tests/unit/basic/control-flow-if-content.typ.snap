@@ -68,7 +68,9 @@
 #              ^ source.typst meta.expr.if.typst
 #               ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #                ^ source.typst meta.expr.if.typst meta.brace.square.typst
-#                 ^^^^ source.typst
+#                 ^ source.typst
+#                  ^ source.typst markup.content.brace.typst
+#                   ^ source.typst markup.content.brace.typst
 >#if () [] else [] # a
 #^ source.typst keyword.control.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
@@ -120,7 +122,8 @@
 #               ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #                ^ source.typst meta.expr.if.typst meta.brace.square.typst
 >[]
-#^^^ source.typst
+#^ source.typst markup.content.brace.typst
+# ^ source.typst markup.content.brace.typst
 >
 >#if () [] else []
 #^ source.typst keyword.control.hash.typst
@@ -137,7 +140,7 @@
 #               ^ source.typst meta.expr.if.typst meta.brace.square.typst
 #                ^ source.typst meta.expr.if.typst meta.brace.square.typst
 >{
-#^^ source.typst
+#^ source.typst markup.content.brace.typst
 >#if () [] else []
 #^ source.typst keyword.control.hash.typst
 # ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
@@ -159,7 +162,15 @@
 ># if () [] else []
 #^ source.typst punctuation.definition.hash.typst
 # ^ source.typst
-#  ^^^^^^^^^^^^^^^^^ source.typst
+#  ^^^ source.typst
+#     ^ source.typst markup.content.brace.typst
+#      ^ source.typst markup.content.brace.typst
+#       ^ source.typst
+#        ^ source.typst markup.content.brace.typst
+#         ^ source.typst markup.content.brace.typst
+#          ^^^^^^ source.typst
+#                ^ source.typst markup.content.brace.typst
+#                 ^ source.typst markup.content.brace.typst
 >1
 #^^ source.typst
 >
@@ -168,7 +179,7 @@
 # ^ source.typst keyword.control.hash.typst
 #  ^^ source.typst meta.expr.if.typst keyword.control.conditional.typst
 #    ^ source.typst meta.expr.if.typst
-#     ^^^^^ source.typst meta.expr.if.typst entity.name.type.primitive.typst
+#     ^^^^^ source.typst meta.expr.if.typst constant.language.boolean.typst
 #          ^ source.typst meta.expr.if.typst
 #           ^ source.typst meta.expr.if.typst meta.brace.curly.typst
 #            ^ source.typst meta.expr.if.typst meta.brace.curly.typst

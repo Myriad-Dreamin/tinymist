@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/rename.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/rename/module_path_non_cano.typ
+snapshot_kind: text
 ---
 {
  "documentChanges": [

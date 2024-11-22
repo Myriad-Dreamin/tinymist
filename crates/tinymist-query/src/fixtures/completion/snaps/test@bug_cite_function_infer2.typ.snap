@@ -1,8 +1,9 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on > (272..273)
+description: Completion on > (275..276)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/bug_cite_function_infer2.typ
+snapshot_kind: text
 ---
 [
  {

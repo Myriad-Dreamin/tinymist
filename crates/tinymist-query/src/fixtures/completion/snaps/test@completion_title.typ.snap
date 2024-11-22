@@ -1,8 +1,9 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on @R (132..134)
+description: Completion on @R (135..137)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/completion_title.typ
+snapshot_kind: text
 ---
 [
  {

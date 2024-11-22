@@ -30,6 +30,17 @@
         - #document-previewing
         - #vs-code-client-side-support
       ]
+  - ParaN3xus
+    - #github("ParaN3xus")
+    - #email("paran3xus007@gmail.com")
+    - #maintains[
+        - #nightly-releases
+      ]
+  - Max397
+    - #github("max397574")
+    - #maintains[
+        - #editor-integration
+      ]
   - Ericoolen
     - #github("Eric-Song-Nop")
     - #email("EricYFSong@gmail.com")
