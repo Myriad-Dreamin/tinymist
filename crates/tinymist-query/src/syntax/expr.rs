@@ -489,11 +489,11 @@ impl<'a> ExprWorker<'a> {
                             Decl::spread(s.span()).into()
                         };
 
-                        let spreaded = Pattern::Expr(this.check(s.expr())).into();
+                        let spread = Pattern::Expr(this.check(s.expr())).into();
                         if inputs.is_empty() {
-                            spread_left = Some((decl.clone(), spreaded));
+                            spread_left = Some((decl.clone(), spread));
                         } else {
-                            spread_right = Some((decl.clone(), spreaded));
+                            spread_right = Some((decl.clone(), spread));
                         }
 
                         this.resolve_as(Decl::as_def(&decl, None));

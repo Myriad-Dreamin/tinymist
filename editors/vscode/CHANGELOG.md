@@ -843,7 +843,7 @@ These bugs are introduced by [Preparing for parallelizing lsp requests](https://
 ### Misc
 
 * Bumped to typstyle v0.11.14 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/200
-* Preferring less uses of `analzer_expr` during definition analysis in https://github.com/Myriad-Dreamin/tinymist/pull/192
+* Preferring less uses of `analyzer_expr` during definition analysis in https://github.com/Myriad-Dreamin/tinymist/pull/192
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.11.4...v0.11.5
 

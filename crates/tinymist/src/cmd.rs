@@ -49,7 +49,7 @@ struct QueryOpts {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct HiglightRangeOpts {
+struct HighlightRangeOpts {
     range: Option<Range>,
 }
 
@@ -175,7 +175,7 @@ impl LanguageState {
     /// Export a range of the current document as Ansi highlighted text.
     pub fn export_ansi_hl(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let path = get_arg!(args[0] as PathBuf);
-        let opts = get_arg_or_default!(args[1] as HiglightRangeOpts);
+        let opts = get_arg_or_default!(args[1] as HighlightRangeOpts);
 
         let s = self
             .query_source(path.into(), Ok)
@@ -211,8 +211,8 @@ impl LanguageState {
     /// Clear all cached resources.
     pub fn clear_cache(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         comemo::evict(0);
-        for ded in self.servers_mut() {
-            ded.clear_cache();
+        for dead in self.servers_mut() {
+            dead.clear_cache();
         }
         just_ok(JsonValue::Null)
     }
@@ -504,7 +504,7 @@ impl LanguageState {
         run_query!(req_id, self.DocumentMetrics(path))
     }
 
-    /// Get all syntatic labels in workspace.
+    /// Get all syntactic labels in workspace.
     pub fn get_workspace_labels(
         &mut self,
         req_id: RequestId,
@@ -541,7 +541,7 @@ impl LanguageState {
         Err(method_not_found())
     }
 
-    /// Get directory of pacakges
+    /// Get directory of packages
     pub fn resource_package_dirs(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let snap = self.primary().snapshot().map_err(z_internal_error)?;
         just_future(async move {
@@ -551,7 +551,7 @@ impl LanguageState {
         })
     }
 
-    /// Get writable directory of pacakges
+    /// Get writable directory of packages
     pub fn resource_local_package_dir(
         &mut self,
         _arguments: Vec<JsonValue>,
@@ -569,7 +569,7 @@ impl LanguageState {
         })
     }
 
-    /// Get writable directory of pacakges
+    /// Get writable directory of packages
     pub fn resource_package_by_ns(
         &mut self,
         mut arguments: Vec<JsonValue>,

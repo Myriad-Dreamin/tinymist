@@ -193,7 +193,7 @@ export const Summary = () => {
                     style:
                       "height: calc(100% - 20px); box-sizing: border-box; padding-top: 4px",
                   },
-                  fontsExportPannel({
+                  fontsExportPanel({
                     fonts: docMetrics.val.fontInfo,
                     sources: docMetrics.val.spanInfo.sources,
                   })
@@ -302,7 +302,7 @@ export const Summary = () => {
   );
 };
 
-interface fontsExportPannelProps {
+interface fontsExportPanelProps {
   fonts: FontInfo[];
   sources: FontSource[];
 }
@@ -457,7 +457,7 @@ export const fontsExportDefaultConfigure: fontsExportConfigure = {
 
 let savedConfigureData = `:[[preview:FontsExportConfigure]]:`;
 
-const fontsExportPannel = ({ fonts, sources }: fontsExportPannelProps) => {
+const fontsExportPanel = ({ fonts, sources }: fontsExportPanelProps) => {
   const savedConfigure: fontsExportConfigure = savedConfigureData.startsWith(
     ":"
   )

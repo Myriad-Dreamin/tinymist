@@ -115,7 +115,7 @@ function preReplaceNonSVGElements(
 }
 
 function postReplaceNonSVGElements(prev: Element, frozen: FrozenReplacement) {
-  /// Retrive the `<g>` elements from the `prev` element.
+  /// Retrieve the `<g>` elements from the `prev` element.
   const gElements = Array.from(prev.children).filter(isGElem);
   if (gElements.length + 1 !== frozen.inserts.length) {
     throw new Error(`invalid frozen replacement: gElements.length (${gElements.length
@@ -174,7 +174,7 @@ function initOrPatchSvgHeader(svg: SVGElement) {
     resourceHeader.append(svg.firstElementChild!);
   }
 
-  /// Insert resource header to somewhere visble to the svg element.
+  /// Insert resource header to somewhere visible to the svg element.
   document.body.prepend(resourceHeader);
 }
 

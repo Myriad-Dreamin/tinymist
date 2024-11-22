@@ -240,7 +240,7 @@ describe("interpretView", () => {
     `);
   });
 
-  it("handleReusePreseveOrder", () => {
+  it("handleReusePreserveOrder", () => {
     const result = indexTargetView([0, 1, 2, 1, 2], [1, 2, 1, 2]);
     expect(toSnapshot(result)).toMatchInlineSnapshot(`
       [
@@ -253,7 +253,7 @@ describe("interpretView", () => {
       ]
     `);
   });
-  it("handleReusePreseveOrder_origin", () => {
+  it("handleReusePreserveOrder_origin", () => {
     const result = indexOriginView([0, 1, 2, 1, 2], [1, 2, 1, 2]);
     expect(toSnapshot([result, []])).toMatchInlineSnapshot(`
       [
@@ -261,7 +261,7 @@ describe("interpretView", () => {
       ]
     `);
   });
-  it("handleReusePreseveOrder2", () => {
+  it("handleReusePreserveOrder2", () => {
     const result = indexTargetView(
       [0, 1, 2, 1, 2, 3, 4, 3, 4],
       [1, 2, 3, 4, 3, 4, 1, 2]
@@ -281,7 +281,7 @@ describe("interpretView", () => {
       ]
     `);
   });
-  it("handleReusePreseveOrder2_origin", () => {
+  it("handleReusePreserveOrder2_origin", () => {
     const result = indexOriginView(
       [0, 1, 2, 1, 2, 3, 4, 3, 4],
       [1, 2, 3, 4, 3, 4, 1, 2]

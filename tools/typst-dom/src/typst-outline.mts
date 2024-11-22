@@ -263,7 +263,7 @@ function patchOutlineChildren(ctx: GenContext, prev: Element, next: Element) {
   const [targetView, toPatch] = interpretTargetView<Element>(
     prev.children as unknown as Element[],
     next.children as unknown as Element[],
-    // todo: accurate calcuation
+    // todo: accurate calculation
     false
   );
 

@@ -58,7 +58,7 @@ impl<'a> DecenderItem<'a> {
 }
 
 /// Find the decender nodes starting from the given position.
-pub fn node_decenders<T>(
+pub fn node_descenders<T>(
     node: LinkedNode,
     mut recv: impl FnMut(DecenderItem) -> Option<T>,
 ) -> Option<T> {
@@ -99,7 +99,7 @@ pub fn descending_decls<T>(
     node: LinkedNode,
     mut recv: impl FnMut(DescentDecl) -> Option<T>,
 ) -> Option<T> {
-    node_decenders(node, |node| {
+    node_descenders(node, |node| {
         match (&node, node.node().cast::<ast::Expr>()?) {
             (DecenderItem::Sibling(..), ast::Expr::Let(lb)) => {
                 for ident in lb.kind().bindings() {

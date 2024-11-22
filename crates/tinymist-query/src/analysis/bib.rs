@@ -216,7 +216,7 @@ Euclid2:
     }
 
     #[test]
-    fn yaml_bib_imcomplete() {
+    fn yaml_bib_incomplete() {
         let content = r#"
 Euclid:
   type: article

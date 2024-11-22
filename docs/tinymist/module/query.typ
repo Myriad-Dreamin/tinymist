@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: "Tinymist Languague Queries")
+#show: book-page.with(title: "Tinymist Language Queries")
 
 == Base Analyses
 
@@ -27,7 +27,7 @@ There are seven basic analyzers:
       node-stroke: 1pt,
       edge-stroke: 1pt,
       // edge("-|>", align(center)[Analysis\ Request], label-pos: 0.1),
-      pg-node((0.3, 0.2), [`Lexical`\ `Heirarchy`]),
+      pg-node((0.3, 0.2), [`Lexical`\ `Hierarchy`]),
       edge("<|-", []),
       pg-node((1.2, 0), [`Source`]),
       edge("-|>", []),
@@ -50,7 +50,7 @@ There are seven basic analyzers:
         let j = 1 + i * 0.25;
         edge((j, 1.4), (j, 1.8), "-|>")
       },
-      pg-node((2, 2.3), [`Extented`\
+      pg-node((2, 2.3), [`Extended`\
       `Language Features`]),
       // for i in (1, 3, 5) {
       //   edge((i, 0), (i, -0.5), (5.5, -0.5), (5.6, 0), "-|>")
@@ -104,7 +104,7 @@ Typicial language features are implemented based on basic analyzers:
 
 - The `textDocument/prepareRename` _finds definition_ and determines whether it can be renamed.
 
-- The `textDocument/rename` _finds defintion and references_ and renamed them all.
+- The `textDocument/rename` _finds definition and references_ and renamed them all.
 
 == Contributing
 

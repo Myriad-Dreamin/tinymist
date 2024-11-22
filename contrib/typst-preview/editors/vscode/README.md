@@ -1,4 +1,4 @@
-# [DEPRECATION NOTICE] Typst preivew extension has been integrated into [tinymist](https://github.com/Myriad-Dreamin/tinymist)
+# [DEPRECATION NOTICE] Typst preview extension has been integrated into [tinymist](https://github.com/Myriad-Dreamin/tinymist)
 
 We recommend all users migrate to tinymist for the following benefits:
 
