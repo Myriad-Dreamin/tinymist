@@ -11,7 +11,7 @@ Some tricks are taken for help reducing the complexity of code:
 First, the array literals are identified as tuple type, that each cell of the array has type individually.
 
 #let sig = $sans("sig")$
-#let ags = $sans("args")$
+#let args = $sans("args")$
 
 Second, the $sig$ and the $sans("argument")$ type are reused frequently.
 
@@ -28,11 +28,11 @@ Second, the $sig$ and the $sans("argument")$ type are reused frequently.
   notated as $sig := sig(sans("tup")(tau_1,..,tau_n),sans("rec")(a_1=tau_(n+1),..,a_m=tau_(n+m)),..sans("arr")(tau_(n+m+1))) arrow psi$
 - the $sans("argument")$ is a $sans("signature")$ without rest and body.
 
-  $ags := ags(sig(..))$
+  $args := args(sig(..))$
 
 With aboving constructors, we soonly get typst's type checker.
 
-- it checks array or dictionary literals by converting them with a corresponding $sig$ and $ags$.
+- it checks array or dictionary literals by converting them with a corresponding $sig$ and $args$.
 - it performs the getting element operation by calls a corresponding $sig$.
 - the closure is converted into a typed lambda, in $sig$ type.
 - the pattern destructing are converted to array and dictionary constrains.
