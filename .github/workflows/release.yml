@@ -41,35 +41,39 @@ jobs:
             platform: win32
             arch: x64
             regular_build: 'true'
+            cross: false
           - os: windows-latest
             rust-target: aarch64-pc-windows-msvc
             platform: win32
             arch: arm64
+            cross: false
           - os: ubuntu-20.04
-            rust-target: x86_64-unknown-linux-gnu
+            rust-target: x86_64-unknown-linux-musl
             platform: linux
             arch: x64
             regular_build: 'true'
             cross: true
           - os: ubuntu-20.04
-            rust-target: aarch64-unknown-linux-gnu
+            rust-target: aarch64-unknown-linux-musl
             platform: linux
             arch: arm64
             cross: true
           - os: ubuntu-20.04
-            rust-target: arm-unknown-linux-gnueabihf
+            rust-target: armv7-unknown-linux-musleabi
             platform: linux
-            arch: armhf
+            arch: armv7
             cross: true
           - os: macos-13
             rust-target: x86_64-apple-darwin
             platform: darwin
             arch: x64
+            cross: false
           - os: macos-13
             rust-target: aarch64-apple-darwin
             platform: darwin
             arch: arm64
             regular_build: 'true'
+            cross: false
     name: build (${{ matrix.platform }}-${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
     env:
