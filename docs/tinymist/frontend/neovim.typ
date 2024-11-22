@@ -2,7 +2,7 @@
 
 #show: book-page.with(title: "Tinymist Neovim Extension")
 
-Run and configure tinymist in neovim for Typst.
+Run and configure tinymist in Neovim for Typst.
 
 == Features
 <features>
@@ -10,7 +10,7 @@ See #link("https://github.com/Myriad-Dreamin/tinymist#features")[Tinymist Featur
 
 #include "common-finding-executable.typ"
 
-- (Recommended) Stable versions available with #link("https://github.com/williamboman/mason.nvim")[mason.nvim];.
+- (Recommended) Stable versions available via #link("https://github.com/williamboman/mason.nvim")[mason.nvim];.
 
   ```lua
   {
@@ -25,7 +25,7 @@ See #link("https://github.com/Myriad-Dreamin/tinymist#features")[Tinymist Featur
 
 == Setup
 
-This section shows you a minimal way to setup tinymist in #link("https://www.lazyvim.org/")[LazyVim]. For other distros, we also bring some tips for you.
+This section shows you a minimal way to setup tinymist in #link("https://www.lazyvim.org/")[LazyVim]. We also have some tips for users of other distros.
 
 // todo: heading link support
 Please see #md-alter(link(<neovim-extra-settings>)[Extra Settings], () => link("#extra-settings")[Extra Settings]) for more configuration.
@@ -34,7 +34,7 @@ Please see #md-alter(link(<neovim-extra-settings>)[Extra Settings], () => link("
 
 Copy or merge the two files to corresponding paths into `~/.config/nvim/`.
 
-- #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/config/autocmds.lua")[Autocmds file] will help associate `.typ` file extension to `typst` filetype.
+- #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/config/autocmds.lua")[Autocmds file] will help associate the `.typ` file extension with the `typst` filetype.
 - #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/plugins/tinymist.lua")[Plugin file] will help start tinymist for buffers with the `typst` filetype.
 
 Then, check and restart Neovim.
@@ -72,7 +72,7 @@ vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.ap
 vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { nil } })
 ```
 
-There is also a plan to support multiple-file project by workspace configuration, but I don’t know whether it is neovim’s way, so it needs further discussion.
+There is also a plan to support multiple-file projects with a workspace configuration, but I don’t know whether it is Neovim’s way, so it needs further discussion.
 
 #note-box[
   `tinymist.pinMain` is a stateful command, and tinymist doesn't remember it between sessions (closing and opening the editor).
@@ -82,15 +82,15 @@ There is also a plan to support multiple-file project by workspace configuration
 <troubleshooting>
 === tinymist does not start on creating/opening files
 <tinymist-does-not-start-on-creatingopening-files>
-First, please check that tinymist can start with manual file association.
+First, please check that tinymist starts when manually setting the filetype.
 
 ```
 :set filetype=typst
 ```
 
-If tinymist starts, that means you have not made correct file association. If not, there should be some errors in your lspconfig.
+If tinymist starts, that means you have not made correct association between the file extension and filetype. There should be some error messages related to this in your lspconfig.
 
-Please associate `.typ` file extension to `typst` filetype to start tinymist on creating/opening file events.
+Please associate the `.typ` file extension with the `typst` filetype to start tinymist on file create/open events.
 
 ```shell
 autocmd BufNewFile,BufRead *.typ setfiletype typst
@@ -100,7 +100,7 @@ autocmd BufNewFile,BufRead *.typ setfiletype typst
 <neovim-extra-settings>
 === Configuring Language Server
 <neovim-configuring-language-server>
-To configure language server, you can edit the `opts.servers.tinymist.settings`. For example, if you want to export PDF on typing and output files in `$root_dir/target` directory:
+To configure the language server, you can edit the `opts.servers.tinymist.settings`. For example, if you want to export to PDF on typing and output files in `$root_dir/target` directory:
 
 ```lua
 return {
