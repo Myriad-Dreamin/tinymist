@@ -4,6 +4,67 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.12.4 - [2024-11-22]
+
+* Updated roadmap (typst v0.13.0+) in https://github.com/Myriad-Dreamin/tinymist/pull/876
+
+### Announcement: New Maintainers
+
+We have added maintainers to GitHub since 2024-11-22:
+- @ParaN3xus has become a maintainer of the "Nightly Releases" feature in https://github.com/Myriad-Dreamin/tinymist/pull/783
+- @max397574 has become a maintainer of the "Editor integration" feature in https://github.com/Myriad-Dreamin/tinymist/pull/784
+- @Eric-Song-Nop has become a maintainer of the "Language Service" feature in https://github.com/Myriad-Dreamin/tinymist/pull/796
+- @alerque has become a maintainer of the "Neovim integration" feature in https://github.com/Myriad-Dreamin/tinymist/pull/810
+
+### Compiler
+
+* Added package related arguments to `typstExtraArgs` in https://github.com/Myriad-Dreamin/tinymist/pull/832 and https://github.com/Myriad-Dreamin/tinymist/pull/833
+* Taking configuration items from `tinymist` section in https://github.com/Myriad-Dreamin/tinymist/pull/835
+
+### Editor
+
+* Statically registering formatting and semantic tokens capabilities by @MrLego8-9 in https://github.com/Myriad-Dreamin/tinymist/pull/814
+* Opening exported files using rust's `open` crate in https://github.com/Myriad-Dreamin/tinymist/pull/838 and https://github.com/Myriad-Dreamin/tinymist/pull/855
+
+### Completion
+
+* Added more completion tests in https://github.com/Myriad-Dreamin/tinymist/pull/845
+* Completing bracket if the function accepts an only content arg in https://github.com/Myriad-Dreamin/tinymist/pull/848, https://github.com/Myriad-Dreamin/tinymist/pull/860, https://github.com/Myriad-Dreamin/tinymist/pull/867, and https://github.com/Myriad-Dreamin/tinymist/pull/870
+* Providing UFCS-style completion on content types in https://github.com/Myriad-Dreamin/tinymist/pull/849
+* Providing postfix completion on values in https://github.com/Myriad-Dreamin/tinymist/pull/850 and https://github.com/Myriad-Dreamin/tinymist/pull/880
+* Improved and filtered completion in show/set syntax in https://github.com/Myriad-Dreamin/tinymist/pull/858 and https://github.com/Myriad-Dreamin/tinymist/pull/859
+* (Fix) Using correct base directory for path completion by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/854
+* Preferring to guide coding by signature help than completion list in https://github.com/Myriad-Dreamin/tinymist/pull/874
+* (Fix) Skipping code completion when editing length in https://github.com/Myriad-Dreamin/tinymist/pull/882
+
+### Docstring
+
+* Checking union type annotation in https://github.com/Myriad-Dreamin/tinymist/pull/842
+
+### Syntax/Semantic Highlighting
+
+* (Fix) match brackets in content block recursively in https://github.com/Myriad-Dreamin/tinymist/pull/856
+
+### Rename
+
+* Added search index to quickly filter unrelated files in https://github.com/Myriad-Dreamin/tinymist/pull/864
+* Added support to rename resource paths in files in https://github.com/Myriad-Dreamin/tinymist/pull/869
+
+### References
+
+* Added search index to quickly filter unrelated files in https://github.com/Myriad-Dreamin/tinymist/pull/864
+
+### Code Action
+
+* Added code action to wrap content blocks in https://github.com/Myriad-Dreamin/tinymist/pull/881
+
+### Misc
+
+* Caching link expressions in https://github.com/Myriad-Dreamin/tinymist/pull/866
+* Improved caches of calls and module exports type checking in https://github.com/Myriad-Dreamin/tinymist/pull/847
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.2...v0.12.4
+
 ## v0.12.2 - [2024-11-15]
 
 * Bumped typstyle to v0.12.1 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/764
