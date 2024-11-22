@@ -1,10 +1,12 @@
+use std::sync::OnceLock;
+
 use log::debug;
 use typst::syntax::Span;
 
 use crate::{
     analysis::{Definition, SearchCtx},
     prelude::*,
-    syntax::{DerefTarget, RefExpr},
+    syntax::{get_index_info, DerefTarget, RefExpr},
     ty::Interned,
 };
 
@@ -59,6 +61,7 @@ pub(crate) fn find_references(
         ctx: ctx.fork_for_search(),
         references: vec![],
         def,
+        module_path: OnceLock::new(),
     };
 
     if finding_label {
@@ -73,6 +76,7 @@ struct ReferencesWorker<'a> {
     ctx: SearchCtx<'a>,
     references: Vec<LspLocation>,
     def: Definition,
+    module_path: OnceLock<Interned<str>>,
 }
 
 impl<'a> ReferencesWorker<'a> {
@@ -103,7 +107,25 @@ impl<'a> ReferencesWorker<'a> {
 
     fn file(&mut self, ref_fid: TypstFileId) -> Option<()> {
         log::debug!("references: file: {ref_fid:?}");
-        let ei = self.ctx.ctx.expr_stage_by_id(ref_fid)?;
+        let src = self.ctx.ctx.source_by_id(ref_fid).ok()?;
+        let index = get_index_info(&src);
+        match self.def.decl.kind() {
+            DefKind::Constant | DefKind::Function | DefKind::Struct | DefKind::Variable => {
+                if !index.identifiers.contains(self.def.decl.name()) {
+                    return Some(());
+                }
+            }
+            DefKind::Module => {
+                let ref_by_ident = index.identifiers.contains(self.def.decl.name());
+                let ref_by_path = index.paths.contains(self.module_path());
+                if !(ref_by_ident || ref_by_path) {
+                    return Some(());
+                }
+            }
+            DefKind::Reference => {}
+        }
+
+        let ei = self.ctx.ctx.expr_stage(&src);
         let uri = self.ctx.ctx.uri_for_id(ref_fid).ok()?;
 
         let t = ei.get_refs(self.def.decl.clone());
@@ -134,6 +156,23 @@ impl<'a> ReferencesWorker<'a> {
                 range,
             })
         }));
+    }
+
+    // todo: references of package
+    fn module_path(&self) -> &Interned<str> {
+        self.module_path.get_or_init(|| {
+            self.def
+                .decl
+                .file_id()
+                .and_then(|fid| {
+                    fid.vpath()
+                        .as_rooted_path()
+                        .file_name()?
+                        .to_str()
+                        .map(From::from)
+                })
+                .unwrap_or_default()
+        })
     }
 }
 

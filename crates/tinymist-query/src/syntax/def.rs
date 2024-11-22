@@ -737,7 +737,7 @@ pub struct SetExpr {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ImportExpr {
-    pub decl: DeclExpr,
+    pub decl: Interned<RefExpr>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

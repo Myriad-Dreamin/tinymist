@@ -47,9 +47,14 @@ impl<'a> Sig<'a> {
     }
 
     pub fn shape(self, ctx: &mut impl TyCtxMut) -> Option<SigShape<'a>> {
-        let (cano_sig, withs) = match self {
+        let (sig, _is_partialize) = match self {
+            Sig::Partialize(sig) => (*sig, true),
+            sig => (sig, false),
+        };
+
+        let (cano_sig, withs) = match sig {
             Sig::With { sig, withs, .. } => (*sig, Some(withs)),
-            _ => (self, None),
+            sig => (sig, None),
         };
 
         let sig_ins = match cano_sig {
@@ -237,6 +242,10 @@ impl<'a> SigCheckDriver<'a> {
             Ty::Unary(_) => {}
             Ty::Binary(_) => {}
             Ty::If(_) => {}
+            Ty::Param(p) => {
+                // todo: keep type information
+                self.ty(&p.ty, pol);
+            }
             _ if ty.has_bounds() => ty.bounds(pol, self),
             _ => {}
         }

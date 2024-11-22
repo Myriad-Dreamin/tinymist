@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on / (103..104)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/show3.typ
+snapshot_kind: text
 ---
 [
  {
@@ -14,6 +15,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show3.typ
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
+    "sortText": "094",
     "textEdit": {
      "newText": "raw: ${1:}",
      "range": {
@@ -34,6 +36,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show3.typ
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
+    "sortText": "095",
     "textEdit": {
      "newText": "raw.where(${1:}): ${2:}",
      "range": {
@@ -51,6 +54,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/show3.typ
    {
     "kind": 15,
     "label": "regex selector",
+    "sortText": "100",
     "textEdit": {
      "newText": "regex(\"${1:regex}\"): ${2:}",
      "range": {

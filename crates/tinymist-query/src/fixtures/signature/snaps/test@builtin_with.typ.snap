@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: SignatureSnapshot(result.as_ref())
 input_file: crates/tinymist-query/src/fixtures/signature/builtin_with.typ
+snapshot_kind: text
 ---
 with red: 50%, green: 50%, blue: 50%, 
 fn(

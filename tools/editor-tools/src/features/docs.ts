@@ -38,7 +38,7 @@ export const Docs = () => {
       },
       (_dom?: Element) => {
         const v = parsedDocs.val;
-        console.log("updated", v);
+        // console.log("updated", v);
         return div(MakeDoc(v));
       }
     )
@@ -213,7 +213,7 @@ async function recoverDocsStructure(content: string) {
         current = structStack.pop()!;
         break;
       case TokenKind.Comment:
-        console.log("Comment", token[1]);
+        // console.log("Comment", token[1]);
         break;
       case TokenKind.Text:
         current.contents.push(token[1]);
@@ -298,7 +298,7 @@ function MakeDoc(root: DocElement) {
   // module-symbol-module-src.lib-barchart
   getKnownPackages(root);
   processInternalModules(root);
-  console.log("MakeDoc", root, knownFiles, knownPackages);
+  // console.log("MakeDoc", root, knownFiles, knownPackages);
 
   function getKnownPackages(v: DocElement) {
     for (const child of v.children) {
@@ -391,7 +391,7 @@ function MakeDoc(root: DocElement) {
   }
 
   function ShortItemDoc(v: DocElement): ChildDom[] {
-    console.log("item ref to ", v);
+    // console.log("item ref to ", v);
     return [ItemDoc(v)];
   }
 
@@ -484,7 +484,7 @@ function MakeDoc(root: DocElement) {
     const fileLoc = v.data.loc;
     const fid = genFileId(knownFiles[fileLoc]);
     const isInternal = knownFiles[fileLoc]?.isInternal;
-    console.log("ModuleItem", v, fid);
+    // console.log("ModuleItem", v, fid);
 
     const title = [];
     if (isInternal) {
@@ -510,7 +510,7 @@ function MakeDoc(root: DocElement) {
   }
 
   function PackageItem(v: DocElement) {
-    console.log("PackageItem", v);
+    // console.log("PackageItem", v);
     return div(
       h1(`@${v.data.namespace}/${v.data.name}:${v.data.version}`),
       p(

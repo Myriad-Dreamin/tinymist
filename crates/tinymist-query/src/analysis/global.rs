@@ -36,7 +36,7 @@ use crate::syntax::{
     scan_workspace_files, Decl, DefKind, DerefTarget, ExprInfo, ExprRoute, LexicalScope,
     ModuleDependency,
 };
-use crate::upstream::{tooltip_, Tooltip};
+use crate::upstream::{tooltip_, CompletionFeat, Tooltip};
 use crate::{
     lsp_to_typst, typst_to_lsp, ColorTheme, CompilerQueryRequest, LspPosition, LspRange,
     LspWorldExt, PositionEncoding, TypstRange, VersionedDocument,
@@ -53,6 +53,10 @@ pub struct Analysis {
     pub allow_overlapping_token: bool,
     /// Whether to allow multiline semantic tokens.
     pub allow_multiline_token: bool,
+    /// Whether to remove html from markup content in responses.
+    pub remove_html: bool,
+    /// Tinymist's completion features.
+    pub completion_feat: CompletionFeat,
     /// The editor's color theme.
     pub color_theme: ColorTheme,
     /// The periscope provider.
@@ -141,6 +145,36 @@ impl Analysis {
     pub fn report_alloc_stats(&self) -> String {
         AllocStats::report(self)
     }
+
+    /// Get configured trigger parameter hints command.
+    pub fn trigger_parameter_hints(&self, context: bool) -> Option<&'static str> {
+        (self.completion_feat.trigger_parameter_hints && context)
+            .then_some("editor.action.triggerParameterHints")
+    }
+
+    /// Get configured trigger after snippet command.
+    ///
+    /// > VS Code doesn't do that... Auto triggering suggestion only happens on
+    /// > typing (word starts or trigger characters). However, you can use
+    /// > editor.action.triggerSuggest as command on a suggestion to "manually"
+    /// > retrigger suggest after inserting one
+    pub fn trigger_on_snippet(&self, context: bool) -> Option<&'static str> {
+        if !self.completion_feat.trigger_on_snippet_placeholders {
+            return None;
+        }
+
+        (self.completion_feat.trigger_suggest && context).then_some("editor.action.triggerSuggest")
+    }
+
+    /// Get configured trigger on positional parameter hints command.
+    pub fn trigger_on_snippet_with_param_hint(&self, context: bool) -> Option<&'static str> {
+        if !self.completion_feat.trigger_on_snippet_placeholders {
+            return self.trigger_parameter_hints(context);
+        }
+
+        (self.completion_feat.trigger_suggest_and_parameter_hints && context)
+            .then_some("tinymist.triggerSuggestAndParameterHints")
+    }
 }
 
 /// The periscope provider.
@@ -218,22 +252,12 @@ impl LocalContextGuard {
             break;
         }
 
-        self.analysis
-            .caches
-            .def_signatures
-            .retain(|(l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .static_signatures
-            .retain(|(l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .terms
-            .retain(|(l, _)| lifetime - *l < 60);
-        self.analysis
-            .caches
-            .signatures
-            .retain(|(l, _)| lifetime - *l < 60);
+        let retainer = |l: u64| lifetime.saturating_sub(l) < 60;
+        let caches = &self.analysis.caches;
+        caches.def_signatures.retain(|(l, _)| retainer(*l));
+        caches.static_signatures.retain(|(l, _)| retainer(*l));
+        caches.terms.retain(|(l, _)| retainer(*l));
+        caches.signatures.retain(|(l, _)| retainer(*l));
     }
 }
 
@@ -404,13 +428,33 @@ impl LocalContext {
         cache.get_or_init(|| self.shared.type_check(source)).clone()
     }
 
+    /// Get the type check information of a source file.
+    pub(crate) fn type_check_by_id(&mut self, id: TypstFileId) -> Arc<TypeScheme> {
+        let cache = &self.caches.modules.entry(id).or_default().type_check;
+        cache
+            .clone()
+            .get_or_init(|| {
+                let source = self.source_by_id(id).ok();
+                source
+                    .map(|s| self.shared.type_check(&s))
+                    .unwrap_or_default()
+            })
+            .clone()
+    }
+
+    pub(crate) fn type_of_span(&mut self, s: Span) -> Option<Ty> {
+        let scheme = self.type_check_by_id(s.id()?);
+        let ty = scheme.type_of_span(s)?;
+        Some(scheme.simplify(ty, false))
+    }
+
     pub(crate) fn def_docs(&mut self, def: &Definition) -> Option<DefDocs> {
         // let plain_docs = sym.head.docs.as_deref();
         // let plain_docs = plain_docs.or(sym.head.oneliner.as_deref());
         match def.decl.kind() {
             DefKind::Function => {
                 let sig = self.sig_of_def(def.clone())?;
-                let docs = crate::docs::sig_docs(&sig, None)?;
+                let docs = crate::docs::sig_docs(&sig)?;
                 Some(DefDocs::Function(Box::new(docs)))
             }
             DefKind::Struct | DefKind::Constant | DefKind::Variable => {
@@ -506,17 +550,7 @@ impl SharedContext {
 
     /// Get file's id by its path
     pub fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
-        // todo: source in packages
-        let root = self.world.workspace_root().ok_or_else(|| {
-            let reason = eco_format!("workspace root not found");
-            FileError::Other(Some(reason))
-        })?;
-        let relative_path = p.strip_prefix(&root).map_err(|_| {
-            let reason = eco_format!("access denied, path: {p:?}, root: {root:?}");
-            FileError::Other(Some(reason))
-        })?;
-
-        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
+        self.world.file_id_by_path(p)
     }
 
     /// Get the content of a file by file id.
@@ -531,7 +565,6 @@ impl SharedContext {
 
     /// Get the source of a file by file path.
     pub fn source_by_path(&self, p: &Path) -> FileResult<Source> {
-        // todo: source cache
         self.source_by_id(self.file_id_by_path(p)?)
     }
 
@@ -739,7 +772,7 @@ impl SharedContext {
             return cached;
         }
 
-        let res = crate::analysis::term_value(self, val);
+        let res = crate::analysis::term_value(val);
 
         self.analysis
             .caches
@@ -778,10 +811,6 @@ impl SharedContext {
         definition(self, source, doc, deref_target)
     }
 
-    pub(crate) fn type_of(self: &Arc<Self>, rr: &SyntaxNode) -> Option<Ty> {
-        self.type_of_span(rr.span())
-    }
-
     pub(crate) fn type_of_span(self: &Arc<Self>, s: Span) -> Option<Ty> {
         self.type_of_span_(&self.source_by_id(s.id()?).ok()?, s)
     }
@@ -806,9 +835,8 @@ impl SharedContext {
         analyze_signature(self, SignatureTarget::Def(source, def))
     }
 
-    pub(crate) fn sig_of_func(self: &Arc<Self>, func: Func) -> Signature {
-        log::debug!("check runtime func {func:?}");
-        analyze_signature(self, SignatureTarget::Runtime(func)).unwrap()
+    pub(crate) fn sig_of_type(self: &Arc<Self>, ti: &TypeScheme, ty: Ty) -> Option<Signature> {
+        super::sig_of_type(self, ti, ty)
     }
 
     /// Try to find imported target from the current source file.
@@ -902,6 +930,20 @@ impl SharedContext {
                 .entry(hash128(&rt), self.lifetime),
         };
         res.get_or_init(|| compute(self)).clone()
+    }
+
+    /// Remove html tags from markup content if necessary.
+    pub fn remove_html(&self, markup: EcoString) -> EcoString {
+        if !self.analysis.remove_html {
+            return markup;
+        }
+
+        static REMOVE_HTML_COMMENT_REGEX: LazyLock<regex::Regex> =
+            LazyLock::new(|| regex::Regex::new(r#"<!--[\s\S]*?-->"#).unwrap());
+        REMOVE_HTML_COMMENT_REGEX
+            .replace_all(&markup, "")
+            .trim()
+            .into()
     }
 
     fn query_stat(&self, id: TypstFileId, query: &'static str) -> QueryStatGuard {
@@ -1104,16 +1146,26 @@ pub struct AnalysisRevCache {
 impl RevisionManagerLike for AnalysisRevCache {
     fn gc(&mut self, rev: usize) {
         self.manager.gc(rev);
-        self.default_slot
-            .expr_stage
-            .global
-            .lock()
-            .retain(|_, r| r.0 + 60 >= rev);
-        self.default_slot
-            .type_check
-            .global
-            .lock()
-            .retain(|_, r| r.0 + 60 >= rev);
+
+        {
+            let mut max_ei = FxHashMap::default();
+            let es = self.default_slot.expr_stage.global.lock();
+            for r in es.iter() {
+                let rev: &mut usize = max_ei.entry(r.1.fid).or_default();
+                *rev = (*rev).max(r.1.revision);
+            }
+            es.retain(|_, r| r.1.revision == *max_ei.get(&r.1.fid).unwrap_or(&0));
+        }
+
+        {
+            let mut max_ti = FxHashMap::default();
+            let ts = self.default_slot.type_check.global.lock();
+            for r in ts.iter() {
+                let rev: &mut usize = max_ti.entry(r.1.fid).or_default();
+                *rev = (*rev).max(r.1.revision);
+            }
+            ts.retain(|_, r| r.1.revision == *max_ti.get(&r.1.fid).unwrap_or(&0));
+        }
     }
 }
 
@@ -1131,6 +1183,7 @@ impl AnalysisRevCache {
     ) -> Arc<RevisionSlot<AnalysisRevSlot>> {
         lg.inner.access(revision);
         self.manager.find_revision(revision, |slot_base| {
+            log::info!("analysis revision {} is created", revision.get());
             slot_base
                 .map(|e| AnalysisRevSlot {
                     revision: e.revision,
@@ -1172,7 +1225,7 @@ struct AnalysisRevSlot {
 
 impl Drop for AnalysisRevSlot {
     fn drop(&mut self) {
-        log::info!("analysis revision {} is dropped", self.revision)
+        log::info!("analysis revision {} is dropped", self.revision);
     }
 }
 

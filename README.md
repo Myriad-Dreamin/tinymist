@@ -43,6 +43,7 @@ Language service (LSP) features:
   - Or ctrl+click on a symbol.
 - [Hover tips](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-hovers)
   - Also known as "hovering tooltip".
+  - Render docs according to [tidy](https://github.com/Mc-Zen/tidy) style.
 - [Inlay hints](https://www.jetbrains.com/help/idea/inlay-hints.html)
   - Inlay hints are special markers that appear in the editor and provide you with additional information about your code, like the names of the parameters that a called method expects.
 - [Color Provider](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-color-decorators)
@@ -55,10 +56,12 @@ Language service (LSP) features:
 - [Workspace Symbols](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-all-symbol-definitions-in-folder)
 - [Code Action](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-code-actions)
   - Increasing/Decreasing heading levels.
+  - Turn equation into "inline", "block" or "multiple-line block" styles.
 - [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter)
   - <kbd>Enter</kbd> inside triple-slash comments automatically inserts `///`
   - <kbd>Enter</kbd> in the middle or after a trailing space in `//` inserts `//`
   - <kbd>Enter</kbd> inside `//!` doc comments automatically inserts `//!`
+  - <kbd>Enter</kbd> inside equation markups automatically inserts indents.
 
 Extra features:
 
@@ -75,7 +78,7 @@ Extra features:
 ## Versioning and Release Cycle
 
 Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
-- If a version is suffixed with `-rcN` (<picture><source media="(prefers-color-scheme: dark)" srcset="./assets/images/introduction.typ-inlined0.svg"><img style="vertical-align: -0.35em" alt="typst-block" src="./assets/images/introduction.typ-inlined1.svg"/></picture>), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
+- If a version is suffixed with `-rcN` (<picture><source media="(prefers-color-scheme: dark)" srcset="./assets/images/introduction.typ-inlined0.svg"><img style="vertical-align: -0.35em" alt="typst-block" src="./assets/images/introduction.typ-inlined1.svg" /></picture>), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
 - If the `PATCH` number is odd, e.g. `0.11.1` and `0.12.3`, it means this version is a nightly release. The nightly release will use both [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main) and [typst](https://github.com/typst/typst/tree/main) at **main branch**. They will be published as prerelease version to the marketplace.
 - Otherwise, if the `PATCH` number is even, e.g. `0.11.0` and `0.12.2`, it means this version is a regular release. The regular release will always use the recent stable version of tinymist and typst.
 
@@ -120,12 +123,30 @@ Nightly Channel:
 
 ## Roadmap
 
+The development in typst v0.12.0 has been finished. We'll slow down for a while to catch regressions and bugs by changes. We are also planning to implement the following features in typst v0.13.0 or spare time in weekend:
+
 - Spell checking: There is already a branch but no suitable (default) spell checking library is found.
+- Type checking: complete the type checker.
+- Static Linter: linting code statically according to feedback of the type checker and succeeding code analysis.
 - Periscope renderer: It is disabled since vscode reject to render SVGs containing foreignObjects.
 - Inlay hint: It is disabled _by default_ because of performance issues.
 - Find references of dictionary fields and named function arguments.
-- Go to definition of dictionary fields and named function arguments.
+- A reliable way of configuring projects's entry files and files to export across editors. See [GitHub Issue 530.](https://github.com/Myriad-Dreamin/tinymist/issues/530)
 - Improve symbol view's appearance.
+- Improve package view.
+  - Navigate to symbols by clicking on the symbol name in the view.
+  - Automatically locate the symbol item in the view when viewing local documentation.
+  - Remember the recently invoked package commands, e.g. "Open Docs of \@preview/cetz:0.3.1", "Open directory of \@preview/touying:0.5.3".
+- Improve label view.
+  - Group labels.
+  - Search labels.
+  - Keep (persist) group preferences.
+- Improve Typst Preview.
+  - Browsing mode: if no main file is specified, the preview will be in browsing mode and use the recently focused file as the main.
+  - Pin drop-down: Set the file to preview in the drop-down for clients that doesn't support passing arguments to the preview command.
+  - Render in web worker (another thread) to reduce overhead on the electron's main thread.
+
+If you are interested by any above features, please feel free to send Issues to discuss or PRs to implement to [GitHub.](https://github.com/Myriad-Dreamin/tinymist)
 
 ## Contributing
 
@@ -133,10 +154,12 @@ Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for contribution guideli
 
 ## Maintainers
 
-Get list of maintainers from [MAINTAINERS.typ](MAINTAINERS.typ). Or programmatically by `yarn maintainers`
+Get list of maintainers from [MAINTAINERS.typ](https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.typ). Or programmatically by `yarn maintainers`
 
-> [!TIP]
-> You can add extra arguments for specific information. For example, `yarn maintainers --input="action=maintainers"`.
+> [!NOTE]
+> 
+>   You can add extra arguments for specific information. For example, `yarn maintainers --input="action=maintainers"`.
+
 
 ## Acknowledgements
 

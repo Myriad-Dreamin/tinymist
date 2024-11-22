@@ -29,6 +29,7 @@ Language service (LSP) features:
   - Or ctrl+click on a symbol.
 - #link("https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-hovers")[Hover tips]
   - Also known as "hovering tooltip".
+  - Render docs according to #link("https://github.com/Mc-Zen/tidy")[tidy] style.
 - #link("https://www.jetbrains.com/help/idea/inlay-hints.html")[Inlay hints]
   - Inlay hints are special markers that appear in the editor and provide you with additional information about your code, like the names of the parameters that a called method expects.
 - #link("https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-color-decorators")[Color Provider]
@@ -41,10 +42,12 @@ Language service (LSP) features:
 - #link("https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-all-symbol-definitions-in-folder")[Workspace Symbols]
 - #link("https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-code-actions")[Code Action]
   - Increasing/Decreasing heading levels.
+  - Turn equation into "inline", "block" or "multiple-line block" styles.
 - #link("https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter")[experimental/onEnter]
   - #kbd("Enter") inside triple-slash comments automatically inserts `///`
   - #kbd("Enter") in the middle or after a trailing space in `//` inserts `//`
   - #kbd("Enter") inside `//!` doc comments automatically inserts `//!`
+  - #kbd("Enter") inside equation markups automatically inserts indents.
 
 Extra features:
 

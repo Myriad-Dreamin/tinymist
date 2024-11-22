@@ -1,5 +1,6 @@
 use core::fmt;
 
+use ecow::{eco_format, EcoString};
 use once_cell::sync::Lazy;
 use regex::RegexSet;
 use strum::{EnumIter, IntoEnumIterator};
@@ -9,6 +10,7 @@ use typst::{
     layout::Length,
 };
 
+use crate::syntax::Decl;
 use crate::ty::*;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, EnumIter)]
@@ -227,7 +229,9 @@ pub enum BuiltinTy {
 
     Tag(Box<(StrRef, Option<Interned<PackageId>>)>),
     Type(typst::foundations::Type),
+    TypeType(typst::foundations::Type),
     Element(typst::foundations::Element),
+    Module(Interned<Decl>),
     Path(PathPreference),
 }
 
@@ -262,6 +266,7 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::Inset => write!(f, "Inset"),
             BuiltinTy::Outset => write!(f, "Outset"),
             BuiltinTy::Radius => write!(f, "Radius"),
+            BuiltinTy::TypeType(ty) => write!(f, "TypeType({})", ty.short_name()),
             BuiltinTy::Type(ty) => write!(f, "Type({})", ty.short_name()),
             BuiltinTy::Element(e) => e.fmt(f),
             BuiltinTy::Tag(tag) => {
@@ -272,6 +277,7 @@ impl fmt::Debug for BuiltinTy {
                     write!(f, "Tag({name:?})")
                 }
             }
+            BuiltinTy::Module(m) => write!(f, "{m:?}"),
             BuiltinTy::Path(p) => write!(f, "Path({p:?})"),
         }
     }
@@ -312,7 +318,7 @@ impl BuiltinTy {
         BuiltinTy::Type(builtin).literally()
     }
 
-    pub(crate) fn describe(&self) -> String {
+    pub(crate) fn describe(&self) -> EcoString {
         let res = match self {
             BuiltinTy::Clause => "any",
             BuiltinTy::Undef => "any",
@@ -342,16 +348,18 @@ impl BuiltinTy {
             BuiltinTy::Inset => "inset",
             BuiltinTy::Outset => "outset",
             BuiltinTy::Radius => "radius",
+            BuiltinTy::TypeType(..) => "type",
             BuiltinTy::Type(ty) => ty.short_name(),
             BuiltinTy::Element(ty) => ty.name(),
             BuiltinTy::Tag(tag) => {
                 let (name, id) = tag.as_ref();
                 return if let Some(id) = id {
-                    format!("tag {name} of {id:?}")
+                    eco_format!("tag {name} of {id:?}")
                 } else {
-                    format!("tag {name}")
+                    eco_format!("tag {name}")
                 };
             }
+            BuiltinTy::Module(m) => return eco_format!("module({})", m.name()),
             BuiltinTy::Path(s) => match s {
                 PathPreference::None => "[any]",
                 PathPreference::Special => "[any]",
@@ -369,7 +377,7 @@ impl BuiltinTy {
             },
         };
 
-        res.to_string()
+        res.into()
     }
 }
 

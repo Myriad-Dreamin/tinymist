@@ -2,10 +2,11 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/fn_named3.typ
+snapshot_kind: text
 ---
 "fun" = () => TypeUnary { lhs: 2, op: Return }
 "foo" = (("b": Any) => Any).with(..("b": TypeUnary { lhs: 2, op: Return }) => any)
-"b" = ( ⪰ TypeUnary { lhs: 2, op: Return } | TypeUnary { lhs: 2, op: Return })
+"b" = TypeUnary { lhs: 2, op: Return }
 "x" = TypeUnary { lhs: 2, op: Return }
 ---
 5..8 -> @fun

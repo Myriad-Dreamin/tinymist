@@ -15,7 +15,7 @@ use serde_json::{json, Map, Value as JsonValue};
 use strum::IntoEnumIterator;
 use task::FormatUserConfig;
 use tinymist_query::analysis::{Modifier, TokenType};
-use tinymist_query::PositionEncoding;
+use tinymist_query::{CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use typst::foundations::IntoValue;
 use typst::syntax::{FileId, VirtualPath};
@@ -147,25 +147,11 @@ impl Initializer for SuperInit {
             return (service, Err(err));
         }
 
-        // Respond to the host (LSP client)
-        // Register these capabilities statically if the client does not support dynamic
-        // registration
-        let semantic_tokens_provider = match service.config.semantic_tokens {
-            SemanticTokensMode::Enable if !const_config.tokens_dynamic_registration => {
-                Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
-                    get_semantic_tokens_options(),
-                ))
-            }
-            _ => None,
-        };
-        let document_formatting_provider = match service.config.formatter_mode {
-            FormatterMode::Typstyle | FormatterMode::Typstfmt
-                if !const_config.doc_fmt_dynamic_registration =>
-            {
-                Some(OneOf::Left(true))
-            }
-            _ => None,
-        };
+        let semantic_tokens_provider = (!const_config.tokens_dynamic_registration).then(|| {
+            SemanticTokensServerCapabilities::SemanticTokensOptions(get_semantic_tokens_options())
+        });
+        let document_formatting_provider =
+            (!const_config.doc_fmt_dynamic_registration).then_some(OneOf::Left(true));
 
         let file_operations = const_config.notify_will_rename_files.then(|| {
             WorkspaceFileOperationsServerCapabilities {
@@ -189,7 +175,11 @@ impl Initializer for SuperInit {
                 // position_encoding: Some(cc.position_encoding.into()),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 signature_help_provider: Some(SignatureHelpOptions {
-                    trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
+                    trigger_characters: Some(vec![
+                        String::from("("),
+                        String::from(","),
+                        String::from(":"),
+                    ]),
                     retrigger_characters: None,
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: None,
@@ -275,12 +265,14 @@ impl Initializer for SuperInit {
 
 // region Configuration Items
 const CONFIG_ITEMS: &[&str] = &[
+    "tinymist",
     "outputPath",
     "exportPdf",
     "rootPath",
     "semanticTokens",
     "formatterMode",
     "formatterPrintWidth",
+    "completion",
     "fontPaths",
     "systemFonts",
     "typstExtraArgs",
@@ -305,12 +297,10 @@ pub struct Config {
     pub formatter_mode: FormatterMode,
     /// Dynamic configuration for the experimental formatter.
     pub formatter_print_width: Option<u32>,
-    /// Whether to trigger suggest completion, a.k.a. auto-completion.
-    pub trigger_suggest: bool,
-    /// Whether to trigger named parameter completion.
-    pub trigger_named_completion: bool,
-    /// Whether to trigger parameter hint, a.k.a. signature help.
-    pub trigger_parameter_hints: bool,
+    /// Whether to remove html from markup content in responses.
+    pub support_html_in_markdown: bool,
+    /// Tinymist's completion features.
+    pub completion: CompletionFeat,
 }
 
 impl Config {
@@ -348,7 +338,16 @@ impl Config {
     /// Errors if the update is invalid.
     pub fn update(&mut self, update: &JsonValue) -> anyhow::Result<()> {
         if let JsonValue::Object(update) = update {
-            self.update_by_map(update)
+            let namespaced = update.get("tinymist").and_then(|m| match m {
+                JsonValue::Object(namespaced) => Some(namespaced),
+                _ => None,
+            });
+
+            self.update_by_map(update)?;
+            if let Some(namespaced) = namespaced {
+                self.update_by_map(namespaced)?;
+            }
+            Ok(())
         } else {
             bail!("got invalid configuration object {update}")
         }
@@ -359,21 +358,34 @@ impl Config {
     /// # Errors
     /// Errors if the update is invalid.
     pub fn update_by_map(&mut self, update: &Map<String, JsonValue>) -> anyhow::Result<()> {
-        macro_rules! deser_or_default {
-            ($key:expr, $ty:ty) => {
-                try_or_default(|| <$ty>::deserialize(update.get($key)?).ok())
+        macro_rules! assign_config {
+            ($( $field_path:ident ).+ := $bind:literal?: $ty:ty) => {
+                let v = try_deserialize::<$ty>(update, $bind);
+                self.$($field_path).+ = v.unwrap_or_default();
+            };
+            ($( $field_path:ident ).+ := $bind:literal: $ty:ty = $default_value:expr) => {
+                let v = try_deserialize::<$ty>(update, $bind);
+                self.$($field_path).+ = v.unwrap_or_else(|| $default_value);
             };
         }
 
-        try_(|| SemanticTokensMode::deserialize(update.get("semanticTokens")?).ok())
-            .inspect(|v| self.semantic_tokens = *v);
-        try_(|| FormatterMode::deserialize(update.get("formatterMode")?).ok())
-            .inspect(|v| self.formatter_mode = *v);
-        try_(|| u32::deserialize(update.get("formatterPrintWidth")?).ok())
-            .inspect(|v| self.formatter_print_width = Some(*v));
-        self.trigger_suggest = deser_or_default!("triggerSuggest", bool);
-        self.trigger_parameter_hints = deser_or_default!("triggerParameterHints", bool);
-        self.trigger_named_completion = deser_or_default!("triggerNamedCompletion", bool);
+        fn try_deserialize<T: serde::de::DeserializeOwned>(
+            map: &Map<String, JsonValue>,
+            key: &str,
+        ) -> Option<T> {
+            T::deserialize(map.get(key)?)
+                .inspect_err(|e| log::warn!("failed to deserialize {key:?}: {e}"))
+                .ok()
+        }
+
+        assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
+        assign_config!(formatter_mode := "formatterMode"?: FormatterMode);
+        assign_config!(formatter_print_width := "formatterPrintWidth"?: Option<u32>);
+        assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
+        assign_config!(completion := "completion"?: CompletionFeat);
+        assign_config!(completion.trigger_suggest := "triggerSuggest"?: bool);
+        assign_config!(completion.trigger_parameter_hints := "triggerParameterHints"?: bool);
+        assign_config!(completion.trigger_suggest_and_parameter_hints := "triggerSuggestAndParameterHints"?: bool);
         self.compile.update_by_map(update)?;
         self.compile.validate()
     }
@@ -564,8 +576,9 @@ impl CompileConfig {
                 root_dir: command.root,
                 inputs: Arc::new(LazyHash::new(inputs)),
                 font: command.font,
+                package: command.package,
                 creation_timestamp: command.creation_timestamp,
-                cert: command.certification,
+                cert: command.cert,
             });
         }
 
@@ -709,6 +722,14 @@ impl CompileConfig {
         }
 
         opts
+    }
+
+    /// Determines the package options.
+    pub fn determine_package_opts(&self) -> CompilePackageArgs {
+        if let Some(extras) = &self.typst_extra_args {
+            return extras.package.clone();
+        }
+        CompilePackageArgs::default()
     }
 
     /// Determines the font resolver.
@@ -868,6 +889,8 @@ pub struct CompileExtraOpts {
     pub inputs: ImmutDict,
     /// Additional font paths.
     pub font: CompileFontArgs,
+    /// Package related arguments.
+    pub package: CompilePackageArgs,
     /// The creation timestamp for various output.
     pub creation_timestamp: Option<chrono::DateTime<chrono::Utc>>,
     /// Path to certification file
@@ -987,6 +1010,23 @@ mod tests {
                 ..Default::default()
             })
         );
+    }
+
+    #[test]
+    fn test_namespaced_config() {
+        let mut config = Config::default();
+
+        // Emacs uses a shared configuration object for all language servers.
+        let update = json!({
+            "exportPdf": "onSave",
+            "tinymist": {
+                "exportPdf": "onType",
+            }
+        });
+
+        config.update(&update).unwrap();
+
+        assert_eq!(config.compile.export_pdf, ExportMode::OnType);
     }
 
     #[test]

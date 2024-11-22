@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/references.rs
 expression: "JsonRepr::new_pure(result)"
 input_file: crates/tinymist-query/src/fixtures/references/at_def.typ
+snapshot_kind: text
 ---
 [
  "/s0.typ@0:23:0:24",

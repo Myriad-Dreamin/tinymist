@@ -22,8 +22,6 @@ impl SemanticRequest for WorkspaceLabelRequest {
         let mut symbols = vec![];
 
         for id in ctx.source_files().clone() {
-            let now = reflexo::time::Instant::now();
-            log::info!("workspace/label: {:?}", id);
             let Ok(source) = ctx.source_by_id(id) else {
                 continue;
             };
@@ -39,7 +37,6 @@ impl SemanticRequest for WorkspaceLabelRequest {
             if let Some(mut res) = res {
                 symbols.append(&mut res)
             }
-            log::info!("workspace/label: {:?} took {:?}", id, now.elapsed());
         }
 
         Some(symbols)

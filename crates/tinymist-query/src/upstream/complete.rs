@@ -4,10 +4,10 @@ use std::ops::Range;
 
 use ecow::{eco_format, EcoString};
 use if_chain::if_chain;
+use lsp_types::TextEdit;
 use serde::{Deserialize, Serialize};
 use typst::foundations::{fields_on, format_str, repr, Repr, StyleChain, Styles, Value};
 use typst::model::Document;
-use typst::syntax::ast::AstNode;
 use typst::syntax::{ast, is_id_continue, is_id_start, is_ident, LinkedNode, Source, SyntaxKind};
 use typst::text::RawElem;
 use typst::World;
@@ -16,12 +16,11 @@ use unscanny::Scanner;
 
 use super::{plain_docs_sentence, summarize_font_family};
 use crate::adt::interner::Interned;
-use crate::analysis::{analyze_labels, DynLabel, Ty};
-use crate::LocalContext;
+use crate::analysis::{analyze_labels, DynLabel, LocalContext, Ty};
 
 mod ext;
-pub use ext::complete_path;
 use ext::*;
+pub use ext::{complete_path, CompletionFeat, PostfixSnippet};
 
 /// Autocomplete a cursor position in a source file.
 ///
@@ -39,12 +38,10 @@ pub fn autocomplete(
 ) -> Option<(usize, bool, Vec<Completion>, Vec<lsp_types::CompletionItem>)> {
     let _ = complete_comments(&mut ctx)
         || complete_type(&mut ctx).is_none() && {
-            log::info!("continue after completing type");
+            log::debug!("continue after completing type");
             complete_labels(&mut ctx)
                 || complete_field_accesses(&mut ctx)
                 || complete_imports(&mut ctx)
-                || complete_rules(&mut ctx)
-                || complete_params(&mut ctx)
                 || complete_markup(&mut ctx)
                 || complete_math(&mut ctx)
                 || complete_code(&mut ctx, false)
@@ -66,6 +63,8 @@ pub struct Completion {
     pub sort_text: Option<EcoString>,
     /// The composed text used for filtering.
     pub filter_text: Option<EcoString>,
+    /// The character that should be committed when selecting this completion.
+    pub commit_char: Option<char>,
     /// The completed version of the input, possibly described with snippet
     /// syntax like `${lhs} + ${rhs}`.
     ///
@@ -73,6 +72,10 @@ pub struct Completion {
     pub apply: Option<EcoString>,
     /// An optional short description, at most one sentence.
     pub detail: Option<EcoString>,
+    /// An optional array of additional text edits that are applied when
+    /// selecting this completion. Edits must not overlap with the main edit
+    /// nor with themselves.
+    pub additional_text_edits: Option<Vec<TextEdit>>,
     /// An optional command to run when the completion is selected.
     pub command: Option<&'static str>,
 }
@@ -337,7 +340,7 @@ fn complete_math(ctx: &mut CompletionContext) -> bool {
 /// Add completions for math snippets.
 #[rustfmt::skip]
 fn math_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(true, |_| true);
+    ctx.scope_completions(true);
 
     ctx.snippet_completion(
         "subscript",
@@ -382,7 +385,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
         if let Some((value, styles)) = ctx.ctx.analyze_expr(&prev).into_iter().next();
         then {
             ctx.from = ctx.cursor;
-            field_access_completions(ctx, &value, &styles);
+            field_access_completions(ctx, &prev, &value, &styles);
             return true;
         }
     }
@@ -397,7 +400,7 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
         if let Some((value, styles)) = ctx.ctx.analyze_expr(&prev_prev).into_iter().next();
         then {
             ctx.from = ctx.leaf.offset();
-            field_access_completions(ctx, &value, &styles);
+            field_access_completions(ctx,&prev_prev, &value, &styles);
             return true;
         }
     }
@@ -406,7 +409,12 @@ fn complete_field_accesses(ctx: &mut CompletionContext) -> bool {
 }
 
 /// Add completions for all fields on a value.
-fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: &Option<Styles>) {
+fn field_access_completions(
+    ctx: &mut CompletionContext,
+    node: &LinkedNode,
+    value: &Value,
+    styles: &Option<Styles>,
+) {
     for (name, value, _) in value.ty().scope().iter() {
         ctx.value_completion(Some(name.clone()), value, true, None);
     }
@@ -431,6 +439,8 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
         );
     }
 
+    ctx.postfix_completions(node, value);
+
     match value {
         Value::Symbol(symbol) => {
             for modifier in symbol.modifiers() {
@@ -443,11 +453,15 @@ fn field_access_completions(ctx: &mut CompletionContext, value: &Value, styles: 
                     });
                 }
             }
+
+            ctx.ufcs_completions(node, value);
         }
         Value::Content(content) => {
             for (name, value) in content.fields() {
                 ctx.value_completion(Some(name.into()), &value, false, None);
             }
+
+            ctx.ufcs_completions(node, value);
         }
         Value::Dict(dict) => {
             for (name, value) in dict.iter() {
@@ -574,187 +588,20 @@ fn import_item_completions<'a>(
     }
 }
 
-/// Complete set and show rules.
-fn complete_rules(ctx: &mut CompletionContext) -> bool {
-    // We don't want to complete directly behind the keyword.
-    if !ctx.leaf.kind().is_trivia() {
-        return false;
-    }
-
-    let Some(prev) = ctx.leaf.prev_leaf() else {
-        return false;
-    };
-
-    // Behind the set keyword: "set |".
-    if matches!(prev.kind(), SyntaxKind::Set) {
-        ctx.from = ctx.cursor;
-        set_rule_completions(ctx);
-        return true;
-    }
-
-    // Behind the show keyword: "show |".
-    if matches!(prev.kind(), SyntaxKind::Show) {
-        ctx.from = ctx.cursor;
-        show_rule_selector_completions(ctx);
-        return true;
-    }
-
-    // Behind a half-completed show rule: "show strong: |".
-    if_chain! {
-        if let Some(prev) = ctx.leaf.prev_leaf();
-        if matches!(prev.kind(), SyntaxKind::Colon);
-        if matches!(prev.parent_kind(), Some(SyntaxKind::ShowRule));
-        then {
-            ctx.from = ctx.cursor;
-            show_rule_recipe_completions(ctx);
-            return true;
-        }
-    }
-
-    false
-}
-
-/// Add completions for all functions from the global scope.
-fn set_rule_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(true, |value| {
-        matches!(
-            value,
-            Value::Func(func) if func.params()
-                .unwrap_or_default()
-                .iter()
-                .any(|param| param.settable),
-        )
-    });
-}
-
-/// Add completions for selectors.
-fn show_rule_selector_completions(ctx: &mut CompletionContext) {
-    ctx.scope_completions(
-        false,
-        |value| matches!(value, Value::Func(func) if func.element().is_some()),
-    );
-
-    ctx.snippet_completion(
-        "text selector",
-        "\"${text}\"",
-        "Replace occurrences of specific text.",
-    );
-
-    ctx.snippet_completion(
-        "regex selector",
-        "regex(\"${regex}\")",
-        "Replace matches of a regular expression.",
-    );
-
-    ctx.enrich("", ": ${}");
-}
-
-/// Add completions for recipes.
-fn show_rule_recipe_completions(ctx: &mut CompletionContext) {
-    ctx.snippet_completion(
-        "replacement",
-        "[${content}]",
-        "Replace the selected element with content.",
-    );
-
-    ctx.snippet_completion(
-        "replacement (string)",
-        "\"${text}\"",
-        "Replace the selected element with a string of text.",
-    );
-
-    ctx.snippet_completion(
-        "transformation",
-        "element => [${content}]",
-        "Transform the element with a function.",
-    );
-
-    ctx.scope_completions(false, |value| matches!(value, Value::Func(_)));
-}
-
-/// Complete call and set rule parameters.
-fn complete_params(ctx: &mut CompletionContext) -> bool {
-    // Ensure that we are in a function call or set rule's argument list.
-    let (callee, set, args) = if_chain! {
-        if let Some(parent) = ctx.leaf.parent();
-        if let Some(parent) = match parent.kind() {
-            SyntaxKind::Named => parent.parent(),
-            _ => Some(parent),
-        };
-        if let Some(args) = parent.get().cast::<ast::Args>();
-        if let Some(grand) = parent.parent();
-        if let Some(expr) = grand.get().cast::<ast::Expr>();
-        let set = matches!(expr, ast::Expr::Set(_));
-        if let Some(callee) = match expr {
-            ast::Expr::FuncCall(call) => Some(call.callee()),
-            ast::Expr::Set(set) => Some(set.target()),
-            _ => None,
-        };
-        then {
-            (callee, set, args)
-        } else {
-            return false;
-        }
-    };
-
-    // Find the piece of syntax that decides what we're completing.
-    let mut deciding = ctx.leaf.clone();
-    while !matches!(
-        deciding.kind(),
-        SyntaxKind::LeftParen | SyntaxKind::Comma | SyntaxKind::Colon
-    ) {
-        let Some(prev) = deciding.prev_leaf() else {
-            break;
-        };
-        deciding = prev;
-    }
-
-    // Parameter values: "func(param:|)", "func(param: |)".
-    if_chain! {
-        if deciding.kind() == SyntaxKind::Colon;
-        if let Some(prev) = deciding.prev_leaf();
-        if let Some(param) = prev.get().cast::<ast::Ident>();
-        then {
-            if let Some(next) = deciding.next_leaf() {
-                ctx.from = ctx.cursor.min(next.offset());
-            }
-            let parent = deciding.parent().unwrap();
-            log::debug!("named param parent: {:?}", parent);
-            // get type of this param
-            let ty = ctx.ctx.type_of(param.to_untyped());
-            log::debug!("named param type: {:?}", ty);
-
-            named_param_value_completions(ctx, callee, &param.into(), ty.as_ref());
-            return true;
-        }
-    }
-
-    // Parameters: "func(|)", "func(hi|)", "func(12,|)".
-    if_chain! {
-        if matches!(deciding.kind(), SyntaxKind::LeftParen | SyntaxKind::Comma);
-        if deciding.kind() != SyntaxKind::Comma || deciding.range().end <= ctx.cursor;
-        then {
-            if let Some(next) = deciding.next_leaf() {
-                ctx.from = ctx.cursor.min(next.offset());
-            }
-
-            param_completions(ctx, callee, set, args);
-            return true;
-        }
-    }
-
-    false
-}
-
 /// Complete in code mode.
 fn complete_code(ctx: &mut CompletionContext, from_type: bool) -> bool {
+    let surrounding_syntax = ctx.surrounding_syntax();
+
     if matches!(
-        ctx.leaf.parent_kind(),
-        None | Some(SyntaxKind::Markup)
-            | Some(SyntaxKind::Math)
-            | Some(SyntaxKind::MathFrac)
-            | Some(SyntaxKind::MathAttach)
-            | Some(SyntaxKind::MathRoot)
+        (ctx.leaf.parent_kind(), surrounding_syntax),
+        (
+            None | Some(SyntaxKind::Markup)
+                | Some(SyntaxKind::Math)
+                | Some(SyntaxKind::MathFrac)
+                | Some(SyntaxKind::MathAttach)
+                | Some(SyntaxKind::MathRoot),
+            SurroundingSyntax::Regular
+        )
     ) {
         return false;
     }
@@ -777,10 +624,11 @@ fn complete_code(ctx: &mut CompletionContext, from_type: bool) -> bool {
     // But not within or after an expression.
     if ctx.explicit
         && (ctx.leaf.kind().is_trivia()
-            || matches!(
+            || (matches!(
                 ctx.leaf.kind(),
                 SyntaxKind::LeftParen | SyntaxKind::LeftBrace
-            ))
+            ) || (matches!(ctx.leaf.kind(), SyntaxKind::Colon)
+                && ctx.leaf.parent_kind() == Some(SyntaxKind::ShowRule))))
     {
         ctx.from = ctx.cursor;
         code_completions(ctx, false);
@@ -793,9 +641,9 @@ fn complete_code(ctx: &mut CompletionContext, from_type: bool) -> bool {
 /// Add completions for expression snippets.
 #[rustfmt::skip]
 fn code_completions(ctx: &mut CompletionContext, hash: bool) {
-    ctx.scope_completions(true, |value| !hash || {
-        matches!(value, Value::Symbol(_) | Value::Func(_) | Value::Type(_) | Value::Module(_))
-    });
+    // todo: filter code completions
+    // matches!(value, Value::Symbol(_) | Value::Func(_) | Value::Type(_) | Value::Module(_))
+    ctx.scope_completions(true);
 
     ctx.snippet_completion(
         "function call",
@@ -962,10 +810,8 @@ pub struct CompletionContext<'a> {
     pub cursor: usize,
     pub explicit: bool,
     pub trigger_character: Option<char>,
-    pub trigger_suggest: bool,
-    pub trigger_parameter_hints: bool,
-    pub trigger_named_completion: bool,
     pub from: usize,
+    pub from_ty: Option<Ty>,
     pub completions: Vec<Completion>,
     pub completions2: Vec<lsp_types::CompletionItem>,
     pub incomplete: bool,
@@ -984,9 +830,6 @@ impl<'a> CompletionContext<'a> {
         cursor: usize,
         explicit: bool,
         trigger_character: Option<char>,
-        trigger_suggest: bool,
-        trigger_parameter_hints: bool,
-        trigger_named_completion: bool,
     ) -> Option<Self> {
         let text = source.text();
         let root = LinkedNode::new(source.root());
@@ -1001,11 +844,9 @@ impl<'a> CompletionContext<'a> {
             leaf,
             cursor,
             trigger_character,
-            trigger_suggest,
-            trigger_parameter_hints,
-            trigger_named_completion,
             explicit,
             from: cursor,
+            from_ty: None,
             incomplete: true,
             completions: vec![],
             completions2: vec![],
@@ -1044,11 +885,7 @@ impl<'a> CompletionContext<'a> {
             apply: Some(snippet.into()),
             detail: Some(docs.into()),
             label_detail: None,
-            // VS Code doesn't do that... Auto triggering suggestion only happens on typing (word
-            // starts or trigger characters). However, you can use editor.action.triggerSuggest as
-            // command on a suggestion to "manually" retrigger suggest after inserting one
-            command: (self.trigger_suggest && snippet.contains("${"))
-                .then_some("editor.action.triggerSuggest"),
+            command: self.ctx.analysis.trigger_on_snippet(snippet.contains("${")),
             ..Completion::default()
         });
     }
@@ -1243,9 +1080,7 @@ impl<'a> CompletionContext<'a> {
         let mut command = None;
         if parens && matches!(value, Value::Func(_)) {
             if let Value::Func(func) = value {
-                command = self
-                    .trigger_parameter_hints
-                    .then_some("editor.action.triggerParameterHints");
+                command = self.ctx.analysis.trigger_parameter_hints(true);
                 if func
                     .params()
                     .is_some_and(|params| params.iter().all(|param| param.name == "self"))

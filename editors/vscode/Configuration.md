@@ -34,6 +34,13 @@ Enable or disable semantic tokens (LSP syntax highlighting)
   - `disable`: Do not use semantic tokens for syntax highlighting
 - **Default**: `"enable"`
 
+## `tinymist.typingContinueCommentsOnNewline`
+
+Whether to prefix newlines after comments with the corresponding comment prefix.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
 ## `tinymist.onEnterEvent`
 
 Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter) (LSP onEnter feature) to allow automatic insertion of characters on enter, such as `///` for comments. Note: restarting the editor is required to change this setting.
@@ -120,6 +127,50 @@ Whether to handle drag-and-drop of resources into the editing typst document. No
   - `enable`
   - `disable`
 - **Default**: `"enable"`
+
+## `tinymist.renderDocs`
+
+(Experimental) Whether to render typst elements in (hover) docs. In VS Code, when this feature is enabled, tinymist will store rendered results in the filesystem's temporary storage to show them in the hover content. Note: Please disable this feature if the editor doesn't support/handle image previewing in docs.
+
+- **Type**: `string`
+- **Enum**:
+  - `enable`
+  - `disable`
+- **Default**: `"enable"`
+
+## `tinymist.completion.triggerOnSnippetPlaceholders`
+
+Whether to trigger completions on arguments (placeholders) of snippets. For example, `box` will be completed to `box(|)`, and server will request the editor (lsp client) to request completion after moving cursor to the placeholder in the snippet. Note: this has no effect if the editor doesn't support `editor.action.triggerSuggest` or `tinymist.triggerSuggestAndParameterHints` command. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+
+## `tinymist.completion.postfix`
+
+Whether to enable postfix code completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.completion.postfixUfcs`
+
+Whether to enable UFCS-style completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.completion.postfixUfcsLeft`
+
+Whether to enable left-variant UFCS-style completion. For example, `[A].table|` will be completed to `table(|)[A]`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `tinymist.completion.postfixUfcsRight`
+
+Whether to enable right-variant UFCS-style completion. For example, `[A].table|` will be completed to `table([A], |)`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
 
 ## `tinymist.previewFeature`
 

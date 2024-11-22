@@ -235,15 +235,22 @@ fn link_tooltip(
         node = node.parent()?;
     }
 
-    let mut links = get_link_exprs_in(ctx, node)?;
-    links.retain(|link| link.0.contains(&cursor));
+    let links = get_link_exprs_in(node)?;
+    let links = links
+        .objects
+        .iter()
+        .filter(|link| link.range.contains(&cursor))
+        .collect::<Vec<_>>();
     if links.is_empty() {
         return None;
     }
 
     let mut results = vec![];
     let mut actions = vec![];
-    for (_, target) in links {
+    for obj in links {
+        let Some(target) = obj.target.resolve(ctx) else {
+            continue;
+        };
         // open file in tab or system application
         actions.push(CommandLink {
             title: Some("Open in Tab".to_string()),
@@ -272,8 +279,12 @@ fn link_tooltip(
     Some(HoverContents::Array(results))
 }
 
-fn push_result_ty(name: &str, ty_repr: Option<&(String, String)>, type_doc: &mut String) {
-    let Some((short, _)) = ty_repr else {
+fn push_result_ty(
+    name: &str,
+    ty_repr: Option<&(EcoString, EcoString, EcoString)>,
+    type_doc: &mut String,
+) {
+    let Some((short, _, _)) = ty_repr else {
         return;
     };
     if short == name {

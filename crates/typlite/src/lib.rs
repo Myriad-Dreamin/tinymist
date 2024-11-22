@@ -46,18 +46,28 @@ pub enum ColorTheme {
     Dark,
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct TypliteFeat {
+    /// The preferred color theme
+    pub color_theme: Option<ColorTheme>,
+    /// Allows GFM (GitHub Flavored Markdown) markups.
+    pub gfm: bool,
+    /// Annotate the elements for identification.
+    pub annotate_elem: bool,
+    /// Embed errors in the output instead of yielding them.
+    pub soft_error: bool,
+    /// Remove HTML tags from the output.
+    pub remove_html: bool,
+}
+
 /// Task builder for converting a typst document to Markdown.
 pub struct Typlite {
     /// The universe to use for the conversion.
     world: Arc<LspWorld>,
     /// library to use for the conversion.
     library: Option<Arc<Scopes<Value>>>,
-    /// Documentation style to use for annotating the document.
-    do_annotate: bool,
-    /// Whether to enable GFM (GitHub Flavored Markdown) features.
-    gfm: bool,
-    /// The preferred color theme
-    theme: Option<ColorTheme>,
+    /// Features for the conversion.
+    feat: TypliteFeat,
 }
 
 impl Typlite {
@@ -69,9 +79,7 @@ impl Typlite {
         Self {
             world,
             library: None,
-            do_annotate: false,
-            gfm: false,
-            theme: None,
+            feat: Default::default(),
         }
     }
 
@@ -81,15 +89,9 @@ impl Typlite {
         self
     }
 
-    /// Set the preferred color theme.
-    pub fn with_color_theme(mut self, theme: ColorTheme) -> Self {
-        self.theme = Some(theme);
-        self
-    }
-
-    /// Annotate the elements for identification.
-    pub fn annotate_elements(mut self, do_annotate: bool) -> Self {
-        self.do_annotate = do_annotate;
+    /// Set conversion feature
+    pub fn with_feature(mut self, feat: TypliteFeat) -> Self {
+        self.feat = feat;
         self
     }
 
@@ -108,10 +110,7 @@ impl Typlite {
 
         let worker = TypliteWorker {
             current,
-            gfm: self.gfm,
-            do_annotate: self.do_annotate,
-            soft_error: true,
-            theme: self.theme,
+            feat: self.feat,
             list_depth: 0,
             scopes: self
                 .library
@@ -129,13 +128,11 @@ impl Typlite {
 #[derive(Clone)]
 pub struct TypliteWorker {
     current: FileId,
-    theme: Option<ColorTheme>,
-    gfm: bool,
-    do_annotate: bool,
-    soft_error: bool,
     scopes: Arc<Scopes<Value>>,
     world: Arc<LspWorld>,
     list_depth: usize,
+    /// Features for the conversion.
+    pub feat: TypliteFeat,
 }
 
 impl TypliteWorker {
@@ -322,6 +319,34 @@ impl TypliteWorker {
         Ok(Value::Content(s))
     }
 
+    pub fn to_raw_block(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
+        let content = node.clone().into_text();
+
+        let s = if inline {
+            let mut s = EcoString::with_capacity(content.len() + 2);
+            s.push_str("`");
+            s.push_str(&content);
+            s.push_str("`");
+            s
+        } else {
+            let mut s = EcoString::with_capacity(content.len() + 15);
+            s.push_str("```");
+            let lang = match node.cast::<ast::Expr>() {
+                Some(ast::Expr::Text(..) | ast::Expr::Space(..)) => "typ",
+                Some(..) => "typc",
+                None => "typ",
+            };
+            s.push_str(lang);
+            s.push('\n');
+            s.push_str(&content);
+            s.push('\n');
+            s.push_str("```");
+            s
+        };
+
+        Ok(Value::Content(s))
+    }
+
     pub fn render(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
         let code = node.clone().into_text();
         self.render_code(&code, false, "center", "", inline)
@@ -335,7 +360,7 @@ impl TypliteWorker {
         extra_attrs: &str,
         inline: bool,
     ) -> Result<Value> {
-        let theme = self.theme;
+        let theme = self.feat.color_theme;
         let mut render = |theme| self.render_inner(code, is_markup, theme);
 
         let mut content = EcoString::new();
@@ -361,7 +386,7 @@ impl TypliteWorker {
                             content.push_str("</p>");
                         }
                     }
-                    Err(err) if self.soft_error => {
+                    Err(err) if self.feat.soft_error => {
                         // wrap the error in a fenced code block
                         let err = err.to_string().replace("`", r#"\`"#);
                         let _ = write!(content, "```\nRender Error\n{err}\n```");
@@ -386,7 +411,7 @@ impl TypliteWorker {
                             content.push_str("</p>");
                         }
                     }
-                    (Err(err), _) | (_, Err(err)) if self.soft_error => {
+                    (Err(err), _) | (_, Err(err)) if self.feat.soft_error => {
                         // wrap the error in a fenced code block
                         let err = err.to_string().replace("`", r#"\`"#);
                         let _ = write!(content, "```\nRendering Error\n{err}\n```");
@@ -569,7 +594,7 @@ impl TypliteWorker {
 
     fn link(&mut self, node: &SyntaxNode) -> Result<Value> {
         // GFM supports autolinks
-        if self.gfm {
+        if self.feat.gfm {
             // return Self::str(node, s);
             return Self::str(node);
         }
@@ -602,12 +627,12 @@ impl TypliteWorker {
         let list_item = node.cast::<ast::ListItem>().unwrap();
 
         s.push_str("- ");
-        if self.do_annotate {
+        if self.feat.annotate_elem {
             let _ = write!(s, "<!-- typlite:begin:list-item {} -->", self.list_depth);
             self.list_depth += 1;
         }
         s.push_str(&Self::value(self.eval(list_item.body().to_untyped())?));
-        if self.do_annotate {
+        if self.feat.annotate_elem {
             self.list_depth -= 1;
             let _ = write!(s, "<!-- typlite:end:list-item {} -->", self.list_depth);
         }
@@ -635,6 +660,10 @@ impl TypliteWorker {
 
     fn equation(&mut self, node: &SyntaxNode) -> Result<Value> {
         let equation: ast::Equation = node.cast().unwrap();
+
+        if self.feat.remove_html {
+            return self.to_raw_block(node, !equation.block());
+        }
 
         self.render(node, !equation.block())
     }
@@ -668,6 +697,9 @@ impl TypliteWorker {
     }
 
     fn contextual(&mut self, node: &SyntaxNode) -> Result<Value> {
+        if self.feat.remove_html {
+            return self.to_raw_block(node, false);
+        }
         self.render(node, false)
     }
 

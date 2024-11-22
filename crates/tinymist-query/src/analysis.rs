@@ -1,6 +1,8 @@
 //! Semantic static and dynamic analysis of the source code.
 
 mod bib;
+use std::path::Path;
+
 pub(crate) use bib::*;
 pub mod call;
 pub use call::*;
@@ -16,6 +18,8 @@ pub mod signature;
 pub use signature::*;
 pub mod semantic_tokens;
 pub use semantic_tokens::*;
+use typst::syntax::{Source, VirtualPath};
+use typst::World;
 mod post_tyck;
 mod tyck;
 pub(crate) use crate::ty::*;
@@ -30,8 +34,8 @@ pub use global::*;
 
 use ecow::eco_format;
 use lsp_types::Url;
-use reflexo_typst::TypstFileId;
-use typst::diag::FileError;
+use reflexo_typst::{EntryReader, TypstFileId};
+use typst::diag::{FileError, FileResult};
 use typst::foundations::{Func, Value};
 
 use crate::path_to_url;
@@ -52,12 +56,36 @@ impl ToFunc for Value {
 
 /// Extension trait for `typst::World`.
 pub trait LspWorldExt {
+    /// Get file's id by its path
+    fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId>;
+
+    /// Get the source of a file by file path.
+    fn source_by_path(&self, p: &Path) -> FileResult<Source>;
+
     /// Resolve the uri for a file id.
-    fn uri_for_id(&self, id: TypstFileId) -> Result<Url, FileError>;
+    fn uri_for_id(&self, id: TypstFileId) -> FileResult<Url>;
 }
 
 impl LspWorldExt for tinymist_world::LspWorld {
-    /// Resolve the uri for a file id.
+    fn file_id_by_path(&self, p: &Path) -> FileResult<TypstFileId> {
+        // todo: source in packages
+        let root = self.workspace_root().ok_or_else(|| {
+            let reason = eco_format!("workspace root not found");
+            FileError::Other(Some(reason))
+        })?;
+        let relative_path = p.strip_prefix(&root).map_err(|_| {
+            let reason = eco_format!("access denied, path: {p:?}, root: {root:?}");
+            FileError::Other(Some(reason))
+        })?;
+
+        Ok(TypstFileId::new(None, VirtualPath::new(relative_path)))
+    }
+
+    fn source_by_path(&self, p: &Path) -> FileResult<Source> {
+        // todo: source cache
+        self.source(self.file_id_by_path(p)?)
+    }
+
     fn uri_for_id(&self, id: TypstFileId) -> Result<Url, FileError> {
         self.path_for_id(id).and_then(|e| {
             path_to_url(&e)
@@ -388,7 +416,7 @@ mod type_describe_tests {
                 description => format!("Check on {text:?} ({pos:?})"),
             }, {
                 let literal_type = literal_type.and_then(|e| e.describe())
-                    .unwrap_or_else(|| "<nil>".to_string());
+                    .unwrap_or_else(|| "<nil>".into());
                 assert_snapshot!(literal_type);
             })
         });

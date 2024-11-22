@@ -2,9 +2,10 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/with.typ
+snapshot_kind: text
 ---
 "f" = (Any) => Any
-"x" = ( ⪰ Type(int) | Type(int))
+"x" = Type(int)
 "g" = ((Any) => Any).with(..(1) => any)
 "x" = 1
 ---

@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/base.typ
+snapshot_kind: text
 ---
 = resolves
 Var(x)@34..35 in /s0.typ -> Var(x)@34..35 in /s0.typ, root Var(x)@34..35 in /s0.typ, val: None

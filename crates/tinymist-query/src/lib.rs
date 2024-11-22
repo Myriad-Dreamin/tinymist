@@ -16,7 +16,7 @@ pub mod ty;
 mod upstream;
 
 pub use analysis::{LocalContext, LocalContextGuard, LspWorldExt};
-pub use upstream::with_vm;
+pub use upstream::{with_vm, CompletionFeat, PostfixSnippet};
 
 mod diagnostics;
 pub use diagnostics::*;
@@ -134,6 +134,21 @@ pub trait StatefulRequest {
     ) -> Option<Self::Response>;
 }
 
+/// Completely disabled log
+#[macro_export]
+macro_rules! log_never {
+    // debug!(target: "my_target", key1 = 42, key2 = true; "a {} event", "log")
+    // debug!(target: "my_target", "a {} event", "log")
+    (target: $target:expr, $($arg:tt)+) => {
+        let _ = format_args!($target, $($arg)+);
+    };
+
+    // debug!("a {} event", "log")
+    ($($arg:tt)+) => {
+        let _ = format_args!($($arg)+);
+    };
+}
+
 #[allow(missing_docs)]
 mod polymorphic {
     use lsp_types::TextEdit;
@@ -208,8 +223,12 @@ mod polymorphic {
 
     #[derive(Debug, Clone)]
     pub struct OnExportRequest {
+        /// The path of the document to export.
         pub path: PathBuf,
+        /// The kind of the export.
         pub kind: ExportKind,
+        /// Whether to open the exported file(s) after the export is done.
+        pub open: bool,
     }
 
     #[derive(Debug, Clone)]

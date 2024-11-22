@@ -24,7 +24,7 @@ use sync_lsp::*;
 use task::{CacheTask, ExportUserConfig, FormatTask, FormatUserConfig, UserActionTask};
 use tinymist_query::PageSelection;
 use tinymist_query::{
-    lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, OnExportRequest,
+    lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature,
     PositionEncoding, SyntaxRequest,
 };
 use tokio::sync::mpsc;
@@ -771,21 +771,10 @@ impl LanguageState {
             .context
             .and_then(|c| c.trigger_character)
             .and_then(|c| c.chars().next());
-        let trigger_suggest = self.config.trigger_suggest;
-        let trigger_parameter_hints = self.config.trigger_parameter_hints;
-        let trigger_named_completion = self.config.trigger_named_completion;
 
         run_query!(
             req_id,
-            self.Completion(
-                path,
-                position,
-                explicit,
-                trigger_character,
-                trigger_suggest,
-                trigger_parameter_hints,
-                trigger_named_completion
-            )
+            self.Completion(path, position, explicit, trigger_character)
         )
     }
 
@@ -818,13 +807,10 @@ impl LanguageState {
         run_query!(req_id, self.Symbol(pattern))
     }
 
-    fn on_enter(
-        &mut self,
-        req_id: RequestId,
-        params: TextDocumentPositionParams,
-    ) -> ScheduledResult {
-        let (path, position) = as_path_pos(params);
-        run_query!(req_id, self.OnEnter(path, position))
+    fn on_enter(&mut self, req_id: RequestId, params: OnEnterParams) -> ScheduledResult {
+        let path = as_path(params.text_document);
+        let range = params.range;
+        run_query!(req_id, self.OnEnter(path, range))
     }
 
     fn will_rename_files(
@@ -1043,7 +1029,7 @@ impl LanguageState {
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req)?,
             OnEnter(req) => query_source!(self, OnEnter, req)?,
             ColorPresentation(req) => CompilerQueryResponse::ColorPresentation(req.request()),
-            OnExport(OnExportRequest { kind, path }) => return primary().on_export(kind, path),
+            OnExport(req) => return primary().on_export(req),
             ServerInfo(_) => return primary().collect_server_info(),
             _ => return Self::query_on(primary(), is_pinning, query),
         })
@@ -1119,9 +1105,22 @@ struct ExportOpts {
     page: PageSelection,
 }
 
+/// A parameter for the `experimental/onEnter` command.
+///
+/// @since 3.17.0
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OnEnterParams {
+    /// The text document.
+    pub text_document: TextDocumentIdentifier,
+
+    /// The visible document range for which `onEnter` edits should be computed.
+    pub range: Range,
+}
+
 struct OnEnter;
 impl lsp_types::request::Request for OnEnter {
-    type Params = TextDocumentPositionParams;
+    type Params = OnEnterParams;
     type Result = Option<Vec<TextEdit>>;
     const METHOD: &'static str = "experimental/onEnter";
 }

@@ -20,14 +20,19 @@ use super::server::*;
 use super::*;
 use crate::tool::package::InitTask;
 
+/// See [`ExportKind`].
 #[derive(Debug, Clone, Default, Deserialize)]
 struct ExportOpts {
     creation_timestamp: Option<String>,
     fill: Option<String>,
     ppi: Option<f64>,
+    #[serde(default)]
     page: PageSelection,
+    /// Whether to open the exported file(s) after the export is done.
+    open: Option<bool>,
 }
 
+/// See [`ExportKind`].
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct QueryOpts {
@@ -38,6 +43,8 @@ struct QueryOpts {
     selector: String,
     field: Option<String>,
     one: Option<bool>,
+    /// Whether to open the exported file(s) after the export is done.
+    open: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -61,22 +68,49 @@ impl LanguageState {
             self.config.compile.determine_creation_timestamp()
         };
 
-        self.export(req_id, ExportKind::Pdf { creation_timestamp }, args)
+        self.export(
+            req_id,
+            ExportKind::Pdf { creation_timestamp },
+            opts.open.unwrap_or_default(),
+            args,
+        )
     }
 
     /// Export the current document as HTML file(s).
-    pub fn export_html(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
-        self.export(req_id, ExportKind::Html {}, args)
+    pub fn export_html(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+        let opts = get_arg_or_default!(args[1] as ExportOpts);
+        self.export(
+            req_id,
+            ExportKind::Html {},
+            opts.open.unwrap_or_default(),
+            args,
+        )
     }
 
     /// Export the current document as Markdown file(s).
-    pub fn export_markdown(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
-        self.export(req_id, ExportKind::Markdown {}, args)
+    pub fn export_markdown(
+        &mut self,
+        req_id: RequestId,
+        mut args: Vec<JsonValue>,
+    ) -> ScheduledResult {
+        let opts = get_arg_or_default!(args[1] as ExportOpts);
+        self.export(
+            req_id,
+            ExportKind::Markdown {},
+            opts.open.unwrap_or_default(),
+            args,
+        )
     }
 
     /// Export the current document as Text file(s).
-    pub fn export_text(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduledResult {
-        self.export(req_id, ExportKind::Text {}, args)
+    pub fn export_text(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
+        let opts = get_arg_or_default!(args[1] as ExportOpts);
+        self.export(
+            req_id,
+            ExportKind::Text {},
+            opts.open.unwrap_or_default(),
+            args,
+        )
     }
 
     /// Query the current document and export the result as JSON file(s).
@@ -93,6 +127,7 @@ impl LanguageState {
                 pretty: opts.pretty.unwrap_or(true),
                 one: opts.one.unwrap_or(false),
             },
+            opts.open.unwrap_or_default(),
             args,
         )
     }
@@ -100,7 +135,12 @@ impl LanguageState {
     /// Export the current document as Svg file(s).
     pub fn export_svg(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
         let opts = get_arg_or_default!(args[1] as ExportOpts);
-        self.export(req_id, ExportKind::Svg { page: opts.page }, args)
+        self.export(
+            req_id,
+            ExportKind::Svg { page: opts.page },
+            opts.open.unwrap_or_default(),
+            args,
+        )
     }
 
     /// Export the current document as Png file(s).
@@ -113,6 +153,7 @@ impl LanguageState {
                 ppi: opts.ppi,
                 page: opts.page,
             },
+            opts.open.unwrap_or_default(),
             args,
         )
     }
@@ -123,11 +164,12 @@ impl LanguageState {
         &mut self,
         req_id: RequestId,
         kind: ExportKind,
+        open: bool,
         mut args: Vec<JsonValue>,
     ) -> ScheduledResult {
         let path = get_arg!(args[0] as PathBuf);
 
-        run_query!(req_id, self.OnExport(path, kind))
+        run_query!(req_id, self.OnExport(path, open, kind))
     }
 
     /// Export a range of the current document as Ansi highlighted text.
@@ -292,7 +334,7 @@ impl LanguageState {
 
     /// Initialize a new template.
     pub fn init_template(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        use crate::tool::package::{self, determine_latest_version, TemplateSource};
+        use crate::tool::package::{self, TemplateSource};
 
         #[derive(Debug, Serialize)]
         #[serde(rename_all = "camelCase")]
@@ -317,7 +359,7 @@ impl LanguageState {
                     // Try to parse without version, but prefer the error message of the
                     // normal package spec parsing if it fails.
                     let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                    let version = determine_latest_version(&snap.world, &spec)?;
+                    let version = snap.world.registry.determine_latest_version(&spec)?;
                     StrResult::Ok(spec.at(version))
                 })
                 .map_err(map_string_err("failed to parse package spec"))
@@ -344,7 +386,7 @@ impl LanguageState {
 
     /// Get the entry of a template.
     pub fn get_template_entry(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        use crate::tool::package::{self, determine_latest_version, TemplateSource};
+        use crate::tool::package::{self, TemplateSource};
 
         let from_source = get_arg!(args[0] as String);
 
@@ -362,7 +404,7 @@ impl LanguageState {
                     // Try to parse without version, but prefer the error message of the
                     // normal package spec parsing if it fails.
                     let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                    let version = determine_latest_version(&snap.world, &spec)?;
+                    let version = snap.world.registry.determine_latest_version(&spec)?;
                     StrResult::Ok(spec.at(version))
                 })
                 .map_err(map_string_err("failed to parse package spec"))
@@ -505,6 +547,7 @@ impl LanguageState {
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
             let paths = snap.world.registry.paths();
+            let paths = paths.iter().map(|p| p.as_ref()).collect::<Vec<_>>();
             serde_json::to_value(paths).map_err(|e| internal_error(e.to_string()))
         })
     }
@@ -517,12 +560,8 @@ impl LanguageState {
         let snap = self.primary().snapshot().map_err(z_internal_error)?;
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
-            let paths = snap
-                .world
-                .registry
-                .local_path()
-                .into_iter()
-                .collect::<Vec<_>>();
+            let paths = snap.world.registry.local_path();
+            let paths = paths.as_deref().into_iter().collect::<Vec<_>>();
             serde_json::to_value(paths).map_err(|e| internal_error(e.to_string()))
         })
     }

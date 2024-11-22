@@ -274,7 +274,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
 
     fn write_import(&mut self, i: &Interned<ImportExpr>) -> fmt::Result {
         self.f.write_str("import(")?;
-        self.write_decl(&i.decl)?;
+        self.write_decl(&i.decl.decl)?;
         self.f.write_str(")")
     }
 
@@ -589,7 +589,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
 
     fn write_import(&mut self, i: &Interned<ImportExpr>) -> fmt::Result {
         self.f.write_str("import(")?;
-        self.write_decl(&i.decl)?;
+        self.write_decl(&i.decl.decl)?;
         self.f.write_str(")")
     }
 

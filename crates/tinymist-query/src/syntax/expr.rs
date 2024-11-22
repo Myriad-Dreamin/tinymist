@@ -161,6 +161,14 @@ impl std::hash::Hash for ExprInfo {
 }
 
 impl ExprInfo {
+    pub fn get_def(&self, decl: &Interned<Decl>) -> Option<Expr> {
+        if decl.is_def() {
+            return Some(Expr::Decl(decl.clone()));
+        }
+        let resolved = self.resolves.get(&decl.span())?;
+        Some(Expr::Ref(resolved.clone()))
+    }
+
     pub fn get_refs(
         &self,
         decl: Interned<Decl>,
@@ -612,7 +620,7 @@ impl<'a> ExprWorker<'a> {
                 .insert_mut(decl.name().clone(), Expr::Ref(mod_ref.clone()));
         }
 
-        self.resolve_as(mod_ref);
+        self.resolve_as(mod_ref.clone());
 
         let fid = mod_expr.as_ref().and_then(|mod_expr| match mod_expr {
             Expr::Type(Ty::Value(v)) => match &v.val {
@@ -678,7 +686,7 @@ impl<'a> ExprWorker<'a> {
             }
         };
 
-        Expr::Import(ImportExpr { decl }.into())
+        Expr::Import(ImportExpr { decl: mod_ref }.into())
     }
 
     fn check_import(&mut self, source: ast::Expr, is_import: bool) -> Option<Expr> {
@@ -1179,4 +1187,13 @@ fn extract_ref(step: Option<Expr>) -> (Option<Expr>, Option<Expr>) {
 
 fn none_expr() -> Expr {
     Expr::Type(Ty::Builtin(BuiltinTy::None))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_expr_size() {
+        use super::*;
+        assert!(size_of::<Expr>() <= size_of::<usize>() * 2);
+    }
 }
