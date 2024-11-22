@@ -36,6 +36,10 @@
     - #maintains[
         - #nightly-releases
       ]
+  - Max397
+    - #github("max397574")
+    - #maintains[
+        - #editor-integration
 ]
 
 == Features
