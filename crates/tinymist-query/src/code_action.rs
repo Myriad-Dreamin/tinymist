@@ -3,7 +3,11 @@ use once_cell::sync::{Lazy, OnceCell};
 use regex::Regex;
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::{prelude::*, SemanticRequest};
+use crate::{
+    prelude::*,
+    syntax::{interpret_mode_at, InterpretMode},
+    SemanticRequest,
+};
 
 /// The [`textDocument/codeAction`] request is sent from the client to the
 /// server to compute commands for a given text document and range. These
@@ -77,12 +81,10 @@ impl SemanticRequest for CodeActionRequest {
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let range = ctx.to_typst_range(self.range, &source)?;
-        let cursor = (range.start + 1).min(source.text().len());
-        // todo: don't ignore the range end
 
         let root = LinkedNode::new(source.root());
         let mut worker = CodeActionWorker::new(ctx, source.clone());
-        worker.work(root, cursor);
+        worker.work(root, range);
 
         let res = worker.actions;
         (!res.is_empty()).then_some(res)
@@ -112,6 +114,7 @@ impl<'a> CodeActionWorker<'a> {
             .as_ref()
     }
 
+    #[must_use]
     fn local_edits(&self, edits: Vec<TextEdit>) -> Option<WorkspaceEdit> {
         Some(WorkspaceEdit {
             changes: Some(HashMap::from_iter([(self.local_url()?.clone(), edits)])),
@@ -119,8 +122,43 @@ impl<'a> CodeActionWorker<'a> {
         })
     }
 
+    #[must_use]
     fn local_edit(&self, edit: TextEdit) -> Option<WorkspaceEdit> {
         self.local_edits(vec![edit])
+    }
+
+    fn wrap_actions(&mut self, node: &LinkedNode, range: Range<usize>) -> Option<()> {
+        if range.is_empty() {
+            return None;
+        }
+
+        let start_mode = interpret_mode_at(Some(node));
+        if !matches!(start_mode, InterpretMode::Markup | InterpretMode::Math) {
+            return None;
+        }
+
+        let edit = self.local_edits(vec![
+            TextEdit {
+                range: self
+                    .ctx
+                    .to_lsp_range(range.start..range.start, &self.current),
+                new_text: "#[".into(),
+            },
+            TextEdit {
+                range: self.ctx.to_lsp_range(range.end..range.end, &self.current),
+                new_text: "]".into(),
+            },
+        ])?;
+
+        let action = CodeActionOrCommand::CodeAction(CodeAction {
+            title: "Wrap with content block".to_string(),
+            kind: Some(CodeActionKind::REFACTOR_REWRITE),
+            edit: Some(edit),
+            ..CodeAction::default()
+        });
+        self.actions.push(action);
+
+        Some(())
     }
 
     fn heading_actions(&mut self, node: &LinkedNode) -> Option<()> {
@@ -269,12 +307,15 @@ impl<'a> CodeActionWorker<'a> {
         Some(())
     }
 
-    fn work(&mut self, root: LinkedNode, cursor: usize) -> Option<()> {
+    fn work(&mut self, root: LinkedNode, range: Range<usize>) -> Option<()> {
+        let cursor = (range.start + 1).min(self.current.text().len());
         let node = root.leaf_at_compat(cursor)?;
         let mut node = &node;
 
         let mut heading_resolved = false;
         let mut equation_resolved = false;
+
+        self.wrap_actions(node, range);
 
         loop {
             match node.kind() {
