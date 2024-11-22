@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on / (63..64)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-current-heading.typ
+snapshot_kind: text
 ---
 [
  {
@@ -27,14 +28,14 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-current-headin
     }
    },
    {
-    "kind": 7,
+    "kind": 3,
     "label": "int",
     "labelDetails": {
      "description": "type"
     },
-    "sortText": "125",
+    "sortText": "089",
     "textEdit": {
-     "newText": "int",
+     "newText": "int(${1:})",
      "range": {
       "end": {
        "character": 24,

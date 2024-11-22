@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/confusing-name.typ
+snapshot_kind: text
 ---
 "x" = (Any) => Any
 "date" = Any

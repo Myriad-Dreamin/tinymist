@@ -1,0 +1,77 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (57..58)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
+snapshot_kind: text
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 5,
+    "label": "config",
+    "labelDetails": {
+     "description": "dictionary"
+    },
+    "sortText": "003",
+    "textEdit": {
+     "newText": "config: ${1:}",
+     "range": {
+      "end": {
+       "character": 7,
+       "line": 2
+      },
+      "start": {
+       "character": 7,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 5,
+    "label": "repeat",
+    "labelDetails": {
+     "description": "auto"
+    },
+    "sortText": "004",
+    "textEdit": {
+     "newText": "repeat: ${1:}",
+     "range": {
+      "end": {
+       "character": 7,
+       "line": 2
+      },
+      "start": {
+       "character": 7,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "kind": 3,
+    "label": "repeat",
+    "labelDetails": {
+     "description": "(content, gap: length, justify: bool) => repeat"
+    },
+    "sortText": "159",
+    "textEdit": {
+     "newText": "repeat(${1:})",
+     "range": {
+      "end": {
+       "character": 7,
+       "line": 2
+      },
+      "start": {
+       "character": 7,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]

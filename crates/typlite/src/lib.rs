@@ -13,8 +13,10 @@ pub use error::*;
 
 use base64::Engine;
 use scopes::Scopes;
+use tinymist_world::reflexo_typst::path::unix_slash;
 use tinymist_world::{base::ShadowApi, EntryReader, LspWorld};
 use typst::foundations::IntoValue;
+use typst::WorldExt;
 use typst::{
     foundations::{Bytes, Dict},
     layout::Abs,
@@ -44,18 +46,28 @@ pub enum ColorTheme {
     Dark,
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct TypliteFeat {
+    /// The preferred color theme
+    pub color_theme: Option<ColorTheme>,
+    /// Allows GFM (GitHub Flavored Markdown) markups.
+    pub gfm: bool,
+    /// Annotate the elements for identification.
+    pub annotate_elem: bool,
+    /// Embed errors in the output instead of yielding them.
+    pub soft_error: bool,
+    /// Remove HTML tags from the output.
+    pub remove_html: bool,
+}
+
 /// Task builder for converting a typst document to Markdown.
 pub struct Typlite {
     /// The universe to use for the conversion.
     world: Arc<LspWorld>,
     /// library to use for the conversion.
     library: Option<Arc<Scopes<Value>>>,
-    /// Documentation style to use for annotating the document.
-    do_annotate: bool,
-    /// Whether to enable GFM (GitHub Flavored Markdown) features.
-    gfm: bool,
-    /// The preferred color theme
-    theme: Option<ColorTheme>,
+    /// Features for the conversion.
+    feat: TypliteFeat,
 }
 
 impl Typlite {
@@ -67,9 +79,7 @@ impl Typlite {
         Self {
             world,
             library: None,
-            do_annotate: false,
-            gfm: false,
-            theme: None,
+            feat: Default::default(),
         }
     }
 
@@ -79,15 +89,9 @@ impl Typlite {
         self
     }
 
-    /// Set the preferred color theme.
-    pub fn with_color_theme(mut self, theme: ColorTheme) -> Self {
-        self.theme = Some(theme);
-        self
-    }
-
-    /// Annotate the elements for identification.
-    pub fn annotate_elements(mut self, do_annotate: bool) -> Self {
-        self.do_annotate = do_annotate;
+    /// Set conversion feature
+    pub fn with_feature(mut self, feat: TypliteFeat) -> Self {
+        self.feat = feat;
         self
     }
 
@@ -106,9 +110,7 @@ impl Typlite {
 
         let worker = TypliteWorker {
             current,
-            gfm: self.gfm,
-            do_annotate: self.do_annotate,
-            theme: self.theme,
+            feat: self.feat,
             list_depth: 0,
             scopes: self
                 .library
@@ -126,12 +128,11 @@ impl Typlite {
 #[derive(Clone)]
 pub struct TypliteWorker {
     current: FileId,
-    theme: Option<ColorTheme>,
-    gfm: bool,
-    do_annotate: bool,
     scopes: Arc<Scopes<Value>>,
     world: Arc<LspWorld>,
     list_depth: usize,
+    /// Features for the conversion.
+    pub feat: TypliteFeat,
 }
 
 impl TypliteWorker {
@@ -318,6 +319,34 @@ impl TypliteWorker {
         Ok(Value::Content(s))
     }
 
+    pub fn to_raw_block(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
+        let content = node.clone().into_text();
+
+        let s = if inline {
+            let mut s = EcoString::with_capacity(content.len() + 2);
+            s.push_str("`");
+            s.push_str(&content);
+            s.push_str("`");
+            s
+        } else {
+            let mut s = EcoString::with_capacity(content.len() + 15);
+            s.push_str("```");
+            let lang = match node.cast::<ast::Expr>() {
+                Some(ast::Expr::Text(..) | ast::Expr::Space(..)) => "typ",
+                Some(..) => "typc",
+                None => "typ",
+            };
+            s.push_str(lang);
+            s.push('\n');
+            s.push_str(&content);
+            s.push('\n');
+            s.push_str("```");
+            s
+        };
+
+        Ok(Value::Content(s))
+    }
+
     pub fn render(&mut self, node: &SyntaxNode, inline: bool) -> Result<Value> {
         let code = node.clone().into_text();
         self.render_code(&code, false, "center", "", inline)
@@ -331,13 +360,10 @@ impl TypliteWorker {
         extra_attrs: &str,
         inline: bool,
     ) -> Result<Value> {
-        let theme = self.theme;
+        let theme = self.feat.color_theme;
         let mut render = |theme| self.render_inner(code, is_markup, theme);
 
         let mut content = EcoString::new();
-        if !inline {
-            let _ = write!(content, r#"<p align="{align}">"#);
-        }
 
         let inline_attrs = if inline {
             r#" style="vertical-align: -0.35em""#
@@ -346,24 +372,53 @@ impl TypliteWorker {
         };
         match theme {
             Some(theme) => {
-                let data = render(theme)?;
-                let _ = write!(
-                    content,
-                    r#"<img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{data}" {extra_attrs}/>"#,
-                );
+                let data = render(theme);
+                match data {
+                    Ok(data) => {
+                        if !inline {
+                            let _ = write!(content, r#"<p align="{align}">"#);
+                        }
+                        let _ = write!(
+                            content,
+                            r#"<img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{data}" {extra_attrs}/>"#,
+                        );
+                        if !inline {
+                            content.push_str("</p>");
+                        }
+                    }
+                    Err(err) if self.feat.soft_error => {
+                        // wrap the error in a fenced code block
+                        let err = err.to_string().replace("`", r#"\`"#);
+                        let _ = write!(content, "```\nRender Error\n{err}\n```");
+                    }
+                    Err(err) => return Err(err),
+                }
             }
             None => {
-                let _ = write!(
-                    content,
-                    r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{light}" {extra_attrs}/></picture>"#,
-                    dark = render(ColorTheme::Dark)?,
-                    light = render(ColorTheme::Light)?
-                );
-            }
-        }
+                let dark = render(ColorTheme::Dark);
+                let light = render(ColorTheme::Light);
 
-        if !inline {
-            content.push_str("</p>");
+                match (dark, light) {
+                    (Ok(dark), Ok(light)) => {
+                        if !inline {
+                            let _ = write!(content, r#"<p align="{align}">"#);
+                        }
+                        let _ = write!(
+                            content,
+                            r#"<picture><source media="(prefers-color-scheme: dark)" srcset="data:image/svg+xml;base64,{dark}"><img{inline_attrs} alt="typst-block" src="data:image/svg+xml;base64,{light}" {extra_attrs}/></picture>"#,
+                        );
+                        if !inline {
+                            content.push_str("</p>");
+                        }
+                    }
+                    (Err(err), _) | (_, Err(err)) if self.feat.soft_error => {
+                        // wrap the error in a fenced code block
+                        let err = err.to_string().replace("`", r#"\`"#);
+                        let _ = write!(content, "```\nRendering Error\n{err}\n```");
+                    }
+                    (Err(err), _) | (_, Err(err)) => return Err(err),
+                }
+            }
         }
 
         Ok(Value::Content(content))
@@ -400,9 +455,63 @@ impl TypliteWorker {
         world.source_db.take_state();
         world.map_shadow_by_id(main_id, main).unwrap();
 
-        let document = typst::compile(&world)
-            .output
-            .map_err(|e| format!("compiling math node: {e:?}"))?;
+        let document = typst::compile(&world).output;
+        let document = document.map_err(|e| {
+            let mut err = String::new();
+            let _ = write!(err, "compiling node: ");
+            let write_span = |span: typst_syntax::Span, err: &mut String| {
+                let file = span.id().map(|id| match id.package() {
+                    Some(package) => {
+                        format!("{package}:{}", unix_slash(id.vpath().as_rooted_path()))
+                    }
+                    None => unix_slash(id.vpath().as_rooted_path()),
+                });
+                let range = world.range(span);
+                match (file, range) {
+                    (Some(file), Some(range)) => {
+                        let _ = write!(err, "{file:?}:{range:?}");
+                    }
+                    (Some(file), None) => {
+                        let _ = write!(err, "{file:?}");
+                    }
+                    (None, Some(range)) => {
+                        let _ = write!(err, "{range:?}");
+                    }
+                    _ => {
+                        let _ = write!(err, "unknown location");
+                    }
+                }
+            };
+
+            for s in e.iter() {
+                match s.severity {
+                    typst::diag::Severity::Error => {
+                        let _ = write!(err, "error: ");
+                    }
+                    typst::diag::Severity::Warning => {
+                        let _ = write!(err, "warning: ");
+                    }
+                }
+
+                err.push_str(&s.message);
+                err.push_str(" at ");
+                write_span(s.span, &mut err);
+
+                for hint in s.hints.iter() {
+                    err.push_str("\nHint: ");
+                    err.push_str(hint);
+                }
+
+                for trace in &s.trace {
+                    write!(err, "\nTrace: {} at ", trace.v).unwrap();
+                    write_span(trace.span, &mut err);
+                }
+
+                err.push('\n');
+            }
+
+            err
+        })?;
 
         let svg_payload = typst_svg::svg_merged(&document, Abs::zero());
         Ok(base64::engine::general_purpose::STANDARD.encode(svg_payload))
@@ -485,7 +594,7 @@ impl TypliteWorker {
 
     fn link(&mut self, node: &SyntaxNode) -> Result<Value> {
         // GFM supports autolinks
-        if self.gfm {
+        if self.feat.gfm {
             // return Self::str(node, s);
             return Self::str(node);
         }
@@ -518,12 +627,12 @@ impl TypliteWorker {
         let list_item = node.cast::<ast::ListItem>().unwrap();
 
         s.push_str("- ");
-        if self.do_annotate {
+        if self.feat.annotate_elem {
             let _ = write!(s, "<!-- typlite:begin:list-item {} -->", self.list_depth);
             self.list_depth += 1;
         }
         s.push_str(&Self::value(self.eval(list_item.body().to_untyped())?));
-        if self.do_annotate {
+        if self.feat.annotate_elem {
             self.list_depth -= 1;
             let _ = write!(s, "<!-- typlite:end:list-item {} -->", self.list_depth);
         }
@@ -551,6 +660,10 @@ impl TypliteWorker {
 
     fn equation(&mut self, node: &SyntaxNode) -> Result<Value> {
         let equation: ast::Equation = node.cast().unwrap();
+
+        if self.feat.remove_html {
+            return self.to_raw_block(node, !equation.block());
+        }
 
         self.render(node, !equation.block())
     }
@@ -584,6 +697,9 @@ impl TypliteWorker {
     }
 
     fn contextual(&mut self, node: &SyntaxNode) -> Result<Value> {
+        if self.feat.remove_html {
+            return self.to_raw_block(node, false);
+        }
         self.render(node, false)
     }
 

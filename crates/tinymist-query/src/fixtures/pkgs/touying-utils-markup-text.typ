@@ -2,10 +2,12 @@
 
 /// Convert content to markup text, partly from
 /// [typst-examples-book](https://sitandr.github.io/typst-examples-book/book/typstonomicon/extract_markup_text.html).
+/// 
+/// #let mode = `"typ" or "md"`
 ///
-/// - it (content): The content to convert.
+/// - it (content, str): The content to convert.
 ///
-/// - mode (string): The mode of the markup text, either `typ` or `md`.
+/// - mode (str, mode): The mode of the markup text, either `typ` or `md`.
 ///
 /// - indent (int): The number of spaces to indent. Default is `0`.
 #let markup-text(it, mode: "typ", indent: 0) = {
@@ -85,7 +87,7 @@
   }
 }
 -----
-/// contains: typ
+/// contains: str, "typ", "md"
 #import "lib.typ": *
 #markup-text(mode: /* range 0..1 */)[];
 -----

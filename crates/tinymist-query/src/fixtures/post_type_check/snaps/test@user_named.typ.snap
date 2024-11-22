@@ -3,5 +3,6 @@ source: crates/tinymist-query/src/analysis.rs
 description: "Check on \")\" (98)"
 expression: literal_type
 input_file: crates/tinymist-query/src/fixtures/post_type_check/user_named.typ
+snapshot_kind: text
 ---
-( ⪯ None & "font": Any)
+( ⪰ "content": None | "font": ( ⪰ None ⪯ (TextFont | Array<TextFont>)))

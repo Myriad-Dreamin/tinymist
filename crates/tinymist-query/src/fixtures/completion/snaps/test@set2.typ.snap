@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/completion.rs
 description: Completion on / (86..87)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/set2.typ
+snapshot_kind: text
 ---
 [
  {
@@ -14,6 +15,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/set2.typ
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
+    "sortText": "052",
     "textEdit": {
      "newText": "raw(${1:})",
      "range": {

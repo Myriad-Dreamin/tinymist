@@ -2,8 +2,9 @@
 source: crates/tinymist-query/src/hover.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/hover/param.typ
+snapshot_kind: text
 ---
 {
- "contents": "```typc\nlet param;\n```\n\n---\nThe `parameter`.",
+ "contents": "```typc\nlet param = any;\n```\n\n---\nThe `parameter`.",
  "range": "3:25:3:30"
 }

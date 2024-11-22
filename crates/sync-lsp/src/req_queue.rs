@@ -31,6 +31,17 @@ impl<I, O> fmt::Debug for ReqQueue<I, O> {
     }
 }
 
+impl<I, O> ReqQueue<I, O> {
+    pub fn begin_panic(&self) {
+        let keys = self.incoming.pending.keys().cloned().collect::<Vec<_>>();
+        log::error!("incoming pending: {keys:?}");
+        let keys = self.outgoing.pending.keys().cloned().collect::<Vec<_>>();
+        log::error!("outgoing pending: {keys:?}");
+
+        panic!("req queue panicking");
+    }
+}
+
 #[derive(Debug)]
 pub struct Incoming<I> {
     pending: HashMap<RequestId, I>,

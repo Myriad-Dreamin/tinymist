@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/hover.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/hover/builtin_var2.typ
+snapshot_kind: text
 ---
 {
  "contents": "```typc\n<module sys>\n```\n\n---\n```typc\nlet sys;\n```",

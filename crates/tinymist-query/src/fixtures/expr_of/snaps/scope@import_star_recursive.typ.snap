@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/import_star_recursive.typ
+snapshot_kind: text
 ---
 = resolves
 ModuleImport(..)@1..22 in /s2.typ -> Module(base2)@0..0 in /base2.typ, root Module(base2)@0..0 in /base2.typ, val: None

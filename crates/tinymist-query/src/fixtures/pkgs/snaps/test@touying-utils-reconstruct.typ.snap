@@ -1,8 +1,9 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (87..88)
+description: Completion on / (88..89)
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/completion-pkgs/touying-utils-reconstruct.typ
+input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-reconstruct.typ
+snapshot_kind: text
 ---
 [
  {
@@ -11,6 +12,9 @@ input_file: crates/tinymist-query/src/fixtures/completion-pkgs/touying-utils-rec
    {
     "kind": 5,
     "label": "body-name",
+    "labelDetails": {
+     "description": "\"body\""
+    },
     "sortText": "000",
     "textEdit": {
      "newText": "body-name: ${1:}",
@@ -29,6 +33,9 @@ input_file: crates/tinymist-query/src/fixtures/completion-pkgs/touying-utils-rec
    {
     "kind": 5,
     "label": "labeled",
+    "labelDetails": {
+     "description": "true"
+    },
     "sortText": "001",
     "textEdit": {
      "newText": "labeled: ${1:}",
@@ -47,6 +54,9 @@ input_file: crates/tinymist-query/src/fixtures/completion-pkgs/touying-utils-rec
    {
     "kind": 5,
     "label": "named",
+    "labelDetails": {
+     "description": "false"
+    },
     "sortText": "002",
     "textEdit": {
      "newText": "named: ${1:}",

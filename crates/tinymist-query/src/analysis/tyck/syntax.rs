@@ -484,7 +484,8 @@ impl<'a> TypeChecker<'a> {
         Ty::Builtin(BuiltinTy::Content)
     }
 
-    fn check_import(&mut self, _import: &Interned<ImportExpr>) -> Ty {
+    fn check_import(&mut self, import: &Interned<ImportExpr>) -> Ty {
+        self.check_ref(&import.decl);
         Ty::Builtin(BuiltinTy::None)
     }
 
@@ -527,8 +528,21 @@ impl<'a> TypeChecker<'a> {
 
     pub(crate) fn check_decl(&mut self, decl: &Interned<Decl>) -> Ty {
         let v = Ty::Var(self.get_var(decl));
-        if let Decl::Label(..) = decl.as_ref() {
-            self.constrain(&v, &Ty::Builtin(BuiltinTy::Label));
+        match decl.kind() {
+            DefKind::Reference => {
+                self.constrain(&v, &Ty::Builtin(BuiltinTy::Label));
+            }
+            DefKind::Module => {
+                let ty = if decl.is_def() {
+                    Some(Ty::Builtin(BuiltinTy::Module(decl.clone())))
+                } else {
+                    self.ei.get_def(decl).map(|e| self.check(&e))
+                };
+                if let Some(ty) = ty {
+                    self.constrain(&v, &ty);
+                }
+            }
+            _ => {}
         }
 
         v

@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/destructing.typ
+snapshot_kind: text
 ---
 = resolves
 Var(a)@6..7 in /s0.typ -> Var(a)@6..7 in /s0.typ, root Var(a)@6..7 in /s0.typ, val: None

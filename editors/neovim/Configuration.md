@@ -81,3 +81,37 @@ Set the print width for the formatter, which is a **soft limit** of characters p
 
 - **Type**: `number`
 - **Default**: `120`
+
+## `completion.triggerOnSnippetPlaceholders`
+
+Whether to trigger completions on arguments (placeholders) of snippets. For example, `box` will be completed to `box(|)`, and server will request the editor (lsp client) to request completion after moving cursor to the placeholder in the snippet. Note: this has no effect if the editor doesn't support `editor.action.triggerSuggest` or `tinymist.triggerSuggestAndParameterHints` command. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+
+## `completion.postfix`
+
+Whether to enable postfix code completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `completion.postfixUfcs`
+
+Whether to enable UFCS-style completion. For example, `[A].box|` will be completed to `box[A]|`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `completion.postfixUfcsLeft`
+
+Whether to enable left-variant UFCS-style completion. For example, `[A].table|` will be completed to `table(|)[A]`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`
+
+## `completion.postfixUfcsRight`
+
+Whether to enable right-variant UFCS-style completion. For example, `[A].table|` will be completed to `table([A], |)`. Hint: Restarting the editor is required to change this setting.
+
+- **Type**: `boolean`
+- **Default**: `true`

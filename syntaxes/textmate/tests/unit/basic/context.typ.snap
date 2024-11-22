@@ -11,14 +11,16 @@
 #        ^ source.typst meta.expr.context.typst
 #         ^ source.typst meta.expr.context.typst constant.numeric.integer.typst
 #          ^ source.typst punctuation.terminator.statement.typst
-#           ^^^ source.typst
+#           ^ source.typst markup.content.brace.typst
+#            ^ source.typst markup.content.brace.typst
 >#context {}{}
 #^ source.typst keyword.control.hash.typst
 # ^^^^^^^ source.typst meta.expr.context.typst keyword.control.other.typst
 #        ^ source.typst meta.expr.context.typst
 #         ^ source.typst meta.expr.context.typst meta.brace.curly.typst
 #          ^ source.typst meta.expr.context.typst meta.brace.curly.typst
-#           ^^^ source.typst
+#           ^ source.typst markup.content.brace.typst
+#            ^ source.typst markup.content.brace.typst
 >#context [][]
 #^ source.typst keyword.control.hash.typst
 # ^^^^^^^ source.typst meta.expr.context.typst keyword.control.other.typst
@@ -43,7 +45,8 @@
 #              ^ source.typst meta.expr.context.typst meta.expr.call.typst meta.brace.round.typst
 >}{}
 #^ source.typst meta.expr.context.typst meta.brace.curly.typst
-# ^^^ source.typst
+# ^ source.typst markup.content.brace.typst
+#  ^ source.typst markup.content.brace.typst
 >#context [Citation @distress on page #here().page()]{}
 #^ source.typst keyword.control.hash.typst
 # ^^^^^^^ source.typst meta.expr.context.typst keyword.control.other.typst
@@ -62,4 +65,5 @@
 #                                                 ^ source.typst meta.expr.context.typst meta.expr.call.typst meta.brace.round.typst
 #                                                  ^ source.typst meta.expr.context.typst meta.expr.call.typst meta.brace.round.typst
 #                                                   ^ source.typst meta.expr.context.typst meta.brace.square.typst
-#                                                    ^^^ source.typst
+#                                                    ^ source.typst markup.content.brace.typst
+#                                                     ^ source.typst markup.content.brace.typst

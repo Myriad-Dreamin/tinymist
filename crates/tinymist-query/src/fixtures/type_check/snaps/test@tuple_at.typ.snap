@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/tuple_at.typ
+snapshot_kind: text
 ---
 "a" = (1, 2, 3, )
 "b" = 2

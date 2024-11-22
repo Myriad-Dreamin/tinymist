@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/hover.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/hover/user.typ
+snapshot_kind: text
 ---
 {
  "contents": "```typc\nlet f() = int;\n```\n\n---\nTest",

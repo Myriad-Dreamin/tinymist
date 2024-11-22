@@ -1,20 +1,22 @@
 use std::{
     collections::BTreeMap,
+    ops::Deref,
     sync::{LazyLock, OnceLock},
 };
 
+use ecow::eco_format;
 use typst::foundations::{IntoValue, Module, Str, Type};
 
 use crate::{
     adt::snapshot_map::SnapshotMap,
     analysis::SharedContext,
-    docs::{
-        convert_docs, identify_func_docs, identify_tidy_module_docs, identify_var_docs,
-        UntypedDefDocs, VarDocsT,
-    },
+    docs::{convert_docs, identify_pat_docs, identify_tidy_module_docs, UntypedDefDocs, VarDocsT},
     prelude::*,
     syntax::{Decl, DefKind},
-    ty::{BuiltinTy, Interned, PackageId, SigTy, StrRef, Ty, TypeBounds, TypeVar, TypeVarBounds},
+    ty::{
+        BuiltinTy, InsTy, Interned, PackageId, SigTy, StrRef, Ty, TypeBounds, TypeVar,
+        TypeVarBounds,
+    },
 };
 
 use super::DeclExpr;
@@ -85,13 +87,11 @@ pub(crate) fn compute_docstring(
         locals: SnapshotMap::default(),
         next_id: 0,
     };
+    use DefKind::*;
     match kind {
-        DefKind::Function => checker.check_func_docs(docs),
-        DefKind::Variable => checker.check_var_docs(docs),
-        DefKind::Module => checker.check_module_docs(docs),
-        DefKind::Constant => None,
-        DefKind::Struct => None,
-        DefKind::Reference => None,
+        Function | Variable => checker.check_pat_docs(docs),
+        Module => checker.check_module_docs(docs),
+        Constant | Struct | Reference => None,
     }
 }
 
@@ -105,62 +105,88 @@ struct DocsChecker<'a> {
     next_id: u32,
 }
 
+static EMPTY_MODULE: LazyLock<Module> =
+    LazyLock::new(|| Module::new("stub", typst::foundations::Scope::new()));
+
 impl<'a> DocsChecker<'a> {
-    pub fn check_func_docs(mut self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(self.ctx, &docs).ok()?;
-        let converted = identify_func_docs(&converted).ok()?;
-        let module = self.ctx.module_by_str(docs)?;
+    pub fn check_pat_docs(mut self, docs: String) -> Option<DocString> {
+        let converted =
+            convert_docs(self.ctx, &docs).and_then(|converted| identify_pat_docs(&converted));
+
+        let converted = match Self::fallback_docs(converted, &docs) {
+            Ok(c) => c,
+            Err(e) => return Some(e),
+        };
+
+        let module = self.ctx.module_by_str(docs);
+        let module = module.as_ref().unwrap_or(EMPTY_MODULE.deref());
 
         let mut params = BTreeMap::new();
         for param in converted.params.into_iter() {
             params.insert(
                 param.name.into(),
                 VarDoc {
-                    docs: param.docs,
-                    ty: self.check_type_strings(&module, &param.types),
+                    docs: self.ctx.remove_html(param.docs),
+                    ty: self.check_type_strings(module, &param.types),
                 },
             );
         }
 
         let res_ty = converted
             .return_ty
-            .and_then(|ty| self.check_type_strings(&module, &ty));
+            .and_then(|ty| self.check_type_strings(module, &ty));
 
         Some(DocString {
-            docs: Some(converted.docs),
+            docs: Some(self.ctx.remove_html(converted.docs)),
             var_bounds: self.vars,
             vars: params,
             res_ty,
         })
     }
 
-    pub fn check_var_docs(mut self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(self.ctx, &docs).ok()?;
-        let converted = identify_var_docs(converted).ok()?;
-        let module = self.ctx.module_by_str(docs)?;
-
-        let res_ty = converted
-            .return_ty
-            .and_then(|ty| self.check_type_strings(&module, &ty.0));
-
-        Some(DocString {
-            docs: Some(converted.docs),
-            var_bounds: self.vars,
-            vars: BTreeMap::new(),
-            res_ty,
-        })
-    }
-
     pub fn check_module_docs(self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(self.ctx, &docs).ok()?;
-        let converted = identify_tidy_module_docs(converted).ok()?;
+        let converted = convert_docs(self.ctx, &docs).and_then(identify_tidy_module_docs);
+
+        let converted = match Self::fallback_docs(converted, &docs) {
+            Ok(c) => c,
+            Err(e) => return Some(e),
+        };
 
         Some(DocString {
-            docs: Some(converted.docs),
+            docs: Some(self.ctx.remove_html(converted.docs)),
             var_bounds: self.vars,
             vars: BTreeMap::new(),
             res_ty: None,
         })
+    }
+
+    fn fallback_docs<T>(converted: Result<T, EcoString>, docs: &str) -> Result<T, DocString> {
+        match converted {
+            Ok(c) => Ok(c),
+            Err(e) => {
+                let e = e.replace("`", "\\`");
+                let max_consecutive_backticks = docs
+                    .chars()
+                    .fold((0, 0), |(max, count), c| {
+                        if c == '`' {
+                            (max.max(count + 1), count + 1)
+                        } else {
+                            (max, 0)
+                        }
+                    })
+                    .0;
+                let backticks = "`".repeat((max_consecutive_backticks + 1).max(3));
+                let fallback_docs = eco_format!(
+                    "```\nfailed to parse docs: {e}\n```\n\n{backticks}typ\n{docs}\n{backticks}\n"
+                );
+                Err(DocString {
+                    docs: Some(fallback_docs),
+                    var_bounds: HashMap::new(),
+                    vars: BTreeMap::new(),
+                    res_ty: None,
+                })
+            }
+        }
     }
 
     fn generate_var(&mut self, name: StrRef) -> Ty {
@@ -275,6 +301,30 @@ impl<'a> DocsChecker<'a> {
         log::debug!("check doc type expr: {s:?}");
         match s {
             ast::Expr::Ident(i) => self.check_type_ident(m, i.get().as_str()),
+            ast::Expr::None(_)
+            | ast::Expr::Auto(_)
+            | ast::Expr::Bool(..)
+            | ast::Expr::Int(..)
+            | ast::Expr::Float(..)
+            | ast::Expr::Numeric(..)
+            | ast::Expr::Str(..) => SharedContext::const_eval(s).map(|v| Ty::Value(InsTy::new(v))),
+            ast::Expr::Binary(b) => {
+                let mut components = Vec::with_capacity(2);
+                components.push(self.check_type_expr(m, b.lhs())?);
+
+                let mut expr = b.rhs();
+                while let ast::Expr::Binary(b) = expr {
+                    if b.op() != ast::BinOp::Or {
+                        break;
+                    }
+
+                    components.push(self.check_type_expr(m, b.lhs())?);
+                    expr = b.rhs();
+                }
+
+                components.push(self.check_type_expr(m, expr)?);
+                Some(Ty::from_types(components.into_iter()))
+            }
             ast::Expr::FuncCall(c) => match c.callee() {
                 ast::Expr::Ident(i) => {
                     let name = i.get().as_str();

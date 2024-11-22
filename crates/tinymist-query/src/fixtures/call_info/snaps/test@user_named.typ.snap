@@ -2,6 +2,7 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: CallSnapshot(result.as_deref())
 input_file: crates/tinymist-query/src/fixtures/call_info/user_named.typ
+snapshot_kind: text
 ---
 y: 1 -> CallParamInfo { kind: Named, is_content_block: false, param_name: "y" }
 1 -> CallParamInfo { kind: Positional, is_content_block: false, param_name: "x" }

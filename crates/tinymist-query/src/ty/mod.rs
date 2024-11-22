@@ -32,6 +32,16 @@ pub trait TyCtx {
     fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds>;
 }
 
+impl TyCtx for () {
+    fn local_bind_of(&self, _var: &Interned<TypeVar>) -> Option<Ty> {
+        None
+    }
+
+    fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
+        None
+    }
+}
+
 /// A mutable type context.
 pub trait TyCtxMut: TyCtx {
     /// The type of a snapshot of the scope.

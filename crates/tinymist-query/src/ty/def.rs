@@ -8,17 +8,18 @@ use std::{
     sync::Arc,
 };
 
-use ecow::EcoVec;
+use ecow::{EcoString, EcoVec};
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
 use reflexo_typst::TypstFileId;
 use rustc_hash::{FxHashMap, FxHashSet};
+use serde::{Deserialize, Serialize};
 use typst::{
-    foundations::Value,
+    foundations::{Content, Element, ParamInfo, Type, Value},
     syntax::{ast, Span, SyntaxKind, SyntaxNode},
 };
 
-use super::PackageId;
+use super::{BoundPred, PackageId};
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
     analysis::BuiltinTy,
@@ -49,8 +50,8 @@ pub enum Ty {
     Builtin(BuiltinTy),
     /// A possible typst instance of some type.
     Value(Interned<InsTy>),
-    /// A field type
-    Field(Interned<FieldTy>),
+    /// A parameter type
+    Param(Interned<ParamTy>),
 
     // Combination Types
     /// A union type, whose negation is intersection type.
@@ -120,7 +121,7 @@ impl fmt::Debug for Ty {
                 f.write_str(")")
             }
             Ty::Let(v) => write!(f, "({v:?})"),
-            Ty::Field(ff) => write!(f, "{:?}: {:?}", ff.name, ff.field),
+            Ty::Param(ff) => write!(f, "{:?}: {:?}", ff.name, ff.ty),
             Ty::Var(v) => v.fmt(f),
             Ty::Unary(u) => write!(f, "{u:?}"),
             Ty::Binary(b) => write!(f, "{b:?}"),
@@ -141,6 +142,15 @@ impl Ty {
     /// Whether the type is a dictionary type
     pub fn is_dict(&self) -> bool {
         matches!(self, Ty::Dict(..))
+    }
+
+    pub(crate) fn or(ty: Option<Ty>, pos: Option<Ty>) -> Option<Ty> {
+        Some(match (ty, pos) {
+            (Some(ty), Some(pos)) => Ty::from_types([ty, pos].into_iter()),
+            (Some(ty), None) => ty,
+            (None, Some(pos)) => pos,
+            (None, None) => return None,
+        })
     }
 
     /// Create a union type from an iterator of types
@@ -168,6 +178,40 @@ impl Ty {
         Ty::Builtin(BuiltinTy::Undef)
     }
 
+    /// Get name of the type
+    pub fn name(&self) -> Interned<str> {
+        match self {
+            Ty::Var(v) => v.name.clone(),
+            Ty::Builtin(BuiltinTy::Module(m)) => m.name().clone(),
+            ty => ty
+                .value()
+                .and_then(|v| Some(Interned::new_str(v.name()?)))
+                .unwrap_or_default(),
+        }
+    }
+
+    /// Get span of the type
+    pub fn span(&self) -> Span {
+        fn seq(u: &[Ty]) -> Option<Span> {
+            u.iter().find_map(|ty| {
+                let sub = ty.span();
+                if sub.is_detached() {
+                    return None;
+                }
+                Some(sub)
+            })
+        }
+
+        match self {
+            Ty::Var(v) => v.def.span(),
+            Ty::Let(u) => seq(&u.ubs)
+                .or_else(|| seq(&u.lbs))
+                .unwrap_or_else(Span::detached),
+            Ty::Union(u) => seq(u).unwrap_or_else(Span::detached),
+            _ => Span::detached(),
+        }
+    }
+
     /// Get value repr of the type
     pub fn value(&self) -> Option<Value> {
         match self {
@@ -176,6 +220,37 @@ impl Ty {
             Ty::Builtin(BuiltinTy::Type(ty)) => Some(Value::Type(*ty)),
             _ => None,
         }
+    }
+
+    /// Get the type of the type
+    pub fn element(&self) -> Option<Element> {
+        match self {
+            Ty::Value(v) => match &v.val {
+                Value::Func(f) => f.element(),
+                _ => None,
+            },
+            Ty::Builtin(BuiltinTy::Element(v)) => Some(*v),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn satisfy<T: TyCtx>(&self, ctx: &T, f: impl FnMut(&Ty, bool)) {
+        self.bounds(true, &mut BoundPred::new(ctx, f));
+    }
+
+    pub(crate) fn is_content<T: TyCtx>(&self, ctx: &T) -> bool {
+        let mut res = false;
+        self.satisfy(ctx, |ty: &Ty, _pol| {
+            res = res || {
+                match ty {
+                    Ty::Value(v) => matches!(v.val, Value::Content(..)),
+                    Ty::Builtin(BuiltinTy::Content | BuiltinTy::Element(..)) => true,
+                    Ty::Builtin(BuiltinTy::Type(v)) => *v == Type::of::<Content>(),
+                    _ => false,
+                }
+            }
+        });
+        res
     }
 }
 
@@ -418,23 +493,107 @@ impl InsTy {
             })),
         })
     }
+
+    /// Get the span of the instance
+    pub fn span(&self) -> Span {
+        self.syntax
+            .as_ref()
+            .map(|s| s.name_node.span())
+            .or_else(|| {
+                Some(match &self.val {
+                    Value::Func(f) => f.span(),
+                    Value::Args(a) => a.span,
+                    Value::Content(c) => c.span(),
+                    // todo: module might have file id
+                    _ => return None,
+                })
+            })
+            .unwrap_or_else(Span::detached)
+    }
 }
 
-/// A field type
-#[derive(Debug, Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct FieldTy {
-    /// The name of the field
+/// Describes a function parameter.
+#[derive(
+    Debug, Clone, Copy, Hash, Serialize, Deserialize, Default, PartialEq, Eq, PartialOrd, Ord,
+)]
+pub struct ParamAttrs {
+    /// Is the parameter positional?
+    pub positional: bool,
+    /// Is the parameter named?
+    ///
+    /// Can be true even if `positional` is true if the parameter can be given
+    /// in both variants.
+    pub named: bool,
+    /// Can the parameter be given any number of times?
+    pub variadic: bool,
+    /// Is the parameter settable with a set rule?
+    pub settable: bool,
+}
+
+impl ParamAttrs {
+    pub(crate) fn positional() -> ParamAttrs {
+        ParamAttrs {
+            positional: true,
+            named: false,
+            variadic: false,
+            settable: false,
+        }
+    }
+
+    pub(crate) fn named() -> ParamAttrs {
+        ParamAttrs {
+            positional: false,
+            named: true,
+            variadic: false,
+            settable: false,
+        }
+    }
+
+    pub(crate) fn variadic() -> ParamAttrs {
+        ParamAttrs {
+            positional: true,
+            named: false,
+            variadic: true,
+            settable: false,
+        }
+    }
+}
+
+impl From<&ParamInfo> for ParamAttrs {
+    fn from(param: &ParamInfo) -> Self {
+        ParamAttrs {
+            positional: param.positional,
+            named: param.named,
+            variadic: param.variadic,
+            settable: param.settable,
+        }
+    }
+}
+
+/// Describes a parameter type.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ParamTy {
+    /// The name of the parameter.
     pub name: StrRef,
-    /// The type of the field
-    pub field: Ty,
+    /// The docstring of the parameter.
+    pub docs: Option<EcoString>,
+    /// The default value of the variable
+    pub default: Option<EcoString>,
+    /// The type of the parameter.
+    pub ty: Ty,
+    /// The attributes of the parameter.
+    pub attrs: ParamAttrs,
 }
 
-impl FieldTy {
+impl ParamTy {
     /// Create an untyped field type
-    pub fn new_untyped(name: StrRef) -> Interned<Self> {
+    pub fn new_untyped(name: StrRef, attrs: ParamAttrs) -> Interned<Self> {
         Interned::new(Self {
             name,
-            field: Ty::Any,
+            ty: Ty::Any,
+            docs: None,
+            default: None,
+            attrs,
         })
     }
 }
@@ -719,6 +878,21 @@ impl SigTy {
             .and_then(|_| self.inputs.get(idx))
     }
 
+    /// Get the parameter or the rest parameter at the given index
+    pub fn pos_or_rest(&self, idx: usize) -> Option<Ty> {
+        let nth = self.pos(idx).cloned();
+        nth.or_else(|| {
+            let rest_idx = || idx.saturating_sub(self.positional_params().len());
+
+            let rest_ty = self.rest_param()?;
+            match rest_ty {
+                Ty::Array(ty) => Some(ty.as_ref().clone()),
+                Ty::Tuple(tys) => tys.get(rest_idx()).cloned(),
+                _ => None,
+            }
+        })
+    }
+
     /// Get the named parameters of the function
     pub fn named_params(&self) -> impl ExactSizeIterator<Item = (&StrRef, &Ty)> {
         let named_names = self.names.names.iter();
@@ -958,8 +1132,14 @@ impl IfTy {
 /// A type scheme on a group of syntax structures (typing)
 #[derive(Default)]
 pub struct TypeScheme {
+    /// Whether the typing is valid
+    pub valid: bool,
+    /// The belonging file id
+    pub fid: Option<TypstFileId>,
     /// The revision used
     pub revision: usize,
+    /// The exported types
+    pub exports: FxHashMap<StrRef, Ty>,
     /// The typing on definitions
     pub vars: FxHashMap<DeclExpr, TypeVarBounds>,
     /// The checked documentation of definitions
@@ -1146,7 +1326,7 @@ pub(super) struct TypeCanoStore {
 
 impl_internable!(Ty,);
 impl_internable!(InsTy,);
-impl_internable!(FieldTy,);
+impl_internable!(ParamTy,);
 impl_internable!(TypeSource,);
 impl_internable!(TypeVar,);
 impl_internable!(SigWithTy,);
@@ -1198,7 +1378,7 @@ mod tests {
     #[test]
     fn test_ty_size() {
         use super::*;
-        assert!(size_of::<Ty>() == 16);
+        assert!(size_of::<Ty>() <= size_of::<usize>() * 2);
     }
 
     #[test]

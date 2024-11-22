@@ -176,11 +176,9 @@ async fn trace_main(
 
     let timings = writer.into_inner().unwrap();
 
-    let diagnostics = state.primary().handle.run_analysis(w, |ctx| {
-        tinymist_query::convert_diagnostics(ctx, diags.iter())
-    });
-
-    let diagnostics = diagnostics.unwrap_or_default();
+    let handle = &state.primary().handle;
+    let diagnostics =
+        tinymist_query::convert_diagnostics(w, diags.iter(), handle.analysis.position_encoding);
 
     let rpc_kind = rpc_kind.as_str();
 

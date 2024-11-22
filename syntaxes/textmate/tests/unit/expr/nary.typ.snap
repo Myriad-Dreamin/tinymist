@@ -5,7 +5,7 @@
 #     ^ source.typst meta.expr.let.typst variable.other.readwrite.typst
 #      ^ source.typst meta.expr.let.typst
 #       ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
-#         ^^^^ source.typst meta.expr.let.typst entity.name.type.primitive.typst
+#         ^^^^ source.typst meta.expr.let.typst keyword.other.none.typst
 #             ^ source.typst punctuation.terminator.statement.typst
 >#red = red
 #^ source.typst variable.other.readwrite.hash.typst

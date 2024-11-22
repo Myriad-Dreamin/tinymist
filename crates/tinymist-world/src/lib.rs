@@ -1,5 +1,6 @@
 //! World implementation of typst for tinymist.
 
+pub use reflexo_typst;
 pub use reflexo_typst::config::CompileFontOpts;
 pub use reflexo_typst::error::prelude;
 pub use reflexo_typst::font::FontResolverImpl;
@@ -20,8 +21,8 @@ use reflexo_typst::vfs::{system::SystemAccessModel, Vfs};
 use reflexo_typst::{CompilerFeat, CompilerUniverse, CompilerWorld, TypstDict};
 use serde::{Deserialize, Serialize};
 
-pub mod https;
-use https::HttpsRegistry;
+pub mod package;
+use package::HttpsRegistry;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
@@ -64,6 +65,22 @@ pub struct CompileFontArgs {
     pub ignore_system_fonts: bool,
 }
 
+/// Arguments related to where packages are stored in the system.
+#[derive(Debug, Clone, Parser, Default, PartialEq, Eq)]
+pub struct CompilePackageArgs {
+    /// Custom path to local packages, defaults to system-dependent location
+    #[clap(long = "package-path", env = "TYPST_PACKAGE_PATH", value_name = "DIR")]
+    pub package_path: Option<PathBuf>,
+
+    /// Custom path to package cache, defaults to system-dependent location
+    #[clap(
+        long = "package-cache-path",
+        env = "TYPST_PACKAGE_CACHE_PATH",
+        value_name = "DIR"
+    )]
+    pub package_cache_path: Option<PathBuf>,
+}
+
 /// Common arguments of compile, watch, and query.
 #[derive(Debug, Clone, Parser, Default)]
 pub struct CompileOnceArgs {
@@ -88,6 +105,10 @@ pub struct CompileOnceArgs {
     #[clap(flatten)]
     pub font: CompileFontArgs,
 
+    /// Package related arguments.
+    #[clap(flatten)]
+    pub package: CompilePackageArgs,
+
     /// The document's creation date formatted as a UNIX timestamp.
     ///
     /// For more information, see <https://reproducible-builds.org/specs/source-date-epoch/>.
@@ -103,26 +124,26 @@ pub struct CompileOnceArgs {
     /// Path to CA certificate file for network access, especially for
     /// downloading typst packages.
     #[clap(long = "cert", env = "TYPST_CERT", value_name = "CERT_PATH")]
-    pub certification: Option<PathBuf>,
+    pub cert: Option<PathBuf>,
 }
 
 impl CompileOnceArgs {
     /// Get a universe instance from the given arguments.
     pub fn resolve(&self) -> anyhow::Result<LspUniverse> {
         let entry = self.entry()?.try_into()?;
-        let fonts = LspUniverseBuilder::resolve_fonts(self.font.clone())?;
         let inputs = self
             .inputs
             .iter()
             .map(|(k, v)| (Str::from(k.as_str()), Value::Str(Str::from(v.as_str()))))
             .collect();
-        let cert_path = self.certification.clone();
+        let fonts = LspUniverseBuilder::resolve_fonts(self.font.clone())?;
+        let package = LspUniverseBuilder::resolve_package(self.cert.clone(), Some(&self.package));
 
         LspUniverseBuilder::build(
             entry,
-            Arc::new(fonts),
             Arc::new(LazyHash::new(inputs)),
-            cert_path,
+            Arc::new(fonts),
+            package,
         )
         .context("failed to create universe")
     }
@@ -184,15 +205,15 @@ impl LspUniverseBuilder {
     /// See [`LspCompilerFeat`] for instantiation details.
     pub fn build(
         entry: EntryState,
-        font_resolver: Arc<FontResolverImpl>,
         inputs: ImmutDict,
-        cert_path: Option<PathBuf>,
+        font_resolver: Arc<FontResolverImpl>,
+        package_registry: HttpsRegistry,
     ) -> ZResult<LspUniverse> {
         Ok(LspUniverse::new_raw(
             entry,
             Some(inputs),
             Vfs::new(SystemAccessModel {}),
-            HttpsRegistry::new(cert_path),
+            package_registry,
             font_resolver,
         ))
     }
@@ -207,6 +228,14 @@ impl LspUniverseBuilder {
             with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
         })?;
         Ok(searcher.into())
+    }
+
+    /// Resolve package registry from given options.
+    pub fn resolve_package(
+        cert_path: Option<PathBuf>,
+        args: Option<&CompilePackageArgs>,
+    ) -> HttpsRegistry {
+        HttpsRegistry::new(cert_path, args)
     }
 }
 

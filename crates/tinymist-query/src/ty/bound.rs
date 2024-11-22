@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use typst::foundations::{self, Func};
 
 use crate::ty::prelude::*;
@@ -16,6 +18,25 @@ pub trait BoundChecker: Sized + TyCtx {
         let mut ctx = BoundCheckContext;
         ctx.tys(w.ubs.iter(), pol, self);
         ctx.tys(w.lbs.iter(), !pol, self);
+    }
+}
+
+#[derive(BindTyCtx)]
+#[bind(0)]
+pub struct BoundPred<'a, T: TyCtx, F>(pub &'a T, pub F);
+
+impl<'a, T: TyCtx, F> BoundPred<'a, T, F> {
+    pub fn new(t: &'a T, f: F) -> Self {
+        Self(t, f)
+    }
+}
+
+impl<'a, T: TyCtx, F> BoundChecker for BoundPred<'a, T, F>
+where
+    F: FnMut(&Ty, bool),
+{
+    fn collect(&mut self, ty: &Ty, pol: bool) {
+        self.1(ty, pol);
     }
 }
 
@@ -78,8 +99,9 @@ impl Ty {
                 Any | Boolean(_) | If(..) | Builtin(..) | Value(..) => {}
                 Dict(..) | Array(..) | Tuple(..) | Func(..) | Args(..) | Pattern(..) => {}
                 Unary(..) | Binary(..) => {}
-                Field(ty) => {
-                    collect(&ty.field, results);
+                Param(ty) => {
+                    // todo: doc source can be param ty
+                    collect(&ty.ty, results);
                 }
                 Union(ty) => {
                     for ty in ty.iter() {
@@ -98,7 +120,12 @@ impl Ty {
                     results.push(DocSource::Var(ty.clone()));
                 }
                 With(ty) => collect(&ty.sig, results),
-                Select(_ty) => {
+                Select(ty) => {
+                    // todo: do this correctly
+                    if matches!(ty.select.deref(), "with" | "where") {
+                        collect(&ty.ty, results);
+                    }
+
                     // collect(&ty.ty, results)
                 }
             }
