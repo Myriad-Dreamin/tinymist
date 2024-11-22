@@ -160,8 +160,12 @@ jobs:
           cp "target/${{ matrix.rust-target }}/gh-release/tinymist$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )" "tinymist-${{ env.target }}$(If ('${{ matrix.platform }}' -eq 'win32') { '.exe' } else { '' } )"
       - name: Test tinymist
         run: |
+          cross test --profile=gh-release --workspace --target ${{ matrix.rust-target }}
+        if: matrix.cross && (fromJson(env.isRelease) || fromJson(env.isNightly)) && (matrix.platform == 'linux') && (matrix.arch == 'x64')
+      - name: Test tinymist
+        run: |
           cargo test --profile=gh-release --workspace --target ${{ matrix.rust-target }}
-        if: (fromJson(env.isRelease) || fromJson(env.isNightly)) && (matrix.platform == 'linux') && (matrix.arch == 'x64')
+        if: "!matrix.cross && (fromJson(env.isRelease) || fromJson(env.isNightly)) && (matrix.platform == 'linux') && (matrix.arch == 'x64')"
       - name: Upload split debug symbols for windows
         if: matrix.platform == 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         uses: actions/upload-artifact@v4
