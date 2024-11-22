@@ -81,6 +81,7 @@ open = { workspace = true, optional = true }
 dirs.workspace = true
 base64.workspace = true
 rayon.workspace = true
+typst-kit.workspace = true
 
 typst-ansi-hl = "0.2.0"
 
@@ -98,6 +99,9 @@ dhat-heap = ["dhat"]
 # and additionally New Computer Modern for text
 # into the binary.
 embed-fonts = ["typst-assets/fonts"]
+
+# Whether to vendor OpenSSL. Not applicable to Windows and macOS builds.
+vendor-openssl = ["typst-kit/vendor-openssl"]
 
 # Disable the default content hint.
 # This requires modifying typst.
