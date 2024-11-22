@@ -29,7 +29,7 @@ pub type LspResponseFuture<T> = LspResult<ResponseFuture<T>>;
 pub type SchedulableResponse<T> = LspResponseFuture<LspResult<T>>;
 /// The common future type for the language server.
 pub type AnySchedulableResponse = SchedulableResponse<JsonValue>;
-/// The result of a scheduled response which could be finally catched by
+/// The result of a scheduled response which could be finally caught by
 /// `schedule_tail`.
 /// - Returns Ok(Some()) -> Already responded
 /// - Returns Ok(None) -> Need to respond none

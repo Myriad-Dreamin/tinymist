@@ -331,7 +331,7 @@ pub async fn make_http_server(
     // final_tx.send(()).ok();
 
     tokio::spawn(async move {
-        // timemout alive_rx
+        // timeout alive_rx
         loop {
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => {

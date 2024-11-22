@@ -227,7 +227,7 @@ impl<'a> CodeActionWorker<'a> {
             .ctx
             .to_lsp_range(body_range.end..last_dollar.range().start, &self.current);
 
-        // Retrive punctuation to move
+        // Retrieve punctuation to move
         let mark_after_equation = self
             .current
             .text()

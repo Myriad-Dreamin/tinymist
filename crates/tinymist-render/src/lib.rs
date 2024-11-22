@@ -97,7 +97,7 @@ impl PeriscopeRenderer {
         doc: VersionedDocument,
         pos: FramePosition,
     ) -> Option<(String, f32, f32)> {
-        // todo: svg viewer compablity
+        // todo: svg viewer compatibility
         type UsingExporter = SvgExporter<PeriscopeExportFeature>;
         let mut doc = UsingExporter::svg_doc(&doc.document);
         doc.module.prepare_glyphs();

@@ -15,7 +15,7 @@ LSP will serve completion if you enter _trigger characters_ in the editor. Curre
   If ```js Ctrl+Space``` doesn't work, please check your IME settings or keybindings.
 ]
 
-When an item is selected, it will be commited if some character is typed.
+When an item is selected, it will be committed if some character is typed.
 1. press ```js Esc``` to avoid commit.
 1. press ```js Enter``` to commit one.
 2. press ```js '.'``` to commit one for those that can interact with the dot operator.

@@ -97,7 +97,7 @@ pub fn list_package_by_namespace(
         }
         // namespace/package_name/version
         // 2. package_name
-        let Some(package_names) = once_log(std::fs::read_dir(local_path), "read local pacakge")
+        let Some(package_names) = once_log(std::fs::read_dir(local_path), "read local package")
         else {
             continue;
         };

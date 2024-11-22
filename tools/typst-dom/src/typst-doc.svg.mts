@@ -341,7 +341,7 @@ export function provideSvgDoc<
       const INNER_RECT_UNIT = 100;
       const INNER_RECT_SCALE = "scale(0.01)";
 
-      /// Caclulate width
+      /// Calculate width
       let maxWidth = 0;
 
       interface SvgPage {
@@ -543,12 +543,12 @@ export function provideSvgDoc<
           );
           pageNumberIndicator.setAttribute("x", "0");
           pageNumberIndicator.setAttribute("y", "0");
-          const pnPaddedX = calculatedPaddedX + pageWidth / 2;
-          const pnPaddedY =
+          const onPaddedX = calculatedPaddedX + pageWidth / 2;
+          const onPaddedY =
             calculatedPaddedY + pageHeight + heightMargin + fontSize / 2;
           pageNumberIndicator.setAttribute(
             "transform",
-            `translate(${pnPaddedX}, ${pnPaddedY})`
+            `translate(${onPaddedX}, ${onPaddedY})`
           );
           pageNumberIndicator.setAttribute("font-size", fontSize.toString());
           pageNumberIndicator.textContent = `${i + 1}`;
@@ -616,7 +616,7 @@ export function provideSvgDoc<
 
         console.assert(
           this.canvasRenderCToken === undefined,
-          "Noo!!: canvasRenderCToken should be undefined"
+          "No!!: canvasRenderCToken should be undefined"
         );
 
         const tok = (this.canvasRenderCToken = new TypstCancellationToken());

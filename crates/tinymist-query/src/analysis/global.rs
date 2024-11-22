@@ -601,7 +601,7 @@ impl SharedContext {
     }
 
     /// Get the real definition of a compilation.
-    /// Note: must be called after compliation.
+    /// Note: must be called after compilation.
     pub(crate) fn dependencies(&self) -> EcoVec<reflexo::ImmutPath> {
         let mut v = EcoVec::new();
         self.world.iter_dependencies(&mut |p| {

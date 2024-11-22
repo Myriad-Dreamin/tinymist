@@ -19,7 +19,7 @@ export { PreviewMode } from 'typst-dom/typst-doc.mjs';
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
-const NOT_AVAIABLE = "current not avalible";
+const NOT_AVAILABLE = "current not available";
 const COMMA = enc.encode(",");
 export interface WsArgs {
     url: string;
@@ -271,7 +271,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
         function processMessage(data: ArrayBuffer) {
             if (!(data instanceof ArrayBuffer)) {
-                if (data === NOT_AVAIABLE) {
+                if (data === NOT_AVAILABLE) {
                     return;
                 }
 
