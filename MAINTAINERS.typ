@@ -40,6 +40,13 @@
     - #github("max397574")
     - #maintains[
         - #editor-integration
+      ]
+  - Ericoolen
+    - #github("Eric-Song-Nop")
+    - #email("EricYFSong@gmail.com")
+    - #maintains[
+        - #language-service
+      ]
 ]
 
 == Features
