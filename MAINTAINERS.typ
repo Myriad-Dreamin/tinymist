@@ -47,6 +47,12 @@
     - #maintains[
         - #language-service
       ]
+  - Caleb Maclennan
+    - #github("alerque")
+    - #email("caleb@alerque.com")
+    - #maintains[
+        - #editor-integration
+      ]
 ]
 
 == Features
