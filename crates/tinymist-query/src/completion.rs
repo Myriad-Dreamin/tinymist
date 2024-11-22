@@ -101,6 +101,27 @@ impl StatefulRequest for CompletionRequest {
             }
         }
 
+        // Skip if an error node starts with number (e.g. `1pt`)
+        if matches!(
+            deref_target,
+            Some(DerefTarget::Callee(..) | DerefTarget::VarAccess(..) | DerefTarget::Normal(..),)
+        ) {
+            let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
+            if node.erroneous() {
+                let mut n = node.text().chars();
+
+                match n.next() {
+                    Some(c) if c.is_numeric() => return None,
+                    Some('.') => {
+                        if matches!(n.next(), Some(c) if c.is_numeric()) {
+                            return None;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         // Do some completion specific to the deref target
         let mut ident_like = None;
         let mut completion_result = None;
