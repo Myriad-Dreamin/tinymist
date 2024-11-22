@@ -116,6 +116,11 @@ jobs:
         with:
           targets: ${{ matrix.rust-target }}
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Install llvm
+        if: matrix.platform == 'linux' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+        run: |
+          sudo apt-get update
+          sudo apt-get install llvm
       - name: Run rust-cache
         uses: Swatinem/rust-cache@v2
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
