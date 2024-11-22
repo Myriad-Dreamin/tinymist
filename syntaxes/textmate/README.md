@@ -7,7 +7,7 @@ The syntax highlighting is written in TypeScript, and ensures correct grammar by
 
 ### Building
 
-The following script running the TypeSCript program will generate the TextMate grammar file:
+The following script running the TypeScript program will generate the TextMate grammar file:
 
 ```shell
 yarn compile
