@@ -13,8 +13,14 @@ repository.workspace = true
 name = "typlite"
 path = "src/main.rs"
 
+[features]
+
+# Whether to vendor OpenSSL. Not applicable to Windows and macOS builds.
+vendor-openssl = ["typst-kit/vendor-openssl"]
+
 [dependencies]
 typlite.workspace = true
 clap.workspace = true
 tinymist-world.workspace = true
 ecow.workspace = true
+typst-kit.workspace = true
