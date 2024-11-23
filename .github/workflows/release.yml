@@ -50,17 +50,14 @@ jobs:
             platform: linux
             arch: x64
             regular_build: 'true'
-            cross: true
           - os: ubuntu-20.04
             rust-target: aarch64-unknown-linux-gnu
             platform: linux
             arch: arm64
-            cross: true
           - os: ubuntu-20.04
             rust-target: arm-unknown-linux-gnueabihf
             platform: linux
             arch: armhf
-            cross: true
           - os: macos-13
             rust-target: x86_64-apple-darwin
             platform: darwin
@@ -112,20 +109,29 @@ jobs:
         with:
           targets: ${{ matrix.rust-target }}
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Install llvm
+        if: matrix.platform == 'linux' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+        run: |
+          sudo apt-get update
+          sudo apt-get install llvm
+      - name: Install AArch64 target toolchain
+        if: matrix.rust-target == 'aarch64-unknown-linux-gnu' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+        run: |
+          sudo apt-get update
+          sudo apt-get install gcc-aarch64-linux-gnu
+      - name: Install ARM target toolchain
+        if: matrix.rust-target == 'arm-unknown-linux-gnueabihf' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+        run: |
+          sudo apt-get update
+          sudo apt-get install gcc-arm-linux-gnueabihf
       - name: Run rust-cache
         uses: Swatinem/rust-cache@v2
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
-      - name: Build tinymist binary (cross)
-        shell: pwsh
-        run: |
-          cargo install cross --git https://github.com/cross-rs/cross.git --locked --rev 085092ca
-          cross build --profile=gh-release -p tinymist --target ${{ matrix.rust-target }} --features vendor-openssl
-        if: matrix.cross && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')
       - name: Build tinymist binary
         shell: pwsh
         run: |
           cargo build --profile=gh-release -p tinymist --target ${{ matrix.rust-target }}
-        if: "!matrix.cross && (startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true')"
+        if: startsWith(github.ref, 'refs/tags/') || matrix.regular_build == 'true'
       - name: Rename debug symbols for windows
         if: matrix.platform == 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
         run: |
