@@ -104,7 +104,6 @@ reflexo-typst-shim = { version = "0.5.0-rc9", features = ["nightly"] }
 
 
 typst = "0.12.0"
-typst-kit = "0.12.0"
 typst-timing = "0.12.0"
 typst-svg = "0.12.0"
 typst-render = "0.12.0"
@@ -183,7 +182,6 @@ undocumented_unsafe_blocks = "warn"
 # tinymist-assets = { path = "./crates/tinymist-assets/" }
 
 typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
-typst-kit = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
 typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
 typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
 typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist-v0.12.0" }
