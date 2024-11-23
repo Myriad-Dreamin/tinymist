@@ -576,9 +576,8 @@ impl CompileConfig {
                 root_dir: command.root,
                 inputs: Arc::new(LazyHash::new(inputs)),
                 font: command.font,
-                package: command.package,
                 creation_timestamp: command.creation_timestamp,
-                cert: command.cert,
+                cert: command.certification,
             });
         }
 
@@ -722,14 +721,6 @@ impl CompileConfig {
         }
 
         opts
-    }
-
-    /// Determines the package options.
-    pub fn determine_package_opts(&self) -> CompilePackageArgs {
-        if let Some(extras) = &self.typst_extra_args {
-            return extras.package.clone();
-        }
-        CompilePackageArgs::default()
     }
 
     /// Determines the font resolver.
@@ -889,8 +880,6 @@ pub struct CompileExtraOpts {
     pub inputs: ImmutDict,
     /// Additional font paths.
     pub font: CompileFontArgs,
-    /// Package related arguments.
-    pub package: CompilePackageArgs,
     /// The creation timestamp for various output.
     pub creation_timestamp: Option<chrono::DateTime<chrono::Utc>>,
     /// Path to certification file
