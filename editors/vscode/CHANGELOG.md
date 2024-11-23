@@ -18,7 +18,8 @@ We have added maintainers to GitHub since 2024-11-22:
 
 ### Compiler
 
-* Added package related arguments to `typstExtraArgs` in https://github.com/Myriad-Dreamin/tinymist/pull/832 and https://github.com/Myriad-Dreamin/tinymist/pull/833
+* ~~Added package related arguments to `typstExtraArgs` in https://github.com/Myriad-Dreamin/tinymist/pull/832 and https://github.com/Myriad-Dreamin/tinymist/pull/833~~
+  * (Help Wanted) Reverted because of the OpenSSL problem. See https://github.com/Myriad-Dreamin/tinymist/pull/885.
 * Taking configuration items from `tinymist` section in https://github.com/Myriad-Dreamin/tinymist/pull/835
 
 ### Editor
