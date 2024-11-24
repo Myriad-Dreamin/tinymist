@@ -367,7 +367,7 @@
         },
         "tinymist.serverPath": {
           "title": "Path to server executable",
-          "description": "The extension can use a local tinymist executable instead of the one bundled with the extension. This setting controls the path to the executable.",
+          "description": "The extension can use a local tinymist executable instead of the one bundled with the extension. This setting controls the path to the executable. The string \"tinymist\" means look up Tinymist in PATH.",
           "type": [
             "string",
             "null"
