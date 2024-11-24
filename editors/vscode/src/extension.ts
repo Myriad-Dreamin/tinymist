@@ -315,6 +315,10 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
     commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
     commands.registerCommand("tinymist.getCurrentDocumentMetrics", commandGetCurrentDocumentMetrics),
     commands.registerCommand("tinymist.clearCache", commandClearCache),
+    commands.registerCommand("tinymist.restartServer", async () => {
+      await deactivate();
+      await doActivate(context);
+    }),
     commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
     commands.registerCommand("tinymist.showLog", tinymist.showLog),
     commands.registerCommand("tinymist.copyAnsiHighlight", commandCopyAnsiHighlight),

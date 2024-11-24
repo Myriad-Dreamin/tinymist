@@ -898,6 +898,11 @@
         "icon": "$(list-flat)"
       },
       {
+        "command": "tinymist.restartServer",
+        "title": "Restart server",
+        "category": "Typst"
+      },
+      {
         "command": "tinymist.clearCache",
         "title": "Clear all Cached Resources",
         "category": "Typst"
@@ -1011,6 +1016,10 @@
         },
         {
           "command": "tinymist.clearCache",
+          "when": "editorLangId == typst"
+        },
+        {
+          "command": "tinymist.restartServer",
           "when": "editorLangId == typst"
         }
       ],
