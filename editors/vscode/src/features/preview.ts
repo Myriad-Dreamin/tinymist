@@ -13,13 +13,9 @@ import {
   LaunchInBrowserTask,
   getPreviewHtml as getPreviewHtmlCompat,
 } from "./preview-compat";
-import {
-  commandKillPreview,
-  commandScrollPreview,
-  commandStartPreview,
-  registerPreviewTaskDispose,
-} from "../extension";
+import { commandKillPreview, commandScrollPreview, commandStartPreview } from "../extension";
 import { isGitpod, translateGitpodURL } from "../gitpod";
+import { registerPreviewTaskDispose } from "../lsp";
 
 function translateExternalURL(urlstr: string): string {
   if (isGitpod()) {

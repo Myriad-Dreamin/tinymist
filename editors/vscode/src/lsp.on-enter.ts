@@ -1,9 +1,9 @@
 import * as lc from "vscode-languageclient";
 import * as vscode from "vscode";
-import { client } from "./lsp";
 import { applySnippetTextEdits } from "./snippets";
 import { activeTypstEditor } from "./util";
 import { extensionState } from "./state";
+import { tinymist } from "./lsp";
 
 /**
  * A parameter literal used in requests to pass a text document and a range inside that
@@ -39,6 +39,7 @@ async function handleKeypress() {
 
   const editor = activeTypstEditor();
 
+  const client = tinymist.client;
   if (!editor || !client) return false;
 
   const lcEdits = await client

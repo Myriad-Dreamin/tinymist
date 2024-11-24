@@ -1020,7 +1020,7 @@
         },
         {
           "command": "tinymist.restartServer",
-          "when": "editorLangId == typst"
+          "when": "ext.tinymistActivated"
         }
       ],
       "editor/title": [
