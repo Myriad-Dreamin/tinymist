@@ -4257,7 +4257,7 @@ dependencies = [
  "serde_yaml",
  "strum",
  "sync-lsp",
- "tinymist-assets 0.12.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets",
  "tinymist-query",
  "tinymist-render",
  "tinymist-world",
@@ -4301,12 +4301,6 @@ dependencies = [
 [[package]]
 name = "tinymist-assets"
 version = "0.12.4"
-
-[[package]]
-name = "tinymist-assets"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26bc0e4f70f441caf62246598f8df638aac391ccdfa5d94c24c039725c099475"
 
 [[package]]
 name = "tinymist-derive"
@@ -4399,7 +4393,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
- "tinymist-assets 0.12.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets",
  "typst",
  "typst-assets",
 ]
@@ -4859,7 +4853,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.12.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets",
  "tokio",
  "typst",
  "typst-assets",
