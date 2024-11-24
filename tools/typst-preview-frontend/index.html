@@ -16,6 +16,7 @@
     <!-- before all of code to avoid rerender by style replacement -->
     <script>
       if (typeof acquireVsCodeApi !== "undefined") {
+        const bytes2utf8 = new TextDecoder("utf-8");
         /**
          * Base64 to UTF-8
          * @param encoded Base64 encoded string
@@ -32,7 +33,7 @@
         console.log("state", state);
         if (state !== "") {
           /// Set it later when acquiring the VSCode API
-          window.vscode_state = JSON.parse(base64ToString(state));
+          window.vscode_state = JSON.parse(base64Decode(state));
           console.log("vscode_state", window.vscode_state);
         }
       }

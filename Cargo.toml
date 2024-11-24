@@ -144,7 +144,7 @@ insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
 typst-preview = { path = "./crates/typst-preview" }
-tinymist-assets = { version = "0.12.4" }
+tinymist-assets = { version = "0.12.5-rc1" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-derive = { path = "./crates/tinymist-derive/" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/" }
