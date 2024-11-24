@@ -8,7 +8,7 @@ use parking_lot::Mutex;
 use reflexo_typst::typst::prelude::*;
 use reflexo_typst::{package::PackageSpec, TypstFileId};
 use serde::{Deserialize, Serialize};
-use tinymist_world::package::HttpsRegistry;
+use tinymist_world::https::HttpsRegistry;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
 use typst::syntax::VirtualPath;
