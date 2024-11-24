@@ -299,24 +299,25 @@ const markup: textmate.Pattern = {
       name: "punctuation.definition.list.numbered.typst",
       match: /^\s*([0-9]+\.|\+)\s+/,
     },
-    {
-      match: /^\s*(\/)\s+([^:]*)(:)/,
-      captures: {
-        "1": {
-          name: "punctuation.definition.list.description.typst",
-        },
-        "2": {
-          patterns: [
-            {
-              include: "#markup",
-            },
-          ],
-        },
-        "3": {
-          name: "markup.list.term.typst",
-        },
-      },
-    },
+    // The term list parsing is buggy
+    // {
+    //   match: /^\s*(\/)\s+([^:]*)(:)/,
+    //   captures: {
+    //     "1": {
+    //       name: "punctuation.definition.list.description.typst",
+    //     },
+    //     "2": {
+    //       patterns: [
+    //         {
+    //           include: "#markup",
+    //         },
+    //       ],
+    //     },
+    //     "3": {
+    //       name: "markup.list.term.typst",
+    //     },
+    //   },
+    // },
     {
       include: "#markupLabel",
     },

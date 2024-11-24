@@ -4,8 +4,7 @@
 #^^^^ source.typst
 >
 >/ #text(red, "a"): b
-#^ source.typst punctuation.definition.list.description.typst
-# ^ source.typst
+#^^ source.typst
 #  ^ source.typst entity.name.function.hash.typst
 #   ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
 #       ^ source.typst meta.expr.call.typst meta.brace.round.typst
@@ -16,14 +15,15 @@
 #              ^ source.typst meta.expr.call.typst string.quoted.double.typst
 #               ^ source.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
 #                ^ source.typst meta.expr.call.typst meta.brace.round.typst
-#                 ^ source.typst markup.list.term.typst
-#                  ^^^ source.typst
+#                 ^^^^ source.typst
 >
 >/ a: b
-#^ source.typst punctuation.definition.list.description.typst
-# ^ source.typst
-#  ^ source.typst
-#   ^ source.typst markup.list.term.typst
-#    ^^^ source.typst
+#^^^^^^^ source.typst
 >
+>/ term `:`: description
+#^^^^^^^ source.typst
+#       ^ source.typst markup.raw.inline.typst string.other.raw.typst punctuation.definition.raw.inline.typst
+#        ^ source.typst markup.raw.inline.typst string.other.raw.typst
+#         ^ source.typst markup.raw.inline.typst string.other.raw.typst punctuation.definition.raw.inline.typst
+#          ^^^^^^^^^^^^^^ source.typst
 >
