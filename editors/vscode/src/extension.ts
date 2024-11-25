@@ -11,12 +11,8 @@ import {
 import * as vscode from "vscode";
 import * as path from "path";
 
-import {
-  LanguageClient,
-  type LanguageClientOptions,
-  type ServerOptions,
-} from "vscode-languageclient/node";
-import { loadTinymistConfig, substVscodeVarsInConfig } from "./config";
+import { LanguageClient } from "vscode-languageclient/node";
+import { loadTinymistConfig } from "./config";
 import {
   EditorToolName,
   SymbolViewProvider as SymbolViewProvider,
@@ -32,13 +28,8 @@ import {
   previewProcessOutline,
 } from "./features/preview";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
-import {
-  activeTypstEditor,
-  DisposeList,
-  getSensibleTextEditorColumn,
-  typstDocumentSelector,
-} from "./util";
-import { client, getClient, setClient, tinymist } from "./lsp";
+import { activeTypstEditor, DisposeList, getSensibleTextEditorColumn } from "./util";
+import { tinymist } from "./lsp";
 import { taskActivate } from "./features/tasks";
 import { onEnterHandler } from "./lsp.on-enter";
 import { extensionState } from "./state";
@@ -46,7 +37,6 @@ import { devKitFeatureActivate } from "./features/dev-kit";
 import { labelFeatureActivate } from "./features/label";
 import { packageFeatureActivate } from "./features/package";
 import { dragAndDropActivate } from "./features/drag-and-drop";
-import { HoverDummyStorage, HoverTmpStorage } from "./features/hover-storage";
 
 export async function activate(context: ExtensionContext): Promise<void> {
   try {
@@ -57,15 +47,28 @@ export async function activate(context: ExtensionContext): Promise<void> {
   }
 }
 
-export function deactivate(): Promise<void> | undefined {
+export async function deactivate(): Promise<void> {
+  // Remove handlers first to avoid sending messages to the server when deactivating
   previewDeactivate();
-  return client?.stop();
+  if (tinymist.context) {
+    for (const disposable of tinymist.context.subscriptions.splice(0)) {
+      disposable.dispose();
+    }
+  }
+  await tinymist.stop();
+  tinymist.context = undefined!;
 }
 
 export async function doActivate(context: ExtensionContext): Promise<void> {
+  tinymist.context = context;
   const isDevMode = vscode.ExtensionMode.Development == context.extensionMode;
   // Sets a global context key to indicate that the extension is activated
   vscode.commands.executeCommand("setContext", "ext.tinymistActivated", true);
+  context.subscriptions.push({
+    dispose: () => {
+      vscode.commands.executeCommand("setContext", "ext.tinymistActivated", false);
+    },
+  });
   // Loads configuration
   const config = loadTinymistConfig();
   // Inform server that we support named completion callback at the client side
@@ -93,8 +96,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   );
 
   // Initializes language client
-  const client = initClient(context, config);
-  setClient(client);
+  const client = tinymist.initClient(config);
   // Activates features
   labelFeatureActivate(context);
   packageFeatureActivate(context);
@@ -124,229 +126,10 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   }
 
   // Starts language client
-  return await startClient(client, context);
-}
+  languageActivate(context);
+  await tinymist.startClient();
 
-function initClient(context: ExtensionContext, config: Record<string, any>) {
-  const isProdMode = context.extensionMode === ExtensionMode.Production;
-
-  const run = {
-    command: tinymist.probeEnvPath("tinymist.serverPath", config.serverPath),
-    args: [
-      "lsp",
-      /// The `--mirror` flag is only used in development/test mode for testing
-      ...(isProdMode ? [] : ["--mirror", "tinymist-lsp.log"]),
-    ],
-    options: { env: Object.assign({}, process.env, { RUST_BACKTRACE: "1" }) },
-  };
-  // console.log("use arguments", run);
-  const serverOptions: ServerOptions = {
-    run,
-    debug: run,
-  };
-
-  const trustedCommands = {
-    enabledCommands: ["tinymist.openInternal", "tinymist.openExternal"],
-  };
-  const hoverStorage = extensionState.features.renderDocs
-    ? new HoverTmpStorage(context)
-    : new HoverDummyStorage();
-
-  const clientOptions: LanguageClientOptions = {
-    documentSelector: typstDocumentSelector,
-    initializationOptions: config,
-    middleware: {
-      workspace: {
-        async configuration(params, token, next) {
-          const items = params.items.map((item) => item.section);
-          const result = await next(params, token);
-          if (!Array.isArray(result)) {
-            return result;
-          }
-          return substVscodeVarsInConfig(items, result);
-        },
-      },
-      provideHover: async (document, position, token, next) => {
-        const hover = await next(document, position, token);
-        if (!hover) {
-          return hover;
-        }
-
-        const hoverHandler = await hoverStorage.startHover();
-
-        for (const content of hover.contents) {
-          if (content instanceof vscode.MarkdownString) {
-            content.isTrusted = trustedCommands;
-            content.supportHtml = true;
-
-            if (context.storageUri) {
-              content.baseUri = Uri.joinPath(context.storageUri, "tmp/");
-            }
-
-            // outline all data "data:image/svg+xml;base64," to render huge image correctly
-            content.value = content.value.replace(
-              /\"data\:image\/svg\+xml\;base64,([^\"]*)\"/g,
-              (_, content) => hoverHandler.storeImage(content),
-            );
-          }
-        }
-
-        await hoverHandler.finish();
-        return hover;
-      },
-    },
-  };
-
-  return new LanguageClient(
-    "tinymist",
-    "Tinymist Typst Language Server",
-    serverOptions,
-    clientOptions,
-  );
-}
-
-async function startClient(client: LanguageClient, context: ExtensionContext): Promise<void> {
-  if (!client) {
-    throw new Error("Language client is not set");
-  }
-
-  client.onNotification("tinymist/compileStatus", (params) => {
-    wordCountItemProcess(params);
-  });
-
-  interface JumpInfo {
-    filepath: string;
-    start: [number, number] | null;
-    end: [number, number] | null;
-  }
-  client.onNotification("tinymist/preview/scrollSource", async (jump: JumpInfo) => {
-    console.log(
-      "recv editorScrollTo request",
-      jump,
-      "active",
-      window.activeTextEditor !== undefined,
-      "documents",
-      vscode.workspace.textDocuments.map((doc) => doc.uri.fsPath),
-    );
-
-    if (jump.start === null || jump.end === null) {
-      return;
-    }
-
-    // open this file and show in editor
-    const doc =
-      vscode.workspace.textDocuments.find((doc) => doc.uri.fsPath === jump.filepath) ||
-      (await vscode.workspace.openTextDocument(jump.filepath));
-    const editor = await vscode.window.showTextDocument(doc, getSensibleTextEditorColumn());
-    const startPosition = new vscode.Position(jump.start[0], jump.start[1]);
-    const endPosition = new vscode.Position(jump.end[0], jump.end[1]);
-    const range = new vscode.Range(startPosition, endPosition);
-    editor.selection = new vscode.Selection(range.start, range.end);
-    editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
-  });
-
-  client.onNotification("tinymist/documentOutline", async (data: any) => {
-    previewProcessOutline(data);
-  });
-
-  client.onNotification("tinymist/preview/dispose", ({ taskId }) => {
-    const dispose = previewDisposes[taskId];
-    if (dispose) {
-      dispose();
-      delete previewDisposes[taskId];
-    } else {
-      console.warn("No dispose function found for task", taskId);
-    }
-  });
-
-  context.subscriptions.push(
-    window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
-      if (editor?.document.isUntitled) {
-        return;
-      }
-      const langId = editor?.document.languageId;
-      // todo: plaintext detection
-      // if (langId === "plaintext") {
-      //     console.log("plaintext", langId, editor?.document.uri.fsPath);
-      // }
-      if (langId !== "typst") {
-        // console.log("not typst", langId, editor?.document.uri.fsPath);
-        return commandActivateDoc(undefined);
-      }
-      return commandActivateDoc(editor?.document);
-    }),
-  );
-  context.subscriptions.push(
-    vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
-      if (doc.isUntitled && window.activeTextEditor?.document === doc) {
-        if (doc.languageId === "typst") {
-          return commandActivateDocPath(doc, "/untitled/" + doc.uri.fsPath);
-        } else {
-          return commandActivateDoc(undefined);
-        }
-      }
-    }),
-  );
-  context.subscriptions.push(
-    vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
-      if (extensionState.mut.focusingDoc === doc) {
-        extensionState.mut.focusingDoc = undefined;
-        commandActivateDoc(undefined);
-      }
-    }),
-  );
-
-  const editorToolCommand = (tool: EditorToolName) => async () => {
-    await editorTool(context, tool);
-  };
-
-  const initTemplateCommand =
-    (inPlace: boolean) =>
-    (...args: string[]) =>
-      initTemplate(context, inPlace, ...args);
-
-  // prettier-ignore
-  context.subscriptions.push(
-    commands.registerCommand("tinymist.onEnter", onEnterHandler),
-    commands.registerCommand("tinymist.openInternal", openInternal),
-    commands.registerCommand("tinymist.openExternal", openExternal),
-
-    commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
-    commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
-    commands.registerCommand("tinymist.getCurrentDocumentMetrics", commandGetCurrentDocumentMetrics),
-    commands.registerCommand("tinymist.clearCache", commandClearCache),
-    commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
-    commands.registerCommand("tinymist.showLog", tinymist.showLog),
-    commands.registerCommand("tinymist.copyAnsiHighlight", commandCopyAnsiHighlight),
-
-    commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true)),
-    commands.registerCommand("tinymist.unpinMain", () => commandPinMain(false)),
-    commands.registerCommand("typst-lsp.pinMainToCurrent", () => commandPinMain(true)),
-    commands.registerCommand("typst-lsp.unpinMain", () => commandPinMain(false)),
-
-    commands.registerCommand("tinymist.initTemplate", initTemplateCommand(false)),
-    commands.registerCommand("tinymist.initTemplateInPlace", initTemplateCommand(true)),
-
-    commands.registerCommand("tinymist.showTemplateGallery", editorToolCommand("template-gallery")),
-    commands.registerCommand("tinymist.showSummary", editorToolCommand("summary")),
-    commands.registerCommand("tinymist.showSymbolView", editorToolCommand("symbol-view")),
-    commands.registerCommand("tinymist.profileCurrentFile", editorToolCommand("tracing")),
-
-    commands.registerCommand("tinymist.createLocalPackage", commandCreateLocalPackage),
-    commands.registerCommand("tinymist.openLocalPackage", commandOpenLocalPackage),
-
-    // We would like to define it at the server side, but it is not possible for now.
-    // https://github.com/microsoft/language-server-protocol/issues/1117
-    commands.registerCommand("tinymist.triggerSuggestAndParameterHints", triggerSuggestAndParameterHints),
-  );
-  // context.subscriptions.push
-  const provider = new SymbolViewProvider(context);
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(SymbolViewProvider.Name, provider),
-  );
-
-  await client.start();
-
+  // Loads the preview HTML from the binary
   if (extensionState.features.preview) {
     previewPreload(context);
   }
@@ -419,6 +202,98 @@ async function startClient(client: LanguageClient, context: ExtensionContext): P
   return;
 }
 
+async function languageActivate(context: ExtensionContext) {
+  context.subscriptions.push(
+    window.onDidChangeActiveTextEditor((editor: TextEditor | undefined) => {
+      if (editor?.document.isUntitled) {
+        return;
+      }
+      const langId = editor?.document.languageId;
+      // todo: plaintext detection
+      // if (langId === "plaintext") {
+      //     console.log("plaintext", langId, editor?.document.uri.fsPath);
+      // }
+      if (langId !== "typst") {
+        // console.log("not typst", langId, editor?.document.uri.fsPath);
+        return commandActivateDoc(undefined);
+      }
+      return commandActivateDoc(editor?.document);
+    }),
+  );
+  context.subscriptions.push(
+    vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
+      if (doc.isUntitled && window.activeTextEditor?.document === doc) {
+        if (doc.languageId === "typst") {
+          return commandActivateDocPath(doc, "/untitled/" + doc.uri.fsPath);
+        } else {
+          return commandActivateDoc(undefined);
+        }
+      }
+    }),
+  );
+  context.subscriptions.push(
+    vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
+      if (extensionState.mut.focusingDoc === doc) {
+        extensionState.mut.focusingDoc = undefined;
+        commandActivateDoc(undefined);
+      }
+    }),
+  );
+
+  const editorToolCommand = (tool: EditorToolName) => async () => {
+    await editorTool(context, tool);
+  };
+
+  const initTemplateCommand =
+    (inPlace: boolean) =>
+    (...args: string[]) =>
+      initTemplate(context, inPlace, ...args);
+
+  // prettier-ignore
+  context.subscriptions.push(
+    commands.registerCommand("tinymist.onEnter", onEnterHandler),
+    commands.registerCommand("tinymist.openInternal", openInternal),
+    commands.registerCommand("tinymist.openExternal", openExternal),
+
+    commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
+    commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
+    commands.registerCommand("tinymist.getCurrentDocumentMetrics", commandGetCurrentDocumentMetrics),
+    commands.registerCommand("tinymist.clearCache", commandClearCache),
+    commands.registerCommand("tinymist.restartServer", async () => {
+      await deactivate();
+      await doActivate(context);
+    }),
+    commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
+    commands.registerCommand("tinymist.showLog", tinymist.showLog),
+    commands.registerCommand("tinymist.copyAnsiHighlight", commandCopyAnsiHighlight),
+
+    commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true)),
+    commands.registerCommand("tinymist.unpinMain", () => commandPinMain(false)),
+    commands.registerCommand("typst-lsp.pinMainToCurrent", () => commandPinMain(true)),
+    commands.registerCommand("typst-lsp.unpinMain", () => commandPinMain(false)),
+
+    commands.registerCommand("tinymist.initTemplate", initTemplateCommand(false)),
+    commands.registerCommand("tinymist.initTemplateInPlace", initTemplateCommand(true)),
+
+    commands.registerCommand("tinymist.showTemplateGallery", editorToolCommand("template-gallery")),
+    commands.registerCommand("tinymist.showSummary", editorToolCommand("summary")),
+    commands.registerCommand("tinymist.showSymbolView", editorToolCommand("symbol-view")),
+    commands.registerCommand("tinymist.profileCurrentFile", editorToolCommand("tracing")),
+
+    commands.registerCommand("tinymist.createLocalPackage", commandCreateLocalPackage),
+    commands.registerCommand("tinymist.openLocalPackage", commandOpenLocalPackage),
+
+    // We would like to define it at the server side, but it is not possible for now.
+    // https://github.com/microsoft/language-server-protocol/issues/1117
+    commands.registerCommand("tinymist.triggerSuggestAndParameterHints", triggerSuggestAndParameterHints),
+  );
+  // context.subscriptions.push
+  const provider = new SymbolViewProvider(context);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(SymbolViewProvider.Name, provider),
+  );
+}
+
 async function openInternal(target: string): Promise<void> {
   const uri = Uri.parse(target);
   await commands.executeCommand("vscode.open", uri, ViewColumn.Beside);
@@ -444,10 +319,10 @@ async function commandExport(
 
   handler(uri, extraOpts);
 
-  const res = await client?.sendRequest<string | null>("workspace/executeCommand", {
-    command: `tinymist.export${mode}`,
-    arguments: [uri, ...(extraOpts ? [extraOpts] : [])],
-  });
+  const res = await tinymist.executeCommand<string | null>(`tinymist.export${mode}`, [
+    uri,
+    ...(extraOpts ? [extraOpts] : []),
+  ]);
   if (res === null) {
     return undefined;
   }
@@ -462,10 +337,7 @@ async function commandGetCurrentDocumentMetrics(): Promise<any> {
 
   const fsPath = activeEditor.document.uri.fsPath;
 
-  const res = await client?.sendRequest<string | null>("workspace/executeCommand", {
-    command: `tinymist.getDocumentMetrics`,
-    arguments: [fsPath],
-  });
+  const res = await tinymist.executeCommand<string | null>(`tinymist.getDocumentMetrics`, [fsPath]);
   if (res === null) {
     return undefined;
   }
@@ -563,43 +435,19 @@ export interface PreviewResult {
   isPrimary?: boolean;
 }
 
-const previewDisposes: Record<string, () => void> = {};
-export function registerPreviewTaskDispose(taskId: string, dl: DisposeList): void {
-  if (previewDisposes[taskId]) {
-    throw new Error(`Task ${taskId} already exists`);
-  }
-  dl.add(() => {
-    delete previewDisposes[taskId];
-  });
-  previewDisposes[taskId] = () => dl.dispose();
-}
-
 export async function commandStartPreview(previewArgs: string[]): Promise<PreviewResult> {
-  const res = await (
-    await getClient()
-  ).sendRequest<PreviewResult>("workspace/executeCommand", {
-    command: `tinymist.doStartPreview`,
-    arguments: [previewArgs],
-  });
+  const res = await tinymist.executeCommand<PreviewResult>(`tinymist.doStartPreview`, [
+    previewArgs,
+  ]);
   return res || {};
 }
 
 export async function commandKillPreview(taskId: string): Promise<void> {
-  return await (
-    await getClient()
-  ).sendRequest("workspace/executeCommand", {
-    command: `tinymist.doKillPreview`,
-    arguments: [taskId],
-  });
+  return await tinymist.executeCommand(`tinymist.doKillPreview`, [taskId]);
 }
 
 export async function commandScrollPreview(taskId: string, req: any): Promise<void> {
-  return await (
-    await getClient()
-  ).sendRequest("workspace/executeCommand", {
-    command: `tinymist.scrollPreview`,
-    arguments: [taskId, req],
-  });
+  return await tinymist.executeCommand(`tinymist.scrollPreview`, [taskId, req]);
 }
 
 async function commandClearCache(): Promise<void> {
@@ -610,18 +458,12 @@ async function commandClearCache(): Promise<void> {
 
   const uri = activeEditor.document.uri.toString();
 
-  await client?.sendRequest("workspace/executeCommand", {
-    command: "tinymist.doClearCache",
-    arguments: [uri],
-  });
+  await tinymist.executeCommand("tinymist.doClearCache", [uri]);
 }
 
 async function commandPinMain(isPin: boolean): Promise<void> {
   if (!isPin) {
-    await client?.sendRequest("workspace/executeCommand", {
-      command: "tinymist.pinMain",
-      arguments: [null],
-    });
+    await tinymist.executeCommand("tinymist.pinMain", [null]);
     return;
   }
 
@@ -630,10 +472,7 @@ async function commandPinMain(isPin: boolean): Promise<void> {
     return;
   }
 
-  await client?.sendRequest("workspace/executeCommand", {
-    command: "tinymist.pinMain",
-    arguments: [activeEditor.document.uri.fsPath],
-  });
+  await tinymist.executeCommand("tinymist.pinMain", [activeEditor.document.uri.fsPath]);
 }
 
 async function initTemplate(context: vscode.ExtensionContext, inPlace: boolean, ...args: string[]) {
@@ -668,10 +507,10 @@ async function initTemplate(context: vscode.ExtensionContext, inPlace: boolean, 
       entryPath: string;
     }
 
-    const res: InitResult | undefined = await client?.sendRequest("workspace/executeCommand", {
-      command: "tinymist.doInitTemplate",
-      arguments: [...initArgs],
-    });
+    const res = await tinymist.executeCommand<InitResult | undefined>(
+      "tinymist.doInitTemplate",
+      initArgs,
+    );
 
     const workspaceRoot = workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (res && workspaceRoot && uri.fsPath.startsWith(workspaceRoot)) {
@@ -694,10 +533,10 @@ async function initTemplate(context: vscode.ExtensionContext, inPlace: boolean, 
       initArgs.push(mode ?? "");
     }
 
-    const res: string | undefined = await client?.sendRequest("workspace/executeCommand", {
-      command: "tinymist.doGetTemplateEntry",
-      arguments: [...initArgs],
-    });
+    const res = await tinymist.executeCommand<string | undefined>(
+      "tinymist.doGetTemplateEntry",
+      initArgs,
+    );
 
     if (!res) {
       return;
@@ -770,10 +609,7 @@ async function commandActivateDocPath(
   }
   // remove the status bar until the last focusing file is closed
   triggerStatusBar(!!(fsPath || extensionState.mut.focusingDoc?.isClosed === false));
-  await client?.sendRequest("workspace/executeCommand", {
-    command: "tinymist.focusMain",
-    arguments: [fsPath],
-  });
+  await tinymist.executeCommand("tinymist.focusMain", [fsPath]);
 }
 
 async function commandRunCodeLens(...args: string[]): Promise<void> {

@@ -2,6 +2,11 @@ import * as vscode from "vscode";
 
 export function devKitFeatureActivate(context: vscode.ExtensionContext) {
   vscode.commands.executeCommand("setContext", "ext.tinymistDevKit", true);
+  context.subscriptions.push({
+    dispose: () => {
+      vscode.commands.executeCommand("setContext", "ext.tinymistDevKit", false);
+    },
+  });
 
   const devKitProvider = new DevKitViewProvider();
   context.subscriptions.push(

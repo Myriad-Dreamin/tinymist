@@ -100,6 +100,12 @@ export async function getPreviewHtml(context: vscode.ExtensionContext) {
     _previewHtml = html;
   }
 
+  context.subscriptions.push({
+    dispose: () => {
+      _previewHtml = undefined;
+    },
+  });
+
   return html;
 }
 
