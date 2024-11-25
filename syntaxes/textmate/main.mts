@@ -139,6 +139,11 @@ const markupBrace: textmate.PatternMatch = {
   match: /[{}()\[\]]/,
 };
 
+const mathBrace: textmate.PatternMatch = {
+  name: "markup.content.brace.typst",
+  match: /[{}]/,
+};
+
 const stringLiteral: textmate.PatternBeginEnd = {
   name: "string.quoted.double.typst",
   begin: /"/,
@@ -182,6 +187,14 @@ const markupMath: textmate.Pattern = {
   },
   patterns: [
     {
+      include: "#math",
+    },
+  ],
+};
+
+const math: textmate.Pattern = {
+  patterns: [
+    {
       include: "#markupEscape",
     },
     {
@@ -193,6 +206,9 @@ const markupMath: textmate.Pattern = {
     // },
     {
       include: "#markupEnterCode",
+    },
+    {
+      include: "#mathBrace",
     },
   ],
 };
@@ -1386,6 +1402,7 @@ export const typst: textmate.Grammar = {
   repository: {
     common,
     markup,
+    math,
     markupEnterCode,
     code,
     keywordConstants,
@@ -1420,6 +1437,7 @@ export const typst: textmate.Grammar = {
     markupMath,
     markupHeading,
     markupBrace,
+    mathBrace,
 
     ...expressions().repository,
 

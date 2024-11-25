@@ -1,0 +1,65 @@
+>
+>$
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>  {
+#^^ source.typst markup.math.typst
+#  ^ source.typst markup.math.typst markup.content.brace.typst
+>$
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>  (
+#^^^^ source.typst markup.math.typst
+>$
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>  )
+#^^^^ source.typst markup.math.typst
+>$
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>  {}
+#^^ source.typst markup.math.typst
+#  ^ source.typst markup.math.typst markup.content.brace.typst
+#   ^ source.typst markup.math.typst markup.content.brace.typst
+>$
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>$
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>  {}}
+#^^ source.typst markup.math.typst
+#  ^ source.typst markup.math.typst markup.content.brace.typst
+#   ^ source.typst markup.math.typst markup.content.brace.typst
+#    ^ source.typst markup.math.typst markup.content.brace.typst
+>$
+#^ source.typst markup.math.typst punctuation.definition.string.math.typst
+>
+>#let f() = {
+#^ source.typst keyword.control.hash.typst
+# ^^^ source.typst meta.expr.let.typst storage.type.typst
+#    ^ source.typst meta.expr.let.typst
+#     ^ source.typst meta.expr.let.typst entity.name.function.typst
+#      ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#       ^ source.typst meta.expr.let.typst meta.brace.round.typst
+#        ^ source.typst meta.expr.let.typst
+#         ^^ source.typst meta.expr.let.typst keyword.operator.assignment.typst
+#           ^ source.typst meta.expr.let.typst meta.brace.curly.typst
+>  $
+#^^ source.typst meta.expr.let.typst
+#  ^ source.typst meta.expr.let.typst markup.math.typst punctuation.definition.string.math.typst
+>    lr(})
+#^^^^^^^ source.typst meta.expr.let.typst markup.math.typst
+#       ^ source.typst meta.expr.let.typst markup.math.typst markup.content.brace.typst
+#        ^^ source.typst meta.expr.let.typst markup.math.typst
+>  $
+#^^ source.typst meta.expr.let.typst markup.math.typst
+#  ^ source.typst meta.expr.let.typst markup.math.typst punctuation.definition.string.math.typst
+>}
+#^ source.typst meta.expr.let.typst meta.brace.curly.typst
+>
