@@ -5000,13 +5000,15 @@ dependencies = [
 
 [[package]]
 name = "typstyle"
-version = "0.12.2"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e065ac369d7703504b4c5d7ec849ab033f2c55fb616739ef62c67af2f8050c50"
+checksum = "9f0e6fb3386b1068f073d846b71d24ae3cbccb358b8d79f0a9fdd34d16dfe97c"
 dependencies = [
  "anyhow",
+ "ecow 0.2.3",
  "itertools 0.13.0",
  "pretty",
+ "rustc-hash 2.0.0",
  "typst-syntax 0.12.0",
  "vergen",
 ]
