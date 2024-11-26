@@ -5,7 +5,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/set_font.typ
 snapshot_kind: text
 ---
 "font" = "Times New Roman"
----
+=====
 5..9 -> @font
 36..40 -> Func(text)
 47..51 -> @font

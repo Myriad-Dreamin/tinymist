@@ -328,7 +328,7 @@ mod type_check_tests {
                 writeln!(f, "{:?} = {:?}", name, info.simplify(var.as_type(), true))?;
             }
 
-            writeln!(f, "---")?;
+            writeln!(f, "=====")?;
             let mut mapping = info
                 .mapping
                 .iter()

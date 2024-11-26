@@ -9,7 +9,7 @@ snapshot_kind: text
 "" = ((Type(bytes) | Type(decimal) | Type(float) | Type(int) | Type(label) | Type(str) | Type(type) | Type(version))) => Type(str)
 "x" = Any
 "b" = (Type(str), )
----
+=====
 5..6 -> @a
 20..21 -> @f
 24..25 -> @x

@@ -11,7 +11,7 @@ snapshot_kind: text
 "master-cover" = ((Any, "x": Any) => TypeBinary { operands: (Any, TypeBinary { operands: ({"submit-date": 0}, Any), op: Add }), op: Assign }).with(..("x": Any) => any)
 "info" = Any
 "x" = Any
----
+=====
 5..6 -> @x
 7..11 -> @date
 15..19 -> @date

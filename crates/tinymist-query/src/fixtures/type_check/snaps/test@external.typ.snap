@@ -8,7 +8,7 @@ snapshot_kind: text
 "bad-instantiate" = Any
 "prefix" = (("title": Any) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, None), op: Add }, None), op: Add }, None), op: Add }).with(..("title": None) => any)
 "title" = None
----
+=====
 0..0 -> @bad-instantiate
 1..21 -> @base
 27..33 -> @prefix

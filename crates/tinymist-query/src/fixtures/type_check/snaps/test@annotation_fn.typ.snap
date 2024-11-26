@@ -9,7 +9,7 @@ snapshot_kind: text
 "max-repetitions" = None
 "repetitions" = None
 "args" = Args
----
+=====
 162..180 -> @touying-fn-wrapper
 181..183 -> @fn
 185..200 -> @max-repetitions

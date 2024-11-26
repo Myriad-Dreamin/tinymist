@@ -6,7 +6,7 @@ snapshot_kind: text
 ---
 "x" = "Test"
 "y" = ("Test", )
----
+=====
 1..5 -> Func(text)
 1..21 -> Element(text)
 23..27 -> Func(text)
