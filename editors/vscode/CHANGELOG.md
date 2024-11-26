@@ -4,6 +4,12 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Unreleased
+
+* Bumped typstyle to v0.12.3 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/893
+  * Comment formatting and code block formatting is improved. For details, see https://enter-tainer.github.io/typstyle/changelog/#v0122---2024-11-23
+  * Performance is greatly improved. For details, see https://enter-tainer.github.io/typstyle/changelog/#v0124---2024-11-26
+
 ## v0.12.4 - [2024-11-22]
 
 * Updated roadmap (typst v0.13.0+) in https://github.com/Myriad-Dreamin/tinymist/pull/876
