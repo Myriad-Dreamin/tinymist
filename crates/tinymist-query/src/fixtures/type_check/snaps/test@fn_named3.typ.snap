@@ -8,7 +8,7 @@ snapshot_kind: text
 "foo" = (("b": Any) => Any).with(..("b": TypeUnary { lhs: 2, op: Return }) => any)
 "b" = TypeUnary { lhs: 2, op: Return }
 "x" = TypeUnary { lhs: 2, op: Return }
----
+=====
 5..8 -> @fun
 33..36 -> @foo
 37..38 -> @b

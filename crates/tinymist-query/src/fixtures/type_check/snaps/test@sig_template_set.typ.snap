@@ -9,7 +9,7 @@ snapshot_kind: text
 "authors" = ()
 "font" = None
 "class" = ( ⪰ "article" | "letter")
----
+=====
 5..9 -> @tmpl
 10..17 -> @content
 19..26 -> @authors

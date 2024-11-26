@@ -7,7 +7,7 @@ snapshot_kind: text
 "foo" = (("d": Any) => Any).with(..("d": 3) => any)
 "d" = ( ⪰ Type(int) | 3)
 "x" = 3
----
+=====
 5..8 -> @foo
 9..10 -> @d
 17..18 -> @d

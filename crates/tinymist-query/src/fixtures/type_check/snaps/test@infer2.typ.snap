@@ -4,7 +4,7 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/infer2.typ
 snapshot_kind: text
 ---
----
+=====
 1..5 -> Func(text)
 1..52 -> Element(text)
 46..49 -> Rgb(1, 0.254902, 0.211765, 1)

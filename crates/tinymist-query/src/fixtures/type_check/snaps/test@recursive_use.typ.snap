@@ -7,7 +7,7 @@ snapshot_kind: text
 "base" = Any
 "a" = Any
 "f" = () => Any
----
+=====
 0..0 -> @a
 1..21 -> @base
 27..28 -> @f

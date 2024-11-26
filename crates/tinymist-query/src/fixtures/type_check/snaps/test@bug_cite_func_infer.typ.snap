@@ -8,7 +8,7 @@ snapshot_kind: text
 "labl" = Any
 "cite_prose_different_name" = (RefLabel) => Element(ref)
 "labl" = Any
----
+=====
 5..15 -> @cite_prose
 16..20 -> @labl
 24..27 -> Func(ref)

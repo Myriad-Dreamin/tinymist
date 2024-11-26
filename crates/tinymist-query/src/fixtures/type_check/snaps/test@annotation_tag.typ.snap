@@ -5,5 +5,5 @@ input_file: crates/tinymist-query/src/fixtures/type_check/annotation_tag.typ
 snapshot_kind: text
 ---
 "config-common" = () => None
----
+=====
 113..126 -> @config-common

@@ -4,7 +4,7 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/infer.typ
 snapshot_kind: text
 ---
----
+=====
 1..6 -> Func(image)
 1..18 -> Element(image)
 21..25 -> Func(read)

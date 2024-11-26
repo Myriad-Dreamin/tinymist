@@ -10,7 +10,7 @@ snapshot_kind: text
 "" = (Any, Any) => Any
 "x" = Any
 "f" = Any
----
+=====
 56..62 -> @mapper
 65..83 -> @
 66..67 -> @x

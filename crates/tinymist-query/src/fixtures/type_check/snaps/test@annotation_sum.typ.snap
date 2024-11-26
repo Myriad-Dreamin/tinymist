@@ -6,6 +6,6 @@ snapshot_kind: text
 ---
 "sum" = (...: Array<Type(int)>) => None
 "args" = Args
----
+=====
 65..68 -> @sum
 71..75 -> @args

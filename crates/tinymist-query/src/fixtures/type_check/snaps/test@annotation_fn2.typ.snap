@@ -8,7 +8,7 @@ snapshot_kind: text
 "fn-wrapper" = ((Type(function) | (...: Any) => Any), ...: Any) => None
 "fn" = Any
 "args" = Args
----
+=====
 107..117 -> @fn-wrapper
 118..120 -> @fn
 124..128 -> @args
