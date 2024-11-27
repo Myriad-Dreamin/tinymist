@@ -27,6 +27,7 @@ strum = { version = "0.26.2", features = ["derive"] }
 quote = "1"
 syn = "2"
 triomphe = { version = "0.1.10", default-features = false, features = ["std"] }
+salsa = { git = "https://github.com/salsa-rs/salsa", rev = "5f0904ae4a9a54944fbf34300b380bed13b27621" }
 
 # Asynchoronous and Multi-threading
 async-trait = "0.1.77"
