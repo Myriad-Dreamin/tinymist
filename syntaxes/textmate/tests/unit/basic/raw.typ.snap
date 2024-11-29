@@ -35,7 +35,9 @@
 #      ^^^ source.typst meta.expr.call.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
 #         ^^^ source.typst meta.expr.call.typst markup.raw.block.typst fenced_code.block.language.typst
 #            ^ source.typst meta.expr.call.typst markup.raw.block.typst meta.embedded.block.typst
-#             ^^^^^^^^^^^^^^^^^^^^^^^^ source.typst meta.expr.call.typst markup.raw.block.typst meta.embedded.block.typst markup.underline.link.typst
+#             ^^^^^^^^ source.typst meta.expr.call.typst markup.raw.block.typst meta.embedded.block.typst markup.underline.link.typst
+#                     ^^ source.typst meta.expr.call.typst markup.raw.block.typst meta.embedded.block.typst markup.underline.link.typst
+#                       ^^^^^^^^^^^^^^ source.typst meta.expr.call.typst markup.raw.block.typst meta.embedded.block.typst markup.underline.link.typst
 #                                     ^^^ source.typst meta.expr.call.typst markup.raw.block.typst punctuation.definition.raw.end.typst
 #                                        ^ source.typst meta.expr.call.typst meta.brace.round.typst
 >
@@ -43,7 +45,9 @@
 #^^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
 #    ^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
 >https://zh.wikipedia.org
-#^^^^^^^^^^^^^^^^^^^^^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.underline.link.typst
+#^^^^^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.underline.link.typst
+#        ^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.underline.link.typst
+#          ^^^^^^^^^^^^^^ source.typst markup.raw.block.typst meta.embedded.block.typst markup.underline.link.typst
 >````
 #^^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
 >
