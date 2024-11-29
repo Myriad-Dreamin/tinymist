@@ -57,7 +57,7 @@
 #                   ^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #                     ^ source.typst meta.expr.import.typst
 #                      ^ source.typst meta.expr.import.typst variable.other.readwrite.typst
-#                       ^ source.typst meta.expr.import.typst
+#                       ^ source.typst meta.expr.import.typst punctuation.separator.colon.typst
 #                        ^ source.typst meta.expr.import.typst
 #                         ^ source.typst meta.expr.import.typst keyword.operator.wildcard.typst
 >#import "base.typ": x
@@ -123,7 +123,7 @@
 #                   ^^ source.typst meta.expr.import.typst keyword.control.import.typst
 #                     ^ source.typst meta.expr.import.typst
 #                      ^^^ source.typst meta.expr.import.typst variable.other.readwrite.typst
-#                         ^ source.typst meta.expr.import.typst
+#                         ^ source.typst meta.expr.import.typst punctuation.separator.colon.typst
 #                          ^ source.typst meta.expr.import.typst
 #                           ^ source.typst meta.expr.import.typst variable.other.readwrite.typst
 #                            ^ source.typst meta.expr.import.typst punctuation.separator.comma.typst

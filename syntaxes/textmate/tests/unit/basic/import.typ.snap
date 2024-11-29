@@ -1,0 +1,4 @@
+>#import
+#^ source.typst keyword.control.hash.typst
+# ^^^^^^ source.typst meta.expr.import.typst keyword.control.import.typst
+>

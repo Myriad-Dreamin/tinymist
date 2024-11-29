@@ -829,7 +829,7 @@ const importStatement = (): textmate.Grammar => {
   const importAsClause: textmate.Pattern = {
     // todo: as...
     begin: /(\bas\b)\s*/,
-    end: /(?=[\s;\}\]\)])/,
+    end: /(?=[\s;\}\]\)\:])/,
     beginCaptures: {
       "1": {
         name: "keyword.control.import.typst",
