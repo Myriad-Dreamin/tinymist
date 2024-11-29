@@ -33,11 +33,25 @@ function braceMatch(pattern: RegExp) {
   return ("(?x)" + pattern.source) as unknown as RegExp;
 }
 
+function oneOf(...patterns: RegExp[]) {
+  return new RegExp(
+    patterns
+      .map((p) => {
+        const src = p.source;
+        if (src.startsWith("(")) {
+          return src;
+        }
+
+        return `(?:${src})`;
+      })
+      .join("|")
+  );
+}
+
 const PAREN_BLOCK = generatePattern(6, "\\(", "\\)");
 const exprEndReg =
   /(?<!(?:if|and|or|not|in|!=|==|<=|>=|<|>|\+|-|\*|\/|=|\+=|-=|\*=|\/=)\s*)(?=[\[\{\n])|(?=[;\}\]\)\n]|$)/;
 
-// todo: This is invocable
 const codeBlock: textmate.Pattern = {
   //   name: "meta.block.continuous.typst",
   begin: /\{/,
@@ -350,9 +364,21 @@ const enterExpression = (kind: string, seek: RegExp): textmate.Pattern => {
   return {
     /// name: 'markup.expr.typst'
     begin: new RegExp("#" + seek.source),
-    // `?=(?<![\d#])\.[^\p{XID_Start}_]`: This means that we are on a dot and the next character is not a valid identifier start, but we are not at the beginning of hash or number
-    end: /(?<=;)|(?<=[\)\]\}])(?![;\(\[\$])|(?<!#)(?=")|(?=\.(?:[^0-9\p{XID_Start}_]|$))|(?=[\s\}\]\)\$]|$)|(;)/u
-      .source,
+    end: oneOf(
+      /(?<=;)/,
+      // Ends unless we are in a call or method call
+      new RegExp(
+        /(?<=[\)\]\}])(?![;\(\[\$]|(?:\.method-continue))/.source.replace(
+          /method-continue/g,
+          IDENTIFIER.source + /(?=[\(\[])/.source
+        )
+      ),
+      /(?<!#)(?=")/,
+      // This means that we are on a dot and the next character is not a valid identifier start, but we are not at the beginning of hash or number
+      /(?=\.(?:[^0-9\p{XID_Start}_]|$))/u,
+      /(?=[\s\}\]\)\$]|$)/,
+      /(;)/
+    ).source,
     beginCaptures: {
       "0": {
         name: kind,
@@ -631,7 +657,6 @@ const expressions = (): textmate.Grammar => {
         },
       },
       /// parentheisized expressions: (...)
-      // todo: This is invocable
       {
         begin: /\(/,
         end: /\)/,
