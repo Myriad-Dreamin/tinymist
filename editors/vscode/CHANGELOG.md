@@ -16,7 +16,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Preview
 
-* (Fix) Correct function references in HTML in https://github.com/Myriad-Dreamin/tinymist/pull/896
+* (Fix) Corrected function references in HTML in https://github.com/Myriad-Dreamin/tinymist/pull/896
 
 ### Completion
 
