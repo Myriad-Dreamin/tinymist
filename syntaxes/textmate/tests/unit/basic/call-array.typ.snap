@@ -1,0 +1,20 @@
+>#(module,).at(0).push(); ()
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.round.typst
+#  ^^^^^^ source.typst variable.other.readwrite.typst
+#        ^ source.typst punctuation.separator.comma.typst
+#         ^ source.typst meta.brace.round.typst
+#          ^ source.typst meta.expr.call.typst keyword.operator.accessor.typst
+#           ^^ source.typst meta.expr.call.typst entity.name.function.typst
+#             ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#              ^ source.typst meta.expr.call.typst constant.numeric.integer.typst
+#               ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                 ^^^^ source.typst meta.expr.call.typst entity.name.function.typst
+#                     ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#                      ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#                       ^ source.typst punctuation.terminator.statement.typst
+#                        ^ source.typst
+#                         ^ source.typst markup.content.brace.typst
+#                          ^ source.typst markup.content.brace.typst
+>

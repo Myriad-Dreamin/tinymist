@@ -1,0 +1,15 @@
+>#[test].at("text") ()
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.square.typst
+#  ^^^^ source.typst
+#      ^ source.typst meta.brace.square.typst
+#       ^ source.typst meta.expr.call.typst keyword.operator.accessor.typst
+#        ^^ source.typst meta.expr.call.typst entity.name.function.typst
+#          ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#           ^ source.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#            ^^^^ source.typst meta.expr.call.typst string.quoted.double.typst
+#                ^ source.typst meta.expr.call.typst string.quoted.double.typst punctuation.definition.string.typst
+#                 ^ source.typst meta.expr.call.typst meta.brace.round.typst
+#                  ^ source.typst
+#                   ^ source.typst markup.content.brace.typst
+#                    ^ source.typst markup.content.brace.typst
