@@ -48,7 +48,7 @@ impl StatefulRequest for GotoDefinitionRequest {
             target_selection_range: range,
         }]));
 
-        log::debug!("goto_definition: {fid:?} {res:?}");
+        crate::log_debug_ct!("goto_definition: {fid:?} {res:?}");
         res
     }
 }

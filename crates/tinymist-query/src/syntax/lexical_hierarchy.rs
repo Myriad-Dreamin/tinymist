@@ -41,7 +41,7 @@ pub(crate) fn get_lexical_hierarchy(
         worker.symbreak();
     }
 
-    log::debug!("lexical hierarchy analysis took {:?}", b.elapsed());
+    crate::log_debug_ct!("lexical hierarchy analysis took {:?}", b.elapsed());
     res.map(|_| worker.stack.pop().unwrap().1)
 }
 

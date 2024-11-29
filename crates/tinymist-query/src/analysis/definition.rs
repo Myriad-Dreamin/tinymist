@@ -98,7 +98,7 @@ fn find_ident_definition(
         ast::Expr::MathIdent(e) => e.span(),
         ast::Expr::FieldAccess(s) => return find_field_definition(ctx, s),
         _ => {
-            log::debug!("unsupported kind {kind:?}", kind = use_site.kind());
+            crate::log_debug_ct!("unsupported kind {kind:?}", kind = use_site.kind());
             Span::detached()
         }
     };
@@ -109,16 +109,16 @@ fn find_ident_definition(
 fn find_field_definition(ctx: &Arc<SharedContext>, fa: ast::FieldAccess<'_>) -> Option<Definition> {
     let span = fa.span();
     let ty = ctx.type_of_span(span)?;
-    log::debug!("find_field_definition[{span:?}]: {ty:?}");
+    crate::log_debug_ct!("find_field_definition[{span:?}]: {ty:?}");
 
     // todo multiple sources
     let mut srcs = ty.sources();
     srcs.sort();
-    log::debug!("check type signature of ty: {ty:?} => {srcs:?}");
+    crate::log_debug_ct!("check type signature of ty: {ty:?} => {srcs:?}");
     let type_var = srcs.into_iter().next()?;
     match type_var {
         DocSource::Var(v) => {
-            log::debug!("field var: {:?} {:?}", v.def, v.def.span());
+            crate::log_debug_ct!("field var: {:?} {:?}", v.def, v.def.span());
             Some(Definition::new(v.def.clone(), None))
         }
         DocSource::Ins(v) if !v.span().is_detached() => {
@@ -144,7 +144,7 @@ fn find_bib_definition(
     let bib_info = ctx.analyze_bib(bib_elem.span(), bib_paths)?;
 
     let entry = bib_info.entries.get(key)?;
-    log::debug!("find_bib_definition: {key} => {entry:?}");
+    crate::log_debug_ct!("find_bib_definition: {key} => {entry:?}");
 
     // todo: rename with regard to string format: yaml-key/bib etc.
     let decl = Decl::bib_entry(key.into(), entry.file_id, entry.span.clone());
@@ -357,7 +357,7 @@ impl DefResolver {
     }
 
     fn of_expr(&mut self, expr: &Expr, term: Option<&Ty>) -> Option<Definition> {
-        log::debug!("of_expr: {expr:?}");
+        crate::log_debug_ct!("of_expr: {expr:?}");
 
         match expr {
             Expr::Decl(decl) => self.of_decl(decl, term),
@@ -367,7 +367,7 @@ impl DefResolver {
     }
 
     fn of_term(&mut self, term: &Ty) -> Option<Definition> {
-        log::debug!("of_term: {term:?}");
+        crate::log_debug_ct!("of_term: {term:?}");
 
         // Get the type of the type node
         let better_def = match term {
@@ -385,7 +385,7 @@ impl DefResolver {
     }
 
     fn of_decl(&mut self, decl: &Interned<Decl>, term: Option<&Ty>) -> Option<Definition> {
-        log::debug!("of_decl: {decl:?}");
+        crate::log_debug_ct!("of_decl: {decl:?}");
 
         // todo:
         match decl.as_ref() {

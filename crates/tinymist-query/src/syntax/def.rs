@@ -120,7 +120,7 @@ impl ExprScope {
     pub fn get(&self, name: &Interned<str>) -> (Option<Expr>, Option<Ty>) {
         let (of, val) = match self {
             ExprScope::Lexical(scope) => {
-                log::debug!("evaluating: {name:?} in {scope:?}");
+                crate::log_debug_ct!("evaluating: {name:?} in {scope:?}");
                 (scope.get(name).cloned(), None)
             }
             ExprScope::Module(module) => {
@@ -148,7 +148,7 @@ impl ExprScope {
                 }
             }
             ExprScope::Module(module) => {
-                log::debug!("imported: {module:?}");
+                crate::log_debug_ct!("imported: {module:?}");
                 let v = Interned::new(Ty::Value(InsTy::new(Value::Module(module.clone()))));
                 for (name, _, _) in module.scope().iter() {
                     let name: Interned<str> = name.into();

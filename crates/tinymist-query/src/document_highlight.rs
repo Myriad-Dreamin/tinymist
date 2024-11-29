@@ -132,7 +132,7 @@ impl<'a> DocumentHighlightWorker<'a> {
         self.check_children(loop_node);
         self.check(Self::check_loop);
 
-        log::debug!("highlights: {:?}", self.highlights);
+        crate::log_debug_ct!("highlights: {:?}", self.highlights);
         self.finish()
     }
 }

@@ -40,7 +40,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
             Sig::Builtin(BuiltinSig::TupleMap(this)) => {
                 if let Some(p0) = args.pos(0) {
                     let mut resultants = vec![];
-                    log::debug!("syntax check tuple map {this:?} {p0:?}");
+                    crate::log_debug_ct!("syntax check tuple map {this:?} {p0:?}");
                     let mut mapper = |base: &mut TypeChecker, sig: Sig<'_>, _pol| {
                         resultants.push(Ty::Any);
 
@@ -49,7 +49,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                                 let res = cons
                                     .iter()
                                     .map(|elem| {
-                                        log::debug!(
+                                        crate::log_debug_ct!(
                                             "tuple map check on tuple elem: {elem:?} {p0:?}"
                                         );
                                         let args = ArgsTy::unary(elem.clone(), Ty::Any);
@@ -66,7 +66,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                                 self.resultant.push(Ty::Tuple(res.into()));
                             }
                             Sig::ArrayCons(elem) => {
-                                log::debug!("array map check on array: {elem:?} {p0:?}");
+                                crate::log_debug_ct!("array map check on array: {elem:?} {p0:?}");
                                 let args = ArgsTy::unary(elem.as_ref().clone(), Ty::Any);
                                 let mut mapper = ApplyTypeChecker {
                                     base,
@@ -86,13 +86,13 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                         driver: &mut mapper,
                     };
                     this.tuple_element_of(pol, &mut worker);
-                    log::debug!("resultant: {resultants:?}");
+                    crate::log_debug_ct!("resultant: {resultants:?}");
                 }
             }
             Sig::Builtin(BuiltinSig::TupleAt(this)) => {
                 if let Some(p0) = args.pos(0) {
                     let mut resultants = vec![];
-                    log::debug!("syntax check tuple at {this:?} {p0:?}");
+                    crate::log_debug_ct!("syntax check tuple at {this:?} {p0:?}");
 
                     // todo: caster
                     let selector = match p0 {
@@ -109,7 +109,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
 
                         match sig {
                             Sig::TupleCons(cons) => {
-                                log::debug!("tuple at check on tuple elem: {cons:?} {p0:?}");
+                                crate::log_debug_ct!("tuple at check on tuple elem: {cons:?} {p0:?}");
                                 let sel = match selector {
                                     Ok(i) => cons.get(i).cloned(),
                                     Err(_) => None,
@@ -120,7 +120,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                                 self.resultant.push(res);
                             }
                             Sig::ArrayCons(elem) => {
-                                log::debug!("array at check on array: {elem:?} {p0:?}");
+                                crate::log_debug_ct!("array at check on array: {elem:?} {p0:?}");
                                 self.resultant.push(elem.as_ref().clone());
                             }
                             _ => {}
@@ -131,7 +131,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                         driver: &mut mapper,
                     };
                     this.tuple_element_of(pol, &mut worker);
-                    log::debug!("resultant: {resultants:?}");
+                    crate::log_debug_ct!("resultant: {resultants:?}");
                 }
             }
             _ => {}
@@ -149,7 +149,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
         }
 
         if is_partialize {
-            log::debug!("Partialize location {sig:?} a.k.a {callee:?}");
+            crate::log_debug_ct!("Partialize location {sig:?} a.k.a {callee:?}");
             if let Some(Ty::Select(call_raw_for_with)) = self.call_raw_for_with.take() {
                 self.resultant.push(Ty::With(SigWithTy::new(
                     call_raw_for_with.ty.clone(),

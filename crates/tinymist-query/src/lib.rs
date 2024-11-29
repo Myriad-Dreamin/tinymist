@@ -136,7 +136,7 @@ pub trait StatefulRequest {
 
 /// Completely disabled log
 #[macro_export]
-macro_rules! log_never {
+macro_rules! log_debug_ct {
     // debug!(target: "my_target", key1 = 42, key2 = true; "a {} event", "log")
     // debug!(target: "my_target", "a {} event", "log")
     (target: $target:expr, $($arg:tt)+) => {

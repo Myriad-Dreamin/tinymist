@@ -239,7 +239,7 @@ impl RenameFileWorker<'_> {
         if importing.map_or(true, |i| i != self.def_fid) {
             return None;
         }
-        log::debug!("import: {span:?} -> {importing:?} v.s. {:?}", self.def_fid);
+        crate::log_debug_ct!("import: {span:?} -> {importing:?} v.s. {:?}", self.def_fid);
         // rename_importer(self.ctx, &ref_src, *span, &self.diff, edits);
 
         let root = LinkedNode::new(src.root());

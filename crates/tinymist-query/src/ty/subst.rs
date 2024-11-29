@@ -3,7 +3,7 @@ use crate::ty::prelude::*;
 
 impl Sig<'_> {
     pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, ctx: &mut impl TyCtxMut) -> Option<Ty> {
-        log::debug!("call {self:?} {args:?} {pol:?}");
+        crate::log_debug_ct!("call {self:?} {args:?} {pol:?}");
         ctx.with_scope(|ctx| {
             let body = self.check_bind(args, ctx)?;
 
@@ -21,7 +21,7 @@ impl Sig<'_> {
 
         for (arg_recv, arg_ins) in sig.matches(args, withs) {
             if let Ty::Var(arg_recv) = arg_recv {
-                log::debug!("bind {arg_recv:?} {arg_ins:?}");
+                crate::log_debug_ct!("bind {arg_recv:?} {arg_ins:?}");
                 ctx.bind_local(arg_recv, arg_ins.clone());
             }
         }

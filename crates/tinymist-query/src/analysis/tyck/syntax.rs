@@ -334,7 +334,7 @@ impl TypeChecker<'_> {
         let select_site = select.span;
         let ty = self.check(&select.lhs);
         let field = select.key.name().clone();
-        log::debug!("field access: {select:?}[{select_site:?}] => {ty:?}.{field:?}");
+        crate::log_debug_ct!("field access: {select:?}[{select_site:?}] => {ty:?}.{field:?}");
 
         // todo: move this to base
         let base = Ty::Select(SelectTy::new(ty.clone().into(), field.clone()));
@@ -352,7 +352,7 @@ impl TypeChecker<'_> {
         let args = self.check(&apply.args);
         let callee = self.check(&apply.callee);
 
-        log::debug!("func_call: {callee:?} with {args:?}");
+        crate::log_debug_ct!("func_call: {callee:?} with {args:?}");
 
         if let Ty::Args(args) = args {
             let mut worker = ApplyTypeChecker {
@@ -377,7 +377,7 @@ impl TypeChecker<'_> {
         let docstring = self.check_docstring(&def_id);
         let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
 
-        log::debug!("check closure: {func:?} with docs {docstring:#?}");
+        crate::log_debug_ct!("check closure: {func:?} with docs {docstring:#?}");
 
         let (sig, defaults) = self.check_pattern_sig(Some(&def_id), &func.params, docstring);
 
@@ -447,7 +447,7 @@ impl TypeChecker<'_> {
         let args = self.check(&set.args);
         let _cond = set.cond.as_ref().map(|cond| self.check(cond));
 
-        log::debug!("set rule: {callee:?} with {args:?}");
+        crate::log_debug_ct!("set rule: {callee:?} with {args:?}");
 
         if let Ty::Args(args) = args {
             let mut worker = ApplyTypeChecker {

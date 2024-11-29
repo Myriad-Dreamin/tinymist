@@ -1,6 +1,5 @@
 use std::sync::OnceLock;
 
-use log::debug;
 use typst::syntax::Span;
 
 use crate::{
@@ -36,7 +35,7 @@ impl StatefulRequest for ReferencesRequest {
 
         let locations = find_references(ctx, &source, doc.as_ref(), deref_target)?;
 
-        debug!("references: {locations:?}");
+        crate::log_debug_ct!("references: {locations:?}");
         Some(locations)
     }
 }

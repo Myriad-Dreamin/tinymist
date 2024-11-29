@@ -31,7 +31,7 @@ pub(crate) fn expr_of(
     guard: QueryStatGuard,
     prev: Option<Arc<ExprInfo>>,
 ) -> Arc<ExprInfo> {
-    log::debug!("expr_of: {:?}", source.id());
+    crate::log_debug_ct!("expr_of: {:?}", source.id());
 
     route.insert(source.id(), None);
 
@@ -128,7 +128,7 @@ pub(crate) fn expr_of(
         exprs: std::mem::take(exprs_base.lock().deref_mut()),
         root,
     };
-    log::debug!("expr_of end {:?}", source.id());
+    crate::log_debug_ct!("expr_of end {:?}", source.id());
 
     route.remove(&info.fid);
     Arc::new(info)
@@ -591,7 +591,7 @@ impl ExprWorker<'_> {
 
     fn check_module_import(&mut self, typed: ast::ModuleImport) -> Expr {
         let source = typed.source();
-        log::debug!("checking import: {source:?}");
+        crate::log_debug_ct!("checking import: {source:?}");
         let mod_expr = self.check_import(typed.source(), true);
 
         let decl = typed.new_name().map(Decl::module_alias).or_else(|| {
@@ -613,7 +613,7 @@ impl ExprWorker<'_> {
             root: mod_expr.clone(),
             val: None,
         };
-        log::debug!("create import variable: {mod_ref:?}");
+        crate::log_debug_ct!("create import variable: {mod_ref:?}");
         let mod_ref = Interned::new(mod_ref);
         if is_named {
             self.scope_mut()
@@ -639,7 +639,7 @@ impl ExprWorker<'_> {
 
         // Prefetch Type Check Information
         if let Some(f) = fid {
-            log::debug!("prefetch type check: {f:?}");
+            crate::log_debug_ct!("prefetch type check: {f:?}");
             self.ctx.prefetch_type_check(f);
         }
 
@@ -666,7 +666,7 @@ impl ExprWorker<'_> {
         let scope = if let Some(scope) = scope {
             scope
         } else {
-            log::debug!(
+            crate::log_debug_ct!(
                 "cannot analyze import on: {typed:?}, expr {mod_expr:?}, in file {:?}",
                 typed.span().id()
             );
@@ -676,7 +676,7 @@ impl ExprWorker<'_> {
         if let Some(imports) = typed.imports() {
             match imports {
                 ast::Imports::Wildcard => {
-                    log::debug!("checking wildcard: {mod_expr:?}");
+                    crate::log_debug_ct!("checking wildcard: {mod_expr:?}");
                     self.lexical.scopes.push(scope);
                 }
                 ast::Imports::Items(items) => {
@@ -701,7 +701,7 @@ impl ExprWorker<'_> {
                 })
         })?;
 
-        log::debug!("checking import source: {src_expr:?}");
+        crate::log_debug_ct!("checking import source: {src_expr:?}");
         let src_str = match &src_expr {
             Expr::Type(Ty::Value(val)) => {
                 if val.val.scope().is_some() {
@@ -741,7 +741,7 @@ impl ExprWorker<'_> {
     }
 
     fn import_decls(&mut self, scope: &ExprScope, module: Expr, items: ast::ImportItems) {
-        log::debug!("import scope {scope:?}");
+        crate::log_debug_ct!("import scope {scope:?}");
 
         for item in items.iter() {
             let (path_ast, old, rename) = match item {
@@ -768,7 +768,7 @@ impl ExprWorker<'_> {
                 None => (None, None),
             };
 
-            log::debug!("path {path:?} -> {root:?} {val:?}");
+            crate::log_debug_ct!("path {path:?} -> {root:?} {val:?}");
             if root.is_none() && val.is_none() {
                 let mut sel = module.clone();
                 for seg in path.into_iter() {
@@ -1081,7 +1081,7 @@ impl ExprWorker<'_> {
         if let Some(s) = self.const_eval_expr(expr) {
             return (None, Some(Ty::Value(InsTy::new(s))));
         }
-        log::debug!("checking expr: {expr:?}");
+        crate::log_debug_ct!("checking expr: {expr:?}");
 
         match expr {
             ast::Expr::FieldAccess(f) => {
@@ -1103,7 +1103,7 @@ impl ExprWorker<'_> {
             }
             ast::Expr::Ident(ident) => {
                 let res = self.eval_ident(&ident.get().into(), mode);
-                log::debug!("checking expr: {expr:?} -> res: {res:?}");
+                crate::log_debug_ct!("checking expr: {expr:?} -> res: {res:?}");
                 res
             }
             _ => (None, None),
@@ -1138,7 +1138,7 @@ impl ExprWorker<'_> {
     }
 
     fn fold_expr_and_val(&self, src: ConcolicExpr) -> Option<Expr> {
-        log::debug!("folding cc: {src:?}");
+        crate::log_debug_ct!("folding cc: {src:?}");
         match src {
             (None, Some(val)) => Some(Expr::Type(val)),
             (expr, _) => self.fold_expr(expr),
@@ -1146,19 +1146,19 @@ impl ExprWorker<'_> {
     }
 
     fn fold_expr(&self, src: Option<Expr>) -> Option<Expr> {
-        log::debug!("folding cc: {src:?}");
+        crate::log_debug_ct!("folding cc: {src:?}");
         match src {
             Some(Expr::Decl(decl)) if !decl.is_def() => {
-                log::debug!("folding decl: {decl:?}");
+                crate::log_debug_ct!("folding decl: {decl:?}");
                 let (x, y) = self.eval_ident(decl.name(), InterpretMode::Code);
                 self.fold_expr_and_val((x, y))
             }
             Some(Expr::Ref(r)) => {
-                log::debug!("folding ref: {r:?}");
+                crate::log_debug_ct!("folding ref: {r:?}");
                 self.fold_expr_and_val((r.root.clone(), r.val.clone()))
             }
             Some(expr) => {
-                log::debug!("folding expr: {expr:?}");
+                crate::log_debug_ct!("folding expr: {expr:?}");
                 Some(expr)
             }
             _ => None,

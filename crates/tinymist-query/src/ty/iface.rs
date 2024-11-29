@@ -32,7 +32,7 @@ pub enum Iface<'a> {
 impl Iface<'_> {
     // IfaceShape { iface }
     pub fn select(self, ctx: &mut impl TyCtxMut, key: &StrRef) -> Option<Ty> {
-        log::debug!("iface shape: {self:?}");
+        crate::log_debug_ct!("iface shape: {self:?}");
 
         match self {
             // Iface::ArrayCons(a) => SigTy::array_cons(a.as_ref().clone(), false),
@@ -102,7 +102,7 @@ impl IfaceCheckDriver<'_> {
     }
 
     fn ty(&mut self, ty: &Ty, pol: bool) {
-        log::debug!("check iface ty: {ty:?}");
+        crate::log_debug_ct!("check iface ty: {ty:?}");
 
         match ty {
             Ty::Builtin(BuiltinTy::Stroke) if self.dict_as_iface() => {

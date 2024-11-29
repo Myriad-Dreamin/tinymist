@@ -23,7 +23,7 @@ pub use complete::*;
 ///
 /// Removes Markdown formatting.
 pub fn plain_docs_sentence(docs: &str) -> EcoString {
-    log::debug!("plain docs {docs:?}");
+    crate::log_debug_ct!("plain docs {docs:?}");
     let docs = docs.replace("```example", "```typ");
     let mut s = unscanny::Scanner::new(&docs);
     let mut output = EcoString::new();
@@ -55,7 +55,7 @@ pub fn plain_docs_sentence(docs: &str) -> EcoString {
                     let link_content = s.from(c + 1);
                     s.eat();
 
-                    log::debug!("Intra Link: {link_content}");
+                    crate::log_debug_ct!("Intra Link: {link_content}");
                     let link = resolve(link_content, "https://typst.app/docs/").ok();
                     let link = link.unwrap_or_else(|| {
                         log::warn!("Failed to resolve link: {link_content}");
@@ -308,7 +308,7 @@ static ROUTE_MAPS: Lazy<HashMap<CatKey, String>> = Lazy::new(|| {
                             continue;
                         }
 
-                        log::debug!("func: {f:?} -> {cat:?}");
+                        crate::log_debug_ct!("func: {f:?} -> {cat:?}");
 
                         let route = if let Some(parent_name) = &parent_name {
                             format!("reference/{}/{parent_name}/#definitions-{name}", cat.name())
@@ -324,7 +324,7 @@ static ROUTE_MAPS: Lazy<HashMap<CatKey, String>> = Lazy::new(|| {
                 }
                 Value::Type(t) => {
                     if let Some(cat) = cat {
-                        log::debug!("type: {t:?} -> {cat:?}");
+                        crate::log_debug_ct!("type: {t:?} -> {cat:?}");
 
                         let route = if let Some(parent_name) = &parent_name {
                             format!("reference/{}/{parent_name}/#definitions-{name}", cat.name())

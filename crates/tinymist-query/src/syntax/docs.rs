@@ -192,7 +192,7 @@ impl DocsChecker<'_> {
     fn generate_var(&mut self, name: StrRef) -> Ty {
         self.next_id += 1;
         let encoded = Interned::new(Decl::generated(DefId(self.next_id as u64)));
-        log::debug!("generate var {name:?} {encoded:?}");
+        crate::log_debug_ct!("generate var {name:?} {encoded:?}");
         let var = TypeVar {
             name,
             def: encoded.clone(),
@@ -283,7 +283,7 @@ impl DocsChecker<'_> {
         }
 
         let v = m.scope().get(name)?;
-        log::debug!("check doc type annotation: {name:?}");
+        crate::log_debug_ct!("check doc type annotation: {name:?}");
         if let Value::Content(c) = v {
             let annotated = c.clone().unpack::<typst::text::RawElem>().ok()?;
             let text = annotated.text().clone().into_value().cast::<Str>().ok()?;
@@ -298,7 +298,7 @@ impl DocsChecker<'_> {
     }
 
     fn check_type_expr(&mut self, m: &Module, s: ast::Expr) -> Option<Ty> {
-        log::debug!("check doc type expr: {s:?}");
+        crate::log_debug_ct!("check doc type expr: {s:?}");
         match s {
             ast::Expr::Ident(i) => self.check_type_ident(m, i.get().as_str()),
             ast::Expr::None(_)
@@ -352,7 +352,7 @@ impl DocsChecker<'_> {
                 _ => None,
             },
             ast::Expr::Closure(c) => {
-                log::debug!("check doc closure annotation: {c:?}");
+                crate::log_debug_ct!("check doc closure annotation: {c:?}");
                 let mut pos = vec![];
                 let mut named = BTreeMap::new();
                 let mut rest = None;
@@ -397,7 +397,7 @@ impl DocsChecker<'_> {
                 sig
             }
             ast::Expr::Dict(d) => {
-                log::debug!("check doc dict annotation: {d:?}");
+                crate::log_debug_ct!("check doc dict annotation: {d:?}");
                 None
             }
             _ => None,
