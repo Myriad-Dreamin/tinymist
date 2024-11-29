@@ -1221,7 +1221,7 @@ const showStatement = (): textmate.Grammar => {
   const showSubstClause: textmate.Pattern = {
     // name: "meta.show.clause.subst.typst",
     begin: /(\:)\s*/,
-    end: /(?<!:)(?<=\S)(?!\S)|(?=[\n;\}\]\)])/,
+    end: /(?=[\n;\}\]\)])/,
     beginCaptures: {
       "1": {
         name: "punctuation.separator.colon.typst",
