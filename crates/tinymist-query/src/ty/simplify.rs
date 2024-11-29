@@ -49,7 +49,7 @@ struct TypeSimplifier<'a, 'b> {
     positives: &'b mut FxHashSet<DeclExpr>,
 }
 
-impl<'a, 'b> TypeSimplifier<'a, 'b> {
+impl TypeSimplifier<'_, '_> {
     fn simplify(&mut self, ty: Ty, principal: bool) -> Ty {
         if let Some(cano) = self.cano_cache.get(&(ty.clone(), principal)) {
             return cano.clone();

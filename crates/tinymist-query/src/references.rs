@@ -79,7 +79,7 @@ struct ReferencesWorker<'a> {
     module_path: OnceLock<Interned<str>>,
 }
 
-impl<'a> ReferencesWorker<'a> {
+impl ReferencesWorker<'_> {
     fn label_root(mut self) -> Option<Vec<LspLocation>> {
         let mut ids = vec![];
 

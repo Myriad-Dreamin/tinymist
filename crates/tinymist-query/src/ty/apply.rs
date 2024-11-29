@@ -30,13 +30,13 @@ impl Ty {
 #[bind(0)]
 pub struct ApplySigChecker<'a, T: ApplyChecker>(&'a mut T, &'a Interned<ArgsTy>);
 
-impl<'a, T: ApplyChecker> ApplySigChecker<'a, T> {
+impl<T: ApplyChecker> ApplySigChecker<'_, T> {
     fn ty(&mut self, ty: &Ty, surface: SigSurfaceKind, pol: bool) {
         ty.sig_surface(pol, surface, self)
     }
 }
 
-impl<'a, T: ApplyChecker> SigChecker for ApplySigChecker<'a, T> {
+impl<T: ApplyChecker> SigChecker for ApplySigChecker<'_, T> {
     fn check(&mut self, cano_sig: Sig, ctx: &mut super::SigCheckContext, pol: bool) -> Option<()> {
         let (cano_sig, is_partialize) = match cano_sig {
             Sig::Partialize(sig) => (*sig, true),

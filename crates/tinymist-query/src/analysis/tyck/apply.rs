@@ -14,7 +14,7 @@ pub struct ApplyTypeChecker<'a, 'b> {
     pub resultant: Vec<Ty>,
 }
 
-impl<'a, 'b> ApplyChecker for ApplyTypeChecker<'a, 'b> {
+impl ApplyChecker for ApplyTypeChecker<'_, '_> {
     fn apply(&mut self, sig: Sig, args: &Interned<ArgsTy>, pol: bool) {
         let (sig, is_partialize) = match sig {
             Sig::Partialize(sig) => (*sig, true),
@@ -177,7 +177,7 @@ pub struct TupleChecker<'a, 'b> {
     driver: &'a mut dyn TupleCheckDriver,
 }
 
-impl<'a, 'b> ApplyChecker for TupleChecker<'a, 'b> {
+impl ApplyChecker for TupleChecker<'_, '_> {
     fn apply(&mut self, sig: Sig, _args: &Interned<ArgsTy>, pol: bool) {
         self.driver.check(self.base, sig, pol);
     }

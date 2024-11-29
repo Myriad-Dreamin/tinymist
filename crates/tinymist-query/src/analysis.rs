@@ -460,7 +460,7 @@ mod signature_tests {
 
     struct SignatureSnapshot<'a>(pub Option<&'a Signature>);
 
-    impl<'a> fmt::Display for SignatureSnapshot<'a> {
+    impl fmt::Display for SignatureSnapshot<'_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let Some(sig) = self.0 else {
                 return write!(f, "<nil>");
@@ -547,7 +547,7 @@ mod call_info_tests {
 
     struct CallSnapshot<'a>(pub Option<&'a CallInfo>);
 
-    impl<'a> fmt::Display for CallSnapshot<'a> {
+    impl fmt::Display for CallSnapshot<'_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let Some(ci) = self.0 else {
                 return write!(f, "<nil>");

@@ -95,7 +95,7 @@ pub(crate) struct TypeChecker<'a> {
     env: &'a mut TypeEnv,
 }
 
-impl<'a> TyCtx for TypeChecker<'a> {
+impl TyCtx for TypeChecker<'_> {
     fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<TypeBounds> {
         self.info.global_bounds(var, pol)
     }
@@ -105,7 +105,7 @@ impl<'a> TyCtx for TypeChecker<'a> {
     }
 }
 
-impl<'a> TyCtxMut for TypeChecker<'a> {
+impl TyCtxMut for TypeChecker<'_> {
     type Snap = <TypeScheme as TyCtxMut>::Snap;
 
     fn start_scope(&mut self) -> Self::Snap {
@@ -147,7 +147,7 @@ impl<'a> TyCtxMut for TypeChecker<'a> {
     }
 }
 
-impl<'a> TypeChecker<'a> {
+impl TypeChecker<'_> {
     fn check(&mut self, root: &Expr) -> Ty {
         self.check_syntax(root).unwrap_or(Ty::undef())
     }

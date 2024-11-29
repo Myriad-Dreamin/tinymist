@@ -31,7 +31,7 @@ impl<'a, T: TyCtx, F> BoundPred<'a, T, F> {
     }
 }
 
-impl<'a, T: TyCtx, F> BoundChecker for BoundPred<'a, T, F>
+impl<T: TyCtx, F> BoundChecker for BoundPred<'_, T, F>
 where
     F: FnMut(&Ty, bool),
 {

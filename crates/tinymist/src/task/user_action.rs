@@ -89,6 +89,8 @@ async fn run_trace_program(params: TraceParams) -> anyhow::Result<JsonValue> {
     log::info!("running trace program: {cmd:?}");
     let start = reflexo::time::Instant::now();
 
+    // FIXME: we actually have waited it by `wait_with_output`
+    #[allow(clippy::zombie_processes)]
     let mut child = cmd
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
@@ -119,18 +121,6 @@ async fn run_trace_program(params: TraceParams) -> anyhow::Result<JsonValue> {
         msg_tx.send(messages).ok();
     });
 
-    let messages = msg_rx.await.unwrap();
-
-    log::info!("trace program executed in {:?}", start.elapsed());
-    let start = reflexo::time::Instant::now();
-
-    let res = serde_json::to_value(TraceReport {
-        request: params,
-        messages,
-        stderr: base64::engine::general_purpose::STANDARD.encode(String::new()),
-    })?;
-    log::info!("trace result encoded in {:?}", start.elapsed());
-
     std::thread::spawn(move || {
         let res = child.wait_with_output();
         match res {
@@ -150,6 +140,18 @@ async fn run_trace_program(params: TraceParams) -> anyhow::Result<JsonValue> {
             }
         }
     });
+
+    let messages = msg_rx.await.unwrap();
+
+    log::info!("trace program executed in {:?}", start.elapsed());
+    let start = reflexo::time::Instant::now();
+
+    let res = serde_json::to_value(TraceReport {
+        request: params,
+        messages,
+        stderr: base64::engine::general_purpose::STANDARD.encode(String::new()),
+    })?;
+    log::info!("trace result encoded in {:?}", start.elapsed());
 
     Ok(res)
 }

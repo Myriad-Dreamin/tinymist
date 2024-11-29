@@ -1344,7 +1344,7 @@ impl_internable!((Ty, Ty),);
 
 struct RefDebug<'a>(&'a Ty);
 
-impl<'a> fmt::Debug for RefDebug<'a> {
+impl fmt::Debug for RefDebug<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             Ty::Var(v) => write!(f, "@v{:?}", v.name()),

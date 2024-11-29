@@ -3,7 +3,7 @@ use reflexo::TakeAs;
 use super::*;
 use crate::syntax::DocString;
 
-impl<'a> TypeChecker<'a> {
+impl TypeChecker<'_> {
     pub fn check_docstring(&mut self, base_id: &Interned<Decl>) -> Option<Arc<DocString>> {
         let docstring = self.ei.docstrings.get(base_id)?.clone();
         Some(Arc::new(
@@ -53,7 +53,7 @@ struct IdRenamer<'a, 'b> {
     base_id: Interned<Decl>,
 }
 
-impl<'a, 'b> TyMutator for IdRenamer<'a, 'b> {
+impl TyMutator for IdRenamer<'_, '_> {
     fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
         match ty {
             Ty::Var(v) => Some(self.base.copy_doc_vars(

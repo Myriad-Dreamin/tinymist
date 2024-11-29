@@ -9,7 +9,7 @@ use crate::ty::*;
 static EMPTY_DOCSTRING: LazyLock<DocString> = LazyLock::new(DocString::default);
 static EMPTY_VAR_DOC: LazyLock<VarDoc> = LazyLock::new(VarDoc::default);
 
-impl<'a> TypeChecker<'a> {
+impl TypeChecker<'_> {
     pub(crate) fn check_syntax(&mut self, root: &Expr) -> Option<Ty> {
         Some(match root {
             Expr::Block(seq) => self.check_block(seq),

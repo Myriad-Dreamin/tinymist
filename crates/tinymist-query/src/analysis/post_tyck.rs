@@ -105,7 +105,7 @@ pub(crate) struct PostTypeChecker<'a> {
     locals: TypeScheme,
 }
 
-impl<'a> TyCtx for PostTypeChecker<'a> {
+impl TyCtx for PostTypeChecker<'_> {
     fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<TypeBounds> {
         self.info.global_bounds(var, pol)
     }
@@ -115,7 +115,7 @@ impl<'a> TyCtx for PostTypeChecker<'a> {
     }
 }
 
-impl<'a> TyCtxMut for PostTypeChecker<'a> {
+impl TyCtxMut for PostTypeChecker<'_> {
     type Snap = <TypeScheme as TyCtxMut>::Snap;
 
     fn start_scope(&mut self) -> Self::Snap {
@@ -396,7 +396,7 @@ where
 #[bind(0)]
 struct PostSigCheckWorker<'x, 'a, T>(&'x mut PostTypeChecker<'a>, &'x mut T);
 
-impl<'x, 'a, T: PostSigChecker> SigChecker for PostSigCheckWorker<'x, 'a, T> {
+impl<T: PostSigChecker> SigChecker for PostSigCheckWorker<'_, '_, T> {
     fn check(
         &mut self,
         sig: Sig,

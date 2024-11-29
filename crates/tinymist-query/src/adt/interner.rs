@@ -282,7 +282,7 @@ impl<'de> serde::Deserialize<'de> for Interned<str> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct StrVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for StrVisitor {
+        impl serde::de::Visitor<'_> for StrVisitor {
             type Value = Interned<str>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
