@@ -1,0 +1,296 @@
+// NOTE: we avoid a possible syntax error in the future when custom elements are added and self may become a keyword by appending an underscore
+#import "@preview/t4t:0.3.2"
+
+#let _resolve(elem, it, field) = {
+  if it.has(field) {
+    it.at(field)
+  } else {
+    // we can't func.at(field) to resolve the field
+    // eval(repr(elem) + "." + field)
+    elem.at(field)
+  }
+}
+
+/// The default figure show rule. The active set rules will be used.
+///
+/// This function is contextual.
+///
+/// - self_ (content): The figure to show using the defualt show rule.
+/// -> content
+#let show-figure(self_) = {
+  // NOTE: this is written to be close to the rust impl to make changes easier to compare
+
+  let realized = self_.body
+
+  let caption = _resolve(figure, self_, "caption")
+  if caption != none {
+    let v = v(self_.gap, weak: true)
+    let position = _resolve(figure.caption, caption, "position")
+    realized = if position == top {
+      caption + v + realized
+    } else {
+      realized + v + caption
+    }
+  }
+
+  realized = {
+    set align(center)
+    block(realized)
+  }
+
+  let placement = _resolve(figure, self_, "placement")
+  if placement != none {
+    realized = place(placement, float: true)
+  }
+
+  realized
+}
+
+#let _numbering = numbering
+
+#let apply-for-all(
+  values,
+  rule,
+) = (
+  outer => {
+    show: inner => {
+      values.map(rule).fold(inner, (acc, f) => f(acc))
+    }
+
+    outer
+  }
+)
+
+#let gather-kinds(body) = {
+  if t4t.is.elem(figure, body) {
+    if body.at("kind", default: auto) != auto {
+      return (figure.kind,)
+    }
+  } else if body.has("children") {
+    return body.children.map(gather-kinds).flatten().dedup()
+  }
+
+  (image, raw, table)
+}
+
+#let i18n-kind(kind) = {
+  let map = toml("/assets/i18n.toml")
+
+  if kind not in map.en {
+    panic("Unknown kind: `" + kind + "`")
+  }
+
+  let lang-map = map.at(text.lang, default: (:))
+  let region-map = if text.region != none {
+    lang-map.at(text.region, default: (:))
+  } else {
+    (:)
+  }
+  let term = region-map.at(kind, default: none)
+
+  if term == none {
+    term = lang-map.at(kind, default: none)
+  }
+
+  if term == none {
+    term = map.en.at(kind)
+  }
+
+  term
+}
+
+#let stitch-pairs(args) = {
+  if args.len() == 0 {
+    return ()
+  }
+
+  assert.ne(type(args.first()), label, message: "First item must not be a label")
+
+  let pairs = ()
+  while args.len() != 0 {
+    let item = args.remove(0)
+    if type(item) == label {
+      let last = pairs.pop()
+
+      assert.ne(type(last), label, message: "Cannot have two consecutive labels")
+
+      last.at(1) = item
+      pairs.push(last)
+    } else {
+      pairs.push((item, none))
+    }
+  }
+
+  pairs
+}
+
+#let sparse-numbering(numbering) = if type(numbering) == str {
+  let symbols = ("1", "a", "A", "i", "I", "い", "イ", "א", "가", "ㄱ", "\\*")
+  let c = numbering.matches(regex(symbols.join("|"))).len()
+
+  if c == 1 {
+    // if we have only one symbol we drop the super number
+    (_, num) => _numbering(numbering, num)
+  } else {
+    (..nums) => _numbering(numbering, ..nums)
+  }
+} else {
+  numbering
+}
+
+#let _numbering = numbering
+#let _label = label
+#let _grid = grid
+
+/// The counter used for sub figures.
+#let sub-figure-counter = counter("__subpar:sub-figure-counter")
+
+/// Creates a figure which may contain other figures, a #emph[super]figure. For
+/// the meaning of parameters take a look at the regular figure documentation.
+///
+/// See @@grid() for a function which places its sub figures in a grid.
+///
+/// - kind (str, function): The image kind which should be used, this is mainly
+///   relevant for introspection and defaults to `image`. This cannot be
+///   automatically resovled like for normal figures and must be set.
+/// - numbering (str, function): This is the numbering used for this super
+///   figure.
+/// - numbering-sub (str, function): This is the numbering used for the sub
+///   figures.
+/// - numbering-sub-ref (str, function): This is the numbering used for
+///   _references_ to the sub figures. If this is a function, it receives both
+///   the super and sub figure numbering respectively.
+/// - supplement (content, function, auto, none): The supplement used for this
+///   super figure _and_ the sub figures when referenced.
+/// - propagate-supplement (bool): Whether the super figure's supplement should
+///   propagate down to its sub figures.
+/// - caption (content): The caption of this super figure.
+/// - placement (alignment, auto, none): The float placement of this super
+///   figure.
+/// - scope (str): Relative to which containing scope the figure is placed. Set
+///   this to `"parent"` to create a full-width figure in a two-column document.
+///   Has no effect if placement is `none`. Can be set to `"parent"` or
+///   `"column"`.
+/// - gap (length): The gap between this super figure's caption and body.
+/// - outlined (bool): Whether this super figure should appear in an outline of
+///   figures.
+/// - outlined-sub (bool): Whether the sub figures should appear in an outline
+///   of figures.
+/// - label (label, none): The label to attach to this super figure.
+/// - show-sub (function, auto): A show rule override for sub figures. Recevies
+///   the sub figure.
+/// - show-sub-caption (function, auto): A show rule override for sub figure's
+///   captions. Receives the realized numbering and caption element.
+/// -> content
+#let super(
+  kind: image,
+  numbering: "1",
+  numbering-sub: "(a)",
+  numbering-sub-ref: "1a",
+  supplement: auto,
+  propagate-supplement: true,
+  caption: none,
+  placement: none,
+  scope: "column",
+  gap: 0.65em,
+  outlined: true,
+  outlined-sub: false,
+  label: none,
+  show-sub: auto,
+  show-sub-caption: auto,
+  body,
+) = {
+  t4t.assert.any-type(str, function, kind)
+
+  let assert-numbering = t4t.assert.any-type.with(str, function)
+  assert-numbering(numbering)
+  assert-numbering(numbering-sub)
+  assert-numbering(numbering-sub-ref)
+
+  // adjust numberings to receive either both or the sub number
+  numbering-sub = sparse-numbering(numbering-sub)
+  numbering-sub-ref = sparse-numbering(numbering-sub-ref)
+
+  t4t.assert.any-type(str, content, function, type(auto), type(none), supplement)
+  t4t.assert.any-type(bool, propagate-supplement)
+  t4t.assert.any-type(str, content, type(none), caption)
+  t4t.assert.any(top, bottom, auto, none, placement)
+  t4t.assert.any-type(length, gap)
+  t4t.assert.any-type(bool, outlined)
+  t4t.assert.any-type(bool, outlined-sub)
+  t4t.assert.any-type(_label, type(none), label)
+
+  t4t.assert.any-type(function, type(auto), show-sub)
+  t4t.assert.any-type(function, type(auto), show-sub-caption)
+
+  let function-kinds = (
+    image: "figure",
+    table: "table",
+    raw: "raw",
+  )
+
+  // NOTE: if we use no propagation, then we can fallback to the normal auto behavior, fixing #4.
+  if propagate-supplement and supplement == auto {
+    if repr(kind) in function-kinds {
+      supplement = context i18n-kind(function-kinds.at(repr(kind)))
+    } else {
+      panic("Cannot infer `supplement`, must be set.")
+    }
+  }
+
+  show-sub = t4t.def.if-auto(it => it, show-sub)
+  show-sub-caption = t4t.def.if-auto((num, it) => it, show-sub-caption)
+
+  context {
+    let n-super = counter(figure.where(kind: kind)).get().first() + 1
+
+    [#figure(
+        kind: kind,
+        numbering: n => _numbering(numbering, n),
+        supplement: supplement,
+        caption: caption,
+        placement: placement,
+        scope: scope,
+        gap: gap,
+        outlined: outlined,
+        {
+          // TODO: simply setting it for all doesn't seem to work
+          show: apply-for-all(
+            gather-kinds(body),
+            kind => (
+              inner => {
+                show figure.where(kind: kind): set figure(numbering: _ => _numbering(
+                  numbering-sub-ref,
+                  n-super,
+                  sub-figure-counter.get().first() + 1,
+                ))
+                inner
+              }
+            ),
+          )
+
+          set figure(supplement: supplement) if propagate-supplement
+          set figure(outlined: outlined-sub, placement: none)
+
+          show figure: show-sub
+          show figure: it => {
+            let n-sub = sub-figure-counter.get().first() + 1
+            let num = _numbering(numbering-sub, n-super, n-sub)
+            show figure.caption: it => {
+              num
+              [ ]
+              it.body
+            }
+            show figure.caption: show-sub-caption.with(num)
+
+            sub-figure-counter.step()
+            it
+            counter(figure.where(kind: it.kind)).update(n => n - 1)
+          }
+
+          sub-figure-counter.update(0)
+          body
+        },
+      )#label]
+  }
+}

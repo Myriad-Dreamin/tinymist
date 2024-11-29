@@ -11,8 +11,8 @@ use super::{
 use crate::analysis::PostTypeChecker;
 use crate::docs::{UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
 use crate::syntax::get_non_strict_def_target;
+use crate::ty::{DynTypeBounds, ParamAttrs};
 use crate::ty::{InsTy, TyCtx};
-use crate::ty::{ParamAttrs, TypeBounds};
 use crate::upstream::truncated_repr;
 
 /// Describes a function signature.

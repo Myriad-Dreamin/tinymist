@@ -58,7 +58,7 @@ mod tests {
     use insta::{assert_debug_snapshot, assert_snapshot};
     use tinymist_derive::BindTyCtx;
 
-    use super::{Interned, Ty, TyCtx, TypeBounds, TypeScheme, TypeVar};
+    use super::{DynTypeBounds, Interned, Ty, TyCtx, TypeScheme, TypeVar};
     use crate::ty::tests::*;
     use crate::ty::ApplyChecker;
     #[test]

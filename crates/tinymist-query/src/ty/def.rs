@@ -8,7 +8,7 @@ use std::{
     sync::Arc,
 };
 
-use ecow::{EcoString, EcoVec};
+use ecow::EcoString;
 use once_cell::sync::OnceCell;
 use parking_lot::{Mutex, RwLock};
 use reflexo_typst::TypstFileId;
@@ -367,15 +367,45 @@ impl NameBone {
     }
 }
 
+/// The state of a type variable (bounds of some type in program)
+#[derive(Clone, Default)]
+pub struct DynTypeBounds {
+    /// The lower bounds
+    pub lbs: rpds::HashTrieSetSync<Ty>,
+    /// The upper bounds
+    pub ubs: rpds::HashTrieSetSync<Ty>,
+}
+
+impl From<TypeBounds> for DynTypeBounds {
+    fn from(bounds: TypeBounds) -> Self {
+        Self {
+            lbs: bounds.lbs.into_iter().collect(),
+            ubs: bounds.ubs.into_iter().collect(),
+        }
+    }
+}
+
+impl DynTypeBounds {
+    /// Get frozen bounds
+    pub fn freeze(&self) -> TypeBounds {
+        // sorted
+        let mut lbs: Vec<_> = self.lbs.iter().cloned().collect();
+        lbs.sort();
+        let mut ubs: Vec<_> = self.ubs.iter().cloned().collect();
+        ubs.sort();
+        TypeBounds { lbs, ubs }
+    }
+}
+
 /// A frozen type variable (bounds of some type in program)
 /// `t :> t1 | ... | tn <: f1 & ... & fn`
 /// `  lbs------------- ubs-------------`
 #[derive(Hash, Clone, PartialEq, Eq, Default, PartialOrd, Ord)]
 pub struct TypeBounds {
     /// The lower bounds
-    pub lbs: EcoVec<Ty>,
+    pub lbs: Vec<Ty>,
     /// The upper bounds
-    pub ubs: EcoVec<Ty>,
+    pub ubs: Vec<Ty>,
 }
 
 impl fmt::Debug for TypeBounds {
@@ -1153,7 +1183,7 @@ pub struct TypeScheme {
 }
 
 impl TyCtx for TypeScheme {
-    fn global_bounds(&self, var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
+    fn global_bounds(&self, var: &Interned<TypeVar>, _pol: bool) -> Option<DynTypeBounds> {
         let v = self.vars.get(&var.def)?;
         Some(v.bounds.bounds().read().clone())
     }
@@ -1198,25 +1228,33 @@ impl TypeScheme {
     }
 
     /// Converts a type to a type with bounds
-    pub fn to_bounds(&self, def: Ty) -> TypeBounds {
-        let mut store = TypeBounds::default();
+    pub fn to_bounds(&self, def: Ty) -> DynTypeBounds {
+        let mut store = DynTypeBounds::default();
         match def {
             Ty::Var(v) => {
                 let w = self.vars.get(&v.def).unwrap();
                 match &w.bounds {
                     FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         let w = w.read();
-                        store.lbs.extend(w.lbs.iter().cloned());
-                        store.ubs.extend(w.ubs.iter().cloned());
+                        for l in w.lbs.iter() {
+                            store.lbs.insert_mut(l.clone());
+                        }
+                        for l in w.ubs.iter() {
+                            store.ubs.insert_mut(l.clone());
+                        }
                     }
                 }
             }
             Ty::Let(v) => {
-                store.lbs.extend(v.lbs.iter().cloned());
-                store.ubs.extend(v.ubs.iter().cloned());
+                for l in v.lbs.iter() {
+                    store.lbs.insert_mut(l.clone());
+                }
+                for l in v.ubs.iter() {
+                    store.ubs.insert_mut(l.clone());
+                }
             }
             _ => {
-                store.ubs.push(def);
+                store.ubs.insert_mut(def);
             }
         }
 
@@ -1269,10 +1307,10 @@ impl fmt::Debug for TypeVarBounds {
 
 impl TypeVarBounds {
     /// Create a type variable bounds
-    pub fn new(var: TypeVar, init: TypeBounds) -> Self {
+    pub fn new(var: TypeVar, init: DynTypeBounds) -> Self {
         Self {
             var: Interned::new(var),
-            bounds: FlowVarKind::Strong(Arc::new(RwLock::new(init))),
+            bounds: FlowVarKind::Strong(Arc::new(RwLock::new(init.clone()))),
         }
     }
 
@@ -1301,15 +1339,15 @@ impl TypeVarBounds {
 #[derive(Clone)]
 pub enum FlowVarKind {
     /// A type variable that receives both types and values (type instances)
-    Strong(Arc<RwLock<TypeBounds>>),
+    Strong(Arc<RwLock<DynTypeBounds>>),
     /// A type variable that receives only types
     /// The received values will be lifted to types
-    Weak(Arc<RwLock<TypeBounds>>),
+    Weak(Arc<RwLock<DynTypeBounds>>),
 }
 
 impl FlowVarKind {
     /// Get the bounds of the type variable
-    pub fn bounds(&self) -> &RwLock<TypeBounds> {
+    pub fn bounds(&self) -> &RwLock<DynTypeBounds> {
         match self {
             FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => w,
         }
