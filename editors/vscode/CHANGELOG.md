@@ -4,11 +4,39 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Unreleased
+## v0.12.6 - [2024-11-30]
 
 * Bumped typstyle to v0.12.3 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/893
   * Comment formatting and code block formatting is improved. For details, see https://enter-tainer.github.io/typstyle/changelog/#v0122---2024-11-23
   * Performance is greatly improved. For details, see https://enter-tainer.github.io/typstyle/changelog/#v0124---2024-11-26
+
+### Editor
+
+* Providing `tinymist.restartServer` command by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/894
+
+### Preview
+
+* (Fix) Correct function references in HTML in https://github.com/Myriad-Dreamin/tinymist/pull/896
+
+### Completion
+
+* (Fix) Detecting surrounding syntax of argument lists in show rule in https://github.com/Myriad-Dreamin/tinymist/pull/914
+
+### Syntax/Semantic Highlighting
+
+* (Fix) Removed buggy term list parsing in https://github.com/Myriad-Dreamin/tinymist/pull/897
+* (Fix) Matching braces in math mode as content in https://github.com/Myriad-Dreamin/tinymist/pull/901
+* (Fix) Stopping import-as clause parsing before colon in https://github.com/Myriad-Dreamin/tinymist/pull/908
+* (Fix) Parsing atomic func/method call expression in markup mode in https://github.com/Myriad-Dreamin/tinymist/pull/909
+* (Fix) Parsing show transformer until new line or code terminator in https://github.com/Myriad-Dreamin/tinymist/pull/910
+* Recursively parsing markup link according to typst syntax in https://github.com/Myriad-Dreamin/tinymist/pull/911
+
+### Misc
+
+* Copy-edited Neovim readme by @alerque in https://github.com/Myriad-Dreamin/tinymist/pull/888
+* Set up `typos` tool and fixed typos in entire code base by @alerque and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/887 and https://github.com/Myriad-Dreamin/tinymist/pull/899
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.4...v0.12.6
 
 ## v0.12.4 - [2024-11-22]
 
