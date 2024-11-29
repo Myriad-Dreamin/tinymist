@@ -1,0 +1,11 @@
+>https://[::1]:8080/test
+#^^^^^^^^ source.typst markup.underline.link.typst
+#        ^ source.typst markup.underline.link.typst
+#         ^^^ source.typst markup.underline.link.typst
+#            ^ source.typst markup.underline.link.typst
+#             ^^^^^^^^^^ source.typst markup.underline.link.typst
+>https://test.
+#^^^^^^^^ source.typst markup.underline.link.typst
+#        ^^^^ source.typst markup.underline.link.typst
+#            ^^ source.typst
+>

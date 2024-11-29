@@ -312,8 +312,7 @@ const markup: textmate.Pattern = {
     // },
     ...boldItalicMarkup,
     {
-      name: "markup.underline.link.typst",
-      match: /https?:\/\/[0-9a-zA-Z~\/%#&='',;\.\+\?\-\_]*/,
+      include: "#markupLink",
     },
     {
       include: "#markupMath",
@@ -700,6 +699,42 @@ const expressions = (): textmate.Grammar => {
       expression,
       arrayOrDict,
       literalContent,
+    },
+  };
+};
+
+const link = (): textmate.Grammar => {
+  const markupLink: textmate.Pattern = {
+    name: "markup.underline.link.typst",
+    begin: /(?:https?):\/\//,
+    end: /(?=[\s\]\)]|(?=[!,.:;?'](?:[\s\]\)]|$)))/,
+    patterns: [
+      { include: "#markupLinkParen" },
+      { include: "#markupLinkBracket" },
+      {
+        match:
+          /(^|\G)(?:[0-9a-zA-Z#$%&*\+\-\/\=\@\_\~]+|(?:[!,.:;?']+(?![\s\]\)]|$)))/,
+      },
+    ],
+  };
+
+  const markupLinkParen: textmate.Pattern = {
+    begin: /\(/,
+    end: /\)|(?=[\s\]])/,
+    patterns: [{ include: "#markupLink" }],
+  };
+
+  const markupLinkBracket: textmate.Pattern = {
+    begin: /\[/,
+    end: /\]|(?=[\s\)])/,
+    patterns: [{ include: "#markupLink" }],
+  };
+
+  return {
+    repository: {
+      markupLink,
+      markupLinkParen,
+      markupLinkBracket,
     },
   };
 };
@@ -1460,6 +1495,7 @@ export const typst: textmate.Grammar = {
     markupBold,
     markupItalic,
     markupMath,
+    ...link().repository,
     markupHeading,
     markupBrace,
     mathBrace,
