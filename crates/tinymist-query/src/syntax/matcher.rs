@@ -398,7 +398,7 @@ pub enum DefTarget<'a> {
     Import(LinkedNode<'a>),
 }
 
-impl<'a> DefTarget<'a> {
+impl DefTarget<'_> {
     pub fn node(&self) -> &LinkedNode {
         match self {
             DefTarget::Let(node) => node,
@@ -506,7 +506,7 @@ pub enum ParamTarget<'a> {
     },
     Named(LinkedNode<'a>),
 }
-impl<'a> ParamTarget<'a> {
+impl ParamTarget<'_> {
     pub(crate) fn positional_from_before(before: bool) -> Self {
         ParamTarget::Positional {
             spreads: EcoVec::new(),

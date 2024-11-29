@@ -29,7 +29,7 @@ pub enum Iface<'a> {
     },
 }
 
-impl<'a> Iface<'a> {
+impl Iface<'_> {
     // IfaceShape { iface }
     pub fn select(self, ctx: &mut impl TyCtxMut, key: &StrRef) -> Option<Ty> {
         log::debug!("iface shape: {self:?}");
@@ -87,7 +87,7 @@ impl BoundChecker for IfaceCheckDriver<'_> {
     }
 }
 
-impl<'a> IfaceCheckDriver<'a> {
+impl IfaceCheckDriver<'_> {
     fn dict_as_iface(&self) -> bool {
         // matches!(
         // self.ctx.sig_kind,

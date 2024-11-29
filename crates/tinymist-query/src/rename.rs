@@ -151,7 +151,7 @@ struct RenameFileWorker<'a> {
     inserted: FxHashSet<Span>,
 }
 
-impl<'a> RenameFileWorker<'a> {
+impl RenameFileWorker<'_> {
     pub(crate) fn work(&mut self, edits: &mut HashMap<Url, Vec<TextEdit>>) -> Option<()> {
         let dep = self.ctx.module_dependencies().get(&self.def_fid).cloned();
         if let Some(dep) = dep {

@@ -1,7 +1,7 @@
 use super::{Sig, SigShape, TyMutator};
 use crate::ty::prelude::*;
 
-impl<'a> Sig<'a> {
+impl Sig<'_> {
     pub fn call(&self, args: &Interned<ArgsTy>, pol: bool, ctx: &mut impl TyCtxMut) -> Option<Ty> {
         log::debug!("call {self:?} {args:?} {pol:?}");
         ctx.with_scope(|ctx| {
@@ -34,13 +34,13 @@ struct SubstituteChecker<'a, T: TyCtxMut> {
     ctx: &'a mut T,
 }
 
-impl<'a, T: TyCtxMut> SubstituteChecker<'a, T> {
+impl<T: TyCtxMut> SubstituteChecker<'_, T> {
     fn ty(&mut self, body: &Ty, pol: bool) -> Option<Ty> {
         body.mutate(pol, self)
     }
 }
 
-impl<'a, T: TyCtxMut> TyMutator for SubstituteChecker<'a, T> {
+impl<T: TyCtxMut> TyMutator for SubstituteChecker<'_, T> {
     fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
         // todo: extrude the type into a polarized type
         let _ = pol;

@@ -141,7 +141,7 @@ struct DocumentMetricsWorker<'a> {
     font_info: HashMap<Font, FontInfoValue>,
 }
 
-impl<'a> DocumentMetricsWorker<'a> {
+impl DocumentMetricsWorker<'_> {
     fn work(&mut self, doc: &Document) -> Option<()> {
         for page in &doc.pages {
             self.work_frame(&page.frame)?;

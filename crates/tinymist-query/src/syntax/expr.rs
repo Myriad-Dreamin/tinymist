@@ -257,7 +257,7 @@ pub(crate) struct ExprWorker<'a> {
     comment_matcher: DocCommentMatcher,
 }
 
-impl<'a> ExprWorker<'a> {
+impl ExprWorker<'_> {
     fn with_scope<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         self.lexical.scopes.push(std::mem::replace(
             &mut self.lexical.last,

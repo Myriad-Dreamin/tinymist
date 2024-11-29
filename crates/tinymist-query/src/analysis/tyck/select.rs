@@ -10,7 +10,7 @@ pub struct SelectFieldChecker<'a, 'b> {
     pub resultant: Vec<Ty>,
 }
 
-impl<'a, 'b> SelectChecker for SelectFieldChecker<'a, 'b> {
+impl SelectChecker for SelectFieldChecker<'_, '_> {
     fn select(&mut self, iface: Iface, key: &Interned<str>, pol: bool) {
         log::debug!("selecting field: {iface:?} {key:?}");
         let _ = pol;

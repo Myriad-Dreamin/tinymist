@@ -108,7 +108,7 @@ struct DocsChecker<'a> {
 static EMPTY_MODULE: LazyLock<Module> =
     LazyLock::new(|| Module::new("stub", typst::foundations::Scope::new()));
 
-impl<'a> DocsChecker<'a> {
+impl DocsChecker<'_> {
     pub fn check_pat_docs(mut self, docs: String) -> Option<DocString> {
         let converted =
             convert_docs(self.ctx, &docs).and_then(|converted| identify_pat_docs(&converted));

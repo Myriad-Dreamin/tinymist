@@ -382,7 +382,7 @@ struct AliasStackChecker<'a, 'b> {
     checking_with: bool,
 }
 
-impl<'a, 'b> BoundChecker for AliasStackChecker<'a, 'b> {
+impl BoundChecker for AliasStackChecker<'_, '_> {
     fn check_var(&mut self, u: &Interned<TypeVar>, pol: bool) {
         log::debug!("collecting var {u:?} {pol:?}");
         if self.res.is_some() {
@@ -619,7 +619,7 @@ fn analyze_closure_signature(
 
 struct PatternDisplay<'a>(&'a ast::Pattern<'a>);
 
-impl<'a> fmt::Display for PatternDisplay<'a> {
+impl fmt::Display for PatternDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             ast::Pattern::Normal(ast::Expr::Ident(ident)) => f.write_str(ident.as_str()),

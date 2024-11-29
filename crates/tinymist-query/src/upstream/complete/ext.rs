@@ -116,7 +116,7 @@ impl CompletionFeat {
     }
 }
 
-impl<'a> CompletionContext<'a> {
+impl CompletionContext<'_> {
     pub fn world(&self) -> &LspWorld {
         self.ctx.world()
     }
@@ -687,7 +687,7 @@ fn analyze_import_source(ctx: &LocalContext, types: &TypeScheme, s: ast::Expr) -
 #[bind(0)]
 struct ScopeChecker<'a>(&'a mut Defines, &'a mut LocalContext);
 
-impl<'a> IfaceChecker for ScopeChecker<'a> {
+impl IfaceChecker for ScopeChecker<'_> {
     fn check(
         &mut self,
         iface: Iface,
@@ -1803,7 +1803,6 @@ static DEFAULT_POSTFIX_SNIPPET: LazyLock<Vec<PostfixSnippet>> = LazyLock::new(||
 });
 
 #[cfg(test)]
-
 mod tests {
     use crate::upstream::complete::slice_at;
 

@@ -722,7 +722,7 @@ impl TypliteWorker {
 
 struct WrapCode<'a>(&'a str, bool);
 
-impl<'a> fmt::Display for WrapCode<'a> {
+impl fmt::Display for WrapCode<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let is_markup = self.1;
         if is_markup {

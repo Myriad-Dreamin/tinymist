@@ -286,11 +286,13 @@ impl DerefMut for LocalContext {
 }
 
 impl LocalContext {
+    /// Set the files for LSP-based completion.
     #[cfg(test)]
     pub fn test_completion_files(&mut self, f: impl FnOnce() -> Vec<TypstFileId>) {
         self.caches.completion_files.get_or_init(f);
     }
 
+    /// Set the files for analysis.
     #[cfg(test)]
     pub fn test_files(&mut self, f: impl FnOnce() -> Vec<TypstFileId>) {
         self.caches.root_files.get_or_init(f);
@@ -335,7 +337,7 @@ impl LocalContext {
     /// Get the module dependencies of the workspace.
     pub fn module_dependencies(&mut self) -> &HashMap<TypstFileId, ModuleDependency> {
         if self.caches.module_deps.get().is_some() {
-            return self.caches.module_deps.get().unwrap();
+            self.caches.module_deps.get().unwrap()
         } else {
             // may cause multiple times to calculate, but it is okay because we have mutable
             // reference to self.

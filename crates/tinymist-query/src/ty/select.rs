@@ -16,13 +16,13 @@ impl Ty {
 #[bind(0)]
 pub struct SelectKeyChecker<'a, T: TyCtx>(&'a mut T, &'a Interned<str>);
 
-impl<'a, T: SelectChecker> SelectKeyChecker<'a, T> {
+impl<T: SelectChecker> SelectKeyChecker<'_, T> {
     fn ty(&mut self, ty: &Ty, pol: bool) {
         ty.iface_surface(pol, self)
     }
 }
 
-impl<'a, T: SelectChecker> IfaceChecker for SelectKeyChecker<'a, T> {
+impl<T: SelectChecker> IfaceChecker for SelectKeyChecker<'_, T> {
     fn check(
         &mut self,
         iface: Iface,

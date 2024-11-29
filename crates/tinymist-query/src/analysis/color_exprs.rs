@@ -24,7 +24,7 @@ struct ColorExprWorker<'a> {
     colors: Vec<ColorInformation>,
 }
 
-impl<'a> ColorExprWorker<'a> {
+impl ColorExprWorker<'_> {
     fn collect_colors(&mut self, node: LinkedNode) -> Option<()> {
         match node.kind() {
             SyntaxKind::FuncCall => {
