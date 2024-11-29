@@ -29,7 +29,7 @@ pub trait TyCtx {
     /// Get local binding of a variable.
     fn local_bind_of(&self, _var: &Interned<TypeVar>) -> Option<Ty>;
     /// Get the type of a variable.
-    fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds>;
+    fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<DynTypeBounds>;
 }
 
 impl TyCtx for () {
@@ -37,7 +37,7 @@ impl TyCtx for () {
         None
     }
 
-    fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<TypeBounds> {
+    fn global_bounds(&self, _var: &Interned<TypeVar>, _pol: bool) -> Option<DynTypeBounds> {
         None
     }
 }

@@ -3,7 +3,7 @@
 use hashbrown::HashSet;
 use tinymist_derive::BindTyCtx;
 
-use super::{prelude::*, ParamAttrs, ParamTy, SharedContext};
+use super::{prelude::*, DynTypeBounds, ParamAttrs, ParamTy, SharedContext};
 use super::{
     ArgsTy, Sig, SigChecker, SigShape, SigSurfaceKind, SigTy, Ty, TyCtx, TyCtxMut, TypeBounds,
     TypeScheme, TypeVar,
@@ -106,7 +106,7 @@ pub(crate) struct PostTypeChecker<'a> {
 }
 
 impl TyCtx for PostTypeChecker<'_> {
-    fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<TypeBounds> {
+    fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<DynTypeBounds> {
         self.info.global_bounds(var, pol)
     }
 

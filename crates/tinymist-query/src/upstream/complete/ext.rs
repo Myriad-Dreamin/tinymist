@@ -21,7 +21,7 @@ use crate::analysis::{func_signature, BuiltinTy, PathPreference, Ty};
 use crate::syntax::{
     descending_decls, interpret_mode_at, is_ident_like, CheckTarget, DescentDecl, InterpretMode,
 };
-use crate::ty::{Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeBounds, TypeScheme, TypeVar};
+use crate::ty::{DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeScheme, TypeVar};
 use crate::upstream::complete::complete_code;
 
 use crate::{completion_kind, prelude::*, LspCompletion};

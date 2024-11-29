@@ -6,8 +6,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use tinymist_derive::BindTyCtx;
 
 use super::{
-    prelude::*, BuiltinTy, FlowVarKind, SharedContext, TyCtxMut, TypeBounds, TypeScheme, TypeVar,
-    TypeVarBounds,
+    prelude::*, BuiltinTy, DynTypeBounds, FlowVarKind, SharedContext, TyCtxMut, TypeScheme,
+    TypeVar, TypeVarBounds,
 };
 use crate::{
     syntax::{Decl, DeclExpr, Expr, ExprInfo, UnaryOp},
@@ -95,7 +95,7 @@ pub(crate) struct TypeChecker<'a> {
 }
 
 impl TyCtx for TypeChecker<'_> {
-    fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<TypeBounds> {
+    fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<DynTypeBounds> {
         self.info.global_bounds(var, pol)
     }
 
@@ -285,7 +285,7 @@ impl TypeChecker<'_> {
                 match &w.bounds {
                     FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         let mut w = w.write();
-                        w.ubs.push(bound);
+                        w.ubs.insert_mut(bound);
                     }
                 }
             }
@@ -296,7 +296,7 @@ impl TypeChecker<'_> {
                 match &w.bounds {
                     FlowVarKind::Strong(v) | FlowVarKind::Weak(v) => {
                         let mut v = v.write();
-                        v.lbs.push(bound);
+                        v.lbs.insert_mut(bound);
                     }
                 }
             }

@@ -385,8 +385,8 @@ impl TypeChecker<'_> {
         let res_ty = if let Some(annotated) = &docstring.res_ty {
             self.constrain(&body, annotated);
             Ty::Let(Interned::new(TypeBounds {
-                lbs: eco_vec![body],
-                ubs: eco_vec![annotated.clone()],
+                lbs: vec![body],
+                ubs: vec![annotated.clone()],
             }))
         } else {
             body

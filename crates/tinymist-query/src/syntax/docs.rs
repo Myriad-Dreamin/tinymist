@@ -14,7 +14,7 @@ use crate::{
     prelude::*,
     syntax::{Decl, DefKind},
     ty::{
-        BuiltinTy, InsTy, Interned, PackageId, SigTy, StrRef, Ty, TypeBounds, TypeVar,
+        BuiltinTy, DynTypeBounds, InsTy, Interned, PackageId, SigTy, StrRef, Ty, TypeVar,
         TypeVarBounds,
     },
 };
@@ -197,7 +197,7 @@ impl DocsChecker<'_> {
             name,
             def: encoded.clone(),
         };
-        let bounds = TypeVarBounds::new(var, TypeBounds::default());
+        let bounds = TypeVarBounds::new(var, DynTypeBounds::default());
         let var = bounds.as_type();
         self.vars.insert(encoded, bounds);
         var

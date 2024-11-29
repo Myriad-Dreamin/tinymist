@@ -31,7 +31,7 @@ pub fn bind_ty_ctx(input: TokenStream) -> TokenStream {
 
             quote! {
                 impl #impl_generics TyCtx for #name #ty_generics #where_clause {
-                    fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<TypeBounds> {
+                    fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<DynTypeBounds> {
                         self.#bind_name.global_bounds(var, pol)
                     }
                     fn local_bind_of(&self, var: &Interned<TypeVar>) -> Option<Ty> {
