@@ -595,6 +595,10 @@ fn check_surrounding_syntax(mut leaf: &LinkedNode) -> Option<SurroundingSyntax> 
                 }
             }
             SyntaxKind::ShowRule => {
+                if met_args {
+                    return Some(Regular);
+                }
+
                 let rule = parent.get().cast::<ast::ShowRule>()?;
                 let colon = rule
                     .to_untyped()
