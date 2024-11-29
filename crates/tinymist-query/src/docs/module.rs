@@ -54,7 +54,7 @@ pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<Pac
         })
         .collect();
 
-    log::debug!("module_uses: {module_uses:#?}",);
+    crate::log_debug_ct!("module_uses: {module_uses:#?}",);
 
     defs.children.extend(extras);
 
@@ -184,11 +184,11 @@ impl ScanDefCtx<'_> {
                 aliases_vec.push(path.iter().join("."));
 
                 if !is_fresh {
-                    log::debug!("found module: {path:?} (reexport)");
+                    crate::log_debug_ct!("found module: {path:?} (reexport)");
                     return None;
                 }
 
-                log::debug!("found module: {path:?}");
+                crate::log_debug_ct!("found module: {path:?}");
 
                 let ei = self.ctx.expr_stage_by_id(fid)?;
 
@@ -239,7 +239,7 @@ impl ScanDefCtx<'_> {
                     path.push("-");
                     path.push(key);
 
-                    log::debug!("found internal module: {path:?}");
+                    crate::log_debug_ct!("found internal module: {path:?}");
                     if let Some(m) = src {
                         let msym = self.defs(path, m);
                         self.extras.push(msym)

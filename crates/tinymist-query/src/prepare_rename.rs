@@ -3,7 +3,6 @@ use crate::{
     prelude::*,
     syntax::{Decl, DerefTarget},
 };
-use log::debug;
 
 /// The [`textDocument/prepareRename`] request is sent from the client to the
 /// server to setup and test the validity of a rename operation at a given
@@ -67,16 +66,16 @@ pub(crate) fn prepare_renaming(
     let (def_fid, _def_range) = def.def_at(ctx.shared()).clone()?;
 
     if def_fid.package().is_some() {
-        debug!(
+        crate::log_debug_ct!(
             "prepare_rename: {name} is in a package {pkg:?}",
-            pkg = def_fid.package()
+            pkg = def_fid.package(),
         );
         return None;
     }
 
     let var_rename = || Some((name.to_string(), None));
 
-    log::debug!("prepare_rename: {name}");
+    crate::log_debug_ct!("prepare_rename: {name}");
     use Decl::*;
     match def.decl.as_ref() {
         // Cannot rename headings or blocks

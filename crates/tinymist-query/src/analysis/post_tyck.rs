@@ -31,7 +31,7 @@ struct SignatureReceiver {
 
 impl SignatureReceiver {
     fn insert(&mut self, ty: Ty, pol: bool) {
-        log::debug!("post check receive: {ty:?}");
+        crate::log_debug_ct!("post check receive: {ty:?}");
         if !pol {
             if self.lbs_dedup.insert(ty.clone()) {
                 self.bounds.lbs.push(ty);
@@ -172,7 +172,7 @@ impl<'a> PostTypeChecker<'a> {
 
     fn check_(&mut self, node: &LinkedNode) -> Option<Ty> {
         let context = node.parent()?;
-        log::debug!("post check: {:?}::{:?}", context.kind(), node.kind());
+        crate::log_debug_ct!("post check: {:?}::{:?}", context.kind(), node.kind());
 
         let context_ty = self.check_context(context, node);
         let self_ty = if !matches!(node.kind(), SyntaxKind::Label | SyntaxKind::Ref) {
@@ -182,7 +182,7 @@ impl<'a> PostTypeChecker<'a> {
         };
 
         let contextual_self_ty = self.check_target(get_check_target(node.clone()), context_ty);
-        log::debug!(
+        crate::log_debug_ct!(
             "post check(res): {:?}::{:?} -> {self_ty:?}, {contextual_self_ty:?}",
             context.kind(),
             node.kind(),
@@ -207,7 +207,7 @@ impl<'a> PostTypeChecker<'a> {
         let Some(node) = node else {
             return context_ty;
         };
-        log::debug!("post check target: {node:?}");
+        crate::log_debug_ct!("post check target: {node:?}");
 
         match node {
             CheckTarget::Param {
@@ -217,10 +217,12 @@ impl<'a> PostTypeChecker<'a> {
                 is_set,
             } => {
                 let callee = self.check_context_or(&callee, context_ty)?;
-                log::debug!("post check call target: ({callee:?})::{target:?} is_set: {is_set}");
+                crate::log_debug_ct!(
+                    "post check call target: ({callee:?})::{target:?} is_set: {is_set}"
+                );
 
                 let sig = self.ctx.sig_of_type(self.info, callee)?;
-                log::debug!("post check call sig: {target:?} {sig:?}");
+                crate::log_debug_ct!("post check call sig: {target:?} {sig:?}");
                 let mut resp = SignatureReceiver::default();
 
                 match &target {
@@ -261,12 +263,12 @@ impl<'a> PostTypeChecker<'a> {
                     }
                 }
 
-                log::debug!("post check target iterated: {:?}", resp.bounds);
+                crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
             CheckTarget::Element { container, target } => {
                 let container_ty = self.check_context_or(&container, context_ty)?;
-                log::debug!("post check element target: ({container_ty:?})::{target:?}");
+                crate::log_debug_ct!("post check element target: ({container_ty:?})::{target:?}");
 
                 let mut resp = SignatureReceiver::default();
 
@@ -277,7 +279,7 @@ impl<'a> PostTypeChecker<'a> {
                     &mut check_signature(&mut resp, &target),
                 );
 
-                log::debug!("post check target iterated: {:?}", resp.bounds);
+                crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
             CheckTarget::Paren {
@@ -285,7 +287,7 @@ impl<'a> PostTypeChecker<'a> {
                 is_before,
             } => {
                 let container_ty = self.check_context_or(&container, context_ty)?;
-                log::debug!("post check paren target: {container_ty:?}::{is_before:?}");
+                crate::log_debug_ct!("post check paren target: {container_ty:?}::{is_before:?}");
 
                 let mut resp = SignatureReceiver::default();
                 // todo: this is legal, but it makes it sometimes complete itself.
@@ -300,12 +302,12 @@ impl<'a> PostTypeChecker<'a> {
                     &mut check_signature(&mut resp, &target),
                 );
 
-                log::debug!("post check target iterated: {:?}", resp.bounds);
+                crate::log_debug_ct!("post check target iterated: {:?}", resp.bounds);
                 Some(resp.finalize())
             }
             CheckTarget::Normal(target) => {
                 let ty = self.check_context_or(&target, context_ty)?;
-                log::debug!("post check target normal: {ty:?}");
+                crate::log_debug_ct!("post check target normal: {ty:?}");
                 Some(ty)
             }
         }

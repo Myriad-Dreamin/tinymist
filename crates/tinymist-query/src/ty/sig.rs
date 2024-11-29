@@ -167,7 +167,7 @@ impl SigCheckDriver<'_> {
     }
 
     fn ty(&mut self, ty: &Ty, pol: bool) {
-        log::debug!("check sig: {ty:?}");
+        crate::log_debug_ct!("check sig: {ty:?}");
         match ty {
             Ty::Builtin(BuiltinTy::Stroke) if self.dict_as_sig() => {
                 self.checker
@@ -254,7 +254,7 @@ impl SigCheckDriver<'_> {
 
 impl BoundChecker for SigCheckDriver<'_> {
     fn collect(&mut self, ty: &Ty, pol: bool) {
-        log::debug!("sig bounds: {ty:?}");
+        crate::log_debug_ct!("sig bounds: {ty:?}");
         self.ty(ty, pol);
     }
 }
@@ -282,7 +282,7 @@ impl MethodDriver<'_, '_> {
 
 impl BoundChecker for MethodDriver<'_, '_> {
     fn collect(&mut self, ty: &Ty, pol: bool) {
-        log::debug!("check method: {ty:?}.{}", self.1.as_ref());
+        crate::log_debug_ct!("check method: {ty:?}.{}", self.1.as_ref());
         match ty {
             // todo: deduplicate checking early
             Ty::Value(v) => {

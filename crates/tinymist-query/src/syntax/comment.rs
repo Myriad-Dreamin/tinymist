@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 pub fn find_module_level_docs(src: &Source) -> Option<String> {
-    log::debug!("finding docs at: {id:?}", id = src.id());
+    crate::log_debug_ct!("finding docs at: {id:?}", id = src.id());
 
     let root = LinkedNode::new(src.root());
     for n in root.children() {
@@ -34,7 +34,7 @@ fn extract_mod_docs_between(
             break 'scan_comments;
         }
 
-        log::debug!("found comment for docs: {:?}: {:?}", n.kind(), n.text());
+        crate::log_debug_ct!("found comment for docs: {:?}: {:?}", n.kind(), n.text());
         if matcher.process(n.get()) {
             if first_group {
                 break 'scan_comments;

@@ -150,7 +150,7 @@ impl StatefulRequest for CompletionRequest {
                     let ty_chk = ctx.type_check(&source);
 
                     let ty = ty_chk.type_of_span(cano_expr.span());
-                    log::debug!("check string ty: {ty:?}");
+                    crate::log_debug_ct!("check string ty: {ty:?}");
                     if let Some(Ty::Builtin(BuiltinTy::Path(path_filter))) = ty {
                         completion_result =
                             complete_path(ctx, Some(cano_expr), &source, cursor, &path_filter);

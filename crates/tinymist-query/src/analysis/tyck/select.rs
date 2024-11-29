@@ -12,14 +12,14 @@ pub struct SelectFieldChecker<'a, 'b> {
 
 impl SelectChecker for SelectFieldChecker<'_, '_> {
     fn select(&mut self, iface: Iface, key: &Interned<str>, pol: bool) {
-        log::debug!("selecting field: {iface:?} {key:?}");
+        crate::log_debug_ct!("selecting field: {iface:?} {key:?}");
         let _ = pol;
 
         let Some(res) = iface.select(self.base, key) else {
             return;
         };
 
-        log::debug!("selecting field real: {key:?} -> {res:?}");
+        crate::log_debug_ct!("selecting field real: {key:?} -> {res:?}");
         self.resultant.push(res.clone());
     }
 }

@@ -255,7 +255,7 @@ impl TypeSimplifier<'_, '_> {
         let mut lbs = HashSet::with_capacity(w.lbs.len());
         let mut ubs = HashSet::with_capacity(w.ubs.len());
 
-        log::debug!("transform let [principal={}] with {w:?}", self.principal);
+        crate::log_debug_ct!("transform let [principal={}] with {w:?}", self.principal);
 
         if !self.principal || ((pol) && !def_id.is_some_and(|i| self.negatives.contains(i))) {
             for lb in w.lbs.iter() {

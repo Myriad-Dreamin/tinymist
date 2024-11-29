@@ -288,7 +288,7 @@ pub(crate) fn interpret_mode_at_kind(k: SyntaxKind) -> Option<InterpretMode> {
 
 pub(crate) fn interpret_mode_at(mut leaf: Option<&LinkedNode>) -> InterpretMode {
     loop {
-        log::debug!("leaf for context: {leaf:?}");
+        crate::log_debug_ct!("leaf for context: {leaf:?}");
         if let Some(t) = leaf {
             if let Some(mode) = interpret_mode_at_kind(t.kind()) {
                 break mode;
@@ -357,11 +357,11 @@ pub fn get_deref_target(node: LinkedNode, cursor: usize) -> Option<DerefTarget<'
 
     // Move to the first ancestor that is an expression.
     let ancestor = deref_expr(node)?;
-    log::debug!("deref expr: {ancestor:?}");
+    crate::log_debug_ct!("deref expr: {ancestor:?}");
 
     // Unwrap all parentheses to get the actual expression.
     let cano_expr = deref_lvalue(ancestor)?;
-    log::debug!("deref lvalue: {cano_expr:?}");
+    crate::log_debug_ct!("deref lvalue: {cano_expr:?}");
 
     // Identify convenient expression kinds.
     let expr = cano_expr.cast::<ast::Expr>()?;
@@ -452,9 +452,9 @@ fn get_def_target_(node: LinkedNode, strict: bool) -> Option<DefTarget<'_>> {
     while !ancestor.is::<ast::Expr>() {
         ancestor = ancestor.parent()?.clone();
     }
-    log::debug!("def expr: {ancestor:?}");
+    crate::log_debug_ct!("def expr: {ancestor:?}");
     let ancestor = deref_lvalue(ancestor)?;
-    log::debug!("def lvalue: {ancestor:?}");
+    crate::log_debug_ct!("def lvalue: {ancestor:?}");
 
     let may_ident = ancestor.cast::<ast::Expr>()?;
     if strict && !may_ident.hash() && !matches!(may_ident, ast::Expr::MathIdent(_)) {
@@ -491,7 +491,7 @@ fn get_def_target_(node: LinkedNode, strict: bool) -> Option<DefTarget<'_>> {
         }
         _ if may_ident.hash() => return None,
         _ => {
-            log::debug!("unsupported kind {kind:?}", kind = ancestor.kind());
+            crate::log_debug_ct!("unsupported kind {kind:?}", kind = ancestor.kind());
             return None;
         }
     })

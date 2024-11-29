@@ -28,7 +28,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
 
     let PackageDefInfo { root, module_uses } = module_docs(ctx, entry_point)?;
 
-    log::debug!("module_uses: {module_uses:#?}");
+    crate::log_debug_ct!("module_uses: {module_uses:#?}");
 
     let title = for_spec.to_string();
 
@@ -86,7 +86,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                 let _ = writeln!(md, "---\n## Module: {primary}");
             }
 
-            log::debug!("module: {primary} -- {parent_ident}");
+            crate::log_debug_ct!("module: {primary} -- {parent_ident}");
 
             let persist_fid = fid.map(|f| file_ids.insert_full(f).0);
 
@@ -228,7 +228,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Str
                 }
 
                 if !child_children.is_empty() {
-                    log::debug!("sub_fid: {child_fid:?}");
+                    crate::log_debug_ct!("sub_fid: {child_fid:?}");
                     match child_fid {
                         Some(fid) => {
                             let aka = akas(fid);

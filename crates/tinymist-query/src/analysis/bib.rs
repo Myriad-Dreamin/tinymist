@@ -24,13 +24,13 @@ impl MarkedEventReceiver for YamlBibLoader {
         match event {
             Event::MappingStart(..) => {
                 if self.depth == 1 {
-                    log::debug!("mapping start: {:?} {:?}", self.key, mark.index());
+                    crate::log_debug_ct!("mapping start: {:?} {:?}", self.key, mark.index());
                     self.start = self.key.take();
                 }
                 self.depth += 1;
             }
             Event::Scalar(s, ..) => {
-                log::debug!("scalar: {:?} {:?}", s, mark.index());
+                crate::log_debug_ct!("scalar: {:?} {:?}", s, mark.index());
                 if self.depth == 1 {
                     self.key = Some(BibSpanned {
                         value: s.to_owned(),
@@ -48,7 +48,7 @@ impl MarkedEventReceiver for YamlBibLoader {
                     };
                     let span = start.span.start..end;
                     self.content.push((start, span));
-                    log::debug!("mapping end: {:?} {:?}", self.key, mark.index());
+                    crate::log_debug_ct!("mapping end: {:?} {:?}", self.key, mark.index());
                 }
             }
             _ => {}
@@ -141,7 +141,7 @@ pub(crate) fn analyze_bib(paths: EcoVec<(TypstFileId, Bytes)>) -> Option<Arc<Bib
         worker.analyze_path(path, content);
     }
 
-    log::debug!(
+    crate::log_debug_ct!(
         "bib analysis: {paths:?} -> {entries:?}",
         entries = worker.info.entries
     );

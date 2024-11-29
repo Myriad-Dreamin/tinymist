@@ -65,14 +65,14 @@ impl SemanticRequest for InlayHintRequest {
         let range = ctx.to_typst_range(self.range, &source)?;
 
         let hints = inlay_hint(ctx, &source, range, ctx.position_encoding()).ok()?;
-        log::debug!(
+        crate::log_debug_ct!(
             "got inlay hints on {source:?} => {hints:?}",
             source = source.id(),
             hints = hints.len()
         );
         if hints.is_empty() {
             let root = LinkedNode::new(source.root());
-            log::debug!("debug root {root:#?}");
+            crate::log_debug_ct!("debug root {root:#?}");
         }
 
         Some(hints)
@@ -132,7 +132,7 @@ fn inlay_hint(
                 SyntaxKind::FuncCall => {
                     log::trace!("func call found: {:?}", node);
                     let call_info = analyze_call(self.ctx, self.source.clone(), node.clone())?;
-                    log::debug!("got call_info {call_info:?}");
+                    crate::log_debug_ct!("got call_info {call_info:?}");
 
                     let f = node.cast::<ast::FuncCall>().unwrap();
                     let args = f.args();

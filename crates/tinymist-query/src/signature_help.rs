@@ -41,7 +41,7 @@ impl SemanticRequest for SignatureHelpRequest {
         let deref_target = get_deref_target(callee, cursor)?;
         let def = ctx.def_of_syntax(&source, None, deref_target)?;
         let sig = ctx.sig_of_def(def.clone())?;
-        log::debug!("got signature {sig:?}");
+        crate::log_debug_ct!("got signature {sig:?}");
 
         let param_shift = sig.param_shift();
         let mut active_parameter = None;
