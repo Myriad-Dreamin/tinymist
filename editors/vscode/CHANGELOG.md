@@ -6,8 +6,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## v0.12.6 - [2024-11-30]
 
-* Bumped typstyle to v0.12.3 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/893
-  * Comment formatting and code block formatting is improved. For details, see https://enter-tainer.github.io/typstyle/changelog/#v0122---2024-11-23
+* Bumped typstyle to v0.12.5 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/893 and https://github.com/Myriad-Dreamin/tinymist/pull/904
+  * Comment formatting and code block formatting is improved. For details, see https://enter-tainer.github.io/typstyle/changelog/#v0125---2024-11-29
   * Performance is greatly improved. For details, see https://enter-tainer.github.io/typstyle/changelog/#v0124---2024-11-26
 
 ### Editor
