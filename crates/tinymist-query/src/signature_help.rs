@@ -111,7 +111,7 @@ impl SemanticRequest for SignatureHelpRequest {
                 active_parameter.map(|x| x.min(sig.primary().pos_size().saturating_sub(1)));
         }
 
-        log::trace!("got signature info {label} {params:?}");
+        crate::log_debug_ct!("got signature info {label} {params:?}");
 
         Some(SignatureHelp {
             signatures: vec![SignatureInformation {

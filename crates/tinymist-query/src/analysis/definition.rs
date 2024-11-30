@@ -126,7 +126,8 @@ fn find_field_definition(ctx: &Arc<SharedContext>, fa: ast::FieldAccess<'_>) -> 
             let source = ctx.source_by_id(s.id()?).ok()?;
             DefResolver::new(ctx, &source)?.of_span(s)
         }
-        DocSource::Builtin(..) | DocSource::Ins(..) => None,
+        DocSource::Ins(ins) => value_to_def(ins.val.clone(), || Some(fa.field().get().into())),
+        DocSource::Builtin(..) => None,
     }
 }
 
@@ -294,27 +295,8 @@ static WHERE_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
     Some(f)
 });
 
-fn value_to_def(
-    value: Value,
-    name: impl FnOnce() -> Option<Interned<str>>,
-    name_range: Option<Range<usize>>,
-) -> Option<Definition> {
+fn value_to_def(value: Value, name: impl FnOnce() -> Option<Interned<str>>) -> Option<Definition> {
     let val = Ty::Value(InsTy::new(value.clone()));
-    // DefKind::Closure | DefKind::Func => {
-    // let value = def_fid.and_then(|fid| {
-    //     let def_source = ctx.source_by_id(fid).ok()?;
-    //     let root = LinkedNode::new(def_source.root());
-    //     let def_name = root.find(def?.span()?)?;
-
-    //     log::info!("def_name for function: {def_name:?}");
-    //     let values = ctx.analyze_expr(def_name.get());
-    //     let func = values
-    //         .into_iter()
-    //         .find(|v| matches!(v.0, Value::Func(..)))?;
-    //     log::info!("okay for function: {func:?}");
-    //     Some(func.0)
-    // });
-
     Some(match value {
         Value::Func(func) => {
             let name = func.name().map(|e| e.into()).or_else(name)?;
@@ -325,11 +307,7 @@ fn value_to_def(
             Definition::new(decl.into(), Some(val))
         }
         Value::Module(module) => Definition::new_var(module.name().into(), val),
-        _v => {
-            // todo name_range
-            let _ = name_range;
-            Definition::new_var(name()?, val)
-        }
+        _v => Definition::new_var(name()?, val),
     })
 }
 
@@ -371,7 +349,7 @@ impl DefResolver {
 
         // Get the type of the type node
         let better_def = match term {
-            Ty::Value(v) => value_to_def(v.val.clone(), || None, None),
+            Ty::Value(v) => value_to_def(v.val.clone(), || None),
             // Ty::Var(..) => DeclKind::Var,
             // Ty::Func(..) => DeclKind::Func,
             // Ty::With(..) => DeclKind::Func,
