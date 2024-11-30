@@ -1,0 +1,28 @@
+---
+source: crates/tinymist-query/src/signature_help.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/signature_help/list_item.typ
+snapshot_kind: text
+---
+{
+ "activeSignature": 0,
+ "signatures": [
+  {
+   "activeParameter": 0,
+   "documentation": {
+    "kind": "markdown",
+    "value": "A bullet list item."
+   },
+   "label": "item(body: content) -> item",
+   "parameters": [
+    {
+     "documentation": {
+      "kind": "markdown",
+      "value": "The item's body."
+     },
+     "label": "body:"
+    }
+   ]
+  }
+ ]
+}

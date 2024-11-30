@@ -1,0 +1,28 @@
+---
+source: crates/tinymist-query/src/signature_help.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/signature_help/where.typ
+snapshot_kind: text
+---
+{
+ "activeSignature": 0,
+ "signatures": [
+  {
+   "activeParameter": 0,
+   "documentation": {
+    "kind": "markdown",
+    "value": "A horizontal line under content.\n\n```example\n$ underline(1 + 2 + ... + 5) $\n```"
+   },
+   "label": "underline(body: content) -> underline",
+   "parameters": [
+    {
+     "documentation": {
+      "kind": "markdown",
+      "value": "The content above the line."
+     },
+     "label": "body:"
+    }
+   ]
+  }
+ ]
+}

@@ -1,5 +1,8 @@
 use reflexo_typst::TypstFileId;
-use typst::foundations::{Dict, Module};
+use typst::{
+    foundations::{Dict, Module, Scope},
+    syntax::Span,
+};
 
 use super::BoundChecker;
 use crate::{syntax::Decl, ty::prelude::*};
@@ -13,6 +16,10 @@ pub enum Iface<'a> {
     },
     Type {
         val: &'a typst::foundations::Type,
+        at: &'a Ty,
+    },
+    Func {
+        val: &'a typst::foundations::Func,
         at: &'a Ty,
     },
     Value {
@@ -35,17 +42,22 @@ impl Iface<'_> {
         crate::log_debug_ct!("iface shape: {self:?}");
 
         match self {
-            // Iface::ArrayCons(a) => SigTy::array_cons(a.as_ref().clone(), false),
             Iface::Dict(d) => d.field_by_name(key).cloned(),
-            // Iface::Type { val, .. } => ctx?.type_of_func(&val.constructor().ok()?)?,
-            // Iface::Value { val, .. } => ctx?.type_of_func(val)?, // todo
-            Iface::Element { .. } => None,
-            Iface::Type { .. } => None,
+            Iface::Element { val, .. } => select_scope(Some(val.scope()), key),
+            Iface::Type { val, .. } => select_scope(Some(val.scope()), key),
+            Iface::Func { val, .. } => select_scope(val.scope(), key),
             Iface::Value { val, at: _ } => ctx.type_of_dict(val).field_by_name(key).cloned(),
             Iface::Module { val, at: _ } => ctx.check_module_item(val, key),
             Iface::ModuleVal { val, at: _ } => ctx.type_of_module(val).field_by_name(key).cloned(),
         }
     }
+}
+
+fn select_scope(scope: Option<&Scope>, key: &str) -> Option<Ty> {
+    let scope = scope?;
+    let sub = scope.get(key)?;
+    let sub_span = scope.get_span(key).unwrap_or_else(Span::detached);
+    Some(Ty::Value(InsTy::new_at(sub.clone(), sub_span)))
 }
 
 pub trait IfaceChecker: TyCtx {
@@ -143,6 +155,10 @@ impl IfaceCheckDriver<'_> {
                         Value::Type(t) => {
                             self.checker
                                 .check(Iface::Type { val: t, at: ty }, &mut self.ctx, pol);
+                        }
+                        Value::Func(t) => {
+                            self.checker
+                                .check(Iface::Func { val: t, at: ty }, &mut self.ctx, pol);
                         }
                         _ => {}
                     }
