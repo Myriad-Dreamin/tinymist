@@ -1,0 +1,1 @@
+#show math.underline.where(/* position */): it => it

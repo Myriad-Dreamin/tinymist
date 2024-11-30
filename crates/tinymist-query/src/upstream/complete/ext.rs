@@ -707,6 +707,11 @@ impl IfaceChecker for ScopeChecker<'_> {
             Iface::Type { val, .. } => {
                 self.0.insert_scope(val.scope());
             }
+            Iface::Func { val, .. } => {
+                if let Some(s) = val.scope() {
+                    self.0.insert_scope(s);
+                }
+            }
             Iface::Module { val, .. } => {
                 let ti = self.1.type_check_by_id(val);
                 if !ti.valid {
