@@ -1,0 +1,7 @@
+---
+source: crates/tinymist-query/src/signature_help.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/signature_help/builtin.typ
+snapshot_kind: text
+---
+null
