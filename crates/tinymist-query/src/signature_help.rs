@@ -132,3 +132,24 @@ fn markdown_docs(docs: &str) -> Documentation {
         value: docs.to_owned(),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("signature_help", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let request = SignatureHelpRequest {
+                path: path.clone(),
+                position: find_test_position(&source),
+            };
+
+            let result = request.request(ctx);
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
+}
