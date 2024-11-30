@@ -6,12 +6,12 @@ snapshot_kind: text
 ---
 "x0" = IfTy { cond: true, then: 1, else_: None }
 "x1" = IfTy { cond: false, then: 2, else_: None }
-"x2" = TypeUnary { lhs: IfTy { cond: TypeBinary { operands: (Any, 0), op: Gt }, then: 1, else_: 2 }, op: Context }
+"x2" = TypeUnary { lhs: IfTy { cond: TypeBinary { operands: (Type(int), 0), op: Gt }, then: 1, else_: 2 }, op: Context }
 =====
 5..7 -> @x0
 31..33 -> @x1
 58..60 -> @x2
 74..78 -> Func(here)
 74..80 -> Type(location)
-74..85 -> Type(location).page
-74..87 -> Any
+74..85 -> (Func(page) | (Func(page) | Type(location).page))
+74..87 -> Type(int)

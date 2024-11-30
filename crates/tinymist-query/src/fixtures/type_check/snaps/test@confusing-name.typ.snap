@@ -28,5 +28,5 @@ snapshot_kind: text
 121..122 -> @x
 121..140 -> Any
 123..131 -> Type(datetime)
-123..137 -> Type(datetime).today
-123..139 -> Any
+123..137 -> (Func(today) | (Func(today) | Type(datetime).today))
+123..139 -> Type(datetime)

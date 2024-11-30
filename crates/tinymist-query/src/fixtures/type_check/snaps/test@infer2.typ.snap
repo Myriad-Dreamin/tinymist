@@ -40,12 +40,12 @@ snapshot_kind: text
 362..365 -> Rgb(1, 0.254902, 0.211765, 1)
 377..380 -> Rgb(1, 0.254902, 0.211765, 1)
 384..389 -> Func(table)
-384..395 -> Func(table).hline
-384..408 -> Any
+384..395 -> (Func(hline) | (Func(hline) | Func(table).hline))
+384..408 -> Element(hline)
 404..407 -> Rgb(1, 0.254902, 0.211765, 1)
 412..417 -> Func(table)
-412..423 -> Func(table).vline
-412..436 -> Any
+412..423 -> (Func(vline) | (Func(vline) | Func(table).vline))
+412..436 -> Element(vline)
 432..435 -> Rgb(1, 0.254902, 0.211765, 1)
 441..445 -> Func(text)
 441..457 -> Element(text)
