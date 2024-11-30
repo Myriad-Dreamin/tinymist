@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.12.4"
+version = "0.12.6-rc1"
 edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
@@ -144,7 +144,7 @@ insta = { version = "1.39", features = ["glob"] }
 
 # Our Own Crates
 typst-preview = { path = "./crates/typst-preview" }
-tinymist-assets = { version = "0.12.5-rc1" }
+tinymist-assets = { version = "0.12.6-rc1" }
 tinymist = { path = "./crates/tinymist/" }
 tinymist-derive = { path = "./crates/tinymist-derive/" }
 tinymist-analysis = { path = "./crates/tinymist-analysis/" }
@@ -187,11 +187,7 @@ withs = "withs"
 
 [workspace.metadata.typos.files]
 ignore-hidden = false
-extend-exclude = [
-  "/.git",
-  "fixtures",
-  "upstream",
-]
+extend-exclude = ["/.git", "fixtures", "upstream"]
 
 [patch.crates-io]
 
