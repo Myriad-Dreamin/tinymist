@@ -16,6 +16,7 @@ use clap_complete::generate;
 use futures::future::MaybeDone;
 use lsp_server::RequestId;
 use once_cell::sync::Lazy;
+use reflexo::ImmutPath;
 use reflexo_typst::{package::PackageSpec, TaskInputs, TypstDict};
 use serde_json::Value as JsonValue;
 use sync_lsp::{
@@ -165,7 +166,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
 
         let config = Config {
             compile: CompileConfig {
-                roots: vec![root_path],
+                roots: vec![ImmutPath::from(root_path)],
                 font_opts: args.compile.font,
                 ..CompileConfig::default()
             },

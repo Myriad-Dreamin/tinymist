@@ -76,14 +76,14 @@ impl Initializer for RegularInit {
                 roots: match params.workspace_folders.as_ref() {
                     Some(roots) => roots
                         .iter()
-                        .filter_map(|root| root.uri.to_file_path().ok())
-                        .collect::<Vec<_>>(),
+                        .filter_map(|root| root.uri.to_file_path().ok().map(ImmutPath::from))
+                        .collect(),
                     #[allow(deprecated)] // `params.root_path` is marked as deprecated
                     None => params
                         .root_uri
                         .as_ref()
-                        .map(|uri| uri.to_file_path().unwrap())
-                        .or_else(|| params.root_path.clone().map(PathBuf::from))
+                        .and_then(|uri| uri.to_file_path().ok().map(ImmutPath::from))
+                        .or_else(|| Some(Path::new(&params.root_path?).into()))
                         .into_iter()
                         .collect(),
                 },
@@ -469,13 +469,13 @@ impl From<&InitializeParams> for ConstConfig {
 #[derive(Debug, Default, Clone)]
 pub struct CompileConfig {
     /// The workspace roots from initialization.
-    pub roots: Vec<PathBuf>,
+    pub roots: Vec<ImmutPath>,
     /// The output directory for PDF export.
     pub output_path: PathPattern,
     /// The mode of PDF export.
     pub export_pdf: ExportMode,
     /// Specifies the root path of the project manually.
-    pub root_path: Option<PathBuf>,
+    pub root_path: Option<ImmutPath>,
     /// Specifies the cli font options
     pub font_opts: CompileFontArgs,
     /// Whether to ignore system fonts
@@ -518,7 +518,7 @@ impl CompileConfig {
 
         self.output_path = deser_or_default!("outputPath", PathPattern);
         self.export_pdf = deser_or_default!("exportPdf", ExportMode);
-        self.root_path = try_(|| Some(update.get("rootPath")?.as_str()?.into()));
+        self.root_path = try_(|| Some(Path::new(update.get("rootPath")?.as_str()?).into()));
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
             Some("enable") => true,
             Some("disable") | None => false,
@@ -573,7 +573,7 @@ impl CompileConfig {
             // todo: the command.root may be not absolute
             self.typst_extra_args = Some(CompileExtraOpts {
                 entry: command.input.map(|e| Path::new(&e).into()),
-                root_dir: command.root,
+                root_dir: command.root.as_ref().map(|r| r.as_path().into()),
                 inputs: Arc::new(LazyHash::new(inputs)),
                 font: command.font,
                 package: command.package,
@@ -615,17 +615,17 @@ impl CompileConfig {
     /// Determines the root directory for the entry file.
     pub fn determine_root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
         if let Some(path) = &self.root_path {
-            return Some(path.as_path().into());
+            return Some(path.clone());
         }
 
         if let Some(root) = try_(|| self.typst_extra_args.as_ref()?.root_dir.as_ref()) {
-            return Some(root.as_path().into());
+            return Some(root.clone());
         }
 
         if let Some(entry) = entry {
             for root in self.roots.iter() {
                 if entry.starts_with(root) {
-                    return Some(root.as_path().into());
+                    return Some(root.clone());
                 }
             }
 
@@ -639,23 +639,10 @@ impl CompileConfig {
         }
 
         if !self.roots.is_empty() {
-            return Some(self.roots[0].as_path().into());
+            return Some(self.roots[0].clone());
         }
 
         None
-    }
-
-    /// Determines the default entry path.
-    pub fn determine_default_entry_path(&self) -> Option<ImmutPath> {
-        let extras = self.typst_extra_args.as_ref()?;
-        // todo: pre-compute this when updating config
-        if let Some(entry) = &extras.entry {
-            if entry.is_relative() {
-                let root = self.determine_root(None)?;
-                return Some(root.join(entry).as_path().into());
-            }
-        }
-        extras.entry.clone()
     }
 
     /// Determines the entry state.
@@ -690,6 +677,19 @@ impl CompileConfig {
             Some(root) => EntryState::new_workspace(root),
             None => EntryState::new_detached(),
         })
+    }
+
+    /// Determines the default entry path.
+    pub fn determine_default_entry_path(&self) -> Option<ImmutPath> {
+        let extras = self.typst_extra_args.as_ref()?;
+        // todo: pre-compute this when updating config
+        if let Some(entry) = &extras.entry {
+            if entry.is_relative() {
+                let root = self.determine_root(None)?;
+                return Some(root.join(entry).as_path().into());
+            }
+        }
+        extras.entry.clone()
     }
 
     /// Determines the font options.
@@ -882,7 +882,7 @@ pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CompileExtraOpts {
     /// The root directory for compilation routine.
-    pub root_dir: Option<PathBuf>,
+    pub root_dir: Option<ImmutPath>,
     /// Path to entry
     pub entry: Option<ImmutPath>,
     /// Additional input arguments to compile the entry file.
@@ -977,7 +977,7 @@ mod tests {
     fn test_config_update() {
         let mut config = Config::default();
 
-        let root_path = if cfg!(windows) { "C:\\root" } else { "/root" };
+        let root_path = Path::new(if cfg!(windows) { "C:\\root" } else { "/root" });
 
         let update = json!({
             "outputPath": "out",
@@ -1000,13 +1000,13 @@ mod tests {
 
         assert_eq!(config.compile.output_path, PathPattern::new("out"));
         assert_eq!(config.compile.export_pdf, ExportMode::OnSave);
-        assert_eq!(config.compile.root_path, Some(PathBuf::from(root_path)));
+        assert_eq!(config.compile.root_path, Some(ImmutPath::from(root_path)));
         assert_eq!(config.semantic_tokens, SemanticTokensMode::Enable);
         assert_eq!(config.formatter_mode, FormatterMode::Typstyle);
         assert_eq!(
             config.compile.typst_extra_args,
             Some(CompileExtraOpts {
-                root_dir: Some(PathBuf::from(root_path)),
+                root_dir: Some(ImmutPath::from(root_path)),
                 ..Default::default()
             })
         );
