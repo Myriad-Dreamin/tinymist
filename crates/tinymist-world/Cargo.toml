@@ -23,7 +23,6 @@ log.workspace = true
 reflexo-typst.workspace = true
 reflexo-typst-shim = { workspace = true, features = ["nightly"] }
 typst.workspace = true
-typst-kit.workspace = true
 
 tinymist-assets = { workspace = true }
 typst-assets = { workspace = true, features = ["fonts"] }

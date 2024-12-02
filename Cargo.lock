@@ -1057,16 +1057,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "env_proxy"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a5019be18538406a43b5419a5501461f0c8b49ea7dfda0cfc32f4e51fc44be1"
-dependencies = [
- "log",
- "url",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4195,7 +4185,6 @@ dependencies = [
  "tinymist-assets 0.12.6-rc1 (registry+https://github.com/rust-lang/crates.io-index)",
  "typst",
  "typst-assets",
- "typst-kit",
 ]
 
 [[package]]
@@ -4591,26 +4580,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fe00da1b24da2c4a7da532fc33d0c3bd43a902ca4c408ee2c36eabe70f2f4ba"
 
 [[package]]
-name = "typst-kit"
-version = "0.12.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.12.0#58426a90a7ef721738a01be09793d33e55eb75a9"
-dependencies = [
- "dirs",
- "ecow 0.2.3",
- "env_proxy",
- "flate2",
- "fontdb",
- "native-tls",
- "once_cell",
- "openssl",
- "tar",
- "typst",
- "typst-timing",
- "typst-utils",
- "ureq",
-]
-
-[[package]]
 name = "typst-macros"
 version = "0.12.0"
 source = "git+https://github.com/Myriad-Dreamin/typst.git?tag=tinymist-v0.12.0#58426a90a7ef721738a01be09793d33e55eb75a9"
@@ -4934,22 +4903,6 @@ name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
-
-[[package]]
-name = "ureq"
-version = "2.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b74fc6b57825be3373f7054754755f03ac3a8f5d70015ccad699ba2029956f4a"
-dependencies = [
- "base64",
- "flate2",
- "log",
- "native-tls",
- "once_cell",
- "serde",
- "serde_json",
- "url",
-]
 
 [[package]]
 name = "url"
