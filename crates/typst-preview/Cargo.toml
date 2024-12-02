@@ -8,6 +8,7 @@ authors = ["The Typst Project Developers"]
 edition.workspace = true
 keywords = ["typst"]
 include = ["src/**/*", "/LICENSE", "/README.md"]
+rust-version.workspace = true
 
 [dependencies]
 typst.workspace = true
