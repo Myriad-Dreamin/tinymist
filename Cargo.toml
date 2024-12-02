@@ -7,7 +7,8 @@ readme = "README.md"
 license = "Apache-2.0"
 homepage = "https://github.com/Myriad-Dreamin/tinymist"
 repository = "https://github.com/Myriad-Dreamin/tinymist"
-rust-version = "1.82"                                              # also change in ci.yml
+# also change in ci.yml
+rust-version = "1.82"
 
 [workspace]
 resolver = "2"
