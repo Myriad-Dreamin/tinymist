@@ -75,11 +75,11 @@ const TemplateList = (
     );
   };
 
-  const highlightMatch = (text: string, searchTerm?: string) => {
-    if (!searchTerm || !text) return van.tags.span({}, text);
-    console.log("searchTerm", searchTerm);
+  const highlightMatches = (text: string, searchResults?: SearchResult[]): HTMLSpanElement => {
+    if (!searchResults || !text) return van.tags.span({}, text);
+    const searchTerms = searchResults.flatMap(result => result.queryTerms);
+    const regex = new RegExp(`(${searchTerms.join("|")})`, 'gi');
 
-    const regex = new RegExp(`(${searchTerm})`, 'gi');
     const parts = text.split(regex);
 
     return van.tags.span({}, ...parts.map(part =>
@@ -87,7 +87,7 @@ const TemplateList = (
         ? van.tags.span({ class: 'tinymist-highlight' }, part)
         : part
     ));
-  };
+  }
 
   const TemplateListItem = (item: PackageMeta) => {
     const TemplateAction = (
@@ -109,8 +109,7 @@ const TemplateList = (
       div(
         a({ href: item.repository, style: "font-size: 1.2em" },
           () => {
-            const searchTerm = catState.searchSelected.val?.[0]?.queryTerms?.[0];
-            return highlightMatch(item.name, searchTerm);
+            return highlightMatches(item.name, catState.searchSelected.val);
           }
         ),
         span(" "),
@@ -162,8 +161,7 @@ const TemplateList = (
       div({ style: "clear: both" }),
       div({ style: "margin-top: 0.4em" },
         div({}, () => {
-          const searchTerm = catState.searchSelected.val?.[0]?.queryTerms?.[0];
-          return highlightMatch(item.description, searchTerm);
+          return highlightMatches(item.description, catState.searchSelected.val);
         })
       )
     );
