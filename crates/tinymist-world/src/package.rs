@@ -17,10 +17,10 @@ use crate::CompilePackageArgs;
 /// The https package registry for tinymist.
 pub struct HttpsRegistry {
     /// The path at which local packages (`@local` packages) are stored.
-    local_dir: OnceLock<Option<ImmutPath>>,
+    local_dir: Option<ImmutPath>,
     /// The path at which non-local packages (`@preview` packages) should be
     /// stored when downloaded.
-    cache_dir: OnceLock<Option<ImmutPath>>,
+    cache_dir: Option<ImmutPath>,
     /// lazily initialized package storage.
     storage: OnceLock<PackageStorage>,
     /// The path to the certificate file to use for HTTPS requests.
@@ -35,9 +35,9 @@ impl Default for HttpsRegistry {
         Self {
             notifier: Arc::new(Mutex::<DummyNotifier>::default()),
             cert_path: None,
+            local_dir: None,
+            cache_dir: None,
 
-            local_dir: OnceLock::new(),
-            cache_dir: OnceLock::new(),
             storage: OnceLock::new(),
             // package_dir_cache: RwLock::new(HashMap::new()),
         }
@@ -54,21 +54,11 @@ impl std::ops::Deref for HttpsRegistry {
 
 impl HttpsRegistry {
     /// Create a new registry.
-    pub fn new(cert_path: Option<ImmutPath>, package_args: Option<&CompilePackageArgs>) -> Self {
-        let local_dir = OnceLock::new();
-        if let Some(dir) = package_args.and_then(|args| args.package_path.as_deref()) {
-            let _ = local_dir.set(Some(dir.into()));
-        }
-
-        let cache_dir = OnceLock::new();
-        if let Some(dir) = package_args.and_then(|args| args.package_cache_path.as_deref()) {
-            let _ = cache_dir.set(Some(dir.into()));
-        }
-
+    pub fn new(cert_path: Option<ImmutPath>, args: Option<&CompilePackageArgs>) -> Self {
         Self {
             cert_path,
-            local_dir,
-            cache_dir,
+            local_dir: args.and_then(|args| Some(args.package_path.as_deref()?.into())),
+            cache_dir: args.and_then(|args| Some(args.package_cache_path.as_deref()?.into())),
             ..Default::default()
         }
     }
@@ -90,11 +80,11 @@ impl HttpsRegistry {
         self.storage.get_or_init(|| {
             PackageStorage::new(
                 self.cache_dir
-                    .get_or_init(|| Some(dirs::cache_dir()?.join(DEFAULT_PACKAGES_SUBDIR).into()))
-                    .clone(),
+                    .clone()
+                    .or_else(|| Some(dirs::cache_dir()?.join(DEFAULT_PACKAGES_SUBDIR).into())),
                 self.local_dir
-                    .get_or_init(|| Some(dirs::data_dir()?.join(DEFAULT_PACKAGES_SUBDIR).into()))
-                    .clone(),
+                    .clone()
+                    .or_else(|| Some(dirs::data_dir()?.join(DEFAULT_PACKAGES_SUBDIR).into())),
                 self.cert_path.clone(),
                 self.notifier.clone(),
             )
