@@ -27,7 +27,7 @@ use package::HttpsRegistry;
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
 /// Compiler feature for LSP universe and worlds without typst.ts to implement
-/// more for tinymist. type trait of [`TypstSystemWorld`].
+/// more for tinymist. type trait of [`CompilerUniverse`].
 #[derive(Debug, Clone, Copy)]
 pub struct SystemCompilerFeatExtend;
 
