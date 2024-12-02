@@ -866,7 +866,7 @@ impl LanguageState {
     /// This is used for tracking activating document status if a client is not
     /// performing any focus command request.
     ///
-    /// See https://github.com/microsoft/language-server-protocol/issues/718
+    /// See <https://github.com/microsoft/language-server-protocol/issues/718>
     ///
     /// we do want to focus the file implicitly by `textDocument/diagnostic`
     /// (pullDiagnostics mode), as suggested by language-server-protocol#718,

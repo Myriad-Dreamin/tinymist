@@ -109,7 +109,9 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
 
                         match sig {
                             Sig::TupleCons(cons) => {
-                                crate::log_debug_ct!("tuple at check on tuple elem: {cons:?} {p0:?}");
+                                crate::log_debug_ct!(
+                                    "tuple at check on tuple elem: {cons:?} {p0:?}"
+                                );
                                 let sel = match selector {
                                     Ok(i) => cons.get(i).cloned(),
                                     Err(_) => None,
