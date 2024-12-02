@@ -3,6 +3,8 @@ import van, { ChildDom, State } from "vanjs-core";
 import { requestSavePackageData, requestInitTemplate } from "../vscode";
 import { AddIcon, HeartIcon } from "../icons";
 import { base64Decode } from "../utils";
+import MiniSearch from "minisearch";
+import type { SearchResult } from "minisearch";
 const { div, input, button, a, span } = van.tags;
 
 // const isDarkMode = () =>
@@ -15,6 +17,7 @@ const Card = (cls: string, ...content: any) => {
 };
 
 interface PackageMeta {
+  id: string;
   name: string;
   version: string;
   authors: string[];
@@ -142,14 +145,11 @@ const TemplateList = (
     );
   };
 
-  function runFilterSearch(searchTerm: string) {
-    return (value: PackageMeta) => {
-      if (!searchTerm) {
-        return true;
-      }
-
-      return value.name.toLowerCase().includes(searchTerm);
-    };
+  function runFilterSearch(searchResult: SearchResult[] | undefined) {
+    // console.log("search", searchResult);
+    const searchResultMap = new Set(searchResult?.map((result) => result.id));
+    return (value: PackageMeta) =>
+      searchResult === undefined || searchResultMap.has(value.id);
   }
 
   function runFilterCategory(categoryFilter: Set<string>) {
@@ -174,20 +174,36 @@ const TemplateList = (
         .filter((item) => item.template)
         .filter(runFilterCategory(catState.categories.val))
         .filter(runFilterFavorite)
-        .filter(runFilterSearch(catState.searchTerm.val))
+        .filter(runFilterSearch(catState.searchSelected.val))
         .map(TemplateListItem) || []
     )
   );
 };
 
-const SearchBar = (catState: FilterState) => {
+const SearchBar = (packages: State<PackageMeta[]>, catState: FilterState) => {
+  const search = van.derive(() => {
+    // console.log("indexing search", packages);
+    const search = new MiniSearch({
+      fields: ["name", "description", "authors", "keywords", "categories"],
+    });
+    // console.log("search", Object.values(packages.val));
+    search.addAll(Object.values(packages.val.filter((item) => item.template)));
+    return search;
+  });
+
   return input({
     class: "tinymist-search",
-    value: catState.searchTerm.val,
     type: "text",
     placeholder: "Search templates...",
     oninput: (e) => {
-      catState.setSearchTerm(e.target.value);
+      const input = e.target as HTMLInputElement;
+      if (input.value === "") {
+        catState.searchSelected.val = undefined;
+        return;
+      }
+      const results = search.val.search(input.value, { prefix: true });
+      // console.log(input.value, results);
+      catState.searchSelected.val = results;
     },
   });
 };
@@ -197,18 +213,14 @@ class FilterState {
   categories = van.state(new Set(["all"]));
   filterFavorite: State<boolean>;
   packageUserData: State<any>;
-  searchTerm = van.state("");
+  searchSelected = van.state<SearchResult[] | undefined>(undefined);
 
   constructor(packageUserData: any) {
     this.filterFavorite = van.state(Object.keys(packageUserData).length > 0);
     this.packageUserData = van.state(packageUserData);
   }
 
-  setSearchTerm(term: string) {
-    this.searchTerm.val = term.toLowerCase();
-  }
-
-  set(category: string) {
+  setCategory(category: string) {
     this.activating.val = category;
     //   console.log("activating", category);
     this.categories.val = new Set([category]);
@@ -255,7 +267,7 @@ const CategoryButton = (catState: FilterState) => (category: Category) => {
         return "tinymist-button" + activatingCls;
       }),
       title: "Filter by category: " + category.value,
-      onclick: () => catState.set(category.value),
+      onclick: () => catState.setCategory(category.value),
     },
     div(
       {
@@ -317,6 +329,7 @@ export const TemplateGallery = () => {
       const lastVersion = versions[versions.length - 1];
       return {
         ...lastVersion,
+        id: `@preview/${lastVersion.name}`,
         versions,
       };
     });
@@ -325,7 +338,7 @@ export const TemplateGallery = () => {
   });
 
   return div(
-    SearchBar(catState),
+    SearchBar(packages, catState),
     FilterRow(catState),
     TemplateList(packages, catState)
   );
