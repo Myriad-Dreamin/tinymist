@@ -63,18 +63,6 @@ impl HttpsRegistry {
         }
     }
 
-    /// Get local path option
-    pub fn local_path(&self) -> Option<ImmutPath> {
-        self.storage().package_path().cloned()
-    }
-
-    /// Get data & cache dir
-    pub fn paths(&self) -> Vec<ImmutPath> {
-        let data_dir = self.storage().package_path().cloned();
-        let cache_dir = self.storage().package_cache_path().cloned();
-        data_dir.into_iter().chain(cache_dir).collect::<Vec<_>>()
-    }
-
     /// Get `typst-kit` implementing package storage
     pub fn storage(&self) -> &PackageStorage {
         self.storage.get_or_init(|| {
@@ -91,15 +79,22 @@ impl HttpsRegistry {
         })
     }
 
-    /// Make a package available in the on-disk cache.
-    pub fn prepare_package(&self, spec: &PackageSpec) -> Result<ImmutPath, PackageError> {
-        self.storage().prepare_package(spec)
+    /// Get local path option
+    pub fn local_path(&self) -> Option<ImmutPath> {
+        self.storage().package_path().cloned()
+    }
+
+    /// Get data & cache dir
+    pub fn paths(&self) -> Vec<ImmutPath> {
+        let data_dir = self.storage().package_path().cloned();
+        let cache_dir = self.storage().package_cache_path().cloned();
+        data_dir.into_iter().chain(cache_dir).collect::<Vec<_>>()
     }
 }
 
 impl PackageRegistry for HttpsRegistry {
     fn resolve(&self, spec: &PackageSpec) -> Result<ImmutPath, PackageError> {
-        self.prepare_package(spec)
+        self.storage().prepare_package(spec)
     }
 
     fn packages(&self) -> &[(PackageSpec, Option<EcoString>)] {
@@ -158,7 +153,7 @@ impl PackageStorage {
         self.package_path.as_ref()
     }
 
-    /// Make a package available in the on-disk.
+    /// Make a package available in the on-disk cache.
     pub fn prepare_package(&self, spec: &PackageSpec) -> PackageResult<ImmutPath> {
         let subdir = format!("{}/{}/{}", spec.namespace, spec.name, spec.version);
 
