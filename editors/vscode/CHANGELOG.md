@@ -4,11 +4,17 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## v0.12.6 - [2024-11-30]
+## v0.12.6 - [2024-12-02]
 
 * Bumped typstyle to v0.12.6 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/893, https://github.com/Myriad-Dreamin/tinymist/pull/904 and https://github.com/Myriad-Dreamin/tinymist/pull/928
   * Comment formatting and code block formatting is improved. For details, see https://enter-tainer.github.io/typstyle/changelog/#v0125---2024-11-29
   * Performance is greatly improved. For details, see https://enter-tainer.github.io/typstyle/changelog/#v0124---2024-11-26
+
+### Compiler
+
+* Added package related arguments to typstExtraArgs in https://github.com/Myriad-Dreamin/tinymist/pull/923
+* Improved definition finder of builtin values and field accesses in https://github.com/Myriad-Dreamin/tinymist/pull/919 and https://github.com/Myriad-Dreamin/tinymist/pull/920
+  * Previously, tinymist cannot resolve definitions of items such as `math.equation` and `list.item`, so some functions did not work on them, like signature help or hover. Here, `math` is a builtin value. `list` is a element as well as a scope owning a `item` field (element).
 
 ### Editor
 
@@ -35,6 +41,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 * Copy-edited Neovim readme by @alerque in https://github.com/Myriad-Dreamin/tinymist/pull/888
 * Set up `typos` tool and fixed typos in entire code base by @alerque and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/887 and https://github.com/Myriad-Dreamin/tinymist/pull/899
+* Added fmt, clippy, doc, and msrv tests to CI in https://github.com/Myriad-Dreamin/tinymist/pull/926
+* Running CI tests on windows in https://github.com/Myriad-Dreamin/tinymist/pull/925
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.4...v0.12.6
 
