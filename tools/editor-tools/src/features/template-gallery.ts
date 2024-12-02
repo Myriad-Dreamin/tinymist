@@ -75,6 +75,20 @@ const TemplateList = (
     );
   };
 
+  const highlightMatch = (text: string, searchTerm?: string) => {
+    if (!searchTerm || !text) return van.tags.span({}, text);
+    console.log("searchTerm", searchTerm);
+
+    const regex = new RegExp(`(${searchTerm})`, 'gi');
+    const parts = text.split(regex);
+
+    return van.tags.span({}, ...parts.map(part =>
+      regex.test(part)
+        ? van.tags.span({ class: 'tinymist-highlight' }, part)
+        : part
+    ));
+  };
+
   const TemplateListItem = (item: PackageMeta) => {
     const TemplateAction = (
       icon: ChildDom,
@@ -93,7 +107,12 @@ const TemplateList = (
     return Card(
       "template-card",
       div(
-        a({ href: item.repository, style: "font-size: 1.2em" }, item.name),
+        a({ href: item.repository, style: "font-size: 1.2em" },
+          () => {
+            const searchTerm = catState.searchSelected.val?.[0]?.queryTerms?.[0];
+            return highlightMatch(item.name, searchTerm);
+          }
+        ),
         span(" "),
         span({ style: "font-size: 0.8em" }, "v" + item.version),
         span(" by "),
@@ -141,7 +160,12 @@ const TemplateList = (
           .map(CategoryButton(catState))
       ),
       div({ style: "clear: both" }),
-      div({ style: "margin-top: 0.4em" }, item.description)
+      div({ style: "margin-top: 0.4em" },
+        div({}, () => {
+          const searchTerm = catState.searchSelected.val?.[0]?.queryTerms?.[0];
+          return highlightMatch(item.description, searchTerm);
+        })
+      )
     );
   };
 
@@ -182,11 +206,9 @@ const TemplateList = (
 
 const SearchBar = (packages: State<PackageMeta[]>, catState: FilterState) => {
   const search = van.derive(() => {
-    // console.log("indexing search", packages);
     const search = new MiniSearch({
       fields: ["name", "description", "authors", "keywords", "categories"],
     });
-    // console.log("search", Object.values(packages.val));
     search.addAll(Object.values(packages.val.filter((item) => item.template)));
     return search;
   });
@@ -202,7 +224,6 @@ const SearchBar = (packages: State<PackageMeta[]>, catState: FilterState) => {
         return;
       }
       const results = search.val.search(input.value, { prefix: true });
-      // console.log(input.value, results);
       catState.searchSelected.val = results;
     },
   });
@@ -222,7 +243,6 @@ class FilterState {
 
   setCategory(category: string) {
     this.activating.val = category;
-    //   console.log("activating", category);
     this.categories.val = new Set([category]);
   }
 

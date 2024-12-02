@@ -96,6 +96,10 @@ body {
   transition: color 0.05s;
 }
 
+.tinymist-highlight {
+  background: rgba(255, 255, 0, 0.15);
+}
+
 .tinymist-code {
   font-family: Cascadia Code, Consolas, SF Mono, DejaVu Sans Mono, monospace;
 }
