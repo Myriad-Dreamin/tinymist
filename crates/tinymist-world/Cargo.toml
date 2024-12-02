@@ -23,6 +23,7 @@ log.workspace = true
 reflexo-typst.workspace = true
 reflexo-typst-shim = { workspace = true, features = ["nightly"] }
 typst.workspace = true
+typst-kit.workspace = true
 
 tinymist-assets = { workspace = true }
 typst-assets = { workspace = true, features = ["fonts"] }
@@ -33,14 +34,14 @@ flate2 = "1"
 tar = "0.4"
 
 [target.'cfg(not(any(target_arch = "riscv64", target_arch = "wasm32", all(target_os = "windows", target_arch = "aarch64"))))'.dependencies]
-reqwest = { version = "^0.11", default-features = false, features = [
+reqwest = { version = "^0.12", default-features = false, features = [
     "rustls-tls",
     "blocking",
     "multipart",
 ] }
 
 [target.'cfg(any(target_arch = "riscv64", all(target_os = "windows", target_arch = "aarch64")))'.dependencies]
-reqwest = { version = "^0.11", default-features = false, features = [
+reqwest = { version = "^0.12", default-features = false, features = [
     "native-tls",
     "blocking",
     "multipart",

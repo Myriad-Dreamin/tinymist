@@ -334,7 +334,7 @@ impl LanguageState {
 
     /// Initialize a new template.
     pub fn init_template(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        use crate::tool::package::{self, determine_latest_version, TemplateSource};
+        use crate::tool::package::{self, TemplateSource};
 
         #[derive(Debug, Serialize)]
         #[serde(rename_all = "camelCase")]
@@ -359,7 +359,7 @@ impl LanguageState {
                     // Try to parse without version, but prefer the error message of the
                     // normal package spec parsing if it fails.
                     let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                    let version = determine_latest_version(&snap.world, &spec)?;
+                    let version = snap.world.registry.determine_latest_version(&spec)?;
                     StrResult::Ok(spec.at(version))
                 })
                 .map_err(map_string_err("failed to parse package spec"))
@@ -386,7 +386,7 @@ impl LanguageState {
 
     /// Get the entry of a template.
     pub fn get_template_entry(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        use crate::tool::package::{self, determine_latest_version, TemplateSource};
+        use crate::tool::package::{self, TemplateSource};
 
         let from_source = get_arg!(args[0] as String);
 
@@ -404,7 +404,7 @@ impl LanguageState {
                     // Try to parse without version, but prefer the error message of the
                     // normal package spec parsing if it fails.
                     let spec: VersionlessPackageSpec = from_source.parse().map_err(|_| err)?;
-                    let version = determine_latest_version(&snap.world, &spec)?;
+                    let version = snap.world.registry.determine_latest_version(&spec)?;
                     StrResult::Ok(spec.at(version))
                 })
                 .map_err(map_string_err("failed to parse package spec"))
@@ -547,6 +547,7 @@ impl LanguageState {
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
             let paths = snap.world.registry.paths();
+            let paths = paths.iter().map(|p| p.as_ref()).collect::<Vec<_>>();
             serde_json::to_value(paths).map_err(|e| internal_error(e.to_string()))
         })
     }
@@ -559,12 +560,8 @@ impl LanguageState {
         let snap = self.primary().snapshot().map_err(z_internal_error)?;
         just_future(async move {
             let snap = snap.receive().await.map_err(z_internal_error)?;
-            let paths = snap
-                .world
-                .registry
-                .local_path()
-                .into_iter()
-                .collect::<Vec<_>>();
+            let paths = snap.world.registry.local_path();
+            let paths = paths.as_deref().into_iter().collect::<Vec<_>>();
             serde_json::to_value(paths).map_err(|e| internal_error(e.to_string()))
         })
     }
