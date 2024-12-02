@@ -142,6 +142,16 @@ const TemplateList = (
     );
   };
 
+  function runFilterSearch(searchTerm: string) {
+    return (value: PackageMeta) => {
+      if (!searchTerm) {
+        return true;
+      }
+
+      return value.name.toLowerCase().includes(searchTerm);
+    };
+  }
+
   function runFilterCategory(categoryFilter: Set<string>) {
     return (value: PackageMeta) => {
       if (categoryFilter.has("all")) {
@@ -164,16 +174,21 @@ const TemplateList = (
         .filter((item) => item.template)
         .filter(runFilterCategory(catState.categories.val))
         .filter(runFilterFavorite)
+        .filter(runFilterSearch(catState.searchTerm.val))
         .map(TemplateListItem) || []
     )
   );
 };
 
-const SearchBar = () => {
+const SearchBar = (catState: FilterState) => {
   return input({
     class: "tinymist-search",
-    placeholder: "Search templates... (todo: implement search)",
-    disabled: true,
+    value: catState.searchTerm.val,
+    type: "text",
+    placeholder: "Search templates...",
+    oninput: (e) => {
+      catState.setSearchTerm(e.target.value);
+    },
   });
 };
 
@@ -182,11 +197,15 @@ class FilterState {
   categories = van.state(new Set(["all"]));
   filterFavorite: State<boolean>;
   packageUserData: State<any>;
+  searchTerm = van.state("");
 
   constructor(packageUserData: any) {
     this.filterFavorite = van.state(Object.keys(packageUserData).length > 0);
     this.packageUserData = van.state(packageUserData);
-    console.log("this.packageUserData", this.packageUserData);
+  }
+
+  setSearchTerm(term: string) {
+    this.searchTerm.val = term.toLowerCase();
   }
 
   set(category: string) {
@@ -306,7 +325,7 @@ export const TemplateGallery = () => {
   });
 
   return div(
-    SearchBar(),
+    SearchBar(catState),
     FilterRow(catState),
     TemplateList(packages, catState)
   );
