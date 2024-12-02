@@ -1,3 +1,4 @@
+mod fonts;
 mod symbols;
 
 mod prelude {
@@ -11,6 +12,7 @@ mod prelude {
     pub use reflexo_vec2svg::{DefaultExportFeature, SvgTask, SvgText};
     pub use serde::{Deserialize, Serialize};
     pub use serde_json::Value as JsonValue;
+    pub use sync_lsp::*;
     pub use typst::foundations::{Scope, Value};
     pub use typst::symbols::Symbol;
 

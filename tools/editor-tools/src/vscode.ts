@@ -44,9 +44,19 @@ interface TraceReport {
   stderr: string;
 }
 
+export interface StyleAtCursor {
+  version: number;
+  textDocument: any;
+  position: any;
+  style: string[];
+  styleAt: any[];
+}
+
 // import { traceDataMock } from "./vscode.trace.mock";
 // export const traceData = van.state<TraceReport | undefined>(traceDataMock);
 export const traceData = van.state<TraceReport | undefined>(undefined);
+
+export const styleAtCursor = van.state<StyleAtCursor | undefined>(undefined);
 
 /// A frontend will try to setup a vscode channel if it is running
 /// in vscode.
@@ -58,6 +68,9 @@ export function setupVscodeChannel() {
         case "traceData": {
           traceData.val = event.data.data;
           break;
+        }
+        case "styleAtCursor": {
+          styleAtCursor.val = event.data.data;
         }
       }
     });
@@ -101,6 +114,19 @@ export interface TextEdit {
       };
 }
 
+export function copyToClipboard(content: string) {
+  if (content === undefined) {
+    return;
+  }
+
+  if (vscodeAPI?.postMessage) {
+    vscodeAPI.postMessage({ type: "copyToClipboard", content });
+  } else {
+    // copy to clipboard
+    navigator.clipboard.writeText(content);
+  }
+}
+
 export function requestTextEdit(edit: TextEdit) {
   if (vscodeAPI?.postMessage) {
     vscodeAPI.postMessage({ type: "editText", edit });
@@ -114,8 +140,16 @@ export function requestTextEdit(edit: TextEdit) {
   }
 }
 
-export function saveDataToFile({data, path, option}: { data: string, path?: string, option?: any}) {
+export function saveDataToFile({
+  data,
+  path,
+  option,
+}: {
+  data: string;
+  path?: string;
+  option?: any;
+}) {
   if (vscodeAPI?.postMessage) {
-    vscodeAPI.postMessage({ type: "saveDataToFile", data, path, option});
+    vscodeAPI.postMessage({ type: "saveDataToFile", data, path, option });
   }
 }

@@ -6,12 +6,10 @@ import {
   ViewColumn,
   Uri,
   TextEditor,
-  ExtensionMode,
 } from "vscode";
 import * as vscode from "vscode";
 import * as path from "path";
 
-import { LanguageClient } from "vscode-languageclient/node";
 import { loadTinymistConfig } from "./config";
 import {
   EditorToolName,
@@ -19,16 +17,11 @@ import {
   editorTool,
   getUserPackageData,
 } from "./editor-tools";
-import { triggerStatusBar, wordCountItemProcess } from "./ui-extends";
+import { triggerStatusBar } from "./ui-extends";
 import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
-import {
-  previewActivate,
-  previewDeactivate,
-  previewPreload,
-  previewProcessOutline,
-} from "./features/preview";
+import { previewActivate, previewDeactivate, previewPreload } from "./features/preview";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
-import { activeTypstEditor, DisposeList, getSensibleTextEditorColumn } from "./util";
+import { activeTypstEditor } from "./util";
 import { tinymist } from "./lsp";
 import { taskActivate } from "./features/tasks";
 import { onEnterHandler } from "./lsp.on-enter";
@@ -278,6 +271,7 @@ async function languageActivate(context: ExtensionContext) {
     commands.registerCommand("tinymist.showTemplateGallery", editorToolCommand("template-gallery")),
     commands.registerCommand("tinymist.showSummary", editorToolCommand("summary")),
     commands.registerCommand("tinymist.showSymbolView", editorToolCommand("symbol-view")),
+    commands.registerCommand("tinymist.showFontView", editorToolCommand("font-view")),
     commands.registerCommand("tinymist.profileCurrentFile", editorToolCommand("tracing")),
 
     commands.registerCommand("tinymist.createLocalPackage", commandCreateLocalPackage),

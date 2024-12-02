@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use anyhow::bail;
 use clap::Parser;
+use font::TinymistFontResolver;
 use itertools::Itertools;
 use lsp_types::*;
 use once_cell::sync::{Lazy, OnceCell};
 use reflexo::path::PathClean;
-use reflexo_typst::font::FontResolverImpl;
 use reflexo_typst::world::EntryState;
 use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
@@ -483,7 +483,7 @@ pub struct CompileConfig {
     /// Specifies the font paths
     pub font_paths: Vec<PathBuf>,
     /// Computed fonts based on configuration.
-    pub fonts: OnceCell<Derived<Deferred<Arc<FontResolverImpl>>>>,
+    pub fonts: OnceCell<Derived<Deferred<Arc<TinymistFontResolver>>>>,
     /// Notify the compile status to the editor.
     pub notify_status: bool,
     /// Enable periscope document in hover.
@@ -733,7 +733,7 @@ impl CompileConfig {
     }
 
     /// Determines the font resolver.
-    pub fn determine_fonts(&self) -> Deferred<Arc<FontResolverImpl>> {
+    pub fn determine_fonts(&self) -> Deferred<Arc<TinymistFontResolver>> {
         // todo: on font resolving failure, downgrade to a fake font book
         let font = || {
             let opts = self.determine_font_opts();

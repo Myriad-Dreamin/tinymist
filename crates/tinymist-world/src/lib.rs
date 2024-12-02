@@ -1,11 +1,11 @@
 //! World implementation of typst for tinymist.
 
+use font::TinymistFontResolver;
 pub use reflexo_typst;
 pub use reflexo_typst::config::CompileFontOpts;
 pub use reflexo_typst::error::prelude;
-pub use reflexo_typst::font::FontResolverImpl;
 pub use reflexo_typst::world as base;
-pub use reflexo_typst::{entry::*, font, vfs, EntryOpts, EntryState};
+pub use reflexo_typst::{entry::*, vfs, EntryOpts, EntryState};
 
 use std::path::Path;
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
@@ -21,6 +21,7 @@ use reflexo_typst::vfs::{system::SystemAccessModel, Vfs};
 use reflexo_typst::{CompilerFeat, CompilerUniverse, CompilerWorld, ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 
+pub mod font;
 pub mod package;
 use package::HttpsRegistry;
 
@@ -32,8 +33,8 @@ const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 pub struct SystemCompilerFeatExtend;
 
 impl CompilerFeat for SystemCompilerFeatExtend {
-    /// Uses [`FontResolverImpl`] directly.
-    type FontResolver = FontResolverImpl;
+    /// Uses [`TinymistFontResolver`] directly.
+    type FontResolver = TinymistFontResolver;
     /// It accesses a physical file system.
     type AccessModel = SystemAccessModel;
     /// It performs native HTTP requests for fetching package data.
@@ -209,7 +210,7 @@ impl LspUniverseBuilder {
     pub fn build(
         entry: EntryState,
         inputs: ImmutDict,
-        font_resolver: Arc<FontResolverImpl>,
+        font_resolver: Arc<TinymistFontResolver>,
         package_registry: HttpsRegistry,
     ) -> ZResult<LspUniverse> {
         Ok(LspUniverse::new_raw(
@@ -222,7 +223,7 @@ impl LspUniverseBuilder {
     }
 
     /// Resolve fonts from given options.
-    pub fn resolve_fonts(args: CompileFontArgs) -> ZResult<FontResolverImpl> {
+    pub fn resolve_fonts(args: CompileFontArgs) -> ZResult<TinymistFontResolver> {
         let mut searcher = SystemFontSearcher::new();
         searcher.resolve_opts(CompileFontOpts {
             font_profile_cache_path: Default::default(),

@@ -437,7 +437,7 @@ impl LanguageState {
         #[serde(rename_all = "camelCase")]
         pub struct InteractCodeContextParams {
             pub text_document: TextDocumentIdentifier,
-            pub query: Vec<tinymist_query::InteractCodeContextQuery>,
+            pub query: Vec<Option<tinymist_query::InteractCodeContextQuery>>,
         }
 
         let params: InteractCodeContextParams = serde_json::from_value(queries)
@@ -524,6 +524,12 @@ impl LanguageState {
 }
 
 impl LanguageState {
+    /// Get the all valid fonts
+    pub fn resource_fonts(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
+        let snapshot = self.primary().snapshot().map_err(z_internal_error)?;
+        just_future(Self::get_font_resources(snapshot))
+    }
+
     /// Get the all valid symbols
     pub fn resource_symbols(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let snapshot = self.primary().snapshot().map_err(z_internal_error)?;

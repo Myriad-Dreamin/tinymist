@@ -18,6 +18,7 @@ import { wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
 
 interface ResourceRoutes {
+  "/fonts": any;
   "/symbols": any;
   "/preview/index.html": string;
   "/dir/package": string;
