@@ -80,16 +80,9 @@ impl HttpsRegistry {
 
     /// Get data & cache dir
     pub fn paths(&self) -> Vec<ImmutPath> {
-        let mut res = Vec::with_capacity(2);
-        if let Some(data_dir) = self.storage().package_path() {
-            res.push(data_dir.clone());
-        }
-
-        if let Some(cache_dir) = self.storage().package_cache_path() {
-            res.push(cache_dir.clone())
-        }
-
-        res
+        let data_dir = self.storage().package_path().cloned();
+        let cache_dir = self.storage().package_cache_path().cloned();
+        data_dir.into_iter().chain(cache_dir).collect::<Vec<_>>()
     }
 
     /// Get `typst-kit` implementing package storage
