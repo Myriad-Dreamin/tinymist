@@ -578,7 +578,7 @@ impl CompileConfig {
                 font: command.font,
                 package: command.package,
                 creation_timestamp: command.creation_timestamp,
-                cert: command.cert,
+                cert: command.cert.as_deref().map(From::from),
             });
         }
 
@@ -771,7 +771,7 @@ impl CompileConfig {
     }
 
     /// Determines the certification path.
-    pub fn determine_certification_path(&self) -> Option<PathBuf> {
+    pub fn determine_certification_path(&self) -> Option<ImmutPath> {
         let extras = self.typst_extra_args.as_ref()?;
         extras.cert.clone()
     }
@@ -894,7 +894,7 @@ pub struct CompileExtraOpts {
     /// The creation timestamp for various output.
     pub creation_timestamp: Option<chrono::DateTime<chrono::Utc>>,
     /// Path to certification file
-    pub cert: Option<PathBuf>,
+    pub cert: Option<ImmutPath>,
 }
 
 /// The path pattern that could be substituted.

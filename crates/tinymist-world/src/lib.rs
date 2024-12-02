@@ -18,7 +18,7 @@ use reflexo_typst::error::prelude::*;
 use reflexo_typst::font::system::SystemFontSearcher;
 use reflexo_typst::foundations::{Str, Value};
 use reflexo_typst::vfs::{system::SystemAccessModel, Vfs};
-use reflexo_typst::{CompilerFeat, CompilerUniverse, CompilerWorld, TypstDict};
+use reflexo_typst::{CompilerFeat, CompilerUniverse, CompilerWorld, ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 
 pub mod package;
@@ -137,7 +137,10 @@ impl CompileOnceArgs {
             .map(|(k, v)| (Str::from(k.as_str()), Value::Str(Str::from(v.as_str()))))
             .collect();
         let fonts = LspUniverseBuilder::resolve_fonts(self.font.clone())?;
-        let package = LspUniverseBuilder::resolve_package(self.cert.clone(), Some(&self.package));
+        let package = LspUniverseBuilder::resolve_package(
+            self.cert.as_deref().map(From::from),
+            Some(&self.package),
+        );
 
         LspUniverseBuilder::build(
             entry,
@@ -232,7 +235,7 @@ impl LspUniverseBuilder {
 
     /// Resolve package registry from given options.
     pub fn resolve_package(
-        cert_path: Option<PathBuf>,
+        cert_path: Option<ImmutPath>,
         args: Option<&CompilePackageArgs>,
     ) -> HttpsRegistry {
         HttpsRegistry::new(cert_path, args)
