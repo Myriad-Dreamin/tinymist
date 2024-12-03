@@ -590,8 +590,10 @@ impl ExprWorker<'_> {
     }
 
     fn check_module_import(&mut self, typed: ast::ModuleImport) -> Expr {
+        let is_wildcard_import = matches!(typed.imports(), Some(ast::Imports::Wildcard));
+
         let source = typed.source();
-        let mod_expr = self.check_import(typed.source(), true);
+        let mod_expr = self.check_import(typed.source(), true, is_wildcard_import);
         crate::log_debug_ct!("checking import: {source:?} => {mod_expr:?}");
 
         let mod_var = typed.new_name().map(Decl::module_alias).or_else(|| {
@@ -689,7 +691,12 @@ impl ExprWorker<'_> {
         Expr::Import(ImportExpr { decl: mod_ref }.into())
     }
 
-    fn check_import(&mut self, source: ast::Expr, is_import: bool) -> Option<Expr> {
+    fn check_import(
+        &mut self,
+        source: ast::Expr,
+        is_import: bool,
+        is_wildcard_import: bool,
+    ) -> Option<Expr> {
         let src = self.eval_expr(source, InterpretMode::Code);
         let src_expr = self.fold_expr_and_val(src).or_else(|| {
             self.ctx
@@ -702,36 +709,63 @@ impl ExprWorker<'_> {
         })?;
 
         crate::log_debug_ct!("checking import source: {src_expr:?}");
-        self.check_import_by_str(source, &src_expr, is_import)
-            .or_else(|| self.check_import_by_def(&src_expr))
-    }
-
-    fn check_import_by_str(
-        &mut self,
-        source: ast::Expr,
-        src_expr: &Expr,
-        is_import: bool,
-    ) -> Option<Expr> {
-        let src_str = match src_expr {
+        let const_res = match &src_expr {
             Expr::Type(Ty::Value(val)) => {
-                if val.val.scope().is_some() {
-                    return Some(src_expr.clone());
-                }
-
-                match &val.val {
-                    Value::Str(s) => Some(s.as_str()),
-                    _ => None,
-                }
+                self.check_import_source_val(source, &val.val, Some(&src_expr), is_import)
             }
             Expr::Decl(d) if matches!(d.as_ref(), Decl::Module { .. }) => {
                 return Some(src_expr.clone())
             }
 
             _ => None,
-        }?;
+        };
+        const_res
+            .or_else(|| self.check_import_by_def(&src_expr))
+            .or_else(|| is_wildcard_import.then(|| self.check_import_dyn(source, &src_expr))?)
+    }
 
-        let fid = resolve_id_by_path(&self.ctx.world, self.fid, src_str)?;
-        let name = Decl::calc_path_stem(src_str);
+    fn check_import_dyn(&mut self, source: ast::Expr, src_expr: &Expr) -> Option<Expr> {
+        let src_or_module = self.ctx.analyze_import(source.to_untyped());
+        crate::log_debug_ct!("checking import source dyn: {src_or_module:?}");
+
+        match src_or_module {
+            (_, Some(Value::Module(m))) => {
+                // todo: dyn resolve src_expr
+                match m.file_id() {
+                    Some(fid) => Some(Expr::Decl(Decl::module(m.name().into(), fid).into())),
+                    None => Some(Expr::Type(Ty::Value(InsTy::new(Value::Module(m))))),
+                }
+            }
+            (_, Some(v)) => Some(Expr::Type(Ty::Value(InsTy::new(v)))),
+            (Some(s), _) => self.check_import_source_val(source, &s, Some(src_expr), true),
+            (None, None) => None,
+        }
+    }
+
+    fn check_import_source_val(
+        &mut self,
+        source: ast::Expr,
+        src: &Value,
+        src_expr: Option<&Expr>,
+        is_import: bool,
+    ) -> Option<Expr> {
+        match &src {
+            _ if src.scope().is_some() => src_expr
+                .cloned()
+                .or_else(|| Some(Expr::Type(Ty::Value(InsTy::new(src.clone()))))),
+            Value::Str(s) => self.check_import_by_str(source, s.as_str(), is_import),
+            _ => None,
+        }
+    }
+
+    fn check_import_by_str(
+        &mut self,
+        source: ast::Expr,
+        src: &str,
+        is_import: bool,
+    ) -> Option<Expr> {
+        let fid = resolve_id_by_path(&self.ctx.world, self.fid, src)?;
+        let name = Decl::calc_path_stem(src);
         let module = Expr::Decl(Decl::module(name.clone(), fid).into());
 
         let import_path = if is_import {
@@ -752,7 +786,7 @@ impl ExprWorker<'_> {
 
     fn check_import_by_def(&mut self, src_expr: &Expr) -> Option<Expr> {
         match src_expr {
-            Expr::Decl(..) => Some(src_expr.clone()),
+            Expr::Decl(m) if matches!(m.kind(), DefKind::Module) => Some(src_expr.clone()),
             Expr::Ref(r) => r.root.clone(),
             _ => None,
         }
@@ -822,7 +856,7 @@ impl ExprWorker<'_> {
     }
 
     fn check_module_include(&mut self, typed: ast::ModuleInclude) -> Expr {
-        let _mod_expr = self.check_import(typed.source(), false);
+        let _mod_expr = self.check_import(typed.source(), false, false);
         let source = self.check(typed.source());
         Expr::Include(IncludeExpr { source }.into())
     }
