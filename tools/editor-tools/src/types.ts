@@ -30,7 +30,11 @@ export function humanStyle(style?: string) {
   return `Style ${style}`;
 }
 
-export function humanWeight(weight?: number) {
+interface ShowOptions {
+  showNumber?: boolean;
+}
+
+export function humanWeightBase(weight?: number) {
   if (!weight) {
     return "Regular";
   }
@@ -71,10 +75,23 @@ export function humanWeight(weight?: number) {
     return "Black";
   }
 
-  return `Weight ${weight}`;
+  return "";
 }
 
-export function humanStretch(stretch?: number) {
+export function humanWeight(weight?: number, opts?: ShowOptions) {
+  const base = humanWeightBase(weight);
+  if (!base) {
+    return `Weight ${weight}`;
+  }
+
+  if (!opts?.showNumber) {
+    return base;
+  }
+
+  return `${base} (${weight})`;
+}
+
+export function humanStretchBase(stretch?: number) {
   if (!stretch) {
     return "Normal";
   }
@@ -115,5 +132,18 @@ export function humanStretch(stretch?: number) {
     return "Ultra-expanded";
   }
 
-  return `${stretch}`;
+  return "";
+}
+
+export function humanStretch(stretch?: number, opts?: ShowOptions) {
+  const base = humanStretchBase(stretch);
+  if (!base) {
+    return `Stretch ${stretch}`;
+  }
+
+  if (!opts?.showNumber) {
+    return base;
+  }
+
+  return `${base} (${stretch})`;
 }

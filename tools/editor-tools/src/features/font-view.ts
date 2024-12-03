@@ -1,4 +1,4 @@
-import van, { ChildDom } from "vanjs-core";
+import van, { ChildDom, PropsWithKnownKeys, State } from "vanjs-core";
 import {
   copyToClipboard,
   requestRevealPath,
@@ -10,6 +10,9 @@ import { FontSource, humanStretch, humanStyle, humanWeight } from "../types";
 const { div, a, span, code, br, button } = van.tags;
 
 export const FontView = () => {
+  const showNumber = van.state(false);
+  const showNumberOpt = van.derive(() => ({ showNumber: showNumber.val }));
+
   const FontResourcesData = `:[[preview:FontInformation]]:`;
   const fontResources = van.state<FontResources>(
     FontResourcesData.startsWith(":")
@@ -68,27 +71,52 @@ export const FontView = () => {
   const FontAction = (
     icon: ChildDom,
     title: string,
-    onclick: (this: HTMLDivElement) => void
-  ) =>
-    button(
+    onclick: (this: HTMLDivElement) => void,
+    opts?: PropsWithKnownKeys<HTMLButtonElement> & { active?: State<boolean> }
+  ) => {
+    const classProp = opts?.active
+      ? van.derive(
+          () =>
+            `tinymist-button tinymist-font-action${opts?.active?.val ? " activated" : ""}`
+        )
+      : "tinymist-button tinymist-font-action";
+
+    return button(
       {
-        class: "tinymist-button tinymist-font-action",
+        ...opts,
+        class: classProp,
         style: "height: 1.2rem",
         title,
         onclick,
       },
       icon
     );
+  };
 
   const FontSlot = (font: FontInfo) => {
+    let fileName;
+    if (typeof font.source === "number") {
+      let w = fontResources.val.sources[font.source];
+      if (w.kind === "fs") {
+        fileName = w.path.split(/[\\\/]/g).pop();
+      } else {
+        fileName = `Embedded: ${w.name}`;
+      }
+    }
+
     const machineTitle = `Weight ${font.weight || 400}, Stretch ${font.stretch || 1000}, at `;
     const baseName = code(
       font.style === "normal" || !font.style
         ? ""
         : `${humanStyle(font.style)}, `,
-      span(`${humanWeight(font.weight)} Weight`),
-      ", ",
-      span(`${humanStretch(font.stretch)} Stretch`)
+      (_dom?: Element) => {
+        return span(
+          humanWeight(font.weight, showNumberOpt.val),
+          showNumber.val ? ", " : " ",
+          humanStretch(font.stretch, showNumberOpt.val)
+        );
+      },
+      ` (${fileName})`
     );
 
     let variantName;
@@ -231,6 +259,19 @@ export const FontView = () => {
           style:
             "justify-content: center; align-items: center; gap: 10px; width: 100%;",
         },
+        div(
+          {
+            style: "flex: 1; width: 100%; padding: 10px",
+          },
+          FontAction(
+            "Show Number",
+            "Toggle to show weight or stretch number",
+            () => {
+              showNumber.val = !showNumber.val;
+            },
+            { active: showNumber }
+          )
+        ),
         div(
           {
             class: `tinymist-card`,

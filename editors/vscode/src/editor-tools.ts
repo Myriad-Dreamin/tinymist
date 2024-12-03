@@ -142,6 +142,10 @@ export async function editorTool(context: ExtensionContext, tool: EditorToolName
     summary: "Summary",
     docs: `@${opts?.pkg?.namespace}/${opts?.pkg?.name}:${opts?.pkg?.version} (Docs)`,
   }[tool];
+  const enableFindWidget: Partial<Record<EditorToolName, boolean>> = {
+    docs: true,
+    "font-view": true,
+  };
   const panel = vscode.window.createWebviewPanel(
     `tinymist-${tool}`,
     title,
@@ -152,7 +156,7 @@ export async function editorTool(context: ExtensionContext, tool: EditorToolName
     {
       enableScripts: true,
       retainContextWhenHidden: true,
-      enableFindWidget: tool === "docs",
+      enableFindWidget: !!enableFindWidget[tool],
     },
   );
 
