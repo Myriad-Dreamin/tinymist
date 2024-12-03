@@ -50,13 +50,39 @@ If you don’t like the activity bar, you can right-click on the activity bar an
 - See symbols grouped by categories.
 - Click on a symbol, then it will be inserted into the editor.
 
-#### Preview Command
+#### Tool View
+
+- Template Gallery: Show available Typst templates for picking up a template to initialize.
+- Document Summary: Show a summary of the current document.
+- Symbols: Show symbols in the current document.
+- Fonts: Show fonts in the current document.
+- Profiling: Profile the current document.
+
+#### Package View
+
+- Create or open some local typst packages.
+- Show a list of available typst packages and invoke associated commands.
+
+#### Content View
+
+- Show thumbnail content of the current document, which is useful for creating slides.
+
+#### Label View
+
+- Show labels in the current workspace.
+
+#### Outline View
+
+- Show outline of exported document, viewing typst as a markup language.
+  - This is slightly different from the LSP-provided document outline, which shows the syntax structure of the document, viewing typst as a programming language.
+
+### Preview Command
 
 Open command palette (Ctrl+Shift+P), and type `>Typst Preview:`.
 
 You can also use the shortcut (Ctrl+K V).
 
-#### Theme-aware template (previewing)
+### Theme-aware template (previewing)
 
 In short, there is a `sys.inputs` item added to the compiler when your document is under the context of _user editing or previewing task_. You can use it to configure your template:
 
