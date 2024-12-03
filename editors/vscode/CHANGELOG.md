@@ -4,6 +4,10 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## v0.12.8 - [2024-12-03]
+
+v0.12.6 was wrongly released as v0.12.6-rc3. This release is to fix the version number.
+
 ## v0.12.6 - [2024-12-03]
 
 * Bumped typstyle to v0.12.6 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/893, https://github.com/Myriad-Dreamin/tinymist/pull/904 and https://github.com/Myriad-Dreamin/tinymist/pull/928
