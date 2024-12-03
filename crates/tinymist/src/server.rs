@@ -253,6 +253,7 @@ impl LanguageState {
             .with_command_("tinymist.getWorkspaceLabels", State::get_workspace_labels)
             .with_command_("tinymist.getServerInfo", State::get_server_info)
             // resources
+            .with_resource("/fonts", State::resource_fonts)
             .with_resource("/symbols", State::resource_symbols)
             .with_resource("/preview/index.html", State::resource_preview_html)
             .with_resource("/tutorial", State::resource_tutoral)
@@ -1023,7 +1024,6 @@ impl LanguageState {
         let primary = || self.primary();
         let is_pinning = self.pinning;
         just_ok(match query {
-            InteractCodeContext(req) => query_source!(self, InteractCodeContext, req)?,
             FoldingRange(req) => query_source!(self, FoldingRange, req)?,
             SelectionRange(req) => query_source!(self, SelectionRange, req)?,
             DocumentSymbol(req) => query_source!(self, DocumentSymbol, req)?,
@@ -1067,6 +1067,7 @@ impl LanguageState {
             match query {
                 SemanticTokensFull(req) => snap.run_semantic(req, R::SemanticTokensFull),
                 SemanticTokensDelta(req) => snap.run_semantic(req, R::SemanticTokensDelta),
+                InteractCodeContext(req) => snap.run_semantic(req, R::InteractCodeContext),
                 Hover(req) => snap.run_stateful(req, R::Hover),
                 GotoDefinition(req) => snap.run_stateful(req, R::GotoDefinition),
                 GotoDeclaration(req) => snap.run_semantic(req, R::GotoDeclaration),

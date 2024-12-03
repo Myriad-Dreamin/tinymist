@@ -10,6 +10,7 @@ type PageComponent =
   | "summary"
   | "diagnostics"
   | "symbol-view"
+  | "font-view"
   | "docs";
 
 /// The frontend arguments that are passed from the backend.
@@ -27,7 +28,7 @@ function retrieveArgs(): Arguments {
   ///   let frontend_html = frontend_html.replace(
   ///     "editor-tools-args:{}", ...);
   /// ```
-  let mode = `editor-tools-args:{"page": "docs"}`;
+  let mode = `editor-tools-args:{"page": "font-view"}`;
   /// Remove the placeholder prefix.
   mode = mode.replace("editor-tools-args:", "");
 

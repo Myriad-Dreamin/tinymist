@@ -3,7 +3,7 @@ import * as path from "path";
 import { readFile, writeFile } from "fs/promises";
 import { tinymist } from "./lsp";
 import { extensionState, ExtensionContext } from "./state";
-import { base64Encode } from "./util";
+import { activeTypstEditor, base64Encode } from "./util";
 
 async function loadHTMLFile(context: ExtensionContext, relativePath: string) {
   const filePath = path.resolve(context.extensionPath, relativePath);
@@ -125,16 +125,27 @@ const Standalone: Partial<Record<EditorToolName, boolean>> = {
   "symbol-view": true,
 } as const;
 
-export type EditorToolName = "template-gallery" | "tracing" | "summary" | "symbol-view" | "docs";
+export type EditorToolName =
+  | "template-gallery"
+  | "tracing"
+  | "summary"
+  | "font-view"
+  | "symbol-view"
+  | "docs";
 export async function editorTool(context: ExtensionContext, tool: EditorToolName, opts?: any) {
   // Create and show a new WebView
   const title = {
     "template-gallery": "Template Gallery",
+    "font-view": "Font View",
     "symbol-view": "Symbol View",
     tracing: "Tracing",
     summary: "Summary",
     docs: `@${opts?.pkg?.namespace}/${opts?.pkg?.name}:${opts?.pkg?.version} (Docs)`,
   }[tool];
+  const enableFindWidget: Partial<Record<EditorToolName, boolean>> = {
+    docs: true,
+    "font-view": true,
+  };
   const panel = vscode.window.createWebviewPanel(
     `tinymist-${tool}`,
     title,
@@ -145,7 +156,7 @@ export async function editorTool(context: ExtensionContext, tool: EditorToolName
     {
       enableScripts: true,
       retainContextWhenHidden: true,
-      enableFindWidget: tool === "docs",
+      enableFindWidget: !!enableFindWidget[tool],
     },
   );
 
@@ -177,7 +188,11 @@ async function editorToolAt(
   panel: vscode.WebviewView | vscode.WebviewPanel,
   opts?: any,
 ) {
+  const disposes: vscode.Disposable[] = [];
   const dispose = () => {
+    for (const d of disposes) {
+      d.dispose();
+    }
     // if has dispose method
     if ("dispose" in panel) {
       panel.dispose();
@@ -189,7 +204,9 @@ async function editorToolAt(
     switch (message.type) {
       case "revealPath": {
         const path = message.path;
-        await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(path));
+        const x = await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(path));
+        const y = await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(path));
+        console.log("revealPath", x, y);
         break;
       }
       case "savePackageData": {
@@ -226,6 +243,9 @@ async function editorToolAt(
 
         dispose();
         break;
+      }
+      case "copyToClipboard": {
+        vscode.env.clipboard.writeText(message.content);
       }
       case "editText": {
         const activeDocument = extensionState.getFocusingDoc();
@@ -401,8 +421,114 @@ async function editorToolAt(
       html = html.replace(":[[preview:ServerInfo]]:", base64Encode(serverInfo));
       break;
     }
+    case "font-view": {
+      const result = await tinymist.getResource("/fonts");
+
+      if (!result) {
+        vscode.window.showErrorMessage("No resource");
+        dispose();
+        return;
+      }
+
+      const fontInfo = JSON.stringify(result);
+      html = html.replace(":[[preview:FontInformation]]:", base64Encode(fontInfo));
+
+      let version = 0;
+
+      const processSelections = async (
+        selectionVersion: number,
+        textEditor: vscode.TextEditor | undefined,
+        selections: readonly vscode.Selection[],
+      ) => {
+        console.log(selections);
+        // todo: very buggy so we disabling it
+        if (!textEditor || selections.length >= 0) {
+          return undefined;
+        }
+
+        if (!textEditor || selections.length > 1) {
+          return;
+        }
+
+        for (const sel of selections) {
+          console.log(textEditor, sel.start);
+          const textDocument = {
+            uri: textEditor.document.uri.toString(),
+          };
+          const position = {
+            line: sel.start.line,
+            character: sel.start.character,
+          };
+          const style = ["text.font"];
+          const styleAt = (
+            await vscode.commands.executeCommand<{ style: any[] }[]>(
+              "tinymist.interactCodeContext",
+              {
+                textDocument,
+                query: [
+                  {
+                    kind: "styleAt",
+                    position,
+                    style,
+                  },
+                ],
+              },
+            )
+          )?.[0]?.style;
+
+          return {
+            version: selectionVersion,
+            selections: [
+              {
+                textDocument,
+                position,
+                style,
+                styleAt,
+              },
+            ],
+          };
+        }
+      };
+
+      disposes.push(
+        vscode.window.onDidChangeTextEditorSelection(async (event) => {
+          if (disposed) {
+            return;
+          }
+          if (!event.textEditor || event.textEditor.document.languageId !== "typst") {
+            return;
+          }
+          version += 1;
+          const styleAtCursor = await processSelections(
+            version,
+            event.textEditor,
+            event.selections,
+          );
+          if (disposed) {
+            return;
+          }
+          panel.webview.postMessage({ type: "styleAtCursor", data: styleAtCursor });
+        }),
+      );
+
+      const activeEditor = activeTypstEditor();
+      if (activeEditor) {
+        const styleAtCursor = await processSelections(
+          version,
+          activeEditor,
+          activeEditor.selections,
+        );
+        if (styleAtCursor) {
+          html = html.replace(
+            ":[[preview:StyleAtCursor]]:",
+            base64Encode(JSON.stringify(styleAtCursor)),
+          );
+        }
+      }
+
+      break;
+    }
     case "symbol-view": {
-      // tinymist.getCurrentDocumentMetrics
       const result = await tinymist.getResource("/symbols");
 
       if (!result) {

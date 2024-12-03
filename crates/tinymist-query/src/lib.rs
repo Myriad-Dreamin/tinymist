@@ -394,7 +394,7 @@ mod polymorphic {
         Formatting(Option<Vec<TextEdit>>),
         FoldingRange(Option<Vec<FoldingRange>>),
         SelectionRange(Option<Vec<SelectionRange>>),
-        InteractCodeContext(Option<Vec<InteractCodeContextResponse>>),
+        InteractCodeContext(Option<Vec<Option<InteractCodeContextResponse>>>),
 
         OnEnter(Option<Vec<TextEdit>>),
 

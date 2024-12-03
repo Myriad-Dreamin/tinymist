@@ -8,7 +8,7 @@ use sync_lsp::LspResult;
 
 use crate::{actor::typ_client::WorldSnapFut, z_internal_error};
 
-pub use super::prelude::*;
+use super::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

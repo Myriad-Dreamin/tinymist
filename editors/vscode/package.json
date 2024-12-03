@@ -939,7 +939,12 @@
       },
       {
         "command": "tinymist.showSymbolView",
-        "title": "Show symbol view",
+        "title": "Show Symbol View",
+        "category": "Typst"
+      },
+      {
+        "command": "tinymist.showFontView",
+        "title": "Show Font View",
         "category": "Typst"
       },
       {
