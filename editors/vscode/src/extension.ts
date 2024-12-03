@@ -11,24 +11,22 @@ import * as vscode from "vscode";
 import * as path from "path";
 
 import { loadTinymistConfig } from "./config";
-import {
-  EditorToolName,
-  SymbolViewProvider as SymbolViewProvider,
-  editorTool,
-  getUserPackageData,
-} from "./editor-tools";
 import { triggerStatusBar } from "./ui-extends";
-import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
-import { previewActivate, previewDeactivate, previewPreload } from "./features/preview";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { activeTypstEditor } from "./util";
 import { tinymist } from "./lsp";
-import { taskActivate } from "./features/tasks";
 import { onEnterHandler } from "./lsp.on-enter";
 import { extensionState } from "./state";
+
+import { getUserPackageData } from "./features/tool";
+import { SymbolViewProvider } from "./features/tool.symbol-view";
+import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
+import { previewActivate, previewDeactivate, previewPreload } from "./features/preview";
+import { taskActivate } from "./features/tasks";
 import { devKitFeatureActivate } from "./features/dev-kit";
 import { labelFeatureActivate } from "./features/label";
 import { packageFeatureActivate } from "./features/package";
+import { toolFeatureActivate } from "./features/tool";
 import { dragAndDropActivate } from "./features/drag-and-drop";
 
 export async function activate(context: ExtensionContext): Promise<void> {
@@ -93,6 +91,7 @@ export async function doActivate(context: ExtensionContext): Promise<void> {
   // Activates features
   labelFeatureActivate(context);
   packageFeatureActivate(context);
+  toolFeatureActivate(context);
   if (extensionState.features.dragAndDrop) {
     dragAndDropActivate(context);
   }
@@ -233,10 +232,6 @@ async function languageActivate(context: ExtensionContext) {
     }),
   );
 
-  const editorToolCommand = (tool: EditorToolName) => async () => {
-    await editorTool(context, tool);
-  };
-
   const initTemplateCommand =
     (inPlace: boolean) =>
     (...args: string[]) =>
@@ -267,12 +262,6 @@ async function languageActivate(context: ExtensionContext) {
 
     commands.registerCommand("tinymist.initTemplate", initTemplateCommand(false)),
     commands.registerCommand("tinymist.initTemplateInPlace", initTemplateCommand(true)),
-
-    commands.registerCommand("tinymist.showTemplateGallery", editorToolCommand("template-gallery")),
-    commands.registerCommand("tinymist.showSummary", editorToolCommand("summary")),
-    commands.registerCommand("tinymist.showSymbolView", editorToolCommand("symbol-view")),
-    commands.registerCommand("tinymist.showFontView", editorToolCommand("font-view")),
-    commands.registerCommand("tinymist.profileCurrentFile", editorToolCommand("tracing")),
 
     commands.registerCommand("tinymist.createLocalPackage", commandCreateLocalPackage),
     commands.registerCommand("tinymist.openLocalPackage", commandOpenLocalPackage),

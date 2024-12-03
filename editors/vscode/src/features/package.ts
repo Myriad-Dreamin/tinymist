@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import { PackageInfo, SymbolInfo, tinymist } from "../lsp";
-import { getTargetViewColumn } from "../util";
-import { editorTool } from "../editor-tools";
+import { editorTool } from "./tool";
 
 export function packageFeatureActivate(context: vscode.ExtensionContext) {
   const packageView = new PackageViewProvider();
@@ -128,7 +127,7 @@ class PackageViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   }
 }
 
-export class CommandsItem extends vscode.TreeItem {
+class CommandsItem extends vscode.TreeItem {
   static is(element: vscode.TreeItem): element is CommandsItem {
     return element.contextValue === "package-commands";
   }
@@ -141,7 +140,7 @@ export class CommandsItem extends vscode.TreeItem {
   contextValue = "package-commands";
 }
 
-export class CommandItem extends vscode.TreeItem {
+class CommandItem extends vscode.TreeItem {
   constructor(
     public readonly command: vscode.Command,
     public description = "",

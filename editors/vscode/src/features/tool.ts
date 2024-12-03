@@ -1,129 +1,66 @@
 import * as vscode from "vscode";
+import { commands } from "vscode";
 import * as path from "path";
 import { readFile, writeFile } from "fs/promises";
-import { tinymist } from "./lsp";
-import { extensionState, ExtensionContext } from "./state";
-import { activeTypstEditor, base64Encode } from "./util";
-
-async function loadHTMLFile(context: ExtensionContext, relativePath: string) {
-  const filePath = path.resolve(context.extensionPath, relativePath);
-  const fileContents = await readFile(filePath, "utf8");
-  return fileContents;
-}
+import { tinymist } from "../lsp";
+import { extensionState, ExtensionContext } from "../state";
+import { activeTypstEditor, base64Encode, loadHTMLFile } from "../util";
 
 const USER_PACKAGE_VERSION = "0.0.1";
-
-interface Versioned<T> {
-  version: string;
-  data: T;
-}
-
-export interface PackageData {
-  [ns: string]: {
-    [packageName: string]: {
-      isFavorite: boolean;
-    };
-  };
-}
-
-export function getUserPackageData(context: ExtensionContext) {
-  const defaultPackageData: Versioned<PackageData> = {
-    version: USER_PACKAGE_VERSION,
-    data: {},
-  };
-
-  const userPackageData = context.globalState.get("userPackageData", defaultPackageData);
-  if (userPackageData?.version !== USER_PACKAGE_VERSION) {
-    return defaultPackageData;
-  }
-
-  return userPackageData;
-}
-
 const FONTS_EXPORT_CONFIGURE_VERSION = "0.0.1";
 
-interface FsFontSource {
-  kind: "fs";
-  path: string;
+interface ToolDescriptor {
+  command: string;
+  title: string;
+  description: string;
+  toolId: EditorToolName;
 }
 
-interface MemoryFontSource {
-  kind: "memory";
-  name: string;
-}
-
-type FontSource = FsFontSource | MemoryFontSource;
-
-export type fontLocation = FontSource extends { kind: infer Kind } ? Kind : never;
-
-export type fontsCSVHeader =
-  | "name"
-  | "postscript"
-  | "style"
-  | "weight"
-  | "stretch"
-  | "location"
-  | "path";
-
-export interface fontsExportCSVConfigure {
-  header: boolean;
-  delimiter: string;
-  fields: fontsCSVHeader[];
-}
-
-export interface fontsExportJSONConfigure {
-  indent: number;
-}
-
-export interface fontsExportFormatConfigure {
-  csv: fontsExportCSVConfigure;
-  json: fontsExportJSONConfigure;
-}
-
-export type fontsExportFormat = keyof fontsExportFormatConfigure;
-
-interface fontsExportCommonConfigure {
-  format: fontsExportFormat;
-  filters: {
-    location: fontLocation[];
-  };
-}
-
-export type fontsExportConfigure = fontsExportCommonConfigure & fontsExportFormatConfigure;
-
-// todo: deduplicate me. it also occurs in tools/editor-tools/src/features/summary.ts
-export const fontsExportDefaultConfigure: fontsExportConfigure = {
-  format: "csv",
-  filters: {
-    location: ["fs"],
+const toolDesc: Partial<Record<EditorToolName, ToolDescriptor>> = {
+  "template-gallery": {
+    command: "tinymist.showTemplateGallery",
+    title: "Template Gallery",
+    description: "Show Template Gallery",
+    toolId: "template-gallery",
   },
-  csv: {
-    header: false,
-    delimiter: ",",
-    fields: ["name", "path"],
+  summary: {
+    command: "tinymist.showSummary",
+    title: "Document Summary",
+    description: "Show Document Summary",
+    toolId: "summary",
   },
-  json: {
-    indent: 2,
+  "symbol-view": {
+    command: "tinymist.showSymbolView",
+    title: "Symbols",
+    description: "Show Symbol View",
+    toolId: "symbol-view",
+  },
+  "font-view": {
+    command: "tinymist.showFontView",
+    title: "Fonts",
+    description: "Show Font View",
+    toolId: "font-view",
+  },
+  tracing: {
+    command: "tinymist.profileCurrentFile",
+    title: "Profiling",
+    description: "Profile Current File",
+    toolId: "tracing",
   },
 };
 
-export function getFontsExportConfigure(context: ExtensionContext) {
-  const defaultConfigure: Versioned<fontsExportConfigure> = {
-    version: FONTS_EXPORT_CONFIGURE_VERSION,
-    data: fontsExportDefaultConfigure,
-  };
+export function toolFeatureActivate(context: vscode.ExtensionContext) {
+  const toolView = new ToolViewProvider();
 
-  const configure = context.globalState.get("fontsExportConfigure", defaultConfigure);
-  if (configure?.version !== FONTS_EXPORT_CONFIGURE_VERSION) {
-    return defaultConfigure;
-  }
-
-  return configure;
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider("tinymist.tool-view", toolView),
+    ...Object.values(toolDesc).map((desc) =>
+      vscode.commands.registerCommand(desc.command, async () => {
+        await editorTool(context, desc.toolId);
+      }),
+    ),
+  );
 }
-
-const Standalone: Partial<Record<EditorToolName, boolean>> = {
-  "symbol-view": true,
-} as const;
 
 export type EditorToolName =
   | "template-gallery"
@@ -163,31 +100,16 @@ export async function editorTool(context: ExtensionContext, tool: EditorToolName
   await editorToolAt(context, tool, panel, opts);
 }
 
-export class SymbolViewProvider implements vscode.WebviewViewProvider {
-  static readonly Name = "tinymist.side-symbol-view";
-
-  constructor(private context: ExtensionContext) {}
-
-  public resolveWebviewView(
-    webviewView: vscode.WebviewView,
-    _context: vscode.WebviewViewResolveContext,
-    _token: vscode.CancellationToken,
-  ) {
-    webviewView.webview.options = {
-      // Allow scripts in the webview
-      enableScripts: true,
-    };
-
-    editorToolAt(this.context, "symbol-view", webviewView);
-  }
-}
-
-async function editorToolAt(
+export async function editorToolAt(
   context: ExtensionContext,
   tool: EditorToolName,
   panel: vscode.WebviewView | vscode.WebviewPanel,
   opts?: any,
 ) {
+  const Standalone: Partial<Record<EditorToolName, boolean>> = {
+    "symbol-view": true,
+  } as const;
+
   const disposes: vscode.Disposable[] = [];
   const dispose = () => {
     for (const d of disposes) {
@@ -554,6 +476,112 @@ async function editorToolAt(
   }
 }
 
+export function getUserPackageData(context: ExtensionContext) {
+  const defaultPackageData: Versioned<PackageData> = {
+    version: USER_PACKAGE_VERSION,
+    data: {},
+  };
+
+  const userPackageData = context.globalState.get("userPackageData", defaultPackageData);
+  if (userPackageData?.version !== USER_PACKAGE_VERSION) {
+    return defaultPackageData;
+  }
+
+  return userPackageData;
+}
+
+// todo: deduplicate me. it also occurs in tools/editor-tools/src/features/summary.ts
+export const fontsExportDefaultConfigure: fontsExportConfigure = {
+  format: "csv",
+  filters: {
+    location: ["fs"],
+  },
+  csv: {
+    header: false,
+    delimiter: ",",
+    fields: ["name", "path"],
+  },
+  json: {
+    indent: 2,
+  },
+};
+
+export function getFontsExportConfigure(context: ExtensionContext) {
+  const defaultConfigure: Versioned<fontsExportConfigure> = {
+    version: FONTS_EXPORT_CONFIGURE_VERSION,
+    data: fontsExportDefaultConfigure,
+  };
+
+  const configure = context.globalState.get("fontsExportConfigure", defaultConfigure);
+  if (configure?.version !== FONTS_EXPORT_CONFIGURE_VERSION) {
+    return defaultConfigure;
+  }
+
+  return configure;
+}
+
+interface Versioned<T> {
+  version: string;
+  data: T;
+}
+
+export interface PackageData {
+  [ns: string]: {
+    [packageName: string]: {
+      isFavorite: boolean;
+    };
+  };
+}
+
+interface FsFontSource {
+  kind: "fs";
+  path: string;
+}
+
+interface MemoryFontSource {
+  kind: "memory";
+  name: string;
+}
+
+type FontSource = FsFontSource | MemoryFontSource;
+
+export type fontLocation = FontSource extends { kind: infer Kind } ? Kind : never;
+
+export type fontsCSVHeader =
+  | "name"
+  | "postscript"
+  | "style"
+  | "weight"
+  | "stretch"
+  | "location"
+  | "path";
+
+export interface fontsExportCSVConfigure {
+  header: boolean;
+  delimiter: string;
+  fields: fontsCSVHeader[];
+}
+
+export interface fontsExportJSONConfigure {
+  indent: number;
+}
+
+export interface fontsExportFormatConfigure {
+  csv: fontsExportCSVConfigure;
+  json: fontsExportJSONConfigure;
+}
+
+export type fontsExportFormat = keyof fontsExportFormatConfigure;
+
+interface fontsExportCommonConfigure {
+  format: fontsExportFormat;
+  filters: {
+    location: fontLocation[];
+  };
+}
+
+export type fontsExportConfigure = fontsExportCommonConfigure & fontsExportFormatConfigure;
+
 const waitTimeList = [100, 200, 400, 1000, 1200, 1500, 1800, 2000];
 async function fetchSummaryInfo(): Promise<[any | undefined, any | undefined]> {
   let res: [any | undefined, any | undefined] = [undefined, undefined];
@@ -597,4 +625,40 @@ async function fetchSummaryInfo(): Promise<[any | undefined, any | undefined]> {
       res[1] = serverInfo;
     }
   }
+}
+
+class ToolViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
+  constructor() {}
+
+  refresh(): void {}
+
+  getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
+    return element;
+  }
+
+  getChildren(): Thenable<vscode.TreeItem[]> {
+    return Promise.resolve([
+      ...Object.values(toolDesc).map((desc) => {
+        return new CommandItem({
+          title: desc.title,
+          command: desc.command,
+          tooltip: desc.description,
+        });
+      }),
+    ]);
+  }
+}
+
+class CommandItem extends vscode.TreeItem {
+  constructor(
+    public readonly command: vscode.Command,
+    public description = "",
+  ) {
+    super(command.title, vscode.TreeItemCollapsibleState.None);
+    this.tooltip = this.command.tooltip || ``;
+  }
+
+  iconPath = new vscode.ThemeIcon("tools");
+
+  contextValue = "tool-command";
 }

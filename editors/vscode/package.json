@@ -52,6 +52,11 @@
           "when": "ext.tinymistActivated && ext.tinymistDevKit"
         },
         {
+          "id": "tinymist.tool-view",
+          "name": "Tool",
+          "when": "ext.tinymistActivated"
+        },
+        {
           "id": "tinymist.package-view",
           "name": "Package",
           "when": "ext.tinymistActivated"
