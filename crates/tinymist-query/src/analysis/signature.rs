@@ -231,7 +231,12 @@ pub(crate) fn sig_of_type(
             let sig_ty = Ty::Func(ty.sig_repr(true, &mut ty_ctx)?);
             let sig_ty = type_info.simplify(sig_ty, false);
             let Ty::Func(sig_ty) = sig_ty else {
-                panic!("expected function type, got {sig_ty:?}");
+                static WARN_ONCE: std::sync::Once = std::sync::Once::new();
+                WARN_ONCE.call_once(|| {
+                    // todo: seems like a bug
+                    log::warn!("expected function type, got {sig_ty:?}");
+                });
+                return None;
             };
 
             // todo: this will affect inlay hint: _var_with
@@ -251,7 +256,12 @@ pub(crate) fn sig_of_type(
             let mut _broken = false;
 
             if docstring.pos.len() != sig_ty.positional_params().len() {
-                panic!("positional params mismatch: {docstring:#?} != {sig_ty:#?}");
+                static WARN_ONCE: std::sync::Once = std::sync::Once::new();
+                WARN_ONCE.call_once(|| {
+                    // todo: seems like a bug
+                    log::warn!("positional params mismatch: {docstring:#?} != {sig_ty:#?}");
+                });
+                return None;
             }
 
             for (doc, ty) in docstring.pos.iter().zip(sig_ty.positional_params()) {
