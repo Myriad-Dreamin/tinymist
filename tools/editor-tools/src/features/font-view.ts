@@ -237,6 +237,7 @@ export const FontView = () => {
     );
   };
 
+  // todo: very buggy so we disabling it
   const SelectingSlot = () => {
     return div(
       { style: "margin: 1.2em; margin-left: 0.5em" },
