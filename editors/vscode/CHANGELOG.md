@@ -17,8 +17,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ### Editor
 
 * Providing `tinymist.restartServer` command by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/894
-* Providing elementary font view in https://github.com/Myriad-Dreamin/tinymist/pull/932
 * Implemented Search function in template gallery by @Eric-Song-Nop and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/922
+* Providing elementary font view in https://github.com/Myriad-Dreamin/tinymist/pull/932
+* Providing tool view in https://github.com/Myriad-Dreamin/tinymist/pull/936
+  * A tool view can be found by users at the side bar. This helps discover and use available tools. It can be optionally disabled by users by right click.
 
 ### Code Analysis
 
