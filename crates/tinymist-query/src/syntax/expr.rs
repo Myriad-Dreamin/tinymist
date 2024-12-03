@@ -591,10 +591,10 @@ impl ExprWorker<'_> {
 
     fn check_module_import(&mut self, typed: ast::ModuleImport) -> Expr {
         let source = typed.source();
-        crate::log_debug_ct!("checking import: {source:?}");
         let mod_expr = self.check_import(typed.source(), true);
+        crate::log_debug_ct!("checking import: {source:?} => {mod_expr:?}");
 
-        let decl = typed.new_name().map(Decl::module_alias).or_else(|| {
+        let mod_var = typed.new_name().map(Decl::module_alias).or_else(|| {
             typed.imports().is_none().then(|| {
                 let name = match mod_expr.as_ref()? {
                     Expr::Decl(d) if matches!(d.as_ref(), Decl::Module { .. }) => d.name().clone(),
@@ -605,19 +605,19 @@ impl ExprWorker<'_> {
             })?
         });
 
-        let is_named = decl.is_some();
-        let decl = Interned::new(decl.unwrap_or_else(|| Decl::module_import(typed.span())));
+        let creating_mod_var = mod_var.is_some();
+        let mod_var = Interned::new(mod_var.unwrap_or_else(|| Decl::module_import(typed.span())));
         let mod_ref = RefExpr {
-            decl: decl.clone(),
+            decl: mod_var.clone(),
             step: mod_expr.clone(),
             root: mod_expr.clone(),
             val: None,
         };
         crate::log_debug_ct!("create import variable: {mod_ref:?}");
         let mod_ref = Interned::new(mod_ref);
-        if is_named {
+        if creating_mod_var {
             self.scope_mut()
-                .insert_mut(decl.name().clone(), Expr::Ref(mod_ref.clone()));
+                .insert_mut(mod_var.name().clone(), Expr::Ref(mod_ref.clone()));
         }
 
         self.resolve_as(mod_ref.clone());
@@ -666,7 +666,7 @@ impl ExprWorker<'_> {
         let scope = if let Some(scope) = scope {
             scope
         } else {
-            crate::log_debug_ct!(
+            log::warn!(
                 "cannot analyze import on: {typed:?}, expr {mod_expr:?}, in file {:?}",
                 typed.span().id()
             );
@@ -680,7 +680,7 @@ impl ExprWorker<'_> {
                     self.lexical.scopes.push(scope);
                 }
                 ast::Imports::Items(items) => {
-                    let module = Expr::Decl(decl.clone());
+                    let module = Expr::Decl(mod_var.clone());
                     self.import_decls(&scope, module, items);
                 }
             }
@@ -702,7 +702,17 @@ impl ExprWorker<'_> {
         })?;
 
         crate::log_debug_ct!("checking import source: {src_expr:?}");
-        let src_str = match &src_expr {
+        self.check_import_by_str(source, &src_expr, is_import)
+            .or_else(|| self.check_import_by_def(&src_expr))
+    }
+
+    fn check_import_by_str(
+        &mut self,
+        source: ast::Expr,
+        src_expr: &Expr,
+        is_import: bool,
+    ) -> Option<Expr> {
+        let src_str = match src_expr {
             Expr::Type(Ty::Value(val)) => {
                 if val.val.scope().is_some() {
                     return Some(src_expr.clone());
@@ -738,6 +748,14 @@ impl ExprWorker<'_> {
         };
         self.resolve_as(ref_expr.into());
         Some(module)
+    }
+
+    fn check_import_by_def(&mut self, src_expr: &Expr) -> Option<Expr> {
+        match src_expr {
+            Expr::Decl(..) => Some(src_expr.clone()),
+            Expr::Ref(r) => r.root.clone(),
+            _ => None,
+        }
     }
 
     fn import_decls(&mut self, scope: &ExprScope, module: Expr, items: ast::ImportItems) {
@@ -1034,7 +1052,10 @@ impl ExprWorker<'_> {
     }
 
     fn resolve_as(&mut self, r: Interned<RefExpr>) {
-        let s = r.decl.span();
+        self.resolve_as_(r.decl.span(), r);
+    }
+
+    fn resolve_as_(&mut self, s: Span, r: Interned<RefExpr>) {
         self.buffer.push((s, r.clone()));
     }
 
@@ -1137,7 +1158,7 @@ impl ExprWorker<'_> {
         (None, val)
     }
 
-    fn fold_expr_and_val(&self, src: ConcolicExpr) -> Option<Expr> {
+    fn fold_expr_and_val(&mut self, src: ConcolicExpr) -> Option<Expr> {
         crate::log_debug_ct!("folding cc: {src:?}");
         match src {
             (None, Some(val)) => Some(Expr::Type(val)),
@@ -1145,7 +1166,7 @@ impl ExprWorker<'_> {
         }
     }
 
-    fn fold_expr(&self, src: Option<Expr>) -> Option<Expr> {
+    fn fold_expr(&mut self, src: Option<Expr>) -> Option<Expr> {
         crate::log_debug_ct!("folding cc: {src:?}");
         match src {
             Some(Expr::Decl(decl)) if !decl.is_def() => {
@@ -1157,10 +1178,37 @@ impl ExprWorker<'_> {
                 crate::log_debug_ct!("folding ref: {r:?}");
                 self.fold_expr_and_val((r.root.clone(), r.val.clone()))
             }
+            Some(Expr::Select(r)) => {
+                let lhs = self.fold_expr(Some(r.lhs.clone()));
+                crate::log_debug_ct!("folding select: {r:?} ([{lhs:?}].[{:?}])", r.key);
+                self.syntax_level_select(lhs?, &r.key, r.span)
+            }
             Some(expr) => {
                 crate::log_debug_ct!("folding expr: {expr:?}");
                 Some(expr)
             }
+            _ => None,
+        }
+    }
+
+    fn syntax_level_select(&mut self, lhs: Expr, key: &Interned<Decl>, span: Span) -> Option<Expr> {
+        match &lhs {
+            Expr::Decl(d) => match d.as_ref() {
+                Decl::Module(m) => {
+                    let f = self.exports_of(m.fid);
+                    let selected = f.get(key.name())?;
+                    let select_ref = Interned::new(RefExpr {
+                        decl: key.clone(),
+                        root: Some(lhs.clone()),
+                        step: Some(selected.clone()),
+                        val: None,
+                    });
+                    self.resolve_as(select_ref.clone());
+                    self.resolve_as_(span, select_ref);
+                    Some(selected.clone())
+                }
+                _ => None,
+            },
             _ => None,
         }
     }
