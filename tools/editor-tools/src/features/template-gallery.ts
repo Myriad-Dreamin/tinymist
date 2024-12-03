@@ -3,6 +3,8 @@ import van, { ChildDom, State } from "vanjs-core";
 import { requestSavePackageData, requestInitTemplate } from "../vscode";
 import { AddIcon, HeartIcon } from "../icons";
 import { base64Decode } from "../utils";
+import MiniSearch from "minisearch";
+import type { SearchResult } from "minisearch";
 const { div, input, button, a, span } = van.tags;
 
 // const isDarkMode = () =>
@@ -15,6 +17,7 @@ const Card = (cls: string, ...content: any) => {
 };
 
 interface PackageMeta {
+  id: string;
   name: string;
   version: string;
   authors: string[];
@@ -72,6 +75,20 @@ const TemplateList = (
     );
   };
 
+  const highlightMatches = (text: string, searchResults?: SearchResult[]): HTMLSpanElement => {
+    if (!searchResults || !text) return van.tags.span({}, text);
+    const searchTerms = searchResults.flatMap(result => result.queryTerms);
+    const regex = new RegExp(`(${searchTerms.join("|")})`, 'gi');
+
+    const parts = text.split(regex);
+
+    return van.tags.span({}, ...parts.map(part =>
+      regex.test(part)
+        ? van.tags.span({ class: 'tinymist-highlight' }, part)
+        : part
+    ));
+  }
+
   const TemplateListItem = (item: PackageMeta) => {
     const TemplateAction = (
       icon: ChildDom,
@@ -90,7 +107,11 @@ const TemplateList = (
     return Card(
       "template-card",
       div(
-        a({ href: item.repository, style: "font-size: 1.2em" }, item.name),
+        a({ href: item.repository, style: "font-size: 1.2em" },
+          () => {
+            return highlightMatches(item.name, catState.searchSelected.val);
+          }
+        ),
         span(" "),
         span({ style: "font-size: 0.8em" }, "v" + item.version),
         span(" by "),
@@ -138,9 +159,20 @@ const TemplateList = (
           .map(CategoryButton(catState))
       ),
       div({ style: "clear: both" }),
-      div({ style: "margin-top: 0.4em" }, item.description)
+      div({ style: "margin-top: 0.4em" },
+        div({}, () => {
+          return highlightMatches(item.description, catState.searchSelected.val);
+        })
+      )
     );
   };
+
+  function runFilterSearch(searchResult: SearchResult[] | undefined) {
+    // console.log("search", searchResult);
+    const searchResultMap = new Set(searchResult?.map((result) => result.id));
+    return (value: PackageMeta) =>
+      searchResult === undefined || searchResultMap.has(value.id);
+  }
 
   function runFilterCategory(categoryFilter: Set<string>) {
     return (value: PackageMeta) => {
@@ -164,16 +196,34 @@ const TemplateList = (
         .filter((item) => item.template)
         .filter(runFilterCategory(catState.categories.val))
         .filter(runFilterFavorite)
+        .filter(runFilterSearch(catState.searchSelected.val))
         .map(TemplateListItem) || []
     )
   );
 };
 
-const SearchBar = () => {
+const SearchBar = (packages: State<PackageMeta[]>, catState: FilterState) => {
+  const search = van.derive(() => {
+    const search = new MiniSearch({
+      fields: ["name", "description", "authors", "keywords", "categories"],
+    });
+    search.addAll(Object.values(packages.val.filter((item) => item.template)));
+    return search;
+  });
+
   return input({
     class: "tinymist-search",
-    placeholder: "Search templates... (todo: implement search)",
-    disabled: true,
+    type: "text",
+    placeholder: "Search templates...",
+    oninput: (e) => {
+      const input = e.target as HTMLInputElement;
+      if (input.value === "") {
+        catState.searchSelected.val = undefined;
+        return;
+      }
+      const results = search.val.search(input.value, { prefix: true });
+      catState.searchSelected.val = results;
+    },
   });
 };
 
@@ -182,16 +232,15 @@ class FilterState {
   categories = van.state(new Set(["all"]));
   filterFavorite: State<boolean>;
   packageUserData: State<any>;
+  searchSelected = van.state<SearchResult[] | undefined>(undefined);
 
   constructor(packageUserData: any) {
     this.filterFavorite = van.state(Object.keys(packageUserData).length > 0);
     this.packageUserData = van.state(packageUserData);
-    console.log("this.packageUserData", this.packageUserData);
   }
 
-  set(category: string) {
+  setCategory(category: string) {
     this.activating.val = category;
-    //   console.log("activating", category);
     this.categories.val = new Set([category]);
   }
 
@@ -236,7 +285,7 @@ const CategoryButton = (catState: FilterState) => (category: Category) => {
         return "tinymist-button" + activatingCls;
       }),
       title: "Filter by category: " + category.value,
-      onclick: () => catState.set(category.value),
+      onclick: () => catState.setCategory(category.value),
     },
     div(
       {
@@ -298,6 +347,7 @@ export const TemplateGallery = () => {
       const lastVersion = versions[versions.length - 1];
       return {
         ...lastVersion,
+        id: `@preview/${lastVersion.name}`,
         versions,
       };
     });
@@ -306,7 +356,7 @@ export const TemplateGallery = () => {
   });
 
   return div(
-    SearchBar(),
+    SearchBar(packages, catState),
     FilterRow(catState),
     TemplateList(packages, catState)
   );
