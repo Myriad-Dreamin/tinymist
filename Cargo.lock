@@ -3754,7 +3754,7 @@ dependencies = [
 
 [[package]]
 name = "sync-lsp"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 dependencies = [
  "anyhow",
  "clap",
@@ -3876,7 +3876,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 dependencies = [
  "insta",
  "lsp-server",
@@ -3940,9 +3940,9 @@ checksum = "3bf63baf9f5039dadc247375c29eb13706706cfde997d0330d05aa63a77d8820"
 
 [[package]]
 name = "time"
-version = "0.3.36"
+version = "0.3.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dfd88e563464686c916c7e46e623e520ddc6d79fa6641390f2e3fa86e83e885"
+checksum = "35e7868883861bd0e56d9ac6efcaaca0d6d5d82a2a7ec8209ff492c07cf37b21"
 dependencies = [
  "deranged",
  "itoa",
@@ -3963,9 +3963,9 @@ checksum = "ef927ca75afb808a4d64dd374f00a2adf8d0fcff8e7b184af886c3c87ec4a3f3"
 
 [[package]]
 name = "time-macros"
-version = "0.2.18"
+version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f252a68540fde3a3877aeea552b832b40ab9a69e318efd078774a01ddee1ccf"
+checksum = "2834e6017e3e5e4b9834939793b282bc03b37a3336245fa820e35e233e2a85de"
 dependencies = [
  "num-conv",
  "time-core",
@@ -3999,7 +3999,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4040,7 +4040,7 @@ dependencies = [
  "serde_yaml",
  "strum",
  "sync-lsp",
- "tinymist-assets 0.12.6-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.12.6-rc3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-query",
  "tinymist-render",
  "tinymist-world",
@@ -4067,7 +4067,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 dependencies = [
  "base64",
  "comemo 0.4.0",
@@ -4084,17 +4084,17 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9656983957f0bfdb77a849e03be3bfa7d5846304cb39a496b01bab497967276"
+checksum = "8ef772841426c03de777968c29960adf470f95771ab89d9ac4f75143669f45b5"
 
 [[package]]
 name = "tinymist-derive"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 dependencies = [
  "quote",
  "syn 2.0.90",
@@ -4102,7 +4102,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 dependencies = [
  "anyhow",
  "base64",
@@ -4156,7 +4156,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 dependencies = [
  "base64",
  "log",
@@ -4167,7 +4167,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4183,7 +4183,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
- "tinymist-assets 0.12.6-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.12.6-rc3 (registry+https://github.com/rust-lang/crates.io-index)",
  "typst",
  "typst-assets",
 ]
@@ -4467,7 +4467,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "typlite"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 dependencies = [
  "base64",
  "comemo 0.4.0",
@@ -4620,7 +4620,7 @@ dependencies = [
 
 [[package]]
 name = "typst-preview"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 dependencies = [
  "clap",
  "comemo 0.4.0",
@@ -4633,7 +4633,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.12.6-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.12.6-rc3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio",
  "typst",
  "typst-assets",
@@ -4660,7 +4660,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.12.6-rc2"
+version = "0.12.6-rc3"
 dependencies = [
  "cfg-if",
  "typst",
