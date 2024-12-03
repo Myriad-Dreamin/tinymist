@@ -80,7 +80,7 @@ You can pass any arguments as you like, and we will try to follow behaviors of t
 
 ## `tinymist.serverPath`
 
-The extension can use a local tinymist executable instead of the one bundled with the extension. This setting controls the path to the executable.
+The extension can use a local tinymist executable instead of the one bundled with the extension. This setting controls the path to the executable. The string "tinymist" means look up Tinymist in PATH.
 
 - **Type**: `string` or `null`
 
