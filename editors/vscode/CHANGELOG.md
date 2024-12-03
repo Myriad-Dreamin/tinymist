@@ -4,7 +4,7 @@ All notable changes to the "tinymist" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## v0.12.6 - [2024-12-02]
+## v0.12.6 - [2024-12-03]
 
 * Bumped typstyle to v0.12.6 by @Enter-tainer in https://github.com/Myriad-Dreamin/tinymist/pull/893, https://github.com/Myriad-Dreamin/tinymist/pull/904 and https://github.com/Myriad-Dreamin/tinymist/pull/928
   * Comment formatting and code block formatting is improved. For details, see https://enter-tainer.github.io/typstyle/changelog/#v0125---2024-11-29
@@ -13,12 +13,23 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ### Compiler
 
 * Added package related arguments to typstExtraArgs in https://github.com/Myriad-Dreamin/tinymist/pull/923
-* Improved definition finder of builtin values and field accesses in https://github.com/Myriad-Dreamin/tinymist/pull/919 and https://github.com/Myriad-Dreamin/tinymist/pull/920
-  * Previously, tinymist cannot resolve definitions of items such as `math.equation` and `list.item`, so some functions did not work on them, like signature help or hover. Here, `math` is a builtin value. `list` is a element as well as a scope owning a `item` field (element).
 
 ### Editor
 
 * Providing `tinymist.restartServer` command by @Eric-Song-Nop in https://github.com/Myriad-Dreamin/tinymist/pull/894
+* Providing elementary font view in https://github.com/Myriad-Dreamin/tinymist/pull/932
+* Implemented Search function in template gallery by @Eric-Song-Nop and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/922
+
+### Code Analysis
+
+* Improved definition finder of builtin values and field accesses in https://github.com/Myriad-Dreamin/tinymist/pull/919 and https://github.com/Myriad-Dreamin/tinymist/pull/920
+  * Previously, tinymist cannot resolve definitions of items such as `math.equation` and `list.item`, so some functions did not work on them, like signature help or hover. Here, `math` is a builtin value. `list` is a element as well as a scope owning a `item` field (element).
+* Resolving constant references in import at syntax level in https://github.com/Myriad-Dreamin/tinymist/pull/933
+  * To solve wildcard imports like: `import cetz.draw: *`.
+* Dynamically analyzing import source for wildcard imports in https://github.com/Myriad-Dreamin/tinymist/pull/935
+  * To solve more static imports like: `let draw = cetz.draw; import draw: *`.
+  * To solve more static imports like: `import ("draw" + ".typ"): *`.
+* (Fix) Replaced two touched panics with `log::warn` in signature checker in https://github.com/Myriad-Dreamin/tinymist/pull/934
 
 ### Preview
 
