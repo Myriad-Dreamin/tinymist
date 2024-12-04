@@ -33,8 +33,8 @@ use reflexo_typst::{
 use sync_lsp::{just_future, QueryFuture};
 use tinymist_query::{
     analysis::{Analysis, AnalysisRevLock, LocalContextGuard},
-    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, OnExportRequest, SemanticRequest,
-    ServerInfoResponse, StatefulRequest, VersionedDocument,
+    CompilerQueryRequest, CompilerQueryResponse, DiagnosticsMap, EntryResolver, OnExportRequest,
+    SemanticRequest, ServerInfoResponse, StatefulRequest, VersionedDocument,
 };
 use tokio::sync::{mpsc, oneshot};
 use typst::{diag::SourceDiagnostic, World};
@@ -49,7 +49,7 @@ use crate::{
     stats::{CompilerQueryStats, QueryStatGuard},
     task::{ExportTask, ExportUserConfig},
     world::{LspCompilerFeat, LspWorld},
-    CompileConfig, EntryResolver,
+    CompileConfig,
 };
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;

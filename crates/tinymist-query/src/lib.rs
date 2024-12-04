@@ -18,6 +18,8 @@ mod upstream;
 pub use analysis::{LocalContext, LocalContextGuard, LspWorldExt};
 pub use upstream::{with_vm, CompletionFeat, PostfixSnippet};
 
+mod entry;
+pub use entry::*;
 mod diagnostics;
 pub use diagnostics::*;
 mod code_action;

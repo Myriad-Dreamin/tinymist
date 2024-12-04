@@ -24,10 +24,8 @@ use sync_lsp::{
     transport::{with_stdio_transport, MirrorArgs},
     LspBuilder, LspClientRoot, LspResult,
 };
-use tinymist::{
-    CompileConfig, Config, EntryResolver, LanguageState, RegularInit, SuperInit, UserActionTask,
-};
-use tinymist_query::package::PackageInfo;
+use tinymist::{CompileConfig, Config, LanguageState, RegularInit, SuperInit, UserActionTask};
+use tinymist_query::{package::PackageInfo, EntryResolver};
 use typst::foundations::IntoValue;
 use typst_shim::utils::LazyHash;
 
