@@ -456,7 +456,7 @@ impl LanguageState {
         let self_path = std::env::current_exe()
             .map_err(|e| internal_error(format!("Cannot get typst compiler {e}")))?;
 
-        let entry = self.entry_resolver().entry(Some(path));
+        let entry = self.entry_resolver().resolve(Some(path));
 
         let snap = self.primary().snapshot().map_err(z_internal_error)?;
         let user_action = self.user_action;

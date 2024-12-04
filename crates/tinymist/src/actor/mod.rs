@@ -28,7 +28,7 @@ use typ_server::{CompileServerActor, CompileServerOpts};
 impl LanguageState {
     /// Restart the primary server.
     pub fn restart_primary(&mut self) {
-        let entry = self.entry_resolver().default_entry();
+        let entry = self.entry_resolver().resolve_default();
         self.restart_server("primary", entry);
     }
 
@@ -41,7 +41,7 @@ impl LanguageState {
     fn restart_server(&mut self, group: &str, entry: Option<ImmutPath>) {
         let server = self.server(
             group.to_owned(),
-            self.entry_resolver().entry(entry),
+            self.entry_resolver().resolve(entry),
             self.compile_config().determine_inputs(),
             self.vfs_snapshot(),
         );

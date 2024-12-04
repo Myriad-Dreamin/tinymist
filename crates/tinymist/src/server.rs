@@ -854,7 +854,7 @@ impl LanguageState {
     pub fn pin_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
         self.pinning = new_entry.is_some();
         let entry = new_entry
-            .or_else(|| self.entry_resolver().default_entry())
+            .or_else(|| self.entry_resolver().resolve_default())
             .or_else(|| self.focusing.clone());
         self.do_change_entry(entry).map(|_| ())
     }
@@ -1052,7 +1052,7 @@ impl LanguageState {
         let fut_stat = client.query_snapshot_with_stat(&query)?;
         let entry = query
             .associated_path()
-            .map(|path| client.entry_resolver().entry(Some(path.into())))
+            .map(|path| client.entry_resolver().resolve(Some(path.into())))
             .or_else(|| {
                 let root = client.entry_resolver().root(None)?;
                 Some(EntryState::new_rooted(root, Some(*DETACHED_ENTRY)))

@@ -210,7 +210,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> anyhow::Result<()> {
 
         let state = service.state_mut().unwrap();
 
-        let entry = state.entry_resolver().entry(Some(input.as_path().into()));
+        let entry = state.entry_resolver().resolve(Some(input.as_path().into()));
 
         let snap = state.primary().snapshot().unwrap();
 

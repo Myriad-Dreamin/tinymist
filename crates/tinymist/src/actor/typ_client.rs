@@ -326,7 +326,7 @@ impl CompileClientActor {
         let OnExportRequest { path, kind, open } = req;
         let snap = self.snapshot()?;
 
-        let entry = self.entry_resolver().entry(Some(path.as_path().into()));
+        let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
         let export = self.handle.export.oneshot(snap, Some(entry), kind);
         just_future(async move {
             let res = export.await?;
@@ -374,7 +374,7 @@ impl CompileClientActor {
             return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
         }
 
-        let next_entry = self.entry_resolver().entry(path);
+        let next_entry = self.entry_resolver().resolve(path);
         if next_entry == self.entry {
             return Ok(false);
         }

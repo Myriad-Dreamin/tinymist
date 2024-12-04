@@ -481,7 +481,7 @@ pub struct EntryResolver {
 }
 
 impl EntryResolver {
-    /// Determines the root directory for the entry file.
+    /// Resolves the root directory for the entry file.
     pub fn root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
         if let Some(path) = &self.root_path {
             return Some(path.clone());
@@ -514,8 +514,8 @@ impl EntryResolver {
         None
     }
 
-    /// Determines the entry state.
-    pub fn entry(&self, entry: Option<ImmutPath>) -> EntryState {
+    /// Resolves the entry state.
+    pub fn resolve(&self, entry: Option<ImmutPath>) -> EntryState {
         // todo: formalize untitled path
         // let is_untitled = entry.as_ref().is_some_and(|p| p.starts_with("/untitled"));
         // let root_dir = self.determine_root(if is_untitled { None } else {
@@ -549,7 +549,7 @@ impl EntryResolver {
     }
 
     /// Determines the default entry path.
-    pub fn default_entry(&self) -> Option<ImmutPath> {
+    pub fn resolve_default(&self) -> Option<ImmutPath> {
         let extras = self.typst_extra_args.as_ref()?;
         // todo: pre-compute this when updating config
         if let Some(entry) = &extras.entry {
@@ -701,7 +701,7 @@ impl CompileConfig {
         self.entry_resolver.root_path =
             try_(|| Some(Path::new(update.get("rootPath")?.as_str()?).into()));
         self.entry_resolver.typst_extra_args = self.typst_extra_args.clone();
-        self.has_default_entry_path = self.entry_resolver.default_entry().is_some();
+        self.has_default_entry_path = self.entry_resolver.resolve_default().is_some();
         self.lsp_inputs = {
             let mut dict = TypstDict::default();
 
@@ -837,7 +837,7 @@ impl CompileConfig {
             &self.font_paths,
             self.typst_extra_args.as_ref().map(|e| &e.font),
             self.entry_resolver
-                .root(self.entry_resolver.default_entry().as_ref()),
+                .root(self.entry_resolver.resolve_default().as_ref()),
         )
     }
 
