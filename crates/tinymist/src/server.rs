@@ -22,11 +22,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use sync_lsp::*;
 use task::{CacheTask, ExportUserConfig, FormatTask, FormatUserConfig, UserActionTask};
-use tinymist_query::PageSelection;
 use tinymist_query::{
     lsp_to_typst, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature,
     PositionEncoding, SyntaxRequest,
 };
+use tinymist_query::{EntryResolver, PageSelection};
 use tokio::sync::mpsc;
 use typst::{diag::FileResult, syntax::Source};
 
