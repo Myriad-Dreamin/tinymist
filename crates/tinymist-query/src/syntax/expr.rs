@@ -20,51 +20,21 @@ use crate::{
     ty::{BuiltinTy, InsTy, Interned, Ty},
 };
 
-use super::{compute_docstring, def::*, DocCommentMatcher, DocString, InterpretMode};
+use super::{
+    compute_docstring, def::*, Db, DocCommentMatcher, DocString, InterpretMode, SalsaSource,
+};
 
 pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>;
 
-pub(crate) fn expr_of(
-    ctx: Arc<SharedContext>,
-    source: Source,
-    route: &mut ExprRoute,
-    guard: QueryStatGuard,
-    prev: Option<Arc<ExprInfo>>,
-) -> Arc<ExprInfo> {
-    crate::log_debug_ct!("expr_of: {:?}", source.id());
-
-    route.insert(source.id(), None);
-
-    let cache_hit = prev.and_then(|prev| {
-        if prev.source.len_bytes() != source.len_bytes()
-            || hash128(&prev.source) != hash128(&source)
-        {
-            return None;
-        }
-        for (i, prev_exports) in &prev.imports {
-            let ei = ctx.exports_of(&ctx.source_by_id(*i).ok()?, route);
-
-            // If there is a cycle, the expression will be stable as the source is
-            // unchanged.
-            if let Some(exports) = ei {
-                if prev_exports.size() != exports.size()
-                    || hash128(&prev_exports) != hash128(&exports)
-                {
-                    return None;
-                }
-            }
-        }
-
-        Some(prev)
-    });
-
-    if let Some(prev) = cache_hit {
-        route.remove(&source.id());
-        return prev;
-    }
-    guard.miss();
-
-    let revision = ctx.revision();
+// ctx: Arc<SharedContext>,
+// source: Source,
+// route: &mut ExprRoute,
+// guard: QueryStatGuard,
+// prev: Option<Arc<ExprInfo>>,
+#[salsa::tracked(recovery_fn=recover_a)]
+fn expr_stage(ctx: &dyn Db, src: SalsaSource) -> FileResult<()> {
+    // let revision = ctx.revision();
+    let source = src.contents(ctx);
 
     let resolves_base = Arc::new(Mutex::new(vec![]));
     let resolves = resolves_base.clone();
@@ -81,7 +51,7 @@ pub(crate) fn expr_of(
 
     let module_docstring = Arc::new(
         find_module_level_docs(&source)
-            .and_then(|docs| compute_docstring(&ctx, source.id(), docs, DefKind::Module))
+            .and_then(|docs| compute_docstring(todo!(), source.id(), docs, DefKind::Module))
             .unwrap_or_default(),
     );
 
@@ -98,13 +68,13 @@ pub(crate) fn expr_of(
             buffer: vec![],
             init_stage: true,
             comment_matcher: DocCommentMatcher::default(),
-            route,
+            // route,
         };
 
         let root = source.root().cast::<ast::Markup>().unwrap();
         w.check_root_scope(root.to_untyped().children());
         let root_scope = Arc::new(LazyHash::new(w.summarize_scope()));
-        w.route.insert(w.fid, Some(root_scope.clone()));
+        // w.route.insert(w.fid, Some(root_scope.clone()));
 
         w.lexical = LexicalContext::default();
         w.buffer.clear();
@@ -118,7 +88,7 @@ pub(crate) fn expr_of(
 
     let info = ExprInfo {
         fid: source.id(),
-        revision,
+        revision: 0,
         source: source.clone(),
         resolves: HashMap::from_iter(std::mem::take(resolves_base.lock().deref_mut())),
         module_docstring,
@@ -130,8 +100,128 @@ pub(crate) fn expr_of(
     };
     crate::log_debug_ct!("expr_of end {:?}", source.id());
 
-    route.remove(&info.fid);
+    // route.remove(&info.fid);
     Arc::new(info)
+}
+
+fn recover_a(_db: &dyn Db, _cycle: &salsa::Cycle, _src: SalsaSource) -> FileResult<()> {
+    // cycle.participant_keys()
+    // Ok(())
+    panic!("cycle detected")
+}
+
+pub(crate) fn expr_of(
+    ctx: Arc<SharedContext>,
+    source: Source,
+    route: &mut ExprRoute,
+    guard: QueryStatGuard,
+    prev: Option<Arc<ExprInfo>>,
+) -> Arc<ExprInfo> {
+    // crate::log_debug_ct!("expr_of: {:?}", source.id());
+
+    // route.insert(source.id(), None);
+
+    // let cache_hit = prev.and_then(|prev| {
+    //     if prev.source.len_bytes() != source.len_bytes()
+    //         || hash128(&prev.source) != hash128(&source)
+    //     {
+    //         return None;
+    //     }
+    //     for (i, prev_exports) in &prev.imports {
+    //         let ei = ctx.exports_of(&ctx.source_by_id(*i).ok()?, route);
+
+    //         // If there is a cycle, the expression will be stable as the source
+    // is         // unchanged.
+    //         if let Some(exports) = ei {
+    //             if prev_exports.size() != exports.size()
+    //                 || hash128(&prev_exports) != hash128(&exports)
+    //             {
+    //                 return None;
+    //             }
+    //         }
+    //     }
+
+    //     Some(prev)
+    // });
+
+    // if let Some(prev) = cache_hit {
+    //     route.remove(&source.id());
+    //     return prev;
+    // }
+    // guard.miss();
+
+    // let revision = ctx.revision();
+
+    // let resolves_base = Arc::new(Mutex::new(vec![]));
+    // let resolves = resolves_base.clone();
+
+    // // todo: cache docs capture
+    // let docstrings_base = Arc::new(Mutex::new(FxHashMap::default()));
+    // let docstrings = docstrings_base.clone();
+
+    // let exprs_base = Arc::new(Mutex::new(FxHashMap::default()));
+    // let exprs = exprs_base.clone();
+
+    // let imports_base = Arc::new(Mutex::new(FxHashMap::default()));
+    // let imports = imports_base.clone();
+
+    // let module_docstring = Arc::new(
+    //     find_module_level_docs(&source)
+    //         .and_then(|docs| compute_docstring(&ctx, source.id(), docs,
+    // DefKind::Module))         .unwrap_or_default(),
+    // );
+
+    // let (exports, root) = {
+    //     let mut w = ExprWorker {
+    //         fid: source.id(),
+    //         ctx,
+    //         imports,
+    //         docstrings,
+    //         exprs,
+    //         import_buffer: Vec::new(),
+    //         lexical: LexicalContext::default(),
+    //         resolves,
+    //         buffer: vec![],
+    //         init_stage: true,
+    //         comment_matcher: DocCommentMatcher::default(),
+    //         route,
+    //     };
+
+    //     let root = source.root().cast::<ast::Markup>().unwrap();
+    //     w.check_root_scope(root.to_untyped().children());
+    //     let root_scope = Arc::new(LazyHash::new(w.summarize_scope()));
+    //     w.route.insert(w.fid, Some(root_scope.clone()));
+
+    //     w.lexical = LexicalContext::default();
+    //     w.buffer.clear();
+    //     w.import_buffer.clear();
+    //     let root = w.check_in_mode(root.to_untyped().children(),
+    // InterpretMode::Markup);     let root_scope =
+    // Arc::new(LazyHash::new(w.summarize_scope()));
+
+    //     w.collect_buffer();
+    //     (root_scope, root)
+    // };
+
+    // let info = ExprInfo {
+    //     fid: source.id(),
+    //     revision,
+    //     source: source.clone(),
+    //     resolves:
+    // HashMap::from_iter(std::mem::take(resolves_base.lock().deref_mut())),
+    //     module_docstring,
+    //     docstrings: std::mem::take(docstrings_base.lock().deref_mut()),
+    //     imports:
+    // HashMap::from_iter(std::mem::take(imports_base.lock().deref_mut())),
+    //     exports,
+    //     exprs: std::mem::take(exprs_base.lock().deref_mut()),
+    //     root,
+    // };
+    // crate::log_debug_ct!("expr_of end {:?}", source.id());
+
+    // route.remove(&info.fid);
+    // Arc::new(info)
+    todo!()
 }
 
 #[derive(Debug)]
@@ -243,7 +333,7 @@ impl Default for LexicalContext {
 
 pub(crate) struct ExprWorker<'a> {
     fid: TypstFileId,
-    ctx: Arc<SharedContext>,
+    ctx: &'a dyn Db,
     imports: Arc<Mutex<FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>>>,
     import_buffer: Vec<(TypstFileId, Arc<LazyHash<LexicalScope>>)>,
     docstrings: Arc<Mutex<FxHashMap<DeclExpr, Arc<DocString>>>>,
@@ -253,7 +343,7 @@ pub(crate) struct ExprWorker<'a> {
     lexical: LexicalContext,
     init_stage: bool,
 
-    route: &'a mut ExprRoute,
+    // route: &'a mut ExprRoute,
     comment_matcher: DocCommentMatcher,
 }
 
@@ -642,7 +732,7 @@ impl ExprWorker<'_> {
         // Prefetch Type Check Information
         if let Some(f) = fid {
             crate::log_debug_ct!("prefetch type check: {f:?}");
-            self.ctx.prefetch_type_check(f);
+            // self.ctx.prefetch_type_check(f);
         }
 
         let scope = if let Some(fid) = &fid {

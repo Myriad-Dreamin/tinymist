@@ -24,3 +24,5 @@ pub(crate) mod repr;
 use repr::*;
 pub(crate) mod index;
 pub use index::*;
+pub(crate) mod db;
+pub use db::*;

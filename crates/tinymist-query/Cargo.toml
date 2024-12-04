@@ -42,6 +42,8 @@ siphasher.workspace = true
 chrono.workspace = true
 rpds.workspace = true
 rayon.workspace = true
+salsa.workspace = true
+salsa-macros.workspace = true
 
 typst.workspace = true
 
