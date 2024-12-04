@@ -476,18 +476,14 @@ pub struct EntryResolver {
     pub root_path: Option<ImmutPath>,
     /// The workspace roots from initialization.
     pub roots: Vec<ImmutPath>,
-    /// Typst extra arguments.
-    pub typst_extra_args: Option<CompileExtraOpts>,
+    /// Default entry path from the configuration.
+    pub entry: Option<ImmutPath>,
 }
 
 impl EntryResolver {
     /// Resolves the root directory for the entry file.
     pub fn root(&self, entry: Option<&ImmutPath>) -> Option<ImmutPath> {
-        if let Some(path) = &self.root_path {
-            return Some(path.clone());
-        }
-
-        if let Some(root) = try_(|| self.typst_extra_args.as_ref()?.root_dir.as_ref()) {
+        if let Some(root) = &self.root_path {
             return Some(root.clone());
         }
 
@@ -550,30 +546,22 @@ impl EntryResolver {
 
     /// Determines the default entry path.
     pub fn resolve_default(&self) -> Option<ImmutPath> {
-        let extras = self.typst_extra_args.as_ref()?;
+        let entry = self.entry.as_ref();
         // todo: pre-compute this when updating config
-        if let Some(entry) = &extras.entry {
+        if let Some(entry) = entry {
             if entry.is_relative() {
                 let root = self.root(None)?;
                 return Some(root.join(entry).as_path().into());
             }
         }
-        extras.entry.clone()
+        entry.cloned()
     }
 
     /// Validates the configuration.
     pub fn validate(&self) -> anyhow::Result<()> {
         if let Some(root) = &self.root_path {
             if !root.is_absolute() {
-                bail!("rootPath must be an absolute path: {root:?}");
-            }
-        }
-
-        if let Some(extra_args) = &self.typst_extra_args {
-            if let Some(root) = &extra_args.root_dir {
-                if !root.is_absolute() {
-                    bail!("typstExtraArgs.root must be an absolute path: {root:?}");
-                }
+                bail!("rootPath or typstExtraArgs.root must be an absolute path: {root:?}");
             }
         }
 
@@ -699,8 +687,12 @@ impl CompileConfig {
         self.system_fonts = try_(|| update.get("systemFonts")?.as_bool());
 
         self.entry_resolver.root_path =
-            try_(|| Some(Path::new(update.get("rootPath")?.as_str()?).into()));
-        self.entry_resolver.typst_extra_args = self.typst_extra_args.clone();
+            try_(|| Some(Path::new(update.get("rootPath")?.as_str()?).into())).or_else(|| {
+                self.typst_extra_args
+                    .as_ref()
+                    .and_then(|e| e.root_dir.clone())
+            });
+        self.entry_resolver.entry = self.typst_extra_args.as_ref().and_then(|e| e.entry.clone());
         self.has_default_entry_path = self.entry_resolver.resolve_default().is_some();
         self.lsp_inputs = {
             let mut dict = TypstDict::default();
@@ -991,6 +983,110 @@ impl PathPattern {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    #[cfg(any(windows, unix, target_os = "macos"))]
+    fn test_entry_resolution() {
+        let root_path = Path::new(if cfg!(windows) { "C:\\root" } else { "/root" });
+
+        let entry = EntryResolver {
+            root_path: Some(ImmutPath::from(root_path)),
+            ..Default::default()
+        };
+
+        let entry = entry.resolve(if cfg!(windows) {
+            Some(Path::new("C:\\root\\main.typ").into())
+        } else {
+            Some(Path::new("/root/main.typ").into())
+        });
+
+        assert_eq!(entry.root(), Some(ImmutPath::from(root_path)));
+        assert_eq!(
+            entry.main(),
+            Some(FileId::new(None, VirtualPath::new("main.typ")))
+        );
+    }
+
+    #[test]
+    #[cfg(any(windows, unix, target_os = "macos"))]
+    fn test_entry_resolution_multi_root() {
+        let root_path = Path::new(if cfg!(windows) { "C:\\root" } else { "/root" });
+        let root2_path = Path::new(if cfg!(windows) { "C:\\root2" } else { "/root2" });
+
+        let entry = EntryResolver {
+            root_path: Some(ImmutPath::from(root_path)),
+            roots: vec![ImmutPath::from(root_path), ImmutPath::from(root2_path)],
+            ..Default::default()
+        };
+
+        {
+            let entry = entry.resolve(if cfg!(windows) {
+                Some(Path::new("C:\\root\\main.typ").into())
+            } else {
+                Some(Path::new("/root/main.typ").into())
+            });
+
+            assert_eq!(entry.root(), Some(ImmutPath::from(root_path)));
+            assert_eq!(
+                entry.main(),
+                Some(FileId::new(None, VirtualPath::new("main.typ")))
+            );
+        }
+
+        {
+            let entry = entry.resolve(if cfg!(windows) {
+                Some(Path::new("C:\\root2\\main.typ").into())
+            } else {
+                Some(Path::new("/root2/main.typ").into())
+            });
+
+            assert_eq!(entry.root(), Some(ImmutPath::from(root2_path)));
+            assert_eq!(
+                entry.main(),
+                Some(FileId::new(None, VirtualPath::new("main.typ")))
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(any(windows, unix, target_os = "macos"))]
+    fn test_entry_resolution_default_multi_root() {
+        let root_path = Path::new(if cfg!(windows) { "C:\\root" } else { "/root" });
+        let root2_path = Path::new(if cfg!(windows) { "C:\\root2" } else { "/root2" });
+
+        let mut entry = EntryResolver {
+            root_path: Some(ImmutPath::from(root_path)),
+            roots: vec![ImmutPath::from(root_path), ImmutPath::from(root2_path)],
+            ..Default::default()
+        };
+
+        {
+            entry.entry = if cfg!(windows) {
+                Some(Path::new("C:\\root\\main.typ").into())
+            } else {
+                Some(Path::new("/root/main.typ").into())
+            };
+
+            let default_entry = entry.resolve_default();
+
+            assert_eq!(default_entry, entry.entry);
+        }
+
+        {
+            entry.entry = Some(Path::new("main.typ").into());
+
+            let default_entry = entry.resolve_default();
+
+            assert_eq!(
+                default_entry,
+                if cfg!(windows) {
+                    Some(Path::new("C:\\root\\main.typ").into())
+                } else {
+                    Some(Path::new("/root/main.typ").into())
+                }
+            );
+        }
+    }
 
     #[test]
     fn test_default_encoding() {
