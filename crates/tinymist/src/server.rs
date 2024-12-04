@@ -165,6 +165,11 @@ impl LanguageState {
         &self.config.compile
     }
 
+    /// Get the entry resolver.
+    pub fn entry_resolver(&self) -> &EntryResolver {
+        &self.compile_config().entry_resolver
+    }
+
     /// Get the primary compile server for those commands without task context.
     pub fn primary(&self) -> &CompileClientActor {
         self.primary.as_ref().expect("primary")
@@ -849,7 +854,7 @@ impl LanguageState {
     pub fn pin_entry(&mut self, new_entry: Option<ImmutPath>) -> Result<(), Error> {
         self.pinning = new_entry.is_some();
         let entry = new_entry
-            .or_else(|| self.config.compile.determine_default_entry_path())
+            .or_else(|| self.entry_resolver().resolve_default())
             .or_else(|| self.focusing.clone());
         self.do_change_entry(entry).map(|_| ())
     }
@@ -1047,9 +1052,9 @@ impl LanguageState {
         let fut_stat = client.query_snapshot_with_stat(&query)?;
         let entry = query
             .associated_path()
-            .map(|path| client.config.determine_entry(Some(path.into())))
+            .map(|path| client.entry_resolver().resolve(Some(path.into())))
             .or_else(|| {
-                let root = client.config.determine_root(None)?;
+                let root = client.entry_resolver().root(None)?;
                 Some(EntryState::new_rooted(root, Some(*DETACHED_ENTRY)))
             });
 

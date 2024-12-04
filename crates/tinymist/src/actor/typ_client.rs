@@ -49,7 +49,7 @@ use crate::{
     stats::{CompilerQueryStats, QueryStatGuard},
     task::{ExportTask, ExportUserConfig},
     world::{LspCompilerFeat, LspWorld},
-    CompileConfig,
+    CompileConfig, EntryResolver,
 };
 
 type EditorSender = mpsc::UnboundedSender<EditorRequest>;
@@ -287,6 +287,11 @@ impl CompileClientActor {
         self.handle.clone().snapshot()
     }
 
+    /// Get the entry resolver.
+    pub fn entry_resolver(&self) -> &EntryResolver {
+        &self.config.entry_resolver
+    }
+
     /// Snapshot the compiler thread for language queries
     pub fn query_snapshot(&self) -> ZResult<QuerySnapFut> {
         self.handle.clone().query_snapshot(None)
@@ -321,7 +326,7 @@ impl CompileClientActor {
         let OnExportRequest { path, kind, open } = req;
         let snap = self.snapshot()?;
 
-        let entry = self.config.determine_entry(Some(path.as_path().into()));
+        let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
         let export = self.handle.export.oneshot(snap, Some(entry), kind);
         just_future(async move {
             let res = export.await?;
@@ -369,7 +374,7 @@ impl CompileClientActor {
             return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
         }
 
-        let next_entry = self.config.determine_entry(path);
+        let next_entry = self.entry_resolver().resolve(path);
         if next_entry == self.entry {
             return Ok(false);
         }
